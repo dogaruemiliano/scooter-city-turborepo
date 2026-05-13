@@ -1,6 +1,6 @@
 /**
- * Orval config — generates a typed fetch client + zod schemas from the
- * API's OpenAPI spec at `openapi.json`.
+ * Orval config — generates a typed fetch client from the API's OpenAPI
+ * spec at `openapi.json`.
  *
  * The pipeline:
  *   1. `pnpm gen:env`          — refresh .env.example from zod
@@ -10,6 +10,12 @@
  *
  * The output package (`packages/api-generated`) lands in PR 2. Until then,
  * the orval target is silently skipped if `openapi.json` is missing.
+ *
+ * TODO(PR 5): once the first auth DTO ships, add a second target here
+ * that emits zod schemas to `packages/api-generated/src/zod/`. Forms on
+ * the web + mobile clients then import the same schema the API validates
+ * against, so DTO-level rules (email format, password length, etc.) live
+ * in exactly one place. See README at packages/api-shared for context.
  */
 import { defineConfig } from "orval";
 

@@ -4,6 +4,18 @@ All notable changes land here. Each PR appends an entry under `Unreleased`; rele
 
 ## Unreleased
 
+### Added — PR 2 (`@repo/api-shared`)
+
+- New zero-build workspace package `packages/api-shared` exporting hand-maintained code that Orval cannot generate from the OpenAPI doc:
+  - **Cookies**: `ACCESS_TOKEN_COOKIE`, `REFRESH_TOKEN_COOKIE`, `AuthCookieName`.
+  - **Session shapes**: `SessionUser`, `SessionSummary`, `TokenPair`, `EnabledAuthMethods`.
+  - **Zod fragments**: `emailSchema` (RFC 5321, accepts `@privaterelay.appleid.com`), `phoneSchema` (E.164), `otpCodeSchema` (6 digits, accepts the non-prod `"000000"` value), `passwordSchema` (`min(8)`, `max(128)`, no complexity refine).
+  - **`ROUTES`** constant — every `/v1/auth/*` path that the locked plan defines, including parametrized helpers `sessions.revoke(id)` and `accounts.unlink(provider)`.
+- Wired `@repo/api-shared` into `apps/api` as a workspace dependency.
+- Added an API E2E smoke test (`test/api-shared.e2e-spec.ts`) proving the workspace import + transform pipeline works end-to-end. Real schema/route correctness is left to the auth-module E2E tests in PR 5+ — these fragments would otherwise just be re-testing zod.
+- Jest config (`apps/api/test/jest-e2e.json`) gained `transformIgnorePatterns` + `moduleNameMapper` entries that whitelist `@repo/*` workspace packages so ts-jest transforms their raw `.ts` source.
+- `orval.config.ts`: TODO note for PR 5 to add a zod-schema target alongside the fetch client. Form validation across web + mobile will then import the same zod schemas the API validates against (single source of truth: API DTOs → OpenAPI → orval → zod).
+
 ### Added — PR 1 (Plumbing)
 
 - `docker-compose.yml` — local Postgres 16 with healthcheck.
