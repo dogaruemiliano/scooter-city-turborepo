@@ -1,22 +1,38 @@
 /**
  * Root module.
  *
- * Wires global concerns (config, structured logging, request IDs, health).
- * Feature modules (auth, users, etc.) are added in subsequent PRs via
- * `AuthModule.forRoot(buildAuthConfig(env))`.
+ * Wires global concerns (config, structured logging, request IDs, health)
+ * and the always-on infrastructure modules every feature module needs
+ * (Prisma, Users, Mailer, SMS, Audit). Auth submodules are added in PR 5+
+ * via `AuthModule.forRoot(buildAuthConfig(env))`.
  */
 import { MiddlewareConsumer, Module, NestModule } from "@nestjs/common";
 import { LoggerModule } from "nestjs-pino";
 
-import { RequestIdMiddleware } from "./common/middleware/request-id.middleware";
+import { AuditModule } from "./audit/audit.module";
 import { pinoConfig } from "./common/logger/pino.config";
+import { RequestIdMiddleware } from "./common/middleware/request-id.middleware";
 import { ConfigModule } from "./config/config.module";
 import { HealthModule } from "./health/health.module";
+import { MailerModule } from "./mailer/mailer.module";
+import { PrismaModule } from "./prisma/prisma.module";
+import { SmsModule } from "./sms/sms.module";
+import { UsersModule } from "./users/users.module";
 
 @Module({
   imports: [
+    // Global infrastructure (every feature module sees these).
     ConfigModule,
     LoggerModule.forRoot(pinoConfig(process.env.NODE_ENV ?? "development")),
+    PrismaModule,
+    MailerModule,
+    SmsModule,
+    AuditModule,
+
+    // Internal (non-global) feature modules.
+    UsersModule,
+
+    // Public-surface modules.
     HealthModule,
   ],
 })

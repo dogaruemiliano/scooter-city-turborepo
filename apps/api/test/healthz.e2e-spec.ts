@@ -12,6 +12,7 @@ import { AppModule } from "../src/app.module";
 interface HealthResponse {
   status: string;
   info: Record<string, { status: string }>;
+  details: Record<string, { status: string }>;
 }
 
 describe("healthz (e2e)", () => {
@@ -40,7 +41,8 @@ describe("healthz (e2e)", () => {
     const body = res.body as HealthResponse;
     expect(res.status).toBe(200);
     expect(body.status).toBe("ok");
-    expect(body.info.memory_heap.status).toBe("up");
+    expect(body.info.memory_heap?.status).toBe("up");
+    expect(body.info.db?.status).toBe("up"); // Prisma SELECT 1 against the test DB
   });
 
   it("echoes incoming X-Request-Id header", async () => {

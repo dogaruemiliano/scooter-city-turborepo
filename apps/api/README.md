@@ -18,11 +18,11 @@ can coexist with any host-installed Postgres. See
 
 ## Endpoints (current)
 
-| Method | Path             | Auth                    | Description                                 |
-| ------ | ---------------- | ----------------------- | ------------------------------------------- |
-| `GET`  | `/healthz`       | public, version-neutral | Liveness + readiness probe (heap indicator) |
-| `GET`  | `/api-docs`      | public                  | Swagger UI                                  |
-| `GET`  | `/api-docs-json` | public                  | Raw OpenAPI 3 spec                          |
+| Method | Path             | Auth                    | Description                                       |
+| ------ | ---------------- | ----------------------- | ------------------------------------------------- |
+| `GET`  | `/healthz`       | public, version-neutral | Liveness + readiness probe (heap + DB indicators) |
+| `GET`  | `/api-docs`      | public                  | Swagger UI                                        |
+| `GET`  | `/api-docs-json` | public                  | Raw OpenAPI 3 spec                                |
 
 Auth endpoints land in PR 5+. See [the ADR](../../docs/adr/0001-rest-not-trpc.md) and the docs in [docs/auth/](../../docs/auth/) (populated as features ship).
 

@@ -1,5 +1,5 @@
 {
-  "moduleFileExtensions": ["js", "json", "ts"],
+  "moduleFileExtensions": ["js", "json", "ts", "mjs"],
   "rootDir": ".",
   "testEnvironment": "node",
   "testRegex": ".e2e-spec.ts$",
@@ -9,6 +9,10 @@
   },
   "transformIgnorePatterns": ["/node_modules/(?!@repo/)"],
   "moduleNameMapper": {
-    "^@repo/(.*)$": "<rootDir>/../../../packages/$1/src/index.ts"
+    "^@repo/(.*)$": "<rootDir>/../../../packages/$1/src/index.ts",
+    "^(\\.{1,2}/.*)\\.js$": "$1"
+  },
+  "testEnvironmentOptions": {
+    "customExportConditions": ["node", "node-addons", "require", "default"]
   }
 }

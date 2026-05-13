@@ -4,6 +4,21 @@ All notable changes land here. Each PR appends an entry under `Unreleased`; rele
 
 ## Unreleased
 
+### Added — PR 4 (Prisma / Users / Mailer / SMS / Audit infrastructure)
+
+- **`PrismaModule` + `PrismaService`** — global module exposing a `PrismaClient` constructed with the `PrismaPg` driver adapter and explicit pool settings (`max: 10`, `idleTimeoutMillis: 30s`, `connectionTimeoutMillis: 5s`) per `AGENTS.md → prisma-verify-rule`. `onModuleInit → $connect`, `onModuleDestroy → $disconnect` wired into NestJS's shutdown hooks.
+- **`/healthz` now pings the DB** via the built-in `@nestjs/terminus` `PrismaHealthIndicator` (`SELECT 1` with a 2s timeout). The custom indicator pattern is no longer needed; the new `HealthIndicatorService` API from terminus 11 is already used internally by the built-in indicator.
+- **`UsersModule` + `UsersService`** — thin data-access wrapper exposing `findById`, `findByEmail`, `findByPhone`, `createOne`, `deleteOne`. Inputs use Prisma's generated `Prisma.UserCreateInput` (no hand-rolled DTOs at this layer — auth modules in PR 5+ own those).
+- **`MailerModule`** — `MailerService` (abstract) + `LogMailerService` (default, pino-backed) + `SpyMailerService` (in-memory queue for E2E). `MAILER_PROVIDER=resend|smtp` paths fall back to `Log` until PR 7 lands the concrete impls. Tests override via `Test.createTestingModule().overrideProvider(MailerService).useClass(SpyMailerService)`.
+- **`SmsModule`** — same shape as MailerModule (`SmsService` + `LogSmsService` + `SpySmsService`). `SMS_PROVIDER=smso` falls back to `Log` until PR 13.
+- **`AuditModule` + `AuditService`** — global `record({ type, userId?, ip?, userAgent?, meta? })` writes one `AuditEvent` row per call. Failures are logged but never thrown — losing an audit must not break the user-facing flow that emits it. `AuditEventType` closed vocabulary at `src/audit/audit.types.ts` (16 values today; grows as features land).
+- **Authorization explicitly deferred** to a future session. UsersService has no role check; controllers in PR 5+ rely on the existing `JwtAuthGuard` for authentication only. Adding CASL / Nest RolesGuard / a `role` column is a deliberate follow-up choice for downstream projects.
+- **Jest + Prisma 7 plumbing:**
+  - `moduleNameMapper` now strips `.js` from relative imports so ts-jest can resolve the generated client's ESM-style imports inside a CJS test env.
+  - `testEnvironmentOptions.customExportConditions = ["node", "node-addons", "require", "default"]` so Jest resolves the `@prisma/client` exports map correctly.
+  - `test:e2e` script now runs under `NODE_OPTIONS=--experimental-vm-modules` so the dynamic `await import()` in Prisma's WASM query-compiler loader works.
+- **CI workflow** now runs `prisma migrate deploy` + `prisma db seed` before the E2E suite so the Postgres service is in a known-good state.
+
 ### Added — PR 3 (Prisma 7 + auth schema + seed)
 
 - **Prisma 7** wired into `apps/api`:

@@ -56,6 +56,13 @@ jobs:
       - name: Unit tests
         run: pnpm test
 
+      - name: Prisma migrate + seed (E2E DB)
+        env:
+          DATABASE_URL: postgresql://app:app@localhost:5434/app
+        run: |
+          pnpm --filter api db:deploy
+          NODE_ENV=test pnpm --filter api db:seed
+
       - name: E2E tests
         env:
           DATABASE_URL: postgresql://app:app@localhost:5434/app
