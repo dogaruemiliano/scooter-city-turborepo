@@ -7,8 +7,14 @@ REST API surface. Versioned at `/v1`. Documented via OpenAPI at `/api-docs`. Aut
 ```bash
 docker compose -f ../../docker-compose.yml up -d postgres
 pnpm gen:env && cp .env.example .env   # fill in JWT_*_SECRET, *_HMAC_SECRET (≥32 chars each)
+pnpm db:migrate                         # apply migrations
+pnpm db:seed                            # idempotent test users
 pnpm start:dev                          # :3000 with hot reload
 ```
+
+Local Postgres runs on **`localhost:5434`** (not 5432) so the template
+can coexist with any host-installed Postgres. See
+[../../docker-compose.yml](../../docker-compose.yml).
 
 ## Endpoints (current)
 
@@ -24,12 +30,20 @@ Auth endpoints land in PR 5+. See [the ADR](../../docs/adr/0001-rest-not-trpc.md
 
 ```bash
 pnpm start:dev      # watch mode
-pnpm build          # compile to dist/
+pnpm build          # prisma generate + nest build
 pnpm spec           # emit OpenAPI JSON to stdout (used by `pnpm gen` from root)
 pnpm lint           # eslint --fix
 pnpm check-types    # tsc --noEmit
 pnpm test           # unit tests (Jest)
 pnpm test:e2e       # E2E tests (Jest + Supertest)
+
+# Database (Prisma 7 — see ../../AGENTS.md → prisma-verify-rule)
+pnpm db:migrate     # prisma migrate dev (creates + applies new migration)
+pnpm db:deploy      # prisma migrate deploy (CI / prod — apply only)
+pnpm db:seed        # prisma db seed (test fixtures; refuses in production)
+pnpm db:studio      # prisma studio
+pnpm db:generate    # regenerate the client into src/generated/prisma
+pnpm db:reset       # destructive — drops + reapplies; AI-agent guarded
 ```
 
 ## Logging

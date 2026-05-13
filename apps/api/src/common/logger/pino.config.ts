@@ -7,33 +7,33 @@
  * Reads `req.id` from the request object (populated by [RequestIdMiddleware](../middleware/request-id.middleware.ts))
  * so every log line carries a `reqId` for correlation.
  */
-import type { Params } from 'nestjs-pino';
+import type { Params } from "nestjs-pino";
 
 export function pinoConfig(nodeEnv: string): Params {
-  const isProd = nodeEnv === 'production';
+  const isProd = nodeEnv === "production";
   return {
     pinoHttp: {
-      level: isProd ? 'info' : 'debug',
+      level: isProd ? "info" : "debug",
       transport: isProd
         ? undefined
         : {
-            target: 'pino-pretty',
+            target: "pino-pretty",
             options: {
               singleLine: true,
               colorize: true,
-              translateTime: 'SYS:HH:MM:ss.l',
+              translateTime: "SYS:HH:MM:ss.l",
             },
           },
       customProps: (req) => ({ reqId: (req as { id?: string }).id }),
       redact: {
         paths: [
-          'req.headers.authorization',
-          'req.headers.cookie',
+          "req.headers.authorization",
+          "req.headers.cookie",
           'res.headers["set-cookie"]',
         ],
-        censor: '[redacted]',
+        censor: "[redacted]",
       },
-      autoLogging: { ignore: (req) => req.url === '/healthz' },
+      autoLogging: { ignore: (req) => req.url === "/healthz" },
     },
   };
 }

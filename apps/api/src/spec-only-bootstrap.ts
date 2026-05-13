@@ -13,13 +13,13 @@
  * OpenAPI document to stdout. These placeholders satisfy the zod schema
  * with values that have no security meaning.
  */
-if (process.argv.includes('--spec-only')) {
+if (process.argv.includes("--spec-only")) {
   const placeholders: Record<string, string> = {
-    NODE_ENV: 'development',
-    JWT_ACCESS_SECRET: 'spec-only-placeholder-padded-to-32-chars',
-    JWT_REFRESH_SECRET: 'spec-only-placeholder-padded-to-32-chars',
-    REFRESH_TOKEN_HMAC_SECRET: 'spec-only-placeholder-padded-to-32-chars',
-    OTP_HMAC_SECRET: 'spec-only-placeholder-padded-to-32-chars',
+    NODE_ENV: "development",
+    JWT_ACCESS_SECRET: "spec-only-placeholder-padded-to-32-chars",
+    JWT_REFRESH_SECRET: "spec-only-placeholder-padded-to-32-chars",
+    REFRESH_TOKEN_HMAC_SECRET: "spec-only-placeholder-padded-to-32-chars",
+    OTP_HMAC_SECRET: "spec-only-placeholder-padded-to-32-chars",
   };
   for (const [k, v] of Object.entries(placeholders)) {
     if (process.env[k] === undefined) process.env[k] = v;

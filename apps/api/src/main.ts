@@ -24,43 +24,43 @@
  * process running.
  */
 // MUST be the very first import — see file header for why.
-import './spec-only-bootstrap';
+import "./spec-only-bootstrap";
 
-import cookieParser from 'cookie-parser';
-import { Logger as PinoLogger } from 'nestjs-pino';
+import cookieParser from "cookie-parser";
+import { Logger as PinoLogger } from "nestjs-pino";
 
-import { ValidationPipe, VersioningType } from '@nestjs/common';
-import { NestFactory } from '@nestjs/core';
-import type { NestExpressApplication } from '@nestjs/platform-express';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { ValidationPipe, VersioningType } from "@nestjs/common";
+import { NestFactory } from "@nestjs/core";
+import type { NestExpressApplication } from "@nestjs/platform-express";
+import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 
-import { AppModule } from './app.module';
-import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
-import { loadEnv } from './config/env';
+import { AppModule } from "./app.module";
+import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
+import { loadEnv } from "./config/env";
 
-const COOKIE_AUTH_NAME = 'access_token';
+const COOKIE_AUTH_NAME = "access_token";
 
 function buildSwaggerDocument(app: NestExpressApplication) {
   const config = new DocumentBuilder()
-    .setTitle('Turborepo Full Template API')
-    .setDescription('REST API surface. All operations live under /v1.')
-    .setVersion('1.0.0')
+    .setTitle("Turborepo Full Template API")
+    .setDescription("REST API surface. All operations live under /v1.")
+    .setVersion("1.0.0")
     .addCookieAuth(COOKIE_AUTH_NAME, {
-      type: 'apiKey',
-      in: 'cookie',
+      type: "apiKey",
+      in: "cookie",
       name: COOKIE_AUTH_NAME,
-      description: 'HTTP-only access-token cookie.',
+      description: "HTTP-only access-token cookie.",
     })
     .addBearerAuth(
-      { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
-      'bearer',
+      { type: "http", scheme: "bearer", bearerFormat: "JWT" },
+      "bearer",
     )
     .build();
   return SwaggerModule.createDocument(app, config);
 }
 
 async function bootstrap(): Promise<void> {
-  const specOnly = process.argv.includes('--spec-only');
+  const specOnly = process.argv.includes("--spec-only");
   const env = loadEnv();
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
@@ -74,7 +74,7 @@ async function bootstrap(): Promise<void> {
 
   app.use(cookieParser());
 
-  app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
+  app.enableVersioning({ type: VersioningType.URI, defaultVersion: "1" });
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -90,9 +90,9 @@ async function bootstrap(): Promise<void> {
   app.enableCors({
     origin: env.CORS_ORIGINS,
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id'],
-    exposedHeaders: ['X-Request-Id'],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Request-Id"],
+    exposedHeaders: ["X-Request-Id"],
   });
 
   app.enableShutdownHooks();
@@ -105,13 +105,13 @@ async function bootstrap(): Promise<void> {
     process.exit(0);
   }
 
-  SwaggerModule.setup('api-docs', app, swaggerDocument, {
-    jsonDocumentUrl: 'api-docs-json',
+  SwaggerModule.setup("api-docs", app, swaggerDocument, {
+    jsonDocumentUrl: "api-docs-json",
     swaggerOptions: { persistAuthorization: true },
   });
 
   await app.listen(env.PORT);
-  app.get(PinoLogger).log(`API listening on :${env.PORT}`, 'Bootstrap');
+  app.get(PinoLogger).log(`API listening on :${env.PORT}`, "Bootstrap");
 }
 
 void bootstrap();

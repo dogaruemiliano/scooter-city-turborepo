@@ -8,17 +8,17 @@
  * Lives outside the versioned `/v1/...` namespace (VERSION_NEUTRAL) so
  * orchestrators don't need to be aware of API versions.
  */
-import { Controller, Get, VERSION_NEUTRAL } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Controller, Get, VERSION_NEUTRAL } from "@nestjs/common";
+import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import {
   HealthCheck,
   HealthCheckResult,
   HealthCheckService,
   MemoryHealthIndicator,
-} from '@nestjs/terminus';
+} from "@nestjs/terminus";
 
-@ApiTags('health')
-@Controller({ path: 'healthz', version: VERSION_NEUTRAL })
+@ApiTags("health")
+@Controller({ path: "healthz", version: VERSION_NEUTRAL })
 export class HealthController {
   constructor(
     private readonly health: HealthCheckService,
@@ -27,11 +27,11 @@ export class HealthController {
 
   @Get()
   @HealthCheck()
-  @ApiOperation({ summary: 'Liveness + readiness probe' })
+  @ApiOperation({ summary: "Liveness + readiness probe" })
   check(): Promise<HealthCheckResult> {
     return this.health.check([
       // 300 MB heap ceiling — flips the indicator red if the process is leaking.
-      () => this.memory.checkHeap('memory_heap', 300 * 1024 * 1024),
+      () => this.memory.checkHeap("memory_heap", 300 * 1024 * 1024),
     ]);
   }
 }

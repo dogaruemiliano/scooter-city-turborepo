@@ -7,8 +7,11 @@ services:
       POSTGRES_DB: app
       POSTGRES_USER: app
       POSTGRES_PASSWORD: app
+    # 5434 (not 5432) so this template can coexist with any host-installed
+    # Postgres on the default port, and with other dev databases on 5433.
+    # Adjust to taste; update DATABASE_URL to match.
     ports:
-      - "5432:5432"
+      - "5434:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:

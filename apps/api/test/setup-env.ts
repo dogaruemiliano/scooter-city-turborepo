@@ -7,12 +7,12 @@
  * specific vars via `process.env.X = ...` in `beforeAll`.
  */
 const TEST_ENV: Record<string, string> = {
-  NODE_ENV: 'test',
-  JWT_ACCESS_SECRET: 'x'.repeat(32),
-  JWT_REFRESH_SECRET: 'y'.repeat(32),
-  REFRESH_TOKEN_HMAC_SECRET: 'z'.repeat(32),
-  OTP_HMAC_SECRET: 'q'.repeat(32),
-  DATABASE_URL: 'postgresql://app:app@localhost:5432/app',
+  NODE_ENV: "test",
+  JWT_ACCESS_SECRET: "x".repeat(32),
+  JWT_REFRESH_SECRET: "y".repeat(32),
+  REFRESH_TOKEN_HMAC_SECRET: "z".repeat(32),
+  OTP_HMAC_SECRET: "q".repeat(32),
+  DATABASE_URL: "postgresql://app:app@localhost:5434/app",
 };
 
 for (const [k, v] of Object.entries(TEST_ENV)) {

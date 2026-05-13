@@ -4,6 +4,18 @@ All notable changes land here. Each PR appends an entry under `Unreleased`; rele
 
 ## Unreleased
 
+### Added — PR 3 (Prisma 7 + auth schema + seed)
+
+- **Prisma 7** wired into `apps/api`:
+  - `prisma.config.ts` is the single source of truth for the datasource URL (Prisma 7 removed `url = env(...)` from the schema).
+  - `schema.prisma` uses the `prisma-client` generator (not the legacy `prisma-client-js`) with `engineType = "client"` and `output = "../src/generated/prisma"`. The generated client lives outside `node_modules` and is gitignored; `prisma generate` runs on `postinstall` and as part of `pnpm build` so it can never drift.
+  - Runtime client connects through the **`PrismaPg` driver adapter** (mandatory in v7) with explicit pool settings (`max: 10`, `idleTimeoutMillis: 30_000`, `connectionTimeoutMillis: 5_000`) per AGENTS.md.
+- **Auth schema** lands as the first migration (`init`): `User`, `Session`, `RefreshToken` (with `previousJti` + `pendingTokenHash` for the option-B grace window), `OtpToken`, `AuthAccount`, `AuditEvent`. Every PK is `String @id @default(cuid())` — the BigInt-in-JSON serialization footgun (would silently crash `AllExceptionsFilter` on a Prisma-error response) is documented in [docs/auth/sessions-and-audit.md](docs/auth/sessions-and-audit.md).
+- **Idempotent seed** at `apps/api/prisma/seed.ts` with six fixture users with stable IDs (`seed-user-credentials`, `seed-user-email-otp`, …). Refuses to run when `NODE_ENV=production`. Wired via `prisma db seed` → `tsx prisma/seed.ts`.
+- **Docker Compose port bumped from 5432 → 5434** to coexist with any host-installed Postgres on the default port. `DATABASE_URL` defaults and CI workflow updated to match.
+- **New deps in `apps/api`:** `@prisma/client@7`, `@prisma/adapter-pg`, `pg`, `prisma@7` (dev), `@types/pg` (dev), `bcrypt`, `@types/bcrypt`, `dotenv`, `tsx` (dev).
+- **`docs/auth/sessions-and-audit.md`** documents the four-table layout, why a first-class `Session` table exists, cascade behavior on user deletion, the `AuditEvent.type` vocabulary, and what the seed creates.
+
 ### Added — PR 2 (`@repo/api-shared`)
 
 - New zero-build workspace package `packages/api-shared` exporting hand-maintained code that Orval cannot generate from the OpenAPI doc:

@@ -22,8 +22,10 @@ jobs:
           POSTGRES_DB: app
           POSTGRES_USER: app
           POSTGRES_PASSWORD: app
+        # CI has no host-Postgres conflict; 5434 keeps DATABASE_URL the same
+        # locally and in CI so .env.example values just work.
         ports:
-          - 5432:5432
+          - 5434:5432
         options: >-
           --health-cmd "pg_isready -U app -d app"
           --health-interval 5s
@@ -56,7 +58,7 @@ jobs:
 
       - name: E2E tests
         env:
-          DATABASE_URL: postgresql://app:app@localhost:5432/app
+          DATABASE_URL: postgresql://app:app@localhost:5434/app
           JWT_ACCESS_SECRET: ${{ secrets.JWT_ACCESS_SECRET || 'ci-test-access-secret-padded-to-32-chars' }}
           JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET || 'ci-test-refresh-secret-padded-to-32-chars' }}
           REFRESH_TOKEN_HMAC_SECRET: ${{ secrets.REFRESH_TOKEN_HMAC_SECRET || 'ci-test-refresh-hmac-padded-to-32-chars-x' }}

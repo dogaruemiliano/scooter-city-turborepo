@@ -12,12 +12,12 @@
  * }
  * ```
  */
-import { Global, Module } from '@nestjs/common';
-import { ConfigModule as NestConfigModule } from '@nestjs/config';
+import { Global, Module } from "@nestjs/common";
+import { ConfigModule as NestConfigModule } from "@nestjs/config";
 
-import { envSchema, type Env } from './env';
+import { envSchema, type Env } from "./env";
 
-export const ENV = 'ENV';
+export const ENV = "ENV";
 
 @Global()
 @Module({

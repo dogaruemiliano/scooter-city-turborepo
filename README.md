@@ -13,7 +13,7 @@ Status: **PR 1 (plumbing) landed.** Auth modules begin in PR 5. See [docs/adr/](
 ## Quick start
 
 ```bash
-# 1. Local Postgres
+# 1. Local Postgres (listens on :5434 so it can coexist with any host Postgres on :5432)
 docker compose up -d postgres
 
 # 2. Install
@@ -25,7 +25,11 @@ cp apps/api/.env.example apps/api/.env
 # edit apps/api/.env to set JWT_*_SECRET, REFRESH_TOKEN_HMAC_SECRET, OTP_HMAC_SECRET
 # (each must be ≥ 32 chars; `openssl rand -hex 32` is handy)
 
-# 4. Dev
+# 4. Apply DB migrations + seed test users
+pnpm --filter api db:migrate
+pnpm --filter api db:seed
+
+# 5. Dev
 pnpm dev                    # all apps via turbo
 # or:
 pnpm --filter api start:dev # only the API on :3000

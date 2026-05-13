@@ -23,8 +23,8 @@ import {
   HttpException,
   HttpStatus,
   Logger,
-} from '@nestjs/common';
-import type { Request, Response } from 'express';
+} from "@nestjs/common";
+import type { Request, Response } from "express";
 
 interface ErrorResponse {
   error: {
@@ -37,7 +37,7 @@ interface ErrorResponse {
 
 function codeForStatus(status: number): string {
   return (
-    HttpStatus[status] ?? (status >= 500 ? 'INTERNAL_SERVER_ERROR' : 'ERROR')
+    HttpStatus[status] ?? (status >= 500 ? "INTERNAL_SERVER_ERROR" : "ERROR")
   )
     .toString()
     .toUpperCase();
@@ -53,28 +53,28 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const res = ctx.getResponse<Response>();
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
-    let message = 'Internal server error';
+    let message = "Internal server error";
     let details: unknown;
 
     if (exception instanceof HttpException) {
       status = exception.getStatus();
       const body = exception.getResponse();
-      if (typeof body === 'string') {
+      if (typeof body === "string") {
         message = body;
-      } else if (body && typeof body === 'object') {
+      } else if (body && typeof body === "object") {
         const obj = body as { message?: unknown; error?: unknown };
         if (Array.isArray(obj.message)) {
           message =
-            typeof obj.error === 'string' ? obj.error : 'Validation failed';
+            typeof obj.error === "string" ? obj.error : "Validation failed";
           details = obj.message;
-        } else if (typeof obj.message === 'string') {
+        } else if (typeof obj.message === "string") {
           message = obj.message;
         }
       }
     } else if (exception instanceof Error) {
       message =
-        process.env.NODE_ENV === 'production'
-          ? 'Internal server error'
+        process.env.NODE_ENV === "production"
+          ? "Internal server error"
           : exception.message;
       this.logger.error(exception.stack ?? exception.message);
     } else {

@@ -3,6 +3,11 @@
 /node_modules
 /build
 
+# Prisma 7 generated client — `prisma generate` rebuilds it after every
+# `prisma migrate dev` or `pnpm install`. CI runs `prisma generate` before
+# build. Keep it out of git so it can't drift from the schema.
+/src/generated/
+
 # Logs
 logs
 *.log

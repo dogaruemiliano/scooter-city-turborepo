@@ -1,0 +1,177 @@
+// Auth subsystem schema. Business models land in later PRs.
+//
+// Design references:
+// - docs/adr/0002-cookie-based-sessions.md         (cookies, no authjs)
+// - docs/adr/0003-multi-instance-refresh-rotation.md (previous_jti + pendingTokenHash)
+// - docs/auth/sessions-and-audit.md                 (this PR — what each table is for)
+//
+// Every model that ties to a user uses `onDelete: Cascade` so DELETE /v1/auth/me
+// in PR 5 wipes the user's full footprint atomically. The single exception is
+// AuditEvent which uses `SetNull` — we keep audit history after account deletion
+// for compliance / forensics; rows are simply detached from the gone user.
+
+// Canonical Prisma 7 generator block. See AGENTS.md → prisma-verify-rule.
+// - `prisma-client` (not the deprecated `prisma-client-js`)
+// - `engineType = "client"` (WASM compiler, no Rust binary)
+// - `output` is required in v7 and lives outside node_modules; consumers
+//   import from `../src/generated/prisma/client` rather than `@prisma/client`.
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  engineType   = "client"
+  moduleFormat = "cjs"
+}
+
+// The `url` lives in `prisma.config.ts` from Prisma 7 onward. Migrate +
+// generate commands read it from there; the runtime PrismaClient (later
+// PR) gets it via the PrismaPg driver adapter.
+datasource db {
+  provider = "postgresql"
+}
+
+/// A human. `passwordHash` is nullable so OAuth-only and OTP-only users
+/// exist without one. `emailVerified` / `phoneVerified` are timestamps
+/// (not booleans) — when verified is the audit trail.
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified DateTime?
+  phone         String?   @unique
+  phoneVerified DateTime?
+  firstName     String?
+  lastName      String?
+  passwordHash  String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  /// Soft-delete marker. Hard cascade still runs via DELETE /v1/auth/me; this
+  /// column is reserved for "deactivate" flows that may land later.
+  deletedAt     DateTime?
+
+  sessions      Session[]
+  refreshTokens RefreshToken[]
+  otpTokens     OtpToken[]
+  authAccounts  AuthAccount[]
+  auditEvents   AuditEvent[]
+
+  @@index([email])
+  @@index([phone])
+}
+
+/// First-class session record. One row per "logged-in device". Refresh-token
+/// rotations within the same session reuse this row (only `lastUsedAt`
+/// moves). Powers the user-visible "active devices" list and "log out other
+/// devices" UI.
+model Session {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userAgent     String?
+  ip            String?
+  createdAt     DateTime  @default(now())
+  lastUsedAt    DateTime  @default(now())
+  revokedAt     DateTime?
+  refreshTokens RefreshToken[]
+
+  @@index([userId, revokedAt])
+}
+
+/// One row per refresh-token *value* ever minted. Multiple rows per session
+/// (one per rotation). The cleanup cron deletes rows older than `expiresAt`.
+///
+/// - `tokenHash` is the SHA-256 HMAC of the plaintext token (peppered by
+///   REFRESH_TOKEN_HMAC_SECRET). Stored, not the plaintext.
+/// - `previousJti` chains a row to the row it replaced. Lets concurrent
+///   refreshes within the grace window detect they're racing against an
+///   already-rotated token without rejecting either caller.
+/// - `pendingTokenHash` lets the grace path return the *literal same*
+///   just-issued pair to a concurrent caller (option B from the locked
+///   plan). Cleared once the grace window expires.
+/// - `revokedAt` is set on rotation, on logout, and on full-session burn
+///   (reuse detection).
+model RefreshToken {
+  id               String    @id @default(cuid())
+  jti              String    @unique
+  previousJti      String?   @unique
+  pendingTokenHash String?
+  sessionId        String
+  session          Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  userId           String
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash        String
+  createdAt        DateTime  @default(now())
+  expiresAt        DateTime
+  revokedAt        DateTime?
+
+  @@index([sessionId, revokedAt])
+  @@index([userId, expiresAt])
+  @@index([expiresAt])
+}
+
+/// One-time codes for email-OTP, SMS-OTP, email-verification, and
+/// password-reset flows. `purpose` discriminates the use case.
+///
+/// `codeHash` is the SHA-256 HMAC of the plaintext code (peppered by
+/// OTP_HMAC_SECRET). Plaintext never persists. `attemptsCount` is
+/// incremented on every failed verification — at OTP_MAX_ATTEMPTS the
+/// row is dead even before `expiresAt`. `sentCount` tracks resend abuse.
+model OtpToken {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// "EMAIL" | "SMS"
+  channel       String
+  /// "AUTH" | "EMAIL_VERIFY" | "PASSWORD_RESET"
+  purpose       String   @default("AUTH")
+  codeHash      String
+  expiresAt     DateTime
+  used          Boolean  @default(false)
+  attemptsCount Int      @default(0)
+  sentAt        DateTime @default(now())
+  sentCount     Int      @default(1)
+  createdAt     DateTime @default(now())
+
+  @@index([userId, channel, purpose, used, expiresAt])
+}
+
+/// One row per OAuth identity linked to a user. The `provider + providerId`
+/// uniqueness prevents the same provider account from binding to two users.
+///
+/// `email` is captured opportunistically at link time. Important for Apple
+/// Sign-in, which returns the email ONLY on the very first login — we save
+/// it here so subsequent logins (which omit the claim) can still associate
+/// the identity with a known address.
+model AuthAccount {
+  id         String   @id @default(cuid())
+  /// "google" | "facebook" | "apple"
+  provider   String
+  providerId String
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email      String?
+  createdAt  DateTime @default(now())
+
+  @@unique([provider, providerId])
+  @@index([userId])
+}
+
+/// Append-only audit log. Survives user deletion (userId becomes null) so
+/// forensics + compliance reports can reconstruct activity after the fact.
+///
+/// `type` values are defined in TS by `AuditEventType` and include:
+/// LOGIN_SUCCESS, LOGIN_FAIL, PASSWORD_CHANGED, OAUTH_LINKED, OAUTH_UNLINKED,
+/// SESSION_REVOKED, SESSION_BURNED, ACCOUNT_DELETED, SIGNUP,
+/// SIGNUP_ATTEMPT_EXISTING_EMAIL, EMAIL_VERIFY_SENT, EMAIL_VERIFIED,
+/// PASSWORD_RESET_REQUESTED, PASSWORD_RESET_CONFIRMED, NEW_DEVICE_NOTIFIED.
+model AuditEvent {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  type      String
+  ip        String?
+  userAgent String?
+  meta      Json?
+  createdAt DateTime @default(now())
+
+  @@index([userId, type, createdAt])
+  @@index([type, createdAt])
+}
