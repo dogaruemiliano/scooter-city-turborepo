@@ -1,159 +1,98 @@
-# Turborepo starter
+# turborepo-full-template-v2
 
-This Turborepo starter is maintained by the Turborepo core team.
+Opinionated turborepo template seed: NestJS API · Next.js 16 web · shared TS/ESLint configs · Postgres · OpenAPI + Orval for the API contract.
 
-## Using this example
+Status: **PR 1 (plumbing) landed.** Auth modules begin in PR 5. See [docs/adr/](docs/adr/) for the decision record and [docs/auth/](docs/auth/) (populated as features land) for cross-cutting auth docs.
 
-Run the following command:
+## Prerequisites
 
-```sh
-npx create-turbo@latest
+- Node **≥ 20** (uses native `crypto.randomUUID`, `fetch`, etc.)
+- pnpm **9** (`corepack enable && corepack prepare pnpm@9.0.0 --activate`)
+- Docker (for local Postgres)
+
+## Quick start
+
+```bash
+# 1. Local Postgres
+docker compose up -d postgres
+
+# 2. Install
+pnpm install
+
+# 3. Configure secrets — generate the example, copy, fill in the SECRETS sections
+pnpm gen:env
+cp apps/api/.env.example apps/api/.env
+# edit apps/api/.env to set JWT_*_SECRET, REFRESH_TOKEN_HMAC_SECRET, OTP_HMAC_SECRET
+# (each must be ≥ 32 chars; `openssl rand -hex 32` is handy)
+
+# 4. Dev
+pnpm dev                    # all apps via turbo
+# or:
+pnpm --filter api start:dev # only the API on :3000
 ```
 
-## What's inside?
+Once the API is up:
 
-This Turborepo includes the following packages/apps:
+- Swagger UI: <http://localhost:3000/api-docs>
+- OpenAPI JSON: <http://localhost:3000/api-docs-json>
+- Healthcheck: <http://localhost:3000/healthz>
 
-### Apps and Packages
+## Workspace layout
 
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
-
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
-
-### Utilities
-
-This Turborepo has some additional tools already setup for you:
-
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
-
-### Build
-
-To build all apps and packages, run the following command:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo build
+```
+apps/
+├─ api/                NestJS 11 · REST · OpenAPI · pino · cookies-only sessions
+├─ web/                Next.js 16 (App Router) — auth wiring lands in a later session
+└─ docs/               Minimal docs site
+packages/
+├─ eslint-config/      Shared ESLint config (@repo/eslint-config)
+├─ typescript-config/  Shared tsconfigs (@repo/typescript-config)
+└─ ui/                 Shared React UI primitives (@repo/ui)
 ```
 
-Without global `turbo`, use your package manager:
+Two more packages land in PR 2:
 
-```sh
-cd my-turborepo
-npx turbo build
-pnpm dlx turbo build
-pnpm exec turbo build
-```
+- `packages/api-shared` — hand-written: cookie names, session types, route paths.
+- `packages/api-generated` — `pnpm gen` output. **Do not edit by hand.**
 
-You can build a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
+## Common scripts
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
+| Script             | Purpose                                                            |
+| ------------------ | ------------------------------------------------------------------ |
+| `pnpm dev`         | Run every app's dev task via turbo                                 |
+| `pnpm build`       | Build every app                                                    |
+| `pnpm lint`        | ESLint across the workspace                                        |
+| `pnpm check-types` | `tsc --noEmit` across the workspace                                |
+| `pnpm test`        | Unit tests (Jest)                                                  |
+| `pnpm test:e2e`    | E2E tests (Jest+Supertest for API; Playwright lands later for web) |
+| `pnpm gen`         | Regenerate `.env.example` + OpenAPI spec + Orval client            |
+| `pnpm gen:env`     | Refresh `apps/api/.env.example` from the zod schema only           |
+| `pnpm format`      | Prettier across the workspace                                      |
 
-```sh
-turbo build --filter=docs
-```
+## Documentation map
 
-Without global `turbo`:
+- [docs/adr/](docs/adr/) — Architecture Decision Records (the _why_ for load-bearing choices)
+- [docs/auth/](docs/auth/) — Auth subsystem cross-cutting docs (lands as auth modules ship)
+- Per-app READMEs in each `apps/*` directory
+- Per-package READMEs in each `packages/*` directory
 
-```sh
-npx turbo build --filter=docs
-pnpm exec turbo build --filter=docs
-pnpm exec turbo build --filter=docs
-```
+The template's value is being readable months later. Every new feature ships with: OpenAPI decorators on every route, JSDoc on every public service method, a `docs/<area>/*.md` for any non-obvious mechanism, and an ADR for load-bearing decisions.
 
-### Develop
+## Enabling / disabling auth methods
 
-To develop all apps and packages, run the following command:
+Once auth modules land, the source of truth is **API env vars**, not a checked-in config file:
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
+| Env var                    | Default | Effect                                      |
+| -------------------------- | ------- | ------------------------------------------- |
+| `AUTH_EMAIL_OTP_ENABLED`   | `true`  | Wires `/v1/auth/email-otp/{request,verify}` |
+| `AUTH_SMS_OTP_ENABLED`     | `false` | Wires `/v1/auth/sms-otp/{request,verify}`   |
+| `AUTH_CREDENTIALS_ENABLED` | `true`  | Wires signup/login/reset endpoints          |
+| `AUTH_GOOGLE_ENABLED`      | `false` | Wires `/v1/auth/google`                     |
+| `AUTH_FACEBOOK_ENABLED`    | `false` | Wires `/v1/auth/facebook`                   |
+| `AUTH_APPLE_ENABLED`       | `false` | Wires `/v1/auth/apple`                      |
 
-```sh
-cd my-turborepo
-turbo dev
-```
+Disabled methods don't just hide — their routes don't exist, their providers aren't registered, their env vars aren't required. The future web app reads `GET /v1/auth/enabled-methods` at SSR to know which buttons/forms to render. No `NEXT_PUBLIC_*` mirroring needed.
 
-Without global `turbo`, use your package manager:
+## License
 
-```sh
-cd my-turborepo
-npx turbo dev
-pnpm exec turbo dev
-pnpm exec turbo dev
-```
-
-You can develop a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo dev --filter=web
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo dev --filter=web
-pnpm exec turbo dev --filter=web
-pnpm exec turbo dev --filter=web
-```
-
-### Remote Caching
-
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
-
-Turborepo can use a technique known as [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
-
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo login
-```
-
-Without global `turbo`, use your package manager:
-
-```sh
-cd my-turborepo
-npx turbo login
-pnpm exec turbo login
-pnpm exec turbo login
-```
-
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
-
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo link
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo link
-pnpm exec turbo link
-pnpm exec turbo link
-```
-
-## Useful Links
-
-Learn more about the power of Turborepo:
-
-- [Tasks](https://turborepo.dev/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.dev/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.dev/docs/reference/configuration)
-- [CLI Usage](https://turborepo.dev/docs/reference/command-line-reference)
+UNLICENSED — internal template.

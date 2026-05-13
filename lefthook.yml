@@ -1,0 +1,11 @@
+# lefthook — pre-commit hooks. Auto-installed by `pnpm install` (root prepare script).
+# Docs: https://lefthook.dev/configuration/
+#
+# Keep hooks fast: a slow pre-commit gets disabled and stops protecting the repo.
+
+pre-commit:
+  parallel: true
+  jobs:
+    - name: lint-staged
+      run: pnpm exec lint-staged
+      glob: "*.{ts,tsx,js,jsx,json,md,yml,yaml}"
