@@ -166,7 +166,7 @@ describe("CoreAuthService rotation (e2e)", () => {
   it("unknown jti is rejected without touching any session", async () => {
     const { issued } = await freshSession();
     // Sign a refresh JWT with a jti that was never persisted.
-    const fakeJwt = await fakeRefreshJwtWithUnknownJti(coreAuth);
+    const fakeJwt = fakeRefreshJwtWithUnknownJti(coreAuth);
     void issued;
     await expect(coreAuth.rotateTokens(fakeJwt)).rejects.toThrow(
       /invalid refresh token/i,
@@ -186,9 +186,7 @@ describe("CoreAuthService rotation (e2e)", () => {
  * Forge a refresh JWT whose `jti` was never persisted. Uses the same
  * secret CoreAuthService verifies against (via the injected Env).
  */
-async function fakeRefreshJwtWithUnknownJti(
-  coreAuth: CoreAuthService,
-): Promise<string> {
+function fakeRefreshJwtWithUnknownJti(coreAuth: CoreAuthService): string {
   // Yank the env + jwt service via the service's private fields (test-only).
   const svc = coreAuth as unknown as {
     env: Env;

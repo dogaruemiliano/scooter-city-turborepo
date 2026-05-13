@@ -21,9 +21,11 @@ import {
   PrismaHealthIndicator,
 } from "@nestjs/terminus";
 
+import { Public } from "../auth/decorators/public.decorator";
 import { PrismaService } from "../prisma/prisma.service";
 
 @ApiTags("health")
+@Public() // orchestrators (k8s, fly.io) probe without an auth context
 @Controller({ path: "healthz", version: VERSION_NEUTRAL })
 export class HealthController {
   constructor(

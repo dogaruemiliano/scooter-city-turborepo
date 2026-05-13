@@ -10,6 +10,7 @@ import { MiddlewareConsumer, Module, NestModule } from "@nestjs/common";
 import { LoggerModule } from "nestjs-pino";
 
 import { AuditModule } from "./audit/audit.module";
+import { AuthModule } from "./auth/auth.module";
 import { pinoConfig } from "./common/logger/pino.config";
 import { RequestIdMiddleware } from "./common/middleware/request-id.middleware";
 import { ConfigModule } from "./config/config.module";
@@ -34,6 +35,7 @@ import { UsersModule } from "./users/users.module";
 
     // Public-surface modules.
     HealthModule,
+    AuthModule.forRoot(),
   ],
 })
 export class AppModule implements NestModule {

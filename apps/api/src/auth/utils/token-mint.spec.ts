@@ -68,9 +68,9 @@ describe("mintAccessToken", () => {
       ACCESS_SECRET,
       "15m",
     );
-    expect(() =>
-      jwt.verify(result.token, { secret: "wrong".repeat(8) }),
-    ).toThrow();
+    expect(() => {
+      jwt.verify(result.token, { secret: "wrong".repeat(8) });
+    }).toThrow();
   });
 });
 

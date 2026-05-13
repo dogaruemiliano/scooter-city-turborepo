@@ -4,6 +4,32 @@ All notable changes land here. Each PR appends an entry under `Unreleased`; rele
 
 ## Unreleased
 
+### Added — PR 5 part 2 (`CoreAuthController` + AuthModule + Orval pipeline + docs)
+
+- **`CoreAuthController`** under `/v1/auth/...` with eight endpoints:
+  - `POST /refresh` (public; cookie or JSON-body refresh token), `POST /logout`, `POST /logout-all`, `GET /me`, `DELETE /me`, `GET /sessions`, `DELETE /sessions/:id`, `DELETE /accounts/:provider` (refuses if the unlink would leave the user with no remaining auth method), `GET /enabled-methods` (public).
+  - Every state-changing call emits an `AuditEvent` row.
+  - DTOs decorated with `@ApiProperty` so Orval emits schema names that mirror the `@repo/api-shared` types (`SessionUser`, `SessionSummary`, `TokenPair`, `EnabledAuthMethods`).
+- **`AuthModule.forRoot()` DynamicModule** wiring `PassportModule` + `JwtModule` + `ThrottlerModule` + `CoreAuthModule`. PR 8+ will append conditional auth-method modules (`EmailOtpModule`, `CredentialsModule`, OAuth modules, `SmsOtpModule`) based on the `AUTH_*_ENABLED` env flags.
+- **Global guards** registered via `APP_GUARD`: `JwtAuthGuard` (honors `@Public()`) and `ThrottlerGuard`. `/healthz` is marked `@Public()` so orchestrators don't need credentials.
+- **First Orval generation** — `packages/api-generated` now contains an auto-generated 461-line `src/index.ts` derived from the OpenAPI spec, plus a hand-written `src/mutator.ts` that wraps `fetch` with `credentials: "include"` and normalizes the AllExceptionsFilter error envelope. The `pnpm gen` pipeline now runs: refresh `.env.example` → build `@repo/api-shared` → build `apps/api` → emit OpenAPI JSON → run Orval.
+- **`@repo/api-shared` is now a build-emitting package** (`tsc -p tsconfig.build.json` → `dist/`) so compiled API can load it from Node. Test consumers still hit source via Jest's `moduleNameMapper`.
+- **Docs:**
+  - [`docs/auth/refresh-rotation.md`](docs/auth/refresh-rotation.md) — full algorithm walkthrough (FOR UPDATE, chain walk, grace window, burn semantics, why-not-Serializable).
+  - [`docs/auth/cookies.md`](docs/auth/cookies.md) — flags, eTLD+1 constraint, CSRF stance.
+  - [`docs/auth/rate-limiting.md`](docs/auth/rate-limiting.md) — four named buckets, custom tracker plans, in-memory storage caveat.
+  - [`docs/adr/0002-cookie-based-sessions.md`](docs/adr/0002-cookie-based-sessions.md) — why no `next-auth`/Lucia/better-auth.
+  - [`docs/adr/0003-multi-instance-refresh-rotation.md`](docs/adr/0003-multi-instance-refresh-rotation.md) — why DB-side chain instead of in-memory cache.
+
+### Added — PR 5 part 1 (auth foundations: utils + JWT + guards + CoreAuthService + 45 tests)
+
+- **CoreAuthService** (~378 lines) — `issueSession`, `rotateTokens` (FOR UPDATE-locked, chain-walk grace, reuse-burn in separate transaction), `revokeSession`, `revokeAllUserSessions`, `listSessions`, `performDummyHashCompare`.
+- **Token-mint utils** at `auth/utils/token-mint.ts` (~108 lines) — pure functions for `ttlStringToSeconds`, `mintAccessToken`, `mintRefreshToken`.
+- **Cookies + hash + JWT-extractors** under `auth/utils/`. Cookie-first then Bearer fallback for browser + mobile.
+- **JwtStrategy + JwtAuthGuard + `@Public()` + `@CurrentUser()`**.
+- **Throttler config** with four named buckets (`otp-ip`, `otp-target`, `otp-target-daily`, `login-ip`).
+- **Tests: 45 passing.** 22 unit (token-mint, spy mailer/sms, schemas + hash) + 23 e2e (rotation: 6 scenarios; timing: 3 attack-path sanity checks; healthz + api-shared + users + audit + controller endpoints). Includes a parallel-3 rotation test that exercises the chain-walk under concurrency.
+
 ### Added — PR 4 (Prisma / Users / Mailer / SMS / Audit infrastructure)
 
 - **`PrismaModule` + `PrismaService`** — global module exposing a `PrismaClient` constructed with the `PrismaPg` driver adapter and explicit pool settings (`max: 10`, `idleTimeoutMillis: 30s`, `connectionTimeoutMillis: 5s`) per `AGENTS.md → prisma-verify-rule`. `onModuleInit → $connect`, `onModuleDestroy → $disconnect` wired into NestJS's shutdown hooks.

@@ -28,8 +28,17 @@ export const cookieAccessTokenExtractor: JwtFromRequestFunction<Request> = (
   return cookies?.[ACCESS_TOKEN_COOKIE] ?? null;
 };
 
-/** Cookie-first chain used by the global `JwtStrategy`. */
-export const accessTokenExtractor = ExtractJwt.fromExtractors([
-  cookieAccessTokenExtractor,
-  ExtractJwt.fromAuthHeaderAsBearerToken(),
-]);
+/**
+ * Cookie-first chain used by the global `JwtStrategy`.
+ *
+ * Explicit return type annotation: without it, TS infers the type as
+ * `JwtFromRequestFunction<Request>` whose `Request` references
+ * `@types/express-serve-static-core` / `@types/qs` via pnpm-hoisted
+ * symlinks. `tsc --declaration` (Nest's build) refuses to emit a
+ * declaration that names types outside the package's own dep graph.
+ */
+export const accessTokenExtractor: JwtFromRequestFunction =
+  ExtractJwt.fromExtractors([
+    cookieAccessTokenExtractor,
+    ExtractJwt.fromAuthHeaderAsBearerToken(),
+  ]);
