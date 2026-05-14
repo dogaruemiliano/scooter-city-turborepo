@@ -20,6 +20,15 @@ if (process.argv.includes("--spec-only")) {
     JWT_REFRESH_SECRET: "spec-only-placeholder-padded-to-32-chars",
     REFRESH_TOKEN_HMAC_SECRET: "spec-only-placeholder-padded-to-32-chars",
     OTP_HMAC_SECRET: "spec-only-placeholder-padded-to-32-chars",
+    // Force-enable every auth method so the generated OpenAPI document
+    // is complete (consumers shouldn't have to set env flags to see a
+    // route in the spec). The credentials are placeholders the verifier
+    // never actually consumes — `--spec-only` exits before any incoming
+    // request reaches the verifier.
+    AUTH_APPLE_ENABLED: "true",
+    APPLE_SERVICE_ID: "com.example.spec.placeholder",
+    AUTH_GOOGLE_ENABLED: "true",
+    GOOGLE_CLIENT_ID_WEB: "spec-only-google-client-id-web.placeholder",
   };
   for (const [k, v] of Object.entries(placeholders)) {
     if (process.env[k] === undefined) process.env[k] = v;

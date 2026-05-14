@@ -29,9 +29,13 @@ datasource db {
   provider = "postgresql"
 }
 
-/// A human. `passwordHash` is nullable so OAuth-only and OTP-only users
-/// exist without one. `emailVerified` / `phoneVerified` are timestamps
-/// (not booleans) — when verified is the audit trail.
+/// A human. `emailVerified` / `phoneVerified` are timestamps (not
+/// booleans) — when verified is the audit trail.
+///
+/// Email-and-password login isn't part of the v1 template — every auth
+/// method here proves identity via a channel (OTP) or an OAuth provider.
+/// If a future variant needs password login, add `passwordHash` back via
+/// migration; nothing else has to move.
 model User {
   id            String    @id @default(cuid())
   email         String    @unique
@@ -40,7 +44,6 @@ model User {
   phoneVerified DateTime?
   firstName     String?
   lastName      String?
-  passwordHash  String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   /// Soft-delete marker. Hard cascade still runs via DELETE /v1/auth/me; this
@@ -120,7 +123,7 @@ model OtpToken {
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   /// "EMAIL" | "SMS"
   channel       String
-  /// "AUTH" | "EMAIL_VERIFY" | "PASSWORD_RESET"
+  /// "AUTH" | "EMAIL_VERIFY"
   purpose       String   @default("AUTH")
   codeHash      String
   expiresAt     DateTime
@@ -142,7 +145,7 @@ model OtpToken {
 /// the identity with a known address.
 model AuthAccount {
   id         String   @id @default(cuid())
-  /// "google" | "facebook" | "apple"
+  /// "google" | "apple"
   provider   String
   providerId String
   userId     String
@@ -158,10 +161,9 @@ model AuthAccount {
 /// forensics + compliance reports can reconstruct activity after the fact.
 ///
 /// `type` values are defined in TS by `AuditEventType` and include:
-/// LOGIN_SUCCESS, LOGIN_FAIL, PASSWORD_CHANGED, OAUTH_LINKED, OAUTH_UNLINKED,
-/// SESSION_REVOKED, SESSION_BURNED, ACCOUNT_DELETED, SIGNUP,
-/// SIGNUP_ATTEMPT_EXISTING_EMAIL, EMAIL_VERIFY_SENT, EMAIL_VERIFIED,
-/// PASSWORD_RESET_REQUESTED, PASSWORD_RESET_CONFIRMED, NEW_DEVICE_NOTIFIED.
+/// SIGNUP, LOGIN_SUCCESS, LOGIN_FAIL, EMAIL_VERIFIED, OAUTH_LINKED,
+/// OAUTH_UNLINKED, SESSION_REVOKED, SESSION_BURNED, LOGOUT_ALL,
+/// ACCOUNT_DELETED, NEW_DEVICE_NOTIFIED.
 model AuditEvent {
   id        String   @id @default(cuid())
   userId    String?

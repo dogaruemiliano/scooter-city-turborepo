@@ -47,12 +47,10 @@ export const envSchema = z
       .default(3000)
       .describe("Port the API listens on."),
     APP_BASE_URL: z
-      .string()
       .url()
       .default("http://localhost:3001")
       .describe("Public base URL of the web app (used in emails, redirects)."),
     API_BASE_URL: z
-      .string()
       .url()
       .default("http://localhost:3000")
       .describe("Public base URL of this API (used in OpenAPI servers list)."),
@@ -63,14 +61,13 @@ export const envSchema = z
         'Cookie domain in production (e.g. ".example.com"). Leave empty in dev — Lax cookies on localhost work without it.',
       ),
     CORS_ORIGINS: csv
-      .default("http://localhost:3001")
+      .default(["http://localhost:3001"])
       .describe(
         'Comma-separated list of allowed CORS origins. MUST be explicit when credentials are enabled (no "*").',
       ),
 
     /* DB ------------------------------------------------------------------ */
     DATABASE_URL: z
-      .string()
       .url()
       .default("postgresql://app:app@localhost:5434/app")
       .describe(
@@ -120,20 +117,10 @@ export const envSchema = z
     AUTH_SMS_OTP_ENABLED: boolFromString
       .default(false)
       .describe("Enable SMS-OTP login. Requires SMS_PROVIDER credentials."),
-    AUTH_CREDENTIALS_ENABLED: boolFromString
-      .default(true)
-      .describe(
-        "Enable email+password signup/login/reset. Email verification on signup is mandatory when this is on.",
-      ),
     AUTH_GOOGLE_ENABLED: boolFromString
       .default(false)
       .describe(
         "Enable Google Sign-in (ID-token verification). Requires GOOGLE_CLIENT_ID_*.",
-      ),
-    AUTH_FACEBOOK_ENABLED: boolFromString
-      .default(false)
-      .describe(
-        "Enable Facebook Sign-in. Requires FACEBOOK_APP_ID + FACEBOOK_APP_SECRET.",
       ),
     AUTH_APPLE_ENABLED: boolFromString
       .default(false)
@@ -154,18 +141,6 @@ export const envSchema = z
       .string()
       .optional()
       .describe("Google OAuth Android client ID (audience for verification)."),
-    FACEBOOK_APP_ID: z
-      .string()
-      .optional()
-      .describe(
-        "Facebook App ID (audience for Limited-Login JWT verification).",
-      ),
-    FACEBOOK_APP_SECRET: z
-      .string()
-      .optional()
-      .describe(
-        "Facebook App secret (used for classic-access-token debug_token verification).",
-      ),
     APPLE_SERVICE_ID: z
       .string()
       .optional()
@@ -220,7 +195,6 @@ export const envSchema = z
         'Email provider. "log" prints to stdout (dev/test). "resend" uses Resend API. "smtp" uses nodemailer.',
       ),
     MAILER_FROM: z
-      .string()
       .email()
       .default("no-reply@example.com")
       .describe("From address used for outgoing mail."),
@@ -298,7 +272,7 @@ export const envSchema = z
     const requireIf = (cond: boolean, key: keyof typeof v, hint: string) => {
       if (cond && !v[key]) {
         ctx.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: "custom",
           path: [String(key)],
           message: `${String(key)} is required when ${hint}.`,
         });
@@ -313,27 +287,17 @@ export const envSchema = z
         !v.GOOGLE_CLIENT_ID_ANDROID
       ) {
         ctx.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: "custom",
           path: ["GOOGLE_CLIENT_ID_WEB"],
           message:
             "At least one of GOOGLE_CLIENT_ID_WEB|IOS|ANDROID is required when AUTH_GOOGLE_ENABLED=true.",
         });
       }
     }
-    requireIf(
-      v.AUTH_FACEBOOK_ENABLED,
-      "FACEBOOK_APP_ID",
-      "AUTH_FACEBOOK_ENABLED=true",
-    );
-    requireIf(
-      v.AUTH_FACEBOOK_ENABLED,
-      "FACEBOOK_APP_SECRET",
-      "AUTH_FACEBOOK_ENABLED=true",
-    );
     if (v.AUTH_APPLE_ENABLED) {
       if (!v.APPLE_SERVICE_ID && !v.APPLE_BUNDLE_ID) {
         ctx.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: "custom",
           path: ["APPLE_SERVICE_ID"],
           message:
             "At least one of APPLE_SERVICE_ID or APPLE_BUNDLE_ID is required when AUTH_APPLE_ENABLED=true.",
@@ -375,7 +339,7 @@ export const envSchema = z
       v.NODE_ENV === "production"
     ) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: "custom",
         path: ["SMS_PROVIDER"],
         message:
           "SMS_PROVIDER=log is not allowed in production when AUTH_SMS_OTP_ENABLED=true.",

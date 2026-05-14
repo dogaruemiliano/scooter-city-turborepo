@@ -10,19 +10,10 @@
  * `createdUserIds`; `afterAll` removes them. The seed users
  * (`seed-user-*`) are left alone.
  */
-import {
-  INestApplication,
-  ValidationPipe,
-  VersioningType,
-} from "@nestjs/common";
+import { INestApplication, VersioningType } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import type { LogoutAllResponse } from "@repo/api-generated";
-import type {
-  EnabledAuthMethods,
-  SessionSummary,
-  SessionUser,
-  TokenPair,
-} from "@repo/api-shared";
+import { v1 } from "@repo/api-shared";
 import cookieParser from "cookie-parser";
 import type { Server } from "node:http";
 import request from "supertest";
@@ -56,13 +47,10 @@ describe("CoreAuthController (e2e)", () => {
     app = moduleRef.createNestApplication();
     app.enableVersioning({ type: VersioningType.URI, defaultVersion: "1" });
     app.use(cookieParser());
-    app.useGlobalPipes(
-      new ValidationPipe({
-        whitelist: true,
-        forbidNonWhitelisted: true,
-        transform: true,
-      }),
-    );
+    // ZodValidationPipe is registered globally via APP_PIPE in AppModule
+    // (see apps/api/src/app.module.ts). Don't add a useGlobalPipes() here
+    // — it would shadow the APP_PIPE provider with a class-validator pipe
+    // that doesn't understand nestjs-zod DTOs.
     await app.init();
     prisma = app.get(PrismaService);
     users = app.get(UsersService);
@@ -76,12 +64,9 @@ describe("CoreAuthController (e2e)", () => {
     await app.close();
   });
 
-  async function freshSession(
-    opts: { passwordHash?: string } = {},
-  ): Promise<IssuedSession> {
+  async function freshSession(): Promise<IssuedSession> {
     const user = await users.createOne({
       email: `ctrl-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`,
-      passwordHash: opts.passwordHash ?? null,
     });
     createdUserIds.push(user.id);
     const issued = await coreAuth.issueSession({ user });
@@ -99,13 +84,11 @@ describe("CoreAuthController (e2e)", () => {
 
   it("GET /v1/auth/enabled-methods returns the enabled-flag bag", async () => {
     const res = await request(server()).get("/v1/auth/enabled-methods");
-    const body = res.body as EnabledAuthMethods;
+    const body = res.body as v1.auth.EnabledAuthMethods;
     expect(res.status).toBe(200);
     expect(typeof body.emailOtp).toBe("boolean");
     expect(typeof body.smsOtp).toBe("boolean");
-    expect(typeof body.credentials).toBe("boolean");
     expect(typeof body.google).toBe("boolean");
-    expect(typeof body.facebook).toBe("boolean");
     expect(typeof body.apple).toBe("boolean");
   });
 
@@ -124,7 +107,7 @@ describe("CoreAuthController (e2e)", () => {
     const res = await request(server())
       .post("/v1/auth/refresh")
       .send({ refreshToken: issued.refreshToken });
-    const body = res.body as TokenPair;
+    const body = res.body as v1.auth.TokenPair;
 
     expect(res.status).toBe(200);
     expect(body.accessToken).toBeTruthy();
@@ -145,7 +128,7 @@ describe("CoreAuthController (e2e)", () => {
       .post("/v1/auth/refresh")
       .set("Cookie", [`refresh_token=${issued.refreshToken}`])
       .send({});
-    const body = res.body as TokenPair;
+    const body = res.body as v1.auth.TokenPair;
 
     expect(res.status).toBe(200);
     expect(body.refreshToken).not.toBe(issued.refreshToken);
@@ -166,7 +149,7 @@ describe("CoreAuthController (e2e)", () => {
     const res = await request(server())
       .get("/v1/auth/me")
       .set("Cookie", [`access_token=${issued.accessToken}`]);
-    const body = res.body as SessionUser;
+    const body = res.body as v1.auth.SessionUser;
 
     expect(res.status).toBe(200);
     expect(body.id).toBe(issued.userId);
@@ -181,7 +164,7 @@ describe("CoreAuthController (e2e)", () => {
     const res = await request(server())
       .get("/v1/auth/me")
       .set("Authorization", `Bearer ${issued.accessToken}`);
-    const body = res.body as SessionUser;
+    const body = res.body as v1.auth.SessionUser;
 
     expect(res.status).toBe(200);
     expect(body.id).toBe(issued.userId);
@@ -198,7 +181,7 @@ describe("CoreAuthController (e2e)", () => {
     const res = await request(server())
       .get("/v1/auth/sessions")
       .set("Cookie", [`access_token=${issued.accessToken}`]);
-    const body = res.body as SessionSummary[];
+    const body = res.body as v1.auth.SessionSummary[];
 
     expect(res.status).toBe(200);
     expect(Array.isArray(body)).toBe(true);
@@ -309,10 +292,10 @@ describe("CoreAuthController (e2e)", () => {
   // ────────────────────────────────────────────────────────────────────
 
   it("DELETE /v1/auth/accounts/:provider refuses if it would leave no auth method", async () => {
-    // User has ONLY a Google AuthAccount, no password, no verified email/phone.
+    // User has ONLY a Google AuthAccount, no verified email/phone.
     const user = await users.createOne({
       email: `lonely-${Date.now()}@example.com`,
-      // explicitly leave passwordHash, emailVerified, phoneVerified null
+      // explicitly leave emailVerified, phoneVerified null
     });
     createdUserIds.push(user.id);
     await prisma.authAccount.create({
@@ -342,20 +325,20 @@ describe("CoreAuthController (e2e)", () => {
     await prisma.authAccount.create({
       data: {
         userId: user.id,
-        provider: "facebook",
-        providerId: "fb-multi-1",
+        provider: "apple",
+        providerId: "apple-multi-1",
         email: user.email,
       },
     });
     const issued = await coreAuth.issueSession({ user });
 
     const res = await request(server())
-      .delete("/v1/auth/accounts/facebook")
+      .delete("/v1/auth/accounts/apple")
       .set("Cookie", [`access_token=${issued.accessToken}`]);
 
     expect(res.status).toBe(204);
     const acct = await prisma.authAccount.findFirst({
-      where: { userId: user.id, provider: "facebook" },
+      where: { userId: user.id, provider: "apple" },
     });
     expect(acct).toBeNull();
   });

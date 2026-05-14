@@ -9,99 +9,70 @@
  * Design choice: the schema is the single source of truth — there is no
  * separate `.env.example` to drift. Adding a new env var only requires
  * extending the zod schema with a `.describe()`; `.env.example` regenerates.
+ *
+ * Implementation: uses `z.toJSONSchema()` (Zod 4) to produce a stable
+ * JSON-Schema view of the env schema, then iterates `properties` and the
+ * top-level `required` array. We deliberately avoid poking at Zod 4's
+ * internal `_zod.def` — those internals are explicitly marked unstable.
  */
 import { writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import {
-  z,
-  ZodDefault,
-  ZodEffects,
-  ZodObject,
-  ZodOptional,
-  ZodTypeAny,
-} from "zod";
+import { z } from "zod";
 
 import { envSchema } from "../apps/api/src/config/env";
 
-type ZodShape = Record<string, ZodTypeAny>;
-
-function unwrap(schema: ZodTypeAny): {
-  inner: ZodTypeAny;
-  optional: boolean;
-  defaultValue: unknown;
-  description: string | undefined;
-} {
-  let cur: ZodTypeAny = schema;
-  let optional = false;
-  let defaultValue: unknown;
-  let description: string | undefined;
-
-  // ZodEffects wraps refines/transforms; recurse into inner schema.
-  while (cur instanceof ZodEffects) {
-    cur = cur._def.schema as ZodTypeAny;
-  }
-  if (description === undefined && cur.description)
-    description = cur.description;
-
-  if (cur instanceof ZodDefault) {
-    defaultValue = cur._def.defaultValue();
-    cur = cur._def.innerType as ZodTypeAny;
-  }
-  if (cur instanceof ZodOptional) {
-    optional = true;
-    cur = cur._def.innerType as ZodTypeAny;
-  }
-  if (cur instanceof ZodDefault) {
-    defaultValue = cur._def.defaultValue();
-    cur = cur._def.innerType as ZodTypeAny;
-  }
-  if (description === undefined && cur.description)
-    description = cur.description;
-  // Also check the original schema's description (it might be on the wrapper).
-  if (description === undefined && schema.description)
-    description = schema.description;
-
-  return { inner: cur, optional, defaultValue, description };
+interface FieldSchema {
+  description?: string;
+  default?: unknown;
+  // Other fields from JSONSchema (type, format, enum, etc.) are present
+  // but the env-example only needs description + default.
 }
 
-function exampleFor(value: unknown, optional: boolean): string {
+interface JsonSchemaShape {
+  properties?: Record<string, FieldSchema>;
+  required?: string[];
+}
+
+function exampleFor(value: unknown): string {
   if (value === undefined) return "";
   if (Array.isArray(value)) return value.join(",");
   if (typeof value === "boolean") return value ? "true" : "false";
   if (typeof value === "number") return String(value);
   if (typeof value === "string") return value;
-  return optional ? "" : "";
+  return "";
 }
 
-function lineFor(key: string, schema: ZodTypeAny): string[] {
-  const { optional, defaultValue, description } = unwrap(schema);
+function lineFor(key: string, field: FieldSchema, required: boolean): string[] {
   const out: string[] = [];
-  if (description) {
-    out.push(...description.split("\n").map((s) => `# ${s.trim()}`));
+  if (field.description) {
+    out.push(...field.description.split("\n").map((s) => `# ${s.trim()}`));
   }
   out.push(
-    `# Required: ${optional || defaultValue !== undefined ? "no" : "yes"}`,
+    `# Required: ${required && field.default === undefined ? "yes" : "no"}`,
   );
-  if (defaultValue !== undefined) {
-    out.push(`# Default: ${exampleFor(defaultValue, false) || '""'}`);
+  if (field.default !== undefined) {
+    out.push(`# Default: ${exampleFor(field.default) || '""'}`);
   }
-  const example = exampleFor(defaultValue, optional);
-  out.push(`${key}=${example}`);
+  out.push(`${key}=${exampleFor(field.default)}`);
   return out;
 }
 
 function generate(): string {
-  // The schema is wrapped in `.superRefine(...)` which produces a ZodEffects.
-  // Unwrap to reach the underlying ZodObject so we can iterate `.shape`.
-  let inner: ZodTypeAny = envSchema as ZodTypeAny;
-  while (inner instanceof ZodEffects) {
-    inner = inner._def.schema as ZodTypeAny;
+  // `z.toJSONSchema` produces a stable JSON Schema view. `unrepresentable:
+  // "any"` keeps transforms (e.g. CORS_ORIGINS' string→string[] transform)
+  // from throwing — we don't need the post-transform type, just description
+  // and default.
+  const json = z.toJSONSchema(envSchema, {
+    unrepresentable: "any",
+  }) as JsonSchemaShape;
+
+  if (!json.properties) {
+    throw new Error(
+      "Expected envSchema to produce JSON Schema with properties",
+    );
   }
-  if (!(inner instanceof ZodObject)) {
-    throw new Error("Expected envSchema to resolve to a ZodObject");
-  }
-  const shape = inner.shape as ZodShape;
+  const requiredSet = new Set(json.required ?? []);
 
   const blocks: string[] = [
     "# ==========================================================================",
@@ -111,8 +82,8 @@ function generate(): string {
     "",
   ];
 
-  for (const [key, subSchema] of Object.entries(shape)) {
-    blocks.push(...lineFor(key, subSchema), "");
+  for (const [key, field] of Object.entries(json.properties)) {
+    blocks.push(...lineFor(key, field, requiredSet.has(key)), "");
   }
 
   return blocks.join("\n");
@@ -126,9 +97,5 @@ function main(): void {
   // eslint-disable-next-line no-console
   console.log(`Wrote ${target}`);
 }
-
-// Silence "z is unused" linter complaint — re-exporting for completeness in case
-// scripts/ later imports a custom-typed helper.
-void z;
 
 main();

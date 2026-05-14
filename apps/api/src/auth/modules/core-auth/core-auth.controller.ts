@@ -44,12 +44,7 @@ import {
   ApiOperation,
   ApiTags,
 } from "@nestjs/swagger";
-import {
-  ACCESS_TOKEN_COOKIE,
-  REFRESH_TOKEN_COOKIE,
-  type SessionSummary,
-  type SessionUser,
-} from "@repo/api-shared";
+import { v1 } from "@repo/api-shared";
 import type { Request, Response } from "express";
 
 import { AuditService } from "../../../audit/audit.service";
@@ -72,11 +67,11 @@ import {
   TokenPairResponse,
 } from "./dto/responses";
 
-type OAuthProvider = "google" | "facebook" | "apple";
-const OAUTH_PROVIDERS = new Set<OAuthProvider>(["google", "facebook", "apple"]);
+type OAuthProvider = "google" | "apple";
+const OAUTH_PROVIDERS = new Set<OAuthProvider>(["google", "apple"]);
 
 @ApiTags("auth")
-@ApiCookieAuth(ACCESS_TOKEN_COOKIE)
+@ApiCookieAuth(v1.auth.ACCESS_TOKEN_COOKIE)
 @Controller({ path: "auth", version: "1" })
 export class CoreAuthController {
   constructor(
@@ -104,7 +99,7 @@ export class CoreAuthController {
     const cookies = req.cookies as
       | Record<string, string | undefined>
       | undefined;
-    const cookieToken = cookies?.[REFRESH_TOKEN_COOKIE];
+    const cookieToken = cookies?.[v1.auth.REFRESH_TOKEN_COOKIE];
     const token = cookieToken ?? body.refreshToken;
     if (!token) {
       throw new UnauthorizedException("No refresh token provided");
@@ -174,7 +169,7 @@ export class CoreAuthController {
   @Get("me")
   @ApiOperation({ summary: "Current user profile" })
   @ApiOkResponse({ type: SessionUserResponse })
-  async me(@CurrentUser() user: AuthPrincipal): Promise<SessionUser> {
+  async me(@CurrentUser() user: AuthPrincipal): Promise<v1.auth.SessionUser> {
     const row = await this.users.findById(user.id);
     if (!row) {
       // Token references a user who no longer exists (deleted via
@@ -228,7 +223,7 @@ export class CoreAuthController {
   @ApiOkResponse({ type: SessionSummaryResponse, isArray: true })
   async listSessions(
     @CurrentUser() user: AuthPrincipal,
-  ): Promise<SessionSummary[]> {
+  ): Promise<v1.auth.SessionSummary[]> {
     const rows = await this.coreAuth.listSessions(user.id);
     return rows.map((row) => ({
       id: row.id,
@@ -309,13 +304,12 @@ export class CoreAuthController {
 
     // Count auth methods that would remain after the unlink.
     const remainingFallbacks =
-      (userRow.passwordHash !== null ? 1 : 0) +
       (userRow.emailVerified !== null ? 1 : 0) +
       (userRow.phoneVerified !== null ? 1 : 0) +
       userRow.authAccounts.filter((a) => a.provider !== provider).length;
     if (remainingFallbacks === 0) {
       throw new ConflictException(
-        "Cannot unlink the only auth method — set a password or link another provider first.",
+        "Cannot unlink the only auth method — link another provider or verify an OTP channel first.",
       );
     }
 
@@ -346,9 +340,7 @@ export class CoreAuthController {
     return {
       emailOtp: this.env.AUTH_EMAIL_OTP_ENABLED,
       smsOtp: this.env.AUTH_SMS_OTP_ENABLED,
-      credentials: this.env.AUTH_CREDENTIALS_ENABLED,
       google: this.env.AUTH_GOOGLE_ENABLED,
-      facebook: this.env.AUTH_FACEBOOK_ENABLED,
       apple: this.env.AUTH_APPLE_ENABLED,
     };
   }

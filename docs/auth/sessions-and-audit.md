@@ -17,8 +17,8 @@ User ──┬── Session ──── RefreshToken
 | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | `Session`      | One _logged-in device_. `userAgent`, `ip`, `lastUsedAt` for the active-devices UI; `revokedAt` flips on logout or "log out other devices".                                                   | Created on every successful login. One row per device, regardless of how many refresh-token rotations the session goes through. |
 | `RefreshToken` | One _plaintext refresh-token value_ ever minted. Many rows per Session (one per rotation). Stores SHA-256 HMAC of the token, not plaintext.                                                  | Created on rotation; old row's `revokedAt` is set to now. Daily cron deletes rows past `expiresAt`.                             |
-| `OtpToken`     | One _one-time code_: 6 digits HMAC'd, plus an `attemptsCount` and `expiresAt`. Discriminated by `channel` (EMAIL/SMS) and `purpose` (AUTH/EMAIL_VERIFY/PASSWORD_RESET).                      | Created on request; `used=true` on successful verify or `attemptsCount >= 5`. Daily cron deletes rows older than 7d.            |
-| `AuthAccount`  | One _OAuth identity_ linked to a user. `provider + providerId` uniquely identifies an external account; `email` saved on first link (Apple-specifically, since Apple only sends email once). | Created when a user first signs in via Google/Facebook/Apple. Deleted via `DELETE /v1/auth/accounts/:provider`.                 |
+| `OtpToken`     | One _one-time code_: 6 digits HMAC'd, plus an `attemptsCount` and `expiresAt`. Discriminated by `channel` (EMAIL/SMS) and `purpose` (AUTH/EMAIL_VERIFY).                                     | Created on request; `used=true` on successful verify or `attemptsCount >= 5`. Daily cron deletes rows older than 7d.            |
+| `AuthAccount`  | One _OAuth identity_ linked to a user. `provider + providerId` uniquely identifies an external account; `email` saved on first link (Apple-specifically, since Apple only sends email once). | Created when a user first signs in via Google/Apple. Deleted via `DELETE /v1/auth/accounts/:provider`.                          |
 | `AuditEvent`   | One _append-only event_: who did what, when, from which IP/UA, with optional `meta` JSON.                                                                                                    | Never deleted. `userId` becomes `NULL` if the user is deleted (forensics + compliance).                                         |
 
 ## Why a first-class `Session` table
@@ -55,37 +55,30 @@ Every model uses `String @id @default(cuid())`. Reasoning is in [`docs/adr/0004-
 
 Currently expected types (will grow as features land):
 
-| Type                            | Emitted when                                                               | `meta` carries                                                                                       |
-| ------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `SIGNUP`                        | Credentials signup succeeds                                                | —                                                                                                    |
-| `SIGNUP_ATTEMPT_EXISTING_EMAIL` | Anti-enum signup: someone tried to sign up with an email already on file   | — (the existing user gets a notification email; the row is on _their_ `userId`, not the attempter's) |
-| `EMAIL_VERIFY_SENT`             | OTP for email verification dispatched                                      | —                                                                                                    |
-| `EMAIL_VERIFIED`                | User completed email verification                                          | —                                                                                                    |
-| `LOGIN_SUCCESS`                 | Any auth method succeeds                                                   | `{ method: "credentials" \| "email-otp" \| "sms-otp" \| "google" \| ... }`                           |
-| `LOGIN_FAIL`                    | Credentials login wrong password, OTP wrong code, OAuth verification fails | `{ method, reason }`                                                                                 |
-| `PASSWORD_CHANGED`              | Reset-password confirm or settings-side change                             | —                                                                                                    |
-| `PASSWORD_RESET_REQUESTED`      | Reset-OTP dispatched                                                       | —                                                                                                    |
-| `PASSWORD_RESET_CONFIRMED`      | Reset flow completed                                                       | —                                                                                                    |
-| `OAUTH_LINKED`                  | New AuthAccount row created (first OAuth sign-in OR settings-side link)    | `{ provider }`                                                                                       |
-| `OAUTH_UNLINKED`                | `DELETE /v1/auth/accounts/:provider` succeeded                             | `{ provider }`                                                                                       |
-| `SESSION_REVOKED`               | Single session revoked (logout or `DELETE /v1/auth/sessions/:id`)          | `{ sessionId }`                                                                                      |
-| `SESSION_BURNED`                | Reuse-detection burned every session under one `sessionId`                 | `{ sessionId, reason: "reuse-detection" }`                                                           |
-| `LOGOUT_ALL`                    | `POST /v1/auth/logout-all`                                                 | `{ sessionsRevoked: N }`                                                                             |
-| `ACCOUNT_DELETED`               | `DELETE /v1/auth/me`                                                       | —                                                                                                    |
-| `NEW_DEVICE_NOTIFIED`           | Login from first-seen (uaSummary, ipCountry) triggers an email             | `{ uaSummary, ipCountry }`                                                                           |
+| Type                  | Emitted when                                                            | `meta` carries                                                |
+| --------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------- |
+| `SIGNUP`              | First-time sign-in for a previously-unknown identity (OTP or OAuth)     | `{ method }`                                                  |
+| `EMAIL_VERIFIED`      | User completed email verification (e.g. first successful email-OTP)     | —                                                             |
+| `LOGIN_SUCCESS`       | Any auth method succeeds                                                | `{ method: "email-otp" \| "sms-otp" \| "google" \| "apple" }` |
+| `LOGIN_FAIL`          | OTP wrong code, OAuth verification fails                                | `{ method, reason }`                                          |
+| `OAUTH_LINKED`        | New AuthAccount row created (first OAuth sign-in OR settings-side link) | `{ provider }`                                                |
+| `OAUTH_UNLINKED`      | `DELETE /v1/auth/accounts/:provider` succeeded                          | `{ provider }`                                                |
+| `SESSION_REVOKED`     | Single session revoked (logout or `DELETE /v1/auth/sessions/:id`)       | `{ sessionId }`                                               |
+| `SESSION_BURNED`      | Reuse-detection burned every session under one `sessionId`              | `{ sessionId, reason: "reuse-detection" }`                    |
+| `LOGOUT_ALL`          | `POST /v1/auth/logout-all`                                              | `{ sessionsRevoked: N }`                                      |
+| `ACCOUNT_DELETED`     | `DELETE /v1/auth/me`                                                    | —                                                             |
+| `NEW_DEVICE_NOTIFIED` | Login from first-seen (uaSummary, ipCountry) triggers an email          | `{ uaSummary, ipCountry }`                                    |
 
 ## What the seed creates
 
-`pnpm db:seed` runs [`apps/api/prisma/seed.ts`](../../apps/api/prisma/seed.ts), which idempotently creates six fixture users with stable IDs (`seed-user-credentials`, `seed-user-email-otp`, etc.). Tests rely on these IDs being constant across `prisma migrate reset` cycles. The seed refuses to run when `NODE_ENV=production`.
+`pnpm db:seed` runs [`apps/api/prisma/seed.ts`](../../apps/api/prisma/seed.ts), which idempotently creates four fixture users with stable IDs (`seed-user-email-otp`, `seed-user-sms`, `seed-user-google`, `seed-user-apple`). Tests rely on these IDs being constant across `prisma migrate reset` cycles. The seed refuses to run when `NODE_ENV=production`.
 
-| Fixture user            | Drives which test scenarios                                                      |
-| ----------------------- | -------------------------------------------------------------------------------- |
-| `seed-user-credentials` | Credentials login (password `Password123!`) + password-reset flow                |
-| `seed-user-email-otp`   | Email-OTP request/verify, anti-enum signup behavior                              |
-| `seed-user-sms`         | SMS-OTP request/verify (phone `+40700000001`)                                    |
-| `seed-user-google`      | Existing Google AuthAccount → repeat-login flow + unlink-refuse-only-method flow |
-| `seed-user-facebook`    | Same, for Facebook                                                               |
-| `seed-user-apple`       | Apple specifics: stored email persists after first login                         |
+| Fixture user          | Drives which test scenarios                                                      |
+| --------------------- | -------------------------------------------------------------------------------- |
+| `seed-user-email-otp` | Email-OTP request/verify                                                         |
+| `seed-user-sms`       | SMS-OTP request/verify (phone `+40700000001`)                                    |
+| `seed-user-google`    | Existing Google AuthAccount → repeat-login flow + unlink-refuse-only-method flow |
+| `seed-user-apple`     | Apple specifics: stored email persists after first login                         |
 
 ## Cleanup cron (PR 6 preview)
 

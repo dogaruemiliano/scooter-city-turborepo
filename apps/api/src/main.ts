@@ -28,8 +28,9 @@ import "./spec-only-bootstrap";
 
 import cookieParser from "cookie-parser";
 import { Logger as PinoLogger } from "nestjs-pino";
+import { cleanupOpenApiDoc } from "nestjs-zod";
 
-import { ValidationPipe, VersioningType } from "@nestjs/common";
+import { VersioningType } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import type { NestExpressApplication } from "@nestjs/platform-express";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
@@ -56,7 +57,11 @@ function buildSwaggerDocument(app: NestExpressApplication) {
       "bearer",
     )
     .build();
-  return SwaggerModule.createDocument(app, config);
+  // `cleanupOpenApiDoc` is required when emitting OpenAPI from
+  // nestjs-zod DTOs — it strips internal markers, fixes refs, renames
+  // schemas via `.meta({ id })`, and unwraps array roots. Without it the
+  // generated spec has stray fields that confuse Orval.
+  return cleanupOpenApiDoc(SwaggerModule.createDocument(app, config));
 }
 
 async function bootstrap(): Promise<void> {
@@ -76,14 +81,14 @@ async function bootstrap(): Promise<void> {
 
   app.enableVersioning({ type: VersioningType.URI, defaultVersion: "1" });
 
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-      transformOptions: { enableImplicitConversion: true },
-    }),
-  );
+  // Validation runs through `ZodValidationPipe` registered globally via
+  // `APP_PIPE` in `AppModule`. Each `@Body() dto: SomeDto` where
+  // `SomeDto extends createZodDto(...)` is parsed by the schema in
+  // `@repo/api-shared`. Behavior parity with the old `ValidationPipe`:
+  //   - `whitelist` / `forbidNonWhitelisted` → schemas mark themselves
+  //     `.strict()` to reject unknown keys.
+  //   - `transform` / `enableImplicitConversion` → use Zod's `.coerce.*`
+  //     where coercion is needed; otherwise input matches output type.
 
   app.useGlobalFilters(new AllExceptionsFilter());
 

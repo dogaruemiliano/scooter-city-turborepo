@@ -4,6 +4,72 @@ All notable changes land here. Each PR appends an entry under `Unreleased`; rele
 
 ## Unreleased
 
+### Added — PR 7 (Resend + SMTP mailer impls + ADR-0005)
+
+- **`ResendMailerService`** ([`apps/api/src/mailer/impls/resend-mailer.service.ts`](apps/api/src/mailer/impls/resend-mailer.service.ts)) — production mailer over the Resend HTTP API. Constructor validates `RESEND_API_KEY` (defense in depth on top of the env schema's cross-field rule). Surfaces Resend's error envelope as a thrown `Error`. No retry loop — Resend owns its own queuing.
+- **`SmtpMailerService`** ([`apps/api/src/mailer/impls/smtp-mailer.service.ts`](apps/api/src/mailer/impls/smtp-mailer.service.ts)) — production mailer over SMTP via `nodemailer`. Auto-picks STARTTLS-on-587 vs implicit-TLS-on-465 based on `SMTP_PORT`. Implements `OnModuleDestroy` to close the transporter on shutdown.
+- **`MailerModule.forRoot(env)`** — `DynamicModule` factory that registers **only** the impl selected by `env.MAILER_PROVIDER`. The previous design (pre-register every impl, switch in a factory) would have fired the unselected impls' constructors and tripped their env validators. The factory pattern keeps unused impls out of the graph entirely. The abstract `MailerService` token still binds via `useExisting` so E2E tests can swap in `SpyMailerService` with `overrideProvider(MailerService).useClass(SpyMailerService)`.
+- **Unit tests** for both new impls mock the underlying SDKs (`resend`, `nodemailer`) so they run without network: [`resend-mailer.service.spec.ts`](apps/api/src/mailer/impls/resend-mailer.service.spec.ts), [`smtp-mailer.service.spec.ts`](apps/api/src/mailer/impls/smtp-mailer.service.spec.ts).
+- **`resend`** and **`nodemailer`** added as runtime deps; **`@types/nodemailer`** as a dev dep.
+- **[ADR-0005](docs/adr/0005-pluggable-mailer-sms.md)** — pluggable mailer + SMS interface-and-adapter pattern: why `forRoot(env)` over factory-with-conditional-providers, why per-impl constructor validation, why each impl owns its own provider switch arm. Sets the pattern PR 11 (SMSO.ro SMS adapter) will follow.
+
+### Added — PR 10 (Sign in with Apple)
+
+- **`POST /v1/auth/apple`** — accepts an Apple-issued identity token (web Sign in with Apple JS or the native SDK), verifies it against Apple's rotating JWKS (`https://appleid.apple.com/auth/keys`) with audience pinned to `APPLE_SERVICE_ID | APPLE_BUNDLE_ID`, resolves the user via the four linking cases documented in [`docs/auth/oauth-linking-rules.md`](docs/auth/oauth-linking-rules.md), mints a first-party session via `CoreAuthService.issueSession`, sets `access_token` + `refresh_token` cookies, and returns a `TokenPair`. Public + `login-ip`-throttled.
+- **`AppleVerifier` abstract + `RealAppleVerifier`** — wraps `jose`'s `createRemoteJWKSet` (JWKS caching + key rotation handled transparently) and `jwtVerify` (signature + issuer + audience + `±5s` clock-skew). `FakeAppleVerifier` ships with the test suite for `Test.createTestingModule().overrideProvider(AppleVerifier).useClass(FakeAppleVerifier)`-style injection.
+- **`AppleAuthModule`** conditionally registered by `AuthModule.forRoot(buildAuthConfig(env))` when `config.apple.enabled === true`. When the flag is off, the route returns 404, no JWKS fetch ever happens, and no `APPLE_*` env is required.
+- **Apple-specific behavior baked into `AppleAuthService`:**
+  - Email captured into `AuthAccount.email` on the very first sign-in (Apple omits it on every subsequent sign-in for the same `sub`); never overwritten thereafter.
+  - `@privaterelay.appleid.com` addresses accepted with no domain block.
+  - `email_verified` / `is_private_email` claims coerced from either string or boolean.
+  - Subsequent sign-in arriving without a known `AuthAccount` row → 401 with a generic message + `LOGIN_FAIL { reason: "missing-email-on-resign" }` (data-loss edge case).
+- **`v1.auth.appleSigninSchema`** in `@repo/api-shared` — `.strict()` body validator with `meta({ id: "AppleSignin" })` so Orval emits `AppleSignin` in `openapi.json`. Optional nested `fullName` payload (first-login hint) is also schema'd as `AppleFullName`.
+- **E2E coverage** in `apps/api/test/apple-auth.e2e-spec.ts` exercising: new-user first sign-in, return sign-in without `email`, private-relay accepted, auto-link onto same-email verified user, 409 unverified-email branch, verifier-rejected 401, cookie writes, and schema-strictness 400.
+- **Dependency added:** `jose@^6` in `apps/api` (signature verification + JWKS fetching).
+- **Docs** — new [`docs/auth/apple-signin.md`](docs/auth/apple-signin.md) with the full quirk list (JWKS rotation, audience config, per-app `sub`, first-login email rule, private relay, `fullName` hint). The Apple section of [`docs/auth/oauth-linking-rules.md`](docs/auth/oauth-linking-rules.md) is fleshed out (was a placeholder under PR 9).
+
+### Added — PR 8 (Email OTP module)
+
+- **`EmailOtpModule`** at [`apps/api/src/auth/modules/email-otp/`](apps/api/src/auth/modules/email-otp/). Two public endpoints:
+  - `POST /v1/auth/email-otp/request` — body `{ email }`; returns `202 { status: "sent" }` unconditionally. Inserts an `OtpToken` row + sends the code via `MailerService` when the email matches a real user; otherwise burns matched-latency work via `coreAuth.performDummyHashCompare()` so the response time doesn't disclose existence.
+  - `POST /v1/auth/email-otp/verify` — body `{ email, code }`; on match marks the row used, sets `User.emailVerified` (first time only), emits `EMAIL_VERIFIED` + `SIGNUP` (first sign-in only) + `LOGIN_SUCCESS` audits, calls `coreAuth.issueSession`, writes cookies, returns a `TokenPair`. Wrong-code attempts bump `attemptsCount`; at `OTP_MAX_ATTEMPTS` the row is locked and further verifies are refused without re-checking. Every failure path returns the generic `401 "Invalid or expired code"` body.
+- **Shared schemas** in [`packages/api-shared/src/v1/auth/email-otp.schemas.ts`](packages/api-shared/src/v1/auth/email-otp.schemas.ts): `emailOtpRequestSchema`, `emailOtpVerifySchema` — both `.strict()` and consumed by NestJS DTOs via `createZodDto`.
+- **Shared OTP-code helper** at [`apps/api/src/auth/utils/otp-code.ts`](apps/api/src/auth/utils/otp-code.ts) — `generateOtpCode({ nodeEnv, length })`. Returns `"000000"` in non-production; rejection-sampled crypto-random digits in production. Will be reused by the SMS-OTP module (PR 11) without reimplementation.
+- **Module wired into `AuthModule.forRoot()`** behind `config.emailOtp.enabled` (drives off `env.AUTH_EMAIL_OTP_ENABLED`, default `true`).
+- **E2E coverage** at [`apps/api/test/email-otp.e2e-spec.ts`](apps/api/test/email-otp.e2e-spec.ts): request happy paths (known + unknown email), verify happy path (cookies, session, audits), 5-wrong-attempts lockout, expired-row 401, anti-enumeration timing sanity, throttler 21st-call 429.
+- **Docs:** [`docs/auth/otp.md`](docs/auth/otp.md) — code generation (the `"000000"` dev bypass, why `NODE_ENV`-derived), hashing, attempts counter, expiry, anti-enumeration, throttler buckets, audit emissions.
+
+**Known gap (carried forward):** `otp-target` / `otp-target-daily` throttler buckets currently fall back to IP keying — the request-body tracker keyed on `body.email` has not shipped. Under a single IP these buckets behave like extra per-IP limits, not per-target limits. Tracked in [`docs/auth/rate-limiting.md`](docs/auth/rate-limiting.md).
+
+### Added — PR 6 (`AuthModule.forRoot(config)` + cleanup cron)
+
+- **`AuthModule.forRoot(config: AuthModuleConfig)`** now accepts a typed config — disabled features contribute nothing to the graph. The config is built from env by `buildAuthConfig(env)` in [`apps/api/src/auth/auth.config.ts`](apps/api/src/auth/auth.config.ts). The factory itself stays free of `env.AUTH_X_ENABLED` lookups so tests can hand-craft configs (force-enable a single method, disable the cron) without going through `process.env`.
+- **`AuthCleanupService`** ([`apps/api/src/auth/cleanup/auth-cleanup.service.ts`](apps/api/src/auth/cleanup/auth-cleanup.service.ts)) runs daily at 03:00 server-local via `@nestjs/schedule`'s `EVERY_DAY_AT_3AM` cron. Three deletes in one transaction: `RefreshToken WHERE expiresAt < now`, `OtpToken WHERE expiresAt < now - 7d`, `Session WHERE revokedAt < now - 30d`. `AuditEvent` rows are never touched here — audit history is append-only. The cron entry-point and the test-friendly `runOnce()` share one body.
+- **`AUTH_CLEANUP_ENABLED`** env flag (default `true`) gates registration of both `ScheduleModule` and the service. When off, no cron is installed, no scheduler runs.
+- **`@nestjs/schedule`** added as a runtime dep.
+- **E2E coverage** in [`apps/api/test/auth-cleanup.e2e-spec.ts`](apps/api/test/auth-cleanup.e2e-spec.ts): seeds an old + a fresh row per table, calls `runOnce()`, asserts the old row is gone and the fresh one survives. Includes an idempotency check (second pass deletes nothing).
+
+### Added — PR 9 (Google OAuth)
+
+- **`POST /v1/auth/google`** — accepts a Google-issued ID token, verifies it against the configured `GOOGLE_CLIENT_ID_WEB | _IOS | _ANDROID` audiences, resolves the user via the four linking cases documented in [`docs/auth/oauth-linking-rules.md`](docs/auth/oauth-linking-rules.md), mints a first-party session via `CoreAuthService.issueSession`, sets `access_token` + `refresh_token` cookies, and returns a `TokenPair`. Public + `login-ip`-throttled.
+- **`GoogleVerifier` abstraction** — abstract class declared in `apps/api/src/auth/modules/google/google-verifier.interface.ts`, bound to the production `RealGoogleVerifier` (wraps `google-auth-library`'s `OAuth2Client.verifyIdToken`) inside `GoogleAuthModule`. `FakeGoogleVerifier` lives in the same directory and is swapped in via `Test.createTestingModule().overrideProvider(GoogleVerifier).useClass(FakeGoogleVerifier)`.
+- **`GoogleAuthModule`** conditionally registered by `AuthModule.forRoot(buildAuthConfig(env))` when `config.google.enabled === true`. When the flag is off, the route returns 404, no Google client is constructed, and no `GOOGLE_CLIENT_ID_*` env is required.
+- **`v1.auth.googleSigninSchema`** in `@repo/api-shared` — `.strict()` body validator with `meta({ id: "GoogleSignin" })` so Orval emits `GoogleSignin` in `openapi.json`.
+- **E2E coverage** in `apps/api/test/google-auth.e2e-spec.ts` exercising all four linking cases, the 409 unverified-email branch, the verifier-rejected 401 path, cookie writes, and schema-strictness 400s.
+- **Docs** — new [`docs/auth/oauth-linking-rules.md`](docs/auth/oauth-linking-rules.md) covering the four linking cases, unlink semantics, and per-provider quirks (Google's `email_verified`, Apple's email-on-first-login).
+
+### Removed — scope strip (credentials + Facebook out of v1)
+
+- **`User.passwordHash`** column removed from the Prisma schema (init migration edited; reset the local dev DB to re-apply).
+- **`passwordSchema`** removed from `@repo/api-shared`.
+- **`AUTH_CREDENTIALS_ENABLED`, `AUTH_FACEBOOK_ENABLED`, `FACEBOOK_APP_ID`, `FACEBOOK_APP_SECRET`** env vars removed (and their `superRefine` cross-field rules).
+- **`credentials` and `facebook` fields** removed from `EnabledAuthMethods`, the OpenAPI response, and the controller payload.
+- **`SIGNUP_ATTEMPT_EXISTING_EMAIL`, `EMAIL_VERIFY_SENT`, `PASSWORD_CHANGED`, `PASSWORD_RESET_REQUESTED`, `PASSWORD_RESET_CONFIRMED`** removed from `AuditEventType`. (`EMAIL_VERIFIED` kept — emitted by email-OTP first verify.)
+- **OAuth provider set** in `unlinkOAuthAccount` narrowed to `"google" | "apple"`.
+- **`ROUTES.credentials.*` and `ROUTES.facebook`** removed from `@repo/api-shared`.
+- **Seed** narrowed to 4 fixture users (`seed-user-email-otp`, `-sms`, `-google`, `-apple`); bcrypt dependency unused at the seed boundary.
+- **Docs** synced (`docs/auth/sessions-and-audit.md`, `README.md`, `packages/api-shared/README.md`).
+
 ### Added — PR 5 part 2 (`CoreAuthController` + AuthModule + Orval pipeline + docs)
 
 - **`CoreAuthController`** under `/v1/auth/...` with eight endpoints:

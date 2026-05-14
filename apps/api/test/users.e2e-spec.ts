@@ -36,11 +36,10 @@ describe("UsersService (e2e)", () => {
     expect(await users.findById("user-does-not-exist")).toBeNull();
   });
 
-  it("findByEmail returns the seeded credentials user", async () => {
-    const user = await users.findByEmail("test-credentials@example.com");
+  it("findByEmail returns the seeded email-OTP user", async () => {
+    const user = await users.findByEmail("test-email-otp@example.com");
     expect(user).not.toBeNull();
-    expect(user?.id).toBe("seed-user-credentials");
-    expect(user?.passwordHash).not.toBeNull();
+    expect(user?.id).toBe("seed-user-email-otp");
   });
 
   it("findByPhone returns the seeded SMS user", async () => {

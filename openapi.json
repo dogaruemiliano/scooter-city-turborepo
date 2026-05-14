@@ -1,0 +1,766 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/healthz": {
+      "get": {
+        "operationId": "HealthController_check",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The Health Check is successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "ok"
+                    },
+                    "info": {
+                      "type": "object",
+                      "example": {
+                        "database": {
+                          "status": "up"
+                        }
+                      },
+                      "additionalProperties": {
+                        "type": "object",
+                        "required": ["status"],
+                        "properties": {
+                          "status": {
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": true
+                      },
+                      "nullable": true
+                    },
+                    "error": {
+                      "type": "object",
+                      "example": {},
+                      "additionalProperties": {
+                        "type": "object",
+                        "required": ["status"],
+                        "properties": {
+                          "status": {
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": true
+                      },
+                      "nullable": true
+                    },
+                    "details": {
+                      "type": "object",
+                      "example": {
+                        "database": {
+                          "status": "up"
+                        }
+                      },
+                      "additionalProperties": {
+                        "type": "object",
+                        "required": ["status"],
+                        "properties": {
+                          "status": {
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The Health Check is not successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "error"
+                    },
+                    "info": {
+                      "type": "object",
+                      "example": {
+                        "database": {
+                          "status": "up"
+                        }
+                      },
+                      "additionalProperties": {
+                        "type": "object",
+                        "required": ["status"],
+                        "properties": {
+                          "status": {
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": true
+                      },
+                      "nullable": true
+                    },
+                    "error": {
+                      "type": "object",
+                      "example": {
+                        "redis": {
+                          "status": "down",
+                          "message": "Could not connect"
+                        }
+                      },
+                      "additionalProperties": {
+                        "type": "object",
+                        "required": ["status"],
+                        "properties": {
+                          "status": {
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": true
+                      },
+                      "nullable": true
+                    },
+                    "details": {
+                      "type": "object",
+                      "example": {
+                        "database": {
+                          "status": "up"
+                        },
+                        "redis": {
+                          "status": "down",
+                          "message": "Could not connect"
+                        }
+                      },
+                      "additionalProperties": {
+                        "type": "object",
+                        "required": ["status"],
+                        "properties": {
+                          "status": {
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Liveness + readiness probe",
+        "tags": ["health"]
+      }
+    },
+    "/v1/auth/refresh": {
+      "post": {
+        "operationId": "CoreAuthController_refresh_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshTokensDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenPairResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Rotate the refresh token (cookie or body)",
+        "tags": ["auth"]
+      }
+    },
+    "/v1/auth/logout": {
+      "post": {
+        "operationId": "CoreAuthController_logout_v1",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Revoke the current session",
+        "tags": ["auth"]
+      }
+    },
+    "/v1/auth/logout-all": {
+      "post": {
+        "operationId": "CoreAuthController_logoutAll_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LogoutAllResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Revoke every session of the current user (including this one)",
+        "tags": ["auth"]
+      }
+    },
+    "/v1/auth/me": {
+      "get": {
+        "operationId": "CoreAuthController_me_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionUserResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Current user profile",
+        "tags": ["auth"]
+      },
+      "delete": {
+        "operationId": "CoreAuthController_deleteMe_v1",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Hard-delete the current user. Cascades sessions, refresh tokens, OTPs, and OAuth links. Audit events survive.",
+        "tags": ["auth"]
+      }
+    },
+    "/v1/auth/sessions": {
+      "get": {
+        "operationId": "CoreAuthController_listSessions_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SessionSummaryResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "List active sessions ('devices')",
+        "tags": ["auth"]
+      }
+    },
+    "/v1/auth/sessions/{id}": {
+      "delete": {
+        "operationId": "CoreAuthController_revokeSpecificSession_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Revoke one specific session",
+        "tags": ["auth"]
+      }
+    },
+    "/v1/auth/accounts/{provider}": {
+      "delete": {
+        "operationId": "CoreAuthController_unlinkOAuthAccount_v1",
+        "parameters": [
+          {
+            "name": "provider",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Unlink an OAuth identity. Refuses if doing so would leave the user with no remaining auth method.",
+        "tags": ["auth"]
+      }
+    },
+    "/v1/auth/enabled-methods": {
+      "get": {
+        "operationId": "CoreAuthController_enabledMethods_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnabledAuthMethodsResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Which auth methods this API has enabled. Drives conditional UI on the web/mobile clients.",
+        "tags": ["auth"]
+      }
+    },
+    "/v1/auth/email-otp/request": {
+      "post": {
+        "operationId": "EmailOtpController_request_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailOtpRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OtpRequestResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Email-OTP request: mail a single-use 6-digit code if the email matches a real user. Always returns 202; the response does not disclose whether the address is known.",
+        "tags": ["auth"]
+      }
+    },
+    "/v1/auth/email-otp/verify": {
+      "post": {
+        "operationId": "EmailOtpController_verify_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailOtpVerifyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenPairResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or expired code. The response is intentionally identical whether the email is unknown, the row is expired, the code is wrong, or the row has hit OTP_MAX_ATTEMPTS."
+          }
+        },
+        "summary": "Email-OTP verify: exchange a valid code for a fresh session (cookies set + TokenPair returned).",
+        "tags": ["auth"]
+      }
+    },
+    "/v1/auth/google": {
+      "post": {
+        "description": "Exchanges a Google ID token (from Google Identity Services on web, or the native Google Sign-In SDK on mobile) for a first-party session. Verification is local: we check the JWT signature, expiry, and audience against the configured `GOOGLE_CLIENT_ID_*` client IDs. Google's token is discarded after verification — subsequent requests authenticate with the access/refresh tokens this endpoint returns.",
+        "operationId": "GoogleAuthController_signin_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoogleSigninDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenPairResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The provided ID token failed signature, audience, or expiry verification."
+          },
+          "409": {
+            "description": "An account with the same email exists locally, but Google has not verified that email. Sign in via another method and link Google from settings."
+          }
+        },
+        "summary": "Sign in with a Google-issued ID token",
+        "tags": ["auth"]
+      }
+    },
+    "/v1/auth/apple": {
+      "post": {
+        "description": "Verifies the JWT against Apple's JWKS. On success, resolves or creates the user, issues a session, sets HttpOnly cookies, and returns a TokenPair. See docs/auth/apple-signin.md for the auto-link decision matrix.",
+        "operationId": "AppleAuthController_signin_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppleSigninDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenPairResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Apple identity token failed verification (signature, audience, issuer, expiry), or a subsequent sign-in arrived without a known AuthAccount row."
+          },
+          "409": {
+            "description": "A user with this email exists but the email is not verified on our side. Sign in via another method first, then link Apple from settings."
+          }
+        },
+        "summary": "Exchange an Apple identity token for an API session.",
+        "tags": ["auth"]
+      }
+    }
+  },
+  "info": {
+    "title": "Turborepo Full Template API",
+    "description": "REST API surface. All operations live under /v1.",
+    "version": "1.0.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "cookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "access_token",
+        "description": "HTTP-only access-token cookie."
+      },
+      "bearer": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http"
+      }
+    },
+    "schemas": {
+      "RefreshTokensDto": {
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "description": "Refresh token (mobile clients without a cookie jar pass it in the body). Ignored when an `access_token` cookie is present and valid.",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "TokenPairResponse": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "description": "Signed access JWT. Also set as the `access_token` HttpOnly cookie; mobile clients consume the body field."
+          },
+          "refreshToken": {
+            "type": "string",
+            "description": "Signed refresh JWT. Also set as the `refresh_token` HttpOnly cookie."
+          }
+        },
+        "required": ["accessToken", "refreshToken"]
+      },
+      "LogoutAllResponse": {
+        "type": "object",
+        "properties": {
+          "sessionsRevoked": {
+            "type": "number",
+            "description": "Number of sessions revoked, excluding the caller's current session."
+          }
+        },
+        "required": ["sessionsRevoked"]
+      },
+      "SessionUserResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "emailVerified": {
+            "type": "string",
+            "nullable": true
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "phoneVerified": {
+            "type": "string",
+            "nullable": true
+          },
+          "firstName": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastName": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "emailVerified",
+          "phone",
+          "phoneVerified",
+          "firstName",
+          "lastName",
+          "createdAt"
+        ]
+      },
+      "SessionSummaryResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "userAgent": {
+            "type": "string",
+            "nullable": true
+          },
+          "ip": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "lastUsedAt": {
+            "type": "string"
+          },
+          "current": {
+            "type": "boolean",
+            "description": "True for the session whose refresh token issued the current request."
+          }
+        },
+        "required": [
+          "id",
+          "userAgent",
+          "ip",
+          "createdAt",
+          "lastUsedAt",
+          "current"
+        ]
+      },
+      "EnabledAuthMethodsResponse": {
+        "type": "object",
+        "properties": {
+          "emailOtp": {
+            "type": "boolean"
+          },
+          "smsOtp": {
+            "type": "boolean"
+          },
+          "google": {
+            "type": "boolean"
+          },
+          "apple": {
+            "type": "boolean"
+          }
+        },
+        "required": ["emailOtp", "smsOtp", "google", "apple"]
+      },
+      "EmailOtpRequestDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "maxLength": 254,
+            "format": "email",
+            "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$",
+            "description": "Email address to send the one-time code to. Treated case-insensitively (normalized to lowercase before lookup)."
+          }
+        },
+        "required": ["email"],
+        "additionalProperties": false
+      },
+      "OtpRequestResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Constant acknowledgement of the request. Returned unconditionally — whether the email matched a real user is intentionally not disclosed (anti-enumeration).",
+            "enum": ["sent"]
+          }
+        },
+        "required": ["status"]
+      },
+      "EmailOtpVerifyDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "maxLength": 254,
+            "format": "email",
+            "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$",
+            "description": "Email address that received the code. Must match the address used in the preceding /request call."
+          },
+          "code": {
+            "type": "string",
+            "pattern": "^\\d{6}$",
+            "description": "The 6-digit one-time code. In non-production `NODE_ENV`, the API accepts the literal `\"000000\"`."
+          }
+        },
+        "required": ["email", "code"],
+        "additionalProperties": false
+      },
+      "GoogleSigninDto": {
+        "type": "object",
+        "properties": {
+          "idToken": {
+            "type": "string",
+            "minLength": 20,
+            "description": "Google-issued ID token (JWT) from Google Identity Services or the native SDK."
+          }
+        },
+        "required": ["idToken"],
+        "additionalProperties": false
+      },
+      "AppleSigninDtoAppleFullName": {
+        "type": "object",
+        "properties": {
+          "givenName": {
+            "type": "string",
+            "maxLength": 80,
+            "nullable": true
+          },
+          "familyName": {
+            "type": "string",
+            "maxLength": 80,
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "AppleSigninDto": {
+        "type": "object",
+        "properties": {
+          "idToken": {
+            "type": "string",
+            "minLength": 20,
+            "description": "Apple-issued identity token (JWT) from Sign in with Apple JS or the native SDK."
+          },
+          "fullName": {
+            "description": "Optional name payload Apple sends only on the very first sign-in. Used as a hint when creating a new User.",
+            "$ref": "#/components/schemas/AppleSigninDtoAppleFullName"
+          }
+        },
+        "required": ["idToken"],
+        "additionalProperties": false
+      }
+    }
+  }
+}

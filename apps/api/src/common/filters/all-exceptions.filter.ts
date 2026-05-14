@@ -10,9 +10,20 @@
  * clients want one shape. Without normalization the client error types
  * become useless union noise.
  *
- * - `HttpException` → preserves status, derives a SCREAMING_SNAKE code from
- *   the status text. If the response body already has a `message` array
- *   (typical ValidationPipe output), it lands in `error.details`.
+ * Handling order:
+ *
+ * - `ZodValidationException` (from nestjs-zod) → 400 BAD_REQUEST with each
+ *   ZodIssue mapped into `details[]`. Triggered by `ZodValidationPipe` on
+ *   any request body / query / params that fails parsing.
+ * - `ZodSerializationException` (from nestjs-zod) → 500 INTERNAL_SERVER_ERROR.
+ *   Means the controller returned a value that doesn't satisfy its
+ *   `@ZodSerializerDto` / `@ZodResponse` schema — a real bug. We log the
+ *   underlying ZodError so the failure is debuggable, but never expose
+ *   internals to the caller.
+ * - `HttpException` (everything else from Nest) → preserves status,
+ *   derives a SCREAMING_SNAKE code from the status text. If the response
+ *   body already has a `message` array (typical legacy ValidationPipe
+ *   output), it lands in `error.details`.
  * - Anything else → 500 INTERNAL_SERVER_ERROR with the message hidden in
  *   non-development environments.
  */
@@ -25,6 +36,8 @@ import {
   Logger,
 } from "@nestjs/common";
 import type { Request, Response } from "express";
+import { ZodSerializationException, ZodValidationException } from "nestjs-zod";
+import { ZodError } from "zod";
 
 interface ErrorResponse {
   error: {
@@ -35,12 +48,39 @@ interface ErrorResponse {
   };
 }
 
+interface NormalizedIssue {
+  path: string;
+  code: string;
+  message: string;
+}
+
 function codeForStatus(status: number): string {
   return (
     HttpStatus[status] ?? (status >= 500 ? "INTERNAL_SERVER_ERROR" : "ERROR")
   )
     .toString()
     .toUpperCase();
+}
+
+function isZodError(value: unknown): value is ZodError {
+  // nestjs-zod stores the original error as `unknown`. We accept anything
+  // shaped like a ZodError (has `issues`) — covers v3 and v4 schemas, plus
+  // the case where someone manually throws ZodError outside a pipe.
+  return (
+    value instanceof ZodError ||
+    (typeof value === "object" &&
+      value !== null &&
+      "issues" in value &&
+      Array.isArray((value as { issues: unknown }).issues))
+  );
+}
+
+function normalizeIssues(error: ZodError): NormalizedIssue[] {
+  return error.issues.map((issue) => ({
+    path: issue.path.map((segment) => String(segment)).join("."),
+    code: issue.code,
+    message: issue.message,
+  }));
 }
 
 @Catch()
@@ -56,7 +96,30 @@ export class AllExceptionsFilter implements ExceptionFilter {
     let message = "Internal server error";
     let details: unknown;
 
-    if (exception instanceof HttpException) {
+    if (exception instanceof ZodValidationException) {
+      status = HttpStatus.BAD_REQUEST;
+      message = "Validation failed";
+      const zodError = exception.getZodError();
+      if (isZodError(zodError)) {
+        details = normalizeIssues(zodError);
+      }
+    } else if (exception instanceof ZodSerializationException) {
+      // The handler returned data that doesn't satisfy its declared
+      // response schema. The client gets a generic 500 — we don't leak
+      // serialization details — but log the underlying error so the
+      // shape mismatch is debuggable.
+      status = HttpStatus.INTERNAL_SERVER_ERROR;
+      message = "Internal server error";
+      const zodError = exception.getZodError();
+      if (isZodError(zodError)) {
+        this.logger.error(
+          `ZodSerializationException: ${zodError.message}`,
+          zodError.stack,
+        );
+      } else {
+        this.logger.error(`ZodSerializationException: ${String(zodError)}`);
+      }
+    } else if (exception instanceof HttpException) {
       status = exception.getStatus();
       const body = exception.getResponse();
       if (typeof body === "string") {
@@ -71,6 +134,13 @@ export class AllExceptionsFilter implements ExceptionFilter {
           message = obj.message;
         }
       }
+    } else if (isZodError(exception)) {
+      // Raw ZodError thrown outside any pipe (e.g. manual `.parse()` in
+      // a service). Treat the same as ZodValidationException so callers
+      // see a consistent envelope.
+      status = HttpStatus.BAD_REQUEST;
+      message = "Validation failed";
+      details = normalizeIssues(exception);
     } else if (exception instanceof Error) {
       message =
         process.env.NODE_ENV === "production"

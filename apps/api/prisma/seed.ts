@@ -5,10 +5,9 @@
  * its purpose, so tests can rely on stable IDs across `prisma migrate
  * reset` cycles. Idempotent: re-running upserts existing rows in place.
  *
- * NOT for production. These users have weak, well-known credentials and
- * exist for the sole purpose of giving developers and the E2E suite known
- * accounts to log in with. The script refuses to run when
- * NODE_ENV=production.
+ * NOT for production. These users exist for the sole purpose of giving
+ * developers and the E2E suite known accounts to log in with. The script
+ * refuses to run when NODE_ENV=production.
  *
  * Uses Prisma 7's canonical setup per AGENTS.md → prisma-verify-rule:
  *   - PrismaClient comes from `../src/generated/prisma/client`
@@ -20,11 +19,9 @@
  *
  *   | Email                          | Purpose                       | Notes                               |
  *   |--------------------------------|-------------------------------|-------------------------------------|
- *   | test-credentials@example.com   | Credentials login flow        | password "Password123!"; verified   |
- *   | test-email-otp@example.com     | Email-OTP flow                | no password                         |
+ *   | test-email-otp@example.com     | Email-OTP flow                | no OAuth links                      |
  *   | test-sms@example.com           | SMS-OTP flow                  | phone +40700000001                  |
  *   | test-google@example.com        | Google OAuth                  | linked AuthAccount row              |
- *   | test-facebook@example.com      | Facebook OAuth                | linked AuthAccount row              |
  *   | test-apple@example.com         | Apple OAuth                   | linked AuthAccount row, email saved |
  *
  * Run via `pnpm db:seed` (which calls `prisma db seed` → `tsx prisma/seed.ts`).
@@ -32,7 +29,6 @@
 import "dotenv/config";
 
 import { PrismaPg } from "@prisma/adapter-pg";
-import bcrypt from "bcrypt";
 
 import { PrismaClient } from "../src/generated/prisma/client";
 
@@ -59,37 +55,17 @@ const adapter = new PrismaPg({
 
 const prisma = new PrismaClient({ adapter });
 
-const SEED_PASSWORD = "Password123!";
-const BCRYPT_COST = 12;
-
 const FIXED_IDS = {
-  credentials: "seed-user-credentials",
   emailOtp: "seed-user-email-otp",
   sms: "seed-user-sms",
   google: "seed-user-google",
-  facebook: "seed-user-facebook",
   apple: "seed-user-apple",
 } as const;
 
 async function main(): Promise<void> {
-  const passwordHash = await bcrypt.hash(SEED_PASSWORD, BCRYPT_COST);
   const now = new Date();
 
-  // Credentials user — passwordHash, emailVerified.
-  await prisma.user.upsert({
-    where: { id: FIXED_IDS.credentials },
-    create: {
-      id: FIXED_IDS.credentials,
-      email: "test-credentials@example.com",
-      emailVerified: now,
-      passwordHash,
-      firstName: "Test",
-      lastName: "Credentials",
-    },
-    update: { passwordHash, emailVerified: now },
-  });
-
-  // Email-OTP user — no password.
+  // Email-OTP user — no OAuth links.
   await prisma.user.upsert({
     where: { id: FIXED_IDS.emailOtp },
     create: {
@@ -121,12 +97,6 @@ async function main(): Promise<void> {
       email: "test-google@example.com",
       provider: "google" as const,
       providerId: "seed-google-sub-001",
-    },
-    {
-      id: FIXED_IDS.facebook,
-      email: "test-facebook@example.com",
-      provider: "facebook" as const,
-      providerId: "seed-facebook-sub-001",
     },
     {
       id: FIXED_IDS.apple,
@@ -168,9 +138,7 @@ async function main(): Promise<void> {
   }
 
   // eslint-disable-next-line no-console
-  console.log(
-    `Seeded ${Object.keys(FIXED_IDS).length} users (password for credentials user: "${SEED_PASSWORD}").`,
-  );
+  console.log(`Seeded ${Object.keys(FIXED_IDS).length} users.`);
 }
 
 main()

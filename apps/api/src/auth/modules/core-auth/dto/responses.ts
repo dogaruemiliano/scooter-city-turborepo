@@ -11,14 +11,9 @@
  */
 import { ApiProperty } from "@nestjs/swagger";
 
-import type {
-  EnabledAuthMethods,
-  SessionSummary,
-  SessionUser,
-  TokenPair,
-} from "@repo/api-shared";
+import { v1 } from "@repo/api-shared";
 
-export class SessionUserResponse implements SessionUser {
+export class SessionUserResponse implements v1.auth.SessionUser {
   @ApiProperty() id!: string;
   @ApiProperty() email!: string;
   @ApiProperty({ type: String, nullable: true }) emailVerified!: string | null;
@@ -29,7 +24,7 @@ export class SessionUserResponse implements SessionUser {
   @ApiProperty() createdAt!: string;
 }
 
-export class SessionSummaryResponse implements SessionSummary {
+export class SessionSummaryResponse implements v1.auth.SessionSummary {
   @ApiProperty() id!: string;
   @ApiProperty({ type: String, nullable: true }) userAgent!: string | null;
   @ApiProperty({ type: String, nullable: true }) ip!: string | null;
@@ -42,7 +37,7 @@ export class SessionSummaryResponse implements SessionSummary {
   current!: boolean;
 }
 
-export class TokenPairResponse implements TokenPair {
+export class TokenPairResponse implements v1.auth.TokenPair {
   @ApiProperty({
     description:
       "Signed access JWT. Also set as the `access_token` HttpOnly cookie; mobile clients consume the body field.",
@@ -56,12 +51,10 @@ export class TokenPairResponse implements TokenPair {
   refreshToken!: string;
 }
 
-export class EnabledAuthMethodsResponse implements EnabledAuthMethods {
+export class EnabledAuthMethodsResponse implements v1.auth.EnabledAuthMethods {
   @ApiProperty() emailOtp!: boolean;
   @ApiProperty() smsOtp!: boolean;
-  @ApiProperty() credentials!: boolean;
   @ApiProperty() google!: boolean;
-  @ApiProperty() facebook!: boolean;
   @ApiProperty() apple!: boolean;
 }
 

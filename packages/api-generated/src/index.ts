@@ -54,10 +54,73 @@ export interface SessionSummaryResponse {
 export interface EnabledAuthMethodsResponse {
   emailOtp: boolean;
   smsOtp: boolean;
-  credentials: boolean;
   google: boolean;
-  facebook: boolean;
   apple: boolean;
+}
+
+export interface EmailOtpRequestDto {
+  /**
+   * Email address to send the one-time code to. Treated case-insensitively (normalized to lowercase before lookup).
+   * @maxLength 254
+   * @pattern ^(?!\.)(?!.*\.\.)([A-Za-z0-9_'+\-\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\-]*\.)+[A-Za-z]{2,}$
+   */
+  email: string;
+}
+
+/**
+ * Constant acknowledgement of the request. Returned unconditionally — whether the email matched a real user is intentionally not disclosed (anti-enumeration).
+ */
+export enum OtpRequestResponseStatus {
+  sent = "sent",
+}
+export interface OtpRequestResponse {
+  /** Constant acknowledgement of the request. Returned unconditionally — whether the email matched a real user is intentionally not disclosed (anti-enumeration). */
+  status: OtpRequestResponseStatus;
+}
+
+export interface EmailOtpVerifyDto {
+  /**
+   * Email address that received the code. Must match the address used in the preceding /request call.
+   * @maxLength 254
+   * @pattern ^(?!\.)(?!.*\.\.)([A-Za-z0-9_'+\-\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\-]*\.)+[A-Za-z]{2,}$
+   */
+  email: string;
+  /**
+   * The 6-digit one-time code. In non-production `NODE_ENV`, the API accepts the literal `"000000"`.
+   * @pattern ^\d{6}$
+   */
+  code: string;
+}
+
+export interface GoogleSigninDto {
+  /**
+   * Google-issued ID token (JWT) from Google Identity Services or the native SDK.
+   * @minLength 20
+   */
+  idToken: string;
+}
+
+export interface AppleSigninDtoAppleFullName {
+  /**
+   * @maxLength 80
+   * @nullable
+   */
+  givenName?: string | null;
+  /**
+   * @maxLength 80
+   * @nullable
+   */
+  familyName?: string | null;
+}
+
+export interface AppleSigninDto {
+  /**
+   * Apple-issued identity token (JWT) from Sign in with Apple JS or the native SDK.
+   * @minLength 20
+   */
+  idToken: string;
+  /** Optional name payload Apple sends only on the very first sign-in. Used as a hint when creating a new User. */
+  fullName?: AppleSigninDtoAppleFullName;
 }
 
 /**
@@ -456,6 +519,191 @@ export const coreAuthControllerEnabledMethodsV1 = async (
     {
       ...options,
       method: "GET",
+    },
+  );
+};
+
+/**
+ * @summary Email-OTP request: mail a single-use 6-digit code if the email matches a real user. Always returns 202; the response does not disclose whether the address is known.
+ */
+export type emailOtpControllerRequestV1Response202 = {
+  data: OtpRequestResponse;
+  status: 202;
+};
+
+export type emailOtpControllerRequestV1ResponseSuccess =
+  emailOtpControllerRequestV1Response202 & {
+    headers: Headers;
+  };
+export type emailOtpControllerRequestV1Response =
+  emailOtpControllerRequestV1ResponseSuccess;
+
+export const getEmailOtpControllerRequestV1Url = () => {
+  return `/v1/auth/email-otp/request`;
+};
+
+export const emailOtpControllerRequestV1 = async (
+  emailOtpRequestDto: EmailOtpRequestDto,
+  options?: RequestInit,
+): Promise<emailOtpControllerRequestV1Response> => {
+  return customFetch<emailOtpControllerRequestV1Response>(
+    getEmailOtpControllerRequestV1Url(),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(emailOtpRequestDto),
+    },
+  );
+};
+
+/**
+ * @summary Email-OTP verify: exchange a valid code for a fresh session (cookies set + TokenPair returned).
+ */
+export type emailOtpControllerVerifyV1Response200 = {
+  data: TokenPairResponse;
+  status: 200;
+};
+
+export type emailOtpControllerVerifyV1Response401 = {
+  data: void;
+  status: 401;
+};
+
+export type emailOtpControllerVerifyV1ResponseSuccess =
+  emailOtpControllerVerifyV1Response200 & {
+    headers: Headers;
+  };
+export type emailOtpControllerVerifyV1ResponseError =
+  emailOtpControllerVerifyV1Response401 & {
+    headers: Headers;
+  };
+
+export type emailOtpControllerVerifyV1Response =
+  | emailOtpControllerVerifyV1ResponseSuccess
+  | emailOtpControllerVerifyV1ResponseError;
+
+export const getEmailOtpControllerVerifyV1Url = () => {
+  return `/v1/auth/email-otp/verify`;
+};
+
+export const emailOtpControllerVerifyV1 = async (
+  emailOtpVerifyDto: EmailOtpVerifyDto,
+  options?: RequestInit,
+): Promise<emailOtpControllerVerifyV1Response> => {
+  return customFetch<emailOtpControllerVerifyV1Response>(
+    getEmailOtpControllerVerifyV1Url(),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(emailOtpVerifyDto),
+    },
+  );
+};
+
+/**
+ * Exchanges a Google ID token (from Google Identity Services on web, or the native Google Sign-In SDK on mobile) for a first-party session. Verification is local: we check the JWT signature, expiry, and audience against the configured `GOOGLE_CLIENT_ID_*` client IDs. Google's token is discarded after verification — subsequent requests authenticate with the access/refresh tokens this endpoint returns.
+ * @summary Sign in with a Google-issued ID token
+ */
+export type googleAuthControllerSigninV1Response200 = {
+  data: TokenPairResponse;
+  status: 200;
+};
+
+export type googleAuthControllerSigninV1Response401 = {
+  data: void;
+  status: 401;
+};
+
+export type googleAuthControllerSigninV1Response409 = {
+  data: void;
+  status: 409;
+};
+
+export type googleAuthControllerSigninV1ResponseSuccess =
+  googleAuthControllerSigninV1Response200 & {
+    headers: Headers;
+  };
+export type googleAuthControllerSigninV1ResponseError = (
+  | googleAuthControllerSigninV1Response401
+  | googleAuthControllerSigninV1Response409
+) & {
+  headers: Headers;
+};
+
+export type googleAuthControllerSigninV1Response =
+  | googleAuthControllerSigninV1ResponseSuccess
+  | googleAuthControllerSigninV1ResponseError;
+
+export const getGoogleAuthControllerSigninV1Url = () => {
+  return `/v1/auth/google`;
+};
+
+export const googleAuthControllerSigninV1 = async (
+  googleSigninDto: GoogleSigninDto,
+  options?: RequestInit,
+): Promise<googleAuthControllerSigninV1Response> => {
+  return customFetch<googleAuthControllerSigninV1Response>(
+    getGoogleAuthControllerSigninV1Url(),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(googleSigninDto),
+    },
+  );
+};
+
+/**
+ * Verifies the JWT against Apple's JWKS. On success, resolves or creates the user, issues a session, sets HttpOnly cookies, and returns a TokenPair. See docs/auth/apple-signin.md for the auto-link decision matrix.
+ * @summary Exchange an Apple identity token for an API session.
+ */
+export type appleAuthControllerSigninV1Response200 = {
+  data: TokenPairResponse;
+  status: 200;
+};
+
+export type appleAuthControllerSigninV1Response401 = {
+  data: void;
+  status: 401;
+};
+
+export type appleAuthControllerSigninV1Response409 = {
+  data: void;
+  status: 409;
+};
+
+export type appleAuthControllerSigninV1ResponseSuccess =
+  appleAuthControllerSigninV1Response200 & {
+    headers: Headers;
+  };
+export type appleAuthControllerSigninV1ResponseError = (
+  | appleAuthControllerSigninV1Response401
+  | appleAuthControllerSigninV1Response409
+) & {
+  headers: Headers;
+};
+
+export type appleAuthControllerSigninV1Response =
+  | appleAuthControllerSigninV1ResponseSuccess
+  | appleAuthControllerSigninV1ResponseError;
+
+export const getAppleAuthControllerSigninV1Url = () => {
+  return `/v1/auth/apple`;
+};
+
+export const appleAuthControllerSigninV1 = async (
+  appleSigninDto: AppleSigninDto,
+  options?: RequestInit,
+): Promise<appleAuthControllerSigninV1Response> => {
+  return customFetch<appleAuthControllerSigninV1Response>(
+    getAppleAuthControllerSigninV1Url(),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(appleSigninDto),
     },
   );
 };

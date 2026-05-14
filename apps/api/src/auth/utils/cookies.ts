@@ -19,7 +19,7 @@
  * - `maxAge` — matched to the JWT `exp` so the browser drops the cookie
  *   exactly when the JWT becomes invalid.
  */
-import { ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE } from "@repo/api-shared";
+import { v1 } from "@repo/api-shared";
 import type { CookieOptions, Response } from "express";
 
 import type { Env } from "../../config/env";
@@ -51,11 +51,11 @@ export function setAuthCookies(
   tokens: TokenPair,
 ): void {
   const base = cookieBaseOptions(env);
-  res.cookie(ACCESS_TOKEN_COOKIE, tokens.accessToken, {
+  res.cookie(v1.auth.ACCESS_TOKEN_COOKIE, tokens.accessToken, {
     ...base,
     maxAge: tokens.accessTokenExpiresInSec * 1000,
   });
-  res.cookie(REFRESH_TOKEN_COOKIE, tokens.refreshToken, {
+  res.cookie(v1.auth.REFRESH_TOKEN_COOKIE, tokens.refreshToken, {
     ...base,
     maxAge: tokens.refreshTokenExpiresInSec * 1000,
   });
@@ -65,6 +65,6 @@ export function clearAuthCookies(res: Response, env: Env): void {
   // `clearCookie` only matches when the same path + domain attributes
   // were used at set time. Mirror them precisely.
   const base = cookieBaseOptions(env);
-  res.clearCookie(ACCESS_TOKEN_COOKIE, base);
-  res.clearCookie(REFRESH_TOKEN_COOKIE, base);
+  res.clearCookie(v1.auth.ACCESS_TOKEN_COOKIE, base);
+  res.clearCookie(v1.auth.REFRESH_TOKEN_COOKIE, base);
 }

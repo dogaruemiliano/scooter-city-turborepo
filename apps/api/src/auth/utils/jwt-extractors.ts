@@ -15,17 +15,17 @@
  * The cookie name comes from `@repo/api-shared` so the web client and
  * mobile client can never disagree with the API about what to call it.
  */
-import { ACCESS_TOKEN_COOKIE } from "@repo/api-shared";
+import { v1 } from "@repo/api-shared";
 import type { Request } from "express";
 import type { JwtFromRequestFunction } from "passport-jwt";
 import { ExtractJwt } from "passport-jwt";
 
-/** Reads `req.cookies[ACCESS_TOKEN_COOKIE]`, or returns `null`. */
+/** Reads `req.cookies[v1.auth.ACCESS_TOKEN_COOKIE]`, or returns `null`. */
 export const cookieAccessTokenExtractor: JwtFromRequestFunction<Request> = (
   req: Request,
 ) => {
   const cookies = req.cookies as Record<string, string | undefined> | undefined;
-  return cookies?.[ACCESS_TOKEN_COOKIE] ?? null;
+  return cookies?.[v1.auth.ACCESS_TOKEN_COOKIE] ?? null;
 };
 
 /**

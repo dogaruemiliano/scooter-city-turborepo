@@ -86,14 +86,12 @@ The template's value is being readable months later. Every new feature ships wit
 
 Once auth modules land, the source of truth is **API env vars**, not a checked-in config file:
 
-| Env var                    | Default | Effect                                      |
-| -------------------------- | ------- | ------------------------------------------- |
-| `AUTH_EMAIL_OTP_ENABLED`   | `true`  | Wires `/v1/auth/email-otp/{request,verify}` |
-| `AUTH_SMS_OTP_ENABLED`     | `false` | Wires `/v1/auth/sms-otp/{request,verify}`   |
-| `AUTH_CREDENTIALS_ENABLED` | `true`  | Wires signup/login/reset endpoints          |
-| `AUTH_GOOGLE_ENABLED`      | `false` | Wires `/v1/auth/google`                     |
-| `AUTH_FACEBOOK_ENABLED`    | `false` | Wires `/v1/auth/facebook`                   |
-| `AUTH_APPLE_ENABLED`       | `false` | Wires `/v1/auth/apple`                      |
+| Env var                  | Default | Effect                                      |
+| ------------------------ | ------- | ------------------------------------------- |
+| `AUTH_EMAIL_OTP_ENABLED` | `true`  | Wires `/v1/auth/email-otp/{request,verify}` |
+| `AUTH_SMS_OTP_ENABLED`   | `false` | Wires `/v1/auth/sms-otp/{request,verify}`   |
+| `AUTH_GOOGLE_ENABLED`    | `false` | Wires `/v1/auth/google`                     |
+| `AUTH_APPLE_ENABLED`     | `false` | Wires `/v1/auth/apple`                      |
 
 Disabled methods don't just hide — their routes don't exist, their providers aren't registered, their env vars aren't required. The future web app reads `GET /v1/auth/enabled-methods` at SSR to know which buttons/forms to render. No `NEXT_PUBLIC_*` mirroring needed.
 

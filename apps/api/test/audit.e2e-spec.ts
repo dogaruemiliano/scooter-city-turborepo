@@ -92,13 +92,13 @@ describe("AuditService (e2e)", () => {
 
     await audit.record({
       type: AuditEventType.LOGIN_FAIL,
-      meta: { method: "credentials", reason: "wrong-password" },
+      meta: { method: "email-otp", reason: "wrong-code" },
     });
 
     const row = await prisma.auditEvent.findFirst({
       where: { type: AuditEventType.LOGIN_FAIL },
       orderBy: { createdAt: "desc" },
     });
-    expect(row?.meta).toMatchObject({ method: "credentials" });
+    expect(row?.meta).toMatchObject({ method: "email-otp" });
   });
 });

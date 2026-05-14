@@ -13,6 +13,11 @@ const TEST_ENV: Record<string, string> = {
   REFRESH_TOKEN_HMAC_SECRET: "z".repeat(32),
   OTP_HMAC_SECRET: "q".repeat(32),
   DATABASE_URL: "postgresql://app:app@localhost:5434/app",
+  // Enable Google with a stub web client ID so AppModule registers the
+  // /v1/auth/google route. The e2e suite overrides `GoogleVerifier`
+  // with `FakeGoogleVerifier` — the real client ID is never consulted.
+  AUTH_GOOGLE_ENABLED: "true",
+  GOOGLE_CLIENT_ID_WEB: "test-google-client-id-web",
 };
 
 for (const [k, v] of Object.entries(TEST_ENV)) {

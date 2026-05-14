@@ -1,6 +1,6 @@
 /**
  * Global module exposing `AuditService`. Auth submodules in PR 5+ inject
- * it to record `LOGIN_SUCCESS`, `LOGIN_FAIL`, `PASSWORD_CHANGED`, etc.
+ * it to record `LOGIN_SUCCESS`, `LOGIN_FAIL`, `OAUTH_LINKED`, etc.
  *
  * `@Global()` because audit is genuinely cross-cutting — every auth flow
  * emits events.

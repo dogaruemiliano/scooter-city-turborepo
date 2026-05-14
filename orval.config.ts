@@ -8,14 +8,15 @@
  *   3. `pnpm gen:openapi`      — `node apps/api/dist/main --spec-only > openapi.json`
  *   4. `pnpm gen:orval`        — this config emits into packages/api-generated/src
  *
- * The output package (`packages/api-generated`) lands in PR 2. Until then,
- * the orval target is silently skipped if `openapi.json` is missing.
- *
- * TODO(PR 5): once the first auth DTO ships, add a second target here
- * that emits zod schemas to `packages/api-generated/src/zod/`. Forms on
- * the web + mobile clients then import the same schema the API validates
- * against, so DTO-level rules (email format, password length, etc.) live
- * in exactly one place. See README at packages/api-shared for context.
+ * Validation-rule source of truth:
+ *   Zod schemas in `packages/api-shared/src/v1/` are the canonical
+ *   definitions. NestJS consumes them via `nestjs-zod`'s `createZodDto`
+ *   and emits OpenAPI through `@nestjs/swagger` + `cleanupOpenApiDoc()`.
+ *   Orval generates TypeScript request/response types from that OpenAPI
+ *   doc — so the wire types are downstream of the same schemas the API
+ *   validates against. Web + mobile forms validate with the same schemas
+ *   imported directly from `@repo/api-shared`. No second Orval target
+ *   that emits Zod is needed; the schemas are already shared.
  */
 import { defineConfig } from "orval";
 
