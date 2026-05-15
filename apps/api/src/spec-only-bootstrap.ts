@@ -29,6 +29,8 @@ if (process.argv.includes("--spec-only")) {
     APPLE_SERVICE_ID: "com.example.spec.placeholder",
     AUTH_GOOGLE_ENABLED: "true",
     GOOGLE_CLIENT_ID_WEB: "spec-only-google-client-id-web.placeholder",
+    AUTH_SMS_OTP_ENABLED: "true",
+    SMS_PROVIDER: "log",
   };
   for (const [k, v] of Object.entries(placeholders)) {
     if (process.env[k] === undefined) process.env[k] = v;

@@ -4,6 +4,23 @@ All notable changes land here. Each PR appends an entry under `Unreleased`; rele
 
 ## Unreleased
 
+### Added — PR 11 (SMS OTP module + SMSO.ro adapter)
+
+- **`SmsOtpModule`** at [`apps/api/src/auth/modules/sms-otp/`](apps/api/src/auth/modules/sms-otp/). Mirrors `EmailOtpModule` with `email → phone`, `MailerService → SmsService`, `channel: "SMS"`, `User.phoneVerified` instead of `emailVerified`. Two public endpoints:
+  - `POST /v1/auth/sms-otp/request` — body `{ phone }` (E.164); returns `202 { status: "sent" }` unconditionally. Inserts an `OtpToken` row + sends the code via `SmsService` when the phone matches a real user; otherwise burns matched-latency work via `coreAuth.performDummyHashCompare()` so response time doesn't leak existence.
+  - `POST /v1/auth/sms-otp/verify` — body `{ phone, code }`; on match marks the row used, sets `User.phoneVerified` (first time only), emits `SIGNUP` (first sign-in only) + `LOGIN_SUCCESS` audits, calls `coreAuth.issueSession`, writes cookies, returns a `TokenPair`. Wrong-code lockout at `OTP_MAX_ATTEMPTS`. Every failure path returns the generic `401 "Invalid or expired code"` body.
+- **`SmsoSmsService`** ([`apps/api/src/sms/impls/smso-sms.service.ts`](apps/api/src/sms/impls/smso-sms.service.ts)) — production SMS adapter for [SMSO.ro](https://app.smso.ro). `POST /api/v1/send` with `X-Authorization` header and JSON `{ sender, to, body, type: "otp" }`. Surfaces both non-2xx HTTP and non-200-envelope statuses as thrown errors. No internal retry — `/request` is idempotent from the caller's perspective.
+- **`SmsModule`** ([`apps/api/src/sms/sms.module.ts`](apps/api/src/sms/sms.module.ts)) selects the impl by `env.SMS_PROVIDER` (`log` default, `smso` production). `SmsoSmsService` is conditionally registered so its env-validating constructor stays dormant on `log` boots. Pattern mirrors `MailerModule` (ADR-0005).
+- **`PHONE_VERIFIED`-shaped audit gap:** SMS-OTP emits `LOGIN_SUCCESS` / `SIGNUP` / `LOGIN_FAIL` with `meta.method: "sms-otp"`. No `PHONE_VERIFIED` event type exists yet — flipping `User.phoneVerified` is not separately auditable. Documented as a follow-up in [`docs/auth/otp.md`](docs/auth/otp.md).
+- **Shared schemas** in [`packages/api-shared/src/v1/auth/sms-otp.schemas.ts`](packages/api-shared/src/v1/auth/sms-otp.schemas.ts): `smsOtpRequestSchema`, `smsOtpVerifySchema` — `.strict()` with `.meta({ id })` driving the OpenAPI schema names. Re-uses `v1.common.phoneSchema` (E.164) and `v1.common.otpCodeSchema`.
+- **Shared OTP-code helper** ([`apps/api/src/auth/utils/otp-code.ts`](apps/api/src/auth/utils/otp-code.ts)) created by PR 8 is reused here unchanged — no duplicate copy.
+- **Module wired into `AuthModule.forRoot()`** behind `config.smsOtp.enabled` (drives off `env.AUTH_SMS_OTP_ENABLED`).
+- **E2E coverage** at [`apps/api/test/sms-otp.e2e-spec.ts`](apps/api/test/sms-otp.e2e-spec.ts): request happy paths (known + unknown phone), verify happy path (cookies, session, audits, `phoneVerified` flip), 5-wrong-attempts lockout, expired-row 401, anti-enumeration timing sanity, throttler 21st-call 429.
+- **Unit coverage** at [`apps/api/src/sms/impls/smso-sms.service.spec.ts`](apps/api/src/sms/impls/smso-sms.service.spec.ts): mocks `globalThis.fetch` and asserts URL, headers, body shape, non-2xx error, non-200 envelope error, and constructor-side env validation.
+- **Docs:** new [`docs/auth/sms-provider.md`](docs/auth/sms-provider.md) covering the SMSO.ro contract, env config, status-code reference, and DI wiring. [`docs/auth/otp.md`](docs/auth/otp.md) updated to cover both channels and the audit-gap caveat.
+
+**Known gap carried forward from PR 8:** `otp-target` / `otp-target-daily` throttler buckets still fall back to IP keying — the request-body tracker keyed on `body.phone` (or `body.email`) has not shipped. Under a single IP these buckets behave like extra per-IP limits.
+
 ### Added — PR 7 (Resend + SMTP mailer impls + ADR-0005)
 
 - **`ResendMailerService`** ([`apps/api/src/mailer/impls/resend-mailer.service.ts`](apps/api/src/mailer/impls/resend-mailer.service.ts)) — production mailer over the Resend HTTP API. Constructor validates `RESEND_API_KEY` (defense in depth on top of the env schema's cross-field rule). Surfaces Resend's error envelope as a thrown `Error`. No retry loop — Resend owns its own queuing.

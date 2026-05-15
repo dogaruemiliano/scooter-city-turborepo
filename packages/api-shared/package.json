@@ -4,10 +4,10 @@
   "private": true,
   "description": "Hand-written types, zod fragments, cookie names, and route paths shared between apps/api, apps/web, and apps/mobile. Anything Orval cannot generate from the OpenAPI doc lives here.",
   "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "types": "./src/index.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
+      "types": "./src/index.ts",
       "default": "./dist/index.js"
     }
   },

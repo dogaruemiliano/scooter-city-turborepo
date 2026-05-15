@@ -1,67 +1,35 @@
 /**
- * Response shapes for the core-auth controller.
+ * NestJS DTO wrappers for the core-auth controller's response bodies.
  *
- * Each class mirrors the corresponding shared type in
- * `@repo/api-shared` (SessionUser, SessionSummary, TokenPair,
- * EnabledAuthMethods) and adds `@ApiProperty` decorators so Orval
- * picks the schemas up from the OpenAPI document.
+ * Each class extends `createZodDto(...)` over a schema in
+ * `@repo/api-shared` — the schema is the contract, the class is the
+ * NestJS-compatible vessel that `@ZodResponse({ type })` /
+ * `@ApiOkResponse({ type })` decorators need at runtime.
  *
- * The shared types stay the contract surface; these classes exist only
- * because NestJS Swagger needs decorated classes to emit schemas.
+ * Field-level metadata (types, descriptions, nullability) lives in the
+ * schema; nestjs-zod's patched Swagger metadata factory emits the
+ * OpenAPI doc from `z.toJSONSchema()` and `cleanupOpenApiDoc()` renames
+ * the components by `.meta({ id })`. No `@ApiProperty` decorators here.
  */
-import { ApiProperty } from "@nestjs/swagger";
-
 import { v1 } from "@repo/api-shared";
+import { createZodDto } from "nestjs-zod";
 
-export class SessionUserResponse implements v1.auth.SessionUser {
-  @ApiProperty() id!: string;
-  @ApiProperty() email!: string;
-  @ApiProperty({ type: String, nullable: true }) emailVerified!: string | null;
-  @ApiProperty({ type: String, nullable: true }) phone!: string | null;
-  @ApiProperty({ type: String, nullable: true }) phoneVerified!: string | null;
-  @ApiProperty({ type: String, nullable: true }) firstName!: string | null;
-  @ApiProperty({ type: String, nullable: true }) lastName!: string | null;
-  @ApiProperty() createdAt!: string;
-}
+export class SessionUserResponse extends createZodDto(
+  v1.auth.sessionUserResponseSchema,
+) {}
 
-export class SessionSummaryResponse implements v1.auth.SessionSummary {
-  @ApiProperty() id!: string;
-  @ApiProperty({ type: String, nullable: true }) userAgent!: string | null;
-  @ApiProperty({ type: String, nullable: true }) ip!: string | null;
-  @ApiProperty() createdAt!: string;
-  @ApiProperty() lastUsedAt!: string;
-  @ApiProperty({
-    description:
-      "True for the session whose refresh token issued the current request.",
-  })
-  current!: boolean;
-}
+export class SessionSummaryResponse extends createZodDto(
+  v1.auth.sessionSummaryResponseSchema,
+) {}
 
-export class TokenPairResponse implements v1.auth.TokenPair {
-  @ApiProperty({
-    description:
-      "Signed access JWT. Also set as the `access_token` HttpOnly cookie; mobile clients consume the body field.",
-  })
-  accessToken!: string;
+export class TokenPairResponse extends createZodDto(
+  v1.auth.tokenPairResponseSchema,
+) {}
 
-  @ApiProperty({
-    description:
-      "Signed refresh JWT. Also set as the `refresh_token` HttpOnly cookie.",
-  })
-  refreshToken!: string;
-}
+export class EnabledAuthMethodsResponse extends createZodDto(
+  v1.auth.enabledAuthMethodsResponseSchema,
+) {}
 
-export class EnabledAuthMethodsResponse implements v1.auth.EnabledAuthMethods {
-  @ApiProperty() emailOtp!: boolean;
-  @ApiProperty() smsOtp!: boolean;
-  @ApiProperty() google!: boolean;
-  @ApiProperty() apple!: boolean;
-}
-
-export class LogoutAllResponse {
-  @ApiProperty({
-    description:
-      "Number of sessions revoked, excluding the caller's current session.",
-  })
-  sessionsRevoked!: number;
-}
+export class LogoutAllResponse extends createZodDto(
+  v1.auth.logoutAllResponseSchema,
+) {}

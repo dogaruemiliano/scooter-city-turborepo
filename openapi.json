@@ -518,6 +518,69 @@
         "summary": "Exchange an Apple identity token for an API session.",
         "tags": ["auth"]
       }
+    },
+    "/v1/auth/sms-otp/request": {
+      "post": {
+        "operationId": "SmsOtpController_request_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SmsOtpRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SmsOtpRequestResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "SMS-OTP request: send a single-use 6-digit code if the phone matches a real user. Always returns 202; the response does not disclose whether the number is known.",
+        "tags": ["auth"]
+      }
+    },
+    "/v1/auth/sms-otp/verify": {
+      "post": {
+        "operationId": "SmsOtpController_verify_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SmsOtpVerifyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenPairResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or expired code. The response is intentionally identical whether the phone is unknown, the row is expired, the code is wrong, or the row has hit OTP_MAX_ATTEMPTS."
+          }
+        },
+        "summary": "SMS-OTP verify: exchange a valid code for a fresh session (cookies set + TokenPair returned).",
+        "tags": ["auth"]
+      }
     }
   },
   "info": {
@@ -571,7 +634,9 @@
         "type": "object",
         "properties": {
           "sessionsRevoked": {
-            "type": "number",
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
             "description": "Number of sessions revoked, excluding the caller's current session."
           }
         },
@@ -588,6 +653,7 @@
           },
           "emailVerified": {
             "type": "string",
+            "description": "ISO timestamp of email verification, or `null` if unverified.",
             "nullable": true
           },
           "phone": {
@@ -596,6 +662,7 @@
           },
           "phoneVerified": {
             "type": "string",
+            "description": "ISO timestamp of phone verification, or `null` if unverified.",
             "nullable": true
           },
           "firstName": {
@@ -607,7 +674,8 @@
             "nullable": true
           },
           "createdAt": {
-            "type": "string"
+            "type": "string",
+            "description": "ISO timestamp of account creation."
           }
         },
         "required": [
@@ -636,10 +704,12 @@
             "nullable": true
           },
           "createdAt": {
-            "type": "string"
+            "type": "string",
+            "description": "ISO timestamp."
           },
           "lastUsedAt": {
-            "type": "string"
+            "type": "string",
+            "description": "ISO timestamp."
           },
           "current": {
             "type": "boolean",
@@ -759,6 +829,46 @@
           }
         },
         "required": ["idToken"],
+        "additionalProperties": false
+      },
+      "SmsOtpRequestDto": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "pattern": "^\\+[1-9]\\d{6,14}$",
+            "description": "Phone number to send the one-time code to, in E.164 format (e.g. +40712345678)."
+          }
+        },
+        "required": ["phone"],
+        "additionalProperties": false
+      },
+      "SmsOtpRequestResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Constant acknowledgement of the request. Returned unconditionally — whether the phone matched a real user is intentionally not disclosed (anti-enumeration).",
+            "enum": ["sent"]
+          }
+        },
+        "required": ["status"]
+      },
+      "SmsOtpVerifyDto": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "pattern": "^\\+[1-9]\\d{6,14}$",
+            "description": "Phone number that received the code. Must match the number used in the preceding /request call."
+          },
+          "code": {
+            "type": "string",
+            "pattern": "^\\d{6}$",
+            "description": "The 6-digit one-time code. In non-production `NODE_ENV`, the API accepts the literal `\"000000\"`."
+          }
+        },
+        "required": ["phone", "code"],
         "additionalProperties": false
       }
     }

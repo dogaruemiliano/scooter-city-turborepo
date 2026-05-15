@@ -45,6 +45,7 @@ import { AppleAuthModule } from "./modules/apple/apple.module";
 import { CoreAuthModule } from "./modules/core-auth/core-auth.module";
 import { EmailOtpModule } from "./modules/email-otp/email-otp.module";
 import { GoogleAuthModule } from "./modules/google/google.module";
+import { SmsOtpModule } from "./modules/sms-otp/sms-otp.module";
 import { JwtStrategy } from "./strategies/jwt.strategy";
 import { buildThrottlerOptions } from "./throttler.config";
 
@@ -89,7 +90,7 @@ export class AuthModule {
     if (config.emailOtp.enabled) imports.push(EmailOtpModule); // PR 8
     if (config.google.enabled) imports.push(GoogleAuthModule); // PR 9
     if (config.apple.enabled) imports.push(AppleAuthModule); // PR 10
-    // if (config.smsOtp.enabled)   imports.push(SmsOtpModule);     // PR 11
+    if (config.smsOtp.enabled) imports.push(SmsOtpModule); // PR 11
 
     return {
       module: AuthModule,

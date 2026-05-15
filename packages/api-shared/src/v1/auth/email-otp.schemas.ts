@@ -41,3 +41,21 @@ export const emailOtpVerifySchema = z
 
 export type EmailOtpRequestInput = z.infer<typeof emailOtpRequestSchema>;
 export type EmailOtpVerifyInput = z.infer<typeof emailOtpVerifySchema>;
+
+/**
+ * Response body for `POST /v1/auth/email-otp/request`. Constant payload
+ * (`{ status: "sent" }`) returned regardless of whether the email
+ * matched a real user — disclosing the difference would defeat the
+ * anti-enumeration goal.
+ */
+export const otpRequestResponseSchema = z
+  .object({
+    status: z
+      .literal("sent")
+      .describe(
+        "Constant acknowledgement of the request. Returned unconditionally — whether the email matched a real user is intentionally not disclosed (anti-enumeration).",
+      ),
+  })
+  .meta({ id: "OtpRequestResponse" });
+
+export type OtpRequestResponseBody = z.infer<typeof otpRequestResponseSchema>;

@@ -19,23 +19,34 @@ export interface TokenPairResponse {
 }
 
 export interface LogoutAllResponse {
-  /** Number of sessions revoked, excluding the caller's current session. */
+  /**
+   * Number of sessions revoked, excluding the caller's current session.
+   * @minimum -9007199254740991
+   * @maximum 9007199254740991
+   */
   sessionsRevoked: number;
 }
 
 export interface SessionUserResponse {
   id: string;
   email: string;
-  /** @nullable */
+  /**
+   * ISO timestamp of email verification, or `null` if unverified.
+   * @nullable
+   */
   emailVerified: string | null;
   /** @nullable */
   phone: string | null;
-  /** @nullable */
+  /**
+   * ISO timestamp of phone verification, or `null` if unverified.
+   * @nullable
+   */
   phoneVerified: string | null;
   /** @nullable */
   firstName: string | null;
   /** @nullable */
   lastName: string | null;
+  /** ISO timestamp of account creation. */
   createdAt: string;
 }
 
@@ -45,7 +56,9 @@ export interface SessionSummaryResponse {
   userAgent: string | null;
   /** @nullable */
   ip: string | null;
+  /** ISO timestamp. */
   createdAt: string;
+  /** ISO timestamp. */
   lastUsedAt: string;
   /** True for the session whose refresh token issued the current request. */
   current: boolean;
@@ -121,6 +134,38 @@ export interface AppleSigninDto {
   idToken: string;
   /** Optional name payload Apple sends only on the very first sign-in. Used as a hint when creating a new User. */
   fullName?: AppleSigninDtoAppleFullName;
+}
+
+export interface SmsOtpRequestDto {
+  /**
+   * Phone number to send the one-time code to, in E.164 format (e.g. +40712345678).
+   * @pattern ^\+[1-9]\d{6,14}$
+   */
+  phone: string;
+}
+
+/**
+ * Constant acknowledgement of the request. Returned unconditionally — whether the phone matched a real user is intentionally not disclosed (anti-enumeration).
+ */
+export enum SmsOtpRequestResponseStatus {
+  sent = "sent",
+}
+export interface SmsOtpRequestResponse {
+  /** Constant acknowledgement of the request. Returned unconditionally — whether the phone matched a real user is intentionally not disclosed (anti-enumeration). */
+  status: SmsOtpRequestResponseStatus;
+}
+
+export interface SmsOtpVerifyDto {
+  /**
+   * Phone number that received the code. Must match the number used in the preceding /request call.
+   * @pattern ^\+[1-9]\d{6,14}$
+   */
+  phone: string;
+  /**
+   * The 6-digit one-time code. In non-production `NODE_ENV`, the API accepts the literal `"000000"`.
+   * @pattern ^\d{6}$
+   */
+  code: string;
 }
 
 /**
@@ -704,6 +749,85 @@ export const appleAuthControllerSigninV1 = async (
       method: "POST",
       headers: { "Content-Type": "application/json", ...options?.headers },
       body: JSON.stringify(appleSigninDto),
+    },
+  );
+};
+
+/**
+ * @summary SMS-OTP request: send a single-use 6-digit code if the phone matches a real user. Always returns 202; the response does not disclose whether the number is known.
+ */
+export type smsOtpControllerRequestV1Response202 = {
+  data: SmsOtpRequestResponse;
+  status: 202;
+};
+
+export type smsOtpControllerRequestV1ResponseSuccess =
+  smsOtpControllerRequestV1Response202 & {
+    headers: Headers;
+  };
+export type smsOtpControllerRequestV1Response =
+  smsOtpControllerRequestV1ResponseSuccess;
+
+export const getSmsOtpControllerRequestV1Url = () => {
+  return `/v1/auth/sms-otp/request`;
+};
+
+export const smsOtpControllerRequestV1 = async (
+  smsOtpRequestDto: SmsOtpRequestDto,
+  options?: RequestInit,
+): Promise<smsOtpControllerRequestV1Response> => {
+  return customFetch<smsOtpControllerRequestV1Response>(
+    getSmsOtpControllerRequestV1Url(),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(smsOtpRequestDto),
+    },
+  );
+};
+
+/**
+ * @summary SMS-OTP verify: exchange a valid code for a fresh session (cookies set + TokenPair returned).
+ */
+export type smsOtpControllerVerifyV1Response200 = {
+  data: TokenPairResponse;
+  status: 200;
+};
+
+export type smsOtpControllerVerifyV1Response401 = {
+  data: void;
+  status: 401;
+};
+
+export type smsOtpControllerVerifyV1ResponseSuccess =
+  smsOtpControllerVerifyV1Response200 & {
+    headers: Headers;
+  };
+export type smsOtpControllerVerifyV1ResponseError =
+  smsOtpControllerVerifyV1Response401 & {
+    headers: Headers;
+  };
+
+export type smsOtpControllerVerifyV1Response =
+  | smsOtpControllerVerifyV1ResponseSuccess
+  | smsOtpControllerVerifyV1ResponseError;
+
+export const getSmsOtpControllerVerifyV1Url = () => {
+  return `/v1/auth/sms-otp/verify`;
+};
+
+export const smsOtpControllerVerifyV1 = async (
+  smsOtpVerifyDto: SmsOtpVerifyDto,
+  options?: RequestInit,
+): Promise<smsOtpControllerVerifyV1Response> => {
+  return customFetch<smsOtpControllerVerifyV1Response>(
+    getSmsOtpControllerVerifyV1Url(),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(smsOtpVerifyDto),
     },
   );
 };
