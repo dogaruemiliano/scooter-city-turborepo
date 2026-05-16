@@ -34,6 +34,30 @@ export const config = [
       ...pluginReactHooks.configs.recommended.rules,
       // React scope no longer necessary with new JSX transform.
       "react/react-in-jsx-scope": "off",
+      // Function components must be arrow functions. Carve-out for route
+      // files below allows `export default function ScreenName()`.
+      "react/function-component-definition": [
+        "error",
+        {
+          namedComponents: "arrow-function",
+          unnamedComponents: "arrow-function",
+        },
+      ],
+    },
+  },
+  {
+    // Expo Router route files may use `export default function ScreenName()`
+    // since the file *is* the component. Helpers inside the file should still
+    // be arrow functions.
+    files: ["**/app/**/*.tsx"],
+    rules: {
+      "react/function-component-definition": [
+        "error",
+        {
+          namedComponents: ["arrow-function", "function-declaration"],
+          unnamedComponents: "arrow-function",
+        },
+      ],
     },
   },
 ];

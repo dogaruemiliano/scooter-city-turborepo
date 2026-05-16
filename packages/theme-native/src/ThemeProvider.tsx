@@ -1,79 +1,40 @@
-import {
-  createContext,
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { useEffect } from "react";
 import type { ReactNode } from "react";
-import { useColorScheme } from "react-native";
-import { tokens } from "@repo/theme/native";
-import type { ColorScheme, Tokens } from "@repo/theme/native";
+import { UnistylesRuntime } from "react-native-unistyles";
+import type { ThemePreference } from "./useTheme";
 
-export type ThemePreference = ColorScheme | "system";
-
-export type ThemeContextValue = {
-  /** Resolved scheme actually in use (system preference resolved if preference === "system"). */
-  scheme: ColorScheme;
-  /** What the user picked. "system" means follow OS. */
-  preference: ThemePreference;
-  setPreference: (pref: ThemePreference) => void;
-  /** Color palette for the current scheme. */
-  colors: Tokens["color"][ColorScheme];
-  /** Mode-independent tokens. */
-  tokens: Tokens;
-};
-
-export const ThemeContext = createContext<ThemeContextValue | null>(null);
+export type { ThemeContextValue, ThemePreference } from "./useTheme";
 
 export type ThemeProviderProps = {
   children: ReactNode;
   /** Initial preference; defaults to "system". */
   defaultPreference?: ThemePreference;
-  /** Optional persistence hook (e.g. AsyncStorage). Called whenever preference changes. */
+  /** Optional persistence hook. Called whenever preference changes. */
   onPreferenceChange?: (pref: ThemePreference) => void;
 };
 
-export function ThemeProvider({
+/**
+ * Pass-through provider kept for API compatibility. Unistyles drives theme
+ * resolution globally via `StyleSheet.configure({ adaptiveThemes: true })` in
+ * `@repo/theme-native/configure`, so no React context is needed.
+ *
+ * The `defaultPreference` prop, if not "system", flips unistyles into manual
+ * mode on mount. Runtime changes go through `useTheme().setPreference(...)`.
+ */
+export const ThemeProvider = ({
   children,
   defaultPreference = "system",
   onPreferenceChange,
-}: ThemeProviderProps) {
-  const systemScheme = useColorScheme();
-  const [preference, setPreferenceState] =
-    useState<ThemePreference>(defaultPreference);
-
-  const setPreference = useCallback(
-    (next: ThemePreference) => {
-      setPreferenceState(next);
-      onPreferenceChange?.(next);
-    },
-    [onPreferenceChange],
-  );
-
+}: ThemeProviderProps) => {
   useEffect(() => {
-    setPreferenceState(defaultPreference);
-  }, [defaultPreference]);
+    if (defaultPreference === "system") {
+      UnistylesRuntime.setAdaptiveThemes(true);
+    } else {
+      UnistylesRuntime.setAdaptiveThemes(false);
+      UnistylesRuntime.setTheme(defaultPreference);
+    }
+    onPreferenceChange?.(defaultPreference);
+  }, [defaultPreference, onPreferenceChange]);
 
-  const scheme: ColorScheme =
-    preference === "system"
-      ? systemScheme === "dark"
-        ? "dark"
-        : "light"
-      : preference;
-
-  const value = useMemo<ThemeContextValue>(
-    () => ({
-      scheme,
-      preference,
-      setPreference,
-      colors: tokens.color[scheme],
-      tokens,
-    }),
-    [scheme, preference, setPreference],
-  );
-
-  return (
-    <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
-  );
-}
+  return <>{children}</>;
+};

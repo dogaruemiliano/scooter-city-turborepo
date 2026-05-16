@@ -1,0 +1,58 @@
+{
+  "name": "@repo/ui-native",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./DecBadge": {
+      "types": "./src/DecBadge/index.ts",
+      "default": "./src/DecBadge/index.ts"
+    },
+    "./DecBlur": {
+      "types": "./src/DecBlur/index.ts",
+      "default": "./src/DecBlur/index.ts"
+    },
+    "./DecBottomSheet": {
+      "types": "./src/DecBottomSheet/index.ts",
+      "default": "./src/DecBottomSheet/index.ts"
+    },
+    "./DecButton": {
+      "types": "./src/DecButton/index.ts",
+      "default": "./src/DecButton/index.ts"
+    },
+    "./DecCard": {
+      "types": "./src/DecCard/index.ts",
+      "default": "./src/DecCard/index.ts"
+    },
+    "./DecInput": {
+      "types": "./src/DecInput/index.ts",
+      "default": "./src/DecInput/index.ts"
+    },
+    "./DecText": {
+      "types": "./src/DecText/index.ts",
+      "default": "./src/DecText/index.ts"
+    }
+  },
+  "scripts": {
+    "lint": "eslint . --max-warnings 0",
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@repo/theme-native": "workspace:*"
+  },
+  "peerDependencies": {
+    "@gorhom/bottom-sheet": ">=5",
+    "expo-blur": ">=55",
+    "react": ">=19",
+    "react-native": ">=0.76",
+    "react-native-gesture-handler": ">=2",
+    "react-native-reanimated": ">=4"
+  },
+  "devDependencies": {
+    "@repo/eslint-config": "workspace:*",
+    "@repo/typescript-config": "workspace:*",
+    "@types/react": "19.2.2",
+    "eslint": "^9.39.1",
+    "typescript": "5.9.2"
+  }
+}
