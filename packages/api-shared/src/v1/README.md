@@ -27,6 +27,31 @@ v1/
 
 Each domain folder is named after the API resource (`auth`, `users`, `appointments`, etc.) and contains up to five files. Use the file that matches the export's kind — keeping schemas, constants, types, and errors in separate files makes the package's surface easy to scan.
 
+## Naming convention
+
+A single convention covers schemas, classes, OpenAPI components, and Orval-generated types. The plan that introduced it lives at [`docs/migration-plans/zod-input-output-split.md`](../../../../docs/migration-plans/zod-input-output-split.md).
+
+| Layer                                         | Input                                              | Output                               |
+| --------------------------------------------- | -------------------------------------------------- | ------------------------------------ |
+| api-shared variable                           | `*InputSchema` (e.g. `requestEmailOtpInputSchema`) | `*Schema` (e.g. `tokenPairSchema`)   |
+| api-shared `.meta({ id })`                    | `*Input` (e.g. `RequestEmailOtpInput`)             | bare resource (e.g. `TokenPair`)     |
+| api-shared inferred type                      | `*Input`                                           | bare resource                        |
+| NestJS class                                  | `*Input`                                           | bare resource                        |
+| OpenAPI component (input)                     | `*Input`                                           | —                                    |
+| OpenAPI component (output via `@ZodResponse`) | —                                                  | `*_Output` (e.g. `TokenPair_Output`) |
+| Orval-generated TS type                       | `*Input`                                           | `*Output` (underscore stripped)      |
+| DTO filename                                  | `*.input.ts`                                       | bare `*.ts` (no `.dto.` suffix)      |
+
+Hard rules:
+
+1. **No `Dto` suffix anywhere.** Not on api-shared variables, not on NestJS classes, not on file names.
+2. **Every Zod schema gets `.meta({ id })`** matching the class name.
+3. **`@ZodResponse({ status, type })` is the response decorator everywhere.** Do not pair `@ZodSerializerDto` with `@ApiOkResponse`. `@ZodResponse` covers status code, OpenAPI doc, runtime serialization, and compile-time return-type check in one call.
+4. **Accept the `_Output` suffix** on output OpenAPI components. Orval converts to `*Output` types. The asymmetry (`*Input` for inputs, `*Output` for outputs) is the documented cost of `@ZodResponse`'s compile-time correctness.
+5. **Output schemas omit `.strict()`** — the global `ZodSerializerInterceptor` strips unknowns; tightening here would 500 on legitimately stored data.
+6. **Action endpoints use verb-prefixed input names** (`RequestEmailOtpInput`, `VerifyEmailOtpInput`, `RefreshTokenInput`, `SignInWithGoogleInput`, `SignInWithAppleInput`). CRUD endpoints follow `Create{Resource}Input` / `Update{Resource}Input` / `Patch{Resource}Input` / `{Resource}Query`.
+7. **Documented naming exception for ack-shape responses.** Constant `{ status: "sent" }` acks (currently `OtpRequestResponse` and `SmsOtpRequestResponse`) keep the `Response` suffix. Bare `OtpRequest` would collide with the input concept and there's no clean resource noun for a fire-and-forget acknowledgement. Document the exception inline in the schema file's header comment.
+
 ## Import pattern
 
 Always import the `v1` namespace, then drill into the domain:
@@ -35,7 +60,7 @@ Always import the `v1` namespace, then drill into the domain:
 import { v1 } from "@repo/api-shared";
 
 // Schemas
-const loginSchema = v1.auth.loginSchema;
+const refreshInput = v1.auth.refreshTokenInputSchema;
 const email = v1.common.emailSchema;
 
 // Constants
@@ -48,34 +73,49 @@ type User = v1.auth.SessionUser;
 
 Avoid `import * as v1 from "@repo/api-shared/v1"` — the public barrel is `@repo/api-shared` and that's what every other workspace expects to resolve.
 
-For backward compatibility, a small set of legacy top-level exports (`ACCESS_TOKEN_COOKIE`, `emailSchema`, `ROUTES`, etc.) still works from `@repo/api-shared` directly. New code should prefer the `v1.*` form so it's obvious which version is being used.
-
 ## How to add a new schema to an existing domain
 
-Walk-through: adding `requestPasswordResetSchema` to `auth/`.
+Walk-through: adding `requestPasswordResetInputSchema` to `auth/`.
 
 1. Open `v1/auth/auth.schemas.ts` and add:
+
    ```ts
-   export const requestPasswordResetSchema = z
+   export const requestPasswordResetInputSchema = z
      .object({
        email: v1Common.emailSchema, // or import directly from "../common/common.schemas"
      })
-     .strict();
+     .strict()
+     .meta({ id: "RequestPasswordResetInput" });
    export type RequestPasswordResetInput = z.infer<
-     typeof requestPasswordResetSchema
+     typeof requestPasswordResetInputSchema
    >;
    ```
+
 2. No re-export change is needed — `v1/auth/index.ts` already does `export * from "./auth.schemas"`.
-3. In `apps/api`, create the DTO class:
+
+3. In `apps/api`, create the DTO class in a file named after the input, no `.dto.` suffix:
+
    ```ts
+   // apps/api/src/auth/modules/password-reset/dto/request-password-reset.input.ts
    import { createZodDto } from "nestjs-zod";
    import { v1 } from "@repo/api-shared";
-   export class RequestPasswordResetDto extends createZodDto(
-     v1.auth.requestPasswordResetSchema,
+   export class RequestPasswordResetInput extends createZodDto(
+     v1.auth.requestPasswordResetInputSchema,
    ) {}
    ```
-4. Wire the DTO into the controller via `@Body() dto: RequestPasswordResetDto`. NestJS's global `ZodValidationPipe` (registered in `AppModule`) does the rest.
-5. Run `pnpm gen`. The OpenAPI doc updates, Orval regenerates the typed client, and web/mobile consumers can use either the inferred Orval type or the shared schema for form validation.
+
+4. Wire the DTO into the controller via `@Body() dto: RequestPasswordResetInput`. NestJS's global `ZodValidationPipe` (registered in `AppModule`) does the rest.
+
+5. For the response, define a separate output schema (no `Input` suffix, bare `.meta({ id })`), wrap it in a DTO class with no `Dto` suffix, and decorate the controller with `@ZodResponse({ status, type })`:
+
+   ```ts
+   // controller
+   @Post("request")
+   @ZodResponse({ status: HttpStatus.ACCEPTED, type: PasswordResetAck })
+   async request(@Body() body: RequestPasswordResetInput): Promise<PasswordResetAck> { ... }
+   ```
+
+6. Run `pnpm gen`. The OpenAPI doc updates, Orval regenerates the typed client, and web/mobile consumers can use either the inferred Orval type or the shared schema for form validation.
 
 ## How to add a new domain
 

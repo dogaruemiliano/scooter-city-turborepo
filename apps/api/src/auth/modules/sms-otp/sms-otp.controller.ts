@@ -17,31 +17,21 @@
  * lockout against attempt-spraying on a single code. See
  * `docs/auth/rate-limiting.md` for the bucket layout.
  */
+import { Body, Controller, HttpStatus, Post, Req, Res } from "@nestjs/common";
 import {
-  Body,
-  Controller,
-  HttpCode,
-  HttpStatus,
-  Post,
-  Req,
-  Res,
-} from "@nestjs/common";
-import {
-  ApiAcceptedResponse,
-  ApiBody,
-  ApiOkResponse,
   ApiOperation,
   ApiTags,
   ApiUnauthorizedResponse,
 } from "@nestjs/swagger";
 import type { Request, Response } from "express";
+import { ZodResponse } from "nestjs-zod";
 
 import { Public } from "../../decorators/public.decorator";
-import { TokenPairResponse } from "../core-auth/dto/responses";
+import { TokenPair } from "../core-auth/dto/token-pair";
 
-import { SmsOtpRequestDto } from "./dto/sms-otp-request.dto";
-import { SmsOtpVerifyDto } from "./dto/sms-otp-verify.dto";
-import { SmsOtpRequestResponse } from "./dto/responses";
+import { RequestSmsOtpInput } from "./dto/request-sms-otp.input";
+import { SmsOtpRequestResponse } from "./dto/sms-otp-request-response";
+import { VerifySmsOtpInput } from "./dto/verify-sms-otp.input";
 import { SmsOtpService } from "./sms-otp.service";
 
 // Throttling: the four named throttler buckets configured at module
@@ -61,15 +51,13 @@ export class SmsOtpController {
 
   @Public()
   @Post("request")
-  @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({
     summary:
       "SMS-OTP request: send a single-use 6-digit code if the phone matches a real user. Always returns 202; the response does not disclose whether the number is known.",
   })
-  @ApiBody({ type: SmsOtpRequestDto })
-  @ApiAcceptedResponse({ type: SmsOtpRequestResponse })
+  @ZodResponse({ status: HttpStatus.ACCEPTED, type: SmsOtpRequestResponse })
   async request(
-    @Body() body: SmsOtpRequestDto,
+    @Body() body: RequestSmsOtpInput,
     @Req() req: Request,
   ): Promise<SmsOtpRequestResponse> {
     await this.service.request({
@@ -82,22 +70,20 @@ export class SmsOtpController {
 
   @Public()
   @Post("verify")
-  @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:
       "SMS-OTP verify: exchange a valid code for a fresh session (cookies set + TokenPair returned).",
   })
-  @ApiBody({ type: SmsOtpVerifyDto })
-  @ApiOkResponse({ type: TokenPairResponse })
+  @ZodResponse({ status: HttpStatus.OK, type: TokenPair })
   @ApiUnauthorizedResponse({
     description:
       "Invalid or expired code. The response is intentionally identical whether the phone is unknown, the row is expired, the code is wrong, or the row has hit OTP_MAX_ATTEMPTS.",
   })
   async verify(
-    @Body() body: SmsOtpVerifyDto,
+    @Body() body: VerifySmsOtpInput,
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
-  ): Promise<TokenPairResponse> {
+  ): Promise<TokenPair> {
     const pair = await this.service.verify({
       phone: body.phone,
       code: body.code,

@@ -13,21 +13,25 @@
  * Schemas use `.strict()` so unknown keys produce 400. The shared
  * `phoneSchema` (E.164) and `otpCodeSchema` fragments (see
  * `v1.common.*`) carry the actual validation rules.
+ *
+ * Naming exception: `smsOtpRequestResponseSchema` keeps the `Response`
+ * suffix (and so does the NestJS class `SmsOtpRequestResponse`). See
+ * `email-otp.schemas.ts` for the rationale.
  */
 import { z } from "zod";
 
 import { otpCodeSchema, phoneSchema } from "../common/common.schemas";
 
-export const smsOtpRequestSchema = z
+export const requestSmsOtpInputSchema = z
   .object({
     phone: phoneSchema.describe(
       "Phone number to send the one-time code to, in E.164 format (e.g. +40712345678).",
     ),
   })
   .strict()
-  .meta({ id: "SmsOtpRequest" });
+  .meta({ id: "RequestSmsOtpInput" });
 
-export const smsOtpVerifySchema = z
+export const verifySmsOtpInputSchema = z
   .object({
     phone: phoneSchema.describe(
       "Phone number that received the code. Must match the number used in the preceding /request call.",
@@ -37,10 +41,10 @@ export const smsOtpVerifySchema = z
     ),
   })
   .strict()
-  .meta({ id: "SmsOtpVerify" });
+  .meta({ id: "VerifySmsOtpInput" });
 
-export type SmsOtpRequestInput = z.infer<typeof smsOtpRequestSchema>;
-export type SmsOtpVerifyInput = z.infer<typeof smsOtpVerifySchema>;
+export type RequestSmsOtpInput = z.infer<typeof requestSmsOtpInputSchema>;
+export type VerifySmsOtpInput = z.infer<typeof verifySmsOtpInputSchema>;
 
 /**
  * Response body for `POST /v1/auth/sms-otp/request`. Constant payload
@@ -58,6 +62,4 @@ export const smsOtpRequestResponseSchema = z
   })
   .meta({ id: "SmsOtpRequestResponse" });
 
-export type SmsOtpRequestResponseBody = z.infer<
-  typeof smsOtpRequestResponseSchema
->;
+export type SmsOtpRequestResponse = z.infer<typeof smsOtpRequestResponseSchema>;

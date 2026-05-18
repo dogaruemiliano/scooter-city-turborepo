@@ -65,7 +65,7 @@ describe("AppleAuthController (e2e)", () => {
     app.use(cookieParser());
     await app.init();
     prisma = app.get(PrismaService);
-    verifier = app.get(AppleVerifier) as unknown as FakeAppleVerifier;
+    verifier = app.get(AppleVerifier);
   });
 
   afterEach(() => {

@@ -72,7 +72,7 @@ describe("EmailOtpController (e2e)", () => {
     await app.init();
     prisma = app.get(PrismaService);
     users = app.get(UsersService);
-    mailer = app.get(MailerService) as unknown as SpyMailerService;
+    mailer = app.get(MailerService);
   });
 
   afterAll(async () => {

@@ -17,31 +17,21 @@
  * lockout against attempt-spraying on a single code. See
  * `docs/auth/rate-limiting.md` for the bucket layout.
  */
+import { Body, Controller, HttpStatus, Post, Req, Res } from "@nestjs/common";
 import {
-  Body,
-  Controller,
-  HttpCode,
-  HttpStatus,
-  Post,
-  Req,
-  Res,
-} from "@nestjs/common";
-import {
-  ApiAcceptedResponse,
-  ApiBody,
-  ApiOkResponse,
   ApiOperation,
   ApiTags,
   ApiUnauthorizedResponse,
 } from "@nestjs/swagger";
 import type { Request, Response } from "express";
+import { ZodResponse } from "nestjs-zod";
 
 import { Public } from "../../decorators/public.decorator";
-import { TokenPairResponse } from "../core-auth/dto/responses";
+import { TokenPair } from "../core-auth/dto/token-pair";
 
-import { EmailOtpRequestDto } from "./dto/email-otp-request.dto";
-import { EmailOtpVerifyDto } from "./dto/email-otp-verify.dto";
-import { OtpRequestResponse } from "./dto/responses";
+import { OtpRequestResponse } from "./dto/otp-request-response";
+import { RequestEmailOtpInput } from "./dto/request-email-otp.input";
+import { VerifyEmailOtpInput } from "./dto/verify-email-otp.input";
 import { EmailOtpService } from "./email-otp.service";
 
 // Throttling: the four named throttler buckets configured at module
@@ -61,15 +51,13 @@ export class EmailOtpController {
 
   @Public()
   @Post("request")
-  @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({
     summary:
       "Email-OTP request: mail a single-use 6-digit code if the email matches a real user. Always returns 202; the response does not disclose whether the address is known.",
   })
-  @ApiBody({ type: EmailOtpRequestDto })
-  @ApiAcceptedResponse({ type: OtpRequestResponse })
+  @ZodResponse({ status: HttpStatus.ACCEPTED, type: OtpRequestResponse })
   async request(
-    @Body() body: EmailOtpRequestDto,
+    @Body() body: RequestEmailOtpInput,
     @Req() req: Request,
   ): Promise<OtpRequestResponse> {
     await this.service.request({
@@ -82,22 +70,20 @@ export class EmailOtpController {
 
   @Public()
   @Post("verify")
-  @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:
       "Email-OTP verify: exchange a valid code for a fresh session (cookies set + TokenPair returned).",
   })
-  @ApiBody({ type: EmailOtpVerifyDto })
-  @ApiOkResponse({ type: TokenPairResponse })
+  @ZodResponse({ status: HttpStatus.OK, type: TokenPair })
   @ApiUnauthorizedResponse({
     description:
       "Invalid or expired code. The response is intentionally identical whether the email is unknown, the row is expired, the code is wrong, or the row has hit OTP_MAX_ATTEMPTS.",
   })
   async verify(
-    @Body() body: EmailOtpVerifyDto,
+    @Body() body: VerifyEmailOtpInput,
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
-  ): Promise<TokenPairResponse> {
+  ): Promise<TokenPair> {
     const pair = await this.service.verify({
       email: body.email,
       code: body.code,

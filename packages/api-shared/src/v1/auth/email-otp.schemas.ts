@@ -13,21 +13,27 @@
  * Schemas use `.strict()` so unknown keys produce 400. The shared
  * `emailSchema` and `otpCodeSchema` fragments (see
  * `v1.common.*`) carry the actual validation rules.
+ *
+ * Naming exception: `otpRequestResponseSchema` keeps the `Response`
+ * suffix (and so does the NestJS class `OtpRequestResponse`). The body
+ * is a constant ack with no resource-style noun — bare `OtpRequest`
+ * would collide with the input concept, so the suffix stays for this
+ * one. Mirrors `smsOtpRequestResponseSchema` in `sms-otp.schemas.ts`.
  */
 import { z } from "zod";
 
 import { emailSchema, otpCodeSchema } from "../common/common.schemas";
 
-export const emailOtpRequestSchema = z
+export const requestEmailOtpInputSchema = z
   .object({
     email: emailSchema.describe(
       "Email address to send the one-time code to. Treated case-insensitively (normalized to lowercase before lookup).",
     ),
   })
   .strict()
-  .meta({ id: "EmailOtpRequest" });
+  .meta({ id: "RequestEmailOtpInput" });
 
-export const emailOtpVerifySchema = z
+export const verifyEmailOtpInputSchema = z
   .object({
     email: emailSchema.describe(
       "Email address that received the code. Must match the address used in the preceding /request call.",
@@ -37,10 +43,10 @@ export const emailOtpVerifySchema = z
     ),
   })
   .strict()
-  .meta({ id: "EmailOtpVerify" });
+  .meta({ id: "VerifyEmailOtpInput" });
 
-export type EmailOtpRequestInput = z.infer<typeof emailOtpRequestSchema>;
-export type EmailOtpVerifyInput = z.infer<typeof emailOtpVerifySchema>;
+export type RequestEmailOtpInput = z.infer<typeof requestEmailOtpInputSchema>;
+export type VerifyEmailOtpInput = z.infer<typeof verifyEmailOtpInputSchema>;
 
 /**
  * Response body for `POST /v1/auth/email-otp/request`. Constant payload
@@ -58,4 +64,4 @@ export const otpRequestResponseSchema = z
   })
   .meta({ id: "OtpRequestResponse" });
 
-export type OtpRequestResponseBody = z.infer<typeof otpRequestResponseSchema>;
+export type OtpRequestResponse = z.infer<typeof otpRequestResponseSchema>;

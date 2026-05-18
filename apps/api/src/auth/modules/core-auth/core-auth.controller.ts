@@ -40,12 +40,12 @@ import {
 import {
   ApiCookieAuth,
   ApiNoContentResponse,
-  ApiOkResponse,
   ApiOperation,
   ApiTags,
 } from "@nestjs/swagger";
 import { v1 } from "@repo/api-shared";
 import type { Request, Response } from "express";
+import { ZodResponse } from "nestjs-zod";
 
 import { AuditService } from "../../../audit/audit.service";
 import { AuditEventType } from "../../../audit/audit.types";
@@ -58,14 +58,12 @@ import { CurrentUser } from "../../decorators/current-user.decorator";
 import { Public } from "../../decorators/public.decorator";
 import { clearAuthCookies, setAuthCookies } from "../../utils/cookies";
 import { CoreAuthService } from "./core-auth.service";
-import { RefreshTokensDto } from "./dto/refresh-tokens.dto";
-import {
-  EnabledAuthMethodsResponse,
-  LogoutAllResponse,
-  SessionSummaryResponse,
-  SessionUserResponse,
-  TokenPairResponse,
-} from "./dto/responses";
+import { EnabledAuthMethods } from "./dto/enabled-auth-methods";
+import { LogoutAllResult } from "./dto/logout-all-result";
+import { RefreshTokenInput } from "./dto/refresh-token.input";
+import { SessionSummary } from "./dto/session-summary";
+import { SessionUser } from "./dto/session-user";
+import { TokenPair } from "./dto/token-pair";
 
 type OAuthProvider = "google" | "apple";
 const OAUTH_PROVIDERS = new Set<OAuthProvider>(["google", "apple"]);
@@ -87,15 +85,14 @@ export class CoreAuthController {
   // ────────────────────────────────────────────────────────────────────
 
   @Public()
-  @HttpCode(HttpStatus.OK)
   @Post("refresh")
   @ApiOperation({ summary: "Rotate the refresh token (cookie or body)" })
-  @ApiOkResponse({ type: TokenPairResponse })
+  @ZodResponse({ status: HttpStatus.OK, type: TokenPair })
   async refresh(
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
-    @Body() body: RefreshTokensDto,
-  ): Promise<TokenPairResponse> {
+    @Body() body: RefreshTokenInput,
+  ): Promise<TokenPair> {
     const cookies = req.cookies as
       | Record<string, string | undefined>
       | undefined;
@@ -140,16 +137,15 @@ export class CoreAuthController {
   }
 
   @Post("logout-all")
-  @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: "Revoke every session of the current user (including this one)",
   })
-  @ApiOkResponse({ type: LogoutAllResponse })
+  @ZodResponse({ status: HttpStatus.OK, type: LogoutAllResult })
   async logoutAll(
     @CurrentUser() user: AuthPrincipal,
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
-  ): Promise<LogoutAllResponse> {
+  ): Promise<LogoutAllResult> {
     const revoked = await this.coreAuth.revokeAllUserSessions(user.id);
     clearAuthCookies(res, this.env);
     await this.audit.record({
@@ -168,7 +164,7 @@ export class CoreAuthController {
 
   @Get("me")
   @ApiOperation({ summary: "Current user profile" })
-  @ApiOkResponse({ type: SessionUserResponse })
+  @ZodResponse({ type: SessionUser })
   async me(@CurrentUser() user: AuthPrincipal): Promise<v1.auth.SessionUser> {
     const row = await this.users.findById(user.id);
     if (!row) {
@@ -220,7 +216,7 @@ export class CoreAuthController {
 
   @Get("sessions")
   @ApiOperation({ summary: "List active sessions ('devices')" })
-  @ApiOkResponse({ type: SessionSummaryResponse, isArray: true })
+  @ZodResponse({ type: [SessionSummary] })
   async listSessions(
     @CurrentUser() user: AuthPrincipal,
   ): Promise<v1.auth.SessionSummary[]> {
@@ -335,8 +331,8 @@ export class CoreAuthController {
     summary:
       "Which auth methods this API has enabled. Drives conditional UI on the web/mobile clients.",
   })
-  @ApiOkResponse({ type: EnabledAuthMethodsResponse })
-  enabledMethods(): EnabledAuthMethodsResponse {
+  @ZodResponse({ type: EnabledAuthMethods })
+  enabledMethods(): EnabledAuthMethods {
     return {
       emailOtp: this.env.AUTH_EMAIL_OTP_ENABLED,
       smsOtp: this.env.AUTH_SMS_OTP_ENABLED,

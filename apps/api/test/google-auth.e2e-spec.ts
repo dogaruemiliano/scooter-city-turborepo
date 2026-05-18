@@ -52,7 +52,7 @@ describe("GoogleAuthController (e2e)", () => {
 
     prisma = app.get(PrismaService);
     users = app.get(UsersService);
-    verifier = app.get(GoogleVerifier) as FakeGoogleVerifier;
+    verifier = app.get(GoogleVerifier);
   });
 
   afterEach(() => {

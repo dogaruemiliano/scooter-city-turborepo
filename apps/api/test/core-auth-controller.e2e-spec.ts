@@ -12,7 +12,6 @@
  */
 import { INestApplication, VersioningType } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
-import type { LogoutAllResponse } from "@repo/api-generated";
 import { v1 } from "@repo/api-shared";
 import cookieParser from "cookie-parser";
 import type { Server } from "node:http";
@@ -224,7 +223,7 @@ describe("CoreAuthController (e2e)", () => {
     const res = await request(server())
       .post("/v1/auth/logout-all")
       .set("Cookie", [`access_token=${issued.accessToken}`]);
-    const body = res.body as LogoutAllResponse;
+    const body = res.body as v1.auth.LogoutAllResult;
 
     expect(res.status).toBe(200);
     expect(body.sessionsRevoked).toBeGreaterThanOrEqual(2);

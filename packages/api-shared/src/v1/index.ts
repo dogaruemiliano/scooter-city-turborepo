@@ -4,7 +4,7 @@
  * are explicit about which domain they're using:
  *
  *   import { v1 } from "@repo/api-shared";
- *   const s = v1.auth.refreshTokensSchema;
+ *   const s = v1.auth.refreshTokenInputSchema;
  *   const e = v1.common.emailSchema;
  *
  * When a `v2/` is added, prefer re-exporting unchanged domains from `v1`

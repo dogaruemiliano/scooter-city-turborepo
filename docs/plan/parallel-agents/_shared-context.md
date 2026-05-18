@@ -69,7 +69,7 @@ import { v1 } from "@repo/api-shared";
 import { createZodDto } from "nestjs-zod";
 
 export class EmailOtpRequestDto extends createZodDto(
-  v1.auth.emailOtpRequestSchema,
+  v1.auth.emailOtpRequestInputSchema,
 ) {}
 ```
 

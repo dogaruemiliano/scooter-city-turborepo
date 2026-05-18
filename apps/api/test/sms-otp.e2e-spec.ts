@@ -78,7 +78,7 @@ describe("SmsOtpController (e2e)", () => {
     await app.init();
     prisma = app.get(PrismaService);
     users = app.get(UsersService);
-    sms = app.get(SmsService) as unknown as SpySmsService;
+    sms = app.get(SmsService);
   });
 
   afterAll(async () => {

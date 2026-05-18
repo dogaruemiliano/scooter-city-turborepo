@@ -21,7 +21,6 @@ import {
   Body,
   ConflictException,
   Controller,
-  HttpCode,
   HttpStatus,
   Inject,
   Post,
@@ -30,26 +29,25 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import {
-  ApiBody,
   ApiConflictResponse,
-  ApiOkResponse,
   ApiOperation,
   ApiTags,
   ApiUnauthorizedResponse,
 } from "@nestjs/swagger";
 import { SkipThrottle, Throttle } from "@nestjs/throttler";
 import type { Request, Response } from "express";
+import { ZodResponse } from "nestjs-zod";
 
 import { AuditService } from "../../../audit/audit.service";
 import { AuditEventType } from "../../../audit/audit.types";
 import { ENV } from "../../../config/config.module";
 import type { Env } from "../../../config/env";
-import { TokenPairResponse } from "../core-auth/dto/responses";
+import { TokenPair } from "../core-auth/dto/token-pair";
 import { CoreAuthService } from "../core-auth/core-auth.service";
 import { Public } from "../../decorators/public.decorator";
 import { setAuthCookies } from "../../utils/cookies";
 
-import { GoogleSigninDto } from "./dto/google-signin.dto";
+import { SignInWithGoogleInput } from "./dto/sign-in-with-google.input";
 import { GoogleAuthService } from "./google.service";
 
 @ApiTags("auth")
@@ -73,15 +71,13 @@ export class GoogleAuthController {
     "otp-target-daily": true,
   })
   @Throttle({ "login-ip": {} })
-  @HttpCode(HttpStatus.OK)
   @Post()
   @ApiOperation({
     summary: "Sign in with a Google-issued ID token",
     description:
       "Exchanges a Google ID token (from Google Identity Services on web, or the native Google Sign-In SDK on mobile) for a first-party session. Verification is local: we check the JWT signature, expiry, and audience against the configured `GOOGLE_CLIENT_ID_*` client IDs. Google's token is discarded after verification — subsequent requests authenticate with the access/refresh tokens this endpoint returns.",
   })
-  @ApiBody({ type: GoogleSigninDto })
-  @ApiOkResponse({ type: TokenPairResponse })
+  @ZodResponse({ status: HttpStatus.OK, type: TokenPair })
   @ApiUnauthorizedResponse({
     description:
       "The provided ID token failed signature, audience, or expiry verification.",
@@ -93,8 +89,8 @@ export class GoogleAuthController {
   async signin(
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
-    @Body() body: GoogleSigninDto,
-  ): Promise<TokenPairResponse> {
+    @Body() body: SignInWithGoogleInput,
+  ): Promise<TokenPair> {
     const ip = requestIp(req);
     const userAgent = req.header("user-agent") ?? null;
 

@@ -165,7 +165,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RefreshTokensDto"
+                "$ref": "#/components/schemas/RefreshTokenInput"
               }
             }
           }
@@ -176,7 +176,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TokenPairResponse"
+                  "$ref": "#/components/schemas/TokenPair_Output"
                 }
               }
             }
@@ -219,7 +219,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/LogoutAllResponse"
+                  "$ref": "#/components/schemas/LogoutAllResult_Output"
                 }
               }
             }
@@ -239,12 +239,12 @@
         "operationId": "CoreAuthController_me_v1",
         "parameters": [],
         "responses": {
-          "200": {
+          "default": {
             "description": "",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SessionUserResponse"
+                  "$ref": "#/components/schemas/SessionUser_Output"
                 }
               }
             }
@@ -280,14 +280,14 @@
         "operationId": "CoreAuthController_listSessions_v1",
         "parameters": [],
         "responses": {
-          "200": {
+          "default": {
             "description": "",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/SessionSummaryResponse"
+                    "$ref": "#/components/schemas/SessionSummary_Output"
                   }
                 }
               }
@@ -362,12 +362,12 @@
         "operationId": "CoreAuthController_enabledMethods_v1",
         "parameters": [],
         "responses": {
-          "200": {
+          "default": {
             "description": "",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EnabledAuthMethodsResponse"
+                  "$ref": "#/components/schemas/EnabledAuthMethods_Output"
                 }
               }
             }
@@ -391,7 +391,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/EmailOtpRequestDto"
+                "$ref": "#/components/schemas/RequestEmailOtpInput"
               }
             }
           }
@@ -402,7 +402,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OtpRequestResponse"
+                  "$ref": "#/components/schemas/OtpRequestResponse_Output"
                 }
               }
             }
@@ -421,7 +421,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/EmailOtpVerifyDto"
+                "$ref": "#/components/schemas/VerifyEmailOtpInput"
               }
             }
           }
@@ -432,7 +432,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TokenPairResponse"
+                  "$ref": "#/components/schemas/TokenPair_Output"
                 }
               }
             }
@@ -455,7 +455,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/GoogleSigninDto"
+                "$ref": "#/components/schemas/SignInWithGoogleInput"
               }
             }
           }
@@ -466,7 +466,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TokenPairResponse"
+                  "$ref": "#/components/schemas/TokenPair_Output"
                 }
               }
             }
@@ -492,7 +492,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AppleSigninDto"
+                "$ref": "#/components/schemas/SignInWithAppleInput"
               }
             }
           }
@@ -503,7 +503,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TokenPairResponse"
+                  "$ref": "#/components/schemas/TokenPair_Output"
                 }
               }
             }
@@ -528,7 +528,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SmsOtpRequestDto"
+                "$ref": "#/components/schemas/RequestSmsOtpInput"
               }
             }
           }
@@ -539,7 +539,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SmsOtpRequestResponse"
+                  "$ref": "#/components/schemas/SmsOtpRequestResponse_Output"
                 }
               }
             }
@@ -558,7 +558,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SmsOtpVerifyDto"
+                "$ref": "#/components/schemas/VerifySmsOtpInput"
               }
             }
           }
@@ -569,7 +569,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TokenPairResponse"
+                  "$ref": "#/components/schemas/TokenPair_Output"
                 }
               }
             }
@@ -606,7 +606,7 @@
       }
     },
     "schemas": {
-      "RefreshTokensDto": {
+      "RefreshTokenInput": {
         "type": "object",
         "properties": {
           "refreshToken": {
@@ -616,7 +616,7 @@
         },
         "additionalProperties": false
       },
-      "TokenPairResponse": {
+      "TokenPair_Output": {
         "type": "object",
         "properties": {
           "accessToken": {
@@ -628,9 +628,10 @@
             "description": "Signed refresh JWT. Also set as the `refresh_token` HttpOnly cookie."
           }
         },
-        "required": ["accessToken", "refreshToken"]
+        "required": ["accessToken", "refreshToken"],
+        "additionalProperties": false
       },
-      "LogoutAllResponse": {
+      "LogoutAllResult_Output": {
         "type": "object",
         "properties": {
           "sessionsRevoked": {
@@ -640,9 +641,10 @@
             "description": "Number of sessions revoked, excluding the caller's current session."
           }
         },
-        "required": ["sessionsRevoked"]
+        "required": ["sessionsRevoked"],
+        "additionalProperties": false
       },
-      "SessionUserResponse": {
+      "SessionUser_Output": {
         "type": "object",
         "properties": {
           "id": {
@@ -687,9 +689,10 @@
           "firstName",
           "lastName",
           "createdAt"
-        ]
+        ],
+        "additionalProperties": false
       },
-      "SessionSummaryResponse": {
+      "SessionSummary_Output": {
         "type": "object",
         "properties": {
           "id": {
@@ -723,9 +726,10 @@
           "createdAt",
           "lastUsedAt",
           "current"
-        ]
+        ],
+        "additionalProperties": false
       },
-      "EnabledAuthMethodsResponse": {
+      "EnabledAuthMethods_Output": {
         "type": "object",
         "properties": {
           "emailOtp": {
@@ -741,9 +745,10 @@
             "type": "boolean"
           }
         },
-        "required": ["emailOtp", "smsOtp", "google", "apple"]
+        "required": ["emailOtp", "smsOtp", "google", "apple"],
+        "additionalProperties": false
       },
-      "EmailOtpRequestDto": {
+      "RequestEmailOtpInput": {
         "type": "object",
         "properties": {
           "email": {
@@ -757,7 +762,7 @@
         "required": ["email"],
         "additionalProperties": false
       },
-      "OtpRequestResponse": {
+      "OtpRequestResponse_Output": {
         "type": "object",
         "properties": {
           "status": {
@@ -766,9 +771,10 @@
             "enum": ["sent"]
           }
         },
-        "required": ["status"]
+        "required": ["status"],
+        "additionalProperties": false
       },
-      "EmailOtpVerifyDto": {
+      "VerifyEmailOtpInput": {
         "type": "object",
         "properties": {
           "email": {
@@ -787,7 +793,7 @@
         "required": ["email", "code"],
         "additionalProperties": false
       },
-      "GoogleSigninDto": {
+      "SignInWithGoogleInput": {
         "type": "object",
         "properties": {
           "idToken": {
@@ -799,7 +805,7 @@
         "required": ["idToken"],
         "additionalProperties": false
       },
-      "AppleSigninDtoAppleFullName": {
+      "SignInWithAppleInputAppleFullName": {
         "type": "object",
         "properties": {
           "givenName": {
@@ -815,7 +821,7 @@
         },
         "additionalProperties": false
       },
-      "AppleSigninDto": {
+      "SignInWithAppleInput": {
         "type": "object",
         "properties": {
           "idToken": {
@@ -825,13 +831,13 @@
           },
           "fullName": {
             "description": "Optional name payload Apple sends only on the very first sign-in. Used as a hint when creating a new User.",
-            "$ref": "#/components/schemas/AppleSigninDtoAppleFullName"
+            "$ref": "#/components/schemas/SignInWithAppleInputAppleFullName"
           }
         },
         "required": ["idToken"],
         "additionalProperties": false
       },
-      "SmsOtpRequestDto": {
+      "RequestSmsOtpInput": {
         "type": "object",
         "properties": {
           "phone": {
@@ -843,7 +849,7 @@
         "required": ["phone"],
         "additionalProperties": false
       },
-      "SmsOtpRequestResponse": {
+      "SmsOtpRequestResponse_Output": {
         "type": "object",
         "properties": {
           "status": {
@@ -852,9 +858,10 @@
             "enum": ["sent"]
           }
         },
-        "required": ["status"]
+        "required": ["status"],
+        "additionalProperties": false
       },
-      "SmsOtpVerifyDto": {
+      "VerifySmsOtpInput": {
         "type": "object",
         "properties": {
           "phone": {

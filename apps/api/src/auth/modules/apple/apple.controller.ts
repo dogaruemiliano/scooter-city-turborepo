@@ -16,16 +16,14 @@
 import {
   Body,
   Controller,
-  HttpCode,
   HttpStatus,
+  Inject,
   Post,
   Req,
   Res,
 } from "@nestjs/common";
 import {
-  ApiBody,
   ApiConflictResponse,
-  ApiOkResponse,
   ApiOperation,
   ApiTags,
   ApiUnauthorizedResponse,
@@ -33,17 +31,17 @@ import {
 import { Throttle } from "@nestjs/throttler";
 import { v1 } from "@repo/api-shared";
 import type { Request, Response } from "express";
+import { ZodResponse } from "nestjs-zod";
 
 import { ENV } from "../../../config/config.module";
-import { Inject } from "@nestjs/common";
 import type { Env } from "../../../config/env";
-import { TokenPairResponse } from "../core-auth/dto/responses";
+import { TokenPair } from "../core-auth/dto/token-pair";
 import { Public } from "../../decorators/public.decorator";
 import { setAuthCookies } from "../../utils/cookies";
 import { THROTTLER_NAMES } from "../../throttler.config";
 
 import { AppleAuthService } from "./apple.service";
-import { AppleSigninDto } from "./dto/apple-signin.dto";
+import { SignInWithAppleInput } from "./dto/sign-in-with-apple.input";
 
 @ApiTags("auth")
 @Controller({ path: "auth/apple", version: "1" })
@@ -55,15 +53,13 @@ export class AppleAuthController {
 
   @Public()
   @Post()
-  @HttpCode(HttpStatus.OK)
   @Throttle({ [THROTTLER_NAMES.loginIp]: {} })
   @ApiOperation({
     summary: "Exchange an Apple identity token for an API session.",
     description:
       "Verifies the JWT against Apple's JWKS. On success, resolves or creates the user, issues a session, sets HttpOnly cookies, and returns a TokenPair. See docs/auth/apple-signin.md for the auto-link decision matrix.",
   })
-  @ApiBody({ type: AppleSigninDto })
-  @ApiOkResponse({ type: TokenPairResponse })
+  @ZodResponse({ status: HttpStatus.OK, type: TokenPair })
   @ApiUnauthorizedResponse({
     description:
       "Apple identity token failed verification (signature, audience, issuer, expiry), or a subsequent sign-in arrived without a known AuthAccount row.",
@@ -73,7 +69,7 @@ export class AppleAuthController {
       "A user with this email exists but the email is not verified on our side. Sign in via another method first, then link Apple from settings.",
   })
   async signin(
-    @Body() body: AppleSigninDto,
+    @Body() body: SignInWithAppleInput,
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ): Promise<v1.auth.TokenPair> {

@@ -42,12 +42,12 @@ apps/api/src/auth/modules/email-otp/
 ├── email-otp.service.ts
 ├── email-otp.controller.ts
 └── dto/
-    ├── email-otp-request.dto.ts        # extends createZodDto(v1.auth.emailOtpRequestSchema)
+    ├── email-otp-request.dto.ts        # extends createZodDto(v1.auth.emailOtpRequestInputSchema)
     ├── email-otp-verify.dto.ts         # extends createZodDto(v1.auth.emailOtpVerifySchema)
     └── responses.ts                    # OtpRequestResponse, TokenPair already exists
 
 packages/api-shared/src/v1/auth/
-└── email-otp.schemas.ts                # emailOtpRequestSchema, emailOtpVerifySchema
+└── email-otp.schemas.ts                # emailOtpRequestInputSchema, emailOtpVerifySchema
 
 apps/api/test/
 ├── email-otp.e2e-spec.ts               # request/verify happy + sad paths, 5-wrong-attempts, expired, throttler
@@ -63,7 +63,7 @@ docs/auth/
 import { z } from "zod";
 import { emailSchema, otpCodeSchema } from "../common/common.schemas";
 
-export const emailOtpRequestSchema = z
+export const emailOtpRequestInputSchema = z
   .object({ email: emailSchema })
   .strict()
   .meta({ id: "EmailOtpRequest" });
@@ -73,7 +73,7 @@ export const emailOtpVerifySchema = z
   .strict()
   .meta({ id: "EmailOtpVerify" });
 
-export type EmailOtpRequestInput = z.infer<typeof emailOtpRequestSchema>;
+export type EmailOtpRequestInput = z.infer<typeof emailOtpRequestInputSchema>;
 export type EmailOtpVerifyInput = z.infer<typeof emailOtpVerifySchema>;
 ```
 

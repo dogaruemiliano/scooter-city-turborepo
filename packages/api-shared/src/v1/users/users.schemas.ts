@@ -1,17 +1,17 @@
 /**
  * Users-domain Zod schemas.
  *
- * `userResponseSchema` is the **maximal** public-user wire-shape — the
- * union of every field that a user record could legitimately return on
- * any future `/v1/users/*` endpoint. It is the single source of truth
- * for every user-shaped response on the API.
+ * `userSchema` is the **maximal** public-user wire-shape — the union of
+ * every field that a user record could legitimately return on any future
+ * `/v1/users/*` endpoint. It is the single source of truth for every
+ * user-shaped response on the API.
  *
  * Different endpoints expose different projections of this shape based
  * on permissions and visibility. Each projection is a `.pick(...)` over
  * this schema, never a redeclaration:
  *
  * - `GET  /v1/auth/me` — owner view of self. Picks every field except
- *   `updatedAt` and re-`.meta()`s it as `SessionUserResponse` (see
+ *   `updatedAt` and re-`.meta()`s it as `SessionUser` (see
  *   `auth/auth.schemas.ts`).
  * - `GET  /v1/users/:id` (future) — admin / owner view of one user.
  *   Returns the full shape.
@@ -46,7 +46,7 @@
  */
 import { z } from "zod";
 
-export const userResponseSchema = z
+export const userSchema = z
   .object({
     id: z.string(),
     email: z.string(),
@@ -68,6 +68,6 @@ export const userResponseSchema = z
     createdAt: z.string().describe("ISO timestamp of account creation."),
     updatedAt: z.string().describe("ISO timestamp of last profile update."),
   })
-  .meta({ id: "UserResponse" });
+  .meta({ id: "User" });
 
-export type User = z.infer<typeof userResponseSchema>;
+export type User = z.infer<typeof userSchema>;

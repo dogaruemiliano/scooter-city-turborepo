@@ -14,7 +14,7 @@
  */
 import { z } from "zod";
 
-export const googleSigninSchema = z
+export const signInWithGoogleInputSchema = z
   .object({
     idToken: z
       .string()
@@ -24,6 +24,6 @@ export const googleSigninSchema = z
       ),
   })
   .strict()
-  .meta({ id: "GoogleSignin" });
+  .meta({ id: "SignInWithGoogleInput" });
 
-export type GoogleSigninInput = z.infer<typeof googleSigninSchema>;
+export type SignInWithGoogleInput = z.infer<typeof signInWithGoogleInputSchema>;

@@ -3,9 +3,14 @@
  * field validators for every `/v1/auth/*` endpoint.
  *
  * Consumed by the NestJS API via `nestjs-zod`'s `createZodDto`, and by
- * web/mobile form validators (later) via `@hookform/resolvers/zod`. The
- * same schema validates on every side of the wire — drift between server
- * and client validation is impossible by construction.
+ * web/mobile form validators via `@hookform/resolvers/zod`. The same
+ * schema validates on every side of the wire — drift between server and
+ * client validation is impossible by construction.
+ *
+ * Naming convention (see `docs/migration-plans/zod-input-output-split.md`):
+ *   - Inputs:  `*InputSchema` here, `.meta({ id: "*Input" })`, `class *Input` in NestJS.
+ *   - Outputs: `*Schema` here,      `.meta({ id: "*" })`,      `class *` in NestJS.
+ *   - No `Dto` suffix anywhere. `@ZodResponse` is the response decorator.
  *
  * Request schemas use `.strict()` so unknown keys produce 400, mirroring
  * `forbidNonWhitelisted: true` on the legacy class-validator pipe.
@@ -21,7 +26,7 @@
  */
 import { z } from "zod";
 
-import { userResponseSchema } from "../users/users.schemas";
+import { userSchema } from "../users/users.schemas";
 
 /**
  * Request body for `POST /v1/auth/refresh`.
@@ -30,7 +35,7 @@ import { userResponseSchema } from "../users/users.schemas";
  * endpoint. When an `access_token` cookie is present and valid the cookie
  * wins — `refreshToken` in the body is ignored.
  */
-export const refreshTokensSchema = z
+export const refreshTokenInputSchema = z
   .object({
     refreshToken: z
       .string()
@@ -39,27 +44,23 @@ export const refreshTokensSchema = z
         "Refresh token (mobile clients without a cookie jar pass it in the body). Ignored when an `access_token` cookie is present and valid.",
       ),
   })
-  .strict();
+  .strict()
+  .meta({ id: "RefreshTokenInput" });
 
-export type RefreshTokensInput = z.infer<typeof refreshTokensSchema>;
+export type RefreshTokenInput = z.infer<typeof refreshTokenInputSchema>;
 
 // ────────────────────────────────────────────────────────────────────────
 // Response schemas
-//
-// Each schema gets a stable `.meta({ id })` matching the eventual DTO
-// class name so the OpenAPI doc and the Orval-generated client share the
-// same identifier. Names ending in `Response` mirror the request-side
-// convention (`...Dto`).
 // ────────────────────────────────────────────────────────────────────────
 
 /**
  * `GET /v1/auth/me` response — the owner's view of their own user
  * record. Picks every public field except `updatedAt` from
- * `users.userResponseSchema` (the maximal user wire-shape). When a
- * `/v1/users/:id` endpoint ships, it returns the full `UserResponse`
- * and this projection diverges only by the omitted `updatedAt`.
+ * `users.userSchema` (the maximal user wire-shape). When a
+ * `/v1/users/:id` endpoint ships, it returns the full `User` and this
+ * projection diverges only by the omitted `updatedAt`.
  */
-export const sessionUserResponseSchema = userResponseSchema
+export const sessionUserSchema = userSchema
   .pick({
     id: true,
     email: true,
@@ -70,16 +71,16 @@ export const sessionUserResponseSchema = userResponseSchema
     lastName: true,
     createdAt: true,
   })
-  .meta({ id: "SessionUserResponse" });
+  .meta({ id: "SessionUser" });
 
-export type SessionUser = z.infer<typeof sessionUserResponseSchema>;
+export type SessionUser = z.infer<typeof sessionUserSchema>;
 
 /**
  * One row in the user-visible "active devices" list returned by
  * `GET /v1/auth/sessions`. The API joins `Session` with the latest
  * refresh-token activity to compute `current`.
  */
-export const sessionSummaryResponseSchema = z
+export const sessionSummarySchema = z
   .object({
     id: z.string(),
     userAgent: z.string().nullable(),
@@ -92,9 +93,9 @@ export const sessionSummaryResponseSchema = z
         "True for the session whose refresh token issued the current request.",
       ),
   })
-  .meta({ id: "SessionSummaryResponse" });
+  .meta({ id: "SessionSummary" });
 
-export type SessionSummary = z.infer<typeof sessionSummaryResponseSchema>;
+export type SessionSummary = z.infer<typeof sessionSummarySchema>;
 
 /**
  * Returned by every endpoint that mints a fresh session (`/refresh`,
@@ -102,7 +103,7 @@ export type SessionSummary = z.infer<typeof sessionSummaryResponseSchema>;
  * addition to setting cookies. Mobile clients read the body fields; the
  * web ignores them because cookies are authoritative.
  */
-export const tokenPairResponseSchema = z
+export const tokenPairSchema = z
   .object({
     accessToken: z
       .string()
@@ -115,32 +116,30 @@ export const tokenPairResponseSchema = z
         "Signed refresh JWT. Also set as the `refresh_token` HttpOnly cookie.",
       ),
   })
-  .meta({ id: "TokenPairResponse" });
+  .meta({ id: "TokenPair" });
 
-export type TokenPair = z.infer<typeof tokenPairResponseSchema>;
+export type TokenPair = z.infer<typeof tokenPairSchema>;
 
 /**
  * Drives conditional rendering on every client (which login buttons /
  * forms to show). Returned by `GET /v1/auth/enabled-methods`. Mirrors
  * the API env flags one-for-one.
  */
-export const enabledAuthMethodsResponseSchema = z
+export const enabledAuthMethodsSchema = z
   .object({
     emailOtp: z.boolean(),
     smsOtp: z.boolean(),
     google: z.boolean(),
     apple: z.boolean(),
   })
-  .meta({ id: "EnabledAuthMethodsResponse" });
+  .meta({ id: "EnabledAuthMethods" });
 
-export type EnabledAuthMethods = z.infer<
-  typeof enabledAuthMethodsResponseSchema
->;
+export type EnabledAuthMethods = z.infer<typeof enabledAuthMethodsSchema>;
 
 /**
  * Returned by `POST /v1/auth/logout-all` — count of sessions revoked.
  */
-export const logoutAllResponseSchema = z
+export const logoutAllResultSchema = z
   .object({
     sessionsRevoked: z
       .number()
@@ -149,6 +148,6 @@ export const logoutAllResponseSchema = z
         "Number of sessions revoked, excluding the caller's current session.",
       ),
   })
-  .meta({ id: "LogoutAllResponse" });
+  .meta({ id: "LogoutAllResult" });
 
-export type LogoutAllResult = z.infer<typeof logoutAllResponseSchema>;
+export type LogoutAllResult = z.infer<typeof logoutAllResultSchema>;

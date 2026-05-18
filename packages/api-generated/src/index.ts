@@ -6,19 +6,19 @@
  * OpenAPI spec version: 1.0.0
  */
 import { customFetch } from "./mutator";
-export interface RefreshTokensDto {
+export interface RefreshTokenInput {
   /** Refresh token (mobile clients without a cookie jar pass it in the body). Ignored when an `access_token` cookie is present and valid. */
   refreshToken?: string;
 }
 
-export interface TokenPairResponse {
+export interface TokenPairOutput {
   /** Signed access JWT. Also set as the `access_token` HttpOnly cookie; mobile clients consume the body field. */
   accessToken: string;
   /** Signed refresh JWT. Also set as the `refresh_token` HttpOnly cookie. */
   refreshToken: string;
 }
 
-export interface LogoutAllResponse {
+export interface LogoutAllResultOutput {
   /**
    * Number of sessions revoked, excluding the caller's current session.
    * @minimum -9007199254740991
@@ -27,7 +27,7 @@ export interface LogoutAllResponse {
   sessionsRevoked: number;
 }
 
-export interface SessionUserResponse {
+export interface SessionUserOutput {
   id: string;
   email: string;
   /**
@@ -50,7 +50,7 @@ export interface SessionUserResponse {
   createdAt: string;
 }
 
-export interface SessionSummaryResponse {
+export interface SessionSummaryOutput {
   id: string;
   /** @nullable */
   userAgent: string | null;
@@ -64,14 +64,14 @@ export interface SessionSummaryResponse {
   current: boolean;
 }
 
-export interface EnabledAuthMethodsResponse {
+export interface EnabledAuthMethodsOutput {
   emailOtp: boolean;
   smsOtp: boolean;
   google: boolean;
   apple: boolean;
 }
 
-export interface EmailOtpRequestDto {
+export interface RequestEmailOtpInput {
   /**
    * Email address to send the one-time code to. Treated case-insensitively (normalized to lowercase before lookup).
    * @maxLength 254
@@ -83,15 +83,15 @@ export interface EmailOtpRequestDto {
 /**
  * Constant acknowledgement of the request. Returned unconditionally — whether the email matched a real user is intentionally not disclosed (anti-enumeration).
  */
-export enum OtpRequestResponseStatus {
+export enum OtpRequestResponseOutputStatus {
   sent = "sent",
 }
-export interface OtpRequestResponse {
+export interface OtpRequestResponseOutput {
   /** Constant acknowledgement of the request. Returned unconditionally — whether the email matched a real user is intentionally not disclosed (anti-enumeration). */
-  status: OtpRequestResponseStatus;
+  status: OtpRequestResponseOutputStatus;
 }
 
-export interface EmailOtpVerifyDto {
+export interface VerifyEmailOtpInput {
   /**
    * Email address that received the code. Must match the address used in the preceding /request call.
    * @maxLength 254
@@ -105,7 +105,7 @@ export interface EmailOtpVerifyDto {
   code: string;
 }
 
-export interface GoogleSigninDto {
+export interface SignInWithGoogleInput {
   /**
    * Google-issued ID token (JWT) from Google Identity Services or the native SDK.
    * @minLength 20
@@ -113,7 +113,7 @@ export interface GoogleSigninDto {
   idToken: string;
 }
 
-export interface AppleSigninDtoAppleFullName {
+export interface SignInWithAppleInputAppleFullName {
   /**
    * @maxLength 80
    * @nullable
@@ -126,17 +126,17 @@ export interface AppleSigninDtoAppleFullName {
   familyName?: string | null;
 }
 
-export interface AppleSigninDto {
+export interface SignInWithAppleInput {
   /**
    * Apple-issued identity token (JWT) from Sign in with Apple JS or the native SDK.
    * @minLength 20
    */
   idToken: string;
   /** Optional name payload Apple sends only on the very first sign-in. Used as a hint when creating a new User. */
-  fullName?: AppleSigninDtoAppleFullName;
+  fullName?: SignInWithAppleInputAppleFullName;
 }
 
-export interface SmsOtpRequestDto {
+export interface RequestSmsOtpInput {
   /**
    * Phone number to send the one-time code to, in E.164 format (e.g. +40712345678).
    * @pattern ^\+[1-9]\d{6,14}$
@@ -147,15 +147,15 @@ export interface SmsOtpRequestDto {
 /**
  * Constant acknowledgement of the request. Returned unconditionally — whether the phone matched a real user is intentionally not disclosed (anti-enumeration).
  */
-export enum SmsOtpRequestResponseStatus {
+export enum SmsOtpRequestResponseOutputStatus {
   sent = "sent",
 }
-export interface SmsOtpRequestResponse {
+export interface SmsOtpRequestResponseOutput {
   /** Constant acknowledgement of the request. Returned unconditionally — whether the phone matched a real user is intentionally not disclosed (anti-enumeration). */
-  status: SmsOtpRequestResponseStatus;
+  status: SmsOtpRequestResponseOutputStatus;
 }
 
-export interface SmsOtpVerifyDto {
+export interface VerifySmsOtpInput {
   /**
    * Phone number that received the code. Must match the number used in the preceding /request call.
    * @pattern ^\+[1-9]\d{6,14}$
@@ -286,7 +286,7 @@ export const healthControllerCheck = async (
  * @summary Rotate the refresh token (cookie or body)
  */
 export type coreAuthControllerRefreshV1Response200 = {
-  data: TokenPairResponse;
+  data: TokenPairOutput;
   status: 200;
 };
 
@@ -302,7 +302,7 @@ export const getCoreAuthControllerRefreshV1Url = () => {
 };
 
 export const coreAuthControllerRefreshV1 = async (
-  refreshTokensDto: RefreshTokensDto,
+  refreshTokenInput: RefreshTokenInput,
   options?: RequestInit,
 ): Promise<coreAuthControllerRefreshV1Response> => {
   return customFetch<coreAuthControllerRefreshV1Response>(
@@ -311,7 +311,7 @@ export const coreAuthControllerRefreshV1 = async (
       ...options,
       method: "POST",
       headers: { "Content-Type": "application/json", ...options?.headers },
-      body: JSON.stringify(refreshTokensDto),
+      body: JSON.stringify(refreshTokenInput),
     },
   );
 };
@@ -351,7 +351,7 @@ export const coreAuthControllerLogoutV1 = async (
  * @summary Revoke every session of the current user (including this one)
  */
 export type coreAuthControllerLogoutAllV1Response200 = {
-  data: LogoutAllResponse;
+  data: LogoutAllResultOutput;
   status: 200;
 };
 
@@ -381,17 +381,17 @@ export const coreAuthControllerLogoutAllV1 = async (
 /**
  * @summary Current user profile
  */
-export type coreAuthControllerMeV1Response200 = {
-  data: SessionUserResponse;
-  status: 200;
+export type coreAuthControllerMeV1ResponseDefault = {
+  data: SessionUserOutput;
+  status: number;
 };
-
-export type coreAuthControllerMeV1ResponseSuccess =
-  coreAuthControllerMeV1Response200 & {
+export type coreAuthControllerMeV1ResponseError =
+  coreAuthControllerMeV1ResponseDefault & {
     headers: Headers;
   };
+
 export type coreAuthControllerMeV1Response =
-  coreAuthControllerMeV1ResponseSuccess;
+  coreAuthControllerMeV1ResponseError;
 
 export const getCoreAuthControllerMeV1Url = () => {
   return `/v1/auth/me`;
@@ -443,17 +443,17 @@ export const coreAuthControllerDeleteMeV1 = async (
 /**
  * @summary List active sessions ('devices')
  */
-export type coreAuthControllerListSessionsV1Response200 = {
-  data: SessionSummaryResponse[];
-  status: 200;
+export type coreAuthControllerListSessionsV1ResponseDefault = {
+  data: SessionSummaryOutput[];
+  status: number;
 };
-
-export type coreAuthControllerListSessionsV1ResponseSuccess =
-  coreAuthControllerListSessionsV1Response200 & {
+export type coreAuthControllerListSessionsV1ResponseError =
+  coreAuthControllerListSessionsV1ResponseDefault & {
     headers: Headers;
   };
+
 export type coreAuthControllerListSessionsV1Response =
-  coreAuthControllerListSessionsV1ResponseSuccess;
+  coreAuthControllerListSessionsV1ResponseError;
 
 export const getCoreAuthControllerListSessionsV1Url = () => {
   return `/v1/auth/sessions`;
@@ -540,17 +540,17 @@ export const coreAuthControllerUnlinkOAuthAccountV1 = async (
 /**
  * @summary Which auth methods this API has enabled. Drives conditional UI on the web/mobile clients.
  */
-export type coreAuthControllerEnabledMethodsV1Response200 = {
-  data: EnabledAuthMethodsResponse;
-  status: 200;
+export type coreAuthControllerEnabledMethodsV1ResponseDefault = {
+  data: EnabledAuthMethodsOutput;
+  status: number;
 };
-
-export type coreAuthControllerEnabledMethodsV1ResponseSuccess =
-  coreAuthControllerEnabledMethodsV1Response200 & {
+export type coreAuthControllerEnabledMethodsV1ResponseError =
+  coreAuthControllerEnabledMethodsV1ResponseDefault & {
     headers: Headers;
   };
+
 export type coreAuthControllerEnabledMethodsV1Response =
-  coreAuthControllerEnabledMethodsV1ResponseSuccess;
+  coreAuthControllerEnabledMethodsV1ResponseError;
 
 export const getCoreAuthControllerEnabledMethodsV1Url = () => {
   return `/v1/auth/enabled-methods`;
@@ -572,7 +572,7 @@ export const coreAuthControllerEnabledMethodsV1 = async (
  * @summary Email-OTP request: mail a single-use 6-digit code if the email matches a real user. Always returns 202; the response does not disclose whether the address is known.
  */
 export type emailOtpControllerRequestV1Response202 = {
-  data: OtpRequestResponse;
+  data: OtpRequestResponseOutput;
   status: 202;
 };
 
@@ -588,7 +588,7 @@ export const getEmailOtpControllerRequestV1Url = () => {
 };
 
 export const emailOtpControllerRequestV1 = async (
-  emailOtpRequestDto: EmailOtpRequestDto,
+  requestEmailOtpInput: RequestEmailOtpInput,
   options?: RequestInit,
 ): Promise<emailOtpControllerRequestV1Response> => {
   return customFetch<emailOtpControllerRequestV1Response>(
@@ -597,7 +597,7 @@ export const emailOtpControllerRequestV1 = async (
       ...options,
       method: "POST",
       headers: { "Content-Type": "application/json", ...options?.headers },
-      body: JSON.stringify(emailOtpRequestDto),
+      body: JSON.stringify(requestEmailOtpInput),
     },
   );
 };
@@ -606,7 +606,7 @@ export const emailOtpControllerRequestV1 = async (
  * @summary Email-OTP verify: exchange a valid code for a fresh session (cookies set + TokenPair returned).
  */
 export type emailOtpControllerVerifyV1Response200 = {
-  data: TokenPairResponse;
+  data: TokenPairOutput;
   status: 200;
 };
 
@@ -633,7 +633,7 @@ export const getEmailOtpControllerVerifyV1Url = () => {
 };
 
 export const emailOtpControllerVerifyV1 = async (
-  emailOtpVerifyDto: EmailOtpVerifyDto,
+  verifyEmailOtpInput: VerifyEmailOtpInput,
   options?: RequestInit,
 ): Promise<emailOtpControllerVerifyV1Response> => {
   return customFetch<emailOtpControllerVerifyV1Response>(
@@ -642,7 +642,7 @@ export const emailOtpControllerVerifyV1 = async (
       ...options,
       method: "POST",
       headers: { "Content-Type": "application/json", ...options?.headers },
-      body: JSON.stringify(emailOtpVerifyDto),
+      body: JSON.stringify(verifyEmailOtpInput),
     },
   );
 };
@@ -652,7 +652,7 @@ export const emailOtpControllerVerifyV1 = async (
  * @summary Sign in with a Google-issued ID token
  */
 export type googleAuthControllerSigninV1Response200 = {
-  data: TokenPairResponse;
+  data: TokenPairOutput;
   status: 200;
 };
 
@@ -686,7 +686,7 @@ export const getGoogleAuthControllerSigninV1Url = () => {
 };
 
 export const googleAuthControllerSigninV1 = async (
-  googleSigninDto: GoogleSigninDto,
+  signInWithGoogleInput: SignInWithGoogleInput,
   options?: RequestInit,
 ): Promise<googleAuthControllerSigninV1Response> => {
   return customFetch<googleAuthControllerSigninV1Response>(
@@ -695,7 +695,7 @@ export const googleAuthControllerSigninV1 = async (
       ...options,
       method: "POST",
       headers: { "Content-Type": "application/json", ...options?.headers },
-      body: JSON.stringify(googleSigninDto),
+      body: JSON.stringify(signInWithGoogleInput),
     },
   );
 };
@@ -705,7 +705,7 @@ export const googleAuthControllerSigninV1 = async (
  * @summary Exchange an Apple identity token for an API session.
  */
 export type appleAuthControllerSigninV1Response200 = {
-  data: TokenPairResponse;
+  data: TokenPairOutput;
   status: 200;
 };
 
@@ -739,7 +739,7 @@ export const getAppleAuthControllerSigninV1Url = () => {
 };
 
 export const appleAuthControllerSigninV1 = async (
-  appleSigninDto: AppleSigninDto,
+  signInWithAppleInput: SignInWithAppleInput,
   options?: RequestInit,
 ): Promise<appleAuthControllerSigninV1Response> => {
   return customFetch<appleAuthControllerSigninV1Response>(
@@ -748,7 +748,7 @@ export const appleAuthControllerSigninV1 = async (
       ...options,
       method: "POST",
       headers: { "Content-Type": "application/json", ...options?.headers },
-      body: JSON.stringify(appleSigninDto),
+      body: JSON.stringify(signInWithAppleInput),
     },
   );
 };
@@ -757,7 +757,7 @@ export const appleAuthControllerSigninV1 = async (
  * @summary SMS-OTP request: send a single-use 6-digit code if the phone matches a real user. Always returns 202; the response does not disclose whether the number is known.
  */
 export type smsOtpControllerRequestV1Response202 = {
-  data: SmsOtpRequestResponse;
+  data: SmsOtpRequestResponseOutput;
   status: 202;
 };
 
@@ -773,7 +773,7 @@ export const getSmsOtpControllerRequestV1Url = () => {
 };
 
 export const smsOtpControllerRequestV1 = async (
-  smsOtpRequestDto: SmsOtpRequestDto,
+  requestSmsOtpInput: RequestSmsOtpInput,
   options?: RequestInit,
 ): Promise<smsOtpControllerRequestV1Response> => {
   return customFetch<smsOtpControllerRequestV1Response>(
@@ -782,7 +782,7 @@ export const smsOtpControllerRequestV1 = async (
       ...options,
       method: "POST",
       headers: { "Content-Type": "application/json", ...options?.headers },
-      body: JSON.stringify(smsOtpRequestDto),
+      body: JSON.stringify(requestSmsOtpInput),
     },
   );
 };
@@ -791,7 +791,7 @@ export const smsOtpControllerRequestV1 = async (
  * @summary SMS-OTP verify: exchange a valid code for a fresh session (cookies set + TokenPair returned).
  */
 export type smsOtpControllerVerifyV1Response200 = {
-  data: TokenPairResponse;
+  data: TokenPairOutput;
   status: 200;
 };
 
@@ -818,7 +818,7 @@ export const getSmsOtpControllerVerifyV1Url = () => {
 };
 
 export const smsOtpControllerVerifyV1 = async (
-  smsOtpVerifyDto: SmsOtpVerifyDto,
+  verifySmsOtpInput: VerifySmsOtpInput,
   options?: RequestInit,
 ): Promise<smsOtpControllerVerifyV1Response> => {
   return customFetch<smsOtpControllerVerifyV1Response>(
@@ -827,7 +827,7 @@ export const smsOtpControllerVerifyV1 = async (
       ...options,
       method: "POST",
       headers: { "Content-Type": "application/json", ...options?.headers },
-      body: JSON.stringify(smsOtpVerifyDto),
+      body: JSON.stringify(verifySmsOtpInput),
     },
   );
 };
