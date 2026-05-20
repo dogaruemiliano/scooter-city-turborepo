@@ -1,5 +1,5 @@
 import { forwardRef, useCallback, type ReactNode } from "react";
-import { Pressable, View } from "react-native";
+import { Platform, Pressable, View } from "react-native";
 import {
   BottomSheetBackdrop,
   BottomSheetModal,
@@ -8,9 +8,10 @@ import {
   type BottomSheetBackdropProps,
   type BottomSheetModalProps,
 } from "@gorhom/bottom-sheet";
-import { StyleSheet, useUnistyles } from "@repo/theme-native/styles";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { DecBlur } from "../DecBlur";
 import { DecText } from "../DecText";
+import { BlurTint } from "expo-blur";
 
 export type DecBottomSheetRef = BottomSheetModal;
 
@@ -48,7 +49,10 @@ export const DecBottomSheet = forwardRef<
 ) {
   const { theme, rt } = useUnistyles();
   const dynamicSizing = !snapPoints;
-  const blurTint = rt.themeName === "dark" ? "dark" : "light";
+  const blurTint: BlurTint =
+    rt.themeName === "dark"
+      ? "systemThickMaterialDark"
+      : "systemThickMaterialDark";
 
   const renderBackdrop = useCallback(
     (props: BottomSheetBackdropProps) => (
@@ -61,7 +65,7 @@ export const DecBottomSheet = forwardRef<
         style={[props.style, styles.backdropTransparent]}
       >
         <DecBlur
-          intensity={30}
+          intensity={15}
           tint={blurTint}
           fallbackColor={theme.colors.surface.scrim}
           style={StyleSheet.absoluteFillObject}

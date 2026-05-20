@@ -46,13 +46,21 @@
     "react": ">=19",
     "react-native": ">=0.76",
     "react-native-gesture-handler": ">=2",
-    "react-native-reanimated": ">=4"
+    "react-native-reanimated": ">=4",
+    "react-native-unistyles": ">=3"
   },
   "devDependencies": {
     "@repo/eslint-config": "workspace:*",
     "@repo/typescript-config": "workspace:*",
     "@types/react": "19.2.2",
     "eslint": "^9.39.1",
-    "typescript": "5.9.2"
+    "typescript": "5.9.2",
+    "@gorhom/bottom-sheet": ">=5",
+    "expo-blur": ">=55",
+    "react": ">=19",
+    "react-native": ">=0.76",
+    "react-native-gesture-handler": ">=2",
+    "react-native-reanimated": ">=4",
+    "react-native-unistyles": ">=3"
   }
 }

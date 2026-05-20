@@ -16,5 +16,10 @@
  *
  * See `src/v1/README.md` for the folder convention and the rule that
  * versions are frozen at release.
+ *
+ * The version-agnostic `apiFetch` helper (and its `ApiError`) is also
+ * exported here — it pairs a path with a Zod schema to produce a
+ * validated, typed response. Used by web (server + client) and mobile.
  */
 export * as v1 from "./v1";
+export { apiFetch, ApiError, type ApiFetchOptions } from "./api-fetch";

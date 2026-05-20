@@ -1,6 +1,6 @@
 import { useRef } from "react";
 import { ScrollView, View, type ViewProps } from "react-native";
-import { StyleSheet } from "@repo/theme-native/styles";
+import { StyleSheet } from "react-native-unistyles";
 import { DecBadge } from "@repo/ui-native/DecBadge";
 import {
   DecBottomSheet,
@@ -11,7 +11,7 @@ import { DecCard } from "@repo/ui-native/DecCard";
 import { DecInput } from "@repo/ui-native/DecInput";
 import { DecText } from "@repo/ui-native/DecText";
 
-export default function ComponentsScreen() {
+export default function UIKitScreen() {
   const dynamicSheetRef = useRef<DecBottomSheetRef>(null);
   const fixedSheetRef = useRef<DecBottomSheetRef>(null);
   const customHeaderSheetRef = useRef<DecBottomSheetRef>(null);

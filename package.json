@@ -9,16 +9,14 @@
     "check-types": "turbo run check-types",
     "test": "turbo run test",
     "test:e2e": "turbo run test:e2e",
-    "gen": "pnpm gen:env && pnpm --filter @repo/api-shared build && pnpm --filter api build && pnpm gen:openapi && pnpm gen:orval",
+    "gen": "pnpm gen:env && pnpm --filter @repo/api-shared build && pnpm --filter api build && pnpm gen:openapi",
     "gen:env": "tsx scripts/generate-env-example.ts",
     "gen:openapi": "node apps/api/dist/src/main --spec-only > openapi.json",
-    "gen:orval": "orval --config ./orval.config.ts || true",
     "prepare": "lefthook install"
   },
   "devDependencies": {
     "lefthook": "^1.8.4",
     "lint-staged": "^15.2.10",
-    "orval": "^7.3.0",
     "prettier": "^3.7.4",
     "tsx": "^4.19.2",
     "turbo": "^2.9.12",

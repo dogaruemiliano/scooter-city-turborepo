@@ -3,24 +3,55 @@
   "version": "0.0.0",
   "private": true,
   "exports": {
-    "./*": "./src/*.tsx"
+    "./Badge": {
+      "types": "./src/Badge.tsx",
+      "default": "./src/Badge.tsx"
+    },
+    "./Button": {
+      "types": "./src/Button.tsx",
+      "default": "./src/Button.tsx"
+    },
+    "./Card": {
+      "types": "./src/Card.tsx",
+      "default": "./src/Card.tsx"
+    },
+    "./Input": {
+      "types": "./src/Input.tsx",
+      "default": "./src/Input.tsx"
+    },
+    "./Text": {
+      "types": "./src/Text.tsx",
+      "default": "./src/Text.tsx"
+    }
   },
   "scripts": {
+    "dev": "storybook dev -p 6006",
+    "build-storybook": "storybook build",
     "lint": "eslint . --max-warnings 0",
-    "generate:component": "turbo gen react-component",
     "check-types": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "react": ">=19",
+    "react-dom": ">=19"
+  },
+  "dependencies": {
+    "@repo/theme": "workspace:*"
   },
   "devDependencies": {
     "@repo/eslint-config": "workspace:*",
     "@repo/typescript-config": "workspace:*",
+    "@storybook/react-vite": "^10.3.6",
+    "@tailwindcss/vite": "^4.0.0",
     "@types/node": "^22.15.3",
     "@types/react": "19.2.2",
     "@types/react-dom": "19.2.2",
+    "@vitejs/plugin-react": "^5.0.0",
     "eslint": "^9.39.1",
-    "typescript": "5.9.2"
-  },
-  "dependencies": {
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "storybook": "^10.3.6",
+    "tailwindcss": "^4.0.0",
+    "typescript": "5.9.2",
+    "vite": "^7.0.0"
   }
 }

@@ -47,7 +47,7 @@ describe("SmsoSmsService", () => {
     await service.send({ to: "+40712345678", body: "Your code is 000000" });
 
     expect(fetchSpy).toHaveBeenCalledTimes(1);
-    const [url, init] = fetchSpy.mock.calls[0]!;
+    const [url, init] = fetchSpy.mock.calls[0];
     expect(url).toBe("https://app.smso.ro/api/v1/send");
     expect(init?.method).toBe("POST");
 

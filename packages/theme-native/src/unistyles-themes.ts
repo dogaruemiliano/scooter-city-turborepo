@@ -1,3 +1,4 @@
+/// <reference path="./unistyles.d.ts" />
 import { tokens } from "@repo/theme/native";
 
 const sharedTokens = {
@@ -41,10 +42,3 @@ export const breakpoints = {
 export type AppThemes = typeof themes;
 export type AppBreakpoints = typeof breakpoints;
 export type Theme = AppThemes[keyof AppThemes];
-
-declare module "react-native-unistyles" {
-  // eslint-disable-next-line @typescript-eslint/no-empty-object-type -- declaration merging requires interface form
-  export interface UnistylesThemes extends AppThemes {}
-  // eslint-disable-next-line @typescript-eslint/no-empty-object-type -- declaration merging requires interface form
-  export interface UnistylesBreakpoints extends AppBreakpoints {}
-}

@@ -1,5 +1,5 @@
 import { Pressable, Text, type PressableProps } from "react-native";
-import { StyleSheet } from "@repo/theme-native/styles";
+import { StyleSheet } from "react-native-unistyles";
 
 export type DecButtonVariant = "primary" | "secondary";
 export type DecButtonSize = "sm" | "md" | "lg";

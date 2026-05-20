@@ -1,5 +1,6 @@
 import { useState } from "react";
 import {
+  Platform,
   TextInput,
   View,
   type StyleProp,
@@ -7,7 +8,7 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import { StyleSheet, useUnistyles } from "@repo/theme-native/styles";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { DecText } from "../DecText";
 
 export interface DecInputProps extends Omit<TextInputProps, "style"> {
@@ -86,11 +87,15 @@ const styles = StyleSheet.create((theme) => ({
     variants: {
       focused: {
         true: {
-          borderColor: theme.colors.border.focus,
-          outlineStyle: "solid",
-          outlineWidth: 2,
-          outlineOffset: 0,
-          outlineColor: theme.colors.border.focus,
+          // borderColor: theme.colors.border.focus,
+          ...Platform.select({
+            android: undefined,
+            default: {
+              outlineStyle: "solid",
+              outlineWidth: StyleSheet.hairlineWidth,
+              outlineColor: theme.colors.border.focus,
+            },
+          }),
         },
         false: {
           borderColor: theme.colors.border.default,

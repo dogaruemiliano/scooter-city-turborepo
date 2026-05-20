@@ -1,5 +1,5 @@
 import { View, type ViewProps } from "react-native";
-import { StyleSheet } from "@repo/theme-native/styles";
+import { StyleSheet } from "react-native-unistyles";
 
 export type DecCardPadding = "sm" | "md" | "lg";
 

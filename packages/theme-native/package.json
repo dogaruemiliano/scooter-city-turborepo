@@ -12,9 +12,8 @@
       "types": "./src/configure.ts",
       "default": "./src/configure.ts"
     },
-    "./styles": {
-      "types": "./src/styles.ts",
-      "default": "./src/styles.ts"
+    "./unistyles": {
+      "types": "./src/unistyles.d.ts"
     }
   },
   "scripts": {
@@ -34,6 +33,9 @@
     "@repo/typescript-config": "workspace:*",
     "@types/react": "19.2.2",
     "eslint": "^9.39.1",
-    "typescript": "5.9.2"
+    "typescript": "5.9.2",
+    "react": ">=19",
+    "react-native": ">=0.76",
+    "react-native-unistyles": ">=3"
   }
 }

@@ -7,19 +7,10 @@ module.exports = function (api) {
         "react-native-unistyles/plugin",
         {
           root: "src",
-          // Match every entry point of @repo/theme-native that workspace
-          // packages may import — exact string match, no prefix.
-          autoProcessImports: [
-            "@repo/theme-native",
-            "@repo/theme-native/styles",
-            "@repo/theme-native/configure",
-          ],
-          // Process source files inside the workspace ui package
+          // Process source files inside the workspace ui package so unistyles
+          // can rewrite StyleSheet.create / useUnistyles usages there too
           // (pnpm symlinks them into node_modules/@repo/ui-native/src).
           autoProcessPaths: ["@repo/ui-native/src"],
-          // Log every file the plugin transforms — useful to verify the
-          // workspace components are being processed. Disable in CI.
-          debug: true,
         },
       ],
     ],
