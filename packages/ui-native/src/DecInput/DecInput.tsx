@@ -49,7 +49,7 @@ export const DecInput = ({
         </DecText>
       ) : null}
       <TextInput
-        placeholderTextColor={theme.colors.text.tertiary}
+        placeholderTextColor={theme.colors.mutedForeground}
         editable={editable}
         aria-invalid={invalid}
         style={[styles.input, inputStyle]}
@@ -77,34 +77,35 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.spacing[1],
   },
   input: {
-    backgroundColor: theme.colors.surface.page,
-    color: theme.colors.text.primary,
+    backgroundColor: theme.colors.background,
+    color: theme.colors.foreground,
+    fontFamily: theme.typography.fontFamilyByWeight.regular,
     borderRadius: theme.radius.md,
-    borderWidth: 1,
+    borderWidth: theme.spacing.px,
     paddingHorizontal: theme.spacing[3],
     paddingVertical: theme.spacing[2],
     fontSize: theme.typography.fontSize.base,
     variants: {
       focused: {
         true: {
-          // borderColor: theme.colors.border.focus,
+          borderColor: theme.colors.ring,
           ...Platform.select({
             android: undefined,
             default: {
               outlineStyle: "solid",
               outlineWidth: StyleSheet.hairlineWidth,
-              outlineColor: theme.colors.border.focus,
+              outlineColor: theme.colors.ring,
             },
           }),
         },
         false: {
-          borderColor: theme.colors.border.default,
+          borderColor: theme.colors.input,
         },
       },
       invalid: {
         true: {
-          borderColor: theme.colors.border.danger,
-          outlineColor: theme.colors.border.danger,
+          borderColor: theme.colors.destructive,
+          outlineColor: theme.colors.destructive,
         },
         false: {},
       },

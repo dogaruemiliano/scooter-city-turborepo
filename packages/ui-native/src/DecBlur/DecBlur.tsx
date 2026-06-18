@@ -18,7 +18,7 @@ export interface DecBlurProps extends Omit<ViewProps, "children"> {
   /**
    * Background color used on platforms without native blur (currently
    * everything other than iOS). Should typically be a semi-transparent
-   * theme color (e.g. `theme.colors.surface.scrim`).
+   * theme color (e.g. `theme.colors.scrim`).
    */
   fallbackColor?: string;
   children?: ReactNode;

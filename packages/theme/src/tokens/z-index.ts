@@ -6,6 +6,7 @@ export const zIndex = {
   raised: 10,
   dropdown: 1000,
   sticky: 1100,
+  navigation: 1150,
   overlay: 1200,
   modal: 1300,
   popover: 1400,

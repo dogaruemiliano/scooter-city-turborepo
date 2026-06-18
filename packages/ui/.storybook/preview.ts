@@ -3,6 +3,7 @@ import "./preview.css";
 
 const preview: Preview = {
   parameters: {
+    layout: "centered",
     controls: { expanded: true },
   },
 };

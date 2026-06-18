@@ -34,14 +34,14 @@ export const DecBadge = ({
 const styles = StyleSheet.create((theme) => ({
   container: {
     alignSelf: "flex-start",
-    borderRadius: theme.radius.pill,
+    borderRadius: theme.radius.full,
     variants: {
       variant: {
-        neutral: { backgroundColor: theme.colors.surface.sunken },
-        action: { backgroundColor: theme.colors.surface.actionSubtle },
-        danger: { backgroundColor: theme.colors.surface.dangerSubtle },
-        success: { backgroundColor: theme.colors.surface.successSubtle },
-        warning: { backgroundColor: theme.colors.surface.warningSubtle },
+        neutral: { backgroundColor: theme.colors.muted },
+        action: { backgroundColor: theme.colors.infoSubtle },
+        danger: { backgroundColor: theme.colors.destructiveSubtle },
+        success: { backgroundColor: theme.colors.successSubtle },
+        warning: { backgroundColor: theme.colors.warningSubtle },
       },
       size: {
         sm: {
@@ -56,14 +56,14 @@ const styles = StyleSheet.create((theme) => ({
     },
   },
   label: {
-    fontWeight: theme.typography.fontWeight.medium.toString() as "500",
+    fontFamily: theme.typography.fontFamilyByWeight.medium,
     variants: {
       variant: {
-        neutral: { color: theme.colors.text.secondary },
-        action: { color: theme.colors.text.link },
-        danger: { color: theme.colors.surface.danger },
-        success: { color: theme.colors.surface.success },
-        warning: { color: theme.colors.text.warning },
+        neutral: { color: theme.colors.mutedForeground },
+        action: { color: theme.colors.info },
+        danger: { color: theme.colors.destructive },
+        success: { color: theme.colors.success },
+        warning: { color: theme.colors.warning },
       },
       size: {
         sm: { fontSize: theme.typography.fontSize.xs },

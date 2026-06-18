@@ -19,7 +19,7 @@ export const shadow: Record<"none" | "sm" | "md" | "lg" | "xl", ShadowToken> = {
   none: {
     web: "none",
     native: {
-      shadowColor: "#000000",
+      shadowColor: "oklch(0 0 0)",
       shadowOffset: { width: 0, height: 0 },
       shadowOpacity: 0,
       shadowRadius: 0,
@@ -27,9 +27,9 @@ export const shadow: Record<"none" | "sm" | "md" | "lg" | "xl", ShadowToken> = {
     },
   },
   sm: {
-    web: "0 1px 2px 0 rgb(0 0 0 / 0.05)",
+    web: "0 1px 2px 0 oklch(0 0 0 / 0.05)",
     native: {
-      shadowColor: "#000000",
+      shadowColor: "oklch(0 0 0)",
       shadowOffset: { width: 0, height: 1 },
       shadowOpacity: 0.05,
       shadowRadius: 2,
@@ -37,9 +37,9 @@ export const shadow: Record<"none" | "sm" | "md" | "lg" | "xl", ShadowToken> = {
     },
   },
   md: {
-    web: "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)",
+    web: "0 4px 6px -1px oklch(0 0 0 / 0.1), 0 2px 4px -2px oklch(0 0 0 / 0.1)",
     native: {
-      shadowColor: "#000000",
+      shadowColor: "oklch(0 0 0)",
       shadowOffset: { width: 0, height: 4 },
       shadowOpacity: 0.1,
       shadowRadius: 6,
@@ -47,9 +47,9 @@ export const shadow: Record<"none" | "sm" | "md" | "lg" | "xl", ShadowToken> = {
     },
   },
   lg: {
-    web: "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)",
+    web: "0 10px 15px -3px oklch(0 0 0 / 0.1), 0 4px 6px -4px oklch(0 0 0 / 0.1)",
     native: {
-      shadowColor: "#000000",
+      shadowColor: "oklch(0 0 0)",
       shadowOffset: { width: 0, height: 10 },
       shadowOpacity: 0.1,
       shadowRadius: 15,
@@ -57,9 +57,9 @@ export const shadow: Record<"none" | "sm" | "md" | "lg" | "xl", ShadowToken> = {
     },
   },
   xl: {
-    web: "0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)",
+    web: "0 20px 25px -5px oklch(0 0 0 / 0.1), 0 8px 10px -6px oklch(0 0 0 / 0.1)",
     native: {
-      shadowColor: "#000000",
+      shadowColor: "oklch(0 0 0)",
       shadowOffset: { width: 0, height: 20 },
       shadowOpacity: 0.1,
       shadowRadius: 25,

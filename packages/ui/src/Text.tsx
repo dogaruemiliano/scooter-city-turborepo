@@ -45,10 +45,10 @@ const weightClass: Record<TextWeight, string> = {
 };
 
 const colorClass: Record<TextColor, string> = {
-  primary: "text-text-primary",
-  secondary: "text-text-secondary",
-  tertiary: "text-text-tertiary",
-  disabled: "text-text-disabled",
+  primary: "text-foreground",
+  secondary: "text-muted-foreground",
+  tertiary: "text-muted-foreground",
+  disabled: "text-disabled-foreground",
 };
 
 export const Text = forwardRef<HTMLElement, TextProps>(

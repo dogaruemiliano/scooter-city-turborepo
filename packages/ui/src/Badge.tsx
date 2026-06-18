@@ -14,11 +14,11 @@ export interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
 }
 
 const variantClass: Record<BadgeVariant, string> = {
-  neutral: "bg-surface-sunken text-text-secondary",
-  action: "bg-surface-action-subtle text-text-link",
-  danger: "bg-surface-danger-subtle text-surface-danger",
-  success: "bg-surface-success-subtle text-surface-success",
-  warning: "bg-surface-warning-subtle text-text-on-warning",
+  neutral: "bg-muted text-muted-foreground",
+  action: "bg-info-subtle text-info",
+  danger: "bg-destructive-subtle text-destructive",
+  success: "bg-success-subtle text-success",
+  warning: "bg-warning-subtle text-warning",
 };
 
 const sizeClass: Record<BadgeSize, string> = {
@@ -31,7 +31,7 @@ export const Badge = forwardRef<HTMLSpanElement, BadgeProps>(
     <span
       ref={ref}
       className={[
-        "inline-flex items-center rounded-pill font-medium",
+        "inline-flex items-center rounded-full font-medium",
         variantClass[variant],
         sizeClass[size],
         className,

@@ -16,12 +16,18 @@ export const spacing = {
   6: 24,
   7: 28,
   8: 32,
+  9: 36,
   10: 40,
   12: 48,
   16: 64,
+  18: 72,
   20: 80,
   24: 96,
   32: 128,
+  36: 144,
+  64: 256,
+  72: 288,
+  96: 384,
 } as const;
 
 export type Spacing = typeof spacing;

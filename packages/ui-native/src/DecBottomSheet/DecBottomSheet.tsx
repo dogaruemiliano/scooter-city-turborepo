@@ -1,5 +1,5 @@
 import { forwardRef, useCallback, type ReactNode } from "react";
-import { Platform, Pressable, View } from "react-native";
+import { Pressable, View } from "react-native";
 import {
   BottomSheetBackdrop,
   BottomSheetModal,
@@ -67,12 +67,12 @@ export const DecBottomSheet = forwardRef<
         <DecBlur
           intensity={15}
           tint={blurTint}
-          fallbackColor={theme.colors.surface.scrim}
+          fallbackColor={theme.colors.scrim}
           style={StyleSheet.absoluteFillObject}
         />
       </BottomSheetBackdrop>
     ),
-    [blurTint, theme.colors.surface.scrim],
+    [blurTint, theme.colors.scrim],
   );
 
   return (
@@ -130,7 +130,7 @@ const styles = StyleSheet.create((theme) => ({
     backgroundColor: "transparent",
   },
   background: {
-    backgroundColor: theme.colors.surface.raised,
+    backgroundColor: theme.colors.card,
     borderTopLeftRadius: theme.radius.xl,
     borderTopRightRadius: theme.radius.xl,
   },
@@ -143,8 +143,8 @@ const styles = StyleSheet.create((theme) => ({
     padding: 0,
   },
   handleIndicator: {
-    backgroundColor: theme.colors.border.strong,
-    width: 36,
+    backgroundColor: theme.colors.borderStrong,
+    width: theme.spacing[9],
   },
   content: {
     paddingHorizontal: theme.spacing[5],
@@ -166,9 +166,9 @@ const styles = StyleSheet.create((theme) => ({
     height: theme.spacing[8],
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: theme.radius.pill,
+    borderRadius: theme.radius.full,
   },
   closeButtonPressed: {
-    backgroundColor: theme.colors.surface.sunken,
+    backgroundColor: theme.colors.muted,
   },
 }));

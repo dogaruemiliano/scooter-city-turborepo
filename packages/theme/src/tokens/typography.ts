@@ -4,13 +4,19 @@
 export const typography = {
   fontFamily: {
     sans: {
-      web: "var(--font-sans, ui-sans-serif), system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
-      native: "System",
+      web: "var(--font-manrope, 'Manrope Variable'), ui-sans-serif, system-ui, sans-serif",
+      native: "Manrope_400Regular",
     },
     mono: {
       web: "var(--font-mono, ui-monospace), SFMono-Regular, Menlo, Consolas, monospace",
       native: "Menlo",
     },
+  },
+  fontFamilyByWeight: {
+    regular: "Manrope_400Regular",
+    medium: "Manrope_500Medium",
+    semibold: "Manrope_600SemiBold",
+    bold: "Manrope_700Bold",
   },
   fontSize: {
     xs: 12,

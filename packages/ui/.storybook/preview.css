@@ -1,12 +1,13 @@
+@import "@fontsource-variable/manrope";
 @import "tailwindcss";
-@import "@repo/theme/css";
+@import "../src/styles/globals.css";
 
 /* Storybook lazy-loads stories, so Tailwind v4's module-graph content detection
    misses classes from components not yet rendered. Force a filesystem scan. */
 @source "../src/**/*.{ts,tsx}";
 
 body {
-  background-color: var(--color-surface-page);
-  color: var(--color-text-primary);
+  background-color: var(--background);
+  color: var(--foreground);
   font-family: var(--font-sans);
 }

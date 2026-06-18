@@ -18,11 +18,21 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Neutral: Story = {};
+export const Neutral: Story = {
+  render: (args) => (
+    <>
+      <div className="bg-card p-4 rounded justify-center items-center flex flex-col">
+        <Badge {...args} variant={args.variant}>
+          {`${args.variant?.charAt(0).toUpperCase()}${args.variant?.slice(1)}`}
+        </Badge>
+      </div>
+    </>
+  ),
+};
 
 export const Variants: Story = {
   render: (args) => (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2 bg-card p-4 rounded">
       <Badge {...args} variant="neutral">
         Neutral
       </Badge>
@@ -44,7 +54,7 @@ export const Variants: Story = {
 
 export const Sizes: Story = {
   render: (args) => (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2 bg-card p-4 rounded">
       <Badge {...args} size="sm">
         Small
       </Badge>

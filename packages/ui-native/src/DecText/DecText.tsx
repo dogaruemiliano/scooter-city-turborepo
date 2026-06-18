@@ -92,24 +92,24 @@ const styles = StyleSheet.create((theme) => ({
       },
       weight: {
         regular: {
-          fontWeight: theme.typography.fontWeight.regular.toString() as "400",
+          fontFamily: theme.typography.fontFamilyByWeight.regular,
         },
         medium: {
-          fontWeight: theme.typography.fontWeight.medium.toString() as "500",
+          fontFamily: theme.typography.fontFamilyByWeight.medium,
         },
         semibold: {
-          fontWeight: theme.typography.fontWeight.semibold.toString() as "600",
+          fontFamily: theme.typography.fontFamilyByWeight.semibold,
         },
         bold: {
-          fontWeight: theme.typography.fontWeight.bold.toString() as "700",
+          fontFamily: theme.typography.fontFamilyByWeight.bold,
         },
       },
       color: {
-        primary: { color: theme.colors.text.primary },
-        secondary: { color: theme.colors.text.secondary },
-        tertiary: { color: theme.colors.text.tertiary },
-        disabled: { color: theme.colors.text.disabled },
-        danger: { color: theme.colors.text.danger },
+        primary: { color: theme.colors.foreground },
+        secondary: { color: theme.colors.mutedForeground },
+        tertiary: { color: theme.colors.mutedForeground },
+        disabled: { color: theme.colors.disabledForeground },
+        danger: { color: theme.colors.destructive },
       },
     },
   },

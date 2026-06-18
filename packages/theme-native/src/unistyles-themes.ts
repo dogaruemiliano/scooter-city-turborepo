@@ -1,4 +1,4 @@
-/// <reference path="./unistyles.d.ts" />
+import type {} from "./unistyles";
 import { tokens } from "@repo/theme/native";
 
 const sharedTokens = {

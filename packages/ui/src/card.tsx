@@ -17,7 +17,7 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(
     <div
       ref={ref}
       className={[
-        "bg-surface-raised text-text-primary border border-border-subtle rounded-lg",
+        "bg-card text-card-foreground border border-border rounded-lg",
         paddingClass[padding],
         className,
       ]

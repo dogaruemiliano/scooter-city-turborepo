@@ -1,0 +1,18 @@
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@repo/theme/css";
+
+@source "../**/*.{ts,tsx}";
+
+@custom-variant dark (&:is(.dark *, [data-theme="dark"] *));
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-sans);
+  }
+}

@@ -1,4 +1,4 @@
-import { breakpoints } from "./tokens/breakpoints.js";
+import { breakpoints } from "./tokens/breakpoints";
 
 /**
  * Tailwind v4 users should `@import "@repo/theme/css"` in their stylesheet —

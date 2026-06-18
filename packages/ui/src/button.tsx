@@ -9,13 +9,13 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const base =
-  "inline-flex items-center justify-center rounded-md font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-border-focus disabled:opacity-50 disabled:cursor-not-allowed";
+  "inline-flex items-center justify-center rounded-md font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:bg-disabled disabled:text-disabled-foreground";
 
 const variantClass: Record<ButtonVariant, string> = {
   primary:
-    "bg-surface-action text-text-on-action hover:bg-surface-action-hover active:bg-surface-action-active",
+    "bg-primary text-primary-foreground hover:bg-primary-hover active:bg-primary-active",
   secondary:
-    "bg-surface-raised text-text-primary border border-border-default hover:bg-surface-sunken",
+    "bg-secondary text-secondary-foreground border border-border hover:bg-secondary-hover active:bg-secondary-active",
 };
 
 const sizeClass: Record<ButtonSize, string> = {

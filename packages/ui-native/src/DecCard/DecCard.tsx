@@ -14,9 +14,9 @@ export const DecCard = ({ padding = "md", style, ...rest }: DecCardProps) => {
 
 const styles = StyleSheet.create((theme) => ({
   base: {
-    backgroundColor: theme.colors.surface.raised,
-    borderColor: theme.colors.border.subtle,
-    borderWidth: 1,
+    backgroundColor: theme.colors.card,
+    borderColor: theme.colors.border,
+    borderWidth: theme.spacing.px,
     borderRadius: theme.radius.lg,
     variants: {
       padding: {

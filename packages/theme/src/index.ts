@@ -1,13 +1,14 @@
-export * from "./tokens/index.js";
+export * from "./tokens/index";
 
-import { semanticColors } from "./tokens/semantic.js";
-import { spacing } from "./tokens/spacing.js";
-import { radius } from "./tokens/radius.js";
-import { typography } from "./tokens/typography.js";
-import { shadow } from "./tokens/shadow.js";
-import { motion } from "./tokens/motion.js";
-import { zIndex } from "./tokens/z-index.js";
-import { breakpoints } from "./tokens/breakpoints.js";
+import { semanticColors } from "./tokens/semantic";
+import { primitives } from "./tokens/primitives";
+import { spacing } from "./tokens/spacing";
+import { radius } from "./tokens/radius";
+import { typography } from "./tokens/typography";
+import { shadow } from "./tokens/shadow";
+import { motion } from "./tokens/motion";
+import { zIndex } from "./tokens/z-index";
+import { breakpoints } from "./tokens/breakpoints";
 
 export type ColorScheme = "light" | "dark";
 
@@ -16,6 +17,7 @@ export type ColorScheme = "light" | "dark";
  * Non-color tokens are mode-independent.
  */
 export const tokens = {
+  primitives,
   color: semanticColors,
   spacing,
   radius,

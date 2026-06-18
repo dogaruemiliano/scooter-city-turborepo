@@ -34,7 +34,9 @@ export const DecButton = ({
       ]}
       {...rest}
     >
-      <Text style={styles.label}>{children}</Text>
+      <Text style={[styles.label, disabled && styles.disabledLabel]}>
+        {children}
+      </Text>
     </Pressable>
   );
 };
@@ -48,13 +50,13 @@ const styles = StyleSheet.create((theme) => ({
     variants: {
       variant: {
         primary: {
-          backgroundColor: theme.colors.surface.action,
+          backgroundColor: theme.colors.primary,
           borderWidth: 0,
         },
         secondary: {
-          backgroundColor: theme.colors.surface.raised,
-          borderWidth: 1,
-          borderColor: theme.colors.border.default,
+          backgroundColor: theme.colors.secondary,
+          borderWidth: theme.spacing.px,
+          borderColor: theme.colors.border,
         },
       },
       size: {
@@ -74,11 +76,11 @@ const styles = StyleSheet.create((theme) => ({
     },
   },
   label: {
-    fontWeight: theme.typography.fontWeight.medium.toString() as "500",
+    fontFamily: theme.typography.fontFamilyByWeight.medium,
     variants: {
       variant: {
-        primary: { color: theme.colors.text.onAction },
-        secondary: { color: theme.colors.text.primary },
+        primary: { color: theme.colors.primaryForeground },
+        secondary: { color: theme.colors.secondaryForeground },
       },
       size: {
         sm: { fontSize: theme.typography.fontSize.sm },
@@ -90,12 +92,15 @@ const styles = StyleSheet.create((theme) => ({
   pressed: {
     variants: {
       variant: {
-        primary: { backgroundColor: theme.colors.surface.actionHover },
-        secondary: { backgroundColor: theme.colors.surface.sunken },
+        primary: { backgroundColor: theme.colors.primaryHover },
+        secondary: { backgroundColor: theme.colors.secondaryHover },
       },
     },
   },
   disabled: {
-    opacity: 0.5,
+    backgroundColor: theme.colors.disabled,
+  },
+  disabledLabel: {
+    color: theme.colors.disabledForeground,
   },
 }));
