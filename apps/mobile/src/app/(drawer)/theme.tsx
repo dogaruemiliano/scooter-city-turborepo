@@ -1,18 +1,67 @@
 import { ScrollView, View, type ViewStyle } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { localeLabels, supportedLocales } from "@repo/i18n";
+import { DecButton } from "@repo/ui-native/DecButton";
+import { DecCard } from "@repo/ui-native/DecCard";
 import {
   DecText,
   type DecTextSize,
   type DecTextWeight,
 } from "@repo/ui-native/DecText";
 import type { ReactNode } from "react";
+import { useLocale } from "@/localization";
 
 export default function ThemeScreen() {
   const { theme } = useUnistyles();
+  const { locale, manualLocale, setLocale, clearLocalePreference, t } =
+    useLocale();
 
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
-      <Section title="Colors">
+      <Section title={t("preferences.language.title")}>
+        <DecCard>
+          <View style={styles.preferenceCard}>
+            <View style={styles.preferenceHeader}>
+              <DecText size="sm" color="secondary">
+                {t("preferences.language.subtitle")}
+              </DecText>
+              <DecText size="sm">
+                {t("preferences.language.current", {
+                  language: localeLabels[locale].label,
+                })}
+              </DecText>
+              <DecText size="xs" color="tertiary">
+                {manualLocale === null
+                  ? t("preferences.language.sourceDevice")
+                  : t("preferences.language.sourceManual")}
+              </DecText>
+            </View>
+            <View style={styles.localeButtonRow}>
+              <DecButton
+                variant={manualLocale === null ? "primary" : "secondary"}
+                onPress={() => {
+                  void clearLocalePreference();
+                }}
+              >
+                {t("preferences.language.device")}
+              </DecButton>
+              {supportedLocales.map((option) => (
+                <DecButton
+                  key={option}
+                  variant={manualLocale === option ? "primary" : "secondary"}
+                  onPress={() => {
+                    void setLocale(option);
+                  }}
+                >
+                  {localeLabels[option].label}
+                </DecButton>
+              ))}
+            </View>
+          </View>
+        </DecCard>
+      </Section>
+
+      <Section title={t("theme.sections.colors")}>
         <View style={styles.swatchRow}>
           {Object.entries(theme.colors).map(([name, hex]) => (
             <Swatch key={name} name={name} hex={hex} />
@@ -20,7 +69,7 @@ export default function ThemeScreen() {
         </View>
       </Section>
 
-      <Section title="Spacing">
+      <Section title={t("theme.sections.spacing")}>
         {Object.entries(theme.spacing).map(([key, value]) => (
           <View key={key} style={styles.row}>
             <DecText size="sm" style={styles.rowLabel}>
@@ -28,13 +77,13 @@ export default function ThemeScreen() {
             </DecText>
             <View style={[styles.spacingBar, { width: value as number }]} />
             <DecText size="xs" color="secondary" style={styles.rowValue}>
-              {value as number}px
+              {t("theme.units.pixels", { value: value as number })}
             </DecText>
           </View>
         ))}
       </Section>
 
-      <Section title="Radius">
+      <Section title={t("theme.sections.radius")}>
         <View style={styles.tileRow}>
           {Object.entries(theme.radius).map(([key, value]) => (
             <View key={key} style={styles.tileItem}>
@@ -43,29 +92,33 @@ export default function ThemeScreen() {
               />
               <DecText size="xs">{key}</DecText>
               <DecText size="xs" color="tertiary">
-                {(value as number) === 9999 ? "full" : `${value}px`}
+                {(value as number) === theme.radius.full
+                  ? t("theme.values.full")
+                  : t("theme.units.pixels", { value: value as number })}
               </DecText>
             </View>
           ))}
         </View>
       </Section>
 
-      <Section title="Typography — Size">
+      <Section title={t("theme.sections.typographySize")}>
         {Object.entries(theme.typography.fontSize).map(([key, value]) => (
           <View key={key} style={styles.typeSizeItem}>
-            <DecText size={key as DecTextSize}>{key} — Aa</DecText>
+            <DecText size={key as DecTextSize}>
+              {t("theme.samples.size", { name: key })}
+            </DecText>
             <DecText size="xs" color="secondary">
-              {value as number}px
+              {t("theme.units.pixels", { value: value as number })}
             </DecText>
           </View>
         ))}
       </Section>
 
-      <Section title="Typography — Weight">
+      <Section title={t("theme.sections.typographyWeight")}>
         {Object.entries(theme.typography.fontWeight).map(([key, value]) => (
           <View key={key} style={styles.typeRow}>
             <DecText size="lg" weight={key as DecTextWeight}>
-              {key} — Aa Bb Cc
+              {t("theme.samples.weight", { name: key })}
             </DecText>
             <DecText size="xs" color="secondary">
               {String(value)}
@@ -74,11 +127,16 @@ export default function ThemeScreen() {
         ))}
       </Section>
 
-      <Section title="Typography — Line Height">
+      <Section title={t("theme.sections.typographyLineHeight")}>
         {Object.entries(theme.typography.lineHeight).map(([key, value]) => (
           <View key={key} style={styles.typeRow}>
-            <DecText style={{ lineHeight: 16 * (value as number) }}>
-              {key} — Quick brown fox
+            <DecText
+              style={{
+                lineHeight:
+                  theme.typography.fontSize.base * (value as number),
+              }}
+            >
+              {t("theme.samples.lineHeight", { name: key })}
             </DecText>
             <DecText size="xs" color="secondary">
               {String(value)}
@@ -87,11 +145,11 @@ export default function ThemeScreen() {
         ))}
       </Section>
 
-      <Section title="Typography — Letter Spacing">
+      <Section title={t("theme.sections.typographyLetterSpacing")}>
         {Object.entries(theme.typography.letterSpacing).map(([key, value]) => (
           <View key={key} style={styles.typeRow}>
             <DecText style={{ letterSpacing: value as number }}>
-              {key} — Spacing sample
+              {t("theme.samples.letterSpacing", { name: key })}
             </DecText>
             <DecText size="xs" color="secondary">
               {String(value)}
@@ -100,7 +158,7 @@ export default function ThemeScreen() {
         ))}
       </Section>
 
-      <Section title="Shadow">
+      <Section title={t("theme.sections.shadow")}>
         <View style={styles.shadowRow}>
           {Object.entries(theme.shadow).map(([key, value]) => {
             const shadowStyle = value as ViewStyle;
@@ -114,20 +172,20 @@ export default function ThemeScreen() {
         </View>
       </Section>
 
-      <Section title="Motion — Duration">
+      <Section title={t("theme.sections.motionDuration")}>
         {Object.entries(theme.motion.duration).map(([key, value]) => (
           <View key={key} style={styles.row}>
             <DecText size="sm" style={styles.rowLabel}>
               {key}
             </DecText>
             <DecText size="sm" color="secondary" style={styles.rowValue}>
-              {value as number}ms
+              {t("theme.units.milliseconds", { value: value as number })}
             </DecText>
           </View>
         ))}
       </Section>
 
-      <Section title="Motion — Easing">
+      <Section title={t("theme.sections.motionEasing")}>
         {Object.entries(theme.motion.easing).map(([key, value]) => (
           <View key={key} style={styles.row}>
             <DecText size="sm" style={styles.rowLabel}>
@@ -140,7 +198,7 @@ export default function ThemeScreen() {
         ))}
       </Section>
 
-      <Section title="Z-Index">
+      <Section title={t("theme.sections.zIndex")}>
         {Object.entries(theme.zIndex).map(([key, value]) => (
           <View key={key} style={styles.row}>
             <DecText size="sm" style={styles.rowLabel}>
@@ -196,6 +254,17 @@ const styles = StyleSheet.create((theme) => ({
   },
   sectionTitle: {
     marginBottom: theme.spacing[1],
+  },
+  preferenceCard: {
+    gap: theme.spacing[3],
+  },
+  preferenceHeader: {
+    gap: theme.spacing[1],
+  },
+  localeButtonRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.spacing[2],
   },
   swatchRow: {
     flexDirection: "row",

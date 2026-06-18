@@ -17,6 +17,7 @@ import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useTheme } from "@repo/theme-native";
+import { LocaleProvider } from "@/localization";
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -54,11 +55,13 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <BottomSheetModalProvider>
-        <NavThemeProvider value={navTheme}>
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="(drawer)" />
-          </Stack>
-        </NavThemeProvider>
+        <LocaleProvider>
+          <NavThemeProvider value={navTheme}>
+            <Stack screenOptions={{ headerShown: false }}>
+              <Stack.Screen name="(drawer)" />
+            </Stack>
+          </NavThemeProvider>
+        </LocaleProvider>
       </BottomSheetModalProvider>
     </GestureHandlerRootView>
   );

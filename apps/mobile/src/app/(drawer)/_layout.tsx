@@ -1,8 +1,10 @@
 import { Drawer } from "expo-router/drawer";
 import { useUnistyles } from "react-native-unistyles";
+import { useTranslation } from "@/localization";
 
 export default function DrawerLayout() {
   const { theme } = useUnistyles();
+  const { t } = useTranslation();
 
   return (
     <Drawer
@@ -16,15 +18,15 @@ export default function DrawerLayout() {
     >
       <Drawer.Screen
         name="index"
-        options={{ title: "Home", drawerLabel: "Home" }}
+        options={{ title: t("nav.home"), drawerLabel: t("nav.home") }}
       />
       <Drawer.Screen
         name="ui-kit"
-        options={{ title: "UI Kit", drawerLabel: "UI Kit" }}
+        options={{ title: t("nav.uiKit"), drawerLabel: t("nav.uiKit") }}
       />
       <Drawer.Screen
         name="theme"
-        options={{ title: "Theme", drawerLabel: "Theme" }}
+        options={{ title: t("nav.theme"), drawerLabel: t("nav.theme") }}
       />
     </Drawer>
   );

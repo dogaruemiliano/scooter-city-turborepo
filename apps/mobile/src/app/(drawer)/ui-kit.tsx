@@ -10,11 +10,13 @@ import { DecButton } from "@repo/ui-native/DecButton";
 import { DecCard } from "@repo/ui-native/DecCard";
 import { DecInput } from "@repo/ui-native/DecInput";
 import { DecText } from "@repo/ui-native/DecText";
+import { useTranslation } from "@/localization";
 
 export default function UIKitScreen() {
   const dynamicSheetRef = useRef<DecBottomSheetRef>(null);
   const fixedSheetRef = useRef<DecBottomSheetRef>(null);
   const customHeaderSheetRef = useRef<DecBottomSheetRef>(null);
+  const { t } = useTranslation();
 
   return (
     <ScrollView
@@ -24,75 +26,75 @@ export default function UIKitScreen() {
     >
       <View style={styles.header}>
         <DecText size="3xl" weight="bold">
-          Components
+          {t("uiKit.header.title")}
         </DecText>
         <DecText size="sm" color="secondary">
-          A reference for every component currently exported from
-          @repo/ui-native.
+          {t("uiKit.header.subtitle")}
         </DecText>
       </View>
 
       <Section
-        title="DecButton"
-        subtitle="Pressable action. Variants × sizes × disabled state."
+        title={t("uiKit.sections.decButton.title")}
+        subtitle={t("uiKit.sections.decButton.subtitle")}
       >
-        <Group label="Variants">
+        <Group label={t("uiKit.groups.variants")}>
           <Row>
-            <DecButton variant="primary">Primary</DecButton>
-            <DecButton variant="secondary">Secondary</DecButton>
+            <DecButton variant="primary">
+              {t("uiKit.buttons.primary")}
+            </DecButton>
+            <DecButton variant="secondary">
+              {t("uiKit.buttons.secondary")}
+            </DecButton>
           </Row>
         </Group>
-        <Group label="Sizes">
+        <Group label={t("uiKit.groups.sizes")}>
           <Row>
-            <DecButton size="sm">Small</DecButton>
-            <DecButton size="md">Medium</DecButton>
-            <DecButton size="lg">Large</DecButton>
+            <DecButton size="sm">{t("uiKit.buttons.small")}</DecButton>
+            <DecButton size="md">{t("uiKit.buttons.medium")}</DecButton>
+            <DecButton size="lg">{t("uiKit.buttons.large")}</DecButton>
           </Row>
         </Group>
-        <Group label="Disabled">
+        <Group label={t("uiKit.groups.disabled")}>
           <Row>
-            <DecButton disabled>Primary</DecButton>
+            <DecButton disabled>{t("uiKit.buttons.primary")}</DecButton>
             <DecButton variant="secondary" disabled>
-              Secondary
+              {t("uiKit.buttons.secondary")}
             </DecButton>
           </Row>
         </Group>
       </Section>
 
       <Section
-        title="DecCard"
-        subtitle="Surface container with three padding scales. Children are arbitrary."
+        title={t("uiKit.sections.decCard.title")}
+        subtitle={t("uiKit.sections.decCard.subtitle")}
       >
-        <Group label="Padding scales">
+        <Group label={t("uiKit.groups.paddingScales")}>
           <DecCard padding="sm">
-            <DecText size="sm">
-              padding=&quot;sm&quot; — spacing[3] (12px)
-            </DecText>
+            <DecText size="sm">{t("uiKit.card.paddingSm")}</DecText>
           </DecCard>
           <DecCard padding="md">
-            <DecText size="sm">
-              padding=&quot;md&quot; — spacing[4] (16px, default)
-            </DecText>
+            <DecText size="sm">{t("uiKit.card.paddingMd")}</DecText>
           </DecCard>
           <DecCard padding="lg">
-            <DecText size="sm">
-              padding=&quot;lg&quot; — spacing[6] (24px)
-            </DecText>
+            <DecText size="sm">{t("uiKit.card.paddingLg")}</DecText>
           </DecCard>
         </Group>
-        <Group label="Composition">
+        <Group label={t("uiKit.groups.composition")}>
           <DecCard>
             <DecText size="lg" weight="semibold">
-              Card title
+              {t("uiKit.card.title")}
             </DecText>
             <View style={styles.cardBody}>
               <DecText size="sm" color="secondary">
-                Cards compose with any child. Here a title, body text, and a row
-                of badges.
+                {t("uiKit.card.body")}
               </DecText>
               <Row>
-                <DecBadge variant="action">Featured</DecBadge>
-                <DecBadge variant="success">Stable</DecBadge>
+                <DecBadge variant="action">
+                  {t("uiKit.card.badgeFeatured")}
+                </DecBadge>
+                <DecBadge variant="success">
+                  {t("uiKit.card.badgeStable")}
+                </DecBadge>
               </Row>
             </View>
           </DecCard>
@@ -100,191 +102,196 @@ export default function UIKitScreen() {
       </Section>
 
       <Section
-        title="DecBadge"
-        subtitle="Pill-shaped status label. 5 variants × 2 sizes."
+        title={t("uiKit.sections.decBadge.title")}
+        subtitle={t("uiKit.sections.decBadge.subtitle")}
       >
-        <Group label="Variants — sm">
+        <Group label={t("uiKit.groups.variantsSm")}>
           <Row>
-            <DecBadge variant="neutral">neutral</DecBadge>
-            <DecBadge variant="action">action</DecBadge>
-            <DecBadge variant="danger">danger</DecBadge>
-            <DecBadge variant="success">success</DecBadge>
-            <DecBadge variant="warning">warning</DecBadge>
+            <DecBadge variant="neutral">{t("uiKit.badges.neutral")}</DecBadge>
+            <DecBadge variant="action">{t("uiKit.badges.action")}</DecBadge>
+            <DecBadge variant="danger">{t("uiKit.badges.danger")}</DecBadge>
+            <DecBadge variant="success">{t("uiKit.badges.success")}</DecBadge>
+            <DecBadge variant="warning">{t("uiKit.badges.warning")}</DecBadge>
           </Row>
         </Group>
-        <Group label="Variants — md">
+        <Group label={t("uiKit.groups.variantsMd")}>
           <Row>
             <DecBadge variant="neutral" size="md">
-              neutral
+              {t("uiKit.badges.neutral")}
             </DecBadge>
             <DecBadge variant="action" size="md">
-              action
+              {t("uiKit.badges.action")}
             </DecBadge>
             <DecBadge variant="danger" size="md">
-              danger
+              {t("uiKit.badges.danger")}
             </DecBadge>
             <DecBadge variant="success" size="md">
-              success
+              {t("uiKit.badges.success")}
             </DecBadge>
             <DecBadge variant="warning" size="md">
-              warning
+              {t("uiKit.badges.warning")}
             </DecBadge>
           </Row>
         </Group>
       </Section>
 
       <Section
-        title="DecText"
-        subtitle="9 size steps × 4 weights × 4 semantic colors. Backed by typography tokens."
+        title={t("uiKit.sections.decText.title")}
+        subtitle={t("uiKit.sections.decText.subtitle")}
       >
-        <Group label="Size scale">
-          <DecText size="xs">xs — 12px</DecText>
-          <DecText size="sm">sm — 14px</DecText>
-          <DecText size="base">base — 16px (default)</DecText>
-          <DecText size="lg">lg — 18px</DecText>
-          <DecText size="xl">xl — 20px</DecText>
-          <DecText size="2xl">2xl — 24px</DecText>
-          <DecText size="3xl">3xl — 30px</DecText>
-          <DecText size="4xl">4xl — 36px</DecText>
-          <DecText size="5xl">5xl — 48px</DecText>
+        <Group label={t("uiKit.groups.sizeScale")}>
+          <DecText size="xs">{t("uiKit.text.sizeXs")}</DecText>
+          <DecText size="sm">{t("uiKit.text.sizeSm")}</DecText>
+          <DecText size="base">{t("uiKit.text.sizeBase")}</DecText>
+          <DecText size="lg">{t("uiKit.text.sizeLg")}</DecText>
+          <DecText size="xl">{t("uiKit.text.sizeXl")}</DecText>
+          <DecText size="2xl">{t("uiKit.text.size2xl")}</DecText>
+          <DecText size="3xl">{t("uiKit.text.size3xl")}</DecText>
+          <DecText size="4xl">{t("uiKit.text.size4xl")}</DecText>
+          <DecText size="5xl">{t("uiKit.text.size5xl")}</DecText>
         </Group>
-        <Group label="Weights">
-          <DecText weight="regular">regular — 400</DecText>
-          <DecText weight="medium">medium — 500</DecText>
-          <DecText weight="semibold">semibold — 600</DecText>
-          <DecText weight="bold">bold — 700</DecText>
+        <Group label={t("uiKit.groups.weights")}>
+          <DecText weight="regular">{t("uiKit.text.weightRegular")}</DecText>
+          <DecText weight="medium">{t("uiKit.text.weightMedium")}</DecText>
+          <DecText weight="semibold">
+            {t("uiKit.text.weightSemibold")}
+          </DecText>
+          <DecText weight="bold">{t("uiKit.text.weightBold")}</DecText>
         </Group>
-        <Group label="Semantic colors">
+        <Group label={t("uiKit.groups.semanticColors")}>
           <DecText color="primary">
-            color=&quot;primary&quot; — text.primary
+            {t("uiKit.text.semanticPrimary")}
           </DecText>
           <DecText color="secondary">
-            color=&quot;secondary&quot; — text.secondary
+            {t("uiKit.text.semanticSecondary")}
           </DecText>
           <DecText color="tertiary">
-            color=&quot;tertiary&quot; — text.tertiary
+            {t("uiKit.text.semanticTertiary")}
           </DecText>
           <DecText color="disabled">
-            color=&quot;disabled&quot; — text.disabled
+            {t("uiKit.text.semanticDisabled")}
           </DecText>
         </Group>
       </Section>
 
       <Section
-        title="DecInput"
-        subtitle="Single-line text input. Border reacts to focus / error / editable. Optional label, hint, and error text."
+        title={t("uiKit.sections.decInput.title")}
+        subtitle={t("uiKit.sections.decInput.subtitle")}
       >
-        <Group label="States">
-          <DecInput placeholder="Default — tap to focus me" />
+        <Group label={t("uiKit.groups.states")}>
+          <DecInput placeholder={t("uiKit.input.placeholderDefault")} />
           <DecInput
-            placeholder="Pre-filled"
-            defaultValue="some content already typed"
+            placeholder={t("uiKit.input.placeholderPrefilled")}
+            defaultValue={t("uiKit.input.defaultValue")}
           />
           <DecInput
-            placeholder="With error"
-            error="Something's off."
+            placeholder={t("uiKit.input.placeholderWithError")}
+            error={t("uiKit.input.error")}
             defaultValue="bad@"
           />
           <DecInput
-            placeholder="Disabled"
+            placeholder={t("uiKit.input.placeholderDisabled")}
             editable={false}
-            value="cannot edit"
+            value={t("uiKit.input.disabledValue")}
           />
         </Group>
-        <Group label="With label and hint">
+        <Group label={t("uiKit.groups.withLabelAndHint")}>
           <DecInput
-            label="Email"
-            hint="We'll never share it."
-            placeholder="you@example.com"
+            label={t("uiKit.input.emailLabel")}
+            hint={t("uiKit.input.emailHint")}
+            placeholder={t("uiKit.input.placeholderEmail")}
             autoCapitalize="none"
             keyboardType="email-address"
           />
         </Group>
-        <Group label="With label and error">
+        <Group label={t("uiKit.groups.withLabelAndError")}>
           <DecInput
-            label="Email"
-            error="Enter a valid email address."
+            label={t("uiKit.input.emailLabel")}
+            error={t("uiKit.input.emailError")}
             defaultValue="bad@"
-            placeholder="you@example.com"
+            placeholder={t("uiKit.input.placeholderEmail")}
           />
         </Group>
-        <Group label="Label only">
-          <DecInput label="Display name" placeholder="Jane Doe" />
+        <Group label={t("uiKit.groups.labelOnly")}>
+          <DecInput
+            label={t("uiKit.input.displayNameLabel")}
+            placeholder={t("uiKit.input.placeholderDisplayName")}
+          />
         </Group>
       </Section>
 
       <Section
-        title="DecBottomSheet"
-        subtitle="Ref-based modal sheet. Dynamic height by default; pass snapPoints for fixed sizes. Header is a string (auto close button) or a custom node."
+        title={t("uiKit.sections.decBottomSheet.title")}
+        subtitle={t("uiKit.sections.decBottomSheet.subtitle")}
       >
-        <Group label="Dynamic — fits content">
+        <Group label={t("uiKit.groups.dynamicFitsContent")}>
           <Row>
             <DecButton onPress={() => dynamicSheetRef.current?.present()}>
-              Open dynamic
+              {t("uiKit.buttons.openDynamic")}
             </DecButton>
           </Row>
         </Group>
-        <Group label="Fixed snap points — 50% / 90%">
+        <Group label={t("uiKit.groups.fixedSnapPoints")}>
           <Row>
             <DecButton onPress={() => fixedSheetRef.current?.present()}>
-              Open fixed
+              {t("uiKit.buttons.openFixed")}
             </DecButton>
           </Row>
         </Group>
-        <Group label="Custom header node">
+        <Group label={t("uiKit.groups.customHeaderNode")}>
           <Row>
             <DecButton onPress={() => customHeaderSheetRef.current?.present()}>
-              Open custom header
+              {t("uiKit.buttons.openCustomHeader")}
             </DecButton>
           </Row>
         </Group>
       </Section>
 
-      <DecBottomSheet ref={dynamicSheetRef} header="Quick actions">
+      <DecBottomSheet
+        ref={dynamicSheetRef}
+        header={t("uiKit.sheet.quickActions")}
+      >
         <DecText size="sm" color="secondary">
-          The sheet auto-sizes to fit its content. Drag down or tap the backdrop
-          to dismiss.
+          {t("uiKit.sheet.dynamicBody")}
         </DecText>
         <DecButton onPress={() => dynamicSheetRef.current?.dismiss()}>
-          Done
+          {t("uiKit.buttons.done")}
         </DecButton>
       </DecBottomSheet>
 
       <DecBottomSheet
         ref={fixedSheetRef}
-        header="Filters"
+        header={t("uiKit.sheet.filters")}
         snapPoints={["50%", "90%"]}
       >
         <DecText size="sm" color="secondary">
-          Fixed snap points. Drag the handle up to expand, down to collapse or
-          dismiss.
+          {t("uiKit.sheet.fixedBody")}
         </DecText>
-        <DecBadge variant="action">action</DecBadge>
-        <DecBadge variant="success">success</DecBadge>
-        <DecBadge variant="warning">warning</DecBadge>
-        <DecBadge variant="danger">danger</DecBadge>
+        <DecBadge variant="action">{t("uiKit.badges.action")}</DecBadge>
+        <DecBadge variant="success">{t("uiKit.badges.success")}</DecBadge>
+        <DecBadge variant="warning">{t("uiKit.badges.warning")}</DecBadge>
+        <DecBadge variant="danger">{t("uiKit.badges.danger")}</DecBadge>
       </DecBottomSheet>
 
       <DecBottomSheet
         ref={customHeaderSheetRef}
         header={
           <View style={styles.customHeader}>
-            <DecBadge variant="action">Custom</DecBadge>
+            <DecBadge variant="action">{t("uiKit.sheet.customBadge")}</DecBadge>
             <DecText size="lg" weight="bold">
-              Anything fits here
+              {t("uiKit.sheet.customHeader")}
             </DecText>
           </View>
         }
       >
         <DecText size="sm" color="secondary">
-          When `header` is a ReactNode, the wrapper renders it as-is — no
-          built-in close button, you compose whatever you need.
+          {t("uiKit.sheet.customBody")}
         </DecText>
         <DecButton
           variant="secondary"
           onPress={() => customHeaderSheetRef.current?.dismiss()}
         >
-          Close
+          {t("uiKit.buttons.close")}
         </DecButton>
       </DecBottomSheet>
     </ScrollView>
