@@ -1,36 +1,8 @@
-/**
- * Email-OTP HTTP-level e2e tests.
- *
- * Covers:
- *
- *   - /request happy path: known + unknown email — both return 202 with
- *     `status: "sent"`, but only the known path inserts a row and mails.
- *   - /verify happy path: dev OTP `"000000"` returns 200 with a TokenPair
- *     + cookies, marks the OtpToken `used`, creates a Session row, sets
- *     `User.emailVerified`, and audits `EMAIL_VERIFIED` + `LOGIN_SUCCESS`.
- *   - /verify wrong-code lockout: 5 wrong attempts brings `attemptsCount`
- *     to 5, returns 401 each, and the 6th call is refused without
- *     re-checking the hash.
- *   - /verify expired row: backdated `expiresAt` → 401 with the generic
- *     message.
- *   - /verify unknown email: 401 with the same generic message; response
- *     time is in the same order of magnitude as the happy path.
- *   - Throttler: the 21st /request call from the same IP returns 429 when
- *     `THROTTLE_OTP_PER_IP_PER_HOUR=20`.
- *
- * Throttler limits other than the per-IP one are forced sky-high in
- * `setup-env.ts`-equivalent overrides at the top of the file so the
- * suite isn't slowed by cross-bucket interactions.
- */
-
-// Env overrides applied before any module is loaded. Lower the per-IP
-// limit to a small number we can blow through deterministically; raise
-// every other bucket so they never bind during the suite. The setup-env
-// helper only writes vars that are still undefined, so explicit writes
-// here win.
-process.env.THROTTLE_OTP_PER_IP_PER_HOUR = "20";
-process.env.THROTTLE_OTP_PER_TARGET_PER_HOUR = "10000";
-process.env.THROTTLE_OTP_PER_TARGET_PER_DAY = "10000";
+process.env.OTP_DELIVERY_QUOTA_PER_TARGET_PER_HOUR = "10000";
+process.env.OTP_DELIVERY_QUOTA_PER_TARGET_PER_DAY = "10000";
+process.env.OTP_DELIVERY_QUOTA_PER_IP_PER_HOUR = "10000";
+process.env.THROTTLE_GLOBAL_PER_IP_PER_MIN = "10000";
+process.env.THROTTLE_OTP_REQUESTS_PER_IP_PER_MIN = "20";
 process.env.THROTTLE_LOGIN_PER_IP_PER_MIN = "10000";
 
 import { INestApplication, VersioningType } from "@nestjs/common";
@@ -42,8 +14,10 @@ import request from "supertest";
 
 import { AppModule } from "../src/app.module";
 import { AuditEventType } from "../src/audit/audit.types";
+import { hashOtp } from "../src/auth/utils/hash";
 import { MailerService } from "../src/mailer/mailer.service";
 import { SpyMailerService } from "../src/mailer/impls/spy-mailer.service";
+import type { MailerMessage } from "../src/mailer/mailer.service";
 import { PrismaService } from "../src/prisma/prisma.service";
 import { UsersService } from "../src/users/users.service";
 
@@ -56,6 +30,7 @@ describe("EmailOtpController (e2e)", () => {
   let mailer: SpyMailerService;
 
   const createdUserIds: string[] = [];
+  const createdChallengeIds: string[] = [];
 
   const server = (): Server => app.getHttpServer() as Server;
 
@@ -76,9 +51,15 @@ describe("EmailOtpController (e2e)", () => {
   });
 
   afterAll(async () => {
+    if (createdChallengeIds.length > 0) {
+      await prisma.otpChallenge.deleteMany({
+        where: { id: { in: createdChallengeIds } },
+      });
+    }
     if (createdUserIds.length > 0) {
       await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
     }
+    await prisma.otpDeliveryQuota.deleteMany();
     await app.close();
   });
 
@@ -87,9 +68,7 @@ describe("EmailOtpController (e2e)", () => {
   });
 
   async function freshUser(opts: { emailVerified?: Date | null } = {}) {
-    const email = `eotp-${Date.now()}-${Math.random()
-      .toString(36)
-      .slice(2, 8)}@example.com`;
+    const email = uniqueEmail("existing");
     const user = await users.createOne({
       email,
       ...(opts.emailVerified !== undefined
@@ -100,221 +79,308 @@ describe("EmailOtpController (e2e)", () => {
     return user;
   }
 
-  // ────────────────────────────────────────────────────────────────────
-  // /request
-  // ────────────────────────────────────────────────────────────────────
-
-  it("POST /request with unknown email → 202, no row inserted, no mail sent", async () => {
-    const unknownEmail = `nobody-${Date.now()}@example.com`;
-    const res = await request(server())
+  async function requestChallenge(
+    email: string,
+  ): Promise<v1.auth.OtpChallengeMetadata> {
+    const response = await request(server())
       .post(v1.auth.ROUTES.emailOtp.request)
-      .send({ email: unknownEmail });
-
-    expect(res.status).toBe(202);
-    expect(res.body).toEqual({ status: "sent" });
-
-    const rows = await prisma.otpToken.count({
-      where: { user: { email: unknownEmail } },
+      .send({ email });
+    expect(response.status).toBe(202);
+    const challenge = v1.auth.otpChallengeMetadataSchema.parse(response.body);
+    expect(challenge).toMatchObject({
+      status: "verification_required",
+      challengeId: expect.any(String) as string,
+      expiresInSec: expect.any(Number) as number,
+      resendAfterSec: expect.any(Number) as number,
     });
-    expect(rows).toBe(0);
-    expect(mailer.findLastTo(unknownEmail)).toBeUndefined();
+    createdChallengeIds.push(challenge.challengeId);
+    return challenge;
+  }
+
+  it("returns identical challenge shapes for existing and new emails without creating the new user", async () => {
+    const existing = await freshUser({ emailVerified: new Date() });
+    const unknownEmail = uniqueEmail("new");
+
+    const existingChallenge = await requestChallenge(existing.email);
+    const unknownChallenge = await requestChallenge(unknownEmail);
+
+    expect(Object.keys(existingChallenge).sort()).toEqual(
+      Object.keys(unknownChallenge).sort(),
+    );
+    expect(
+      await prisma.user.findUnique({ where: { email: unknownEmail } }),
+    ).toBeNull();
+    expect(
+      await prisma.otpChallenge.findUnique({
+        where: { id: unknownChallenge.challengeId },
+      }),
+    ).toMatchObject({
+      target: unknownEmail,
+      purpose: "AUTH",
+      channel: "EMAIL",
+      userId: null,
+      attemptsCount: 0,
+      sentCount: 1,
+      usedAt: null,
+    });
+    expect(mailer.findLastTo(existing.email)?.text).toContain(DEV_OTP);
+    expect(mailer.findLastTo(unknownEmail)?.text).toContain(DEV_OTP);
   });
 
-  it("POST /request with known email → 202, one fresh OtpToken row, one mail", async () => {
-    const user = await freshUser();
-    const res = await request(server())
-      .post(v1.auth.ROUTES.emailOtp.request)
-      .send({ email: user.email });
+  it("verifies a new email, creates one user and session, and emits signup audits", async () => {
+    const email = uniqueEmail("signup");
+    const challenge = await requestChallenge(email);
 
-    expect(res.status).toBe(202);
-    expect(res.body).toEqual({ status: "sent" });
-
-    const rows = await prisma.otpToken.findMany({
-      where: { userId: user.id },
-    });
-    expect(rows).toHaveLength(1);
-    expect(rows[0]?.channel).toBe("EMAIL");
-    expect(rows[0]?.purpose).toBe("AUTH");
-    expect(rows[0]?.attemptsCount).toBe(0);
-    expect(rows[0]?.used).toBe(false);
-    expect(rows[0]?.expiresAt.getTime()).toBeGreaterThan(Date.now());
-
-    const sent = mailer.findLastTo(user.email);
-    expect(sent).toBeDefined();
-    expect(sent?.text).toContain(DEV_OTP);
-  });
-
-  // ────────────────────────────────────────────────────────────────────
-  // /verify happy path
-  // ────────────────────────────────────────────────────────────────────
-
-  it("POST /verify with the dev OTP returns TokenPair + cookies, marks row used, creates a Session, sets emailVerified, emits SIGNUP + EMAIL_VERIFIED + LOGIN_SUCCESS audits", async () => {
-    const user = await freshUser({ emailVerified: null });
-
-    await request(server())
-      .post(v1.auth.ROUTES.emailOtp.request)
-      .send({ email: user.email });
-
-    const before = await prisma.user.findUniqueOrThrow({
-      where: { id: user.id },
-    });
-    expect(before.emailVerified).toBeNull();
-
-    const res = await request(server())
+    const response = await request(server())
       .post(v1.auth.ROUTES.emailOtp.verify)
-      .send({ email: user.email, code: DEV_OTP });
-    const body = res.body as v1.auth.TokenPair;
+      .send({ challengeId: challenge.challengeId, code: DEV_OTP });
 
-    expect(res.status).toBe(200);
-    expect(body.accessToken).toBeTruthy();
-    expect(body.refreshToken).toBeTruthy();
-    const setCookies = res.headers["set-cookie"] as unknown as
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      accessToken: expect.any(String) as string,
+      refreshToken: expect.any(String) as string,
+    });
+    const cookies = response.headers["set-cookie"] as unknown as
       | string[]
       | undefined;
-    expect(setCookies?.some((c) => c.startsWith("access_token="))).toBe(true);
-    expect(setCookies?.some((c) => c.startsWith("refresh_token="))).toBe(true);
+    expect(cookies?.some((cookie) => cookie.startsWith("access_token="))).toBe(
+      true,
+    );
+    expect(cookies?.some((cookie) => cookie.startsWith("refresh_token="))).toBe(
+      true,
+    );
 
-    const otp = await prisma.otpToken.findFirstOrThrow({
-      where: { userId: user.id },
+    const user = await prisma.user.findUnique({
+      where: { email },
+      include: { sessions: true },
     });
-    expect(otp.used).toBe(true);
+    expect(user).not.toBeNull();
+    if (!user) throw new Error("Expected email OTP signup to create a user");
+    createdUserIds.push(user.id);
+    expect(user.emailVerified).not.toBeNull();
+    expect(user.sessions).toHaveLength(1);
 
-    const sessions = await prisma.session.count({
-      where: { userId: user.id, revokedAt: null },
+    const challengeRow = await prisma.otpChallenge.findUniqueOrThrow({
+      where: { id: challenge.challengeId },
     });
-    expect(sessions).toBe(1);
+    expect(challengeRow.usedAt).not.toBeNull();
+    expect(challengeRow.activeKey).toBeNull();
+    expect(challengeRow.userId).toBe(user.id);
 
-    const after = await prisma.user.findUniqueOrThrow({
-      where: { id: user.id },
-    });
-    expect(after.emailVerified).not.toBeNull();
-
-    const auditRows = await prisma.auditEvent.findMany({
-      where: { userId: user.id },
-      orderBy: { createdAt: "asc" },
-    });
-    const types = auditRows.map((r) => r.type);
-    expect(types).toContain(AuditEventType.EMAIL_VERIFIED);
-    expect(types).toContain(AuditEventType.LOGIN_SUCCESS);
-    expect(types).toContain(AuditEventType.SIGNUP);
-  });
-
-  // ────────────────────────────────────────────────────────────────────
-  // /verify — wrong-code lockout
-  // ────────────────────────────────────────────────────────────────────
-
-  it("5 wrong attempts increments attemptsCount and locks the row; 6th attempt is refused without re-checking", async () => {
-    const user = await freshUser({ emailVerified: new Date() });
-    await request(server())
-      .post(v1.auth.ROUTES.emailOtp.request)
-      .send({ email: user.email });
-
-    for (let i = 0; i < 5; i++) {
-      const res = await request(server())
-        .post(v1.auth.ROUTES.emailOtp.verify)
-        .send({ email: user.email, code: "111111" });
-      expect(res.status).toBe(401);
-    }
-
-    const row = await prisma.otpToken.findFirstOrThrow({
-      where: { userId: user.id },
-    });
-    expect(row.attemptsCount).toBe(5);
-    expect(row.used).toBe(false);
-
-    // Sixth attempt — correct code, but locked out (attemptsCount >=
-    // OTP_MAX_ATTEMPTS=5 by default).
-    const sixth = await request(server())
-      .post(v1.auth.ROUTES.emailOtp.verify)
-      .send({ email: user.email, code: DEV_OTP });
-    expect(sixth.status).toBe(401);
-
-    // Counter must not have bumped to 6 (we don't re-check the hash).
-    const after = await prisma.otpToken.findFirstOrThrow({
-      where: { userId: user.id },
-    });
-    expect(after.attemptsCount).toBe(5);
-    expect(after.used).toBe(false);
-  });
-
-  // ────────────────────────────────────────────────────────────────────
-  // /verify — expired row
-  // ────────────────────────────────────────────────────────────────────
-
-  it("expired row → 401 with a generic message", async () => {
-    const user = await freshUser({ emailVerified: new Date() });
-    await request(server())
-      .post(v1.auth.ROUTES.emailOtp.request)
-      .send({ email: user.email });
-
-    await prisma.otpToken.updateMany({
-      where: { userId: user.id },
-      data: { expiresAt: new Date(Date.now() - 60 * 1000) },
-    });
-
-    const res = await request(server())
-      .post(v1.auth.ROUTES.emailOtp.verify)
-      .send({ email: user.email, code: DEV_OTP });
-    expect(res.status).toBe(401);
-    expect(res.body?.error?.message ?? res.body?.message).toMatch(
-      /invalid or expired code/i,
+    const auditTypes = (
+      await prisma.auditEvent.findMany({ where: { userId: user.id } })
+    ).map((row) => row.type);
+    expect(auditTypes).toEqual(
+      expect.arrayContaining([
+        AuditEventType.SIGNUP,
+        AuditEventType.EMAIL_VERIFIED,
+        AuditEventType.LOGIN_SUCCESS,
+      ]),
     );
   });
 
-  // ────────────────────────────────────────────────────────────────────
-  // /verify — unknown email (anti-enumeration)
-  // ────────────────────────────────────────────────────────────────────
+  it("verifies an existing unverified user without emitting SIGNUP", async () => {
+    const user = await freshUser({ emailVerified: null });
+    const challenge = await requestChallenge(user.email);
 
-  it("unknown email → 401 generic; response time is on the same order of magnitude as the happy path", async () => {
-    const user = await freshUser({ emailVerified: new Date() });
-    await request(server())
-      .post(v1.auth.ROUTES.emailOtp.request)
-      .send({ email: user.email });
-
-    const tHappyStart = Date.now();
-    const happy = await request(server())
+    const response = await request(server())
       .post(v1.auth.ROUTES.emailOtp.verify)
-      .send({ email: user.email, code: DEV_OTP });
-    const tHappy = Date.now() - tHappyStart;
-    expect(happy.status).toBe(200);
+      .send({ challengeId: challenge.challengeId, code: DEV_OTP });
+    expect(response.status).toBe(200);
 
-    const tUnknownStart = Date.now();
-    const unknown = await request(server())
+    const updated = await prisma.user.findUniqueOrThrow({
+      where: { id: user.id },
+    });
+    expect(updated.emailVerified).not.toBeNull();
+
+    const auditTypes = (
+      await prisma.auditEvent.findMany({ where: { userId: user.id } })
+    ).map((row) => row.type);
+    expect(auditTypes).toContain(AuditEventType.EMAIL_VERIFIED);
+    expect(auditTypes).toContain(AuditEventType.LOGIN_SUCCESS);
+    expect(auditTypes).not.toContain(AuditEventType.SIGNUP);
+  });
+
+  it("reuses the challenge, keeps the same code, and applies 30s/2m/5m resend backoff", async () => {
+    const email = uniqueEmail("resend");
+    const challenge = await requestChallenge(email);
+    const initialRow = await prisma.otpChallenge.findUniqueOrThrow({
+      where: { id: challenge.challengeId },
+    });
+    const initialExpiry = initialRow.expiresAt;
+    const initialMessage = mailer.findLastTo(email)?.text;
+
+    const early = await request(server())
+      .post(v1.auth.ROUTES.otp.resend)
+      .send({ challengeId: challenge.challengeId });
+    expect(early.status).toBe(202);
+    expect(
+      v1.auth.otpChallengeMetadataSchema.parse(early.body).challengeId,
+    ).toBe(challenge.challengeId);
+    expect(mailer.getOutbox()).toHaveLength(1);
+
+    await prisma.otpChallenge.update({
+      where: { id: challenge.challengeId },
+      data: {
+        attemptsCount: 1,
+        nextSendAt: new Date(Date.now() - 1),
+      },
+    });
+    const first = await request(server())
+      .post(v1.auth.ROUTES.otp.resend)
+      .send({ challengeId: challenge.challengeId });
+    expect(first.status).toBe(202);
+    expect(
+      v1.auth.otpChallengeMetadataSchema.parse(first.body).resendAfterSec,
+    ).toBeGreaterThanOrEqual(119);
+
+    let row = await prisma.otpChallenge.findUniqueOrThrow({
+      where: { id: challenge.challengeId },
+    });
+    expect(row.sentCount).toBe(2);
+    expect(row.attemptsCount).toBe(1);
+    expect(row.expiresAt).toEqual(initialExpiry);
+    expect(mailer.findLastTo(email)?.text).toBe(initialMessage);
+
+    await prisma.otpChallenge.update({
+      where: { id: challenge.challengeId },
+      data: { nextSendAt: new Date(Date.now() - 1) },
+    });
+    const second = await request(server())
+      .post(v1.auth.ROUTES.otp.resend)
+      .send({ challengeId: challenge.challengeId });
+    expect(second.status).toBe(202);
+    expect(
+      v1.auth.otpChallengeMetadataSchema.parse(second.body).resendAfterSec,
+    ).toBeGreaterThanOrEqual(299);
+
+    await prisma.otpChallenge.update({
+      where: { id: challenge.challengeId },
+      data: { nextSendAt: new Date(Date.now() - 1) },
+    });
+    const third = await request(server())
+      .post(v1.auth.ROUTES.otp.resend)
+      .send({ challengeId: challenge.challengeId });
+    expect(third.status).toBe(202);
+    expect(
+      v1.auth.otpChallengeMetadataSchema.parse(third.body).resendAfterSec,
+    ).toBeGreaterThanOrEqual(299);
+
+    row = await prisma.otpChallenge.findUniqueOrThrow({
+      where: { id: challenge.challengeId },
+    });
+    expect(row.sentCount).toBe(4);
+    expect(row.attemptsCount).toBe(1);
+    expect(row.expiresAt).toEqual(initialExpiry);
+    expect(mailer.getOutbox()).toHaveLength(4);
+  });
+
+  it("locks after OTP_MAX_ATTEMPTS and does not reset attempts on resend", async () => {
+    const challenge = await requestChallenge(uniqueEmail("locked"));
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const response = await request(server())
+        .post(v1.auth.ROUTES.emailOtp.verify)
+        .send({ challengeId: challenge.challengeId, code: "111111" });
+      expect(response.status).toBe(401);
+    }
+
+    const locked = await prisma.otpChallenge.findUniqueOrThrow({
+      where: { id: challenge.challengeId },
+    });
+    expect(locked.attemptsCount).toBe(5);
+
+    const correct = await request(server())
       .post(v1.auth.ROUTES.emailOtp.verify)
-      .send({
-        email: `ghost-${Date.now()}@example.com`,
-        code: DEV_OTP,
-      });
-    const tUnknown = Date.now() - tUnknownStart;
-    expect(unknown.status).toBe(401);
+      .send({ challengeId: challenge.challengeId, code: DEV_OTP });
+    expect(correct.status).toBe(401);
 
-    // The security property we care about: the unknown path must not
-    // return instantly relative to the happy path. The dummy bcrypt
-    // compare buys roughly the same ~100ms a production mailer would,
-    // so under a `LogMailerService`-backed test the unknown path is
-    // actually *slower* than the happy one — that's the safer side to
-    // land on. The lower-bound check below catches the bad direction
-    // (unknown returning measurably faster). No upper bound: noise on a
-    // dev laptop swamps any tighter assertion.
-    const ratio = tUnknown / Math.max(tHappy, 1);
-    expect(ratio).toBeGreaterThan(0.5);
+    const resend = await request(server())
+      .post(v1.auth.ROUTES.otp.resend)
+      .send({ challengeId: challenge.challengeId });
+    expect(resend.status).toBe(401);
+  });
+
+  it("rejects expired, replayed, and cross-purpose challenges uniformly", async () => {
+    const expired = await requestChallenge(uniqueEmail("expired"));
+    await prisma.otpChallenge.update({
+      where: { id: expired.challengeId },
+      data: { expiresAt: new Date(Date.now() - 1) },
+    });
+
+    const expiredResponse = await request(server())
+      .post(v1.auth.ROUTES.emailOtp.verify)
+      .send({ challengeId: expired.challengeId, code: DEV_OTP });
+    expect(expiredResponse.status).toBe(401);
+
+    const replayEmail = uniqueEmail("replay");
+    const replay = await requestChallenge(replayEmail);
+    const success = await request(server())
+      .post(v1.auth.ROUTES.emailOtp.verify)
+      .send({ challengeId: replay.challengeId, code: DEV_OTP });
+    expect(success.status).toBe(200);
+    const replayed = await request(server())
+      .post(v1.auth.ROUTES.emailOtp.verify)
+      .send({ challengeId: replay.challengeId, code: DEV_OTP });
+    expect(replayed.status).toBe(401);
+    const created = await prisma.user.findUniqueOrThrow({
+      where: { email: replayEmail },
+    });
+    createdUserIds.push(created.id);
+
+    const oauthId = crypto.randomUUID();
+    await prisma.otpChallenge.create({
+      data: {
+        id: oauthId,
+        activeKey: `test-oauth:${oauthId}`,
+        channel: "EMAIL",
+        purpose: "OAUTH_EMAIL_VERIFY",
+        target: uniqueEmail("cross-purpose"),
+        provider: "google",
+        providerId: `provider-${oauthId}`,
+        codeHash: hashOtp(DEV_OTP, process.env.OTP_HMAC_SECRET as string),
+        expiresAt: new Date(Date.now() + 60_000),
+        nextSendAt: new Date(Date.now() + 30_000),
+      },
+    });
+    createdChallengeIds.push(oauthId);
+    const crossPurpose = await request(server())
+      .post(v1.auth.ROUTES.emailOtp.verify)
+      .send({ challengeId: oauthId, code: DEV_OTP });
+    expect(crossPurpose.status).toBe(401);
+  });
+
+  it("allows exactly one concurrent verification to create the user and session", async () => {
+    const email = uniqueEmail("concurrent");
+    const challenge = await requestChallenge(email);
+
+    const responses = await Promise.all([
+      request(server())
+        .post(v1.auth.ROUTES.emailOtp.verify)
+        .send({ challengeId: challenge.challengeId, code: DEV_OTP }),
+      request(server())
+        .post(v1.auth.ROUTES.emailOtp.verify)
+        .send({ challengeId: challenge.challengeId, code: DEV_OTP }),
+    ]);
+    expect(responses.map((response) => response.status).sort()).toEqual([
+      200, 401,
+    ]);
+
+    const usersForEmail = await prisma.user.findMany({
+      where: { email },
+      include: { sessions: true },
+    });
+    expect(usersForEmail).toHaveLength(1);
+    expect(usersForEmail[0]?.sessions).toHaveLength(1);
+    if (usersForEmail[0]) createdUserIds.push(usersForEmail[0].id);
   });
 });
-
-// ──────────────────────────────────────────────────────────────────────
-// /request — throttler
-// ──────────────────────────────────────────────────────────────────────
-//
-// Separate describe block with its own NestApplication so the
-// throttler's in-memory counters start fresh — otherwise the calls
-// burned by the suite above would skew the 21-call test.
 
 describe("EmailOtpController throttling (e2e)", () => {
   let app: INestApplication;
   let prisma: PrismaService;
-  let users: UsersService;
-
-  const createdUserIds: string[] = [];
+  let mailer: SpyMailerService;
+  const challengeIds: string[] = [];
 
   const server = (): Server => app.getHttpServer() as Server;
 
@@ -330,32 +396,151 @@ describe("EmailOtpController throttling (e2e)", () => {
     app.use(cookieParser());
     await app.init();
     prisma = app.get(PrismaService);
-    users = app.get(UsersService);
+    mailer = app.get(MailerService);
   });
 
   afterAll(async () => {
-    if (createdUserIds.length > 0) {
-      await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
-    }
+    await prisma.otpChallenge.deleteMany({
+      where: { id: { in: challengeIds } },
+    });
+    await prisma.otpDeliveryQuota.deleteMany();
     await app.close();
   });
 
-  it("the 21st /request from the same IP within an hour returns 429", async () => {
-    const user = await users.createOne({
-      email: `throttle-${Date.now()}@example.com`,
-    });
-    createdUserIds.push(user.id);
-
-    for (let i = 1; i <= 20; i++) {
-      const res = await request(server())
+  it("the 21st request from one IP returns 429", async () => {
+    const email = uniqueEmail("throttle");
+    for (let requestNumber = 1; requestNumber <= 20; requestNumber += 1) {
+      const response = await request(server())
         .post(v1.auth.ROUTES.emailOtp.request)
-        .send({ email: user.email });
-      expect(res.status).toBe(202);
+        .send({ email });
+      expect(response.status).toBe(202);
+      if (requestNumber === 1) {
+        challengeIds.push(
+          v1.auth.otpChallengeMetadataSchema.parse(response.body).challengeId,
+        );
+      }
     }
 
-    const res = await request(server())
+    const response = await request(server())
       .post(v1.auth.ROUTES.emailOtp.request)
-      .send({ email: user.email });
-    expect(res.status).toBe(429);
+      .send({ email });
+    expect(response.status).toBe(429);
+    expect(mailer.getOutbox()).toHaveLength(1);
   });
 });
+
+describe("EmailOtp delivery rollback (e2e)", () => {
+  let app: INestApplication;
+  let prisma: PrismaService;
+  let mailer: FailOnceMailerService;
+  const challengeIds: string[] = [];
+
+  const server = (): Server => app.getHttpServer() as Server;
+
+  beforeAll(async () => {
+    const moduleRef = await Test.createTestingModule({
+      imports: [AppModule],
+    })
+      .overrideProvider(MailerService)
+      .useClass(FailOnceMailerService)
+      .compile();
+    app = moduleRef.createNestApplication();
+    app.enableVersioning({ type: VersioningType.URI, defaultVersion: "1" });
+    app.use(cookieParser());
+    await app.init();
+    prisma = app.get(PrismaService);
+    mailer = app.get(MailerService);
+  });
+
+  afterAll(async () => {
+    await prisma.otpChallenge.deleteMany({
+      where: { id: { in: challengeIds } },
+    });
+    await prisma.otpDeliveryQuota.deleteMany();
+    await app.close();
+  });
+
+  beforeEach(async () => {
+    await prisma.otpDeliveryQuota.deleteMany();
+  });
+
+  it("deletes a newly-created challenge when initial delivery fails", async () => {
+    const email = uniqueEmail("initial-mail-failure");
+    mailer.failNext();
+
+    const response = await request(server())
+      .post(v1.auth.ROUTES.emailOtp.request)
+      .send({ email });
+    expect(response.status).toBe(500);
+    expect(await prisma.otpChallenge.count({ where: { target: email } })).toBe(
+      0,
+    );
+  });
+
+  it("restores resend counters and cooldown when resend delivery fails", async () => {
+    const email = uniqueEmail("resend-mail-failure");
+    const initial = await request(server())
+      .post(v1.auth.ROUTES.emailOtp.request)
+      .send({ email });
+    expect(initial.status).toBe(202);
+    const challengeId = v1.auth.otpChallengeMetadataSchema.parse(
+      initial.body,
+    ).challengeId;
+    challengeIds.push(challengeId);
+
+    const previousNextSendAt = new Date(Date.now() - 1);
+    const before = await prisma.otpChallenge.update({
+      where: { id: challengeId },
+      data: { nextSendAt: previousNextSendAt },
+    });
+    const quotaState = async () =>
+      (
+        await prisma.otpDeliveryQuota.findMany({
+          orderBy: [{ bucket: "asc" }, { subjectHash: "asc" }],
+        })
+      ).map(({ bucket, subjectHash, windowStart, windowEnd, count }) => ({
+        bucket,
+        subjectHash,
+        windowStart,
+        windowEnd,
+        count,
+      }));
+    const quotasBeforeFailure = await quotaState();
+
+    mailer.failNext();
+    const response = await request(server())
+      .post(v1.auth.ROUTES.otp.resend)
+      .send({ challengeId });
+    expect(response.status).toBe(500);
+
+    const after = await prisma.otpChallenge.findUniqueOrThrow({
+      where: { id: challengeId },
+    });
+    expect(after.sentCount).toBe(before.sentCount);
+    expect(after.lastSentAt).toEqual(before.lastSentAt);
+    expect(after.nextSendAt).toEqual(previousNextSendAt);
+    expect(await quotaState()).toEqual(quotasBeforeFailure);
+  });
+});
+
+class FailOnceMailerService extends SpyMailerService {
+  private shouldFail = false;
+
+  failNext(): void {
+    this.shouldFail = true;
+  }
+
+  override send(message: MailerMessage): Promise<void> {
+    if (this.shouldFail) {
+      this.shouldFail = false;
+      return Promise.reject(new Error("simulated mail failure"));
+    }
+    return super.send(message);
+  }
+}
+
+function uniqueEmail(prefix: string): string {
+  return `${prefix}-${Date.now()}-${Math.random()
+    .toString(36)
+    .slice(2, 8)}@example.com`;
+}

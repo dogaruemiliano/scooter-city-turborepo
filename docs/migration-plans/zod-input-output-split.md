@@ -1,6 +1,9 @@
 # Zod schema input/output naming + `@ZodResponse` migration plan
 
-> **Status:** Executing in one consolidated change (all modules + regen + tests + README). One PR rather than one-per-module — see §3.1 for the why.
+> Historical migration record. Some listed schemas, including SMS OTP
+> authentication, were removed after this migration completed.
+>
+> **Status:** Completed as one consolidated change. One PR rather than one-per-module — see §3.1 for the rationale.
 >
 > **Decisions baked in:** all open questions answered — see §5.
 
@@ -144,7 +147,7 @@ async fooBar(@Body() body: FooBarInput): Promise<FooBar> { ... }
 
 ### 4.1 Orval-generated TS type churn
 
-Every input and output type in [packages/api-generated/src/index.ts](../../packages/api-generated/src/index.ts) gets renamed. Operation function names are unchanged.
+Every input and output type in the generated API client was renamed. Operation function names were unchanged.
 **Mitigation:** zero production consumers (`apps/web/src/` and `apps/mobile/src/` don't import from `@repo/api-generated`). Only `apps/api/test/*.e2e-spec.ts` needs updates.
 
 ### 4.2 The `_Output` suffix on responses

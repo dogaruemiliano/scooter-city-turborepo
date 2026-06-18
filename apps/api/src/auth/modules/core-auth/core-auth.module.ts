@@ -1,32 +1,48 @@
 /**
- * The always-on auth module: `CoreAuthService` + `CoreAuthController`.
+ * The always-on auth module: session issuance/rotation plus the core
+ * session and identity HTTP surfaces.
  *
- * Imports `JwtModule` locally so `CoreAuthService` can inject
- * `JwtService`. `AuthModule.forRoot()` also registers `JwtModule` at
- * the root level; Nest deduplicates the registration so there's still
- * exactly one `JwtService` instance.
+ * Registers `JwtModule` locally so `CoreAuthService` receives the RS256
+ * signing configuration from the same module scope that provides it.
  *
- * Future auth-method modules (PR 8+ email-OTP, credentials, OAuth)
- * that mint or verify JWTs directly do the same `imports: [JwtModule]`
- * in their own `@Module` decorator. Methods that only call
- * `coreAuth.issueSession(...)` (no direct JWT use) don't need this.
+ * Auth-method modules call `coreAuth.issueSession(...)`; they do not
+ * import or configure JwtModule themselves.
  *
- * `CoreAuthService` is re-exported because PR 8+ auth-method modules
- * call `coreAuth.issueSession` to mint the first token pair after a
- * successful authentication.
+ * `CoreAuthService`, `LinkedAccountService`, and `OAuthAccountResolver`
+ * are re-exported for auth-method modules.
  */
 import { Module } from "@nestjs/common";
 import { JwtModule } from "@nestjs/jwt";
 
 import { UsersModule } from "../../../users/users.module";
+import type { KeyRing } from "../../utils/keys";
+import { KEY_RING, KeysModule } from "../../utils/keys.module";
 
-import { CoreAuthController } from "./core-auth.controller";
+import { AuthIdentityController } from "./auth-identity.controller";
+import { AuthSessionController } from "./auth-session.controller";
 import { CoreAuthService } from "./core-auth.service";
+import { LinkedAccountService } from "./linked-account.service";
+import { OAuthAccountResolver } from "./oauth-account-resolver.service";
 
 @Module({
-  imports: [JwtModule, UsersModule],
-  controllers: [CoreAuthController],
-  providers: [CoreAuthService],
-  exports: [CoreAuthService],
+  imports: [
+    JwtModule.registerAsync({
+      imports: [KeysModule],
+      inject: [KEY_RING],
+      useFactory: (ring: KeyRing) => ({
+        privateKey: ring.signingPrivate,
+        signOptions: {
+          algorithm: "RS256",
+          header: { kid: ring.currentKid, alg: "RS256" },
+        },
+        verifyOptions: { algorithms: ["RS256"] },
+      }),
+    }),
+    UsersModule,
+    KeysModule,
+  ],
+  controllers: [AuthSessionController, AuthIdentityController],
+  providers: [CoreAuthService, LinkedAccountService, OAuthAccountResolver],
+  exports: [CoreAuthService, LinkedAccountService, OAuthAccountResolver],
 })
 export class CoreAuthModule {}

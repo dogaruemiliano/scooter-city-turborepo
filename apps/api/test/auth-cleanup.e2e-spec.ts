@@ -8,7 +8,9 @@
  * `runOnce()`, and asserts the old row is gone and the fresh one
  * survives.
  */
+import type { INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
+import { randomUUID } from "node:crypto";
 
 import { AppModule } from "../src/app.module";
 import { AuthCleanupService } from "../src/auth/cleanup/auth-cleanup.service";
@@ -19,6 +21,7 @@ import { UsersService } from "../src/users/users.service";
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
 describe("AuthCleanupService (e2e)", () => {
+  let app: INestApplication;
   let cleanup: AuthCleanupService;
   let prisma: PrismaService;
   let users: UsersService;
@@ -30,7 +33,7 @@ describe("AuthCleanupService (e2e)", () => {
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
-    const app = moduleRef.createNestApplication();
+    app = moduleRef.createNestApplication();
     await app.init();
     cleanup = app.get(AuthCleanupService);
     prisma = app.get(PrismaService);
@@ -42,7 +45,7 @@ describe("AuthCleanupService (e2e)", () => {
     if (createdUserIds.length > 0) {
       await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
     }
-    await prisma.$disconnect();
+    await app.close();
   });
 
   async function freshUser() {
@@ -87,37 +90,108 @@ describe("AuthCleanupService (e2e)", () => {
     expect(after).toBe(before - 1);
   });
 
-  it("deletes OTP tokens older than 7 days, keeps newer ones", async () => {
+  it("deletes OTP challenges older than 7 days, keeps newer ones", async () => {
     const user = await freshUser();
 
-    const oldHash = await prisma.otpToken.create({
+    const oldChallenge = await prisma.otpChallenge.create({
       data: {
+        id: randomUUID(),
         userId: user.id,
         channel: "EMAIL",
         purpose: "AUTH",
+        target: user.email,
         codeHash: "old".padEnd(64, "0"),
         expiresAt: new Date(Date.now() - 8 * ONE_DAY_MS), // 8 days ago
+        nextSendAt: new Date(Date.now() - 8 * ONE_DAY_MS),
       },
     });
-    const recentHash = await prisma.otpToken.create({
+    const recentChallenge = await prisma.otpChallenge.create({
       data: {
+        id: randomUUID(),
         userId: user.id,
         channel: "EMAIL",
         purpose: "AUTH",
+        target: user.email,
         codeHash: "new".padEnd(64, "0"),
         expiresAt: new Date(Date.now() - 1 * ONE_DAY_MS), // 1 day ago
+        nextSendAt: new Date(Date.now() - ONE_DAY_MS),
       },
     });
 
     const result = await cleanup.runOnce();
-    expect(result.otpTokensDeleted).toBeGreaterThanOrEqual(1);
+    expect(result.otpChallengesDeleted).toBeGreaterThanOrEqual(1);
 
     expect(
-      await prisma.otpToken.findUnique({ where: { id: oldHash.id } }),
+      await prisma.otpChallenge.findUnique({
+        where: { id: oldChallenge.id },
+      }),
     ).toBeNull();
     expect(
-      await prisma.otpToken.findUnique({ where: { id: recentHash.id } }),
+      await prisma.otpChallenge.findUnique({
+        where: { id: recentChallenge.id },
+      }),
     ).not.toBeNull();
+
+    await prisma.otpChallenge.delete({
+      where: { id: recentChallenge.id },
+    });
+  });
+
+  it("deletes expired OTP delivery quota windows and keeps active ones", async () => {
+    const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const expired = await prisma.otpDeliveryQuota.create({
+      data: {
+        bucket: "TARGET_HOUR",
+        subjectHash: `expired-${suffix}`,
+        windowStart: new Date(Date.now() - 2 * ONE_DAY_MS),
+        windowEnd: new Date(Date.now() - ONE_DAY_MS),
+        count: 1,
+      },
+    });
+    const active = await prisma.otpDeliveryQuota.create({
+      data: {
+        bucket: "TARGET_HOUR",
+        subjectHash: `active-${suffix}`,
+        windowStart: new Date(),
+        windowEnd: new Date(Date.now() + ONE_DAY_MS),
+        count: 1,
+      },
+    });
+
+    const result = await cleanup.runOnce();
+    expect(result.otpDeliveryQuotasDeleted).toBeGreaterThanOrEqual(1);
+    expect(
+      await prisma.otpDeliveryQuota.findUnique({
+        where: {
+          bucket_subjectHash_windowStart: {
+            bucket: expired.bucket,
+            subjectHash: expired.subjectHash,
+            windowStart: expired.windowStart,
+          },
+        },
+      }),
+    ).toBeNull();
+    expect(
+      await prisma.otpDeliveryQuota.findUnique({
+        where: {
+          bucket_subjectHash_windowStart: {
+            bucket: active.bucket,
+            subjectHash: active.subjectHash,
+            windowStart: active.windowStart,
+          },
+        },
+      }),
+    ).not.toBeNull();
+
+    await prisma.otpDeliveryQuota.delete({
+      where: {
+        bucket_subjectHash_windowStart: {
+          bucket: active.bucket,
+          subjectHash: active.subjectHash,
+          windowStart: active.windowStart,
+        },
+      },
+    });
   });
 
   it("deletes sessions revoked more than 30 days ago, keeps recent revocations", async () => {
@@ -152,7 +226,8 @@ describe("AuthCleanupService (e2e)", () => {
     await cleanup.runOnce();
     const second = await cleanup.runOnce();
     expect(second.refreshTokensDeleted).toBe(0);
-    expect(second.otpTokensDeleted).toBe(0);
+    expect(second.otpChallengesDeleted).toBe(0);
+    expect(second.otpDeliveryQuotasDeleted).toBe(0);
     expect(second.sessionsDeleted).toBe(0);
   });
 });

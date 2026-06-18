@@ -12,15 +12,12 @@
  */
 process.env.AUTH_APPLE_ENABLED = "true";
 process.env.APPLE_SERVICE_ID = "com.example.app.test";
-// Raise every throttler bucket well above what this suite produces.
-// Apple-auth's controller only opts into `login-ip`, but the globally
-// registered OTP buckets still bind to every route unless explicitly
-// skipped; without these overrides the per-target bucket (default 5)
-// trips after the 5th request and turns the remaining tests into 429s.
 process.env.THROTTLE_LOGIN_PER_IP_PER_MIN = "10000";
-process.env.THROTTLE_OTP_PER_IP_PER_HOUR = "10000";
-process.env.THROTTLE_OTP_PER_TARGET_PER_HOUR = "10000";
-process.env.THROTTLE_OTP_PER_TARGET_PER_DAY = "10000";
+process.env.THROTTLE_GLOBAL_PER_IP_PER_MIN = "10000";
+process.env.THROTTLE_OTP_REQUESTS_PER_IP_PER_MIN = "10000";
+process.env.OTP_DELIVERY_QUOTA_PER_TARGET_PER_HOUR = "10000";
+process.env.OTP_DELIVERY_QUOTA_PER_TARGET_PER_DAY = "10000";
+process.env.OTP_DELIVERY_QUOTA_PER_IP_PER_HOUR = "10000";
 
 import { INestApplication, VersioningType } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
@@ -32,6 +29,8 @@ import request from "supertest";
 import { AppModule } from "../src/app.module";
 import { AuditEventType } from "../src/audit/audit.types";
 import { AppleVerifier } from "../src/auth/modules/apple/apple-verifier.service";
+import { SpyMailerService } from "../src/mailer/impls/spy-mailer.service";
+import { MailerService } from "../src/mailer/mailer.service";
 import { PrismaService } from "../src/prisma/prisma.service";
 
 import { FakeAppleVerifier } from "./fakes/apple-verifier.fake";
@@ -42,11 +41,14 @@ describe("AppleAuthController (e2e)", () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let verifier: FakeAppleVerifier;
+  let mailer: SpyMailerService;
 
   const createdUserIds: string[] = [];
+  const createdChallengeIds: string[] = [];
   const auditTypesToClean = [
     AuditEventType.SIGNUP,
     AuditEventType.OAUTH_LINKED,
+    AuditEventType.EMAIL_VERIFIED,
     AuditEventType.LOGIN_SUCCESS,
     AuditEventType.LOGIN_FAIL,
   ];
@@ -59,6 +61,8 @@ describe("AppleAuthController (e2e)", () => {
     })
       .overrideProvider(AppleVerifier)
       .useClass(FakeAppleVerifier)
+      .overrideProvider(MailerService)
+      .useClass(SpyMailerService)
       .compile();
     app = moduleRef.createNestApplication();
     app.enableVersioning({ type: VersioningType.URI, defaultVersion: "1" });
@@ -66,14 +70,21 @@ describe("AppleAuthController (e2e)", () => {
     await app.init();
     prisma = app.get(PrismaService);
     verifier = app.get(AppleVerifier);
+    mailer = app.get(MailerService);
   });
 
   afterEach(() => {
     verifier?.reset();
+    mailer?.reset();
   });
 
   afterAll(async () => {
     if (!app) return;
+    if (createdChallengeIds.length > 0) {
+      await prisma.otpChallenge.deleteMany({
+        where: { id: { in: createdChallengeIds } },
+      });
+    }
     if (createdUserIds.length > 0) {
       await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
     }
@@ -90,6 +101,7 @@ describe("AppleAuthController (e2e)", () => {
         ],
       },
     });
+    await prisma.otpDeliveryQuota.deleteMany();
     await app.close();
   });
 
@@ -287,26 +299,92 @@ describe("AppleAuthController (e2e)", () => {
     expect(events).not.toContain(AuditEventType.SIGNUP);
   });
 
-  it("returns 409 when same email exists but Apple says email_verified=false", async () => {
-    const email = `apple-conflict-${uniqueSuffix()}@example.com`;
-    const user = await prisma.user.create({ data: { email } });
+  it("returns the same verification challenge for existing and unknown unverified emails, then completes both safely", async () => {
+    const existingEmail = `apple-unverified-existing-${uniqueSuffix()}@example.com`;
+    const unknownEmail = `apple-unverified-unknown-${uniqueSuffix()}@example.com`;
+    const user = await prisma.user.create({ data: { email: existingEmail } });
     createdUserIds.push(user.id);
 
-    const idToken = `tok-conflict-${uniqueSuffix()}`;
-    verifier.registerToken(idToken, {
-      sub: `apple-sub-conflict-${uniqueSuffix()}`,
-      email,
+    const existingToken = `tok-unverified-existing-${uniqueSuffix()}`;
+    const unknownToken = `tok-unverified-unknown-${uniqueSuffix()}`;
+    verifier.registerToken(existingToken, {
+      sub: `apple-sub-unverified-existing-${uniqueSuffix()}`,
+      email: existingEmail,
+      emailVerified: false,
+      audience: APPLE_AUDIENCE,
+    });
+    verifier.registerToken(unknownToken, {
+      sub: `apple-sub-unverified-unknown-${uniqueSuffix()}`,
+      email: unknownEmail,
       emailVerified: false,
       audience: APPLE_AUDIENCE,
     });
 
-    const res = await request(server())
+    const existingResponse = await request(server())
       .post("/v1/auth/apple")
-      .send({ idToken });
-    expect(res.status).toBe(409);
+      .send({ idToken: existingToken });
+    const unknownResponse = await request(server())
+      .post("/v1/auth/apple")
+      .send({ idToken: unknownToken });
+    const existingBody =
+      existingResponse.body as v1.auth.OAuthEmailVerificationRequired;
+    const unknownBody =
+      unknownResponse.body as v1.auth.OAuthEmailVerificationRequired;
 
-    const events = await latestAuditTypesForUser(user.id);
-    expect(events).toContain(AuditEventType.LOGIN_FAIL);
+    expect(existingResponse.status).toBe(202);
+    expect(unknownResponse.status).toBe(202);
+    expect(existingBody).toMatchObject({
+      status: "verification_required",
+      expiresInSec: expect.any(Number) as number,
+    });
+    expect(unknownBody).toMatchObject({
+      status: "verification_required",
+      expiresInSec: expect.any(Number) as number,
+    });
+    expect(Object.keys(existingBody).sort()).toEqual(
+      Object.keys(unknownBody).sort(),
+    );
+    createdChallengeIds.push(existingBody.challengeId, unknownBody.challengeId);
+    expect(mailer.findLastTo(existingEmail)?.text).toContain("000000");
+    expect(mailer.findLastTo(unknownEmail)?.text).toContain("000000");
+
+    expect(
+      await prisma.user.findUnique({ where: { email: unknownEmail } }),
+    ).toBeNull();
+    expect(
+      await prisma.authAccount.findMany({ where: { userId: user.id } }),
+    ).toHaveLength(0);
+
+    const existingVerify = await request(server())
+      .post(v1.auth.ROUTES.oauthEmailVerification.verify)
+      .send({ challengeId: existingBody.challengeId, code: "000000" });
+    expect(existingVerify.status).toBe(200);
+
+    const linked = await prisma.authAccount.findFirst({
+      where: { userId: user.id, provider: "apple" },
+    });
+    expect(linked).not.toBeNull();
+    expect(
+      (await prisma.user.findUniqueOrThrow({ where: { id: user.id } }))
+        .emailVerified,
+    ).not.toBeNull();
+
+    const unknownVerify = await request(server())
+      .post(v1.auth.ROUTES.oauthEmailVerification.verify)
+      .send({ challengeId: unknownBody.challengeId, code: "000000" });
+    expect(unknownVerify.status).toBe(200);
+
+    const created = await prisma.user.findUnique({
+      where: { email: unknownEmail },
+      include: { authAccounts: true },
+    });
+    expect(created).not.toBeNull();
+    if (created) {
+      createdUserIds.push(created.id);
+      expect(created.emailVerified).not.toBeNull();
+      expect(created.authAccounts).toHaveLength(1);
+      expect(created.authAccounts[0]?.provider).toBe("apple");
+    }
   });
 
   it("returns 401 when the verifier rejects the token", async () => {
@@ -325,6 +403,34 @@ describe("AppleAuthController (e2e)", () => {
       },
     });
     expect(failRows.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("returns 401 when a valid return token has no stored link and omits email", async () => {
+    const idToken = `tok-missing-email-${uniqueSuffix()}`;
+    const sub = `apple-sub-missing-email-${uniqueSuffix()}`;
+    verifier.registerToken(idToken, {
+      sub,
+      audience: APPLE_AUDIENCE,
+    });
+
+    const res = await request(server())
+      .post("/v1/auth/apple")
+      .send({ idToken });
+    expect(res.status).toBe(401);
+
+    const account = await prisma.authAccount.findUnique({
+      where: { provider_providerId: { provider: "apple", providerId: sub } },
+    });
+    expect(account).toBeNull();
+
+    const fail = await prisma.auditEvent.findFirst({
+      where: {
+        type: AuditEventType.LOGIN_FAIL,
+        meta: { path: ["reason"], equals: "missing-email-without-link" },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    expect(fail?.userId).toBeNull();
   });
 
   it("sets HttpOnly cookies on success", async () => {

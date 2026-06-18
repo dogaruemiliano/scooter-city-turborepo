@@ -93,6 +93,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const res = ctx.getResponse<Response>();
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
+    let code: string | undefined;
     let message = "Internal server error";
     let details: unknown;
 
@@ -125,7 +126,18 @@ export class AllExceptionsFilter implements ExceptionFilter {
       if (typeof body === "string") {
         message = body;
       } else if (body && typeof body === "object") {
-        const obj = body as { message?: unknown; error?: unknown };
+        const obj = body as {
+          code?: unknown;
+          details?: unknown;
+          message?: unknown;
+          error?: unknown;
+        };
+        if (typeof obj.code === "string" && obj.code.length > 0) {
+          code = obj.code;
+        }
+        if (obj.details !== undefined) {
+          details = obj.details;
+        }
         if (Array.isArray(obj.message)) {
           message =
             typeof obj.error === "string" ? obj.error : "Validation failed";
@@ -153,12 +165,28 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
     const payload: ErrorResponse = {
       error: {
-        code: codeForStatus(status),
+        code: code ?? codeForStatus(status),
         message,
         ...(details !== undefined ? { details } : {}),
         ...(req.id ? { requestId: req.id } : {}),
       },
     };
+
+    if (
+      status === HttpStatus.TOO_MANY_REQUESTS &&
+      details &&
+      typeof details === "object" &&
+      "retryAfterSec" in details &&
+      typeof (details as { retryAfterSec?: unknown }).retryAfterSec === "number"
+    ) {
+      res.setHeader(
+        "Retry-After",
+        Math.max(
+          1,
+          Math.ceil((details as { retryAfterSec: number }).retryAfterSec),
+        ).toString(),
+      );
+    }
 
     res.status(status).json(payload);
   }

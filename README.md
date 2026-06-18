@@ -1,99 +1,125 @@
-# turborepo-full-template-v2
+# Turborepo full-stack template
 
-Opinionated turborepo template seed: NestJS API · Next.js 16 web · shared TS/ESLint configs · Postgres · OpenAPI + Orval for the API contract.
+Opinionated monorepo for:
 
-Status: **PR 1 (plumbing) landed.** Auth modules begin in PR 5. See [docs/adr/](docs/adr/) for the decision record and [docs/auth/](docs/auth/) (populated as features land) for cross-cutting auth docs.
+- NestJS 11 API
+- Next.js 16 web app
+- PostgreSQL with Prisma 7
+- Shared Zod/OpenAPI contracts
+- Shared web and React Native UI/theme packages
+- Custom email OTP, Google, and Apple authentication
 
-## Prerequisites
+## Requirements
 
-- Node **≥ 20** (uses native `crypto.randomUUID`, `fetch`, etc.)
-- pnpm **9** (`corepack enable && corepack prepare pnpm@9.0.0 --activate`)
-- Docker (for local Postgres)
+- Node.js 20 or newer
+- pnpm 9
+- Docker
 
-## Quick start
+## Local setup
 
 ```bash
-# 1. Local Postgres (listens on :5434 so it can coexist with any host Postgres on :5432)
-docker compose up -d postgres
-
-# 2. Install
+# Install dependencies
 pnpm install
 
-# 3. Configure secrets — generate the example, copy, fill in the SECRETS sections
-pnpm gen:env
+# Start PostgreSQL on localhost:5434
+docker compose up -d postgres
+
+# Create local environment files
 cp apps/api/.env.example apps/api/.env
-# edit apps/api/.env to set JWT_*_SECRET, REFRESH_TOKEN_HMAC_SECRET, OTP_HMAC_SECRET
-# (each must be ≥ 32 chars; `openssl rand -hex 32` is handy)
+cp apps/web/.env.example apps/web/.env
+```
 
-# 4. Apply DB migrations + seed test users
+For local API development:
+
+1. Set `REFRESH_TOKEN_HMAC_SECRET` and `OTP_HMAC_SECRET` to values of at least
+   32 characters.
+2. Configure an SMTP relay that supports authentication:
+
+   ```env
+   SMTP_HOST=smtp.example.com
+   SMTP_PORT=587
+   SMTP_USER=local-user
+   SMTP_PASSWORD=local-password
+   ```
+
+3. Leave `JWT_PRIVATE_KEY` and `JWT_PUBLIC_KEY` empty. Development keys are
+   generated under `apps/api/.dev-keys/` on first startup.
+
+Apply migrations:
+
+```bash
 pnpm --filter api db:migrate
-pnpm --filter api db:seed
-
-# 5. Dev
-pnpm dev                    # all apps via turbo
-# or:
-pnpm --filter api start:dev # only the API on :3000
 ```
 
-Once the API is up:
+Start the workspace:
 
-- Swagger UI: <http://localhost:3000/api-docs>
-- OpenAPI JSON: <http://localhost:3000/api-docs-json>
-- Healthcheck: <http://localhost:3000/healthz>
-
-## Workspace layout
-
+```bash
+pnpm dev
 ```
+
+Default URLs:
+
+- Web: <http://localhost:3001>
+- API: <http://localhost:3000>
+- Swagger: <http://localhost:3000/api-docs>
+- Health: <http://localhost:3000/healthz>
+- JWKS: <http://localhost:3000/.well-known/jwks.json>
+
+Non-production OTP codes are always `000000`.
+
+## Workspace
+
+```text
 apps/
-├─ api/                NestJS 11 · REST · OpenAPI · pino · cookies-only sessions
-├─ web/                Next.js 16 (App Router) — auth wiring lands in a later session
-└─ docs/               Minimal docs site
+├── api/          NestJS API
+├── web/          Next.js web app
+└── mobile/       React Native application
+
 packages/
-├─ eslint-config/      Shared ESLint config (@repo/eslint-config)
-├─ typescript-config/  Shared tsconfigs (@repo/typescript-config)
-└─ ui/                 Shared React UI primitives (@repo/ui)
+├── api-shared/        Shared API schemas and fetch client
+├── theme/             Web design tokens
+├── theme-native/      Native design tokens
+├── ui/                Web UI components
+├── ui-native/         Native UI components
+├── eslint-config/     Shared ESLint configuration
+└── typescript-config/ Shared TypeScript configuration
 ```
 
-Two more packages land in PR 2:
+## Authentication
 
-- `packages/api-shared` — hand-written: cookie names, session types, route paths.
-- `packages/api-generated` — `pnpm gen` output. **Do not edit by hand.**
+NestJS owns token issuance, refresh rotation, OAuth verification, and OTP.
+The web app calls the API directly and verifies access JWTs through JWKS.
 
-## Common scripts
+Supported API methods:
 
-| Script             | Purpose                                                            |
-| ------------------ | ------------------------------------------------------------------ |
-| `pnpm dev`         | Run every app's dev task via turbo                                 |
-| `pnpm build`       | Build every app                                                    |
-| `pnpm lint`        | ESLint across the workspace                                        |
-| `pnpm check-types` | `tsc --noEmit` across the workspace                                |
-| `pnpm test`        | Unit tests (Jest)                                                  |
-| `pnpm test:e2e`    | E2E tests (Jest+Supertest for API; Playwright lands later for web) |
-| `pnpm gen`         | Regenerate `.env.example` + OpenAPI spec + Orval client            |
-| `pnpm gen:env`     | Refresh `apps/api/.env.example` from the zod schema only           |
-| `pnpm format`      | Prettier across the workspace                                      |
+- Email OTP sign-up and sign-in
+- Google ID-token exchange
+- Apple ID-token exchange
 
-## Documentation map
+See [`docs/auth/README.md`](docs/auth/README.md) for architecture, endpoints,
+security controls, and deployment requirements.
 
-- [docs/adr/](docs/adr/) — Architecture Decision Records (the _why_ for load-bearing choices)
-- [docs/auth/](docs/auth/) — Auth subsystem cross-cutting docs (lands as auth modules ship)
-- Per-app READMEs in each `apps/*` directory
-- Per-package READMEs in each `packages/*` directory
+## Common commands
 
-The template's value is being readable months later. Every new feature ships with: OpenAPI decorators on every route, JSDoc on every public service method, a `docs/<area>/*.md` for any non-obvious mechanism, and an ADR for load-bearing decisions.
+| Command                        | Purpose                          |
+| ------------------------------ | -------------------------------- |
+| `pnpm dev`                     | Run workspace development tasks. |
+| `pnpm build`                   | Build the workspace.             |
+| `pnpm lint`                    | Run ESLint.                      |
+| `pnpm check-types`             | Run TypeScript checks.           |
+| `pnpm test`                    | Run unit tests.                  |
+| `pnpm test:e2e`                | Run E2E tests.                   |
+| `pnpm gen:env`                 | Regenerate API `.env.example`.   |
+| `pnpm gen:openapi`             | Regenerate `openapi.json`.       |
+| `pnpm --filter api db:migrate` | Apply local Prisma migrations.   |
+| `pnpm --filter api db:seed`    | Seed local development data.     |
 
-## Enabling / disabling auth methods
+## Documentation
 
-Once auth modules land, the source of truth is **API env vars**, not a checked-in config file:
-
-| Env var                  | Default | Effect                                      |
-| ------------------------ | ------- | ------------------------------------------- |
-| `AUTH_EMAIL_OTP_ENABLED` | `true`  | Wires `/v1/auth/email-otp/{request,verify}` |
-| `AUTH_SMS_OTP_ENABLED`   | `false` | Wires `/v1/auth/sms-otp/{request,verify}`   |
-| `AUTH_GOOGLE_ENABLED`    | `false` | Wires `/v1/auth/google`                     |
-| `AUTH_APPLE_ENABLED`     | `false` | Wires `/v1/auth/apple`                      |
-
-Disabled methods don't just hide — their routes don't exist, their providers aren't registered, their env vars aren't required. The future web app reads `GET /v1/auth/enabled-methods` at SSR to know which buttons/forms to render. No `NEXT_PUBLIC_*` mirroring needed.
+- [`docs/auth/`](docs/auth/) — authentication behavior and operations
+- [`docs/adr/`](docs/adr/) — architectural decisions
+- [`packages/api-shared/README.md`](packages/api-shared/README.md) — shared API contracts
+- [`apps/web/src/lib/README.md`](apps/web/src/lib/README.md) — web session helpers
 
 ## License
 

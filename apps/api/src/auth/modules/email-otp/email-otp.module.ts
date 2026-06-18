@@ -23,14 +23,14 @@
  */
 import { Module } from "@nestjs/common";
 
-import { UsersModule } from "../../../users/users.module";
 import { CoreAuthModule } from "../core-auth/core-auth.module";
+import { OtpChallengeModule } from "../otp-challenge/otp-challenge.module";
 
 import { EmailOtpController } from "./email-otp.controller";
 import { EmailOtpService } from "./email-otp.service";
 
 @Module({
-  imports: [UsersModule, CoreAuthModule],
+  imports: [CoreAuthModule, OtpChallengeModule],
   controllers: [EmailOtpController],
   providers: [EmailOtpService],
 })

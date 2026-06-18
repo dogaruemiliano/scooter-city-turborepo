@@ -1,0 +1,412 @@
+{
+  "info": {
+    "_postman_id": "5578aa96-90ea-4e37-a076-bf024a777f64",
+    "name": "Turborepo Template - Email OTP Login",
+    "description": "Passwordless email sign-up/sign-in for the NestJS API.\n\nLocal defaults:\n- API: http://localhost:3000\n- Email: test-email-otp@example.com\n- Development OTP: 000000\n- MailCatcher UI: http://127.0.0.1:1080\n\nRun the requests in order. Request stores the opaque challenge ID; Verify and Refresh store the returned token pair. Postman also retains the HttpOnly authentication cookies returned by the API.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "apiBaseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "email",
+      "value": "test-email-otp@example.com",
+      "type": "string"
+    },
+    {
+      "key": "otpCode",
+      "value": "000000",
+      "type": "string"
+    },
+    {
+      "key": "challengeId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refreshToken",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Email OTP Login",
+      "description": "Run these requests in order to create and verify an email OTP session.",
+      "item": [
+        {
+          "name": "1. Check Enabled Auth Methods",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{apiBaseUrl}}/v1/auth/enabled-methods",
+              "host": ["{{apiBaseUrl}}"],
+              "path": ["v1", "auth", "enabled-methods"]
+            },
+            "description": "Confirms that email OTP authentication is enabled."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Email OTP is enabled\", function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.methods).to.include(\"emailOtp\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2. Request Email OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Requested-With",
+                "value": "fetch",
+                "description": "Required for cookie-bearing mutations."
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{apiBaseUrl}}/v1/auth/email-otp/request",
+              "host": ["{{apiBaseUrl}}"],
+              "path": ["v1", "auth", "email-otp", "request"]
+            },
+            "description": "Starts or resumes a passwordless email challenge. Existing and new emails receive the same response shape. In development the code is 000000; otherwise read it from MailCatcher."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 202\", function () {",
+                  "  pm.response.to.have.status(202);",
+                  "});",
+                  "",
+                  "const body = pm.response.json();",
+                  "",
+                  "pm.test(\"Challenge metadata is returned\", function () {",
+                  "  pm.expect(body.status).to.eql(\"verification_required\");",
+                  "  pm.expect(body.challengeId).to.be.a(\"string\").and.not.empty;",
+                  "  pm.expect(body.expiresInSec).to.be.above(0);",
+                  "  pm.expect(body.resendAfterSec).to.be.at.least(0);",
+                  "});",
+                  "",
+                  "pm.collectionVariables.set(\"challengeId\", body.challengeId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3. Resend Email OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Requested-With",
+                "value": "fetch"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"challengeId\": \"{{challengeId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{apiBaseUrl}}/v1/auth/otp/resend",
+              "host": ["{{apiBaseUrl}}"],
+              "path": ["v1", "auth", "otp", "resend"]
+            },
+            "description": "Attempts delivery again. Calling before resendAfterSec reaches zero returns metadata without sending another email."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 202\", function () {",
+                  "  pm.response.to.have.status(202);",
+                  "});",
+                  "",
+                  "const body = pm.response.json();",
+                  "pm.expect(body.challengeId).to.eql(pm.collectionVariables.get(\"challengeId\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4. Verify Email OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Requested-With",
+                "value": "fetch",
+                "description": "Required for cookie-bearing mutations."
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"challengeId\": \"{{challengeId}}\",\n  \"code\": \"{{otpCode}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{apiBaseUrl}}/v1/auth/email-otp/verify",
+              "host": ["{{apiBaseUrl}}"],
+              "path": ["v1", "auth", "email-otp", "verify"]
+            },
+            "description": "Exchanges the OTP for a new session. The API returns the tokens and also sets HttpOnly access_token and refresh_token cookies."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const body = pm.response.json();",
+                  "",
+                  "pm.test(\"Token pair is returned\", function () {",
+                  "  pm.expect(body.accessToken).to.be.a(\"string\").and.not.empty;",
+                  "  pm.expect(body.refreshToken).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "",
+                  "pm.collectionVariables.set(\"accessToken\", body.accessToken);",
+                  "pm.collectionVariables.set(\"refreshToken\", body.refreshToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5. Get Current User",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{apiBaseUrl}}/v1/auth/me",
+              "host": ["{{apiBaseUrl}}"],
+              "path": ["v1", "auth", "me"]
+            },
+            "description": "Uses the captured access token. The Postman cookie jar can also authenticate this request."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Current user matches the requested email\", function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.email.toLowerCase()).to.eql(pm.collectionVariables.get(\"email\").toLowerCase());",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "6. Refresh Session",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Requested-With",
+                "value": "fetch",
+                "description": "Required when Postman sends the authentication cookies."
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{apiBaseUrl}}/v1/auth/refresh",
+              "host": ["{{apiBaseUrl}}"],
+              "path": ["v1", "auth", "refresh"]
+            },
+            "description": "Rotates the refresh token and stores the newly returned token pair."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const body = pm.response.json();",
+                  "",
+                  "pm.test(\"A rotated token pair is returned\", function () {",
+                  "  pm.expect(body.accessToken).to.be.a(\"string\").and.not.empty;",
+                  "  pm.expect(body.refreshToken).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "",
+                  "pm.collectionVariables.set(\"accessToken\", body.accessToken);",
+                  "pm.collectionVariables.set(\"refreshToken\", body.refreshToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "7. Log Out",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Requested-With",
+                "value": "fetch",
+                "description": "Required because Postman retains the authentication cookies."
+              }
+            ],
+            "url": {
+              "raw": "{{apiBaseUrl}}/v1/auth/logout",
+              "host": ["{{apiBaseUrl}}"],
+              "path": ["v1", "auth", "logout"]
+            },
+            "description": "Revokes the current session and clears its authentication cookies."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 204\", function () {",
+                  "  pm.response.to.have.status(204);",
+                  "});",
+                  "",
+                  "pm.collectionVariables.unset(\"accessToken\");",
+                  "pm.collectionVariables.unset(\"refreshToken\");",
+                  "pm.collectionVariables.unset(\"challengeId\");"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

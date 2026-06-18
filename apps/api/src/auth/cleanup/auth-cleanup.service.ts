@@ -2,18 +2,19 @@
  * Daily background sweep that hard-deletes auth rows the application will
  * never touch again. Runs at 03:00 server-local time via `@nestjs/schedule`.
  *
- * Three tables, three different cutoffs:
+ * Four auth record types plus expired OTP quota windows:
  *
  * - `RefreshToken WHERE expiresAt < now` — once a refresh JWT can no longer
  *   verify (signature TTL hit), its DB row only exists to be skipped by
  *   the rotation lookup. The rotation code already rejects expired tokens,
  *   so deletion is purely an index-bloat measure.
  *
- * - `OtpToken WHERE expiresAt < now - INTERVAL '7 days'` — OTPs become
+ * - `OtpChallenge WHERE expiresAt < now - INTERVAL '7 days'` — OTPs become
  *   useless minutes after issue (`OTP_TTL`, default 10m). We keep an
- *   extra 7-day window so the audit history can correlate a `LOGIN_FAIL`
- *   audit row with the actual OTP attempt it was for. Past 7d the row
- *   has no operational value.
+ *   extra 7-day window for incident correlation.
+ *
+ * - `OtpDeliveryQuota WHERE windowEnd < now` — fixed-window delivery
+ *   counters have no value after their window closes.
  *
  * - `Session WHERE revokedAt < now - INTERVAL '30 days'` — revoked
  *   sessions stay long enough for "log out other devices" UX and incident
@@ -43,7 +44,8 @@ import { PrismaService } from "../../prisma/prisma.service";
 /** Result shape returned by `runOnce()` so tests can assert counts. */
 export interface AuthCleanupResult {
   refreshTokensDeleted: number;
-  otpTokensDeleted: number;
+  otpChallengesDeleted: number;
+  otpDeliveryQuotasDeleted: number;
   sessionsDeleted: number;
 }
 
@@ -65,7 +67,7 @@ export class AuthCleanupService {
   async handleCron(): Promise<void> {
     const result = await this.runOnce();
     this.logger.log(
-      `auth-cleanup: deleted refreshTokens=${result.refreshTokensDeleted} otpTokens=${result.otpTokensDeleted} sessions=${result.sessionsDeleted}`,
+      `auth-cleanup: deleted refreshTokens=${result.refreshTokensDeleted} otpChallenges=${result.otpChallengesDeleted} otpDeliveryQuotas=${result.otpDeliveryQuotasDeleted} sessions=${result.sessionsDeleted}`,
     );
   }
 
@@ -79,21 +81,26 @@ export class AuthCleanupService {
     const otpCutoff = new Date(now.getTime() - SEVEN_DAYS_MS);
     const sessionCutoff = new Date(now.getTime() - THIRTY_DAYS_MS);
 
-    const [refresh, otp, session] = await this.prisma.$transaction([
-      this.prisma.refreshToken.deleteMany({
-        where: { expiresAt: { lt: now } },
-      }),
-      this.prisma.otpToken.deleteMany({
-        where: { expiresAt: { lt: otpCutoff } },
-      }),
-      this.prisma.session.deleteMany({
-        where: { revokedAt: { lt: sessionCutoff } },
-      }),
-    ]);
+    const [refresh, otpChallenge, otpDeliveryQuota, session] =
+      await this.prisma.$transaction([
+        this.prisma.refreshToken.deleteMany({
+          where: { expiresAt: { lt: now } },
+        }),
+        this.prisma.otpChallenge.deleteMany({
+          where: { expiresAt: { lt: otpCutoff } },
+        }),
+        this.prisma.otpDeliveryQuota.deleteMany({
+          where: { windowEnd: { lt: now } },
+        }),
+        this.prisma.session.deleteMany({
+          where: { revokedAt: { lt: sessionCutoff } },
+        }),
+      ]);
 
     return {
       refreshTokensDeleted: refresh.count,
-      otpTokensDeleted: otp.count,
+      otpChallengesDeleted: otpChallenge.count,
+      otpDeliveryQuotasDeleted: otpDeliveryQuota.count,
       sessionsDeleted: session.count,
     };
   }

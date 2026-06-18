@@ -1,68 +1,76 @@
-# Auth cookies
+# Cookies and CSRF
 
-How HttpOnly cookies are set, what flags they carry, and the eTLD+1 constraint downstream projects need to know about.
+The web app authenticates with two HttpOnly cookies set by NestJS.
 
-## Cookies set
+## Cookies
 
-| Name            | Lifetime                          | Purpose                                                            |
-| --------------- | --------------------------------- | ------------------------------------------------------------------ |
-| `access_token`  | `JWT_ACCESS_TTL` (default `15m`)  | Short-lived JWT consumed by every authenticated request.           |
-| `refresh_token` | `JWT_REFRESH_TTL` (default `90d`) | Long-lived JWT used by `POST /v1/auth/refresh` to rotate the pair. |
+| Cookie          | Default lifetime | Purpose                            |
+| --------------- | ---------------- | ---------------------------------- |
+| `access_token`  | 15 minutes       | Authenticates normal API requests. |
+| `refresh_token` | 90 days          | Rotates the token pair.            |
 
-Both names live in [`@repo/api-shared`](../../packages/api-shared/src/cookies.ts) (`ACCESS_TOKEN_COOKIE`, `REFRESH_TOKEN_COOKIE`). Renaming requires a coordinated change across the API's cookie helpers, the web `proxy.ts` middleware (PR 14), and any persisted browser jar — old sessions get evicted on first request.
+Cookie names are defined in
+[`auth.constants.ts`](../../packages/api-shared/src/v1/auth/auth.constants.ts).
+Cookie options are centralized in
+[`cookies.ts`](../../apps/api/src/auth/utils/cookies.ts).
 
-## Flags
+Both cookies use:
 
-Set by [`apps/api/src/auth/utils/cookies.ts`](../../apps/api/src/auth/utils/cookies.ts):
+- `HttpOnly=true`
+- `Secure=true` in production
+- `SameSite=Lax`
+- `Path=/`
+- `Domain=COOKIE_DOMAIN` when configured
+- `Max-Age` matching the JWT expiry
 
-| Flag       | Value                                 | Why                                                                                                                                                                   |
-| ---------- | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `HttpOnly` | `true`                                | JavaScript can't read the cookie. Limits XSS-driven token theft to "they can use the session while the page is open" rather than "exfiltrate to attacker server."     |
-| `Secure`   | `true` in production, `false` in dev  | Browsers refuse to send `Secure` cookies over HTTP — would break `http://localhost` dev. NODE_ENV-derived.                                                            |
-| `SameSite` | `Lax`                                 | Browser sends cookies on top-level navigations and same-site fetches; blocks them on cross-site `POST` (CSRF mitigation). Forces an **eTLD+1 constraint**, see below. |
-| `Path`     | `/`                                   | Cookies travel on every request to the API origin including `/v1/auth/refresh`.                                                                                       |
-| `Domain`   | `COOKIE_DOMAIN` env, omitted if empty | Set to `.example.com` in production so the web app at `app.example.com` and the API at `api.example.com` share the cookie.                                            |
-| `Max-Age`  | Matches JWT `exp`                     | Browser drops the cookie exactly when the JWT becomes invalid. Saves a round trip.                                                                                    |
+Clearing a cookie must use the same path and domain that were used when setting
+it. Controllers therefore use `setAuthCookies()` and `clearAuthCookies()`
+instead of calling `res.cookie()` directly.
 
-## The eTLD+1 constraint
+## Deployment requirement
 
-`SameSite=Lax` cookies are bound to an effective top-level domain plus one (eTLD+1). Concretely:
+`SameSite=Lax` works when the web app and API are same-site:
 
-- **OK in production:** `app.example.com` + `api.example.com` (same eTLD+1 `example.com`).
-- **OK in dev:** `localhost:3001` (web) + `localhost:3000` (API) — same host, just different ports.
-- **NOT OK:** `myapp.com` (web) + `myapp-api.com` (API). Different eTLD+1; the API's cookies never reach the web app.
+- `app.example.com` and `api.example.com`
+- `localhost:3001` and `localhost:3000`
 
-If a downstream project genuinely needs cross-origin (different eTLD+1) cookies, the choice is:
+It does not work for unrelated sites such as `myapp.com` and
+`myapp-api.com`.
 
-1. **Set `SameSite=None; Secure`** and add a CSRF-protection layer (double-submit cookie / custom header). The current code does NOT include CSRF protection; the locked plan deliberately chose Lax + same-eTLD+1.
-2. **Embed the API as a reverse-proxy path** of the web origin (`example.com/api/...`). Then it's same-site and Lax works.
+For the default deployment:
 
-## Why Lax over None (CSRF stance)
-
-The locked plan picked `SameSite=Lax` and skipped CSRF middleware. Trade-offs:
-
-|                       | `Lax` (chosen)                                                                | `None; Secure` + CSRF middleware                              |
-| --------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| Setup cost            | Zero                                                                          | Adds double-submit cookie pattern or `csurf`-style middleware |
-| Cross-origin support  | No (eTLD+1 constraint)                                                        | Yes                                                           |
-| CSRF risk             | Mostly mitigated by Lax itself + JSON-only endpoints with content-type checks | Mitigated by explicit token check                             |
-| Operational footprint | One thing to remember (the eTLD+1 rule)                                       | Two (the rule + the CSRF token storage / rotation)            |
-
-The template is opinionated for the common case (same-eTLD+1 deployment) and documents the escape hatch. Switching is a per-project decision; if you flip `SameSite` to `None`, add CSRF protection at the same time.
-
-## Set/clear contract
-
-The helpers in `cookies.ts` are the only place the cookie attributes are constructed. Direct calls to `res.cookie(...)` from controllers are a code smell — they will drift.
-
-```ts
-setAuthCookies(res, env, {
-  accessToken,
-  refreshToken,
-  accessTokenExpiresInSec,
-  refreshTokenExpiresInSec,
-});
-
-clearAuthCookies(res, env);
+```env
+COOKIE_DOMAIN=.example.com
+CORS_ORIGINS=https://app.example.com
 ```
 
-`clearAuthCookies` mirrors the set-time `path` and `domain` exactly — `clearCookie` only matches when those attributes line up, otherwise it does nothing and the cookie quietly survives.
+The browser calls the API directly with `credentials: "include"`.
+
+## CSRF protection
+
+Cookie-authenticated mutations must include:
+
+```http
+X-Requested-With: fetch
+```
+
+The global `CsrfGuard` enforces this rule when an access or refresh cookie is
+present.
+
+The guard skips:
+
+- `GET`, `HEAD`, and `OPTIONS`
+- Requests without auth cookies, such as Bearer-token native clients
+- Routes explicitly decorated with `@SkipCsrf()`
+
+The custom header forces cross-origin browser requests through CORS preflight.
+Only origins in `CORS_ORIGINS` are allowed.
+
+`@repo/api-shared` adds the header to mutations automatically. Manual browser
+requests must add it themselves.
+
+## Different-site deployments
+
+Using `SameSite=None` requires `Secure=true` and a deliberate review of cookie,
+CORS, and CSRF behavior. Do not change the cookie mode without preserving the
+custom-header protection.

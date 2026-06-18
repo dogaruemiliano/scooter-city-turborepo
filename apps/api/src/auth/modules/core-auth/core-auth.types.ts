@@ -1,7 +1,6 @@
 /**
- * Public types of `CoreAuthService`. Kept in a sibling file so consumers
- * (auth-method modules in PR 5+, controller DTOs, tests) can `import
- * type` without dragging in the runtime service module.
+ * Public `CoreAuthService` types. Kept separate so consumers can use
+ * type-only imports without loading the service module.
  */
 import type { User } from "../../../generated/prisma/client";
 
@@ -15,8 +14,8 @@ export interface TokenPair {
 }
 
 export interface IssueSessionInput {
-  /** Only `id` + `email` are read; pass the full row if convenient. */
-  user: Pick<User, "id" | "email">;
+  /** Only `id` + `email` + `roles` are read; pass the full row if convenient. */
+  user: Pick<User, "id" | "email" | "roles">;
   userAgent?: string | null;
   ip?: string | null;
 }

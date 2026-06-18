@@ -1,11 +1,6 @@
 /**
- * In-memory mailer for E2E tests. Captures every `send()` into a queue so
- * tests can assert "a mail was sent" and (in PR 5+) parse the OTP code
- * out of the captured body to complete the verify step.
- *
- * Wired into the test module via
- * `Test.createTestingModule(...).overrideProvider(MailerService).useClass(SpyMailerService)`.
- * Never enabled in production — there's no env-flag path to it.
+ * In-memory mailer for tests. Captures messages for assertions and is available
+ * only through an explicit provider override.
  */
 import { Injectable } from "@nestjs/common";
 

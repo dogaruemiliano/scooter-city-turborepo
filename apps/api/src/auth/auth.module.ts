@@ -2,7 +2,7 @@
  * The auth subsystem root module.
  *
  * `forRoot(config)` is a `DynamicModule` factory so per-method modules
- * (email-OTP, OAuth, SMS-OTP) can be conditionally added based on the
+ * (email-OTP and OAuth) can be conditionally added based on the
  * env-driven `AUTH_*_ENABLED` flags. Disabled methods don't just hide:
  * their routes don't exist (404), their providers aren't registered,
  * and their env vars aren't required.
@@ -13,41 +13,33 @@
  * the cron, force-enable a method module, etc., without going through
  * `process.env`.
  *
- * `JwtModule` is registered once here at the root. Sibling submodules
- * that need `JwtService` (CoreAuthModule, and future method modules
- * that mint or verify JWTs directly) re-import `JwtModule` from their
- * own `@Module` decorator — Nest deduplicates the registration. Not
- * global on purpose: only the auth subsystem consumes JwtService.
+ * `CoreAuthModule` owns the configured `JwtModule` because it is the
+ * module that injects `JwtService`. Importing a configured JwtModule only
+ * in this parent module would not make those options visible inside a
+ * child module's separately imported JwtModule.
  *
- * # Adding a new auth-method module (for PR 8-11)
- *
- * 1. Add a flag to `AuthModuleConfig` (e.g. `emailOtp: { enabled }`).
- * 2. In the matching branch below, push the module onto `imports` and
- *    the service (if it needs to be exported for other modules) onto
- *    `exports`.
- * 3. The method module re-imports `JwtModule` / `UsersModule` locally
- *    if it injects from them — Nest deduplicates.
+ * Auth-method IDs, env mappings, and module classes are centralized in
+ * `auth-method.registry.ts`.
  */
 import { DynamicModule, Module, type Provider } from "@nestjs/common";
 import { APP_GUARD } from "@nestjs/core";
-import { JwtModule } from "@nestjs/jwt";
 import { PassportModule } from "@nestjs/passport";
 import { ScheduleModule } from "@nestjs/schedule";
-import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
-
-import { ENV } from "../config/config.module";
-import type { Env } from "../config/env";
+import { v1 } from "@repo/api-shared";
 
 import type { AuthModuleConfig } from "./auth.config";
+import {
+  AUTH_ENABLED_METHODS,
+  resolveEnabledAuthMethodModules,
+} from "./auth-method.registry";
 import { AuthCleanupService } from "./cleanup/auth-cleanup.service";
 import { JwtAuthGuard } from "./guards/jwt-auth.guard";
-import { AppleAuthModule } from "./modules/apple/apple.module";
+import { AuthMethodsController } from "./modules/core-auth/auth-methods.controller";
 import { CoreAuthModule } from "./modules/core-auth/core-auth.module";
-import { EmailOtpModule } from "./modules/email-otp/email-otp.module";
-import { GoogleAuthModule } from "./modules/google/google.module";
-import { SmsOtpModule } from "./modules/sms-otp/sms-otp.module";
+import { JwksModule } from "./modules/jwks/jwks.module";
 import { JwtStrategy } from "./strategies/jwt.strategy";
-import { buildThrottlerOptions } from "./throttler.config";
+import { AuthThrottlingModule } from "./throttling/auth-throttling.module";
+import { KeysModule } from "./utils/keys.module";
 
 @Module({})
 export class AuthModule {
@@ -58,22 +50,29 @@ export class AuthModule {
    * dependencies aren't required).
    */
   static forRoot(config: AuthModuleConfig): DynamicModule {
+    const enabledMethods = Object.freeze(
+      v1.auth.AUTH_METHOD_IDS.filter((method) =>
+        config.enabledMethods.includes(method),
+      ),
+    );
     const imports: DynamicModule["imports"] = [
       PassportModule.register({ defaultStrategy: "jwt" }),
-      JwtModule.register({}),
-      ThrottlerModule.forRootAsync({
-        inject: [ENV],
-        useFactory: (env: Env) => ({
-          throttlers: buildThrottlerOptions(env),
-        }),
-      }),
+      // KeysModule provides the singleton KEY_RING used by sign, verify,
+      // and the JWKS endpoint — see auth/utils/keys.ts for the rationale.
+      KeysModule,
+      AuthThrottlingModule,
       CoreAuthModule,
+      JwksModule,
+      ...resolveEnabledAuthMethodModules(enabledMethods),
     ];
 
     const providers: Provider[] = [
+      {
+        provide: AUTH_ENABLED_METHODS,
+        useValue: enabledMethods,
+      },
       JwtStrategy,
       { provide: APP_GUARD, useClass: JwtAuthGuard },
-      { provide: APP_GUARD, useClass: ThrottlerGuard },
     ];
 
     // ─── Cleanup cron ──────────────────────────────────────────────
@@ -83,18 +82,10 @@ export class AuthModule {
       providers.push(AuthCleanupService);
     }
 
-    // ─── Method modules (filled in by PR 8-11) ─────────────────────
-    // Each PR appends one conditional block. The flag exists today; the
-    // module import is added when the matching module lands.
-    //
-    if (config.emailOtp.enabled) imports.push(EmailOtpModule); // PR 8
-    if (config.google.enabled) imports.push(GoogleAuthModule); // PR 9
-    if (config.apple.enabled) imports.push(AppleAuthModule); // PR 10
-    if (config.smsOtp.enabled) imports.push(SmsOtpModule); // PR 11
-
     return {
       module: AuthModule,
       imports,
+      controllers: [AuthMethodsController],
       providers,
       exports: [CoreAuthModule],
     };

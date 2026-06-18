@@ -4,14 +4,21 @@
  * The Google ID-token verifier is replaced with `FakeGoogleVerifier` —
  * tests register `(idToken → claims)` mappings up front so each
  * scenario is deterministic and no network access is required. The
- * rest of the stack (controller, service, transaction-wrapped
- * resolveUser, `CoreAuthService.issueSession`, cookie writes, audit
- * emission) runs as it would in production.
+ * rest of the stack (thin controller, service-owned orchestration,
+ * transaction-wrapped resolution, session issuance, cookie writes, and
+ * audit emission) runs as it would in production.
  *
  * Test data is cleaned up `afterAll` by deleting the users created in
  * each scenario; audit rows referencing deleted users survive with
  * `userId = NULL` (SetNull cascade) and are pruned by type at the end.
  */
+process.env.THROTTLE_LOGIN_PER_IP_PER_MIN = "10000";
+process.env.THROTTLE_GLOBAL_PER_IP_PER_MIN = "10000";
+process.env.THROTTLE_OTP_REQUESTS_PER_IP_PER_MIN = "10000";
+process.env.OTP_DELIVERY_QUOTA_PER_TARGET_PER_HOUR = "10000";
+process.env.OTP_DELIVERY_QUOTA_PER_TARGET_PER_DAY = "10000";
+process.env.OTP_DELIVERY_QUOTA_PER_IP_PER_HOUR = "10000";
+
 import { INestApplication, VersioningType } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import { v1 } from "@repo/api-shared";
@@ -23,6 +30,8 @@ import { AppModule } from "../src/app.module";
 import { AuditEventType } from "../src/audit/audit.types";
 import { FakeGoogleVerifier } from "../src/auth/modules/google/fake-google-verifier.service";
 import { GoogleVerifier } from "../src/auth/modules/google/google-verifier.interface";
+import { SpyMailerService } from "../src/mailer/impls/spy-mailer.service";
+import { MailerService } from "../src/mailer/mailer.service";
 import { PrismaService } from "../src/prisma/prisma.service";
 import { UsersService } from "../src/users/users.service";
 
@@ -31,8 +40,10 @@ describe("GoogleAuthController (e2e)", () => {
   let prisma: PrismaService;
   let users: UsersService;
   let verifier: FakeGoogleVerifier;
+  let mailer: SpyMailerService;
 
   const createdUserIds: string[] = [];
+  const createdChallengeIds: string[] = [];
   const startedAt = new Date();
 
   const server = () => app.getHttpServer() as Server;
@@ -43,6 +54,8 @@ describe("GoogleAuthController (e2e)", () => {
     })
       .overrideProvider(GoogleVerifier)
       .useClass(FakeGoogleVerifier)
+      .overrideProvider(MailerService)
+      .useClass(SpyMailerService)
       .compile();
 
     app = moduleRef.createNestApplication();
@@ -53,13 +66,20 @@ describe("GoogleAuthController (e2e)", () => {
     prisma = app.get(PrismaService);
     users = app.get(UsersService);
     verifier = app.get(GoogleVerifier);
+    mailer = app.get(MailerService);
   });
 
   afterEach(() => {
     verifier.reset();
+    mailer.reset();
   });
 
   afterAll(async () => {
+    if (createdChallengeIds.length > 0) {
+      await prisma.otpChallenge.deleteMany({
+        where: { id: { in: createdChallengeIds } },
+      });
+    }
     if (createdUserIds.length > 0) {
       await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
     }
@@ -74,13 +94,18 @@ describe("GoogleAuthController (e2e)", () => {
           in: [
             AuditEventType.SIGNUP,
             AuditEventType.OAUTH_LINKED,
+            AuditEventType.EMAIL_VERIFIED,
             AuditEventType.LOGIN_SUCCESS,
             AuditEventType.LOGIN_FAIL,
           ],
         },
-        meta: { path: ["method"], equals: "google" },
+        OR: [
+          { meta: { path: ["method"], equals: "google" } },
+          { meta: { path: ["provider"], equals: "google" } },
+        ],
       },
     });
+    await prisma.otpDeliveryQuota.deleteMany();
     await app.close();
   });
 
@@ -163,11 +188,57 @@ describe("GoogleAuthController (e2e)", () => {
     ).toMatchObject({ meta: { method: "google" } });
   });
 
+  it("serializes concurrent first sign-ins into one user and one linked account", async () => {
+    const idToken = "token-concurrent-padded-aaaaaaaa";
+    const email = uniqueEmail("g-concurrent");
+    const sub = uniqueSub("concurrent");
+    verifier.register(idToken, {
+      sub,
+      email,
+      emailVerified: true,
+      name: "Concurrent Person",
+    });
+
+    const [first, second] = await Promise.all([
+      request(server()).post("/v1/auth/google").send({ idToken }),
+      request(server()).post("/v1/auth/google").send({ idToken }),
+    ]);
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+
+    const users = await prisma.user.findMany({
+      where: { email: email.toLowerCase() },
+      include: { authAccounts: true, sessions: true },
+    });
+    expect(users).toHaveLength(1);
+
+    const user = users[0];
+    if (!user) throw new Error();
+    createdUserIds.push(user.id);
+    expect(user.authAccounts).toHaveLength(1);
+    expect(user.authAccounts[0]?.providerId).toBe(sub);
+    expect(user.sessions).toHaveLength(2);
+
+    const audits = await prisma.auditEvent.findMany({
+      where: { userId: user.id },
+    });
+    expect(
+      audits.filter((row) => row.type === AuditEventType.SIGNUP),
+    ).toHaveLength(1);
+    expect(
+      audits.filter((row) => row.type === AuditEventType.OAUTH_LINKED),
+    ).toHaveLength(1);
+    expect(
+      audits.filter((row) => row.type === AuditEventType.LOGIN_SUCCESS),
+    ).toHaveLength(2);
+  });
+
   // ────────────────────────────────────────────────────────────────────
   // 2. Existing AuthAccount → LOGIN_SUCCESS only (no new AuthAccount)
   // ────────────────────────────────────────────────────────────────────
 
-  it("re-signs in an existing user without creating another AuthAccount", async () => {
+  it("re-signs in an existing linked user even when the current email claim is unverified", async () => {
     const sub = uniqueSub("repeat");
     const user = await users.createOne({
       email: uniqueEmail("g-repeat"),
@@ -186,7 +257,7 @@ describe("GoogleAuthController (e2e)", () => {
     verifier.register(idToken, {
       sub,
       email: user.email,
-      emailVerified: true,
+      emailVerified: false,
     });
 
     const res = await request(server())
@@ -245,35 +316,185 @@ describe("GoogleAuthController (e2e)", () => {
   });
 
   // ────────────────────────────────────────────────────────────────────
-  // 4. Unverified Google email collides with existing local user → 409
+  // 4. Unverified Google emails require proof without local enumeration
   // ────────────────────────────────────────────────────────────────────
 
-  it("returns 409 when Google did not verify the email and the address already exists", async () => {
-    const email = uniqueEmail("g-conflict");
+  it("returns the same challenge shape for existing and unknown unverified emails, then links or creates only after OTP proof", async () => {
+    const existingEmail = uniqueEmail("g-unverified-existing");
+    const unknownEmail = uniqueEmail("g-unverified-unknown");
+    const existingSub = uniqueSub("unverified-existing");
+    const unknownSub = uniqueSub("unverified-unknown");
     const user = await users.createOne({
-      email,
+      email: existingEmail,
       emailVerified: new Date(),
     });
     createdUserIds.push(user.id);
 
-    const idToken = "token-conflict-padded-aaaaaaaa";
-    const sub = uniqueSub("conflict");
-    verifier.register(idToken, { sub, email, emailVerified: false });
+    const existingToken = "token-unverified-existing-aaaa";
+    const unknownToken = "token-unverified-unknown-aaaaaa";
+    verifier.register(existingToken, {
+      sub: existingSub,
+      email: existingEmail,
+      emailVerified: false,
+    });
+    verifier.register(unknownToken, {
+      sub: unknownSub,
+      email: unknownEmail,
+      emailVerified: false,
+    });
 
-    const res = await request(server())
+    const existingResponse = await request(server())
       .post("/v1/auth/google")
-      .send({ idToken });
-    expect(res.status).toBe(409);
+      .send({ idToken: existingToken });
+    const unknownResponse = await request(server())
+      .post("/v1/auth/google")
+      .send({ idToken: unknownToken });
+    const existingBody =
+      existingResponse.body as v1.auth.OAuthEmailVerificationRequired;
+    const unknownBody =
+      unknownResponse.body as v1.auth.OAuthEmailVerificationRequired;
+
+    expect(existingResponse.status).toBe(202);
+    expect(unknownResponse.status).toBe(202);
+    expect(existingBody).toMatchObject({
+      status: "verification_required",
+      expiresInSec: expect.any(Number) as number,
+    });
+    expect(unknownBody).toMatchObject({
+      status: "verification_required",
+      expiresInSec: expect.any(Number) as number,
+    });
+    expect(Object.keys(existingBody).sort()).toEqual(
+      Object.keys(unknownBody).sort(),
+    );
+    expect(existingBody.challengeId).not.toBe(unknownBody.challengeId);
+    createdChallengeIds.push(existingBody.challengeId, unknownBody.challengeId);
+    expect(mailer.findLastTo(existingEmail)?.text).toContain("000000");
+    expect(mailer.findLastTo(unknownEmail)?.text).toContain("000000");
 
     const accounts = await prisma.authAccount.findMany({
       where: { userId: user.id, provider: "google" },
     });
     expect(accounts).toHaveLength(0);
+    expect(
+      await prisma.user.findUnique({ where: { email: unknownEmail } }),
+    ).toBeNull();
 
-    const fail = await recentAudit(AuditEventType.LOGIN_FAIL, null);
-    expect(fail).toMatchObject({
-      meta: { method: "google", reason: "email-not-verified-by-provider" },
+    const existingVerify = await request(server())
+      .post(v1.auth.ROUTES.oauthEmailVerification.verify)
+      .send({ challengeId: existingBody.challengeId, code: "000000" });
+    expect(existingVerify.status).toBe(200);
+    expect(existingVerify.body).toMatchObject({
+      accessToken: expect.any(String) as string,
+      refreshToken: expect.any(String) as string,
     });
+
+    const linked = await prisma.authAccount.findUnique({
+      where: {
+        provider_providerId: {
+          provider: "google",
+          providerId: existingSub,
+        },
+      },
+    });
+    expect(linked?.userId).toBe(user.id);
+
+    const unknownVerify = await request(server())
+      .post(v1.auth.ROUTES.oauthEmailVerification.verify)
+      .send({ challengeId: unknownBody.challengeId, code: "000000" });
+    expect(unknownVerify.status).toBe(200);
+
+    const created = await prisma.user.findUnique({
+      where: { email: unknownEmail },
+      include: { authAccounts: true },
+    });
+    expect(created).not.toBeNull();
+    if (!created) throw new Error();
+    createdUserIds.push(created.id);
+    expect(created.emailVerified).not.toBeNull();
+    expect(created.authAccounts).toHaveLength(1);
+    expect(created.authAccounts[0]?.provider).toBe("google");
+
+    const replay = await request(server())
+      .post(v1.auth.ROUTES.oauthEmailVerification.verify)
+      .send({ challengeId: unknownBody.challengeId, code: "000000" });
+    expect(replay.status).toBe(401);
+  });
+
+  it("increments attempts for a wrong OAuth email code without consuming the challenge", async () => {
+    const idToken = "token-unverified-wrong-code-aaaaaa";
+    const email = uniqueEmail("g-unverified-wrong");
+    verifier.register(idToken, {
+      sub: uniqueSub("unverified-wrong"),
+      email,
+      emailVerified: false,
+    });
+
+    const signIn = await request(server())
+      .post(v1.auth.ROUTES.google)
+      .send({ idToken });
+    const challenge = signIn.body as v1.auth.OAuthEmailVerificationRequired;
+    expect(signIn.status).toBe(202);
+    createdChallengeIds.push(challenge.challengeId);
+
+    const wrong = await request(server())
+      .post(v1.auth.ROUTES.oauthEmailVerification.verify)
+      .send({ challengeId: challenge.challengeId, code: "111111" });
+    expect(wrong.status).toBe(401);
+
+    const row = await prisma.otpChallenge.findUniqueOrThrow({
+      where: { id: challenge.challengeId },
+    });
+    expect(row.attemptsCount).toBe(1);
+    expect(row.usedAt).toBeNull();
+
+    const correct = await request(server())
+      .post(v1.auth.ROUTES.oauthEmailVerification.verify)
+      .send({ challengeId: challenge.challengeId, code: "000000" });
+    expect(correct.status).toBe(200);
+
+    const created = await prisma.user.findUnique({ where: { email } });
+    expect(created).not.toBeNull();
+    if (created) createdUserIds.push(created.id);
+  });
+
+  it("allows only one concurrent verification to claim a challenge", async () => {
+    const idToken = "token-unverified-concurrent-aaaaaa";
+    const email = uniqueEmail("g-unverified-concurrent");
+    verifier.register(idToken, {
+      sub: uniqueSub("unverified-concurrent"),
+      email,
+      emailVerified: false,
+    });
+
+    const signIn = await request(server())
+      .post(v1.auth.ROUTES.google)
+      .send({ idToken });
+    const challenge = signIn.body as v1.auth.OAuthEmailVerificationRequired;
+    expect(signIn.status).toBe(202);
+    createdChallengeIds.push(challenge.challengeId);
+
+    const responses = await Promise.all([
+      request(server())
+        .post(v1.auth.ROUTES.oauthEmailVerification.verify)
+        .send({ challengeId: challenge.challengeId, code: "000000" }),
+      request(server())
+        .post(v1.auth.ROUTES.oauthEmailVerification.verify)
+        .send({ challengeId: challenge.challengeId, code: "000000" }),
+    ]);
+    expect(responses.map((response) => response.status).sort()).toEqual([
+      200, 401,
+    ]);
+
+    const created = await prisma.user.findUnique({
+      where: { email },
+      include: { authAccounts: true, sessions: true },
+    });
+    expect(created).not.toBeNull();
+    if (!created) throw new Error();
+    createdUserIds.push(created.id);
+    expect(created.authAccounts).toHaveLength(1);
+    expect(created.sessions).toHaveLength(1);
   });
 
   // ────────────────────────────────────────────────────────────────────

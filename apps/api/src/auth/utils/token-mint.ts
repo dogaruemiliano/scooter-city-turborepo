@@ -21,9 +21,11 @@ import ms from "ms";
 import type { JwtPayload } from "../auth.types";
 
 /** Re-exported under a clearer name for call-site readability. */
-export type AccessTokenClaims = JwtPayload;
+export type AccessTokenClaims = Omit<JwtPayload, "tokenType">;
 
 export interface RefreshTokenClaims {
+  /** Prevents a refresh JWT from being accepted as an access JWT. */
+  tokenType: "refresh";
   /** User ID. */
   sub: string;
   /** Session ID. */
@@ -70,15 +72,24 @@ export function ttlStringToSeconds(ttl: string): number {
  * Sign the access JWT and report its `iat`/`exp` claims so the caller
  * can compute `accessTokenExpiresInSec` for response bodies without
  * re-decoding.
+ *
+ * The RS256 private key and algorithm come from `JwtModule.registerAsync`
+ * in [auth.module.ts](../auth.module.ts) — the public key is exposed via
+ * JWKS so first-party verifiers (Next.js RSCs, future microservices) can
+ * verify locally without the private key ever leaving this process.
  */
 export function mintAccessToken(
   jwt: JwtService,
   claims: AccessTokenClaims,
-  secret: string,
   ttl: string,
 ): MintedToken {
   const expiresInSec = ttlStringToSeconds(ttl);
-  const token = jwt.sign(claims, { secret, expiresIn: expiresInSec });
+  const token = jwt.sign(
+    { ...claims, tokenType: "access" },
+    {
+      expiresIn: expiresInSec,
+    },
+  );
   const decoded = jwt.decode<{ exp?: number; iat?: number }>(token);
   return readMintedToken(token, decoded, expiresInSec);
 }
@@ -87,17 +98,24 @@ export function mintAccessToken(
  * Sign the refresh JWT, generating a fresh `jti`. Returns the new `jti`
  * separately so the caller can index the matching `RefreshToken` row by
  * it without re-decoding the JWT.
+ *
+ * Uses the same keypair as access tokens (refresh JWTs are server-internal
+ * — only this API verifies them — so splitting the keypair would double
+ * operational overhead without raising the security ceiling).
  */
 export function mintRefreshToken(
   jwt: JwtService,
-  partial: Omit<RefreshTokenClaims, "jti">,
-  secret: string,
+  partial: Omit<RefreshTokenClaims, "jti" | "tokenType">,
   ttl: string,
 ): MintedToken & { jti: string } {
   const jti = randomUUID();
-  const claims: RefreshTokenClaims = { ...partial, jti };
+  const claims: RefreshTokenClaims = {
+    ...partial,
+    jti,
+    tokenType: "refresh",
+  };
   const expiresInSec = ttlStringToSeconds(ttl);
-  const token = jwt.sign(claims, { secret, expiresIn: expiresInSec });
+  const token = jwt.sign(claims, { expiresIn: expiresInSec });
   const decoded = jwt.decode<{ exp?: number; iat?: number }>(token);
   return { ...readMintedToken(token, decoded, expiresInSec), jti };
 }

@@ -3,6 +3,7 @@
  * SetNull-on-user-delete cascade (audit history survives account
  * removal) end-to-end.
  */
+import type { INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 
 import { AppModule } from "../src/app.module";
@@ -12,6 +13,7 @@ import { PrismaService } from "../src/prisma/prisma.service";
 import { UsersService } from "../src/users/users.service";
 
 describe("AuditService (e2e)", () => {
+  let app: INestApplication;
   let audit: AuditService;
   let users: UsersService;
   let prisma: PrismaService;
@@ -22,7 +24,7 @@ describe("AuditService (e2e)", () => {
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
-    const app = moduleRef.createNestApplication();
+    app = moduleRef.createNestApplication();
     await app.init();
     audit = app.get(AuditService);
     users = app.get(UsersService);
@@ -39,7 +41,7 @@ describe("AuditService (e2e)", () => {
         where: { type: { in: [...createdAuditTypes] } },
       });
     }
-    await prisma.$disconnect();
+    await app.close();
   });
 
   it("record() writes a row with the expected fields", async () => {

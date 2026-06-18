@@ -1,35 +1,50 @@
 /**
  * Side-effect module that runs BEFORE every other import in `main.ts`.
  *
- * Why this file exists: ESM imports are hoisted. `NestConfigModule.forRoot`
- * runs zod validation the moment `app.module.ts` (and transitively
- * `config.module.ts`) is loaded — before any `bootstrap()` body runs. So
- * we cannot wait until inside `bootstrap()` to populate placeholder env
- * vars for `--spec-only` mode; we have to do it as a side effect that is
- * imported FIRST.
+ * Three responsibilities, all of which must happen before `app.module.ts`
+ * evaluates `loadEnv()` at its top level (line ~30):
  *
- * In `--spec-only` mode (Orval pipeline / CI spec generation) we don't
- * need real secrets — the bootstrap exits immediately after writing the
- * OpenAPI document to stdout. These placeholders satisfy the zod schema
- * with values that have no security meaning.
+ *   1. Load `.env` via `dotenv/config`. `@nestjs/config`'s `forRoot()`
+ *      would normally do this, but its DI lifecycle runs AFTER the
+ *      top-level `loadEnv()` call in `app.module.ts`. Explicit load up
+ *      front means `process.env` is fully populated when validation runs.
+ *
+ *   2. Materialize the dev RSA keypair via `ensureDevJwtKeypair()`. No-op
+ *      in production (which must provide `JWT_PRIVATE_KEY`/`JWT_PUBLIC_KEY`
+ *      explicitly). In dev/test, writes (or reuses) `.dev-keys/*.pem` and
+ *      injects them into `process.env`. Idempotent across restarts.
+ *
+ *   3. In `--spec-only` mode (Orval pipeline / CI spec generation), inject
+ *      placeholder values for the remaining required vars so the env
+ *      schema validates without a real `.env`. Force-enables every auth
+ *      method so the generated OpenAPI document is complete. The
+ *      placeholders have no security meaning — `--spec-only` exits
+ *      immediately after writing stdout.
+ *
+ * The `dotenv/config` and `keys` imports are safe to hoist here: they
+ * have no env-reading top-level side effects of their own, so loading
+ * them doesn't cascade into config-module validation.
  */
+import "dotenv/config";
+
+import { ensureDevJwtKeypair } from "./auth/utils/keys";
+
+ensureDevJwtKeypair();
+
 if (process.argv.includes("--spec-only")) {
   const placeholders: Record<string, string> = {
     NODE_ENV: "development",
-    JWT_ACCESS_SECRET: "spec-only-placeholder-padded-to-32-chars",
-    JWT_REFRESH_SECRET: "spec-only-placeholder-padded-to-32-chars",
     REFRESH_TOKEN_HMAC_SECRET: "spec-only-placeholder-padded-to-32-chars",
     OTP_HMAC_SECRET: "spec-only-placeholder-padded-to-32-chars",
-    // Force-enable every auth method so the generated OpenAPI document
-    // is complete (consumers shouldn't have to set env flags to see a
-    // route in the spec). The credentials are placeholders the verifier
-    // never actually consumes — `--spec-only` exits before any incoming
-    // request reaches the verifier.
+    AUTH_EMAIL_OTP_ENABLED: "true",
+    SMTP_HOST: "127.0.0.1",
+    SMTP_PORT: "1025",
+    SMTP_USER: "spec-only-user",
+    SMTP_PASSWORD: "spec-only-password",
     AUTH_APPLE_ENABLED: "true",
     APPLE_SERVICE_ID: "com.example.spec.placeholder",
     AUTH_GOOGLE_ENABLED: "true",
     GOOGLE_CLIENT_ID_WEB: "spec-only-google-client-id-web.placeholder",
-    AUTH_SMS_OTP_ENABLED: "true",
     SMS_PROVIDER: "log",
   };
   for (const [k, v] of Object.entries(placeholders)) {

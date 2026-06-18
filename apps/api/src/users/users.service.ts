@@ -34,6 +34,18 @@ export class UsersService {
     return this.prisma.user.findUnique({ where: { id } });
   }
 
+  findAccountProfileById(id: string) {
+    return this.prisma.user.findUnique({
+      where: { id },
+      include: {
+        authAccounts: {
+          select: { provider: true },
+          orderBy: { createdAt: "asc" },
+        },
+      },
+    });
+  }
+
   findByEmail(email: string): Promise<User | null> {
     return this.prisma.user.findUnique({ where: { email } });
   }
@@ -46,9 +58,16 @@ export class UsersService {
     return this.prisma.user.create({ data });
   }
 
+  updateProfile(
+    id: string,
+    data: Pick<Prisma.UserUpdateInput, "firstName" | "lastName">,
+  ): Promise<User> {
+    return this.prisma.user.update({ where: { id }, data });
+  }
+
   /**
    * Hard-deletes the user and cascades every dependent row (Session,
-   * RefreshToken, OtpToken, AuthAccount) — see the schema's `onDelete`
+   * RefreshToken, OtpChallenge, AuthAccount) — see the schema's `onDelete`
    * rules in [docs/auth/sessions-and-audit.md](../../../../docs/auth/sessions-and-audit.md).
    *
    * `AuditEvent` rows survive with `userId = NULL` (SetNull on FK).

@@ -27,12 +27,31 @@
 import { z } from "zod";
 
 import { userSchema } from "../users/users.schemas";
+import { AUTH_METHOD_IDS, OAUTH_PROVIDERS } from "./auth.constants";
+
+const profileNameSchema = z.string().trim().min(1).max(100).nullable();
+
+/**
+ * Editable fields accepted by `PATCH /v1/auth/me`.
+ *
+ * Empty form fields are sent as `null`; blank strings are rejected so every
+ * client stores the same canonical representation.
+ */
+export const updateProfileInputSchema = z
+  .object({
+    firstName: profileNameSchema.optional(),
+    lastName: profileNameSchema.optional(),
+  })
+  .strict()
+  .meta({ id: "UpdateProfileInput" });
+
+export type UpdateProfileInput = z.infer<typeof updateProfileInputSchema>;
 
 /**
  * Request body for `POST /v1/auth/refresh`.
  *
  * Both the cookie path (web) and the JSON-body path (mobile) reach this
- * endpoint. When an `access_token` cookie is present and valid the cookie
+ * endpoint. When a `refresh_token` cookie is present the cookie
  * wins — `refreshToken` in the body is ignored.
  */
 export const refreshTokenInputSchema = z
@@ -56,9 +75,8 @@ export type RefreshTokenInput = z.infer<typeof refreshTokenInputSchema>;
 /**
  * `GET /v1/auth/me` response — the owner's view of their own user
  * record. Picks every public field except `updatedAt` from
- * `users.userSchema` (the maximal user wire-shape). When a
- * `/v1/users/:id` endpoint ships, it returns the full `User` and this
- * projection diverges only by the omitted `updatedAt`.
+ * `users.userSchema` (the maximal user wire-shape), then adds the OAuth
+ * providers needed by account-management clients.
  */
 export const sessionUserSchema = userSchema
   .pick({
@@ -69,7 +87,11 @@ export const sessionUserSchema = userSchema
     phoneVerified: true,
     firstName: true,
     lastName: true,
+    roles: true,
     createdAt: true,
+  })
+  .extend({
+    linkedProviders: z.array(z.enum(OAUTH_PROVIDERS)),
   })
   .meta({ id: "SessionUser" });
 
@@ -99,7 +121,7 @@ export type SessionSummary = z.infer<typeof sessionSummarySchema>;
 
 /**
  * Returned by every endpoint that mints a fresh session (`/refresh`,
- * `/email-otp/verify`, `/sms-otp/verify`, `/google`, `/apple`) in
+ * `/email-otp/verify`, `/google`, `/apple`) in
  * addition to setting cookies. Mobile clients read the body fields; the
  * web ignores them because cookies are authoritative.
  */
@@ -121,16 +143,16 @@ export const tokenPairSchema = z
 export type TokenPair = z.infer<typeof tokenPairSchema>;
 
 /**
- * Drives conditional rendering on every client (which login buttons /
- * forms to show). Returned by `GET /v1/auth/enabled-methods`. Mirrors
- * the API env flags one-for-one.
+ * Server-enabled authentication capabilities returned by
+ * `GET /v1/auth/enabled-methods`. Clients still decide which methods
+ * they implement and have configured locally.
  */
+export const authMethodIdSchema = z.enum(AUTH_METHOD_IDS);
+export type AuthMethodId = z.infer<typeof authMethodIdSchema>;
+
 export const enabledAuthMethodsSchema = z
   .object({
-    emailOtp: z.boolean(),
-    smsOtp: z.boolean(),
-    google: z.boolean(),
-    apple: z.boolean(),
+    methods: z.array(authMethodIdSchema),
   })
   .meta({ id: "EnabledAuthMethods" });
 
@@ -145,7 +167,7 @@ export const logoutAllResultSchema = z
       .number()
       .int()
       .describe(
-        "Number of sessions revoked, excluding the caller's current session.",
+        "Number of sessions revoked, including the caller's current session.",
       ),
   })
   .meta({ id: "LogoutAllResult" });

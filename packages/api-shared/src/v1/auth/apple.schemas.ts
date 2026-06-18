@@ -5,7 +5,7 @@
  *
  * - `POST /v1/auth/apple` — body `{ idToken, fullName? }`. The API
  *   verifies the JWT against Apple's JWKS, resolves or creates a `User`,
- *   issues a session, sets cookies, and returns a `TokenPair`.
+ *   and either returns a `TokenPair` or an email-verification challenge.
  *
  * `fullName` is the optional name payload Apple sends only on the very
  * first sign-in for a given `sub`. It is treated as a hint when creating

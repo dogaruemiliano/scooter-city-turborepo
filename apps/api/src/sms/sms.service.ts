@@ -1,12 +1,3 @@
-/**
- * Abstract SMS-delivery contract.
- *
- * Used as the DI token: feature modules inject `SmsService`, the
- * concrete implementation (`Log`, `Spy`, later `Smso`) is chosen at
- * module-registration time by `SmsModule.forRoot`.
- *
- * Tests override the binding by `Test.createTestingModule().overrideProvider(SmsService).useClass(SpySmsService)`.
- */
 export interface SmsMessage {
   /** E.164 phone number. Validated upstream (see `@repo/api-shared` → phoneSchema). */
   to: string;
@@ -14,6 +5,12 @@ export interface SmsMessage {
   body: string;
 }
 
+/**
+ * SMS delivery contract and dependency-injection token.
+ *
+ * `SmsModule.forRoot()` binds this token to the configured implementation.
+ * Tests can replace the binding with `SpySmsService`.
+ */
 export abstract class SmsService {
   abstract send(message: SmsMessage): Promise<void>;
 }

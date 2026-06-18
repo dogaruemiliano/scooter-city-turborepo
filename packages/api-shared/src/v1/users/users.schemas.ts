@@ -11,8 +11,8 @@
  * this schema, never a redeclaration:
  *
  * - `GET  /v1/auth/me` — owner view of self. Picks every field except
- *   `updatedAt` and re-`.meta()`s it as `SessionUser` (see
- *   `auth/auth.schemas.ts`).
+ *   `updatedAt`, adds linked OAuth providers, and re-`.meta()`s it as
+ *   `SessionUser` (see `auth/auth.schemas.ts`).
  * - `GET  /v1/users/:id` (future) — admin / owner view of one user.
  *   Returns the full shape.
  * - `GET  /v1/users` (future, permission-gated) — a public listing
@@ -65,6 +65,11 @@ export const userSchema = z
       ),
     firstName: z.string().nullable(),
     lastName: z.string().nullable(),
+    roles: z
+      .array(z.string())
+      .describe(
+        "Authorization roles. Snapshot also lives in the access-JWT claims; reflects this user's current grants.",
+      ),
     createdAt: z.string().describe("ISO timestamp of account creation."),
     updatedAt: z.string().describe("ISO timestamp of last profile update."),
   })

@@ -16,7 +16,7 @@
  * @see docs/auth/apple-signin.md
  */
 import { Inject, Injectable, UnauthorizedException } from "@nestjs/common";
-import { createRemoteJWKSet, jwtVerify, type JWTPayload } from "jose";
+import type { JWTPayload } from "jose";
 import { Logger } from "nestjs-pino";
 
 import { ENV } from "../../../config/config.module";
@@ -29,7 +29,7 @@ import type { Env } from "../../../config/env";
  *
  * Notes on shape:
  * - `sub` is per-app (keyed by team + service-id), stable across logins.
- * - `email` is present ONLY on the very first sign-in for a given `sub`.
+ * - `email` is optional. Existing links resolve by `sub`, not by email.
  * - `email_verified` and `is_private_email` arrive as either booleans or
  *   the strings `"true"` / `"false"` depending on the SDK. The verifier
  *   normalizes both to booleans.
@@ -62,7 +62,9 @@ export abstract class AppleVerifier {
 
 @Injectable()
 export class RealAppleVerifier implements AppleVerifier {
-  private readonly jwks = createRemoteJWKSet(new URL(APPLE_JWKS_URL));
+  private jwks: ReturnType<
+    (typeof import("jose"))["createRemoteJWKSet"]
+  > | null = null;
   private readonly audiences: string[];
 
   constructor(
@@ -84,7 +86,9 @@ export class RealAppleVerifier implements AppleVerifier {
     }
     let payload: JWTPayload;
     try {
-      const result = await jwtVerify(idToken, this.jwks, {
+      const jose = await import("jose");
+      this.jwks ??= jose.createRemoteJWKSet(new URL(APPLE_JWKS_URL));
+      const result = await jose.jwtVerify(idToken, this.jwks, {
         issuer: APPLE_ISSUER,
         audience: this.audiences,
         clockTolerance: CLOCK_TOLERANCE_SEC,

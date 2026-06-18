@@ -1,6 +1,6 @@
 /**
  * HTTP-level E2E tests for the `/v1/auth/...` endpoints exposed by
- * `CoreAuthController`.
+ * the core auth controllers.
  *
  * Each test boots the full `AppModule` so the global `JwtAuthGuard`,
  * cookie parser, exception filter, and URI versioning are all active —
@@ -10,6 +10,13 @@
  * `createdUserIds`; `afterAll` removes them. The seed users
  * (`seed-user-*`) are left alone.
  */
+process.env.THROTTLE_LOGIN_PER_IP_PER_MIN = "10000";
+process.env.THROTTLE_GLOBAL_PER_IP_PER_MIN = "10000";
+process.env.THROTTLE_OTP_REQUESTS_PER_IP_PER_MIN = "10000";
+process.env.OTP_DELIVERY_QUOTA_PER_TARGET_PER_HOUR = "10000";
+process.env.OTP_DELIVERY_QUOTA_PER_TARGET_PER_DAY = "10000";
+process.env.OTP_DELIVERY_QUOTA_PER_IP_PER_HOUR = "10000";
+
 import { INestApplication, VersioningType } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import { v1 } from "@repo/api-shared";
@@ -29,7 +36,7 @@ interface IssuedSession {
   refreshToken: string;
 }
 
-describe("CoreAuthController (e2e)", () => {
+describe("Core auth HTTP surface (e2e)", () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let users: UsersService;
@@ -38,6 +45,31 @@ describe("CoreAuthController (e2e)", () => {
   const createdUserIds: string[] = [];
 
   const server = () => app.getHttpServer() as Server;
+
+  /**
+   * Thin wrapper around supertest. Every request gets `X-Requested-With:
+   * fetch` so cookie-bearing mutations pass the global `CsrfGuard`. Safe
+   * methods receive the header too, which is harmless — the guard skips
+   * GET/HEAD/OPTIONS regardless.
+   */
+  type RequestBuilder = ReturnType<ReturnType<typeof request>["get"]>;
+  const req = (): {
+    get: (path: string) => RequestBuilder;
+    post: (path: string) => RequestBuilder;
+    put: (path: string) => RequestBuilder;
+    patch: (path: string) => RequestBuilder;
+    delete: (path: string) => RequestBuilder;
+  } => {
+    const base = request(server());
+    const tag = (b: RequestBuilder) => b.set("x-requested-with", "fetch");
+    return {
+      get: (p) => tag(base.get(p)),
+      post: (p) => tag(base.post(p)),
+      put: (p) => tag(base.put(p)),
+      patch: (p) => tag(base.patch(p)),
+      delete: (p) => tag(base.delete(p)),
+    };
+  };
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
@@ -81,14 +113,12 @@ describe("CoreAuthController (e2e)", () => {
   // /enabled-methods (public)
   // ────────────────────────────────────────────────────────────────────
 
-  it("GET /v1/auth/enabled-methods returns the enabled-flag bag", async () => {
-    const res = await request(server()).get("/v1/auth/enabled-methods");
-    const body = res.body as v1.auth.EnabledAuthMethods;
+  it("GET /v1/auth/enabled-methods returns enabled IDs in canonical order", async () => {
+    const res = await req().get("/v1/auth/enabled-methods");
+    const body = v1.auth.enabledAuthMethodsSchema.parse(res.body);
+
     expect(res.status).toBe(200);
-    expect(typeof body.emailOtp).toBe("boolean");
-    expect(typeof body.smsOtp).toBe("boolean");
-    expect(typeof body.google).toBe("boolean");
-    expect(typeof body.apple).toBe("boolean");
+    expect(body).toEqual({ methods: ["emailOtp", "google"] });
   });
 
   // ────────────────────────────────────────────────────────────────────
@@ -96,14 +126,14 @@ describe("CoreAuthController (e2e)", () => {
   // ────────────────────────────────────────────────────────────────────
 
   it("POST /v1/auth/refresh with no token → 401", async () => {
-    const res = await request(server()).post("/v1/auth/refresh").send({});
+    const res = await req().post("/v1/auth/refresh").send({});
     expect(res.status).toBe(401);
   });
 
   it("POST /v1/auth/refresh with body refreshToken returns new pair and sets cookies", async () => {
     const issued = await freshSession();
 
-    const res = await request(server())
+    const res = await req()
       .post("/v1/auth/refresh")
       .send({ refreshToken: issued.refreshToken });
     const body = res.body as v1.auth.TokenPair;
@@ -112,6 +142,9 @@ describe("CoreAuthController (e2e)", () => {
     expect(body.accessToken).toBeTruthy();
     expect(body.refreshToken).toBeTruthy();
     expect(body.refreshToken).not.toBe(issued.refreshToken);
+    expect(res.headers["x-ratelimit-limit"]).toBe("10000");
+    expect(res.headers["x-ratelimit-limit-login-ip"]).toBeUndefined();
+    expect(res.headers["x-ratelimit-limit-otp-request-burst"]).toBeUndefined();
 
     const setCookies = res.headers["set-cookie"] as unknown as
       | string[]
@@ -123,7 +156,7 @@ describe("CoreAuthController (e2e)", () => {
   it("POST /v1/auth/refresh with cookie (web flow) rotates the session", async () => {
     const issued = await freshSession();
 
-    const res = await request(server())
+    const res = await req()
       .post("/v1/auth/refresh")
       .set("Cookie", [`refresh_token=${issued.refreshToken}`])
       .send({});
@@ -138,14 +171,14 @@ describe("CoreAuthController (e2e)", () => {
   // ────────────────────────────────────────────────────────────────────
 
   it("GET /v1/auth/me without auth → 401", async () => {
-    const res = await request(server()).get("/v1/auth/me");
+    const res = await req().get("/v1/auth/me");
     expect(res.status).toBe(401);
   });
 
   it("GET /v1/auth/me with access cookie returns SessionUser", async () => {
     const issued = await freshSession();
 
-    const res = await request(server())
+    const res = await req()
       .get("/v1/auth/me")
       .set("Cookie", [`access_token=${issued.accessToken}`]);
     const body = res.body as v1.auth.SessionUser;
@@ -155,18 +188,86 @@ describe("CoreAuthController (e2e)", () => {
     expect(body.email).toMatch(/@example\.com$/);
     expect(body).toHaveProperty("emailVerified");
     expect(body).toHaveProperty("createdAt");
+    expect(body.linkedProviders).toEqual([]);
+  });
+
+  it("PATCH /v1/auth/me updates and returns the editable profile", async () => {
+    const issued = await freshSession();
+
+    const res = await req()
+      .patch("/v1/auth/me")
+      .set("Cookie", [`access_token=${issued.accessToken}`])
+      .send({ firstName: "  Ada  ", lastName: "Lovelace" });
+    const body = v1.auth.sessionUserSchema.parse(res.body);
+
+    expect(res.status).toBe(200);
+    expect(body.firstName).toBe("Ada");
+    expect(body.lastName).toBe("Lovelace");
+
+    const user = await prisma.user.findUnique({
+      where: { id: issued.userId },
+    });
+    expect(user?.firstName).toBe("Ada");
+    expect(user?.lastName).toBe("Lovelace");
+  });
+
+  it("PATCH /v1/auth/me rejects blank profile names", async () => {
+    const issued = await freshSession();
+
+    const res = await req()
+      .patch("/v1/auth/me")
+      .set("Cookie", [`access_token=${issued.accessToken}`])
+      .send({ firstName: "   " });
+
+    expect(res.status).toBe(400);
   });
 
   it("GET /v1/auth/me with Bearer header works too", async () => {
     const issued = await freshSession();
 
-    const res = await request(server())
+    const res = await req()
       .get("/v1/auth/me")
       .set("Authorization", `Bearer ${issued.accessToken}`);
     const body = res.body as v1.auth.SessionUser;
 
     expect(res.status).toBe(200);
     expect(body.id).toBe(issued.userId);
+  });
+
+  it("GET /v1/auth/me returns linked OAuth providers once each", async () => {
+    const issued = await freshSession();
+    await prisma.authAccount.createMany({
+      data: [
+        {
+          userId: issued.userId,
+          provider: "google",
+          providerId: `google-primary-${issued.userId}`,
+        },
+        {
+          userId: issued.userId,
+          provider: "google",
+          providerId: `google-secondary-${issued.userId}`,
+        },
+      ],
+    });
+
+    const res = await req()
+      .get("/v1/auth/me")
+      .set("Cookie", [`access_token=${issued.accessToken}`]);
+    const body = v1.auth.sessionUserSchema.parse(res.body);
+
+    expect(res.status).toBe(200);
+    expect(body.linkedProviders).toEqual(["google"]);
+  });
+
+  it("rejects a refresh token used as an access credential", async () => {
+    const issued = await freshSession();
+
+    const res = await req()
+      .get("/v1/auth/me")
+      .set("Authorization", `Bearer ${issued.refreshToken}`);
+
+    expect(res.status).toBe(401);
   });
 
   it("GET /v1/auth/sessions returns active sessions with current=true on the calling one", async () => {
@@ -177,7 +278,7 @@ describe("CoreAuthController (e2e)", () => {
     if (!user) throw new Error("seed user missing");
     const other = await coreAuth.issueSession({ user });
 
-    const res = await request(server())
+    const res = await req()
       .get("/v1/auth/sessions")
       .set("Cookie", [`access_token=${issued.accessToken}`]);
     const body = res.body as v1.auth.SessionSummary[];
@@ -197,7 +298,7 @@ describe("CoreAuthController (e2e)", () => {
   it("POST /v1/auth/logout revokes the current session and clears cookies", async () => {
     const issued = await freshSession();
 
-    const res = await request(server())
+    const res = await req()
       .post("/v1/auth/logout")
       .set("Cookie", [`access_token=${issued.accessToken}`]);
 
@@ -220,7 +321,7 @@ describe("CoreAuthController (e2e)", () => {
     if (!user) throw new Error();
     const other = await coreAuth.issueSession({ user });
 
-    const res = await request(server())
+    const res = await req()
       .post("/v1/auth/logout-all")
       .set("Cookie", [`access_token=${issued.accessToken}`]);
     const body = res.body as v1.auth.LogoutAllResult;
@@ -243,7 +344,7 @@ describe("CoreAuthController (e2e)", () => {
     const a = await freshSession();
     const b = await freshSession();
 
-    const res = await request(server())
+    const res = await req()
       .delete(`/v1/auth/sessions/${b.sessionId}`)
       .set("Cookie", [`access_token=${a.accessToken}`]);
 
@@ -256,7 +357,7 @@ describe("CoreAuthController (e2e)", () => {
     if (!user) throw new Error();
     const other = await coreAuth.issueSession({ user });
 
-    const res = await request(server())
+    const res = await req()
       .delete(`/v1/auth/sessions/${other.sessionId}`)
       .set("Cookie", [`access_token=${issued.accessToken}`]);
 
@@ -267,6 +368,20 @@ describe("CoreAuthController (e2e)", () => {
     expect(session?.revokedAt).not.toBeNull();
   });
 
+  it("DELETE /v1/auth/sessions/:id is idempotent for an owned session", async () => {
+    const issued = await freshSession();
+    const user = await users.findById(issued.userId);
+    if (!user) throw new Error();
+    const other = await coreAuth.issueSession({ user });
+    await coreAuth.revokeSession(other.sessionId, issued.userId);
+
+    const res = await req()
+      .delete(`/v1/auth/sessions/${other.sessionId}`)
+      .set("Cookie", [`access_token=${issued.accessToken}`]);
+
+    expect(res.status).toBe(204);
+  });
+
   // ────────────────────────────────────────────────────────────────────
   // DELETE /me
   // ────────────────────────────────────────────────────────────────────
@@ -274,7 +389,7 @@ describe("CoreAuthController (e2e)", () => {
   it("DELETE /v1/auth/me wipes the user and clears cookies", async () => {
     const issued = await freshSession();
 
-    const res = await request(server())
+    const res = await req()
       .delete("/v1/auth/me")
       .set("Cookie", [`access_token=${issued.accessToken}`]);
 
@@ -307,44 +422,124 @@ describe("CoreAuthController (e2e)", () => {
     });
     const issued = await coreAuth.issueSession({ user });
 
-    const res = await request(server())
+    const res = await req()
       .delete("/v1/auth/accounts/google")
       .set("Cookie", [`access_token=${issued.accessToken}`]);
 
     expect(res.status).toBe(409);
   });
 
-  it("DELETE /v1/auth/accounts/:provider succeeds when other auth methods remain", async () => {
+  it("does not count a verified phone as a fallback when SMS auth is disabled", async () => {
+    const user = await users.createOne({
+      email: `phone-only-${Date.now()}@example.com`,
+      phone: `+407${Math.floor(10000000 + Math.random() * 89999999)}`,
+      phoneVerified: new Date(),
+    });
+    createdUserIds.push(user.id);
+    await prisma.authAccount.create({
+      data: {
+        userId: user.id,
+        provider: "google",
+        providerId: `google-phone-only-${user.id}`,
+        email: user.email,
+      },
+    });
+    const issued = await coreAuth.issueSession({ user });
+
+    const res = await req()
+      .delete("/v1/auth/accounts/google")
+      .set("Cookie", [`access_token=${issued.accessToken}`]);
+
+    expect(res.status).toBe(409);
+  });
+
+  it("DELETE /v1/auth/accounts/:provider removes every link for that provider when another auth method remains", async () => {
     // Verified email → user can fall back to email-OTP.
     const user = await users.createOne({
       email: `multi-${Date.now()}@example.com`,
       emailVerified: new Date(),
     });
     createdUserIds.push(user.id);
-    await prisma.authAccount.create({
-      data: {
-        userId: user.id,
-        provider: "apple",
-        providerId: "apple-multi-1",
-        email: user.email,
-      },
+    await prisma.authAccount.createMany({
+      data: [
+        {
+          userId: user.id,
+          provider: "apple",
+          providerId: `apple-multi-1-${user.id}`,
+          email: user.email,
+        },
+        {
+          userId: user.id,
+          provider: "apple",
+          providerId: `apple-multi-2-${user.id}`,
+          email: user.email,
+        },
+      ],
     });
     const issued = await coreAuth.issueSession({ user });
 
-    const res = await request(server())
+    const res = await req()
       .delete("/v1/auth/accounts/apple")
       .set("Cookie", [`access_token=${issued.accessToken}`]);
 
     expect(res.status).toBe(204);
-    const acct = await prisma.authAccount.findFirst({
+    const accountCount = await prisma.authAccount.count({
       where: { userId: user.id, provider: "apple" },
     });
-    expect(acct).toBeNull();
+    expect(accountCount).toBe(0);
+  });
+
+  it("DELETE /v1/auth/accounts/:provider returns 404 when the provider is not linked", async () => {
+    const issued = await freshSession();
+
+    const res = await req()
+      .delete("/v1/auth/accounts/google")
+      .set("Cookie", [`access_token=${issued.accessToken}`]);
+
+    expect(res.status).toBe(404);
+  });
+
+  it("parallel provider unlinks cannot remove both remaining auth methods", async () => {
+    const user = await users.createOne({
+      email: `parallel-unlink-${Date.now()}@example.com`,
+    });
+    createdUserIds.push(user.id);
+    await prisma.authAccount.createMany({
+      data: [
+        {
+          userId: user.id,
+          provider: "google",
+          providerId: `google-parallel-${user.id}`,
+          email: user.email,
+        },
+        {
+          userId: user.id,
+          provider: "apple",
+          providerId: `apple-parallel-${user.id}`,
+          email: user.email,
+        },
+      ],
+    });
+    const issued = await coreAuth.issueSession({ user });
+    const cookie = [`access_token=${issued.accessToken}`];
+
+    const [googleResult, appleResult] = await Promise.all([
+      req().delete("/v1/auth/accounts/google").set("Cookie", cookie),
+      req().delete("/v1/auth/accounts/apple").set("Cookie", cookie),
+    ]);
+
+    expect([googleResult.status, appleResult.status].sort()).toEqual([
+      204, 409,
+    ]);
+    const remainingAccounts = await prisma.authAccount.count({
+      where: { userId: user.id },
+    });
+    expect(remainingAccounts).toBe(1);
   });
 
   it("DELETE /v1/auth/accounts/:provider rejects unknown providers", async () => {
     const issued = await freshSession();
-    const res = await request(server())
+    const res = await req()
       .delete("/v1/auth/accounts/myspace")
       .set("Cookie", [`access_token=${issued.accessToken}`]);
     expect(res.status).toBe(400);

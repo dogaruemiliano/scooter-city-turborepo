@@ -1,10 +1,8 @@
 /**
- * Production mailer that ships messages via SMTP using `nodemailer`.
+ * Mailer that ships messages via SMTP using `nodemailer`.
  *
- * Wired in by `MailerModule` when `env.MAILER_PROVIDER=smtp`. The env
- * schema's cross-field rule already guarantees `SMTP_HOST`, `SMTP_PORT`,
- * `SMTP_USER`, `SMTP_PASSWORD` are present in that case (see
- * [config/env.ts](../../config/env.ts)).
+ * `MailerModule` always binds `MailerService` to this implementation.
+ * SMTP authentication credentials are required in every environment.
  *
  * The transporter is constructed once at module init and reused for
  * every send. `nodemailer`'s default `pool: false` is left on — the
@@ -35,16 +33,16 @@ export class SmtpMailerService
       !env.SMTP_USER ||
       !env.SMTP_PASSWORD
     ) {
-      // Defensive — the env schema's superRefine already catches this.
+      // Defensive — the env schema already requires both values.
       throw new Error(
-        "SMTP_HOST, SMTP_PORT, SMTP_USER, and SMTP_PASSWORD are all required when MAILER_PROVIDER=smtp.",
+        "SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD are required.",
       );
     }
+
     this.transporter = nodemailer.createTransport({
       host: env.SMTP_HOST,
       port: env.SMTP_PORT,
-      // STARTTLS on 587, implicit TLS on 465. nodemailer auto-detects
-      // from the port, but explicitly setting `secure` removes ambiguity.
+      // Port 465 uses implicit TLS. Other ports can upgrade via STARTTLS.
       secure: env.SMTP_PORT === 465,
       auth: { user: env.SMTP_USER, pass: env.SMTP_PASSWORD },
     });

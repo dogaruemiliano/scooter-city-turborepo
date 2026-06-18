@@ -1,8 +1,4 @@
-/**
- * SpyMailerService is the workhorse of every PR-5+ E2E test that needs
- * to grab an OTP / verification code out of an "email". This spec locks
- * down the behaviors those tests will rely on.
- */
+/** Tests for the in-memory mailer used by email-delivery E2E suites. */
 import { SpyMailerService } from "./spy-mailer.service";
 
 describe("SpyMailerService", () => {

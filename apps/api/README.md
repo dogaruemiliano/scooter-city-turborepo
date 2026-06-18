@@ -50,6 +50,13 @@ pnpm db:reset       # destructive — drops + reapplies; AI-agent guarded
 
 `nestjs-pino` is the global logger. Pretty multi-line in `NODE_ENV !== production`, JSON otherwise. Every line carries `reqId` correlated with the `X-Request-Id` header on the corresponding HTTP request. Healthcheck pings are excluded from auto-logging to keep the dev console clean.
 
+## Health checks
+
+`GET /healthz` checks PostgreSQL connectivity and V8 heap usage. The heap
+ceiling defaults to `300` MiB and can be adjusted per deployment with
+`HEALTH_MAX_HEAP_MB`. Set the value below the process/container memory limit so
+the instance stops receiving traffic before exhausting its allocation.
+
 ## Error shape
 
 Every error response (whether thrown as `HttpException`, surfaced from `ValidationPipe`, or an uncaught `Error`) is normalized by `AllExceptionsFilter` to:

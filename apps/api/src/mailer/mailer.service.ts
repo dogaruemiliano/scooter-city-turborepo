@@ -1,9 +1,9 @@
 /**
  * Abstract mail-delivery contract.
  *
- * Used as the DI token: feature modules inject `MailerService`, the
- * concrete implementation (`Log`, `Spy`, later `Resend` / `Smtp`) is
- * chosen at module-registration time by `MailerModule.forRoot`.
+ * Used as the DI token: feature modules inject `MailerService`, and
+ * `MailerModule` binds it to SMTP. Tests can override it with
+ * `SpyMailerService`.
  *
  * Tests override the binding by `Test.createTestingModule().overrideProvider(MailerService).useClass(SpyMailerService)`.
  */

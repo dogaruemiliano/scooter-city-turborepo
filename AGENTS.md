@@ -1,3 +1,19 @@
+<!-- BEGIN:auth-rule -->
+
+# Auth is custom-rolled — do not pull in NextAuth / Auth.js / Lucia
+
+NestJS owns token issuance, refresh-rotation, OAuth verification, and OTP. The web app verifies access JWTs locally via the API's JWKS (`/.well-known/jwks.json`) using `jose`. The mobile app holds tokens in SecureStore and authenticates with Bearer headers. The shared `apiFetch` ([`packages/api-shared/src/api-fetch.ts`](packages/api-shared/src/api-fetch.ts)) uses an `AuthAdapter` interface so each runtime plugs in its own refresh behavior.
+
+If you need to touch anything auth-related:
+
+- **Refresh rotation algorithm**: [`docs/auth/refresh-rotation.md`](docs/auth/refresh-rotation.md) + [ADR-03](docs/adr/0003-multi-instance-refresh-rotation.md). Don't redesign — it's multi-instance-safe and prod-tested.
+- **RS256 + JWKS + key rotation**: [`apps/api/src/auth/utils/keys.ts`](apps/api/src/auth/utils/keys.ts) is the single source of truth for kid derivation (RFC 7638 thumbprint). Both sign and verify go through the same `KeyRing` — asymmetry breaks verification.
+- **Web session helpers**: [`apps/web/src/lib/README.md`](apps/web/src/lib/README.md) — `meOnServer()` (fast, JWKS) vs `meFromApi()` (DB-fresh round-trip).
+- **CSRF defense**: cookie-bearing mutations must carry `X-Requested-With: fetch`. The shared `apiFetch` adds it automatically; manual fetches need to as well.
+- **DO NOT** install `next-auth`, `@auth/core`, `lucia`, or any other auth library. Routes are added to NestJS first, then the schema lands in `@repo/api-shared/v1/auth`, then the web/mobile clients consume the schema.
+
+<!-- END:auth-rule -->
+
 <!-- BEGIN:theme-tokens-rule -->
 
 # Theme tokens are the single source of truth

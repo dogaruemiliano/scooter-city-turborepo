@@ -6,7 +6,9 @@
  * - `POST /v1/auth/google` — body `{ idToken }`. The client (Google
  *   Identity Services on web, native Google SDK on mobile) obtains the
  *   ID token directly from Google; the API verifies its signature and
- *   audience, links/creates the user, and issues an API session.
+ *   audience, links/creates the user, and issues an API session. If the
+ *   provider did not verify the email, the response is a follow-up OTP
+ *   challenge instead of a token pair.
  *
  * The schema is `.strict()` so any extra key (e.g. an accidental
  * `code` or `redirectUri` from a copy-paste of the OAuth-code flow)

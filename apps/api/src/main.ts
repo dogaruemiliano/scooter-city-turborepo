@@ -36,7 +36,6 @@ import type { NestExpressApplication } from "@nestjs/platform-express";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 
 import { AppModule } from "./app.module";
-import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
 import { loadEnv } from "./config/env";
 
 const COOKIE_AUTH_NAME = "access_token";
@@ -90,13 +89,16 @@ async function bootstrap(): Promise<void> {
   //   - `transform` / `enableImplicitConversion` → use Zod's `.coerce.*`
   //     where coercion is needed; otherwise input matches output type.
 
-  app.useGlobalFilters(new AllExceptionsFilter());
-
   app.enableCors({
     origin: env.CORS_ORIGINS,
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "X-Request-Id"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "X-Request-Id",
+      "X-Requested-With",
+    ],
     exposedHeaders: ["X-Request-Id"],
   });
 

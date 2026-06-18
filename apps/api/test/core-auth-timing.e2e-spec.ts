@@ -25,6 +25,7 @@
  * for the full algorithm.
  */
 import { JwtModule } from "@nestjs/jwt";
+import type { INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 
 import { ConfigModule } from "../src/config/config.module";
@@ -33,6 +34,8 @@ import { PrismaService } from "../src/prisma/prisma.service";
 import { UsersModule } from "../src/users/users.module";
 import { UsersService } from "../src/users/users.service";
 import { CoreAuthService } from "../src/auth/modules/core-auth/core-auth.service";
+import type { KeyRing } from "../src/auth/utils/keys";
+import { KEY_RING, KeysModule } from "../src/auth/utils/keys.module";
 
 async function timeMs(fn: () => Promise<unknown>): Promise<number> {
   const start = performance.now();
@@ -54,6 +57,7 @@ async function meanMs(
 }
 
 describe("CoreAuthService timing channels (e2e)", () => {
+  let app: INestApplication;
   let coreAuth: CoreAuthService;
   let users: UsersService;
   let prisma: PrismaService;
@@ -65,11 +69,23 @@ describe("CoreAuthService timing channels (e2e)", () => {
         ConfigModule,
         PrismaModule,
         UsersModule,
-        JwtModule.register({}),
+        KeysModule,
+        JwtModule.registerAsync({
+          imports: [KeysModule],
+          inject: [KEY_RING],
+          useFactory: (ring: KeyRing) => ({
+            privateKey: ring.signingPrivate,
+            signOptions: {
+              algorithm: "RS256",
+              header: { kid: ring.currentKid, alg: "RS256" },
+            },
+            verifyOptions: { algorithms: ["RS256"] },
+          }),
+        }),
       ],
       providers: [CoreAuthService],
     }).compile();
-    const app = moduleRef.createNestApplication();
+    app = moduleRef.createNestApplication();
     await app.init();
     coreAuth = app.get(CoreAuthService);
     users = app.get(UsersService);
@@ -80,7 +96,7 @@ describe("CoreAuthService timing channels (e2e)", () => {
     if (createdUserIds.length > 0) {
       await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
     }
-    await prisma.$disconnect();
+    await app.close();
   });
 
   it("performDummyHashCompare actually does the bcrypt work (≥ 20ms)", async () => {
@@ -92,18 +108,20 @@ describe("CoreAuthService timing channels (e2e)", () => {
     // Build a forged but signature-valid refresh token. If the service
     // were short-circuiting on "no row" before the DB lookup, this would
     // return in microseconds; the lookup forces a roundtrip.
+    //
+    // RS256 + kid header come from JwtModule.registerAsync defaults — no
+    // need to thread keys here.
     const svc = coreAuth as unknown as {
-      env: { JWT_REFRESH_SECRET: string };
-      jwt: {
-        sign: (
-          claims: object,
-          opts: { secret: string; expiresIn: number },
-        ) => string;
-      };
+      jwt: { sign: (claims: object, opts: { expiresIn: number }) => string };
     };
     const fake = svc.jwt.sign(
-      { sub: "ghost", sid: "ghost", jti: "ghost-jti-not-in-db" },
-      { secret: svc.env.JWT_REFRESH_SECRET, expiresIn: 60 },
+      {
+        tokenType: "refresh",
+        sub: "ghost",
+        sid: "ghost",
+        jti: "ghost-jti-not-in-db",
+      },
+      { expiresIn: 60 },
     );
 
     const mean = await meanMs(() => coreAuth.rotateTokens(fake), 5);

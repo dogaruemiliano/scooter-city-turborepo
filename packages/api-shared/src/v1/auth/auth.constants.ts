@@ -27,6 +27,8 @@
  * constant.
  */
 
+import type { AuthMethodId } from "./auth.schemas";
+
 export const ACCESS_TOKEN_COOKIE = "access_token";
 export const REFRESH_TOKEN_COOKIE = "refresh_token";
 
@@ -34,12 +36,22 @@ export type AuthCookieName =
   | typeof ACCESS_TOKEN_COOKIE
   | typeof REFRESH_TOKEN_COOKIE;
 
+export const AUTH_METHOD_IDS = ["emailOtp", "google", "apple"] as const;
+
+export const OAUTH_PROVIDERS = [
+  "google",
+  "apple",
+] as const satisfies readonly AuthMethodId[];
+export type OAuthProvider = (typeof OAUTH_PROVIDERS)[number];
+
 export const ROUTES = {
   // Session lifecycle (core-auth controller, always-on)
   refresh: "/v1/auth/refresh",
   logout: "/v1/auth/logout",
   logoutAll: "/v1/auth/logout-all",
   me: "/v1/auth/me",
+  /** Profile mutation: `PATCH /v1/auth/me`. Shares path with `me`. */
+  updateProfile: "/v1/auth/me",
   /** Account deletion: `DELETE /v1/auth/me`. Shares path with `me`. */
   deleteMe: "/v1/auth/me",
   enabledMethods: "/v1/auth/enabled-methods",
@@ -49,16 +61,16 @@ export const ROUTES = {
     request: "/v1/auth/email-otp/request",
     verify: "/v1/auth/email-otp/verify",
   },
-
-  // SMS OTP
-  smsOtp: {
-    request: "/v1/auth/sms-otp/request",
-    verify: "/v1/auth/sms-otp/verify",
+  otp: {
+    resend: "/v1/auth/otp/resend",
   },
 
   // OAuth (client posts a provider-issued ID token)
   google: "/v1/auth/google",
   apple: "/v1/auth/apple",
+  oauthEmailVerification: {
+    verify: "/v1/auth/oauth-email/verify",
+  },
 
   // Sessions (logged-in user managing their own active devices)
   sessions: {
@@ -70,7 +82,7 @@ export const ROUTES = {
   // OAuth account linking management
   accounts: {
     /** `DELETE /v1/auth/accounts/:provider` — refuses if it would leave the user without any auth method. */
-    unlink: (provider: "google" | "apple"): string =>
+    unlink: (provider: OAuthProvider): string =>
       `/v1/auth/accounts/${provider}`,
   },
 } as const;

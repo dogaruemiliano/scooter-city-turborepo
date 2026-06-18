@@ -44,6 +44,10 @@ model User {
   phoneVerified DateTime?
   firstName     String?
   lastName      String?
+  /// Authorization roles. Snapshotted into access-JWT claims at issue
+  /// time; downstream services read `request.user.roles`. Re-read the
+  /// DB for fresh values; the JWT can lag by up to JWT_ACCESS_TTL.
+  roles         String[]  @default([])
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   /// Soft-delete marker. Hard cascade still runs via DELETE /v1/auth/me; this
@@ -52,7 +56,7 @@ model User {
 
   sessions      Session[]
   refreshTokens RefreshToken[]
-  otpTokens     OtpToken[]
+  otpChallenges OtpChallenge[]
   authAccounts  AuthAccount[]
   auditEvents   AuditEvent[]
 
@@ -65,13 +69,13 @@ model User {
 /// moves). Powers the user-visible "active devices" list and "log out other
 /// devices" UI.
 model Session {
-  id            String    @id @default(cuid())
+  id            String         @id @default(cuid())
   userId        String
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   userAgent     String?
   ip            String?
-  createdAt     DateTime  @default(now())
-  lastUsedAt    DateTime  @default(now())
+  createdAt     DateTime       @default(now())
+  lastUsedAt    DateTime       @default(now())
   revokedAt     DateTime?
   refreshTokens RefreshToken[]
 
@@ -86,9 +90,8 @@ model Session {
 /// - `previousJti` chains a row to the row it replaced. Lets concurrent
 ///   refreshes within the grace window detect they're racing against an
 ///   already-rotated token without rejecting either caller.
-/// - `pendingTokenHash` lets the grace path return the *literal same*
-///   just-issued pair to a concurrent caller (option B from the locked
-///   plan). Cleared once the grace window expires.
+/// - `pendingTokenHash` is reserved for a possible future literal
+///   idempotency design. The current chain algorithm does not use it.
 /// - `revokedAt` is set on rotation, on logout, and on full-session burn
 ///   (reuse detection).
 model RefreshToken {
@@ -110,39 +113,70 @@ model RefreshToken {
   @@index([expiresAt])
 }
 
-/// One-time codes for email-OTP, SMS-OTP, email-verification, and
-/// password-reset flows. `purpose` discriminates the use case.
+/// One active proof per logical target. `activeKey` is cleared when the
+/// challenge is consumed or superseded, allowing historical rows to remain
+/// without blocking a new issuance.
 ///
-/// `codeHash` is the SHA-256 HMAC of the plaintext code (peppered by
-/// OTP_HMAC_SECRET). Plaintext never persists. `attemptsCount` is
-/// incremented on every failed verification — at OTP_MAX_ATTEMPTS the
-/// row is dead even before `expiresAt`. `sentCount` tracks resend abuse.
-model OtpToken {
-  id            String   @id @default(cuid())
-  userId        String
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  /// "EMAIL" | "SMS"
+/// The plaintext code is derived from this UUID and OTP_HMAC_SECRET, then only
+/// its HMAC is persisted. Resends therefore deliver the same code without
+/// storing recoverable plaintext.
+model OtpChallenge {
+  id            String    @id @default(uuid()) @db.Uuid
+  activeKey     String?   @unique
+  /// Currently "EMAIL"; reserved for future channel verification.
   channel       String
-  /// "AUTH" | "EMAIL_VERIFY"
-  purpose       String   @default("AUTH")
+  /// "AUTH" | "OAUTH_EMAIL_VERIFY"
+  purpose       String
+  /// Normalized email or phone target.
+  target        String
+  userId        String?
+  user          User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// OAuth context is populated only for OAUTH_EMAIL_VERIFY.
+  provider      String?
+  providerId    String?
+  firstName     String?
+  lastName      String?
   codeHash      String
   expiresAt     DateTime
-  used          Boolean  @default(false)
-  attemptsCount Int      @default(0)
-  sentAt        DateTime @default(now())
-  sentCount     Int      @default(1)
-  createdAt     DateTime @default(now())
+  usedAt        DateTime?
+  attemptsCount Int       @default(0)
+  sentCount     Int       @default(1)
+  lastSentAt    DateTime  @default(now())
+  nextSendAt    DateTime
+  createdAt     DateTime  @default(now())
 
-  @@index([userId, channel, purpose, used, expiresAt])
+  @@index([channel, purpose, target, usedAt, expiresAt])
+  @@index([provider, providerId, purpose, usedAt, expiresAt])
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+/// Fixed-window counters for successful OTP delivery attempts.
+///
+/// `subjectHash` is an HMAC-derived target or IP identifier. No additional
+/// plaintext email or IP data is stored here. Rows are independent of
+/// challenges so limits survive challenge expiry, API restarts, and
+/// multi-instance deployments.
+model OtpDeliveryQuota {
+  /// "TARGET_HOUR" | "TARGET_DAY" | "IP_HOUR"
+  bucket      String
+  subjectHash String
+  windowStart DateTime
+  windowEnd   DateTime
+  count       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@id([bucket, subjectHash, windowStart])
+  @@index([windowEnd])
 }
 
 /// One row per OAuth identity linked to a user. The `provider + providerId`
 /// uniqueness prevents the same provider account from binding to two users.
 ///
-/// `email` is captured opportunistically at link time. Important for Apple
-/// Sign-in, which returns the email ONLY on the very first login — we save
-/// it here so subsequent logins (which omit the claim) can still associate
-/// the identity with a known address.
+/// `email` is captured opportunistically at link time for support and audit
+/// context. Repeat logins resolve through the stable provider subject, so
+/// providers may omit the email claim after the initial link.
 model AuthAccount {
   id         String   @id @default(cuid())
   /// "google" | "apple"

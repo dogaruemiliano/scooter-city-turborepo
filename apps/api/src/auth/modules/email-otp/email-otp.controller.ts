@@ -4,20 +4,27 @@
  * Routes (both public):
  *
  *   POST /v1/auth/email-otp/request   body { email }
- *   POST /v1/auth/email-otp/verify    body { email, code }
+ *   POST /v1/auth/email-otp/verify    body { challengeId, code }
  *
- * `/request` returns a constant `{ status: "sent" }` whether or not the
- * email matched a real user — disclosing the difference would defeat
- * the anti-enumeration goal. See `docs/auth/otp.md` for the full
- * write-up.
+ * `/request` returns the same challenge metadata for existing and new
+ * addresses. User creation happens only after successful verification.
  *
  * Throttling: `/request` is rate-limited per IP, per target email, and
  * per target email per day. `/verify` is rate-limited per IP only; the
- * `attemptsCount` counter on the `OtpToken` row provides the per-row
+ * `attemptsCount` counter on the `OtpChallenge` row provides the per-row
  * lockout against attempt-spraying on a single code. See
  * `docs/auth/rate-limiting.md` for the bucket layout.
  */
-import { Body, Controller, HttpStatus, Post, Req, Res } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  HttpCode,
+  HttpStatus,
+  Inject,
+  Post,
+  Req,
+  Res,
+} from "@nestjs/common";
 import {
   ApiOperation,
   ApiTags,
@@ -26,46 +33,44 @@ import {
 import type { Request, Response } from "express";
 import { ZodResponse } from "nestjs-zod";
 
+import { getRequestMetadata } from "../../../common/http/request-metadata";
+import { ENV } from "../../../config/config.module";
+import type { Env } from "../../../config/env";
+import { OtpRequestBurst } from "../../decorators/otp-request-burst.decorator";
 import { Public } from "../../decorators/public.decorator";
+import { setAuthCookies } from "../../utils/cookies";
 import { TokenPair } from "../core-auth/dto/token-pair";
+import { OtpChallengeMetadata } from "../otp-challenge/dto/otp-challenge-metadata";
 
-import { OtpRequestResponse } from "./dto/otp-request-response";
 import { RequestEmailOtpInput } from "./dto/request-email-otp.input";
 import { VerifyEmailOtpInput } from "./dto/verify-email-otp.input";
 import { EmailOtpService } from "./email-otp.service";
 
-// Throttling: the four named throttler buckets configured at module
-// level (`otp-ip`, `otp-target`, `otp-target-daily`, `login-ip` — see
-// `throttler.config.ts`) all apply to every route by default. We do not
-// override limits per-route here: env (`THROTTLE_OTP_*`) is the single
-// source of truth, and every bucket enforces its limit independently.
-//
-// `otp-target` / `otp-target-daily` currently fall back to IP keying —
-// no custom request-body tracker has shipped yet. Under a single IP
-// they're effectively redundant with `otp-ip`. Flagged in `[INTEGRATION]`.
-
 @ApiTags("auth")
 @Controller({ path: "auth/email-otp", version: "1" })
 export class EmailOtpController {
-  constructor(private readonly service: EmailOtpService) {}
+  constructor(
+    private readonly service: EmailOtpService,
+    @Inject(ENV) private readonly env: Env,
+  ) {}
 
   @Public()
+  @OtpRequestBurst()
   @Post("request")
+  @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({
     summary:
-      "Email-OTP request: mail a single-use 6-digit code if the email matches a real user. Always returns 202; the response does not disclose whether the address is known.",
+      "Start or resume passwordless email sign-up/sign-in and return an opaque challenge ID.",
   })
-  @ZodResponse({ status: HttpStatus.ACCEPTED, type: OtpRequestResponse })
+  @ZodResponse({ status: HttpStatus.ACCEPTED, type: OtpChallengeMetadata })
   async request(
     @Body() body: RequestEmailOtpInput,
     @Req() req: Request,
-  ): Promise<OtpRequestResponse> {
-    await this.service.request({
+  ): Promise<OtpChallengeMetadata> {
+    return this.service.request({
       email: body.email,
-      ip: requestIp(req),
-      userAgent: req.header("user-agent") ?? null,
+      ...getRequestMetadata(req),
     });
-    return { status: "sent" };
   }
 
   @Public()
@@ -77,31 +82,26 @@ export class EmailOtpController {
   @ZodResponse({ status: HttpStatus.OK, type: TokenPair })
   @ApiUnauthorizedResponse({
     description:
-      "Invalid or expired code. The response is intentionally identical whether the email is unknown, the row is expired, the code is wrong, or the row has hit OTP_MAX_ATTEMPTS.",
+      "Invalid, expired, used, cross-purpose, or attempt-locked challenge.",
   })
   async verify(
     @Body() body: VerifyEmailOtpInput,
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ): Promise<TokenPair> {
-    const pair = await this.service.verify({
-      email: body.email,
+    const result = await this.service.verify({
+      challengeId: body.challengeId,
       code: body.code,
-      ip: requestIp(req),
-      userAgent: req.header("user-agent") ?? null,
-      res,
+      ...getRequestMetadata(req),
     });
-    return {
-      accessToken: pair.accessToken,
-      refreshToken: pair.refreshToken,
-    };
-  }
-}
 
-function requestIp(req: Request): string | null {
-  const forwarded = req.header("x-forwarded-for");
-  if (forwarded) {
-    return forwarded.split(",")[0]?.trim() ?? null;
+    setAuthCookies(res, this.env, {
+      accessToken: result.tokens.accessToken,
+      refreshToken: result.tokens.refreshToken,
+      accessTokenExpiresInSec: result.accessTokenExpiresInSec,
+      refreshTokenExpiresInSec: result.refreshTokenExpiresInSec,
+    });
+
+    return result.tokens;
   }
-  return req.ip ?? null;
 }

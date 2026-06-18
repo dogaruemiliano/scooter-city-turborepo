@@ -5,9 +5,9 @@
  * Every key carries `.describe(...)` so `scripts/generate-env-example.ts` can
  * emit a fully-commented `.env.example` from this file.
  *
- * Cross-field rules (each `AUTH_*_ENABLED=true` requires its provider creds;
- * `MAILER_PROVIDER=resend` requires `RESEND_API_KEY`; etc.) live in the
- * `.superRefine` block at the bottom.
+ * Cross-field rules (each `AUTH_*_ENABLED=true` requires its provider creds,
+ * provider-specific SMS settings, etc.) live in the `.superRefine` block at
+ * the bottom.
  */
 import { z } from "zod";
 
@@ -54,6 +54,14 @@ export const envSchema = z
       .url()
       .default("http://localhost:3000")
       .describe("Public base URL of this API (used in OpenAPI servers list)."),
+    HEALTH_MAX_HEAP_MB: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(300)
+      .describe(
+        "Maximum V8 heap usage in MiB before /healthz reports unhealthy.",
+      ),
     COOKIE_DOMAIN: z
       .string()
       .optional()
@@ -75,17 +83,23 @@ export const envSchema = z
       ),
 
     /* JWT ----------------------------------------------------------------- */
-    JWT_ACCESS_SECRET: z
+    JWT_PRIVATE_KEY: z
       .string()
-      .min(32)
+      .min(1)
       .describe(
-        "HMAC secret for access tokens. Min 32 chars. ROTATE per environment.",
+        "RSA private key (PEM, base64-encoded) used to sign access + refresh JWTs (RS256). In dev/test, auto-generated to .dev-keys/ on first start when unset. MUST be set explicitly in production.",
       ),
-    JWT_REFRESH_SECRET: z
+    JWT_PUBLIC_KEY: z
       .string()
-      .min(32)
+      .min(1)
       .describe(
-        "HMAC secret for refresh tokens. Min 32 chars. Distinct from JWT_ACCESS_SECRET.",
+        "RSA public key (PEM, base64-encoded) used to verify access + refresh JWTs (RS256). Exposed verbatim via /.well-known/jwks.json so first-party clients (Next.js RSC, microservices) can verify locally.",
+      ),
+    JWT_PUBLIC_KEY_PREVIOUS: z
+      .string()
+      .optional()
+      .describe(
+        "Previous RSA public key (PEM, base64-encoded), kept active during a key-rotation window. Published in /.well-known/jwks.json alongside the current key, and accepted by this API's verifier for any token whose `kid` header matches it. Unset means no rotation is in progress.",
       ),
     JWT_ACCESS_TTL: z
       .string()
@@ -99,7 +113,7 @@ export const envSchema = z
       .string()
       .min(32)
       .describe(
-        "SHA-256 HMAC pepper for refresh-token DB hashing. Distinct from JWT_REFRESH_SECRET. Min 32 chars.",
+        "SHA-256 HMAC pepper for refresh-token DB hashing. Independent of the JWT signing keypair (which protects the token wire-format); this one protects DB rows. Min 32 chars.",
       ),
     ROTATION_GRACE_SECONDS: z.coerce
       .number()
@@ -107,16 +121,13 @@ export const envSchema = z
       .positive()
       .default(10)
       .describe(
-        "Window during which a concurrent refresh of the same token returns the literal same just-issued pair (option-B idempotency).",
+        "Window during which concurrent refreshes can advance the same persisted token chain without triggering reuse detection.",
       ),
 
     /* Method toggles ------------------------------------------------------ */
     AUTH_EMAIL_OTP_ENABLED: boolFromString
       .default(true)
       .describe("Enable email-OTP login (request/verify endpoints)."),
-    AUTH_SMS_OTP_ENABLED: boolFromString
-      .default(false)
-      .describe("Enable SMS-OTP login. Requires SMS_PROVIDER credentials."),
     AUTH_GOOGLE_ENABLED: boolFromString
       .default(false)
       .describe(
@@ -186,40 +197,34 @@ export const envSchema = z
       .describe(
         'OTP digit length in production. In non-production NODE_ENV, OTPs are always "000000" regardless of this value.',
       ),
+    OTP_DELIVERY_QUOTA_PER_TARGET_PER_HOUR: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(5)
+      .describe("Max delivered OTP emails per normalized target per UTC hour."),
+    OTP_DELIVERY_QUOTA_PER_TARGET_PER_DAY: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(20)
+      .describe("Max delivered OTP emails per normalized target per UTC day."),
+    OTP_DELIVERY_QUOTA_PER_IP_PER_HOUR: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(20)
+      .describe("Max delivered OTP emails per direct client IP per UTC hour."),
 
     /* Mailer -------------------------------------------------------------- */
-    MAILER_PROVIDER: z
-      .enum(["resend", "smtp", "log"])
-      .default("log")
-      .describe(
-        'Email provider. "log" prints to stdout (dev/test). "resend" uses Resend API. "smtp" uses nodemailer.',
-      ),
     MAILER_FROM: z
       .email()
       .default("no-reply@example.com")
       .describe("From address used for outgoing mail."),
-    RESEND_API_KEY: z
-      .string()
-      .optional()
-      .describe("Resend API key. Required when MAILER_PROVIDER=resend."),
-    SMTP_HOST: z
-      .string()
-      .optional()
-      .describe("SMTP host. Required when MAILER_PROVIDER=smtp."),
-    SMTP_PORT: z.coerce
-      .number()
-      .int()
-      .positive()
-      .optional()
-      .describe("SMTP port. Required when MAILER_PROVIDER=smtp."),
-    SMTP_USER: z
-      .string()
-      .optional()
-      .describe("SMTP username. Required when MAILER_PROVIDER=smtp."),
-    SMTP_PASSWORD: z
-      .string()
-      .optional()
-      .describe("SMTP password. Required when MAILER_PROVIDER=smtp."),
+    SMTP_HOST: z.string().min(1).describe("SMTP host."),
+    SMTP_PORT: z.coerce.number().int().positive().describe("SMTP port."),
+    SMTP_USER: z.string().min(1).describe("SMTP authentication username."),
+    SMTP_PASSWORD: z.string().min(1).describe("SMTP authentication password."),
 
     /* SMS ----------------------------------------------------------------- */
     SMS_PROVIDER: z
@@ -236,24 +241,20 @@ export const envSchema = z
       .describe("SMSO.ro sender ID. Required when SMS_PROVIDER=smso."),
 
     /* Throttler ----------------------------------------------------------- */
-    THROTTLE_OTP_PER_IP_PER_HOUR: z.coerce
+    THROTTLE_GLOBAL_PER_IP_PER_MIN: z.coerce
       .number()
       .int()
       .positive()
-      .default(20)
-      .describe("Max OTP requests per IP per hour."),
-    THROTTLE_OTP_PER_TARGET_PER_HOUR: z.coerce
+      .default(1000)
+      .describe(
+        "Relaxed per-endpoint request ceiling per direct IP per minute.",
+      ),
+    THROTTLE_OTP_REQUESTS_PER_IP_PER_MIN: z.coerce
       .number()
       .int()
       .positive()
-      .default(5)
-      .describe("Max OTP requests per email/phone per hour."),
-    THROTTLE_OTP_PER_TARGET_PER_DAY: z.coerce
-      .number()
-      .int()
-      .positive()
-      .default(20)
-      .describe("Max OTP requests per email/phone per 24h."),
+      .default(10)
+      .describe("Max OTP request/resend calls per direct IP per minute."),
     THROTTLE_LOGIN_PER_IP_PER_MIN: z.coerce
       .number()
       .int()
@@ -305,46 +306,6 @@ export const envSchema = z
       }
     }
 
-    // Mailer
-    requireIf(
-      v.MAILER_PROVIDER === "resend",
-      "RESEND_API_KEY",
-      "MAILER_PROVIDER=resend",
-    );
-    requireIf(
-      v.MAILER_PROVIDER === "smtp",
-      "SMTP_HOST",
-      "MAILER_PROVIDER=smtp",
-    );
-    requireIf(
-      v.MAILER_PROVIDER === "smtp",
-      "SMTP_PORT",
-      "MAILER_PROVIDER=smtp",
-    );
-    requireIf(
-      v.MAILER_PROVIDER === "smtp",
-      "SMTP_USER",
-      "MAILER_PROVIDER=smtp",
-    );
-    requireIf(
-      v.MAILER_PROVIDER === "smtp",
-      "SMTP_PASSWORD",
-      "MAILER_PROVIDER=smtp",
-    );
-
-    // SMS
-    if (
-      v.AUTH_SMS_OTP_ENABLED &&
-      v.SMS_PROVIDER === "log" &&
-      v.NODE_ENV === "production"
-    ) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["SMS_PROVIDER"],
-        message:
-          "SMS_PROVIDER=log is not allowed in production when AUTH_SMS_OTP_ENABLED=true.",
-      });
-    }
     requireIf(v.SMS_PROVIDER === "smso", "SMSO_API_KEY", "SMS_PROVIDER=smso");
     requireIf(v.SMS_PROVIDER === "smso", "SMSO_SENDER", "SMS_PROVIDER=smso");
   });

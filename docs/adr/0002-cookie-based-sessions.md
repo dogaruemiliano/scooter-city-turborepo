@@ -21,7 +21,7 @@ We follow the m-turborepo approach.
 
 ## Decision
 
-The API sets **HttpOnly cookies** (`access_token`, `refresh_token`) directly. The web client never sees the tokens from JavaScript. The Next.js `proxy.ts` middleware (PR 14) reads cookies server-side to decide when to lazy-refresh.
+The API sets **HttpOnly cookies** (`access_token`, `refresh_token`) directly. The web client never sees the tokens from JavaScript. The Next.js `proxy.ts` reads cookies server-side and performs a lazy refresh when only the refresh cookie remains.
 
 Mobile clients get the **same JWTs returned in the JSON body** of every issuing endpoint, and pass them back via `Authorization: Bearer …` on subsequent requests. The API's JWT extractor is cookie-first, Bearer-fallback — same identity check, two transports.
 
@@ -47,16 +47,16 @@ That's it.
 
 ## Trade-offs accepted
 
-- **No social-login UI batteries.** NextAuth ships a polished sign-in flow with provider buttons; we build our own (PR 14+, web side). Worth it because each provider's actual server-side verification is a few dozen lines — most of NextAuth's complexity sits in the parts we're replacing.
-- **No magic session refresh.** With NextAuth, `useSession()` Just Works on the client. With our setup, the web's `proxy.ts` middleware does lazy refresh; client components query a server-rendered `<CurrentUserProvider>`. Different mental model, same end result.
-- **eTLD+1 deployment constraint.** Documented in [`docs/auth/cookies.md`](../auth/cookies.md). Cross-origin deployments need an extra CSRF layer.
+- **No social-login UI batteries.** NextAuth ships provider UI; each supported client in this template implements its own provider controls and SDK configuration.
+- **Explicit session refresh.** `proxy.ts` refreshes stale server requests, while the browser `AuthAdapter` retries one failed request after a singleflight refresh.
+- **Deployment constraints.** Cookie domain, `SameSite`, CORS, and CSRF requirements are documented in [`docs/auth/cookies.md`](../auth/cookies.md).
 
 ## Consequences
 
 - Cookie names live in `@repo/api-shared` so API + web can't drift.
 - Every issuing endpoint sets cookies via the `setAuthCookies` helper — no direct `res.cookie(...)` calls in controllers.
 - Logout / delete-me clear cookies via `clearAuthCookies` with matching `path` + `domain` attributes (otherwise `clearCookie` silently no-ops).
-- The web client never reads or writes cookies from JavaScript. Next.js server actions + middleware handle all cookie mutation server-side.
+- The web client never reads or writes cookies from JavaScript. The API owns cookie mutation; browser and Next.js requests only forward the cookie jar.
 
 ## Alternatives considered
 

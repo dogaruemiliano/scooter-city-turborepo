@@ -12,6 +12,9 @@
  */
 import { z } from "zod";
 
+/** Response validator for successful HTTP 204/205 operations. */
+export const noContentSchema = z.undefined();
+
 /**
  * RFC-5321-bounded email. Accepts `@privaterelay.appleid.com` because
  * Apple Sign-in private relay addresses ARE valid emails. Do NOT add a

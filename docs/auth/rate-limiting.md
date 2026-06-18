@@ -1,80 +1,79 @@
-# Rate limiting
+# Rate limiting and OTP delivery quotas
 
-Throttler buckets, what they protect, and the in-memory storage caveat.
+The API uses two separate controls because request-volume protection and email
+abuse protection have different correctness requirements.
 
-## Buckets
+## Persistent OTP delivery quotas
 
-Defined in [`apps/api/src/auth/throttler.config.ts`](../../apps/api/src/auth/throttler.config.ts). Each is a named bucket with a TTL window and a per-tracker limit. The active tracker by default is the client IP (`req.ip`).
+`OtpDeliveryQuota` stores atomic fixed-window counters in PostgreSQL:
 
-| Bucket             | Window   | Default limit | Env override                       | Protects                                                                       |
-| ------------------ | -------- | ------------- | ---------------------------------- | ------------------------------------------------------------------------------ |
-| `otp-ip`           | 1 hour   | 20            | `THROTTLE_OTP_PER_IP_PER_HOUR`     | One IP can't carpet-bomb OTP requests across many email/phone targets.         |
-| `otp-target`       | 1 hour   | 5             | `THROTTLE_OTP_PER_TARGET_PER_HOUR` | One email or phone can't be hit more than 5× per hour, even from rotating IPs. |
-| `otp-target-daily` | 24 hours | 20            | `THROTTLE_OTP_PER_TARGET_PER_DAY`  | Long-window cap on per-target abuse.                                           |
-| `login-ip`         | 1 minute | 10            | `THROTTLE_LOGIN_PER_IP_PER_MIN`    | Brute-force credentials attempts from one IP.                                  |
+| Scope             | Window   | Default | Environment variable                     |
+| ----------------- | -------- | ------- | ---------------------------------------- |
+| Normalized target | UTC hour | 5       | `OTP_DELIVERY_QUOTA_PER_TARGET_PER_HOUR` |
+| Normalized target | UTC day  | 20      | `OTP_DELIVERY_QUOTA_PER_TARGET_PER_DAY`  |
+| Direct client IP  | UTC hour | 20      | `OTP_DELIVERY_QUOTA_PER_IP_PER_HOUR`     |
 
-Tune via env without code changes. The locked defaults are conservative; bump for high-traffic production with care.
+Initial codes, permitted resends, and post-expiry replacement challenges count.
+Early resends do not count because they send no email.
 
-## How endpoints declare buckets
+The target and IP identifiers are HMAC-derived with `OTP_HMAC_SECRET` and
+domain separation. The quota table stores no additional plaintext email or IP
+fields. Email-authentication and OAuth email-verification deliveries share the
+same target counters.
 
-PR 5 wires the **global `ThrottlerGuard`** but doesn't apply per-endpoint `@Throttle({...})` decorators yet — those land alongside the auth-method controllers in PR 8+. Once they do, each endpoint mixes the buckets that apply to it:
+Quota reservation and challenge mutation run in the same Serializable
+transaction. Concurrent requests cannot overrun the configured limit. SMTP
+failures trigger a best-effort transaction that restores the challenge
+delivery state and releases the quota counters.
 
-```ts
-// Email-OTP request endpoint (PR 8 preview)
-@Throttle({
-  "otp-ip": {},
-  "otp-target": {},
-  "otp-target-daily": {},
-})
-@Post("email-otp/request")
-request(@Body() dto: RequestEmailOtpDto) { ... }
+Quota rejection returns a generic `429` with:
 
-// Credentials login endpoint (PR 9 preview)
-@Throttle({ "login-ip": {} })
-@Post("credentials/login")
-login(@Body() dto: LoginDto) { ... }
+```http
+Retry-After: 120
 ```
 
-Endpoints that don't list a bucket in `@Throttle` still go through the global guard but with default limits — which we intentionally leave high. The named buckets are how we keep aggressive limits on the abusive endpoints.
-
-## Per-target tracking (the custom tracker)
-
-The default tracker is IP, but `otp-target` and `otp-target-daily` need to bucket per email/phone — a single attacker rotating IPs against one target shouldn't bypass them.
-
-The custom tracker (lands with the email-OTP endpoint in PR 8) reads `req.body.email` or `req.body.phone` and returns a composite key like `${ip}::${target}`. That gives per-IP-per-target buckets and ensures the limit is enforced no matter how many IPs the attacker has.
-
-## In-memory storage caveat
-
-`@nestjs/throttler` uses an in-memory store by default. **Each API process tracks its own counters.** A multi-pod deployment effectively gets `N × configured` limits, where `N` is the pod count.
-
-For PR 5 this is fine — single-pod dev + CI use cases. Production deployments with multi-pod sizing should swap to Redis storage:
-
-```ts
-ThrottlerModule.forRootAsync({
-  inject: [ENV],
-  useFactory: (env) => ({
-    throttlers: buildThrottlerOptions(env),
-    storage: new ThrottlerStorageRedisService(redisClient), // post-v1 work
-  }),
-});
+```json
+{
+  "error": {
+    "code": "OTP_DELIVERY_QUOTA_EXCEEDED",
+    "message": "Too many code requests. Try again later.",
+    "details": { "retryAfterSec": 120 }
+  }
+}
 ```
 
-Documented as a follow-up in the locked plan.
+## In-memory request throttles
 
-## Response headers
+Nest throttles are cheap process-local safety valves:
 
-The guard appends rate-limit headers to every response that passes through it (you can see them in the E2E test logs):
+| Bucket              | Window   | Default | Applied to                                      |
+| ------------------- | -------- | ------- | ----------------------------------------------- |
+| `default`           | 1 minute | 1000    | Every non-exempt endpoint, independently        |
+| `otp-request-burst` | 1 minute | 10      | Email OTP request and generic OTP resend routes |
+| `login-ip`          | 1 minute | 10      | Google and Apple token exchanges                |
 
-```
-x-ratelimit-limit-otp-ip: 20
-x-ratelimit-remaining-otp-ip: 19
-x-ratelimit-reset-otp-ip: 3600
-```
+The global guard evaluates only `default`. Composite route decorators attach
+guards that evaluate only their selected strict bucket. A named bucket can
+therefore never run accidentally on refresh, `/me`, logout, OTP verification,
+or enabled-method loading.
 
-Clients can use these to back off proactively. The OpenAPI doc currently doesn't declare them; adding `@ApiHeader` annotations is a small cleanup task.
+`/healthz` and `/.well-known/jwks.json` skip the global throttle. Health probes
+must not mark a healthy instance unavailable, and JWKS is a static cached
+response that may be refreshed by many clients during key rotation.
 
-## What rate limiting does NOT replace
+Counters use direct `req.ip`; proxy trust is disabled. `X-Forwarded-For` is not
+accepted as client identity.
 
-- **Bot detection** — Cloudflare / hCaptcha go in front of the API. Throttler is a backstop, not the only line of defense.
-- **OAuth flow rate limits** — provider tokens are verified server-side; if we're handed 10000 forged tokens per second from one IP, the throttler's `login-ip` bucket catches them, but the per-token verification cost still hits us. Provider rate limits + bot detection are the upstream defenses.
-- **Account lockout** — separately tracked via `OtpToken.attemptsCount` and (future) credentials-login attempt counters. Throttler is about request volume; lockout is about consecutive failures on one account.
+## Deployment limitations
+
+Nest throttler storage is in memory, so every API process has independent burst
+counters. That is intentional: these limits are approximate DoS backstops.
+Persistent OTP delivery quotas remain accurate across API instances and
+restarts because PostgreSQL owns them.
+
+Neither layer replaces upstream DDoS protection, bot detection, or a CDN/WAF.
+Deployments behind a reverse proxy must configure trusted proxy handling before
+depending on IP-based controls.
+
+Verification guessing is controlled separately by
+`OtpChallenge.attemptsCount` and `OTP_MAX_ATTEMPTS`.

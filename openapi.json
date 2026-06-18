@@ -156,6 +156,26 @@
         "tags": ["health"]
       }
     },
+    "/v1/auth/enabled-methods": {
+      "get": {
+        "operationId": "CoreAuthController_enabledMethods_v1",
+        "parameters": [],
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnabledAuthMethods_Output"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Which auth methods this API has enabled. Drives conditional UI on the web/mobile clients.",
+        "tags": ["auth"]
+      }
+    },
     "/v1/auth/refresh": {
       "post": {
         "operationId": "CoreAuthController_refresh_v1",
@@ -182,11 +202,6 @@
             }
           }
         },
-        "security": [
-          {
-            "access_token": []
-          }
-        ],
         "summary": "Rotate the refresh token (cookie or body)",
         "tags": ["auth"]
       }
@@ -231,47 +246,6 @@
           }
         ],
         "summary": "Revoke every session of the current user (including this one)",
-        "tags": ["auth"]
-      }
-    },
-    "/v1/auth/me": {
-      "get": {
-        "operationId": "CoreAuthController_me_v1",
-        "parameters": [],
-        "responses": {
-          "default": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SessionUser_Output"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "access_token": []
-          }
-        ],
-        "summary": "Current user profile",
-        "tags": ["auth"]
-      },
-      "delete": {
-        "operationId": "CoreAuthController_deleteMe_v1",
-        "parameters": [],
-        "responses": {
-          "204": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "access_token": []
-          }
-        ],
-        "summary": "Hard-delete the current user. Cascades sessions, refresh tokens, OTPs, and OAuth links. Audit events survive.",
         "tags": ["auth"]
       }
     },
@@ -330,6 +304,80 @@
         "tags": ["auth"]
       }
     },
+    "/v1/auth/me": {
+      "get": {
+        "operationId": "CoreAuthController_me_v1",
+        "parameters": [],
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionUser_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Current user profile",
+        "tags": ["auth"]
+      },
+      "patch": {
+        "operationId": "CoreAuthController_updateProfile_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProfileInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionUser_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Update the current user's editable profile fields",
+        "tags": ["auth"]
+      },
+      "delete": {
+        "operationId": "CoreAuthController_deleteMe_v1",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Hard-delete the current user. Cascades sessions, refresh tokens, OTPs, and OAuth links. Audit events survive.",
+        "tags": ["auth"]
+      }
+    },
     "/v1/auth/accounts/{provider}": {
       "delete": {
         "operationId": "CoreAuthController_unlinkOAuthAccount_v1",
@@ -357,28 +405,17 @@
         "tags": ["auth"]
       }
     },
-    "/v1/auth/enabled-methods": {
+    "/.well-known/jwks.json": {
       "get": {
-        "operationId": "CoreAuthController_enabledMethods_v1",
+        "description": "Includes the current signing key and (during a rotation window) the previous one. Consumers should respect Cache-Control and refresh on `kid` cache miss.",
+        "operationId": "JwksController_getJwks",
         "parameters": [],
         "responses": {
-          "default": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/EnabledAuthMethods_Output"
-                }
-              }
-            }
+          "200": {
+            "description": ""
           }
         },
-        "security": [
-          {
-            "access_token": []
-          }
-        ],
-        "summary": "Which auth methods this API has enabled. Drives conditional UI on the web/mobile clients.",
+        "summary": "Public JWK set for RS256 access-token verification",
         "tags": ["auth"]
       }
     },
@@ -402,13 +439,13 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OtpRequestResponse_Output"
+                  "$ref": "#/components/schemas/OtpChallengeMetadata_Output"
                 }
               }
             }
           }
         },
-        "summary": "Email-OTP request: mail a single-use 6-digit code if the email matches a real user. Always returns 202; the response does not disclose whether the address is known.",
+        "summary": "Start or resume passwordless email sign-up/sign-in and return an opaque challenge ID.",
         "tags": ["auth"]
       }
     },
@@ -438,7 +475,7 @@
             }
           },
           "401": {
-            "description": "Invalid or expired code. The response is intentionally identical whether the email is unknown, the row is expired, the code is wrong, or the row has hit OTP_MAX_ATTEMPTS."
+            "description": "Invalid, expired, used, cross-purpose, or attempt-locked challenge."
           }
         },
         "summary": "Email-OTP verify: exchange a valid code for a fresh session (cookies set + TokenPair returned).",
@@ -462,7 +499,7 @@
         },
         "responses": {
           "200": {
-            "description": "",
+            "description": "Provider identity resolved; first-party session issued.",
             "content": {
               "application/json": {
                 "schema": {
@@ -471,11 +508,18 @@
               }
             }
           },
-          "401": {
-            "description": "The provided ID token failed signature, audience, or expiry verification."
+          "202": {
+            "description": "The provider did not verify the email. A one-time code was sent and must be submitted to /v1/auth/oauth-email/verify.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OtpChallengeMetadata_Output"
+                }
+              }
+            }
           },
-          "409": {
-            "description": "An account with the same email exists locally, but Google has not verified that email. Sign in via another method and link Google from settings."
+          "401": {
+            "description": "The Google identity token failed verification."
           }
         },
         "summary": "Sign in with a Google-issued ID token",
@@ -499,7 +543,7 @@
         },
         "responses": {
           "200": {
-            "description": "",
+            "description": "Provider identity resolved; first-party session issued.",
             "content": {
               "application/json": {
                 "schema": {
@@ -508,27 +552,34 @@
               }
             }
           },
-          "401": {
-            "description": "Apple identity token failed verification (signature, audience, issuer, expiry), or a subsequent sign-in arrived without a known AuthAccount row."
+          "202": {
+            "description": "Apple did not verify the email. A one-time code was sent and must be submitted to /v1/auth/oauth-email/verify.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OtpChallengeMetadata_Output"
+                }
+              }
+            }
           },
-          "409": {
-            "description": "A user with this email exists but the email is not verified on our side. Sign in via another method first, then link Apple from settings."
+          "401": {
+            "description": "The token failed verification, or an unlinked Apple identity omitted email entirely."
           }
         },
         "summary": "Exchange an Apple identity token for an API session.",
         "tags": ["auth"]
       }
     },
-    "/v1/auth/sms-otp/request": {
+    "/v1/auth/otp/resend": {
       "post": {
-        "operationId": "SmsOtpController_request_v1",
+        "operationId": "OtpChallengeController_resend_v1",
         "parameters": [],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RequestSmsOtpInput"
+                "$ref": "#/components/schemas/ResendOtpChallengeInput"
               }
             }
           }
@@ -539,26 +590,29 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SmsOtpRequestResponse_Output"
+                  "$ref": "#/components/schemas/OtpChallengeMetadata_Output"
                 }
               }
             }
+          },
+          "401": {
+            "description": "The challenge is missing, used, expired, or locked."
           }
         },
-        "summary": "SMS-OTP request: send a single-use 6-digit code if the phone matches a real user. Always returns 202; the response does not disclose whether the number is known.",
+        "summary": "Resend an OTP challenge when its server-controlled cooldown has elapsed.",
         "tags": ["auth"]
       }
     },
-    "/v1/auth/sms-otp/verify": {
+    "/v1/auth/oauth-email/verify": {
       "post": {
-        "operationId": "SmsOtpController_verify_v1",
+        "operationId": "OAuthEmailVerificationController_verify_v1",
         "parameters": [],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/VerifySmsOtpInput"
+                "$ref": "#/components/schemas/VerifyOAuthEmailInput"
               }
             }
           }
@@ -575,10 +629,10 @@
             }
           },
           "401": {
-            "description": "Invalid or expired code. The response is intentionally identical whether the phone is unknown, the row is expired, the code is wrong, or the row has hit OTP_MAX_ATTEMPTS."
+            "description": "Invalid or expired code. Missing, used, expired, locked, and wrong-code challenges return the same response."
           }
         },
-        "summary": "SMS-OTP verify: exchange a valid code for a fresh session (cookies set + TokenPair returned).",
+        "summary": "Complete an OAuth sign-in by proving ownership of an email the provider did not mark as verified.",
         "tags": ["auth"]
       }
     }
@@ -606,6 +660,20 @@
       }
     },
     "schemas": {
+      "EnabledAuthMethods_Output": {
+        "type": "object",
+        "properties": {
+          "methods": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["emailOtp", "google", "apple"]
+            }
+          }
+        },
+        "required": ["methods"],
+        "additionalProperties": false
+      },
       "RefreshTokenInput": {
         "type": "object",
         "properties": {
@@ -638,58 +706,10 @@
             "type": "integer",
             "minimum": -9007199254740991,
             "maximum": 9007199254740991,
-            "description": "Number of sessions revoked, excluding the caller's current session."
+            "description": "Number of sessions revoked, including the caller's current session."
           }
         },
         "required": ["sessionsRevoked"],
-        "additionalProperties": false
-      },
-      "SessionUser_Output": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "email": {
-            "type": "string"
-          },
-          "emailVerified": {
-            "type": "string",
-            "description": "ISO timestamp of email verification, or `null` if unverified.",
-            "nullable": true
-          },
-          "phone": {
-            "type": "string",
-            "nullable": true
-          },
-          "phoneVerified": {
-            "type": "string",
-            "description": "ISO timestamp of phone verification, or `null` if unverified.",
-            "nullable": true
-          },
-          "firstName": {
-            "type": "string",
-            "nullable": true
-          },
-          "lastName": {
-            "type": "string",
-            "nullable": true
-          },
-          "createdAt": {
-            "type": "string",
-            "description": "ISO timestamp of account creation."
-          }
-        },
-        "required": [
-          "id",
-          "email",
-          "emailVerified",
-          "phone",
-          "phoneVerified",
-          "firstName",
-          "lastName",
-          "createdAt"
-        ],
         "additionalProperties": false
       },
       "SessionSummary_Output": {
@@ -729,23 +749,86 @@
         ],
         "additionalProperties": false
       },
-      "EnabledAuthMethods_Output": {
+      "SessionUser_Output": {
         "type": "object",
         "properties": {
-          "emailOtp": {
-            "type": "boolean"
+          "id": {
+            "type": "string"
           },
-          "smsOtp": {
-            "type": "boolean"
+          "email": {
+            "type": "string"
           },
-          "google": {
-            "type": "boolean"
+          "emailVerified": {
+            "type": "string",
+            "description": "ISO timestamp of email verification, or `null` if unverified.",
+            "nullable": true
           },
-          "apple": {
-            "type": "boolean"
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "phoneVerified": {
+            "type": "string",
+            "description": "ISO timestamp of phone verification, or `null` if unverified.",
+            "nullable": true
+          },
+          "firstName": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastName": {
+            "type": "string",
+            "nullable": true
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Authorization roles. Snapshot also lives in the access-JWT claims; reflects this user's current grants."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "ISO timestamp of account creation."
+          },
+          "linkedProviders": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["google", "apple"]
+            }
           }
         },
-        "required": ["emailOtp", "smsOtp", "google", "apple"],
+        "required": [
+          "id",
+          "email",
+          "emailVerified",
+          "phone",
+          "phoneVerified",
+          "firstName",
+          "lastName",
+          "roles",
+          "createdAt",
+          "linkedProviders"
+        ],
+        "additionalProperties": false
+      },
+      "UpdateProfileInput": {
+        "type": "object",
+        "properties": {
+          "firstName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "nullable": true
+          },
+          "lastName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "nullable": true
+          }
+        },
         "additionalProperties": false
       },
       "RequestEmailOtpInput": {
@@ -756,33 +839,49 @@
             "maxLength": 254,
             "format": "email",
             "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$",
-            "description": "Email address to send the one-time code to. Treated case-insensitively (normalized to lowercase before lookup)."
+            "description": "Email address to send the one-time code to. Treated case-insensitively."
           }
         },
         "required": ["email"],
         "additionalProperties": false
       },
-      "OtpRequestResponse_Output": {
+      "OtpChallengeMetadata_Output": {
         "type": "object",
         "properties": {
           "status": {
             "type": "string",
-            "description": "Constant acknowledgement of the request. Returned unconditionally — whether the email matched a real user is intentionally not disclosed (anti-enumeration).",
-            "enum": ["sent"]
+            "enum": ["verification_required"]
+          },
+          "challengeId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+            "description": "Opaque UUID identifying one OTP challenge."
+          },
+          "expiresInSec": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Seconds until the challenge expires."
+          },
+          "resendAfterSec": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Seconds until another delivery may be requested."
           }
         },
-        "required": ["status"],
+        "required": ["status", "challengeId", "expiresInSec", "resendAfterSec"],
         "additionalProperties": false
       },
       "VerifyEmailOtpInput": {
         "type": "object",
         "properties": {
-          "email": {
+          "challengeId": {
             "type": "string",
-            "maxLength": 254,
-            "format": "email",
-            "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$",
-            "description": "Email address that received the code. Must match the address used in the preceding /request call."
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+            "description": "Opaque UUID identifying one OTP challenge."
           },
           "code": {
             "type": "string",
@@ -790,7 +889,7 @@
             "description": "The 6-digit one-time code. In non-production `NODE_ENV`, the API accepts the literal `\"000000\"`."
           }
         },
-        "required": ["email", "code"],
+        "required": ["challengeId", "code"],
         "additionalProperties": false
       },
       "SignInWithGoogleInput": {
@@ -837,45 +936,35 @@
         "required": ["idToken"],
         "additionalProperties": false
       },
-      "RequestSmsOtpInput": {
+      "ResendOtpChallengeInput": {
         "type": "object",
         "properties": {
-          "phone": {
+          "challengeId": {
             "type": "string",
-            "pattern": "^\\+[1-9]\\d{6,14}$",
-            "description": "Phone number to send the one-time code to, in E.164 format (e.g. +40712345678)."
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+            "description": "Opaque UUID identifying one OTP challenge."
           }
         },
-        "required": ["phone"],
+        "required": ["challengeId"],
         "additionalProperties": false
       },
-      "SmsOtpRequestResponse_Output": {
+      "VerifyOAuthEmailInput": {
         "type": "object",
         "properties": {
-          "status": {
+          "challengeId": {
             "type": "string",
-            "description": "Constant acknowledgement of the request. Returned unconditionally — whether the phone matched a real user is intentionally not disclosed (anti-enumeration).",
-            "enum": ["sent"]
-          }
-        },
-        "required": ["status"],
-        "additionalProperties": false
-      },
-      "VerifySmsOtpInput": {
-        "type": "object",
-        "properties": {
-          "phone": {
-            "type": "string",
-            "pattern": "^\\+[1-9]\\d{6,14}$",
-            "description": "Phone number that received the code. Must match the number used in the preceding /request call."
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+            "description": "Opaque UUID identifying one OTP challenge."
           },
           "code": {
             "type": "string",
             "pattern": "^\\d{6}$",
-            "description": "The 6-digit one-time code. In non-production `NODE_ENV`, the API accepts the literal `\"000000\"`."
+            "description": "One-time code sent to the email contained in the verified provider token."
           }
         },
-        "required": ["phone", "code"],
+        "required": ["challengeId", "code"],
         "additionalProperties": false
       }
     }

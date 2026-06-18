@@ -43,7 +43,7 @@ Full algorithm in [`docs/auth/refresh-rotation.md`](../auth/refresh-rotation.md)
 
 - **The chain shape is not "literal idempotency".** Each concurrent caller gets a _different_ new pair, not the same one. m-turborepo's in-memory cache returned the _literal same_ pair to the second caller within the grace window; our chain returns a fresh pair from each call. Both are valid; in our implementation each tab gets its own new chain step. This is fine for correctness — every token issued in the chain works — and is the only realistic option when refresh tokens are HMAC-hashed (we can't replay a token we never stored plaintext for).
 
-- **Chain depth grows under heavy multi-tab burst.** A user with 20 tabs all refreshing simultaneously creates a 20-link chain in one second. Functional but wasteful. The web-side `BroadcastChannel('auth')` lock in PR 14 will keep typical chain depth at 1.
+- **Chain depth grows under heavy multi-tab burst.** A user with 20 tabs refreshing simultaneously can create a 20-link chain. Browser requests in one JavaScript runtime share a module-level singleflight promise, but separate tabs remain independent. The database algorithm is therefore still the correctness boundary.
 
 - **Reuse detection has a 10-second grace window.** A token replayed within the window is treated as concurrent-multi-tab, not reuse. Inside the window an attacker who already has the token could get a fresh pair; outside, they trip the burn. The trade-off is "occasional false-negative on reuse detection within the first 10 seconds" vs "false-positive every multi-tab refresh." We chose the former.
 
@@ -72,8 +72,8 @@ Full algorithm in [`docs/auth/refresh-rotation.md`](../auth/refresh-rotation.md)
 
 [`apps/api/test/core-auth-timing.e2e-spec.ts`](../../apps/api/test/core-auth-timing.e2e-spec.ts) covers the timing-attack analysis documented inline.
 
-## Open follow-ups
+## Possible future optimization
 
-- Web-side `BroadcastChannel` lock (PR 14) to reduce chain depth.
-- Audit emission on `SESSION_BURNED` events from the controller (PR 8+).
-- Possible future "literal idempotent grace replay" via a brief plaintext-storage column — only if multi-tab pressure becomes measurable and the chain-walk overhead shows up in production traces.
+Literal idempotent grace replay would require temporarily storing recoverable token
+material. Add that complexity only if production traces show that bounded chain
+walking is a real bottleneck.

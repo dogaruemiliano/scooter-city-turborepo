@@ -1,23 +1,39 @@
-# ADR 0005 — Pluggable mailer and SMS impls
+# ADR 0005 — SMTP mailer and pluggable SMS implementations
 
 - **Status:** Accepted
 - **Date:** 2026-05-14
+- **Updated:** 2026-06-12
 - **Deciders:** template author
 
 ## Context
 
-The auth subsystem needs to send email (OTP, future new-device notifications) and SMS (OTP). Different downstream projects spawned from this template will pick different providers — some will use Resend, some will already have an SMTP relay, some will have nothing in production yet and just want logs. SMS is similar: SMSO.ro is the chosen production provider for this template, but a project that ships to a different region might swap in Twilio / MessageBird.
+The auth subsystem sends email OTPs. Email delivery is standardized on
+authenticated SMTP so the same implementation works with hosted SMTP relays
+and transactional-email services that expose an SMTP endpoint.
 
-We need:
-
-1. **One injection token per channel** so downstream code (`EmailOtpService`, future `NewDeviceNotifier`) is provider-agnostic.
-2. **Provider chosen at runtime via env** so flipping `MAILER_PROVIDER=resend → smtp` is a redeploy, not a code change.
-3. **No throw-on-startup when credentials for an unselected provider are missing** — `MAILER_PROVIDER=log` must not require `RESEND_API_KEY` or `SMTP_HOST`.
-4. **E2E tests can swap a spy in without going through env** — overriding the abstract token with a test class.
+SMS authentication has been removed. The general SMS transport remains available
+for future phone verification and application notifications. The template
+provides SMSO.ro for real delivery and a log implementation for development.
 
 ## Decision
 
-Each channel is a Nest abstract class used as both type and DI token, with multiple `@Injectable()` implementations under `impls/`. The module exposes a `forRoot(env)` factory that registers **only** the impl selected by `env.<CHANNEL>_PROVIDER`. Tests bypass the factory by overriding the abstract token:
+`MailerService` remains the provider-agnostic injection token consumed by auth
+features, but `MailerModule` always binds it to `SmtpMailerService`.
+
+```text
+apps/api/src/mailer/
+├── mailer.module.ts
+├── mailer.service.ts
+└── impls/
+    ├── smtp-mailer.service.ts
+    └── spy-mailer.service.ts
+```
+
+SMTP requires `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, and `SMTP_PASSWORD`.
+Unauthenticated SMTP is intentionally unsupported so development, test, and
+production exercise the same transport configuration.
+
+Tests override the abstract token with `SpyMailerService`:
 
 ```ts
 Test.createTestingModule({ imports: [AppModule] })
@@ -26,83 +42,68 @@ Test.createTestingModule({ imports: [AppModule] })
   .compile();
 ```
 
-### Mailer
+SMS uses an abstract contract with separate implementations:
 
-```
-apps/api/src/mailer/
-├── mailer.module.ts       # @Global, forRoot(env) picks the impl
-├── mailer.service.ts      # abstract MailerService + MailerMessage type
-└── impls/
-    ├── log-mailer.service.ts      # MAILER_PROVIDER=log (default)
-    ├── resend-mailer.service.ts   # MAILER_PROVIDER=resend
-    ├── smtp-mailer.service.ts     # MAILER_PROVIDER=smtp
-    └── spy-mailer.service.ts      # test-only; never registered by forRoot
-```
-
-### SMS
-
-```
+```text
 apps/api/src/sms/
 ├── sms.module.ts
 ├── sms.service.ts
 └── impls/
-    ├── log-sms.service.ts         # SMS_PROVIDER=log
-    ├── smso-sms.service.ts        # SMS_PROVIDER=smso (PR 11)
-    └── spy-sms.service.ts         # test-only
+    ├── log-sms.service.ts
+    ├── smso-sms.service.ts
+    └── spy-sms.service.ts
 ```
 
-### Env-validated cross-field rules
+`SmsModule.forRoot(env)` registers exactly one implementation under the
+`SmsService` token. `SMS_PROVIDER=log` selects `LogSmsService`;
+`SMS_PROVIDER=smso` selects `SmsoSmsService` and requires `SMSO_API_KEY` and
+`SMSO_SENDER`.
 
-The zod env schema's `superRefine` enforces that the selected provider's credentials are present. Examples (see [`apps/api/src/config/env.ts`](../../apps/api/src/config/env.ts)):
-
-```
-MAILER_PROVIDER=resend  →  RESEND_API_KEY required
-MAILER_PROVIDER=smtp    →  SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD required
-SMS_PROVIDER=smso       →  SMSO_API_KEY, SMSO_SENDER required
-```
-
-These run once at app boot; a misconfiguration aborts the process before any traffic arrives.
+`SmsModule` is infrastructure, not an authentication method. Enabling an SMS
+provider does not add any `/v1/auth` route.
 
 ## Reasoning
 
-1. **Single injection token per channel.** Auth modules inject `MailerService` and don't know or care which impl is wired in. Adding `SesMailerService` later is a one-line change in `forRoot`'s switch + a new impl file — no consumer touches.
+1. SMTP is a stable interoperability boundary and avoids coupling the template
+   to a proprietary email SDK.
+2. One mail implementation removes provider-selection branches, credentials
+   for unused providers, and additional dependencies.
+3. The abstract `MailerService` keeps auth features testable and independent of
+   Nodemailer.
+4. A global module remains appropriate because email delivery is cross-cutting.
+5. The abstract `SmsService` keeps callers independent from SMSO and allows
+   tests to replace delivery with `SpySmsService`.
+6. Registering only the selected implementation prevents unused constructors
+   from validating irrelevant credentials.
+7. The explicit log implementation permits local testing without network calls.
 
-2. **`forRoot(env)` over factory-with-conditional-providers.** An earlier draft pre-registered every impl as a provider and used `useFactory: (env, log, resend, smtp) => env.MAILER_PROVIDER === ...`. That worked but had a sharp edge: the unselected impls' constructors still ran. `ResendMailerService.constructor` validates `env.RESEND_API_KEY` and throws if missing, which would break `MAILER_PROVIDER=log` in any environment that hadn't bothered to set Resend credentials. `forRoot(env)` registers exactly one impl class, so the others never instantiate.
+## Trade-offs
 
-3. **No `forRootAsync` with `inject: [ENV]`.** That pattern requires the Nest container to be partially constructed before module shape is decided, which complicates the import graph. Reading the env synchronously at module-graph build time (`loadEnv()` is called once in `app.module.ts`) is simpler and gives the same dynamism.
+- Projects that require a proprietary email API must replace the SMTP
+  implementation themselves.
+- The Nodemailer transport is intentionally unpooled because auth email volume
+  is low.
+- SMTP configuration is read at process startup; changes require an API
+  restart.
+- SMS implementation selection happens once at process startup; changing
+  `SMS_PROVIDER` requires a restart.
+- Supporting another real provider requires a new `SmsService` implementation
+  and one additional selection branch in `SmsModule.forRoot()`.
 
-4. **`@Global()` on each module.** Mailer and SMS are genuinely cross-cutting — every auth-method module that lands (email-OTP, future password reset, new-device email) needs the mailer; SMS-OTP needs SMS. Marking the modules global avoids forcing each method module to import them locally.
+## Local Development
 
-5. **Tests stay simple.** `overrideProvider(MailerService).useClass(SpyMailerService)` works regardless of which env-selected impl `forRoot` chose — the override applies after `AppModule` is composed. The spy never appears in the env's provider switch, so production code paths can't accidentally select it.
+Point the API at an SMTP relay or local capture service configured with SMTP
+authentication:
 
-## Trade-offs accepted
-
-- **Module config is read once at boot.** Changing `MAILER_PROVIDER` requires a process restart. This is a deliberate constraint — runtime swapping would require a layer of indirection (a `MailerRouter` that re-reads env on every send) for very little gain.
-
-- **Each impl owns its own validation.** `ResendMailerService.constructor` throws when its env is missing even though the env schema's `superRefine` already caught that case. The redundancy is intentional: an impl class that's instantiable with bad input would silently no-op or throw deep in `send()` — neither of which is as clear as a constructor failure with the actual cause.
-
-- **`SmtpMailerService` doesn't pool.** Default `nodemailer` transporter is unpooled. Auth-flow mail volume (OTPs + new-device emails) is tiny and pooling complicates `onModuleDestroy`. If a downstream project blasts marketing email through this module, it should subclass with `pool: true` rather than us pre-optimizing.
-
-## What we explicitly rejected
-
-- **A single concrete `MailerService` that switches on env per-`send()`.** That's where the `MAILER_PROVIDER` env value would ship to a hot-path branch. The redundant work of constructing the right transport per send plus the `if/else` repeated on every call is worse than the upfront one-time selection.
-
-- **Per-app provider configuration via decorators (`@UseProvider("resend")` on a controller).** Auth flows never need per-route provider choice — every project picks exactly one provider per channel. Adding a per-route mechanism is feature creep with no caller.
-
-- **`MailerService` as a TypeScript `interface` plus a separate DI token symbol.** Using the abstract class as both the type and the token simplifies the consumer signature (`constructor(private mailer: MailerService)` Just Works) at no cost — abstract classes are tree-shakable in TS the same as interfaces.
-
-## Consequences
-
-- Every new mailer / SMS provider follows the same recipe: one file under `impls/`, one switch arm in `forRoot`, one env-flag-branch in `superRefine`.
-- Tests that need to assert "an email was sent" override the abstract token with the spy — independent of what production env says.
-- Downstream template consumers who only need a single provider can delete the impls they don't use without touching consumer code. The unselected `case` in `forRoot` becomes dead and can be removed.
+```env
+MAILER_FROM=no-reply@example.com
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_USER=local-user
+SMTP_PASSWORD=local-password
+```
 
 ## Related ADRs
 
-- [ADR 0002](./0002-cookie-based-sessions.md) — sessions and cookies (consumes the mailer for OTP delivery).
-- [ADR 0003](./0003-multi-instance-refresh-rotation.md) — rotation (doesn't touch the mailer directly).
-
-## Open follow-ups
-
-- Webhook-based delivery receipts (`message.delivered`, `message.bounced` from Resend / SMSO). Useful for the new-device email but out of scope until at least one method module ships in production.
-- Background queue for outbound mail (BullMQ on Redis) — only relevant if API request handlers start blocking on slow SMTP relays. Auth flows don't, today.
+- [ADR 0002](./0002-cookie-based-sessions.md)
+- [ADR 0003](./0003-multi-instance-refresh-rotation.md)

@@ -3,8 +3,8 @@
  *
  * Three load-bearing operations:
  *
- * 1. `issueSession` — called by each auth-method module (credentials,
- *    email-OTP, OAuth) after it authenticates a user. Creates a fresh
+ * 1. `issueSession` — called by each auth-method module after it
+ *    authenticates a user. Creates a fresh
  *    `Session` row + first refresh-token row, mints the access+refresh
  *    JWT pair, and returns them to the caller. The caller drops them
  *    into cookies via [`setAuthCookies`](../../utils/cookies.ts).
@@ -18,7 +18,7 @@
  *
  * 3. `revokeSession` / `revokeAllUserSessions` / `burnSession` — write
  *    `revokedAt` on `Session` and the associated `RefreshToken` rows.
- *    The cleanup cron (PR 6) eventually hard-deletes them.
+ *    The cleanup job eventually hard-deletes old revoked rows.
  *
  * Pure crypto / JWT-minting helpers live in
  * [`../../utils/token-mint.ts`](../../utils/token-mint.ts).
@@ -37,6 +37,8 @@ import type {
 } from "../../../generated/prisma/client";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { hashRefreshToken, safeEqualHex } from "../../utils/hash";
+import type { KeyRing } from "../../utils/keys";
+import { KEY_RING } from "../../utils/keys.module";
 import { mintAccessToken, mintRefreshToken } from "../../utils/token-mint";
 
 import type {
@@ -46,10 +48,16 @@ import type {
 } from "./core-auth.types";
 
 interface RefreshJwtPayload {
+  tokenType: "refresh";
   sub: string;
   sid: string;
   jti: string;
 }
+
+type LockedRefreshTokenRow = Pick<
+  RefreshToken,
+  "jti" | "sessionId" | "userId" | "tokenHash" | "createdAt" | "revokedAt"
+>;
 
 const MS_PER_SEC = 1000;
 
@@ -59,30 +67,41 @@ export class CoreAuthService {
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     @Inject(ENV) private readonly env: Env,
+    @Inject(KEY_RING) private readonly ring: KeyRing,
   ) {}
 
   /**
    * Mints a fresh session + token pair for a just-authenticated user.
-   * Called by every auth-method module (credentials, email-OTP, OAuth)
-   * once it has identified the user.
+   * Called by every auth-method module once it has identified the user.
    */
   async issueSession(input: IssueSessionInput): Promise<IssueSessionResult> {
-    return this.prisma.$transaction(async (tx) => {
-      const session = await tx.session.create({
-        data: {
-          userId: input.user.id,
-          userAgent: input.userAgent ?? null,
-          ip: input.ip ?? null,
-        },
-      });
+    return this.prisma.$transaction((tx) =>
+      this.issueSessionInTransaction(tx, input),
+    );
+  }
 
-      const pair = await this.mintAndPersistPair(tx, {
-        user: input.user,
-        sessionId: session.id,
-      });
-
-      return { ...pair, sessionId: session.id };
+  /**
+   * Transaction-aware session issuer for authentication flows that must
+   * atomically claim a challenge, resolve a user, and create the session.
+   */
+  async issueSessionInTransaction(
+    tx: Prisma.TransactionClient,
+    input: IssueSessionInput,
+  ): Promise<IssueSessionResult> {
+    const session = await tx.session.create({
+      data: {
+        userId: input.user.id,
+        userAgent: input.userAgent ?? null,
+        ip: input.ip ?? null,
+      },
     });
+
+    const pair = await this.mintAndPersistPair(tx, {
+      user: input.user,
+      sessionId: session.id,
+    });
+
+    return { ...pair, sessionId: session.id };
   }
 
   /**
@@ -112,12 +131,35 @@ export class CoreAuthService {
       // Acquire the row-level lock on the presented jti. Concurrent
       // rotations of the same token block here; concurrent rotations of
       // *different* tokens proceed in parallel.
-      const locked = await tx.$queryRaw<RefreshToken[]>`
-        SELECT * FROM "RefreshToken" WHERE "jti" = ${payload.jti} FOR UPDATE
+      const locked = await tx.$queryRaw<LockedRefreshTokenRow[]>`
+        SELECT
+          "jti",
+          "sessionId",
+          "userId",
+          "tokenHash",
+          "createdAt",
+          "revokedAt"
+        FROM "RefreshToken"
+        WHERE "jti" = ${payload.jti}
+        FOR UPDATE
       `;
       const row = locked[0];
 
       if (!row) {
+        return { kind: "invalid" as const };
+      }
+      if (row.sessionId !== payload.sid || row.userId !== payload.sub) {
+        return { kind: "invalid" as const };
+      }
+      const activeSession = await tx.session.findFirst({
+        where: {
+          id: row.sessionId,
+          userId: row.userId,
+          revokedAt: null,
+        },
+        select: { id: true },
+      });
+      if (!activeSession) {
         return { kind: "invalid" as const };
       }
 
@@ -167,6 +209,19 @@ export class CoreAuthService {
       case "ok":
         return result.pair;
     }
+  }
+
+  /** Revoke a session only when it belongs to the given user. */
+  async revokeUserSession(sessionId: string, userId: string): Promise<boolean> {
+    const session = await this.prisma.session.findFirst({
+      where: { id: sessionId, userId },
+      select: { id: true },
+    });
+
+    if (!session) return false;
+
+    await this.revokeSession(sessionId, userId);
+    return true;
   }
 
   /** Revoke a single session (and every refresh token under it). */
@@ -247,9 +302,24 @@ export class CoreAuthService {
 
   private verifyRefreshJwt(token: string): RefreshJwtPayload {
     try {
-      return this.jwt.verify<RefreshJwtPayload>(token, {
-        secret: this.env.JWT_REFRESH_SECRET,
+      // Multi-key verify: pick the public key by `header.kid` so tokens
+      // signed with a recently-rotated key still verify during the
+      // rotation window. Algorithms pinned to RS256 to close any
+      // alg-confusion attack surface.
+      const publicKey = this.ring.resolveVerifyKey(token);
+      const payload = this.jwt.verify<RefreshJwtPayload>(token, {
+        publicKey,
+        algorithms: ["RS256"],
       });
+      if (
+        payload.tokenType !== "refresh" ||
+        typeof payload.sub !== "string" ||
+        typeof payload.sid !== "string" ||
+        typeof payload.jti !== "string"
+      ) {
+        throw new Error("invalid refresh claims");
+      }
+      return payload;
     } catch {
       throw new UnauthorizedException("Invalid refresh token");
     }
@@ -268,18 +338,24 @@ export class CoreAuthService {
     tx: Prisma.TransactionClient,
     startJti: string,
     graceCutoffMs: number,
-  ): Promise<RefreshToken | null> {
-    let cursor: string | null = startJti;
-    while (cursor !== null) {
-      const next: RefreshToken | null = await tx.refreshToken.findFirst({
-        where: { previousJti: cursor },
-      });
-      if (next === null) return null;
-      if (next.createdAt.getTime() < graceCutoffMs) return null;
-      if (next.revokedAt === null) return next;
-      cursor = next.jti;
-    }
-    return null;
+  ): Promise<LockedRefreshTokenRow | null> {
+    const locked = await tx.$queryRaw<LockedRefreshTokenRow[]>`
+      SELECT
+        "jti",
+        "sessionId",
+        "userId",
+        "tokenHash",
+        "createdAt",
+        "revokedAt"
+      FROM "RefreshToken"
+      WHERE "previousJti" = ${startJti}
+      FOR UPDATE
+    `;
+    const next = locked[0] ?? null;
+    if (next === null) return null;
+    if (next.createdAt.getTime() < graceCutoffMs) return null;
+    if (next.revokedAt === null) return next;
+    return this.findLiveDescendantInGrace(tx, next.jti, graceCutoffMs);
   }
 
   /**
@@ -289,11 +365,11 @@ export class CoreAuthService {
    */
   private async rotateFromRow(
     tx: Prisma.TransactionClient,
-    previousRow: RefreshToken,
+    previousRow: LockedRefreshTokenRow,
   ): Promise<TokenPair> {
     const user = await tx.user.findUniqueOrThrow({
       where: { id: previousRow.userId },
-      select: { id: true, email: true },
+      select: { id: true, email: true, roles: true },
     });
 
     const pair = await this.mintAndPersistPair(tx, {
@@ -324,7 +400,7 @@ export class CoreAuthService {
   private async mintAndPersistPair(
     tx: Prisma.TransactionClient,
     opts: {
-      user: Pick<User, "id" | "email">;
+      user: Pick<User, "id" | "email" | "roles">;
       sessionId: string;
       previousJti?: string;
     },
@@ -335,15 +411,14 @@ export class CoreAuthService {
         sub: opts.user.id,
         email: opts.user.email,
         sid: opts.sessionId,
+        roles: opts.user.roles,
       },
-      this.env.JWT_ACCESS_SECRET,
       this.env.JWT_ACCESS_TTL,
     );
 
     const refresh = mintRefreshToken(
       this.jwt,
       { sub: opts.user.id, sid: opts.sessionId },
-      this.env.JWT_REFRESH_SECRET,
       this.env.JWT_REFRESH_TTL,
     );
 

@@ -9,17 +9,20 @@
  * The algorithm itself is documented in [docs/auth/refresh-rotation.md](../../../docs/auth/refresh-rotation.md).
  */
 import { JwtModule } from "@nestjs/jwt";
+import type { INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 
 import { ConfigModule, ENV } from "../src/config/config.module";
-import type { Env } from "../src/config/env";
 import { PrismaModule } from "../src/prisma/prisma.module";
 import { PrismaService } from "../src/prisma/prisma.service";
 import { UsersModule } from "../src/users/users.module";
 import { UsersService } from "../src/users/users.service";
 import { CoreAuthService } from "../src/auth/modules/core-auth/core-auth.service";
+import type { KeyRing } from "../src/auth/utils/keys";
+import { KEY_RING, KeysModule } from "../src/auth/utils/keys.module";
 
 describe("CoreAuthService rotation (e2e)", () => {
+  let app: INestApplication;
   let coreAuth: CoreAuthService;
   let users: UsersService;
   let prisma: PrismaService;
@@ -32,12 +35,24 @@ describe("CoreAuthService rotation (e2e)", () => {
         ConfigModule,
         PrismaModule,
         UsersModule,
-        JwtModule.register({}),
+        KeysModule,
+        JwtModule.registerAsync({
+          imports: [KeysModule],
+          inject: [KEY_RING],
+          useFactory: (ring: KeyRing) => ({
+            privateKey: ring.signingPrivate,
+            signOptions: {
+              algorithm: "RS256",
+              header: { kid: ring.currentKid, alg: "RS256" },
+            },
+            verifyOptions: { algorithms: ["RS256"] },
+          }),
+        }),
       ],
       providers: [CoreAuthService],
     }).compile();
 
-    const app = moduleRef.createNestApplication();
+    app = moduleRef.createNestApplication();
     await app.init();
     coreAuth = app.get(CoreAuthService);
     users = app.get(UsersService);
@@ -52,7 +67,7 @@ describe("CoreAuthService rotation (e2e)", () => {
   });
 
   afterAll(async () => {
-    await prisma.$disconnect();
+    await app.close();
   });
 
   /** Creates a user + initial session so the test can present a real refresh token. */
@@ -163,6 +178,18 @@ describe("CoreAuthService rotation (e2e)", () => {
     expect(tokens.size).toBe(3);
   });
 
+  it("serializes concurrent rotations from adjacent token generations", async () => {
+    const { issued } = await freshSession();
+    const first = await coreAuth.rotateTokens(issued.refreshToken);
+
+    const results = await Promise.allSettled([
+      coreAuth.rotateTokens(issued.refreshToken),
+      coreAuth.rotateTokens(first.refreshToken),
+    ]);
+
+    expect(results.every((result) => result.status === "fulfilled")).toBe(true);
+  });
+
   it("unknown jti is rejected without touching any session", async () => {
     const { issued } = await freshSession();
     // Sign a refresh JWT with a jti that was never persisted.
@@ -184,22 +211,24 @@ describe("CoreAuthService rotation (e2e)", () => {
 
 /**
  * Forge a refresh JWT whose `jti` was never persisted. Uses the same
- * secret CoreAuthService verifies against (via the injected Env).
+ * keypair CoreAuthService verifies against — by reusing the injected
+ * `JwtService`, signing options (RS256 + kid header from KeyRing) apply
+ * automatically via `JwtModule.registerAsync` defaults.
  */
 function fakeRefreshJwtWithUnknownJti(coreAuth: CoreAuthService): string {
-  // Yank the env + jwt service via the service's private fields (test-only).
   const svc = coreAuth as unknown as {
-    env: Env;
     jwt: {
-      sign: (
-        claims: object,
-        opts: { secret: string; expiresIn: number },
-      ) => string;
+      sign: (claims: object, opts: { expiresIn: number }) => string;
     };
   };
   return svc.jwt.sign(
-    { sub: "ghost-user", sid: "ghost-session", jti: "never-persisted-jti" },
-    { secret: svc.env.JWT_REFRESH_SECRET, expiresIn: 60 },
+    {
+      tokenType: "refresh",
+      sub: "ghost-user",
+      sid: "ghost-session",
+      jti: "never-persisted-jti",
+    },
+    { expiresIn: 60 },
   );
 }
 

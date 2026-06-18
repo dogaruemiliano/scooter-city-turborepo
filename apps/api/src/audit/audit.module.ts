@@ -1,9 +1,5 @@
 /**
- * Global module exposing `AuditService`. Auth submodules in PR 5+ inject
- * it to record `LOGIN_SUCCESS`, `LOGIN_FAIL`, `OAUTH_LINKED`, etc.
- *
- * `@Global()` because audit is genuinely cross-cutting — every auth flow
- * emits events.
+ * Global audit module used by authentication and account-management flows.
  */
 import { Global, Module } from "@nestjs/common";
 

@@ -3,6 +3,7 @@
  * users so we never have to think about ordering or cleanup of the rows
  * we touch — we operate on fresh emails per test.
  */
+import type { INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 
 import { AppModule } from "../src/app.module";
@@ -10,6 +11,7 @@ import { PrismaService } from "../src/prisma/prisma.service";
 import { UsersService } from "../src/users/users.service";
 
 describe("UsersService (e2e)", () => {
+  let app: INestApplication;
   let users: UsersService;
   let prisma: PrismaService;
   const createdEmails: string[] = [];
@@ -18,7 +20,7 @@ describe("UsersService (e2e)", () => {
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
-    const app = moduleRef.createNestApplication();
+    app = moduleRef.createNestApplication();
     await app.init();
     users = app.get(UsersService);
     prisma = app.get(PrismaService);
@@ -29,7 +31,7 @@ describe("UsersService (e2e)", () => {
     if (createdEmails.length > 0) {
       await prisma.user.deleteMany({ where: { email: { in: createdEmails } } });
     }
-    await prisma.$disconnect();
+    await app.close();
   });
 
   it("findById returns null for an unknown id", async () => {

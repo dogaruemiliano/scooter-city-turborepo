@@ -5,24 +5,29 @@
  * Verifies the constructor wires the right transport options and that
  * `send()` forwards a complete `sendMail` payload.
  */
+import type { Transporter } from "nodemailer";
+import type Mail from "nodemailer/lib/mailer";
+import type SMTPTransport from "nodemailer/lib/smtp-transport";
+
 import type { Env } from "../../config/env";
 import { SmtpMailerService } from "./smtp-mailer.service";
 
-const sendMailMock = jest.fn();
-const closeMock = jest.fn();
-const createTransportMock = jest.fn();
+const sendMailMock = jest.fn<Promise<unknown>, [Mail.Options]>();
+const closeMock = jest.fn<void, []>();
+const createTransportMock = jest.fn<Transporter, [SMTPTransport.Options]>();
 
 jest.mock("nodemailer", () => ({
   __esModule: true,
   default: {
-    createTransport: (...args: unknown[]) => createTransportMock(...args),
+    createTransport: (options: SMTPTransport.Options): Transporter =>
+      createTransportMock(options),
   },
-  createTransport: (...args: unknown[]) => createTransportMock(...args),
+  createTransport: (options: SMTPTransport.Options): Transporter =>
+    createTransportMock(options),
 }));
 
 function envWith(overrides: Partial<Env> = {}): Env {
   return {
-    MAILER_PROVIDER: "smtp",
     MAILER_FROM: "noreply@example.com",
     SMTP_HOST: "smtp.example.com",
     SMTP_PORT: 587,
@@ -40,7 +45,7 @@ describe("SmtpMailerService", () => {
     createTransportMock.mockReturnValue({
       sendMail: sendMailMock,
       close: closeMock,
-    });
+    } as unknown as Transporter);
   });
 
   it.each<[Partial<Env>, RegExp]>([

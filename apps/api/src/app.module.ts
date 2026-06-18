@@ -2,11 +2,10 @@
  * Root module.
  *
  * Wires global concerns (config, structured logging, request IDs, health)
- * and the always-on infrastructure modules every feature module needs
- * (Prisma, Users, Mailer, SMS, Audit). Auth submodules are added in PR 5+
- * via `AuthModule.forRoot(buildAuthConfig(env))`.
+ * and shared infrastructure. `AuthModule.forRoot()` builds the enabled
+ * authentication-method graph from validated environment configuration.
  */
-import { APP_INTERCEPTOR, APP_PIPE } from "@nestjs/core";
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, APP_PIPE } from "@nestjs/core";
 import { ZodSerializerInterceptor, ZodValidationPipe } from "nestjs-zod";
 import { MiddlewareConsumer, Module, NestModule } from "@nestjs/common";
 import { LoggerModule } from "nestjs-pino";
@@ -14,6 +13,8 @@ import { LoggerModule } from "nestjs-pino";
 import { AuditModule } from "./audit/audit.module";
 import { buildAuthConfig } from "./auth/auth.config";
 import { AuthModule } from "./auth/auth.module";
+import { CsrfGuard } from "./common/guards/csrf.guard";
+import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
 import { pinoConfig } from "./common/logger/pino.config";
 import { RequestIdMiddleware } from "./common/middleware/request-id.middleware";
 import { ConfigModule } from "./config/config.module";
@@ -24,8 +25,8 @@ import { PrismaModule } from "./prisma/prisma.module";
 import { SmsModule } from "./sms/sms.module";
 import { UsersModule } from "./users/users.module";
 
-// Loaded once at module-graph build time so both `AuthModule.forRoot`
-// and `MailerModule.forRoot` get the same validated `Env` instance.
+// Loaded once at module-graph build time so configurable modules use the
+// same validated environment values exposed by `ConfigModule`.
 const env = loadEnv();
 
 @Module({
@@ -34,8 +35,8 @@ const env = loadEnv();
     ConfigModule,
     LoggerModule.forRoot(pinoConfig(process.env.NODE_ENV ?? "development")),
     PrismaModule,
-    MailerModule.forRoot(env),
-    SmsModule,
+    MailerModule,
+    SmsModule.forRoot(env),
     AuditModule,
 
     // Internal (non-global) feature modules.
@@ -59,6 +60,17 @@ const env = loadEnv();
     {
       provide: APP_INTERCEPTOR,
       useClass: ZodSerializerInterceptor,
+    },
+    {
+      provide: APP_FILTER,
+      useClass: AllExceptionsFilter,
+    },
+    // CSRF defense for cookie-authenticated mutations. Skipped for safe
+    // methods, Bearer-only callers, and routes marked @SkipCsrf().
+    // Authentication and request throttling are registered by AuthModule.
+    {
+      provide: APP_GUARD,
+      useClass: CsrfGuard,
     },
   ],
 })

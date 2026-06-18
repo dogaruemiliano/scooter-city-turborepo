@@ -17,9 +17,17 @@
  * See `src/v1/README.md` for the folder convention and the rule that
  * versions are frozen at release.
  *
- * The version-agnostic `apiFetch` helper (and its `ApiError`) is also
- * exported here — it pairs a path with a Zod schema to produce a
- * validated, typed response. Used by web (server + client) and mobile.
+ * The version-agnostic `createApiClient` / `apiFetch` helpers (and
+ * `ApiError`) are also exported here. Runtime-specific packages bind their
+ * own explicit API origin instead of this package reading framework env.
  */
 export * as v1 from "./v1";
-export { apiFetch, ApiError, type ApiFetchOptions } from "./api-fetch";
+export {
+  apiFetch,
+  ApiError,
+  configureAuthAdapter,
+  createApiClient,
+  type ApiClient,
+  type ApiFetchOptions,
+  type AuthAdapter,
+} from "./api-fetch";
