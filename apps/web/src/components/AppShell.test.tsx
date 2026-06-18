@@ -99,6 +99,40 @@ describe("AppShell", () => {
       screen.queryByRole("button", { name: "Open account menu" }),
     ).not.toBeInTheDocument();
   });
+
+  it("does not render the application shell on the English sign-in route", () => {
+    mocks.pathname = "/en/sign-in";
+
+    renderAppShell();
+
+    expect(screen.getByText("Page content")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Open account menu" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("keeps navigation links on the English locale prefix", async () => {
+    mocks.pathname = "/en/shadcn";
+
+    renderAppShell();
+
+    expect(screen.getByRole("link", { name: "Dashboard" })).toHaveAttribute(
+      "href",
+      "/en",
+    );
+    expect(screen.getByRole("link", { name: "UI showcase" })).toHaveAttribute(
+      "href",
+      "/en/shadcn",
+    );
+
+    fireEvent.mouseDown(
+      screen.getByRole("button", { name: "Open account menu" }),
+    );
+
+    expect(
+      await screen.findByRole("menuitem", { name: "Account settings" }),
+    ).toHaveAttribute("href", "/en/account/settings");
+  });
 });
 
 function renderAppShell() {

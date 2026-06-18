@@ -25,11 +25,15 @@ import {
   Label,
   Separator,
 } from "@repo/ui/components";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useId, useState, type FormEvent } from "react";
 
-import { useSession } from "../../../components/auth/SessionProvider";
-import { webApi } from "../../../lib/api";
+import {
+  getLocalizedSignInPath,
+  getLocaleFromPathname,
+} from "../../../../i18n/paths";
+import { useSession } from "../../../../components/auth/SessionProvider";
+import { webApi } from "../../../../lib/api";
 
 interface AccountSettingsProps {
   initialUser: v1.auth.SessionUser;
@@ -54,6 +58,7 @@ export function AccountSettings({
   enabledMethods,
 }: AccountSettingsProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const { setUser: setSessionUser } = useSession();
   const [user, setUser] = useState(initialUser);
   const [sessions, setSessions] = useState(initialSessions);
@@ -189,7 +194,7 @@ export function AccountSettings({
 
   function leaveAccount() {
     setSessionUser(null);
-    router.replace("/sign-in");
+    router.replace(getLocalizedSignInPath(getLocaleFromPathname(pathname)));
     router.refresh();
   }
 

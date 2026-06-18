@@ -1,12 +1,17 @@
 import { v1 } from "@repo/api-shared";
 import { redirect } from "next/navigation";
 
-import { SignInMethods } from "../../components/auth";
-import { webApi } from "../../lib/api";
-import { meOnServer } from "../../lib/auth-server";
-import { safeNextPath } from "../../lib/safe-next-path";
+import { SignInMethods } from "../../../components/auth";
+import {
+  localizePath,
+  resolveRouteLocale,
+  safeNextPath,
+} from "../../../i18n/paths";
+import { webApi } from "../../../lib/api";
+import { meOnServer } from "../../../lib/auth-server";
 
 interface SignInPageProps {
+  params: Promise<{ locale: string }>;
   searchParams: Promise<{ next?: string }>;
 }
 
@@ -14,11 +19,16 @@ interface SignInPageProps {
  * Sign-in landing. Lists every enabled auth method (gated by the API's
  * `/enabled-methods` endpoint, cached 1h via Next's data cache).
  *
- * If the user is already signed in, redirect to `next` (or `/`).
+ * If the user is already signed in, redirect to `next` (or the locale root).
  */
-export default async function SignInPage({ searchParams }: SignInPageProps) {
+export default async function SignInPage({
+  params,
+  searchParams,
+}: SignInPageProps) {
+  const { locale: rawLocale } = await params;
+  const locale = resolveRouteLocale(rawLocale);
   const { next } = await searchParams;
-  const destination = safeNextPath(next);
+  const destination = safeNextPath(next, localizePath("/", locale));
   const existing = await meOnServer();
   if (existing) redirect(destination);
 
