@@ -11,6 +11,7 @@
     "lint": "expo lint"
   },
   "dependencies": {
+    "@expo-google-fonts/manrope": "^0.4.2",
     "@gorhom/bottom-sheet": "^5.2.14",
     "@react-navigation/bottom-tabs": "^7.15.5",
     "@react-navigation/drawer": "^7.10.2",
@@ -47,6 +48,7 @@
   },
   "devDependencies": {
     "@types/react": "19.2.2",
+    "eslint-config-expo": "~55.0.0",
     "typescript": "~5.9.2"
   },
   "private": true

@@ -6,15 +6,16 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
-    "build": "prisma generate && nest build",
+    "build": "pnpm --filter @repo/api-shared build && prisma generate && nest build",
     "postinstall": "prisma generate",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
-    "start": "nest start",
-    "dev": "nest start --watch",
+    "start": "pnpm --filter @repo/api-shared build && nest start",
+    "dev": "pnpm --filter @repo/api-shared build && nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
     "spec": "node dist/src/main --spec-only",
-    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --max-warnings 0",
+    "lint:fix": "eslint \"{src,apps,libs,test}/**/*.ts\" --max-warnings 0 --fix",
     "check-types": "tsc --noEmit",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
@@ -22,11 +23,11 @@
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio",
     "db:generate": "prisma generate",
-    "test": "jest --passWithNoTests",
+    "test": "jest --passWithNoTests --watchman=false",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "NODE_OPTIONS='--experimental-vm-modules' jest --config ./test/jest-e2e.json --passWithNoTests"
+    "test:e2e": "NODE_OPTIONS='--experimental-vm-modules' jest --config ./test/jest-e2e.json --passWithNoTests --runInBand --watchman=false"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
@@ -59,7 +60,6 @@
     "pino": "^9.5.0",
     "pino-http": "^10.4.0",
     "reflect-metadata": "^0.2.2",
-    "resend": "^6.12.3",
     "rxjs": "^7.8.1",
     "zod": "^4.4.3"
   },
@@ -115,6 +115,9 @@
       "**/*.(t|j)s"
     ],
     "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "setupFiles": [
+      "<rootDir>/../test/setup-env.ts"
+    ]
   }
 }
