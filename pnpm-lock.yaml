@@ -76,6 +76,9 @@ importers:
       "@repo/api-shared":
         specifier: workspace:*
         version: link:../../packages/api-shared
+      "@repo/i18n":
+        specifier: workspace:^
+        version: link:../../packages/i18n
       bcrypt:
         specifier: ^5.1.1
         version: 5.1.1
@@ -254,6 +257,9 @@ importers:
       "@react-navigation/native":
         specifier: ^7.1.33
         version: 7.2.4(react-native@0.83.6(@babel/core@7.29.0)(@types/react@19.2.2)(react@19.2.0))(react@19.2.0)
+      "@repo/i18n":
+        specifier: workspace:^
+        version: link:../../packages/i18n
       "@repo/theme-native":
         specifier: workspace:*
         version: link:../../packages/theme-native
@@ -357,6 +363,9 @@ importers:
       "@repo/api-shared":
         specifier: workspace:*
         version: link:../../packages/api-shared
+      "@repo/i18n":
+        specifier: workspace:^
+        version: link:../../packages/i18n
       "@repo/theme":
         specifier: workspace:*
         version: link:../../packages/theme

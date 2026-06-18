@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@repo/api-shared": "workspace:*",
+    "@repo/i18n": "workspace:^",
     "@repo/theme": "workspace:*",
     "@repo/ui": "workspace:*",
     "jose": "^6.2.3",
