@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
+import type { SupportedLocale } from "@repo/i18n";
 import {
   Avatar,
   AvatarFallback,
@@ -42,6 +43,12 @@ import {
   applyThemePreference,
   type ThemePreference,
 } from "../lib/theme-cookie";
+import {
+  getLocaleFromPathname,
+  getUnprefixedPathname,
+  isSignInPathname,
+  localizePath,
+} from "../i18n/paths";
 
 const NAVIGATION = [
   { href: "/", label: "Dashboard" },
@@ -62,22 +69,25 @@ export function AppShell({
   initialThemePreference: ThemePreference;
 }) {
   const pathname = usePathname();
+  const routePathname = getUnprefixedPathname(pathname);
+  const locale = getLocaleFromPathname(pathname);
 
-  if (pathname.startsWith("/sign-in")) {
+  if (isSignInPathname(pathname)) {
     return children;
   }
 
   return (
     <SidebarProvider>
       <AppSidebar
-        pathname={pathname}
+        locale={locale}
+        pathname={routePathname}
         initialThemePreference={initialThemePreference}
       />
       <SidebarInset>
         <header className="sticky top-0 z-sticky flex h-12 shrink-0 items-center gap-2 border-b border-border bg-background px-4">
           <SidebarTrigger />
           <span className="text-sm font-medium">
-            {PAGE_TITLES[pathname] ?? "DecTech"}
+            {PAGE_TITLES[routePathname] ?? "DecTech"}
           </span>
         </header>
         <div className="flex flex-1 flex-col">{children}</div>
@@ -87,9 +97,11 @@ export function AppShell({
 }
 
 function AppSidebar({
+  locale,
   pathname,
   initialThemePreference,
 }: {
+  locale: SupportedLocale;
   pathname: string;
   initialThemePreference: ThemePreference;
 }) {
@@ -98,7 +110,10 @@ function AppSidebar({
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" render={<Link href="/" />}>
+            <SidebarMenuButton
+              size="lg"
+              render={<Link href={localizePath("/", locale)} />}
+            >
               <Avatar size="md">
                 <AvatarFallback>DT</AvatarFallback>
               </Avatar>
@@ -121,7 +136,7 @@ function AppSidebar({
                 <SidebarMenuItem key={item.href}>
                   <SidebarMenuButton
                     isActive={pathname === item.href}
-                    render={<Link href={item.href} />}
+                    render={<Link href={localizePath(item.href, locale)} />}
                   >
                     <span>{item.label}</span>
                   </SidebarMenuButton>
@@ -133,7 +148,10 @@ function AppSidebar({
       </SidebarContent>
 
       <SidebarFooter>
-        <AccountMenu initialThemePreference={initialThemePreference} />
+        <AccountMenu
+          locale={locale}
+          initialThemePreference={initialThemePreference}
+        />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>
@@ -141,8 +159,10 @@ function AppSidebar({
 }
 
 function AccountMenu({
+  locale,
   initialThemePreference,
 }: {
+  locale: SupportedLocale;
   initialThemePreference: ThemePreference;
 }) {
   const { isMobile } = useSidebar();
@@ -203,7 +223,11 @@ function AccountMenu({
                 </span>
                 <span className="truncate font-normal">{email}</span>
               </DropdownMenuLabel>
-              <DropdownMenuItem render={<Link href="/account/settings" />}>
+              <DropdownMenuItem
+                render={
+                  <Link href={localizePath("/account/settings", locale)} />
+                }
+              >
                 Account settings
               </DropdownMenuItem>
               <DropdownMenuSub>

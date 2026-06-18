@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { localizePath, resolveRouteLocale } from "../../i18n/paths";
+
 const RADIUS_SAMPLES = [
   { label: "rounded-sm", className: "rounded-sm" },
   { label: "rounded-md", className: "rounded-md" },
@@ -16,7 +18,14 @@ const SHADOW_SAMPLES = [
   { label: "shadow-xl", className: "shadow-xl" },
 ] as const;
 
-export default function Home() {
+interface HomeProps {
+  params: Promise<{ locale: string }>;
+}
+
+export default async function Home({ params }: HomeProps) {
+  const { locale: rawLocale } = await params;
+  const locale = resolveRouteLocale(rawLocale);
+
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-12 px-6 py-12">
       <section className="space-y-4">
@@ -28,7 +37,7 @@ export default function Home() {
           </p>
         </div>
         <Link
-          href="/shadcn"
+          href={localizePath("/shadcn", locale)}
           className="inline-flex w-fit rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary-hover"
         >
           Open component showcase

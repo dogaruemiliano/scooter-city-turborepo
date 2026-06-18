@@ -3,7 +3,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { SessionProvider } from "../../../components/auth/SessionProvider";
+import { SessionProvider } from "../../../../components/auth/SessionProvider";
 import { AccountSettings } from "./AccountSettings";
 
 const mocks = vi.hoisted(() => ({
@@ -12,13 +12,14 @@ const mocks = vi.hoisted(() => ({
   replace: vi.fn(),
 }));
 
-vi.mock("../../../lib/api", () => ({
+vi.mock("../../../../lib/api", () => ({
   webApi: {
     fetch: mocks.apiFetch,
   },
 }));
 
 vi.mock("next/navigation", () => ({
+  usePathname: () => "/account/settings",
   useRouter: () => ({
     refresh: mocks.refresh,
     replace: mocks.replace,

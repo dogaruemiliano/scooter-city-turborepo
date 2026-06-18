@@ -20,6 +20,7 @@ vi.mock("../../lib/api", () => ({
 }));
 
 vi.mock("next/navigation", () => ({
+  usePathname: () => "/sign-in",
   useRouter: () => ({
     replace: mocks.replace,
     refresh: mocks.refresh,

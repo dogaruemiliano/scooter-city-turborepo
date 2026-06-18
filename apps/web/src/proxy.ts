@@ -6,14 +6,15 @@
  * is unchanged — see https://nextjs.org/docs/app/api-reference/file-conventions/proxy.
  *
  *   1. If the user holds a valid access cookie → render.
- *   2. If on the public sign-in path → render.
+ *   2. If on the public sign-in path → render through locale routing.
  *   3. If holding only a refresh cookie → server-to-server POST
  *      /v1/auth/refresh with the request's cookie jar; forward the
  *      Set-Cookie back to the browser and render. This is the "tab
  *      was idle for >15min so access expired but refresh is still
  *      good" path — without it, every long-idle tab would redirect to
  *      /sign-in on first interaction.
- *   4. Otherwise → redirect to /sign-in?next=<original-path>.
+ *   4. Otherwise → redirect to the localized sign-in URL with
+ *      ?next=<original-local-path>.
  *
  * Access-cookie *validity* is verified by RSCs via `meOnServer()`
  * (JWKS local verify) — this proxy only checks for the cookie's
@@ -21,18 +22,26 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { v1 } from "@repo/api-shared";
+import createMiddleware from "next-intl/middleware";
 
+import {
+  getLocalizedSignInPath,
+  getLocaleFromPathname,
+  isPublicPathname,
+  safeNextPath,
+} from "./i18n/paths";
+import { routing } from "./i18n/routing";
 import { webApi } from "./lib/api";
 
-const PUBLIC_PATHS = ["/sign-in"];
+const handleI18nRouting = createMiddleware(routing);
 
 export async function proxy(req: NextRequest): Promise<NextResponse> {
   const access = req.cookies.get(v1.auth.ACCESS_TOKEN_COOKIE)?.value;
   const refresh = req.cookies.get(v1.auth.REFRESH_TOKEN_COOKIE)?.value;
-  const isPublic = PUBLIC_PATHS.some((p) => req.nextUrl.pathname.startsWith(p));
+  const isPublic = isPublicPathname(req.nextUrl.pathname);
 
-  if (access) return NextResponse.next();
-  if (isPublic) return NextResponse.next();
+  if (access) return handleI18nRouting(req);
+  if (isPublic) return handleI18nRouting(req);
 
   if (!refresh) return redirectToSignIn(req);
 
@@ -74,7 +83,8 @@ export async function proxy(req: NextRequest): Promise<NextResponse> {
     "cookie",
     [...requestCookies].map(([name, value]) => `${name}=${value}`).join("; "),
   );
-  const res = NextResponse.next({ request: { headers: requestHeaders } });
+  const res = handleI18nRouting(req);
+  mergeRequestOverrides(res, requestHeaders);
 
   // Also persist the cookies in the browser for subsequent requests.
   for (const cookie of setCookies) {
@@ -84,14 +94,54 @@ export async function proxy(req: NextRequest): Promise<NextResponse> {
 }
 
 function redirectToSignIn(req: NextRequest): NextResponse {
-  const url = new URL("/sign-in", req.url);
-  url.searchParams.set("next", req.nextUrl.pathname);
+  const locale = getLocaleFromPathname(req.nextUrl.pathname);
+  const next = safeNextPath(`${req.nextUrl.pathname}${req.nextUrl.search}`);
+  const url = new URL(getLocalizedSignInPath(locale, next), req.url);
   return NextResponse.redirect(url);
 }
 
+function mergeRequestOverrides(
+  response: NextResponse,
+  requestHeaders: Headers,
+): void {
+  const mergedHeaders = new Headers(requestHeaders);
+  const existingOverrideHeaders =
+    response.headers.get("x-middleware-override-headers") ?? "";
+
+  for (const key of existingOverrideHeaders.split(",")) {
+    const headerName = key.trim();
+    if (headerName.length === 0) {
+      continue;
+    }
+
+    const value = response.headers.get(`x-middleware-request-${headerName}`);
+    if (value !== null) {
+      mergedHeaders.set(headerName, value);
+    }
+  }
+
+  const cookieHeader = requestHeaders.get("cookie");
+  if (cookieHeader !== null) {
+    mergedHeaders.set("cookie", cookieHeader);
+  }
+
+  const overrideResponse = NextResponse.next({
+    request: { headers: mergedHeaders },
+  });
+
+  for (const [key, value] of overrideResponse.headers) {
+    if (
+      key === "x-middleware-override-headers" ||
+      key.startsWith("x-middleware-request-")
+    ) {
+      response.headers.set(key, value);
+    }
+  }
+}
+
 export const config = {
-  // Skip Next internals + favicon + .well-known. Sign-in is handled
+  // Skip Next internals + public files + .well-known. Sign-in is handled
   // inside the proxy body so it can still get the "already signed in →
   // redirect" treatment if we add it later.
-  matcher: ["/((?!_next/|favicon.ico|.well-known/).*)"],
+  matcher: ["/((?!api|trpc|_next|_vercel|favicon.ico|.well-known|.*\\..*).*)"],
 };
