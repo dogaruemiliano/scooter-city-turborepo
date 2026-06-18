@@ -39,6 +39,9 @@ import type { Request, Response } from "express";
 import { ZodSerializationException, ZodValidationException } from "nestjs-zod";
 import { ZodError } from "zod";
 
+import { localizeErrorMessage } from "../i18n/error-messages";
+import { getRequestLocale } from "../i18n/request-locale";
+
 interface ErrorResponse {
   error: {
     code: string;
@@ -163,10 +166,21 @@ export class AllExceptionsFilter implements ExceptionFilter {
       this.logger.error(`Non-Error thrown: ${String(exception)}`);
     }
 
+    const resolvedCode = code ?? codeForStatus(status);
+    const localizedMessage = localizeErrorMessage(
+      {
+        status,
+        code: resolvedCode,
+        message,
+        ...(details !== undefined ? { details } : {}),
+      },
+      getRequestLocale(req),
+    );
+
     const payload: ErrorResponse = {
       error: {
-        code: code ?? codeForStatus(status),
-        message,
+        code: resolvedCode,
+        message: localizedMessage,
         ...(details !== undefined ? { details } : {}),
         ...(req.id ? { requestId: req.id } : {}),
       },

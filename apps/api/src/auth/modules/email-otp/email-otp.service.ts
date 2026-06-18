@@ -1,5 +1,6 @@
 import { Injectable, UnauthorizedException } from "@nestjs/common";
 import type { v1 } from "@repo/api-shared";
+import type { SupportedLocale } from "@repo/i18n";
 
 import { AuditService } from "../../../audit/audit.service";
 import { AuditEventType } from "../../../audit/audit.types";
@@ -16,6 +17,7 @@ interface RequestInput {
   email: string;
   ip: string | null;
   userAgent: string | null;
+  locale: SupportedLocale;
 }
 
 interface VerifyInput {
@@ -51,6 +53,7 @@ export class EmailOtpService {
       purpose: OTP_PURPOSE_AUTH,
       target: input.email,
       ip: input.ip,
+      locale: input.locale,
     });
   }
 

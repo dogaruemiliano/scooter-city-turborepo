@@ -18,6 +18,7 @@
  */
 import { Inject, Injectable, UnauthorizedException } from "@nestjs/common";
 import type { v1 } from "@repo/api-shared";
+import type { SupportedLocale } from "@repo/i18n";
 
 import { AuditService } from "../../../audit/audit.service";
 import { AuditEventType } from "../../../audit/audit.types";
@@ -35,6 +36,7 @@ export interface GoogleSignInArgs {
   idToken: string;
   userAgent?: string | null;
   ip?: string | null;
+  locale?: SupportedLocale;
 }
 
 export type GoogleSignInResult =
@@ -79,6 +81,7 @@ export class GoogleAuthService {
           firstName: this.firstName(claims.name),
           lastName: this.lastName(claims.name),
           ip: args.ip ?? null,
+          locale: args.locale,
         }),
       };
     }

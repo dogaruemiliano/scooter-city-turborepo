@@ -34,6 +34,7 @@ import type { Request, Response } from "express";
 import { ZodResponse } from "nestjs-zod";
 
 import { getRequestMetadata } from "../../../common/http/request-metadata";
+import { getRequestLocale } from "../../../common/i18n/request-locale";
 import { ENV } from "../../../config/config.module";
 import type { Env } from "../../../config/env";
 import { OtpRequestBurst } from "../../decorators/otp-request-burst.decorator";
@@ -69,6 +70,7 @@ export class EmailOtpController {
   ): Promise<OtpChallengeMetadata> {
     return this.service.request({
       email: body.email,
+      locale: getRequestLocale(req),
       ...getRequestMetadata(req),
     });
   }

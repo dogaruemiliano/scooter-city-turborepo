@@ -6,6 +6,11 @@ import {
   Logger,
   UnauthorizedException,
 } from "@nestjs/common";
+import {
+  fallbackLocale,
+  formatMessage,
+  type SupportedLocale,
+} from "@repo/i18n";
 import ms from "ms";
 
 import { ENV } from "../../../config/config.module";
@@ -47,6 +52,7 @@ export interface CreateEmailChallengeInput {
   providerId?: string | null;
   firstName?: string | null;
   lastName?: string | null;
+  locale?: SupportedLocale;
 }
 
 export interface VerifyChallengeInput {
@@ -74,6 +80,7 @@ export type VerifyChallengeResult<T> =
 
 interface DeliveryReservation {
   challenge: OtpChallenge;
+  locale: SupportedLocale;
   shouldSend: boolean;
   created: boolean;
   quotaReservations: OtpDeliveryQuotaReservation[];
@@ -110,9 +117,10 @@ export class OtpChallengeService {
   async resend(
     challengeId: string,
     ip: string | null,
+    locale?: SupportedLocale,
   ): Promise<OtpChallengeMetadata> {
     const reservation = await this.runSerializable((tx) =>
-      this.reserveResend(tx, challengeId, ip),
+      this.reserveResend(tx, challengeId, ip, locale),
     );
 
     if (!reservation) {
@@ -228,7 +236,13 @@ export class OtpChallengeService {
     });
 
     if (existing && this.isReusable(existing, input, now)) {
-      return this.reserveExistingDelivery(tx, existing, now, input.ip);
+      return this.reserveExistingDelivery(
+        tx,
+        existing,
+        now,
+        input.ip,
+        this.localeFor(input.locale),
+      );
     }
 
     if (existing) {
@@ -270,6 +284,7 @@ export class OtpChallengeService {
 
     return {
       challenge,
+      locale: this.localeFor(input.locale),
       shouldSend: true,
       created: true,
       quotaReservations,
@@ -281,13 +296,20 @@ export class OtpChallengeService {
     tx: Prisma.TransactionClient,
     challengeId: string,
     ip: string | null,
+    locale: SupportedLocale | undefined,
   ): Promise<DeliveryReservation | null> {
     const challenge = await tx.otpChallenge.findUnique({
       where: { id: challengeId },
     });
     if (!challenge || !this.isActive(challenge, new Date())) return null;
 
-    return this.reserveExistingDelivery(tx, challenge, new Date(), ip);
+    return this.reserveExistingDelivery(
+      tx,
+      challenge,
+      new Date(),
+      ip,
+      this.localeFor(locale),
+    );
   }
 
   private async reserveExistingDelivery(
@@ -295,10 +317,12 @@ export class OtpChallengeService {
     challenge: OtpChallenge,
     now: Date,
     ip: string | null,
+    locale: SupportedLocale,
   ): Promise<DeliveryReservation> {
     if (challenge.nextSendAt > now) {
       return {
         challenge,
+        locale,
         shouldSend: false,
         created: false,
         quotaReservations: [],
@@ -324,6 +348,7 @@ export class OtpChallengeService {
 
     return {
       challenge: reserved,
+      locale,
       shouldSend: true,
       created: false,
       quotaReservations,
@@ -341,7 +366,7 @@ export class OtpChallengeService {
     if (!reservation.shouldSend) return;
 
     try {
-      await this.send(reservation.challenge);
+      await this.send(reservation.challenge, reservation.locale);
     } catch (error) {
       try {
         await this.runSerializable(async (tx) => {
@@ -379,17 +404,19 @@ export class OtpChallengeService {
     }
   }
 
-  private async send(challenge: OtpChallenge): Promise<void> {
+  private async send(
+    challenge: OtpChallenge,
+    locale: SupportedLocale,
+  ): Promise<void> {
     const code = this.codeFor(challenge.id);
-    const oauthVerification =
-      challenge.purpose === OTP_PURPOSE_OAUTH_EMAIL_VERIFY;
 
     await this.mailer.send({
       to: challenge.target,
-      subject: oauthVerification ? "Verify your email" : "Your sign-in code",
-      text: oauthVerification
-        ? `Your email verification code is ${code}. It expires in ${this.env.OTP_TTL}.`
-        : `Your sign-in code is ${code}. It expires in ${this.env.OTP_TTL}.`,
+      subject: formatMessage(locale, "api.auth.otpEmailSubject"),
+      text: formatMessage(locale, "api.auth.otpSent", {
+        code,
+        ttl: this.otpTtlMinutes(),
+      }),
     });
   }
 
@@ -443,6 +470,17 @@ export class OtpChallengeService {
       nodeEnv: this.env.NODE_ENV,
       length: this.env.OTP_LENGTH,
     });
+  }
+
+  private localeFor(
+    locale: SupportedLocale | null | undefined,
+  ): SupportedLocale {
+    return locale ?? fallbackLocale;
+  }
+
+  private otpTtlMinutes(): number {
+    const ttlMs = ms(this.env.OTP_TTL as ms.StringValue);
+    return Math.max(1, Math.ceil(ttlMs / 60_000));
   }
 
   private resendDelayMs(sentCount: number): number {

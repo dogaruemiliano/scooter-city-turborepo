@@ -34,6 +34,7 @@ import type { Request, Response } from "express";
 import { ZodSerializerDto } from "nestjs-zod";
 
 import { getRequestMetadata } from "../../../common/http/request-metadata";
+import { getRequestLocale } from "../../../common/i18n/request-locale";
 import { ENV } from "../../../config/config.module";
 import type { Env } from "../../../config/env";
 import { LoginBurst } from "../../decorators/login-burst.decorator";
@@ -84,6 +85,7 @@ export class AppleAuthController {
     const result = await this.appleAuth.signIn({
       idToken: body.idToken,
       fullName: body.fullName ?? null,
+      locale: getRequestLocale(req),
       ...getRequestMetadata(req),
     });
 

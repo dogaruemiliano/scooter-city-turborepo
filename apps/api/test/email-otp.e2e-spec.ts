@@ -81,10 +81,15 @@ describe("EmailOtpController (e2e)", () => {
 
   async function requestChallenge(
     email: string,
+    headers: Record<string, string> = {},
   ): Promise<v1.auth.OtpChallengeMetadata> {
-    const response = await request(server())
-      .post(v1.auth.ROUTES.emailOtp.request)
-      .send({ email });
+    const requestBuilder = request(server()).post(
+      v1.auth.ROUTES.emailOtp.request,
+    );
+    for (const [name, value] of Object.entries(headers)) {
+      requestBuilder.set(name, value);
+    }
+    const response = await requestBuilder.send({ email });
     expect(response.status).toBe(202);
     const challenge = v1.auth.otpChallengeMetadataSchema.parse(response.body);
     expect(challenge).toMatchObject({
@@ -125,6 +130,39 @@ describe("EmailOtpController (e2e)", () => {
     });
     expect(mailer.findLastTo(existing.email)?.text).toContain(DEV_OTP);
     expect(mailer.findLastTo(unknownEmail)?.text).toContain(DEV_OTP);
+  });
+
+  it("localizes OTP email and known error envelopes from request locale", async () => {
+    const invalidBody = await request(server())
+      .post(v1.auth.ROUTES.emailOtp.request)
+      .set("X-Locale", "ro")
+      .send({ email: "not-an-email" });
+    expect(invalidBody.status).toBe(400);
+    expect(invalidBody.body).toMatchObject({
+      error: {
+        code: "BAD_REQUEST",
+        message: "Cererea conține date invalide.",
+      },
+    });
+
+    const email = uniqueEmail("localized");
+    const challenge = await requestChallenge(email, { "X-Locale": "ro" });
+    expect(mailer.findLastTo(email)).toMatchObject({
+      subject: "Codul tău de autentificare",
+      text: `Codul tău este ${DEV_OTP}. Expiră în 10 minute.`,
+    });
+
+    const invalidCode = await request(server())
+      .post(v1.auth.ROUTES.emailOtp.verify)
+      .set("Accept-Language", "ro-RO, en;q=0.1")
+      .send({ challengeId: challenge.challengeId, code: "111111" });
+    expect(invalidCode.status).toBe(401);
+    expect(invalidCode.body).toMatchObject({
+      error: {
+        code: "UNAUTHORIZED",
+        message: "Codul este invalid sau a expirat.",
+      },
+    });
   });
 
   it("verifies a new email, creates one user and session, and emits signup audits", async () => {
