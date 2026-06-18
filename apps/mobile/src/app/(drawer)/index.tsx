@@ -1,15 +1,18 @@
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { DecText } from "@repo/ui-native/DecText";
+import { useTranslation } from "@/localization";
 
 export default function HomeScreen() {
+  const { t } = useTranslation();
+
   return (
     <View style={styles.container}>
       <DecText size="3xl" weight="bold">
-        Home
+        {t("home.title")}
       </DecText>
       <DecText size="base" color="secondary">
-        Welcome — open the drawer to navigate.
+        {t("home.welcome")}
       </DecText>
     </View>
   );
