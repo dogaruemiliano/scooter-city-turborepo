@@ -7,11 +7,11 @@ export default function DrawerLayout() {
   return (
     <Drawer
       screenOptions={{
-        headerStyle: { backgroundColor: theme.colors.surface.page },
-        headerTintColor: theme.colors.text.primary,
-        drawerStyle: { backgroundColor: theme.colors.surface.raised },
-        drawerActiveTintColor: theme.colors.surface.action,
-        drawerInactiveTintColor: theme.colors.text.secondary,
+        headerStyle: { backgroundColor: theme.colors.background },
+        headerTintColor: theme.colors.foreground,
+        drawerStyle: { backgroundColor: theme.colors.card },
+        drawerActiveTintColor: theme.colors.primary,
+        drawerInactiveTintColor: theme.colors.mutedForeground,
       }}
     >
       <Drawer.Screen

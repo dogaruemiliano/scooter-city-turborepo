@@ -339,7 +339,7 @@ const Row = ({ children, style, ...rest }: ViewProps) => (
 const styles = StyleSheet.create((theme, rt) => ({
   scroll: {
     flex: 1,
-    backgroundColor: theme.colors.surface.page,
+    backgroundColor: theme.colors.background,
   },
   content: {
     paddingTop: rt.insets.top + theme.spacing[4],
@@ -353,8 +353,8 @@ const styles = StyleSheet.create((theme, rt) => ({
   section: {
     gap: theme.spacing[4],
     paddingTop: theme.spacing[4],
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border.subtle,
+    borderTopWidth: theme.spacing.px,
+    borderTopColor: theme.colors.border,
   },
   sectionHeader: {
     gap: theme.spacing[1],

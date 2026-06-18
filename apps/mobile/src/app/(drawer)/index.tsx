@@ -8,7 +8,7 @@ export default function HomeScreen() {
       <DecText size="3xl" weight="bold">
         Home
       </DecText>
-      <DecText size="md" color="secondary">
+      <DecText size="base" color="secondary">
         Welcome — open the drawer to navigate.
       </DecText>
     </View>
@@ -21,6 +21,6 @@ const styles = StyleSheet.create((theme) => ({
     alignItems: "center",
     justifyContent: "center",
     gap: theme.spacing[2],
-    backgroundColor: theme.colors.surface.page,
+    backgroundColor: theme.colors.background,
   },
 }));

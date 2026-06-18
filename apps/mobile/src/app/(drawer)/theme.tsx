@@ -1,6 +1,10 @@
 import { ScrollView, View, type ViewStyle } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
-import { DecText, type DecTextSize } from "@repo/ui-native/DecText";
+import {
+  DecText,
+  type DecTextSize,
+  type DecTextWeight,
+} from "@repo/ui-native/DecText";
 import type { ReactNode } from "react";
 
 export default function ThemeScreen() {
@@ -9,20 +13,11 @@ export default function ThemeScreen() {
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
       <Section title="Colors">
-        {Object.entries(theme.colors).map(([group, values]) => (
-          <View key={group} style={styles.group}>
-            <DecText size="lg" weight="semibold" style={styles.groupLabel}>
-              {group}
-            </DecText>
-            <View style={styles.swatchRow}>
-              {Object.entries(values as Record<string, string>).map(
-                ([name, hex]) => (
-                  <Swatch key={name} name={name} hex={hex} />
-                ),
-              )}
-            </View>
-          </View>
-        ))}
+        <View style={styles.swatchRow}>
+          {Object.entries(theme.colors).map(([name, hex]) => (
+            <Swatch key={name} name={name} hex={hex} />
+          ))}
+        </View>
       </Section>
 
       <Section title="Spacing">
@@ -48,7 +43,7 @@ export default function ThemeScreen() {
               />
               <DecText size="xs">{key}</DecText>
               <DecText size="xs" color="tertiary">
-                {(value as number) === 9999 ? "pill" : `${value}px`}
+                {(value as number) === 9999 ? "full" : `${value}px`}
               </DecText>
             </View>
           ))}
@@ -69,7 +64,7 @@ export default function ThemeScreen() {
       <Section title="Typography — Weight">
         {Object.entries(theme.typography.fontWeight).map(([key, value]) => (
           <View key={key} style={styles.typeRow}>
-            <DecText size="lg" style={{ fontWeight: String(value) as "400" }}>
+            <DecText size="lg" weight={key as DecTextWeight}>
               {key} — Aa Bb Cc
             </DecText>
             <DecText size="xs" color="secondary">
@@ -108,7 +103,7 @@ export default function ThemeScreen() {
       <Section title="Shadow">
         <View style={styles.shadowRow}>
           {Object.entries(theme.shadow).map(([key, value]) => {
-            const shadowStyle = (value as { native: ViewStyle }).native;
+            const shadowStyle = value as ViewStyle;
             return (
               <View key={key} style={styles.shadowItem}>
                 <View style={[styles.shadowBox, shadowStyle]} />
@@ -179,10 +174,8 @@ const Section = ({
 const Swatch = ({ name, hex }: { name: string; hex: string }) => (
   <View style={styles.swatchWrap}>
     <View style={[styles.swatch, { backgroundColor: hex }]} />
-    <DecText size="xs" style={styles.swatchName}>
-      {name}
-    </DecText>
-    <DecText size="xs" color="tertiary" style={styles.swatchHex}>
+    <DecText size="xs">{name}</DecText>
+    <DecText size="xs" color="tertiary">
       {hex}
     </DecText>
   </View>
@@ -191,7 +184,7 @@ const Swatch = ({ name, hex }: { name: string; hex: string }) => (
 const styles = StyleSheet.create((theme) => ({
   scroll: {
     flex: 1,
-    backgroundColor: theme.colors.surface.page,
+    backgroundColor: theme.colors.background,
   },
   content: {
     padding: theme.spacing[4],
@@ -203,12 +196,6 @@ const styles = StyleSheet.create((theme) => ({
   },
   sectionTitle: {
     marginBottom: theme.spacing[1],
-  },
-  group: {
-    gap: theme.spacing[2],
-  },
-  groupLabel: {
-    textTransform: "capitalize",
   },
   swatchRow: {
     flexDirection: "row",
@@ -223,14 +210,8 @@ const styles = StyleSheet.create((theme) => ({
     width: "100%",
     height: theme.spacing[12],
     borderRadius: theme.radius.md,
-    borderWidth: 1,
-    borderColor: theme.colors.border.subtle,
-  },
-  swatchName: {
-    fontSize: 11,
-  },
-  swatchHex: {
-    fontSize: 10,
+    borderWidth: theme.spacing.px,
+    borderColor: theme.colors.border,
   },
   row: {
     flexDirection: "row",
@@ -238,14 +219,14 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.spacing[3],
   },
   rowLabel: {
-    width: 72,
+    width: theme.spacing[18],
   },
   rowValue: {
     marginLeft: "auto",
   },
   spacingBar: {
     height: theme.spacing[3],
-    backgroundColor: theme.colors.surface.action,
+    backgroundColor: theme.colors.primary,
     borderRadius: theme.radius.sm,
   },
   tileRow: {
@@ -258,11 +239,11 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.spacing[1],
   },
   radiusBox: {
-    width: 72,
-    height: 72,
-    backgroundColor: theme.colors.surface.actionSubtle,
-    borderWidth: 1,
-    borderColor: theme.colors.border.subtle,
+    width: theme.spacing[18],
+    height: theme.spacing[18],
+    backgroundColor: theme.colors.accent,
+    borderWidth: theme.spacing.px,
+    borderColor: theme.colors.border,
   },
   typeRow: {
     flexDirection: "row",
@@ -284,9 +265,9 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.spacing[2],
   },
   shadowBox: {
-    width: 72,
-    height: 72,
+    width: theme.spacing[18],
+    height: theme.spacing[18],
     borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.surface.raised,
+    backgroundColor: theme.colors.card,
   },
 }));
