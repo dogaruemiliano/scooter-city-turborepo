@@ -1,11 +1,19 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist_Mono, Manrope } from "next/font/google";
 import { cookies } from "next/headers";
-import { resolveDataTheme, THEME_COOKIE_NAME } from "../lib/theme-cookie";
+import { TooltipProvider } from "@repo/ui/components/tooltip";
+import { AppShell } from "../components/AppShell";
+import { SessionProvider } from "../components/auth/SessionProvider";
+import { meOnServer } from "../lib/auth-server";
+import {
+  resolveDataTheme,
+  resolveThemePreference,
+  THEME_COOKIE_NAME,
+} from "../lib/theme-cookie";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-sans",
+const manrope = Manrope({
+  variable: "--font-manrope",
   subsets: ["latin"],
 });
 
@@ -24,17 +32,31 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const dataTheme = resolveDataTheme(
-    (await cookies()).get(THEME_COOKIE_NAME)?.value,
-  );
+  const [cookieStore, initialUser] = await Promise.all([
+    cookies(),
+    meOnServer(),
+  ]);
+  const themeCookie = cookieStore.get(THEME_COOKIE_NAME)?.value;
+  const dataTheme = resolveDataTheme(themeCookie);
+  const initialThemePreference = resolveThemePreference(themeCookie);
 
   return (
     <html
       lang="en"
       data-theme={dataTheme}
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${manrope.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="relative min-h-full">
+        <div className="isolate flex min-h-full flex-col">
+          <TooltipProvider>
+            <SessionProvider initialUser={initialUser}>
+              <AppShell initialThemePreference={initialThemePreference}>
+                {children}
+              </AppShell>
+            </SessionProvider>
+          </TooltipProvider>
+        </div>
+      </body>
     </html>
   );
 }

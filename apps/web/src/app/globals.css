@@ -1,10 +1,2 @@
 @import "tailwindcss";
-@import "@repo/theme/css";
-
-@layer base {
-  body {
-    background-color: var(--color-surface-page);
-    color: var(--color-text-primary);
-    font-family: var(--font-sans);
-  }
-}
+@import "@repo/ui/globals.css";

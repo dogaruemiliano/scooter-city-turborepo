@@ -22,7 +22,7 @@ export function ThemeToggle({
     <div
       role="radiogroup"
       aria-label="Theme"
-      className="inline-flex items-center gap-1 rounded-pill border border-border-default p-1"
+      className="inline-flex items-center gap-1 rounded-full border border-border p-1"
     >
       {(["light", "dark", "system"] as const).map((option) => {
         const selected = pref === option;
@@ -34,10 +34,10 @@ export function ThemeToggle({
             aria-checked={selected}
             onClick={() => set(option)}
             className={
-              "rounded-pill px-3 py-1 text-sm font-medium transition-colors " +
+              "rounded-full px-3 py-1 text-sm font-medium transition-colors " +
               (selected
-                ? "bg-surface-action text-text-on-action"
-                : "text-text-secondary hover:text-text-primary")
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground")
             }
           >
             {option[0]!.toUpperCase() + option.slice(1)}
