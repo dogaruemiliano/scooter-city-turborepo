@@ -41,6 +41,7 @@ import type { Request, Response } from "express";
 import { ZodSerializerDto } from "nestjs-zod";
 
 import { getRequestMetadata } from "../../../common/http/request-metadata";
+import { getRequestLocale } from "../../../common/i18n/request-locale";
 import { ENV } from "../../../config/config.module";
 import type { Env } from "../../../config/env";
 import { LoginBurst } from "../../decorators/login-burst.decorator";
@@ -89,6 +90,7 @@ export class GoogleAuthController {
   ): Promise<v1.auth.OAuthSignInResult> {
     const result = await this.google.signIn({
       idToken: body.idToken,
+      locale: getRequestLocale(req),
       ...getRequestMetadata(req),
     });
 

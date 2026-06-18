@@ -23,6 +23,7 @@
  */
 import { Injectable, UnauthorizedException } from "@nestjs/common";
 import type { v1 } from "@repo/api-shared";
+import type { SupportedLocale } from "@repo/i18n";
 
 import { AuditService } from "../../../audit/audit.service";
 import { AuditEventType } from "../../../audit/audit.types";
@@ -41,6 +42,7 @@ export interface AppleSignInArgs {
   fullName?: { givenName?: string | null; familyName?: string | null } | null;
   userAgent?: string | null;
   ip?: string | null;
+  locale?: SupportedLocale;
 }
 
 export type AppleSignInResult =
@@ -107,6 +109,7 @@ export class AppleAuthService {
           firstName: args.fullName?.givenName ?? null,
           lastName: args.fullName?.familyName ?? null,
           ip: args.ip ?? null,
+          locale: args.locale,
         }),
       };
     }

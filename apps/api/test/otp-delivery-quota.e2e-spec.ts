@@ -134,10 +134,12 @@ describe("OTP delivery quotas (e2e)", () => {
         requestId: string;
       };
     };
+    const expectedMessage =
+      `Too many requests. Try again in ${blockedBody.error.details.retryAfterSec} seconds.`;
     expect(blockedBody).toEqual({
       error: {
         code: "OTP_DELIVERY_QUOTA_EXCEEDED",
-        message: "Too many code requests. Try again later.",
+        message: expectedMessage,
         details: {
           retryAfterSec: expect.any(Number) as number,
         },

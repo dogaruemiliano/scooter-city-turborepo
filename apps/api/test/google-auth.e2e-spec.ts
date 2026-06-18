@@ -348,6 +348,7 @@ describe("GoogleAuthController (e2e)", () => {
       .send({ idToken: existingToken });
     const unknownResponse = await request(server())
       .post("/v1/auth/google")
+      .set("X-Locale", "ro")
       .send({ idToken: unknownToken });
     const existingBody =
       existingResponse.body as v1.auth.OAuthEmailVerificationRequired;
@@ -369,8 +370,14 @@ describe("GoogleAuthController (e2e)", () => {
     );
     expect(existingBody.challengeId).not.toBe(unknownBody.challengeId);
     createdChallengeIds.push(existingBody.challengeId, unknownBody.challengeId);
-    expect(mailer.findLastTo(existingEmail)?.text).toContain("000000");
-    expect(mailer.findLastTo(unknownEmail)?.text).toContain("000000");
+    expect(mailer.findLastTo(existingEmail)).toMatchObject({
+      subject: "Your sign-in code",
+      text: "Your code is 000000. It expires in 10 minutes.",
+    });
+    expect(mailer.findLastTo(unknownEmail)).toMatchObject({
+      subject: "Codul tău de autentificare",
+      text: "Codul tău este 000000. Expiră în 10 minute.",
+    });
 
     const accounts = await prisma.authAccount.findMany({
       where: { userId: user.id, provider: "google" },

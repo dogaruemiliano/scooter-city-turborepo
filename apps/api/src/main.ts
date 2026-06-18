@@ -34,6 +34,7 @@ import { VersioningType } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import type { NestExpressApplication } from "@nestjs/platform-express";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
+import { localeHeaderName } from "@repo/i18n";
 
 import { AppModule } from "./app.module";
 import { loadEnv } from "./config/env";
@@ -98,6 +99,7 @@ async function bootstrap(): Promise<void> {
       "Authorization",
       "X-Request-Id",
       "X-Requested-With",
+      localeHeaderName,
     ],
     exposedHeaders: ["X-Request-Id"],
   });

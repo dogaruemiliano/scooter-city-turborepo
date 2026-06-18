@@ -1,5 +1,6 @@
 import { Injectable, UnauthorizedException } from "@nestjs/common";
 import type { v1 } from "@repo/api-shared";
+import type { SupportedLocale } from "@repo/i18n";
 
 import { AuditService } from "../../../audit/audit.service";
 import { AuditEventType } from "../../../audit/audit.types";
@@ -24,6 +25,7 @@ export interface CreateOAuthEmailVerificationInput {
   firstName: string | null;
   lastName: string | null;
   ip: string | null;
+  locale?: SupportedLocale;
 }
 
 export interface VerifyOAuthEmailVerificationInput {
@@ -67,6 +69,7 @@ export class OAuthEmailVerificationService {
       providerId: input.providerId,
       firstName: input.firstName,
       lastName: input.lastName,
+      locale: input.locale,
     });
   }
 

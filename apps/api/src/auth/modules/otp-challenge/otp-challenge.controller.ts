@@ -15,6 +15,7 @@ import type { Request } from "express";
 import { ZodResponse } from "nestjs-zod";
 
 import { getRequestMetadata } from "../../../common/http/request-metadata";
+import { getRequestLocale } from "../../../common/i18n/request-locale";
 import { OtpRequestBurst } from "../../decorators/otp-request-burst.decorator";
 import { Public } from "../../decorators/public.decorator";
 
@@ -43,6 +44,10 @@ export class OtpChallengeController {
     @Body() body: ResendOtpChallengeInput,
     @Req() req: Request,
   ): Promise<OtpChallengeMetadata> {
-    return this.challenges.resend(body.challengeId, getRequestMetadata(req).ip);
+    return this.challenges.resend(
+      body.challengeId,
+      getRequestMetadata(req).ip,
+      getRequestLocale(req),
+    );
   }
 }
