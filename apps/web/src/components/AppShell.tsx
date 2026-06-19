@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { useState, type ReactNode } from "react";
 import type { SupportedLocale } from "@repo/i18n";
 import {
@@ -39,10 +40,12 @@ import {
 
 import { useLogout } from "./auth/LogoutButton";
 import { useSession } from "./auth/SessionProvider";
+import { LanguageMenuSub } from "./LanguageSwitcher";
 import {
   applyThemePreference,
   type ThemePreference,
 } from "../lib/theme-cookie";
+import type { SessionIdentity } from "../lib/auth-types";
 import {
   getLocaleFromPathname,
   getUnprefixedPathname,
@@ -51,14 +54,14 @@ import {
 } from "../i18n/paths";
 
 const NAVIGATION = [
-  { href: "/", label: "Dashboard" },
-  { href: "/shadcn", label: "UI showcase" },
+  { href: "/", labelKey: "dashboard" },
+  { href: "/shadcn", labelKey: "uiShowcase" },
 ] as const;
 
 const PAGE_TITLES: Record<string, string> = {
-  "/": "Dashboard",
-  "/account/settings": "Account settings",
-  "/shadcn": "UI showcase",
+  "/": "dashboard",
+  "/account/settings": "accountSettings",
+  "/shadcn": "uiShowcase",
 };
 
 export function AppShell({
@@ -68,9 +71,11 @@ export function AppShell({
   children: ReactNode;
   initialThemePreference: ThemePreference;
 }) {
+  const tPages = useTranslations("appShell.pages");
   const pathname = usePathname();
   const routePathname = getUnprefixedPathname(pathname);
   const locale = getLocaleFromPathname(pathname);
+  const pageTitleKey = PAGE_TITLES[routePathname];
 
   if (isSignInPathname(pathname)) {
     return children;
@@ -87,7 +92,7 @@ export function AppShell({
         <header className="sticky top-0 z-sticky flex h-12 shrink-0 items-center gap-2 border-b border-border bg-background px-4">
           <SidebarTrigger />
           <span className="text-sm font-medium">
-            {PAGE_TITLES[routePathname] ?? "DecTech"}
+            {pageTitleKey ? tPages(pageTitleKey) : "DecTech"}
           </span>
         </header>
         <div className="flex flex-1 flex-col">{children}</div>
@@ -105,6 +110,9 @@ function AppSidebar({
   pathname: string;
   initialThemePreference: ThemePreference;
 }) {
+  const tNav = useTranslations("appShell.nav");
+  const tWorkspace = useTranslations("appShell.workspace");
+
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
@@ -118,9 +126,11 @@ function AppSidebar({
                 <AvatarFallback>DT</AvatarFallback>
               </Avatar>
               <span className="flex min-w-0 flex-col">
-                <span className="truncate font-semibold">DecTech</span>
+                <span className="truncate font-semibold">
+                  {tWorkspace("name")}
+                </span>
                 <span className="truncate text-xs text-muted-foreground">
-                  Web workspace
+                  {tWorkspace("description")}
                 </span>
               </span>
             </SidebarMenuButton>
@@ -138,7 +148,7 @@ function AppSidebar({
                     isActive={pathname === item.href}
                     render={<Link href={localizePath(item.href, locale)} />}
                   >
-                    <span>{item.label}</span>
+                    <span>{tNav(item.labelKey)}</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
@@ -165,15 +175,18 @@ function AccountMenu({
   locale: SupportedLocale;
   initialThemePreference: ThemePreference;
 }) {
+  const tAccount = useTranslations("appShell.accountMenu");
+  const tTheme = useTranslations("theme");
+  const tLogout = useTranslations("auth.logout");
   const { isMobile } = useSidebar();
   const { user } = useSession();
   const { busy, logout } = useLogout();
   const [themePreference, setThemePreference] = useState(
     initialThemePreference,
   );
-  const email = user?.email ?? "No active session";
-  const displayName = user ? displayNameFromEmail(user.email) : "Account";
-  const initials = user ? initialsFromEmail(user.email) : "?";
+  const email = user?.email ?? tAccount("noActiveSession");
+  const displayName = user ? displayNameFromUser(user) : tAccount("account");
+  const initials = user ? initialsFromUser(user) : "?";
 
   function changeTheme(nextPreference: unknown) {
     if (!isThemePreference(nextPreference)) {
@@ -192,7 +205,7 @@ function AccountMenu({
             render={
               <SidebarMenuButton
                 size="lg"
-                aria-label="Open account menu"
+                aria-label={tAccount("open")}
                 className="data-popup-open:bg-sidebar-accent data-popup-open:text-sidebar-accent-foreground"
               />
             }
@@ -228,13 +241,13 @@ function AccountMenu({
                   <Link href={localizePath("/account/settings", locale)} />
                 }
               >
-                Account settings
+                {tAccount("accountSettings")}
               </DropdownMenuItem>
               <DropdownMenuSub>
                 <DropdownMenuSubTrigger>
-                  Theme
+                  {tTheme("label")}
                   <span className="ml-auto capitalize text-muted-foreground">
-                    {themePreference}
+                    {tTheme(`options.${themePreference}`)}
                   </span>
                 </DropdownMenuSubTrigger>
                 <DropdownMenuSubContent>
@@ -243,17 +256,18 @@ function AccountMenu({
                     onValueChange={changeTheme}
                   >
                     <DropdownMenuRadioItem value="light">
-                      Light
+                      {tTheme("options.light")}
                     </DropdownMenuRadioItem>
                     <DropdownMenuRadioItem value="dark">
-                      Dark
+                      {tTheme("options.dark")}
                     </DropdownMenuRadioItem>
                     <DropdownMenuRadioItem value="system">
-                      System
+                      {tTheme("options.system")}
                     </DropdownMenuRadioItem>
                   </DropdownMenuRadioGroup>
                 </DropdownMenuSubContent>
               </DropdownMenuSub>
+              <LanguageMenuSub />
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem
@@ -261,7 +275,7 @@ function AccountMenu({
               disabled={busy}
               onClick={() => void logout()}
             >
-              {busy ? "Signing out..." : "Sign out"}
+              {busy ? tLogout("busy") : tLogout("label")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -272,6 +286,33 @@ function AccountMenu({
 
 function isThemePreference(value: unknown): value is ThemePreference {
   return value === "light" || value === "dark" || value === "system";
+}
+
+function displayNameFromUser(user: SessionIdentity): string {
+  const parts = namePartsFromUser(user);
+  if (parts.length > 0) {
+    return parts.join(" ");
+  }
+
+  return displayNameFromEmail(user.email);
+}
+
+function initialsFromUser(user: SessionIdentity): string {
+  const parts = namePartsFromUser(user);
+  if (parts.length > 0) {
+    return parts
+      .slice(0, 2)
+      .map((part) => part[0]!.toUpperCase())
+      .join("");
+  }
+
+  return initialsFromEmail(user.email);
+}
+
+function namePartsFromUser(user: SessionIdentity): string[] {
+  return [user.firstName, user.lastName]
+    .map((part) => part?.trim())
+    .filter((part): part is string => Boolean(part));
 }
 
 function displayNameFromEmail(email: string): string {

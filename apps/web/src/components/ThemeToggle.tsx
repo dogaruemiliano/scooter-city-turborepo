@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useState } from "react";
 import {
   applyThemePreference,
@@ -11,6 +12,7 @@ export function ThemeToggle({
 }: {
   initialPreference: ThemePreference;
 }) {
+  const t = useTranslations("theme");
   const [pref, setPref] = useState<ThemePreference>(initialPreference);
 
   const set = (next: ThemePreference) => {
@@ -21,7 +23,7 @@ export function ThemeToggle({
   return (
     <div
       role="radiogroup"
-      aria-label="Theme"
+      aria-label={t("label")}
       className="inline-flex items-center gap-1 rounded-full border border-border p-1"
     >
       {(["light", "dark", "system"] as const).map((option) => {
@@ -40,7 +42,7 @@ export function ThemeToggle({
                 : "text-muted-foreground hover:text-foreground")
             }
           >
-            {option[0]!.toUpperCase() + option.slice(1)}
+            {t(`options.${option}`)}
           </button>
         );
       })}

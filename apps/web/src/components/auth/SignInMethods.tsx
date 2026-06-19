@@ -1,6 +1,7 @@
 "use client";
 
 import { ApiError, v1 } from "@repo/api-shared";
+import { useTranslations } from "next-intl";
 import { useCallback, useState } from "react";
 
 import { webApi } from "../../lib/api";
@@ -30,6 +31,9 @@ export function SignInMethods({
   enabledMethods,
   googleClientId,
 }: SignInMethodsProps) {
+  const tSignIn = useTranslations("auth.signIn");
+  const tOtp = useTranslations("auth.otp");
+  const tGoogle = useTranslations("auth.google");
   const completeSignIn = useCompleteSignIn();
   const [activeChallenge, setActiveChallenge] =
     useState<ActiveChallenge | null>(null);
@@ -55,8 +59,8 @@ export function SignInMethods({
   );
 
   const handleGoogleError = useCallback(() => {
-    setMethodError("Google sign-in failed. Try again.");
-  }, []);
+    setMethodError(tGoogle("failed"));
+  }, [tGoogle]);
 
   if (activeChallenge) {
     const verifyRoute =
@@ -65,8 +69,8 @@ export function SignInMethods({
         : v1.auth.ROUTES.oauthEmailVerification.verify;
     const description =
       activeChallenge.kind === "email"
-        ? `Code sent to ${activeChallenge.email}`
-        : "Google could not verify the account email. Enter the code we sent to it.";
+        ? tOtp("codeSentTo", { email: activeChallenge.email })
+        : tOtp("emailVerificationRequired");
 
     return (
       <OtpChallengeForm
@@ -104,9 +108,7 @@ export function SignInMethods({
           } catch (error) {
             if (error instanceof ApiError && error.status === 401) {
               setActiveChallenge(null);
-              setMethodError(
-                "Your Google sign-in expired. Continue with Google again.",
-              );
+              setMethodError(tGoogle("expired"));
               return;
             }
             throw error;
@@ -139,7 +141,7 @@ export function SignInMethods({
         <div className="flex flex-col gap-2">
           {emailOtpEnabled ? (
             <div className="text-center text-xs uppercase text-muted-foreground">
-              or
+              {tSignIn("separator")}
             </div>
           ) : null}
           <GoogleSignInButton
@@ -152,7 +154,7 @@ export function SignInMethods({
 
       {!emailOtpEnabled && !googleAvailable ? (
         <p className="text-sm text-muted-foreground">
-          No sign-in methods are available on the web. Contact an administrator.
+          {tSignIn("unavailable")}
         </p>
       ) : null}
 

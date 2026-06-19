@@ -3,7 +3,10 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { SessionProvider } from "../../../../components/auth/SessionProvider";
+import {
+  SessionProvider,
+  useSession,
+} from "../../../../components/auth/SessionProvider";
 import { AccountSettings } from "./AccountSettings";
 
 const mocks = vi.hoisted(() => ({
@@ -90,6 +93,7 @@ describe("AccountSettings", () => {
       },
     );
     expect(await screen.findByText("Profile saved")).toBeInTheDocument();
+    expect(screen.getByTestId("session-user-name")).toHaveTextContent("Grace");
     expect(mocks.refresh).toHaveBeenCalledOnce();
   });
 
@@ -190,6 +194,7 @@ function renderSettings() {
         roles: user.roles,
       }}
     >
+      <SessionUserProbe />
       <AccountSettings
         initialUser={user}
         initialSessions={sessions}
@@ -197,4 +202,10 @@ function renderSettings() {
       />
     </SessionProvider>,
   );
+}
+
+function SessionUserProbe() {
+  const { user } = useSession();
+  const name = [user?.firstName, user?.lastName].filter(Boolean).join(" ");
+  return <span data-testid="session-user-name">{name}</span>;
 }

@@ -2,6 +2,7 @@
 
 import { v1 } from "@repo/api-shared";
 import { usePathname, useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { useState, type ReactNode } from "react";
 import { Button } from "@repo/ui/components/button";
 import { z } from "zod";
@@ -39,10 +40,8 @@ export function useLogout() {
   return { busy, logout };
 }
 
-export function LogoutButton({
-  children = "Sign out",
-  className,
-}: LogoutButtonProps) {
+export function LogoutButton({ children, className }: LogoutButtonProps) {
+  const t = useTranslations("auth.logout");
   const { busy, logout } = useLogout();
 
   return (
@@ -54,7 +53,7 @@ export function LogoutButton({
       size="sm"
       className={className}
     >
-      {busy ? "Signing out…" : children}
+      {busy ? t("busy") : (children ?? t("label"))}
     </Button>
   );
 }

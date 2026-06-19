@@ -1,6 +1,7 @@
 "use client";
 
 import { v1 } from "@repo/api-shared";
+import { useTranslations } from "next-intl";
 import { useState, type FormEvent } from "react";
 
 import { webApi } from "../../lib/api";
@@ -11,6 +12,7 @@ export interface EmailOtpSignInFormProps {
 }
 
 export function EmailOtpSignInForm({ onChallenge }: EmailOtpSignInFormProps) {
+  const t = useTranslations("auth.signIn.emailOtp");
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -28,9 +30,7 @@ export function EmailOtpSignInForm({ onChallenge }: EmailOtpSignInFormProps) {
       );
       onChallenge(challenge, email);
     } catch (requestError) {
-      setError(
-        formatAuthError(requestError, "Could not send code. Try again."),
-      );
+      setError(formatAuthError(requestError, t("sendCodeError")));
     } finally {
       setBusy(false);
     }
@@ -39,7 +39,7 @@ export function EmailOtpSignInForm({ onChallenge }: EmailOtpSignInFormProps) {
   return (
     <form onSubmit={requestCode} className="flex flex-col gap-3">
       <label className="flex flex-col gap-1">
-        <span className="text-sm font-medium">Email</span>
+        <span className="text-sm font-medium">{t("emailLabel")}</span>
         <input
           type="email"
           required
@@ -55,7 +55,7 @@ export function EmailOtpSignInForm({ onChallenge }: EmailOtpSignInFormProps) {
         disabled={busy || !email}
         className="rounded-md bg-primary px-4 py-2 text-base font-medium text-primary-foreground hover:bg-primary-hover disabled:bg-disabled disabled:text-disabled-foreground"
       >
-        {busy ? "Sending…" : "Send code"}
+        {busy ? t("sendingCode") : t("sendCode")}
       </button>
       {error ? (
         <p role="alert" className="text-sm text-destructive">

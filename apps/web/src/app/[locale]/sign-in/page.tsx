@@ -1,6 +1,8 @@
 import { v1 } from "@repo/api-shared";
 import { redirect } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 
+import { LanguageSwitcher } from "../../../components/LanguageSwitcher";
 import { SignInMethods } from "../../../components/auth";
 import {
   localizePath,
@@ -32,6 +34,7 @@ export default async function SignInPage({
   const existing = await meOnServer();
   if (existing) redirect(destination);
 
+  const t = await getTranslations({ locale, namespace: "auth.signIn" });
   const { methods } = await loadEnabledMethods();
 
   const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
@@ -40,11 +43,11 @@ export default async function SignInPage({
     <main className="flex w-full flex-1 items-center justify-center px-4 py-12">
       <div className="flex w-full max-w-sm flex-col gap-6">
         <header className="text-center">
-          <h1 className="text-2xl font-semibold">Sign in</h1>
-          <p className="text-sm text-muted-foreground">
-            Choose a method to continue.
-          </p>
+          <h1 className="text-2xl font-semibold">{t("title")}</h1>
+          <p className="text-sm text-muted-foreground">{t("subtitle")}</p>
         </header>
+
+        <LanguageSwitcher />
 
         <SignInMethods
           enabledMethods={methods}

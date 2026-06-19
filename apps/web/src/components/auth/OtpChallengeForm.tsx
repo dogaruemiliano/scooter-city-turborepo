@@ -3,6 +3,7 @@
 import { v1 } from "@repo/api-shared";
 import { tokens } from "@repo/theme/runtime";
 import { OTPField } from "@repo/ui/components/otp-field";
+import { useTranslations } from "next-intl";
 import { useEffect, useState, type FormEvent } from "react";
 
 import { webApi } from "../../lib/api";
@@ -30,6 +31,8 @@ export function OtpChallengeForm({
   onRequestAnother,
   onCancel,
 }: OtpChallengeFormProps) {
+  const t = useTranslations("auth.otp");
+  const tSharedActions = useTranslations("shared.actions");
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -68,7 +71,9 @@ export function OtpChallengeForm({
       });
       await onVerified();
     } catch (verificationError) {
-      setError(formatAuthError(verificationError, "Invalid or expired code."));
+      setError(
+        formatAuthError(verificationError, t("errors.invalidOrExpired")),
+      );
     } finally {
       setBusy(false);
     }
@@ -95,7 +100,7 @@ export function OtpChallengeForm({
       setResendAt(currentTime + nextChallenge.resendAfterSec * SECOND_MS);
       onChallengeChange(nextChallenge);
     } catch (resendError) {
-      setError(formatAuthError(resendError, "Could not resend code."));
+      setError(formatAuthError(resendError, t("errors.resendFailed")));
     } finally {
       setBusy(false);
     }
@@ -109,12 +114,7 @@ export function OtpChallengeForm({
       await onRequestAnother();
       setCode("");
     } catch (requestError) {
-      setError(
-        formatAuthError(
-          requestError,
-          "Could not request another code. Try again.",
-        ),
-      );
+      setError(formatAuthError(requestError, t("errors.requestAnotherFailed")));
     } finally {
       setBusy(false);
     }
@@ -126,17 +126,17 @@ export function OtpChallengeForm({
 
       {expired ? (
         <p role="status" className="text-sm text-destructive">
-          This code has expired.
+          {t("expired")}
         </p>
       ) : (
         <p role="status" className="text-sm text-muted-foreground">
-          Code expires in {formattedExpiration}.
+          {t("expiresIn", { time: formattedExpiration })}
         </p>
       )}
 
       <div className="flex flex-col items-center gap-1">
         <label htmlFor="otp-code" className="text-sm font-medium">
-          6-digit code
+          {t("codeLabel")}
         </label>
         <OTPField
           id="otp-code"
@@ -156,7 +156,7 @@ export function OtpChallengeForm({
           disabled={busy}
           className="rounded-md bg-primary px-4 py-2 text-base font-medium text-primary-foreground hover:bg-primary-hover disabled:bg-disabled disabled:text-disabled-foreground"
         >
-          {busy ? "Requesting…" : "Request another code"}
+          {busy ? t("requestingAnotherCode") : t("requestAnotherCode")}
         </button>
       ) : (
         <>
@@ -165,7 +165,7 @@ export function OtpChallengeForm({
             disabled={busy || code.length !== 6}
             className="rounded-md bg-primary px-4 py-2 text-base font-medium text-primary-foreground hover:bg-primary-hover disabled:bg-disabled disabled:text-disabled-foreground"
           >
-            {busy ? "Verifying…" : "Sign in"}
+            {busy ? t("verifying") : t("verify")}
           </button>
           <button
             type="button"
@@ -174,8 +174,10 @@ export function OtpChallengeForm({
             className="text-sm text-link underline hover:text-link-hover disabled:text-disabled-foreground"
           >
             {resendAfterSec > 0
-              ? `Resend in ${formatSecondsAsMinutesAndSeconds(resendAfterSec)}`
-              : "Resend code"}
+              ? t("resendIn", {
+                  time: formatSecondsAsMinutesAndSeconds(resendAfterSec),
+                })
+              : t("resendCode")}
           </button>
         </>
       )}
@@ -186,7 +188,7 @@ export function OtpChallengeForm({
         className="text-sm text-link underline hover:text-link-hover"
         disabled={busy}
       >
-        Cancel
+        {tSharedActions("cancel")}
       </button>
 
       {error ? (

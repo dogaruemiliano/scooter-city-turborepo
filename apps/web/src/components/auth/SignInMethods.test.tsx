@@ -1,5 +1,7 @@
 import { ApiError, v1 } from "@repo/api-shared";
+import { messages, type SupportedLocale } from "@repo/i18n";
 import { act, fireEvent, render, screen } from "@testing-library/react";
+import { NextIntlClientProvider } from "next-intl";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -9,6 +11,7 @@ import { SignInMethods } from "./SignInMethods";
 
 const mocks = vi.hoisted(() => ({
   apiFetch: vi.fn(),
+  pathname: "/en/sign-in",
   replace: vi.fn(),
   refresh: vi.fn(),
 }));
@@ -20,7 +23,7 @@ vi.mock("../../lib/api", () => ({
 }));
 
 vi.mock("next/navigation", () => ({
-  usePathname: () => "/sign-in",
+  usePathname: () => mocks.pathname,
   useRouter: () => ({
     replace: mocks.replace,
     refresh: mocks.refresh,
@@ -73,6 +76,7 @@ const renderGoogleButton =
 
 beforeEach(() => {
   mocks.apiFetch.mockReset();
+  mocks.pathname = "/en/sign-in";
   mocks.replace.mockReset();
   mocks.refresh.mockReset();
   googleCredentialCallback = undefined;
@@ -171,12 +175,24 @@ describe("SignInMethods", () => {
       expect(
         Boolean(
           screen.queryByText(
-            "No sign-in methods are available on the web. Contact an administrator.",
+            "No sign-in methods are available. Contact an administrator.",
           ),
         ),
       ).toBe(unavailableVisible);
     },
   );
+
+  it("renders Romanian email OTP labels", () => {
+    renderSignInMethods({
+      enabledMethods: ["emailOtp"] as const,
+      locale: "ro",
+    });
+
+    expect(screen.getByLabelText("Email")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Trimite codul" }),
+    ).toBeInTheDocument();
+  });
 
   it("completes email OTP sign-in through the shared challenge form", async () => {
     const challenge = createChallenge("00000000-0000-4000-8000-000000000001");
@@ -478,16 +494,23 @@ function getOtpInput(): HTMLInputElement {
 }
 
 function renderSignInMethods(
-  props: Partial<ComponentProps<typeof SignInMethods>> = {},
+  props: Partial<ComponentProps<typeof SignInMethods>> & {
+    locale?: SupportedLocale;
+  } = {},
 ) {
+  const { locale = "en", ...componentProps } = props;
+  mocks.pathname = locale === "en" ? "/en/sign-in" : "/sign-in";
+
   return render(
-    <SessionProvider initialUser={null}>
-      <SignInMethods
-        enabledMethods={enabledAll}
-        googleClientId="google-client-id"
-        {...props}
-      />
-    </SessionProvider>,
+    <NextIntlClientProvider locale={locale} messages={messages[locale]}>
+      <SessionProvider initialUser={null}>
+        <SignInMethods
+          enabledMethods={enabledAll}
+          googleClientId="google-client-id"
+          {...componentProps}
+        />
+      </SessionProvider>
+    </NextIntlClientProvider>,
   );
 }
 

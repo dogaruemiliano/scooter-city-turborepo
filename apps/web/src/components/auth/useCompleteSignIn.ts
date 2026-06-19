@@ -6,6 +6,7 @@ import { useCallback } from "react";
 
 import { getLocaleFromPathname, localizePath } from "../../i18n/paths";
 import { webApi } from "../../lib/api";
+import { toSessionIdentity } from "../../lib/auth-types";
 import { safeNextPath } from "../../lib/safe-next-path";
 import { useSession } from "./SessionProvider";
 
@@ -24,7 +25,7 @@ export function useCompleteSignIn(): () => Promise<void> {
       v1.auth.ROUTES.me,
       v1.auth.sessionUserSchema,
     );
-    setUser(user);
+    setUser(toSessionIdentity(user));
     router.replace(destination);
     router.refresh();
   }, [destination, router, setUser]);

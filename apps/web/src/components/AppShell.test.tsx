@@ -1,9 +1,13 @@
 import { fireEvent, render, screen } from "@testing-library/react";
+import { messages, type SupportedLocale } from "@repo/i18n";
 import { TooltipProvider } from "@repo/ui/components/tooltip";
+import { NextIntlClientProvider } from "next-intl";
+import type { AnchorHTMLAttributes } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AppShell } from "./AppShell";
 import { SessionProvider } from "./auth/SessionProvider";
+import type { SessionIdentity } from "../lib/auth-types";
 
 class TestPointerEvent extends MouseEvent {
   pointerType: string;
@@ -29,10 +33,22 @@ vi.mock("../lib/api", () => ({
 
 vi.mock("next/navigation", () => ({
   usePathname: () => mocks.pathname,
+  useSearchParams: () => new URLSearchParams(),
   useRouter: () => ({
     push: mocks.push,
     refresh: mocks.refresh,
   }),
+}));
+
+type MockLinkProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href"> & {
+  href?: string;
+  locale?: string;
+};
+
+vi.mock("../i18n/navigation", () => ({
+  Link({ href, locale, ...props }: MockLinkProps) {
+    return <a href={locale ? prefixHref(href, locale) : href} {...props} />;
+  },
 }));
 
 beforeEach(() => {
@@ -68,25 +84,40 @@ describe("AppShell", () => {
   it("renders the application navigation and current user menu", async () => {
     renderAppShell();
 
-    expect(screen.getByRole("link", { name: "Dashboard" })).toHaveAttribute(
-      "href",
-      "/",
-    );
-    expect(screen.getByRole("link", { name: "UI showcase" })).toHaveAttribute(
+    expect(
+      screen.getByRole("link", { name: "Panou principal" }),
+    ).toHaveAttribute("href", "/");
+    expect(screen.getByRole("link", { name: "Galerie UI" })).toHaveAttribute(
       "href",
       "/shadcn",
     );
+    expect(screen.getByText("Emilia Stone")).toBeInTheDocument();
     expect(screen.getByText("emilia.stone@example.com")).toBeInTheDocument();
 
     fireEvent.mouseDown(
-      screen.getByRole("button", { name: "Open account menu" }),
+      screen.getByRole("button", { name: "Deschide meniul contului" }),
     );
 
     expect(
-      await screen.findByRole("menuitem", { name: "Account settings" }),
+      await screen.findByRole("menuitem", { name: "Setări cont" }),
     ).toHaveAttribute("href", "/account/settings");
-    expect(screen.getByText("Theme")).toBeInTheDocument();
-    expect(screen.getByText("Sign out")).toBeInTheDocument();
+    expect(screen.getByText("Temă")).toBeInTheDocument();
+    expect(screen.getByText("Limbă")).toBeInTheDocument();
+    expect(screen.getByText("Deconectare")).toBeInTheDocument();
+  });
+
+  it("uses profile names from the session in the current user menu", () => {
+    renderAppShell({
+      id: "user-1",
+      email: "emilia.stone@example.com",
+      roles: ["USER"],
+      firstName: "Ada",
+      lastName: "Lovelace",
+    });
+
+    expect(screen.getByText("Ada Lovelace")).toBeInTheDocument();
+    expect(screen.getByText("AL")).toBeInTheDocument();
+    expect(screen.queryByText("Emilia Stone")).not.toBeInTheDocument();
   });
 
   it("does not render the application shell on the sign-in route", () => {
@@ -96,7 +127,7 @@ describe("AppShell", () => {
 
     expect(screen.getByText("Page content")).toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "Open account menu" }),
+      screen.queryByRole("button", { name: "Deschide meniul contului" }),
     ).not.toBeInTheDocument();
   });
 
@@ -135,20 +166,31 @@ describe("AppShell", () => {
   });
 });
 
-function renderAppShell() {
+function renderAppShell(
+  initialUser: SessionIdentity | null = {
+    id: "user-1",
+    email: "emilia.stone@example.com",
+    roles: ["USER"],
+  },
+) {
+  const locale: SupportedLocale = mocks.pathname.startsWith("/en")
+    ? "en"
+    : "ro";
+
   return render(
-    <TooltipProvider>
-      <SessionProvider
-        initialUser={{
-          id: "user-1",
-          email: "emilia.stone@example.com",
-          roles: ["USER"],
-        }}
-      >
-        <AppShell initialThemePreference="system">
-          <div>Page content</div>
-        </AppShell>
-      </SessionProvider>
-    </TooltipProvider>,
+    <NextIntlClientProvider locale={locale} messages={messages[locale]}>
+      <TooltipProvider>
+        <SessionProvider initialUser={initialUser}>
+          <AppShell initialThemePreference="system">
+            <div>Page content</div>
+          </AppShell>
+        </SessionProvider>
+      </TooltipProvider>
+    </NextIntlClientProvider>,
   );
+}
+
+function prefixHref(href: string | undefined, locale: string): string {
+  const safeHref = href ?? "/";
+  return safeHref === "/" ? `/${locale}` : `/${locale}${safeHref}`;
 }

@@ -43,9 +43,14 @@ test("formatMessage falls back to fallback locale catalog", () => {
   } satisfies CatalogsByLocale;
 
   assert.equal(
-    formatMessage("ro", "api.auth.otpSent", { code: "123456", ttl: 5 }, {
-      catalogs,
-    }),
+    formatMessage(
+      "ro",
+      "api.auth.otpSent",
+      { code: "123456", ttl: 5 },
+      {
+        catalogs,
+      },
+    ),
     "Fallback code 123456 expires in 5 minutes.",
   );
 });
@@ -77,7 +82,7 @@ test("createFormatter normalizes locale and reports template availability", () =
 
 test("getMessageTemplate returns null for missing custom templates", () => {
   assert.equal(
-    getMessageTemplate("ro", "web.errors.csrf", {
+    getMessageTemplate("ro", "auth.errors.csrf", {
       catalogs: {
         en: {},
         ro: {},

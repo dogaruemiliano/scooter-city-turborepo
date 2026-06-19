@@ -34,6 +34,7 @@ import {
 } from "../../../../i18n/paths";
 import { useSession } from "../../../../components/auth/SessionProvider";
 import { webApi } from "../../../../lib/api";
+import { toSessionIdentity } from "../../../../lib/auth-types";
 
 interface AccountSettingsProps {
   initialUser: v1.auth.SessionUser;
@@ -95,6 +96,7 @@ export function AccountSettings({
         },
       );
       setUser(updated);
+      setSessionUser(toSessionIdentity(updated));
       setFirstName(updated.firstName ?? "");
       setLastName(updated.lastName ?? "");
       setFeedback({
