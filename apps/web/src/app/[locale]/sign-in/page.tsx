@@ -32,11 +32,7 @@ export default async function SignInPage({
   const existing = await meOnServer();
   if (existing) redirect(destination);
 
-  const { methods } = await webApi.fetch(
-    v1.auth.ROUTES.enabledMethods,
-    v1.auth.enabledAuthMethodsSchema,
-    { next: { revalidate: 3600 } },
-  );
+  const { methods } = await loadEnabledMethods();
 
   const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
 
@@ -57,4 +53,16 @@ export default async function SignInPage({
       </div>
     </main>
   );
+}
+
+async function loadEnabledMethods(): Promise<v1.auth.EnabledAuthMethods> {
+  try {
+    return await webApi.fetch(
+      v1.auth.ROUTES.enabledMethods,
+      v1.auth.enabledAuthMethodsSchema,
+      { next: { revalidate: 3600 } },
+    );
+  } catch {
+    return { methods: [] };
+  }
 }

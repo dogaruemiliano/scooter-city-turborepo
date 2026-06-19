@@ -7,8 +7,8 @@
     "build": "next build",
     "start": "next start -p 3001",
     "lint": "eslint",
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "test": "pnpm --filter @repo/i18n build && pnpm --filter @repo/api-shared build && vitest run",
+    "test:watch": "pnpm --filter @repo/i18n build && pnpm --filter @repo/api-shared build && vitest"
   },
   "dependencies": {
     "@repo/api-shared": "workspace:*",
