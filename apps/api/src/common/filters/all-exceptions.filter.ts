@@ -74,7 +74,7 @@ function isZodError(value: unknown): value is ZodError {
     (typeof value === "object" &&
       value !== null &&
       "issues" in value &&
-      Array.isArray((value as { issues: unknown }).issues))
+      Array.isArray(value.issues))
   );
 }
 

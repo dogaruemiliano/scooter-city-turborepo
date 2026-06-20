@@ -10,7 +10,7 @@ describe("LogSmsService", () => {
     } as unknown as Logger;
     const fetchSpy = jest.fn();
     const originalFetch = globalThis.fetch;
-    globalThis.fetch = fetchSpy as unknown as typeof globalThis.fetch;
+    globalThis.fetch = fetchSpy;
 
     try {
       const service = new LogSmsService(logger);

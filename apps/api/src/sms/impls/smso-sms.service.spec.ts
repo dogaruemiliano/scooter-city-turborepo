@@ -35,7 +35,7 @@ describe("SmsoSmsService", () => {
           headers: { "Content-Type": "application/json" },
         }),
       );
-    globalThis.fetch = fetchSpy as unknown as typeof globalThis.fetch;
+    globalThis.fetch = fetchSpy;
 
     const service = buildService();
     await service.send({ to: "+40712345678", body: "Your code is 000000" });
@@ -58,9 +58,7 @@ describe("SmsoSmsService", () => {
   it("throws on non-2xx responses and includes the response body", async () => {
     globalThis.fetch = jest
       .fn()
-      .mockResolvedValue(
-        new Response("invalid api key", { status: 401 }),
-      ) as unknown as typeof globalThis.fetch;
+      .mockResolvedValue(new Response("invalid api key", { status: 401 }));
 
     await expect(
       buildService().send({ to: "+40712345678", body: "hi" }),
@@ -73,7 +71,7 @@ describe("SmsoSmsService", () => {
         status: 200,
         headers: { "Content-Type": "application/json" },
       }),
-    ) as unknown as typeof globalThis.fetch;
+    );
 
     await expect(
       buildService().send({ to: "+40712345678", body: "hi" }),
@@ -83,9 +81,7 @@ describe("SmsoSmsService", () => {
   it("accepts successful responses without a JSON status field", async () => {
     globalThis.fetch = jest
       .fn()
-      .mockResolvedValue(
-        new Response("OK", { status: 200 }),
-      ) as unknown as typeof globalThis.fetch;
+      .mockResolvedValue(new Response("OK", { status: 200 }));
 
     await expect(
       buildService().send({ to: "+40712345678", body: "hi" }),

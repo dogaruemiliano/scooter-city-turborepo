@@ -94,7 +94,7 @@ describe("AppleAuthController (e2e)", () => {
     // never emits with either meta — cheaper than per-row id tracking.
     await prisma.auditEvent.deleteMany({
       where: {
-        type: { in: auditTypesToClean as unknown as string[] },
+        type: { in: auditTypesToClean },
         OR: [
           { meta: { path: ["method"], equals: "apple" } },
           { meta: { path: ["provider"], equals: "apple" } },
