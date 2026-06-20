@@ -1,36 +1,93 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# `web` - Next.js App
 
-## Getting Started
+Next.js 16 App Router client for the template. The web app renders the product
+shell, sign-in/account flows, locale routing, theme controls, and shared UI
+component previews.
 
-First, run the development server:
+The API remains the source of truth for authentication. The web app verifies
+access JWTs locally through the API JWKS and uses `@repo/api-shared` for route
+constants, schemas, and `apiFetch`.
+
+## Responsibilities
+
+- Render localized routes under `src/app/[locale]/`.
+- Use `next-intl` routing helpers from `src/i18n/`.
+- Hydrate session state through `src/components/auth/SessionProvider.tsx`.
+- Verify access JWTs on the server through `src/lib/auth-server.ts`.
+- Refresh expired browser sessions through the web auth adapter.
+- Consume shared components from `@repo/ui` and theme CSS from `@repo/theme`.
+- Provide an interactive shared UI reference at `/shadcn`.
+
+## Local Development
+
+From the repository root:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cp apps/web/.env.example apps/web/.env
+pnpm --filter web dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The app runs on <http://localhost:3001>. It expects the API at
+`NEXT_PUBLIC_API_URL`, which defaults to <http://localhost:3000>.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Required environment:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```env
+NEXT_PUBLIC_API_URL=http://localhost:3000
+```
 
-## Learn More
+Optional environment:
 
-To learn more about Next.js, take a look at the following resources:
+```env
+NEXT_PUBLIC_GOOGLE_CLIENT_ID=
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Set `NEXT_PUBLIC_GOOGLE_CLIENT_ID` only when Google sign-in should render. It
+must match the API's `GOOGLE_CLIENT_ID_WEB`.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Useful Commands
 
-## Deploy on Vercel
+| Command                        | Purpose                                  |
+| ------------------------------ | ---------------------------------------- |
+| `pnpm --filter web dev`        | Run Next.js on port 3001.                |
+| `pnpm --filter web build`      | Build the production web app.            |
+| `pnpm --filter web start`      | Serve the production build on port 3001. |
+| `pnpm --filter web lint`       | Run ESLint.                              |
+| `pnpm --filter web test`       | Run Vitest tests.                        |
+| `pnpm --filter web test:watch` | Run Vitest in watch mode.                |
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Auth Integration
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The important files are documented in
+[src/lib/README.md](src/lib/README.md). Use these helpers instead of creating
+parallel session logic:
+
+- `meOnServer()` verifies the access JWT locally against JWKS and is fast.
+- `meFromApi()` calls `GET /v1/auth/me` and is DB-fresh.
+- `requireUser()` gates protected server routes.
+- `webApi.fetch(...)` uses the shared `apiFetch` client and installs the web
+  refresh behavior.
+
+Cookie-authenticated mutations must go through `apiFetch` or manually include
+`X-Requested-With: fetch`.
+
+## Routes
+
+| Route               | Purpose                                                          |
+| ------------------- | ---------------------------------------------------------------- |
+| `/`                 | Localized landing/dashboard entry.                               |
+| `/sign-in`          | Email OTP and Google sign-in when enabled/configured.            |
+| `/account/settings` | Profile, linked providers, sessions, logout-all, delete account. |
+| `/shadcn`           | Internal shared UI component reference.                          |
+
+Apple sign-in has API support but no web UI yet. See
+[../../docs/missing-work.md](../../docs/missing-work.md).
+
+## Styling And Theme
+
+All visual values must come from `@repo/theme` tokens. Do not add raw hex
+colors, spacing values, radii, timing values, or z-indexes directly in app code
+when a token exists. Add missing tokens under `packages/theme/src/tokens/` first.
+
+Shared web components come from `@repo/ui`. Prefer those components over
+one-off app primitives unless the component is truly app-specific.

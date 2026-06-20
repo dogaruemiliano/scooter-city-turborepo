@@ -10,6 +10,8 @@ The package contains:
 - Cookie names
 - Shared validation primitives
 - The runtime-neutral `apiFetch` client
+- The `AuthAdapter` interface that lets web and native runtimes plug in their
+  own refresh behavior
 
 Import through the version namespace:
 
@@ -35,12 +37,12 @@ Do not duplicate request or response shapes in an application package.
 
 ```text
 src/
-├── api-fetch.ts
-├── index.ts
-└── v1/
-    ├── auth/
-    ├── common/
-    └── users/
++-- api-fetch.ts
++-- index.ts
++-- v1/
+    +-- auth/
+    +-- common/
+    +-- users/
 ```
 
 Each domain exports through `v1.<domain>`.
@@ -56,6 +58,21 @@ Each domain exports through `v1.<domain>`.
 
 See [`src/v1/README.md`](./src/v1/README.md) for naming rules.
 
+## Runtime fetch behavior
+
+`apiFetch` is intentionally runtime-neutral. It knows how to:
+
+- Prefix API paths with the configured API origin.
+- Validate JSON responses with a provided Zod schema.
+- Normalize API error responses.
+- Add `X-Requested-With: fetch` for CSRF-protected cookie mutations.
+- Delegate 401 refresh behavior to the active `AuthAdapter`.
+
+The web app installs its adapter in
+[`apps/web/src/lib/auth-adapter-web.ts`](../../apps/web/src/lib/auth-adapter-web.ts).
+The mobile adapter is still missing; see
+[`docs/missing-work.md`](../../docs/missing-work.md).
+
 ## Build behavior
 
 TypeScript consumers read types from `src/`, while runtime imports use
@@ -66,3 +83,8 @@ pnpm --filter @repo/api-shared build
 ```
 
 The API build already runs this command before compiling NestJS.
+
+## Internal rule
+
+Do not duplicate request/response shapes inside app packages. If a wire shape is
+shared by API and client code, it belongs here first.

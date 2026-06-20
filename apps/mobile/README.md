@@ -1,56 +1,63 @@
-# Welcome to your Expo app 👋
+# `mobile` - Expo App
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Expo SDK 55 / React Native 0.83 mobile shell for the template. It currently
+proves navigation, localization, theme wiring, and shared native UI components.
+It is not yet a complete authenticated client.
 
-## Get started
+## Current Responsibilities
 
-1. Install dependencies
+- File-based routing through `expo-router`.
+- Drawer navigation and example screens under `src/app/(drawer)/`.
+- Shared locale resolution and message access through `src/localization/`.
+- Native theme setup through `@repo/theme-native` and Unistyles.
+- Shared native components from `@repo/ui-native`.
+- Expo platform setup for iOS, Android, and web development.
 
-   ```bash
-   npm install
-   ```
+## Not Implemented Yet
 
-2. Start the app
+- Mobile sign-in screens.
+- SecureStore token persistence.
+- Bearer-token auth adapter for `@repo/api-shared`'s `apiFetch`.
+- Refresh-token rotation handling on native clients.
+- Google/Apple native sign-in UI.
+- Account settings and active-session management screens.
 
-   ```bash
-   npx expo start
-   ```
+See [../../docs/missing-work.md](../../docs/missing-work.md) for the planned
+work.
 
-In the output, you'll find options to open the app in a
+## Local Development
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+From the repository root:
 
 ```bash
-npm run reset-project
+pnpm --filter mobile start
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Platform-specific commands:
 
-### Other setup steps
+```bash
+pnpm --filter mobile ios
+pnpm --filter mobile android
+pnpm --filter mobile web
+```
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+The app has no `.env.example` yet because it does not call the API. Add mobile
+runtime configuration when the native auth/API client is implemented.
 
-## Learn more
+## Useful Commands
 
-To learn more about developing your project with Expo, look at the following resources:
+| Command                        | Purpose                       |
+| ------------------------------ | ----------------------------- |
+| `pnpm --filter mobile start`   | Start Expo.                   |
+| `pnpm --filter mobile ios`     | Run the iOS native build.     |
+| `pnpm --filter mobile android` | Run the Android native build. |
+| `pnpm --filter mobile web`     | Run Expo web.                 |
+| `pnpm --filter mobile lint`    | Run Expo lint.                |
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## Theme And UI
 
-## Join the community
+Use `@repo/theme-native` for token-backed Unistyles setup and `@repo/ui-native`
+for shared `Dec*` components. Add design-token changes in `@repo/theme` first,
+then consume the generated/native token bridge.
 
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Avoid adding raw visual values in app screens when a token exists.

@@ -1,65 +1,118 @@
-# `api` — NestJS
+# `api` - NestJS API
 
-REST API surface. Versioned at `/v1`. Documented via OpenAPI at `/api-docs`. Auth submodules ship in PR 5+; PR 1 is plumbing only (env, logger, request-id, healthcheck, exception filter, swagger).
+NestJS REST API for the template. The API owns authentication, database access,
+OpenAPI generation, mail/SMS transports, audit events, and operational health
+checks.
 
-## Dev
+Routes are versioned under `/v1` except operational endpoints such as
+`/healthz`, `/api-docs`, `/api-docs-json`, and `/.well-known/jwks.json`.
 
-```bash
-docker compose -f ../../docker-compose.yml up -d postgres
-pnpm gen:env && cp .env.example .env   # fill in JWT_*_SECRET, *_HMAC_SECRET (≥32 chars each)
-pnpm db:migrate                         # apply migrations
-pnpm db:seed                            # idempotent test users
-pnpm start:dev                          # :3000 with hot reload
-```
+## Responsibilities
 
-Local Postgres runs on **`localhost:5434`** (not 5432) so the template
-can coexist with any host-installed Postgres. See
-[../../docker-compose.yml](../../docker-compose.yml).
+- Validate runtime config with Zod through `src/config/env.ts`.
+- Serve Swagger/OpenAPI documentation from NestJS decorators and Zod DTOs.
+- Issue and verify RS256 JWTs through the shared key-ring implementation.
+- Rotate refresh tokens with the multi-instance-safe algorithm documented in
+  [../../docs/auth/refresh-rotation.md](../../docs/auth/refresh-rotation.md).
+- Persist users, sessions, refresh tokens, OTP challenges, OAuth accounts,
+  delivery quotas, and audit events in PostgreSQL through Prisma 7.
+- Send email OTP messages through SMTP and provide pluggable SMS transports.
+- Enforce request throttles, CSRF protection for cookie mutations, and
+  normalized error responses.
 
-## Endpoints (current)
+## Local Development
 
-| Method | Path             | Auth                    | Description                                       |
-| ------ | ---------------- | ----------------------- | ------------------------------------------------- |
-| `GET`  | `/healthz`       | public, version-neutral | Liveness + readiness probe (heap + DB indicators) |
-| `GET`  | `/api-docs`      | public                  | Swagger UI                                        |
-| `GET`  | `/api-docs-json` | public                  | Raw OpenAPI 3 spec                                |
-
-Auth endpoints land in PR 5+. See [the ADR](../../docs/adr/0001-rest-not-trpc.md) and the docs in [docs/auth/](../../docs/auth/) (populated as features ship).
-
-## Useful commands
+From the repository root:
 
 ```bash
-pnpm start:dev      # watch mode
-pnpm build          # prisma generate + nest build
-pnpm spec           # emit OpenAPI JSON to stdout (used by `pnpm gen` from root)
-pnpm lint           # eslint --fix
-pnpm check-types    # tsc --noEmit
-pnpm test           # unit tests (Jest)
-pnpm test:e2e       # E2E tests (Jest + Supertest)
-
-# Database (Prisma 7 — see ../../AGENTS.md → prisma-verify-rule)
-pnpm db:migrate     # prisma migrate dev (creates + applies new migration)
-pnpm db:deploy      # prisma migrate deploy (CI / prod — apply only)
-pnpm db:seed        # prisma db seed (test fixtures; refuses in production)
-pnpm db:studio      # prisma studio
-pnpm db:generate    # regenerate the client into src/generated/prisma
-pnpm db:reset       # destructive — drops + reapplies; AI-agent guarded
+docker compose up -d postgres
+cp apps/api/.env.example apps/api/.env
+pnpm --filter api db:migrate
+pnpm --filter api db:seed
+pnpm --filter api dev
 ```
 
-## Logging
+Local PostgreSQL runs on `localhost:5434` to avoid colliding with a host
+PostgreSQL instance on the default port.
 
-`nestjs-pino` is the global logger. Pretty multi-line in `NODE_ENV !== production`, JSON otherwise. Every line carries `reqId` correlated with the `X-Request-Id` header on the corresponding HTTP request. Healthcheck pings are excluded from auto-logging to keep the dev console clean.
+For local auth development:
 
-## Health checks
+- Set `REFRESH_TOKEN_HMAC_SECRET` and `OTP_HMAC_SECRET` to values with 32 or more
+  characters.
+- Leave `JWT_PRIVATE_KEY` and `JWT_PUBLIC_KEY` empty in development. Dev keys are
+  generated under `apps/api/.dev-keys/` and are ignored by Git.
+- Configure SMTP variables if you need real email delivery. In non-production,
+  OTP codes are always `000000`.
 
-`GET /healthz` checks PostgreSQL connectivity and V8 heap usage. The heap
-ceiling defaults to `300` MiB and can be adjusted per deployment with
-`HEALTH_MAX_HEAP_MB`. Set the value below the process/container memory limit so
-the instance stops receiving traffic before exhausting its allocation.
+Regenerate `.env.example` after changing `src/config/env.ts`:
 
-## Error shape
+```bash
+pnpm gen:env
+```
 
-Every error response (whether thrown as `HttpException`, surfaced from `ValidationPipe`, or an uncaught `Error`) is normalized by `AllExceptionsFilter` to:
+## Useful Commands
+
+| Command                         | Purpose                                                        |
+| ------------------------------- | -------------------------------------------------------------- |
+| `pnpm --filter api dev`         | Run NestJS in watch mode.                                      |
+| `pnpm --filter api start`       | Run NestJS without watch mode.                                 |
+| `pnpm --filter api build`       | Build shared packages, generate Prisma client, compile NestJS. |
+| `pnpm --filter api lint`        | Run ESLint for API source and tests.                           |
+| `pnpm --filter api check-types` | Run `tsc --noEmit`.                                            |
+| `pnpm --filter api test`        | Run API unit tests.                                            |
+| `pnpm --filter api test:e2e`    | Run API E2E tests with Jest and Supertest.                     |
+| `pnpm --filter api db:migrate`  | Run `prisma migrate dev` locally.                              |
+| `pnpm --filter api db:deploy`   | Run `prisma migrate deploy` for CI/deployments.                |
+| `pnpm --filter api db:seed`     | Seed local/test data.                                          |
+| `pnpm --filter api db:generate` | Regenerate the Prisma client.                                  |
+| `pnpm --filter api spec`        | Print OpenAPI JSON from the compiled API.                      |
+
+Do not use destructive Prisma reset commands unless a human explicitly decides
+that data loss is acceptable.
+
+## Main Runtime Endpoints
+
+| Endpoint                          | Purpose                                               |
+| --------------------------------- | ----------------------------------------------------- |
+| `GET /healthz`                    | Liveness/readiness check with DB and heap indicators. |
+| `GET /api-docs`                   | Swagger UI.                                           |
+| `GET /api-docs-json`              | Raw OpenAPI document.                                 |
+| `GET /.well-known/jwks.json`      | Public signing keys for local JWT verification.       |
+| `GET /v1/auth/enabled-methods`    | Server-enabled auth method list.                      |
+| `POST /v1/auth/email-otp/request` | Request an email OTP challenge.                       |
+| `POST /v1/auth/email-otp/verify`  | Verify an email OTP code.                             |
+| `POST /v1/auth/google`            | Exchange a Google ID token for an API session.        |
+| `POST /v1/auth/apple`             | Exchange an Apple ID token for an API session.        |
+| `POST /v1/auth/refresh`           | Rotate refresh token and issue a new access token.    |
+| `GET /v1/auth/me`                 | Return the current DB-backed user.                    |
+| `POST /v1/auth/logout`            | Revoke current session.                               |
+| `POST /v1/auth/logout-all`        | Revoke all user sessions.                             |
+| `GET /v1/auth/sessions`           | List active sessions.                                 |
+
+Use the generated `openapi.json` and `/api-docs` as the complete HTTP
+reference. The auth architecture is documented in
+[../../docs/auth/README.md](../../docs/auth/README.md).
+
+## Prisma 7 Notes
+
+This project intentionally uses Prisma 7's driver-adapter architecture:
+
+- Generator provider is `prisma-client`.
+- Generated client output is `src/generated/prisma`.
+- `datasource.url` lives in `prisma.config.ts`.
+- Runtime `PrismaClient` is created with `@prisma/adapter-pg`.
+- Pool settings are explicit in `src/prisma/prisma.service.ts`.
+
+Before changing schema, generated client setup, migration commands, or Prisma
+runtime code, read the Prisma rule in [../../AGENTS.md](../../AGENTS.md).
+
+## Logging And Errors
+
+`nestjs-pino` is the global logger. Development output is pretty-printed;
+production output is structured JSON. Request logs carry `reqId`, correlated
+with the `X-Request-Id` header when provided.
+
+Every error response is normalized by `AllExceptionsFilter`:
 
 ```json
 {
@@ -67,18 +120,7 @@ Every error response (whether thrown as `HttpException`, surfaced from `Validati
     "code": "BAD_REQUEST",
     "message": "Validation failed",
     "details": ["email must be an email"],
-    "requestId": "8f3c…"
+    "requestId": "8f3c..."
   }
 }
 ```
-
-Reasoning: Orval clients want one error type. See [docs/adr/0001-rest-not-trpc.md](../../docs/adr/0001-rest-not-trpc.md) for the broader contract decision.
-
-## Adding a new env var
-
-1. Add the field to [src/config/env.ts](src/config/env.ts) with a `.describe(...)` line and (where applicable) a default.
-2. Add cross-field requirements to the `.superRefine` block at the bottom of the same file.
-3. From repo root, `pnpm gen:env` — `apps/api/.env.example` regenerates.
-4. Update your local `apps/api/.env`.
-
-The env example is auto-generated. **Don't hand-edit it.**

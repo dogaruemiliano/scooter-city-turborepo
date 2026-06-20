@@ -9,6 +9,7 @@
     "check-types": "turbo run check-types",
     "test": "turbo run test",
     "test:e2e": "turbo run test:e2e",
+    "init:local": "tsx scripts/init-local.ts",
     "gen": "pnpm gen:env && pnpm --filter @repo/api-shared build && pnpm --filter api build && pnpm gen:openapi",
     "gen:env": "tsx scripts/generate-env-example.ts",
     "gen:openapi": "node apps/api/dist/src/main --spec-only > openapi.json",
