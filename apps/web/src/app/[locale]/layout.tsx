@@ -9,7 +9,7 @@ import { setRequestLocale } from "next-intl/server";
 
 import { AppShell } from "../../components/AppShell";
 import { SessionProvider } from "../../components/auth/SessionProvider";
-import { meOnServer } from "../../lib/auth-server";
+import { meFromApi } from "../../lib/auth-server";
 import {
   resolveDataTheme,
   resolveThemePreference,
@@ -52,7 +52,7 @@ export default async function RootLayout({
 
   const [cookieStore, initialUser] = await Promise.all([
     cookies(),
-    meOnServer(),
+    meFromApi(),
   ]);
   const themeCookie = cookieStore.get(THEME_COOKIE_NAME)?.value;
   const dataTheme = resolveDataTheme(themeCookie);
