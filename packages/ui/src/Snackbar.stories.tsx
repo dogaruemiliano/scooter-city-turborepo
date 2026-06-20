@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Snackbar } from "./Snackbar";
-import { Button } from "./Button";
+import { Button } from "./button";
 
 const meta = {
   title: "Components/Snackbar",

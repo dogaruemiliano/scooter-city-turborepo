@@ -29,12 +29,12 @@
       "default": "./src/BottomSheet.tsx"
     },
     "./Button": {
-      "types": "./src/Button.tsx",
-      "default": "./src/Button.tsx"
+      "types": "./src/button.tsx",
+      "default": "./src/button.tsx"
     },
     "./Card": {
-      "types": "./src/Card.tsx",
-      "default": "./src/Card.tsx"
+      "types": "./src/card.tsx",
+      "default": "./src/card.tsx"
     },
     "./Divider": {
       "types": "./src/Divider.tsx",

@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
-import { Button } from "./Button";
+import { Button } from "./button";
 import { Divider } from "./Divider";
 import { Input } from "./Input";
 import { Text } from "./Text";

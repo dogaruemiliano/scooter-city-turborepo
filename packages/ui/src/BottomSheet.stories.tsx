@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { BottomSheet } from "./BottomSheet";
-import { Button } from "./Button";
+import { Button } from "./button";
 import { Text } from "./Text";
 
 const DemoBackdrop = () => (
