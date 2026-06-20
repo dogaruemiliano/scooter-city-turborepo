@@ -6,13 +6,14 @@
  * is unchanged — see https://nextjs.org/docs/app/api-reference/file-conventions/proxy.
  *
  *   1. If the user holds a valid access cookie → render.
- *   2. If on the public sign-in path → render through locale routing.
- *   3. If holding only a refresh cookie → server-to-server POST
+ *   2. If holding only a refresh cookie → server-to-server POST
  *      /v1/auth/refresh with the request's cookie jar; forward the
  *      Set-Cookie back to the browser and render. This is the "tab
  *      was idle for >15min so access expired but refresh is still
  *      good" path — without it, every long-idle tab would redirect to
  *      /sign-in on first interaction.
+ *   3. If on the public sign-in path with no refresh cookie → render
+ *      through locale routing.
  *   4. Otherwise → redirect to the localized sign-in URL with
  *      ?next=<original-local-path>.
  *
@@ -41,9 +42,10 @@ export async function proxy(req: NextRequest): Promise<NextResponse> {
   const isPublic = isPublicPathname(req.nextUrl.pathname);
 
   if (access) return handleI18nRouting(req);
-  if (isPublic) return handleI18nRouting(req);
 
-  if (!refresh) return redirectToSignIn(req);
+  if (!refresh) {
+    return isPublic ? handleI18nRouting(req) : redirectToSignIn(req);
+  }
 
   // Stale-tab refresh path.
   let apiRes: Response;
@@ -58,10 +60,16 @@ export async function proxy(req: NextRequest): Promise<NextResponse> {
       body: "{}",
     });
   } catch {
-    return redirectToSignIn(req);
+    return sessionTemporarilyUnavailable();
   }
 
-  if (!apiRes.ok) return redirectToSignIn(req);
+  if (!apiRes.ok) {
+    if (isRefreshAuthFailure(apiRes.status)) {
+      return isPublic ? handleI18nRouting(req) : redirectToSignIn(req);
+    }
+
+    return sessionTemporarilyUnavailable();
+  }
 
   const setCookies = apiRes.headers.getSetCookie();
   const requestCookies = new Map(
@@ -98,6 +106,24 @@ function redirectToSignIn(req: NextRequest): NextResponse {
   const next = safeNextPath(`${req.nextUrl.pathname}${req.nextUrl.search}`);
   const url = new URL(getLocalizedSignInPath(locale, next), req.url);
   return NextResponse.redirect(url);
+}
+
+function isRefreshAuthFailure(status: number): boolean {
+  return status === 401 || status === 403;
+}
+
+function sessionTemporarilyUnavailable(): NextResponse {
+  return new NextResponse(
+    "Your session could not be checked because the authentication service is temporarily unavailable. Your browser session was not cleared. Retry when the API is back online.",
+    {
+      status: 503,
+      headers: {
+        "cache-control": "no-store",
+        "content-type": "text/plain; charset=utf-8",
+        "retry-after": "5",
+      },
+    },
+  );
 }
 
 function mergeRequestOverrides(
