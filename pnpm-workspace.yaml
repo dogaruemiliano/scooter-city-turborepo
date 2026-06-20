@@ -1,3 +1,23 @@
 packages:
   - "apps/*"
   - "packages/*"
+
+allowBuilds:
+  "@nestjs/core": true
+  "@parcel/watcher": true
+  "@prisma/engines": true
+  "@scarf/scarf": true
+  "@swc/core": true
+  bcrypt: true
+  esbuild: true
+  lefthook: true
+  prisma: true
+  sharp: true
+  unrs-resolver: true
+
+overrides:
+  esbuild: ^0.27.7
+  jest-mock: ^30.0.0
+  react: 19.2.0
+  react-dom: 19.2.0
+  unrs-resolver: 1.12.2

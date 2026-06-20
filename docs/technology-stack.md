@@ -7,7 +7,7 @@ and shared design tokens.
 
 ## Monorepo Foundation
 
-- pnpm 9 workspaces manage `apps/*` and `packages/*`.
+- pnpm 11 workspaces manage `apps/*` and `packages/*`.
 - Turborepo 2 coordinates `build`, `dev`, `lint`, `check-types`, `test`, and
   `test:e2e` tasks.
 - TypeScript is the default language across apps and packages.

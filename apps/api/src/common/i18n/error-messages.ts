@@ -26,6 +26,15 @@ const SESSION_MESSAGES = new Set([
   "Refresh token reuse detected; session revoked",
 ]);
 
+const LOCALIZED_HTTP_STATUS = {
+  badRequest: Number(HttpStatus.BAD_REQUEST),
+  conflict: Number(HttpStatus.CONFLICT),
+  forbidden: Number(HttpStatus.FORBIDDEN),
+  notFound: Number(HttpStatus.NOT_FOUND),
+  tooManyRequests: Number(HttpStatus.TOO_MANY_REQUESTS),
+  unauthorized: Number(HttpStatus.UNAUTHORIZED),
+} as const;
+
 export function localizeErrorMessage(
   input: LocalizeErrorMessageInput,
   locale: SupportedLocale,
@@ -43,7 +52,7 @@ function matchErrorMessage(
   input: LocalizeErrorMessageInput,
 ): { key: MessageKey; values?: InterpolationValues } | null {
   if (
-    input.status === HttpStatus.TOO_MANY_REQUESTS ||
+    input.status === LOCALIZED_HTTP_STATUS.tooManyRequests ||
     input.code === "OTP_DELIVERY_QUOTA_EXCEEDED"
   ) {
     return {
@@ -61,25 +70,25 @@ function matchErrorMessage(
   }
 
   if (
-    input.status === HttpStatus.BAD_REQUEST &&
+    input.status === LOCALIZED_HTTP_STATUS.badRequest &&
     (input.message === "Validation failed" || input.details !== undefined)
   ) {
     return { key: "api.errors.validation" };
   }
 
-  if (input.status === HttpStatus.UNAUTHORIZED) {
+  if (input.status === LOCALIZED_HTTP_STATUS.unauthorized) {
     return { key: "api.errors.unauthorized" };
   }
 
-  if (input.status === HttpStatus.FORBIDDEN) {
+  if (input.status === LOCALIZED_HTTP_STATUS.forbidden) {
     return { key: "api.errors.forbidden" };
   }
 
-  if (input.status === HttpStatus.NOT_FOUND) {
+  if (input.status === LOCALIZED_HTTP_STATUS.notFound) {
     return { key: "api.errors.notFound" };
   }
 
-  if (input.status === HttpStatus.CONFLICT) {
+  if (input.status === LOCALIZED_HTTP_STATUS.conflict) {
     return { key: "api.errors.conflict" };
   }
 

@@ -13,4 +13,3 @@ export function getRequestLocale(req: RequestWithHeaders): SupportedLocale {
     fallback: fallbackLocale,
   });
 }
-

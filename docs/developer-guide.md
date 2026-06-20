@@ -6,8 +6,8 @@ Day-to-day guide for internal engineers using or extending the template.
 
 Requirements:
 
-- Node.js 20 or newer.
-- pnpm 9.
+- Node.js 24.17 or newer.
+- pnpm 11.
 - Docker.
 
 Install dependencies:

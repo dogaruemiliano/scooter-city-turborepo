@@ -27,7 +27,7 @@ need a real backend.
 
 | Area             | Technology                                                            |
 | ---------------- | --------------------------------------------------------------------- |
-| Workspace        | pnpm 9 workspaces, Turborepo 2                                        |
+| Workspace        | pnpm 11 workspaces, Turborepo 2                                       |
 | Language         | TypeScript 5.9                                                        |
 | API              | NestJS 11, Express, Swagger/OpenAPI, nestjs-zod                       |
 | Database         | PostgreSQL 16, Prisma 7, `@prisma/adapter-pg`                         |
@@ -63,8 +63,8 @@ packages/
 
 Requirements:
 
-- Node.js 20 or newer
-- pnpm 9
+- Node.js 24.17 or newer
+- pnpm 11
 - Docker
 
 Install dependencies:

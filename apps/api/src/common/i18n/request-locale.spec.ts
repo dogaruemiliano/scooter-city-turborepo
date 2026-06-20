@@ -33,4 +33,3 @@ describe("getRequestLocale", () => {
     ).toBe("en");
   });
 });
-

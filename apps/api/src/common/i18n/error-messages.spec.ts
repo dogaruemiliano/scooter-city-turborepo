@@ -93,4 +93,3 @@ describe("localizeErrorMessage", () => {
     ).toBe("Unknown OAuth provider");
   });
 });
-
