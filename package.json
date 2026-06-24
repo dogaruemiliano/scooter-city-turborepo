@@ -1,5 +1,5 @@
 {
-  "name": "turborepo-full-template-v2",
+  "name": "jusem-hub-turborepo",
   "private": true,
   "scripts": {
     "build": "turbo run build",

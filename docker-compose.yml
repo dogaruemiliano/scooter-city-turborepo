@@ -1,7 +1,7 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: turborepo-full-template-v2-postgres
+    container_name: jusem-hub-turborepo-postgres
     restart: unless-stopped
     environment:
       POSTGRES_DB: app
