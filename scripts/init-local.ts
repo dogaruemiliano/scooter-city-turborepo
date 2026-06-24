@@ -10,7 +10,7 @@
 import { spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, relative, resolve } from "node:path";
+import { basename, dirname, relative, resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
 import { setTimeout as delay } from "node:timers/promises";
@@ -18,6 +18,7 @@ import { fileURLToPath } from "node:url";
 
 interface Options {
   yes: boolean;
+  projectName?: string;
   skipDocker: boolean;
   skipDb: boolean;
   skipSeed: boolean;
@@ -40,6 +41,7 @@ interface EnvBlock {
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const isWindows = process.platform === "win32";
+const templatePackageName = "turborepo-full-template-v2";
 const secretKeys = ["REFRESH_TOKEN_HMAC_SECRET", "OTP_HMAC_SECRET"] as const;
 
 const envFiles: EnvFile[] = [
@@ -62,6 +64,7 @@ Sets up a local development clone. Run after pnpm install.
 
 Options:
   --yes           Accept safe defaults without prompting.
+  --name <name>   Set the root package name and Docker container prefix.
   --skip-docker   Do not start Docker Compose.
   --skip-db       Skip migrations, Prisma generate, and seed.
   --skip-seed     Apply migrations and generate Prisma client, but skip seed.
@@ -75,6 +78,7 @@ Options:
 function parseOptions(argv: string[]): Options {
   const options: Options = {
     yes: false,
+    projectName: undefined,
     skipDocker: false,
     skipDb: false,
     skipSeed: false,
@@ -84,11 +88,28 @@ function parseOptions(argv: string[]): Options {
     help: false,
   };
 
-  for (const arg of argv) {
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+
+    if (arg.startsWith("--name=") || arg.startsWith("--project-name=")) {
+      options.projectName = arg.slice(arg.indexOf("=") + 1);
+      continue;
+    }
+
     switch (arg) {
       case "--yes":
         options.yes = true;
         break;
+      case "--name":
+      case "--project-name": {
+        const value = argv[index + 1];
+        if (!value || value.startsWith("--")) {
+          throw new Error(`Missing value for ${arg}\n\n${usage()}`);
+        }
+        options.projectName = value;
+        index += 1;
+        break;
+      }
       case "--skip-docker":
         options.skipDocker = true;
         break;
@@ -139,6 +160,26 @@ class Prompter {
 
     if (!answer) return defaultValue;
     return ["y", "yes"].includes(answer);
+  }
+
+  async text(
+    question: string,
+    defaultValue: string,
+    validate: (value: string) => string | undefined,
+  ): Promise<string> {
+    if (this.options.yes || !this.rl) {
+      return defaultValue;
+    }
+
+    while (true) {
+      const answer = (
+        await this.rl.question(`${question} (${defaultValue}) `)
+      ).trim();
+      const value = answer || defaultValue;
+      const error = validate(value);
+      if (!error) return value;
+      warn(error);
+    }
   }
 
   close(): void {
@@ -213,6 +254,164 @@ function parseExampleBlocks(content: string): EnvBlock[] {
 function readIfExists(path: string): string | undefined {
   if (!existsSync(path)) return undefined;
   return readFileSync(path, "utf8");
+}
+
+function defaultPackageNameFromDirectory(): string {
+  const name = basename(root)
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._~-]+/g, "-")
+    .replace(/^[._-]+/, "")
+    .replace(/[._-]+$/, "");
+
+  return validatePackageName(name) ? "app" : name;
+}
+
+function packageNameSegmentError(segment: string): string | undefined {
+  if (!segment) return "Package name segments cannot be empty.";
+  if (segment.startsWith(".") || segment.startsWith("_")) {
+    return "Package name segments cannot start with a dot or underscore.";
+  }
+  if (!/^[a-z0-9][a-z0-9._~-]*$/.test(segment)) {
+    return "Package names can only contain lowercase letters, numbers, dots, underscores, hyphens, and tildes.";
+  }
+  return undefined;
+}
+
+function validatePackageName(name: string): string | undefined {
+  const trimmed = name.trim();
+  if (!trimmed) return "Project name is required.";
+  if (trimmed !== name)
+    return "Project name cannot include leading or trailing whitespace.";
+  if (trimmed.length > 214)
+    return "Project name must be 214 characters or fewer.";
+  if (trimmed !== trimmed.toLowerCase()) {
+    return "Project name must be lowercase to be a valid npm package name.";
+  }
+
+  if (trimmed.startsWith("@")) {
+    const parts = trimmed.split("/");
+    if (parts.length !== 2) {
+      return "Scoped package names must look like @scope/name.";
+    }
+    const scopeError = packageNameSegmentError(parts[0].slice(1));
+    return scopeError ?? packageNameSegmentError(parts[1]);
+  }
+
+  if (trimmed.includes("/")) {
+    return "Only scoped package names can include a slash.";
+  }
+
+  return packageNameSegmentError(trimmed);
+}
+
+function readPackageName(path: string): string | undefined {
+  const content = readIfExists(path);
+  if (content === undefined) return undefined;
+  const parsed = JSON.parse(content) as { name?: unknown };
+  return typeof parsed.name === "string" ? parsed.name : undefined;
+}
+
+async function resolveProjectName(
+  prompter: Prompter,
+  options: Options,
+): Promise<string> {
+  const packageJson = resolve(root, "package.json");
+  const existingName = readPackageName(packageJson);
+  const defaultName =
+    existingName && existingName !== templatePackageName
+      ? existingName
+      : defaultPackageNameFromDirectory();
+  if (options.projectName !== undefined) {
+    const requestedName = options.projectName.trim();
+    const error = validatePackageName(requestedName);
+    if (error) throw new Error(error);
+    return requestedName;
+  }
+
+  return prompter.text(
+    "Project package name",
+    defaultName,
+    validatePackageName,
+  );
+}
+
+function dockerContainerPrefix(projectName: string): string {
+  const prefix = projectName
+    .replace(/^@/, "")
+    .replace(/\//g, "-")
+    .replace(/[^a-z0-9_.-]+/g, "-")
+    .replace(/^[^a-z0-9]+/, "")
+    .replace(/[^a-z0-9]+$/, "");
+
+  return prefix || "app";
+}
+
+function ensurePackageName(projectName: string, options: Options): void {
+  const packageJson = resolve(root, "package.json");
+  const content = readIfExists(packageJson);
+  if (content === undefined) {
+    throw new Error(`Missing ${repoPath(packageJson)}`);
+  }
+
+  const parsed = JSON.parse(content) as { name?: string };
+  if (parsed.name === projectName) {
+    log(`${repoPath(packageJson)} already uses project name ${projectName}.`);
+    return;
+  }
+
+  if (options.dryRun) {
+    log(`[dry-run] Would set ${repoPath(packageJson)} name to ${projectName}`);
+    return;
+  }
+
+  parsed.name = projectName;
+  writeFileSync(packageJson, `${JSON.stringify(parsed, null, 2)}\n`, "utf8");
+  log(`Set ${repoPath(packageJson)} name to ${projectName}`);
+}
+
+function ensureDockerContainerName(
+  projectName: string,
+  options: Options,
+): void {
+  const composeFile = resolve(root, "docker-compose.yml");
+  const content = readIfExists(composeFile);
+  if (content === undefined) {
+    throw new Error(`Missing ${repoPath(composeFile)}`);
+  }
+
+  const containerName = `${dockerContainerPrefix(projectName)}-postgres`;
+  const nextContent = content.replace(
+    /^(\s*container_name:\s*).+$/m,
+    `$1${containerName}`,
+  );
+
+  if (nextContent === content) {
+    if (content.includes(`container_name: ${containerName}`)) {
+      log(
+        `${repoPath(composeFile)} already uses Postgres container ${containerName}.`,
+      );
+      return;
+    }
+    throw new Error(`Missing container_name in ${repoPath(composeFile)}`);
+  }
+
+  if (options.dryRun) {
+    log(
+      `[dry-run] Would set ${repoPath(
+        composeFile,
+      )} Postgres container_name to ${containerName}`,
+    );
+    return;
+  }
+
+  writeFileSync(composeFile, nextContent, "utf8");
+  log(`Set Postgres container_name to ${containerName}`);
+}
+
+function ensureProjectNaming(projectName: string, options: Options): void {
+  ensurePackageName(projectName, options);
+  ensureDockerContainerName(projectName, options);
 }
 
 function isNonEmptyEnvValue(value: string | undefined): boolean {
@@ -505,6 +704,9 @@ async function main(): Promise<void> {
   const prompter = new Prompter(options);
 
   try {
+    const projectName = await resolveProjectName(prompter, options);
+    ensureProjectNaming(projectName, options);
+
     const envReady = new Map<string, boolean>();
     for (const envFile of envFiles) {
       envReady.set(

@@ -22,9 +22,10 @@ Run the local bootstrap:
 pnpm init:local
 ```
 
-This command is for local development only. It creates missing ignored env
-files, merges missing env keys without overwriting existing values, generates
-local HMAC secrets when blank, starts Docker Postgres, applies checked-in
+This command is for local development only. It sets the root package name from
+the clone directory, updates the local Postgres container name, creates missing
+ignored env files, merges missing env keys without overwriting existing values,
+generates local HMAC secrets when blank, starts Docker Postgres, applies checked-in
 migrations, regenerates Prisma client output, seeds local data, and builds the
 shared runtime packages.
 
@@ -74,26 +75,27 @@ Local URLs:
 
 ## Daily Commands
 
-| Command                        | Purpose                                                                              |
-| ------------------------------ | ------------------------------------------------------------------------------------ |
-| `pnpm dev`                     | Run development tasks across the workspace.                                          |
-| `pnpm build`                   | Build all packages/apps.                                                             |
-| `pnpm lint`                    | Run ESLint.                                                                          |
-| `pnpm check-types`             | Run TypeScript checks.                                                               |
-| `pnpm test`                    | Run unit/package tests.                                                              |
-| `pnpm test:e2e`                | Run API E2E tests.                                                                   |
-| `pnpm init:local`              | Configure local env files, Docker Postgres, DB, seed, and shared builds after clone. |
-| `pnpm gen`                     | Regenerate env example and OpenAPI after API changes.                                |
-| `pnpm --filter api db:migrate` | Create/apply local Prisma migrations.                                                |
-| `pnpm --filter api db:deploy`  | Apply migrations without creating new ones.                                          |
-| `pnpm --filter api db:seed`    | Seed local/test data.                                                                |
-| `pnpm --filter @repo/ui dev`   | Run Storybook.                                                                       |
+| Command                        | Purpose                                                                                                |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------ |
+| `pnpm dev`                     | Run development tasks across the workspace.                                                            |
+| `pnpm build`                   | Build all packages/apps.                                                                               |
+| `pnpm lint`                    | Run ESLint.                                                                                            |
+| `pnpm check-types`             | Run TypeScript checks.                                                                                 |
+| `pnpm test`                    | Run unit/package tests.                                                                                |
+| `pnpm test:e2e`                | Run API E2E tests.                                                                                     |
+| `pnpm init:local`              | Configure the local project name, env files, Docker Postgres, DB, seed, and shared builds after clone. |
+| `pnpm gen`                     | Regenerate env example and OpenAPI after API changes.                                                  |
+| `pnpm --filter api db:migrate` | Create/apply local Prisma migrations.                                                                  |
+| `pnpm --filter api db:deploy`  | Apply migrations without creating new ones.                                                            |
+| `pnpm --filter api db:seed`    | Seed local/test data.                                                                                  |
+| `pnpm --filter @repo/ui dev`   | Run Storybook.                                                                                         |
 
 ## `pnpm init:local` Options
 
 ```bash
 pnpm init:local --help
 pnpm init:local --yes
+pnpm init:local --name my-project
 pnpm init:local --skip-docker
 pnpm init:local --skip-db
 pnpm init:local --skip-seed

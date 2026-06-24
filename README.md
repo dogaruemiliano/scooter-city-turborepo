@@ -79,10 +79,11 @@ Run the local bootstrap:
 pnpm init:local
 ```
 
-`pnpm init:local` is for local development only. It creates or updates ignored
-local env files, generates local HMAC secrets when blank, starts Docker
-Postgres, applies checked-in migrations, regenerates the Prisma client, seeds
-local data, and builds shared runtime packages.
+`pnpm init:local` is for local development only. It sets the root package name
+from the clone directory, updates the local Postgres container name, creates or
+updates ignored local env files, generates local HMAC secrets when blank, starts
+Docker Postgres, applies checked-in migrations, regenerates the Prisma client,
+seeds local data, and builds shared runtime packages.
 
 Start the workspace:
 
@@ -131,23 +132,23 @@ For a longer setup guide, see [docs/developer-guide.md](docs/developer-guide.md)
 
 ## Common Commands
 
-| Command                         | Purpose                                                                                      |
-| ------------------------------- | -------------------------------------------------------------------------------------------- |
-| `pnpm dev`                      | Run workspace development tasks.                                                             |
-| `pnpm build`                    | Build the workspace.                                                                         |
-| `pnpm lint`                     | Run ESLint.                                                                                  |
-| `pnpm check-types`              | Run TypeScript checks.                                                                       |
-| `pnpm test`                     | Run unit tests.                                                                              |
-| `pnpm test:e2e`                 | Run API E2E tests.                                                                           |
-| `pnpm init:local`               | Configure ignored local env files, Docker Postgres, DB, seed, and shared builds after clone. |
-| `pnpm gen`                      | Regenerate env example, build shared/API packages, emit OpenAPI.                             |
-| `pnpm gen:env`                  | Regenerate `apps/api/.env.example` from env schema.                                          |
-| `pnpm gen:openapi`              | Emit root `openapi.json` from the compiled API.                                              |
-| `pnpm --filter api db:migrate`  | Apply local Prisma migrations.                                                               |
-| `pnpm --filter api db:deploy`   | Apply migrations in CI or deployment.                                                        |
-| `pnpm --filter api db:seed`     | Seed local/test data.                                                                        |
-| `pnpm --filter api db:generate` | Regenerate Prisma client output.                                                             |
-| `pnpm --filter @repo/ui dev`    | Run Storybook on port 6006.                                                                  |
+| Command                         | Purpose                                                                                                |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `pnpm dev`                      | Run workspace development tasks.                                                                       |
+| `pnpm build`                    | Build the workspace.                                                                                   |
+| `pnpm lint`                     | Run ESLint.                                                                                            |
+| `pnpm check-types`              | Run TypeScript checks.                                                                                 |
+| `pnpm test`                     | Run unit tests.                                                                                        |
+| `pnpm test:e2e`                 | Run API E2E tests.                                                                                     |
+| `pnpm init:local`               | Configure the local project name, env files, Docker Postgres, DB, seed, and shared builds after clone. |
+| `pnpm gen`                      | Regenerate env example, build shared/API packages, emit OpenAPI.                                       |
+| `pnpm gen:env`                  | Regenerate `apps/api/.env.example` from env schema.                                                    |
+| `pnpm gen:openapi`              | Emit root `openapi.json` from the compiled API.                                                        |
+| `pnpm --filter api db:migrate`  | Apply local Prisma migrations.                                                                         |
+| `pnpm --filter api db:deploy`   | Apply migrations in CI or deployment.                                                                  |
+| `pnpm --filter api db:seed`     | Seed local/test data.                                                                                  |
+| `pnpm --filter api db:generate` | Regenerate Prisma client output.                                                                       |
+| `pnpm --filter @repo/ui dev`    | Run Storybook on port 6006.                                                                            |
 
 ## Internal Conventions
 
