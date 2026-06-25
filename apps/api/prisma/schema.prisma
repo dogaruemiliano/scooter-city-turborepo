@@ -29,6 +29,39 @@ datasource db {
   provider = "postgresql"
 }
 
+/// Admin-managed person record used by rental flows.
+///
+/// This is intentionally separate from `User`: a person can exist before
+/// they have an app account, and a future linking flow can connect them by
+/// the required unique email.
+model Person {
+  id                         String    @id @default(cuid())
+  email                      String    @unique
+  phone                      String    @unique
+  firstName                  String
+  lastName                   String
+  dateOfBirth                DateTime? @db.Date
+  addressLine1               String?
+  addressLine2               String?
+  city                       String?
+  region                     String?
+  postalCode                 String?
+  countryCode                String?
+  documentType               String?
+  documentNumber             String?
+  documentIssuingCountryCode String?
+  documentExpiresOn          DateTime? @db.Date
+  documentStatus             String    @default("unverified")
+  notes                      String?
+  createdAt                  DateTime  @default(now())
+  updatedAt                  DateTime  @updatedAt
+  deletedAt                  DateTime?
+
+  @@index([deletedAt])
+  @@index([lastName, firstName])
+  @@index([documentStatus])
+}
+
 /// A human. `emailVerified` / `phoneVerified` are timestamps (not
 /// booleans) — when verified is the audit trail.
 ///
