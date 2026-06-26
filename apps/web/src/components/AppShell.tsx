@@ -55,12 +55,15 @@ import {
 
 const NAVIGATION = [
   { href: "/", labelKey: "dashboard" },
+  { href: "/persons", labelKey: "persons", requiredRole: "ADMIN" },
   { href: "/shadcn", labelKey: "uiShowcase" },
 ] as const;
 
 const PAGE_TITLES: Record<string, string> = {
   "/": "dashboard",
   "/account/settings": "accountSettings",
+  "/persons": "persons",
+  "/persons/new": "newPerson",
   "/shadcn": "uiShowcase",
 };
 
@@ -112,6 +115,12 @@ function AppSidebar({
 }) {
   const tNav = useTranslations("appShell.nav");
   const tWorkspace = useTranslations("appShell.workspace");
+  const { user } = useSession();
+  const navigation = NAVIGATION.filter(
+    (item) =>
+      !("requiredRole" in item) ||
+      user?.roles.includes(item.requiredRole) === true,
+  );
 
   return (
     <Sidebar collapsible="icon">
@@ -142,10 +151,10 @@ function AppSidebar({
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {NAVIGATION.map((item) => (
+              {navigation.map((item) => (
                 <SidebarMenuItem key={item.href}>
                   <SidebarMenuButton
-                    isActive={pathname === item.href}
+                    isActive={isActiveNavigationItem(pathname, item.href)}
                     render={<Link href={localizePath(item.href, locale)} />}
                   >
                     <span>{tNav(item.labelKey)}</span>
@@ -166,6 +175,10 @@ function AppSidebar({
       <SidebarRail />
     </Sidebar>
   );
+}
+
+function isActiveNavigationItem(pathname: string, href: string): boolean {
+  return pathname === href || (href !== "/" && pathname.startsWith(`${href}/`));
 }
 
 function AccountMenu({

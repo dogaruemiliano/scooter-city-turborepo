@@ -1,4 +1,10 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { messages, type SupportedLocale } from "@repo/i18n";
 import { TooltipProvider } from "@repo/ui/components/tooltip";
 import { NextIntlClientProvider } from "next-intl";
@@ -91,6 +97,9 @@ describe("AppShell", () => {
       "href",
       "/shadcn",
     );
+    expect(
+      screen.queryByRole("link", { name: "Persoane" }),
+    ).not.toBeInTheDocument();
     expect(screen.getByText("Emilia Stone")).toBeInTheDocument();
     expect(screen.getByText("emilia.stone@example.com")).toBeInTheDocument();
 
@@ -163,6 +172,70 @@ describe("AppShell", () => {
     expect(
       await screen.findByRole("menuitem", { name: "Account settings" }),
     ).toHaveAttribute("href", "/en/account/settings");
+  });
+
+  it("closes the mobile drawer when a navigation link is pressed", async () => {
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: 390,
+    });
+
+    renderAppShell();
+
+    const trigger = await screen.findByRole("button", {
+      name: "Open navigation",
+    });
+
+    fireEvent.click(trigger);
+
+    await waitFor(() =>
+      expect(trigger).toHaveAttribute("aria-expanded", "true"),
+    );
+
+    const uiShowcaseLink = screen.getByRole("link", { name: "Galerie UI" });
+
+    uiShowcaseLink.addEventListener(
+      "click",
+      (event) => event.preventDefault(),
+      { once: true },
+    );
+    fireEvent.click(uiShowcaseLink);
+
+    await waitFor(() =>
+      expect(trigger).toHaveAttribute("aria-expanded", "false"),
+    );
+  });
+
+  it("renders the persons navigation and title for admins", () => {
+    mocks.pathname = "/en/persons";
+
+    renderAppShell({
+      id: "admin-1",
+      email: "admin@example.com",
+      roles: ["ADMIN"],
+    });
+
+    expect(screen.getByRole("link", { name: "Persons" })).toHaveAttribute(
+      "href",
+      "/en/persons",
+    );
+    expect(
+      within(screen.getByRole("banner")).getByText("Persons"),
+    ).toBeInTheDocument();
+  });
+
+  it("renders the new person page title for admin nested person routes", () => {
+    mocks.pathname = "/en/persons/new";
+
+    renderAppShell({
+      id: "admin-1",
+      email: "admin@example.com",
+      roles: ["ADMIN"],
+    });
+
+    expect(
+      within(screen.getByRole("banner")).getByText("New person"),
+    ).toBeInTheDocument();
   });
 });
 

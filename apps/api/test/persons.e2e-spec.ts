@@ -97,6 +97,12 @@ describe("Persons HTTP surface (e2e)", () => {
     return `+407${phoneSeq}`;
   }
 
+  function dateOnlyDaysFromNow(days: number): string {
+    const date = new Date();
+    date.setUTCDate(date.getUTCDate() + days);
+    return date.toISOString().slice(0, 10);
+  }
+
   function personInput(overrides: Partial<v1.persons.CreatePersonInput> = {}) {
     const email = `person-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`;
     const phone = uniquePhone();
@@ -108,10 +114,19 @@ describe("Persons HTTP surface (e2e)", () => {
       firstName: "Ada",
       lastName: "Lovelace",
       dateOfBirth: "1990-02-28",
-      documentType: "passport",
-      documentNumber: "P1234567",
-      documentIssuingCountryCode: "RO",
-      documentExpiresOn: "2030-01-31",
+      documents: [
+        {
+          type: "nationalId",
+          series: "RX",
+          number: "123456",
+          cnp: "1900228123450",
+          issuingCountryCode: "RO",
+          issuedBy: "SPCLEP Bucuresti",
+          issuedOn: "2024-01-15",
+          expiresOn: "2030-01-31",
+          status: "unverified",
+        },
+      ],
       ...overrides,
     };
   }
@@ -149,8 +164,84 @@ describe("Persons HTTP surface (e2e)", () => {
     expect(created.phone).toBe(input.phone);
     expect(created.firstName).toBe("Grace");
     expect(created.lastName).toBe("Hopper");
-    expect(created.documentStatus).toBe("unverified");
+    expect(created.documents).toHaveLength(1);
+    expect(created.documents[0]?.type).toBe("nationalId");
+    expect(created.documents[0]?.series).toBe("RX");
+    expect(created.documents[0]?.number).toBe("123456");
+    expect(created.documents[0]?.cnp).toBe("1900228123450");
+    expect(created.documents[0]?.issuingCountryCode).toBe("RO");
+    expect(created.documents[0]?.issuedBy).toBe("SPCLEP Bucuresti");
+    expect(created.documents[0]?.issuedOn).toBe("2024-01-15");
+    expect(created.documents[0]?.status).toBe("unverified");
     expect(created.deletedAt).toBeNull();
+
+    const duplicateInitialDocumentRes = await req()
+      .post(v1.persons.ROUTES.documents.create(created.id))
+      .set("Cookie", [`access_token=${session.accessToken}`])
+      .send({
+        type: "nationalId",
+        number: "RR999999",
+        issuingCountryCode: "RO",
+      });
+    expect(duplicateInitialDocumentRes.status).toBe(409);
+
+    const duplicateIdentityDocumentRes = await req()
+      .post(v1.persons.ROUTES.documents.create(created.id))
+      .set("Cookie", [`access_token=${session.accessToken}`])
+      .send({
+        type: "passport",
+        number: "123456789",
+        issuingCountryCode: "RO",
+      });
+    expect(duplicateIdentityDocumentRes.status).toBe(409);
+
+    const driverLicenseRes = await req()
+      .post(v1.persons.ROUTES.documents.create(created.id))
+      .set("Cookie", [`access_token=${session.accessToken}`])
+      .send({
+        type: "driverLicense",
+        number: "B7654321",
+        issuingCountryCode: "RO",
+        expiresOn: "2032-05-20",
+      });
+    const driverLicense = v1.persons.personDocumentSchema.parse(
+      driverLicenseRes.body,
+    );
+
+    expect(driverLicenseRes.status).toBe(201);
+    expect(driverLicense.personId).toBe(created.id);
+    expect(driverLicense.type).toBe("driverLicense");
+
+    const documentsRes = await req()
+      .get(v1.persons.ROUTES.documents.list(created.id))
+      .set("Cookie", [`access_token=${session.accessToken}`]);
+    const documents = v1.persons.personDocumentListSchema.parse(
+      documentsRes.body,
+    );
+
+    expect(documentsRes.status).toBe(200);
+    expect(documents.map((document) => document.type).sort()).toEqual([
+      "driverLicense",
+      "nationalId",
+    ]);
+
+    const updateDocumentRes = await req()
+      .patch(v1.persons.ROUTES.documents.update(created.id, driverLicense.id))
+      .set("Cookie", [`access_token=${session.accessToken}`])
+      .send({ status: "verified" });
+    const updatedDocument = v1.persons.personDocumentSchema.parse(
+      updateDocumentRes.body,
+    );
+    expect(updateDocumentRes.status).toBe(200);
+    expect(updatedDocument.status).toBe("verified");
+
+    const duplicateDocumentUpdateRes = await req()
+      .patch(
+        v1.persons.ROUTES.documents.update(created.id, created.documents[0].id),
+      )
+      .set("Cookie", [`access_token=${session.accessToken}`])
+      .send({ type: "driverLicense" });
+    expect(duplicateDocumentUpdateRes.status).toBe(409);
 
     const listRes = await req()
       .get(`${v1.persons.ROUTES.list}?search=hopper&page=1&pageSize=10`)
@@ -160,11 +251,43 @@ describe("Persons HTTP surface (e2e)", () => {
     expect(listRes.status).toBe(200);
     expect(list.items.some((person) => person.id === created.id)).toBe(true);
 
+    const fuzzyNameSearchRes = await req()
+      .get(`${v1.persons.ROUTES.list}?search=hoper&page=1&pageSize=10`)
+      .set("Cookie", [`access_token=${session.accessToken}`]);
+    const fuzzyNameSearch = v1.persons.personListSchema.parse(
+      fuzzyNameSearchRes.body,
+    );
+    expect(
+      fuzzyNameSearch.items.some((person) => person.id === created.id),
+    ).toBe(true);
+
+    const documentSearchRes = await req()
+      .get(`${v1.persons.ROUTES.list}?search=B7654321&page=1&pageSize=10`)
+      .set("Cookie", [`access_token=${session.accessToken}`]);
+    const documentSearch = v1.persons.personListSchema.parse(
+      documentSearchRes.body,
+    );
+    expect(
+      documentSearch.items.some((person) => person.id === created.id),
+    ).toBe(true);
+
+    const fuzzyDocumentSearchRes = await req()
+      .get(`${v1.persons.ROUTES.list}?search=Bucuretsi&page=1&pageSize=10`)
+      .set("Cookie", [`access_token=${session.accessToken}`]);
+    const fuzzyDocumentSearch = v1.persons.personListSchema.parse(
+      fuzzyDocumentSearchRes.body,
+    );
+    expect(
+      fuzzyDocumentSearch.items.some((person) => person.id === created.id),
+    ).toBe(true);
+
     const getRes = await req()
       .get(v1.persons.ROUTES.get(created.id))
       .set("Cookie", [`access_token=${session.accessToken}`]);
     expect(getRes.status).toBe(200);
-    expect(v1.persons.personSchema.parse(getRes.body).id).toBe(created.id);
+    const fetched = v1.persons.personSchema.parse(getRes.body);
+    expect(fetched.id).toBe(created.id);
+    expect(fetched.documents).toHaveLength(2);
 
     const newPhone = uniquePhone();
     createdPersonPhones.push(newPhone);
@@ -173,15 +296,33 @@ describe("Persons HTTP surface (e2e)", () => {
       .set("Cookie", [`access_token=${session.accessToken}`])
       .send({
         phone: newPhone,
-        documentStatus: "verified",
         addressLine1: "  1 Test Street ",
       });
     const updated = v1.persons.personSchema.parse(updateRes.body);
 
     expect(updateRes.status).toBe(200);
     expect(updated.phone).toBe(newPhone);
-    expect(updated.documentStatus).toBe("verified");
     expect(updated.addressLine1).toBe("1 Test Street");
+
+    const deleteDocumentRes = await req()
+      .delete(v1.persons.ROUTES.documents.delete(created.id, driverLicense.id))
+      .set("Cookie", [`access_token=${session.accessToken}`]);
+    expect(deleteDocumentRes.status).toBe(204);
+
+    const getDeletedDocumentRes = await req()
+      .get(v1.persons.ROUTES.documents.get(created.id, driverLicense.id))
+      .set("Cookie", [`access_token=${session.accessToken}`]);
+    expect(getDeletedDocumentRes.status).toBe(404);
+
+    const recreatedDriverLicenseRes = await req()
+      .post(v1.persons.ROUTES.documents.create(created.id))
+      .set("Cookie", [`access_token=${session.accessToken}`])
+      .send({
+        type: "driverLicense",
+        number: "B7654322",
+        issuingCountryCode: "RO",
+      });
+    expect(recreatedDriverLicenseRes.status).toBe(201);
 
     const deleteRes = await req()
       .delete(v1.persons.ROUTES.delete(created.id))
@@ -242,6 +383,283 @@ describe("Persons HTTP surface (e2e)", () => {
     expect(duplicatePhoneRes.status).toBe(409);
   });
 
+  it("sorts persons by requested list order", async () => {
+    const session = await freshSession(["ADMIN"]);
+    const alphaInput = personInput({
+      firstName: "Sort",
+      lastName: "Alpha",
+      countryCode: "XQ",
+      notes: "SORT-SCOPE",
+    });
+    const zuluInput = personInput({
+      firstName: "Sort",
+      lastName: "Zulu",
+      countryCode: "XQ",
+      notes: "SORT-SCOPE",
+    });
+
+    const alpha = v1.persons.personSchema.parse(
+      (
+        await req()
+          .post(v1.persons.ROUTES.create)
+          .set("Cookie", [`access_token=${session.accessToken}`])
+          .send(alphaInput)
+      ).body,
+    );
+    const zulu = v1.persons.personSchema.parse(
+      (
+        await req()
+          .post(v1.persons.ROUTES.create)
+          .set("Cookie", [`access_token=${session.accessToken}`])
+          .send(zuluInput)
+      ).body,
+    );
+
+    const sortedListRes = await req()
+      .get(
+        `${v1.persons.ROUTES.list}?countryCode=XQ&sort=nameDesc&page=1&pageSize=50`,
+      )
+      .set("Cookie", [`access_token=${session.accessToken}`]);
+    const sortedList = v1.persons.personListSchema.parse(sortedListRes.body);
+    expect(sortedListRes.status).toBe(200);
+    expect(
+      sortedList.items
+        .map((person) => person.id)
+        .filter((id) => id === alpha.id || id === zulu.id),
+    ).toEqual([zulu.id, alpha.id]);
+
+    const sortedSearchRes = await req()
+      .get(
+        `${v1.persons.ROUTES.list}?search=SORT-SCOPE&sort=nameAsc&page=1&pageSize=50`,
+      )
+      .set("Cookie", [`access_token=${session.accessToken}`]);
+    const sortedSearch = v1.persons.personListSchema.parse(
+      sortedSearchRes.body,
+    );
+    expect(sortedSearchRes.status).toBe(200);
+    expect(
+      sortedSearch.items
+        .map((person) => person.id)
+        .filter((id) => id === alpha.id || id === zulu.id),
+    ).toEqual([alpha.id, zulu.id]);
+  });
+
+  it("filters persons by record and document operations", async () => {
+    const session = await freshSession(["ADMIN"]);
+    const activeInput = personInput({
+      firstName: "Filter",
+      lastName: "Verified",
+      countryCode: "RO",
+      documents: [
+        {
+          type: "nationalId",
+          number: "FILTER-VERIFIED",
+          issuingCountryCode: "RO",
+          expiresOn: dateOnlyDaysFromNow(10),
+          status: "verified",
+        },
+      ],
+    });
+    const rejectedInput = personInput({
+      firstName: "Filter",
+      lastName: "Rejected",
+      countryCode: "US",
+      documents: [
+        {
+          type: "passport",
+          number: "FILTER-REJECTED",
+          issuingCountryCode: "US",
+          expiresOn: "2000-01-01",
+          status: "rejected",
+        },
+      ],
+    });
+    const missingInput = personInput({
+      firstName: "Filter",
+      lastName: "Missing",
+      documents: [],
+    });
+    const deletedInput = personInput({
+      firstName: "Filter",
+      lastName: "Deleted",
+      documents: [
+        {
+          type: "nationalId",
+          number: "FILTER-DELETED",
+          status: "unverified",
+        },
+      ],
+    });
+    const sameDocumentInput = personInput({
+      firstName: "Filter",
+      lastName: "SameDocument",
+      documents: [
+        {
+          type: "nationalId",
+          number: "FILTER-SAME-ID",
+          status: "verified",
+        },
+      ],
+    });
+
+    const active = v1.persons.personSchema.parse(
+      (
+        await req()
+          .post(v1.persons.ROUTES.create)
+          .set("Cookie", [`access_token=${session.accessToken}`])
+          .send(activeInput)
+      ).body,
+    );
+    const rejected = v1.persons.personSchema.parse(
+      (
+        await req()
+          .post(v1.persons.ROUTES.create)
+          .set("Cookie", [`access_token=${session.accessToken}`])
+          .send(rejectedInput)
+      ).body,
+    );
+    const missing = v1.persons.personSchema.parse(
+      (
+        await req()
+          .post(v1.persons.ROUTES.create)
+          .set("Cookie", [`access_token=${session.accessToken}`])
+          .send(missingInput)
+      ).body,
+    );
+    const deleted = v1.persons.personSchema.parse(
+      (
+        await req()
+          .post(v1.persons.ROUTES.create)
+          .set("Cookie", [`access_token=${session.accessToken}`])
+          .send(deletedInput)
+      ).body,
+    );
+    const sameDocument = v1.persons.personSchema.parse(
+      (
+        await req()
+          .post(v1.persons.ROUTES.create)
+          .set("Cookie", [`access_token=${session.accessToken}`])
+          .send(sameDocumentInput)
+      ).body,
+    );
+
+    const sameDocumentLicenseRes = await req()
+      .post(v1.persons.ROUTES.documents.create(sameDocument.id))
+      .set("Cookie", [`access_token=${session.accessToken}`])
+      .send({
+        type: "driverLicense",
+        number: "FILTER-SAME-LICENSE",
+        status: "rejected",
+      });
+    expect(sameDocumentLicenseRes.status).toBe(201);
+
+    const deleteRes = await req()
+      .delete(v1.persons.ROUTES.delete(deleted.id))
+      .set("Cookie", [`access_token=${session.accessToken}`]);
+    expect(deleteRes.status).toBe(204);
+
+    const verifiedNationalIdRes = await req()
+      .get(
+        `${v1.persons.ROUTES.list}?search=FILTER-VERIFIED&documentType=nationalId&documentStatus=verified&page=1&pageSize=50`,
+      )
+      .set("Cookie", [`access_token=${session.accessToken}`]);
+    const verifiedNationalId = v1.persons.personListSchema.parse(
+      verifiedNationalIdRes.body,
+    );
+    expect(verifiedNationalId.items.map((person) => person.id)).toContain(
+      active.id,
+    );
+
+    const sameDocumentPredicateRes = await req()
+      .get(
+        `${v1.persons.ROUTES.list}?search=FILTER-SAME&documentType=driverLicense&documentStatus=verified&page=1&pageSize=50`,
+      )
+      .set("Cookie", [`access_token=${session.accessToken}`]);
+    const sameDocumentPredicate = v1.persons.personListSchema.parse(
+      sameDocumentPredicateRes.body,
+    );
+    expect(
+      sameDocumentPredicate.items.map((person) => person.id),
+    ).not.toContain(sameDocument.id);
+
+    const countryRes = await req()
+      .get(
+        `${v1.persons.ROUTES.list}?search=FILTER-REJECTED&countryCode=US&page=1&pageSize=50`,
+      )
+      .set("Cookie", [`access_token=${session.accessToken}`]);
+    const country = v1.persons.personListSchema.parse(countryRes.body);
+    expect(country.items.map((person) => person.id)).toContain(rejected.id);
+    expect(country.items.map((person) => person.id)).not.toContain(active.id);
+
+    const issuingCountryRes = await req()
+      .get(
+        `${v1.persons.ROUTES.list}?search=FILTER-REJECTED&documentIssuingCountryCode=US&page=1&pageSize=50`,
+      )
+      .set("Cookie", [`access_token=${session.accessToken}`]);
+    const issuingCountry = v1.persons.personListSchema.parse(
+      issuingCountryRes.body,
+    );
+    expect(issuingCountry.items.map((person) => person.id)).toContain(
+      rejected.id,
+    );
+    expect(issuingCountry.items.map((person) => person.id)).not.toContain(
+      active.id,
+    );
+
+    const expiredRes = await req()
+      .get(
+        `${v1.persons.ROUTES.list}?search=FILTER-REJECTED&documentExpiry=expired&page=1&pageSize=50`,
+      )
+      .set("Cookie", [`access_token=${session.accessToken}`]);
+    const expired = v1.persons.personListSchema.parse(expiredRes.body);
+    expect(expired.items.map((person) => person.id)).toContain(rejected.id);
+    expect(expired.items.map((person) => person.id)).not.toContain(active.id);
+
+    const expiresSoonRes = await req()
+      .get(
+        `${v1.persons.ROUTES.list}?search=FILTER-VERIFIED&documentExpiry=expiresSoon&page=1&pageSize=50`,
+      )
+      .set("Cookie", [`access_token=${session.accessToken}`]);
+    const expiresSoon = v1.persons.personListSchema.parse(expiresSoonRes.body);
+    expect(expiresSoon.items.map((person) => person.id)).toContain(active.id);
+
+    const missingRes = await req()
+      .get(
+        `${v1.persons.ROUTES.list}?search=${encodeURIComponent(missingInput.email)}&documentExpiry=missing&page=1&pageSize=50`,
+      )
+      .set("Cookie", [`access_token=${session.accessToken}`]);
+    const missingDocuments = v1.persons.personListSchema.parse(missingRes.body);
+    expect(missingDocuments.items.map((person) => person.id)).toContain(
+      missing.id,
+    );
+    expect(missingDocuments.items.map((person) => person.id)).not.toContain(
+      active.id,
+    );
+
+    const deletedRes = await req()
+      .get(
+        `${v1.persons.ROUTES.list}?search=${encodeURIComponent(deletedInput.email)}&recordStatus=deleted&page=1&pageSize=50`,
+      )
+      .set("Cookie", [`access_token=${session.accessToken}`]);
+    const deletedList = v1.persons.personListSchema.parse(deletedRes.body);
+    expect(deletedList.items.map((person) => person.id)).toContain(deleted.id);
+    expect(deletedList.items.map((person) => person.id)).not.toContain(
+      active.id,
+    );
+
+    const includeDeletedRes = await req()
+      .get(
+        `${v1.persons.ROUTES.list}?includeDeleted=true&search=${encodeURIComponent(deletedInput.email)}&page=1&pageSize=50`,
+      )
+      .set("Cookie", [`access_token=${session.accessToken}`]);
+    const includeDeleted = v1.persons.personListSchema.parse(
+      includeDeletedRes.body,
+    );
+    expect(includeDeleted.items.map((person) => person.id)).toContain(
+      deleted.id,
+    );
+  });
+
   it("rejects invalid payloads", async () => {
     const session = await freshSession(["ADMIN"]);
 
@@ -256,5 +674,33 @@ describe("Persons HTTP surface (e2e)", () => {
       });
 
     expect(res.status).toBe(400);
+
+    const duplicateDocumentTypeRes = await req()
+      .post(v1.persons.ROUTES.create)
+      .set("Cookie", [`access_token=${session.accessToken}`])
+      .send(
+        personInput({
+          documents: [
+            { type: "nationalId", status: "unverified" },
+            { type: "nationalId", status: "unverified" },
+          ],
+        }),
+      );
+
+    expect(duplicateDocumentTypeRes.status).toBe(400);
+
+    const duplicateIdentityDocumentRes = await req()
+      .post(v1.persons.ROUTES.create)
+      .set("Cookie", [`access_token=${session.accessToken}`])
+      .send(
+        personInput({
+          documents: [
+            { type: "nationalId", status: "unverified" },
+            { type: "passport", status: "unverified" },
+          ],
+        }),
+      );
+
+    expect(duplicateIdentityDocumentRes.status).toBe(400);
   });
 });

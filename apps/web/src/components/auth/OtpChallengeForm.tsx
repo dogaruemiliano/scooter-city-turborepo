@@ -2,6 +2,7 @@
 
 import { v1 } from "@repo/api-shared";
 import { tokens } from "@repo/theme/runtime";
+import { Button } from "@repo/ui/components";
 import { OTPField } from "@repo/ui/components/otp-field";
 import { useTranslations } from "next-intl";
 import { useEffect, useState, type FormEvent } from "react";
@@ -14,7 +15,7 @@ const SECOND_MS = tokens.motion.duration.countdownTick;
 
 export interface OtpChallengeFormProps {
   challenge: v1.auth.OtpChallengeMetadata;
-  description: string;
+  description?: string;
   verifyRoute: string;
   onChallengeChange: (challenge: v1.auth.OtpChallengeMetadata) => void;
   onVerified: () => Promise<void>;
@@ -120,22 +121,23 @@ export function OtpChallengeForm({
     }
   }
 
+  function handleCodeChange(nextCode: string) {
+    setCode(nextCode);
+    if (error) {
+      setError(null);
+    }
+  }
+
   return (
-    <form onSubmit={verifyCode} className="flex flex-col gap-3 text-center">
-      <p className="text-sm text-muted-foreground">{description}</p>
-
-      {expired ? (
-        <p role="status" className="text-sm text-destructive">
-          {t("expired")}
+    <form onSubmit={verifyCode} className="flex flex-col gap-5">
+      {description ? (
+        <p className="text-center text-sm text-muted-foreground">
+          {description}
         </p>
-      ) : (
-        <p role="status" className="text-sm text-muted-foreground">
-          {t("expiresIn", { time: formattedExpiration })}
-        </p>
-      )}
+      ) : null}
 
-      <div className="flex flex-col items-center gap-1">
-        <label htmlFor="otp-code" className="text-sm font-medium">
+      <div className="flex flex-col items-center gap-3 text-center">
+        <label htmlFor="otp-code" className="text-sm font-semibold">
           {t("codeLabel")}
         </label>
         <OTPField
@@ -143,59 +145,75 @@ export function OtpChallengeForm({
           name="code"
           required
           value={code}
-          onValueChange={setCode}
+          onValueChange={handleCodeChange}
           disabled={busy || expired}
           autoFocus
+          invalid={Boolean(error)}
+          className="justify-center gap-2"
+          inputClassName="size-12 text-xl font-semibold"
         />
+
+        {expired ? (
+          <p role="status" className="text-sm font-medium text-destructive">
+            {t("expired")}
+          </p>
+        ) : (
+          <p role="status" className="text-sm text-muted-foreground">
+            {t("expiresIn", { time: formattedExpiration })}
+          </p>
+        )}
       </div>
 
+      {error ? (
+        <p role="alert" className="text-center text-sm text-destructive">
+          {error}
+        </p>
+      ) : null}
+
       {expired ? (
-        <button
+        <Button
           type="button"
           onClick={requestAnotherCode}
           disabled={busy}
-          className="rounded-md bg-primary px-4 py-2 text-base font-medium text-primary-foreground hover:bg-primary-hover disabled:bg-disabled disabled:text-disabled-foreground"
+          size="lg"
+          className="w-full"
         >
           {busy ? t("requestingAnotherCode") : t("requestAnotherCode")}
-        </button>
+        </Button>
       ) : (
-        <>
-          <button
+        <div className="flex flex-col gap-2">
+          <Button
             type="submit"
             disabled={busy || code.length !== 6}
-            className="rounded-md bg-primary px-4 py-2 text-base font-medium text-primary-foreground hover:bg-primary-hover disabled:bg-disabled disabled:text-disabled-foreground"
+            size="lg"
+            className="w-full"
           >
             {busy ? t("verifying") : t("verify")}
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="link"
             onClick={resendCode}
             disabled={busy || resendAfterSec > 0}
-            className="text-sm text-link underline hover:text-link-hover disabled:text-disabled-foreground"
+            className="self-center"
           >
             {resendAfterSec > 0
               ? t("resendIn", {
                   time: formatSecondsAsMinutesAndSeconds(resendAfterSec),
                 })
               : t("resendCode")}
-          </button>
-        </>
+          </Button>
+        </div>
       )}
 
-      <button
+      <Button
         type="button"
+        variant="link"
         onClick={onCancel}
-        className="text-sm text-link underline hover:text-link-hover"
+        className="self-center"
         disabled={busy}
       >
         {tSharedActions("cancel")}
-      </button>
-
-      {error ? (
-        <p role="alert" className="text-sm text-destructive">
-          {error}
-        </p>
-      ) : null}
+      </Button>
     </form>
   );
 }

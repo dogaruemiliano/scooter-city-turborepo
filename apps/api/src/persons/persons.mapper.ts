@@ -1,9 +1,16 @@
 import { v1 } from "@repo/api-shared";
 
 import { toDateOnlyString } from "../common/dates/date-only";
-import type { Person as PersonRow } from "../generated/prisma/client";
+import type {
+  Person as PersonRow,
+  PersonDocument as PersonDocumentRow,
+} from "../generated/prisma/client";
 
-export function toPerson(row: PersonRow): v1.persons.Person {
+export type PersonWithDocuments = PersonRow & {
+  documents: PersonDocumentRow[];
+};
+
+export function toPerson(row: PersonWithDocuments): v1.persons.Person {
   return {
     id: row.id,
     email: row.email,
@@ -17,11 +24,29 @@ export function toPerson(row: PersonRow): v1.persons.Person {
     region: row.region,
     postalCode: row.postalCode,
     countryCode: row.countryCode,
-    documentType: row.documentType as v1.persons.Person["documentType"],
-    documentNumber: row.documentNumber,
-    documentIssuingCountryCode: row.documentIssuingCountryCode,
-    documentExpiresOn: toDateOnlyString(row.documentExpiresOn),
-    documentStatus: row.documentStatus as v1.persons.Person["documentStatus"],
+    documents: row.documents.map(toPersonDocument),
+    notes: row.notes,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+    deletedAt: row.deletedAt?.toISOString() ?? null,
+  };
+}
+
+export function toPersonDocument(
+  row: PersonDocumentRow,
+): v1.persons.PersonDocument {
+  return {
+    id: row.id,
+    personId: row.personId,
+    type: row.type as v1.persons.PersonDocument["type"],
+    series: row.series,
+    number: row.number,
+    cnp: row.cnp,
+    issuingCountryCode: row.issuingCountryCode,
+    issuedBy: row.issuedBy,
+    issuedOn: toDateOnlyString(row.issuedOn),
+    expiresOn: toDateOnlyString(row.expiresOn),
+    status: row.status as v1.persons.PersonDocument["status"],
     notes: row.notes,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),

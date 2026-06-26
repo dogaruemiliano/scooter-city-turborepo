@@ -16,10 +16,11 @@
 // - `output` is required in v7 and lives outside node_modules; consumers
 //   import from `../src/generated/prisma/client` rather than `@prisma/client`.
 generator client {
-  provider     = "prisma-client"
-  output       = "../src/generated/prisma"
-  engineType   = "client"
-  moduleFormat = "cjs"
+  provider        = "prisma-client"
+  output          = "../src/generated/prisma"
+  engineType      = "client"
+  moduleFormat    = "cjs"
+  previewFeatures = ["partialIndexes"]
 }
 
 // The `url` lives in `prisma.config.ts` from Prisma 7 onward. Migrate +
@@ -35,31 +36,57 @@ datasource db {
 /// they have an app account, and a future linking flow can connect them by
 /// the required unique email.
 model Person {
-  id                         String    @id @default(cuid())
-  email                      String    @unique
-  phone                      String    @unique
-  firstName                  String
-  lastName                   String
-  dateOfBirth                DateTime? @db.Date
-  addressLine1               String?
-  addressLine2               String?
-  city                       String?
-  region                     String?
-  postalCode                 String?
-  countryCode                String?
-  documentType               String?
-  documentNumber             String?
-  documentIssuingCountryCode String?
-  documentExpiresOn          DateTime? @db.Date
-  documentStatus             String    @default("unverified")
-  notes                      String?
-  createdAt                  DateTime  @default(now())
-  updatedAt                  DateTime  @updatedAt
-  deletedAt                  DateTime?
+  id           String           @id @default(cuid())
+  email        String           @unique
+  phone        String           @unique
+  firstName    String
+  lastName     String
+  dateOfBirth  DateTime?        @db.Date
+  addressLine1 String?
+  addressLine2 String?
+  city         String?
+  region       String?
+  postalCode   String?
+  countryCode  String?
+  notes        String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  deletedAt    DateTime?
+  documents    PersonDocument[]
 
   @@index([deletedAt])
   @@index([lastName, firstName])
-  @@index([documentStatus])
+}
+
+/// KYC/rental document belonging to a Person.
+///
+/// A person can hold multiple documents at once, for example a Romanian
+/// national ID (`type = "nationalId"`, `issuingCountryCode = "RO"`) and a
+/// driver license. Document photos will be attached later via MediaAsset.
+model PersonDocument {
+  id                 String    @id @default(cuid())
+  personId           String
+  person             Person    @relation(fields: [personId], references: [id], onDelete: Cascade)
+  type               String
+  series             String?
+  number             String?
+  cnp                String?
+  issuingCountryCode String?
+  issuedBy           String?
+  issuedOn           DateTime? @db.Date
+  expiresOn          DateTime? @db.Date
+  status             String    @default("unverified")
+  notes              String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  deletedAt          DateTime?
+
+  @@index([personId, deletedAt])
+  @@index([type])
+  @@index([status])
+  @@index([expiresOn])
+  @@unique([personId, type], map: "person_document_active_type_unique", where: { deletedAt: null })
+  @@unique([personId], map: "person_document_active_identity_unique", where: raw("\"deletedAt\" IS NULL AND \"type\" IN ('passport', 'nationalId', 'residencePermit', 'other')"))
 }
 
 /// A human. `emailVerified` / `phoneVerified` are timestamps (not

@@ -1,8 +1,9 @@
 "use client";
 
 import { v1 } from "@repo/api-shared";
+import { Button, Input, Label } from "@repo/ui/components";
 import { useTranslations } from "next-intl";
-import { useState, type FormEvent } from "react";
+import { useId, useRef, useState, type FormEvent } from "react";
 
 import { webApi } from "../../lib/api";
 import { formatAuthError } from "./auth-errors";
@@ -13,22 +14,35 @@ export interface EmailOtpSignInFormProps {
 
 export function EmailOtpSignInForm({ onChallenge }: EmailOtpSignInFormProps) {
   const t = useTranslations("auth.signIn.emailOtp");
+  const emailInputId = useId();
+  const emailErrorId = `${emailInputId}-error`;
+  const emailInputRef = useRef<HTMLInputElement>(null);
   const [email, setEmail] = useState("");
+  const [emailError, setEmailError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function requestCode(event: FormEvent) {
     event.preventDefault();
     setError(null);
+
+    const input = v1.auth.requestEmailOtpInputSchema.safeParse({ email });
+    if (!input.success) {
+      setEmailError(t("emailInvalid"));
+      emailInputRef.current?.focus();
+      return;
+    }
+
+    setEmailError(null);
     setBusy(true);
 
     try {
       const challenge = await webApi.fetch(
         v1.auth.ROUTES.emailOtp.request,
         v1.auth.emailOtpChallengeSchema,
-        { method: "POST", json: { email } },
+        { method: "POST", json: input.data },
       );
-      onChallenge(challenge, email);
+      onChallenge(challenge, input.data.email);
     } catch (requestError) {
       setError(formatAuthError(requestError, t("sendCodeError")));
     } finally {
@@ -36,27 +50,53 @@ export function EmailOtpSignInForm({ onChallenge }: EmailOtpSignInFormProps) {
     }
   }
 
+  function updateEmail(nextEmail: string) {
+    setEmail(nextEmail);
+    if (
+      emailError &&
+      v1.auth.requestEmailOtpInputSchema.safeParse({ email: nextEmail }).success
+    ) {
+      setEmailError(null);
+    }
+  }
+
+  function validateEmailOnBlur() {
+    if (!email) return;
+
+    const input = v1.auth.requestEmailOtpInputSchema.safeParse({ email });
+    setEmailError(input.success ? null : t("emailInvalid"));
+  }
+
   return (
-    <form onSubmit={requestCode} className="flex flex-col gap-3">
-      <label className="flex flex-col gap-1">
-        <span className="text-sm font-medium">{t("emailLabel")}</span>
-        <input
+    <form noValidate onSubmit={requestCode} className="flex flex-col gap-3">
+      <div className="flex flex-col gap-1">
+        <Label htmlFor={emailInputId}>{t("emailLabel")}</Label>
+        <Input
+          ref={emailInputRef}
+          id={emailInputId}
           type="email"
           required
           autoComplete="email"
+          aria-describedby={emailError ? emailErrorId : undefined}
+          aria-invalid={emailError ? true : undefined}
           value={email}
-          onChange={(event) => setEmail(event.target.value)}
-          className="rounded-md border border-input bg-background px-3 py-2 text-base outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring"
+          onBlur={validateEmailOnBlur}
+          onChange={(event) => updateEmail(event.target.value)}
           disabled={busy}
         />
-      </label>
-      <button
-        type="submit"
-        disabled={busy || !email}
-        className="rounded-md bg-primary px-4 py-2 text-base font-medium text-primary-foreground hover:bg-primary-hover disabled:bg-disabled disabled:text-disabled-foreground"
-      >
+        {emailError ? (
+          <p
+            id={emailErrorId}
+            role="alert"
+            className="text-sm text-destructive"
+          >
+            {emailError}
+          </p>
+        ) : null}
+      </div>
+      <Button type="submit" disabled={busy}>
         {busy ? t("sendingCode") : t("sendCode")}
-      </button>
+      </Button>
       {error ? (
         <p role="alert" className="text-sm text-destructive">
           {error}

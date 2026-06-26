@@ -229,6 +229,101 @@
             }
           },
           {
+            "name": "recordStatus",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["active", "deleted", "all"]
+            }
+          },
+          {
+            "name": "documentType",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "passport",
+                "nationalId",
+                "driverLicense",
+                "residencePermit",
+                "other"
+              ]
+            }
+          },
+          {
+            "name": "documentStatus",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["unverified", "verified", "rejected", "expired"]
+            }
+          },
+          {
+            "name": "documentExpiry",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["expired", "expiresSoon", "valid", "missing"]
+            }
+          },
+          {
+            "name": "documentExpiresFrom",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "documentExpiresTo",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "countryCode",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "documentIssuingCountryCode",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "relevance",
+                "nameAsc",
+                "nameDesc",
+                "createdAtDesc",
+                "createdAtAsc",
+                "updatedAtDesc",
+                "updatedAtAsc",
+                "emailAsc",
+                "emailDesc"
+              ]
+            }
+          },
+          {
             "name": "includeDeleted",
             "required": false,
             "in": "query",
@@ -368,6 +463,222 @@
           }
         ],
         "summary": "Soft-delete one active person record",
+        "tags": ["persons"]
+      }
+    },
+    "/v1/persons/{id}/documents": {
+      "get": {
+        "operationId": "PersonsController_listDocuments_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonDocumentList_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "List active documents for one active person record",
+        "tags": ["persons"]
+      },
+      "post": {
+        "operationId": "PersonsController_createDocument_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePersonDocumentInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonDocument_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Create a document for one active person record",
+        "tags": ["persons"]
+      }
+    },
+    "/v1/persons/{id}/documents/{documentId}": {
+      "get": {
+        "operationId": "PersonsController_getDocument_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "documentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonDocument_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Get one active document for one active person record",
+        "tags": ["persons"]
+      },
+      "patch": {
+        "operationId": "PersonsController_updateDocument_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "documentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePersonDocumentInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonDocument_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Update one active document for one active person record",
+        "tags": ["persons"]
+      },
+      "delete": {
+        "operationId": "PersonsController_deleteDocument_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "documentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Soft-delete one active document for one active person record",
         "tags": ["persons"]
       }
     },
@@ -875,6 +1186,71 @@
       }
     },
     "schemas": {
+      "CreatePersonInputCreatePersonDocumentInput": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "passport",
+              "nationalId",
+              "driverLicense",
+              "residencePermit",
+              "other"
+            ]
+          },
+          "series": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "nullable": true
+          },
+          "number": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "nullable": true
+          },
+          "cnp": {
+            "type": "string",
+            "pattern": "^\\d{13}$",
+            "nullable": true
+          },
+          "issuingCountryCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "issuedBy": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "nullable": true
+          },
+          "issuedOn": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "nullable": true
+          },
+          "expiresOn": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "nullable": true
+          },
+          "status": {
+            "default": "unverified",
+            "type": "string",
+            "enum": ["unverified", "verified", "rejected", "expired"]
+          },
+          "notes": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "nullable": true
+          }
+        },
+        "required": ["type"],
+        "additionalProperties": false
+      },
       "CreatePersonInput": {
         "type": "object",
         "properties": {
@@ -933,37 +1309,11 @@
             "type": "string",
             "nullable": true
           },
-          "documentType": {
-            "type": "string",
-            "enum": [
-              "passport",
-              "nationalId",
-              "driverLicense",
-              "residencePermit",
-              "other",
-              null
-            ],
-            "nullable": true
-          },
-          "documentNumber": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 200,
-            "nullable": true
-          },
-          "documentIssuingCountryCode": {
-            "type": "string",
-            "nullable": true
-          },
-          "documentExpiresOn": {
-            "type": "string",
-            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
-            "nullable": true
-          },
-          "documentStatus": {
-            "default": "unverified",
-            "type": "string",
-            "enum": ["unverified", "verified", "rejected", "expired"]
+          "documents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CreatePersonInputCreatePersonDocumentInput"
+            }
           },
           "notes": {
             "type": "string",
@@ -973,6 +1323,93 @@
           }
         },
         "required": ["email", "phone", "firstName", "lastName"],
+        "additionalProperties": false
+      },
+      "PersonDocument_Output": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "personId": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "passport",
+              "nationalId",
+              "driverLicense",
+              "residencePermit",
+              "other"
+            ]
+          },
+          "series": {
+            "type": "string",
+            "nullable": true
+          },
+          "number": {
+            "type": "string",
+            "nullable": true
+          },
+          "cnp": {
+            "type": "string",
+            "nullable": true
+          },
+          "issuingCountryCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "issuedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "issuedOn": {
+            "type": "string",
+            "nullable": true
+          },
+          "expiresOn": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": ["unverified", "verified", "rejected", "expired"]
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "ISO timestamp of document creation."
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "ISO timestamp of last document update."
+          },
+          "deletedAt": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "personId",
+          "type",
+          "series",
+          "number",
+          "cnp",
+          "issuingCountryCode",
+          "issuedBy",
+          "issuedOn",
+          "expiresOn",
+          "status",
+          "notes",
+          "createdAt",
+          "updatedAt",
+          "deletedAt"
+        ],
         "additionalProperties": false
       },
       "Person_Output": {
@@ -1021,33 +1458,11 @@
             "type": "string",
             "nullable": true
           },
-          "documentType": {
-            "type": "string",
-            "enum": [
-              "passport",
-              "nationalId",
-              "driverLicense",
-              "residencePermit",
-              "other",
-              null
-            ],
-            "nullable": true
-          },
-          "documentNumber": {
-            "type": "string",
-            "nullable": true
-          },
-          "documentIssuingCountryCode": {
-            "type": "string",
-            "nullable": true
-          },
-          "documentExpiresOn": {
-            "type": "string",
-            "nullable": true
-          },
-          "documentStatus": {
-            "type": "string",
-            "enum": ["unverified", "verified", "rejected", "expired"]
+          "documents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PersonDocument_Output"
+            }
           },
           "notes": {
             "type": "string",
@@ -1079,11 +1494,7 @@
           "region",
           "postalCode",
           "countryCode",
-          "documentType",
-          "documentNumber",
-          "documentIssuingCountryCode",
-          "documentExpiresOn",
-          "documentStatus",
+          "documents",
           "notes",
           "createdAt",
           "updatedAt",
@@ -1117,6 +1528,140 @@
           }
         },
         "required": ["items", "page", "pageSize", "total"],
+        "additionalProperties": false
+      },
+      "PersonDocumentList_Output": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/PersonDocument_Output"
+        }
+      },
+      "CreatePersonDocumentInput": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "passport",
+              "nationalId",
+              "driverLicense",
+              "residencePermit",
+              "other"
+            ]
+          },
+          "series": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "nullable": true
+          },
+          "number": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "nullable": true
+          },
+          "cnp": {
+            "type": "string",
+            "pattern": "^\\d{13}$",
+            "nullable": true
+          },
+          "issuingCountryCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "issuedBy": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "nullable": true
+          },
+          "issuedOn": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "nullable": true
+          },
+          "expiresOn": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "nullable": true
+          },
+          "status": {
+            "default": "unverified",
+            "type": "string",
+            "enum": ["unverified", "verified", "rejected", "expired"]
+          },
+          "notes": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "nullable": true
+          }
+        },
+        "required": ["type"],
+        "additionalProperties": false
+      },
+      "UpdatePersonDocumentInput": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "passport",
+              "nationalId",
+              "driverLicense",
+              "residencePermit",
+              "other"
+            ]
+          },
+          "series": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "nullable": true
+          },
+          "number": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "nullable": true
+          },
+          "cnp": {
+            "type": "string",
+            "pattern": "^\\d{13}$",
+            "nullable": true
+          },
+          "issuingCountryCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "issuedBy": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "nullable": true
+          },
+          "issuedOn": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "nullable": true
+          },
+          "expiresOn": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": ["unverified", "verified", "rejected", "expired"]
+          },
+          "notes": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "nullable": true
+          }
+        },
         "additionalProperties": false
       },
       "UpdatePersonInput": {
@@ -1176,37 +1721,6 @@
           "countryCode": {
             "type": "string",
             "nullable": true
-          },
-          "documentType": {
-            "type": "string",
-            "enum": [
-              "passport",
-              "nationalId",
-              "driverLicense",
-              "residencePermit",
-              "other",
-              null
-            ],
-            "nullable": true
-          },
-          "documentNumber": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 200,
-            "nullable": true
-          },
-          "documentIssuingCountryCode": {
-            "type": "string",
-            "nullable": true
-          },
-          "documentExpiresOn": {
-            "type": "string",
-            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
-            "nullable": true
-          },
-          "documentStatus": {
-            "type": "string",
-            "enum": ["unverified", "verified", "rejected", "expired"]
           },
           "notes": {
             "type": "string",
