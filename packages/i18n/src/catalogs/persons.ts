@@ -24,6 +24,8 @@ export const personsCatalog = {
       createSuccessTitle: "Person created",
       createSuccessMessage: "The person record is ready for rental operations.",
       genericError: "Something went wrong. Try again.",
+      under18Warning:
+        "This person is under 18 years old. Review eligibility before continuing.",
       date: {
         incomplete: "Complete {field}.",
         invalid: "Enter a valid {field}.",
@@ -86,10 +88,17 @@ export const personsCatalog = {
       address: "Address",
       document: "Documents",
     },
+    citizenship: {
+      label: "Citizenship",
+      romanian: "Romanian citizen",
+      foreign: "Foreign citizen",
+    },
     documentForm: {
       empty: "No documents added.",
       allTypesAdded: "Identity document and driver license have been added.",
       itemTitle: "Document {index}",
+      required: "Required",
+      optional: "Optional",
     },
     fields: {
       firstName: "First name",
@@ -219,6 +228,8 @@ export const personsCatalog = {
       createSuccessMessage:
         "Înregistrarea persoanei este pregătită pentru închirieri.",
       genericError: "A apărut o eroare. Încearcă din nou.",
+      under18Warning:
+        "Persoana are sub 18 ani. Verifică eligibilitatea înainte de a continua.",
       date: {
         incomplete: "Completează {field}.",
         invalid: "Introdu o valoare validă pentru {field}.",
@@ -282,11 +293,18 @@ export const personsCatalog = {
       address: "Adresă",
       document: "Documente",
     },
+    citizenship: {
+      label: "Cetățenie",
+      romanian: "Cetățean român",
+      foreign: "Cetățean străin",
+    },
     documentForm: {
       empty: "Nu a fost adăugat niciun document.",
       allTypesAdded:
         "Documentul de identitate și permisul de conducere au fost adăugate.",
       itemTitle: "Document {index}",
+      required: "Obligatoriu",
+      optional: "Opțional",
     },
     fields: {
       firstName: "Prenume",

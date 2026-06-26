@@ -246,10 +246,43 @@ function hasAllowedDocumentSlots(
 }
 
 export function isValidCnp(value?: string | null): boolean {
-  if (!value) return false;
+  return getDateOfBirthFromCnp(value) !== null;
+}
+
+export function isUnder18FromCnp(
+  value?: string | null,
+  referenceDate = new Date(),
+): boolean {
+  const dateOfBirth = getDateOfBirthFromCnp(value);
+  return isUnder18FromDateOfBirth(dateOfBirth, referenceDate);
+}
+
+export function isUnder18FromDateOfBirth(
+  value?: string | null,
+  referenceDate = new Date(),
+): boolean {
+  const dateOfBirth = parseDateOnly(value);
+  if (!dateOfBirth) return false;
+
+  const eighteenthBirthday = Date.UTC(
+    dateOfBirth.year + 18,
+    dateOfBirth.month - 1,
+    dateOfBirth.day,
+  );
+  const referenceDay = Date.UTC(
+    referenceDate.getUTCFullYear(),
+    referenceDate.getUTCMonth(),
+    referenceDate.getUTCDate(),
+  );
+
+  return referenceDay < eighteenthBirthday;
+}
+
+export function getDateOfBirthFromCnp(value?: string | null): string | null {
+  if (!value) return null;
 
   const cnp = value.replace(/\s+/g, "");
-  if (!/^\d{13}$/.test(cnp)) return false;
+  if (!/^\d{13}$/.test(cnp)) return null;
 
   const S = Number(cnp[0]);
   const YY = Number(cnp.slice(1, 3));
@@ -257,11 +290,10 @@ export function isValidCnp(value?: string | null): boolean {
   const DD = Number(cnp.slice(5, 7));
   const JJ = Number(cnp.slice(7, 9));
   const NNN = Number(cnp.slice(9, 12));
-  const C = Number(cnp[12]);
 
-  if (S < 1 || S > 9) return false;
-  if (MM < 1 || MM > 12) return false;
-  if (DD < 1 || DD > 31) return false;
+  if (S < 1 || S > 9) return null;
+  if (MM < 1 || MM > 12) return null;
+  if (DD < 1 || DD > 31) return null;
 
   const century =
     S === 1 || S === 2
@@ -274,20 +306,55 @@ export function isValidCnp(value?: string | null): boolean {
             ? 2000
             : 1900;
   const year = century + YY;
-  const date = new Date(year, MM - 1, DD);
+  const date = new Date(Date.UTC(year, MM - 1, DD));
 
   if (
-    date.getFullYear() !== year ||
-    date.getMonth() !== MM - 1 ||
-    date.getDate() !== DD
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== MM - 1 ||
+    date.getUTCDate() !== DD
   ) {
-    return false;
+    return null;
   }
 
   const isCountyValid = (JJ >= 1 && JJ <= 52) || JJ === 99;
-  if (!isCountyValid) return false;
-  if (NNN === 0) return false;
+  if (!isCountyValid) return null;
+  if (NNN === 0) return null;
+  if (!hasValidCnpChecksum(cnp)) return null;
 
+  return date.toISOString().slice(0, 10);
+}
+
+function parseDateOnly(
+  value?: string | null,
+): { year: number; month: number; day: number } | null {
+  if (!value) return null;
+
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return null;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    return null;
+  }
+
+  return { year, month, day };
+}
+
+function hasValidCnpChecksum(value?: string | null): boolean {
+  if (!value) return false;
+
+  const cnp = value.replace(/\s+/g, "");
+  if (!/^\d{13}$/.test(cnp)) return false;
+
+  const C = Number(cnp[12]);
   let sum = 0;
   for (let i = 0; i < 12; i += 1) {
     sum += Number(cnp.charAt(i)) * Number(CNP_WEIGHTS.charAt(i));

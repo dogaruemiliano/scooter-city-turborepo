@@ -161,6 +161,42 @@ test("person document CNP validation checks checksum, date, county, and serial",
 
   assert.equal(v1.persons.isValidCnp("1900228123450"), true);
   assert.equal(v1.persons.isValidCnp("1900228123456"), false);
+  assert.equal(
+    v1.persons.getDateOfBirthFromCnp("190 022 812 3450"),
+    "1990-02-28",
+  );
+  assert.equal(v1.persons.getDateOfBirthFromCnp("1900228123456"), null);
+});
+
+test("person CNP helpers derive minority from date of birth", () => {
+  assert.equal(
+    v1.persons.isUnder18FromDateOfBirth(
+      "2010-06-26",
+      new Date("2028-06-25T12:00:00.000Z"),
+    ),
+    true,
+  );
+  assert.equal(
+    v1.persons.isUnder18FromDateOfBirth(
+      "2010-06-26",
+      new Date("2028-06-26T00:00:00.000Z"),
+    ),
+    false,
+  );
+  assert.equal(
+    v1.persons.isUnder18FromCnp(
+      "5100626123456",
+      new Date("2028-06-25T12:00:00.000Z"),
+    ),
+    true,
+  );
+  assert.equal(
+    v1.persons.isUnder18FromCnp(
+      "5100626123456",
+      new Date("2028-06-26T00:00:00.000Z"),
+    ),
+    false,
+  );
 });
 
 test("updatePersonInputSchema rejects phone clearing and unknown fields", () => {

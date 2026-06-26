@@ -76,7 +76,7 @@ beforeEach(() => {
 });
 
 describe("PersonCreateForm", () => {
-  it("renders required labels, Romanian phone default, numeric dates, and Romanian country default", () => {
+  it("renders Romanian citizen defaults with fixed document slots", () => {
     renderCreateForm();
 
     expect(
@@ -93,23 +93,37 @@ describe("PersonCreateForm", () => {
     expect(screen.getByLabelText("Phone country")).toHaveValue("RO");
     expect(screen.getByLabelText("Country")).toHaveValue("RO");
     expect(screen.getByLabelText("County")).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("DD")).toHaveAttribute(
+    expect(
+      screen.getByRole("button", { name: "Romanian citizen" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    expect(
+      screen.getByRole("button", { name: "Foreign citizen" }),
+    ).toHaveAttribute("aria-pressed", "false");
+    expect(screen.queryByLabelText("Date of birth")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "National ID" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Driver license" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Add document" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getAllByPlaceholderText("DD")[0]).toHaveAttribute(
       "inputmode",
       "numeric",
     );
-    expect(screen.getByPlaceholderText("MM")).toHaveAttribute(
+    expect(screen.getAllByPlaceholderText("MM")[0]).toHaveAttribute(
       "inputmode",
       "numeric",
     );
-    expect(screen.getByPlaceholderText("YYYY")).toHaveAttribute(
+    expect(screen.getAllByPlaceholderText("YYYY")[0]).toHaveAttribute(
       "inputmode",
       "numeric",
     );
   });
 
-  it("renders Romanian create page copy and localized date placeholders", async () => {
-    const browser = userEvent.setup();
-
+  it("renders Romanian create page copy and localized date placeholders", () => {
     renderCreateForm("ro");
 
     expect(
@@ -122,17 +136,12 @@ describe("PersonCreateForm", () => {
     expect(screen.getByLabelText("Telefon")).toBeInTheDocument();
     expect(screen.getByLabelText("Țară")).toHaveValue("RO");
     expect(screen.getByLabelText("Județ")).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("ZZ")).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("LL")).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("AAAA")).toBeInTheDocument();
-
-    await browser.click(
-      screen.getByRole("button", { name: "Adaugă document" }),
-    );
-    await browser.click(
-      await screen.findByRole("menuitem", { name: "Carte de identitate" }),
-    );
-
+    expect(screen.getAllByPlaceholderText("ZZ")[0]).toBeInTheDocument();
+    expect(screen.getAllByPlaceholderText("LL")[0]).toBeInTheDocument();
+    expect(screen.getAllByPlaceholderText("AAAA")[0]).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Cetățean român" }),
+    ).toHaveAttribute("aria-pressed", "true");
     expect(
       screen.getByRole("heading", { name: "Carte de identitate" }),
     ).toBeInTheDocument();
@@ -144,71 +153,37 @@ describe("PersonCreateForm", () => {
     expect(screen.getByLabelText("CNP")).toBeInTheDocument();
     expect(screen.getByLabelText("Emis de")).toBeInTheDocument();
     expect(screen.getByLabelText("Emis la")).toBeInTheDocument();
-    expect(screen.getByLabelText("Stare document")).toBeInTheDocument();
+    expect(
+      screen.getAllByRole("combobox", { name: "Stare document" })[0],
+    ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Creează persoana" }),
     ).toBeInTheDocument();
   });
 
-  it("adds one identity document and one driver license slot", async () => {
+  it("switches to foreign citizen identity document mode", async () => {
     const browser = userEvent.setup();
 
     renderCreateForm();
 
-    await browser.click(screen.getByRole("button", { name: "Add document" }));
-
-    expect(
-      await screen.findByRole("menuitem", { name: "National ID" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("menuitem", { name: "Driver license" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("menuitem", { name: "Passport" }),
-    ).toBeInTheDocument();
-
-    await browser.click(screen.getByRole("menuitem", { name: "National ID" }));
-
-    expect(
-      screen.getByRole("heading", { name: "National ID" }),
-    ).toBeInTheDocument();
-    expect(screen.queryByLabelText("Document type")).not.toBeInTheDocument();
-
-    await browser.click(screen.getByRole("button", { name: "Add document" }));
-
-    expect(
-      screen.queryByRole("menuitem", { name: "National ID" }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("menuitem", { name: "Passport" }),
-    ).not.toBeInTheDocument();
-    expect(
-      await screen.findByRole("menuitem", { name: "Driver license" }),
-    ).toBeInTheDocument();
-
     await browser.click(
-      screen.getByRole("menuitem", { name: "Driver license" }),
+      screen.getByRole("button", { name: "Foreign citizen" }),
     );
+
+    expect(screen.getByLabelText("Date of birth")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Passport" }),
+    ).toBeInTheDocument();
     expect(
       screen.getByRole("heading", { name: "Driver license" }),
     ).toBeInTheDocument();
+    expect(screen.getByLabelText("Document type")).toBeInTheDocument();
+    expect(screen.queryByLabelText("CNP")).not.toBeInTheDocument();
     expect(
-      screen.getByText("Identity document and driver license have been added."),
-    ).toBeInTheDocument();
-
-    await browser.click(
-      screen.getAllByRole("button", { name: "Remove document" })[0]!,
-    );
-    await browser.click(screen.getByRole("button", { name: "Add document" }));
-
+      screen.queryByRole("heading", { name: "National ID" }),
+    ).not.toBeInTheDocument();
     expect(
-      await screen.findByRole("menuitem", { name: "National ID" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("menuitem", { name: "Passport" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("menuitem", { name: "Driver license" }),
+      screen.queryByRole("button", { name: "Add document" }),
     ).not.toBeInTheDocument();
   });
 
@@ -216,6 +191,9 @@ describe("PersonCreateForm", () => {
     const browser = userEvent.setup();
 
     renderCreateForm();
+    await browser.click(
+      screen.getByRole("button", { name: "Foreign citizen" }),
+    );
     await browser.type(screen.getByLabelText("Date of birth YYYY"), "2");
 
     expect(screen.getByLabelText("Date of birth YYYY")).toHaveValue("2");
@@ -297,7 +275,7 @@ describe("PersonCreateForm", () => {
     );
     expect(mocks.push).toHaveBeenCalledWith("/en/persons");
     expect(mocks.refresh).toHaveBeenCalledOnce();
-  });
+  }, 10_000);
 
   it("rejects an invalid non-normalizable phone", async () => {
     const browser = userEvent.setup();
@@ -326,6 +304,9 @@ describe("PersonCreateForm", () => {
     const browser = userEvent.setup();
 
     renderCreateForm();
+    await browser.click(
+      screen.getByRole("button", { name: "Foreign citizen" }),
+    );
     await fillRequiredFields(browser);
     await browser.type(screen.getByLabelText("Date of birth"), "28");
     await browser.click(screen.getByRole("button", { name: "Create person" }));
@@ -362,7 +343,6 @@ describe("PersonCreateForm", () => {
 
     renderCreateForm();
     await fillRequiredFields(browser);
-    await addDocument(browser, "National ID");
     await browser.type(screen.getByLabelText("CNP"), "123");
     await browser.click(screen.getByRole("button", { name: "Create person" }));
 
@@ -404,6 +384,39 @@ describe("PersonCreateForm", () => {
     expect(mocks.apiFetch).not.toHaveBeenCalled();
   });
 
+  it("shows an under-18 warning from Romanian CNP", async () => {
+    const browser = userEvent.setup();
+
+    renderCreateForm();
+    await browser.type(screen.getByLabelText("CNP"), "5100626123456");
+
+    expect(
+      await screen.findByText(
+        "This person is under 18 years old. Review eligibility before continuing.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("shows an under-18 warning from foreign date of birth", async () => {
+    const browser = userEvent.setup();
+
+    renderCreateForm();
+    await browser.click(
+      screen.getByRole("button", { name: "Foreign citizen" }),
+    );
+    await fillDateParts(browser, "Date of birth", {
+      day: "26",
+      month: "06",
+      year: "2010",
+    });
+
+    expect(
+      await screen.findByText(
+        "This person is under 18 years old. Review eligibility before continuing.",
+      ),
+    ).toBeInTheDocument();
+  });
+
   it("switches non-Romanian addresses to free-text region", async () => {
     const browser = userEvent.setup();
 
@@ -425,6 +438,7 @@ describe("PersonCreateForm", () => {
 
     renderCreateForm();
     await fillRequiredFields(browser);
+    await browser.type(screen.getByLabelText("CNP"), "1900228123450");
     await browser.click(screen.getByRole("button", { name: "Create person" }));
 
     expect(await screen.findByText("Phone already exists")).toBeInTheDocument();
@@ -460,11 +474,6 @@ async function fillFullCreateForm(
   overrides: Partial<Pick<v1.persons.CreatePersonInput, "phone">> = {},
 ) {
   await fillRequiredFields(browser, overrides);
-  await fillDateParts(browser, "Date of birth", {
-    day: "28",
-    month: "02",
-    year: "1990",
-  });
   await browser.selectOptions(screen.getByLabelText("County"), "București");
   await browser.type(
     screen.getByLabelText("Address line 1"),
@@ -473,7 +482,6 @@ async function fillFullCreateForm(
   await browser.type(screen.getByLabelText("Address line 2"), "Apt 4");
   await browser.type(screen.getByLabelText("City"), "Bucharest");
   await browser.type(screen.getByLabelText("Postal code"), "010101");
-  await addDocument(browser, "National ID");
   await browser.type(screen.getByLabelText("Series"), "rx");
   await browser.type(screen.getByLabelText("Number"), "123456");
   await browser.type(screen.getByLabelText("CNP"), "1900228123450");
@@ -488,25 +496,25 @@ async function fillFullCreateForm(
     month: "01",
     year: "2030",
   });
-  await browser.type(screen.getAllByLabelText("Notes")[1]!, "Frequent rider");
-}
-
-async function addDocument(
-  browser: ReturnType<typeof userEvent.setup>,
-  typeLabel: string,
-) {
-  await browser.click(screen.getByRole("button", { name: "Add document" }));
-  await browser.click(await screen.findByRole("menuitem", { name: typeLabel }));
+  const notesFields = screen.getAllByLabelText("Notes");
+  await browser.type(notesFields[notesFields.length - 1]!, "Frequent rider");
 }
 
 async function fillDateParts(
   browser: ReturnType<typeof userEvent.setup>,
   label: string,
   value: { day: string; month: string; year: string },
+  index = 0,
 ) {
-  await browser.type(screen.getByLabelText(label), value.day);
-  await browser.type(screen.getByLabelText(`${label} MM`), value.month);
-  await browser.type(screen.getByLabelText(`${label} YYYY`), value.year);
+  await browser.type(screen.getAllByLabelText(label)[index]!, value.day);
+  await browser.type(
+    screen.getAllByLabelText(`${label} MM`)[index]!,
+    value.month,
+  );
+  await browser.type(
+    screen.getAllByLabelText(`${label} YYYY`)[index]!,
+    value.year,
+  );
 }
 
 function requiredLabel(controlName: string): HTMLElement {

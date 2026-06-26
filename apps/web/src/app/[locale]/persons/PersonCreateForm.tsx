@@ -8,10 +8,6 @@ import {
   Button,
   buttonVariants,
   CountrySelect,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
   Input,
   Label,
   PhoneNumberInput,
@@ -24,7 +20,7 @@ import {
   type CountryCode,
   type PhoneNumberInputChangeDetails,
 } from "@repo/ui/components";
-import { Trash2Icon, UserPlusIcon } from "lucide-react";
+import { UserPlusIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
@@ -41,6 +37,8 @@ interface Feedback {
   title: string;
   messages: string[];
 }
+
+type PersonCitizenship = "romanian" | "foreign";
 
 type PersonFormFieldKey =
   | "email"
@@ -76,6 +74,7 @@ type FormErrorKey =
 type FormErrors = Partial<Record<FormErrorKey, string>>;
 
 interface CreatePersonFormState {
+  citizenship: PersonCitizenship;
   email: string;
   phone: string;
   phoneCountry: CountryCode;
@@ -96,6 +95,8 @@ interface CreatePersonFormState {
 
 interface CreatePersonDocumentFormState {
   key: string;
+  required: boolean;
+  slot: "identity" | "driverLicense";
   type: v1.persons.PersonDocumentType;
   series: string;
   number: string;
@@ -132,25 +133,6 @@ interface FormValidationIssue {
   maximum?: number | bigint;
   format?: string;
 }
-
-const EMPTY_CREATE_FORM: CreatePersonFormState = {
-  email: "",
-  phone: "",
-  phoneCountry: "RO",
-  phoneCountryCallingCode: "40",
-  phoneNationalNumber: "",
-  firstName: "",
-  lastName: "",
-  dateOfBirth: emptyDateParts(),
-  addressLine1: "",
-  addressLine2: "",
-  city: "",
-  region: "",
-  postalCode: "",
-  countryCode: "RO",
-  documents: [],
-  notes: "",
-};
 
 const ROMANIAN_COUNTIES = [
   "Alba",
@@ -197,9 +179,7 @@ const ROMANIAN_COUNTIES = [
   "Vrancea",
 ] as const;
 
-const DOCUMENT_TYPE_MENU_ORDER = [
-  "nationalId",
-  "driverLicense",
+const FOREIGN_IDENTITY_DOCUMENT_TYPES = [
   "passport",
   "residencePermit",
   "other",
@@ -211,10 +191,11 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
   const router = useRouter();
   const formId = useId();
   const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState<CreatePersonFormState>(EMPTY_CREATE_FORM);
+  const [form, setForm] = useState<CreatePersonFormState>(() =>
+    createEmptyCreateForm("romanian"),
+  );
   const [fieldErrors, setFieldErrors] = useState<FormErrors>({});
   const [feedback, setFeedback] = useState<Feedback | null>(null);
-  const availableDocumentTypes = getAvailableDocumentTypes(form.documents);
 
   async function createPerson(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -282,7 +263,7 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
         title: t("feedback.createSuccessTitle"),
         messages: [t("feedback.createSuccessMessage")],
       });
-      setForm(EMPTY_CREATE_FORM);
+      setForm(createEmptyCreateForm("romanian"));
       router.push(personsHref);
       router.refresh();
     } catch (error) {
@@ -425,6 +406,7 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
   const addressLine2Error = fieldErrors.addressLine2;
   const cityError = fieldErrors.city;
   const postalCodeError = fieldErrors.postalCode;
+  const showUnder18Warning = isUnder18Person(form);
 
   return (
     <div className="mx-auto flex w-full max-w-screen-lg flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
@@ -442,6 +424,54 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
         noValidate
         onSubmit={(event) => void createPerson(event)}
       >
+        <div
+          role="group"
+          aria-label={t("citizenship.label")}
+          className="relative grid grid-cols-2 rounded-lg border border-border bg-muted p-1"
+        >
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-1 right-1 left-1 grid grid-cols-2"
+          >
+            <span
+              className={[
+                "rounded-md bg-background shadow-sm transition-transform duration-fast ease-standard",
+                form.citizenship === "foreign"
+                  ? "translate-x-full"
+                  : "translate-x-0",
+              ].join(" ")}
+            />
+          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            className={[
+              "relative z-raised w-full bg-transparent hover:bg-transparent",
+              form.citizenship === "romanian"
+                ? "text-foreground"
+                : "text-muted-foreground",
+            ].join(" ")}
+            aria-pressed={form.citizenship === "romanian"}
+            onClick={() => changeCitizenship("romanian")}
+          >
+            {t("citizenship.romanian")}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            className={[
+              "relative z-raised w-full bg-transparent hover:bg-transparent",
+              form.citizenship === "foreign"
+                ? "text-foreground"
+                : "text-muted-foreground",
+            ].join(" ")}
+            aria-pressed={form.citizenship === "foreign"}
+            onClick={() => changeCitizenship("foreign")}
+          >
+            {t("citizenship.foreign")}
+          </Button>
+        </div>
+
         <FormSection title={t("sections.contact")}>
           <FormField
             id={`${formId}-first-name`}
@@ -520,24 +550,31 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
               onValueChange={changePhone}
             />
           </FormField>
-          <FormField
-            id={`${formId}-date-of-birth-day`}
-            label={t("fields.dateOfBirth")}
-            error={dateOfBirthError}
-          >
-            <DatePartsInput
-              baseId={`${formId}-date-of-birth`}
-              aria-describedby={fieldErrorId(
-                `${formId}-date-of-birth-day`,
-                dateOfBirthError,
-              )}
-              invalid={Boolean(dateOfBirthError)}
-              label={t("fields.dateOfBirth")}
-              locale={locale}
-              value={form.dateOfBirth}
-              onChange={(value) => setFormValue("dateOfBirth", value)}
-            />
-          </FormField>
+          {form.citizenship === "foreign" ? (
+            <>
+              <FormField
+                id={`${formId}-date-of-birth-day`}
+                label={t("fields.dateOfBirth")}
+                error={dateOfBirthError}
+              >
+                <DatePartsInput
+                  baseId={`${formId}-date-of-birth`}
+                  aria-describedby={fieldErrorId(
+                    `${formId}-date-of-birth-day`,
+                    dateOfBirthError,
+                  )}
+                  invalid={Boolean(dateOfBirthError)}
+                  label={t("fields.dateOfBirth")}
+                  locale={locale}
+                  value={form.dateOfBirth}
+                  onChange={(value) => setFormValue("dateOfBirth", value)}
+                />
+              </FormField>
+              {showUnder18Warning ? (
+                <Under18Warning message={t("feedback.under18Warning")} />
+              ) : null}
+            </>
+          ) : null}
         </FormSection>
 
         <FormSection title={t("sections.address")}>
@@ -688,14 +725,13 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
         </FormSection>
 
         <FormSection title={t("sections.document")}>
-          {form.documents.length === 0 ? (
-            <p className="text-sm text-muted-foreground sm:col-span-2">
-              {t("documentForm.empty")}
-            </p>
-          ) : null}
           {form.documents.map((document) => {
             const documentId = `${formId}-document-${document.key}`;
             const isNationalId = document.type === "nationalId";
+            const canChangeIdentityType =
+              form.citizenship === "foreign" && document.slot === "identity";
+            const typeError =
+              fieldErrors[documentFieldErrorKey(document.key, "type")];
             const seriesError =
               fieldErrors[documentFieldErrorKey(document.key, "series")];
             const numberError =
@@ -716,6 +752,7 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
               fieldErrors[documentFieldErrorKey(document.key, "status")];
             const notesError =
               fieldErrors[documentFieldErrorKey(document.key, "notes")];
+
             return (
               <div
                 key={document.key}
@@ -723,18 +760,60 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
               >
                 <div className="flex items-center justify-between gap-3 sm:col-span-2">
                   <h3 className="text-sm font-bold">
-                    {t(`documentTypes.${document.type}`)}
+                    {document.slot === "driverLicense"
+                      ? t("documentTypes.driverLicense")
+                      : t(`documentTypes.${document.type}`)}
                   </h3>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label={t("actions.removeDocument")}
-                    onClick={() => removeDocument(document.key)}
-                  >
-                    <Trash2Icon />
-                  </Button>
+                  <span className="text-xs font-medium text-muted-foreground">
+                    {document.required
+                      ? t("documentForm.required")
+                      : t("documentForm.optional")}
+                  </span>
                 </div>
+
+                {canChangeIdentityType ? (
+                  <FormField
+                    id={`${documentId}-type`}
+                    label={t("fields.documentType")}
+                    required={document.required}
+                    error={typeError}
+                  >
+                    <Select
+                      value={document.type}
+                      onValueChange={(value) => {
+                        if (value) {
+                          setDocumentValue(
+                            document.key,
+                            "type",
+                            value as v1.persons.PersonDocumentType,
+                          );
+                        }
+                      }}
+                    >
+                      <SelectTrigger
+                        id={`${documentId}-type`}
+                        aria-describedby={fieldErrorId(
+                          `${documentId}-type`,
+                          typeError,
+                        )}
+                        aria-invalid={invalidAria(typeError)}
+                        className="w-full"
+                      >
+                        <SelectValue
+                          placeholder={t("placeholders.documentType")}
+                        />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {FOREIGN_IDENTITY_DOCUMENT_TYPES.map((type) => (
+                          <SelectItem key={type} value={type}>
+                            {t(`documentTypes.${type}`)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FormField>
+                ) : null}
+
                 {isNationalId ? (
                   <div className="grid min-w-0 grid-cols-3 gap-3 sm:col-span-2">
                     <FormField
@@ -812,11 +891,13 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
                     />
                   </FormField>
                 )}
+
                 {isNationalId ? (
                   <>
                     <FormField
                       id={`${documentId}-cnp`}
                       label={t("fields.documentCnp")}
+                      required={document.required}
                       error={cnpError}
                     >
                       <Input
@@ -839,6 +920,9 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
                         }
                       />
                     </FormField>
+                    {showUnder18Warning ? (
+                      <Under18Warning message={t("feedback.under18Warning")} />
+                    ) : null}
                     <FormField
                       id={`${documentId}-issued-by`}
                       label={t("fields.documentIssuedBy")}
@@ -909,6 +993,7 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
                     />
                   </FormField>
                 )}
+
                 <FormField
                   id={`${documentId}-expires-on-day`}
                   label={t("fields.documentExpiresOn")}
@@ -993,47 +1078,15 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
               </div>
             );
           })}
-          {availableDocumentTypes.length === 0 ? (
-            <p className="text-sm text-muted-foreground sm:col-span-2">
-              {t("documentForm.allTypesAdded")}
+          {fieldErrors.documents ? (
+            <p
+              id={`${formId}-documents-error`}
+              role="alert"
+              className="text-sm text-destructive sm:col-span-2"
+            >
+              {fieldErrors.documents}
             </p>
           ) : null}
-          <div className="sm:col-span-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                render={
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="w-full sm:w-auto"
-                    disabled={availableDocumentTypes.length === 0}
-                  />
-                }
-              >
-                {t("actions.addDocument")}
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                {availableDocumentTypes.map((type) => (
-                  <DropdownMenuItem
-                    key={type}
-                    onClick={() => addDocument(type)}
-                  >
-                    {t(`documentTypes.${type}`)}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-            {fieldErrors.documents ? (
-              <p
-                id={`${formId}-documents-error`}
-                role="alert"
-                className="mt-2 text-sm text-destructive"
-              >
-                {fieldErrors.documents}
-              </p>
-            ) : null}
-          </div>
         </FormSection>
 
         <FormField
@@ -1137,20 +1190,22 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
     clearFieldError("region");
   }
 
-  function addDocument(type: v1.persons.PersonDocumentType) {
-    setForm((current) => ({
-      ...current,
-      documents: [...current.documents, createDocumentDraft(type)],
-    }));
-    clearFieldError("documents");
-  }
-
-  function removeDocument(key: string) {
-    setForm((current) => ({
-      ...current,
-      documents: current.documents.filter((document) => document.key !== key),
-    }));
-    clearDocumentErrors(key);
+  function changeCitizenship(citizenship: PersonCitizenship) {
+    setForm((current) =>
+      current.citizenship === citizenship
+        ? current
+        : {
+            ...current,
+            citizenship,
+            dateOfBirth:
+              citizenship === "romanian"
+                ? emptyDateParts()
+                : current.dateOfBirth,
+            documents: createInitialDocuments(citizenship),
+          },
+    );
+    setFieldErrors({});
+    setFeedback(null);
   }
 
   function setDocumentValue<Key extends PersonDocumentFormFieldKey>(
@@ -1184,32 +1239,97 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
       clearFieldError(key);
     }
   }
+}
 
-  function clearDocumentErrors(documentKey: string) {
-    setFieldErrors((current) => {
-      const prefix = `document.${documentKey}.`;
-      let changed = false;
-      const next: FormErrors = {};
+function Under18Warning({ message }: { message: string }) {
+  return (
+    <div
+      role="status"
+      className="rounded-lg border border-warning bg-warning-subtle px-3 py-2 text-sm font-medium text-warning sm:col-span-2"
+    >
+      {message}
+    </div>
+  );
+}
 
-      for (const [key, value] of Object.entries(current)) {
-        if (key.startsWith(prefix)) {
-          changed = true;
-          continue;
-        }
+function isUnder18Person(form: CreatePersonFormState): boolean {
+  const dateOfBirth =
+    form.citizenship === "romanian"
+      ? v1.persons.getDateOfBirthFromCnp(
+          form.documents.find((document) => document.type === "nationalId")
+            ?.cnp,
+        )
+      : buildDateOnly(form.dateOfBirth).value;
 
-        next[key as FormErrorKey] = value;
-      }
+  return v1.persons.isUnder18FromDateOfBirth(dateOfBirth);
+}
 
-      return changed ? next : current;
-    });
-  }
+function createEmptyCreateForm(
+  citizenship: PersonCitizenship,
+): CreatePersonFormState {
+  return {
+    citizenship,
+    email: "",
+    phone: "",
+    phoneCountry: "RO",
+    phoneCountryCallingCode: "40",
+    phoneNationalNumber: "",
+    firstName: "",
+    lastName: "",
+    dateOfBirth: emptyDateParts(),
+    addressLine1: "",
+    addressLine2: "",
+    city: "",
+    region: "",
+    postalCode: "",
+    countryCode: "RO",
+    documents: createInitialDocuments(citizenship),
+    notes: "",
+  };
+}
+
+function createInitialDocuments(
+  citizenship: PersonCitizenship,
+): CreatePersonDocumentFormState[] {
+  return citizenship === "romanian"
+    ? [
+        createDocumentDraft("nationalId", {
+          key: "romanian-national-id",
+          required: true,
+          slot: "identity",
+        }),
+        createDocumentDraft("driverLicense", {
+          key: "romanian-driver-license",
+          required: false,
+          slot: "driverLicense",
+        }),
+      ]
+    : [
+        createDocumentDraft("passport", {
+          key: "foreign-identity",
+          required: true,
+          slot: "identity",
+        }),
+        createDocumentDraft("driverLicense", {
+          key: "foreign-driver-license",
+          required: false,
+          slot: "driverLicense",
+        }),
+      ];
 }
 
 function createDocumentDraft(
   type: v1.persons.PersonDocumentType,
+  options: {
+    key: string;
+    required: boolean;
+    slot: CreatePersonDocumentFormState["slot"];
+  },
 ): CreatePersonDocumentFormState {
   return {
-    key: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    key: options.key,
+    required: options.required,
+    slot: options.slot,
     type,
     series: "",
     number: "",
@@ -1223,24 +1343,22 @@ function createDocumentDraft(
   };
 }
 
-function getAvailableDocumentTypes(
-  documents: CreatePersonDocumentFormState[],
-): v1.persons.PersonDocumentType[] {
-  const hasDriverLicense = documents.some(
-    (document) =>
-      document.type === v1.persons.PERSON_DRIVER_LICENSE_DOCUMENT_TYPE,
+function isBlankOptionalDocument(document: CreatePersonDocumentFormState) {
+  return (
+    document.series.trim().length === 0 &&
+    document.number.trim().length === 0 &&
+    document.cnp.trim().length === 0 &&
+    document.issuedBy.trim().length === 0 &&
+    document.notes.trim().length === 0 &&
+    !hasDateParts(document.issuedOn) &&
+    !hasDateParts(document.expiresOn)
   );
-  const hasIdentityDocument = documents.some((document) =>
-    v1.persons.isPersonIdentityDocumentType(document.type),
+}
+
+function hasDateParts(parts: DateParts): boolean {
+  return (
+    parts.day.length > 0 || parts.month.length > 0 || parts.year.length > 0
   );
-
-  return DOCUMENT_TYPE_MENU_ORDER.filter((type) => {
-    if (type === v1.persons.PERSON_DRIVER_LICENSE_DOCUMENT_TYPE) {
-      return !hasDriverLicense;
-    }
-
-    return !hasIdentityDocument;
-  });
 }
 
 function DatePartsInput({
@@ -1392,47 +1510,58 @@ function createPersonInput(
     lastName: form.lastName,
   };
 
-  const dateOfBirth = buildDateOnly(form.dateOfBirth);
-  if (dateOfBirth.error) {
-    return {
-      error: {
-        field: "dateOfBirth",
-        message: formatDateError("dateOfBirth", dateOfBirth.error),
-      },
-    };
+  if (form.citizenship === "foreign") {
+    const dateOfBirth = buildDateOnly(form.dateOfBirth);
+    if (dateOfBirth.error) {
+      return {
+        error: {
+          field: "dateOfBirth",
+          message: formatDateError("dateOfBirth", dateOfBirth.error),
+        },
+      };
+    }
+
+    addOptional(input, "dateOfBirth", dateOfBirth.value);
+  } else {
+    const nationalId = form.documents.find(
+      (document) => document.type === "nationalId",
+    );
+    const dateOfBirth = v1.persons.getDateOfBirthFromCnp(nationalId?.cnp);
+
+    addOptional(input, "dateOfBirth", dateOfBirth ?? undefined);
   }
 
-  addOptional(input, "dateOfBirth", dateOfBirth.value);
   addOptional(input, "addressLine1", form.addressLine1);
   addOptional(input, "addressLine2", form.addressLine2);
   addOptional(input, "city", form.city);
   addOptional(input, "region", form.region);
   addOptional(input, "postalCode", form.postalCode);
   addOptional(input, "countryCode", form.countryCode);
-  if (form.documents.length > 0) {
-    const documents: Record<string, unknown>[] = [];
+  const documents: Record<string, unknown>[] = [];
 
-    for (const document of form.documents) {
-      const documentInput = createDocumentInput(document);
-
-      if (documentInput.error) {
-        return {
-          error: {
-            field: documentFieldErrorKey(
-              document.key,
-              documentInput.error.field,
-            ),
-            message: formatDateError(
-              documentInput.error.dateField,
-              documentInput.error.kind,
-            ),
-          },
-        };
-      }
-
-      documents.push(documentInput.input);
+  for (const document of form.documents) {
+    if (!document.required && isBlankOptionalDocument(document)) {
+      continue;
     }
 
+    const documentInput = createDocumentInput(document);
+
+    if (documentInput.error) {
+      return {
+        error: {
+          field: documentFieldErrorKey(document.key, documentInput.error.field),
+          message: formatDateError(
+            documentInput.error.dateField,
+            documentInput.error.kind,
+          ),
+        },
+      };
+    }
+
+    documents.push(documentInput.input);
+  }
+
+  if (documents.length > 0) {
     input.documents = documents;
   }
   addOptional(input, "notes", form.notes);
@@ -1479,7 +1608,11 @@ function createDocumentInput(document: CreatePersonDocumentFormState): {
 
   addOptional(input, "series", document.series);
   addOptional(input, "number", document.number);
-  addOptional(input, "cnp", document.cnp);
+  if (document.required && document.type === "nationalId") {
+    input.cnp = document.cnp;
+  } else {
+    addOptional(input, "cnp", document.cnp);
+  }
   addOptional(input, "issuingCountryCode", document.issuingCountryCode);
   addOptional(input, "issuedBy", document.issuedBy);
   addOptional(input, "issuedOn", issuedOn.value);
