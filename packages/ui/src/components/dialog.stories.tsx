@@ -43,3 +43,50 @@ export const Default: Story = {
     </Dialog>
   ),
 };
+
+export const DestructiveAction: Story = {
+  render: () => (
+    <Dialog>
+      <DialogTrigger render={<Button variant="destructive" />}>
+        Remove device
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Remove trusted device?</DialogTitle>
+          <DialogDescription>
+            The device will need to sign in again before it can access this
+            workspace.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter showCloseButton>
+          <Button variant="destructive">Remove device</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  ),
+};
+
+export const WithoutCloseButton: Story = {
+  render: () => (
+    <Dialog>
+      <DialogTrigger render={<Button variant="outline" />}>
+        Open blocking dialog
+      </DialogTrigger>
+      <DialogContent showCloseButton={false}>
+        <DialogHeader>
+          <DialogTitle>Complete required review</DialogTitle>
+          <DialogDescription>
+            This flow uses explicit footer actions instead of a corner close
+            button.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <DialogClose render={<Button variant="outline" />}>
+            Cancel
+          </DialogClose>
+          <Button>Complete review</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  ),
+};

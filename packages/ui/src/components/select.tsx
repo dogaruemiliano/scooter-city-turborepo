@@ -7,7 +7,27 @@ import { tokens } from "@repo/theme";
 import { cn } from "@repo/ui/lib/utils";
 import { ChevronDownIcon, CheckIcon, ChevronUpIcon } from "lucide-react";
 
-const Select = SelectPrimitive.Root;
+function Select<Value = unknown, Multiple extends boolean | undefined = false>({
+  children,
+  items,
+  ...props
+}: SelectPrimitive.Root.Props<Value, Multiple>) {
+  const resolvedItems = React.useMemo(() => {
+    if (items !== undefined) {
+      return items;
+    }
+
+    const inferredItems = collectSelectItems(children);
+
+    return inferredItems.length > 0 ? inferredItems : undefined;
+  }, [children, items]);
+
+  return (
+    <SelectPrimitive.Root items={resolvedItems} {...props}>
+      {children}
+    </SelectPrimitive.Root>
+  );
+}
 
 function SelectGroup({ className, ...props }: SelectPrimitive.Group.Props) {
   return (
@@ -187,6 +207,37 @@ function SelectScrollDownButton({
       <ChevronDownIcon />
     </SelectPrimitive.ScrollDownArrow>
   );
+}
+
+function collectSelectItems(
+  children: React.ReactNode,
+): Array<{ label: React.ReactNode; value: unknown }> {
+  const items: Array<{ label: React.ReactNode; value: unknown }> = [];
+
+  React.Children.forEach(children, (child) => {
+    if (!React.isValidElement(child)) {
+      return;
+    }
+
+    if (child.type === SelectItem) {
+      const props = child.props as SelectPrimitive.Item.Props;
+
+      items.push({
+        label: props.children ?? props.label ?? String(props.value ?? ""),
+        value: props.value ?? null,
+      });
+
+      return;
+    }
+
+    const props = child.props as { children?: React.ReactNode };
+
+    if (props.children !== undefined) {
+      items.push(...collectSelectItems(props.children));
+    }
+  });
+
+  return items;
 }
 
 export {
