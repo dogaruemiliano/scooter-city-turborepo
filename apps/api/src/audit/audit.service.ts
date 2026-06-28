@@ -26,6 +26,8 @@ import type { AuditEventType } from "./audit.types";
 export interface RecordAuditInput {
   type: AuditEventType;
   userId?: string | null;
+  targetType?: string | null;
+  targetId?: string | null;
   ip?: string | null;
   userAgent?: string | null;
   /**
@@ -44,17 +46,7 @@ export class AuditService {
 
   async record(input: RecordAuditInput): Promise<void> {
     try {
-      await this.prisma.auditEvent.create({
-        data: {
-          type: input.type,
-          userId: input.userId ?? null,
-          ip: input.ip ?? null,
-          userAgent: input.userAgent ?? null,
-          // `Prisma.JsonNull` writes JSON-null into the column; the JS
-          // `null` literal would mean "don't set this field" instead.
-          meta: input.meta ?? Prisma.JsonNull,
-        },
-      });
+      await this.recordRequired(this.prisma, input);
     } catch (error) {
       this.logger.error(
         {
@@ -65,5 +57,24 @@ export class AuditService {
         "AuditService.record failed",
       );
     }
+  }
+
+  async recordRequired(
+    tx: Pick<PrismaService, "auditEvent"> | Prisma.TransactionClient,
+    input: RecordAuditInput,
+  ): Promise<void> {
+    await tx.auditEvent.create({
+      data: {
+        type: input.type,
+        userId: input.userId ?? null,
+        targetType: input.targetType ?? null,
+        targetId: input.targetId ?? null,
+        ip: input.ip ?? null,
+        userAgent: input.userAgent ?? null,
+        // `Prisma.JsonNull` writes JSON-null into the column; the JS
+        // `null` literal would mean "don't set this field" instead.
+        meta: input.meta ?? Prisma.JsonNull,
+      },
+    });
   }
 }

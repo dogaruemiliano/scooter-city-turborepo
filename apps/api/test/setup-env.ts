@@ -17,6 +17,11 @@ const TEST_ENV: Record<string, string> = {
   REFRESH_TOKEN_HMAC_SECRET: "z".repeat(32),
   OTP_HMAC_SECRET: "q".repeat(32),
   DATABASE_URL: "postgresql://app:app@localhost:5434/app",
+  IMAGE_STORAGE_DRIVER: "s3",
+  IMAGE_STORAGE_S3_BUCKET: "test-private-document-photos",
+  IMAGE_STORAGE_S3_REGION: "eu-central-1",
+  IMAGE_STORAGE_S3_PREFIX: "document-photos-test",
+  IMAGE_STORAGE_UPLOAD_TOKEN_SECRET: "i".repeat(32),
   // Enable Google with a stub web client ID so AppModule registers the
   // /v1/auth/google route. The e2e suite overrides `GoogleVerifier`
   // with `FakeGoogleVerifier` — the real client ID is never consulted.

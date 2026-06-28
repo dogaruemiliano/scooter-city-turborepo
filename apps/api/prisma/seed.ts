@@ -86,6 +86,15 @@ const FIXED_PERSON_DOCUMENT_IDS = {
 } as const;
 
 const GENERATED_PERSON_COUNT = 120;
+const PERSON_AUDIT_TARGET_TYPE = "person";
+const SEED_AUDIT_ACTOR = {
+  kind: "system",
+  userId: null,
+  email: null,
+  name: "Seed data",
+} as const;
+const REDACTED_VALUE = "[redacted]";
+const SET_VALUE = "[set]";
 
 type PersonDocumentSeed = {
   id: string;
@@ -461,7 +470,84 @@ async function seedPersons(): Promise<void> {
         },
       });
     }
+
+    await seedPersonAuditEvents(seed);
   }
+}
+
+async function seedPersonAuditEvents(seed: PersonSeed): Promise<void> {
+  await upsertPersonAuditEvent({
+    id: `seed-audit-person-created-${seed.id}`,
+    type: "PERSON_CREATED",
+    personId: seed.id,
+    changes: personSeedAuditChanges(seed),
+    createdAt: new Date("2026-01-01T00:00:00.000Z"),
+  });
+
+  for (const document of seed.documents) {
+    await upsertPersonAuditEvent({
+      id: `seed-audit-document-created-${document.id}`,
+      type: "PERSON_DOCUMENT_CREATED",
+      personId: seed.id,
+      document: documentSeedSummary(document),
+      changes: documentSeedAuditChanges(document),
+      createdAt: new Date("2026-01-01T00:01:00.000Z"),
+    });
+  }
+
+  if (seed.deletedAt) {
+    await upsertPersonAuditEvent({
+      id: `seed-audit-person-deleted-${seed.id}`,
+      type: "PERSON_DELETED",
+      personId: seed.id,
+      changes: [],
+      createdAt: seed.deletedAt,
+    });
+  }
+}
+
+async function upsertPersonAuditEvent({
+  id,
+  type,
+  personId,
+  document = null,
+  replacement = null,
+  changes,
+  createdAt,
+}: {
+  id: string;
+  type: string;
+  personId: string;
+  document?: ReturnType<typeof documentSeedSummary> | null;
+  replacement?: null;
+  changes: Array<{
+    field: string;
+    oldValue: string | null;
+    newValue: string | null;
+  }>;
+  createdAt: Date;
+}): Promise<void> {
+  const data = {
+    userId: null,
+    type,
+    targetType: PERSON_AUDIT_TARGET_TYPE,
+    targetId: personId,
+    ip: null,
+    userAgent: null,
+    meta: {
+      actor: SEED_AUDIT_ACTOR,
+      document,
+      replacement,
+      changes,
+    },
+    createdAt,
+  };
+
+  await prisma.auditEvent.upsert({
+    where: { id },
+    create: { id, ...data },
+    update: data,
+  });
 }
 
 function personData(seed: PersonSeed) {
@@ -496,6 +582,71 @@ function personDocumentData(seed: PersonDocumentSeed) {
     notes: seed.notes,
     deletedAt: seed.deletedAt,
   };
+}
+
+function personSeedAuditChanges(seed: PersonSeed) {
+  return compactSeedChanges([
+    createSeedChange("email", seed.email),
+    createSeedChange("phone", seed.phone),
+    createSeedChange("firstName", seed.firstName),
+    createSeedChange("lastName", seed.lastName),
+    createSeedChange("dateOfBirth", dateOnlyString(seed.dateOfBirth)),
+    createSeedChange("addressLine1", seed.addressLine1),
+    createSeedChange("addressLine2", seed.addressLine2),
+    createSeedChange("city", seed.city),
+    createSeedChange("region", seed.region),
+    createSeedChange("postalCode", seed.postalCode),
+    createSeedChange("countryCode", seed.countryCode),
+    createSeedChange("notes", seed.notes ? SET_VALUE : null),
+  ]);
+}
+
+function documentSeedAuditChanges(seed: PersonDocumentSeed) {
+  return compactSeedChanges([
+    createSeedChange("document.type", seed.type),
+    createSeedChange("document.series", seed.series),
+    createSeedChange("document.number", maskSensitiveSeedValue(seed.number)),
+    createSeedChange("document.cnp", maskSensitiveSeedValue(seed.cnp)),
+    createSeedChange("document.issuingCountryCode", seed.issuingCountryCode),
+    createSeedChange("document.issuedBy", seed.issuedBy),
+    createSeedChange("document.issuedOn", dateOnlyString(seed.issuedOn)),
+    createSeedChange("document.expiresOn", dateOnlyString(seed.expiresOn)),
+    createSeedChange("document.status", seed.status),
+    createSeedChange("document.notes", seed.notes ? SET_VALUE : null),
+  ]);
+}
+
+function documentSeedSummary(seed: PersonDocumentSeed) {
+  return {
+    id: seed.id,
+    type: seed.type,
+    status: seed.status,
+  };
+}
+
+function createSeedChange(field: string, value: string | null) {
+  return value === null ? null : { field, oldValue: null, newValue: value };
+}
+
+function compactSeedChanges(
+  changes: Array<ReturnType<typeof createSeedChange>>,
+) {
+  return changes.filter(
+    (change): change is NonNullable<typeof change> => change !== null,
+  );
+}
+
+function maskSensitiveSeedValue(value: string | null): string | null {
+  if (!value) {
+    return null;
+  }
+
+  const visibleLength = Math.min(4, value.length);
+  return `${REDACTED_VALUE} ${value.slice(-visibleLength)}`;
+}
+
+function dateOnlyString(value: Date | null): string | null {
+  return value ? value.toISOString().slice(0, 10) : null;
 }
 
 function buildGeneratedPersonSeeds(count: number): PersonSeed[] {

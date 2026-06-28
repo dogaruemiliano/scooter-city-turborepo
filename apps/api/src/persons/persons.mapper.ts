@@ -2,12 +2,18 @@ import { v1 } from "@repo/api-shared";
 
 import { toDateOnlyString } from "../common/dates/date-only";
 import type {
+  MediaAsset as MediaAssetRow,
   Person as PersonRow,
   PersonDocument as PersonDocumentRow,
+  PersonDocumentPhoto as PersonDocumentPhotoRow,
 } from "../generated/prisma/client";
 
 export type PersonWithDocuments = PersonRow & {
   documents: PersonDocumentRow[];
+};
+
+export type PersonDocumentPhotoWithAsset = PersonDocumentPhotoRow & {
+  asset: MediaAssetRow;
 };
 
 export function toPerson(row: PersonWithDocuments): v1.persons.Person {
@@ -50,6 +56,30 @@ export function toPersonDocument(
     notes: row.notes,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
+    deletedAt: row.deletedAt?.toISOString() ?? null,
+  };
+}
+
+export function toPersonDocumentPhoto(
+  row: PersonDocumentPhotoWithAsset,
+  personId: string,
+): v1.persons.PersonDocumentPhoto {
+  const slot = row.slot as v1.persons.PersonDocumentPhotoSlot;
+
+  return {
+    id: row.id,
+    personDocumentId: row.personDocumentId,
+    slot,
+    assetId: row.assetId,
+    contentType: row.asset.contentType,
+    byteSize: row.asset.byteSize,
+    checksumSha256: row.asset.checksumSha256,
+    contentUrl: v1.persons.ROUTES.documents.photos.content(
+      personId,
+      row.personDocumentId,
+      slot,
+    ),
+    createdAt: row.createdAt.toISOString(),
     deletedAt: row.deletedAt?.toISOString() ?? null,
   };
 }

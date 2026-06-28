@@ -128,6 +128,196 @@ test("person schemas validate document values and date-only strings", () => {
   );
 });
 
+test("person document photo schemas expose slot metadata and content routes", () => {
+  const contentUrl = v1.persons.ROUTES.documents.photos.content(
+    "person-1",
+    "document-1",
+    "front",
+  );
+  const uploadUrl = v1.persons.ROUTES.documents.photos.createUploadUrl(
+    "person-1",
+    "document-1",
+    "front",
+  );
+  const completeUploadUrl = v1.persons.ROUTES.documents.photos.completeUpload(
+    "person-1",
+    "document-1",
+    "front",
+  );
+  const readUrl = v1.persons.ROUTES.documents.photos.readUrl(
+    "person-1",
+    "document-1",
+    "front",
+  );
+
+  assert.equal(
+    contentUrl,
+    "/v1/persons/person-1/documents/document-1/photos/front/content",
+  );
+  assert.equal(
+    uploadUrl,
+    "/v1/persons/person-1/documents/document-1/photos/front/upload-url",
+  );
+  assert.equal(
+    completeUploadUrl,
+    "/v1/persons/person-1/documents/document-1/photos/front/complete-upload",
+  );
+  assert.equal(
+    readUrl,
+    "/v1/persons/person-1/documents/document-1/photos/front/read-url",
+  );
+  assert.equal(
+    v1.persons.personDocumentPhotoSlotSchema.safeParse("front").success,
+    true,
+  );
+  assert.equal(
+    v1.persons.personDocumentPhotoSlotSchema.safeParse("portrait").success,
+    false,
+  );
+
+  assert.deepEqual(
+    v1.persons.personDocumentPhotoSchema.parse({
+      id: "photo-1",
+      personDocumentId: "document-1",
+      slot: "front",
+      assetId: "asset-1",
+      contentType: "image/jpeg",
+      byteSize: 1234,
+      checksumSha256: "abc123",
+      contentUrl,
+      createdAt: "2026-06-26T10:00:00.000Z",
+      deletedAt: null,
+    }),
+    {
+      id: "photo-1",
+      personDocumentId: "document-1",
+      slot: "front",
+      assetId: "asset-1",
+      contentType: "image/jpeg",
+      byteSize: 1234,
+      checksumSha256: "abc123",
+      contentUrl,
+      createdAt: "2026-06-26T10:00:00.000Z",
+      deletedAt: null,
+    },
+  );
+
+  const checksumSha256 =
+    "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+  assert.deepEqual(
+    v1.persons.createPersonDocumentPhotoUploadUrlInputSchema.parse({
+      contentType: "image/webp",
+      byteSize: 1234,
+      checksumSha256,
+    }),
+    {
+      contentType: "image/webp",
+      byteSize: 1234,
+      checksumSha256,
+    },
+  );
+  assert.equal(
+    v1.persons.createPersonDocumentPhotoUploadUrlInputSchema.safeParse({
+      contentType: "application/pdf",
+      byteSize: 1234,
+      checksumSha256,
+    }).success,
+    false,
+  );
+  assert.equal(
+    v1.persons.createPersonDocumentPhotoUploadUrlInputSchema.safeParse({
+      contentType: "image/webp",
+      byteSize: 1234,
+      checksumSha256: "abc123",
+    }).success,
+    false,
+  );
+  assert.equal(
+    v1.persons.personDocumentPhotoUploadUrlSchema.parse({
+      uploadUrl: "https://s3.example/upload",
+      uploadToken: "token",
+      method: "PUT",
+      headers: {
+        "Content-Type": "image/webp",
+        "x-amz-checksum-sha256": "ASNFZ4mrze8BI0VniavN7wEjRWeJq83vASNFZ4mrze8=",
+      },
+      expiresAt: "2026-06-26T10:05:00.000Z",
+      maxBytes: 10485760,
+    }).method,
+    "PUT",
+  );
+  assert.equal(
+    v1.persons.completePersonDocumentPhotoUploadInputSchema.parse({
+      uploadToken: "token",
+    }).uploadToken,
+    "token",
+  );
+  assert.equal(
+    v1.persons.personDocumentPhotoReadUrlSchema.parse({
+      readUrl: "https://s3.example/read",
+      method: "GET",
+      headers: {},
+      expiresAt: "2026-06-26T10:05:00.000Z",
+    }).method,
+    "GET",
+  );
+});
+
+test("person audit schemas expose safe activity metadata and routes", () => {
+  assert.equal(
+    v1.persons.ROUTES.auditEvents.list("person-1"),
+    "/v1/persons/person-1/audit-events",
+  );
+  assert.equal(
+    v1.persons.ROUTES.documents.replace("person-1", "document-1"),
+    "/v1/persons/person-1/documents/document-1/replace",
+  );
+
+  const parsed = v1.persons.personAuditEventSchema.parse({
+    id: "audit-1",
+    type: "PERSON_DOCUMENT_REPLACED",
+    personId: "person-1",
+    actor: {
+      kind: "user",
+      userId: "user-1",
+      email: "admin@example.com",
+      name: null,
+    },
+    document: {
+      id: "document-2",
+      type: "nationalId",
+      status: "verified",
+    },
+    replacement: {
+      oldDocument: {
+        id: "document-1",
+        type: "nationalId",
+        status: "expired",
+      },
+      newDocument: {
+        id: "document-2",
+        type: "nationalId",
+        status: "verified",
+      },
+    },
+    changes: [
+      {
+        field: "document.number",
+        oldValue: "[redacted] 3456",
+        newValue: "[redacted] 9999",
+      },
+    ],
+    createdAt: "2026-06-26T10:00:00.000Z",
+  });
+
+  assert.equal(parsed.type, "PERSON_DOCUMENT_REPLACED");
+  assert.equal(parsed.changes[0]?.oldValue?.includes("123456"), false);
+  assert.equal(
+    v1.persons.personAuditEventTypeSchema.safeParse("LOGIN_SUCCESS").success,
+    false,
+  );
+});
+
 test("person document CNP validation checks checksum, date, county, and serial", () => {
   assert.equal(
     v1.persons.createPersonDocumentInputSchema.safeParse({

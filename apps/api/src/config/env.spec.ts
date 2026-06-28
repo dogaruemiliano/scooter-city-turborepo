@@ -7,6 +7,9 @@ function validEnv(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
     SMTP_PORT: "587",
     SMTP_USER: "test-user",
     SMTP_PASSWORD: "test-password",
+    IMAGE_STORAGE_S3_BUCKET: "test-private-document-photos",
+    IMAGE_STORAGE_S3_REGION: "eu-central-1",
+    IMAGE_STORAGE_UPLOAD_TOKEN_SECRET: "i".repeat(32),
     ...overrides,
   };
 }
@@ -36,5 +39,18 @@ describe("environment schema", () => {
     expect(() => loadEnv(validEnv({ HEALTH_MAX_HEAP_MB: "0" }))).toThrow(
       "HEALTH_MAX_HEAP_MB",
     );
+  });
+
+  it("requires S3 bucket and region for image storage", () => {
+    const missingBucket = validEnv();
+    delete missingBucket.IMAGE_STORAGE_S3_BUCKET;
+
+    expect(() => loadEnv(missingBucket)).toThrow("IMAGE_STORAGE_S3_BUCKET");
+    expect(() => loadEnv(validEnv({ IMAGE_STORAGE_S3_REGION: "" }))).toThrow(
+      "IMAGE_STORAGE_S3_REGION",
+    );
+    expect(() =>
+      loadEnv(validEnv({ IMAGE_STORAGE_UPLOAD_TOKEN_SECRET: "" })),
+    ).toThrow("IMAGE_STORAGE_UPLOAD_TOKEN_SECRET");
   });
 });

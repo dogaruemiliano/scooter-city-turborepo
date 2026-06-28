@@ -18,9 +18,11 @@ import {
   requiredTrimmedStringSchema,
 } from "../common/common.schemas";
 import {
+  PERSON_AUDIT_EVENT_TYPES,
   isPersonIdentityDocumentType,
   PERSON_DOCUMENT_EXPIRIES,
   PERSON_DRIVER_LICENSE_DOCUMENT_TYPE,
+  PERSON_DOCUMENT_PHOTO_SLOTS,
   PERSON_DOCUMENT_STATUSES,
   PERSON_DOCUMENT_TYPES,
   PERSON_LIST_SORTS,
@@ -31,6 +33,8 @@ const MAX_NAME_LENGTH = 100;
 const MAX_TEXT_LENGTH = 200;
 const MAX_NOTES_LENGTH = 2_000;
 const MAX_PAGE_SIZE = 100;
+const IMAGE_CONTENT_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
+const SHA_256_HEX_PATTERN = /^[a-f0-9]{64}$/i;
 
 const personNameSchema = requiredTrimmedStringSchema(MAX_NAME_LENGTH);
 const nullableTrimmedTextSchema = nullableTrimmedStringSchema(MAX_TEXT_LENGTH);
@@ -45,6 +49,11 @@ const cnpSchema = z
 
 export const personDocumentTypeSchema = z.enum(PERSON_DOCUMENT_TYPES);
 export const personDocumentStatusSchema = z.enum(PERSON_DOCUMENT_STATUSES);
+export const personDocumentPhotoSlotSchema = z.enum(
+  PERSON_DOCUMENT_PHOTO_SLOTS,
+);
+export const personDocumentPhotoContentTypeSchema = z.enum(IMAGE_CONTENT_TYPES);
+export const personAuditEventTypeSchema = z.enum(PERSON_AUDIT_EVENT_TYPES);
 export const personRecordStatusSchema = z.enum(PERSON_RECORD_STATUSES);
 export const personDocumentExpirySchema = z.enum(PERSON_DOCUMENT_EXPIRIES);
 export const personListSortSchema = z.enum(PERSON_LIST_SORTS);
@@ -76,6 +85,154 @@ export const personDocumentListSchema = z
   .meta({ id: "PersonDocumentList" });
 
 export type PersonDocumentList = z.infer<typeof personDocumentListSchema>;
+
+export const personDocumentPhotoSchema = z
+  .object({
+    id: z.string(),
+    personDocumentId: z.string(),
+    slot: personDocumentPhotoSlotSchema,
+    assetId: z.string(),
+    contentType: z.string(),
+    byteSize: z.number().int().nonnegative(),
+    checksumSha256: z.string(),
+    contentUrl: z.string(),
+    createdAt: z.string().describe("ISO timestamp of photo creation."),
+    deletedAt: z.string().nullable(),
+  })
+  .meta({ id: "PersonDocumentPhoto" });
+
+export type PersonDocumentPhoto = z.infer<typeof personDocumentPhotoSchema>;
+
+export const personDocumentPhotoListSchema = z
+  .array(personDocumentPhotoSchema)
+  .meta({ id: "PersonDocumentPhotoList" });
+
+export type PersonDocumentPhotoList = z.infer<
+  typeof personDocumentPhotoListSchema
+>;
+
+export const createPersonDocumentPhotoUploadUrlInputSchema = z
+  .object({
+    contentType: personDocumentPhotoContentTypeSchema,
+    byteSize: z.number().int().positive(),
+    checksumSha256: z.string().regex(SHA_256_HEX_PATTERN),
+  })
+  .strict()
+  .meta({ id: "CreatePersonDocumentPhotoUploadUrlInput" });
+
+export type CreatePersonDocumentPhotoUploadUrlInput = z.infer<
+  typeof createPersonDocumentPhotoUploadUrlInputSchema
+>;
+
+export const personDocumentPhotoUploadUrlSchema = z
+  .object({
+    uploadUrl: z.string().url(),
+    uploadToken: z.string().min(1),
+    method: z.literal("PUT"),
+    headers: z.record(z.string(), z.string()),
+    expiresAt: z
+      .string()
+      .describe("ISO timestamp when the signed URL expires."),
+    maxBytes: z.number().int().positive(),
+  })
+  .meta({ id: "PersonDocumentPhotoUploadUrl" });
+
+export type PersonDocumentPhotoUploadUrl = z.infer<
+  typeof personDocumentPhotoUploadUrlSchema
+>;
+
+export const completePersonDocumentPhotoUploadInputSchema = z
+  .object({
+    uploadToken: z.string().min(1),
+  })
+  .strict()
+  .meta({ id: "CompletePersonDocumentPhotoUploadInput" });
+
+export type CompletePersonDocumentPhotoUploadInput = z.infer<
+  typeof completePersonDocumentPhotoUploadInputSchema
+>;
+
+export const personDocumentPhotoReadUrlSchema = z
+  .object({
+    readUrl: z.string().url(),
+    method: z.literal("GET"),
+    headers: z.record(z.string(), z.string()),
+    expiresAt: z
+      .string()
+      .describe("ISO timestamp when the signed URL expires."),
+  })
+  .meta({ id: "PersonDocumentPhotoReadUrl" });
+
+export type PersonDocumentPhotoReadUrl = z.infer<
+  typeof personDocumentPhotoReadUrlSchema
+>;
+
+export const personAuditActorSchema = z
+  .object({
+    kind: z.enum(["user", "system"]),
+    userId: z.string().nullable(),
+    email: z.string().nullable(),
+    name: z.string().nullable(),
+  })
+  .meta({ id: "PersonAuditActor" });
+
+export type PersonAuditActor = z.infer<typeof personAuditActorSchema>;
+
+export const personAuditFieldChangeSchema = z
+  .object({
+    field: z.string(),
+    oldValue: z.string().nullable(),
+    newValue: z.string().nullable(),
+  })
+  .meta({ id: "PersonAuditFieldChange" });
+
+export type PersonAuditFieldChange = z.infer<
+  typeof personAuditFieldChangeSchema
+>;
+
+export const personAuditDocumentSummarySchema = z
+  .object({
+    id: z.string(),
+    type: personDocumentTypeSchema,
+    status: personDocumentStatusSchema,
+  })
+  .meta({ id: "PersonAuditDocumentSummary" });
+
+export type PersonAuditDocumentSummary = z.infer<
+  typeof personAuditDocumentSummarySchema
+>;
+
+export const personAuditReplacementSchema = z
+  .object({
+    oldDocument: personAuditDocumentSummarySchema,
+    newDocument: personAuditDocumentSummarySchema,
+  })
+  .meta({ id: "PersonAuditReplacement" });
+
+export type PersonAuditReplacement = z.infer<
+  typeof personAuditReplacementSchema
+>;
+
+export const personAuditEventSchema = z
+  .object({
+    id: z.string(),
+    type: personAuditEventTypeSchema,
+    personId: z.string(),
+    actor: personAuditActorSchema,
+    document: personAuditDocumentSummarySchema.nullable(),
+    replacement: personAuditReplacementSchema.nullable(),
+    changes: z.array(personAuditFieldChangeSchema),
+    createdAt: z.string().describe("ISO timestamp of audit event creation."),
+  })
+  .meta({ id: "PersonAuditEvent" });
+
+export type PersonAuditEvent = z.infer<typeof personAuditEventSchema>;
+
+export const personAuditEventListSchema = z
+  .array(personAuditEventSchema)
+  .meta({ id: "PersonAuditEventList" });
+
+export type PersonAuditEventList = z.infer<typeof personAuditEventListSchema>;
 
 export const personSchema = z
   .object({
