@@ -4,23 +4,25 @@ import { render, screen } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import PersonRoutePage from "./page";
+import PersonRoutePage from "../[id]/page";
 
 const mocks = vi.hoisted(() => ({
   apiFetch: vi.fn(),
   cookies: vi.fn(),
   meFromApi: vi.fn(),
   notFound: vi.fn(),
+  refresh: vi.fn(),
   redirect: vi.fn(),
+  replace: vi.fn(),
 }));
 
-vi.mock("../../../../lib/api", () => ({
+vi.mock("@/lib/api", () => ({
   webApi: {
     fetch: mocks.apiFetch,
   },
 }));
 
-vi.mock("../../../../lib/auth-server", () => ({
+vi.mock("@/lib/auth-server", () => ({
   meFromApi: mocks.meFromApi,
 }));
 
@@ -31,6 +33,10 @@ vi.mock("next/headers", () => ({
 vi.mock("next/navigation", () => ({
   notFound: mocks.notFound,
   redirect: mocks.redirect,
+  useRouter: () => ({
+    refresh: mocks.refresh,
+    replace: mocks.replace,
+  }),
 }));
 
 const person: v1.persons.Person = {
@@ -93,7 +99,9 @@ beforeEach(() => {
   mocks.cookies.mockReset();
   mocks.meFromApi.mockReset();
   mocks.notFound.mockReset();
+  mocks.refresh.mockReset();
   mocks.redirect.mockReset();
+  mocks.replace.mockReset();
 
   mocks.cookies.mockResolvedValue({ toString: () => "session=abc" });
   mocks.meFromApi.mockResolvedValue({
@@ -139,13 +147,21 @@ describe("PersonRoutePage", () => {
   });
 
   it("renders a fetched person detail page", async () => {
-    mocks.apiFetch.mockResolvedValueOnce(person);
+    mocks.apiFetch.mockResolvedValueOnce(person).mockResolvedValueOnce([]);
 
     const element = await renderRoute();
 
     expect(mocks.apiFetch).toHaveBeenCalledWith(
       v1.persons.ROUTES.get("person-1"),
       v1.persons.personSchema,
+      {
+        headers: { cookie: "session=abc" },
+        cache: "no-store",
+      },
+    );
+    expect(mocks.apiFetch).toHaveBeenCalledWith(
+      v1.persons.ROUTES.auditEvents.list("person-1"),
+      v1.persons.personAuditEventListSchema,
       {
         headers: { cookie: "session=abc" },
         cache: "no-store",

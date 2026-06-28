@@ -6,10 +6,10 @@ import {
   getLocalizedSignInPath,
   localizePath,
   resolveRouteLocale,
-} from "../../../../i18n/paths";
-import { webApi } from "../../../../lib/api";
-import { meFromApi } from "../../../../lib/auth-server";
-import { PersonDetailPage } from "../PersonDetailPage";
+} from "@/i18n/paths";
+import { webApi } from "@/lib/api";
+import { meFromApi } from "@/lib/auth-server";
+import { PersonDetailPage } from "../_components/PersonDetailPage";
 
 const PERSONS_PATH = "/persons";
 const ADMIN_ROLE = "ADMIN";
@@ -37,11 +37,16 @@ export default async function PersonRoutePage({
     notFound();
   }
 
-  const person = await personFromApi(locale, id, detailPath);
+  const cookieHeader = (await cookies()).toString();
+  const [person, auditEvents] = await Promise.all([
+    personFromApi(locale, id, detailPath, cookieHeader),
+    auditEventsFromApi(locale, id, detailPath, cookieHeader),
+  ]);
 
   return (
     <PersonDetailPage
       person={person}
+      auditEvents={auditEvents}
       personsHref={localizePath(PERSONS_PATH, locale)}
     />
   );
@@ -51,13 +56,41 @@ async function personFromApi(
   locale: ReturnType<typeof resolveRouteLocale>,
   id: string,
   detailPath: string,
+  cookieHeader: string,
 ): Promise<v1.persons.Person> {
-  const cookieHeader = (await cookies()).toString();
-
   try {
     return await webApi.fetch(
       v1.persons.ROUTES.get(id),
       v1.persons.personSchema,
+      {
+        headers: { cookie: cookieHeader },
+        cache: "no-store",
+      },
+    );
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 401) {
+      redirect(getLocalizedSignInPath(locale, detailPath));
+    }
+    if (
+      error instanceof ApiError &&
+      (error.status === 403 || error.status === 404)
+    ) {
+      notFound();
+    }
+    throw error;
+  }
+}
+
+async function auditEventsFromApi(
+  locale: ReturnType<typeof resolveRouteLocale>,
+  id: string,
+  detailPath: string,
+  cookieHeader: string,
+): Promise<v1.persons.PersonAuditEvent[]> {
+  try {
+    return await webApi.fetch(
+      v1.persons.ROUTES.auditEvents.list(id),
+      v1.persons.personAuditEventListSchema,
       {
         headers: { cookie: cookieHeader },
         cache: "no-store",

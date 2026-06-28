@@ -9,7 +9,7 @@ import {
 } from "../../../i18n/paths";
 import { webApi } from "../../../lib/api";
 import { meFromApi } from "../../../lib/auth-server";
-import { PersonsPage } from "./PersonsPage";
+import { PersonsPage } from "./_components/PersonsPage";
 
 const PERSONS_PATH = "/persons";
 const PERSONS_NEW_PATH = "/persons/new";

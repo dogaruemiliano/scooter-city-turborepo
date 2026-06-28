@@ -1,10 +1,30 @@
 import { v1 } from "@repo/api-shared";
 import { messages, type SupportedLocale } from "@repo/i18n";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PersonDetailPage } from "./PersonDetailPage";
+
+const mocks = vi.hoisted(() => ({
+  apiFetch: vi.fn(),
+  refresh: vi.fn(),
+  replace: vi.fn(),
+}));
+
+vi.mock("@/lib/api", () => ({
+  webApi: {
+    fetch: mocks.apiFetch,
+  },
+}));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({
+    refresh: mocks.refresh,
+    replace: mocks.replace,
+  }),
+}));
 
 const identityDocument: v1.persons.PersonDocument = {
   id: "document-1",
@@ -54,6 +74,41 @@ const readyPerson: v1.persons.Person = {
   deletedAt: null,
 };
 
+const auditEvents: v1.persons.PersonAuditEvent[] = [
+  {
+    id: "audit-1",
+    type: "PERSON_UPDATED",
+    personId: "person-1",
+    actor: {
+      kind: "user",
+      userId: "user-1",
+      email: "admin@example.com",
+      name: null,
+    },
+    document: null,
+    replacement: null,
+    changes: [
+      {
+        field: "phone",
+        oldValue: "+40700000000",
+        newValue: "+40712345678",
+      },
+    ],
+    createdAt: "2026-06-25T12:00:00.000Z",
+  },
+];
+
+beforeEach(() => {
+  mocks.apiFetch.mockReset();
+  mocks.refresh.mockReset();
+  mocks.replace.mockReset();
+
+  Object.defineProperty(window, "PointerEvent", {
+    configurable: true,
+    value: MouseEvent,
+  });
+});
+
 describe("PersonDetailPage", () => {
   it("renders profile details, documents, and masked sensitive fields", () => {
     renderDetail();
@@ -72,9 +127,91 @@ describe("PersonDetailPage", () => {
     expect(screen.getByText("Driver license")).toBeInTheDocument();
     expect(screen.getByText("RR")).toBeInTheDocument();
     expect(screen.getByText("****3456")).toBeInTheDocument();
-    expect(screen.getByText("*********3456")).toBeInTheDocument();
+    expect(screen.getByText("*********3450")).toBeInTheDocument();
     expect(screen.queryByText("123456")).not.toBeInTheDocument();
     expect(screen.queryByText("1900228123450")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Edit person" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Add document" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "More actions" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Activity" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Person updated")).toBeInTheDocument();
+    expect(screen.getByText("admin@example.com")).toBeInTheDocument();
+  });
+
+  it("updates the person from the edit dialog", async () => {
+    mocks.apiFetch.mockResolvedValueOnce({
+      ...readyPerson,
+      firstName: "Grace",
+    });
+    const browser = userEvent.setup();
+
+    renderDetail();
+    await browser.click(screen.getByRole("button", { name: "Edit person" }));
+    const dialog = await screen.findByRole("dialog");
+    await browser.clear(within(dialog).getByLabelText("First name"));
+    await browser.type(within(dialog).getByLabelText("First name"), "Grace");
+    await browser.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    await waitFor(() =>
+      expect(mocks.apiFetch).toHaveBeenCalledWith(
+        v1.persons.ROUTES.update(readyPerson.id),
+        v1.persons.personSchema,
+        expect.objectContaining({
+          method: "PATCH",
+          json: expect.objectContaining({ firstName: "Grace" }),
+        }),
+      ),
+    );
+    expect(mocks.refresh).toHaveBeenCalledOnce();
+  });
+
+  it("soft-deletes documents and the person with confirmation", async () => {
+    mocks.apiFetch.mockResolvedValue(undefined);
+    const browser = userEvent.setup();
+
+    renderDetail();
+    await browser.click(
+      screen.getAllByRole("button", { name: "Delete document" })[0],
+    );
+    let dialog = await screen.findByRole("dialog");
+    await browser.click(
+      within(dialog).getByRole("button", { name: "Delete document" }),
+    );
+
+    await waitFor(() =>
+      expect(mocks.apiFetch).toHaveBeenCalledWith(
+        v1.persons.ROUTES.documents.delete(readyPerson.id, identityDocument.id),
+        v1.common.noContentSchema,
+        { method: "DELETE" },
+      ),
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
+
+    await browser.click(screen.getByRole("button", { name: "More actions" }));
+    await browser.click(await screen.findByText("Delete person"));
+    dialog = await screen.findByRole("dialog");
+    await browser.click(
+      within(dialog).getByRole("button", { name: "Delete person" }),
+    );
+
+    await waitFor(() =>
+      expect(mocks.apiFetch).toHaveBeenCalledWith(
+        v1.persons.ROUTES.delete(readyPerson.id),
+        v1.common.noContentSchema,
+        { method: "DELETE" },
+      ),
+    );
+    expect(mocks.replace).toHaveBeenCalledWith("/en/persons");
   });
 
   it("renders deleted and empty document states", () => {
@@ -150,6 +287,7 @@ function renderDetail(
     <NextIntlClientProvider locale={locale} messages={messages[locale]}>
       <PersonDetailPage
         person={person}
+        auditEvents={auditEvents}
         personsHref={locale === "en" ? "/en/persons" : "/persons"}
       />
     </NextIntlClientProvider>,

@@ -23,6 +23,7 @@ import { CheckIcon, RotateCcwIcon, UserPlusIcon } from "lucide-react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import {
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -31,8 +32,8 @@ import {
 } from "react";
 
 import { AppPagination } from "@/components/AppPagination";
-import { PersonList } from "@/components/persons/PersonList";
-import { webApi } from "../../../lib/api";
+import { webApi } from "@/lib/api";
+import { PersonList } from "./PersonList";
 
 interface PersonsPageProps {
   createHref: string;
@@ -55,6 +56,21 @@ export function PersonsPage({
   initialList,
   initialQuery,
 }: PersonsPageProps) {
+  return (
+    <PersonsPageContent
+      key={personsPageStateKey(initialQuery, initialList)}
+      createHref={createHref}
+      initialList={initialList}
+      initialQuery={initialQuery}
+    />
+  );
+}
+
+function PersonsPageContent({
+  createHref,
+  initialList,
+  initialQuery,
+}: PersonsPageProps) {
   const t = useTranslations("persons");
   const [list, setList] = useState(initialList);
   const [query, setQuery] = useState<v1.persons.ListPersonsQuery>(initialQuery);
@@ -66,11 +82,67 @@ export function PersonsPage({
   const searchDebounceReadyRef = useRef(false);
   const searchDebounceTimeoutRef = useRef<number | null>(null);
 
-  useEffect(() => {
-    setList(initialList);
-    setQuery(initialQuery);
-    setDraftQuery(initialQuery);
-  }, [initialList, initialQuery]);
+  const clearSearchDebounce = useCallback(() => {
+    if (searchDebounceTimeoutRef.current === null) {
+      return;
+    }
+
+    window.clearTimeout(searchDebounceTimeoutRef.current);
+    searchDebounceTimeoutRef.current = null;
+  }, []);
+
+  const loadPersons = useCallback(
+    async (
+      nextQuery: v1.persons.ListPersonsQuery,
+      options: {
+        clearFeedback?: boolean;
+        history?: "push" | "replace";
+      } = {},
+    ) => {
+      const parsedQuery = v1.persons.listPersonsQuerySchema.parse(nextQuery);
+      const requestId = requestIdRef.current + 1;
+      requestIdRef.current = requestId;
+      setListLoading(true);
+      if (options.clearFeedback !== false) {
+        setFeedback(null);
+      }
+
+      try {
+        const nextList = await webApi.fetch(
+          personsListPath(parsedQuery),
+          v1.persons.personListSchema,
+          { cache: "no-store" },
+        );
+
+        if (requestId !== requestIdRef.current) {
+          return;
+        }
+
+        updatePersonsUrl(parsedQuery, options.history ?? "push");
+        setList(nextList);
+        setQuery(parsedQuery);
+        setDraftQuery(parsedQuery);
+      } catch (error) {
+        if (requestId !== requestIdRef.current) {
+          return;
+        }
+
+        setFeedback({
+          kind: "error",
+          title: t("feedback.listErrorTitle"),
+          message:
+            error instanceof ApiError
+              ? error.message
+              : t("feedback.genericError"),
+        });
+      } finally {
+        if (requestId === requestIdRef.current) {
+          setListLoading(false);
+        }
+      }
+    },
+    [t],
+  );
 
   useEffect(() => {
     if (!searchDebounceReadyRef.current) {
@@ -108,57 +180,13 @@ export function PersonsPage({
         searchDebounceTimeoutRef.current = null;
       }
     };
-  }, [draftQuery.search, list.pageSize, query]);
-
-  async function loadPersons(
-    nextQuery: v1.persons.ListPersonsQuery,
-    options: {
-      clearFeedback?: boolean;
-      history?: "push" | "replace";
-    } = {},
-  ) {
-    const parsedQuery = v1.persons.listPersonsQuerySchema.parse(nextQuery);
-    const requestId = requestIdRef.current + 1;
-    requestIdRef.current = requestId;
-    setListLoading(true);
-    if (options.clearFeedback !== false) {
-      setFeedback(null);
-    }
-
-    try {
-      const nextList = await webApi.fetch(
-        personsListPath(parsedQuery),
-        v1.persons.personListSchema,
-        { cache: "no-store" },
-      );
-
-      if (requestId !== requestIdRef.current) {
-        return;
-      }
-
-      updatePersonsUrl(parsedQuery, options.history ?? "push");
-      setList(nextList);
-      setQuery(parsedQuery);
-      setDraftQuery(parsedQuery);
-    } catch (error) {
-      if (requestId !== requestIdRef.current) {
-        return;
-      }
-
-      setFeedback({
-        kind: "error",
-        title: t("feedback.listErrorTitle"),
-        message:
-          error instanceof ApiError
-            ? error.message
-            : t("feedback.genericError"),
-      });
-    } finally {
-      if (requestId === requestIdRef.current) {
-        setListLoading(false);
-      }
-    }
-  }
+  }, [
+    clearSearchDebounce,
+    draftQuery.search,
+    list.pageSize,
+    loadPersons,
+    query,
+  ]);
 
   async function searchPersons(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -213,15 +241,6 @@ export function PersonsPage({
       pageSize: list.pageSize,
       includeDeleted: false,
     });
-  }
-
-  function clearSearchDebounce() {
-    if (searchDebounceTimeoutRef.current === null) {
-      return;
-    }
-
-    window.clearTimeout(searchDebounceTimeoutRef.current);
-    searchDebounceTimeoutRef.current = null;
   }
 
   function setDraftValue<Key extends keyof v1.persons.ListPersonsQuery>(
@@ -599,6 +618,21 @@ function personsListPath(query: v1.persons.ListPersonsQuery): string {
   params.set("pageSize", String(query.pageSize));
   appendPersonsQueryParams(params, query);
   return `${v1.persons.ROUTES.list}?${params}`;
+}
+
+function personsPageStateKey(
+  query: v1.persons.ListPersonsQuery,
+  list: v1.persons.PersonList,
+): string {
+  return JSON.stringify({
+    query,
+    list: {
+      page: list.page,
+      pageSize: list.pageSize,
+      total: list.total,
+      items: list.items.map((person) => [person.id, person.updatedAt]),
+    },
+  });
 }
 
 function updatePersonsUrl(

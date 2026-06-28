@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => ({
   apiFetch: vi.fn(),
 }));
 
-vi.mock("../../../lib/api", () => ({
+vi.mock("@/lib/api", () => ({
   webApi: {
     fetch: mocks.apiFetch,
   },
