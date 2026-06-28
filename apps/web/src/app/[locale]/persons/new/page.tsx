@@ -6,7 +6,7 @@ import {
   resolveRouteLocale,
 } from "../../../../i18n/paths";
 import { meFromApi } from "../../../../lib/auth-server";
-import { PersonCreateForm } from "../PersonCreateForm";
+import { PersonCreateForm } from "../_components/PersonCreateForm";
 
 const PERSONS_PATH = "/persons";
 const PERSONS_NEW_PATH = "/persons/new";

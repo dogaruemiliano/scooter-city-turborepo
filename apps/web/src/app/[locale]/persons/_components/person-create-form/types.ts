@@ -1,0 +1,124 @@
+import { v1 } from "@repo/api-shared";
+import type { CountryCode } from "@repo/ui/components";
+
+export interface PersonCreateFormProps {
+  personsHref: string;
+}
+
+export interface Feedback {
+  kind: "error" | "success";
+  title: string;
+  messages: string[];
+}
+
+export type PersonCitizenship = "romanian" | "foreign";
+
+export type PersonFormFieldKey =
+  | "email"
+  | "phone"
+  | "firstName"
+  | "lastName"
+  | "dateOfBirth"
+  | "addressLine1"
+  | "addressLine2"
+  | "city"
+  | "region"
+  | "postalCode"
+  | "countryCode"
+  | "documents"
+  | "notes";
+
+export type PersonDocumentFormFieldKey =
+  | "type"
+  | "series"
+  | "number"
+  | "cnp"
+  | "issuingCountryCode"
+  | "issuedBy"
+  | "issuedOn"
+  | "expiresOn"
+  | "status"
+  | "notes";
+
+export type FormErrorKey =
+  | PersonFormFieldKey
+  | `document.${string}.${PersonDocumentFormFieldKey}`;
+
+export type FormErrors = Partial<Record<FormErrorKey, string>>;
+
+export interface CreatePersonFormState {
+  citizenship: PersonCitizenship;
+  email: string;
+  phone: string;
+  phoneCountry: CountryCode;
+  phoneCountryCallingCode: string;
+  phoneNationalNumber: string;
+  firstName: string;
+  lastName: string;
+  dateOfBirth: DateParts;
+  addressLine1: string;
+  addressLine2: string;
+  city: string;
+  region: string;
+  postalCode: string;
+  countryCode: CountryCode;
+  documents: CreatePersonDocumentFormState[];
+  notes: string;
+}
+
+export interface CreatePersonDocumentFormState {
+  key: string;
+  required: boolean;
+  slot: "identity" | "driverLicense";
+  type: v1.persons.PersonDocumentType;
+  series: string;
+  number: string;
+  cnp: string;
+  issuingCountryCode: CountryCode;
+  issuedBy: string;
+  issuedOn: DateParts;
+  expiresOn: DateParts;
+  status: v1.persons.PersonDocumentStatus;
+  notes: string;
+}
+
+export interface DateParts {
+  day: string;
+  month: string;
+  year: string;
+}
+
+export interface DateBuildResult {
+  value?: string;
+  error?: "incomplete" | "invalid";
+}
+
+export interface FieldValidationError {
+  field: FormErrorKey;
+  message: string;
+}
+
+export interface FormValidationIssue {
+  code: string;
+  path: readonly PropertyKey[];
+  message: string;
+  minimum?: number | bigint;
+  maximum?: number | bigint;
+  format?: string;
+}
+
+export type DateField =
+  | "dateOfBirth"
+  | "documentIssuedOn"
+  | "documentExpiresOn";
+
+export type SetPersonFormValue = <Key extends keyof CreatePersonFormState>(
+  key: Key,
+  value: CreatePersonFormState[Key],
+) => void;
+
+export type SetPersonDocumentValue = <Key extends PersonDocumentFormFieldKey>(
+  documentKey: string,
+  key: Key,
+  value: CreatePersonDocumentFormState[Key],
+) => void;
