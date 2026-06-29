@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/api", () => ({
   webApi: {
     fetch: mocks.apiFetch,
+    url: (path: string) => `https://api.test${path}`,
   },
 }));
 
@@ -94,6 +95,24 @@ const person: v1.persons.Person = {
   deletedAt: null,
 };
 
+const identityFrontPhoto: v1.persons.PersonDocumentPhoto = {
+  id: "photo-1",
+  personDocumentId: "document-1",
+  slot: "front",
+  assetId: "asset-1",
+  contentType: "image/jpeg",
+  byteSize: 1234,
+  checksumSha256:
+    "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  contentUrl: v1.persons.ROUTES.documents.photos.content(
+    "person-1",
+    "document-1",
+    "front",
+  ),
+  createdAt: "2026-06-25T12:30:00.000Z",
+  deletedAt: null,
+};
+
 beforeEach(() => {
   mocks.apiFetch.mockReset();
   mocks.cookies.mockReset();
@@ -147,7 +166,11 @@ describe("PersonRoutePage", () => {
   });
 
   it("renders a fetched person detail page", async () => {
-    mocks.apiFetch.mockResolvedValueOnce(person).mockResolvedValueOnce([]);
+    mocks.apiFetch
+      .mockResolvedValueOnce(person)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([identityFrontPhoto])
+      .mockResolvedValueOnce([]);
 
     const element = await renderRoute();
 
@@ -167,6 +190,22 @@ describe("PersonRoutePage", () => {
         cache: "no-store",
       },
     );
+    expect(mocks.apiFetch).toHaveBeenCalledWith(
+      v1.persons.ROUTES.documents.photos.list("person-1", "document-1"),
+      v1.persons.personDocumentPhotoListSchema,
+      {
+        headers: { cookie: "session=abc" },
+        cache: "no-store",
+      },
+    );
+    expect(mocks.apiFetch).toHaveBeenCalledWith(
+      v1.persons.ROUTES.documents.photos.list("person-1", "document-2"),
+      v1.persons.personDocumentPhotoListSchema,
+      {
+        headers: { cookie: "session=abc" },
+        cache: "no-store",
+      },
+    );
 
     render(
       <NextIntlClientProvider locale="en" messages={messages.en}>
@@ -179,6 +218,12 @@ describe("PersonRoutePage", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("ada@example.com")).toBeInTheDocument();
     expect(screen.getByText("National ID")).toBeInTheDocument();
+    expect(
+      screen.getByRole("img", { name: "Front document photo" }),
+    ).toHaveAttribute(
+      "src",
+      `https://api.test${identityFrontPhoto.contentUrl}`,
+    );
   });
 });
 

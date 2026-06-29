@@ -5,6 +5,7 @@ import {
   InternalServerErrorException,
   NotFoundException,
   PayloadTooLargeException,
+  ServiceUnavailableException,
 } from "@nestjs/common";
 import {
   DeleteObjectCommand,
@@ -31,7 +32,6 @@ import type { S3Presigner } from "./image-storage.module";
 import {
   IMAGE_STORAGE_PROVIDER_S3,
   SUPPORTED_IMAGE_CONTENT_TYPES,
-  type PresignedImageRead,
   type PresignedImageUpload,
   type PresignImageUploadInput,
   type ReadStoredImageResult,
@@ -48,6 +48,17 @@ const CONTENT_TYPE_EXTENSIONS = {
 
 const UPLOAD_TOKEN_VERSION = 1;
 const SHA_256_HEX_PATTERN = /^[a-f0-9]{64}$/i;
+const IMAGE_STORAGE_BUCKET_UNAVAILABLE_CODE =
+  "IMAGE_STORAGE_BUCKET_UNAVAILABLE";
+const IMAGE_STORAGE_UNAVAILABLE_CODE = "IMAGE_STORAGE_UNAVAILABLE";
+const S3_CONFIGURATION_ERROR_NAMES = new Set([
+  "AccessDenied",
+  "AuthorizationHeaderMalformed",
+  "InvalidAccessKeyId",
+  "NoSuchBucket",
+  "PermanentRedirect",
+  "SignatureDoesNotMatch",
+]);
 
 interface UploadTokenPayload {
   v: typeof UPLOAD_TOKEN_VERSION;
@@ -89,7 +100,11 @@ export class ImageStorageService {
       putInput.SSEKMSKeyId = this.env.IMAGE_STORAGE_S3_KMS_KEY_ID;
     }
 
-    await this.s3.send(new PutObjectCommand(putInput));
+    try {
+      await this.s3.send(new PutObjectCommand(putInput));
+    } catch (error) {
+      throwS3StorageError(error);
+    }
 
     return {
       provider: IMAGE_STORAGE_PROVIDER_S3,
@@ -143,10 +158,15 @@ export class ImageStorageService {
       exp: Math.floor(expiresAt.getTime() / 1000),
     });
 
-    const uploadUrl = await this.presigner.getSignedUrl(
-      new PutObjectCommand(putInput),
-      this.env.IMAGE_STORAGE_SIGNED_URL_TTL_SECONDS,
-    );
+    let uploadUrl: string;
+    try {
+      uploadUrl = await this.presigner.getSignedUrl(
+        new PutObjectCommand(putInput),
+        this.env.IMAGE_STORAGE_SIGNED_URL_TTL_SECONDS,
+      );
+    } catch (error) {
+      throwS3StorageError(error);
+    }
 
     return {
       uploadUrl,
@@ -177,7 +197,7 @@ export class ImageStorageService {
       if (isMissingObjectError(error)) {
         throw new BadRequestException("Uploaded image object was not found");
       }
-      throw error;
+      throwS3StorageError(error);
     }
 
     const contentLength =
@@ -198,25 +218,6 @@ export class ImageStorageService {
       contentType: payload.contentType,
       byteSize: payload.byteSize,
       checksumSha256: payload.checksumSha256,
-    };
-  }
-
-  async createPresignedRead(storageKey: string): Promise<PresignedImageRead> {
-    this.assertSafeStorageKey(storageKey);
-    const expiresAt = this.createExpiresAt();
-    const readUrl = await this.presigner.getSignedUrl(
-      new GetObjectCommand({
-        Bucket: this.bucket,
-        Key: storageKey,
-      }),
-      this.env.IMAGE_STORAGE_SIGNED_URL_TTL_SECONDS,
-    );
-
-    return {
-      readUrl,
-      method: "GET",
-      headers: {},
-      expiresAt,
     };
   }
 
@@ -243,18 +244,22 @@ export class ImageStorageService {
       if (isMissingObjectError(error)) {
         throw new NotFoundException("Image not found");
       }
-      throw error;
+      throwS3StorageError(error);
     }
   }
 
   async deleteImage(storageKey: string): Promise<void> {
     this.assertSafeStorageKey(storageKey);
-    await this.s3.send(
-      new DeleteObjectCommand({
-        Bucket: this.bucket,
-        Key: storageKey,
-      }),
-    );
+    try {
+      await this.s3.send(
+        new DeleteObjectCommand({
+          Bucket: this.bucket,
+          Key: storageKey,
+        }),
+      );
+    } catch (error) {
+      throwS3StorageError(error);
+    }
   }
 
   private requireSupportedContentType(
@@ -428,19 +433,40 @@ export class ImageStorageService {
 }
 
 function isMissingObjectError(error: unknown): boolean {
+  const name = s3ErrorName(error);
+  return name === "NoSuchKey" || name === "NotFound";
+}
+
+function throwS3StorageError(error: unknown): never {
+  const name = s3ErrorName(error);
+
+  if (name === "NoSuchBucket") {
+    throw new ServiceUnavailableException({
+      code: IMAGE_STORAGE_BUCKET_UNAVAILABLE_CODE,
+      message: "Image storage bucket is not available",
+    });
+  }
+
+  if (name && S3_CONFIGURATION_ERROR_NAMES.has(name)) {
+    throw new ServiceUnavailableException({
+      code: IMAGE_STORAGE_UNAVAILABLE_CODE,
+      message: "Image storage is unavailable",
+    });
+  }
+
+  throw error;
+}
+
+function s3ErrorName(error: unknown): string | null {
   if (
     !(error instanceof S3ServiceException) &&
     (typeof error !== "object" || error === null)
   ) {
-    return false;
+    return null;
   }
 
-  const value = error as {
-    name?: unknown;
-    $metadata?: { httpStatusCode?: unknown };
-  };
-
-  return value.name === "NoSuchKey" || value.$metadata?.httpStatusCode === 404;
+  const name = (error as { name?: unknown }).name;
+  return typeof name === "string" && name.length > 0 ? name : null;
 }
 
 function isUploadTokenPayload(value: unknown): value is UploadTokenPayload {

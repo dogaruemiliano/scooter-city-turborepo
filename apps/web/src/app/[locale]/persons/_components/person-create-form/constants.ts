@@ -53,6 +53,8 @@ export const FOREIGN_IDENTITY_DOCUMENT_TYPES = [
   "other",
 ] as const satisfies readonly v1.persons.PersonDocumentType[];
 
+export const DOCUMENT_PHOTO_ACCEPT = "image/jpeg,image/png,image/webp";
+
 export const PERSON_FORM_FIELD_KEYS = new Set<PersonFormFieldKey>([
   "email",
   "phone",

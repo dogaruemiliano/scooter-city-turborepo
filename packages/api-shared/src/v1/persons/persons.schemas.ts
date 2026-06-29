@@ -152,21 +152,6 @@ export type CompletePersonDocumentPhotoUploadInput = z.infer<
   typeof completePersonDocumentPhotoUploadInputSchema
 >;
 
-export const personDocumentPhotoReadUrlSchema = z
-  .object({
-    readUrl: z.string().url(),
-    method: z.literal("GET"),
-    headers: z.record(z.string(), z.string()),
-    expiresAt: z
-      .string()
-      .describe("ISO timestamp when the signed URL expires."),
-  })
-  .meta({ id: "PersonDocumentPhotoReadUrl" });
-
-export type PersonDocumentPhotoReadUrl = z.infer<
-  typeof personDocumentPhotoReadUrlSchema
->;
-
 export const personAuditActorSchema = z
   .object({
     kind: z.enum(["user", "system"]),
@@ -268,7 +253,7 @@ export const createPersonDocumentInputSchema = z
     issuedBy: nullableTrimmedTextSchema.optional(),
     issuedOn: dateOnlySchema.nullable().optional(),
     expiresOn: dateOnlySchema.nullable().optional(),
-    status: personDocumentStatusSchema.default("unverified"),
+    status: personDocumentStatusSchema.default("verified"),
     notes: notesSchema.optional(),
   })
   .strict()

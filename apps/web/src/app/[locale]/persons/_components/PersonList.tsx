@@ -3,9 +3,7 @@
 import { v1 } from "@repo/api-shared";
 import {
   Badge,
-  buttonVariants,
   Card,
-  CardAction,
   CardContent,
   CardHeader,
   CardTitle,
@@ -14,14 +12,10 @@ import { cn } from "@repo/ui/lib/utils";
 import {
   BadgeAlertIcon,
   BadgeCheckIcon,
-  CalendarDaysIcon,
   CarFrontIcon,
   CircleAlertIcon,
-  EyeIcon,
   FileTextIcon,
   IdCardIcon,
-  MailIcon,
-  PhoneIcon,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -71,18 +65,40 @@ export function PersonList({ items }: PersonListProps) {
     <ul className="flex flex-col gap-3">
       {items.map((person) => {
         const fullName = `${person.firstName} ${person.lastName}`;
+        const canOpenDetail = !person.deletedAt;
         const detailHref = localizePath(
           `/persons/${encodeURIComponent(person.id)}`,
           routeLocale,
         );
 
         return (
-          <li key={person.id}>
-            <Card size="sm">
-              <CardHeader className="gap-3 has-data-[slot=card-action]:grid-cols-1 sm:has-data-[slot=card-action]:grid-cols-[1fr_auto]">
+          <li
+            key={person.id}
+            className={cn(
+              canOpenDetail &&
+                "group/person-card relative rounded-xl focus-within:ring-2 focus-within:ring-ring",
+            )}
+          >
+            {canOpenDetail ? (
+              <Link
+                href={detailHref}
+                aria-label={t("actions.viewDetails", { name: fullName })}
+                className="absolute inset-0 rounded-xl outline-none"
+              >
+                <span aria-hidden="true" />
+              </Link>
+            ) : null}
+            <Card
+              size="sm"
+              className={cn(
+                canOpenDetail &&
+                  "pointer-events-none transition-colors group-hover/person-card:bg-muted",
+              )}
+            >
+              <CardHeader className="gap-3">
                 <div className="flex min-w-0 flex-col gap-1">
-                  <CardTitle className="flex justify-between truncate">
-                    {fullName}
+                  <CardTitle className="flex items-start justify-between gap-2">
+                    <span className="truncate">{fullName}</span>
                     <span className="text-xs font-light text-muted-foreground">
                       {formatDate(person.createdAt, locale)}
                     </span>
@@ -90,54 +106,13 @@ export function PersonList({ items }: PersonListProps) {
                   <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-sm text-muted-foreground">
                     <span className="truncate font-medium">{person.email}</span>
                     <span className="truncate font-medium">{person.phone}</span>
-                  </div>
-                </div>
-                <CardAction className="col-start-1 row-span-1 row-start-2 justify-self-start sm:col-start-2 sm:row-span-2 sm:row-start-1 sm:justify-self-end">
-                  <div className="flex flex-wrap justify-end gap-2">
                     {person.deletedAt && (
                       <Badge variant="outline">
                         {t("recordStatus.deleted")}
                       </Badge>
                     )}
-                    {!person.deletedAt ? (
-                      <Link
-                        href={detailHref}
-                        aria-label={t("actions.viewDetails", {
-                          name: fullName,
-                        })}
-                        className={buttonVariants({
-                          variant: "outline",
-                          size: "sm",
-                        })}
-                      >
-                        <EyeIcon data-icon="inline-start" />
-                        {t("actions.view")}
-                      </Link>
-                    ) : null}
-                    <Link
-                      href={`mailto:${person.email}`}
-                      aria-label={t("actions.emailPerson", { name: fullName })}
-                      className={buttonVariants({
-                        variant: "ghost",
-                        size: "sm",
-                      })}
-                    >
-                      <MailIcon data-icon="inline-start" />
-                      {t("actions.email")}
-                    </Link>
-                    <Link
-                      href={`tel:${person.phone}`}
-                      aria-label={t("actions.callPerson", { name: fullName })}
-                      className={buttonVariants({
-                        variant: "ghost",
-                        size: "sm",
-                      })}
-                    >
-                      <PhoneIcon data-icon="inline-start" />
-                      {t("actions.call")}
-                    </Link>
                   </div>
-                </CardAction>
+                </div>
               </CardHeader>
               <CardContent className="flex flex-col gap-2">
                 {person.documents.length > 0 ? (
@@ -148,13 +123,6 @@ export function PersonList({ items }: PersonListProps) {
                         document={document}
                         typeText={t(`documentTypes.${document.type}`)}
                         statusText={t(`documentStatuses.${document.status}`)}
-                        expirationText={formatDocumentExpiration(
-                          document,
-                          locale,
-                          t("list.noExpirationDate"),
-                          t("list.expirationPrefix"),
-                        )}
-                        expirationLabel={t("fields.documentExpiresOn")}
                       />
                     ))}
                   </div>
@@ -180,14 +148,10 @@ function DocumentCard({
   document,
   typeText,
   statusText,
-  expirationText,
-  expirationLabel,
 }: {
   document: v1.persons.PersonDocument;
   typeText: string;
   statusText: string;
-  expirationText: string;
-  expirationLabel: string;
 }) {
   const TypeIcon = documentTypeIcons[document.type];
   const StatusIcon = documentStatusIcons[document.status];
@@ -212,34 +176,8 @@ function DocumentCard({
           {statusText}
         </Badge>
       </div>
-      <span className="inline-flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-        <CalendarDaysIcon
-          aria-label={expirationLabel}
-          className={inlineIconClassName}
-        />
-        <span className="truncate font-medium">{expirationText}</span>
-      </span>
     </div>
   );
-}
-
-function formatDocumentExpiration(
-  document: v1.persons.PersonDocument,
-  locale: string,
-  fallbackText: string,
-  prefixText: string,
-): string {
-  if (!document.expiresOn) {
-    return fallbackText;
-  }
-
-  const formattedDate = formatDate(document.expiresOn, locale);
-
-  // if (document.status !== "verified") {
-  //   return formattedDate;
-  // }
-
-  return `${prefixText} ${formattedDate}`;
 }
 
 function formatDate(value: string, locale: string): string {

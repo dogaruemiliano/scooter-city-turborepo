@@ -114,11 +114,19 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
     }
 
     setCreating(true);
+    let createdPerson: v1.persons.Person | null = null;
     try {
-      await webApi.fetch(v1.persons.ROUTES.create, v1.persons.personSchema, {
-        method: "POST",
-        json: input.data,
-      });
+      createdPerson = await webApi.fetch(
+        v1.persons.ROUTES.create,
+        v1.persons.personSchema,
+        {
+          method: "POST",
+          json: input.data,
+        },
+      );
+
+      await uploadSelectedDocumentPhotos(createdPerson, form.documents);
+
       setFeedback({
         kind: "success",
         title: t("feedback.createSuccessTitle"),
@@ -128,17 +136,70 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
       router.push(personsHref);
       router.refresh();
     } catch (error) {
+      if (createdPerson) {
+        setForm(createEmptyCreateForm("romanian"));
+      }
+
+      const personConflict = createdPerson ? null : personCreateConflict(error);
+      if (personConflict) {
+        setFieldErrors({ [personConflict.field]: personConflict.message });
+      }
+      const message = personConflict
+        ? personConflict.message
+        : createdPerson
+          ? t("feedback.documentPhotoUploadErrorMessage")
+          : error instanceof ApiError
+            ? error.message
+            : t("feedback.genericError");
+
       setFeedback({
         kind: "error",
-        title: t("feedback.createErrorTitle"),
-        messages: [
-          error instanceof ApiError
-            ? error.message
-            : t("feedback.genericError"),
-        ],
+        title: createdPerson
+          ? t("feedback.documentPhotoUploadErrorTitle")
+          : t("feedback.createErrorTitle"),
+        messages: [message],
       });
     } finally {
       setCreating(false);
+    }
+  }
+
+  async function uploadSelectedDocumentPhotos(
+    person: v1.persons.Person,
+    documents: CreatePersonDocumentFormState[],
+  ): Promise<void> {
+    const createdDocumentsByType = new Map(
+      person.documents.map((document) => [document.type, document]),
+    );
+
+    for (const document of documents) {
+      const createdDocument = createdDocumentsByType.get(document.type);
+      if (!createdDocument) {
+        continue;
+      }
+
+      for (const slot of v1.persons.PERSON_DOCUMENT_PHOTO_SLOTS) {
+        const file = document.photos[slot];
+        if (!file) {
+          continue;
+        }
+
+        const formData = new FormData();
+        formData.append("file", file);
+
+        await webApi.fetch(
+          v1.persons.ROUTES.documents.photos.upsert(
+            person.id,
+            createdDocument.id,
+            slot,
+          ),
+          v1.persons.personDocumentPhotoSchema,
+          {
+            method: "PUT",
+            body: formData,
+          },
+        );
+      }
     }
   }
 
@@ -301,7 +362,9 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
           fieldErrors={fieldErrors}
           locale={locale}
           showUnder18Warning={showUnder18Warning}
+          disabled={creating}
           onSetDocumentValue={setDocumentValue}
+          onSetDocumentPhoto={setDocumentPhoto}
         />
         <NotesField
           formId={formId}
@@ -378,6 +441,38 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
     clearFieldError(documentFieldErrorKey(documentKey, key));
   }
 
+  function setDocumentPhoto(
+    documentKey: string,
+    slot: v1.persons.PersonDocumentPhotoSlot,
+    file: File | null,
+  ) {
+    setForm((current) => ({
+      ...current,
+      documents: current.documents.map((document) => {
+        if (document.key !== documentKey) {
+          return document;
+        }
+
+        if (file) {
+          return {
+            ...document,
+            photos: {
+              ...document.photos,
+              [slot]: file,
+            },
+          };
+        }
+
+        const photos = { ...document.photos };
+        delete photos[slot];
+        return {
+          ...document,
+          photos,
+        };
+      }),
+    }));
+  }
+
   function clearFieldError(field: FormErrorKey) {
     setFieldErrors((current) => {
       if (!current[field]) {
@@ -395,4 +490,28 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
       clearFieldError(key);
     }
   }
+}
+
+function personCreateConflict(
+  error: unknown,
+): { field: Extract<FormErrorKey, "email" | "phone">; message: string } | null {
+  if (!(error instanceof ApiError) || error.status !== 409) {
+    return null;
+  }
+
+  const field = conflictField(error.details);
+  if (field !== "email" && field !== "phone") {
+    return null;
+  }
+
+  return { field, message: error.message };
+}
+
+function conflictField(details: unknown): unknown {
+  return details &&
+    typeof details === "object" &&
+    !Array.isArray(details) &&
+    "field" in details
+    ? details.field
+    : null;
 }

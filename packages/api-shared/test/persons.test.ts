@@ -74,7 +74,7 @@ test("person schemas validate document values and date-only strings", () => {
   assert.equal(parsed.documents?.[0]?.issuedOn, "2024-01-15");
   assert.equal(parsed.documents?.[0]?.status, "verified");
   assert.equal(parsed.documents?.[1]?.number, "B123456");
-  assert.equal(parsed.documents?.[1]?.status, "unverified");
+  assert.equal(parsed.documents?.[1]?.status, "verified");
   assert.equal(
     v1.persons.createPersonInputSchema.safeParse({
       email: "rider@example.com",
@@ -144,11 +144,6 @@ test("person document photo schemas expose slot metadata and content routes", ()
     "document-1",
     "front",
   );
-  const readUrl = v1.persons.ROUTES.documents.photos.readUrl(
-    "person-1",
-    "document-1",
-    "front",
-  );
 
   assert.equal(
     contentUrl,
@@ -161,10 +156,6 @@ test("person document photo schemas expose slot metadata and content routes", ()
   assert.equal(
     completeUploadUrl,
     "/v1/persons/person-1/documents/document-1/photos/front/complete-upload",
-  );
-  assert.equal(
-    readUrl,
-    "/v1/persons/person-1/documents/document-1/photos/front/read-url",
   );
   assert.equal(
     v1.persons.personDocumentPhotoSlotSchema.safeParse("front").success,
@@ -251,15 +242,6 @@ test("person document photo schemas expose slot metadata and content routes", ()
       uploadToken: "token",
     }).uploadToken,
     "token",
-  );
-  assert.equal(
-    v1.persons.personDocumentPhotoReadUrlSchema.parse({
-      readUrl: "https://s3.example/read",
-      method: "GET",
-      headers: {},
-      expiresAt: "2026-06-26T10:05:00.000Z",
-    }).method,
-    "GET",
   );
 });
 

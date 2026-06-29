@@ -81,7 +81,8 @@ export function createDocumentDraft(
     issuedBy: "",
     issuedOn: emptyDateParts(),
     expiresOn: emptyDateParts(),
-    status: "unverified",
+    status: "verified",
+    photos: {},
     notes: "",
   };
 }
@@ -90,6 +91,7 @@ export function isBlankOptionalDocument(
   document: CreatePersonDocumentFormState,
 ) {
   return (
+    !hasSelectedDocumentPhoto(document) &&
     document.series.trim().length === 0 &&
     document.number.trim().length === 0 &&
     document.cnp.trim().length === 0 &&
@@ -97,6 +99,14 @@ export function isBlankOptionalDocument(
     document.notes.trim().length === 0 &&
     !hasDateParts(document.issuedOn) &&
     !hasDateParts(document.expiresOn)
+  );
+}
+
+export function hasSelectedDocumentPhoto(
+  document: CreatePersonDocumentFormState,
+): boolean {
+  return v1.persons.PERSON_DOCUMENT_PHOTO_SLOTS.some((slot) =>
+    Boolean(document.photos[slot]),
   );
 }
 

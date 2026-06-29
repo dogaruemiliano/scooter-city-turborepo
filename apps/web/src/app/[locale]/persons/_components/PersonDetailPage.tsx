@@ -45,6 +45,7 @@ import {
   CircleAlertIcon,
   EllipsisIcon,
   FileTextIcon,
+  ImageIcon,
   IdCardIcon,
   MailIcon,
   MapPinIcon,
@@ -53,6 +54,7 @@ import {
   PlusIcon,
   RefreshCwIcon,
   Trash2Icon,
+  UploadIcon,
   UserRoundIcon,
   type LucideIcon,
 } from "lucide-react";
@@ -66,6 +68,7 @@ import { webApi } from "@/lib/api";
 interface PersonDetailPageProps {
   person: v1.persons.Person;
   auditEvents: v1.persons.PersonAuditEvent[];
+  documentPhotos: DocumentPhotosByDocumentId;
   personsHref: string;
 }
 
@@ -84,7 +87,13 @@ type ReadinessIssue =
   | "hasExpired"
   | "hasUnverified";
 
+type DocumentPhotosByDocumentId = Record<
+  string,
+  v1.persons.PersonDocumentPhoto[]
+>;
+
 const inlineIconClassName = "size-4 shrink-0";
+const documentPhotoAccept = "image/jpeg,image/png,image/webp";
 const documentStatusClasses = {
   unverified: "border-warning-subtle text-warning",
   verified: "border-success-subtle text-success",
@@ -108,6 +117,7 @@ const documentTypeIcons = {
 export function PersonDetailPage({
   person,
   auditEvents,
+  documentPhotos,
   personsHref,
 }: PersonDetailPageProps) {
   const t = useTranslations("persons");
@@ -119,6 +129,8 @@ export function PersonDetailPage({
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [deletePersonOpen, setDeletePersonOpen] = useState(false);
+  const [photosByDocumentId, setPhotosByDocumentId] =
+    useState<DocumentPhotosByDocumentId>(() => documentPhotos);
 
   async function updatePerson(
     input: v1.persons.UpdatePersonInput,
@@ -293,6 +305,82 @@ export function PersonDetailPage({
         messages: [t("feedback.documentSuccessMessage")],
       });
       router.refresh();
+      return true;
+    } catch (error) {
+      setFeedback(
+        apiErrorFeedback(
+          error,
+          t("feedback.deleteErrorTitle"),
+          t("feedback.genericError"),
+        ),
+      );
+      return false;
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  async function uploadDocumentPhoto(
+    documentId: string,
+    slot: v1.persons.PersonDocumentPhotoSlot,
+    file: File,
+  ): Promise<boolean> {
+    setFeedback(null);
+    setBusyAction(`document-photo:upload:${documentId}:${slot}`);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const photo = await webApi.fetch(
+        v1.persons.ROUTES.documents.photos.upsert(person.id, documentId, slot),
+        v1.persons.personDocumentPhotoSchema,
+        { method: "PUT", body: formData },
+      );
+
+      setPhotosByDocumentId((current) =>
+        upsertDocumentPhoto(current, documentId, photo),
+      );
+      setFeedback({
+        kind: "success",
+        title: t("feedback.documentPhotoSuccessTitle"),
+        messages: [t("feedback.documentPhotoSuccessMessage")],
+      });
+      return true;
+    } catch (error) {
+      setFeedback(
+        apiErrorFeedback(
+          error,
+          t("feedback.updateErrorTitle"),
+          t("feedback.genericError"),
+        ),
+      );
+      return false;
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  async function deleteDocumentPhoto(
+    documentId: string,
+    slot: v1.persons.PersonDocumentPhotoSlot,
+  ): Promise<boolean> {
+    setFeedback(null);
+    setBusyAction(`document-photo:delete:${documentId}:${slot}`);
+    try {
+      await webApi.fetch(
+        v1.persons.ROUTES.documents.photos.delete(person.id, documentId, slot),
+        v1.common.noContentSchema,
+        { method: "DELETE" },
+      );
+
+      setPhotosByDocumentId((current) =>
+        removeDocumentPhoto(current, documentId, slot),
+      );
+      setFeedback({
+        kind: "success",
+        title: t("feedback.deleteSuccessTitle"),
+        messages: [t("feedback.documentPhotoDeletedMessage")],
+      });
       return true;
     } catch (error) {
       setFeedback(
@@ -573,11 +661,16 @@ export function PersonDetailPage({
               <DocumentDetailCard
                 key={document.id}
                 document={document}
+                photos={photosByDocumentId[document.id] ?? []}
                 locale={locale}
                 busyAction={busyAction}
                 onUpdate={(input) => updateDocument(document.id, input)}
                 onReplace={(input) => replaceDocument(document.id, input)}
                 onDelete={() => deleteDocument(document.id)}
+                onUploadPhoto={(slot, file) =>
+                  uploadDocumentPhoto(document.id, slot, file)
+                }
+                onDeletePhoto={(slot) => deleteDocumentPhoto(document.id, slot)}
               />
             ))}
           </div>
@@ -1194,18 +1287,27 @@ function SelectField<Value extends string>({
 
 function DocumentDetailCard({
   document,
+  photos,
   locale,
   busyAction,
   onUpdate,
   onReplace,
   onDelete,
+  onUploadPhoto,
+  onDeletePhoto,
 }: {
   document: v1.persons.PersonDocument;
+  photos: v1.persons.PersonDocumentPhoto[];
   locale: string;
   busyAction: string | null;
   onUpdate: (input: v1.persons.UpdatePersonDocumentInput) => Promise<boolean>;
   onReplace: (input: v1.persons.CreatePersonDocumentInput) => Promise<boolean>;
   onDelete: () => Promise<boolean>;
+  onUploadPhoto: (
+    slot: v1.persons.PersonDocumentPhotoSlot,
+    file: File,
+  ) => Promise<boolean>;
+  onDeletePhoto: (slot: v1.persons.PersonDocumentPhotoSlot) => Promise<boolean>;
 }) {
   const t = useTranslations("persons");
   const TypeIcon = documentTypeIcons[document.type];
@@ -1285,6 +1387,14 @@ function DocumentDetailCard({
           {t("detail.documents.masked")}
         </p>
 
+        <DocumentPhotosPanel
+          documentId={document.id}
+          photos={photos}
+          busyAction={busyAction}
+          onUploadPhoto={onUploadPhoto}
+          onDeletePhoto={onDeletePhoto}
+        />
+
         <dl className="grid gap-3 sm:grid-cols-2">
           <DetailField
             label={t("fields.documentSeries")}
@@ -1340,6 +1450,137 @@ function DocumentDetailCard({
         </dl>
       </CardContent>
     </Card>
+  );
+}
+
+function DocumentPhotosPanel({
+  documentId,
+  photos,
+  busyAction,
+  onUploadPhoto,
+  onDeletePhoto,
+}: {
+  documentId: string;
+  photos: v1.persons.PersonDocumentPhoto[];
+  busyAction: string | null;
+  onUploadPhoto: (
+    slot: v1.persons.PersonDocumentPhotoSlot,
+    file: File,
+  ) => Promise<boolean>;
+  onDeletePhoto: (slot: v1.persons.PersonDocumentPhotoSlot) => Promise<boolean>;
+}) {
+  const t = useTranslations("persons");
+  const photosBySlot = new Map(photos.map((photo) => [photo.slot, photo]));
+
+  return (
+    <div className="grid gap-3">
+      <div className="flex items-center gap-2">
+        <ImageIcon aria-hidden="true" className={inlineIconClassName} />
+        <h3 className="text-sm font-medium">
+          {t("detail.documents.photosTitle")}
+        </h3>
+      </div>
+      <div className="grid gap-3">
+        {v1.persons.PERSON_DOCUMENT_PHOTO_SLOTS.map((slot) => {
+          const photo = photosBySlot.get(slot);
+          const inputId = `document-${documentId}-${slot}-photo`;
+          const uploadBusy =
+            busyAction === `document-photo:upload:${documentId}:${slot}`;
+          const deleteBusy =
+            busyAction === `document-photo:delete:${documentId}:${slot}`;
+          const disabled = busyAction !== null;
+          const slotLabel = t(`documentPhotoSlots.${slot}`);
+          const imageUrl = photo ? webApi.url(photo.contentUrl) : null;
+
+          return (
+            <div
+              key={slot}
+              className="grid gap-2 border-t border-border pt-3 first:border-t-0 first:pt-0"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="outline">{slotLabel}</Badge>
+                  <span className="text-xs text-muted-foreground">
+                    {photo
+                      ? t("detail.documents.photoMetadata", {
+                          contentType: photo.contentType,
+                          byteSize: photo.byteSize,
+                        })
+                      : t("detail.documents.noPhoto")}
+                  </span>
+                </div>
+                {photo ? (
+                  <ConfirmationDialog
+                    triggerLabel={t("actions.deleteDocumentPhoto")}
+                    triggerIcon={<Trash2Icon data-icon="inline-start" />}
+                    title={t("detail.dialogs.deleteDocumentPhotoTitle")}
+                    description={t(
+                      "detail.dialogs.deleteDocumentPhotoDescription",
+                    )}
+                    confirmLabel={t("actions.deleteDocumentPhoto")}
+                    busy={deleteBusy}
+                    onConfirm={() => onDeletePhoto(slot)}
+                  />
+                ) : null}
+              </div>
+
+              {photo && imageUrl ? (
+                <a
+                  href={imageUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block overflow-hidden rounded-lg border border-border bg-muted"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element -- protected API images must load with browser cookies */}
+                  <img
+                    src={imageUrl}
+                    alt={t("detail.documents.photoAlt", { slot: slotLabel })}
+                    className="h-40 w-full object-cover"
+                  />
+                </a>
+              ) : (
+                <div className="flex h-24 items-center justify-center rounded-lg border border-dashed border-border bg-muted text-muted-foreground">
+                  <ImageIcon aria-hidden="true" className="size-5" />
+                  <span className="sr-only">
+                    {t("detail.documents.noPhoto")}
+                  </span>
+                </div>
+              )}
+
+              <div className="grid gap-2 sm:flex sm:items-end sm:justify-between">
+                <div className="grid flex-1 gap-1">
+                  <Label htmlFor={inputId} className="text-xs font-medium">
+                    {t("detail.documents.photoUploadLabel", {
+                      slot: slotLabel,
+                    })}
+                  </Label>
+                  <Input
+                    id={inputId}
+                    type="file"
+                    accept={documentPhotoAccept}
+                    disabled={disabled}
+                    onChange={(event) => {
+                      const input = event.currentTarget;
+                      const file = input.files?.[0];
+                      if (!file) return;
+                      void onUploadPhoto(slot, file).finally(() => {
+                        input.value = "";
+                      });
+                    }}
+                  />
+                </div>
+                <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <UploadIcon aria-hidden="true" className="size-3.5" />
+                  {uploadBusy
+                    ? t("actions.uploadingDocumentPhoto")
+                    : t("detail.documents.photoFileTypes")}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -1562,9 +1803,50 @@ function documentFormState(
     issuedBy: document?.issuedBy ?? "",
     issuedOn: document?.issuedOn ?? "",
     expiresOn: document?.expiresOn ?? "",
-    status: document?.status ?? "unverified",
+    status: document?.status ?? "verified",
     notes: document?.notes ?? "",
   };
+}
+
+function upsertDocumentPhoto(
+  current: DocumentPhotosByDocumentId,
+  documentId: string,
+  photo: v1.persons.PersonDocumentPhoto,
+): DocumentPhotosByDocumentId {
+  const photos = current[documentId] ?? [];
+  return {
+    ...current,
+    [documentId]: sortDocumentPhotos([
+      ...photos.filter((existing) => existing.slot !== photo.slot),
+      photo,
+    ]),
+  };
+}
+
+function removeDocumentPhoto(
+  current: DocumentPhotosByDocumentId,
+  documentId: string,
+  slot: v1.persons.PersonDocumentPhotoSlot,
+): DocumentPhotosByDocumentId {
+  return {
+    ...current,
+    [documentId]: (current[documentId] ?? []).filter(
+      (photo) => photo.slot !== slot,
+    ),
+  };
+}
+
+function sortDocumentPhotos(
+  photos: v1.persons.PersonDocumentPhoto[],
+): v1.persons.PersonDocumentPhoto[] {
+  const slotOrder = new Map(
+    v1.persons.PERSON_DOCUMENT_PHOTO_SLOTS.map((slot, index) => [slot, index]),
+  );
+  return photos.toSorted(
+    (first, second) =>
+      (slotOrder.get(first.slot) ?? Number.MAX_SAFE_INTEGER) -
+      (slotOrder.get(second.slot) ?? Number.MAX_SAFE_INTEGER),
+  );
 }
 
 function blankToNull(value: string): string | null {

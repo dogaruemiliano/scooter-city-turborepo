@@ -5,7 +5,11 @@ import {
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
-import { BadRequestException, PayloadTooLargeException } from "@nestjs/common";
+import {
+  BadRequestException,
+  PayloadTooLargeException,
+  ServiceUnavailableException,
+} from "@nestjs/common";
 import { createHash } from "node:crypto";
 import { Readable } from "node:stream";
 
@@ -14,10 +18,13 @@ import type { S3Presigner } from "./image-storage.module";
 import { ImageStorageService } from "./image-storage.service";
 
 type SendMock = jest.Mock<unknown, [unknown]>;
-type PresignMock = jest.Mock<
-  Promise<string>,
-  [PutObjectCommand | GetObjectCommand, number]
->;
+type PresignMock = jest.Mock<Promise<string>, [PutObjectCommand, number]>;
+
+function s3Error(name: string): Error & { name: string } {
+  const error = new Error(name) as Error & { name: string };
+  error.name = name;
+  return error;
+}
 
 function testEnv(overrides: NodeJS.ProcessEnv = {}): Env {
   return loadEnv({
@@ -120,6 +127,34 @@ describe("ImageStorageService", () => {
     expect(command.input.SSEKMSKeyId).toBe("alias/document-photos");
   });
 
+  it("maps missing S3 buckets to a storage availability error", async () => {
+    const { service } = createService(
+      jest.fn(() => {
+        throw s3Error("NoSuchBucket");
+      }),
+    );
+
+    await expect(
+      service.storeImage({
+        buffer: Buffer.from("image-bytes"),
+        contentType: "image/png",
+        byteSize: 11,
+      }),
+    ).rejects.toMatchObject({
+      response: {
+        code: "IMAGE_STORAGE_BUCKET_UNAVAILABLE",
+        message: "Image storage bucket is not available",
+      },
+    });
+    await expect(
+      service.storeImage({
+        buffer: Buffer.from("image-bytes"),
+        contentType: "image/png",
+        byteSize: 11,
+      }),
+    ).rejects.toBeInstanceOf(ServiceUnavailableException);
+  });
+
   it("reads and deletes objects by private storage key", async () => {
     const send = jest.fn((command: unknown) => {
       if (command instanceof GetObjectCommand) {
@@ -196,19 +231,6 @@ describe("ImageStorageService", () => {
       checksumSha256,
     });
     expect(send.mock.calls[0]?.[0]).toBeInstanceOf(HeadObjectCommand);
-  });
-
-  it("creates signed GET URLs for safe private storage keys", async () => {
-    const { service, presign } = createService();
-
-    const read = await service.createPresignedRead(
-      "document-photos-test/2026/06/28/a.png",
-    );
-
-    expect(read.method).toBe("GET");
-    expect(read.readUrl).toContain("https://signed.example/");
-    expect(read.headers).toEqual({});
-    expect(presign.mock.calls[0]?.[0]).toBeInstanceOf(GetObjectCommand);
   });
 
   it("rejects unsupported content types, oversized files, and unsafe keys", async () => {

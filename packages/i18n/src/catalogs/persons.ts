@@ -18,6 +18,7 @@ export const personsCatalog = {
       replaceDocument: "Replace document",
       deletePerson: "Delete person",
       deleteDocument: "Delete document",
+      deleteDocumentPhoto: "Delete photo",
       removeDocument: "Remove document",
       backToList: "Back to persons",
       view: "View",
@@ -28,6 +29,7 @@ export const personsCatalog = {
       callPerson: "Call {name}",
       apply: "Apply",
       moreActions: "More actions",
+      uploadingDocumentPhoto: "Uploading...",
     },
     feedback: {
       listErrorTitle: "Persons not loaded",
@@ -39,6 +41,12 @@ export const personsCatalog = {
       updateSuccessMessage: "The person record has been updated.",
       documentSuccessTitle: "Document saved",
       documentSuccessMessage: "The document changes have been saved.",
+      documentPhotoSuccessTitle: "Photo saved",
+      documentPhotoSuccessMessage: "The document photo has been saved.",
+      documentPhotoUploadErrorTitle: "Photos not uploaded",
+      documentPhotoUploadErrorMessage:
+        "The person was created, but at least one document photo was not uploaded.",
+      documentPhotoDeletedMessage: "The document photo has been deleted.",
       deleteSuccessTitle: "Deleted",
       updateErrorTitle: "Changes not saved",
       deleteErrorTitle: "Delete failed",
@@ -100,6 +108,12 @@ export const personsCatalog = {
       documents: {
         empty: "No documents are attached to this person.",
         masked: "Sensitive document identifiers are masked.",
+        photosTitle: "Document photos",
+        noPhoto: "No photo",
+        photoAlt: "{slot} document photo",
+        photoUploadLabel: "{slot} photo upload",
+        photoFileTypes: "JPEG, PNG, or WebP",
+        photoMetadata: "{contentType}, {byteSize} bytes",
       },
       dialogs: {
         editPersonTitle: "Edit person",
@@ -112,6 +126,9 @@ export const personsCatalog = {
         deleteDocumentTitle: "Delete document?",
         deleteDocumentDescription:
           "This soft-deletes the document from the person record.",
+        deleteDocumentPhotoTitle: "Delete photo?",
+        deleteDocumentPhotoDescription:
+          "This removes the image from the document photo slot.",
       },
       activity: {
         title: "Activity",
@@ -149,6 +166,8 @@ export const personsCatalog = {
       itemTitle: "Document {index}",
       required: "Required",
       optional: "Optional",
+      photoHelp: "Upload document images now, or add them later from details.",
+      selectedPhoto: "Selected: {fileName}",
     },
     fields: {
       firstName: "First name",
@@ -229,6 +248,11 @@ export const personsCatalog = {
       rejected: "Rejected",
       expired: "Expired",
     },
+    documentPhotoSlots: {
+      front: "Front",
+      back: "Back",
+      other: "Other",
+    },
     list: {
       empty: "No persons found.",
       searchLabel: "Search persons",
@@ -271,6 +295,7 @@ export const personsCatalog = {
       replaceDocument: "Înlocuiește documentul",
       deletePerson: "Șterge persoana",
       deleteDocument: "Șterge documentul",
+      deleteDocumentPhoto: "Șterge poza",
       removeDocument: "Elimină documentul",
       backToList: "Înapoi la persoane",
       view: "Vezi",
@@ -281,6 +306,7 @@ export const personsCatalog = {
       callPerson: "Sună {name}",
       apply: "Aplică",
       moreActions: "Mai multe acțiuni",
+      uploadingDocumentPhoto: "Se încarcă...",
     },
     feedback: {
       listErrorTitle: "Persoanele nu au fost încărcate",
@@ -293,6 +319,12 @@ export const personsCatalog = {
       updateSuccessMessage: "Înregistrarea persoanei a fost actualizată.",
       documentSuccessTitle: "Document salvat",
       documentSuccessMessage: "Modificările documentului au fost salvate.",
+      documentPhotoSuccessTitle: "Poză salvată",
+      documentPhotoSuccessMessage: "Poza documentului a fost salvată.",
+      documentPhotoUploadErrorTitle: "Pozele nu au fost încărcate",
+      documentPhotoUploadErrorMessage:
+        "Persoana a fost creată, dar cel puțin o poză de document nu a fost încărcată.",
+      documentPhotoDeletedMessage: "Poza documentului a fost ștearsă.",
       deleteSuccessTitle: "Șters",
       updateErrorTitle: "Modificările nu au fost salvate",
       deleteErrorTitle: "Ștergerea a eșuat",
@@ -355,6 +387,12 @@ export const personsCatalog = {
       documents: {
         empty: "Nu există documente atașate acestei persoane.",
         masked: "Identificatorii sensibili ai documentelor sunt mascați.",
+        photosTitle: "Poze document",
+        noPhoto: "Fără poză",
+        photoAlt: "Poză document {slot}",
+        photoUploadLabel: "Încărcare poză {slot}",
+        photoFileTypes: "JPEG, PNG sau WebP",
+        photoMetadata: "{contentType}, {byteSize} bytes",
       },
       dialogs: {
         editPersonTitle: "Editează persoana",
@@ -367,6 +405,9 @@ export const personsCatalog = {
         deleteDocumentTitle: "Ștergi documentul?",
         deleteDocumentDescription:
           "Documentul este șters logic din înregistrarea persoanei.",
+        deleteDocumentPhotoTitle: "Ștergi poza?",
+        deleteDocumentPhotoDescription:
+          "Imaginea este eliminată din poziția de poză a documentului.",
       },
       activity: {
         title: "Activitate",
@@ -405,6 +446,9 @@ export const personsCatalog = {
       itemTitle: "Document {index}",
       required: "Obligatoriu",
       optional: "Opțional",
+      photoHelp:
+        "Încarcă imaginile documentului acum sau adaugă-le ulterior din detalii.",
+      selectedPhoto: "Selectat: {fileName}",
     },
     fields: {
       firstName: "Prenume",
@@ -484,6 +528,11 @@ export const personsCatalog = {
       verified: "Verificat",
       rejected: "Respins",
       expired: "Expirat",
+    },
+    documentPhotoSlots: {
+      front: "Față",
+      back: "Verso",
+      other: "Altă poză",
     },
     list: {
       empty: "Nu s-au găsit persoane.",

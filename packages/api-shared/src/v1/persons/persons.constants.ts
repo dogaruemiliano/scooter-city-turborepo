@@ -124,12 +124,6 @@ export const ROUTES = {
         slot: PersonDocumentPhotoSlot,
       ): string =>
         `/v1/persons/${personId}/documents/${documentId}/photos/${slot}/complete-upload`,
-      readUrl: (
-        personId: string,
-        documentId: string,
-        slot: PersonDocumentPhotoSlot,
-      ): string =>
-        `/v1/persons/${personId}/documents/${documentId}/photos/${slot}/read-url`,
       content: (
         personId: string,
         documentId: string,

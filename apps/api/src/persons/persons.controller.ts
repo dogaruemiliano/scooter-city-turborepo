@@ -49,7 +49,6 @@ import { PersonDocument } from "./dto/person-document";
 import { PersonDocumentList } from "./dto/person-document-list";
 import { PersonDocumentPhoto } from "./dto/person-document-photo";
 import { PersonDocumentPhotoList } from "./dto/person-document-photo-list";
-import { PersonDocumentPhotoReadUrl } from "./dto/person-document-photo-read-url";
 import { PersonDocumentPhotoUploadUrl } from "./dto/person-document-photo-upload-url";
 import { PersonList } from "./dto/person-list";
 import { UpdatePersonDocumentInput } from "./dto/update-person-document.input";
@@ -341,20 +340,6 @@ export class PersonsController {
       ),
       id,
     );
-  }
-
-  @Get(":id/documents/:documentId/photos/:slot/read-url")
-  @ApiOperation({
-    operationId: "PersonsController_getDocumentPhotoReadUrl_v1",
-    summary: "Create a signed S3 GET URL for one active person document photo",
-  })
-  @ZodResponse({ type: PersonDocumentPhotoReadUrl })
-  async getDocumentPhotoReadUrl(
-    @Param("id") id: string,
-    @Param("documentId") documentId: string,
-    @Param("slot") slot: string,
-  ): Promise<v1.persons.PersonDocumentPhotoReadUrl> {
-    return this.persons.getDocumentPhotoReadUrl(id, documentId, slot);
   }
 
   @Get(":id/documents/:documentId/photos/:slot/content")

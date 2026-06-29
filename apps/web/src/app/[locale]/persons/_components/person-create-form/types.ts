@@ -46,6 +46,10 @@ export type FormErrorKey =
 
 export type FormErrors = Partial<Record<FormErrorKey, string>>;
 
+export type PersonDocumentPhotoFiles = Partial<
+  Record<v1.persons.PersonDocumentPhotoSlot, File>
+>;
+
 export interface CreatePersonFormState {
   citizenship: PersonCitizenship;
   email: string;
@@ -79,6 +83,7 @@ export interface CreatePersonDocumentFormState {
   issuedOn: DateParts;
   expiresOn: DateParts;
   status: v1.persons.PersonDocumentStatus;
+  photos: PersonDocumentPhotoFiles;
   notes: string;
 }
 
@@ -121,4 +126,10 @@ export type SetPersonDocumentValue = <Key extends PersonDocumentFormFieldKey>(
   documentKey: string,
   key: Key,
   value: CreatePersonDocumentFormState[Key],
+) => void;
+
+export type SetPersonDocumentPhoto = (
+  documentKey: string,
+  slot: v1.persons.PersonDocumentPhotoSlot,
+  file: File | null,
 ) => void;

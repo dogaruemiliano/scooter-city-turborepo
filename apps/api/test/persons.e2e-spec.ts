@@ -120,22 +120,14 @@ describe("Persons HTTP surface (e2e)", () => {
   };
   const fakePresigner = {
     getSignedUrl: jest.fn(
-      (
-        command: PutObjectCommand | GetObjectCommand,
-        expiresIn: number,
-      ): Promise<string> => {
+      (command: PutObjectCommand, expiresIn: number): Promise<string> => {
         const key = command.input.Key;
         if (typeof key !== "string") {
           throw new Error("Unexpected signed URL command input");
         }
-        if (command instanceof PutObjectCommand) {
-          presignedPutKeys.push(key);
-          return Promise.resolve(
-            `https://s3.test/upload/${encodeURIComponent(key)}?expires=${expiresIn}`,
-          );
-        }
+        presignedPutKeys.push(key);
         return Promise.resolve(
-          `https://s3.test/read/${encodeURIComponent(key)}?expires=${expiresIn}`,
+          `https://s3.test/upload/${encodeURIComponent(key)}?expires=${expiresIn}`,
         );
       },
     ),
@@ -737,6 +729,14 @@ describe("Persons HTTP surface (e2e)", () => {
     expect(photos).toHaveLength(1);
     expect(photos[0]?.id).toBe(uploaded.id);
 
+    const unauthenticatedContentRes = await req().get(uploaded.contentUrl);
+    expect(unauthenticatedContentRes.status).toBe(401);
+
+    const nonAdminContentRes = await req()
+      .get(uploaded.contentUrl)
+      .set("Cookie", [`access_token=${user.accessToken}`]);
+    expect(nonAdminContentRes.status).toBe(403);
+
     const contentRes = await req()
       .get(uploaded.contentUrl)
       .set("Cookie", [`access_token=${admin.accessToken}`]);
@@ -825,22 +825,6 @@ describe("Persons HTTP surface (e2e)", () => {
     expect(directlyUploaded.checksumSha256).toBe(directChecksum);
     expect(s3Objects.size).toBe(1);
 
-    const readUrlRes = await req()
-      .get(
-        v1.persons.ROUTES.documents.photos.readUrl(
-          person.id,
-          document.id,
-          "front",
-        ),
-      )
-      .set("Cookie", [`access_token=${admin.accessToken}`]);
-    const readUrl = v1.persons.personDocumentPhotoReadUrlSchema.parse(
-      readUrlRes.body,
-    );
-    expect(readUrlRes.status).toBe(200);
-    expect(readUrl.method).toBe("GET");
-    expect(readUrl.readUrl).toContain("https://s3.test/read/");
-
     const directContentRes = await req()
       .get(directlyUploaded.contentUrl)
       .set("Cookie", [`access_token=${admin.accessToken}`]);
@@ -888,6 +872,13 @@ describe("Persons HTTP surface (e2e)", () => {
       .set("Cookie", [`access_token=${session.accessToken}`])
       .send(duplicateEmail);
     expect(duplicateEmailRes.status).toBe(409);
+    expect(duplicateEmailRes.body).toMatchObject({
+      error: {
+        code: "PERSON_EMAIL_CONFLICT",
+        message: "Email already exists.",
+        details: { field: "email" },
+      },
+    });
 
     const duplicatePhone = personInput({ phone: input.phone });
     const duplicatePhoneRes = await req()
@@ -895,6 +886,13 @@ describe("Persons HTTP surface (e2e)", () => {
       .set("Cookie", [`access_token=${session.accessToken}`])
       .send(duplicatePhone);
     expect(duplicatePhoneRes.status).toBe(409);
+    expect(duplicatePhoneRes.body).toMatchObject({
+      error: {
+        code: "PERSON_PHONE_CONFLICT",
+        message: "Phone already exists.",
+        details: { field: "phone" },
+      },
+    });
   });
 
   it("sorts persons by requested list order", async () => {

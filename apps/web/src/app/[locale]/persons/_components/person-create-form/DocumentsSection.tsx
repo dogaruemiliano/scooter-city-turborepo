@@ -4,6 +4,7 @@ import { v1 } from "@repo/api-shared";
 import {
   CountrySelect,
   Input,
+  Label,
   Select,
   SelectContent,
   SelectItem,
@@ -13,7 +14,10 @@ import {
 } from "@repo/ui/components";
 import { useTranslations } from "next-intl";
 
-import { FOREIGN_IDENTITY_DOCUMENT_TYPES } from "./constants";
+import {
+  DOCUMENT_PHOTO_ACCEPT,
+  FOREIGN_IDENTITY_DOCUMENT_TYPES,
+} from "./constants";
 import { DatePartsInput } from "./DatePartsInput";
 import { dateDigits } from "./date-utils";
 import { documentFieldErrorKey, fieldErrorId, invalidAria } from "./errors";
@@ -22,6 +26,7 @@ import { Under18Warning } from "./Under18Warning";
 import type {
   CreatePersonFormState,
   FormErrors,
+  SetPersonDocumentPhoto,
   SetPersonDocumentValue,
 } from "./types";
 
@@ -31,14 +36,18 @@ export function DocumentsSection({
   fieldErrors,
   locale,
   showUnder18Warning,
+  disabled,
   onSetDocumentValue,
+  onSetDocumentPhoto,
 }: {
   formId: string;
   form: CreatePersonFormState;
   fieldErrors: FormErrors;
   locale: string;
   showUnder18Warning: boolean;
+  disabled: boolean;
   onSetDocumentValue: SetPersonDocumentValue;
+  onSetDocumentPhoto: SetPersonDocumentPhoto;
 }) {
   const t = useTranslations("persons");
 
@@ -388,6 +397,55 @@ export function DocumentsSection({
                 }
               />
             </FormField>
+
+            <div className="grid gap-3 sm:col-span-2">
+              <div className="grid gap-1">
+                <h4 className="text-sm font-medium">
+                  {t("detail.documents.photosTitle")}
+                </h4>
+                <p className="text-xs text-muted-foreground">
+                  {t("documentForm.photoHelp")}
+                </p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-3">
+                {v1.persons.PERSON_DOCUMENT_PHOTO_SLOTS.map((slot) => {
+                  const photoInputId = `${documentId}-${slot}-photo`;
+                  const slotLabel = t(`documentPhotoSlots.${slot}`);
+                  const file = document.photos[slot];
+
+                  return (
+                    <div key={slot} className="grid min-w-0 gap-2">
+                      <Label
+                        htmlFor={photoInputId}
+                        className="text-xs font-medium"
+                      >
+                        {t("detail.documents.photoUploadLabel", {
+                          slot: slotLabel,
+                        })}
+                      </Label>
+                      <Input
+                        id={photoInputId}
+                        type="file"
+                        accept={DOCUMENT_PHOTO_ACCEPT}
+                        disabled={disabled}
+                        onChange={(event) => {
+                          const selectedFile =
+                            event.currentTarget.files?.[0] ?? null;
+                          onSetDocumentPhoto(document.key, slot, selectedFile);
+                        }}
+                      />
+                      <p className="break-all text-xs text-muted-foreground">
+                        {file
+                          ? t("documentForm.selectedPhoto", {
+                              fileName: file.name,
+                            })
+                          : t("detail.documents.photoFileTypes")}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         );
       })}

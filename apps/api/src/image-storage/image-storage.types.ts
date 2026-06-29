@@ -47,10 +47,3 @@ export interface PresignedImageUpload {
   expiresAt: Date;
   maxBytes: number;
 }
-
-export interface PresignedImageRead {
-  readUrl: string;
-  method: "GET";
-  headers: Record<string, string>;
-  expiresAt: Date;
-}

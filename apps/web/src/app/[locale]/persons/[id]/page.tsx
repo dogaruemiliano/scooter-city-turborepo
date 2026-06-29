@@ -42,11 +42,18 @@ export default async function PersonRoutePage({
     personFromApi(locale, id, detailPath, cookieHeader),
     auditEventsFromApi(locale, id, detailPath, cookieHeader),
   ]);
+  const documentPhotos = await documentPhotosFromApi(
+    locale,
+    person,
+    detailPath,
+    cookieHeader,
+  );
 
   return (
     <PersonDetailPage
       person={person}
       auditEvents={auditEvents}
+      documentPhotos={documentPhotos}
       personsHref={localizePath(PERSONS_PATH, locale)}
     />
   );
@@ -96,6 +103,43 @@ async function auditEventsFromApi(
         cache: "no-store",
       },
     );
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 401) {
+      redirect(getLocalizedSignInPath(locale, detailPath));
+    }
+    if (
+      error instanceof ApiError &&
+      (error.status === 403 || error.status === 404)
+    ) {
+      notFound();
+    }
+    throw error;
+  }
+}
+
+async function documentPhotosFromApi(
+  locale: ReturnType<typeof resolveRouteLocale>,
+  person: v1.persons.Person,
+  detailPath: string,
+  cookieHeader: string,
+): Promise<Record<string, v1.persons.PersonDocumentPhoto[]>> {
+  try {
+    const entries = await Promise.all(
+      person.documents.map(async (document) => {
+        const photos = await webApi.fetch(
+          v1.persons.ROUTES.documents.photos.list(person.id, document.id),
+          v1.persons.personDocumentPhotoListSchema,
+          {
+            headers: { cookie: cookieHeader },
+            cache: "no-store",
+          },
+        );
+
+        return [document.id, photos] as const;
+      }),
+    );
+
+    return Object.fromEntries(entries);
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) {
       redirect(getLocalizedSignInPath(locale, detailPath));

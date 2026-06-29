@@ -37,6 +37,8 @@ const PERSON_AUDIT_TARGET_TYPE = "person";
 const PERSON_AUDIT_EVENT_LIMIT = 50;
 const REDACTED_VALUE = "[redacted]";
 const SET_VALUE = "[set]";
+const PERSON_EMAIL_CONFLICT_CODE = "PERSON_EMAIL_CONFLICT";
+const PERSON_PHONE_CONFLICT_CODE = "PERSON_PHONE_CONFLICT";
 
 type PersonAuditContext = RequestMetadata & {
   actor: AuthPrincipal;
@@ -573,29 +575,6 @@ export class PersonsService {
     }
   }
 
-  async getDocumentPhotoReadUrl(
-    personId: string,
-    documentId: string,
-    slot: string,
-  ): Promise<v1.persons.PersonDocumentPhotoReadUrl> {
-    const photo = await this.findActiveDocumentPhoto(
-      personId,
-      documentId,
-      slot,
-    );
-    if (!photo) {
-      throw new NotFoundException("Person document photo not found");
-    }
-
-    const read = await this.imageStorage.createPresignedRead(
-      photo.asset.storageKey,
-    );
-    return {
-      ...read,
-      expiresAt: read.expiresAt.toISOString(),
-    };
-  }
-
   async getDocumentPhotoContent(
     personId: string,
     documentId: string,
@@ -709,7 +688,7 @@ export class PersonsService {
       issuedBy: input.issuedBy,
       issuedOn: toDateOnlyDate(input.issuedOn),
       expiresOn: toDateOnlyDate(input.expiresOn),
-      status: input.status ?? "unverified",
+      status: input.status ?? "verified",
       notes: input.notes,
     };
   }
@@ -1406,6 +1385,20 @@ export class PersonsService {
       if (isMediaAssetStorageKeyConflict(error)) {
         throw new BadRequestException("Image upload token was already used");
       }
+      if (isPersonEmailConflict(error)) {
+        throw new ConflictException({
+          code: PERSON_EMAIL_CONFLICT_CODE,
+          message: "Email already exists",
+          details: { field: "email" },
+        });
+      }
+      if (isPersonPhoneConflict(error)) {
+        throw new ConflictException({
+          code: PERSON_PHONE_CONFLICT_CODE,
+          message: "Phone already exists",
+          details: { field: "phone" },
+        });
+      }
       throw new ConflictException("Person email or phone already exists");
     }
     throw error;
@@ -1580,6 +1573,18 @@ function isPersonDocumentTypeConflict(
   return false;
 }
 
+function isPersonEmailConflict(
+  error: PrismaRuntime.PrismaClientKnownRequestError,
+): boolean {
+  return isUniqueTarget(error, "email");
+}
+
+function isPersonPhoneConflict(
+  error: PrismaRuntime.PrismaClientKnownRequestError,
+): boolean {
+  return isUniqueTarget(error, "phone");
+}
+
 function isPersonDocumentIdentityConflict(
   error: PrismaRuntime.PrismaClientKnownRequestError,
 ): boolean {
@@ -1610,6 +1615,26 @@ function isPersonDocumentPhotoSlotConflict(
   }
 
   return false;
+}
+
+function isUniqueTarget(
+  error: PrismaRuntime.PrismaClientKnownRequestError,
+  field: string,
+): boolean {
+  const target = error.meta?.target;
+
+  if (Array.isArray(target)) {
+    return target.some(
+      (item): item is string =>
+        typeof item === "string" && item.includes(field),
+    );
+  }
+
+  if (typeof target === "string" && target.includes(field)) {
+    return true;
+  }
+
+  return error.message.includes(`\`${field}\``);
 }
 
 function isMediaAssetStorageKeyConflict(

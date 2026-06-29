@@ -82,18 +82,19 @@ describe("PersonsPage", () => {
     expect(
       screen.getByRole("link", { name: "View Ada Lovelace" }),
     ).toHaveAttribute("href", "/en/persons/person-1");
+    expect(screen.queryByText("View")).not.toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: "Email Ada Lovelace" }),
-    ).toHaveAttribute("href", "mailto:ada@example.com");
+      screen.queryByRole("link", { name: "Email Ada Lovelace" }),
+    ).not.toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: "Call Ada Lovelace" }),
-    ).toHaveAttribute("href", "tel:+40712345678");
+      screen.queryByRole("link", { name: "Call Ada Lovelace" }),
+    ).not.toBeInTheDocument();
     expect(screen.getByText("ada@example.com")).toBeInTheDocument();
     expect(screen.getByText("+40712345678")).toBeInTheDocument();
     expect(screen.getByText("National ID")).toBeInTheDocument();
-    expect(screen.getByText("exp. Jan 31, 2030")).toBeInTheDocument();
+    expect(screen.queryByText("exp. Jan 31, 2030")).not.toBeInTheDocument();
     expect(screen.getByText("Verified")).toBeInTheDocument();
-    expect(screen.getByLabelText("Expires on")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Expires on")).not.toBeInTheDocument();
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
   });
 
@@ -110,12 +111,13 @@ describe("PersonsPage", () => {
     expect(
       screen.getByRole("link", { name: "Vezi Ada Lovelace" }),
     ).toHaveAttribute("href", "/persons/person-1");
+    expect(screen.queryByText("Vezi")).not.toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: "Trimite email către Ada Lovelace" }),
-    ).toHaveAttribute("href", "mailto:ada@example.com");
+      screen.queryByRole("link", { name: "Trimite email către Ada Lovelace" }),
+    ).not.toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: "Sună Ada Lovelace" }),
-    ).toHaveAttribute("href", "tel:+40712345678");
+      screen.queryByRole("link", { name: "Sună Ada Lovelace" }),
+    ).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Filtre" })).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: "Adaugă persoană" }),

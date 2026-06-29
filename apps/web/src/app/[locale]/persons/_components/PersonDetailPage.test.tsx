@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/api", () => ({
   webApi: {
     fetch: mocks.apiFetch,
+    url: (path: string) => `https://api.test${path}`,
   },
 }));
 
@@ -98,6 +99,29 @@ const auditEvents: v1.persons.PersonAuditEvent[] = [
   },
 ];
 
+const identityFrontPhoto: v1.persons.PersonDocumentPhoto = {
+  id: "photo-1",
+  personDocumentId: identityDocument.id,
+  slot: "front",
+  assetId: "asset-1",
+  contentType: "image/jpeg",
+  byteSize: 1234,
+  checksumSha256:
+    "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  contentUrl: v1.persons.ROUTES.documents.photos.content(
+    readyPerson.id,
+    identityDocument.id,
+    "front",
+  ),
+  createdAt: "2026-06-25T12:30:00.000Z",
+  deletedAt: null,
+};
+
+const documentPhotos = {
+  [identityDocument.id]: [identityFrontPhoto],
+  [driverLicenseDocument.id]: [],
+} satisfies Record<string, v1.persons.PersonDocumentPhoto[]>;
+
 beforeEach(() => {
   mocks.apiFetch.mockReset();
   mocks.refresh.mockReset();
@@ -125,6 +149,12 @@ describe("PersonDetailPage", () => {
     expect(screen.getByText("Ready")).toBeInTheDocument();
     expect(screen.getByText("National ID")).toBeInTheDocument();
     expect(screen.getByText("Driver license")).toBeInTheDocument();
+    expect(
+      screen.getByRole("img", { name: "Front document photo" }),
+    ).toHaveAttribute(
+      "src",
+      `https://api.test${identityFrontPhoto.contentUrl}`,
+    );
     expect(screen.getByText("RR")).toBeInTheDocument();
     expect(screen.getByText("****3456")).toBeInTheDocument();
     expect(screen.getByText("*********3450")).toBeInTheDocument();
@@ -214,6 +244,68 @@ describe("PersonDetailPage", () => {
     expect(mocks.replace).toHaveBeenCalledWith("/en/persons");
   });
 
+  it("uploads and deletes document photos through the API", async () => {
+    const backPhoto: v1.persons.PersonDocumentPhoto = {
+      ...identityFrontPhoto,
+      id: "photo-2",
+      slot: "back",
+      contentType: "image/png",
+      contentUrl: v1.persons.ROUTES.documents.photos.content(
+        readyPerson.id,
+        identityDocument.id,
+        "back",
+      ),
+    };
+    mocks.apiFetch
+      .mockResolvedValueOnce(backPhoto)
+      .mockResolvedValueOnce(undefined);
+    const browser = userEvent.setup();
+
+    renderDetail();
+    await browser.upload(
+      screen.getAllByLabelText("Back photo upload")[0],
+      new File(["back-image"], "back.png", { type: "image/png" }),
+    );
+
+    await waitFor(() =>
+      expect(mocks.apiFetch).toHaveBeenCalledWith(
+        v1.persons.ROUTES.documents.photos.upsert(
+          readyPerson.id,
+          identityDocument.id,
+          "back",
+        ),
+        v1.persons.personDocumentPhotoSchema,
+        expect.objectContaining({
+          method: "PUT",
+          body: expect.any(FormData),
+        }),
+      ),
+    );
+    expect(
+      screen.getByRole("img", { name: "Back document photo" }),
+    ).toHaveAttribute("src", `https://api.test${backPhoto.contentUrl}`);
+
+    await browser.click(
+      screen.getAllByRole("button", { name: "Delete photo" })[0],
+    );
+    const dialog = await screen.findByRole("dialog");
+    await browser.click(
+      within(dialog).getByRole("button", { name: "Delete photo" }),
+    );
+
+    await waitFor(() =>
+      expect(mocks.apiFetch).toHaveBeenCalledWith(
+        v1.persons.ROUTES.documents.photos.delete(
+          readyPerson.id,
+          identityDocument.id,
+          "front",
+        ),
+        v1.common.noContentSchema,
+        { method: "DELETE" },
+      ),
+    );
+  });
+
   it("renders deleted and empty document states", () => {
     renderDetail({
       ...readyPerson,
@@ -288,6 +380,7 @@ function renderDetail(
       <PersonDetailPage
         person={person}
         auditEvents={auditEvents}
+        documentPhotos={documentPhotos}
         personsHref={locale === "en" ? "/en/persons" : "/persons"}
       />
     </NextIntlClientProvider>,

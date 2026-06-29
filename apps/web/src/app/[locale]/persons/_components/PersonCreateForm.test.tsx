@@ -51,7 +51,7 @@ const createdPerson: v1.persons.Person = {
       issuedBy: "SPCLEP Bucuresti",
       issuedOn: "2024-01-15",
       expiresOn: "2030-01-31",
-      status: "unverified",
+      status: "verified",
       notes: null,
       createdAt: "2026-06-25T10:00:00.000Z",
       updatedAt: "2026-06-25T10:00:00.000Z",
@@ -265,7 +265,7 @@ describe("PersonCreateForm", () => {
                 issuedBy: "SPCLEP Bucuresti",
                 issuedOn: "2024-01-15",
                 expiresOn: "2030-01-31",
-                status: "unverified",
+                status: "verified",
               },
             ],
             notes: "Frequent rider",
@@ -275,6 +275,85 @@ describe("PersonCreateForm", () => {
     );
     expect(mocks.push).toHaveBeenCalledWith("/en/persons");
     expect(mocks.refresh).toHaveBeenCalledOnce();
+  }, 10_000);
+
+  it("uploads selected document photos after creating the person", async () => {
+    const uploadedPhoto: v1.persons.PersonDocumentPhoto = {
+      id: "photo-1",
+      personDocumentId: "document-1",
+      slot: "front",
+      assetId: "asset-1",
+      contentType: "image/png",
+      byteSize: 5,
+      checksumSha256: "a".repeat(64),
+      contentUrl: v1.persons.ROUTES.documents.photos.content(
+        "person-2",
+        "document-1",
+        "front",
+      ),
+      createdAt: "2026-06-25T10:00:00.000Z",
+      deletedAt: null,
+    };
+    mocks.apiFetch
+      .mockResolvedValueOnce(createdPerson)
+      .mockResolvedValueOnce(uploadedPhoto);
+    const browser = userEvent.setup();
+    const file = new File(["photo"], "front.png", { type: "image/png" });
+
+    renderCreateForm();
+    await fillFullCreateForm(browser);
+    await browser.upload(
+      screen.getAllByLabelText("Front photo upload")[0]!,
+      file,
+    );
+    await browser.click(screen.getByRole("button", { name: "Create person" }));
+
+    await waitFor(() => expect(mocks.apiFetch).toHaveBeenCalledTimes(2));
+    expect(mocks.apiFetch).toHaveBeenNthCalledWith(
+      2,
+      v1.persons.ROUTES.documents.photos.upsert(
+        "person-2",
+        "document-1",
+        "front",
+      ),
+      v1.persons.personDocumentPhotoSchema,
+      {
+        method: "PUT",
+        body: expect.any(FormData),
+      },
+    );
+
+    const uploadBody = mocks.apiFetch.mock.calls[1]?.[2]?.body;
+    expect(uploadBody).toBeInstanceOf(FormData);
+    expect((uploadBody as FormData).get("file")).toBe(file);
+    expect(mocks.push).toHaveBeenCalledWith("/en/persons");
+    expect(mocks.refresh).toHaveBeenCalledOnce();
+  }, 10_000);
+
+  it("shows photo upload feedback when post-create document photo upload fails", async () => {
+    mocks.apiFetch
+      .mockResolvedValueOnce(createdPerson)
+      .mockRejectedValueOnce(new ApiError(500, "Internal server error"));
+    const browser = userEvent.setup();
+    const file = new File(["photo"], "front.png", { type: "image/png" });
+
+    renderCreateForm();
+    await fillFullCreateForm(browser);
+    await browser.upload(
+      screen.getAllByLabelText("Front photo upload")[0]!,
+      file,
+    );
+    await browser.click(screen.getByRole("button", { name: "Create person" }));
+
+    expect(await screen.findByText("Photos not uploaded")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "The person was created, but at least one document photo was not uploaded.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Internal server error")).not.toBeInTheDocument();
+    expect(mocks.push).not.toHaveBeenCalled();
+    expect(mocks.refresh).not.toHaveBeenCalled();
   }, 10_000);
 
   it("rejects an invalid non-normalizable phone", async () => {
@@ -430,9 +509,26 @@ describe("PersonCreateForm", () => {
     expect(screen.getByLabelText("Region")).toHaveValue("");
   });
 
-  it("shows API errors when create fails", async () => {
+  it("shows generic API errors when create fails", async () => {
+    mocks.apiFetch.mockRejectedValueOnce(new ApiError(409, "Conflict"));
+    const browser = userEvent.setup();
+
+    renderCreateForm();
+    await fillRequiredFields(browser);
+    await browser.type(screen.getByLabelText("CNP"), "1900228123450");
+    await browser.click(screen.getByRole("button", { name: "Create person" }));
+
+    expect(await screen.findByText("Conflict")).toBeInTheDocument();
+    expect(screen.getByLabelText("Phone")).not.toHaveAttribute("aria-invalid");
+    expect(screen.getByLabelText("Email")).not.toHaveAttribute("aria-invalid");
+    expect(mocks.push).not.toHaveBeenCalled();
+  });
+
+  it("marks the phone field when the API returns a duplicate phone conflict", async () => {
     mocks.apiFetch.mockRejectedValueOnce(
-      new ApiError(409, "Phone already exists"),
+      new ApiError(409, "Phone already exists.", "PERSON_PHONE_CONFLICT", {
+        field: "phone",
+      }),
     );
     const browser = userEvent.setup();
 
@@ -441,7 +537,30 @@ describe("PersonCreateForm", () => {
     await browser.type(screen.getByLabelText("CNP"), "1900228123450");
     await browser.click(screen.getByRole("button", { name: "Create person" }));
 
-    expect(await screen.findByText("Phone already exists")).toBeInTheDocument();
+    const phoneInput = screen.getByLabelText("Phone");
+    expect(await screen.findAllByText("Phone already exists.")).toHaveLength(2);
+    expect(phoneInput).toHaveAttribute("aria-invalid", "true");
+    expect(phoneInput).toHaveAccessibleDescription("Phone already exists.");
+    expect(mocks.push).not.toHaveBeenCalled();
+  });
+
+  it("marks the email field when the API returns a duplicate email conflict", async () => {
+    mocks.apiFetch.mockRejectedValueOnce(
+      new ApiError(409, "Email already exists.", "PERSON_EMAIL_CONFLICT", {
+        field: "email",
+      }),
+    );
+    const browser = userEvent.setup();
+
+    renderCreateForm();
+    await fillRequiredFields(browser);
+    await browser.type(screen.getByLabelText("CNP"), "1900228123450");
+    await browser.click(screen.getByRole("button", { name: "Create person" }));
+
+    const emailInput = screen.getByLabelText("Email");
+    expect(await screen.findAllByText("Email already exists.")).toHaveLength(2);
+    expect(emailInput).toHaveAttribute("aria-invalid", "true");
+    expect(emailInput).toHaveAccessibleDescription("Email already exists.");
     expect(mocks.push).not.toHaveBeenCalled();
   });
 });
