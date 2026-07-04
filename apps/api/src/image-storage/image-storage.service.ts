@@ -127,7 +127,7 @@ export class ImageStorageService {
     );
     const storageKey = this.generateStorageKey(contentType);
     const expiresAt = this.createExpiresAt();
-    const headers: Record<string, string> = {
+    const requestHeaders: Record<string, string> = {
       "Content-Type": contentType,
       "x-amz-checksum-sha256": checksumSha256Base64,
     };
@@ -141,8 +141,8 @@ export class ImageStorageService {
     if (this.env.IMAGE_STORAGE_S3_KMS_KEY_ID) {
       putInput.ServerSideEncryption = "aws:kms";
       putInput.SSEKMSKeyId = this.env.IMAGE_STORAGE_S3_KMS_KEY_ID;
-      headers["x-amz-server-side-encryption"] = "aws:kms";
-      headers["x-amz-server-side-encryption-aws-kms-key-id"] =
+      requestHeaders["x-amz-server-side-encryption"] = "aws:kms";
+      requestHeaders["x-amz-server-side-encryption-aws-kms-key-id"] =
         this.env.IMAGE_STORAGE_S3_KMS_KEY_ID;
     }
 
@@ -163,16 +163,22 @@ export class ImageStorageService {
       uploadUrl = await this.presigner.getSignedUrl(
         new PutObjectCommand(putInput),
         this.env.IMAGE_STORAGE_SIGNED_URL_TTL_SECONDS,
+        {
+          unhoistableHeaders: this.amzHeaderNames(requestHeaders),
+        },
       );
     } catch (error) {
       throwS3StorageError(error);
     }
 
     return {
+      provider: IMAGE_STORAGE_PROVIDER_S3,
+      bucket: this.bucket,
+      storageKey,
       uploadUrl,
       uploadToken,
       method: "PUT",
-      headers,
+      headers: this.browserUploadHeadersForSignedUrl(uploadUrl, requestHeaders),
       expiresAt,
       maxBytes: this.env.IMAGE_STORAGE_MAX_BYTES,
     };
@@ -307,6 +313,35 @@ export class ImageStorageService {
   private createExpiresAt(): Date {
     return new Date(
       Date.now() + this.env.IMAGE_STORAGE_SIGNED_URL_TTL_SECONDS * 1000,
+    );
+  }
+
+  private browserUploadHeadersForSignedUrl(
+    uploadUrl: string,
+    headers: Record<string, string>,
+  ): Record<string, string> {
+    const signedHeaders = new Set(
+      (new URL(uploadUrl).searchParams.get("X-Amz-SignedHeaders") ?? "")
+        .split(";")
+        .filter(Boolean),
+    );
+
+    return Object.fromEntries(
+      Object.entries(headers).filter(([name]) => {
+        const normalizedName = name.toLowerCase();
+        return (
+          !normalizedName.startsWith("x-amz-") ||
+          signedHeaders.has(normalizedName)
+        );
+      }),
+    );
+  }
+
+  private amzHeaderNames(headers: Record<string, string>): Set<string> {
+    return new Set(
+      Object.keys(headers)
+        .map((name) => name.toLowerCase())
+        .filter((name) => name.startsWith("x-amz-")),
     );
   }
 

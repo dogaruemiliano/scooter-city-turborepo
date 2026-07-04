@@ -40,6 +40,7 @@ import { RequireRoles } from "../common/decorators/roles.decorator";
 import { getRequestMetadata } from "../common/http/request-metadata";
 import { CompletePersonDocumentPhotoUploadInput } from "./dto/complete-person-document-photo-upload.input";
 import { CreatePersonDocumentInput } from "./dto/create-person-document.input";
+import { CreatePersonDocumentPhotoDraftUploadUrlInput } from "./dto/create-person-document-photo-draft-upload-url.input";
 import { CreatePersonDocumentPhotoUploadUrlInput } from "./dto/create-person-document-photo-upload-url.input";
 import { CreatePersonInput } from "./dto/create-person.input";
 import { ListPersonsQuery } from "./dto/list-persons.query";
@@ -315,6 +316,19 @@ export class PersonsController {
       input,
       user.id,
     );
+  }
+
+  @Post("document-photo-draft-upload-url")
+  @ApiOperation({
+    operationId: "PersonsController_createDocumentPhotoDraftUploadUrl_v1",
+    summary: "Create a signed S3 PUT URL for a draft document photo",
+  })
+  @ZodResponse({ type: PersonDocumentPhotoUploadUrl })
+  async createDocumentPhotoDraftUploadUrl(
+    @Body() input: CreatePersonDocumentPhotoDraftUploadUrlInput,
+    @CurrentUser() user: AuthPrincipal,
+  ): Promise<v1.persons.PersonDocumentPhotoUploadUrl> {
+    return this.persons.createDocumentPhotoDraftUploadUrl(input, user.id);
   }
 
   @Post(":id/documents/:documentId/photos/:slot/complete-upload")

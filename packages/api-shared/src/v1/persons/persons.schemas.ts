@@ -152,6 +152,32 @@ export type CompletePersonDocumentPhotoUploadInput = z.infer<
   typeof completePersonDocumentPhotoUploadInputSchema
 >;
 
+export const createPersonDocumentPhotoDraftUploadUrlInputSchema = z
+  .object({
+    contentType: personDocumentPhotoContentTypeSchema,
+    byteSize: z.number().int().positive(),
+    checksumSha256: z.string().regex(SHA_256_HEX_PATTERN),
+  })
+  .strict()
+  .meta({ id: "CreatePersonDocumentPhotoDraftUploadUrlInput" });
+
+export type CreatePersonDocumentPhotoDraftUploadUrlInput = z.infer<
+  typeof createPersonDocumentPhotoDraftUploadUrlInputSchema
+>;
+
+const createPersonDocumentPhotoDraftTokensSchema = z
+  .object({
+    front: z.string().min(1).optional(),
+    back: z.string().min(1).optional(),
+    other: z.string().min(1).optional(),
+  })
+  .strict()
+  .meta({ id: "CreatePersonDocumentPhotoDraftTokens" });
+
+export type CreatePersonDocumentPhotoDraftTokens = z.infer<
+  typeof createPersonDocumentPhotoDraftTokensSchema
+>;
+
 export const personAuditActorSchema = z
   .object({
     kind: z.enum(["user", "system"]),
@@ -263,6 +289,17 @@ export type CreatePersonDocumentInput = z.infer<
   typeof createPersonDocumentInputSchema
 >;
 
+const createPersonNestedDocumentInputSchema = createPersonDocumentInputSchema
+  .extend({
+    photos: createPersonDocumentPhotoDraftTokensSchema.optional(),
+  })
+  .strict()
+  .meta({ id: "CreatePersonNestedDocumentInput" });
+
+export type CreatePersonNestedDocumentInput = z.infer<
+  typeof createPersonNestedDocumentInputSchema
+>;
+
 export const updatePersonDocumentInputSchema = z
   .object({
     type: personDocumentTypeSchema.optional(),
@@ -297,7 +334,7 @@ export const createPersonInputSchema = z
     postalCode: nullableTrimmedTextSchema.optional(),
     countryCode: countryCodeSchema.nullable().optional(),
     documents: z
-      .array(createPersonDocumentInputSchema)
+      .array(createPersonNestedDocumentInputSchema)
       .refine(hasUniqueDocumentTypes, {
         message: "Document types must be unique.",
       })

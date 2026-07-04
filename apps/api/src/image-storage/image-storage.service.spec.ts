@@ -14,11 +14,14 @@ import { createHash } from "node:crypto";
 import { Readable } from "node:stream";
 
 import { loadEnv, type Env } from "../config/env";
-import type { S3Presigner } from "./image-storage.module";
+import type { S3Presigner, S3PresignOptions } from "./image-storage.module";
 import { ImageStorageService } from "./image-storage.service";
 
 type SendMock = jest.Mock<unknown, [unknown]>;
-type PresignMock = jest.Mock<Promise<string>, [PutObjectCommand, number]>;
+type PresignMock = jest.Mock<
+  Promise<string>,
+  [PutObjectCommand, number, S3PresignOptions?]
+>;
 
 function s3Error(name: string): Error & { name: string } {
   const error = new Error(name) as Error & { name: string };
@@ -53,10 +56,16 @@ function createService(
     });
   const mockPresign: PresignMock =
     presign ??
-    jest.fn((command, expiresIn) => {
+    jest.fn((command, expiresIn, options) => {
       const key = command.input.Key ?? "unknown";
+      const extraSignedHeaders = options?.unhoistableHeaders
+        ? Array.from(options.unhoistableHeaders).sort()
+        : [];
+      const signedHeaders = ["host", ...extraSignedHeaders].join(";");
       return Promise.resolve(
-        `https://signed.example/${key}?expires=${expiresIn}`,
+        `https://signed.example/${key}?X-Amz-SignedHeaders=${encodeURIComponent(
+          signedHeaders,
+        )}&expires=${expiresIn}`,
       );
     });
   return {
@@ -129,7 +138,8 @@ describe("ImageStorageService", () => {
 
   it("maps missing S3 buckets to a storage availability error", async () => {
     const { service } = createService(
-      jest.fn(() => {
+      jest.fn((command: unknown) => {
+        void command;
         throw s3Error("NoSuchBucket");
       }),
     );
@@ -202,6 +212,9 @@ describe("ImageStorageService", () => {
 
     expect(upload.method).toBe("PUT");
     expect(upload.uploadUrl).toContain("https://signed.example/");
+    expect(upload.uploadUrl).toContain(
+      "X-Amz-SignedHeaders=host%3Bx-amz-checksum-sha256",
+    );
     expect(upload.headers).toMatchObject({
       "Content-Type": "image/png",
       "x-amz-checksum-sha256": Buffer.from(checksumSha256, "hex").toString(

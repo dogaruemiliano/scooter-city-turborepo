@@ -121,6 +121,7 @@ model User {
   authAccounts  AuthAccount[]
   auditEvents   AuditEvent[]
   mediaAssets   MediaAsset[]
+  draftUploads  DraftUpload[]
 
   @@index([email])
   @@index([phone])
@@ -148,6 +149,33 @@ model MediaAsset {
   @@index([provider, bucket])
   @@index([uploadedByUserId])
   @@index([deletedAt])
+}
+
+/// Browser-uploaded object that is not attached to a domain record yet.
+///
+/// Person creation uses this for direct-to-S3 document photos: the API creates
+/// a row and signed PUT URL, the browser uploads the bytes to S3, and final
+/// submit claims the row into MediaAsset / PersonDocumentPhoto. Expired,
+/// unclaimed rows identify S3 objects that can be cleaned up as abandoned
+/// drafts.
+model DraftUpload {
+  id             String    @id @default(cuid())
+  userId         String?
+  user           User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  provider       String
+  bucket         String
+  storageKey     String    @unique
+  contentType    String
+  byteSize       Int
+  checksumSha256 String
+  purpose        String
+  expiresAt      DateTime
+  claimedAt      DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@index([userId, purpose, claimedAt, expiresAt])
+  @@index([claimedAt, expiresAt])
+  @@index([purpose, expiresAt])
 }
 
 /// Photo attached to one person document slot.

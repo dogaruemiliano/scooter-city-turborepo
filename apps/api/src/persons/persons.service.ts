@@ -11,10 +11,14 @@ import { AuditEventType } from "../audit/audit.types";
 import type { AuthPrincipal } from "../auth/auth.types";
 import { toDateOnlyDate, toDateOnlyString } from "../common/dates/date-only";
 import type { RequestMetadata } from "../common/http/request-metadata";
-import type { StoredImage } from "../image-storage/image-storage.types";
+import type {
+  PresignedImageUpload,
+  StoredImage,
+} from "../image-storage/image-storage.types";
 import { ImageStorageService } from "../image-storage/image-storage.service";
 import type {
   AuditEvent,
+  DraftUpload,
   PersonDocument,
   Prisma,
 } from "../generated/prisma/client";
@@ -39,12 +43,20 @@ const REDACTED_VALUE = "[redacted]";
 const SET_VALUE = "[set]";
 const PERSON_EMAIL_CONFLICT_CODE = "PERSON_EMAIL_CONFLICT";
 const PERSON_PHONE_CONFLICT_CODE = "PERSON_PHONE_CONFLICT";
+const DRAFT_DOCUMENT_PHOTO_PURPOSE = "person-document-photo";
 
 type PersonAuditContext = RequestMetadata & {
   actor: AuthPrincipal;
 };
 
 type PrismaClientLike = PrismaService | Prisma.TransactionClient;
+
+interface PreparedDraftDocumentPhoto {
+  documentType: v1.persons.PersonDocumentType;
+  slot: v1.persons.PersonDocumentPhotoSlot;
+  draftUploadId: string;
+  storedImage: StoredImage;
+}
 
 @Injectable()
 export class PersonsService {
@@ -58,12 +70,20 @@ export class PersonsService {
     input: v1.persons.CreatePersonInput,
     context: PersonAuditContext,
   ): Promise<PersonWithDocuments> {
+    const preparedDraftPhotos = await this.prepareDraftDocumentPhotos(
+      input,
+      context.actor.id,
+    );
+
     try {
       return await this.prisma.$transaction(async (tx) => {
         const created = await tx.person.create({
           data: this.toCreateData(input),
           include: this.personInclude(),
         });
+        const documentsByType = new Map(
+          created.documents.map((document) => [document.type, document]),
+        );
 
         await this.recordPersonAudit(tx, {
           type: AuditEventType.PERSON_CREATED,
@@ -80,6 +100,24 @@ export class PersonsService {
             document,
             changes: this.documentCreateChanges(document),
           });
+        }
+
+        for (const draftPhoto of preparedDraftPhotos) {
+          const document = documentsByType.get(draftPhoto.documentType);
+          if (!document) {
+            throw new BadRequestException(
+              "Draft image belongs to a document that was not created",
+            );
+          }
+
+          await this.createDocumentPhotoFromDraft(
+            tx,
+            document.id,
+            draftPhoto.slot,
+            draftPhoto.storedImage,
+            draftPhoto.draftUploadId,
+            context.actor.id,
+          );
         }
 
         return created;
@@ -526,10 +564,33 @@ export class PersonsService {
       ),
     });
 
-    return {
-      ...upload,
-      expiresAt: upload.expiresAt.toISOString(),
-    };
+    return this.toPublicUploadUrl(upload);
+  }
+
+  async createDocumentPhotoDraftUploadUrl(
+    input: v1.persons.CreatePersonDocumentPhotoDraftUploadUrlInput,
+    uploadedByUserId: string,
+  ): Promise<v1.persons.PersonDocumentPhotoUploadUrl> {
+    const upload = await this.imageStorage.createPresignedUpload({
+      ...input,
+      scope: this.draftDocumentPhotoUploadScope(uploadedByUserId),
+    });
+
+    await this.prisma.draftUpload.create({
+      data: {
+        user: { connect: { id: uploadedByUserId } },
+        provider: upload.provider,
+        bucket: upload.bucket,
+        storageKey: upload.storageKey,
+        contentType: input.contentType,
+        byteSize: input.byteSize,
+        checksumSha256: input.checksumSha256.trim().toLowerCase(),
+        purpose: DRAFT_DOCUMENT_PHOTO_PURPOSE,
+        expiresAt: upload.expiresAt,
+      },
+    });
+
+    return this.toPublicUploadUrl(upload);
   }
 
   async completeDocumentPhotoUpload(
@@ -628,6 +689,85 @@ export class PersonsService {
     ]);
 
     await this.deleteImageBestEffort(photo.asset.storageKey);
+  }
+
+  private async prepareDraftDocumentPhotos(
+    input: v1.persons.CreatePersonInput,
+    uploadedByUserId: string,
+  ): Promise<PreparedDraftDocumentPhoto[]> {
+    const prepared: PreparedDraftDocumentPhoto[] = [];
+    const seenStorageKeys = new Set<string>();
+
+    for (const document of input.documents ?? []) {
+      for (const slot of v1.persons.PERSON_DOCUMENT_PHOTO_SLOTS) {
+        const uploadToken = document.photos?.[slot];
+        if (!uploadToken) {
+          continue;
+        }
+
+        const storedImage = await this.imageStorage.completePresignedUpload(
+          uploadToken,
+          this.draftDocumentPhotoUploadScope(uploadedByUserId),
+        );
+
+        if (seenStorageKeys.has(storedImage.storageKey)) {
+          throw new BadRequestException("Draft image upload was used twice");
+        }
+        seenStorageKeys.add(storedImage.storageKey);
+
+        const draft = await this.assertUsableDraftUpload(
+          await this.prisma.draftUpload.findUnique({
+            where: { storageKey: storedImage.storageKey },
+          }),
+          storedImage,
+          uploadedByUserId,
+        );
+
+        prepared.push({
+          documentType: document.type,
+          slot,
+          draftUploadId: draft.id,
+          storedImage,
+        });
+      }
+    }
+
+    return prepared;
+  }
+
+  private async assertUsableDraftUpload(
+    draft: DraftUpload | null,
+    storedImage: StoredImage,
+    uploadedByUserId: string,
+  ): Promise<DraftUpload> {
+    if (!draft) {
+      await this.deleteImageBestEffort(storedImage.storageKey);
+      throw new BadRequestException("Draft image upload was not found");
+    }
+
+    if (draft.claimedAt) {
+      throw new BadRequestException("Draft image upload was already used");
+    }
+
+    if (draft.expiresAt <= new Date()) {
+      await this.deleteImageBestEffort(storedImage.storageKey);
+      throw new BadRequestException("Draft image upload expired");
+    }
+
+    if (
+      draft.userId !== uploadedByUserId ||
+      draft.purpose !== DRAFT_DOCUMENT_PHOTO_PURPOSE ||
+      draft.provider !== storedImage.provider ||
+      draft.bucket !== storedImage.bucket ||
+      draft.contentType !== storedImage.contentType ||
+      draft.byteSize !== storedImage.byteSize ||
+      draft.checksumSha256 !== storedImage.checksumSha256
+    ) {
+      await this.deleteImageBestEffort(storedImage.storageKey);
+      throw new BadRequestException("Draft image upload metadata mismatch");
+    }
+
+    return draft;
   }
 
   private toCreateData(
@@ -1220,6 +1360,47 @@ export class PersonsService {
     }
   }
 
+  private async createDocumentPhotoFromDraft(
+    tx: Prisma.TransactionClient,
+    documentId: string,
+    slot: v1.persons.PersonDocumentPhotoSlot,
+    storedImage: StoredImage,
+    draftUploadId: string,
+    uploadedByUserId: string,
+  ): Promise<void> {
+    const asset = await tx.mediaAsset.create({
+      data: {
+        provider: storedImage.provider,
+        bucket: storedImage.bucket,
+        storageKey: storedImage.storageKey,
+        contentType: storedImage.contentType,
+        byteSize: storedImage.byteSize,
+        checksumSha256: storedImage.checksumSha256,
+        uploadedByUser: { connect: { id: uploadedByUserId } },
+      },
+    });
+
+    await tx.personDocumentPhoto.create({
+      data: {
+        personDocument: { connect: { id: documentId } },
+        asset: { connect: { id: asset.id } },
+        slot,
+      },
+    });
+
+    const claimed = await tx.draftUpload.updateMany({
+      where: {
+        id: draftUploadId,
+        claimedAt: null,
+      },
+      data: { claimedAt: new Date() },
+    });
+
+    if (claimed.count !== 1) {
+      throw new BadRequestException("Draft image upload was already used");
+    }
+  }
+
   private async replaceDocumentPhotoWithStoredImage(
     documentId: string,
     slot: v1.persons.PersonDocumentPhotoSlot,
@@ -1310,6 +1491,23 @@ export class PersonsService {
     uploadedByUserId: string,
   ): string {
     return `person-document-photo:${personId}:${documentId}:${slot}:${uploadedByUserId}`;
+  }
+
+  private draftDocumentPhotoUploadScope(uploadedByUserId: string): string {
+    return `person-document-photo-draft:${uploadedByUserId}`;
+  }
+
+  private toPublicUploadUrl(
+    upload: PresignedImageUpload,
+  ): v1.persons.PersonDocumentPhotoUploadUrl {
+    return {
+      uploadUrl: upload.uploadUrl,
+      uploadToken: upload.uploadToken,
+      method: upload.method,
+      headers: upload.headers,
+      expiresAt: upload.expiresAt.toISOString(),
+      maxBytes: upload.maxBytes,
+    };
   }
 
   private async deleteImageBestEffort(storageKey: string): Promise<void> {

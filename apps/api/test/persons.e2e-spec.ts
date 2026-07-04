@@ -22,6 +22,7 @@ import {
   S3_CLIENT,
   S3_PRESIGNER,
 } from "../src/image-storage/image-storage.constants";
+import type { S3PresignOptions } from "../src/image-storage/image-storage.module";
 import { PrismaService } from "../src/prisma/prisma.service";
 import { UsersService } from "../src/users/users.service";
 
@@ -120,14 +121,26 @@ describe("Persons HTTP surface (e2e)", () => {
   };
   const fakePresigner = {
     getSignedUrl: jest.fn(
-      (command: PutObjectCommand, expiresIn: number): Promise<string> => {
+      (
+        command: PutObjectCommand,
+        expiresIn: number,
+        options?: S3PresignOptions,
+      ): Promise<string> => {
         const key = command.input.Key;
         if (typeof key !== "string") {
           throw new Error("Unexpected signed URL command input");
         }
+        const extraSignedHeaders = options?.unhoistableHeaders
+          ? Array.from(options.unhoistableHeaders).sort()
+          : [];
+        const signedHeaders = ["host", ...extraSignedHeaders].join(";");
         presignedPutKeys.push(key);
         return Promise.resolve(
-          `https://s3.test/upload/${encodeURIComponent(key)}?expires=${expiresIn}`,
+          `https://s3.test/upload/${encodeURIComponent(
+            key,
+          )}?X-Amz-SignedHeaders=${encodeURIComponent(
+            signedHeaders,
+          )}&expires=${expiresIn}`,
         );
       },
     ),
@@ -186,6 +199,11 @@ describe("Persons HTTP surface (e2e)", () => {
             { phone: { in: createdPersonPhones } },
           ],
         },
+      });
+    }
+    if (prisma && createdUserIds.length > 0) {
+      await prisma.draftUpload.deleteMany({
+        where: { userId: { in: createdUserIds } },
       });
     }
     if (prisma && createdUserIds.length > 0) {
@@ -790,6 +808,9 @@ describe("Persons HTTP surface (e2e)", () => {
     expect(uploadUrlRes.status).toBe(201);
     expect(uploadUrl.method).toBe("PUT");
     expect(uploadUrl.uploadUrl).toContain("https://s3.test/upload/");
+    expect(uploadUrl.uploadUrl).toContain(
+      "X-Amz-SignedHeaders=host%3Bx-amz-checksum-sha256",
+    );
     expect(uploadUrl.headers).toMatchObject({
       "Content-Type": "image/webp",
       "x-amz-checksum-sha256": Buffer.from(directChecksum, "hex").toString(
@@ -854,6 +875,84 @@ describe("Persons HTTP surface (e2e)", () => {
       .get(replaced.contentUrl)
       .set("Cookie", [`access_token=${admin.accessToken}`]);
     expect(deletedContentRes.status).toBe(404);
+  });
+
+  it("claims draft document photo uploads during person creation", async () => {
+    const admin = await freshSession(["ADMIN"]);
+    const draftBuffer = Buffer.from("draft-put");
+    const draftChecksum = createHash("sha256")
+      .update(draftBuffer)
+      .digest("hex");
+    const uploadUrlRes = await req()
+      .post(v1.persons.ROUTES.documents.photos.createDraftUploadUrl)
+      .set("Cookie", [`access_token=${admin.accessToken}`])
+      .send({
+        contentType: "image/png",
+        byteSize: draftBuffer.length,
+        checksumSha256: draftChecksum,
+      });
+    const uploadUrl = v1.persons.personDocumentPhotoUploadUrlSchema.parse(
+      uploadUrlRes.body,
+    );
+
+    expect(uploadUrlRes.status).toBe(201);
+    const draftStorageKey = presignedPutKeys.at(-1);
+    expect(draftStorageKey).toBeDefined();
+    s3Objects.set(draftStorageKey ?? "", {
+      body: draftBuffer,
+      contentType: "image/png",
+    });
+
+    const input = personInput({
+      documents: [
+        {
+          type: "nationalId",
+          series: "DR",
+          number: "777777",
+          cnp: "1900228123450",
+          issuingCountryCode: "RO",
+          issuedBy: "SPCLEP Bucuresti",
+          issuedOn: "2024-01-15",
+          expiresOn: "2030-01-31",
+          status: "verified",
+          photos: { front: uploadUrl.uploadToken },
+        },
+      ],
+    });
+
+    const createRes = await req()
+      .post(v1.persons.ROUTES.create)
+      .set("Cookie", [`access_token=${admin.accessToken}`])
+      .send(input);
+    const created = v1.persons.personSchema.parse(createRes.body);
+
+    expect(createRes.status).toBe(201);
+    const document = created.documents[0];
+    if (!document) {
+      throw new Error("Expected created person to include a document");
+    }
+
+    const photosRes = await req()
+      .get(v1.persons.ROUTES.documents.photos.list(created.id, document.id))
+      .set("Cookie", [`access_token=${admin.accessToken}`]);
+    const photos = v1.persons.personDocumentPhotoListSchema.parse(
+      photosRes.body,
+    );
+    expect(photosRes.status).toBe(200);
+    expect(photos).toHaveLength(1);
+    expect(photos[0]).toMatchObject({
+      personDocumentId: document.id,
+      slot: "front",
+      contentType: "image/png",
+      byteSize: draftBuffer.length,
+      checksumSha256: draftChecksum,
+    });
+
+    const draft = await prisma.draftUpload.findUnique({
+      where: { storageKey: draftStorageKey ?? "" },
+    });
+    expect(draft?.claimedAt).toBeInstanceOf(Date);
+    expect(s3Objects.size).toBe(1);
   });
 
   it("returns 409 for duplicate email or phone", async () => {

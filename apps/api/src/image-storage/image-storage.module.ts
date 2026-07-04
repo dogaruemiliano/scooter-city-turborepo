@@ -8,7 +8,15 @@ import { S3_CLIENT, S3_PRESIGNER } from "./image-storage.constants";
 import { ImageStorageService } from "./image-storage.service";
 
 export interface S3Presigner {
-  getSignedUrl(command: PutObjectCommand, expiresIn: number): Promise<string>;
+  getSignedUrl(
+    command: PutObjectCommand,
+    expiresIn: number,
+    options?: S3PresignOptions,
+  ): Promise<string>;
+}
+
+export interface S3PresignOptions {
+  unhoistableHeaders?: Set<string>;
 }
 
 @Module({
@@ -23,8 +31,8 @@ export interface S3Presigner {
       provide: S3_PRESIGNER,
       inject: [S3_CLIENT],
       useFactory: (s3: S3Client): S3Presigner => ({
-        getSignedUrl: (command, expiresIn) =>
-          getSignedUrl(s3, command, { expiresIn }),
+        getSignedUrl: (command, expiresIn, options) =>
+          getSignedUrl(s3, command, { expiresIn, ...options }),
       }),
     },
     ImageStorageService,

@@ -40,6 +40,9 @@ export interface ReadStoredImageResult {
 }
 
 export interface PresignedImageUpload {
+  provider: typeof IMAGE_STORAGE_PROVIDER_S3;
+  bucket: string;
+  storageKey: string;
   uploadUrl: string;
   uploadToken: string;
   method: "PUT";

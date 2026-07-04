@@ -104,6 +104,7 @@ export const ROUTES = {
     delete: (personId: string, documentId: string): string =>
       `/v1/persons/${personId}/documents/${documentId}`,
     photos: {
+      createDraftUploadUrl: "/v1/persons/document-photo-draft-upload-url",
       list: (personId: string, documentId: string): string =>
         `/v1/persons/${personId}/documents/${documentId}/photos`,
       upsert: (
