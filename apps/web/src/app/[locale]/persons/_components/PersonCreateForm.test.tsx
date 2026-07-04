@@ -9,6 +9,7 @@ import { PersonCreateForm } from "./PersonCreateForm";
 
 const mocks = vi.hoisted(() => ({
   apiFetch: vi.fn(),
+  s3Fetch: vi.fn(),
   push: vi.fn(),
   refresh: vi.fn(),
 }));
@@ -66,8 +67,10 @@ const createdPerson: v1.persons.Person = {
 
 beforeEach(() => {
   mocks.apiFetch.mockReset();
+  mocks.s3Fetch.mockReset();
   mocks.push.mockReset();
   mocks.refresh.mockReset();
+  vi.stubGlobal("fetch", mocks.s3Fetch);
 
   Object.defineProperty(window, "PointerEvent", {
     configurable: true,
@@ -277,26 +280,22 @@ describe("PersonCreateForm", () => {
     expect(mocks.refresh).toHaveBeenCalledOnce();
   }, 10_000);
 
-  it("uploads selected document photos after creating the person", async () => {
-    const uploadedPhoto: v1.persons.PersonDocumentPhoto = {
-      id: "photo-1",
-      personDocumentId: "document-1",
-      slot: "front",
-      assetId: "asset-1",
-      contentType: "image/png",
-      byteSize: 5,
-      checksumSha256: "a".repeat(64),
-      contentUrl: v1.persons.ROUTES.documents.photos.content(
-        "person-2",
-        "document-1",
-        "front",
-      ),
-      createdAt: "2026-06-25T10:00:00.000Z",
-      deletedAt: null,
+  it("uploads selected document photos as drafts and submits their tokens", async () => {
+    const draftUpload: v1.persons.PersonDocumentPhotoUploadUrl = {
+      uploadUrl: "https://s3.test/upload/front",
+      uploadToken: "draft-front-token",
+      method: "PUT",
+      headers: {
+        "Content-Type": "image/png",
+        "x-amz-checksum-sha256": "checksum-base64",
+      },
+      expiresAt: "2026-06-25T10:05:00.000Z",
+      maxBytes: 64,
     };
     mocks.apiFetch
-      .mockResolvedValueOnce(createdPerson)
-      .mockResolvedValueOnce(uploadedPhoto);
+      .mockResolvedValueOnce(draftUpload)
+      .mockResolvedValueOnce(createdPerson);
+    mocks.s3Fetch.mockResolvedValueOnce(new Response(null, { status: 200 }));
     const browser = userEvent.setup();
     const file = new File(["photo"], "front.png", { type: "image/png" });
 
@@ -306,34 +305,65 @@ describe("PersonCreateForm", () => {
       screen.getAllByLabelText("Front photo upload")[0]!,
       file,
     );
+    await waitFor(() => expect(mocks.s3Fetch).toHaveBeenCalledOnce());
+    expect(
+      screen.getByRole("img", { name: "Front document photo" }),
+    ).toBeInTheDocument();
     await browser.click(screen.getByRole("button", { name: "Create person" }));
 
     await waitFor(() => expect(mocks.apiFetch).toHaveBeenCalledTimes(2));
     expect(mocks.apiFetch).toHaveBeenNthCalledWith(
-      2,
-      v1.persons.ROUTES.documents.photos.upsert(
-        "person-2",
-        "document-1",
-        "front",
-      ),
-      v1.persons.personDocumentPhotoSchema,
+      1,
+      v1.persons.ROUTES.documents.photos.createDraftUploadUrl,
+      v1.persons.personDocumentPhotoUploadUrlSchema,
       {
-        method: "PUT",
-        body: expect.any(FormData),
+        method: "POST",
+        json: {
+          contentType: "image/png",
+          byteSize: 5,
+          checksumSha256: expect.stringMatching(/^[a-f0-9]{64}$/),
+        },
       },
     );
-
-    const uploadBody = mocks.apiFetch.mock.calls[1]?.[2]?.body;
-    expect(uploadBody).toBeInstanceOf(FormData);
-    expect((uploadBody as FormData).get("file")).toBe(file);
+    expect(mocks.s3Fetch).toHaveBeenCalledWith("https://s3.test/upload/front", {
+      method: "PUT",
+      headers: draftUpload.headers,
+      body: file,
+    });
+    expect(mocks.apiFetch).toHaveBeenNthCalledWith(
+      2,
+      v1.persons.ROUTES.create,
+      v1.persons.personSchema,
+      {
+        method: "POST",
+        json: expect.objectContaining({
+          documents: [
+            expect.objectContaining({
+              type: "nationalId",
+              photos: { front: "draft-front-token" },
+            }),
+          ],
+        }),
+      },
+    );
     expect(mocks.push).toHaveBeenCalledWith("/en/persons");
     expect(mocks.refresh).toHaveBeenCalledOnce();
   }, 10_000);
 
-  it("shows photo upload feedback when post-create document photo upload fails", async () => {
-    mocks.apiFetch
-      .mockResolvedValueOnce(createdPerson)
-      .mockRejectedValueOnce(new ApiError(500, "Internal server error"));
+  it("shows photo upload feedback when draft document photo upload fails", async () => {
+    const draftUpload: v1.persons.PersonDocumentPhotoUploadUrl = {
+      uploadUrl: "https://s3.test/upload/front",
+      uploadToken: "draft-front-token",
+      method: "PUT",
+      headers: {
+        "Content-Type": "image/png",
+        "x-amz-checksum-sha256": "checksum-base64",
+      },
+      expiresAt: "2026-06-25T10:05:00.000Z",
+      maxBytes: 64,
+    };
+    mocks.apiFetch.mockResolvedValueOnce(draftUpload);
+    mocks.s3Fetch.mockResolvedValueOnce(new Response(null, { status: 500 }));
     const browser = userEvent.setup();
     const file = new File(["photo"], "front.png", { type: "image/png" });
 
@@ -343,15 +373,16 @@ describe("PersonCreateForm", () => {
       screen.getAllByLabelText("Front photo upload")[0]!,
       file,
     );
-    await browser.click(screen.getByRole("button", { name: "Create person" }));
 
     expect(await screen.findByText("Photos not uploaded")).toBeInTheDocument();
     expect(
       screen.getByText(
-        "The person was created, but at least one document photo was not uploaded.",
+        "The selected document photo was not uploaded. Try selecting it again.",
       ),
     ).toBeInTheDocument();
-    expect(screen.queryByText("Internal server error")).not.toBeInTheDocument();
+    await browser.click(screen.getByRole("button", { name: "Create person" }));
+
+    expect(mocks.apiFetch).toHaveBeenCalledTimes(1);
     expect(mocks.push).not.toHaveBeenCalled();
     expect(mocks.refresh).not.toHaveBeenCalled();
   }, 10_000);

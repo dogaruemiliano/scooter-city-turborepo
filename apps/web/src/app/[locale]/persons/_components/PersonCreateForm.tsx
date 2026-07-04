@@ -57,11 +57,31 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
   const [fieldErrors, setFieldErrors] = useState<FormErrors>({});
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const showUnder18Warning = isUnder18Person(form);
+  const uploadingPhotos = hasDocumentPhotoStatus(form, "uploading");
 
   async function createPerson(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFeedback(null);
     setFieldErrors({});
+
+    const failedPhoto = firstDocumentPhotoWithStatus(form, "failed");
+    if (failedPhoto) {
+      setFeedback({
+        kind: "error",
+        title: t("feedback.documentPhotoUploadErrorTitle"),
+        messages: [failedPhoto.message],
+      });
+      return;
+    }
+
+    if (uploadingPhotos) {
+      setFeedback({
+        kind: "error",
+        title: t("feedback.documentPhotoUploadErrorTitle"),
+        messages: [t("feedback.documentPhotoUploadPendingMessage")],
+      });
+      return;
+    }
 
     const inputCandidate = createPersonInput(form, (field, error) => {
       const fieldLabel =
@@ -114,18 +134,11 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
     }
 
     setCreating(true);
-    let createdPerson: v1.persons.Person | null = null;
     try {
-      createdPerson = await webApi.fetch(
-        v1.persons.ROUTES.create,
-        v1.persons.personSchema,
-        {
-          method: "POST",
-          json: input.data,
-        },
-      );
-
-      await uploadSelectedDocumentPhotos(createdPerson, form.documents);
+      await webApi.fetch(v1.persons.ROUTES.create, v1.persons.personSchema, {
+        method: "POST",
+        json: input.data,
+      });
 
       setFeedback({
         kind: "success",
@@ -136,70 +149,23 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
       router.push(personsHref);
       router.refresh();
     } catch (error) {
-      if (createdPerson) {
-        setForm(createEmptyCreateForm("romanian"));
-      }
-
-      const personConflict = createdPerson ? null : personCreateConflict(error);
+      const personConflict = personCreateConflict(error);
       if (personConflict) {
         setFieldErrors({ [personConflict.field]: personConflict.message });
       }
       const message = personConflict
         ? personConflict.message
-        : createdPerson
-          ? t("feedback.documentPhotoUploadErrorMessage")
-          : error instanceof ApiError
-            ? error.message
-            : t("feedback.genericError");
+        : error instanceof ApiError
+          ? error.message
+          : t("feedback.genericError");
 
       setFeedback({
         kind: "error",
-        title: createdPerson
-          ? t("feedback.documentPhotoUploadErrorTitle")
-          : t("feedback.createErrorTitle"),
+        title: t("feedback.createErrorTitle"),
         messages: [message],
       });
     } finally {
       setCreating(false);
-    }
-  }
-
-  async function uploadSelectedDocumentPhotos(
-    person: v1.persons.Person,
-    documents: CreatePersonDocumentFormState[],
-  ): Promise<void> {
-    const createdDocumentsByType = new Map(
-      person.documents.map((document) => [document.type, document]),
-    );
-
-    for (const document of documents) {
-      const createdDocument = createdDocumentsByType.get(document.type);
-      if (!createdDocument) {
-        continue;
-      }
-
-      for (const slot of v1.persons.PERSON_DOCUMENT_PHOTO_SLOTS) {
-        const file = document.photos[slot];
-        if (!file) {
-          continue;
-        }
-
-        const formData = new FormData();
-        formData.append("file", file);
-
-        await webApi.fetch(
-          v1.persons.ROUTES.documents.photos.upsert(
-            person.id,
-            createdDocument.id,
-            slot,
-          ),
-          v1.persons.personDocumentPhotoSchema,
-          {
-            method: "PUT",
-            body: formData,
-          },
-        );
-      }
     }
   }
 
@@ -375,7 +341,11 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
 
         {feedback ? <CreateFormFeedback feedback={feedback} /> : null}
 
-        <FormActions creating={creating} personsHref={personsHref} />
+        <FormActions
+          creating={creating}
+          uploadingPhotos={uploadingPhotos}
+          personsHref={personsHref}
+        />
       </form>
     </div>
   );
@@ -446,28 +416,124 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
     slot: v1.persons.PersonDocumentPhotoSlot,
     file: File | null,
   ) {
+    if (file) {
+      const uploadId = createDraftUploadId();
+      setForm((current) => ({
+        ...current,
+        documents: current.documents.map((document) =>
+          document.key === documentKey
+            ? {
+                ...document,
+                photos: {
+                  ...document.photos,
+                  [slot]: {
+                    id: uploadId,
+                    status: "uploading",
+                    file,
+                  },
+                },
+              }
+            : document,
+        ),
+      }));
+      setFeedback(null);
+      void uploadDocumentPhotoDraft(documentKey, slot, file, uploadId);
+      return;
+    }
+
     setForm((current) => ({
       ...current,
       documents: current.documents.map((document) => {
         if (document.key !== documentKey) {
           return document;
         }
-
-        if (file) {
-          return {
-            ...document,
-            photos: {
-              ...document.photos,
-              [slot]: file,
-            },
-          };
-        }
-
         const photos = { ...document.photos };
         delete photos[slot];
         return {
           ...document,
           photos,
+        };
+      }),
+    }));
+  }
+
+  async function uploadDocumentPhotoDraft(
+    documentKey: string,
+    slot: v1.persons.PersonDocumentPhotoSlot,
+    file: File,
+    uploadId: string,
+  ): Promise<void> {
+    try {
+      const checksumSha256 = await sha256Hex(file);
+      const upload = await webApi.fetch(
+        v1.persons.ROUTES.documents.photos.createDraftUploadUrl,
+        v1.persons.personDocumentPhotoUploadUrlSchema,
+        {
+          method: "POST",
+          json: {
+            contentType: file.type,
+            byteSize: file.size,
+            checksumSha256,
+          },
+        },
+      );
+
+      const uploadResponse = await fetch(upload.uploadUrl, {
+        method: upload.method,
+        headers: upload.headers,
+        body: file,
+      });
+      if (!uploadResponse.ok) {
+        throw new Error(t("feedback.documentPhotoDraftUploadErrorMessage"));
+      }
+
+      setDocumentPhotoUploadState(documentKey, slot, uploadId, {
+        id: uploadId,
+        status: "uploaded",
+        file,
+        uploadToken: upload.uploadToken,
+      });
+    } catch (error) {
+      const message =
+        error instanceof ApiError
+          ? error.message
+          : t("feedback.documentPhotoDraftUploadErrorMessage");
+      setDocumentPhotoUploadState(documentKey, slot, uploadId, {
+        id: uploadId,
+        status: "failed",
+        file,
+        message,
+      });
+      setFeedback({
+        kind: "error",
+        title: t("feedback.documentPhotoUploadErrorTitle"),
+        messages: [message],
+      });
+    }
+  }
+
+  function setDocumentPhotoUploadState(
+    documentKey: string,
+    slot: v1.persons.PersonDocumentPhotoSlot,
+    uploadId: string,
+    nextUpload: CreatePersonDocumentFormState["photos"][v1.persons.PersonDocumentPhotoSlot],
+  ) {
+    setForm((current) => ({
+      ...current,
+      documents: current.documents.map((document) => {
+        if (
+          document.key !== documentKey ||
+          document.photos[slot]?.id !== uploadId
+        ) {
+          return document;
+        }
+
+        return {
+          ...document,
+          photos: {
+            ...document.photos,
+            [slot]: nextUpload,
+          },
         };
       }),
     }));
@@ -514,4 +580,62 @@ function conflictField(details: unknown): unknown {
     "field" in details
     ? details.field
     : null;
+}
+
+function hasDocumentPhotoStatus(
+  form: CreatePersonFormState,
+  status: "uploading" | "failed",
+): boolean {
+  return form.documents.some((document) =>
+    v1.persons.PERSON_DOCUMENT_PHOTO_SLOTS.some(
+      (slot) => document.photos[slot]?.status === status,
+    ),
+  );
+}
+
+function firstDocumentPhotoWithStatus(
+  form: CreatePersonFormState,
+  status: "failed",
+): Extract<
+  CreatePersonDocumentFormState["photos"][v1.persons.PersonDocumentPhotoSlot],
+  { status: "failed" }
+> | null;
+function firstDocumentPhotoWithStatus(
+  form: CreatePersonFormState,
+  status: "uploading",
+): Extract<
+  CreatePersonDocumentFormState["photos"][v1.persons.PersonDocumentPhotoSlot],
+  { status: "uploading" }
+> | null;
+function firstDocumentPhotoWithStatus(
+  form: CreatePersonFormState,
+  status: "uploading" | "failed",
+):
+  | CreatePersonDocumentFormState["photos"][v1.persons.PersonDocumentPhotoSlot]
+  | null {
+  for (const document of form.documents) {
+    for (const slot of v1.persons.PERSON_DOCUMENT_PHOTO_SLOTS) {
+      const upload = document.photos[slot];
+      if (upload?.status === status) {
+        return upload as Extract<typeof upload, { status: typeof status }>;
+      }
+    }
+  }
+
+  return null;
+}
+
+function createDraftUploadId(): string {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+}
+
+async function sha256Hex(file: File): Promise<string> {
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    await file.arrayBuffer(),
+  );
+
+  return [...new Uint8Array(digest)]
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
 }

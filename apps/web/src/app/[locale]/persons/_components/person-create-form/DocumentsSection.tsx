@@ -2,9 +2,9 @@
 
 import { v1 } from "@repo/api-shared";
 import {
+  Button,
   CountrySelect,
   Input,
-  Label,
   Select,
   SelectContent,
   SelectItem,
@@ -12,8 +12,11 @@ import {
   SelectValue,
   Textarea,
 } from "@repo/ui/components";
+import { Trash2Icon } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { useEffect, useMemo } from "react";
 
+import { DocumentImageUploader } from "../DocumentImageUploader";
 import {
   DOCUMENT_PHOTO_ACCEPT,
   FOREIGN_IDENTITY_DOCUMENT_TYPES,
@@ -26,6 +29,7 @@ import { Under18Warning } from "./Under18Warning";
 import type {
   CreatePersonFormState,
   FormErrors,
+  PersonDocumentPhotoDraftUpload,
   SetPersonDocumentPhoto,
   SetPersonDocumentValue,
 } from "./types";
@@ -407,41 +411,25 @@ export function DocumentsSection({
                   {t("documentForm.photoHelp")}
                 </p>
               </div>
-              <div className="grid gap-3 sm:grid-cols-3">
-                {v1.persons.PERSON_DOCUMENT_PHOTO_SLOTS.map((slot) => {
+              <div className="grid gap-3 sm:grid-cols-2">
+                {v1.persons.PERSON_DOCUMENT_PHOTO_SLOTS.filter(
+                  (slot) => slot !== "other" || document.photos[slot],
+                ).map((slot) => {
                   const photoInputId = `${documentId}-${slot}-photo`;
                   const slotLabel = t(`documentPhotoSlots.${slot}`);
-                  const file = document.photos[slot];
+                  const upload = document.photos[slot];
 
                   return (
-                    <div key={slot} className="grid min-w-0 gap-2">
-                      <Label
-                        htmlFor={photoInputId}
-                        className="text-xs font-medium"
-                      >
-                        {t("detail.documents.photoUploadLabel", {
-                          slot: slotLabel,
-                        })}
-                      </Label>
-                      <Input
-                        id={photoInputId}
-                        type="file"
-                        accept={DOCUMENT_PHOTO_ACCEPT}
-                        disabled={disabled}
-                        onChange={(event) => {
-                          const selectedFile =
-                            event.currentTarget.files?.[0] ?? null;
-                          onSetDocumentPhoto(document.key, slot, selectedFile);
-                        }}
-                      />
-                      <p className="break-all text-xs text-muted-foreground">
-                        {file
-                          ? t("documentForm.selectedPhoto", {
-                              fileName: file.name,
-                            })
-                          : t("detail.documents.photoFileTypes")}
-                      </p>
-                    </div>
+                    <DocumentPhotoDraftCard
+                      key={slot}
+                      inputId={photoInputId}
+                      documentKey={document.key}
+                      slot={slot}
+                      slotLabel={slotLabel}
+                      upload={upload}
+                      disabled={disabled}
+                      onSetDocumentPhoto={onSetDocumentPhoto}
+                    />
                   );
                 })}
               </div>
@@ -460,4 +448,79 @@ export function DocumentsSection({
       ) : null}
     </FormSection>
   );
+}
+
+function DocumentPhotoDraftCard({
+  inputId,
+  documentKey,
+  slot,
+  slotLabel,
+  upload,
+  disabled,
+  onSetDocumentPhoto,
+}: {
+  inputId: string;
+  documentKey: string;
+  slot: v1.persons.PersonDocumentPhotoSlot;
+  slotLabel: string;
+  upload: PersonDocumentPhotoDraftUpload | undefined;
+  disabled: boolean;
+  onSetDocumentPhoto: SetPersonDocumentPhoto;
+}) {
+  const t = useTranslations("persons");
+  const previewUrl = useObjectUrl(upload?.file ?? null);
+  const uploadLabel = t("detail.documents.photoUploadLabel", {
+    slot: slotLabel,
+  });
+  const photoAlt = t("detail.documents.photoAlt", { slot: slotLabel });
+
+  return (
+    <DocumentImageUploader
+      inputId={inputId}
+      accept={DOCUMENT_PHOTO_ACCEPT}
+      uploadLabel={uploadLabel}
+      slotLabel={slotLabel}
+      imageUrl={previewUrl}
+      alt={photoAlt}
+      disabled={disabled}
+      missingLabel={t("detail.documents.missingPhoto")}
+      addLabel={t("detail.documents.addPhoto")}
+      replaceLabel={t("detail.documents.replacePhoto")}
+      formatsLabel={t("detail.documents.photoFileTypesShort")}
+      onFileSelected={(selectedFile) =>
+        onSetDocumentPhoto(documentKey, slot, selectedFile)
+      }
+      action={
+        upload ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="icon-sm"
+            aria-label={t("actions.deleteDocumentPhoto")}
+            disabled={disabled}
+            onClick={() => onSetDocumentPhoto(documentKey, slot, null)}
+          >
+            <Trash2Icon aria-hidden="true" />
+          </Button>
+        ) : null
+      }
+    />
+  );
+}
+
+function useObjectUrl(file: File | null): string | null {
+  const objectUrl = useMemo(
+    () => (file ? URL.createObjectURL(file) : null),
+    [file],
+  );
+
+  useEffect(() => {
+    return () => {
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [objectUrl]);
+
+  return objectUrl;
 }

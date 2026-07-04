@@ -9,6 +9,7 @@ import type {
   DateField,
   FieldValidationError,
   PersonDocumentFormFieldKey,
+  PersonDocumentPhotoDraftUploads,
 } from "./types";
 
 export function createPersonInput(
@@ -133,8 +134,28 @@ function createDocumentInput(document: CreatePersonDocumentFormState): {
   addOptional(input, "issuedOn", issuedOn.value);
   addOptional(input, "expiresOn", expiresOn.value);
   addOptional(input, "notes", document.notes);
+  const photoTokens = documentPhotoUploadTokens(document.photos);
+  if (Object.keys(photoTokens).length > 0) {
+    input.photos = photoTokens;
+  }
 
   return { input };
+}
+
+function documentPhotoUploadTokens(
+  photos: PersonDocumentPhotoDraftUploads,
+): Partial<Record<v1.persons.PersonDocumentPhotoSlot, string>> {
+  const tokens: Partial<Record<v1.persons.PersonDocumentPhotoSlot, string>> =
+    {};
+
+  for (const slot of v1.persons.PERSON_DOCUMENT_PHOTO_SLOTS) {
+    const photo = photos[slot];
+    if (photo?.status === "uploaded") {
+      tokens[slot] = photo.uploadToken;
+    }
+  }
+
+  return tokens;
 }
 
 function addOptional(

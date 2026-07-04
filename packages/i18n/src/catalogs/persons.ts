@@ -27,6 +27,8 @@ export const personsCatalog = {
       emailPerson: "Email {name}",
       call: "Call",
       callPerson: "Call {name}",
+      whatsapp: "WhatsApp",
+      whatsappPerson: "Message {name} on WhatsApp",
       apply: "Apply",
       moreActions: "More actions",
       uploadingDocumentPhoto: "Uploading...",
@@ -46,6 +48,10 @@ export const personsCatalog = {
       documentPhotoUploadErrorTitle: "Photos not uploaded",
       documentPhotoUploadErrorMessage:
         "The person was created, but at least one document photo was not uploaded.",
+      documentPhotoUploadPendingMessage:
+        "Wait for the selected document photo upload to finish.",
+      documentPhotoDraftUploadErrorMessage:
+        "The selected document photo was not uploaded. Try selecting it again.",
       documentPhotoDeletedMessage: "The document photo has been deleted.",
       deleteSuccessTitle: "Deleted",
       updateErrorTitle: "Changes not saved",
@@ -110,9 +116,14 @@ export const personsCatalog = {
         masked: "Sensitive document identifiers are masked.",
         photosTitle: "Document photos",
         noPhoto: "No photo",
+        missingPhoto: "Missing",
         photoAlt: "{slot} document photo",
         photoUploadLabel: "{slot} photo upload",
+        addPhoto: "Add photo",
+        replacePhoto: "Replace photo",
+        photoSources: "Camera, gallery, files",
         photoFileTypes: "JPEG, PNG, or WebP",
+        photoFileTypesShort: "JPEG • PNG • WebP",
         photoMetadata: "{contentType}, {byteSize} bytes",
       },
       dialogs: {
@@ -166,8 +177,11 @@ export const personsCatalog = {
       itemTitle: "Document {index}",
       required: "Required",
       optional: "Optional",
-      photoHelp: "Upload document images now, or add them later from details.",
+      photoHelp: "Optional. You can add them later.",
       selectedPhoto: "Selected: {fileName}",
+      uploadingPhoto: "Uploading: {fileName}",
+      uploadedPhoto: "Uploaded: {fileName}",
+      failedPhoto: "Upload failed: {fileName}",
     },
     fields: {
       firstName: "First name",
@@ -304,6 +318,8 @@ export const personsCatalog = {
       emailPerson: "Trimite email către {name}",
       call: "Sună",
       callPerson: "Sună {name}",
+      whatsapp: "WhatsApp",
+      whatsappPerson: "Trimite mesaj pe WhatsApp către {name}",
       apply: "Aplică",
       moreActions: "Mai multe acțiuni",
       uploadingDocumentPhoto: "Se încarcă...",
@@ -324,6 +340,10 @@ export const personsCatalog = {
       documentPhotoUploadErrorTitle: "Pozele nu au fost încărcate",
       documentPhotoUploadErrorMessage:
         "Persoana a fost creată, dar cel puțin o poză de document nu a fost încărcată.",
+      documentPhotoUploadPendingMessage:
+        "Așteaptă finalizarea încărcării pozei de document selectate.",
+      documentPhotoDraftUploadErrorMessage:
+        "Poza de document selectată nu a fost încărcată. Selecteaz-o din nou.",
       documentPhotoDeletedMessage: "Poza documentului a fost ștearsă.",
       deleteSuccessTitle: "Șters",
       updateErrorTitle: "Modificările nu au fost salvate",
@@ -389,9 +409,14 @@ export const personsCatalog = {
         masked: "Identificatorii sensibili ai documentelor sunt mascați.",
         photosTitle: "Poze document",
         noPhoto: "Fără poză",
+        missingPhoto: "Lipsește",
         photoAlt: "Poză document {slot}",
         photoUploadLabel: "Încărcare poză {slot}",
+        addPhoto: "Adaugă poză",
+        replacePhoto: "Înlocuiește poza",
+        photoSources: "Cameră, galerie, fișiere",
         photoFileTypes: "JPEG, PNG sau WebP",
+        photoFileTypesShort: "JPEG • PNG • WebP",
         photoMetadata: "{contentType}, {byteSize} bytes",
       },
       dialogs: {
@@ -446,9 +471,11 @@ export const personsCatalog = {
       itemTitle: "Document {index}",
       required: "Obligatoriu",
       optional: "Opțional",
-      photoHelp:
-        "Încarcă imaginile documentului acum sau adaugă-le ulterior din detalii.",
+      photoHelp: "Opțional. Le poți adăuga mai târziu.",
       selectedPhoto: "Selectat: {fileName}",
+      uploadingPhoto: "Se încarcă: {fileName}",
+      uploadedPhoto: "Încărcat: {fileName}",
+      failedPhoto: "Încărcare eșuată: {fileName}",
     },
     fields: {
       firstName: "Prenume",

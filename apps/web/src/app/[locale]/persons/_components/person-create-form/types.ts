@@ -46,8 +46,27 @@ export type FormErrorKey =
 
 export type FormErrors = Partial<Record<FormErrorKey, string>>;
 
-export type PersonDocumentPhotoFiles = Partial<
-  Record<v1.persons.PersonDocumentPhotoSlot, File>
+export type PersonDocumentPhotoDraftUpload =
+  | {
+      id: string;
+      status: "uploading";
+      file: File;
+    }
+  | {
+      id: string;
+      status: "uploaded";
+      file: File;
+      uploadToken: string;
+    }
+  | {
+      id: string;
+      status: "failed";
+      file: File;
+      message: string;
+    };
+
+export type PersonDocumentPhotoDraftUploads = Partial<
+  Record<v1.persons.PersonDocumentPhotoSlot, PersonDocumentPhotoDraftUpload>
 >;
 
 export interface CreatePersonFormState {
@@ -83,7 +102,7 @@ export interface CreatePersonDocumentFormState {
   issuedOn: DateParts;
   expiresOn: DateParts;
   status: v1.persons.PersonDocumentStatus;
-  photos: PersonDocumentPhotoFiles;
+  photos: PersonDocumentPhotoDraftUploads;
   notes: string;
 }
 

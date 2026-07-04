@@ -7,9 +7,11 @@ import { useTranslations } from "next-intl";
 
 export function FormActions({
   creating,
+  uploadingPhotos,
   personsHref,
 }: {
   creating: boolean;
+  uploadingPhotos: boolean;
   personsHref: string;
 }) {
   const t = useTranslations("persons");
@@ -36,9 +38,17 @@ export function FormActions({
           {t("actions.cancel")}
         </Link>
       )}
-      <Button type="submit" className="w-full sm:w-auto" disabled={creating}>
+      <Button
+        type="submit"
+        className="w-full sm:w-auto"
+        disabled={creating || uploadingPhotos}
+      >
         <UserPlusIcon data-icon="inline-start" />
-        {creating ? t("actions.creating") : t("actions.create")}
+        {creating
+          ? t("actions.creating")
+          : uploadingPhotos
+            ? t("actions.uploadingDocumentPhoto")
+            : t("actions.create")}
       </Button>
     </div>
   );
