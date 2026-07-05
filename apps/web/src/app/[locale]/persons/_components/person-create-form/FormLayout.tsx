@@ -9,11 +9,9 @@ export function FormSection({
   children: ReactNode;
 }) {
   return (
-    <section className="grid min-w-0 gap-4 rounded-lg bg-muted p-4 md:grid-cols-3 md:gap-6">
-      <h2 className="text-base font-semibold md:text-sm">{title}</h2>
-      <div className="grid min-w-0 gap-4 sm:grid-cols-2 md:col-span-2">
-        {children}
-      </div>
+    <section className="grid min-w-0 gap-4 rounded-lg bg-muted p-4">
+      <h2 className="text-base font-semibold">{title}</h2>
+      <div className="grid min-w-0 gap-4 sm:grid-cols-2">{children}</div>
     </section>
   );
 }

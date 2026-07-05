@@ -1,13 +1,7 @@
 "use client";
 
 import { v1 } from "@repo/api-shared";
-import {
-  Badge,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@repo/ui/components";
+import { Badge, Card, CardHeader, CardTitle } from "@repo/ui/components";
 import { cn } from "@repo/ui/lib/utils";
 import {
   BadgeAlertIcon,
@@ -16,6 +10,8 @@ import {
   CircleAlertIcon,
   FileTextIcon,
   IdCardIcon,
+  MailIcon,
+  PhoneIcon,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -103,39 +99,55 @@ export function PersonList({ items }: PersonListProps) {
                       {formatDate(person.createdAt, locale)}
                     </span>
                   </CardTitle>
-                  <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-sm text-muted-foreground">
-                    <span className="truncate font-medium">{person.email}</span>
-                    <span className="truncate font-medium">{person.phone}</span>
-                    {person.deletedAt && (
-                      <Badge variant="outline">
-                        {t("recordStatus.deleted")}
-                      </Badge>
-                    )}
+                  <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                    <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-muted-foreground md:flex-1">
+                      <span className="inline-flex min-w-0 max-w-full items-center gap-1.5 font-medium">
+                        <MailIcon
+                          aria-hidden="true"
+                          className={inlineIconClassName}
+                        />
+                        <span className="truncate">{person.email}</span>
+                      </span>
+                      <span className="inline-flex min-w-0 max-w-full items-center gap-1.5 font-medium">
+                        <PhoneIcon
+                          aria-hidden="true"
+                          className={inlineIconClassName}
+                        />
+                        <span className="truncate">{person.phone}</span>
+                      </span>
+                      {person.deletedAt && (
+                        <Badge variant="outline">
+                          {t("recordStatus.deleted")}
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="min-w-0 md:flex md:flex-1 md:justify-end">
+                      {person.documents.length > 0 ? (
+                        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap md:justify-end">
+                          {person.documents.map((document) => (
+                            <DocumentCard
+                              key={document.id}
+                              document={document}
+                              typeText={t(`documentTypes.${document.type}`)}
+                              statusText={t(
+                                `documentStatuses.${document.status}`,
+                              )}
+                            />
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 text-sm text-disabled-foreground md:justify-end">
+                          <FileTextIcon
+                            aria-hidden="true"
+                            className={inlineIconClassName}
+                          />
+                          {t("list.noDocuments")}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="flex flex-col gap-2">
-                {person.documents.length > 0 ? (
-                  <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-                    {person.documents.map((document) => (
-                      <DocumentCard
-                        key={document.id}
-                        document={document}
-                        typeText={t(`documentTypes.${document.type}`)}
-                        statusText={t(`documentStatuses.${document.status}`)}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <span className="inline-flex items-center gap-1.5 text-sm text-disabled-foreground">
-                    <FileTextIcon
-                      aria-hidden="true"
-                      className={inlineIconClassName}
-                    />
-                    {t("list.noDocuments")}
-                  </span>
-                )}
-              </CardContent>
             </Card>
           </li>
         );
@@ -159,7 +171,7 @@ function DocumentCard({
   return (
     <div
       className={cn(
-        "flex flex-col gap-2 rounded-lg border p-2.5 text-sm",
+        "flex min-w-0 flex-col gap-2 rounded-lg border p-2.5 text-sm",
         documentStatusClasses[document.status],
       )}
     >
