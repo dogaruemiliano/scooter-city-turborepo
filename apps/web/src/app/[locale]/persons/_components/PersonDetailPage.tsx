@@ -25,6 +25,7 @@ import {
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
   Input,
   Label,
@@ -49,12 +50,12 @@ import {
   IdCardIcon,
   MailIcon,
   MapPinIcon,
+  MessageCircleIcon,
   PencilIcon,
   PhoneIcon,
   PlusIcon,
   RefreshCwIcon,
   Trash2Icon,
-  UploadIcon,
   UserRoundIcon,
   type LucideIcon,
 } from "lucide-react";
@@ -64,6 +65,8 @@ import { useLocale, useTranslations } from "next-intl";
 import { useId, useState, type FormEvent, type ReactNode } from "react";
 
 import { webApi } from "@/lib/api";
+
+import { DocumentImageUploader } from "./DocumentImageUploader";
 
 interface PersonDetailPageProps {
   person: v1.persons.Person;
@@ -124,10 +127,15 @@ export function PersonDetailPage({
   const locale = useLocale();
   const router = useRouter();
   const fullName = `${person.firstName} ${person.lastName}`;
+  const whatsappHref = whatsappHrefForPhone(person.phone);
   const readiness = getRentalReadiness(person);
   const readinessIsReady = readiness.issues.length === 0;
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [editPersonOpen, setEditPersonOpen] = useState(false);
+  const [editPersonDialogKey, setEditPersonDialogKey] = useState(0);
+  const [addDocumentOpen, setAddDocumentOpen] = useState(false);
+  const [addDocumentDialogKey, setAddDocumentDialogKey] = useState(0);
   const [deletePersonOpen, setDeletePersonOpen] = useState(false);
   const [photosByDocumentId, setPhotosByDocumentId] =
     useState<DocumentPhotosByDocumentId>(() => documentPhotos);
@@ -445,43 +453,73 @@ export function PersonDetailPage({
                   : t("detail.readiness.reviewTitle")}
               </Badge>
             </div>
-            <div className="flex flex-wrap gap-2 md:justify-end">
-              <Link
-                href={`mailto:${person.email}`}
-                className={buttonVariants({ variant: "outline", size: "sm" })}
-              >
-                <MailIcon data-icon="inline-start" />
-                {t("actions.email")}
-              </Link>
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
               <Link
                 href={`tel:${person.phone}`}
-                className={buttonVariants({ variant: "outline", size: "sm" })}
+                className={buttonVariants({
+                  size: "lg",
+                  className: "w-full sm:w-auto",
+                })}
               >
                 <PhoneIcon data-icon="inline-start" />
                 {t("actions.call")}
               </Link>
-              <PersonFormDialog
-                person={person}
-                busy={busyAction === "person:update"}
-                onSubmit={updatePerson}
-              />
-              <DocumentFormDialog
-                title={t("detail.dialogs.addDocumentTitle")}
-                triggerLabel={t("actions.addDocument")}
-                triggerIcon={<PlusIcon data-icon="inline-start" />}
-                busy={busyAction === "document:create"}
-                onSubmit={(input) =>
-                  createDocument(input as v1.persons.CreatePersonDocumentInput)
-                }
-              />
+              <Link
+                href={whatsappHref}
+                target="_blank"
+                rel="noreferrer"
+                className={buttonVariants({
+                  variant: "secondary",
+                  size: "lg",
+                  className: "w-full sm:w-auto",
+                })}
+              >
+                <MessageCircleIcon data-icon="inline-start" />
+                {t("actions.whatsapp")}
+              </Link>
               <DropdownMenu>
                 <DropdownMenuTrigger
-                  render={<Button variant="outline" size="sm" />}
+                  render={
+                    <Button
+                      variant="outline"
+                      size="lg"
+                      className="col-span-2 w-full sm:w-auto"
+                    />
+                  }
                 >
                   <EllipsisIcon data-icon="inline-start" />
                   {t("actions.moreActions")}
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
+                <DropdownMenuContent align="end" className="w-auto min-w-48">
+                  <DropdownMenuGroup>
+                    <DropdownMenuItem
+                      disabled={busyAction !== null}
+                      onClick={() => {
+                        setEditPersonDialogKey((current) => current + 1);
+                        setEditPersonOpen(true);
+                      }}
+                    >
+                      <PencilIcon data-icon="inline-start" />
+                      {t("actions.editPerson")}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      disabled={busyAction !== null}
+                      onClick={() => {
+                        setAddDocumentDialogKey((current) => current + 1);
+                        setAddDocumentOpen(true);
+                      }}
+                    >
+                      <PlusIcon data-icon="inline-start" />
+                      {t("actions.addDocument")}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      render={<a href={`mailto:${person.email}`} />}
+                    >
+                      <MailIcon data-icon="inline-start" />
+                      {t("actions.email")}
+                    </DropdownMenuItem>
+                  </DropdownMenuGroup>
+                  <DropdownMenuSeparator />
                   <DropdownMenuGroup>
                     <DropdownMenuItem
                       variant="destructive"
@@ -494,6 +532,25 @@ export function PersonDetailPage({
                   </DropdownMenuGroup>
                 </DropdownMenuContent>
               </DropdownMenu>
+              <PersonFormDialog
+                key={editPersonDialogKey}
+                person={person}
+                busy={busyAction === "person:update"}
+                open={editPersonOpen}
+                onOpenChange={setEditPersonOpen}
+                renderTrigger={false}
+                onSubmit={updatePerson}
+              />
+              <DocumentFormDialog
+                key={addDocumentDialogKey}
+                title={t("detail.dialogs.addDocumentTitle")}
+                busy={busyAction === "document:create"}
+                open={addDocumentOpen}
+                onOpenChange={setAddDocumentOpen}
+                onSubmit={(input) =>
+                  createDocument(input as v1.persons.CreatePersonDocumentInput)
+                }
+              />
               <ConfirmationDialog
                 open={deletePersonOpen}
                 onOpenChange={setDeletePersonOpen}
@@ -733,20 +790,28 @@ function DetailField({
 function PersonFormDialog({
   person,
   busy,
+  open,
+  onOpenChange,
+  renderTrigger = true,
   onSubmit,
 }: {
   person: v1.persons.Person;
   busy: boolean;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  renderTrigger?: boolean;
   onSubmit: (input: v1.persons.UpdatePersonInput) => Promise<boolean>;
 }) {
   const t = useTranslations("persons");
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
   const [form, setForm] = useState(() => personFormState(person));
   const [error, setError] = useState<string | null>(null);
+  const actualOpen = open ?? internalOpen;
+  const setActualOpen = onOpenChange ?? setInternalOpen;
 
   function changeOpen(nextOpen: boolean) {
     if (busy) return;
-    setOpen(nextOpen);
+    setActualOpen(nextOpen);
     if (nextOpen) {
       setForm(personFormState(person));
       setError(null);
@@ -778,7 +843,7 @@ function PersonFormDialog({
     }
 
     if (await onSubmit(input.data)) {
-      setOpen(false);
+      setActualOpen(false);
     }
   }
 
@@ -790,13 +855,15 @@ function PersonFormDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={changeOpen}>
-      <DialogTrigger
-        render={<Button type="button" variant="outline" size="sm" />}
-      >
-        <PencilIcon data-icon="inline-start" />
-        {t("actions.editPerson")}
-      </DialogTrigger>
+    <Dialog open={actualOpen} onOpenChange={changeOpen}>
+      {renderTrigger ? (
+        <DialogTrigger
+          render={<Button type="button" variant="outline" size="sm" />}
+        >
+          <PencilIcon data-icon="inline-start" />
+          {t("actions.editPerson")}
+        </DialogTrigger>
+      ) : null}
       <DialogContent>
         <form
           className="grid gap-4"
@@ -899,10 +966,12 @@ function PersonFormDialog({
 
 type DocumentFormDialogProps = {
   title: string;
-  triggerLabel: string;
-  triggerIcon: ReactNode;
+  triggerLabel?: string;
+  triggerIcon?: ReactNode;
   document?: v1.persons.PersonDocument;
   busy: boolean;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   submitMode?: "create" | "update";
   onSubmit: (
     input:
@@ -917,17 +986,21 @@ function DocumentFormDialog({
   triggerIcon,
   document,
   busy,
+  open,
+  onOpenChange,
   submitMode = "create",
   onSubmit,
 }: DocumentFormDialogProps) {
   const t = useTranslations("persons");
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
   const [form, setForm] = useState(() => documentFormState(document));
   const [error, setError] = useState<string | null>(null);
+  const actualOpen = open ?? internalOpen;
+  const setActualOpen = onOpenChange ?? setInternalOpen;
 
   function changeOpen(nextOpen: boolean) {
     if (busy) return;
-    setOpen(nextOpen);
+    setActualOpen(nextOpen);
     if (nextOpen) {
       setForm(documentFormState(document));
       setError(null);
@@ -959,7 +1032,7 @@ function DocumentFormDialog({
       }
 
       if (await onSubmit(input.data)) {
-        setOpen(false);
+        setActualOpen(false);
       }
       return;
     }
@@ -972,7 +1045,7 @@ function DocumentFormDialog({
     }
 
     if (await onSubmit(input.data)) {
-      setOpen(false);
+      setActualOpen(false);
     }
   }
 
@@ -984,13 +1057,15 @@ function DocumentFormDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={changeOpen}>
-      <DialogTrigger
-        render={<Button type="button" variant="outline" size="sm" />}
-      >
-        {triggerIcon}
-        {triggerLabel}
-      </DialogTrigger>
+    <Dialog open={actualOpen} onOpenChange={changeOpen}>
+      {triggerLabel ? (
+        <DialogTrigger
+          render={<Button type="button" variant="outline" size="sm" />}
+        >
+          {triggerIcon}
+          {triggerLabel}
+        </DialogTrigger>
+      ) : null}
       <DialogContent>
         <form
           className="grid gap-4"
@@ -1092,6 +1167,10 @@ function ConfirmationDialog({
   onOpenChange,
   triggerLabel,
   triggerIcon,
+  triggerAriaLabel,
+  triggerButtonClassName,
+  triggerLabelClassName,
+  triggerSize = "sm",
   title,
   description,
   confirmLabel,
@@ -1102,6 +1181,10 @@ function ConfirmationDialog({
   onOpenChange?: (open: boolean) => void;
   triggerLabel?: string;
   triggerIcon?: ReactNode;
+  triggerAriaLabel?: string;
+  triggerButtonClassName?: string;
+  triggerLabelClassName?: string;
+  triggerSize?: "sm" | "icon-sm";
   title: string;
   description: string;
   confirmLabel: string;
@@ -1128,10 +1211,18 @@ function ConfirmationDialog({
     <Dialog open={actualOpen} onOpenChange={changeOpen}>
       {triggerLabel ? (
         <DialogTrigger
-          render={<Button type="button" variant="outline" size="sm" />}
+          render={
+            <Button
+              type="button"
+              variant="outline"
+              size={triggerSize}
+              aria-label={triggerAriaLabel}
+              className={triggerButtonClassName}
+            />
+          }
         >
           {triggerIcon}
-          {triggerLabel}
+          <span className={triggerLabelClassName}>{triggerLabel}</span>
         </DialogTrigger>
       ) : null}
       <DialogContent>
@@ -1480,8 +1571,10 @@ function DocumentPhotosPanel({
           {t("detail.documents.photosTitle")}
         </h3>
       </div>
-      <div className="grid gap-3">
-        {v1.persons.PERSON_DOCUMENT_PHOTO_SLOTS.map((slot) => {
+      <div className="grid gap-3 sm:grid-cols-2">
+        {v1.persons.PERSON_DOCUMENT_PHOTO_SLOTS.filter(
+          (slot) => slot !== "other" || photosBySlot.has(slot),
+        ).map((slot) => {
           const photo = photosBySlot.get(slot);
           const inputId = `document-${documentId}-${slot}-photo`;
           const uploadBusy =
@@ -1493,94 +1586,97 @@ function DocumentPhotosPanel({
           const imageUrl = photo ? webApi.url(photo.contentUrl) : null;
 
           return (
-            <div
+            <DocumentPhotoCard
               key={slot}
-              className="grid gap-2 border-t border-border pt-3 first:border-t-0 first:pt-0"
-            >
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant="outline">{slotLabel}</Badge>
-                  <span className="text-xs text-muted-foreground">
-                    {photo
-                      ? t("detail.documents.photoMetadata", {
-                          contentType: photo.contentType,
-                          byteSize: photo.byteSize,
-                        })
-                      : t("detail.documents.noPhoto")}
-                  </span>
-                </div>
-                {photo ? (
-                  <ConfirmationDialog
-                    triggerLabel={t("actions.deleteDocumentPhoto")}
-                    triggerIcon={<Trash2Icon data-icon="inline-start" />}
-                    title={t("detail.dialogs.deleteDocumentPhotoTitle")}
-                    description={t(
-                      "detail.dialogs.deleteDocumentPhotoDescription",
-                    )}
-                    confirmLabel={t("actions.deleteDocumentPhoto")}
-                    busy={deleteBusy}
-                    onConfirm={() => onDeletePhoto(slot)}
-                  />
-                ) : null}
-              </div>
-
-              {photo && imageUrl ? (
-                <a
-                  href={imageUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="block overflow-hidden rounded-lg border border-border bg-muted"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element -- protected API images must load with browser cookies */}
-                  <img
-                    src={imageUrl}
-                    alt={t("detail.documents.photoAlt", { slot: slotLabel })}
-                    className="h-40 w-full object-cover"
-                  />
-                </a>
-              ) : (
-                <div className="flex h-24 items-center justify-center rounded-lg border border-dashed border-border bg-muted text-muted-foreground">
-                  <ImageIcon aria-hidden="true" className="size-5" />
-                  <span className="sr-only">
-                    {t("detail.documents.noPhoto")}
-                  </span>
-                </div>
-              )}
-
-              <div className="grid gap-2 sm:flex sm:items-end sm:justify-between">
-                <div className="grid flex-1 gap-1">
-                  <Label htmlFor={inputId} className="text-xs font-medium">
-                    {t("detail.documents.photoUploadLabel", {
-                      slot: slotLabel,
-                    })}
-                  </Label>
-                  <Input
-                    id={inputId}
-                    type="file"
-                    accept={documentPhotoAccept}
-                    disabled={disabled}
-                    onChange={(event) => {
-                      const input = event.currentTarget;
-                      const file = input.files?.[0];
-                      if (!file) return;
-                      void onUploadPhoto(slot, file).finally(() => {
-                        input.value = "";
-                      });
-                    }}
-                  />
-                </div>
-                <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <UploadIcon aria-hidden="true" className="size-3.5" />
-                  {uploadBusy
-                    ? t("actions.uploadingDocumentPhoto")
-                    : t("detail.documents.photoFileTypes")}
-                </span>
-              </div>
-            </div>
+              inputId={inputId}
+              slot={slot}
+              slotLabel={slotLabel}
+              photo={photo}
+              imageUrl={imageUrl}
+              uploadBusy={uploadBusy}
+              deleteBusy={deleteBusy}
+              disabled={disabled}
+              onUploadPhoto={onUploadPhoto}
+              onDeletePhoto={onDeletePhoto}
+            />
           );
         })}
       </div>
     </div>
+  );
+}
+
+function DocumentPhotoCard({
+  inputId,
+  slot,
+  slotLabel,
+  photo,
+  imageUrl,
+  uploadBusy,
+  deleteBusy,
+  disabled,
+  onUploadPhoto,
+  onDeletePhoto,
+}: {
+  inputId: string;
+  slot: v1.persons.PersonDocumentPhotoSlot;
+  slotLabel: string;
+  photo: v1.persons.PersonDocumentPhoto | undefined;
+  imageUrl: string | null;
+  uploadBusy: boolean;
+  deleteBusy: boolean;
+  disabled: boolean;
+  onUploadPhoto: (
+    slot: v1.persons.PersonDocumentPhotoSlot,
+    file: File,
+  ) => Promise<boolean>;
+  onDeletePhoto: (slot: v1.persons.PersonDocumentPhotoSlot) => Promise<boolean>;
+}) {
+  const t = useTranslations("persons");
+  const uploadLabel = t("detail.documents.photoUploadLabel", {
+    slot: slotLabel,
+  });
+  const photoAlt = t("detail.documents.photoAlt", { slot: slotLabel });
+
+  return (
+    <DocumentImageUploader
+      inputId={inputId}
+      accept={documentPhotoAccept}
+      uploadLabel={uploadLabel}
+      slotLabel={slotLabel}
+      imageUrl={imageUrl}
+      alt={photoAlt}
+      disabled={disabled}
+      missingLabel={t("detail.documents.missingPhoto")}
+      addLabel={t("detail.documents.addPhoto")}
+      replaceLabel={
+        uploadBusy
+          ? t("actions.uploadingDocumentPhoto")
+          : t("detail.documents.replacePhoto")
+      }
+      formatsLabel={t("detail.documents.photoFileTypesShort")}
+      onFileSelected={(file) => {
+        if (!file) return;
+        void onUploadPhoto(slot, file);
+      }}
+      action={
+        photo ? (
+          <ConfirmationDialog
+            triggerLabel={t("actions.deleteDocumentPhoto")}
+            triggerIcon={<Trash2Icon aria-hidden="true" />}
+            triggerAriaLabel={t("actions.deleteDocumentPhoto")}
+            triggerButtonClassName="bg-background/95 shadow-sm"
+            triggerLabelClassName="sr-only"
+            triggerSize="icon-sm"
+            title={t("detail.dialogs.deleteDocumentPhotoTitle")}
+            description={t("detail.dialogs.deleteDocumentPhotoDescription")}
+            confirmLabel={t("actions.deleteDocumentPhoto")}
+            busy={deleteBusy}
+            onConfirm={() => onDeletePhoto(slot)}
+          />
+        ) : null
+      }
+    />
   );
 }
 
@@ -1847,6 +1943,10 @@ function sortDocumentPhotos(
       (slotOrder.get(first.slot) ?? Number.MAX_SAFE_INTEGER) -
       (slotOrder.get(second.slot) ?? Number.MAX_SAFE_INTEGER),
   );
+}
+
+function whatsappHrefForPhone(phone: string): string {
+  return `https://wa.me/${phone.replace(/\D/g, "")}`;
 }
 
 function blankToNull(value: string): string | null {

@@ -160,12 +160,14 @@ describe("PersonDetailPage", () => {
     expect(screen.getByText("*********3450")).toBeInTheDocument();
     expect(screen.queryByText("123456")).not.toBeInTheDocument();
     expect(screen.queryByText("1900228123450")).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Edit person" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Add document" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Call" })).toHaveAttribute(
+      "href",
+      "tel:+40712345678",
+    );
+    expect(screen.getByRole("link", { name: "WhatsApp" })).toHaveAttribute(
+      "href",
+      "https://wa.me/40712345678",
+    );
     expect(
       screen.getByRole("button", { name: "More actions" }),
     ).toBeInTheDocument();
@@ -176,6 +178,28 @@ describe("PersonDetailPage", () => {
     expect(screen.getByText("admin@example.com")).toBeInTheDocument();
   });
 
+  it("moves secondary person actions into the more menu", async () => {
+    const browser = userEvent.setup();
+
+    renderDetail();
+    expect(
+      screen.queryByRole("button", { name: "Edit person" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Add document" }),
+    ).not.toBeInTheDocument();
+
+    await browser.click(screen.getByRole("button", { name: "More actions" }));
+    const menu = await screen.findByRole("menu");
+
+    expect(within(menu).getByText("Edit person")).toBeInTheDocument();
+    expect(within(menu).getByText("Add document")).toBeInTheDocument();
+    expect(
+      within(menu).getByRole("menuitem", { name: "Email" }),
+    ).toHaveAttribute("href", "mailto:ada@example.com");
+    expect(within(menu).getByText("Delete person")).toBeInTheDocument();
+  });
+
   it("updates the person from the edit dialog", async () => {
     mocks.apiFetch.mockResolvedValueOnce({
       ...readyPerson,
@@ -184,7 +208,8 @@ describe("PersonDetailPage", () => {
     const browser = userEvent.setup();
 
     renderDetail();
-    await browser.click(screen.getByRole("button", { name: "Edit person" }));
+    await browser.click(screen.getByRole("button", { name: "More actions" }));
+    await browser.click(await screen.findByText("Edit person"));
     const dialog = await screen.findByRole("dialog");
     await browser.clear(within(dialog).getByLabelText("First name"));
     await browser.type(within(dialog).getByLabelText("First name"), "Grace");
