@@ -1,8 +1,7 @@
 # `web` - Next.js App
 
-Next.js 16 App Router client for the template. The web app renders the product
-shell, sign-in/account flows, locale routing, theme controls, and shared UI
-component previews.
+Next.js 16 App Router client for the web workspace. The web app renders the
+product shell, sign-in/account flows, locale routing, and theme controls.
 
 The API remains the source of truth for authentication. The web app verifies
 access JWTs locally through the API JWKS and uses `@repo/api-shared` for route
@@ -16,7 +15,6 @@ constants, schemas, and `apiFetch`.
 - Verify access JWTs on the server through `src/lib/auth-server.ts`.
 - Refresh expired browser sessions through the web auth adapter.
 - Consume shared components from `@repo/ui` and theme CSS from `@repo/theme`.
-- Provide an interactive shared UI reference at `/shadcn`.
 
 ## Local Development
 
@@ -75,10 +73,9 @@ Cookie-authenticated mutations must go through `apiFetch` or manually include
 
 | Route               | Purpose                                                          |
 | ------------------- | ---------------------------------------------------------------- |
-| `/`                 | Localized landing/dashboard entry.                               |
+| `/`                 | Localized dashboard entry.                                       |
 | `/sign-in`          | Email OTP and Google sign-in when enabled/configured.            |
 | `/account/settings` | Profile, linked providers, sessions, logout-all, delete account. |
-| `/shadcn`           | Internal shared UI component reference.                          |
 
 Apple sign-in has API support but no web UI yet. See
 [../../docs/missing-work.md](../../docs/missing-work.md).

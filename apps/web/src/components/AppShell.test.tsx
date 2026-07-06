@@ -91,12 +91,10 @@ describe("AppShell", () => {
     renderAppShell();
 
     expect(
-      screen.getByRole("link", { name: "Panou principal" }),
-    ).toHaveAttribute("href", "/");
-    expect(screen.getByRole("link", { name: "Galerie UI" })).toHaveAttribute(
-      "href",
-      "/shadcn",
-    );
+      screen
+        .getAllByRole("link", { name: "Panou principal" })
+        .map((link) => link.getAttribute("href")),
+    ).toContain("/");
     expect(
       screen.queryByRole("link", { name: "Persoane" }),
     ).not.toBeInTheDocument();
@@ -152,18 +150,15 @@ describe("AppShell", () => {
   });
 
   it("keeps navigation links on the English locale prefix", async () => {
-    mocks.pathname = "/en/shadcn";
+    mocks.pathname = "/en";
 
     renderAppShell();
 
-    expect(screen.getByRole("link", { name: "Dashboard" })).toHaveAttribute(
-      "href",
-      "/en",
-    );
-    expect(screen.getByRole("link", { name: "UI showcase" })).toHaveAttribute(
-      "href",
-      "/en/shadcn",
-    );
+    expect(
+      screen
+        .getAllByRole("link", { name: "Dashboard" })
+        .map((link) => link.getAttribute("href")),
+    ).toContain("/en");
 
     fireEvent.mouseDown(
       screen.getByRole("button", { name: "Open account menu" }),
@@ -180,7 +175,11 @@ describe("AppShell", () => {
       value: 390,
     });
 
-    renderAppShell();
+    renderAppShell({
+      id: "admin-1",
+      email: "admin@example.com",
+      roles: ["ADMIN"],
+    });
 
     const trigger = await screen.findByRole("button", {
       name: "Open navigation",
@@ -192,14 +191,12 @@ describe("AppShell", () => {
       expect(trigger).toHaveAttribute("aria-expanded", "true"),
     );
 
-    const uiShowcaseLink = screen.getByRole("link", { name: "Galerie UI" });
+    const personsLink = screen.getByRole("link", { name: "Persoane" });
 
-    uiShowcaseLink.addEventListener(
-      "click",
-      (event) => event.preventDefault(),
-      { once: true },
-    );
-    fireEvent.click(uiShowcaseLink);
+    personsLink.addEventListener("click", (event) => event.preventDefault(), {
+      once: true,
+    });
+    fireEvent.click(personsLink);
 
     await waitFor(() =>
       expect(trigger).toHaveAttribute("aria-expanded", "false"),

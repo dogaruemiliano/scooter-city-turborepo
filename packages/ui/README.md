@@ -5,7 +5,7 @@ Shared web components use `@repo/theme` tokens and Tailwind CSS v4.
 ## Responsibilities
 
 - Provide reusable React components for `apps/web`.
-- Wrap Base UI/shadcn primitives in the template's token system.
+- Wrap Base UI and shadcn primitives in the project's token system.
 - Export app-consumable components through explicit package entry points.
 - Maintain Storybook examples for reusable components.
 
@@ -22,8 +22,6 @@ Generated components are available from `@repo/ui/components` or individual
 `@repo/ui/components/*` entry points. Their flat color roles come from
 `@repo/theme`; add missing semantic roles there before introducing new visual
 values.
-
-The complete interactive reference is available at `/shadcn` in the web app.
 
 ## Commands
 

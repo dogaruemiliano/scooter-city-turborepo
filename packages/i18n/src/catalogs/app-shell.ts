@@ -3,14 +3,12 @@ export const appShellCatalog = {
     nav: {
       dashboard: "Dashboard",
       persons: "Persons",
-      uiShowcase: "UI showcase",
     },
     pages: {
       dashboard: "Dashboard",
       accountSettings: "Account settings",
       persons: "Persons",
       newPerson: "New person",
-      uiShowcase: "UI showcase",
     },
     workspace: {
       name: "DecTech",
@@ -27,14 +25,12 @@ export const appShellCatalog = {
     nav: {
       dashboard: "Panou principal",
       persons: "Persoane",
-      uiShowcase: "Galerie UI",
     },
     pages: {
       dashboard: "Panou principal",
       accountSettings: "Setări cont",
       persons: "Persoane",
       newPerson: "Persoană nouă",
-      uiShowcase: "Galerie UI",
     },
     workspace: {
       name: "DecTech",
