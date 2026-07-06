@@ -533,7 +533,7 @@ export function PersonDetailPage({
                 </DropdownMenuContent>
               </DropdownMenu>
               <PersonFormDialog
-                key={editPersonDialogKey}
+                key={`edit-person-${editPersonDialogKey}`}
                 person={person}
                 busy={busyAction === "person:update"}
                 open={editPersonOpen}
@@ -542,7 +542,7 @@ export function PersonDetailPage({
                 onSubmit={updatePerson}
               />
               <DocumentFormDialog
-                key={addDocumentDialogKey}
+                key={`add-document-${addDocumentDialogKey}`}
                 title={t("detail.dialogs.addDocumentTitle")}
                 busy={busyAction === "document:create"}
                 open={addDocumentOpen}
