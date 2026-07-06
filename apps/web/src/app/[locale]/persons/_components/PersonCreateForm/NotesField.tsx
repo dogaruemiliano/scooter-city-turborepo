@@ -4,7 +4,7 @@ import { Textarea } from "@repo/ui/components";
 import { useTranslations } from "next-intl";
 
 import { fieldErrorId, invalidAria } from "./errors";
-import { FormField } from "./FormLayout";
+import { FormField } from "./FormField";
 
 export function NotesField({
   formId,

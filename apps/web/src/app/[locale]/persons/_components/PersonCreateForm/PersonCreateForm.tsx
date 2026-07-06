@@ -10,12 +10,12 @@ import { useLocale, useTranslations } from "next-intl";
 import { useId, useState, type FormEvent } from "react";
 
 import { webApi } from "@/lib/api";
-import { AddressSection } from "./person-create-form/AddressSection";
-import { CitizenshipToggle } from "./person-create-form/CitizenshipToggle";
-import { ContactSection } from "./person-create-form/ContactSection";
-import { CreateFormFeedback } from "./person-create-form/CreateFormFeedback";
-import { DocumentsSection } from "./person-create-form/DocumentsSection";
-import { emptyDateParts } from "./person-create-form/date-utils";
+import { AddressSection } from "./AddressSection";
+import { CitizenshipToggle } from "./CitizenshipToggle";
+import { ContactSection } from "./ContactSection";
+import { CreateFormFeedback } from "./CreateFormFeedback";
+import { emptyDateParts } from "./date-utils";
+import { DocumentsSection } from "./DocumentsSection";
 import {
   documentFieldErrorKey,
   documentFieldFromErrorKey,
@@ -24,15 +24,15 @@ import {
   isBlankField,
   isDocumentFieldErrorKey,
   isPersonFormFieldKey,
-} from "./person-create-form/errors";
-import { FormActions } from "./person-create-form/FormActions";
+} from "./errors";
+import { FormActions } from "./FormActions";
 import {
   createEmptyCreateForm,
   createInitialDocuments,
   isUnder18Person,
-} from "./person-create-form/form-state";
-import { createPersonInput } from "./person-create-form/input";
-import { NotesField } from "./person-create-form/NotesField";
+} from "./form-state";
+import { createPersonInput } from "./input";
+import { NotesField } from "./NotesField";
 import type {
   CreatePersonDocumentFormState,
   CreatePersonFormState,
@@ -43,7 +43,7 @@ import type {
   PersonCitizenship,
   PersonCreateFormProps,
   PersonDocumentFormFieldKey,
-} from "./person-create-form/types";
+} from "./types";
 
 export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
   const t = useTranslations("persons");

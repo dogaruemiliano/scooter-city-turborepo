@@ -9,7 +9,8 @@ import { useTranslations } from "next-intl";
 
 import { DatePartsInput } from "./DatePartsInput";
 import { fieldErrorId, invalidAria } from "./errors";
-import { FormField, FormSection } from "./FormLayout";
+import { FormField } from "./FormField";
+import { FormSection } from "./FormSection";
 import { Under18Warning } from "./Under18Warning";
 import type {
   CreatePersonFormState,

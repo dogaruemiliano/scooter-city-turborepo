@@ -5,7 +5,8 @@ import { useTranslations } from "next-intl";
 
 import { ROMANIAN_COUNTIES } from "./constants";
 import { fieldErrorId, invalidAria } from "./errors";
-import { FormField, FormSection } from "./FormLayout";
+import { FormField } from "./FormField";
+import { FormSection } from "./FormSection";
 import type {
   CreatePersonFormState,
   FormErrors,
