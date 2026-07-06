@@ -385,57 +385,78 @@ function MonthGrid({
 }) {
   const weekdays = getWeekdayLabels(locale, weekStartsOn);
   const dates = getVisibleDates(view, weekStartsOn);
+  const gridRef = React.useRef<HTMLDivElement>(null);
+  const [gridHeight, setGridHeight] = React.useState<number | null>(null);
+
+  useIsomorphicLayoutEffect(() => {
+    const element = gridRef.current;
+
+    if (!element) {
+      return;
+    }
+
+    setGridHeight(element.getBoundingClientRect().height);
+  }, [dates.length]);
 
   return (
-    <div className="animate-in fade-in-0 slide-in-from-bottom-2 duration-fast ease-standard">
-      <div className="grid grid-cols-7 gap-y-3">
-        {weekdays.map((weekday) => (
-          <div
-            aria-hidden="true"
-            className="flex h-10 items-center justify-center text-base font-semibold text-foreground"
-            key={weekday}
-          >
-            {weekday}
-          </div>
-        ))}
-
-        {dates.map((date) => {
-          const dateValue = formatDateOnly(date);
-          const isSelected = selectedDate
-            ? isSameDate(date, selectedDate)
-            : false;
-          const isToday = isSameDate(date, todayDate);
-          const isCurrentMonth = date.monthIndex === view.monthIndex;
-          const isDisabled = isDateOutsideYearRange(date, yearRange);
-
-          return (
+    <div
+      className="animate-in overflow-hidden fade-in-0 slide-in-from-bottom-2 transition-[height] duration-fast ease-standard"
+      style={gridHeight === null ? undefined : { height: gridHeight }}
+    >
+      <div ref={gridRef} className="flex flex-col gap-3">
+        <div
+          aria-hidden="true"
+          className="grid grid-cols-7 border-b border-border pb-2"
+        >
+          {weekdays.map((weekday, weekdayIndex) => (
             <div
-              className="flex h-12 items-center justify-center"
-              key={dateValue}
+              className="flex h-8 items-center justify-center text-sm font-bold text-muted-foreground"
+              key={weekdayIndex}
             >
-              <Button
-                aria-current={isToday ? "date" : undefined}
-                aria-label={formatFullDate(date, locale)}
-                aria-pressed={isSelected}
-                className={cn(
-                  "rounded-full text-base font-medium",
-                  !isSelected &&
-                    "text-foreground hover:bg-secondary-hover active:bg-secondary-active",
-                  !isCurrentMonth && "text-muted-foreground",
-                  isToday && !isSelected && "border-primary text-primary",
-                  isSelected && "bg-primary text-primary-foreground",
-                )}
-                disabled={isDisabled}
-                onClick={() => onSelectDate(date)}
-                size="icon-lg"
-                type="button"
-                variant={isSelected ? "default" : "ghost"}
-              >
-                {date.day}
-              </Button>
+              {weekday}
             </div>
-          );
-        })}
+          ))}
+        </div>
+
+        <div className="grid grid-cols-7 gap-y-3">
+          {dates.map((date) => {
+            const dateValue = formatDateOnly(date);
+            const isSelected = selectedDate
+              ? isSameDate(date, selectedDate)
+              : false;
+            const isToday = isSameDate(date, todayDate);
+            const isCurrentMonth = date.monthIndex === view.monthIndex;
+            const isDisabled = isDateOutsideYearRange(date, yearRange);
+
+            return (
+              <div
+                className="flex h-12 items-center justify-center"
+                key={dateValue}
+              >
+                <Button
+                  aria-current={isToday ? "date" : undefined}
+                  aria-label={formatFullDate(date, locale)}
+                  aria-pressed={isSelected}
+                  className={cn(
+                    "rounded-full text-base font-medium",
+                    !isSelected &&
+                      "text-foreground hover:bg-secondary-hover active:bg-secondary-active",
+                    !isCurrentMonth && "text-muted-foreground",
+                    isToday && !isSelected && "border-primary text-primary",
+                    isSelected && "bg-primary text-primary-foreground",
+                  )}
+                  disabled={isDisabled}
+                  onClick={() => onSelectDate(date)}
+                  size="icon-lg"
+                  type="button"
+                  variant={isSelected ? "default" : "ghost"}
+                >
+                  {date.day}
+                </Button>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
@@ -926,6 +947,9 @@ function getDefaultLocale(): string {
 
   return navigator.language;
 }
+
+const useIsomorphicLayoutEffect =
+  typeof window === "undefined" ? React.useEffect : React.useLayoutEffect;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
