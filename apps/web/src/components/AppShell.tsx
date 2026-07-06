@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -56,7 +57,6 @@ import {
 const NAVIGATION = [
   { href: "/", labelKey: "dashboard" },
   { href: "/persons", labelKey: "persons", requiredRole: "ADMIN" },
-  { href: "/shadcn", labelKey: "uiShowcase" },
 ] as const;
 
 const PAGE_TITLES: Record<string, string> = {
@@ -64,7 +64,6 @@ const PAGE_TITLES: Record<string, string> = {
   "/account/settings": "accountSettings",
   "/persons": "persons",
   "/persons/new": "newPerson",
-  "/shadcn": "uiShowcase",
 };
 
 export function AppShell({
@@ -114,7 +113,6 @@ function AppSidebar({
   initialThemePreference: ThemePreference;
 }) {
   const tNav = useTranslations("appShell.nav");
-  const tWorkspace = useTranslations("appShell.workspace");
   const { user } = useSession();
   const navigation = NAVIGATION.filter(
     (item) =>
@@ -129,17 +127,60 @@ function AppSidebar({
           <SidebarMenuItem>
             <SidebarMenuButton
               size="lg"
+              aria-label={tNav("dashboard")}
+              className="justify-start duration-normal ease-linear"
               render={<Link href={localizePath("/", locale)} />}
             >
-              <Avatar size="md">
-                <AvatarFallback>DT</AvatarFallback>
-              </Avatar>
-              <span className="flex min-w-0 flex-col">
-                <span className="truncate font-semibold">
-                  {tWorkspace("name")}
+              <span className="flex min-w-0 flex-1 items-center justify-start gap-2 overflow-hidden transition-[gap] duration-normal ease-linear group-data-[collapsible=icon]:gap-0">
+                <span
+                  className="flex h-8 w-16 shrink-0 items-center justify-center overflow-hidden transition-[width] duration-normal ease-linear group-data-[collapsible=icon]:w-8"
+                  data-sidebar-logo-part="mark"
+                >
+                  <Image
+                    alt=""
+                    aria-hidden="true"
+                    className="h-full w-full object-contain"
+                    data-sidebar-logo-theme="normal"
+                    height={83}
+                    src="/logo/scooter-city-logo-only.svg"
+                    unoptimized
+                    width={224}
+                  />
+                  <Image
+                    alt=""
+                    aria-hidden="true"
+                    className="hidden h-full w-full object-contain"
+                    data-sidebar-logo-theme="light"
+                    height={83}
+                    src="/logo/scooter-city-logo-only-light.svg"
+                    unoptimized
+                    width={224}
+                  />
                 </span>
-                <span className="truncate text-xs text-muted-foreground">
-                  {tWorkspace("description")}
+                <span
+                  className="flex h-5 max-w-36 min-w-0 overflow-hidden opacity-100 transition-[max-width,opacity,transform] duration-normal ease-linear group-data-[collapsible=icon]:max-w-0 group-data-[collapsible=icon]:-translate-x-1 group-data-[collapsible=icon]:opacity-0"
+                  data-sidebar-logo-part="title"
+                >
+                  <Image
+                    alt=""
+                    aria-hidden="true"
+                    className="h-full w-auto shrink-0 object-contain"
+                    data-sidebar-logo-theme="normal"
+                    height={52}
+                    src="/logo/scooter-city-logo-title-tagline-only.svg"
+                    unoptimized
+                    width={265}
+                  />
+                  <Image
+                    alt=""
+                    aria-hidden="true"
+                    className="hidden h-full w-auto shrink-0 object-contain"
+                    data-sidebar-logo-theme="light"
+                    height={52}
+                    src="/logo/scooter-city-logo-title-tagline-only-light.svg"
+                    unoptimized
+                    width={265}
+                  />
                 </span>
               </span>
             </SidebarMenuButton>

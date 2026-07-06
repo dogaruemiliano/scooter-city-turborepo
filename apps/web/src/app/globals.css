@@ -1,2 +1,24 @@
 @import "tailwindcss";
 @import "@repo/ui/globals.css";
+
+[data-sidebar-logo-theme="light"] {
+  display: none;
+}
+
+:root[data-theme="dark"] [data-sidebar-logo-theme="normal"] {
+  display: none;
+}
+
+:root[data-theme="dark"] [data-sidebar-logo-theme="light"] {
+  display: block;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) [data-sidebar-logo-theme="normal"] {
+    display: none;
+  }
+
+  :root:not([data-theme="light"]) [data-sidebar-logo-theme="light"] {
+    display: block;
+  }
+}

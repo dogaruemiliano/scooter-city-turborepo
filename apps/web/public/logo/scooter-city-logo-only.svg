@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   id="Layer_2"
+   data-name="Layer 2"
+   viewBox="0 0 223.97001 82.870001"
+   version="1.1"
+   sodipodi:docname="scooter-city-logo copy.svg"
+   width="223.97"
+   height="82.870003"
+   inkscape:version="1.4 (e7c3feb1, 2024-10-09)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview30"
+     pagecolor="#505050"
+     bordercolor="#eeeeee"
+     borderopacity="1"
+     inkscape:showpageshadow="0"
+     inkscape:pageopacity="0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#505050"
+     inkscape:zoom="3.400966"
+     inkscape:cx="64.687504"
+     inkscape:cy="73.949578"
+     inkscape:window-width="1632"
+     inkscape:window-height="864"
+     inkscape:window-x="0"
+     inkscape:window-y="357"
+     inkscape:window-maximized="0"
+     inkscape:current-layer="g30" />
+  <defs
+     id="defs1">
+    <style
+       id="style1">
+      .cls-1 {
+        fill: #42bccc;
+      }
+
+      .cls-2 {
+        fill: #14181e;
+      }
+
+      .cls-3 {
+        fill: #a3aaae;
+      }
+
+      .cls-4 {
+        fill: #12161b;
+      }
+
+      .cls-5 {
+        fill: #44bbcb;
+      }
+
+      .cls-6 {
+        fill: #13171c;
+      }
+
+      .cls-7 {
+        fill: #13171d;
+      }
+
+      .cls-8 {
+        fill: #13181d;
+      }
+
+      .cls-9 {
+        fill: #41bccc;
+      }
+
+      .cls-10 {
+        fill: #40bccb;
+      }
+
+      .cls-11 {
+        fill: #a3aaaf;
+      }
+
+      .cls-12 {
+        fill: #40bbcb;
+      }
+    </style>
+  </defs>
+  <g
+     id="Layer_1-2"
+     data-name="Layer 1">
+    <g
+       id="g30">
+      <g
+         id="g10" />
+      <g
+         id="g14"
+         transform="translate(-34.32)">
+        <g
+           id="g31">
+          <path
+             class="cls-4"
+             d="m 119.58,82.81 -85.26,0.06 c 0.91,-2.46 3.28,-3.52 5,-5.2 l 12.95,-12.6 68.23,-0.18 c 3.4,0 6.5,-2.42 7.48,-4.6 1.28,-2.83 1.32,-6.83 -0.93,-9.19 -1.69,-1.76 -4.18,-2.6 -6.62,-2.61 L 80.59,48.33 C 74.92,48.31 69.28,46.75 65.19,42.89 59.23,37.26 57.49,28.64 59.86,20.83 64.23,6.49 78.97,-0.3 93.99,0.06 l 71.87,0.06 c -7.78,4.98 -14.6,9.66 -20.45,16.39 L 91.8,16.55 c -3.46,0 -6.89,1.23 -8.86,3.92 -1.8,2.46 -2.29,5.74 -0.9,8.51 1.13,2.25 4.02,4.41 7.33,4.42 l 49.38,0.21 c -4.5,14.47 -3.15,29 5.55,41.47 -7.44,4.75 -15.35,7.32 -24.71,7.72 z"
+             id="path11"
+             sodipodi:nodetypes="cccccccccccccccccccccc" />
+        </g>
+        <g
+           id="g13">
+          <path
+             class="cls-5"
+             d="m 161.89,53.93 c -1.26,-5.95 -0.65,-11.62 1.35,-16.65 l -0.17,0.41 -21.14,-0.21 c -1.01,3.84 -1.58,7.85 -1.61,12 -0.07,8.46 2.18,16.52 7.43,22.85 5.3,6.38 12.49,10.43 20.88,10.45 l 29.34,0.07 c 4.24,0 8.12,-1.46 11.51,-3.78 6.47,-4.45 12.45,-9.2 18.14,-14.76 l -53.53,-0.23 c -5.99,-0.03 -10.9,-4.1 -12.18,-10.13 z"
+             id="path12" />
+          <path
+             class="cls-5"
+             d="M 231.61,9.39 249.24,7.26 258.29,0 191.34,0.14 c -23.05,0.05 -42.64,15 -48.91,35.61 h 21.46 l -0.17,0.4 c 4.96,-11.11 16.77,-18.81 30.02,-18.89 l 43.35,-0.24 9.32,-7.49 -14.81,-0.14 z"
+             id="path13" />
+        </g>
+      </g>
+    </g>
+  </g>
+</svg>
