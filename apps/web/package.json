@@ -16,6 +16,7 @@
     "@repo/theme": "workspace:*",
     "@repo/ui": "workspace:*",
     "jose": "^6.2.3",
+    "lucide-react": "^1.21.0",
     "next": "16.2.6",
     "next-intl": "^4.13.0",
     "react": "19.2.0",

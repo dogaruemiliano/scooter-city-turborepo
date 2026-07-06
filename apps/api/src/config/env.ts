@@ -82,6 +82,61 @@ export const envSchema = z
         "Postgres connection string. See docker-compose.yml for local defaults.",
       ),
 
+    /* Image storage ------------------------------------------------------- */
+    IMAGE_STORAGE_DRIVER: z
+      .enum(["s3"])
+      .default("s3")
+      .describe("Image storage backend. S3 is used for private media assets."),
+    IMAGE_STORAGE_MAX_BYTES: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(10 * 1024 * 1024)
+      .describe("Maximum accepted image upload size in bytes."),
+    IMAGE_STORAGE_S3_BUCKET: z
+      .string()
+      .trim()
+      .min(1)
+      .optional()
+      .describe(
+        "Private S3 bucket name used for image storage. Required when IMAGE_STORAGE_DRIVER=s3.",
+      ),
+    IMAGE_STORAGE_S3_REGION: z
+      .string()
+      .trim()
+      .min(1)
+      .optional()
+      .describe(
+        "AWS region of IMAGE_STORAGE_S3_BUCKET. Required when IMAGE_STORAGE_DRIVER=s3.",
+      ),
+    IMAGE_STORAGE_S3_PREFIX: z
+      .string()
+      .trim()
+      .min(1)
+      .default("document-photos")
+      .describe("Object key prefix for private document-photo images."),
+    IMAGE_STORAGE_S3_KMS_KEY_ID: z
+      .string()
+      .trim()
+      .min(1)
+      .optional()
+      .describe(
+        "Optional AWS KMS key ID/ARN for S3 SSE-KMS image uploads. Leave empty to use the bucket default encryption.",
+      ),
+    IMAGE_STORAGE_SIGNED_URL_TTL_SECONDS: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(300)
+      .describe("Lifetime in seconds for S3 signed image GET/PUT URLs."),
+    IMAGE_STORAGE_UPLOAD_TOKEN_SECRET: z
+      .string()
+      .min(32)
+      .optional()
+      .describe(
+        "HMAC secret used to sign direct-upload completion tokens. Required when IMAGE_STORAGE_DRIVER=s3. Min 32 chars.",
+      ),
+
     /* JWT ----------------------------------------------------------------- */
     JWT_PRIVATE_KEY: z
       .string()
@@ -308,6 +363,21 @@ export const envSchema = z
 
     requireIf(v.SMS_PROVIDER === "smso", "SMSO_API_KEY", "SMS_PROVIDER=smso");
     requireIf(v.SMS_PROVIDER === "smso", "SMSO_SENDER", "SMS_PROVIDER=smso");
+    requireIf(
+      v.IMAGE_STORAGE_DRIVER === "s3",
+      "IMAGE_STORAGE_S3_BUCKET",
+      "IMAGE_STORAGE_DRIVER=s3",
+    );
+    requireIf(
+      v.IMAGE_STORAGE_DRIVER === "s3",
+      "IMAGE_STORAGE_S3_REGION",
+      "IMAGE_STORAGE_DRIVER=s3",
+    );
+    requireIf(
+      v.IMAGE_STORAGE_DRIVER === "s3",
+      "IMAGE_STORAGE_UPLOAD_TOKEN_SECRET",
+      "IMAGE_STORAGE_DRIVER=s3",
+    );
   });
 
 export type Env = z.infer<typeof envSchema>;

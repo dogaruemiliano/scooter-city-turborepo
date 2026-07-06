@@ -13,4 +13,5 @@
  */
 export * as auth from "./auth";
 export * as common from "./common";
+export * as persons from "./persons";
 export * as users from "./users";

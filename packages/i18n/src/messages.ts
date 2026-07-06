@@ -2,8 +2,10 @@ import type { SupportedLocale } from "./locales";
 import { apiCatalog } from "./catalogs/api";
 import { appShellCatalog } from "./catalogs/app-shell";
 import { authCatalog } from "./catalogs/auth";
+import { dashboardCatalog } from "./catalogs/dashboard";
 import { languageCatalog } from "./catalogs/language";
 import { mobilePlatformCatalog } from "./catalogs/mobile-platform";
+import { personsCatalog } from "./catalogs/persons";
 import { sharedCatalog } from "./catalogs/shared";
 import { themeCatalog } from "./catalogs/theme";
 
@@ -18,8 +20,10 @@ export const messages = {
     shared: sharedCatalog.en,
     auth: authCatalog.en,
     appShell: appShellCatalog.en,
+    dashboard: dashboardCatalog.en,
     theme: themeCatalog.en,
     language: languageCatalog.en,
+    persons: personsCatalog.en,
     api: apiCatalog.en,
     mobilePlatform: mobilePlatformCatalog.en,
   },
@@ -27,8 +31,10 @@ export const messages = {
     shared: sharedCatalog.ro,
     auth: authCatalog.ro,
     appShell: appShellCatalog.ro,
+    dashboard: dashboardCatalog.ro,
     theme: themeCatalog.ro,
     language: languageCatalog.ro,
+    persons: personsCatalog.ro,
     api: apiCatalog.ro,
     mobilePlatform: mobilePlatformCatalog.ro,
   },

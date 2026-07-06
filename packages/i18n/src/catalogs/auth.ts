@@ -8,12 +8,18 @@ export const authCatalog = {
         "No sign-in methods are available. Contact an administrator.",
       emailOtp: {
         emailLabel: "Email",
-        sendCode: "Send code",
+        emailInvalid: "Enter a valid email address.",
+        sendCode: "Continue with email",
         sendingCode: "Sending...",
         sendCodeError: "Could not send code. Try again.",
       },
     },
     otp: {
+      title: "Enter verification code",
+      subtitleEmail: "We sent a 6-digit code to {email}.",
+      subtitleProvider:
+        "We sent a 6-digit code to the email on your Google account.",
+      backToMethods: "Back to sign-in methods",
       codeLabel: "6-digit code",
       codeSentTo: "Code sent to {email}",
       emailVerificationRequired:
@@ -22,7 +28,7 @@ export const authCatalog = {
       expiresIn: "Code expires in {time}.",
       requestAnotherCode: "Request another code",
       requestingAnotherCode: "Requesting...",
-      verify: "Sign in",
+      verify: "Verify code",
       verifying: "Verifying...",
       resendCode: "Resend code",
       resendIn: "Resend in {time}",
@@ -54,12 +60,18 @@ export const authCatalog = {
         "Nu există metode de autentificare disponibile. Contactează un administrator.",
       emailOtp: {
         emailLabel: "Email",
-        sendCode: "Trimite codul",
+        emailInvalid: "Introdu o adresă de email validă.",
+        sendCode: "Continuă cu email",
         sendingCode: "Se trimite...",
         sendCodeError: "Codul nu a putut fi trimis. Încearcă din nou.",
       },
     },
     otp: {
+      title: "Introdu codul de verificare",
+      subtitleEmail: "Am trimis un cod din 6 cifre la {email}.",
+      subtitleProvider:
+        "Am trimis un cod din 6 cifre la emailul contului Google.",
+      backToMethods: "Înapoi la metodele de autentificare",
       codeLabel: "Cod din 6 cifre",
       codeSentTo: "Cod trimis la {email}",
       emailVerificationRequired:
@@ -68,7 +80,7 @@ export const authCatalog = {
       expiresIn: "Codul expiră în {time}.",
       requestAnotherCode: "Cere alt cod",
       requestingAnotherCode: "Se cere...",
-      verify: "Autentifică-te",
+      verify: "Verifică codul",
       verifying: "Se verifică...",
       resendCode: "Retrimite codul",
       resendIn: "Retrimite în {time}",

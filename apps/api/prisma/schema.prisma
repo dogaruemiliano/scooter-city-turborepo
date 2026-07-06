@@ -16,10 +16,11 @@
 // - `output` is required in v7 and lives outside node_modules; consumers
 //   import from `../src/generated/prisma/client` rather than `@prisma/client`.
 generator client {
-  provider     = "prisma-client"
-  output       = "../src/generated/prisma"
-  engineType   = "client"
-  moduleFormat = "cjs"
+  provider        = "prisma-client"
+  output          = "../src/generated/prisma"
+  engineType      = "client"
+  moduleFormat    = "cjs"
+  previewFeatures = ["partialIndexes"]
 }
 
 // The `url` lives in `prisma.config.ts` from Prisma 7 onward. Migrate +
@@ -27,6 +28,66 @@ generator client {
 // PR) gets it via the PrismaPg driver adapter.
 datasource db {
   provider = "postgresql"
+}
+
+/// Admin-managed person record used by rental flows.
+///
+/// This is intentionally separate from `User`: a person can exist before
+/// they have an app account, and a future linking flow can connect them by
+/// the required unique email.
+model Person {
+  id           String           @id @default(cuid())
+  email        String           @unique
+  phone        String           @unique
+  firstName    String
+  lastName     String
+  dateOfBirth  DateTime?        @db.Date
+  addressLine1 String?
+  addressLine2 String?
+  city         String?
+  region       String?
+  postalCode   String?
+  countryCode  String?
+  notes        String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  deletedAt    DateTime?
+  documents    PersonDocument[]
+
+  @@index([deletedAt])
+  @@index([lastName, firstName])
+}
+
+/// KYC/rental document belonging to a Person.
+///
+/// A person can hold multiple documents at once, for example a Romanian
+/// national ID (`type = "nationalId"`, `issuingCountryCode = "RO"`) and a
+/// driver license. Document photos are stored as private MediaAsset rows.
+model PersonDocument {
+  id                 String                @id @default(cuid())
+  personId           String
+  person             Person                @relation(fields: [personId], references: [id], onDelete: Cascade)
+  type               String
+  series             String?
+  number             String?
+  cnp                String?
+  issuingCountryCode String?
+  issuedBy           String?
+  issuedOn           DateTime?             @db.Date
+  expiresOn          DateTime?             @db.Date
+  status             String                @default("unverified")
+  notes              String?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+  deletedAt          DateTime?
+  photos             PersonDocumentPhoto[]
+
+  @@unique([personId, type], map: "person_document_active_type_unique", where: { deletedAt: null })
+  @@unique([personId], map: "person_document_active_identity_unique", where: raw("\"deletedAt\" IS NULL AND \"type\" IN ('passport', 'nationalId', 'residencePermit', 'other')"))
+  @@index([personId, deletedAt])
+  @@index([type])
+  @@index([status])
+  @@index([expiresOn])
 }
 
 /// A human. `emailVerified` / `phoneVerified` are timestamps (not
@@ -59,9 +120,81 @@ model User {
   otpChallenges OtpChallenge[]
   authAccounts  AuthAccount[]
   auditEvents   AuditEvent[]
+  mediaAssets   MediaAsset[]
+  draftUploads  DraftUpload[]
 
   @@index([email])
   @@index([phone])
+}
+
+/// Private media object metadata.
+///
+/// The object bytes live in the configured private S3 bucket. This table keeps
+/// the server-only storage key and public-safe metadata that API responses can
+/// expose through domain-specific resources such as PersonDocumentPhoto.
+model MediaAsset {
+  id               String                @id @default(cuid())
+  provider         String
+  bucket           String
+  storageKey       String                @unique
+  contentType      String
+  byteSize         Int
+  checksumSha256   String
+  uploadedByUserId String?
+  uploadedByUser   User?                 @relation(fields: [uploadedByUserId], references: [id], onDelete: SetNull)
+  createdAt        DateTime              @default(now())
+  deletedAt        DateTime?
+  documentPhotos   PersonDocumentPhoto[]
+
+  @@index([provider, bucket])
+  @@index([uploadedByUserId])
+  @@index([deletedAt])
+}
+
+/// Browser-uploaded object that is not attached to a domain record yet.
+///
+/// Person creation uses this for direct-to-S3 document photos: the API creates
+/// a row and signed PUT URL, the browser uploads the bytes to S3, and final
+/// submit claims the row into MediaAsset / PersonDocumentPhoto. Expired,
+/// unclaimed rows identify S3 objects that can be cleaned up as abandoned
+/// drafts.
+model DraftUpload {
+  id             String    @id @default(cuid())
+  userId         String?
+  user           User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  provider       String
+  bucket         String
+  storageKey     String    @unique
+  contentType    String
+  byteSize       Int
+  checksumSha256 String
+  purpose        String
+  expiresAt      DateTime
+  claimedAt      DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@index([userId, purpose, claimedAt, expiresAt])
+  @@index([claimedAt, expiresAt])
+  @@index([purpose, expiresAt])
+}
+
+/// Photo attached to one person document slot.
+///
+/// A partial unique index allows exactly one active image per document and
+/// slot while preserving replaced/deleted history.
+model PersonDocumentPhoto {
+  id               String         @id @default(cuid())
+  personDocumentId String
+  personDocument   PersonDocument @relation(fields: [personDocumentId], references: [id], onDelete: Cascade)
+  assetId          String         @unique
+  asset            MediaAsset     @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  slot             String
+  createdAt        DateTime       @default(now())
+  deletedAt        DateTime?
+
+  @@unique([personDocumentId, slot], map: "person_document_photo_active_slot_unique", where: { deletedAt: null })
+  @@index([personDocumentId, deletedAt])
+  @@index([slot])
 }
 
 /// First-class session record. One row per "logged-in device". Refresh-token
@@ -199,15 +332,18 @@ model AuthAccount {
 /// OAUTH_UNLINKED, SESSION_REVOKED, SESSION_BURNED, LOGOUT_ALL,
 /// ACCOUNT_DELETED, NEW_DEVICE_NOTIFIED.
 model AuditEvent {
-  id        String   @id @default(cuid())
-  userId    String?
-  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
-  type      String
-  ip        String?
-  userAgent String?
-  meta      Json?
-  createdAt DateTime @default(now())
+  id         String   @id @default(cuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  type       String
+  targetType String?
+  targetId   String?
+  ip         String?
+  userAgent  String?
+  meta       Json?
+  createdAt  DateTime @default(now())
 
   @@index([userId, type, createdAt])
   @@index([type, createdAt])
+  @@index([targetType, targetId, createdAt])
 }

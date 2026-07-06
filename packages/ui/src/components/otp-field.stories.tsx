@@ -32,6 +32,19 @@ export const Masked: Story = {
   },
 };
 
+export const FourDigits: Story = {
+  args: {
+    length: 4,
+    name: "pin",
+  },
+};
+
+export const AutoFocus: Story = {
+  args: {
+    autoFocus: true,
+  },
+};
+
 export const Disabled: Story = {
   args: {
     defaultValue: "123456",

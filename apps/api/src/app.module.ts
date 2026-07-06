@@ -21,6 +21,7 @@ import { ConfigModule } from "./config/config.module";
 import { loadEnv } from "./config/env";
 import { HealthModule } from "./health/health.module";
 import { MailerModule } from "./mailer/mailer.module";
+import { PersonsModule } from "./persons/persons.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { SmsModule } from "./sms/sms.module";
 import { UsersModule } from "./users/users.module";
@@ -44,6 +45,7 @@ const env = loadEnv();
 
     // Public-surface modules.
     HealthModule,
+    PersonsModule,
     AuthModule.forRoot(buildAuthConfig(env)),
   ],
   providers: [

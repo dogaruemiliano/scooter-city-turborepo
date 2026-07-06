@@ -19,42 +19,6 @@
     "./lib/*": {
       "types": "./src/lib/*.ts",
       "default": "./src/lib/*.ts"
-    },
-    "./Badge": {
-      "types": "./src/Badge.tsx",
-      "default": "./src/Badge.tsx"
-    },
-    "./BottomSheet": {
-      "types": "./src/BottomSheet.tsx",
-      "default": "./src/BottomSheet.tsx"
-    },
-    "./Button": {
-      "types": "./src/button.tsx",
-      "default": "./src/button.tsx"
-    },
-    "./Card": {
-      "types": "./src/card.tsx",
-      "default": "./src/card.tsx"
-    },
-    "./Divider": {
-      "types": "./src/Divider.tsx",
-      "default": "./src/Divider.tsx"
-    },
-    "./Input": {
-      "types": "./src/Input.tsx",
-      "default": "./src/Input.tsx"
-    },
-    "./Select": {
-      "types": "./src/Select.tsx",
-      "default": "./src/Select.tsx"
-    },
-    "./Snackbar": {
-      "types": "./src/Snackbar.tsx",
-      "default": "./src/Snackbar.tsx"
-    },
-    "./Text": {
-      "types": "./src/Text.tsx",
-      "default": "./src/Text.tsx"
     }
   },
   "scripts": {
@@ -73,6 +37,7 @@
     "@repo/theme": "workspace:*",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "libphonenumber-js": "1.13.7",
     "lucide-react": "^1.17.0",
     "shadcn": "^4.11.0",
     "tailwind-merge": "^3.6.0",

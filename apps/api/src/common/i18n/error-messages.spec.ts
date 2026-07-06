@@ -66,6 +66,54 @@ describe("localizeErrorMessage", () => {
     ).toBe("Cererea intră în conflict cu starea curentă a resursei.");
   });
 
+  it("localizes person duplicate field conflicts", () => {
+    expect(
+      localizeErrorMessage(
+        {
+          status: HttpStatus.CONFLICT,
+          code: "PERSON_EMAIL_CONFLICT",
+          message: "Email already exists",
+        },
+        "ro",
+      ),
+    ).toBe("Emailul există deja.");
+
+    expect(
+      localizeErrorMessage(
+        {
+          status: HttpStatus.CONFLICT,
+          code: "PERSON_PHONE_CONFLICT",
+          message: "Phone already exists",
+        },
+        "en",
+      ),
+    ).toBe("Phone already exists.");
+  });
+
+  it("localizes image storage availability errors", () => {
+    expect(
+      localizeErrorMessage(
+        {
+          status: HttpStatus.SERVICE_UNAVAILABLE,
+          code: "IMAGE_STORAGE_BUCKET_UNAVAILABLE",
+          message: "Image storage bucket is not available",
+        },
+        "ro",
+      ),
+    ).toBe("Bucketul pentru imagini nu este disponibil.");
+
+    expect(
+      localizeErrorMessage(
+        {
+          status: HttpStatus.SERVICE_UNAVAILABLE,
+          code: "IMAGE_STORAGE_UNAVAILABLE",
+          message: "Image storage is unavailable",
+        },
+        "en",
+      ),
+    ).toBe("Image storage is not available.");
+  });
+
   it("localizes rate limits with Retry-After details", () => {
     expect(
       localizeErrorMessage(

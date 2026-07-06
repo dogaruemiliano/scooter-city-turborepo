@@ -69,6 +69,22 @@ function matchErrorMessage(
     return { key: "api.auth.sessionExpired" };
   }
 
+  if (input.code === "IMAGE_STORAGE_BUCKET_UNAVAILABLE") {
+    return { key: "api.errors.imageStorageBucketUnavailable" };
+  }
+
+  if (input.code === "IMAGE_STORAGE_UNAVAILABLE") {
+    return { key: "api.errors.imageStorageUnavailable" };
+  }
+
+  if (input.code === "PERSON_EMAIL_CONFLICT") {
+    return { key: "api.errors.personEmailConflict" };
+  }
+
+  if (input.code === "PERSON_PHONE_CONFLICT") {
+    return { key: "api.errors.personPhoneConflict" };
+  }
+
   if (
     input.status === LOCALIZED_HTTP_STATUS.badRequest &&
     (input.message === "Validation failed" || input.details !== undefined)

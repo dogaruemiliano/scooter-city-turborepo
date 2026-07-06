@@ -190,8 +190,71 @@ describe("SignInMethods", () => {
 
     expect(screen.getByLabelText("Email")).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Trimite codul" }),
+      screen.getByRole("button", { name: "Continuă cu email" }),
     ).toBeInTheDocument();
+  });
+
+  it("shows an inline email error instead of submitting an empty email", async () => {
+    const browser = userEvent.setup();
+
+    renderSignInMethods();
+    const emailInput = screen.getByLabelText("Email");
+
+    await browser.click(
+      screen.getByRole("button", { name: "Continue with email" }),
+    );
+
+    expect(mocks.apiFetch).not.toHaveBeenCalled();
+    expect(emailInput).toHaveFocus();
+    expect(emailInput).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByText("Enter a valid email address.")).toHaveAttribute(
+      "role",
+      "alert",
+    );
+  });
+
+  it("blocks an invalid email and clears the error when the email is valid", async () => {
+    const challenge = createChallenge("00000000-0000-4000-8000-000000000011");
+    mocks.apiFetch.mockResolvedValueOnce(challenge);
+    const browser = userEvent.setup();
+
+    renderSignInMethods();
+    const emailInput = screen.getByLabelText("Email");
+
+    await browser.type(emailInput, "not-an-email");
+    await browser.click(
+      screen.getByRole("button", { name: "Continue with email" }),
+    );
+
+    expect(mocks.apiFetch).not.toHaveBeenCalled();
+    expect(emailInput).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByText("Enter a valid email address.")).toHaveAttribute(
+      "role",
+      "alert",
+    );
+
+    await browser.clear(emailInput);
+    await browser.type(emailInput, user.email);
+
+    expect(
+      screen.queryByText("Enter a valid email address."),
+    ).not.toBeInTheDocument();
+
+    await browser.click(
+      screen.getByRole("button", { name: "Continue with email" }),
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Enter verification code" }),
+    ).toBeInTheDocument();
+    expect(mocks.apiFetch).toHaveBeenCalledWith(
+      v1.auth.ROUTES.emailOtp.request,
+      v1.auth.emailOtpChallengeSchema,
+      {
+        method: "POST",
+        json: { email: user.email },
+      },
+    );
   });
 
   it("completes email OTP sign-in through the shared challenge form", async () => {
@@ -206,13 +269,20 @@ describe("SignInMethods", () => {
 
     renderSignInMethods();
     await browser.type(screen.getByLabelText("Email"), user.email);
-    await browser.click(screen.getByRole("button", { name: "Send code" }));
+    await browser.click(
+      screen.getByRole("button", { name: "Continue with email" }),
+    );
 
     expect(screen.queryByLabelText("Email")).not.toBeInTheDocument();
-    expect(screen.getByText(`Code sent to ${user.email}`)).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Enter verification code" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(`We sent a 6-digit code to ${user.email}.`),
+    ).toBeInTheDocument();
 
     await browser.type(getOtpInput(), "000000");
-    await browser.click(screen.getByRole("button", { name: "Sign in" }));
+    await browser.click(screen.getByRole("button", { name: "Verify code" }));
 
     expect(mocks.apiFetch).toHaveBeenCalledWith(
       v1.auth.ROUTES.emailOtp.verify,
@@ -268,11 +338,13 @@ describe("SignInMethods", () => {
     expect(screen.queryByLabelText("Email")).not.toBeInTheDocument();
     expect(renderGoogleButton).toHaveBeenCalledOnce();
     expect(
-      screen.getByText(/Google could not verify the account email/),
+      screen.getByText(
+        "We sent a 6-digit code to the email on your Google account.",
+      ),
     ).toBeInTheDocument();
 
     await browser.type(getOtpInput(), "000000");
-    await browser.click(screen.getByRole("button", { name: "Sign in" }));
+    await browser.click(screen.getByRole("button", { name: "Verify code" }));
 
     expect(mocks.apiFetch).toHaveBeenCalledWith(
       v1.auth.ROUTES.oauthEmailVerification.verify,
@@ -301,7 +373,9 @@ describe("SignInMethods", () => {
 
     renderSignInMethods();
     await browser.type(screen.getByLabelText("Email"), user.email);
-    await browser.click(screen.getByRole("button", { name: "Send code" }));
+    await browser.click(
+      screen.getByRole("button", { name: "Continue with email" }),
+    );
     await browser.click(screen.getByRole("button", { name: "Resend code" }));
 
     expect(mocks.apiFetch).toHaveBeenCalledWith(
@@ -333,9 +407,13 @@ describe("SignInMethods", () => {
       target: { value: user.email },
     });
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Send code" }));
+      fireEvent.click(
+        screen.getByRole("button", { name: "Continue with email" }),
+      );
     });
-    expect(screen.getByText(`Code sent to ${user.email}`)).toBeInTheDocument();
+    expect(
+      screen.getByText(`We sent a 6-digit code to ${user.email}.`),
+    ).toBeInTheDocument();
 
     await act(async () => {
       vi.advanceTimersByTime(1_000);
@@ -465,19 +543,43 @@ describe("SignInMethods", () => {
 
     renderSignInMethods();
     await browser.type(screen.getByLabelText("Email"), user.email);
-    await browser.click(screen.getByRole("button", { name: "Send code" }));
+    await browser.click(
+      screen.getByRole("button", { name: "Continue with email" }),
+    );
     await browser.click(screen.getByRole("button", { name: "Cancel" }));
 
     expect(screen.getByLabelText("Email")).toHaveValue("");
 
     await browser.type(screen.getByLabelText("Email"), user.email);
-    await browser.click(screen.getByRole("button", { name: "Send code" }));
+    await browser.click(
+      screen.getByRole("button", { name: "Continue with email" }),
+    );
     await browser.type(getOtpInput(), "111111");
-    await browser.click(screen.getByRole("button", { name: "Sign in" }));
+    await browser.click(screen.getByRole("button", { name: "Verify code" }));
 
     expect(
       await screen.findByText("Invalid or expired code."),
     ).toBeInTheDocument();
+  });
+
+  it("returns to sign-in methods from the OTP header back button", async () => {
+    const challenge = createChallenge("00000000-0000-4000-8000-000000000012");
+    mocks.apiFetch.mockResolvedValueOnce(challenge);
+    const browser = userEvent.setup();
+
+    renderSignInMethods();
+    await browser.type(screen.getByLabelText("Email"), user.email);
+    await browser.click(
+      screen.getByRole("button", { name: "Continue with email" }),
+    );
+    await browser.click(
+      screen.getByRole("button", { name: "Back to sign-in methods" }),
+    );
+
+    expect(
+      screen.getByRole("heading", { name: "Sign in" }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Email")).toBeInTheDocument();
   });
 });
 

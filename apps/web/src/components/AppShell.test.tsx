@@ -1,4 +1,10 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { messages, type SupportedLocale } from "@repo/i18n";
 import { TooltipProvider } from "@repo/ui/components/tooltip";
 import { NextIntlClientProvider } from "next-intl";
@@ -85,12 +91,13 @@ describe("AppShell", () => {
     renderAppShell();
 
     expect(
-      screen.getByRole("link", { name: "Panou principal" }),
-    ).toHaveAttribute("href", "/");
-    expect(screen.getByRole("link", { name: "Galerie UI" })).toHaveAttribute(
-      "href",
-      "/shadcn",
-    );
+      screen
+        .getAllByRole("link", { name: "Panou principal" })
+        .map((link) => link.getAttribute("href")),
+    ).toContain("/");
+    expect(
+      screen.queryByRole("link", { name: "Persoane" }),
+    ).not.toBeInTheDocument();
     expect(screen.getByText("Emilia Stone")).toBeInTheDocument();
     expect(screen.getByText("emilia.stone@example.com")).toBeInTheDocument();
 
@@ -143,18 +150,15 @@ describe("AppShell", () => {
   });
 
   it("keeps navigation links on the English locale prefix", async () => {
-    mocks.pathname = "/en/shadcn";
+    mocks.pathname = "/en";
 
     renderAppShell();
 
-    expect(screen.getByRole("link", { name: "Dashboard" })).toHaveAttribute(
-      "href",
-      "/en",
-    );
-    expect(screen.getByRole("link", { name: "UI showcase" })).toHaveAttribute(
-      "href",
-      "/en/shadcn",
-    );
+    expect(
+      screen
+        .getAllByRole("link", { name: "Dashboard" })
+        .map((link) => link.getAttribute("href")),
+    ).toContain("/en");
 
     fireEvent.mouseDown(
       screen.getByRole("button", { name: "Open account menu" }),
@@ -163,6 +167,72 @@ describe("AppShell", () => {
     expect(
       await screen.findByRole("menuitem", { name: "Account settings" }),
     ).toHaveAttribute("href", "/en/account/settings");
+  });
+
+  it("closes the mobile drawer when a navigation link is pressed", async () => {
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: 390,
+    });
+
+    renderAppShell({
+      id: "admin-1",
+      email: "admin@example.com",
+      roles: ["ADMIN"],
+    });
+
+    const trigger = await screen.findByRole("button", {
+      name: "Open navigation",
+    });
+
+    fireEvent.click(trigger);
+
+    await waitFor(() =>
+      expect(trigger).toHaveAttribute("aria-expanded", "true"),
+    );
+
+    const personsLink = screen.getByRole("link", { name: "Persoane" });
+
+    personsLink.addEventListener("click", (event) => event.preventDefault(), {
+      once: true,
+    });
+    fireEvent.click(personsLink);
+
+    await waitFor(() =>
+      expect(trigger).toHaveAttribute("aria-expanded", "false"),
+    );
+  });
+
+  it("renders the persons navigation and title for admins", () => {
+    mocks.pathname = "/en/persons";
+
+    renderAppShell({
+      id: "admin-1",
+      email: "admin@example.com",
+      roles: ["ADMIN"],
+    });
+
+    expect(screen.getByRole("link", { name: "Persons" })).toHaveAttribute(
+      "href",
+      "/en/persons",
+    );
+    expect(
+      within(screen.getByRole("banner")).getByText("Persons"),
+    ).toBeInTheDocument();
+  });
+
+  it("renders the new person page title for admin nested person routes", () => {
+    mocks.pathname = "/en/persons/new";
+
+    renderAppShell({
+      id: "admin-1",
+      email: "admin@example.com",
+      roles: ["ADMIN"],
+    });
+
+    expect(
+      within(screen.getByRole("banner")).getByText("New person"),
+    ).toBeInTheDocument();
   });
 });
 

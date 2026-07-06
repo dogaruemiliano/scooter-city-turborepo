@@ -44,6 +44,35 @@ export function Sidebar({
         ? "w-[calc(var(--sidebar-width-icon)+var(--spacing-4)+var(--spacing-0-5))]"
         : "w-(--sidebar-width-icon)"
       : "w-(--sidebar-width)";
+  const closeMobileOnLinkClick = React.useCallback(
+    (event: React.MouseEvent<HTMLDivElement>) => {
+      if (hasModifiedClick(event)) {
+        return;
+      }
+
+      const target = event.target;
+
+      const targetElement =
+        target instanceof Element
+          ? target
+          : target instanceof Node
+            ? target.parentElement
+            : null;
+
+      if (!targetElement) {
+        return;
+      }
+
+      const link = targetElement.closest("a[href]");
+
+      if (!link || !event.currentTarget.contains(link)) {
+        return;
+      }
+
+      setOpenMobile(false);
+    },
+    [setOpenMobile],
+  );
 
   if (collapsible === "none") {
     return (
@@ -81,7 +110,12 @@ export function Sidebar({
             <SheetTitle>Sidebar</SheetTitle>
             <SheetDescription>Displays the mobile sidebar.</SheetDescription>
           </SheetHeader>
-          <div className="flex h-full w-full flex-col">{children}</div>
+          <div
+            className="flex h-full w-full flex-col"
+            onClickCapture={closeMobileOnLinkClick}
+          >
+            {children}
+          </div>
         </SheetContent>
       </Sheet>
     );
@@ -142,4 +176,8 @@ export function Sidebar({
       </div>
     </div>
   );
+}
+
+function hasModifiedClick(event: React.MouseEvent) {
+  return event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
 }

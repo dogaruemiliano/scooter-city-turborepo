@@ -1,6 +1,8 @@
 "use client";
 
 import { ApiError, v1 } from "@repo/api-shared";
+import { Button } from "@repo/ui/components";
+import { ArrowLeftIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useState } from "react";
 
@@ -62,63 +64,85 @@ export function SignInMethods({
     setMethodError(tGoogle("failed"));
   }, [tGoogle]);
 
+  const handleCancelChallenge = useCallback(() => {
+    setActiveChallenge(null);
+    setMethodError(null);
+  }, []);
+
   if (activeChallenge) {
     const verifyRoute =
       activeChallenge.kind === "email"
         ? v1.auth.ROUTES.emailOtp.verify
         : v1.auth.ROUTES.oauthEmailVerification.verify;
-    const description =
+    const subtitle =
       activeChallenge.kind === "email"
-        ? tOtp("codeSentTo", { email: activeChallenge.email })
-        : tOtp("emailVerificationRequired");
+        ? tOtp("subtitleEmail", { email: activeChallenge.email })
+        : tOtp("subtitleProvider");
 
     return (
-      <OtpChallengeForm
-        key={activeChallenge.challenge.challengeId}
-        challenge={activeChallenge.challenge}
-        description={description}
-        verifyRoute={verifyRoute}
-        onChallengeChange={(challenge) =>
-          setActiveChallenge((current) =>
-            current ? { ...current, challenge } : current,
-          )
-        }
-        onVerified={completeSignIn}
-        onRequestAnother={async () => {
-          if (activeChallenge.kind === "email") {
-            const challenge = await webApi.fetch(
-              v1.auth.ROUTES.emailOtp.request,
-              v1.auth.emailOtpChallengeSchema,
-              {
-                method: "POST",
-                json: { email: activeChallenge.email },
-              },
-            );
-            setActiveChallenge({ ...activeChallenge, challenge });
-            return;
-          }
+      <div className="flex flex-col gap-6">
+        <header className="flex items-start gap-2 relative">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label={tOtp("backToMethods")}
+            onClick={handleCancelChallenge}
+            className="absolute left-0 top-0 z-raised rounded-full p-2 sm:static"
+          >
+            <ArrowLeftIcon />
+          </Button>
+          <div className="min-w-0 flex-1 text-center">
+            <h1 className="text-2xl font-semibold">{tOtp("title")}</h1>
+            <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
+          </div>
+        </header>
 
-          try {
-            const result = await exchangeGoogleIdToken(activeChallenge.idToken);
-            if (isChallenge(result)) {
-              setActiveChallenge({ ...activeChallenge, challenge: result });
-              return;
-            }
-            await completeSignIn();
-          } catch (error) {
-            if (error instanceof ApiError && error.status === 401) {
-              setActiveChallenge(null);
-              setMethodError(tGoogle("expired"));
-              return;
-            }
-            throw error;
+        <OtpChallengeForm
+          key={activeChallenge.challenge.challengeId}
+          challenge={activeChallenge.challenge}
+          verifyRoute={verifyRoute}
+          onChallengeChange={(challenge) =>
+            setActiveChallenge((current) =>
+              current ? { ...current, challenge } : current,
+            )
           }
-        }}
-        onCancel={() => {
-          setActiveChallenge(null);
-          setMethodError(null);
-        }}
-      />
+          onVerified={completeSignIn}
+          onRequestAnother={async () => {
+            if (activeChallenge.kind === "email") {
+              const challenge = await webApi.fetch(
+                v1.auth.ROUTES.emailOtp.request,
+                v1.auth.emailOtpChallengeSchema,
+                {
+                  method: "POST",
+                  json: { email: activeChallenge.email },
+                },
+              );
+              setActiveChallenge({ ...activeChallenge, challenge });
+              return;
+            }
+
+            try {
+              const result = await exchangeGoogleIdToken(
+                activeChallenge.idToken,
+              );
+              if (isChallenge(result)) {
+                setActiveChallenge({ ...activeChallenge, challenge: result });
+                return;
+              }
+              await completeSignIn();
+            } catch (error) {
+              if (error instanceof ApiError && error.status === 401) {
+                setActiveChallenge(null);
+                setMethodError(tGoogle("expired"));
+                return;
+              }
+              throw error;
+            }
+          }}
+          onCancel={handleCancelChallenge}
+        />
+      </div>
     );
   }
 
@@ -128,41 +152,48 @@ export function SignInMethods({
 
   return (
     <div className="flex flex-col gap-6">
-      {emailOtpEnabled ? (
-        <EmailOtpSignInForm
-          onChallenge={(challenge, email) => {
-            setMethodError(null);
-            setActiveChallenge({ kind: "email", challenge, email });
-          }}
-        />
-      ) : null}
+      <header className="text-center">
+        <h1 className="text-2xl font-semibold">{tSignIn("title")}</h1>
+        <p className="text-sm text-muted-foreground">{tSignIn("subtitle")}</p>
+      </header>
 
-      {googleAvailable && googleClientId ? (
-        <div className="flex flex-col gap-2">
-          {emailOtpEnabled ? (
-            <div className="text-center text-xs uppercase text-muted-foreground">
-              {tSignIn("separator")}
-            </div>
-          ) : null}
-          <GoogleSignInButton
-            clientId={googleClientId}
-            onCredential={handleGoogleCredential}
-            onError={handleGoogleError}
+      <div className="flex flex-col gap-6">
+        {emailOtpEnabled ? (
+          <EmailOtpSignInForm
+            onChallenge={(challenge, email) => {
+              setMethodError(null);
+              setActiveChallenge({ kind: "email", challenge, email });
+            }}
           />
-        </div>
-      ) : null}
+        ) : null}
 
-      {!emailOtpEnabled && !googleAvailable ? (
-        <p className="text-sm text-muted-foreground">
-          {tSignIn("unavailable")}
-        </p>
-      ) : null}
+        {googleAvailable && googleClientId ? (
+          <div className="flex flex-col gap-2">
+            {emailOtpEnabled ? (
+              <div className="text-center text-xs uppercase text-muted-foreground">
+                {tSignIn("separator")}
+              </div>
+            ) : null}
+            <GoogleSignInButton
+              clientId={googleClientId}
+              onCredential={handleGoogleCredential}
+              onError={handleGoogleError}
+            />
+          </div>
+        ) : null}
 
-      {methodError ? (
-        <p role="alert" className="text-sm text-destructive">
-          {methodError}
-        </p>
-      ) : null}
+        {!emailOtpEnabled && !googleAvailable ? (
+          <p className="text-sm text-muted-foreground">
+            {tSignIn("unavailable")}
+          </p>
+        ) : null}
+
+        {methodError ? (
+          <p role="alert" className="text-sm text-destructive">
+            {methodError}
+          </p>
+        ) : null}
+      </div>
     </div>
   );
 }
