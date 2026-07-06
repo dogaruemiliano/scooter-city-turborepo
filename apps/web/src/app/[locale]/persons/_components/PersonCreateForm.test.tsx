@@ -1,6 +1,6 @@
 import { ApiError, v1 } from "@repo/api-shared";
 import { messages, type SupportedLocale } from "@repo/i18n";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -309,6 +309,11 @@ describe("PersonCreateForm", () => {
     expect(
       screen.getByRole("img", { name: "Front document photo" }),
     ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Create person" }),
+      ).toBeEnabled(),
+    );
     await browser.click(screen.getByRole("button", { name: "Create person" }));
 
     await waitFor(() => expect(mocks.apiFetch).toHaveBeenCalledTimes(2));
@@ -610,13 +615,11 @@ async function fillRequiredFields(
   browser: ReturnType<typeof userEvent.setup>,
   overrides: Partial<Pick<v1.persons.CreatePersonInput, "phone">> = {},
 ) {
-  await browser.type(screen.getByLabelText("First name"), "Grace");
-  await browser.type(screen.getByLabelText("Last name"), "Hopper");
-  await browser.type(screen.getByLabelText("Email"), "rider@example.com");
-  await browser.type(
-    screen.getByLabelText("Phone"),
-    overrides.phone ?? "749096855",
-  );
+  void browser;
+  changeField("First name", "Grace");
+  changeField("Last name", "Hopper");
+  changeField("Email", "rider@example.com");
+  changeField("Phone", overrides.phone ?? "749096855");
 }
 
 async function fillFullCreateForm(
@@ -625,17 +628,14 @@ async function fillFullCreateForm(
 ) {
   await fillRequiredFields(browser, overrides);
   await browser.selectOptions(screen.getByLabelText("County"), "București");
-  await browser.type(
-    screen.getByLabelText("Address line 1"),
-    "1 Rental Street",
-  );
-  await browser.type(screen.getByLabelText("Address line 2"), "Apt 4");
-  await browser.type(screen.getByLabelText("City"), "Bucharest");
-  await browser.type(screen.getByLabelText("Postal code"), "010101");
-  await browser.type(screen.getByLabelText("Series"), "rx");
-  await browser.type(screen.getByLabelText("Number"), "123456");
-  await browser.type(screen.getByLabelText("CNP"), "1900228123450");
-  await browser.type(screen.getByLabelText("Issued by"), "SPCLEP Bucuresti");
+  changeField("Address line 1", "1 Rental Street");
+  changeField("Address line 2", "Apt 4");
+  changeField("City", "Bucharest");
+  changeField("Postal code", "010101");
+  changeField("Series", "rx");
+  changeField("Number", "123456");
+  changeField("CNP", "1900228123450");
+  changeField("Issued by", "SPCLEP Bucuresti");
   await fillDateParts(browser, "Issued on", {
     day: "15",
     month: "01",
@@ -647,7 +647,9 @@ async function fillFullCreateForm(
     year: "2030",
   });
   const notesFields = screen.getAllByLabelText("Notes");
-  await browser.type(notesFields[notesFields.length - 1]!, "Frequent rider");
+  fireEvent.change(notesFields[notesFields.length - 1]!, {
+    target: { value: "Frequent rider" },
+  });
 }
 
 async function fillDateParts(
@@ -656,15 +658,20 @@ async function fillDateParts(
   value: { day: string; month: string; year: string },
   index = 0,
 ) {
-  await browser.type(screen.getAllByLabelText(label)[index]!, value.day);
-  await browser.type(
-    screen.getAllByLabelText(`${label} MM`)[index]!,
-    value.month,
-  );
-  await browser.type(
-    screen.getAllByLabelText(`${label} YYYY`)[index]!,
-    value.year,
-  );
+  void browser;
+  fireEvent.change(screen.getAllByLabelText(label)[index]!, {
+    target: { value: value.day },
+  });
+  fireEvent.change(screen.getAllByLabelText(`${label} MM`)[index]!, {
+    target: { value: value.month },
+  });
+  fireEvent.change(screen.getAllByLabelText(`${label} YYYY`)[index]!, {
+    target: { value: value.year },
+  });
+}
+
+function changeField(label: string, value: string) {
+  fireEvent.change(screen.getByLabelText(label), { target: { value } });
 }
 
 function requiredLabel(controlName: string): HTMLElement {

@@ -57,7 +57,9 @@ describe("LanguageSwitcher", () => {
     renderLanguageSwitcher("en");
 
     await browser.click(screen.getByRole("combobox", { name: "Language" }));
-    await browser.click(screen.getByRole("option", { name: "Romanian" }));
+    await browser.click(
+      await screen.findByRole("option", { name: "Romanian" }),
+    );
 
     expect(mocks.replace).toHaveBeenCalledWith("/sign-in?next=%2F", {
       locale: "ro",
