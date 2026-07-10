@@ -13,7 +13,7 @@
     "gen": "pnpm gen:env && pnpm --filter @repo/api-shared build && pnpm --filter api build && pnpm gen:openapi",
     "gen:env": "tsx scripts/generate-env-example.ts",
     "gen:openapi": "node apps/api/dist/src/main --spec-only > openapi.json",
-    "prepare": "lefthook install"
+    "prepare": "node scripts/install-hooks.cjs"
   },
   "devDependencies": {
     "@mapbox/node-pre-gyp": "1.0.11",
