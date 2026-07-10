@@ -18,7 +18,7 @@
  *
  * ## `--spec-only` mode
  *
- * When invoked as `node dist/main --spec-only`, the bootstrap builds the
+ * When invoked as `node dist/src/main --spec-only`, the bootstrap builds the
  * Swagger document, writes the JSON to stdout, and exits with code 0. Used
  * by the root `pnpm gen` pipeline to feed Orval without leaving a server
  * process running.

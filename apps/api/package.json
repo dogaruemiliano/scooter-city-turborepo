@@ -12,7 +12,7 @@
     "start": "pnpm --filter @repo/i18n build && pnpm --filter @repo/api-shared build && nest start",
     "dev": "pnpm --filter @repo/i18n build && pnpm --filter @repo/api-shared build && nest start --watch",
     "start:debug": "nest start --debug --watch",
-    "start:prod": "node dist/main",
+    "start:prod": "node dist/src/main",
     "spec": "node dist/src/main --spec-only",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --max-warnings 0",
     "lint:fix": "eslint \"{src,apps,libs,test}/**/*.ts\" --max-warnings 0 --fix",
