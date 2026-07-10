@@ -142,7 +142,7 @@ function AppSidebar({
                     className="h-full w-full object-contain"
                     data-sidebar-logo-theme="normal"
                     height={83}
-                    src="/logo/scooter-city-logo-only.svg"
+                    src="/logo/scooter-city-logo-only-dark.svg"
                     unoptimized
                     width={224}
                   />
@@ -167,7 +167,7 @@ function AppSidebar({
                     className="h-full w-auto shrink-0 object-contain"
                     data-sidebar-logo-theme="normal"
                     height={52}
-                    src="/logo/scooter-city-logo-title-tagline-only.svg"
+                    src="/logo/scooter-city-logo-title-tagline-only-dark.svg"
                     unoptimized
                     width={265}
                   />
