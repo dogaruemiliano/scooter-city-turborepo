@@ -1,5 +1,5 @@
 {
-  "name": "jusem-hub-turborepo",
+  "name": "scooter-city-turborepo",
   "private": true,
   "scripts": {
     "build": "turbo run build",
