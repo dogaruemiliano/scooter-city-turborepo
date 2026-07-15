@@ -31,7 +31,7 @@ import {
   type ReactNode,
 } from "react";
 
-import { AppPagination } from "@/components/AppPagination";
+import { InfiniteListFooter } from "@/components/InfiniteListFooter";
 import { webApi } from "@/lib/api";
 import { PersonList } from "./PersonList";
 
@@ -47,7 +47,7 @@ interface Feedback {
   message: string;
 }
 
-const PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const;
+const LIST_PAGE_SIZE = 25;
 const ALL_FILTERS = "all";
 const SEARCH_DEBOUNCE_MS = 500;
 
@@ -77,8 +77,11 @@ function PersonsPageContent({
   const [draftQuery, setDraftQuery] =
     useState<v1.persons.ListPersonsQuery>(initialQuery);
   const [listLoading, setListLoading] = useState(false);
+  const [appendLoading, setAppendLoading] = useState(false);
+  const [appendError, setAppendError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const requestIdRef = useRef(0);
+  const appendLoadingRef = useRef(false);
   const searchDebounceReadyRef = useRef(false);
   const searchDebounceTimeoutRef = useRef<number | null>(null);
 
@@ -99,10 +102,17 @@ function PersonsPageContent({
         history?: "push" | "replace";
       } = {},
     ) => {
-      const parsedQuery = v1.persons.listPersonsQuerySchema.parse(nextQuery);
+      const parsedQuery = v1.persons.listPersonsQuerySchema.parse({
+        ...nextQuery,
+        page: 1,
+        pageSize: LIST_PAGE_SIZE,
+      });
       const requestId = requestIdRef.current + 1;
       requestIdRef.current = requestId;
+      appendLoadingRef.current = false;
       setListLoading(true);
+      setAppendLoading(false);
+      setAppendError(null);
       if (options.clearFeedback !== false) {
         setFeedback(null);
       }
@@ -144,6 +154,58 @@ function PersonsPageContent({
     [t],
   );
 
+  const loadNextPersonsPage = useCallback(async () => {
+    if (
+      appendLoadingRef.current ||
+      listLoading ||
+      list.items.length >= list.total
+    ) {
+      return;
+    }
+
+    const nextQuery = v1.persons.listPersonsQuerySchema.parse({
+      ...query,
+      page: list.page + 1,
+      pageSize: LIST_PAGE_SIZE,
+    });
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
+    appendLoadingRef.current = true;
+    setAppendLoading(true);
+    setAppendError(null);
+
+    try {
+      const nextList = await webApi.fetch(
+        personsListPath(nextQuery),
+        v1.persons.personListSchema,
+        { cache: "no-store" },
+      );
+
+      if (requestId !== requestIdRef.current) {
+        return;
+      }
+
+      setList((current) => ({
+        ...nextList,
+        items: [...current.items, ...nextList.items],
+      }));
+      setQuery(nextQuery);
+    } catch (error) {
+      if (requestId !== requestIdRef.current) {
+        return;
+      }
+
+      setAppendError(
+        error instanceof ApiError ? error.message : t("feedback.genericError"),
+      );
+    } finally {
+      if (requestId === requestIdRef.current) {
+        appendLoadingRef.current = false;
+        setAppendLoading(false);
+      }
+    }
+  }, [list.items.length, list.page, list.total, listLoading, query, t]);
+
   useEffect(() => {
     if (!searchDebounceReadyRef.current) {
       searchDebounceReadyRef.current = true;
@@ -167,7 +229,7 @@ function PersonsPageContent({
               ? undefined
               : query.sort,
           page: 1,
-          pageSize: list.pageSize,
+          pageSize: LIST_PAGE_SIZE,
         },
         { history: "replace" },
       );
@@ -180,13 +242,7 @@ function PersonsPageContent({
         searchDebounceTimeoutRef.current = null;
       }
     };
-  }, [
-    clearSearchDebounce,
-    draftQuery.search,
-    list.pageSize,
-    loadPersons,
-    query,
-  ]);
+  }, [clearSearchDebounce, draftQuery.search, loadPersons, query]);
 
   async function searchPersons(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -194,25 +250,7 @@ function PersonsPageContent({
     await loadPersons({
       ...draftQuery,
       page: 1,
-      pageSize: list.pageSize,
-    });
-  }
-
-  async function changePage(page: number) {
-    await loadPersons({
-      ...query,
-      page,
-      pageSize: list.pageSize,
-      includeDeleted: false,
-    });
-  }
-
-  async function changePageSize(value: string) {
-    const pageSize = Number(value);
-    await loadPersons({
-      ...query,
-      page: 1,
-      pageSize,
+      pageSize: LIST_PAGE_SIZE,
     });
   }
 
@@ -226,7 +264,7 @@ function PersonsPageContent({
     const nextQuery = {
       ...draftQuery,
       page: 1,
-      pageSize: list.pageSize,
+      pageSize: LIST_PAGE_SIZE,
       sort: isDefaultSort(draftQuery, sort) ? undefined : sort,
     };
 
@@ -238,7 +276,7 @@ function PersonsPageContent({
     clearSearchDebounce();
     await loadPersons({
       page: 1,
-      pageSize: list.pageSize,
+      pageSize: LIST_PAGE_SIZE,
       includeDeleted: false,
     });
   }
@@ -253,7 +291,8 @@ function PersonsPageContent({
     }));
   }
 
-  const totalPages = Math.max(1, Math.ceil(list.total / list.pageSize));
+  const hasMore = list.items.length < list.total;
+
   return (
     <div className="mx-auto flex w-full max-w-screen-xl flex-1 flex-col gap-6 px-6 py-10">
       <div className="flex justify-end">
@@ -568,45 +607,12 @@ function PersonsPageContent({
 
         <PersonList items={list.items} />
 
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span>{t("list.rowsPerPage")}</span>
-            <Label htmlFor="persons-page-size" className="sr-only">
-              {t("list.rowsPerPage")}
-            </Label>
-            <Select
-              value={String(list.pageSize)}
-              onValueChange={(value) => {
-                if (value) {
-                  void changePageSize(value);
-                }
-              }}
-            >
-              <SelectTrigger id="persons-page-size" size="sm">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {PAGE_SIZE_OPTIONS.map((pageSize) => (
-                  <SelectItem key={pageSize} value={String(pageSize)}>
-                    {pageSize}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <AppPagination
-            page={list.page}
-            totalPages={totalPages}
-            disabled={listLoading}
-            label={t("pagination.label")}
-            previousText={t("pagination.previous")}
-            previousAriaLabel={t("pagination.previousAria")}
-            nextText={t("pagination.next")}
-            nextAriaLabel={t("pagination.nextAria")}
-            moreLabel={t("pagination.more")}
-            onPageChange={(page) => void changePage(page)}
-          />
-        </div>
+        <InfiniteListFooter
+          hasMore={hasMore && !listLoading}
+          loading={appendLoading}
+          error={appendError}
+          onLoadMore={loadNextPersonsPage}
+        />
       </div>
     </div>
   );
@@ -640,8 +646,6 @@ function updatePersonsUrl(
   history: "push" | "replace",
 ) {
   const params = new URLSearchParams();
-  if (query.page !== 1) params.set("page", String(query.page));
-  if (query.pageSize !== 25) params.set("pageSize", String(query.pageSize));
   appendPersonsQueryParams(params, query);
 
   const search = params.toString();

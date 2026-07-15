@@ -11,6 +11,34 @@ const mocks = vi.hoisted(() => ({
   apiFetch: vi.fn(),
 }));
 
+let intersectionObservers: MockIntersectionObserver[] = [];
+
+class MockIntersectionObserver {
+  private readonly callback: IntersectionObserverCallback;
+  readonly options?: IntersectionObserverInit;
+
+  constructor(
+    callback: IntersectionObserverCallback,
+    options?: IntersectionObserverInit,
+  ) {
+    this.callback = callback;
+    this.options = options;
+    intersectionObservers.push(this);
+  }
+
+  observe = vi.fn();
+  unobserve = vi.fn();
+  disconnect = vi.fn();
+  takeRecords = vi.fn(() => []);
+
+  trigger(isIntersecting = true) {
+    this.callback(
+      [{ isIntersecting } as IntersectionObserverEntry],
+      this as unknown as IntersectionObserver,
+    );
+  }
+}
+
 vi.mock("@/lib/api", () => ({
   webApi: {
     fetch: mocks.apiFetch,
@@ -57,11 +85,16 @@ const person: v1.persons.Person = {
 
 beforeEach(() => {
   mocks.apiFetch.mockReset();
+  intersectionObservers = [];
   window.history.replaceState(null, "", "/en/persons");
 
   Object.defineProperty(window, "PointerEvent", {
     configurable: true,
     value: MouseEvent,
+  });
+  Object.defineProperty(window, "IntersectionObserver", {
+    configurable: true,
+    value: MockIntersectionObserver,
   });
 });
 
@@ -96,6 +129,8 @@ describe("PersonsPage", () => {
     expect(screen.getByText("Verified")).toBeInTheDocument();
     expect(screen.queryByLabelText("Expires on")).not.toBeInTheDocument();
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    expect(screen.queryByText("Rows per page")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Go to next page")).not.toBeInTheDocument();
   });
 
   it("renders Romanian page copy", () => {
@@ -156,6 +191,35 @@ describe("PersonsPage", () => {
     );
     expect(await screen.findByText("No persons found.")).toBeInTheDocument();
     expect(window.location.search).toBe("?search=hopper");
+  });
+
+  it("resets accumulated results when search changes", async () => {
+    const nextPerson = personRecord({
+      id: "person-2",
+      email: "grace@example.com",
+      firstName: "Grace",
+      lastName: "Hopper",
+    });
+    mocks.apiFetch
+      .mockResolvedValueOnce(personList([nextPerson], { page: 2, total: 26 }))
+      .mockResolvedValueOnce(personList([], { total: 0 }));
+    const browser = userEvent.setup();
+
+    renderPersons(personList([person], { total: 26 }));
+    await browser.click(screen.getByRole("button", { name: "Load more" }));
+    expect(await screen.findByText("Grace Hopper")).toBeInTheDocument();
+
+    await browser.type(screen.getByLabelText("Search persons"), "hopper");
+
+    await waitFor(() =>
+      expect(mocks.apiFetch).toHaveBeenLastCalledWith(
+        `${v1.persons.ROUTES.list}?page=1&pageSize=25&search=hopper`,
+        v1.persons.personListSchema,
+        { cache: "no-store" },
+      ),
+    );
+    expect(await screen.findByText("No persons found.")).toBeInTheDocument();
+    expect(screen.queryByText("Grace Hopper")).not.toBeInTheDocument();
   });
 
   it("applies URL-backed sort through the backend list endpoint", async () => {
@@ -250,26 +314,98 @@ describe("PersonsPage", () => {
     expect(window.location.search).toBe("");
   });
 
-  it("requests the next backend page from pagination controls", async () => {
+  it("loads and appends the next page when the sentinel intersects", async () => {
+    const nextPerson = personRecord({
+      id: "person-2",
+      email: "grace@example.com",
+      firstName: "Grace",
+      lastName: "Hopper",
+    });
     mocks.apiFetch.mockResolvedValueOnce(
-      personList([{ ...person, id: "person-2", email: "grace@example.com" }], {
+      personList([nextPerson], {
         page: 2,
-        pageSize: 1,
-        total: 2,
+        pageSize: 25,
+        total: 26,
       }),
     );
-    const browser = userEvent.setup();
 
-    renderPersons(personList([person], { page: 1, pageSize: 1, total: 2 }));
-    await browser.click(screen.getByLabelText("Go to next page"));
+    renderPersons(personList([person], { page: 1, pageSize: 25, total: 26 }));
+    await waitFor(() => expect(intersectionObservers).toHaveLength(1));
+    expect(intersectionObservers[0]!.options).toEqual({
+      rootMargin: "400px 0px",
+    });
+    intersectionObservers[0]!.trigger();
 
     await waitFor(() =>
       expect(mocks.apiFetch).toHaveBeenCalledWith(
-        `${v1.persons.ROUTES.list}?page=2&pageSize=1`,
+        `${v1.persons.ROUTES.list}?page=2&pageSize=25`,
         v1.persons.personListSchema,
         { cache: "no-store" },
       ),
     );
+    expect(await screen.findByText("Grace Hopper")).toBeInTheDocument();
+    expect(screen.getByText("Ada Lovelace")).toBeInTheDocument();
+  });
+
+  it("loads and appends the next page from the fallback button", async () => {
+    const nextPerson = personRecord({
+      id: "person-2",
+      email: "grace@example.com",
+      firstName: "Grace",
+      lastName: "Hopper",
+    });
+    mocks.apiFetch.mockResolvedValueOnce(
+      personList([nextPerson], { page: 2, pageSize: 25, total: 26 }),
+    );
+    const browser = userEvent.setup();
+
+    renderPersons(personList([person], { total: 26 }));
+    await browser.click(screen.getByRole("button", { name: "Load more" }));
+
+    await waitFor(() =>
+      expect(mocks.apiFetch).toHaveBeenCalledWith(
+        `${v1.persons.ROUTES.list}?page=2&pageSize=25`,
+        v1.persons.personListSchema,
+        { cache: "no-store" },
+      ),
+    );
+    expect(await screen.findByText("Grace Hopper")).toBeInTheDocument();
+  });
+
+  it("does not expose infinite loading when all persons are loaded", () => {
+    renderPersons(personList([person], { total: 1 }));
+
+    expect(
+      screen.queryByRole("button", { name: "Load more" }),
+    ).not.toBeInTheDocument();
+    expect(intersectionObservers).toHaveLength(0);
+  });
+
+  it("keeps existing persons and retries after append failure", async () => {
+    const nextPerson = personRecord({
+      id: "person-2",
+      email: "grace@example.com",
+      firstName: "Grace",
+      lastName: "Hopper",
+    });
+    mocks.apiFetch
+      .mockRejectedValueOnce(new Error("Network down"))
+      .mockResolvedValueOnce(
+        personList([nextPerson], { page: 2, pageSize: 25, total: 26 }),
+      );
+    const browser = userEvent.setup();
+
+    renderPersons(personList([person], { total: 26 }));
+    await browser.click(screen.getByRole("button", { name: "Load more" }));
+
+    expect(
+      await screen.findByText("Something went wrong. Try again."),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Ada Lovelace")).toBeInTheDocument();
+
+    await browser.click(screen.getByRole("button", { name: "Retry" }));
+
+    expect(await screen.findByText("Grace Hopper")).toBeInTheDocument();
   });
 });
 
@@ -301,5 +437,15 @@ function personList(
     page: overrides.page ?? 1,
     pageSize: overrides.pageSize ?? 25,
     total: overrides.total ?? items.length,
+  };
+}
+
+function personRecord(
+  overrides: Partial<v1.persons.Person> = {},
+): v1.persons.Person {
+  return {
+    ...person,
+    documents: [],
+    ...overrides,
   };
 }
