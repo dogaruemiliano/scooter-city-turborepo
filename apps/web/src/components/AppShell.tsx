@@ -42,6 +42,7 @@ import {
 import { useLogout } from "./auth/LogoutButton";
 import { useSession } from "./auth/SessionProvider";
 import { LanguageMenuSub } from "./LanguageSwitcher";
+import { PageTitleOverrideContext } from "./PageTitleOverride";
 import {
   applyThemePreference,
   type ThemePreference,
@@ -57,6 +58,7 @@ import {
 const NAVIGATION = [
   { href: "/", labelKey: "dashboard" },
   { href: "/persons", labelKey: "persons", requiredRole: "ADMIN" },
+  { href: "/scooters", labelKey: "scooters", requiredRole: "ADMIN" },
 ] as const;
 
 const PAGE_TITLES: Record<string, string> = {
@@ -64,6 +66,8 @@ const PAGE_TITLES: Record<string, string> = {
   "/account/settings": "accountSettings",
   "/persons": "persons",
   "/persons/new": "newPerson",
+  "/scooters": "scooters",
+  "/scooters/new": "newScooter",
 };
 
 export function AppShell({
@@ -74,32 +78,37 @@ export function AppShell({
   initialThemePreference: ThemePreference;
 }) {
   const tPages = useTranslations("appShell.pages");
+  const [pageTitleOverride, setPageTitleOverride] = useState<string | null>(
+    null,
+  );
   const pathname = usePathname();
   const routePathname = getUnprefixedPathname(pathname);
   const locale = getLocaleFromPathname(pathname);
   const pageTitleKey = PAGE_TITLES[routePathname];
+  const pageTitle =
+    pageTitleOverride ?? (pageTitleKey ? tPages(pageTitleKey) : "Scooter City");
 
   if (isSignInPathname(pathname)) {
     return children;
   }
 
   return (
-    <SidebarProvider>
-      <AppSidebar
-        locale={locale}
-        pathname={routePathname}
-        initialThemePreference={initialThemePreference}
-      />
-      <SidebarInset>
-        <header className="sticky top-0 z-sticky flex h-12 shrink-0 items-center gap-2 border-b border-border bg-background px-4">
-          <SidebarTrigger />
-          <span className="text-sm font-medium">
-            {pageTitleKey ? tPages(pageTitleKey) : "DecTech"}
-          </span>
-        </header>
-        <div className="flex flex-1 flex-col">{children}</div>
-      </SidebarInset>
-    </SidebarProvider>
+    <PageTitleOverrideContext.Provider value={setPageTitleOverride}>
+      <SidebarProvider>
+        <AppSidebar
+          locale={locale}
+          pathname={routePathname}
+          initialThemePreference={initialThemePreference}
+        />
+        <SidebarInset>
+          <header className="sticky top-0 z-sticky flex h-12 shrink-0 items-center gap-2 border-b border-border bg-background px-4">
+            <SidebarTrigger />
+            <span className="text-sm font-medium">{pageTitle}</span>
+          </header>
+          <div className="flex flex-1 flex-col">{children}</div>
+        </SidebarInset>
+      </SidebarProvider>
+    </PageTitleOverrideContext.Provider>
   );
 }
 

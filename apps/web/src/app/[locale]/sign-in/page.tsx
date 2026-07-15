@@ -1,4 +1,6 @@
 import { v1 } from "@repo/api-shared";
+import { messages } from "@repo/i18n";
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { LanguageSwitcher } from "../../../components/LanguageSwitcher";
@@ -14,6 +16,17 @@ import { meOnServer } from "../../../lib/auth-server";
 interface SignInPageProps {
   params: Promise<{ locale: string }>;
   searchParams: Promise<{ next?: string }>;
+}
+
+export async function generateMetadata({
+  params,
+}: Pick<SignInPageProps, "params">): Promise<Metadata> {
+  const { locale: rawLocale } = await params;
+  const locale = resolveRouteLocale(rawLocale);
+
+  return {
+    title: messages[locale].auth.signIn.title,
+  };
 }
 
 /**

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { useState } from "react";
 
+import { PageTitleOverride } from "@/components/PageTitleOverride";
 import { webApi } from "@/lib/api";
 
 import { ActivitySection } from "./ActivitySection";
@@ -39,6 +40,7 @@ export function PersonDetailPage({
   const router = useRouter();
   const readiness = getRentalReadiness(person);
   const readinessIsReady = readiness.issues.length === 0;
+  const title = `${person.firstName} ${person.lastName}`;
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [photosByDocumentId, setPhotosByDocumentId] =
@@ -310,6 +312,7 @@ export function PersonDetailPage({
 
   return (
     <div className="mx-auto flex w-full max-w-screen-xl flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
+      <PageTitleOverride title={title} />
       <PersonDetailHeader
         person={person}
         personsHref={personsHref}

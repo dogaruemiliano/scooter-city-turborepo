@@ -1,6 +1,8 @@
 import { ApiError, v1 } from "@repo/api-shared";
+import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
+import { cache } from "react";
 
 import {
   getLocalizedSignInPath,
@@ -18,15 +20,26 @@ interface PersonRoutePageProps {
   params: Promise<{ locale: string; id: string }>;
 }
 
+export async function generateMetadata({
+  params,
+}: PersonRoutePageProps): Promise<Metadata> {
+  const { locale: rawLocale, id } = await params;
+  const locale = resolveRouteLocale(rawLocale);
+  const detailPath = personDetailPath(id, locale);
+  const cookieHeader = (await cookies()).toString();
+  const person = await personFromApi(locale, id, detailPath, cookieHeader);
+
+  return {
+    title: personTitle(person),
+  };
+}
+
 export default async function PersonRoutePage({
   params,
 }: PersonRoutePageProps) {
   const { locale: rawLocale, id } = await params;
   const locale = resolveRouteLocale(rawLocale);
-  const detailPath = localizePath(
-    `${PERSONS_PATH}/${encodeURIComponent(id)}`,
-    locale,
-  );
+  const detailPath = personDetailPath(id, locale);
   const user = await meFromApi();
 
   if (!user) {
@@ -59,7 +72,7 @@ export default async function PersonRoutePage({
   );
 }
 
-async function personFromApi(
+const personFromApi = cache(async function personFromApi(
   locale: ReturnType<typeof resolveRouteLocale>,
   id: string,
   detailPath: string,
@@ -86,6 +99,17 @@ async function personFromApi(
     }
     throw error;
   }
+});
+
+function personDetailPath(
+  id: string,
+  locale: ReturnType<typeof resolveRouteLocale>,
+): string {
+  return localizePath(`${PERSONS_PATH}/${encodeURIComponent(id)}`, locale);
+}
+
+function personTitle(person: v1.persons.Person): string {
+  return `${person.firstName} ${person.lastName}`;
 }
 
 async function auditEventsFromApi(
