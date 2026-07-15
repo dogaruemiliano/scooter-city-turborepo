@@ -116,10 +116,13 @@ export const envSchema = z
       .default("document-photos")
       .describe("Object key prefix for private document-photo images."),
     IMAGE_STORAGE_S3_KMS_KEY_ID: z
-      .string()
-      .trim()
-      .min(1)
-      .optional()
+      .preprocess(
+        (value) =>
+          typeof value === "string" && value.trim().length === 0
+            ? undefined
+            : value,
+        z.string().trim().min(1).optional(),
+      )
       .describe(
         "Optional AWS KMS key ID/ARN for S3 SSE-KMS image uploads. Leave empty to use the bucket default encryption.",
       ),
