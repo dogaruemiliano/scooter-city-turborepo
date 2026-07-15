@@ -3,6 +3,7 @@
 import { v1 } from "@repo/api-shared";
 import {
   CountrySelect,
+  DatePartsInput,
   Input,
   Select,
   SelectContent,
@@ -11,11 +12,10 @@ import {
   SelectValue,
   Textarea,
 } from "@repo/ui/components";
+import { dateDigits } from "@repo/ui/lib/date-parts";
 import { useTranslations } from "next-intl";
 
 import { FOREIGN_IDENTITY_DOCUMENT_TYPES } from "./constants";
-import { DatePartsInput } from "./DatePartsInput";
-import { dateDigits } from "./date-utils";
 import { documentFieldErrorKey, fieldErrorId, invalidAria } from "./errors";
 import { FormField } from "./FormField";
 import { FormSection } from "./FormSection";

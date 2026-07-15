@@ -1,5 +1,6 @@
 import { v1 } from "@repo/api-shared";
 import type { CountryCode } from "@repo/ui/components";
+import type { DateParts } from "@repo/ui/lib/date-parts";
 
 export interface PersonCreateFormProps {
   personsHref: string;
@@ -104,17 +105,6 @@ export interface CreatePersonDocumentFormState {
   status: v1.persons.PersonDocumentStatus;
   photos: PersonDocumentPhotoDraftUploads;
   notes: string;
-}
-
-export interface DateParts {
-  day: string;
-  month: string;
-  year: string;
-}
-
-export interface DateBuildResult {
-  value?: string;
-  error?: "incomplete" | "invalid";
 }
 
 export interface FieldValidationError {

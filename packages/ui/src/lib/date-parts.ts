@@ -1,4 +1,13 @@
-import type { DateBuildResult, DateParts } from "./types";
+export interface DateParts {
+  day: string;
+  month: string;
+  year: string;
+}
+
+export interface DateBuildResult {
+  value?: string;
+  error?: "incomplete" | "invalid";
+}
 
 export function buildDateOnly(parts: DateParts): DateBuildResult {
   const hasDay = parts.day.length > 0;
@@ -35,6 +44,22 @@ export function buildDateOnly(parts: DateParts): DateBuildResult {
       2,
       "0",
     )}`,
+  };
+}
+
+export function dateOnlyToDateParts(
+  value: string | null | undefined,
+): DateParts {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value ?? "");
+
+  if (!match) {
+    return emptyDateParts();
+  }
+
+  return {
+    day: match[3]!,
+    month: match[2]!,
+    year: match[1]!,
   };
 }
 

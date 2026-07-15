@@ -3,11 +3,11 @@
 import {
   Input,
   PhoneNumberInput,
+  DatePartsInput,
   type PhoneNumberInputChangeDetails,
 } from "@repo/ui/components";
 import { useTranslations } from "next-intl";
 
-import { DatePartsInput } from "./DatePartsInput";
 import { fieldErrorId, invalidAria } from "./errors";
 import { FormField } from "./FormField";
 import { FormSection } from "./FormSection";
