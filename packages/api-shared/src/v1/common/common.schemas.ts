@@ -63,6 +63,11 @@ export const dateOnlySchema = z
     message: "Date must be a valid calendar date.",
   });
 
+/** Current UTC calendar date as an ISO date-only string. */
+export function dateOnlyToday(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
 /** Coerces common query-string boolean values. */
 export const queryBooleanSchema = z.preprocess((value) => {
   if (value === undefined || typeof value === "boolean") return value;

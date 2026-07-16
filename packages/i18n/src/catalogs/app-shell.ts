@@ -3,12 +3,15 @@ export const appShellCatalog = {
     nav: {
       dashboard: "Dashboard",
       persons: "Persons",
+      scooters: "Scooters",
     },
     pages: {
-      dashboard: "Dashboard",
+      dashboard: "Scooter City",
       accountSettings: "Account settings",
       persons: "Persons",
-      newPerson: "New person",
+      newPerson: "Add person",
+      scooters: "Scooters",
+      newScooter: "Add scooter",
     },
     workspace: {
       name: "DecTech",
@@ -25,12 +28,15 @@ export const appShellCatalog = {
     nav: {
       dashboard: "Panou principal",
       persons: "Persoane",
+      scooters: "Scutere",
     },
     pages: {
-      dashboard: "Panou principal",
+      dashboard: "Scooter City",
       accountSettings: "Setări cont",
       persons: "Persoane",
-      newPerson: "Persoană nouă",
+      newPerson: "Adaugă persoană",
+      scooters: "Scutere",
+      newScooter: "Adaugă scuter",
     },
     workspace: {
       name: "DecTech",

@@ -34,6 +34,15 @@
  *   | seed-victor.dumitrescu@example.com | soft-deleted person                    |
  *   | seed-person-0001@example.com       | generated local dataset, 120 records   |
  *
+ * Scooters created:
+ *
+ *   | Type                    | Count | Notes                         |
+ *   |-------------------------|-------|-------------------------------|
+ *   | combustion, 50cc active | 180   | generated local inventory     |
+ *   | combustion, 125cc active| 10    | generated larger scooter set  |
+ *   | electric active         | 5     | generated electric edge cases |
+ *   | combustion, 50cc deleted| 5     | includeDeleted coverage       |
+ *
  * Run via `pnpm db:seed` (which calls `prisma db seed` → `tsx prisma/seed.ts`).
  */
 import "dotenv/config";
@@ -86,6 +95,7 @@ const FIXED_PERSON_DOCUMENT_IDS = {
 } as const;
 
 const GENERATED_PERSON_COUNT = 120;
+const GENERATED_SCOOTER_COUNT = 200;
 const PERSON_AUDIT_TARGET_TYPE = "person";
 const SEED_AUDIT_ACTOR = {
   kind: "system",
@@ -136,6 +146,24 @@ type PersonSeed = {
   notes: string | null;
   deletedAt: Date | null;
   documents: PersonDocumentSeed[];
+};
+
+type ScooterPowertrainType = "electric" | "combustion";
+type ScooterRegistrationStatus = "unregistered";
+
+type ScooterSeed = {
+  id: string;
+  vin: string;
+  brand: string;
+  model: string;
+  color: string | null;
+  manufactureYear: number;
+  powertrainType: ScooterPowertrainType;
+  cylinderCapacityCc: number | null;
+  purchasedOn: Date;
+  registrationStatus: ScooterRegistrationStatus;
+  notes: string | null;
+  deletedAt: Date | null;
 };
 
 const CURATED_PERSON_SEEDS: PersonSeed[] = [
@@ -351,10 +379,56 @@ const GENERATED_LOCATIONS = [
   },
 ] as const;
 
+const GENERATED_SCOOTER_50CC_MODELS = [
+  { brand: "Piaggio", model: "Liberty 50" },
+  { brand: "Kymco", model: "Agility 50" },
+  { brand: "SYM", model: "Fiddle 50" },
+  { brand: "Yamaha", model: "Neos 50" },
+  { brand: "Honda", model: "Vision 50" },
+  { brand: "Keeway", model: "Fact Evo 50" },
+  { brand: "Aprilia", model: "SR 50" },
+  { brand: "Peugeot", model: "Kisbee 50" },
+  { brand: "Rieju", model: "MRT 50" },
+  { brand: "Znen", model: "Classic 50" },
+] as const;
+
+const GENERATED_SCOOTER_125CC_MODELS = [
+  { brand: "Yamaha", model: "NMAX 125" },
+  { brand: "Honda", model: "PCX 125" },
+  { brand: "Kymco", model: "People S 125" },
+  { brand: "SYM", model: "Jet X 125" },
+  { brand: "Piaggio", model: "Medley 125" },
+] as const;
+
+const GENERATED_ELECTRIC_SCOOTER_MODELS = [
+  { brand: "NIU", model: "MQi GT" },
+  { brand: "Silence", model: "S01" },
+  { brand: "Horwin", model: "EK1" },
+  { brand: "Super Soco", model: "CUx" },
+  { brand: "Askoll", model: "eS2" },
+] as const;
+
+const GENERATED_SCOOTER_COLORS = [
+  "white",
+  "black",
+  "blue",
+  "red",
+  "silver",
+  "grey",
+  "green",
+  "yellow",
+  "orange",
+  "matte black",
+] as const;
+
 const PERSON_SEEDS: PersonSeed[] = [
   ...CURATED_PERSON_SEEDS,
   ...buildGeneratedPersonSeeds(GENERATED_PERSON_COUNT),
 ];
+
+const SCOOTER_SEEDS: ScooterSeed[] = buildGeneratedScooterSeeds(
+  GENERATED_SCOOTER_COUNT,
+);
 
 async function main(): Promise<void> {
   const now = new Date();
@@ -432,9 +506,10 @@ async function main(): Promise<void> {
   }
 
   await seedPersons();
+  await seedScooters();
 
   console.log(
-    `Seeded ${Object.keys(FIXED_IDS).length} users and ${PERSON_SEEDS.length} persons.`,
+    `Seeded ${Object.keys(FIXED_IDS).length} users, ${PERSON_SEEDS.length} persons, and ${SCOOTER_SEEDS.length} scooters.`,
   );
 }
 
@@ -472,6 +547,19 @@ async function seedPersons(): Promise<void> {
     }
 
     await seedPersonAuditEvents(seed);
+  }
+}
+
+async function seedScooters(): Promise<void> {
+  for (const seed of SCOOTER_SEEDS) {
+    await prisma.scooter.upsert({
+      where: { id: seed.id },
+      create: {
+        id: seed.id,
+        ...scooterData(seed),
+      },
+      update: scooterData(seed),
+    });
   }
 }
 
@@ -579,6 +667,22 @@ function personDocumentData(seed: PersonDocumentSeed) {
     issuedOn: seed.issuedOn,
     expiresOn: seed.expiresOn,
     status: seed.status,
+    notes: seed.notes,
+    deletedAt: seed.deletedAt,
+  };
+}
+
+function scooterData(seed: ScooterSeed) {
+  return {
+    vin: seed.vin,
+    brand: seed.brand,
+    model: seed.model,
+    color: seed.color,
+    manufactureYear: seed.manufactureYear,
+    powertrainType: seed.powertrainType,
+    cylinderCapacityCc: seed.cylinderCapacityCc,
+    purchasedOn: seed.purchasedOn,
+    registrationStatus: seed.registrationStatus,
     notes: seed.notes,
     deletedAt: seed.deletedAt,
   };
@@ -699,6 +803,34 @@ function buildGeneratedPersonSeeds(count: number): PersonSeed[] {
   });
 }
 
+function buildGeneratedScooterSeeds(count: number): ScooterSeed[] {
+  return Array.from({ length: count }, (_, index) => {
+    const ordinal = index + 1;
+    const padded = ordinal.toString().padStart(4, "0");
+    const is125Cc = ordinal > 180 && ordinal <= 190;
+    const isElectric = ordinal > 190 && ordinal <= 195;
+    const isDeleted = ordinal > 195;
+    const model = generatedScooterModel({ ordinal, is125Cc, isElectric });
+
+    return {
+      id: `seed-scooter-generated-${padded}`,
+      vin: generatedScooterVin(ordinal),
+      brand: model.brand,
+      model: model.model,
+      color: GENERATED_SCOOTER_COLORS[index % GENERATED_SCOOTER_COLORS.length],
+      manufactureYear: 2021 + (index % 6),
+      powertrainType: isElectric ? "electric" : "combustion",
+      cylinderCapacityCc: isElectric ? null : is125Cc ? 125 : 50,
+      purchasedOn: generatedScooterPurchasedOn(ordinal),
+      registrationStatus: "unregistered",
+      notes: generatedScooterNotes({ is125Cc, isElectric, isDeleted }),
+      deletedAt: isDeleted
+        ? new Date(`2026-03-${pad2(ordinal - 195)}T10:00:00.000Z`)
+        : null,
+    };
+  });
+}
+
 function buildGeneratedPersonDocuments({
   ordinal,
   padded,
@@ -803,6 +935,67 @@ function generatedPersonNotes(ordinal: number): string {
     return "Generated person without documents.";
   }
   return "Generated person seed for local list, search, and pagination flows.";
+}
+
+function generatedScooterModel({
+  ordinal,
+  is125Cc,
+  isElectric,
+}: {
+  ordinal: number;
+  is125Cc: boolean;
+  isElectric: boolean;
+}): { brand: string; model: string } {
+  if (isElectric) {
+    return GENERATED_ELECTRIC_SCOOTER_MODELS[
+      (ordinal - 191) % GENERATED_ELECTRIC_SCOOTER_MODELS.length
+    ];
+  }
+
+  if (is125Cc) {
+    return GENERATED_SCOOTER_125CC_MODELS[
+      (ordinal - 181) % GENERATED_SCOOTER_125CC_MODELS.length
+    ];
+  }
+
+  return GENERATED_SCOOTER_50CC_MODELS[
+    (ordinal - 1) % GENERATED_SCOOTER_50CC_MODELS.length
+  ];
+}
+
+function generatedScooterVin(ordinal: number): string {
+  return `LXYTCKP05P${5_000_000 + ordinal}`;
+}
+
+function generatedScooterPurchasedOn(ordinal: number): Date {
+  const month = ((ordinal - 1) % 12) + 1;
+  const day = ((ordinal - 1) % 27) + 1;
+
+  return dateOnly(`${2025 + (ordinal % 2)}-${pad2(month)}-${pad2(day)}`);
+}
+
+function generatedScooterNotes({
+  is125Cc,
+  isElectric,
+  isDeleted,
+}: {
+  is125Cc: boolean;
+  isElectric: boolean;
+  isDeleted: boolean;
+}): string {
+  if (isDeleted) {
+    return "Generated soft-deleted 50cc scooter for includeDeleted paging checks.";
+  }
+
+  if (isElectric) {
+    return "Generated electric scooter seed for powertrain filter checks.";
+  }
+
+  if (is125Cc) {
+    return "Generated 125cc combustion scooter seed for capacity filter checks.";
+  }
+
+  return "Generated 50cc combustion scooter seed for local inventory flows.";
 }
 
 function generatedDocumentStatus(ordinal: number): PersonDocumentStatus {

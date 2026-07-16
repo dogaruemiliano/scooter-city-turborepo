@@ -8,10 +8,11 @@ import {
 import { messages, type SupportedLocale } from "@repo/i18n";
 import { TooltipProvider } from "@repo/ui/components/tooltip";
 import { NextIntlClientProvider } from "next-intl";
-import type { AnchorHTMLAttributes } from "react";
+import type { AnchorHTMLAttributes, ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AppShell } from "./AppShell";
+import { PageTitleOverride } from "./PageTitleOverride";
 import { SessionProvider } from "./auth/SessionProvider";
 import type { SessionIdentity } from "../lib/auth-types";
 
@@ -100,6 +101,9 @@ describe("AppShell", () => {
     ).not.toBeInTheDocument();
     expect(screen.getByText("Emilia Stone")).toBeInTheDocument();
     expect(screen.getByText("emilia.stone@example.com")).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("banner")).getByText("Scooter City"),
+    ).toBeInTheDocument();
 
     fireEvent.mouseDown(
       screen.getByRole("button", { name: "Deschide meniul contului" }),
@@ -203,8 +207,8 @@ describe("AppShell", () => {
     );
   });
 
-  it("renders the persons navigation and title for admins", () => {
-    mocks.pathname = "/en/persons";
+  it("renders the Romanian persons navigation and title for admins", () => {
+    mocks.pathname = "/persons";
 
     renderAppShell({
       id: "admin-1",
@@ -212,17 +216,21 @@ describe("AppShell", () => {
       roles: ["ADMIN"],
     });
 
-    expect(screen.getByRole("link", { name: "Persons" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Persoane" })).toHaveAttribute(
       "href",
-      "/en/persons",
+      "/persons",
     );
     expect(
-      within(screen.getByRole("banner")).getByText("Persons"),
+      within(screen.getByRole("banner")).getByText("Persoane"),
     ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Scutere" })).toHaveAttribute(
+      "href",
+      "/scooters",
+    );
   });
 
   it("renders the new person page title for admin nested person routes", () => {
-    mocks.pathname = "/en/persons/new";
+    mocks.pathname = "/persons/new";
 
     renderAppShell({
       id: "admin-1",
@@ -231,8 +239,59 @@ describe("AppShell", () => {
     });
 
     expect(
-      within(screen.getByRole("banner")).getByText("New person"),
+      within(screen.getByRole("banner")).getByText("Adaugă persoană"),
     ).toBeInTheDocument();
+  });
+
+  it("renders the scooters navigation and page titles for admins", () => {
+    mocks.pathname = "/scooters";
+
+    renderAppShell({
+      id: "admin-1",
+      email: "admin@example.com",
+      roles: ["ADMIN"],
+    });
+
+    expect(screen.getByRole("link", { name: "Scutere" })).toHaveAttribute(
+      "href",
+      "/scooters",
+    );
+    expect(
+      within(screen.getByRole("banner")).getByText("Scutere"),
+    ).toBeInTheDocument();
+
+    mocks.pathname = "/scooters/new";
+    renderAppShell({
+      id: "admin-1",
+      email: "admin@example.com",
+      roles: ["ADMIN"],
+    });
+
+    expect(
+      within(screen.getAllByRole("banner")[1]).getByText("Adaugă scuter"),
+    ).toBeInTheDocument();
+  });
+
+  it("renders a dynamic page title override", async () => {
+    mocks.pathname = "/persons/person-1";
+
+    renderAppShell(
+      {
+        id: "admin-1",
+        email: "admin@example.com",
+        roles: ["ADMIN"],
+      },
+      <>
+        <PageTitleOverride title="Ada Lovelace" />
+        <div>Page content</div>
+      </>,
+    );
+
+    await waitFor(() =>
+      expect(
+        within(screen.getByRole("banner")).getByText("Ada Lovelace"),
+      ).toBeInTheDocument(),
+    );
   });
 });
 
@@ -242,6 +301,7 @@ function renderAppShell(
     email: "emilia.stone@example.com",
     roles: ["USER"],
   },
+  children: ReactNode = <div>Page content</div>,
 ) {
   const locale: SupportedLocale = mocks.pathname.startsWith("/en")
     ? "en"
@@ -251,9 +311,7 @@ function renderAppShell(
     <NextIntlClientProvider locale={locale} messages={messages[locale]}>
       <TooltipProvider>
         <SessionProvider initialUser={initialUser}>
-          <AppShell initialThemePreference="system">
-            <div>Page content</div>
-          </AppShell>
+          <AppShell initialThemePreference="system">{children}</AppShell>
         </SessionProvider>
       </TooltipProvider>
     </NextIntlClientProvider>,

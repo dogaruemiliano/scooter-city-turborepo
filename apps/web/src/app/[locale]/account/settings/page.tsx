@@ -1,4 +1,6 @@
 import { v1 } from "@repo/api-shared";
+import { messages } from "@repo/i18n";
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import {
@@ -7,14 +9,22 @@ import {
   resolveRouteLocale,
 } from "../../../../i18n/paths";
 import { webApi } from "../../../../lib/api";
-import {
-  activeSessionsFromApi,
-  meFromApi,
-} from "../../../../lib/auth-server";
+import { activeSessionsFromApi, meFromApi } from "../../../../lib/auth-server";
 import { AccountSettings } from "./AccountSettings";
 
 interface AccountSettingsPageProps {
   params: Promise<{ locale: string }>;
+}
+
+export async function generateMetadata({
+  params,
+}: AccountSettingsPageProps): Promise<Metadata> {
+  const { locale: rawLocale } = await params;
+  const locale = resolveRouteLocale(rawLocale);
+
+  return {
+    title: messages[locale].appShell.pages.accountSettings,
+  };
 }
 
 export default async function AccountSettingsPage({
@@ -34,10 +44,7 @@ export default async function AccountSettingsPage({
 
   if (!user || !sessions) {
     redirect(
-      getLocalizedSignInPath(
-        locale,
-        localizePath("/account/settings", locale),
-      ),
+      getLocalizedSignInPath(locale, localizePath("/account/settings", locale)),
     );
   }
 

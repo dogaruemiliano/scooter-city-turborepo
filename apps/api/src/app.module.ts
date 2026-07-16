@@ -23,6 +23,7 @@ import { HealthModule } from "./health/health.module";
 import { MailerModule } from "./mailer/mailer.module";
 import { PersonsModule } from "./persons/persons.module";
 import { PrismaModule } from "./prisma/prisma.module";
+import { ScootersModule } from "./scooters/scooters.module";
 import { SmsModule } from "./sms/sms.module";
 import { UsersModule } from "./users/users.module";
 
@@ -46,6 +47,7 @@ const env = loadEnv();
     // Public-surface modules.
     HealthModule,
     PersonsModule,
+    ScootersModule,
     AuthModule.forRoot(buildAuthConfig(env)),
   ],
   providers: [

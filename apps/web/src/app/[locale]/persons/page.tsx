@@ -1,4 +1,6 @@
 import { ApiError, v1 } from "@repo/api-shared";
+import { messages } from "@repo/i18n";
+import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 
@@ -18,6 +20,17 @@ const ADMIN_ROLE = "ADMIN";
 interface PersonsRoutePageProps {
   params: Promise<{ locale: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
+}
+
+export async function generateMetadata({
+  params,
+}: Pick<PersonsRoutePageProps, "params">): Promise<Metadata> {
+  const { locale: rawLocale } = await params;
+  const locale = resolveRouteLocale(rawLocale);
+
+  return {
+    title: messages[locale].appShell.pages.persons,
+  };
 }
 
 export default async function PersonsRoutePage({

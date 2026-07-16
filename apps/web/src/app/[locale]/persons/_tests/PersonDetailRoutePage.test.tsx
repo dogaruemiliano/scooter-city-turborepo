@@ -4,7 +4,7 @@ import { render, screen } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import PersonRoutePage from "../[id]/page";
+import PersonRoutePage, { generateMetadata } from "../[id]/page";
 
 const mocks = vi.hoisted(() => ({
   apiFetch: vi.fn(),
@@ -137,6 +137,25 @@ beforeEach(() => {
 });
 
 describe("PersonRoutePage", () => {
+  it("returns the person full name as detail metadata", async () => {
+    mocks.apiFetch.mockResolvedValueOnce(person);
+
+    await expect(
+      generateMetadata({
+        params: Promise.resolve({ locale: "ro", id: "person-1" }),
+      }),
+    ).resolves.toEqual({ title: "Ada Lovelace" });
+
+    expect(mocks.apiFetch).toHaveBeenCalledWith(
+      v1.persons.ROUTES.get("person-1"),
+      v1.persons.personSchema,
+      {
+        headers: { cookie: "session=abc" },
+        cache: "no-store",
+      },
+    );
+  });
+
   it("redirects unauthenticated users to sign in with the detail return path", async () => {
     mocks.meFromApi.mockResolvedValueOnce(null);
 

@@ -4,6 +4,7 @@ export const sharedCatalog = {
       cancel: "Cancel",
       close: "Close",
       continue: "Continue",
+      loadMore: "Load more",
       retry: "Retry",
     },
     errors: {
@@ -24,6 +25,7 @@ export const sharedCatalog = {
       cancel: "Anulează",
       close: "Închide",
       continue: "Continuă",
+      loadMore: "Încarcă mai multe",
       retry: "Încearcă din nou",
     },
     errors: {

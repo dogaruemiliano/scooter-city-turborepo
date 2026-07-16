@@ -78,7 +78,7 @@ export const personsCatalog = {
       },
     },
     createPage: {
-      title: "New person",
+      title: "Add person",
       description: "Create a standalone rental person record.",
       formTitle: "Person details",
       formDescription:
@@ -370,7 +370,7 @@ export const personsCatalog = {
       },
     },
     createPage: {
-      title: "Persoană nouă",
+      title: "Adaugă persoană",
       description:
         "Creează o înregistrare independentă de persoană pentru închirieri.",
       formTitle: "Date persoană",

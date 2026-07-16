@@ -1,3 +1,5 @@
+import { messages } from "@repo/i18n";
+import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 
 import {
@@ -14,6 +16,17 @@ const ADMIN_ROLE = "ADMIN";
 
 interface NewPersonRoutePageProps {
   params: Promise<{ locale: string }>;
+}
+
+export async function generateMetadata({
+  params,
+}: NewPersonRoutePageProps): Promise<Metadata> {
+  const { locale: rawLocale } = await params;
+  const locale = resolveRouteLocale(rawLocale);
+
+  return {
+    title: messages[locale].persons.createPage.title,
+  };
 }
 
 export default async function NewPersonRoutePage({

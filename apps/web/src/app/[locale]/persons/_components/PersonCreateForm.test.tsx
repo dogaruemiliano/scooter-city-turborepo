@@ -83,7 +83,7 @@ describe("PersonCreateForm", () => {
     renderCreateForm();
 
     expect(
-      screen.getByRole("heading", { name: "New person" }),
+      screen.getByRole("heading", { name: "Add person" }),
     ).toBeInTheDocument();
     expect(screen.getByText("Contact")).toBeInTheDocument();
     expect(screen.getByText("Address")).toBeInTheDocument();
@@ -130,7 +130,7 @@ describe("PersonCreateForm", () => {
     renderCreateForm("ro");
 
     expect(
-      screen.getByRole("heading", { name: "Persoană nouă" }),
+      screen.getByRole("heading", { name: "Adaugă persoană" }),
     ).toBeInTheDocument();
     expect(screen.getByText("Contact")).toBeInTheDocument();
     expect(screen.getByText("Adresă")).toBeInTheDocument();

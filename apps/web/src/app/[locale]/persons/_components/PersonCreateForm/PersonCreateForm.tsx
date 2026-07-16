@@ -5,6 +5,7 @@ import type {
   CountryCode,
   PhoneNumberInputChangeDetails,
 } from "@repo/ui/components";
+import { emptyDateParts } from "@repo/ui/lib/date-parts";
 import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { useId, useState, type FormEvent } from "react";
@@ -14,7 +15,6 @@ import { AddressSection } from "./AddressSection";
 import { CitizenshipToggle } from "./CitizenshipToggle";
 import { ContactSection } from "./ContactSection";
 import { CreateFormFeedback } from "./CreateFormFeedback";
-import { emptyDateParts } from "./date-utils";
 import { DocumentsSection } from "./DocumentsSection";
 import {
   documentFieldErrorKey,

@@ -28,7 +28,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "DecTech",
+  title: "Scooter City",
   description: "Web workspace",
 };
 

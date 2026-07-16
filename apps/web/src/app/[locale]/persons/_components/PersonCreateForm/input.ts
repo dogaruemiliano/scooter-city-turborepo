@@ -1,6 +1,6 @@
 import { v1 } from "@repo/api-shared";
+import { buildDateOnly } from "@repo/ui/lib/date-parts";
 
-import { buildDateOnly } from "./date-utils";
 import { documentFieldErrorKey } from "./errors";
 import { isBlankOptionalDocument } from "./form-state";
 import type {
