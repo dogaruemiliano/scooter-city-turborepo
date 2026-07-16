@@ -28,8 +28,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Scooter City",
+  title: "ScooterCity",
   description: "Web workspace",
+  appleWebApp: {
+    title: "ScooterCity",
+  },
 };
 
 export function generateStaticParams() {
