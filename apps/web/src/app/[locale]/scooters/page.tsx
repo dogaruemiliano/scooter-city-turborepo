@@ -97,7 +97,7 @@ function scootersQueryFromSearchParams(
   return v1.scooters.listScootersQuerySchema.parse({
     search: firstSearchParam(searchParams.search),
     powertrainType: firstSearchParam(searchParams.powertrainType),
-    registrationStatus: firstSearchParam(searchParams.registrationStatus),
+    registrationType: firstSearchParam(searchParams.registrationType),
     sort: firstSearchParam(searchParams.sort),
     includeDeleted: firstSearchParam(searchParams.includeDeleted),
   });
@@ -125,8 +125,8 @@ function appendScootersQueryParams(
   if (query.powertrainType) {
     params.set("powertrainType", query.powertrainType);
   }
-  if (query.registrationStatus) {
-    params.set("registrationStatus", query.registrationStatus);
+  if (query.registrationType) {
+    params.set("registrationType", query.registrationType);
   }
   if (query.sort && !isDefaultSort(query, query.sort)) {
     params.set("sort", query.sort);

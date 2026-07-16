@@ -6,10 +6,26 @@ export const SCOOTER_POWERTRAIN_TYPES = ["electric", "combustion"] as const;
 
 export type ScooterPowertrainType = (typeof SCOOTER_POWERTRAIN_TYPES)[number];
 
-export const SCOOTER_REGISTRATION_STATUSES = ["unregistered"] as const;
+export const SCOOTER_REGISTRATION_TYPES = [
+  "unregistered",
+  "national",
+  "local",
+  "temporary",
+] as const;
 
-export type ScooterRegistrationStatus =
-  (typeof SCOOTER_REGISTRATION_STATUSES)[number];
+export type ScooterRegistrationType =
+  (typeof SCOOTER_REGISTRATION_TYPES)[number];
+
+export const SCOOTER_REQUIRED_DRIVER_LICENSE_TYPES = [
+  "none",
+  "AM",
+  "A1",
+  "A2",
+  "A",
+] as const;
+
+export type ScooterRequiredDriverLicenseType =
+  (typeof SCOOTER_REQUIRED_DRIVER_LICENSE_TYPES)[number];
 
 export const SCOOTER_LIST_SORTS = [
   "relevance",

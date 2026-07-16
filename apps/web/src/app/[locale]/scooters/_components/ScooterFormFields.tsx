@@ -6,6 +6,11 @@ import {
   DatePartsInput,
   Input,
   Label,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Textarea,
 } from "@repo/ui/components";
 import { cn } from "@repo/ui/lib/utils";
@@ -19,6 +24,7 @@ interface ScooterFormFieldsProps {
   form: ScooterFormState;
   errors: ScooterFormErrors;
   disabled?: boolean;
+  includeRegistration?: boolean;
   onSetValue: <Key extends keyof ScooterFormState>(
     key: Key,
     value: ScooterFormState[Key],
@@ -30,6 +36,7 @@ export function ScooterFormFields({
   form,
   errors,
   disabled,
+  includeRegistration = true,
   onSetValue,
 }: ScooterFormFieldsProps) {
   const t = useTranslations("scooters");
@@ -38,7 +45,7 @@ export function ScooterFormFields({
   function changePowertrain(powertrainType: v1.scooters.ScooterPowertrainType) {
     onSetValue("powertrainType", powertrainType);
     if (powertrainType === "electric") {
-      onSetValue("cylinderCapacityCc", "");
+      onSetValue("engineCc", "");
     }
   }
 
@@ -129,19 +136,40 @@ export function ScooterFormFields({
         </div>
         {form.powertrainType === "combustion" ? (
           <TextField
-            id={`${formId}-cylinder-capacity-cc`}
-            label={t("fields.cylinderCapacityCc")}
+            id={`${formId}-engine-cc`}
+            label={t("fields.engineCc")}
             required
             type="number"
             inputMode="numeric"
-            value={form.cylinderCapacityCc}
-            error={errors.cylinderCapacityCc}
-            placeholder={t("placeholders.cylinderCapacityCc")}
+            value={form.engineCc}
+            error={errors.engineCc}
+            placeholder={t("placeholders.engineCc")}
             disabled={disabled}
-            onChange={(value) => onSetValue("cylinderCapacityCc", value)}
+            onChange={(value) => onSetValue("engineCc", value)}
           />
         ) : null}
+        <TextField
+          id={`${formId}-power-kw`}
+          label={t("fields.powerKw")}
+          type="number"
+          inputMode="decimal"
+          value={form.powerKw}
+          error={errors.powerKw}
+          placeholder={t("placeholders.powerKw")}
+          disabled={disabled}
+          onChange={(value) => onSetValue("powerKw", value)}
+        />
       </FormSection>
+
+      {includeRegistration ? (
+        <ScooterRegistrationFormFields
+          formId={formId}
+          form={form}
+          errors={errors}
+          disabled={disabled}
+          onSetValue={onSetValue}
+        />
+      ) : null}
 
       <FormSection title={t("sections.purchase")}>
         <Field
@@ -181,6 +209,155 @@ export function ScooterFormFields({
         </div>
       </FormSection>
     </>
+  );
+}
+
+export function ScooterRegistrationFormFields({
+  formId,
+  form,
+  errors,
+  disabled,
+  onSetValue,
+}: ScooterFormFieldsProps) {
+  const t = useTranslations("scooters");
+  const locale = useLocale();
+
+  function changeRegistrationType(
+    registrationType: v1.scooters.ScooterRegistrationType,
+  ) {
+    onSetValue("registrationType", registrationType);
+    if (registrationType === "unregistered") {
+      onSetValue("plateNumber", "");
+      onSetValue("registeredOn", { day: "", month: "", year: "" });
+      onSetValue("requiredDriverLicenseType", "none");
+    }
+    if (registrationType !== "temporary") {
+      onSetValue("registrationExpiresOn", { day: "", month: "", year: "" });
+    }
+  }
+
+  const registered = form.registrationType !== "unregistered";
+
+  return (
+    <FormSection title={t("sections.registration")}>
+      <Field
+        id={`${formId}-registration-type`}
+        label={t("fields.registrationType")}
+        required
+        error={errors.registrationType}
+      >
+        <Select
+          value={form.registrationType}
+          onValueChange={(value) =>
+            changeRegistrationType(value as v1.scooters.ScooterRegistrationType)
+          }
+          disabled={disabled}
+        >
+          <SelectTrigger id={`${formId}-registration-type`} className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {v1.scooters.SCOOTER_REGISTRATION_TYPES.map((registrationType) => (
+              <SelectItem key={registrationType} value={registrationType}>
+                {t(`registrationTypes.${registrationType}`)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </Field>
+
+      {registered ? (
+        <>
+          <TextField
+            id={`${formId}-plate-number`}
+            label={t("fields.plateNumber")}
+            required
+            value={form.plateNumber}
+            error={errors.plateNumber}
+            placeholder={t(`placeholders.plateNumber.${form.registrationType}`)}
+            disabled={disabled}
+            onChange={(value) => onSetValue("plateNumber", value)}
+          />
+          <Field
+            id={`${formId}-registered-on-day`}
+            label={t("fields.registeredOn")}
+            required
+            error={errors.registeredOn}
+          >
+            <DatePartsInput
+              baseId={`${formId}-registered-on`}
+              aria-describedby={
+                errors.registeredOn
+                  ? `${formId}-registered-on-day-error`
+                  : undefined
+              }
+              disabled={disabled}
+              invalid={Boolean(errors.registeredOn)}
+              label={t("fields.registeredOn")}
+              locale={locale}
+              value={form.registeredOn}
+              onChange={(value) => onSetValue("registeredOn", value)}
+            />
+          </Field>
+          {form.registrationType === "temporary" ? (
+            <Field
+              id={`${formId}-registration-expires-on-day`}
+              label={t("fields.registrationExpiresOn")}
+              required
+              error={errors.registrationExpiresOn}
+            >
+              <DatePartsInput
+                baseId={`${formId}-registration-expires-on`}
+                aria-describedby={
+                  errors.registrationExpiresOn
+                    ? `${formId}-registration-expires-on-day-error`
+                    : undefined
+                }
+                disabled={disabled}
+                invalid={Boolean(errors.registrationExpiresOn)}
+                label={t("fields.registrationExpiresOn")}
+                locale={locale}
+                value={form.registrationExpiresOn}
+                onChange={(value) => onSetValue("registrationExpiresOn", value)}
+              />
+            </Field>
+          ) : null}
+          <Field
+            id={`${formId}-required-driver-license-type`}
+            label={t("fields.requiredDriverLicenseType")}
+            required
+            error={errors.requiredDriverLicenseType}
+          >
+            <Select
+              value={form.requiredDriverLicenseType}
+              onValueChange={(value) =>
+                onSetValue(
+                  "requiredDriverLicenseType",
+                  value as v1.scooters.ScooterRequiredDriverLicenseType,
+                )
+              }
+              disabled={disabled}
+            >
+              <SelectTrigger
+                id={`${formId}-required-driver-license-type`}
+                className="w-full"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {v1.scooters.SCOOTER_REQUIRED_DRIVER_LICENSE_TYPES.map(
+                  (licenseType) => (
+                    <SelectItem key={licenseType} value={licenseType}>
+                      {t(`requiredDriverLicenseTypes.${licenseType}`)}
+                    </SelectItem>
+                  ),
+                )}
+              </SelectContent>
+            </Select>
+          </Field>
+        </>
+      ) : null}
+    </FormSection>
   );
 }
 

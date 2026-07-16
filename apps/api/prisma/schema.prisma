@@ -197,29 +197,34 @@ model PersonDocumentPhoto {
   @@index([slot])
 }
 
-/// Scooter inventory record for the pre-registration lifecycle stage.
-///
-/// Rows are created when purchased scooters arrive with manufacturer papers
-/// but before Romanian authority registration produces plates / talon data.
+/// Scooter inventory record with Romanian registration metadata.
 model Scooter {
-  id                 String    @id @default(cuid())
-  vin                String    @unique
-  brand              String
-  model              String
-  color              String?
-  manufactureYear    Int
-  powertrainType     String
-  cylinderCapacityCc Int?
-  purchasedOn        DateTime  @db.Date
-  registrationStatus String    @default("unregistered")
-  notes              String?
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
-  deletedAt          DateTime?
+  id                        String    @id @default(cuid())
+  vin                       String    @unique
+  brand                     String
+  model                     String
+  color                     String?
+  manufactureYear           Int
+  powertrainType            String
+  engineCc                  Int?
+  powerKw                   Float?
+  purchasedOn               DateTime  @db.Date
+  registrationType          String    @default("unregistered")
+  plateNumber               String?
+  plateNumberNormalized     String?
+  registeredOn              DateTime? @db.Date
+  registrationExpiresOn     DateTime? @db.Date
+  requiredDriverLicenseType String    @default("none")
+  notes                     String?
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+  deletedAt                 DateTime?
 
+  @@unique([plateNumberNormalized], map: "Scooter_active_plateNumberNormalized_key", where: raw("\"deletedAt\" IS NULL AND \"plateNumberNormalized\" IS NOT NULL"))
   @@index([deletedAt])
   @@index([powertrainType, deletedAt])
-  @@index([registrationStatus, deletedAt])
+  @@index([registrationType, deletedAt])
+  @@index([requiredDriverLicenseType, deletedAt])
   @@index([brand, model])
   @@index([purchasedOn])
 }

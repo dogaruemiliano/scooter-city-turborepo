@@ -8,6 +8,7 @@ import {
   CarFrontIcon,
   CalendarIcon,
   GaugeIcon,
+  IdCardIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
@@ -99,13 +100,20 @@ export function ScooterList({ items }: ScooterListProps) {
                         {formatDate(scooter.purchasedOn, locale)}
                       </span>
                     </span>
+                    {scooter.plateNumber ? (
+                      <span className="inline-flex min-w-0 items-center gap-1.5 md:col-span-2">
+                        <IdCardIcon
+                          aria-hidden="true"
+                          className={inlineIconClassName}
+                        />
+                        <span className="truncate">{scooter.plateNumber}</span>
+                      </span>
+                    ) : null}
 
                     <div className="flex min-w-0 flex-wrap gap-2 sm:col-span-2 md:col-span-3 md:justify-end">
                       <PowertrainBadge scooter={scooter} />
                       <Badge variant="outline">
-                        {t(
-                          `registrationStatuses.${scooter.registrationStatus}`,
-                        )}
+                        {t(`registrationTypes.${scooter.registrationType}`)}
                       </Badge>
                       {scooter.deletedAt ? (
                         <Badge variant="outline">
@@ -132,8 +140,8 @@ function PowertrainBadge({ scooter }: { scooter: v1.scooters.Scooter }) {
   return (
     <Badge variant="outline">
       <Icon aria-hidden="true" data-icon="inline-start" />
-      {scooter.powertrainType === "combustion" && scooter.cylinderCapacityCc
-        ? t("list.ccValue", { cc: scooter.cylinderCapacityCc })
+      {scooter.powertrainType === "combustion" && scooter.engineCc
+        ? t("list.ccValue", { cc: scooter.engineCc })
         : t(`powertrainTypes.${scooter.powertrainType}`)}
     </Badge>
   );

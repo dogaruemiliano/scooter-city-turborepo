@@ -6,7 +6,7 @@ import { NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ScooterCreateForm } from "./ScooterCreateForm";
-import { DEFAULT_COMBUSTION_CYLINDER_CAPACITY_CC } from "./scooter-form";
+import { DEFAULT_COMBUSTION_ENGINE_CC } from "./scooter-form";
 
 const mocks = vi.hoisted(() => ({
   apiFetch: vi.fn(),
@@ -35,9 +35,14 @@ const createdScooter: v1.scooters.Scooter = {
   color: "White",
   manufactureYear: 2026,
   powertrainType: "combustion",
-  cylinderCapacityCc: 125,
+  engineCc: 125,
+  powerKw: 8.5,
   purchasedOn: v1.common.dateOnlyToday(),
-  registrationStatus: "unregistered",
+  registrationType: "unregistered",
+  plateNumber: null,
+  registeredOn: null,
+  registrationExpiresOn: null,
+  requiredDriverLicenseType: "none",
   notes: "Maker papers received",
   createdAt: "2026-06-25T10:00:00.000Z",
   updatedAt: "2026-06-25T10:00:00.000Z",
@@ -74,37 +79,32 @@ describe("ScooterCreateForm", () => {
       "aria-pressed",
       "false",
     );
-    expect(screen.getByLabelText("Cylinder capacity (cc)")).toHaveValue(
-      Number(DEFAULT_COMBUSTION_CYLINDER_CAPACITY_CC),
+    expect(screen.getByText("Registration")).toBeInTheDocument();
+    expect(screen.getByLabelText("Engine cc")).toHaveValue(
+      Number(DEFAULT_COMBUSTION_ENGINE_CC),
     );
   });
 
-  it("hides and clears cylinder capacity for electric scooters", async () => {
+  it("hides and clears engine cc for electric scooters", async () => {
     const browser = userEvent.setup();
 
     renderCreateForm();
-    const cylinderCapacityInput = screen.getByLabelText(
-      "Cylinder capacity (cc)",
-    );
-    expect(cylinderCapacityInput).toHaveValue(
-      Number(DEFAULT_COMBUSTION_CYLINDER_CAPACITY_CC),
-    );
-    await browser.clear(cylinderCapacityInput);
-    await browser.type(cylinderCapacityInput, "125");
+    const engineCcInput = screen.getByLabelText("Engine cc");
+    expect(engineCcInput).toHaveValue(Number(DEFAULT_COMBUSTION_ENGINE_CC));
+    await browser.clear(engineCcInput);
+    await browser.type(engineCcInput, "125");
     await browser.click(screen.getByRole("button", { name: "Electric" }));
 
-    expect(
-      screen.queryByLabelText("Cylinder capacity (cc)"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Engine cc")).not.toBeInTheDocument();
 
     await browser.click(screen.getByRole("button", { name: "Combustion" }));
 
-    expect(screen.getByLabelText("Cylinder capacity (cc)")).toHaveValue(
-      Number(DEFAULT_COMBUSTION_CYLINDER_CAPACITY_CC),
+    expect(screen.getByLabelText("Engine cc")).toHaveValue(
+      Number(DEFAULT_COMBUSTION_ENGINE_CC),
     );
   });
 
-  it("shows frontend required validation while keeping default combustion cc", async () => {
+  it("shows frontend required validation while keeping default engine cc", async () => {
     const browser = userEvent.setup();
 
     renderCreateForm();
@@ -113,9 +113,7 @@ describe("ScooterCreateForm", () => {
     expect(await screen.findByText("Scooter not created")).toBeInTheDocument();
     expect(screen.getAllByText("Color is required.")[0]).toBeInTheDocument();
     expect(
-      screen.queryByText(
-        "Cylinder capacity is required for combustion scooters.",
-      ),
+      screen.queryByText("Engine cc is required for combustion scooters."),
     ).not.toBeInTheDocument();
     expect(mocks.apiFetch).not.toHaveBeenCalled();
   });
@@ -173,8 +171,14 @@ describe("ScooterCreateForm", () => {
             color: "White",
             manufactureYear: 2026,
             powertrainType: "combustion",
-            cylinderCapacityCc: 125,
+            engineCc: 125,
+            powerKw: 8.5,
             purchasedOn: v1.common.dateOnlyToday(),
+            registrationType: "unregistered",
+            plateNumber: null,
+            registeredOn: null,
+            registrationExpiresOn: null,
+            requiredDriverLicenseType: "none",
             notes: "Maker papers received",
           },
         },
@@ -182,6 +186,83 @@ describe("ScooterCreateForm", () => {
     );
     expect(mocks.push).toHaveBeenCalledWith("/en/scooters");
     expect(mocks.refresh).toHaveBeenCalledOnce();
+  });
+
+  it("submits a registered national scooter payload", async () => {
+    mocks.apiFetch.mockResolvedValueOnce({
+      ...createdScooter,
+      registrationType: "national",
+      plateNumber: "CJ 12 ABC",
+      registeredOn: v1.common.dateOnlyToday(),
+      requiredDriverLicenseType: "A1",
+    });
+    const browser = userEvent.setup();
+
+    renderCreateForm();
+    await fillRequiredScooterForm(browser);
+    await chooseSelectOption(browser, "Registration type", "National");
+    expect(
+      screen.queryByLabelText("Registration expires on"),
+    ).not.toBeInTheDocument();
+    await browser.type(screen.getByLabelText("Plate number"), "cj12abc");
+    await fillDateParts(browser, "Registered on", v1.common.dateOnlyToday());
+    await chooseSelectOption(browser, "Required driver license", "A1");
+    await browser.click(screen.getByRole("button", { name: "Create scooter" }));
+
+    await waitFor(() =>
+      expect(mocks.apiFetch).toHaveBeenCalledWith(
+        v1.scooters.ROUTES.create,
+        v1.scooters.scooterSchema,
+        expect.objectContaining({
+          method: "POST",
+          json: expect.objectContaining({
+            registrationType: "national",
+            plateNumber: "CJ 12 ABC",
+            registeredOn: v1.common.dateOnlyToday(),
+            registrationExpiresOn: null,
+            requiredDriverLicenseType: "A1",
+          }),
+        }),
+      ),
+    );
+  });
+
+  it("shows registration expiry only for temporary registration", async () => {
+    const browser = userEvent.setup();
+
+    renderCreateForm();
+    await chooseSelectOption(browser, "Registration type", "National");
+    expect(
+      screen.queryByLabelText("Registration expires on"),
+    ).not.toBeInTheDocument();
+
+    await chooseSelectOption(browser, "Registration type", "Local");
+    expect(
+      screen.queryByLabelText("Registration expires on"),
+    ).not.toBeInTheDocument();
+
+    await chooseSelectOption(browser, "Registration type", "Temporary");
+    expect(
+      screen.getByLabelText("Registration expires on"),
+    ).toBeInTheDocument();
+  });
+
+  it("rejects invalid national plates before submitting", async () => {
+    const browser = userEvent.setup();
+
+    renderCreateForm();
+    await fillRequiredScooterForm(browser);
+    await chooseSelectOption(browser, "Registration type", "National");
+    await browser.type(screen.getByLabelText("Plate number"), "CJ 00 ABC");
+    await fillDateParts(browser, "Registered on", v1.common.dateOnlyToday());
+    await browser.click(screen.getByRole("button", { name: "Create scooter" }));
+
+    expect(
+      await screen.findAllByText(
+        "Plate number does not match the selected registration type.",
+      ),
+    ).toHaveLength(2);
+    expect(mocks.apiFetch).not.toHaveBeenCalled();
   });
 
   it("maps duplicate VIN conflicts to the VIN field", async () => {
@@ -225,14 +306,24 @@ async function fillRequiredScooterForm(
   await browser.type(screen.getByLabelText("Model"), "NMAX");
   await browser.type(screen.getByLabelText("Color"), "White");
   await browser.type(screen.getByLabelText("Manufacture year"), "2026");
-  await browser.clear(screen.getByLabelText("Cylinder capacity (cc)"));
-  await browser.type(screen.getByLabelText("Cylinder capacity (cc)"), "125");
+  await browser.clear(screen.getByLabelText("Engine cc"));
+  await browser.type(screen.getByLabelText("Engine cc"), "125");
+  await browser.type(screen.getByLabelText("Power (kW)"), "8.5");
   await fillDateParts(
     browser,
     "Purchased on",
     overrides.purchasedOn ?? v1.common.dateOnlyToday(),
   );
   await browser.type(screen.getByLabelText("Notes"), "Maker papers received");
+}
+
+async function chooseSelectOption(
+  browser: ReturnType<typeof userEvent.setup>,
+  label: string,
+  option: string,
+) {
+  await browser.click(screen.getByRole("combobox", { name: label }));
+  await browser.click(await screen.findByRole("option", { name: option }));
 }
 
 async function fillDateParts(

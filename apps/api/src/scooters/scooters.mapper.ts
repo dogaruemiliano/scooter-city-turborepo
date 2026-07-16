@@ -12,10 +12,16 @@ export function toScooter(row: ScooterRow): v1.scooters.Scooter {
     color: row.color,
     manufactureYear: row.manufactureYear,
     powertrainType: row.powertrainType as v1.scooters.ScooterPowertrainType,
-    cylinderCapacityCc: row.cylinderCapacityCc,
+    engineCc: row.engineCc,
+    powerKw: row.powerKw,
     purchasedOn: toDateOnlyString(row.purchasedOn)!,
-    registrationStatus:
-      row.registrationStatus as v1.scooters.ScooterRegistrationStatus,
+    registrationType:
+      row.registrationType as v1.scooters.ScooterRegistrationType,
+    plateNumber: row.plateNumber,
+    registeredOn: toDateOnlyString(row.registeredOn),
+    registrationExpiresOn: toDateOnlyString(row.registrationExpiresOn),
+    requiredDriverLicenseType:
+      row.requiredDriverLicenseType as v1.scooters.ScooterRequiredDriverLicenseType,
     notes: row.notes,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
