@@ -40,11 +40,15 @@ It does not work for unrelated sites such as `myapp.com` and
 For the default deployment:
 
 ```env
-COOKIE_DOMAIN=.example.com
-CORS_ORIGINS=https://app.example.com
+APP_BASE_URL=https://scooter-city.ro
+COOKIE_DOMAIN=.scooter-city.ro
+CORS_ORIGINS=https://www.scooter-city.ro
 ```
 
 The browser calls the API directly with `credentials: "include"`.
+The API always allows the origin from `APP_BASE_URL`; use `CORS_ORIGINS` for
+additional exact browser origins such as the `www` variant. Do not include API
+origins here, and do not use `*` with credentialed requests.
 
 ## CSRF protection
 
