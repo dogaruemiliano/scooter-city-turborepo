@@ -17,7 +17,7 @@ import { useId, useState, type FormEvent } from "react";
 import { webApi } from "@/lib/api";
 import { ScooterFormFields } from "./ScooterFormFields";
 import {
-  DEFAULT_COMBUSTION_CYLINDER_CAPACITY_CC,
+  DEFAULT_COMBUSTION_ENGINE_CC,
   blank,
   buildScooterInputCandidate,
   createEmptyScooterForm,
@@ -61,10 +61,9 @@ export function ScooterCreateForm({ scootersHref }: ScooterCreateFormProps) {
         t("feedback.validation.invalid", { field: fieldLabel(field) }),
       invalidNumber: (field) =>
         t("feedback.validation.invalidNumber", { field: fieldLabel(field) }),
-      cylinderCapacityRequired: () =>
-        t("feedback.validation.cylinderCapacityRequired"),
-      cylinderCapacityElectric: () =>
-        t("feedback.validation.cylinderCapacityElectric"),
+      invalidPlateNumber: () => t("feedback.validation.invalidPlateNumber"),
+      engineCcRequired: () => t("feedback.validation.engineCcRequired"),
+      engineCcElectric: () => t("feedback.validation.engineCcElectric"),
     });
 
     if (candidate.errors) {
@@ -116,9 +115,9 @@ export function ScooterCreateForm({ scootersHref }: ScooterCreateFormProps) {
       router.push(scootersHref);
       router.refresh();
     } catch (error) {
-      const conflict = scooterVinConflict(error);
+      const conflict = scooterFieldConflict(error);
       if (conflict) {
-        setFieldErrors({ vin: conflict.message });
+        setFieldErrors({ [conflict.field]: conflict.message });
       }
 
       setFeedback({
@@ -147,16 +146,16 @@ export function ScooterCreateForm({ scootersHref }: ScooterCreateFormProps) {
       if (
         key === "powertrainType" &&
         value === "combustion" &&
-        blank(current.cylinderCapacityCc)
+        blank(current.engineCc)
       ) {
-        next.cylinderCapacityCc = DEFAULT_COMBUSTION_CYLINDER_CAPACITY_CC;
+        next.engineCc = DEFAULT_COMBUSTION_ENGINE_CC;
       }
 
       return next;
     });
     clearFieldError(key);
     if (key === "powertrainType") {
-      clearFieldError("cylinderCapacityCc");
+      clearFieldError("engineCc");
     }
   }
 
@@ -180,17 +179,29 @@ export function ScooterCreateForm({ scootersHref }: ScooterCreateFormProps) {
       return t("feedback.validation.invalidVin");
     }
 
-    if (field === "cylinderCapacityCc") {
+    if (field === "engineCc") {
       if (issue.message.includes("required")) {
-        return t("feedback.validation.cylinderCapacityRequired");
+        return t("feedback.validation.engineCcRequired");
       }
       if (issue.message.includes("only allowed")) {
-        return t("feedback.validation.cylinderCapacityElectric");
+        return t("feedback.validation.engineCcElectric");
       }
+    }
+
+    if (field === "plateNumber") {
+      return t("feedback.validation.invalidPlateNumber");
     }
 
     if (field === "purchasedOn" && issue.message.includes("today")) {
       return t("feedback.validation.purchasedOnPastOrToday");
+    }
+
+    if (field === "registeredOn" && issue.message.includes("today")) {
+      return t("feedback.validation.registeredOnPastOrToday");
+    }
+
+    if (field === "registrationExpiresOn" && issue.message.includes("after")) {
+      return t("feedback.validation.registrationExpiresOnAfterRegisteredOn");
     }
 
     const label = fieldLabel(field);
@@ -227,10 +238,22 @@ export function ScooterCreateForm({ scootersHref }: ScooterCreateFormProps) {
         return t("fields.manufactureYear");
       case "powertrainType":
         return t("fields.powertrainType");
-      case "cylinderCapacityCc":
-        return t("fields.cylinderCapacityCc");
+      case "engineCc":
+        return t("fields.engineCc");
+      case "powerKw":
+        return t("fields.powerKw");
       case "purchasedOn":
         return t("fields.purchasedOn");
+      case "registrationType":
+        return t("fields.registrationType");
+      case "plateNumber":
+        return t("fields.plateNumber");
+      case "registeredOn":
+        return t("fields.registeredOn");
+      case "registrationExpiresOn":
+        return t("fields.registrationExpiresOn");
+      case "requiredDriverLicenseType":
+        return t("fields.requiredDriverLicenseType");
       case "notes":
         return t("fields.notes");
       default:
@@ -332,7 +355,10 @@ export function formErrorsFromIssues(
   return errors;
 }
 
-export function scooterVinConflict(error: unknown): { message: string } | null {
+export function scooterFieldConflict(error: unknown): {
+  field: Extract<ScooterFormField, "vin" | "plateNumber">;
+  message: string;
+} | null {
   if (!(error instanceof ApiError) || error.status !== 409) {
     return null;
   }
@@ -346,5 +372,7 @@ export function scooterVinConflict(error: unknown): { message: string } | null {
       ? details.field
       : null;
 
-  return field === "vin" ? { message: error.message } : null;
+  return field === "vin" || field === "plateNumber"
+    ? { field, message: error.message }
+    : null;
 }

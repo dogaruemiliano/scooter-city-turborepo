@@ -37,9 +37,13 @@ import { useId, useState, type FormEvent, type ReactNode } from "react";
 import { PageTitleOverride } from "@/components/PageTitleOverride";
 import { webApi } from "@/lib/api";
 import { FeedbackAlert, formErrorsFromIssues } from "./ScooterCreateForm";
-import { ScooterFormFields } from "./ScooterFormFields";
+import {
+  ScooterFormFields,
+  ScooterRegistrationFormFields,
+} from "./ScooterFormFields";
 import {
   buildScooterInputCandidate,
+  buildScooterRegistrationInputCandidate,
   fieldFromIssue,
   scooterFormFromScooter,
   type ScooterFormErrors,
@@ -72,8 +76,14 @@ export function ScooterDetailPage({
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [editDialogKey, setEditDialogKey] = useState(0);
+  const [registrationOpen, setRegistrationOpen] = useState(false);
+  const [registrationDialogKey, setRegistrationDialogKey] = useState(0);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const title = `${scooter.brand} ${scooter.model}`;
+  const registrationActionLabel =
+    scooter.registrationType === "unregistered"
+      ? t("actions.addRegistration")
+      : t("actions.editRegistration");
 
   async function updateScooter(
     input: v1.scooters.UpdateScooterInput,
@@ -164,42 +174,56 @@ export function ScooterDetailPage({
               </Badge>
               <PowertrainBadge scooter={scooter} />
               <Badge variant="outline">
-                {t(`registrationStatuses.${scooter.registrationStatus}`)}
+                {t(`registrationTypes.${scooter.registrationType}`)}
               </Badge>
             </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                render={<Button variant="outline" size="lg" />}
+            <div className="flex flex-wrap gap-2 md:justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={busyAction !== null}
+                onClick={() => {
+                  setRegistrationDialogKey((current) => current + 1);
+                  setRegistrationOpen(true);
+                }}
               >
-                <EllipsisIcon data-icon="inline-start" />
-                {t("actions.moreActions")}
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-auto min-w-48">
-                <DropdownMenuGroup>
-                  <DropdownMenuItem
-                    disabled={busyAction !== null}
-                    onClick={() => {
-                      setEditDialogKey((current) => current + 1);
-                      setEditOpen(true);
-                    }}
-                  >
-                    <PencilIcon data-icon="inline-start" />
-                    {t("actions.editScooter")}
-                  </DropdownMenuItem>
-                </DropdownMenuGroup>
-                <DropdownMenuSeparator />
-                <DropdownMenuGroup>
-                  <DropdownMenuItem
-                    variant="destructive"
-                    disabled={busyAction !== null}
-                    onClick={() => setDeleteOpen(true)}
-                  >
-                    <Trash2Icon data-icon="inline-start" />
-                    {t("actions.deleteScooter")}
-                  </DropdownMenuItem>
-                </DropdownMenuGroup>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                <PencilIcon data-icon="inline-start" />
+                {registrationActionLabel}
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  render={<Button variant="outline" size="lg" />}
+                >
+                  <EllipsisIcon data-icon="inline-start" />
+                  {t("actions.moreActions")}
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-auto min-w-48">
+                  <DropdownMenuGroup>
+                    <DropdownMenuItem
+                      disabled={busyAction !== null}
+                      onClick={() => {
+                        setEditDialogKey((current) => current + 1);
+                        setEditOpen(true);
+                      }}
+                    >
+                      <PencilIcon data-icon="inline-start" />
+                      {t("actions.editScooter")}
+                    </DropdownMenuItem>
+                  </DropdownMenuGroup>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuGroup>
+                    <DropdownMenuItem
+                      variant="destructive"
+                      disabled={busyAction !== null}
+                      onClick={() => setDeleteOpen(true)}
+                    >
+                      <Trash2Icon data-icon="inline-start" />
+                      {t("actions.deleteScooter")}
+                    </DropdownMenuItem>
+                  </DropdownMenuGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
         </div>
       </div>
@@ -231,16 +255,55 @@ export function ScooterDetailPage({
           value={t(`powertrainTypes.${scooter.powertrainType}`)}
         />
         <DetailField
-          label={t("fields.cylinderCapacityCc")}
+          label={t("fields.engineCc")}
           value={
-            scooter.cylinderCapacityCc
-              ? t("list.ccValue", { cc: scooter.cylinderCapacityCc })
+            scooter.engineCc
+              ? t("list.ccValue", { cc: scooter.engineCc })
               : t("detail.emptyValue")
           }
         />
         <DetailField
-          label={t("fields.registrationStatus")}
-          value={t(`registrationStatuses.${scooter.registrationStatus}`)}
+          label={t("fields.powerKw")}
+          value={
+            scooter.powerKw
+              ? t("list.kwValue", { kw: scooter.powerKw })
+              : t("detail.emptyValue")
+          }
+        />
+      </DetailSection>
+
+      <DetailSection title={t("sections.registration")}>
+        <DetailField
+          label={t("fields.registrationType")}
+          value={t(`registrationTypes.${scooter.registrationType}`)}
+        />
+        <DetailField
+          label={t("fields.plateNumber")}
+          value={scooter.plateNumber ?? t("detail.emptyValue")}
+        />
+        <DetailField
+          label={t("fields.registeredOn")}
+          value={
+            scooter.registeredOn
+              ? formatDate(scooter.registeredOn, locale)
+              : t("detail.emptyValue")
+          }
+        />
+        {scooter.registrationType === "temporary" ? (
+          <DetailField
+            label={t("fields.registrationExpiresOn")}
+            value={
+              scooter.registrationExpiresOn
+                ? formatDate(scooter.registrationExpiresOn, locale)
+                : t("detail.emptyValue")
+            }
+          />
+        ) : null}
+        <DetailField
+          label={t("fields.requiredDriverLicenseType")}
+          value={t(
+            `requiredDriverLicenseTypes.${scooter.requiredDriverLicenseType}`,
+          )}
         />
       </DetailSection>
 
@@ -279,6 +342,14 @@ export function ScooterDetailPage({
         busy={busyAction === "scooter:update"}
         open={editOpen}
         onOpenChange={setEditOpen}
+        onSubmit={updateScooter}
+      />
+      <ScooterRegistrationDialog
+        key={`edit-scooter-registration-${registrationDialogKey}`}
+        scooter={scooter}
+        busy={busyAction === "scooter:update"}
+        open={registrationOpen}
+        onOpenChange={setRegistrationOpen}
         onSubmit={updateScooter}
       />
       <DeleteScooterDialog
@@ -336,10 +407,174 @@ function ScooterFormDialog({
         t("feedback.validation.invalidNumber", {
           field: fieldLabel(field, t),
         }),
-      cylinderCapacityRequired: () =>
-        t("feedback.validation.cylinderCapacityRequired"),
-      cylinderCapacityElectric: () =>
-        t("feedback.validation.cylinderCapacityElectric"),
+      invalidPlateNumber: () => t("feedback.validation.invalidPlateNumber"),
+      engineCcRequired: () => t("feedback.validation.engineCcRequired"),
+      engineCcElectric: () => t("feedback.validation.engineCcElectric"),
+    });
+
+    if (candidate.errors) {
+      setFieldErrors(candidate.errors);
+      setError(
+        Object.values(candidate.errors)[0] ?? t("feedback.genericError"),
+      );
+      return;
+    }
+
+    const input = v1.scooters.updateScooterInputSchema.safeParse(
+      candidate.input,
+    );
+
+    if (!input.success) {
+      const nextFieldErrors = formErrorsFromIssues(
+        input.error.issues,
+        (issue, field) => formatValidationIssue(issue, field, t),
+      );
+      setFieldErrors(nextFieldErrors);
+      setError(
+        input.error.issues[0]
+          ? formatValidationIssue(
+              input.error.issues[0],
+              fieldFromIssue(input.error.issues[0]),
+              t,
+            )
+          : t("feedback.genericError"),
+      );
+      return;
+    }
+
+    const {
+      registrationType: _registrationType,
+      plateNumber: _plateNumber,
+      registeredOn: _registeredOn,
+      registrationExpiresOn: _registrationExpiresOn,
+      requiredDriverLicenseType: _requiredDriverLicenseType,
+      ...generalInput
+    } = input.data;
+
+    if (await onSubmit(generalInput)) {
+      onOpenChange(false);
+    }
+  }
+
+  function setFormValue<Key extends keyof ScooterFormState>(
+    key: Key,
+    value: ScooterFormState[Key],
+  ) {
+    setForm((current) => ({ ...current, [key]: value }));
+    setFieldErrors((current) => {
+      if (!current[key]) {
+        return current;
+      }
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
+    if (key === "powertrainType") {
+      setFieldErrors((current) => {
+        if (!current.engineCc) {
+          return current;
+        }
+        const next = { ...current };
+        delete next.engineCc;
+        return next;
+      });
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={changeOpen}>
+      <DialogContent className="sm:max-w-2xl">
+        <form
+          className="grid gap-4"
+          noValidate
+          onSubmit={(event) => void submit(event)}
+        >
+          <DialogHeader>
+            <DialogTitle>{t("detail.dialogs.editScooterTitle")}</DialogTitle>
+          </DialogHeader>
+          {error ? (
+            <FeedbackAlert
+              feedback={{
+                kind: "error",
+                title: t("feedback.updateErrorTitle"),
+                messages: [error],
+              }}
+            />
+          ) : null}
+          <ScooterFormFields
+            formId={formId}
+            form={form}
+            errors={fieldErrors}
+            disabled={busy}
+            includeRegistration={false}
+            onSetValue={setFormValue}
+          />
+          <DialogFooter>
+            <DialogClose
+              render={
+                <Button type="button" variant="outline" disabled={busy} />
+              }
+            >
+              {t("actions.cancel")}
+            </DialogClose>
+            <Button type="submit" disabled={busy}>
+              {busy ? t("actions.saving") : t("actions.save")}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ScooterRegistrationDialog({
+  scooter,
+  busy,
+  open,
+  onOpenChange,
+  onSubmit,
+}: {
+  scooter: v1.scooters.Scooter;
+  busy: boolean;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (input: v1.scooters.UpdateScooterInput) => Promise<boolean>;
+}) {
+  const t = useTranslations("scooters");
+  const formId = useId();
+  const [form, setForm] = useState(() => scooterFormFromScooter(scooter));
+  const [fieldErrors, setFieldErrors] = useState<ScooterFormErrors>({});
+  const [error, setError] = useState<string | null>(null);
+
+  function changeOpen(nextOpen: boolean) {
+    if (busy) return;
+    onOpenChange(nextOpen);
+    if (nextOpen) {
+      setForm(scooterFormFromScooter(scooter));
+      setFieldErrors({});
+      setError(null);
+    }
+  }
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setFieldErrors({});
+    setError(null);
+
+    const candidate = buildScooterRegistrationInputCandidate(form, {
+      required: (field) =>
+        t("feedback.validation.required", { field: fieldLabel(field, t) }),
+      invalidDate: (field) =>
+        t("feedback.validation.invalid", {
+          field: fieldLabel(field, t),
+        }),
+      invalidNumber: (field) =>
+        t("feedback.validation.invalidNumber", {
+          field: fieldLabel(field, t),
+        }),
+      invalidPlateNumber: () => t("feedback.validation.invalidPlateNumber"),
+      engineCcRequired: () => t("feedback.validation.engineCcRequired"),
+      engineCcElectric: () => t("feedback.validation.engineCcElectric"),
     });
 
     if (candidate.errors) {
@@ -390,17 +625,12 @@ function ScooterFormDialog({
       delete next[key];
       return next;
     });
-    if (key === "powertrainType") {
-      setFieldErrors((current) => {
-        if (!current.cylinderCapacityCc) {
-          return current;
-        }
-        const next = { ...current };
-        delete next.cylinderCapacityCc;
-        return next;
-      });
-    }
   }
+
+  const title =
+    scooter.registrationType === "unregistered"
+      ? t("actions.addRegistration")
+      : t("actions.editRegistration");
 
   return (
     <Dialog open={open} onOpenChange={changeOpen}>
@@ -411,7 +641,7 @@ function ScooterFormDialog({
           onSubmit={(event) => void submit(event)}
         >
           <DialogHeader>
-            <DialogTitle>{t("detail.dialogs.editScooterTitle")}</DialogTitle>
+            <DialogTitle>{title}</DialogTitle>
           </DialogHeader>
           {error ? (
             <FeedbackAlert
@@ -422,7 +652,7 @@ function ScooterFormDialog({
               }}
             />
           ) : null}
-          <ScooterFormFields
+          <ScooterRegistrationFormFields
             formId={formId}
             form={form}
             errors={fieldErrors}
@@ -543,8 +773,8 @@ function PowertrainBadge({ scooter }: { scooter: v1.scooters.Scooter }) {
   return (
     <Badge variant="outline">
       <Icon aria-hidden="true" data-icon="inline-start" />
-      {scooter.powertrainType === "combustion" && scooter.cylinderCapacityCc
-        ? t("list.ccValue", { cc: scooter.cylinderCapacityCc })
+      {scooter.powertrainType === "combustion" && scooter.engineCc
+        ? t("list.ccValue", { cc: scooter.engineCc })
         : t(`powertrainTypes.${scooter.powertrainType}`)}
     </Badge>
   );
@@ -559,17 +789,29 @@ function formatValidationIssue(
     return t("feedback.validation.invalidVin");
   }
 
-  if (field === "cylinderCapacityCc") {
+  if (field === "engineCc") {
     if (issue.message.includes("required")) {
-      return t("feedback.validation.cylinderCapacityRequired");
+      return t("feedback.validation.engineCcRequired");
     }
     if (issue.message.includes("only allowed")) {
-      return t("feedback.validation.cylinderCapacityElectric");
+      return t("feedback.validation.engineCcElectric");
     }
+  }
+
+  if (field === "plateNumber") {
+    return t("feedback.validation.invalidPlateNumber");
   }
 
   if (field === "purchasedOn" && issue.message.includes("today")) {
     return t("feedback.validation.purchasedOnPastOrToday");
+  }
+
+  if (field === "registeredOn" && issue.message.includes("today")) {
+    return t("feedback.validation.registeredOnPastOrToday");
+  }
+
+  if (field === "registrationExpiresOn" && issue.message.includes("after")) {
+    return t("feedback.validation.registrationExpiresOnAfterRegisteredOn");
   }
 
   const label = fieldLabel(field, t);
@@ -609,10 +851,22 @@ function fieldLabel(
       return t("fields.manufactureYear");
     case "powertrainType":
       return t("fields.powertrainType");
-    case "cylinderCapacityCc":
-      return t("fields.cylinderCapacityCc");
+    case "engineCc":
+      return t("fields.engineCc");
+    case "powerKw":
+      return t("fields.powerKw");
     case "purchasedOn":
       return t("fields.purchasedOn");
+    case "registrationType":
+      return t("fields.registrationType");
+    case "plateNumber":
+      return t("fields.plateNumber");
+    case "registeredOn":
+      return t("fields.registeredOn");
+    case "registrationExpiresOn":
+      return t("fields.registrationExpiresOn");
+    case "requiredDriverLicenseType":
+      return t("fields.requiredDriverLicenseType");
     case "notes":
       return t("fields.notes");
     default:

@@ -53,9 +53,14 @@ const scooter: v1.scooters.Scooter = {
   color: "White",
   manufactureYear: 2026,
   powertrainType: "combustion",
-  cylinderCapacityCc: 125,
+  engineCc: 125,
+  powerKw: 8.5,
   purchasedOn: "2026-01-15",
-  registrationStatus: "unregistered",
+  registrationType: "unregistered",
+  plateNumber: null,
+  registeredOn: null,
+  registrationExpiresOn: null,
+  requiredDriverLicenseType: "none",
   notes: null,
   createdAt: "2026-06-25T10:00:00.000Z",
   updatedAt: "2026-06-25T10:00:00.000Z",
@@ -198,6 +203,28 @@ describe("ScootersPage", () => {
       ),
     );
     expect(window.location.search).toBe("?powertrainType=electric");
+  });
+
+  it("applies URL-backed registration type filters", async () => {
+    mocks.apiFetch.mockResolvedValueOnce(scooterList([], { total: 0 }));
+    const browser = userEvent.setup();
+
+    renderScooters();
+    await browser.click(screen.getByRole("button", { name: "Filters" }));
+    await browser.click(screen.getByRole("combobox", { name: "Registration" }));
+    await browser.click(
+      await screen.findByRole("option", { name: "National" }),
+    );
+    await browser.click(screen.getByRole("button", { name: "Apply" }));
+
+    await waitFor(() =>
+      expect(mocks.apiFetch).toHaveBeenCalledWith(
+        `${v1.scooters.ROUTES.list}?page=1&pageSize=25&registrationType=national`,
+        v1.scooters.scooterListSchema,
+        { cache: "no-store" },
+      ),
+    );
+    expect(window.location.search).toBe("?registrationType=national");
   });
 
   it("loads and appends the next page when the sentinel intersects", async () => {

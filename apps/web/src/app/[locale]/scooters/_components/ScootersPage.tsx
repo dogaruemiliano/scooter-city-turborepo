@@ -387,7 +387,7 @@ function ScootersPageContent({
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                   <FilterField
                     id="scooters-record-status"
-                    label={t("fields.registrationStatus")}
+                    label={t("filters.recordStatus")}
                   >
                     <Select
                       value={
@@ -449,22 +449,22 @@ function ScootersPageContent({
                   </FilterField>
 
                   <FilterField
-                    id="scooters-registration-status"
-                    label={t("filters.registrationStatus")}
+                    id="scooters-registration-type"
+                    label={t("filters.registrationType")}
                   >
                     <Select
-                      value={draftQuery.registrationStatus ?? ALL_FILTERS}
+                      value={draftQuery.registrationType ?? ALL_FILTERS}
                       onValueChange={(value) =>
                         setDraftValue(
-                          "registrationStatus",
+                          "registrationType",
                           value === ALL_FILTERS
                             ? undefined
-                            : (value as v1.scooters.ScooterRegistrationStatus),
+                            : (value as v1.scooters.ScooterRegistrationType),
                         )
                       }
                     >
                       <SelectTrigger
-                        id="scooters-registration-status"
+                        id="scooters-registration-type"
                         className="w-full"
                       >
                         <SelectValue />
@@ -473,10 +473,13 @@ function ScootersPageContent({
                         <SelectItem value={ALL_FILTERS}>
                           {t("filters.all")}
                         </SelectItem>
-                        {v1.scooters.SCOOTER_REGISTRATION_STATUSES.map(
-                          (status) => (
-                            <SelectItem key={status} value={status}>
-                              {t(`registrationStatuses.${status}`)}
+                        {v1.scooters.SCOOTER_REGISTRATION_TYPES.map(
+                          (registrationType) => (
+                            <SelectItem
+                              key={registrationType}
+                              value={registrationType}
+                            >
+                              {t(`registrationTypes.${registrationType}`)}
                             </SelectItem>
                           ),
                         )}
@@ -562,8 +565,8 @@ function appendScootersQueryParams(
   if (query.powertrainType) {
     params.set("powertrainType", query.powertrainType);
   }
-  if (query.registrationStatus) {
-    params.set("registrationStatus", query.registrationStatus);
+  if (query.registrationType) {
+    params.set("registrationType", query.registrationType);
   }
   if (query.sort && !isDefaultSort(query, query.sort)) {
     params.set("sort", query.sort);
@@ -594,7 +597,7 @@ function isDefaultSort(
 
 function hasOperationalFilters(query: v1.scooters.ListScootersQuery): boolean {
   return Boolean(
-    query.includeDeleted || query.powertrainType || query.registrationStatus,
+    query.includeDeleted || query.powertrainType || query.registrationType,
   );
 }
 

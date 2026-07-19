@@ -26,7 +26,7 @@ describe("Scooters HTTP surface (e2e)", () => {
 
   const createdUserIds: string[] = [];
   const createdVins: string[] = [];
-  let vinSeq = 1_000_000;
+  let vinSeq = Math.floor(Math.random() * 7_000_000) + 1_000_000;
 
   const server = () => app.getHttpServer() as Server;
 
@@ -103,7 +103,8 @@ describe("Scooters HTTP surface (e2e)", () => {
       color: "blue",
       manufactureYear: 2025,
       powertrainType: "combustion",
-      cylinderCapacityCc: 125,
+      engineCc: 125,
+      powerKw: 8.5,
       purchasedOn: "2026-07-14",
       notes: "Factory papers received.",
       ...overrides,
@@ -142,9 +143,14 @@ describe("Scooters HTTP surface (e2e)", () => {
         color: "blue",
         manufactureYear: 2025,
         powertrainType: "combustion",
-        cylinderCapacityCc: 125,
+        engineCc: 125,
+        powerKw: 8.5,
         purchasedOn: "2026-07-14",
-        registrationStatus: "unregistered",
+        registrationType: "unregistered",
+        plateNumber: null,
+        registeredOn: null,
+        registrationExpiresOn: null,
+        requiredDriverLicenseType: "none",
         deletedAt: null,
       }),
     );
@@ -176,7 +182,7 @@ describe("Scooters HTTP surface (e2e)", () => {
     expect(electricRes.status).toBe(200);
     const electric = v1.scooters.scooterSchema.parse(electricRes.body);
     expect(electric.powertrainType).toBe("electric");
-    expect(electric.cylinderCapacityCc).toBeNull();
+    expect(electric.engineCc).toBeNull();
 
     const deleteRes = await req()
       .delete(v1.scooters.ROUTES.delete(created.id))
@@ -230,7 +236,7 @@ describe("Scooters HTTP surface (e2e)", () => {
           brand: "Honda",
           model: "PCX Electric",
           powertrainType: "electric",
-          cylinderCapacityCc: undefined,
+          engineCc: undefined,
         }),
       );
     const yamaha = v1.scooters.scooterSchema.parse(yamahaRes.body);
@@ -258,6 +264,208 @@ describe("Scooters HTTP surface (e2e)", () => {
     );
   });
 
+  it("lets admins create registered scooters", async () => {
+    const admin = await freshSession(["ADMIN"]);
+
+    const nationalRes = await req()
+      .post(v1.scooters.ROUTES.create)
+      .set("Cookie", [`access_token=${admin.accessToken}`])
+      .send(
+        scooterInput({
+          registrationType: "national",
+          plateNumber: "cj12abc",
+          registeredOn: "2026-07-14",
+          requiredDriverLicenseType: "A1",
+        }),
+      );
+    expect(nationalRes.status).toBe(201);
+    const national = v1.scooters.scooterSchema.parse(nationalRes.body);
+    expect(national).toEqual(
+      expect.objectContaining({
+        registrationType: "national",
+        plateNumber: "CJ 12 ABC",
+        registeredOn: "2026-07-14",
+        registrationExpiresOn: null,
+        requiredDriverLicenseType: "A1",
+      }),
+    );
+
+    const temporaryRes = await req()
+      .post(v1.scooters.ROUTES.create)
+      .set("Cookie", [`access_token=${admin.accessToken}`])
+      .send(
+        scooterInput({
+          registrationType: "temporary",
+          plateNumber: "B 012345",
+          registeredOn: "2026-07-14",
+          registrationExpiresOn: "2026-08-14",
+          requiredDriverLicenseType: "AM",
+        }),
+      );
+    expect(temporaryRes.status).toBe(201);
+    const temporary = v1.scooters.scooterSchema.parse(temporaryRes.body);
+    expect(temporary).toEqual(
+      expect.objectContaining({
+        registrationType: "temporary",
+        plateNumber: "B 012345",
+        registrationExpiresOn: "2026-08-14",
+        requiredDriverLicenseType: "AM",
+      }),
+    );
+
+    const switchToNationalRes = await req()
+      .patch(v1.scooters.ROUTES.update(temporary.id))
+      .set("Cookie", [`access_token=${admin.accessToken}`])
+      .send({
+        registrationType: "national",
+        plateNumber: "B 46 XYZ",
+        registeredOn: "2026-07-14",
+        requiredDriverLicenseType: "A1",
+      });
+    expect(switchToNationalRes.status).toBe(200);
+    expect(v1.scooters.scooterSchema.parse(switchToNationalRes.body)).toEqual(
+      expect.objectContaining({
+        registrationType: "national",
+        plateNumber: "B 46 XYZ",
+        registrationExpiresOn: null,
+      }),
+    );
+  });
+
+  it("lets admins add and clear scooter registration", async () => {
+    const admin = await freshSession(["ADMIN"]);
+    const createRes = await req()
+      .post(v1.scooters.ROUTES.create)
+      .set("Cookie", [`access_token=${admin.accessToken}`])
+      .send(scooterInput());
+    const created = v1.scooters.scooterSchema.parse(createRes.body);
+    expect(created.registrationType).toBe("unregistered");
+
+    const registeredRes = await req()
+      .patch(v1.scooters.ROUTES.update(created.id))
+      .set("Cookie", [`access_token=${admin.accessToken}`])
+      .send({
+        registrationType: "national",
+        plateNumber: "B 45 XYZ",
+        registeredOn: "2026-07-14",
+        requiredDriverLicenseType: "A1",
+      });
+    expect(registeredRes.status).toBe(200);
+    const registered = v1.scooters.scooterSchema.parse(registeredRes.body);
+    expect(registered).toEqual(
+      expect.objectContaining({
+        registrationType: "national",
+        plateNumber: "B 45 XYZ",
+        registeredOn: "2026-07-14",
+        requiredDriverLicenseType: "A1",
+      }),
+    );
+
+    const clearRes = await req()
+      .patch(v1.scooters.ROUTES.update(created.id))
+      .set("Cookie", [`access_token=${admin.accessToken}`])
+      .send({ registrationType: "unregistered" });
+    expect(clearRes.status).toBe(200);
+    const cleared = v1.scooters.scooterSchema.parse(clearRes.body);
+    expect(cleared).toEqual(
+      expect.objectContaining({
+        registrationType: "unregistered",
+        plateNumber: null,
+        registeredOn: null,
+        registrationExpiresOn: null,
+        requiredDriverLicenseType: "none",
+      }),
+    );
+  });
+
+  it("rejects duplicate active plates and allows reuse after soft delete", async () => {
+    const admin = await freshSession(["ADMIN"]);
+
+    const firstRes = await req()
+      .post(v1.scooters.ROUTES.create)
+      .set("Cookie", [`access_token=${admin.accessToken}`])
+      .send(
+        scooterInput({
+          registrationType: "national",
+          plateNumber: "B 123 ABC",
+          registeredOn: "2026-07-14",
+          requiredDriverLicenseType: "A1",
+        }),
+      );
+    expect(firstRes.status).toBe(201);
+    const first = v1.scooters.scooterSchema.parse(firstRes.body);
+
+    const duplicateRes = await req()
+      .post(v1.scooters.ROUTES.create)
+      .set("Cookie", [`access_token=${admin.accessToken}`])
+      .send(
+        scooterInput({
+          registrationType: "national",
+          plateNumber: "B123ABC",
+          registeredOn: "2026-07-14",
+          requiredDriverLicenseType: "A1",
+        }),
+      );
+    expect(duplicateRes.status).toBe(409);
+    expect(duplicateRes.body).toMatchObject({
+      error: {
+        code: "SCOOTER_PLATE_CONFLICT",
+        details: { field: "plateNumber" },
+      },
+    });
+
+    const deleteRes = await req()
+      .delete(v1.scooters.ROUTES.delete(first.id))
+      .set("Cookie", [`access_token=${admin.accessToken}`]);
+    expect(deleteRes.status).toBe(204);
+
+    const reuseRes = await req()
+      .post(v1.scooters.ROUTES.create)
+      .set("Cookie", [`access_token=${admin.accessToken}`])
+      .send(
+        scooterInput({
+          registrationType: "national",
+          plateNumber: "B 123 ABC",
+          registeredOn: "2026-07-14",
+          requiredDriverLicenseType: "A1",
+        }),
+      );
+    expect(reuseRes.status).toBe(201);
+  });
+
+  it("searches by plate and filters by registration type", async () => {
+    const admin = await freshSession(["ADMIN"]);
+    const createRes = await req()
+      .post(v1.scooters.ROUTES.create)
+      .set("Cookie", [`access_token=${admin.accessToken}`])
+      .send(
+        scooterInput({
+          registrationType: "national",
+          plateNumber: "CJ 34 DEF",
+          registeredOn: "2026-07-14",
+          requiredDriverLicenseType: "A1",
+        }),
+      );
+    expect(createRes.status).toBe(201);
+    const created = v1.scooters.scooterSchema.parse(createRes.body);
+
+    const searchRes = await req()
+      .get(`${v1.scooters.ROUTES.list}?search=CJ34DEF&page=1&pageSize=50`)
+      .set("Cookie", [`access_token=${admin.accessToken}`]);
+    expect(searchRes.status).toBe(200);
+    const searchList = v1.scooters.scooterListSchema.parse(searchRes.body);
+    expect(searchList.items.map((scooter) => scooter.id)).toContain(created.id);
+
+    const filterRes = await req()
+      .get(
+        `${v1.scooters.ROUTES.list}?registrationType=national&page=1&pageSize=50`,
+      )
+      .set("Cookie", [`access_token=${admin.accessToken}`]);
+    expect(filterRes.status).toBe(200);
+    const filterList = v1.scooters.scooterListSchema.parse(filterRes.body);
+    expect(filterList.items.map((scooter) => scooter.id)).toContain(created.id);
+  });
+
   it("rejects duplicate VINs and invalid powertrain payloads", async () => {
     const admin = await freshSession(["ADMIN"]);
     const input = scooterInput();
@@ -279,25 +487,25 @@ describe("Scooters HTTP surface (e2e)", () => {
       },
     });
 
-    const missingCylinderRes = await req()
+    const missingEngineCcRes = await req()
       .post(v1.scooters.ROUTES.create)
       .set("Cookie", [`access_token=${admin.accessToken}`])
       .send({
         ...scooterInput(),
         powertrainType: "combustion",
-        cylinderCapacityCc: undefined,
+        engineCc: undefined,
       });
-    expect(missingCylinderRes.status).toBe(400);
+    expect(missingEngineCcRes.status).toBe(400);
 
-    const electricCylinderRes = await req()
+    const electricEngineCcRes = await req()
       .post(v1.scooters.ROUTES.create)
       .set("Cookie", [`access_token=${admin.accessToken}`])
       .send({
         ...scooterInput(),
         powertrainType: "electric",
-        cylinderCapacityCc: 125,
+        engineCc: 125,
       });
-    expect(electricCylinderRes.status).toBe(400);
+    expect(electricEngineCcRes.status).toBe(400);
 
     const invalidVinRes = await req()
       .post(v1.scooters.ROUTES.create)

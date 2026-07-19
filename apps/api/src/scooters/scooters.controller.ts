@@ -41,7 +41,7 @@ export class ScootersController {
   @Post()
   @ApiOperation({
     operationId: "ScootersController_create_v1",
-    summary: "Create one pre-registration scooter inventory record",
+    summary: "Create one scooter inventory record",
   })
   @ZodResponse({ status: HttpStatus.CREATED, type: Scooter })
   async create(

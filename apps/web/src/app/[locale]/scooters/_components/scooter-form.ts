@@ -6,7 +6,7 @@ import {
   type DateParts,
 } from "@repo/ui/lib/date-parts";
 
-export const DEFAULT_COMBUSTION_CYLINDER_CAPACITY_CC = "50";
+export const DEFAULT_COMBUSTION_ENGINE_CC = "50";
 
 export type ScooterFormField =
   | "vin"
@@ -15,8 +15,14 @@ export type ScooterFormField =
   | "color"
   | "manufactureYear"
   | "powertrainType"
-  | "cylinderCapacityCc"
+  | "engineCc"
+  | "powerKw"
   | "purchasedOn"
+  | "registrationType"
+  | "plateNumber"
+  | "registeredOn"
+  | "registrationExpiresOn"
+  | "requiredDriverLicenseType"
   | "notes";
 
 export type ScooterFormErrors = Partial<Record<ScooterFormField, string>>;
@@ -28,8 +34,14 @@ export interface ScooterFormState {
   color: string;
   manufactureYear: string;
   powertrainType: v1.scooters.ScooterPowertrainType;
-  cylinderCapacityCc: string;
+  engineCc: string;
+  powerKw: string;
   purchasedOn: DateParts;
+  registrationType: v1.scooters.ScooterRegistrationType;
+  plateNumber: string;
+  registeredOn: DateParts;
+  registrationExpiresOn: DateParts;
+  requiredDriverLicenseType: v1.scooters.ScooterRequiredDriverLicenseType;
   notes: string;
 }
 
@@ -41,6 +53,15 @@ export interface ScooterFormIssue {
   maximum?: number | bigint;
 }
 
+interface ScooterFormMessages {
+  required: (field: ScooterFormField) => string;
+  invalidDate: (field: ScooterFormField) => string;
+  invalidNumber: (field: ScooterFormField) => string;
+  invalidPlateNumber: () => string;
+  engineCcRequired: () => string;
+  engineCcElectric: () => string;
+}
+
 export function createEmptyScooterForm(): ScooterFormState {
   return {
     vin: "",
@@ -49,8 +70,14 @@ export function createEmptyScooterForm(): ScooterFormState {
     color: "",
     manufactureYear: "",
     powertrainType: "combustion",
-    cylinderCapacityCc: DEFAULT_COMBUSTION_CYLINDER_CAPACITY_CC,
+    engineCc: DEFAULT_COMBUSTION_ENGINE_CC,
+    powerKw: "",
     purchasedOn: emptyDateParts(),
+    registrationType: "unregistered",
+    plateNumber: "",
+    registeredOn: emptyDateParts(),
+    registrationExpiresOn: emptyDateParts(),
+    requiredDriverLicenseType: "none",
     notes: "",
   };
 }
@@ -65,24 +92,21 @@ export function scooterFormFromScooter(
     color: scooter.color ?? "",
     manufactureYear: String(scooter.manufactureYear),
     powertrainType: scooter.powertrainType,
-    cylinderCapacityCc:
-      scooter.cylinderCapacityCc == null
-        ? ""
-        : String(scooter.cylinderCapacityCc),
+    engineCc: scooter.engineCc == null ? "" : String(scooter.engineCc),
+    powerKw: scooter.powerKw == null ? "" : String(scooter.powerKw),
     purchasedOn: dateOnlyToDateParts(scooter.purchasedOn),
+    registrationType: scooter.registrationType,
+    plateNumber: scooter.plateNumber ?? "",
+    registeredOn: dateOnlyToDateParts(scooter.registeredOn),
+    registrationExpiresOn: dateOnlyToDateParts(scooter.registrationExpiresOn),
+    requiredDriverLicenseType: scooter.requiredDriverLicenseType,
     notes: scooter.notes ?? "",
   };
 }
 
 export function buildScooterInputCandidate(
   form: ScooterFormState,
-  messages: {
-    required: (field: ScooterFormField) => string;
-    invalidDate: (field: ScooterFormField) => string;
-    invalidNumber: (field: ScooterFormField) => string;
-    cylinderCapacityRequired: () => string;
-    cylinderCapacityElectric: () => string;
-  },
+  messages: ScooterFormMessages,
 ): {
   input?: Record<string, unknown>;
   errors?: ScooterFormErrors;
@@ -95,18 +119,25 @@ export function buildScooterInputCandidate(
     messages,
     errors,
   );
-  const cylinderCapacityCc =
+  const engineCc =
     form.powertrainType === "combustion"
       ? numberField(
-          form.cylinderCapacityCc,
-          "cylinderCapacityCc",
+          form.engineCc,
+          "engineCc",
           {
             ...messages,
-            required: () => messages.cylinderCapacityRequired(),
+            required: () => messages.engineCcRequired(),
           },
           errors,
         )
       : undefined;
+  const powerKw = optionalNumberField(
+    form.powerKw,
+    "powerKw",
+    messages,
+    errors,
+  );
+  const registration = buildRegistrationInput(form, messages, errors);
 
   if (blank(form.color)) {
     errors.color = messages.required("color");
@@ -118,11 +149,8 @@ export function buildScooterInputCandidate(
     errors.purchasedOn = messages.required("purchasedOn");
   }
 
-  if (
-    form.powertrainType === "electric" &&
-    form.cylinderCapacityCc.trim().length > 0
-  ) {
-    errors.cylinderCapacityCc = messages.cylinderCapacityElectric();
+  if (form.powertrainType === "electric" && form.engineCc.trim().length > 0) {
+    errors.engineCc = messages.engineCcElectric();
   }
 
   if (Object.keys(errors).length > 0) {
@@ -136,13 +164,15 @@ export function buildScooterInputCandidate(
     color: form.color,
     manufactureYear,
     powertrainType: form.powertrainType,
+    powerKw: powerKw ?? null,
     purchasedOn: purchasedOn.value,
+    ...registration.input,
   };
 
   if (form.powertrainType === "electric") {
-    input.cylinderCapacityCc = null;
+    input.engineCc = null;
   } else {
-    input.cylinderCapacityCc = cylinderCapacityCc;
+    input.engineCc = engineCc;
   }
 
   if (!blank(form.notes)) {
@@ -152,6 +182,39 @@ export function buildScooterInputCandidate(
   }
 
   return { input };
+}
+
+export function buildScooterRegistrationInputCandidate(
+  form: ScooterFormState,
+  messages: ScooterFormMessages,
+): {
+  input?: Pick<
+    v1.scooters.UpdateScooterInput,
+    | "registrationType"
+    | "plateNumber"
+    | "registeredOn"
+    | "registrationExpiresOn"
+    | "requiredDriverLicenseType"
+  >;
+  errors?: ScooterFormErrors;
+} {
+  const errors: ScooterFormErrors = {};
+  const registration = buildRegistrationInput(form, messages, errors);
+
+  if (Object.keys(errors).length > 0) {
+    return { errors };
+  }
+
+  return {
+    input: registration.input as Pick<
+      v1.scooters.UpdateScooterInput,
+      | "registrationType"
+      | "plateNumber"
+      | "registeredOn"
+      | "registrationExpiresOn"
+      | "requiredDriverLicenseType"
+    >,
+  };
 }
 
 export function fieldFromIssue(
@@ -169,8 +232,14 @@ export function isScooterFormField(value: string): value is ScooterFormField {
     value === "color" ||
     value === "manufactureYear" ||
     value === "powertrainType" ||
-    value === "cylinderCapacityCc" ||
+    value === "engineCc" ||
+    value === "powerKw" ||
     value === "purchasedOn" ||
+    value === "registrationType" ||
+    value === "plateNumber" ||
+    value === "registeredOn" ||
+    value === "registrationExpiresOn" ||
+    value === "requiredDriverLicenseType" ||
     value === "notes"
   );
 }
@@ -179,9 +248,83 @@ export function blank(value: string): boolean {
   return value.trim().length === 0;
 }
 
+function buildRegistrationInput(
+  form: ScooterFormState,
+  messages: ScooterFormMessages,
+  errors: ScooterFormErrors,
+): { input: Record<string, unknown> } {
+  if (form.registrationType === "unregistered") {
+    return {
+      input: {
+        registrationType: "unregistered",
+        plateNumber: null,
+        registeredOn: null,
+        registrationExpiresOn: null,
+        requiredDriverLicenseType: "none",
+      },
+    };
+  }
+
+  const registeredOn = buildDateOnly(form.registeredOn);
+  const registrationExpiresOn =
+    form.registrationType === "temporary"
+      ? buildDateOnly(form.registrationExpiresOn)
+      : { value: null, error: false };
+  const normalizedPlate = v1.scooters.validatePlateForRegistrationType(
+    form.registrationType,
+    form.plateNumber,
+  );
+
+  if (!normalizedPlate) {
+    errors.plateNumber = blank(form.plateNumber)
+      ? messages.required("plateNumber")
+      : messages.invalidPlateNumber();
+  }
+
+  if (registeredOn.error) {
+    errors.registeredOn = messages.invalidDate("registeredOn");
+  } else if (!registeredOn.value) {
+    errors.registeredOn = messages.required("registeredOn");
+  }
+
+  if (registrationExpiresOn.error) {
+    errors.registrationExpiresOn = messages.invalidDate(
+      "registrationExpiresOn",
+    );
+  }
+
+  if (
+    form.registrationType === "temporary" &&
+    !registrationExpiresOn.value &&
+    !registrationExpiresOn.error
+  ) {
+    errors.registrationExpiresOn = messages.required("registrationExpiresOn");
+  }
+
+  if (
+    registeredOn.value &&
+    registrationExpiresOn.value &&
+    registrationExpiresOn.value < registeredOn.value
+  ) {
+    errors.registrationExpiresOn = messages.invalidDate(
+      "registrationExpiresOn",
+    );
+  }
+
+  return {
+    input: {
+      registrationType: form.registrationType,
+      plateNumber: normalizedPlate?.displayValue,
+      registeredOn: registeredOn.value,
+      registrationExpiresOn: registrationExpiresOn.value ?? null,
+      requiredDriverLicenseType: form.requiredDriverLicenseType,
+    },
+  };
+}
+
 function numberField(
   value: string,
-  field: Extract<ScooterFormField, "manufactureYear" | "cylinderCapacityCc">,
+  field: Extract<ScooterFormField, "manufactureYear" | "engineCc">,
   messages: {
     required: (field: ScooterFormField) => string;
     invalidNumber: (field: ScooterFormField) => string;
@@ -190,6 +333,27 @@ function numberField(
 ): number | undefined {
   if (blank(value)) {
     errors[field] = messages.required(field);
+    return undefined;
+  }
+
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    errors[field] = messages.invalidNumber(field);
+    return undefined;
+  }
+
+  return numeric;
+}
+
+function optionalNumberField(
+  value: string,
+  field: Extract<ScooterFormField, "powerKw">,
+  messages: {
+    invalidNumber: (field: ScooterFormField) => string;
+  },
+  errors: ScooterFormErrors,
+): number | undefined {
+  if (blank(value)) {
     return undefined;
   }
 

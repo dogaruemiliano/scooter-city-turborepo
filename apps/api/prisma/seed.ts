@@ -149,7 +149,7 @@ type PersonSeed = {
 };
 
 type ScooterPowertrainType = "electric" | "combustion";
-type ScooterRegistrationStatus = "unregistered";
+type ScooterRegistrationType = "unregistered";
 
 type ScooterSeed = {
   id: string;
@@ -159,9 +159,15 @@ type ScooterSeed = {
   color: string | null;
   manufactureYear: number;
   powertrainType: ScooterPowertrainType;
-  cylinderCapacityCc: number | null;
+  engineCc: number | null;
+  powerKw: number | null;
   purchasedOn: Date;
-  registrationStatus: ScooterRegistrationStatus;
+  registrationType: ScooterRegistrationType;
+  plateNumber: string | null;
+  plateNumberNormalized: string | null;
+  registeredOn: Date | null;
+  registrationExpiresOn: Date | null;
+  requiredDriverLicenseType: "none";
   notes: string | null;
   deletedAt: Date | null;
 };
@@ -680,9 +686,15 @@ function scooterData(seed: ScooterSeed) {
     color: seed.color,
     manufactureYear: seed.manufactureYear,
     powertrainType: seed.powertrainType,
-    cylinderCapacityCc: seed.cylinderCapacityCc,
+    engineCc: seed.engineCc,
+    powerKw: seed.powerKw,
     purchasedOn: seed.purchasedOn,
-    registrationStatus: seed.registrationStatus,
+    registrationType: seed.registrationType,
+    plateNumber: seed.plateNumber,
+    plateNumberNormalized: seed.plateNumberNormalized,
+    registeredOn: seed.registeredOn,
+    registrationExpiresOn: seed.registrationExpiresOn,
+    requiredDriverLicenseType: seed.requiredDriverLicenseType,
     notes: seed.notes,
     deletedAt: seed.deletedAt,
   };
@@ -820,9 +832,15 @@ function buildGeneratedScooterSeeds(count: number): ScooterSeed[] {
       color: GENERATED_SCOOTER_COLORS[index % GENERATED_SCOOTER_COLORS.length],
       manufactureYear: 2021 + (index % 6),
       powertrainType: isElectric ? "electric" : "combustion",
-      cylinderCapacityCc: isElectric ? null : is125Cc ? 125 : 50,
+      engineCc: isElectric ? null : is125Cc ? 125 : 50,
+      powerKw: isElectric ? 3.2 : is125Cc ? 8.5 : 2.8,
       purchasedOn: generatedScooterPurchasedOn(ordinal),
-      registrationStatus: "unregistered",
+      registrationType: "unregistered",
+      plateNumber: null,
+      plateNumberNormalized: null,
+      registeredOn: null,
+      registrationExpiresOn: null,
+      requiredDriverLicenseType: "none",
       notes: generatedScooterNotes({ is125Cc, isElectric, isDeleted }),
       deletedAt: isDeleted
         ? new Date(`2026-03-${pad2(ordinal - 195)}T10:00:00.000Z`)

@@ -466,6 +466,43 @@
         "tags": ["persons"]
       }
     },
+    "/v1/persons/{id}/audit-events": {
+      "get": {
+        "operationId": "PersonsController_listAuditEvents_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonAuditEventList_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "List audit events for one active person record",
+        "tags": ["persons"]
+      }
+    },
     "/v1/persons/{id}/documents": {
       "get": {
         "operationId": "PersonsController_listDocuments_v1",
@@ -680,6 +717,715 @@
         ],
         "summary": "Soft-delete one active document for one active person record",
         "tags": ["persons"]
+      }
+    },
+    "/v1/persons/{id}/documents/{documentId}/replace": {
+      "post": {
+        "operationId": "PersonsController_replaceDocument_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "documentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePersonDocumentInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonDocument_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Replace one active document for one active person record",
+        "tags": ["persons"]
+      }
+    },
+    "/v1/persons/{id}/documents/{documentId}/photos": {
+      "get": {
+        "operationId": "PersonsController_listDocumentPhotos_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "documentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonDocumentPhotoList_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "List active photos for one active person document",
+        "tags": ["persons"]
+      }
+    },
+    "/v1/persons/{id}/documents/{documentId}/photos/{slot}": {
+      "put": {
+        "operationId": "PersonsController_upsertDocumentPhoto_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "documentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "slot",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["file"],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonDocumentPhoto_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Upload or replace one active photo slot for a person document",
+        "tags": ["persons"]
+      },
+      "delete": {
+        "operationId": "PersonsController_deleteDocumentPhoto_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "documentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "slot",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Soft-delete one active person document photo slot",
+        "tags": ["persons"]
+      }
+    },
+    "/v1/persons/{id}/documents/{documentId}/photos/{slot}/upload-url": {
+      "post": {
+        "operationId": "PersonsController_createDocumentPhotoUploadUrl_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "documentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "slot",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePersonDocumentPhotoUploadUrlInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonDocumentPhotoUploadUrl_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Create a signed S3 PUT URL for a person document photo",
+        "tags": ["persons"]
+      }
+    },
+    "/v1/persons/document-photo-draft-upload-url": {
+      "post": {
+        "operationId": "PersonsController_createDocumentPhotoDraftUploadUrl_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePersonDocumentPhotoDraftUploadUrlInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonDocumentPhotoUploadUrl_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Create a signed S3 PUT URL for a draft document photo",
+        "tags": ["persons"]
+      }
+    },
+    "/v1/persons/{id}/documents/{documentId}/photos/{slot}/complete-upload": {
+      "post": {
+        "operationId": "PersonsController_completeDocumentPhotoUpload_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "documentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "slot",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompletePersonDocumentPhotoUploadInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonDocumentPhoto_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Complete a signed S3 PUT upload for a person document photo",
+        "tags": ["persons"]
+      }
+    },
+    "/v1/persons/{id}/documents/{documentId}/photos/{slot}/content": {
+      "get": {
+        "operationId": "PersonsController_getDocumentPhotoContent_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "documentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "slot",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Private image bytes.",
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/webp": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Stream one active person document photo",
+        "tags": ["persons"]
+      }
+    },
+    "/v1/scooters": {
+      "post": {
+        "operationId": "ScootersController_create_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateScooterInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Scooter_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Create one scooter inventory record",
+        "tags": ["scooters"]
+      },
+      "get": {
+        "operationId": "ScootersController_list_v1",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "default": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25,
+              "type": "integer"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "name": "powertrainType",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["electric", "combustion"]
+            }
+          },
+          {
+            "name": "registrationType",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["unregistered", "national", "local", "temporary"]
+            }
+          },
+          {
+            "name": "requiredDriverLicenseType",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["none", "AM", "A1", "A2", "A"]
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "relevance",
+                "vinAsc",
+                "vinDesc",
+                "brandAsc",
+                "brandDesc",
+                "manufactureYearDesc",
+                "manufactureYearAsc",
+                "purchasedOnDesc",
+                "purchasedOnAsc",
+                "createdAtDesc",
+                "createdAtAsc",
+                "updatedAtDesc",
+                "updatedAtAsc"
+              ]
+            }
+          },
+          {
+            "name": "includeDeleted",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScooterList_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "List scooter inventory records",
+        "tags": ["scooters"]
+      }
+    },
+    "/v1/scooters/{id}": {
+      "get": {
+        "operationId": "ScootersController_get_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Scooter_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Get one active scooter inventory record",
+        "tags": ["scooters"]
+      },
+      "patch": {
+        "operationId": "ScootersController_update_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateScooterInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Scooter_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Update one active scooter inventory record",
+        "tags": ["scooters"]
+      },
+      "delete": {
+        "operationId": "ScootersController_delete_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Soft-delete one active scooter inventory record",
+        "tags": ["scooters"]
       }
     },
     "/v1/auth/enabled-methods": {
@@ -1186,7 +1932,7 @@
       }
     },
     "schemas": {
-      "CreatePersonInputCreatePersonDocumentInput": {
+      "CreatePersonInputCreatePersonNestedDocumentInput": {
         "type": "object",
         "properties": {
           "type": {
@@ -1213,7 +1959,6 @@
           },
           "cnp": {
             "type": "string",
-            "pattern": "^\\d{13}$",
             "nullable": true
           },
           "issuingCountryCode": {
@@ -1237,7 +1982,7 @@
             "nullable": true
           },
           "status": {
-            "default": "unverified",
+            "default": "verified",
             "type": "string",
             "enum": ["unverified", "verified", "rejected", "expired"]
           },
@@ -1246,9 +1991,30 @@
             "minLength": 1,
             "maxLength": 2000,
             "nullable": true
+          },
+          "photos": {
+            "$ref": "#/components/schemas/CreatePersonInputCreatePersonDocumentPhotoDraftTokens"
           }
         },
         "required": ["type"],
+        "additionalProperties": false
+      },
+      "CreatePersonInputCreatePersonDocumentPhotoDraftTokens": {
+        "type": "object",
+        "properties": {
+          "front": {
+            "type": "string",
+            "minLength": 1
+          },
+          "back": {
+            "type": "string",
+            "minLength": 1
+          },
+          "other": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
         "additionalProperties": false
       },
       "CreatePersonInput": {
@@ -1312,7 +2078,7 @@
           "documents": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/CreatePersonInputCreatePersonDocumentInput"
+              "$ref": "#/components/schemas/CreatePersonInputCreatePersonNestedDocumentInput"
             }
           },
           "notes": {
@@ -1530,6 +2296,153 @@
         "required": ["items", "page", "pageSize", "total"],
         "additionalProperties": false
       },
+      "PersonAuditEvent_Output": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "PERSON_CREATED",
+              "PERSON_UPDATED",
+              "PERSON_DELETED",
+              "PERSON_DOCUMENT_CREATED",
+              "PERSON_DOCUMENT_UPDATED",
+              "PERSON_DOCUMENT_DELETED",
+              "PERSON_DOCUMENT_REPLACED"
+            ]
+          },
+          "personId": {
+            "type": "string"
+          },
+          "actor": {
+            "$ref": "#/components/schemas/PersonAuditActor_Output"
+          },
+          "document": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PersonAuditDocumentSummary_Output"
+              }
+            ],
+            "nullable": true
+          },
+          "replacement": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PersonAuditReplacement_Output"
+              }
+            ],
+            "nullable": true
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PersonAuditFieldChange_Output"
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "ISO timestamp of audit event creation."
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "personId",
+          "actor",
+          "document",
+          "replacement",
+          "changes",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      },
+      "PersonAuditActor_Output": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["user", "system"]
+          },
+          "userId": {
+            "type": "string",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": ["kind", "userId", "email", "name"],
+        "additionalProperties": false
+      },
+      "PersonAuditDocumentSummary_Output": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "passport",
+              "nationalId",
+              "driverLicense",
+              "residencePermit",
+              "other"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": ["unverified", "verified", "rejected", "expired"]
+          }
+        },
+        "required": ["id", "type", "status"],
+        "additionalProperties": false
+      },
+      "PersonAuditReplacement_Output": {
+        "type": "object",
+        "properties": {
+          "oldDocument": {
+            "$ref": "#/components/schemas/PersonAuditDocumentSummary_Output"
+          },
+          "newDocument": {
+            "$ref": "#/components/schemas/PersonAuditDocumentSummary_Output"
+          }
+        },
+        "required": ["oldDocument", "newDocument"],
+        "additionalProperties": false
+      },
+      "PersonAuditFieldChange_Output": {
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "string"
+          },
+          "oldValue": {
+            "type": "string",
+            "nullable": true
+          },
+          "newValue": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": ["field", "oldValue", "newValue"],
+        "additionalProperties": false
+      },
+      "PersonAuditEventList_Output": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/PersonAuditEvent_Output"
+        }
+      },
       "PersonDocumentList_Output": {
         "type": "array",
         "items": {
@@ -1563,7 +2476,6 @@
           },
           "cnp": {
             "type": "string",
-            "pattern": "^\\d{13}$",
             "nullable": true
           },
           "issuingCountryCode": {
@@ -1587,7 +2499,7 @@
             "nullable": true
           },
           "status": {
-            "default": "unverified",
+            "default": "verified",
             "type": "string",
             "enum": ["unverified", "verified", "rejected", "expired"]
           },
@@ -1628,7 +2540,6 @@
           },
           "cnp": {
             "type": "string",
-            "pattern": "^\\d{13}$",
             "nullable": true
           },
           "issuingCountryCode": {
@@ -1662,6 +2573,160 @@
             "nullable": true
           }
         },
+        "additionalProperties": false
+      },
+      "PersonDocumentPhoto_Output": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "personDocumentId": {
+            "type": "string"
+          },
+          "slot": {
+            "type": "string",
+            "enum": ["front", "back", "other"]
+          },
+          "assetId": {
+            "type": "string"
+          },
+          "contentType": {
+            "type": "string"
+          },
+          "byteSize": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "checksumSha256": {
+            "type": "string"
+          },
+          "contentUrl": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "ISO timestamp of photo creation."
+          },
+          "deletedAt": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "personDocumentId",
+          "slot",
+          "assetId",
+          "contentType",
+          "byteSize",
+          "checksumSha256",
+          "contentUrl",
+          "createdAt",
+          "deletedAt"
+        ],
+        "additionalProperties": false
+      },
+      "PersonDocumentPhotoList_Output": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/PersonDocumentPhoto_Output"
+        }
+      },
+      "CreatePersonDocumentPhotoUploadUrlInput": {
+        "type": "object",
+        "properties": {
+          "contentType": {
+            "type": "string",
+            "enum": ["image/jpeg", "image/png", "image/webp"]
+          },
+          "byteSize": {
+            "type": "integer",
+            "exclusiveMinimum": true,
+            "maximum": 9007199254740991,
+            "minimum": 0
+          },
+          "checksumSha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": ["contentType", "byteSize", "checksumSha256"],
+        "additionalProperties": false
+      },
+      "PersonDocumentPhotoUploadUrl_Output": {
+        "type": "object",
+        "properties": {
+          "uploadUrl": {
+            "type": "string",
+            "format": "uri"
+          },
+          "uploadToken": {
+            "type": "string",
+            "minLength": 1
+          },
+          "method": {
+            "type": "string",
+            "enum": ["PUT"]
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "expiresAt": {
+            "type": "string",
+            "description": "ISO timestamp when the signed URL expires."
+          },
+          "maxBytes": {
+            "type": "integer",
+            "exclusiveMinimum": true,
+            "maximum": 9007199254740991,
+            "minimum": 0
+          }
+        },
+        "required": [
+          "uploadUrl",
+          "uploadToken",
+          "method",
+          "headers",
+          "expiresAt",
+          "maxBytes"
+        ],
+        "additionalProperties": false
+      },
+      "CreatePersonDocumentPhotoDraftUploadUrlInput": {
+        "type": "object",
+        "properties": {
+          "contentType": {
+            "type": "string",
+            "enum": ["image/jpeg", "image/png", "image/webp"]
+          },
+          "byteSize": {
+            "type": "integer",
+            "exclusiveMinimum": true,
+            "maximum": 9007199254740991,
+            "minimum": 0
+          },
+          "checksumSha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": ["contentType", "byteSize", "checksumSha256"],
+        "additionalProperties": false
+      },
+      "CompletePersonDocumentPhotoUploadInput": {
+        "type": "object",
+        "properties": {
+          "uploadToken": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": ["uploadToken"],
         "additionalProperties": false
       },
       "UpdatePersonInput": {
@@ -1721,6 +2786,302 @@
           "countryCode": {
             "type": "string",
             "nullable": true
+          },
+          "notes": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreateScooterInput": {
+        "type": "object",
+        "properties": {
+          "vin": {
+            "type": "string"
+          },
+          "brand": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "color": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50,
+            "nullable": true
+          },
+          "manufactureYear": {
+            "type": "integer",
+            "minimum": 1950,
+            "maximum": 2027
+          },
+          "powertrainType": {
+            "type": "string",
+            "enum": ["electric", "combustion"]
+          },
+          "engineCc": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 2000,
+            "nullable": true
+          },
+          "powerKw": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 200,
+            "nullable": true
+          },
+          "purchasedOn": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "registrationType": {
+            "type": "string",
+            "enum": ["unregistered", "national", "local", "temporary"]
+          },
+          "plateNumber": {
+            "type": "string",
+            "maxLength": 64,
+            "nullable": true
+          },
+          "registeredOn": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "nullable": true
+          },
+          "registrationExpiresOn": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "nullable": true
+          },
+          "requiredDriverLicenseType": {
+            "type": "string",
+            "enum": ["none", "AM", "A1", "A2", "A"]
+          },
+          "notes": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "nullable": true
+          }
+        },
+        "required": [
+          "vin",
+          "brand",
+          "model",
+          "manufactureYear",
+          "powertrainType",
+          "purchasedOn"
+        ],
+        "additionalProperties": false
+      },
+      "Scooter_Output": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "vin": {
+            "type": "string"
+          },
+          "brand": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "color": {
+            "type": "string",
+            "nullable": true
+          },
+          "manufactureYear": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "powertrainType": {
+            "type": "string",
+            "enum": ["electric", "combustion"]
+          },
+          "engineCc": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991,
+            "nullable": true
+          },
+          "powerKw": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "nullable": true
+          },
+          "purchasedOn": {
+            "type": "string"
+          },
+          "registrationType": {
+            "type": "string",
+            "enum": ["unregistered", "national", "local", "temporary"]
+          },
+          "plateNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "registeredOn": {
+            "type": "string",
+            "nullable": true
+          },
+          "registrationExpiresOn": {
+            "type": "string",
+            "nullable": true
+          },
+          "requiredDriverLicenseType": {
+            "type": "string",
+            "enum": ["none", "AM", "A1", "A2", "A"]
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "ISO timestamp of scooter creation."
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "ISO timestamp of last scooter update."
+          },
+          "deletedAt": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "vin",
+          "brand",
+          "model",
+          "color",
+          "manufactureYear",
+          "powertrainType",
+          "engineCc",
+          "powerKw",
+          "purchasedOn",
+          "registrationType",
+          "plateNumber",
+          "registeredOn",
+          "registrationExpiresOn",
+          "requiredDriverLicenseType",
+          "notes",
+          "createdAt",
+          "updatedAt",
+          "deletedAt"
+        ],
+        "additionalProperties": false
+      },
+      "ScooterList_Output": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Scooter_Output"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": ["items", "page", "pageSize", "total"],
+        "additionalProperties": false
+      },
+      "UpdateScooterInput": {
+        "type": "object",
+        "properties": {
+          "vin": {
+            "type": "string"
+          },
+          "brand": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "color": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50,
+            "nullable": true
+          },
+          "manufactureYear": {
+            "type": "integer",
+            "minimum": 1950,
+            "maximum": 2027
+          },
+          "powertrainType": {
+            "type": "string",
+            "enum": ["electric", "combustion"]
+          },
+          "engineCc": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 2000,
+            "nullable": true
+          },
+          "powerKw": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 200,
+            "nullable": true
+          },
+          "purchasedOn": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "registrationType": {
+            "type": "string",
+            "enum": ["unregistered", "national", "local", "temporary"]
+          },
+          "plateNumber": {
+            "type": "string",
+            "maxLength": 64,
+            "nullable": true
+          },
+          "registeredOn": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "nullable": true
+          },
+          "registrationExpiresOn": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "nullable": true
+          },
+          "requiredDriverLicenseType": {
+            "type": "string",
+            "enum": ["none", "AM", "A1", "A2", "A"]
           },
           "notes": {
             "type": "string",
