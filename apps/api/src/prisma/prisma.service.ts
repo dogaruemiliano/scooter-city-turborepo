@@ -34,6 +34,25 @@ import { PrismaClient } from "../generated/prisma/client";
 const POOL_MAX = 10;
 const POOL_IDLE_TIMEOUT_MS = 30_000;
 const POOL_CONNECTION_TIMEOUT_MS = 5_000;
+const LOCAL_DATABASE_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
+
+const shouldUseDatabaseSsl = (
+  databaseUrl: string,
+  nodeEnv: Env["NODE_ENV"],
+): boolean => {
+  if (nodeEnv !== "production") {
+    return false;
+  }
+
+  const parsedUrl = new URL(databaseUrl);
+  if (LOCAL_DATABASE_HOSTS.has(parsedUrl.hostname)) {
+    return false;
+  }
+
+  // Let an explicit sslmode in the managed URL win. Heroku-managed URLs can be
+  // rotated, so production SSL should be enforced in code when sslmode is absent.
+  return !parsedUrl.searchParams.has("sslmode");
+};
 
 @Injectable()
 export class PrismaService
@@ -43,6 +62,9 @@ export class PrismaService
   constructor(@Inject(ENV) env: Env) {
     const adapter = new PrismaPg({
       connectionString: env.DATABASE_URL,
+      ...(shouldUseDatabaseSsl(env.DATABASE_URL, env.NODE_ENV)
+        ? { ssl: { rejectUnauthorized: false } }
+        : {}),
       max: POOL_MAX,
       idleTimeoutMillis: POOL_IDLE_TIMEOUT_MS,
       connectionTimeoutMillis: POOL_CONNECTION_TIMEOUT_MS,

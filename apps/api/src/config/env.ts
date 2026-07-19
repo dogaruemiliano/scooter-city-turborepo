@@ -71,7 +71,7 @@ export const envSchema = z
     CORS_ORIGINS: csv
       .default(["http://localhost:3001"])
       .describe(
-        'Comma-separated list of allowed CORS origins. MUST be explicit when credentials are enabled (no "*").',
+        'Comma-separated list of additional allowed CORS origins. APP_BASE_URL is always allowed. MUST be explicit when credentials are enabled (no "*").',
       ),
 
     /* DB ------------------------------------------------------------------ */

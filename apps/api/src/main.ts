@@ -37,6 +37,7 @@ import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { localeHeaderName } from "@repo/i18n";
 
 import { AppModule } from "./app.module";
+import { buildCorsOrigins } from "./config/cors";
 import { loadEnv } from "./config/env";
 
 const COOKIE_AUTH_NAME = "access_token";
@@ -91,7 +92,7 @@ async function bootstrap(): Promise<void> {
   //     where coercion is needed; otherwise input matches output type.
 
   app.enableCors({
-    origin: env.CORS_ORIGINS,
+    origin: buildCorsOrigins(env),
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: [
