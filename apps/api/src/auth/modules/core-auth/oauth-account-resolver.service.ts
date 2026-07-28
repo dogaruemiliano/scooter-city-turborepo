@@ -1,6 +1,7 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, UnauthorizedException } from "@nestjs/common";
 import type { v1 } from "@repo/api-shared";
 
+import { userWalletCreateInput } from "../../../finance/user-wallet";
 import { Prisma, type User } from "../../../generated/prisma/client";
 import { PrismaService } from "../../../prisma/prisma.service";
 
@@ -123,6 +124,9 @@ export class OAuthAccountResolver {
     });
 
     if (!existingAccount) return null;
+    if (existingAccount.user.deletedAt !== null) {
+      throw new UnauthorizedException("Account is unavailable");
+    }
 
     if (
       input.existingEmailPolicy === "sync" &&
@@ -151,6 +155,10 @@ export class OAuthAccountResolver {
     });
 
     if (existingUser) {
+      if (existingUser.deletedAt !== null) {
+        throw new UnauthorizedException("Account is unavailable");
+      }
+
       await tx.authAccount.create({
         data: {
           provider: input.provider,
@@ -172,6 +180,7 @@ export class OAuthAccountResolver {
         emailVerified: new Date(),
         firstName: input.firstName,
         lastName: input.lastName,
+        wallet: userWalletCreateInput(),
         authAccounts: {
           create: {
             provider: input.provider,

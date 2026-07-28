@@ -21,8 +21,13 @@ import type {
   DraftUpload,
   PersonDocument,
   Prisma,
+  User,
 } from "../generated/prisma/client";
 import { Prisma as PrismaRuntime } from "../generated/prisma/client";
+import {
+  ensureUserWallet,
+  userWalletCreateInput,
+} from "../finance/user-wallet";
 import { PrismaService } from "../prisma/prisma.service";
 import type {
   PersonDocumentPhotoWithAsset,
@@ -77,8 +82,12 @@ export class PersonsService {
 
     try {
       return await this.prisma.$transaction(async (tx) => {
+        const user = await this.resolvePersonUser(tx, input);
         const created = await tx.person.create({
-          data: this.toCreateData(input),
+          data: {
+            ...this.toCreateData(input),
+            user: { connect: { id: user.id } },
+          },
           include: this.personInclude(),
         });
         const documentsByType = new Map(
@@ -244,6 +253,15 @@ export class PersonsService {
           where: { id },
           data: this.toUpdateData(input),
           include: this.personInclude(),
+        });
+        await tx.user.update({
+          where: { id: existing.userId },
+          data: {
+            email: updated.email,
+            phone: updated.phone,
+            firstName: updated.firstName,
+            lastName: updated.lastName,
+          },
         });
 
         await this.recordPersonAudit(tx, {
@@ -772,7 +790,7 @@ export class PersonsService {
 
   private toCreateData(
     input: v1.persons.CreatePersonInput,
-  ): Prisma.PersonCreateInput {
+  ): Prisma.PersonCreateWithoutUserInput {
     return {
       email: input.email,
       phone: input.phone,
@@ -795,6 +813,62 @@ export class PersonsService {
           : undefined,
       notes: input.notes,
     };
+  }
+
+  private async resolvePersonUser(
+    tx: Prisma.TransactionClient,
+    input: v1.persons.CreatePersonInput,
+  ): Promise<User> {
+    const [emailUser, phoneUser] = await Promise.all([
+      tx.user.findUnique({ where: { email: input.email } }),
+      tx.user.findUnique({ where: { phone: input.phone } }),
+    ]);
+
+    if (emailUser && phoneUser && emailUser.id !== phoneUser.id) {
+      throw new ConflictException(
+        "Person email and phone belong to different users",
+      );
+    }
+
+    const existingUser = emailUser ?? phoneUser;
+    if (existingUser) {
+      if (
+        existingUser.email !== input.email ||
+        (existingUser.phone !== null && existingUser.phone !== input.phone)
+      ) {
+        throw new ConflictException(
+          "Person identity does not match the existing user",
+        );
+      }
+
+      const existingPerson = await tx.person.findUnique({
+        where: { userId: existingUser.id },
+      });
+      if (existingPerson) {
+        throw new ConflictException("User is already linked to a person");
+      }
+
+      const user = await tx.user.update({
+        where: { id: existingUser.id },
+        data: {
+          phone: existingUser.phone ?? input.phone,
+          firstName: input.firstName,
+          lastName: input.lastName,
+        },
+      });
+      await ensureUserWallet(tx, user.id);
+      return user;
+    }
+
+    return tx.user.create({
+      data: {
+        email: input.email,
+        phone: input.phone,
+        firstName: input.firstName,
+        lastName: input.lastName,
+        wallet: userWalletCreateInput(),
+      },
+    });
   }
 
   private toUpdateData(

@@ -43,6 +43,8 @@ describe("Core auth HTTP surface (e2e)", () => {
   let coreAuth: CoreAuthService;
 
   const createdUserIds: string[] = [];
+  const createdPersonIds: string[] = [];
+  const createdMoneyTransactionIds: string[] = [];
 
   const server = () => app.getHttpServer() as Server;
 
@@ -89,6 +91,16 @@ describe("Core auth HTTP surface (e2e)", () => {
   });
 
   afterAll(async () => {
+    if (createdPersonIds.length > 0) {
+      await prisma.person.deleteMany({
+        where: { id: { in: createdPersonIds } },
+      });
+    }
+    if (createdMoneyTransactionIds.length > 0) {
+      await prisma.moneyTransaction.deleteMany({
+        where: { id: { in: createdMoneyTransactionIds } },
+      });
+    }
     if (createdUserIds.length > 0) {
       await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
     }
@@ -386,8 +398,58 @@ describe("Core auth HTTP surface (e2e)", () => {
   // DELETE /me
   // ────────────────────────────────────────────────────────────────────
 
-  it("DELETE /v1/auth/me wipes the user and clears cookies", async () => {
+  it("DELETE /v1/auth/me removes access but preserves business history", async () => {
     const issued = await freshSession();
+    const userBefore = await prisma.user.findUniqueOrThrow({
+      where: { id: issued.userId },
+      include: { wallet: true },
+    });
+    if (!userBefore.wallet) {
+      throw new Error("Expected a wallet for the account-deletion fixture");
+    }
+    const otherSession = await coreAuth.issueSession({ user: userBefore });
+    const person = await prisma.person.create({
+      data: {
+        userId: issued.userId,
+        email: userBefore.email,
+        phone: `+407${Math.floor(10000000 + Math.random() * 89999999)}`,
+        firstName: "History",
+        lastName: "Preserved",
+      },
+    });
+    createdPersonIds.push(person.id);
+    await prisma.authAccount.create({
+      data: {
+        userId: issued.userId,
+        provider: "google",
+        providerId: `delete-me-${issued.userId}`,
+        email: userBefore.email,
+      },
+    });
+    await prisma.otpChallenge.create({
+      data: {
+        activeKey: `delete-me:${issued.userId}`,
+        channel: "EMAIL",
+        purpose: "AUTH",
+        target: userBefore.email,
+        userId: issued.userId,
+        codeHash: "test-code-hash",
+        expiresAt: new Date(Date.now() + 60_000),
+        nextSendAt: new Date(Date.now() + 30_000),
+      },
+    });
+    const transaction = await prisma.moneyTransaction.create({
+      data: {
+        type: "ADJUSTMENT",
+        amount: "25.00",
+        financialScope: "COMPANY",
+        counterpartyUserId: issued.userId,
+        occurredAt: new Date(),
+        description: "Account deletion history fixture",
+        idempotencyKey: `delete-me-history-${issued.userId}`,
+      },
+    });
+    createdMoneyTransactionIds.push(transaction.id);
 
     const res = await req()
       .delete("/v1/auth/me")
@@ -395,10 +457,65 @@ describe("Core auth HTTP surface (e2e)", () => {
 
     expect(res.status).toBe(204);
     const user = await prisma.user.findUnique({ where: { id: issued.userId } });
-    expect(user).toBeNull();
-    // Don't try to clean up after ourselves; the row is gone.
-    const idx = createdUserIds.indexOf(issued.userId);
-    if (idx >= 0) createdUserIds.splice(idx, 1);
+    expect(user?.deletedAt).toBeInstanceOf(Date);
+    expect(
+      await prisma.person.findUnique({ where: { id: person.id } }),
+    ).not.toBeNull();
+    expect(
+      await prisma.wallet.findUnique({
+        where: { id: userBefore.wallet.id },
+      }),
+    ).not.toBeNull();
+    expect(
+      await prisma.moneyTransaction.findUnique({
+        where: { id: transaction.id },
+        select: { counterpartyUserId: true },
+      }),
+    ).toEqual({ counterpartyUserId: issued.userId });
+    expect(
+      await prisma.session.count({ where: { userId: issued.userId } }),
+    ).toBe(0);
+    expect(
+      await prisma.refreshToken.count({ where: { userId: issued.userId } }),
+    ).toBe(0);
+    expect(
+      await prisma.authAccount.count({ where: { userId: issued.userId } }),
+    ).toBe(0);
+    expect(
+      await prisma.otpChallenge.count({ where: { userId: issued.userId } }),
+    ).toBe(0);
+
+    const oldAccess = await req()
+      .get("/v1/auth/me")
+      .set("Cookie", [`access_token=${issued.accessToken}`]);
+    expect(oldAccess.status).toBe(401);
+    const otherDeviceAccess = await req()
+      .get("/v1/auth/me")
+      .set("Cookie", [`access_token=${otherSession.accessToken}`]);
+    expect(otherDeviceAccess.status).toBe(401);
+
+    const oldRefresh = await req()
+      .post("/v1/auth/refresh")
+      .send({ refreshToken: issued.refreshToken });
+    expect(oldRefresh.status).toBe(401);
+
+    const setCookies = res.headers["set-cookie"] as unknown as
+      | string[]
+      | undefined;
+    expect(setCookies?.some((cookie) => /access_token=;/.test(cookie))).toBe(
+      true,
+    );
+    expect(setCookies?.some((cookie) => /refresh_token=;/.test(cookie))).toBe(
+      true,
+    );
+    expect(
+      await prisma.auditEvent.findFirst({
+        where: {
+          type: "ACCOUNT_DELETED",
+          userId: issued.userId,
+        },
+      }),
+    ).not.toBeNull();
   });
 
   // ────────────────────────────────────────────────────────────────────

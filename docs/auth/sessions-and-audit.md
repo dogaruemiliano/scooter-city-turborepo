@@ -45,39 +45,45 @@ remain part of their verification flows and are not edited by this route.
 Refresh rotation and replay handling are documented in
 [refresh-rotation.md](./refresh-rotation.md).
 
-## User deletion
+## Account deletion
 
-`DELETE /v1/auth/me` deletes the user and relies on database relations:
+`DELETE /v1/auth/me` deactivates access without deleting business history. One
+database transaction sets `User.deletedAt` and deletes the user's sessions,
+refresh tokens, pending OTP challenges, and OAuth accounts.
 
-| Relation       | Delete behavior        |
-| -------------- | ---------------------- |
-| Sessions       | Cascade                |
-| Refresh tokens | Cascade                |
-| OTP challenges | Cascade                |
-| OAuth accounts | Cascade                |
-| Audit events   | Set `userId` to `NULL` |
+The `User`, `Person`, wallet, rentals, financial transactions, and audit events
+remain. Audit events stay linked to the preserved user. `Person.userId` uses
+`ON DELETE RESTRICT` as a final database safeguard against accidental hard
+deletion.
 
-Audit history remains available after account deletion. Projects with stricter
-retention requirements must add their own audit-purge policy.
+Access-token validation checks the active session and `User.deletedAt` on every
+authenticated API request. Therefore access is denied immediately on all
+devices, even if an issued JWT has not expired yet. OAuth and email-OTP login
+also reject a deactivated user, so deleting OAuth links does not allow the same
+email to silently recreate access.
+
+Personal-data anonymization is intentionally separate. It should be implemented
+later as a retention workflow that knows which identifying fields may legally
+be removed without destroying required rental, financial, or audit records.
 
 ## Audit event types
 
 The accepted event names live in
 [`audit.types.ts`](../../apps/api/src/audit/audit.types.ts).
 
-| Event                 | Meaning                                    |
-| --------------------- | ------------------------------------------ |
-| `SIGNUP`              | A new user was created.                    |
-| `EMAIL_VERIFIED`      | Email ownership was verified.              |
-| `LOGIN_SUCCESS`       | Authentication completed successfully.     |
-| `LOGIN_FAIL`          | An authentication attempt failed.          |
-| `OAUTH_LINKED`        | A provider identity was linked.            |
-| `OAUTH_UNLINKED`      | A provider identity was removed.           |
-| `SESSION_REVOKED`     | A session was logged out or revoked.       |
-| `SESSION_BURNED`      | Refresh-token reuse invalidated a session. |
-| `LOGOUT_ALL`          | All user sessions were revoked.            |
-| `ACCOUNT_DELETED`     | A user deleted their account.              |
-| `NEW_DEVICE_NOTIFIED` | A new-device notification was recorded.    |
+| Event                 | Meaning                                     |
+| --------------------- | ------------------------------------------- |
+| `SIGNUP`              | A new user was created.                     |
+| `EMAIL_VERIFIED`      | Email ownership was verified.               |
+| `LOGIN_SUCCESS`       | Authentication completed successfully.      |
+| `LOGIN_FAIL`          | An authentication attempt failed.           |
+| `OAUTH_LINKED`        | A provider identity was linked.             |
+| `OAUTH_UNLINKED`      | A provider identity was removed.            |
+| `SESSION_REVOKED`     | A session was logged out or revoked.        |
+| `SESSION_BURNED`      | Refresh-token reuse invalidated a session.  |
+| `LOGOUT_ALL`          | All user sessions were revoked.             |
+| `ACCOUNT_DELETED`     | A user deactivated access to their account. |
+| `NEW_DEVICE_NOTIFIED` | A new-device notification was recorded.     |
 
 `SESSION_BURNED` and `NEW_DEVICE_NOTIFIED` are part of the accepted vocabulary,
 but the current application does not emit them yet.

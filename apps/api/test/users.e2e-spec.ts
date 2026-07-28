@@ -62,10 +62,14 @@ describe("UsersService (e2e)", () => {
     expect(user.createdAt).toBeInstanceOf(Date);
   });
 
-  it("deleteOne cascades the user out of the table", async () => {
+  it("deactivateAccount preserves the user and marks it deleted", async () => {
     const email = `pr4-delete-${Date.now()}@example.com`;
     const created = await users.createOne({ email });
-    await users.deleteOne(created.id);
-    expect(await users.findById(created.id)).toBeNull();
+    createdEmails.push(email);
+
+    await users.deactivateAccount(created.id);
+
+    const deactivated = await users.findById(created.id);
+    expect(deactivated?.deletedAt).toBeInstanceOf(Date);
   });
 });

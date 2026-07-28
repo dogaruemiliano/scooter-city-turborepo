@@ -83,7 +83,7 @@ export class AuthIdentityController {
   @ApiOperation({
     operationId: "CoreAuthController_deleteMe_v1",
     summary:
-      "Hard-delete the current user. Cascades sessions, refresh tokens, OTPs, and OAuth links. Audit events survive.",
+      "Deactivate the current account. Authentication credentials are deleted while business and audit history are preserved.",
   })
   @ApiNoContentResponse()
   async deleteMe(
@@ -91,13 +91,13 @@ export class AuthIdentityController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ): Promise<void> {
-    await this.users.deleteOne(user.id);
+    await this.users.deactivateAccount(user.id);
     clearAuthCookies(res, this.env);
     await this.audit.record({
       type: AuditEventType.ACCOUNT_DELETED,
-      userId: null,
+      userId: user.id,
       ...getRequestMetadata(req),
-      meta: { userId: user.id },
+      meta: { mode: "soft-delete" },
     });
   }
 
