@@ -105,6 +105,7 @@ const SEED_AUDIT_ACTOR = {
 } as const;
 const REDACTED_VALUE = "[redacted]";
 const SET_VALUE = "[set]";
+const USER_WALLET_NAME = "Personal wallet";
 
 type PersonDocumentSeed = {
   id: string;
@@ -447,8 +448,9 @@ async function main(): Promise<void> {
       email: "test-email-otp@example.com",
       firstName: "Test",
       lastName: "EmailOtp",
+      wallet: seedUserWalletCreate(),
     },
-    update: {},
+    update: { wallet: seedUserWalletUpsert() },
   });
 
   // SMS-OTP user — has phone, no email-verified.
@@ -460,8 +462,12 @@ async function main(): Promise<void> {
       phone: "+40700000001",
       firstName: "Test",
       lastName: "Sms",
+      wallet: seedUserWalletCreate(),
     },
-    update: { phone: "+40700000001" },
+    update: {
+      phone: "+40700000001",
+      wallet: seedUserWalletUpsert(),
+    },
   });
 
   // OAuth-linked users — one AuthAccount row each.
@@ -490,8 +496,12 @@ async function main(): Promise<void> {
         firstName: "Test",
         lastName:
           seed.provider.charAt(0).toUpperCase() + seed.provider.slice(1),
+        wallet: seedUserWalletCreate(),
       },
-      update: { emailVerified: now },
+      update: {
+        emailVerified: now,
+        wallet: seedUserWalletUpsert(),
+      },
     });
 
     await prisma.authAccount.upsert({
@@ -521,13 +531,35 @@ async function main(): Promise<void> {
 
 async function seedPersons(): Promise<void> {
   for (const seed of PERSON_SEEDS) {
+    const user = await prisma.user.upsert({
+      where: { email: seed.email },
+      create: {
+        id: `seed-user-${seed.id}`,
+        email: seed.email,
+        phone: seed.phone,
+        firstName: seed.firstName,
+        lastName: seed.lastName,
+        wallet: seedUserWalletCreate(),
+      },
+      update: {
+        phone: seed.phone,
+        firstName: seed.firstName,
+        lastName: seed.lastName,
+        wallet: seedUserWalletUpsert(),
+      },
+    });
+
     await prisma.person.upsert({
       where: { id: seed.id },
       create: {
         id: seed.id,
         ...personData(seed),
+        user: { connect: { id: user.id } },
       },
-      update: personData(seed),
+      update: {
+        ...personData(seed),
+        user: { connect: { id: user.id } },
+      },
     });
 
     await prisma.personDocument.deleteMany({
@@ -554,6 +586,41 @@ async function seedPersons(): Promise<void> {
 
     await seedPersonAuditEvents(seed);
   }
+}
+
+function seedUserWalletCreate() {
+  return {
+    create: {
+      type: "USER" as const,
+      name: USER_WALLET_NAME,
+      balances: {
+        create: {
+          bucket: "USER_SETTLEMENT" as const,
+          currency: "RON",
+          balance: 0,
+        },
+      },
+    },
+  };
+}
+
+function seedUserWalletUpsert() {
+  return {
+    upsert: {
+      create: {
+        type: "USER" as const,
+        name: USER_WALLET_NAME,
+        balances: {
+          create: {
+            bucket: "USER_SETTLEMENT" as const,
+            currency: "RON",
+            balance: 0,
+          },
+        },
+      },
+      update: {},
+    },
+  };
 }
 
 async function seedScooters(): Promise<void> {

@@ -1,14 +1,14 @@
-// Auth subsystem schema. Business models land in later PRs.
+// Auth, fleet, and financial subsystem schema.
 //
 // Design references:
 // - docs/adr/0002-cookie-based-sessions.md         (cookies, no authjs)
 // - docs/adr/0003-multi-instance-refresh-rotation.md (previous_jti + pendingTokenHash)
 // - docs/auth/sessions-and-audit.md                 (this PR — what each table is for)
 //
-// Every model that ties to a user uses `onDelete: Cascade` so DELETE /v1/auth/me
-// in PR 5 wipes the user's full footprint atomically. The single exception is
-// AuditEvent which uses `SetNull` — we keep audit history after account deletion
-// for compliance / forensics; rows are simply detached from the gone user.
+// Account deletion is a soft-delete of User plus explicit removal of
+// authentication-owned records. Person uses `Restrict` as a database-level
+// guard against accidental hard deletion. Audit and financial records remain
+// linked to the preserved User row.
 
 // Canonical Prisma 7 generator block. See AGENTS.md → prisma-verify-rule.
 // - `prisma-client` (not the deprecated `prisma-client-js`)
@@ -30,13 +30,78 @@ datasource db {
   provider = "postgresql"
 }
 
+enum WalletType {
+  USER
+  COMPANY_CASH
+  COMPANY_BANK
+  PAYMENT_PROCESSOR
+}
+
+enum WalletBalanceBucket {
+  USER_SETTLEMENT
+  BUSINESS_FUNDS
+  ADMIN_PERSONAL_FUNDS
+  CUSTOMER_GUARANTEE_FUNDS
+}
+
+enum MoneyTransactionType {
+  INCOME
+  EXPENSE
+  TRANSFER
+  USER_CHARGE
+  USER_PAYMENT
+  GUARANTEE_RECEIVED
+  GUARANTEE_REFUNDED
+  REIMBURSEMENT
+  PERSONAL_EXTRACTION
+  PERSONAL_FUNDS_SPLIT
+  PERSONAL_FUNDS_CLAIM
+  COMPANY_DISTRIBUTION
+  REFUND
+  ADJUSTMENT
+  REVERSAL
+}
+
+enum MoneyTransactionStatus {
+  DRAFT
+  POSTED
+  REVERSED
+}
+
+enum MoneyTransactionScope {
+  COMPANY
+  ADMIN_PERSONAL
+  CUSTOMER_HELD
+}
+
+enum PaymentMethod {
+  CASH
+  POS
+  BANK_TRANSFER
+  ONLINE_PAYMENT
+}
+
+enum BillingStatus {
+  BILLED
+  NOT_BILLED
+  NOT_APPLICABLE
+}
+
+enum FinancialCategoryKind {
+  INCOME
+  EXPENSE
+  BOTH
+}
+
 /// Admin-managed person record used by rental flows.
 ///
-/// This is intentionally separate from `User`: a person can exist before
-/// they have an app account, and a future linking flow can connect them by
-/// the required unique email.
+/// `Person` remains separate from authentication details, but every person is
+/// backed by exactly one User. Person creation must create both records in one
+/// database transaction.
 model Person {
   id           String           @id @default(cuid())
+  userId       String           @unique
+  user         User             @relation(fields: [userId], references: [id], onDelete: Restrict)
   email        String           @unique
   phone        String           @unique
   firstName    String
@@ -56,6 +121,7 @@ model Person {
 
   @@index([deletedAt])
   @@index([lastName, firstName])
+  @@index([countryCode, deletedAt])
 }
 
 /// KYC/rental document belonging to a Person.
@@ -85,6 +151,7 @@ model PersonDocument {
   @@unique([personId, type], map: "person_document_active_type_unique", where: { deletedAt: null })
   @@unique([personId], map: "person_document_active_identity_unique", where: raw("\"deletedAt\" IS NULL AND \"type\" IN ('passport', 'nationalId', 'residencePermit', 'other')"))
   @@index([personId, deletedAt])
+  @@index([personId, type, status, issuingCountryCode, expiresOn], map: "PersonDocument_active_filters_idx", where: { deletedAt: null })
   @@index([type])
   @@index([status])
   @@index([expiresOn])
@@ -111,20 +178,177 @@ model User {
   roles         String[]  @default([])
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
-  /// Soft-delete marker. Hard cascade still runs via DELETE /v1/auth/me; this
-  /// column is reserved for "deactivate" flows that may land later.
+  /// Account deactivation marker. DELETE /v1/auth/me sets this value while
+  /// preserving the User row and its business history.
   deletedAt     DateTime?
 
-  sessions      Session[]
-  refreshTokens RefreshToken[]
-  otpChallenges OtpChallenge[]
-  authAccounts  AuthAccount[]
-  auditEvents   AuditEvent[]
-  mediaAssets   MediaAsset[]
-  draftUploads  DraftUpload[]
+  sessions                   Session[]
+  refreshTokens              RefreshToken[]
+  otpChallenges              OtpChallenge[]
+  authAccounts               AuthAccount[]
+  auditEvents                AuditEvent[]
+  mediaAssets                MediaAsset[]
+  draftUploads               DraftUpload[]
+  person                     Person?
+  wallet                     Wallet?            @relation("WalletOwner")
+  transactionsRecorded       MoneyTransaction[] @relation("MoneyTransactionRecordedBy")
+  transactionsAsCounterparty MoneyTransaction[] @relation("MoneyTransactionCounterparty")
+  transactionsAsRecipient    MoneyTransaction[] @relation("MoneyTransactionRecipient")
+  transactionsAsDebtor       MoneyTransaction[] @relation("MoneyTransactionDebtor")
+  transactionsAsCreditor     MoneyTransaction[] @relation("MoneyTransactionCreditor")
 
   @@index([email])
   @@index([phone])
+}
+
+/// A tracked money location or a user's single financial wallet.
+///
+/// USER wallets have an owner. Company cash, bank, and payment-processor
+/// wallets do not. The unique ownerUserId enforces at most one wallet per user;
+/// user creation is responsible for creating it.
+model Wallet {
+  id          String     @id @default(cuid())
+  type        WalletType
+  ownerUserId String?    @unique
+  owner       User?      @relation("WalletOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  name        String
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  balances       WalletBalance[]
+  balanceChanges WalletBalanceChange[]
+
+  @@index([type, isActive])
+}
+
+/// Fast, rebuildable current balance for one wallet, bucket, and currency.
+///
+/// USER_SETTLEMENT is from the user's perspective: positive means the company
+/// owes the user; negative means the user owes the company.
+model WalletBalance {
+  id        String              @id @default(cuid())
+  walletId  String
+  wallet    Wallet              @relation(fields: [walletId], references: [id], onDelete: Restrict)
+  bucket    WalletBalanceBucket
+  currency  String              @default("RON") @db.Char(3)
+  balance   Decimal             @default(0) @db.Decimal(19, 2)
+  updatedAt DateTime            @updatedAt
+
+  @@unique([walletId, bucket, currency])
+  @@index([bucket, currency])
+}
+
+/// User-facing financial event describing why money or an obligation changed.
+///
+/// Only POSTED transactions affect WalletBalance. Posted rows are immutable;
+/// corrections are represented by a new REVERSAL transaction.
+model MoneyTransaction {
+  id                      String                 @id @default(cuid())
+  type                    MoneyTransactionType
+  status                  MoneyTransactionStatus @default(DRAFT)
+  amount                  Decimal                @db.Decimal(19, 2)
+  currency                String                 @default("RON") @db.Char(3)
+  financialScope          MoneyTransactionScope
+  paymentMethod           PaymentMethod?
+  billingStatus           BillingStatus          @default(NOT_APPLICABLE)
+  categoryId              String?
+  category                FinancialCategory?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  counterpartyUserId      String?
+  counterparty            User?                  @relation("MoneyTransactionCounterparty", fields: [counterpartyUserId], references: [id], onDelete: SetNull)
+  recipientUserId         String?
+  recipient               User?                  @relation("MoneyTransactionRecipient", fields: [recipientUserId], references: [id], onDelete: SetNull)
+  debtorUserId            String?
+  debtor                  User?                  @relation("MoneyTransactionDebtor", fields: [debtorUserId], references: [id], onDelete: SetNull)
+  creditorUserId          String?
+  creditor                User?                  @relation("MoneyTransactionCreditor", fields: [creditorUserId], references: [id], onDelete: SetNull)
+  recordedByUserId        String?
+  recordedBy              User?                  @relation("MoneyTransactionRecordedBy", fields: [recordedByUserId], references: [id], onDelete: SetNull)
+  occurredAt              DateTime
+  description             String?
+  idempotencyKey          String                 @unique
+  /// Source event that automatically generated this transaction. A
+  /// PERSONAL_FUNDS_CLAIM points to the ADMIN_PERSONAL income that created it.
+  originTransactionId     String?
+  originTransaction       MoneyTransaction?      @relation("MoneyTransactionOrigin", fields: [originTransactionId], references: [id], onDelete: Restrict)
+  generatedTransactions   MoneyTransaction[]     @relation("MoneyTransactionOrigin")
+  reversalOfTransactionId String?
+  reversalOf              MoneyTransaction?      @relation("MoneyTransactionReversal", fields: [reversalOfTransactionId], references: [id], onDelete: Restrict)
+  reversals               MoneyTransaction[]     @relation("MoneyTransactionReversal")
+  createdAt               DateTime               @default(now())
+  updatedAt               DateTime               @updatedAt
+
+  balanceChanges WalletBalanceChange[]
+  references     MoneyTransactionReference[]
+
+  @@index([status, occurredAt])
+  @@index([financialScope, billingStatus, occurredAt])
+  @@index([paymentMethod, occurredAt])
+  @@index([categoryId, occurredAt])
+  @@index([counterpartyUserId, occurredAt])
+  @@index([recipientUserId, occurredAt])
+  @@index([debtorUserId, creditorUserId, occurredAt])
+  @@index([recordedByUserId, occurredAt])
+  @@index([originTransactionId])
+  @@index([reversalOfTransactionId])
+}
+
+/// Exact signed balance effect produced by a MoneyTransaction.
+///
+/// A collection or extraction can have one row, a transfer has two rows, and
+/// events such as guarantees can affect both a money location and a user's
+/// settlement balance without duplicating the parent transaction.
+model WalletBalanceChange {
+  id                 String              @id @default(cuid())
+  moneyTransactionId String
+  moneyTransaction   MoneyTransaction    @relation(fields: [moneyTransactionId], references: [id], onDelete: Restrict)
+  walletId           String
+  wallet             Wallet              @relation(fields: [walletId], references: [id], onDelete: Restrict)
+  bucket             WalletBalanceBucket
+  currency           String              @default("RON") @db.Char(3)
+  amountDelta        Decimal             @db.Decimal(19, 2)
+  createdAt          DateTime            @default(now())
+
+  @@unique([moneyTransactionId, walletId, bucket, currency])
+  @@index([walletId, bucket, currency, createdAt])
+}
+
+/// Configurable reporting category. Categories are data rather than enums so
+/// the business can add scooter and company categories without a migration.
+model FinancialCategory {
+  id               String                @id @default(cuid())
+  code             String                @unique
+  name             String
+  kind             FinancialCategoryKind
+  parentCategoryId String?
+  parentCategory   FinancialCategory?    @relation("FinancialCategoryTree", fields: [parentCategoryId], references: [id], onDelete: SetNull)
+  children         FinancialCategory[]   @relation("FinancialCategoryTree")
+  isActive         Boolean               @default(true)
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+
+  transactions MoneyTransaction[]
+
+  @@index([parentCategoryId])
+  @@index([kind, isActive])
+}
+
+/// Polymorphic link from a financial event to its source domain records.
+///
+/// Prisma does not model polymorphic foreign keys, so referenceType and
+/// referenceId are validated by the financial application service.
+model MoneyTransactionReference {
+  id                 String           @id @default(cuid())
+  moneyTransactionId String
+  moneyTransaction   MoneyTransaction @relation(fields: [moneyTransactionId], references: [id], onDelete: Restrict)
+  referenceType      String
+  referenceId        String
+  isPrimary          Boolean          @default(false)
+  createdAt          DateTime         @default(now())
+
+  @@unique([moneyTransactionId, referenceType, referenceId])
+  @@index([referenceType, referenceId])
+  @@index([moneyTransactionId, isPrimary])
 }
 
 /// Private media object metadata.
@@ -356,8 +580,8 @@ model AuthAccount {
   @@index([userId])
 }
 
-/// Append-only audit log. Survives user deletion (userId becomes null) so
-/// forensics + compliance reports can reconstruct activity after the fact.
+/// Append-only audit log. Account deactivation preserves both the row and its
+/// User relation so forensics + compliance reports retain their actor context.
 ///
 /// `type` values are defined in TS by `AuditEventType` and include:
 /// SIGNUP, LOGIN_SUCCESS, LOGIN_FAIL, EMAIL_VERIFIED, OAUTH_LINKED,
