@@ -44,6 +44,13 @@ interface ClaimAggregate {
   amount: Prisma.Decimal;
 }
 
+type BalanceDirection = "POSITIVE" | "NEGATIVE";
+
+interface RequiredBalanceChange {
+  bucket: WalletBalanceBucket;
+  direction: BalanceDirection;
+}
+
 @Injectable()
 export class FinanceService {
   constructor(
@@ -635,7 +642,8 @@ export class FinanceService {
         throw new BadRequestException("Financial category is not active");
       }
       if (
-        (input.type === MoneyTransactionType.INCOME &&
+        ((input.type === MoneyTransactionType.INCOME ||
+          input.type === MoneyTransactionType.USER_CHARGE) &&
           category.kind === "EXPENSE") ||
         (input.type === MoneyTransactionType.EXPENSE &&
           category.kind === "INCOME")
@@ -653,129 +661,491 @@ export class FinanceService {
   private assertTransactionShape(
     input: v1.finance.CreateMoneyTransactionInput,
   ): void {
-    const deltas = input.balanceChanges.map(
-      (change) => new PrismaRuntime.Decimal(change.amountDelta),
-    );
-    const positive = deltas.filter((delta) => delta.greaterThan(0)).length;
-    const negative = deltas.filter((delta) => delta.lessThan(0)).length;
-
-    if (
-      input.type === MoneyTransactionType.TRANSFER ||
-      input.type === MoneyTransactionType.PERSONAL_FUNDS_SPLIT
-    ) {
-      if (
-        input.balanceChanges.length !== 2 ||
-        positive !== 1 ||
-        negative !== 1
-      ) {
-        throw new BadRequestException(
-          "A transfer requires one source and one destination balance change",
-        );
-      }
-      if (input.balanceChanges[0].bucket !== input.balanceChanges[1].bucket) {
-        throw new BadRequestException(
-          "A transfer must preserve its balance bucket",
-        );
-      }
-    }
-
-    if (
-      input.financialScope === MoneyTransactionScope.ADMIN_PERSONAL &&
-      input.type === MoneyTransactionType.INCOME
-    ) {
-      if (
-        input.paymentMethod !== "CASH" ||
-        input.billingStatus !== "NOT_BILLED" ||
-        input.balanceChanges.length !== 1 ||
-        positive !== 1 ||
-        input.balanceChanges[0].bucket !==
-          WalletBalanceBucket.ADMIN_PERSONAL_FUNDS
-      ) {
-        throw new BadRequestException(
-          "Personal income must be unbilled cash entering one admin personal-funds balance",
-        );
-      }
-    }
-
-    if (
-      input.type === MoneyTransactionType.PERSONAL_FUNDS_SPLIT &&
-      (!input.debtorUserId ||
-        !input.creditorUserId ||
-        input.debtorUserId === input.creditorUserId)
-    ) {
-      throw new BadRequestException(
-        "A personal-funds split requires different debtor and creditor users",
-      );
-    }
-    if (
-      input.type === MoneyTransactionType.PERSONAL_FUNDS_SPLIT &&
-      input.balanceChanges.some(
-        (change) => change.bucket !== WalletBalanceBucket.ADMIN_PERSONAL_FUNDS,
-      )
-    ) {
-      throw new BadRequestException(
-        "A personal-funds split must move admin personal funds",
-      );
-    }
-
-    if (input.type === MoneyTransactionType.PERSONAL_EXTRACTION) {
-      if (
-        input.balanceChanges.length !== 1 ||
-        negative !== 1 ||
-        input.balanceChanges[0].bucket !==
-          WalletBalanceBucket.ADMIN_PERSONAL_FUNDS ||
-        !input.recipientUserId
-      ) {
-        throw new BadRequestException(
-          "A personal extraction requires one personal-funds debit and a recipient",
-        );
-      }
-    }
-
-    if (
-      input.type === MoneyTransactionType.COMPANY_DISTRIBUTION &&
-      (!input.recipientUserId ||
-        input.financialScope !== MoneyTransactionScope.COMPANY ||
-        negative === 0 ||
-        input.balanceChanges.some(
-          (change) => change.bucket !== WalletBalanceBucket.BUSINESS_FUNDS,
-        ))
-    ) {
-      throw new BadRequestException(
-        "A company distribution requires a recipient and a business-funds debit",
-      );
-    }
-
-    if (
-      input.type !== MoneyTransactionType.ADJUSTMENT &&
-      input.balanceChanges.length === 0
-    ) {
-      throw new BadRequestException(
-        "This transaction type requires at least one balance change",
-      );
+    switch (input.type) {
+      case MoneyTransactionType.INCOME:
+        this.assertIncomeShape(input);
+        return;
+      case MoneyTransactionType.EXPENSE:
+        this.assertExpenseShape(input);
+        return;
+      case MoneyTransactionType.TRANSFER:
+        this.assertTransferShape(input);
+        this.assertAllowedPartyFields(input, []);
+        this.assertNotApplicableBilling(input);
+        this.assertPaymentMethodAbsent(input);
+        this.assertCategoryAbsent(input);
+        return;
+      case MoneyTransactionType.USER_CHARGE:
+        this.assertScope(input, MoneyTransactionScope.COMPANY);
+        this.assertExactBalanceChanges(input, [
+          {
+            bucket: WalletBalanceBucket.USER_SETTLEMENT,
+            direction: "NEGATIVE",
+          },
+        ]);
+        this.assertRequiredPartyField(input, "counterpartyUserId");
+        this.assertAllowedPartyFields(input, ["counterpartyUserId"]);
+        if (input.paymentMethod != null || input.billingStatus !== "BILLED") {
+          throw new BadRequestException(
+            "A user charge must be billed and cannot have a payment method",
+          );
+        }
+        return;
+      case MoneyTransactionType.USER_PAYMENT:
+        this.assertCustomerCashMovement(input, "POSITIVE");
+        return;
+      case MoneyTransactionType.GUARANTEE_RECEIVED:
+        this.assertGuaranteeMovement(input, "POSITIVE");
+        return;
+      case MoneyTransactionType.GUARANTEE_REFUNDED:
+        this.assertGuaranteeMovement(input, "NEGATIVE");
+        return;
+      case MoneyTransactionType.REIMBURSEMENT:
+        this.assertScope(input, MoneyTransactionScope.COMPANY);
+        this.assertExactBalanceChanges(input, [
+          {
+            bucket: WalletBalanceBucket.BUSINESS_FUNDS,
+            direction: "NEGATIVE",
+          },
+          {
+            bucket: WalletBalanceBucket.ADMIN_PERSONAL_FUNDS,
+            direction: "POSITIVE",
+          },
+        ]);
+        this.assertRequiredPartyField(input, "recipientUserId");
+        this.assertAllowedPartyFields(input, ["recipientUserId"]);
+        this.assertNotApplicableBilling(input);
+        this.assertPaymentMethodRequired(input);
+        this.assertCategoryAbsent(input);
+        return;
+      case MoneyTransactionType.PERSONAL_EXTRACTION:
+        this.assertScope(input, MoneyTransactionScope.ADMIN_PERSONAL);
+        this.assertExactBalanceChanges(input, [
+          {
+            bucket: WalletBalanceBucket.ADMIN_PERSONAL_FUNDS,
+            direction: "NEGATIVE",
+          },
+        ]);
+        this.assertRequiredPartyField(input, "recipientUserId");
+        this.assertAllowedPartyFields(input, ["recipientUserId"]);
+        this.assertNotApplicableBilling(input);
+        this.assertPaymentMethodRequired(input);
+        this.assertCategoryAbsent(input);
+        return;
+      case MoneyTransactionType.PERSONAL_FUNDS_SPLIT:
+        this.assertScope(input, MoneyTransactionScope.ADMIN_PERSONAL);
+        this.assertExactBalanceChanges(input, [
+          {
+            bucket: WalletBalanceBucket.ADMIN_PERSONAL_FUNDS,
+            direction: "NEGATIVE",
+          },
+          {
+            bucket: WalletBalanceBucket.ADMIN_PERSONAL_FUNDS,
+            direction: "POSITIVE",
+          },
+        ]);
+        this.assertRequiredPartyField(input, "debtorUserId");
+        this.assertRequiredPartyField(input, "creditorUserId");
+        if (input.debtorUserId === input.creditorUserId) {
+          throw new BadRequestException(
+            "A personal-funds split requires different debtor and creditor users",
+          );
+        }
+        this.assertAllowedPartyFields(input, [
+          "debtorUserId",
+          "creditorUserId",
+        ]);
+        this.assertNotApplicableBilling(input);
+        if (input.paymentMethod !== "CASH") {
+          throw new BadRequestException(
+            "A personal-funds split requires the CASH payment method",
+          );
+        }
+        this.assertCategoryAbsent(input);
+        return;
+      case MoneyTransactionType.COMPANY_DISTRIBUTION:
+        this.assertScope(input, MoneyTransactionScope.COMPANY);
+        this.assertExactBalanceChanges(input, [
+          {
+            bucket: WalletBalanceBucket.BUSINESS_FUNDS,
+            direction: "NEGATIVE",
+          },
+        ]);
+        this.assertRequiredPartyField(input, "recipientUserId");
+        this.assertAllowedPartyFields(input, ["recipientUserId"]);
+        this.assertNotApplicableBilling(input);
+        this.assertPaymentMethodRequired(input);
+        this.assertCategoryAbsent(input);
+        return;
+      case MoneyTransactionType.REFUND:
+        this.assertCustomerCashMovement(input, "NEGATIVE");
+        return;
+      case MoneyTransactionType.ADJUSTMENT:
+        if (input.balanceChanges.length !== 1) {
+          throw new BadRequestException(
+            "An adjustment requires exactly one balance change",
+          );
+        }
+        this.assertScopeMatchesBucket(input, input.balanceChanges[0].bucket);
+        this.assertNotApplicableBilling(input);
+        this.assertPaymentMethodAbsent(input);
+        this.assertCategoryAbsent(input);
+        return;
+      default:
+        input.type satisfies never;
     }
   }
 
   private assertTransactionWalletOwnership(
     input: v1.finance.CreateMoneyTransactionInput,
-    wallets: Map<string, { ownerUserId: string | null }>,
+    wallets: Map<string, { ownerUserId: string | null; type: WalletType }>,
   ): void {
-    if (input.type !== MoneyTransactionType.PERSONAL_FUNDS_SPLIT) return;
+    if (input.type === MoneyTransactionType.PERSONAL_FUNDS_SPLIT) {
+      const source = this.findBalanceChange(
+        input,
+        WalletBalanceBucket.ADMIN_PERSONAL_FUNDS,
+        "NEGATIVE",
+      );
+      const destination = this.findBalanceChange(
+        input,
+        WalletBalanceBucket.ADMIN_PERSONAL_FUNDS,
+        "POSITIVE",
+      );
+      if (
+        wallets.get(source.walletId)?.ownerUserId !== input.debtorUserId ||
+        wallets.get(destination.walletId)?.ownerUserId !== input.creditorUserId
+      ) {
+        throw new BadRequestException(
+          "Split source and destination wallets must belong to the debtor and creditor",
+        );
+      }
+    }
 
-    const source = input.balanceChanges.find((change) =>
-      new PrismaRuntime.Decimal(change.amountDelta).isNegative(),
-    );
-    const destination = input.balanceChanges.find((change) =>
-      new PrismaRuntime.Decimal(change.amountDelta).isPositive(),
-    );
     if (
-      !source ||
-      !destination ||
-      wallets.get(source.walletId)?.ownerUserId !== input.debtorUserId ||
-      wallets.get(destination.walletId)?.ownerUserId !== input.creditorUserId
+      input.type === MoneyTransactionType.USER_CHARGE ||
+      input.type === MoneyTransactionType.USER_PAYMENT ||
+      input.type === MoneyTransactionType.GUARANTEE_RECEIVED ||
+      input.type === MoneyTransactionType.GUARANTEE_REFUNDED ||
+      input.type === MoneyTransactionType.REFUND
+    ) {
+      const settlement = this.findBalanceChange(
+        input,
+        WalletBalanceBucket.USER_SETTLEMENT,
+        input.type === MoneyTransactionType.USER_CHARGE ||
+          input.type === MoneyTransactionType.REFUND ||
+          input.type === MoneyTransactionType.GUARANTEE_REFUNDED
+          ? "NEGATIVE"
+          : "POSITIVE",
+      );
+      const wallet = wallets.get(settlement.walletId);
+      if (
+        wallet?.type !== WalletType.USER ||
+        wallet.ownerUserId !== input.counterpartyUserId
+      ) {
+        throw new BadRequestException(
+          "The settlement wallet must belong to the transaction counterparty",
+        );
+      }
+    }
+
+    if (
+      input.type === MoneyTransactionType.GUARANTEE_RECEIVED ||
+      input.type === MoneyTransactionType.GUARANTEE_REFUNDED
+    ) {
+      const guarantee = this.findBalanceChange(
+        input,
+        WalletBalanceBucket.CUSTOMER_GUARANTEE_FUNDS,
+        input.type === MoneyTransactionType.GUARANTEE_RECEIVED
+          ? "POSITIVE"
+          : "NEGATIVE",
+      );
+      if (wallets.get(guarantee.walletId)?.type === WalletType.USER) {
+        throw new BadRequestException(
+          "Customer guarantee funds must be held in a company wallet",
+        );
+      }
+    }
+
+    if (input.type === MoneyTransactionType.REIMBURSEMENT) {
+      const destination = this.findBalanceChange(
+        input,
+        WalletBalanceBucket.ADMIN_PERSONAL_FUNDS,
+        "POSITIVE",
+      );
+      const wallet = wallets.get(destination.walletId);
+      if (
+        wallet?.type !== WalletType.USER ||
+        wallet.ownerUserId !== input.recipientUserId
+      ) {
+        throw new BadRequestException(
+          "The reimbursement destination must be the recipient's admin wallet",
+        );
+      }
+    }
+  }
+
+  private assertIncomeShape(
+    input: v1.finance.CreateMoneyTransactionInput,
+  ): void {
+    this.assertAllowedPartyFields(input, ["counterpartyUserId"]);
+    this.assertPaymentMethodRequired(input);
+    if (input.financialScope === MoneyTransactionScope.COMPANY) {
+      this.assertExactBalanceChanges(input, [
+        {
+          bucket: WalletBalanceBucket.BUSINESS_FUNDS,
+          direction: "POSITIVE",
+        },
+      ]);
+      return;
+    }
+    if (input.financialScope === MoneyTransactionScope.ADMIN_PERSONAL) {
+      this.assertExactBalanceChanges(input, [
+        {
+          bucket: WalletBalanceBucket.ADMIN_PERSONAL_FUNDS,
+          direction: "POSITIVE",
+        },
+      ]);
+      if (
+        input.paymentMethod !== "CASH" ||
+        input.billingStatus !== "NOT_BILLED"
+      ) {
+        throw new BadRequestException(
+          "Personal income must be unbilled cash entering one admin personal-funds balance",
+        );
+      }
+      return;
+    }
+    throw new BadRequestException(
+      "Income must have company or admin-personal scope",
+    );
+  }
+
+  private assertExpenseShape(
+    input: v1.finance.CreateMoneyTransactionInput,
+  ): void {
+    this.assertAllowedPartyFields(input, ["counterpartyUserId"]);
+    this.assertPaymentMethodRequired(input);
+    if (input.financialScope === MoneyTransactionScope.COMPANY) {
+      this.assertExactBalanceChanges(input, [
+        {
+          bucket: WalletBalanceBucket.BUSINESS_FUNDS,
+          direction: "NEGATIVE",
+        },
+      ]);
+      return;
+    }
+    if (input.financialScope === MoneyTransactionScope.ADMIN_PERSONAL) {
+      this.assertExactBalanceChanges(input, [
+        {
+          bucket: WalletBalanceBucket.ADMIN_PERSONAL_FUNDS,
+          direction: "NEGATIVE",
+        },
+      ]);
+      return;
+    }
+    throw new BadRequestException(
+      "An expense must have company or admin-personal scope",
+    );
+  }
+
+  private assertTransferShape(
+    input: v1.finance.CreateMoneyTransactionInput,
+  ): void {
+    if (
+      input.balanceChanges.length !== 2 ||
+      input.balanceChanges[0].walletId === input.balanceChanges[1].walletId
     ) {
       throw new BadRequestException(
-        "Split source and destination wallets must belong to the debtor and creditor",
+        "A transfer requires different source and destination wallets",
+      );
+    }
+    const bucket = input.balanceChanges[0].bucket;
+    this.assertExactBalanceChanges(input, [
+      { bucket, direction: "NEGATIVE" },
+      { bucket, direction: "POSITIVE" },
+    ]);
+    this.assertScopeMatchesBucket(input, bucket);
+  }
+
+  private assertCustomerCashMovement(
+    input: v1.finance.CreateMoneyTransactionInput,
+    direction: BalanceDirection,
+  ): void {
+    this.assertScope(input, MoneyTransactionScope.COMPANY);
+    this.assertExactBalanceChanges(input, [
+      { bucket: WalletBalanceBucket.BUSINESS_FUNDS, direction },
+      { bucket: WalletBalanceBucket.USER_SETTLEMENT, direction },
+    ]);
+    this.assertRequiredPartyField(input, "counterpartyUserId");
+    this.assertAllowedPartyFields(input, ["counterpartyUserId"]);
+    this.assertNotApplicableBilling(input);
+    this.assertPaymentMethodRequired(input);
+    this.assertCategoryAbsent(input);
+  }
+
+  private assertGuaranteeMovement(
+    input: v1.finance.CreateMoneyTransactionInput,
+    direction: BalanceDirection,
+  ): void {
+    this.assertScope(input, MoneyTransactionScope.CUSTOMER_HELD);
+    this.assertExactBalanceChanges(input, [
+      {
+        bucket: WalletBalanceBucket.CUSTOMER_GUARANTEE_FUNDS,
+        direction,
+      },
+      { bucket: WalletBalanceBucket.USER_SETTLEMENT, direction },
+    ]);
+    this.assertRequiredPartyField(input, "counterpartyUserId");
+    this.assertAllowedPartyFields(input, ["counterpartyUserId"]);
+    this.assertNotApplicableBilling(input);
+    this.assertPaymentMethodRequired(input);
+    this.assertCategoryAbsent(input);
+  }
+
+  private assertExactBalanceChanges(
+    input: v1.finance.CreateMoneyTransactionInput,
+    required: RequiredBalanceChange[],
+  ): void {
+    if (input.balanceChanges.length !== required.length) {
+      throw new BadRequestException(
+        `${input.type} requires exactly ${required.length} balance change${required.length === 1 ? "" : "s"}`,
+      );
+    }
+
+    const unmatched = [...input.balanceChanges];
+    for (const expected of required) {
+      const index = unmatched.findIndex(
+        (change) =>
+          change.bucket === expected.bucket &&
+          this.balanceDirection(change.amountDelta) === expected.direction,
+      );
+      if (index === -1) {
+        throw new BadRequestException(
+          `${input.type} has an invalid balance bucket or direction`,
+        );
+      }
+      unmatched.splice(index, 1);
+    }
+  }
+
+  private findBalanceChange(
+    input: v1.finance.CreateMoneyTransactionInput,
+    bucket: WalletBalanceBucket,
+    direction: BalanceDirection,
+  ): v1.finance.WalletBalanceChangeInput {
+    const change = input.balanceChanges.find(
+      (item) =>
+        item.bucket === bucket &&
+        this.balanceDirection(item.amountDelta) === direction,
+    );
+    if (!change) {
+      throw new BadRequestException(
+        `${input.type} is missing a required balance change`,
+      );
+    }
+    return change;
+  }
+
+  private balanceDirection(amountDelta: string): BalanceDirection {
+    return new PrismaRuntime.Decimal(amountDelta).isPositive()
+      ? "POSITIVE"
+      : "NEGATIVE";
+  }
+
+  private assertScope(
+    input: v1.finance.CreateMoneyTransactionInput,
+    expected: MoneyTransactionScope,
+  ): void {
+    if (input.financialScope !== expected) {
+      throw new BadRequestException(
+        `${input.type} requires ${expected} financial scope`,
+      );
+    }
+  }
+
+  private assertScopeMatchesBucket(
+    input: v1.finance.CreateMoneyTransactionInput,
+    bucket: WalletBalanceBucket,
+  ): void {
+    const expected =
+      bucket === WalletBalanceBucket.ADMIN_PERSONAL_FUNDS
+        ? MoneyTransactionScope.ADMIN_PERSONAL
+        : bucket === WalletBalanceBucket.CUSTOMER_GUARANTEE_FUNDS
+          ? MoneyTransactionScope.CUSTOMER_HELD
+          : MoneyTransactionScope.COMPANY;
+    this.assertScope(input, expected);
+  }
+
+  private assertNotApplicableBilling(
+    input: v1.finance.CreateMoneyTransactionInput,
+  ): void {
+    if (input.billingStatus !== BillingStatus.NOT_APPLICABLE) {
+      throw new BadRequestException(
+        `${input.type} requires NOT_APPLICABLE billing status`,
+      );
+    }
+  }
+
+  private assertPaymentMethodRequired(
+    input: v1.finance.CreateMoneyTransactionInput,
+  ): void {
+    if (!input.paymentMethod) {
+      throw new BadRequestException(`${input.type} requires a payment method`);
+    }
+  }
+
+  private assertPaymentMethodAbsent(
+    input: v1.finance.CreateMoneyTransactionInput,
+  ): void {
+    if (input.paymentMethod != null) {
+      throw new BadRequestException(
+        `${input.type} cannot have a payment method`,
+      );
+    }
+  }
+
+  private assertCategoryAbsent(
+    input: v1.finance.CreateMoneyTransactionInput,
+  ): void {
+    if (input.categoryId != null) {
+      throw new BadRequestException(`${input.type} cannot have a category`);
+    }
+  }
+
+  private assertRequiredPartyField(
+    input: v1.finance.CreateMoneyTransactionInput,
+    field:
+      | "counterpartyUserId"
+      | "recipientUserId"
+      | "debtorUserId"
+      | "creditorUserId",
+  ): void {
+    if (!input[field]) {
+      throw new BadRequestException(`${input.type} requires ${field}`);
+    }
+  }
+
+  private assertAllowedPartyFields(
+    input: v1.finance.CreateMoneyTransactionInput,
+    allowed: Array<
+      | "counterpartyUserId"
+      | "recipientUserId"
+      | "debtorUserId"
+      | "creditorUserId"
+    >,
+  ): void {
+    const fields = [
+      "counterpartyUserId",
+      "recipientUserId",
+      "debtorUserId",
+      "creditorUserId",
+    ] as const;
+    const unexpected = fields.find(
+      (field) => input[field] != null && !allowed.includes(field),
+    );
+    if (unexpected) {
+      throw new BadRequestException(
+        `${input.type} does not allow ${unexpected}`,
       );
     }
   }

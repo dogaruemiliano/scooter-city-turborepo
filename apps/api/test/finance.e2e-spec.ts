@@ -574,6 +574,177 @@ describe("Finance HTTP surface (e2e)", () => {
     );
   });
 
+  it("rejects generic transaction payloads that contradict their declared type", async () => {
+    const malformedTransactions = [
+      {
+        name: "positive expense",
+        input: {
+          type: "EXPENSE",
+          amount: "10.00",
+          currency: "RON",
+          financialScope: "COMPANY",
+          paymentMethod: "CASH",
+          billingStatus: "BILLED",
+          categoryId: operatingExpenseCategory.id,
+          idempotencyKey: `finance:${runId}:invalid-positive-expense`,
+          postImmediately: true,
+          balanceChanges: [
+            {
+              walletId: companyCashWallet.id,
+              bucket: "BUSINESS_FUNDS",
+              currency: "RON",
+              amountDelta: "10.00",
+            },
+          ],
+          references: [],
+        },
+      },
+      {
+        name: "guarantee recorded as business funds",
+        input: {
+          type: "GUARANTEE_RECEIVED",
+          amount: "10.00",
+          currency: "RON",
+          financialScope: "CUSTOMER_HELD",
+          paymentMethod: "CASH",
+          billingStatus: "NOT_APPLICABLE",
+          counterpartyUserId: customer.userId,
+          idempotencyKey: `finance:${runId}:invalid-guarantee-bucket`,
+          postImmediately: true,
+          balanceChanges: [
+            {
+              walletId: companyCashWallet.id,
+              bucket: "BUSINESS_FUNDS",
+              currency: "RON",
+              amountDelta: "10.00",
+            },
+            {
+              walletId: customerWallet.id,
+              bucket: "USER_SETTLEMENT",
+              currency: "RON",
+              amountDelta: "10.00",
+            },
+          ],
+          references: [],
+        },
+      },
+      {
+        name: "user charge reducing debt",
+        input: {
+          type: "USER_CHARGE",
+          amount: "10.00",
+          currency: "RON",
+          financialScope: "COMPANY",
+          billingStatus: "BILLED",
+          counterpartyUserId: customer.userId,
+          idempotencyKey: `finance:${runId}:invalid-user-charge-direction`,
+          postImmediately: true,
+          balanceChanges: [
+            {
+              walletId: customerWallet.id,
+              bucket: "USER_SETTLEMENT",
+              currency: "RON",
+              amountDelta: "10.00",
+            },
+          ],
+          references: [],
+        },
+      },
+      {
+        name: "user payment without collected business funds",
+        input: {
+          type: "USER_PAYMENT",
+          amount: "10.00",
+          currency: "RON",
+          financialScope: "COMPANY",
+          paymentMethod: "CASH",
+          billingStatus: "NOT_APPLICABLE",
+          counterpartyUserId: customer.userId,
+          idempotencyKey: `finance:${runId}:invalid-user-payment-shape`,
+          postImmediately: true,
+          balanceChanges: [
+            {
+              walletId: customerWallet.id,
+              bucket: "USER_SETTLEMENT",
+              currency: "RON",
+              amountDelta: "10.00",
+            },
+          ],
+          references: [],
+        },
+      },
+      {
+        name: "reimbursement without recipient personal funds",
+        input: {
+          type: "REIMBURSEMENT",
+          amount: "10.00",
+          currency: "RON",
+          financialScope: "COMPANY",
+          paymentMethod: "BANK_TRANSFER",
+          billingStatus: "NOT_APPLICABLE",
+          recipientUserId: admin.userId,
+          idempotencyKey: `finance:${runId}:invalid-reimbursement-shape`,
+          postImmediately: true,
+          balanceChanges: [
+            {
+              walletId: companyBankWallet.id,
+              bucket: "BUSINESS_FUNDS",
+              currency: "RON",
+              amountDelta: "-10.00",
+            },
+            {
+              walletId: companyCashWallet.id,
+              bucket: "BUSINESS_FUNDS",
+              currency: "RON",
+              amountDelta: "10.00",
+            },
+          ],
+          references: [],
+        },
+      },
+      {
+        name: "refund moving balances in the payment direction",
+        input: {
+          type: "REFUND",
+          amount: "10.00",
+          currency: "RON",
+          financialScope: "COMPANY",
+          paymentMethod: "CASH",
+          billingStatus: "NOT_APPLICABLE",
+          counterpartyUserId: customer.userId,
+          idempotencyKey: `finance:${runId}:invalid-refund-direction`,
+          postImmediately: true,
+          balanceChanges: [
+            {
+              walletId: companyCashWallet.id,
+              bucket: "BUSINESS_FUNDS",
+              currency: "RON",
+              amountDelta: "10.00",
+            },
+            {
+              walletId: customerWallet.id,
+              bucket: "USER_SETTLEMENT",
+              currency: "RON",
+              amountDelta: "10.00",
+            },
+          ],
+          references: [],
+        },
+      },
+    ] as const;
+
+    for (const malformed of malformedTransactions) {
+      const response = await authenticate(
+        req().post(v1.finance.ROUTES.transactions.create).send(malformed.input),
+        admin,
+      );
+      expect({ name: malformed.name, status: response.status }).toEqual({
+        name: malformed.name,
+        status: 400,
+      });
+    }
+  });
+
   it("automatically creates and settles equal-share claims for unbilled personal cash", async () => {
     const personalIncomeResponse = await authenticate(
       req()
