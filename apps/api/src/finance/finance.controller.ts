@@ -28,7 +28,10 @@ import { CreateFinancialCategoryInput } from "./dto/create-financial-category.in
 import { CreateMoneyTransactionInput } from "./dto/create-money-transaction.input";
 import { FinancialCategory } from "./dto/financial-category";
 import { FinancialCategoryList } from "./dto/financial-category-list";
+import { FinanceSummary } from "./dto/finance-summary";
+import { FinanceSummaryQuery } from "./dto/finance-summary.query";
 import { ListMoneyTransactionsQuery } from "./dto/list-money-transactions.query";
+import { ListWalletsQuery } from "./dto/list-wallets.query";
 import { MoneyTransaction } from "./dto/money-transaction";
 import { MoneyTransactionList } from "./dto/money-transaction-list";
 import { OutstandingPersonalClaimList } from "./dto/outstanding-personal-claim-list";
@@ -76,8 +79,11 @@ export class FinanceController {
     summary: "List user and company wallets with current balances",
   })
   @ZodResponse({ type: WalletList })
-  async listWallets(): Promise<v1.finance.WalletList> {
-    return { items: (await this.finance.listWallets()).map(toWallet) };
+  async listWallets(
+    @Query() query: ListWalletsQuery,
+  ): Promise<v1.finance.WalletList> {
+    const result = await this.finance.listWallets(query);
+    return { ...result, items: result.items.map(toWallet) };
   }
 
   @Get("wallets/:id")
@@ -139,6 +145,18 @@ export class FinanceController {
         ...getRequestMetadata(req),
       }),
     );
+  }
+
+  @Get("summary")
+  @ApiOperation({
+    operationId: "FinanceController_getSummary_v1",
+    summary: "Summarize posted income and expenses for a date range",
+  })
+  @ZodResponse({ type: FinanceSummary })
+  async getSummary(
+    @Query() query: FinanceSummaryQuery,
+  ): Promise<v1.finance.FinanceSummary> {
+    return this.finance.getSummary(query);
   }
 
   @Post("transactions")

@@ -102,10 +102,30 @@ export type Wallet = z.infer<typeof walletSchema>;
 export const walletListSchema = z
   .object({
     items: z.array(walletSchema),
+    page: z.number().int().min(1),
+    pageSize: z.number().int().min(1).max(MAX_PAGE_SIZE),
+    total: z.number().int().min(0),
   })
   .meta({ id: "WalletList" });
 
 export type WalletList = z.infer<typeof walletListSchema>;
+
+export const listWalletsQuerySchema = z
+  .object({
+    page: z.coerce.number().int().min(1).default(1),
+    pageSize: z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).default(25),
+    type: walletTypeSchema.optional(),
+    search: z.string().trim().min(1).max(MAX_NAME_LENGTH).optional(),
+    ownerUserId: z.string().trim().min(1).optional(),
+    isActive: z
+      .enum(["true", "false"])
+      .transform((value) => value === "true")
+      .optional(),
+  })
+  .strict()
+  .meta({ id: "ListWalletsQuery" });
+
+export type ListWalletsQuery = z.infer<typeof listWalletsQuerySchema>;
 
 export const createCompanyWalletInputSchema = z
   .object({
@@ -380,6 +400,53 @@ export const listMoneyTransactionsQuerySchema = z
 export type ListMoneyTransactionsQuery = z.infer<
   typeof listMoneyTransactionsQuerySchema
 >;
+
+export const financeSummaryQuerySchema = z
+  .object({
+    from: z.iso.datetime({ offset: true }),
+    to: z.iso.datetime({ offset: true }),
+  })
+  .strict()
+  .refine((query) => query.from <= query.to, {
+    path: ["to"],
+    message: "The end timestamp must be after the start timestamp.",
+  })
+  .meta({ id: "FinanceSummaryQuery" });
+
+export type FinanceSummaryQuery = z.infer<typeof financeSummaryQuerySchema>;
+
+const summaryAmountSchema = z.object({
+  currency: currencySchema,
+  amount: moneyAmountSchema,
+});
+
+const paymentMethodSummarySchema = summaryAmountSchema.extend({
+  paymentMethod: paymentMethodSchema.nullable(),
+});
+
+const categorySummarySchema = summaryAmountSchema.extend({
+  category: financialCategorySchema
+    .pick({ id: true, code: true, name: true })
+    .nullable(),
+});
+
+const billingStatusSummarySchema = summaryAmountSchema.extend({
+  billingStatus: billingStatusSchema,
+});
+
+export const financeSummarySchema = z
+  .object({
+    from: z.iso.datetime({ offset: true }),
+    to: z.iso.datetime({ offset: true }),
+    income: z.array(summaryAmountSchema),
+    expenses: z.array(summaryAmountSchema),
+    incomeByPaymentMethod: z.array(paymentMethodSummarySchema),
+    expensesByCategory: z.array(categorySummarySchema),
+    incomeByBillingStatus: z.array(billingStatusSummarySchema),
+  })
+  .meta({ id: "FinanceSummary" });
+
+export type FinanceSummary = z.infer<typeof financeSummarySchema>;
 
 export const outstandingPersonalClaimSchema = z
   .object({

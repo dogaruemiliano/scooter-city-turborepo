@@ -46,6 +46,7 @@ describe("Finance HTTP surface (e2e)", () => {
   let operatingExpenseCategory: v1.finance.FinancialCategory;
 
   const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const suiteStartedAt = new Date().toISOString();
   const createdUserIds: string[] = [];
   const createdWalletIds: string[] = [];
   const createdCategoryIds: string[] = [];
@@ -1046,5 +1047,84 @@ describe("Finance HTTP surface (e2e)", () => {
         }
       ).items,
     ).toEqual([]);
+  });
+
+  it("filters and paginates wallet selectors without returning every wallet", async () => {
+    const ownerSearch = await authenticate(
+      req().get(
+        `${v1.finance.ROUTES.wallets.list}?search=${encodeURIComponent(`finance-${runId}-0@example.com`)}&page=1&pageSize=1`,
+      ),
+      admin,
+    );
+    expect(ownerSearch.status).toBe(200);
+    expect(ownerSearch.body).toMatchObject({
+      page: 1,
+      pageSize: 1,
+      total: 1,
+      items: [{ id: adminWallet.id, ownerUserId: admin.userId }],
+    });
+
+    const exactFilters = await authenticate(
+      req().get(
+        `${v1.finance.ROUTES.wallets.list}?type=USER&ownerUserId=${admin.userId}&isActive=true`,
+      ),
+      admin,
+    );
+    expect(exactFilters.status).toBe(200);
+    expect(exactFilters.body).toMatchObject({
+      page: 1,
+      pageSize: 25,
+      total: 1,
+      items: [{ id: adminWallet.id }],
+    });
+
+    const companyNameSearch = await authenticate(
+      req().get(
+        `${v1.finance.ROUTES.wallets.list}?search=${encodeURIComponent(`Cash desk ${runId}`)}`,
+      ),
+      admin,
+    );
+    expect(companyNameSearch.status).toBe(200);
+    expect(companyNameSearch.body).toMatchObject({
+      total: 1,
+      items: [{ id: companyCashWallet.id }],
+    });
+  });
+
+  it("summarizes posted income and expenses in the requested range", async () => {
+    const from = encodeURIComponent(suiteStartedAt);
+    const to = encodeURIComponent(new Date().toISOString());
+    const response = await authenticate(
+      req().get(`${v1.finance.ROUTES.summary}?from=${from}&to=${to}`),
+      admin,
+    );
+    expect(response.status).toBe(200);
+
+    const summary = response.body as v1.finance.FinanceSummary;
+    expect(summary.income).toEqual([{ currency: "RON", amount: "2120.00" }]);
+    expect(summary.expenses).toEqual([{ currency: "RON", amount: "300.00" }]);
+    expect(summary.incomeByPaymentMethod).toEqual([
+      {
+        paymentMethod: "BANK_TRANSFER",
+        currency: "RON",
+        amount: "500.00",
+      },
+      { paymentMethod: "CASH", currency: "RON", amount: "1620.00" },
+    ]);
+    expect(summary.expensesByCategory).toEqual([
+      {
+        category: {
+          id: operatingExpenseCategory.id,
+          code: operatingExpenseCategory.code,
+          name: operatingExpenseCategory.name,
+        },
+        currency: "RON",
+        amount: "300.00",
+      },
+    ]);
+    expect(summary.incomeByBillingStatus).toEqual([
+      { billingStatus: "BILLED", currency: "RON", amount: "620.00" },
+      { billingStatus: "NOT_BILLED", currency: "RON", amount: "1500.00" },
+    ]);
   });
 });

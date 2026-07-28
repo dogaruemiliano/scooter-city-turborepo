@@ -83,7 +83,44 @@ test("finance money inputs reject zero and excessive precision", () => {
   );
 });
 
+test("wallet list query coerces pagination and active filters", () => {
+  assert.deepEqual(
+    finance.listWalletsQuerySchema.parse({
+      page: "2",
+      pageSize: "10",
+      type: "USER",
+      isActive: "false",
+      search: "  owner@example.com  ",
+    }),
+    {
+      page: 2,
+      pageSize: 10,
+      type: "USER",
+      isActive: false,
+      search: "owner@example.com",
+    },
+  );
+});
+
+test("finance summary query requires an ordered date range", () => {
+  assert.equal(
+    finance.financeSummaryQuerySchema.safeParse({
+      from: "2026-07-29T12:00:00.000Z",
+      to: "2026-07-29T11:00:00.000Z",
+    }).success,
+    false,
+  );
+  assert.equal(
+    finance.financeSummaryQuerySchema.safeParse({
+      from: "2026-07-29T00:00:00.000Z",
+      to: "2026-07-29T23:59:59.999Z",
+    }).success,
+    true,
+  );
+});
+
 test("finance routes expose stable versioned endpoint paths", () => {
+  assert.equal(finance.ROUTES.summary, "/v1/finance/summary");
   assert.equal(finance.ROUTES.wallets.mine, "/v1/finance/me/wallet");
   assert.equal(
     finance.ROUTES.transactions.reverse("transaction-1"),

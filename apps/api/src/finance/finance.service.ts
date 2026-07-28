@@ -84,11 +84,61 @@ export class FinanceService {
     return wallet;
   }
 
-  listWallets(): Promise<WalletWithDetails[]> {
-    return this.prisma.wallet.findMany({
-      include: this.walletInclude(),
-      orderBy: [{ type: "asc" }, { name: "asc" }, { id: "asc" }],
-    });
+  async listWallets(query: v1.finance.ListWalletsQuery): Promise<{
+    items: WalletWithDetails[];
+    page: number;
+    pageSize: number;
+    total: number;
+  }> {
+    const where: Prisma.WalletWhereInput = {
+      type: query.type,
+      ownerUserId: query.ownerUserId,
+      isActive: query.isActive,
+      ...(query.search
+        ? {
+            OR: [
+              { name: { contains: query.search, mode: "insensitive" } },
+              {
+                owner: {
+                  is: {
+                    OR: [
+                      {
+                        firstName: {
+                          contains: query.search,
+                          mode: "insensitive",
+                        },
+                      },
+                      {
+                        lastName: {
+                          contains: query.search,
+                          mode: "insensitive",
+                        },
+                      },
+                      {
+                        email: {
+                          contains: query.search,
+                          mode: "insensitive",
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
+            ],
+          }
+        : {}),
+    };
+    const [total, items] = await this.prisma.$transaction([
+      this.prisma.wallet.count({ where }),
+      this.prisma.wallet.findMany({
+        where,
+        include: this.walletInclude(),
+        orderBy: [{ type: "asc" }, { name: "asc" }, { id: "asc" }],
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize,
+      }),
+    ]);
+    return { items, page: query.page, pageSize: query.pageSize, total };
   }
 
   async getWallet(id: string): Promise<WalletWithDetails> {
@@ -393,6 +443,119 @@ export class FinanceService {
       }),
     ]);
     return { items, page: query.page, pageSize: query.pageSize, total };
+  }
+
+  async getSummary(
+    query: v1.finance.FinanceSummaryQuery,
+  ): Promise<v1.finance.FinanceSummary> {
+    const occurredAt = {
+      gte: new Date(query.from),
+      lte: new Date(query.to),
+    };
+    const posted = {
+      status: MoneyTransactionStatus.POSTED,
+      occurredAt,
+    } as const;
+
+    const [totals, paymentMethods, expenseCategories, billingStatuses] =
+      await Promise.all([
+        this.prisma.moneyTransaction.groupBy({
+          by: ["type", "currency"],
+          where: {
+            ...posted,
+            type: {
+              in: [MoneyTransactionType.INCOME, MoneyTransactionType.EXPENSE],
+            },
+          },
+          _sum: { amount: true },
+        }),
+        this.prisma.moneyTransaction.groupBy({
+          by: ["paymentMethod", "currency"],
+          where: { ...posted, type: MoneyTransactionType.INCOME },
+          _sum: { amount: true },
+        }),
+        this.prisma.moneyTransaction.groupBy({
+          by: ["categoryId", "currency"],
+          where: { ...posted, type: MoneyTransactionType.EXPENSE },
+          _sum: { amount: true },
+        }),
+        this.prisma.moneyTransaction.groupBy({
+          by: ["billingStatus", "currency"],
+          where: { ...posted, type: MoneyTransactionType.INCOME },
+          _sum: { amount: true },
+        }),
+      ]);
+
+    const categoryIds = expenseCategories.flatMap((row) =>
+      row.categoryId ? [row.categoryId] : [],
+    );
+    const categories = await this.prisma.financialCategory.findMany({
+      where: { id: { in: categoryIds } },
+      select: { id: true, code: true, name: true },
+    });
+    const categoryById = new Map(
+      categories.map((category) => [category.id, category]),
+    );
+    const amount = (value: Prisma.Decimal | null): string =>
+      (value ?? new PrismaRuntime.Decimal(0)).toFixed(2);
+    const byCurrencyThenKey = (
+      first: { currency: string },
+      second: { currency: string },
+    ): number => first.currency.localeCompare(second.currency);
+
+    return {
+      from: query.from,
+      to: query.to,
+      income: totals
+        .filter((row) => row.type === MoneyTransactionType.INCOME)
+        .map((row) => ({
+          currency: row.currency,
+          amount: amount(row._sum.amount),
+        }))
+        .sort(byCurrencyThenKey),
+      expenses: totals
+        .filter((row) => row.type === MoneyTransactionType.EXPENSE)
+        .map((row) => ({
+          currency: row.currency,
+          amount: amount(row._sum.amount),
+        }))
+        .sort(byCurrencyThenKey),
+      incomeByPaymentMethod: paymentMethods
+        .map((row) => ({
+          paymentMethod: row.paymentMethod,
+          currency: row.currency,
+          amount: amount(row._sum.amount),
+        }))
+        .sort((first, second) =>
+          `${first.currency}:${first.paymentMethod ?? ""}`.localeCompare(
+            `${second.currency}:${second.paymentMethod ?? ""}`,
+          ),
+        ),
+      expensesByCategory: expenseCategories
+        .map((row) => ({
+          category: row.categoryId
+            ? (categoryById.get(row.categoryId) ?? null)
+            : null,
+          currency: row.currency,
+          amount: amount(row._sum.amount),
+        }))
+        .sort((first, second) =>
+          `${first.currency}:${first.category?.name ?? ""}`.localeCompare(
+            `${second.currency}:${second.category?.name ?? ""}`,
+          ),
+        ),
+      incomeByBillingStatus: billingStatuses
+        .map((row) => ({
+          billingStatus: row.billingStatus,
+          currency: row.currency,
+          amount: amount(row._sum.amount),
+        }))
+        .sort((first, second) =>
+          `${first.currency}:${first.billingStatus}`.localeCompare(
+            `${second.currency}:${second.billingStatus}`,
+          ),
+        ),
+    };
   }
 
   async listOutstandingClaims(): Promise<
