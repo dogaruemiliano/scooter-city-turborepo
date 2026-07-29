@@ -103,6 +103,7 @@ export type FinancialCategoryKind = (typeof FINANCIAL_CATEGORY_KINDS)[number];
 
 export const ROUTES = {
   summary: "/v1/finance/summary",
+  walletOptions: "/v1/finance/wallet-options",
   wallets: {
     list: "/v1/finance/wallets",
     create: "/v1/finance/wallets",

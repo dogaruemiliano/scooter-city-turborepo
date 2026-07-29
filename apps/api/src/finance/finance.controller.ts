@@ -31,6 +31,7 @@ import { FinancialCategoryList } from "./dto/financial-category-list";
 import { FinanceSummary } from "./dto/finance-summary";
 import { FinanceSummaryQuery } from "./dto/finance-summary.query";
 import { ListMoneyTransactionsQuery } from "./dto/list-money-transactions.query";
+import { ListWalletOptionsQuery } from "./dto/list-wallet-options.query";
 import { ListWalletsQuery } from "./dto/list-wallets.query";
 import { MoneyTransaction } from "./dto/money-transaction";
 import { MoneyTransactionList } from "./dto/money-transaction-list";
@@ -38,12 +39,14 @@ import { OutstandingPersonalClaimList } from "./dto/outstanding-personal-claim-l
 import { ReverseMoneyTransactionInput } from "./dto/reverse-money-transaction.input";
 import { UpdateFinancialCategoryInput } from "./dto/update-financial-category.input";
 import { Wallet } from "./dto/wallet";
+import { WalletOptionList } from "./dto/wallet-option-list";
 import { WalletList } from "./dto/wallet-list";
 import {
   toFinancialCategory,
   toMoneyTransaction,
   toWallet,
 } from "./finance.mapper";
+import { FinanceReportingService } from "./finance-reporting.service";
 import { FinanceService } from "./finance.service";
 
 @ApiTags("finance")
@@ -52,7 +55,10 @@ import { FinanceService } from "./finance.service";
 @RequireRoles("ADMIN")
 @Controller({ path: "finance", version: "1" })
 export class FinanceController {
-  constructor(private readonly finance: FinanceService) {}
+  constructor(
+    private readonly finance: FinanceService,
+    private readonly financeReporting: FinanceReportingService,
+  ) {}
 
   @Post("wallets")
   @ApiOperation({
@@ -84,6 +90,18 @@ export class FinanceController {
   ): Promise<v1.finance.WalletList> {
     const result = await this.finance.listWallets(query);
     return { ...result, items: result.items.map(toWallet) };
+  }
+
+  @Get("wallet-options")
+  @ApiOperation({
+    operationId: "FinanceController_listWalletOptions_v1",
+    summary: "List lightweight wallet options",
+  })
+  @ZodResponse({ type: WalletOptionList })
+  listWalletOptions(
+    @Query() query: ListWalletOptionsQuery,
+  ): Promise<v1.finance.WalletOptionList> {
+    return this.finance.listWalletOptions(query);
   }
 
   @Get("wallets/:id")
@@ -156,7 +174,7 @@ export class FinanceController {
   async getSummary(
     @Query() query: FinanceSummaryQuery,
   ): Promise<v1.finance.FinanceSummary> {
-    return this.finance.getSummary(query);
+    return this.financeReporting.getSummary(query);
   }
 
   @Post("transactions")

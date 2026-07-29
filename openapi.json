@@ -1428,6 +1428,838 @@
         "tags": ["scooters"]
       }
     },
+    "/v1/finance/wallets": {
+      "post": {
+        "operationId": "FinanceController_createWallet_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCompanyWalletInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Wallet_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Create a company money-location wallet",
+        "tags": ["finance"]
+      },
+      "get": {
+        "operationId": "FinanceController_listWallets_v1",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "default": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25,
+              "type": "integer"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "USER",
+                "COMPANY_CASH",
+                "COMPANY_BANK",
+                "PAYMENT_PROCESSOR"
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 120,
+              "type": "string"
+            }
+          },
+          {
+            "name": "ownerUserId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "name": "ownerRole",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["ADMIN"]
+            }
+          },
+          {
+            "name": "ownerIsActive",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "isActive",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WalletList_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "List user and company wallets with current balances",
+        "tags": ["finance"]
+      }
+    },
+    "/v1/finance/wallet-options": {
+      "get": {
+        "operationId": "FinanceController_listWalletOptions_v1",
+        "parameters": [
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 120,
+              "type": "string"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "USER",
+                "COMPANY_CASH",
+                "COMPANY_BANK",
+                "PAYMENT_PROCESSOR"
+              ]
+            }
+          },
+          {
+            "name": "companyOnly",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "ownerRole",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["ADMIN"]
+            }
+          },
+          {
+            "name": "ownerUserId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "name": "isActive",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 2048,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WalletOptionList_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "List lightweight wallet options",
+        "tags": ["finance"]
+      }
+    },
+    "/v1/finance/wallets/{id}": {
+      "get": {
+        "operationId": "FinanceController_getWallet_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Wallet_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Get one wallet with current balances",
+        "tags": ["finance"]
+      }
+    },
+    "/v1/finance/categories": {
+      "post": {
+        "operationId": "FinanceController_createCategory_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateFinancialCategoryInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FinancialCategory_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Create an income or expense category",
+        "tags": ["finance"]
+      },
+      "get": {
+        "operationId": "FinanceController_listCategories_v1",
+        "parameters": [],
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FinancialCategoryList_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "List financial categories",
+        "tags": ["finance"]
+      }
+    },
+    "/v1/finance/categories/{id}": {
+      "patch": {
+        "operationId": "FinanceController_updateCategory_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateFinancialCategoryInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FinancialCategory_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Update a financial category",
+        "tags": ["finance"]
+      }
+    },
+    "/v1/finance/summary": {
+      "get": {
+        "operationId": "FinanceController_getSummary_v1",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "description": "Inclusive start instant for the half-open reporting period.",
+            "schema": {
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "description": "Exclusive end instant for the half-open reporting period.",
+            "schema": {
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FinanceSummary_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Summarize posted income and expenses for a date range",
+        "tags": ["finance"]
+      }
+    },
+    "/v1/finance/transactions": {
+      "post": {
+        "operationId": "FinanceController_createTransaction_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMoneyTransactionInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MoneyTransaction_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Create and optionally post a money transaction",
+        "tags": ["finance"]
+      },
+      "get": {
+        "operationId": "FinanceController_listTransactions_v1",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "default": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25,
+              "type": "integer"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["DRAFT", "POSTED", "REVERSED"]
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "INCOME",
+                "EXPENSE",
+                "TRANSFER",
+                "USER_CHARGE",
+                "USER_PAYMENT",
+                "GUARANTEE_RECEIVED",
+                "GUARANTEE_REFUNDED",
+                "REIMBURSEMENT",
+                "PERSONAL_EXTRACTION",
+                "PERSONAL_FUNDS_SPLIT",
+                "PERSONAL_FUNDS_CLAIM",
+                "COMPANY_DISTRIBUTION",
+                "REFUND",
+                "ADJUSTMENT",
+                "REVERSAL"
+              ]
+            }
+          },
+          {
+            "name": "financialScope",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["COMPANY", "ADMIN_PERSONAL", "CUSTOMER_HELD"]
+            }
+          },
+          {
+            "name": "paymentMethod",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["CASH", "POS", "BANK_TRANSFER", "ONLINE_PAYMENT"]
+            }
+          },
+          {
+            "name": "billingStatus",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["BILLED", "NOT_BILLED", "NOT_APPLICABLE"]
+            }
+          },
+          {
+            "name": "walletId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "recordedByUserId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "categoryId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Inclusive start instant for the half-open ledger period.",
+            "schema": {
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Exclusive end instant for the half-open ledger period.",
+            "schema": {
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MoneyTransactionList_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "List and filter money transactions",
+        "tags": ["finance"]
+      }
+    },
+    "/v1/finance/transactions/{id}": {
+      "get": {
+        "operationId": "FinanceController_getTransaction_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MoneyTransaction_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Get one money transaction",
+        "tags": ["finance"]
+      }
+    },
+    "/v1/finance/transactions/{id}/post": {
+      "post": {
+        "operationId": "FinanceController_postTransaction_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MoneyTransaction_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Post a draft transaction and update wallet balances",
+        "tags": ["finance"]
+      }
+    },
+    "/v1/finance/transactions/{id}/reverse": {
+      "post": {
+        "operationId": "FinanceController_reverseTransaction_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReverseMoneyTransactionInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MoneyTransaction_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Reverse one posted money transaction",
+        "tags": ["finance"]
+      }
+    },
+    "/v1/finance/claims/outstanding": {
+      "get": {
+        "operationId": "FinanceController_listOutstandingClaims_v1",
+        "parameters": [],
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutstandingPersonalClaimList_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "List current personal-funds debts between admins",
+        "tags": ["finance"]
+      }
+    },
+    "/v1/finance/me/wallet": {
+      "get": {
+        "operationId": "MyFinanceController_getWallet_v1",
+        "parameters": [],
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Wallet_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Get the authenticated user's wallet balance",
+        "tags": ["finance"]
+      }
+    },
     "/v1/auth/enabled-methods": {
       "get": {
         "operationId": "CoreAuthController_enabledMethods_v1",
@@ -1646,7 +2478,7 @@
             "access_token": []
           }
         ],
-        "summary": "Hard-delete the current user. Cascades sessions, refresh tokens, OTPs, and OAuth links. Audit events survive.",
+        "summary": "Deactivate the current account. Authentication credentials are deleted while business and audit history are preserved.",
         "tags": ["auth"]
       }
     },
@@ -3090,6 +3922,1280 @@
             "nullable": true
           }
         },
+        "additionalProperties": false
+      },
+      "CreateCompanyWalletInput": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["COMPANY_CASH", "COMPANY_BANK", "PAYMENT_PROCESSOR"]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          }
+        },
+        "required": ["type", "name"],
+        "additionalProperties": false
+      },
+      "FinanceWalletOwner_Output": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+          },
+          "firstName": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastName": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": ["id", "email", "firstName", "lastName"],
+        "additionalProperties": false,
+        "$ref": "#/components/schemas/FinanceUserSummary_Output"
+      },
+      "FinanceUserSummary_Output": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+          },
+          "firstName": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastName": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": ["id", "email", "firstName", "lastName"],
+        "additionalProperties": false
+      },
+      "WalletBalance_Output": {
+        "type": "object",
+        "properties": {
+          "bucket": {
+            "type": "string",
+            "enum": [
+              "USER_SETTLEMENT",
+              "BUSINESS_FUNDS",
+              "ADMIN_PERSONAL_FUNDS",
+              "CUSTOMER_GUARANTEE_FUNDS"
+            ]
+          },
+          "currency": {
+            "default": "RON",
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "balance": {
+            "type": "string",
+            "pattern": "^-?(?:0|[1-9]\\d{0,16})(?:\\.\\d{1,2})?$"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          }
+        },
+        "required": ["bucket", "currency", "balance", "updatedAt"],
+        "additionalProperties": false
+      },
+      "Wallet_Output": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "USER",
+              "COMPANY_CASH",
+              "COMPANY_BANK",
+              "PAYMENT_PROCESSOR"
+            ]
+          },
+          "ownerUserId": {
+            "type": "string",
+            "nullable": true
+          },
+          "owner": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FinanceWalletOwner_Output"
+              }
+            ],
+            "nullable": true
+          },
+          "name": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "balances": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WalletBalance_Output"
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "ownerUserId",
+          "owner",
+          "name",
+          "isActive",
+          "balances",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "WalletList_Output": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Wallet_Output"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": ["items", "page", "pageSize", "total"],
+        "additionalProperties": false
+      },
+      "WalletOption_Output": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "USER",
+              "COMPANY_CASH",
+              "COMPANY_BANK",
+              "PAYMENT_PROCESSOR"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "owner": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FinanceUserSummary_Output"
+              }
+            ],
+            "nullable": true
+          }
+        },
+        "required": ["id", "type", "name", "isActive", "owner"],
+        "additionalProperties": false
+      },
+      "WalletOptionList_Output": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WalletOption_Output"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": ["items", "nextCursor"],
+        "additionalProperties": false
+      },
+      "CreateFinancialCategoryInput": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["INCOME", "EXPENSE", "BOTH"]
+          },
+          "parentCategoryId": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": ["code", "name", "kind"],
+        "additionalProperties": false
+      },
+      "FinancialCategory_Output": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["INCOME", "EXPENSE", "BOTH"]
+          },
+          "parentCategoryId": {
+            "type": "string",
+            "nullable": true
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "kind",
+          "parentCategoryId",
+          "isActive",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "FinancialCategoryList_Output": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FinancialCategory_Output"
+            }
+          }
+        },
+        "required": ["items"],
+        "additionalProperties": false
+      },
+      "UpdateFinancialCategoryInput": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["INCOME", "EXPENSE", "BOTH"]
+          },
+          "parentCategoryId": {
+            "type": "string",
+            "nullable": true
+          },
+          "isActive": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "FinanceSummaryPeriod_Output": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "to": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          }
+        },
+        "required": ["from", "to"],
+        "additionalProperties": false
+      },
+      "FinanceCurrencyTotal_Output": {
+        "type": "object",
+        "properties": {
+          "currency": {
+            "default": "RON",
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "income": {
+            "type": "string",
+            "pattern": "^(?:0|[1-9]\\d*)(?:\\.\\d{1,2})?$"
+          },
+          "expenses": {
+            "type": "string",
+            "pattern": "^(?:0|[1-9]\\d*)(?:\\.\\d{1,2})?$"
+          }
+        },
+        "required": ["currency", "income", "expenses"],
+        "additionalProperties": false
+      },
+      "FinanceCategorySummary_Output": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["INCOME", "EXPENSE", "BOTH"]
+          }
+        },
+        "required": ["id", "code", "name", "kind"],
+        "additionalProperties": false
+      },
+      "FinanceCompanyMoney_Output": {
+        "type": "object",
+        "properties": {
+          "walletId": {
+            "type": "string"
+          },
+          "walletType": {
+            "type": "string",
+            "enum": ["COMPANY_CASH", "COMPANY_BANK", "PAYMENT_PROCESSOR"]
+          },
+          "walletName": {
+            "type": "string"
+          },
+          "currency": {
+            "default": "RON",
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "amount": {
+            "type": "string",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d{1,2})?$"
+          }
+        },
+        "required": [
+          "walletId",
+          "walletType",
+          "walletName",
+          "currency",
+          "amount"
+        ],
+        "additionalProperties": false
+      },
+      "FinanceAdminMoney_Output": {
+        "type": "object",
+        "properties": {
+          "admin": {
+            "$ref": "#/components/schemas/FinanceUserSummary_Output"
+          },
+          "currency": {
+            "default": "RON",
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "businessFunds": {
+            "type": "string",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d{1,2})?$"
+          },
+          "personalFunds": {
+            "type": "string",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d{1,2})?$"
+          },
+          "customerGuaranteeFunds": {
+            "type": "string",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d{1,2})?$"
+          }
+        },
+        "required": [
+          "admin",
+          "currency",
+          "businessFunds",
+          "personalFunds",
+          "customerGuaranteeFunds"
+        ],
+        "additionalProperties": false
+      },
+      "FinanceCurrentBalances_Output": {
+        "type": "object",
+        "properties": {
+          "company": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FinanceBalanceSnapshot_Output"
+            }
+          },
+          "admins": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FinanceBalanceSnapshot_Output"
+            }
+          }
+        },
+        "required": ["company", "admins"],
+        "additionalProperties": false
+      },
+      "FinanceBalanceSnapshot_Output": {
+        "type": "object",
+        "properties": {
+          "wallet": {
+            "$ref": "#/components/schemas/FinanceWalletSummary_Output"
+          },
+          "bucket": {
+            "type": "string",
+            "enum": [
+              "USER_SETTLEMENT",
+              "BUSINESS_FUNDS",
+              "ADMIN_PERSONAL_FUNDS",
+              "CUSTOMER_GUARANTEE_FUNDS"
+            ]
+          },
+          "currency": {
+            "default": "RON",
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "balance": {
+            "type": "string",
+            "pattern": "^-?(?:0|[1-9]\\d{0,16})(?:\\.\\d{1,2})?$"
+          },
+          "ownerIsActive": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "ownerIsAdmin": {
+            "type": "boolean",
+            "nullable": true
+          }
+        },
+        "required": [
+          "wallet",
+          "bucket",
+          "currency",
+          "balance",
+          "ownerIsActive",
+          "ownerIsAdmin"
+        ],
+        "additionalProperties": false
+      },
+      "FinanceWalletSummary_Output": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "USER",
+              "COMPANY_CASH",
+              "COMPANY_BANK",
+              "PAYMENT_PROCESSOR"
+            ]
+          },
+          "ownerUserId": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string"
+          },
+          "owner": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FinanceUserSummary_Output"
+              }
+            ],
+            "nullable": true
+          }
+        },
+        "required": ["id", "type", "ownerUserId", "name", "owner"],
+        "additionalProperties": false
+      },
+      "FinanceSummary_Output": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "to": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "period": {
+            "$ref": "#/components/schemas/FinanceSummaryPeriod_Output"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "income": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "currency": {
+                  "default": "RON",
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$"
+                },
+                "amount": {
+                  "type": "string",
+                  "pattern": "^(?:0|[1-9]\\d*)(?:\\.\\d{1,2})?$"
+                }
+              },
+              "required": ["currency", "amount"],
+              "additionalProperties": false
+            }
+          },
+          "expenses": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "currency": {
+                  "default": "RON",
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$"
+                },
+                "amount": {
+                  "type": "string",
+                  "pattern": "^(?:0|[1-9]\\d*)(?:\\.\\d{1,2})?$"
+                }
+              },
+              "required": ["currency", "amount"],
+              "additionalProperties": false
+            }
+          },
+          "totals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FinanceCurrencyTotal_Output"
+            }
+          },
+          "incomeByPaymentMethod": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "currency": {
+                  "default": "RON",
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$"
+                },
+                "amount": {
+                  "type": "string",
+                  "pattern": "^(?:0|[1-9]\\d*)(?:\\.\\d{1,2})?$"
+                },
+                "paymentMethod": {
+                  "type": "string",
+                  "enum": [
+                    "CASH",
+                    "POS",
+                    "BANK_TRANSFER",
+                    "ONLINE_PAYMENT",
+                    null
+                  ],
+                  "nullable": true
+                }
+              },
+              "required": ["currency", "amount", "paymentMethod"],
+              "additionalProperties": false
+            }
+          },
+          "expensesByCategory": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "currency": {
+                  "default": "RON",
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$"
+                },
+                "amount": {
+                  "type": "string",
+                  "pattern": "^(?:0|[1-9]\\d*)(?:\\.\\d{1,2})?$"
+                },
+                "category": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/FinanceCategorySummary_Output"
+                    }
+                  ],
+                  "nullable": true
+                }
+              },
+              "required": ["currency", "amount", "category"],
+              "additionalProperties": false
+            }
+          },
+          "incomeByBillingStatus": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "currency": {
+                  "default": "RON",
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$"
+                },
+                "amount": {
+                  "type": "string",
+                  "pattern": "^(?:0|[1-9]\\d*)(?:\\.\\d{1,2})?$"
+                },
+                "billingStatus": {
+                  "type": "string",
+                  "enum": ["BILLED", "NOT_BILLED", "NOT_APPLICABLE"]
+                }
+              },
+              "required": ["currency", "amount", "billingStatus"],
+              "additionalProperties": false
+            }
+          },
+          "incomeByScope": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "currency": {
+                  "default": "RON",
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$"
+                },
+                "amount": {
+                  "type": "string",
+                  "pattern": "^(?:0|[1-9]\\d*)(?:\\.\\d{1,2})?$"
+                },
+                "financialScope": {
+                  "type": "string",
+                  "enum": ["COMPANY", "ADMIN_PERSONAL", "CUSTOMER_HELD"]
+                }
+              },
+              "required": ["currency", "amount", "financialScope"],
+              "additionalProperties": false
+            }
+          },
+          "companyMoney": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FinanceCompanyMoney_Output"
+            }
+          },
+          "adminMoney": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FinanceAdminMoney_Output"
+            }
+          },
+          "currentBalances": {
+            "$ref": "#/components/schemas/FinanceCurrentBalances_Output"
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "period",
+          "generatedAt",
+          "income",
+          "expenses",
+          "totals",
+          "incomeByPaymentMethod",
+          "expensesByCategory",
+          "incomeByBillingStatus",
+          "incomeByScope",
+          "companyMoney",
+          "adminMoney",
+          "currentBalances"
+        ],
+        "additionalProperties": false
+      },
+      "CreateMoneyTransactionInput": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "INCOME",
+              "EXPENSE",
+              "TRANSFER",
+              "USER_CHARGE",
+              "USER_PAYMENT",
+              "GUARANTEE_RECEIVED",
+              "GUARANTEE_REFUNDED",
+              "REIMBURSEMENT",
+              "PERSONAL_EXTRACTION",
+              "PERSONAL_FUNDS_SPLIT",
+              "COMPANY_DISTRIBUTION",
+              "REFUND",
+              "ADJUSTMENT"
+            ]
+          },
+          "amount": {
+            "type": "string",
+            "pattern": "^(?:0|[1-9]\\d{0,16})(?:\\.\\d{1,2})?$"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "financialScope": {
+            "type": "string",
+            "enum": ["COMPANY", "ADMIN_PERSONAL", "CUSTOMER_HELD"]
+          },
+          "paymentMethod": {
+            "type": "string",
+            "enum": ["CASH", "POS", "BANK_TRANSFER", "ONLINE_PAYMENT", null],
+            "nullable": true
+          },
+          "billingStatus": {
+            "default": "NOT_APPLICABLE",
+            "type": "string",
+            "enum": ["BILLED", "NOT_BILLED", "NOT_APPLICABLE"]
+          },
+          "categoryId": {
+            "type": "string",
+            "nullable": true
+          },
+          "counterpartyUserId": {
+            "type": "string",
+            "nullable": true
+          },
+          "recipientUserId": {
+            "type": "string",
+            "nullable": true
+          },
+          "debtorUserId": {
+            "type": "string",
+            "nullable": true
+          },
+          "creditorUserId": {
+            "type": "string",
+            "nullable": true
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "nullable": true
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "postImmediately": {
+            "default": true,
+            "type": "boolean"
+          },
+          "balanceChanges": {
+            "maxItems": 16,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "walletId": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "bucket": {
+                  "type": "string",
+                  "enum": [
+                    "USER_SETTLEMENT",
+                    "BUSINESS_FUNDS",
+                    "ADMIN_PERSONAL_FUNDS",
+                    "CUSTOMER_GUARANTEE_FUNDS"
+                  ]
+                },
+                "currency": {
+                  "type": "string"
+                },
+                "amountDelta": {
+                  "type": "string",
+                  "pattern": "^-?(?:0|[1-9]\\d{0,16})(?:\\.\\d{1,2})?$"
+                }
+              },
+              "required": ["walletId", "bucket", "amountDelta"],
+              "additionalProperties": false
+            }
+          },
+          "references": {
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "referenceType": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 80
+                },
+                "referenceId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "isPrimary": {
+                  "default": false,
+                  "type": "boolean"
+                }
+              },
+              "required": ["referenceType", "referenceId"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": ["type", "amount", "financialScope", "idempotencyKey"],
+        "additionalProperties": false
+      },
+      "WalletBalanceChange_Output": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "walletId": {
+            "type": "string"
+          },
+          "wallet": {
+            "$ref": "#/components/schemas/FinanceWalletSummary_Output"
+          },
+          "bucket": {
+            "type": "string",
+            "enum": [
+              "USER_SETTLEMENT",
+              "BUSINESS_FUNDS",
+              "ADMIN_PERSONAL_FUNDS",
+              "CUSTOMER_GUARANTEE_FUNDS"
+            ]
+          },
+          "currency": {
+            "default": "RON",
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "amountDelta": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          }
+        },
+        "required": [
+          "id",
+          "walletId",
+          "wallet",
+          "bucket",
+          "currency",
+          "amountDelta",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      },
+      "MoneyTransactionReference_Output": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "referenceType": {
+            "type": "string"
+          },
+          "referenceId": {
+            "type": "string"
+          },
+          "isPrimary": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          }
+        },
+        "required": [
+          "id",
+          "referenceType",
+          "referenceId",
+          "isPrimary",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      },
+      "MoneyTransaction_Output": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "INCOME",
+              "EXPENSE",
+              "TRANSFER",
+              "USER_CHARGE",
+              "USER_PAYMENT",
+              "GUARANTEE_RECEIVED",
+              "GUARANTEE_REFUNDED",
+              "REIMBURSEMENT",
+              "PERSONAL_EXTRACTION",
+              "PERSONAL_FUNDS_SPLIT",
+              "PERSONAL_FUNDS_CLAIM",
+              "COMPANY_DISTRIBUTION",
+              "REFUND",
+              "ADJUSTMENT",
+              "REVERSAL"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": ["DRAFT", "POSTED", "REVERSED"]
+          },
+          "amount": {
+            "type": "string"
+          },
+          "currency": {
+            "default": "RON",
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "financialScope": {
+            "type": "string",
+            "enum": ["COMPANY", "ADMIN_PERSONAL", "CUSTOMER_HELD"]
+          },
+          "paymentMethod": {
+            "type": "string",
+            "enum": ["CASH", "POS", "BANK_TRANSFER", "ONLINE_PAYMENT", null],
+            "nullable": true
+          },
+          "billingStatus": {
+            "type": "string",
+            "enum": ["BILLED", "NOT_BILLED", "NOT_APPLICABLE"]
+          },
+          "categoryId": {
+            "type": "string",
+            "nullable": true
+          },
+          "counterpartyUserId": {
+            "type": "string",
+            "nullable": true
+          },
+          "recipientUserId": {
+            "type": "string",
+            "nullable": true
+          },
+          "debtorUserId": {
+            "type": "string",
+            "nullable": true
+          },
+          "creditorUserId": {
+            "type": "string",
+            "nullable": true
+          },
+          "recordedByUserId": {
+            "type": "string",
+            "nullable": true
+          },
+          "category": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FinanceCategorySummary_Output"
+              }
+            ],
+            "nullable": true
+          },
+          "counterparty": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FinanceUserSummary_Output"
+              }
+            ],
+            "nullable": true
+          },
+          "recipient": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FinanceUserSummary_Output"
+              }
+            ],
+            "nullable": true
+          },
+          "debtor": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FinanceUserSummary_Output"
+              }
+            ],
+            "nullable": true
+          },
+          "creditor": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FinanceUserSummary_Output"
+              }
+            ],
+            "nullable": true
+          },
+          "recordedBy": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FinanceUserSummary_Output"
+              }
+            ],
+            "nullable": true
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "idempotencyKey": {
+            "type": "string"
+          },
+          "originTransactionId": {
+            "type": "string",
+            "nullable": true
+          },
+          "reversalOfTransactionId": {
+            "type": "string",
+            "nullable": true
+          },
+          "reversalTransactionId": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "balanceChanges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WalletBalanceChange_Output"
+            }
+          },
+          "references": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MoneyTransactionReference_Output"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "status",
+          "amount",
+          "currency",
+          "financialScope",
+          "paymentMethod",
+          "billingStatus",
+          "categoryId",
+          "counterpartyUserId",
+          "recipientUserId",
+          "debtorUserId",
+          "creditorUserId",
+          "recordedByUserId",
+          "category",
+          "counterparty",
+          "recipient",
+          "debtor",
+          "creditor",
+          "recordedBy",
+          "occurredAt",
+          "description",
+          "idempotencyKey",
+          "originTransactionId",
+          "reversalOfTransactionId",
+          "reversalTransactionId",
+          "createdAt",
+          "updatedAt",
+          "balanceChanges",
+          "references"
+        ],
+        "additionalProperties": false
+      },
+      "MoneyTransactionList_Output": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MoneyTransaction_Output"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": ["items", "page", "pageSize", "total"],
+        "additionalProperties": false
+      },
+      "ReverseMoneyTransactionInput": {
+        "type": "object",
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "nullable": true
+          }
+        },
+        "required": ["idempotencyKey"],
+        "additionalProperties": false
+      },
+      "OutstandingPersonalClaim_Output": {
+        "type": "object",
+        "properties": {
+          "debtorUserId": {
+            "type": "string"
+          },
+          "creditorUserId": {
+            "type": "string"
+          },
+          "debtor": {
+            "$ref": "#/components/schemas/FinanceUserSummary_Output"
+          },
+          "creditor": {
+            "$ref": "#/components/schemas/FinanceUserSummary_Output"
+          },
+          "currency": {
+            "default": "RON",
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "amount": {
+            "type": "string",
+            "pattern": "^(?:0|[1-9]\\d*)(?:\\.\\d{1,2})?$"
+          }
+        },
+        "required": [
+          "debtorUserId",
+          "creditorUserId",
+          "debtor",
+          "creditor",
+          "currency",
+          "amount"
+        ],
+        "additionalProperties": false
+      },
+      "OutstandingPersonalClaimList_Output": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OutstandingPersonalClaim_Output"
+            }
+          }
+        },
+        "required": ["items"],
         "additionalProperties": false
       },
       "EnabledAuthMethods_Output": {

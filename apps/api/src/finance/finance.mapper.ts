@@ -15,13 +15,41 @@ export type WalletWithDetails = Wallet & {
   balances: WalletBalance[];
 };
 
+type UserSummary = Pick<User, "id" | "email" | "firstName" | "lastName">;
+type CategorySummary = Pick<FinancialCategory, "id" | "code" | "name" | "kind">;
+type WalletSummary = Pick<Wallet, "id" | "type" | "name" | "ownerUserId"> & {
+  owner: UserSummary | null;
+};
+
 export type MoneyTransactionWithDetails = MoneyTransaction & {
-  balanceChanges: WalletBalanceChange[];
+  category: CategorySummary | null;
+  counterparty: UserSummary | null;
+  recipient: UserSummary | null;
+  debtor: UserSummary | null;
+  creditor: UserSummary | null;
+  recordedBy: UserSummary | null;
+  balanceChanges: Array<
+    WalletBalanceChange & {
+      wallet: WalletSummary;
+    }
+  >;
   references: MoneyTransactionReference[];
+  reversals: Array<Pick<MoneyTransaction, "id">>;
 };
 
 function money(value: { toFixed(decimalPlaces: number): string }): string {
   return value.toFixed(2);
+}
+
+function toUserSummary(row: UserSummary | null) {
+  return row
+    ? {
+        id: row.id,
+        email: row.email,
+        firstName: row.firstName,
+        lastName: row.lastName,
+      }
+    : null;
 }
 
 export function toWallet(row: WalletWithDetails): v1.finance.Wallet {
@@ -63,21 +91,42 @@ export function toMoneyTransaction(
     paymentMethod: row.paymentMethod,
     billingStatus: row.billingStatus,
     categoryId: row.categoryId,
+    category: row.category
+      ? {
+          id: row.category.id,
+          code: row.category.code,
+          name: row.category.name,
+          kind: row.category.kind,
+        }
+      : null,
     counterpartyUserId: row.counterpartyUserId,
+    counterparty: toUserSummary(row.counterparty),
     recipientUserId: row.recipientUserId,
+    recipient: toUserSummary(row.recipient),
     debtorUserId: row.debtorUserId,
+    debtor: toUserSummary(row.debtor),
     creditorUserId: row.creditorUserId,
+    creditor: toUserSummary(row.creditor),
     recordedByUserId: row.recordedByUserId,
+    recordedBy: toUserSummary(row.recordedBy),
     occurredAt: row.occurredAt.toISOString(),
     description: row.description,
     idempotencyKey: row.idempotencyKey,
     originTransactionId: row.originTransactionId,
     reversalOfTransactionId: row.reversalOfTransactionId,
+    reversalTransactionId: row.reversals[0]?.id ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     balanceChanges: row.balanceChanges.map((change) => ({
       id: change.id,
       walletId: change.walletId,
+      wallet: {
+        id: change.wallet.id,
+        type: change.wallet.type,
+        name: change.wallet.name,
+        ownerUserId: change.wallet.ownerUserId,
+        owner: toUserSummary(change.wallet.owner),
+      },
       bucket: change.bucket,
       currency: change.currency,
       amountDelta: money(change.amountDelta),

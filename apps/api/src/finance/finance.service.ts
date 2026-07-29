@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { v1 } from "@repo/api-shared";
+import { createHash } from "node:crypto";
 
 import { AuditService } from "../audit/audit.service";
 import { AuditEventType } from "../audit/audit.types";
@@ -51,6 +52,16 @@ interface RequiredBalanceChange {
   direction: BalanceDirection;
 }
 
+interface WalletFilterQuery {
+  search?: string;
+  type?: v1.finance.WalletType;
+  companyOnly?: boolean;
+  ownerRole?: "ADMIN";
+  ownerUserId?: string;
+  ownerIsActive?: boolean;
+  isActive?: boolean;
+}
+
 @Injectable()
 export class FinanceService {
   constructor(
@@ -90,55 +101,77 @@ export class FinanceService {
     pageSize: number;
     total: number;
   }> {
-    const where: Prisma.WalletWhereInput = {
-      type: query.type,
-      ownerUserId: query.ownerUserId,
-      isActive: query.isActive,
-      ...(query.search
-        ? {
-            OR: [
-              { name: { contains: query.search, mode: "insensitive" } },
-              {
-                owner: {
-                  is: {
-                    OR: [
-                      {
-                        firstName: {
-                          contains: query.search,
-                          mode: "insensitive",
-                        },
-                      },
-                      {
-                        lastName: {
-                          contains: query.search,
-                          mode: "insensitive",
-                        },
-                      },
-                      {
-                        email: {
-                          contains: query.search,
-                          mode: "insensitive",
-                        },
-                      },
-                    ],
-                  },
-                },
-              },
-            ],
-          }
-        : {}),
-    };
+    const where = this.walletWhere(query);
     const [total, items] = await this.prisma.$transaction([
       this.prisma.wallet.count({ where }),
       this.prisma.wallet.findMany({
         where,
         include: this.walletInclude(),
-        orderBy: [{ type: "asc" }, { name: "asc" }, { id: "asc" }],
+        orderBy: this.walletOrderBy(),
         skip: (query.page - 1) * query.pageSize,
         take: query.pageSize,
       }),
     ]);
     return { items, page: query.page, pageSize: query.pageSize, total };
+  }
+
+  async listWalletOptions(
+    query: v1.finance.ListWalletOptionsQuery,
+  ): Promise<v1.finance.WalletOptionList> {
+    const where = this.walletWhere(query, true);
+    const filters = this.walletOptionCursorFilters(query);
+    const cursor = query.cursor
+      ? this.parseWalletOptionCursor(query.cursor)
+      : null;
+
+    if (cursor && !this.walletOptionCursorFiltersMatch(cursor, filters)) {
+      throw new BadRequestException("Invalid or stale wallet options cursor");
+    }
+
+    const pageQuery = this.prisma.wallet.findMany({
+      where,
+      select: this.walletOptionSelect(),
+      orderBy: this.walletOrderBy(),
+      take: query.pageSize + 1,
+      ...(cursor
+        ? {
+            cursor: { id: cursor.id },
+            skip: 1,
+          }
+        : {}),
+    });
+
+    let rows: Awaited<typeof pageQuery>;
+    if (cursor) {
+      const [cursorWallet, cursorRows] = await this.prisma.$transaction([
+        this.prisma.wallet.findFirst({
+          where: { AND: [where, { id: cursor.id }] },
+          select: this.walletOptionSelect(),
+        }),
+        pageQuery,
+      ]);
+      if (
+        !cursorWallet ||
+        !this.walletOptionSortMatches(cursor, cursorWallet)
+      ) {
+        throw new BadRequestException("Invalid or stale wallet options cursor");
+      }
+      rows = cursorRows;
+    } else {
+      rows = await pageQuery;
+    }
+
+    const hasNextPage = rows.length > query.pageSize;
+    const items = rows.slice(0, query.pageSize);
+    const lastItem = items.at(-1);
+
+    return {
+      items,
+      nextCursor:
+        hasNextPage && lastItem
+          ? this.encodeWalletOptionCursor(lastItem, filters)
+          : null,
+    };
   }
 
   async getWallet(id: string): Promise<WalletWithDetails> {
@@ -445,176 +478,102 @@ export class FinanceService {
     return { items, page: query.page, pageSize: query.pageSize, total };
   }
 
-  async getSummary(
-    query: v1.finance.FinanceSummaryQuery,
-  ): Promise<v1.finance.FinanceSummary> {
-    const occurredAt = {
-      gte: new Date(query.from),
-      lte: new Date(query.to),
-    };
-    const posted = {
-      status: MoneyTransactionStatus.POSTED,
-      occurredAt,
-    } as const;
-
-    const [totals, paymentMethods, expenseCategories, billingStatuses] =
-      await Promise.all([
-        this.prisma.moneyTransaction.groupBy({
-          by: ["type", "currency"],
-          where: {
-            ...posted,
-            type: {
-              in: [MoneyTransactionType.INCOME, MoneyTransactionType.EXPENSE],
-            },
-          },
-          _sum: { amount: true },
-        }),
-        this.prisma.moneyTransaction.groupBy({
-          by: ["paymentMethod", "currency"],
-          where: { ...posted, type: MoneyTransactionType.INCOME },
-          _sum: { amount: true },
-        }),
-        this.prisma.moneyTransaction.groupBy({
-          by: ["categoryId", "currency"],
-          where: { ...posted, type: MoneyTransactionType.EXPENSE },
-          _sum: { amount: true },
-        }),
-        this.prisma.moneyTransaction.groupBy({
-          by: ["billingStatus", "currency"],
-          where: { ...posted, type: MoneyTransactionType.INCOME },
-          _sum: { amount: true },
-        }),
-      ]);
-
-    const categoryIds = expenseCategories.flatMap((row) =>
-      row.categoryId ? [row.categoryId] : [],
-    );
-    const categories = await this.prisma.financialCategory.findMany({
-      where: { id: { in: categoryIds } },
-      select: { id: true, code: true, name: true },
-    });
-    const categoryById = new Map(
-      categories.map((category) => [category.id, category]),
-    );
-    const amount = (value: Prisma.Decimal | null): string =>
-      (value ?? new PrismaRuntime.Decimal(0)).toFixed(2);
-    const byCurrencyThenKey = (
-      first: { currency: string },
-      second: { currency: string },
-    ): number => first.currency.localeCompare(second.currency);
-
-    return {
-      from: query.from,
-      to: query.to,
-      income: totals
-        .filter((row) => row.type === MoneyTransactionType.INCOME)
-        .map((row) => ({
-          currency: row.currency,
-          amount: amount(row._sum.amount),
-        }))
-        .sort(byCurrencyThenKey),
-      expenses: totals
-        .filter((row) => row.type === MoneyTransactionType.EXPENSE)
-        .map((row) => ({
-          currency: row.currency,
-          amount: amount(row._sum.amount),
-        }))
-        .sort(byCurrencyThenKey),
-      incomeByPaymentMethod: paymentMethods
-        .map((row) => ({
-          paymentMethod: row.paymentMethod,
-          currency: row.currency,
-          amount: amount(row._sum.amount),
-        }))
-        .sort((first, second) =>
-          `${first.currency}:${first.paymentMethod ?? ""}`.localeCompare(
-            `${second.currency}:${second.paymentMethod ?? ""}`,
-          ),
-        ),
-      expensesByCategory: expenseCategories
-        .map((row) => ({
-          category: row.categoryId
-            ? (categoryById.get(row.categoryId) ?? null)
-            : null,
-          currency: row.currency,
-          amount: amount(row._sum.amount),
-        }))
-        .sort((first, second) =>
-          `${first.currency}:${first.category?.name ?? ""}`.localeCompare(
-            `${second.currency}:${second.category?.name ?? ""}`,
-          ),
-        ),
-      incomeByBillingStatus: billingStatuses
-        .map((row) => ({
-          billingStatus: row.billingStatus,
-          currency: row.currency,
-          amount: amount(row._sum.amount),
-        }))
-        .sort((first, second) =>
-          `${first.currency}:${first.billingStatus}`.localeCompare(
-            `${second.currency}:${second.billingStatus}`,
-          ),
-        ),
-    };
-  }
-
   async listOutstandingClaims(): Promise<
     v1.finance.OutstandingPersonalClaim[]
   > {
-    const [claims, settlements] = await Promise.all([
-      this.claimAggregates(MoneyTransactionType.PERSONAL_FUNDS_CLAIM),
-      this.settlementAggregates(),
-    ]);
-    const netByPair = new Map<
-      string,
-      {
-        firstUserId: string;
-        secondUserId: string;
-        currency: string;
-        amount: Prisma.Decimal;
-      }
-    >();
+    return this.prisma.$transaction(
+      async (tx) => {
+        const claims = await this.claimAggregates(
+          tx,
+          MoneyTransactionType.PERSONAL_FUNDS_CLAIM,
+        );
+        const settlements = await this.settlementAggregates(tx);
+        const netByPair = new Map<
+          string,
+          {
+            firstUserId: string;
+            secondUserId: string;
+            currency: string;
+            amount: Prisma.Decimal;
+          }
+        >();
 
-    const add = (row: ClaimAggregate, multiplier: 1 | -1): void => {
-      const [firstUserId, secondUserId] = [
-        row.debtorUserId,
-        row.creditorUserId,
-      ].sort();
-      const key = `${firstUserId}:${secondUserId}:${row.currency}`;
-      const direction = row.debtorUserId === firstUserId ? 1 : -1;
-      const signedAmount = row.amount.times(direction * multiplier);
-      const existing = netByPair.get(key);
-      if (existing) {
-        existing.amount = existing.amount.plus(signedAmount);
-        return;
-      }
-      netByPair.set(key, {
-        firstUserId,
-        secondUserId,
-        currency: row.currency,
-        amount: signedAmount,
-      });
-    };
-
-    claims.forEach((claim) => add(claim, 1));
-    settlements.forEach((settlement) => add(settlement, -1));
-
-    return [...netByPair.entries()]
-      .filter(([, balance]) => !balance.amount.isZero())
-      .sort(([firstKey], [secondKey]) => firstKey.localeCompare(secondKey))
-      .map(([, balance]) => {
-        const firstOwesSecond = balance.amount.greaterThan(0);
-        return {
-          debtorUserId: firstOwesSecond
-            ? balance.firstUserId
-            : balance.secondUserId,
-          creditorUserId: firstOwesSecond
-            ? balance.secondUserId
-            : balance.firstUserId,
-          currency: balance.currency,
-          amount: balance.amount.abs().toFixed(2),
+        const add = (row: ClaimAggregate, multiplier: 1 | -1): void => {
+          const [firstUserId, secondUserId] = [
+            row.debtorUserId,
+            row.creditorUserId,
+          ].sort();
+          const key = `${firstUserId}:${secondUserId}:${row.currency}`;
+          const direction = row.debtorUserId === firstUserId ? 1 : -1;
+          const signedAmount = row.amount.times(direction * multiplier);
+          const existing = netByPair.get(key);
+          if (existing) {
+            existing.amount = existing.amount.plus(signedAmount);
+            return;
+          }
+          netByPair.set(key, {
+            firstUserId,
+            secondUserId,
+            currency: row.currency,
+            amount: signedAmount,
+          });
         };
-      });
+
+        claims.forEach((claim) => add(claim, 1));
+        settlements.forEach((settlement) => add(settlement, -1));
+
+        const outstanding = [...netByPair.entries()]
+          .filter(([, balance]) => !balance.amount.isZero())
+          .sort(([firstKey], [secondKey]) => firstKey.localeCompare(secondKey))
+          .map(([, balance]) => {
+            const firstOwesSecond = balance.amount.greaterThan(0);
+            return {
+              debtorUserId: firstOwesSecond
+                ? balance.firstUserId
+                : balance.secondUserId,
+              creditorUserId: firstOwesSecond
+                ? balance.secondUserId
+                : balance.firstUserId,
+              currency: balance.currency,
+              amount: balance.amount.abs().toFixed(2),
+            };
+          });
+        if (outstanding.length === 0) return [];
+
+        const participantIds = [
+          ...new Set(
+            outstanding.flatMap((claim) => [
+              claim.debtorUserId,
+              claim.creditorUserId,
+            ]),
+          ),
+        ].sort();
+        const participants = await tx.user.findMany({
+          where: { id: { in: participantIds } },
+          select: this.userSummarySelect(),
+          orderBy: { id: "asc" },
+        });
+        const participantById = new Map(
+          participants.map((participant) => [participant.id, participant]),
+        );
+
+        return outstanding.map((claim) => {
+          const debtor = participantById.get(claim.debtorUserId);
+          const creditor = participantById.get(claim.creditorUserId);
+          if (!debtor || !creditor) {
+            throw new ConflictException(
+              "Outstanding claim participants could not be resolved",
+            );
+          }
+          return { ...claim, debtor, creditor };
+        });
+      },
+      {
+        isolationLevel: PrismaRuntime.TransactionIsolationLevel.RepeatableRead,
+        maxWait: 5_000,
+        timeout: 10_000,
+      },
+    );
   }
 
   private async postTransactionInTx(
@@ -1344,6 +1303,199 @@ export class FinanceService {
     }
   }
 
+  private escapeLikePattern(value: string): string {
+    return value.replace(/[\\%_]/g, "\\$&");
+  }
+
+  private walletWhere(
+    query: WalletFilterQuery,
+    excludeInactiveUserOwners = false,
+  ): Prisma.WalletWhereInput {
+    const searchTokens =
+      query.search
+        ?.trim()
+        .split(/\s+/u)
+        .filter((token) => token.length > 0) ?? [];
+    const and: Prisma.WalletWhereInput[] = searchTokens.map((token) => {
+      const escapedToken = this.escapeLikePattern(token);
+      return {
+        OR: [
+          { name: { contains: escapedToken, mode: "insensitive" } },
+          {
+            owner: {
+              is: {
+                OR: [
+                  {
+                    firstName: {
+                      contains: escapedToken,
+                      mode: "insensitive",
+                    },
+                  },
+                  {
+                    lastName: {
+                      contains: escapedToken,
+                      mode: "insensitive",
+                    },
+                  },
+                  {
+                    email: {
+                      contains: escapedToken,
+                      mode: "insensitive",
+                    },
+                  },
+                ],
+              },
+            },
+          },
+        ],
+      };
+    });
+    const ownerIsActive =
+      query.ownerIsActive ??
+      (excludeInactiveUserOwners && query.ownerRole ? true : undefined);
+    const ownerFilter: Prisma.UserWhereInput = {
+      ...(query.ownerRole ? { roles: { has: query.ownerRole } } : {}),
+      ...(ownerIsActive !== undefined
+        ? {
+            deletedAt: ownerIsActive ? null : { not: null },
+          }
+        : {}),
+    };
+    if (query.ownerRole || ownerIsActive !== undefined) {
+      and.push({ owner: { is: ownerFilter } });
+    }
+    if (excludeInactiveUserOwners) {
+      and.push({
+        OR: [
+          { type: { not: WalletType.USER } },
+          { owner: { is: { deletedAt: null } } },
+        ],
+      });
+    }
+
+    return {
+      type:
+        query.type ??
+        (query.companyOnly ? { not: WalletType.USER } : undefined),
+      ownerUserId: query.ownerUserId,
+      isActive: query.isActive,
+      ...(and.length > 0 ? { AND: and } : {}),
+    };
+  }
+
+  private walletOrderBy(): Prisma.WalletOrderByWithRelationInput[] {
+    return [
+      { type: "asc" },
+      {
+        owner: {
+          lastName: { sort: "asc", nulls: "last" },
+        },
+      },
+      {
+        owner: {
+          firstName: { sort: "asc", nulls: "last" },
+        },
+      },
+      { owner: { email: "asc" } },
+      { name: "asc" },
+      { id: "asc" },
+    ];
+  }
+
+  private walletOptionCursorFilters(
+    query: v1.finance.ListWalletOptionsQuery,
+  ): v1.finance.WalletOptionCursorFilters {
+    return {
+      ...(query.search !== undefined ? { search: query.search } : {}),
+      ...(query.type !== undefined ? { type: query.type } : {}),
+      ...(query.companyOnly !== undefined
+        ? { companyOnly: query.companyOnly }
+        : {}),
+      ...(query.ownerRole !== undefined ? { ownerRole: query.ownerRole } : {}),
+      ...(query.ownerUserId !== undefined
+        ? { ownerUserId: query.ownerUserId }
+        : {}),
+      ...(query.isActive !== undefined ? { isActive: query.isActive } : {}),
+    };
+  }
+
+  private walletOptionCursorFiltersMatch(
+    cursor: v1.finance.WalletOptionCursorPayload,
+    filters: v1.finance.WalletOptionCursorFilters,
+  ): boolean {
+    return (
+      cursor.filterFingerprint === this.walletOptionFilterFingerprint(filters)
+    );
+  }
+
+  private walletOptionFilterFingerprint(
+    filters: v1.finance.WalletOptionCursorFilters,
+  ): string {
+    return this.walletOptionFingerprint([
+      filters.search ?? null,
+      filters.type ?? null,
+      filters.companyOnly ?? null,
+      filters.ownerRole ?? null,
+      filters.ownerUserId ?? null,
+      filters.isActive ?? null,
+    ]);
+  }
+
+  private walletOptionSortFingerprint(wallet: v1.finance.WalletOption): string {
+    return this.walletOptionFingerprint([
+      wallet.type,
+      wallet.owner?.lastName ?? null,
+      wallet.owner?.firstName ?? null,
+      wallet.owner?.email ?? null,
+      wallet.name,
+      wallet.id,
+    ]);
+  }
+
+  private walletOptionFingerprint(values: unknown[]): string {
+    return createHash("sha256")
+      .update(JSON.stringify(values))
+      .digest("base64url");
+  }
+
+  private walletOptionSortMatches(
+    cursor: v1.finance.WalletOptionCursorPayload,
+    wallet: v1.finance.WalletOption,
+  ): boolean {
+    return (
+      cursor.id === wallet.id &&
+      cursor.sortFingerprint === this.walletOptionSortFingerprint(wallet)
+    );
+  }
+
+  private encodeWalletOptionCursor(
+    wallet: v1.finance.WalletOption,
+    filters: v1.finance.WalletOptionCursorFilters,
+  ): string {
+    const payload = v1.finance.walletOptionCursorPayloadSchema.parse({
+      version: 1,
+      id: wallet.id,
+      sortFingerprint: this.walletOptionSortFingerprint(wallet),
+      filterFingerprint: this.walletOptionFilterFingerprint(filters),
+    });
+    return Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
+  }
+
+  private parseWalletOptionCursor(
+    value: string,
+  ): v1.finance.WalletOptionCursorPayload {
+    try {
+      const encoded = Buffer.from(value, "base64url");
+      if (encoded.length === 0 || encoded.toString("base64url") !== value) {
+        throw new Error("Non-canonical base64url");
+      }
+      const parsed: unknown = JSON.parse(encoded.toString("utf8"));
+      return v1.finance.walletOptionCursorPayloadSchema.parse(parsed);
+    } catch {
+      throw new BadRequestException("Invalid or stale wallet options cursor");
+    }
+  }
+
   private transactionWhere(
     query: v1.finance.ListMoneyTransactionsQuery,
   ): Prisma.MoneyTransactionWhereInput {
@@ -1354,6 +1506,7 @@ export class FinanceService {
       paymentMethod: query.paymentMethod,
       billingStatus: query.billingStatus,
       categoryId: query.categoryId,
+      recordedByUserId: query.recordedByUserId,
       ...(query.walletId
         ? { balanceChanges: { some: { walletId: query.walletId } } }
         : {}),
@@ -1364,7 +1517,13 @@ export class FinanceService {
               { recipientUserId: query.userId },
               { debtorUserId: query.userId },
               { creditorUserId: query.userId },
-              { recordedByUserId: query.userId },
+              {
+                balanceChanges: {
+                  some: {
+                    wallet: { ownerUserId: query.userId },
+                  },
+                },
+              },
             ],
           }
         : {}),
@@ -1372,16 +1531,17 @@ export class FinanceService {
         query.from || query.to
           ? {
               ...(query.from ? { gte: new Date(query.from) } : {}),
-              ...(query.to ? { lte: new Date(query.to) } : {}),
+              ...(query.to ? { lt: new Date(query.to) } : {}),
             }
           : undefined,
     };
   }
 
   private async claimAggregates(
+    tx: Prisma.TransactionClient,
     type: MoneyTransactionType,
   ): Promise<ClaimAggregate[]> {
-    const rows = await this.prisma.moneyTransaction.groupBy({
+    const rows = await tx.moneyTransaction.groupBy({
       by: ["debtorUserId", "creditorUserId", "currency"],
       where: {
         type,
@@ -1405,8 +1565,10 @@ export class FinanceService {
     );
   }
 
-  private async settlementAggregates(): Promise<ClaimAggregate[]> {
-    const rows = await this.prisma.moneyTransaction.groupBy({
+  private async settlementAggregates(
+    tx: Prisma.TransactionClient,
+  ): Promise<ClaimAggregate[]> {
+    const rows = await tx.moneyTransaction.groupBy({
       by: ["debtorUserId", "creditorUserId", "currency"],
       where: {
         type: MoneyTransactionType.PERSONAL_FUNDS_SPLIT,
@@ -1624,15 +1786,63 @@ export class FinanceService {
     } satisfies Prisma.WalletInclude;
   }
 
+  private walletOptionSelect() {
+    return {
+      id: true,
+      type: true,
+      name: true,
+      isActive: true,
+      owner: { select: this.userSummarySelect() },
+    } satisfies Prisma.WalletSelect;
+  }
+
   private transactionInclude() {
     return {
+      category: {
+        select: {
+          id: true,
+          code: true,
+          name: true,
+          kind: true,
+        },
+      },
+      counterparty: { select: this.userSummarySelect() },
+      recipient: { select: this.userSummarySelect() },
+      debtor: { select: this.userSummarySelect() },
+      creditor: { select: this.userSummarySelect() },
+      recordedBy: { select: this.userSummarySelect() },
       balanceChanges: {
+        include: {
+          wallet: {
+            select: {
+              id: true,
+              type: true,
+              name: true,
+              ownerUserId: true,
+              owner: { select: this.userSummarySelect() },
+            },
+          },
+        },
         orderBy: [{ walletId: "asc" }, { bucket: "asc" }],
       },
       references: {
         orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }],
       },
+      reversals: {
+        select: { id: true },
+        orderBy: { id: "asc" },
+        take: 1,
+      },
     } satisfies Prisma.MoneyTransactionInclude;
+  }
+
+  private userSummarySelect() {
+    return {
+      id: true,
+      email: true,
+      firstName: true,
+      lastName: true,
+    } satisfies Prisma.UserSelect;
   }
 
   private async runSerializable<T>(
