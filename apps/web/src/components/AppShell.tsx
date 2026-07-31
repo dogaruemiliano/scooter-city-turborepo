@@ -57,13 +57,22 @@ import {
 
 const NAVIGATION = [
   { href: "/", labelKey: "dashboard" },
+  { href: "/account/wallet", labelKey: "myWallet" },
+  { href: "/finance", labelKey: "finance", requiredRole: "ADMIN" },
   { href: "/persons", labelKey: "persons", requiredRole: "ADMIN" },
   { href: "/scooters", labelKey: "scooters", requiredRole: "ADMIN" },
 ] as const;
 
 const PAGE_TITLES: Record<string, string> = {
   "/": "dashboard",
+  "/account/wallet": "myWallet",
   "/account/settings": "accountSettings",
+  "/finance": "finance",
+  "/finance/transactions": "financeTransactions",
+  "/finance/transactions/new": "newFinanceTransaction",
+  "/finance/wallets": "financeWallets",
+  "/finance/categories": "financeCategories",
+  "/finance/claims": "financeClaims",
   "/persons": "persons",
   "/persons/new": "newPerson",
   "/scooters": "scooters",
@@ -84,7 +93,8 @@ export function AppShell({
   const pathname = usePathname();
   const routePathname = getUnprefixedPathname(pathname);
   const locale = getLocaleFromPathname(pathname);
-  const pageTitleKey = PAGE_TITLES[routePathname];
+  const pageTitleKey =
+    PAGE_TITLES[routePathname] ?? getNestedFinancePageTitle(routePathname);
   const pageTitle =
     pageTitleOverride ?? (pageTitleKey ? tPages(pageTitleKey) : "Scooter City");
 
@@ -300,6 +310,11 @@ function AccountMenu({
                 <span className="truncate font-normal">{email}</span>
               </DropdownMenuLabel>
               <DropdownMenuItem
+                render={<Link href={localizePath("/account/wallet", locale)} />}
+              >
+                {tAccount("myWallet")}
+              </DropdownMenuItem>
+              <DropdownMenuItem
                 render={
                   <Link href={localizePath("/account/settings", locale)} />
                 }
@@ -345,6 +360,18 @@ function AccountMenu({
       </SidebarMenuItem>
     </SidebarMenu>
   );
+}
+
+function getNestedFinancePageTitle(pathname: string): string | undefined {
+  if (pathname.startsWith("/finance/transactions/")) {
+    return "financeTransaction";
+  }
+
+  if (pathname.startsWith("/finance/wallets/")) {
+    return "financeWallet";
+  }
+
+  return undefined;
 }
 
 function isThemePreference(value: unknown): value is ThemePreference {

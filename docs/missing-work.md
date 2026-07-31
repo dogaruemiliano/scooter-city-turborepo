@@ -91,14 +91,14 @@ Needed:
 
 ### Web product shell
 
-Status: functional template shell.
+Status: operational shell with persons, scooters, and finance modules.
 
 Needed:
 
-- Product-specific dashboard/navigation.
+- Replace the remaining root dashboard placeholder with a role-aware home.
 - Real onboarding flow after first sign-in.
-- Domain modules beyond auth/users/account settings.
-- More complete empty, loading, and error states for product screens.
+- Add route-level loading and error boundaries where a streamed state materially
+  improves the existing localized in-page states.
 
 ## Lower Priority
 
