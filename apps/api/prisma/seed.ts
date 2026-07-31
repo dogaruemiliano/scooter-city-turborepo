@@ -19,6 +19,7 @@
  *
  *   | Email                          | Purpose                       | Notes                               |
  *   |--------------------------------|-------------------------------|-------------------------------------|
+ *   | admin@email.com                | Local admin access            | ADMIN role                          |
  *   | test-email-otp@example.com     | Email-OTP flow                | no OAuth links                      |
  *   | test-sms@example.com           | SMS-OTP flow                  | phone +40700000001                  |
  *   | test-google@example.com        | Google OAuth                  | linked AuthAccount row              |
@@ -73,6 +74,7 @@ const adapter = new PrismaPg({
 const prisma = new PrismaClient({ adapter });
 
 const FIXED_IDS = {
+  admin: "seed-user-admin",
   emailOtp: "seed-user-email-otp",
   sms: "seed-user-sms",
   google: "seed-user-google",
@@ -439,6 +441,23 @@ const SCOOTER_SEEDS: ScooterSeed[] = buildGeneratedScooterSeeds(
 
 async function main(): Promise<void> {
   const now = new Date();
+
+  // Local admin user. The production guard above prevents this account from
+  // being created in production environments.
+  await prisma.user.upsert({
+    where: { email: "admin@email.com" },
+    create: {
+      id: FIXED_IDS.admin,
+      email: "admin@email.com",
+      firstName: "Admin",
+      roles: ["ADMIN"],
+      wallet: seedUserWalletCreate(),
+    },
+    update: {
+      roles: ["ADMIN"],
+      wallet: seedUserWalletUpsert(),
+    },
+  });
 
   // Email-OTP user — no OAuth links.
   await prisma.user.upsert({

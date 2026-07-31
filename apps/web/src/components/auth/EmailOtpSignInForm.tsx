@@ -8,6 +8,9 @@ import { useId, useRef, useState, type FormEvent } from "react";
 import { webApi } from "../../lib/api";
 import { formatAuthError } from "./auth-errors";
 
+const DEVELOPMENT_EMAIL =
+  process.env.NODE_ENV === "development" ? "admin@email.com" : "";
+
 export interface EmailOtpSignInFormProps {
   onChallenge: (challenge: v1.auth.OtpChallengeMetadata, email: string) => void;
 }
@@ -17,7 +20,7 @@ export function EmailOtpSignInForm({ onChallenge }: EmailOtpSignInFormProps) {
   const emailInputId = useId();
   const emailErrorId = `${emailInputId}-error`;
   const emailInputRef = useRef<HTMLInputElement>(null);
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(DEVELOPMENT_EMAIL);
   const [emailError, setEmailError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
