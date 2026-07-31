@@ -71,6 +71,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/finance/transactions": "financeTransactions",
   "/finance/transactions/new": "newFinanceTransaction",
   "/finance/wallets": "financeWallets",
+  "/finance/companies": "financeCompanies",
   "/finance/categories": "financeCategories",
   "/finance/claims": "financeClaims",
   "/persons": "persons",

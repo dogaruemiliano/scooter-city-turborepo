@@ -244,21 +244,21 @@ describe("transaction recipes", () => {
   });
 
   it.each(["INCOME", "EXPENSE"] as const)(
-    "derives the optional %s counterparty from a user wallet",
+    "includes the optional unified %s counterparty",
     (type) => {
       const result = build(
         formFor(type, {
           primaryWalletId: companyCash.id,
-          counterpartyWalletId: customerWallet.id,
+          counterpartyId: "counterparty-1",
         }),
       );
 
       expect(result.errors).toEqual({});
-      expect(result.input?.counterpartyUserId).toBe("customer");
+      expect(result.input?.counterpartyId).toBe("counterparty-1");
     },
   );
 
-  it("leaves the income counterparty empty when no user is selected", () => {
+  it("leaves the income counterparty empty when none is selected", () => {
     const result = build(
       formFor("INCOME", {
         primaryWalletId: companyCash.id,
@@ -266,7 +266,7 @@ describe("transaction recipes", () => {
     );
 
     expect(result.errors).toEqual({});
-    expect(result.input?.counterpartyUserId).toBeNull();
+    expect(result.input?.counterpartyId).toBeNull();
   });
 });
 

@@ -101,6 +101,11 @@ export const FINANCIAL_CATEGORY_KINDS = ["INCOME", "EXPENSE", "BOTH"] as const;
 
 export type FinancialCategoryKind = (typeof FINANCIAL_CATEGORY_KINDS)[number];
 
+export const FINANCIAL_COUNTERPARTY_KINDS = ["PERSON", "COMPANY"] as const;
+
+export type FinancialCounterpartyKind =
+  (typeof FINANCIAL_COUNTERPARTY_KINDS)[number];
+
 export const ROUTES = {
   summary: "/v1/finance/summary",
   walletOptions: "/v1/finance/wallet-options",
@@ -114,6 +119,15 @@ export const ROUTES = {
     list: "/v1/finance/categories",
     create: "/v1/finance/categories",
     update: (id: string): string => `/v1/finance/categories/${id}`,
+  },
+  counterparties: {
+    search: "/v1/finance/counterparties/search",
+  },
+  companies: {
+    list: "/v1/finance/companies",
+    create: "/v1/finance/companies",
+    get: (id: string): string => `/v1/finance/companies/${id}`,
+    update: (id: string): string => `/v1/finance/companies/${id}`,
   },
   transactions: {
     list: "/v1/finance/transactions",

@@ -6,7 +6,7 @@ export type TransactionFormField =
   | "amount"
   | "billingStatus"
   | "categoryId"
-  | "counterpartyWalletId"
+  | "counterpartyId"
   | "currency"
   | "description"
   | "occurredAt"
@@ -27,7 +27,7 @@ export interface TransactionFormState {
   paymentMethod: v1.finance.PaymentMethod;
   billingStatus: v1.finance.BillingStatus;
   categoryId: string;
-  counterpartyWalletId: string;
+  counterpartyId: string;
   primaryWalletId: string;
   secondaryWalletId: string;
   bucket: v1.finance.WalletBalanceBucket;
@@ -109,7 +109,7 @@ export function createTransactionFormState(
     paymentMethod: "CASH",
     billingStatus: type === "USER_CHARGE" ? "BILLED" : "NOT_APPLICABLE",
     categoryId: "",
-    counterpartyWalletId: "",
+    counterpartyId: "",
     primaryWalletId,
     secondaryWalletId,
     bucket: "BUSINESS_FUNDS",
@@ -242,21 +242,10 @@ export function buildTransactionInput(
   const secondaryWallet = options.wallets.find(
     (wallet) => wallet.id === form.secondaryWalletId,
   );
-  const counterpartyWallet = options.wallets.find(
-    (wallet) => wallet.id === form.counterpartyWalletId,
-  );
 
   if (!form.amount.trim()) errors.amount = options.requiredMessage("amount");
   if (!primaryWallet) {
     errors.primaryWalletId = options.requiredMessage("wallet");
-  }
-  if (
-    form.counterpartyWalletId &&
-    (!counterpartyWallet ||
-      counterpartyWallet.type !== "USER" ||
-      !counterpartyWallet.owner)
-  ) {
-    errors.counterpartyWalletId = options.requiredMessage("wallet");
   }
 
   const recipe = walletFieldRecipe(form);
@@ -329,9 +318,7 @@ export function buildTransactionInput(
         paymentMethod: personal ? "CASH" : form.paymentMethod,
         billingStatus: personal ? "NOT_BILLED" : form.billingStatus,
         categoryId: form.categoryId || null,
-        counterpartyUserId: counterpartyWallet
-          ? ownerId(counterpartyWallet)
-          : null,
+        counterpartyId: form.counterpartyId || null,
         balanceChanges: [
           change(
             primaryWallet.id,
@@ -351,9 +338,7 @@ export function buildTransactionInput(
         paymentMethod: form.paymentMethod,
         billingStatus: form.billingStatus,
         categoryId: form.categoryId || null,
-        counterpartyUserId: counterpartyWallet
-          ? ownerId(counterpartyWallet)
-          : null,
+        counterpartyId: form.counterpartyId || null,
         balanceChanges: [
           change(
             primaryWallet.id,
@@ -627,6 +612,8 @@ function fieldForIssue(
       return "billingStatus";
     case "categoryId":
       return "categoryId";
+    case "counterpartyId":
+      return "counterpartyId";
     case "currency":
       return "currency";
     case "description":

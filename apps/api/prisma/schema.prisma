@@ -93,6 +93,11 @@ enum FinancialCategoryKind {
   BOTH
 }
 
+enum CounterpartyType {
+  PERSON
+  COMPANY
+}
+
 /// Admin-managed person record used by rental flows.
 ///
 /// `Person` remains separate from authentication details, but every person is
@@ -118,6 +123,7 @@ model Person {
   updatedAt    DateTime         @updatedAt
   deletedAt    DateTime?
   documents    PersonDocument[]
+  counterparty Counterparty?
 
   @@index([deletedAt])
   @@index([lastName, firstName])
@@ -201,6 +207,63 @@ model User {
   @@index([phone])
 }
 
+/// An external legal entity that can pay, be paid, owe money, or be owed.
+///
+/// Company is deliberately not a Wallet: this row identifies who the business
+/// trades with, while Wallet continues to identify where money is held.
+model Company {
+  id                      String        @id @default(cuid())
+  legalName               String
+  tradingName             String?
+  taxIdentifier           String?
+  taxIdentifierNormalized String?       @unique
+  registrationNumber      String?
+  email                   String?
+  phone                   String?
+  phoneNormalized         String?
+  addressLine1            String?
+  addressLine2            String?
+  city                    String?
+  region                  String?
+  postalCode              String?
+  countryCode             String?
+  notes                   String?
+  isActive                Boolean       @default(true)
+  createdAt               DateTime      @default(now())
+  updatedAt               DateTime      @updatedAt
+  deletedAt               DateTime?
+  counterparty            Counterparty?
+
+  @@index([legalName])
+  @@index([phoneNormalized])
+  @@index([isActive, deletedAt])
+  @@index([countryCode, deletedAt])
+}
+
+/// Stable financial identity shared by people and companies.
+///
+/// Exactly one of personId/companyId is populated. The database migration
+/// enforces that invariant with a CHECK constraint in addition to the unique
+/// one-to-one relations represented here.
+model Counterparty {
+  id        String           @id @default(cuid())
+  type      CounterpartyType
+  personId  String?          @unique
+  person    Person?          @relation(fields: [personId], references: [id], onDelete: Restrict)
+  companyId String?          @unique
+  company   Company?         @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  isActive  Boolean          @default(true)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  transactionsAsCounterparty MoneyTransaction[] @relation("MoneyTransactionUnifiedCounterparty")
+  transactionsAsRecipient    MoneyTransaction[] @relation("MoneyTransactionUnifiedRecipient")
+  transactionsAsDebtor       MoneyTransaction[] @relation("MoneyTransactionUnifiedDebtor")
+  transactionsAsCreditor     MoneyTransaction[] @relation("MoneyTransactionUnifiedCreditor")
+
+  @@index([type, isActive])
+}
+
 /// A tracked money location or a user's single financial wallet.
 ///
 /// USER wallets have an owner. Company cash, bank, and payment-processor
@@ -256,12 +319,20 @@ model MoneyTransaction {
   category                FinancialCategory?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   counterpartyUserId      String?
   counterparty            User?                  @relation("MoneyTransactionCounterparty", fields: [counterpartyUserId], references: [id], onDelete: SetNull)
+  counterpartyId          String?
+  counterpartyEntity      Counterparty?          @relation("MoneyTransactionUnifiedCounterparty", fields: [counterpartyId], references: [id], onDelete: SetNull)
   recipientUserId         String?
   recipient               User?                  @relation("MoneyTransactionRecipient", fields: [recipientUserId], references: [id], onDelete: SetNull)
+  recipientCounterpartyId String?
+  recipientCounterparty   Counterparty?          @relation("MoneyTransactionUnifiedRecipient", fields: [recipientCounterpartyId], references: [id], onDelete: SetNull)
   debtorUserId            String?
   debtor                  User?                  @relation("MoneyTransactionDebtor", fields: [debtorUserId], references: [id], onDelete: SetNull)
+  debtorCounterpartyId    String?
+  debtorCounterparty      Counterparty?          @relation("MoneyTransactionUnifiedDebtor", fields: [debtorCounterpartyId], references: [id], onDelete: SetNull)
   creditorUserId          String?
   creditor                User?                  @relation("MoneyTransactionCreditor", fields: [creditorUserId], references: [id], onDelete: SetNull)
+  creditorCounterpartyId  String?
+  creditorCounterparty    Counterparty?          @relation("MoneyTransactionUnifiedCreditor", fields: [creditorCounterpartyId], references: [id], onDelete: SetNull)
   recordedByUserId        String?
   recordedBy              User?                  @relation("MoneyTransactionRecordedBy", fields: [recordedByUserId], references: [id], onDelete: SetNull)
   occurredAt              DateTime
@@ -286,8 +357,12 @@ model MoneyTransaction {
   @@index([paymentMethod, occurredAt])
   @@index([categoryId, occurredAt])
   @@index([counterpartyUserId, occurredAt])
+  @@index([counterpartyId, occurredAt])
+  @@index([counterpartyId, type, status])
   @@index([recipientUserId, occurredAt])
+  @@index([recipientCounterpartyId, occurredAt])
   @@index([debtorUserId, creditorUserId, occurredAt])
+  @@index([debtorCounterpartyId, creditorCounterpartyId, occurredAt])
   @@index([recordedByUserId, occurredAt])
   @@index([originTransactionId])
   @@index([reversalOfTransactionId])

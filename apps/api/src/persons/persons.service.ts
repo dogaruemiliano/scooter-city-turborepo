@@ -87,6 +87,7 @@ export class PersonsService {
           data: {
             ...this.toCreateData(input),
             user: { connect: { id: user.id } },
+            counterparty: { create: { type: "PERSON" } },
           },
           include: this.personInclude(),
         });

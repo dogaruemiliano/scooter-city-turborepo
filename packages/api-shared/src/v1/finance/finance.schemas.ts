@@ -9,6 +9,7 @@ import {
   COMPANY_WALLET_TYPES,
   CREATABLE_MONEY_TRANSACTION_TYPES,
   FINANCIAL_CATEGORY_KINDS,
+  FINANCIAL_COUNTERPARTY_KINDS,
   MONEY_TRANSACTION_SCOPES,
   MONEY_TRANSACTION_STATUSES,
   MONEY_TRANSACTION_TYPES,
@@ -29,6 +30,12 @@ const MAX_CURSOR_LENGTH = 2_048;
 const MAX_BALANCE_CHANGES = 16;
 const MAX_REFERENCES = 20;
 const MAX_SUMMARY_RANGE_MS = 366 * 24 * 60 * 60 * 1_000;
+const MAX_COMPANY_TEXT_LENGTH = 255;
+
+const optionalCompanyTextSchema = z.preprocess(
+  (value) => (typeof value === "string" && value.trim() === "" ? null : value),
+  z.string().trim().max(MAX_COMPANY_TEXT_LENGTH).nullable().optional(),
+);
 
 const unsignedMoneyPattern = /^(?:0|[1-9]\d{0,16})(?:\.\d{1,2})?$/;
 const signedMoneyPattern = /^-?(?:0|[1-9]\d{0,16})(?:\.\d{1,2})?$/;
@@ -198,6 +205,165 @@ export const walletOptionListSchema = z
   .meta({ id: "WalletOptionList" });
 
 export type WalletOptionList = z.infer<typeof walletOptionListSchema>;
+
+export const financialCounterpartyKindSchema = z.enum(
+  FINANCIAL_COUNTERPARTY_KINDS,
+);
+
+export const financialCounterpartySearchItemSchema = z
+  .object({
+    id: z.string().min(1),
+    kind: financialCounterpartyKindSchema,
+    label: z.string().min(1),
+    description: z.string(),
+    email: z.email().nullable(),
+    phoneMasked: z.string().nullable(),
+    identifierMasked: z.string().nullable(),
+  })
+  .strict()
+  .meta({ id: "FinancialCounterpartySearchItem" });
+
+export type FinancialCounterpartySearchItem = z.infer<
+  typeof financialCounterpartySearchItemSchema
+>;
+
+export const financialCounterpartySearchResultSchema = z
+  .object({
+    items: z.array(financialCounterpartySearchItemSchema),
+    nextCursor: z.string().nullable(),
+  })
+  .strict()
+  .meta({ id: "FinancialCounterpartySearchResult" });
+
+export type FinancialCounterpartySearchResult = z.infer<
+  typeof financialCounterpartySearchResultSchema
+>;
+
+export const companySchema = z
+  .object({
+    id: z.string(),
+    counterpartyId: z.string(),
+    legalName: z.string(),
+    tradingName: z.string().nullable(),
+    taxIdentifier: z.string().nullable(),
+    registrationNumber: z.string().nullable(),
+    email: z.email().nullable(),
+    phone: z.string().nullable(),
+    addressLine1: z.string().nullable(),
+    addressLine2: z.string().nullable(),
+    city: z.string().nullable(),
+    region: z.string().nullable(),
+    postalCode: z.string().nullable(),
+    countryCode: z.string().nullable(),
+    notes: z.string().nullable(),
+    isActive: z.boolean(),
+    createdAt: z.iso.datetime({ offset: true }),
+    updatedAt: z.iso.datetime({ offset: true }),
+  })
+  .strict()
+  .meta({ id: "Company" });
+
+export type Company = z.infer<typeof companySchema>;
+
+export const companyListSchema = z
+  .object({
+    items: z.array(companySchema),
+    page: z.number().int().min(1),
+    pageSize: z.number().int().min(1).max(MAX_PAGE_SIZE),
+    total: z.number().int().min(0),
+  })
+  .strict()
+  .meta({ id: "CompanyList" });
+
+export type CompanyList = z.infer<typeof companyListSchema>;
+
+const companyFieldsSchema = z.object({
+  legalName: z.string().trim().min(1).max(MAX_COMPANY_TEXT_LENGTH),
+  tradingName: optionalCompanyTextSchema,
+  taxIdentifier: optionalCompanyTextSchema,
+  registrationNumber: optionalCompanyTextSchema,
+  email: z.preprocess(
+    (value) =>
+      typeof value === "string" && value.trim() === "" ? null : value,
+    z.email().nullable().optional(),
+  ),
+  phone: optionalCompanyTextSchema,
+  addressLine1: optionalCompanyTextSchema,
+  addressLine2: optionalCompanyTextSchema,
+  city: optionalCompanyTextSchema,
+  region: optionalCompanyTextSchema,
+  postalCode: optionalCompanyTextSchema,
+  countryCode: z.preprocess(
+    (value) =>
+      typeof value === "string" && value.trim() === "" ? null : value,
+    z
+      .string()
+      .trim()
+      .toUpperCase()
+      .regex(/^[A-Z]{2}$/)
+      .nullable()
+      .optional(),
+  ),
+  notes: z.preprocess(
+    (value) =>
+      typeof value === "string" && value.trim() === "" ? null : value,
+    z.string().trim().max(MAX_DESCRIPTION_LENGTH).nullable().optional(),
+  ),
+});
+
+export const createCompanyInputSchema = companyFieldsSchema
+  .strict()
+  .meta({ id: "CreateCompanyInput" });
+export type CreateCompanyInput = z.infer<typeof createCompanyInputSchema>;
+
+export const updateCompanyInputSchema = companyFieldsSchema
+  .partial()
+  .extend({ isActive: z.boolean().optional() })
+  .strict()
+  .refine((value) => Object.keys(value).length > 0, {
+    message: "At least one field is required.",
+  })
+  .meta({ id: "UpdateCompanyInput" });
+export type UpdateCompanyInput = z.infer<typeof updateCompanyInputSchema>;
+
+export const listCompaniesQuerySchema = z
+  .object({
+    search: optionalSearchStringSchema(MAX_NAME_LENGTH),
+    isActive: queryBooleanSchema.optional(),
+    page: z.coerce.number().int().min(1).default(1),
+    pageSize: z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).default(25),
+  })
+  .strict()
+  .meta({ id: "ListCompaniesQuery" });
+export type ListCompaniesQuery = z.infer<typeof listCompaniesQuerySchema>;
+
+export const searchFinancialCounterpartiesQuerySchema = z
+  .object({
+    search: z.preprocess(
+      (value) =>
+        typeof value === "string" ? value.replace(/\s+/g, " ").trim() : value,
+      z
+        .string()
+        .max(MAX_NAME_LENGTH)
+        .refine((search) => search.length === 0 || search.length >= 2)
+        .default(""),
+    ),
+    transactionType: z.enum(["INCOME", "EXPENSE"]).default("EXPENSE"),
+    kind: financialCounterpartyKindSchema.optional(),
+    cursor: z
+      .string()
+      .min(1)
+      .max(MAX_CURSOR_LENGTH)
+      .regex(/^[A-Za-z0-9_-]+$/)
+      .optional(),
+    pageSize: z.coerce.number().int().min(1).max(20).default(20),
+  })
+  .strict()
+  .meta({ id: "SearchFinancialCounterpartiesQuery" });
+
+export type SearchFinancialCounterpartiesQuery = z.infer<
+  typeof searchFinancialCounterpartiesQuerySchema
+>;
 
 export interface WalletOptionCursorFilters {
   search?: string;
@@ -415,9 +581,13 @@ export const createMoneyTransactionInputSchema = z
     paymentMethod: paymentMethodSchema.nullable().optional(),
     billingStatus: billingStatusSchema.default("NOT_APPLICABLE"),
     categoryId: z.string().nullable().optional(),
+    counterpartyId: z.string().nullable().optional(),
     counterpartyUserId: z.string().nullable().optional(),
+    recipientCounterpartyId: z.string().nullable().optional(),
     recipientUserId: z.string().nullable().optional(),
+    debtorCounterpartyId: z.string().nullable().optional(),
     debtorUserId: z.string().nullable().optional(),
+    creditorCounterpartyId: z.string().nullable().optional(),
     creditorUserId: z.string().nullable().optional(),
     occurredAt: z.iso.datetime({ offset: true }).optional(),
     description: z
@@ -520,9 +690,13 @@ export const moneyTransactionSchema = z
     paymentMethod: paymentMethodSchema.nullable(),
     billingStatus: billingStatusSchema,
     categoryId: z.string().nullable(),
+    counterpartyId: z.string().nullable(),
     counterpartyUserId: z.string().nullable(),
+    recipientCounterpartyId: z.string().nullable(),
     recipientUserId: z.string().nullable(),
+    debtorCounterpartyId: z.string().nullable(),
     debtorUserId: z.string().nullable(),
+    creditorCounterpartyId: z.string().nullable(),
     creditorUserId: z.string().nullable(),
     recordedByUserId: z.string().nullable(),
     category: financeCategorySummarySchema.nullable(),

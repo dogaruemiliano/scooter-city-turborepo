@@ -287,9 +287,13 @@ export class FinanceService {
             paymentMethod: input.paymentMethod ?? null,
             billingStatus: input.billingStatus,
             categoryId: input.categoryId ?? null,
+            counterpartyId: input.counterpartyId ?? null,
             counterpartyUserId: input.counterpartyUserId ?? null,
+            recipientCounterpartyId: input.recipientCounterpartyId ?? null,
             recipientUserId: input.recipientUserId ?? null,
+            debtorCounterpartyId: input.debtorCounterpartyId ?? null,
             debtorUserId: input.debtorUserId ?? null,
+            creditorCounterpartyId: input.creditorCounterpartyId ?? null,
             creditorUserId: input.creditorUserId ?? null,
             recordedByUserId: context.actor.id,
             occurredAt: input.occurredAt
@@ -776,6 +780,42 @@ export class FinanceService {
       }
     }
 
+    const counterpartyIds = [
+      input.counterpartyId,
+      input.recipientCounterpartyId,
+      input.debtorCounterpartyId,
+      input.creditorCounterpartyId,
+    ].filter((id): id is string => Boolean(id));
+    if (counterpartyIds.length > 0) {
+      const uniqueCounterpartyIds = [...new Set(counterpartyIds)];
+      const counterparties = await tx.counterparty.findMany({
+        where: {
+          id: { in: uniqueCounterpartyIds },
+        },
+        select: {
+          isActive: true,
+          person: { select: { deletedAt: true } },
+          company: { select: { isActive: true, deletedAt: true } },
+        },
+      });
+      const allActive = counterparties.every(
+        (counterparty) =>
+          counterparty.isActive &&
+          (counterparty.person
+            ? counterparty.person.deletedAt === null
+            : counterparty.company?.isActive === true &&
+              counterparty.company.deletedAt === null),
+      );
+      if (
+        counterparties.length !== uniqueCounterpartyIds.length ||
+        !allActive
+      ) {
+        throw new BadRequestException(
+          "One or more financial counterparties are not active",
+        );
+      }
+    }
+
     this.assertTransactionShape(input);
     this.assertTransactionWalletOwnership(input, walletById);
   }
@@ -1009,7 +1049,15 @@ export class FinanceService {
   private assertIncomeShape(
     input: v1.finance.CreateMoneyTransactionInput,
   ): void {
-    this.assertAllowedPartyFields(input, ["counterpartyUserId"]);
+    this.assertAllowedPartyFields(input, [
+      "counterpartyId",
+      "counterpartyUserId",
+    ]);
+    this.assertSinglePartyIdentity(
+      input,
+      "counterpartyId",
+      "counterpartyUserId",
+    );
     this.assertPaymentMethodRequired(input);
     if (input.financialScope === MoneyTransactionScope.COMPANY) {
       this.assertExactBalanceChanges(input, [
@@ -1045,7 +1093,15 @@ export class FinanceService {
   private assertExpenseShape(
     input: v1.finance.CreateMoneyTransactionInput,
   ): void {
-    this.assertAllowedPartyFields(input, ["counterpartyUserId"]);
+    this.assertAllowedPartyFields(input, [
+      "counterpartyId",
+      "counterpartyUserId",
+    ]);
+    this.assertSinglePartyIdentity(
+      input,
+      "counterpartyId",
+      "counterpartyUserId",
+    );
     this.assertPaymentMethodRequired(input);
     if (input.financialScope === MoneyTransactionScope.COMPANY) {
       this.assertExactBalanceChanges(input, [
@@ -1237,9 +1293,13 @@ export class FinanceService {
   private assertRequiredPartyField(
     input: v1.finance.CreateMoneyTransactionInput,
     field:
+      | "counterpartyId"
       | "counterpartyUserId"
+      | "recipientCounterpartyId"
       | "recipientUserId"
+      | "debtorCounterpartyId"
       | "debtorUserId"
+      | "creditorCounterpartyId"
       | "creditorUserId",
   ): void {
     if (!input[field]) {
@@ -1250,16 +1310,24 @@ export class FinanceService {
   private assertAllowedPartyFields(
     input: v1.finance.CreateMoneyTransactionInput,
     allowed: Array<
+      | "counterpartyId"
       | "counterpartyUserId"
+      | "recipientCounterpartyId"
       | "recipientUserId"
+      | "debtorCounterpartyId"
       | "debtorUserId"
+      | "creditorCounterpartyId"
       | "creditorUserId"
     >,
   ): void {
     const fields = [
+      "counterpartyId",
       "counterpartyUserId",
+      "recipientCounterpartyId",
       "recipientUserId",
+      "debtorCounterpartyId",
       "debtorUserId",
+      "creditorCounterpartyId",
       "creditorUserId",
     ] as const;
     const unexpected = fields.find(
@@ -1268,6 +1336,18 @@ export class FinanceService {
     if (unexpected) {
       throw new BadRequestException(
         `${input.type} does not allow ${unexpected}`,
+      );
+    }
+  }
+
+  private assertSinglePartyIdentity(
+    input: v1.finance.CreateMoneyTransactionInput,
+    counterpartyField: "counterpartyId",
+    legacyUserField: "counterpartyUserId",
+  ): void {
+    if (input[counterpartyField] && input[legacyUserField]) {
+      throw new BadRequestException(
+        `${input.type} cannot specify both ${counterpartyField} and ${legacyUserField}`,
       );
     }
   }

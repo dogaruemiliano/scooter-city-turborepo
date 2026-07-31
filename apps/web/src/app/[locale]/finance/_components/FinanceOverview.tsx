@@ -56,6 +56,7 @@ export async function FinanceOverview({
   const transactionsHref = localizePath("/finance/transactions", locale);
   const newTransactionHref = localizePath("/finance/transactions/new", locale);
   const claimsHref = localizePath("/finance/claims", locale);
+  const companiesHref = localizePath("/finance/companies", locale);
 
   return (
     <main className="mx-auto flex w-full max-w-screen-xl flex-1 flex-col gap-8 px-4 py-6 sm:px-6 lg:px-8">
@@ -63,13 +64,22 @@ export async function FinanceOverview({
         title={t("overview.title")}
         description={t("overview.description")}
         action={
-          <Button
-            nativeButton={false}
-            render={<Link href={newTransactionHref} />}
-          >
-            <PlusIcon data-icon="inline-start" />
-            {t("overview.newTransaction")}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              nativeButton={false}
+              render={<Link href={companiesHref} />}
+            >
+              {t("overview.manageCompanies")}
+            </Button>
+            <Button
+              nativeButton={false}
+              render={<Link href={newTransactionHref} />}
+            >
+              <PlusIcon data-icon="inline-start" />
+              {t("overview.newTransaction")}
+            </Button>
+          </div>
         }
       />
 

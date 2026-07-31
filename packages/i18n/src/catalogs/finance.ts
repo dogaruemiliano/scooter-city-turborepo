@@ -26,6 +26,7 @@ export const financeCatalog = {
       description:
         "Track company funds, operating activity, and outstanding settlements.",
       newTransaction: "New transaction",
+      manageCompanies: "Companies",
       period: {
         from: "From",
         to: "To",
@@ -134,6 +135,40 @@ export const financeCatalog = {
         submitting: "Creating...",
         success: "The company wallet was created.",
         error: "The company wallet could not be created.",
+      },
+    },
+    companies: {
+      title: "Companies",
+      description:
+        "Manage suppliers, customers, and other legal entities used as financial counterparties.",
+      create: "Add company",
+      edit: "Edit company",
+      empty: "No companies have been added.",
+      columns: {
+        company: "Company",
+        identifier: "Tax / registration ID",
+        contact: "Contact",
+        status: "Status",
+        actions: "Actions",
+      },
+      fields: {
+        legalName: "Legal name",
+        tradingName: "Trading name",
+        taxIdentifier: "Tax identifier",
+        registrationNumber: "Registration number",
+        email: "Email",
+        phone: "Phone",
+        address: "Address",
+        city: "City",
+        countryCode: "Country code",
+        notes: "Notes",
+      },
+      form: {
+        createTitle: "Add company",
+        editTitle: "Edit company",
+        description:
+          "Company counterparties are organizations you pay, invoice, or track obligations for. They are not wallets.",
+        invalid: "Check the company details and try again.",
       },
     },
     categories: {
@@ -360,6 +395,21 @@ export const financeCatalog = {
       placeholders: {
         select: "Select an option",
         optional: "Optional",
+        searchWallets: "Search wallets",
+        searchCounterparties: "Search people or companies",
+        searchCategories: "Search categories",
+        noWallets: "No wallets found",
+        noCounterparties: "No counterparties found",
+        counterpartySearchHint: "Type at least 2 characters to search",
+        searchingCounterparties: "Searching counterparties…",
+        counterpartySearchError: "Counterparties could not be loaded",
+        loadMore: "Load more",
+        noCategories: "No categories found",
+        clearSelection: "Clear selection",
+        toggleOptions: "Toggle options",
+      },
+      optionTypes: {
+        person: "Person",
       },
       typeHelp: {
         INCOME:
@@ -509,6 +559,7 @@ export const financeCatalog = {
       description:
         "Urmărește fondurile companiei, activitatea operațională și decontările restante.",
       newTransaction: "Tranzacție nouă",
+      manageCompanies: "Companii",
       period: {
         from: "De la",
         to: "Până la",
@@ -619,6 +670,40 @@ export const financeCatalog = {
         submitting: "Se creează...",
         success: "Portofelul companiei a fost creat.",
         error: "Portofelul companiei nu a putut fi creat.",
+      },
+    },
+    companies: {
+      title: "Companii",
+      description:
+        "Gestionează furnizorii, clienții și alte entități juridice folosite drept contrapărți financiare.",
+      create: "Adaugă companie",
+      edit: "Editează compania",
+      empty: "Nu a fost adăugată nicio companie.",
+      columns: {
+        company: "Companie",
+        identifier: "CUI / nr. înregistrare",
+        contact: "Contact",
+        status: "Stare",
+        actions: "Acțiuni",
+      },
+      fields: {
+        legalName: "Denumire juridică",
+        tradingName: "Denumire comercială",
+        taxIdentifier: "CUI",
+        registrationNumber: "Număr de înregistrare",
+        email: "Email",
+        phone: "Telefon",
+        address: "Adresă",
+        city: "Oraș",
+        countryCode: "Cod țară",
+        notes: "Notițe",
+      },
+      form: {
+        createTitle: "Adaugă companie",
+        editTitle: "Editează compania",
+        description:
+          "Companiile sunt organizațiile pe care le plătești, le facturezi sau pentru care urmărești obligații. Nu sunt portofele.",
+        invalid: "Verifică datele companiei și încearcă din nou.",
       },
     },
     categories: {
@@ -847,6 +932,21 @@ export const financeCatalog = {
       placeholders: {
         select: "Selectează o opțiune",
         optional: "Opțional",
+        searchWallets: "Caută portofele",
+        searchCounterparties: "Caută persoane sau companii",
+        searchCategories: "Caută categorii",
+        noWallets: "Nu au fost găsite portofele",
+        noCounterparties: "Nu au fost găsite contrapărți",
+        counterpartySearchHint: "Introdu cel puțin 2 caractere pentru căutare",
+        searchingCounterparties: "Se caută contrapărți…",
+        counterpartySearchError: "Contrapărțile nu au putut fi încărcate",
+        loadMore: "Încarcă mai multe",
+        noCategories: "Nu au fost găsite categorii",
+        clearSelection: "Șterge selecția",
+        toggleOptions: "Deschide sau închide opțiunile",
+      },
+      optionTypes: {
+        person: "Persoană",
       },
       typeHelp: {
         INCOME:

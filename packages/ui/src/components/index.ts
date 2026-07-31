@@ -17,6 +17,7 @@ export * from "./popover";
 export * from "./pagination";
 export * from "./phone-number-input";
 export * from "./progress";
+export * from "./search-select";
 export * from "./select";
 export * from "./separator";
 export * from "./sheet";

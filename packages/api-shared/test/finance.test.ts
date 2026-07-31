@@ -128,6 +128,42 @@ test("finance aggregate responses allow totals larger than one money row", () =>
   );
 });
 
+test("counterparty search supports a popular preview and bounded queries", () => {
+  assert.equal(
+    finance.searchFinancialCounterpartiesQuerySchema.safeParse({
+      search: "a",
+    }).success,
+    false,
+  );
+
+  const parsed = finance.searchFinancialCounterpartiesQuerySchema.parse({
+    search: "  Ada   Lovelace  ",
+    pageSize: "20",
+  });
+
+  assert.equal(parsed.search, "Ada Lovelace");
+  assert.equal(parsed.pageSize, 20);
+  assert.equal(parsed.transactionType, "EXPENSE");
+  assert.equal(
+    finance.searchFinancialCounterpartiesQuerySchema.parse({}).search,
+    "",
+  );
+});
+
+test("counterparty search summaries never contain raw identity documents", () => {
+  const parsed = finance.financialCounterpartySearchItemSchema.parse({
+    id: "counterparty-1",
+    kind: "PERSON",
+    label: "Ada Lovelace",
+    description: "Person · ada@example.com",
+    email: "ada@example.com",
+    phoneMasked: "+40 ••• ••• 678",
+    identifierMasked: null,
+  });
+
+  assert.equal("cnp" in parsed, false);
+});
+
 test("wallet list query normalizes search and coerces owner filters", () => {
   assert.deepEqual(
     finance.listWalletsQuerySchema.parse({
@@ -463,9 +499,13 @@ test("finance transaction responses include compact relation summaries", () => {
     paymentMethod: "CASH",
     billingStatus: "BILLED",
     categoryId: financeCategorySummary.id,
+    counterpartyId: "counterparty-1",
     counterpartyUserId: financeUserSummary.id,
+    recipientCounterpartyId: "counterparty-1",
     recipientUserId: financeUserSummary.id,
+    debtorCounterpartyId: "counterparty-1",
     debtorUserId: financeUserSummary.id,
+    creditorCounterpartyId: "counterparty-1",
     creditorUserId: financeUserSummary.id,
     recordedByUserId: financeUserSummary.id,
     category: financeCategorySummary,

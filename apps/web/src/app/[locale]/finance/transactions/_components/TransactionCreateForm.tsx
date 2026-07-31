@@ -14,6 +14,7 @@ import {
   Checkbox,
   Input,
   Label,
+  SearchSelect,
   Select,
   SelectContent,
   SelectItem,
@@ -23,14 +24,21 @@ import {
   buttonVariants,
 } from "@repo/ui/components";
 import { cn } from "@repo/ui/lib/utils";
-import { ArrowLeftIcon, ArrowRightIcon } from "lucide-react";
+import {
+  ArrowLeftIcon,
+  ArrowRightIcon,
+  Building2Icon,
+  UserIcon,
+  WalletCardsIcon,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { useId, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useId, useMemo, useState, type FormEvent } from "react";
 
 import { PageTitleOverride } from "@/components/PageTitleOverride";
 import { financeUserLabel } from "@/lib/finance-format";
+import { FinanceSelectorOptionRow } from "../../_components/FinanceSelectorOptionRow";
 import { webApi } from "@/lib/api";
 import { FinancePageHeader } from "../../_components/FinancePageHeader";
 import {
@@ -100,9 +108,6 @@ export function TransactionCreateForm({
         walletMatchesRole(wallet, recipe.secondaryRole!, adminWalletIdSet),
       )
     : [];
-  const counterpartyWallets = wallets.filter(
-    (wallet) => wallet.type === "USER" && wallet.isActive,
-  );
   const visibleCategories = categories.filter((category) => {
     if (!category.isActive) return false;
     if (form.type === "EXPENSE") return category.kind !== "INCOME";
@@ -118,6 +123,12 @@ export function TransactionCreateForm({
     form.type === "EXPENSE" ||
     (form.type === "INCOME" && form.financialScope === "COMPANY");
   const showCategory = CATEGORY_TYPES.has(form.type);
+  const walletTypeLabels: Record<v1.finance.WalletType, string> = {
+    USER: t("enums.walletTypes.USER"),
+    COMPANY_CASH: t("enums.walletTypes.COMPANY_CASH"),
+    COMPANY_BANK: t("enums.walletTypes.COMPANY_BANK"),
+    PAYMENT_PROCESSOR: t("enums.walletTypes.PAYMENT_PROCESSOR"),
+  };
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -348,6 +359,13 @@ export function TransactionCreateForm({
               disabled={creating}
               error={errors.primaryWalletId}
               placeholder={t("transactionForm.placeholders.select")}
+              searchPlaceholder={t(
+                "transactionForm.placeholders.searchWallets",
+              )}
+              emptyMessage={t("transactionForm.placeholders.noWallets")}
+              clearLabel={t("transactionForm.placeholders.clearSelection")}
+              toggleLabel={t("transactionForm.placeholders.toggleOptions")}
+              walletTypeLabels={walletTypeLabels}
               onChange={(value) => setValue("primaryWalletId", value)}
             />
             {recipe.secondaryRole && recipe.secondaryLabel ? (
@@ -359,20 +377,45 @@ export function TransactionCreateForm({
                 disabled={creating}
                 error={errors.secondaryWalletId}
                 placeholder={t("transactionForm.placeholders.select")}
+                searchPlaceholder={t(
+                  "transactionForm.placeholders.searchWallets",
+                )}
+                emptyMessage={t("transactionForm.placeholders.noWallets")}
+                clearLabel={t("transactionForm.placeholders.clearSelection")}
+                toggleLabel={t("transactionForm.placeholders.toggleOptions")}
+                walletTypeLabels={walletTypeLabels}
                 onChange={(value) => setValue("secondaryWalletId", value)}
               />
             ) : null}
             {form.type === "INCOME" || form.type === "EXPENSE" ? (
-              <WalletSelect
+              <CounterpartySelect
+                key={form.type}
                 id={`${formId}-counterparty`}
+                transactionType={form.type}
                 label={t("transactionForm.fields.counterparty")}
-                value={form.counterpartyWalletId}
-                wallets={counterpartyWallets}
+                value={form.counterpartyId}
                 disabled={creating}
-                error={errors.counterpartyWalletId}
-                placeholder={t("transactionForm.placeholders.select")}
-                optionalLabel={t("transactionForm.placeholders.optional")}
-                onChange={(value) => setValue("counterpartyWalletId", value)}
+                error={errors.counterpartyId}
+                placeholder={t("transactionForm.placeholders.optional")}
+                searchPlaceholder={t(
+                  "transactionForm.placeholders.searchCounterparties",
+                )}
+                emptyMessage={t(
+                  "transactionForm.placeholders.noCounterparties",
+                )}
+                minSearchMessage={t(
+                  "transactionForm.placeholders.counterpartySearchHint",
+                )}
+                loadingMessage={t(
+                  "transactionForm.placeholders.searchingCounterparties",
+                )}
+                errorMessage={t(
+                  "transactionForm.placeholders.counterpartySearchError",
+                )}
+                loadMoreLabel={t("transactionForm.placeholders.loadMore")}
+                clearLabel={t("transactionForm.placeholders.clearSelection")}
+                toggleLabel={t("transactionForm.placeholders.toggleOptions")}
+                onChange={(value) => setValue("counterpartyId", value)}
               />
             ) : null}
             {showPaymentMethod ? (
@@ -408,25 +451,24 @@ export function TransactionCreateForm({
               />
             ) : null}
             {showCategory ? (
-              <SelectField
+              <SearchSelectField
                 id={`${formId}-category`}
                 label={t("transactionForm.fields.category")}
-                value={form.categoryId || "none"}
+                value={form.categoryId || null}
                 disabled={creating}
                 error={errors.categoryId}
-                items={[
-                  {
-                    value: "none",
-                    label: t("transactionForm.placeholders.optional"),
-                  },
-                  ...visibleCategories.map((category) => ({
-                    value: category.id,
-                    label: category.name,
-                  })),
-                ]}
-                onChange={(value) =>
-                  setValue("categoryId", value === "none" ? "" : value)
-                }
+                options={visibleCategories.map((category) => ({
+                  value: category.id,
+                  label: category.name,
+                }))}
+                placeholder={t("transactionForm.placeholders.optional")}
+                searchPlaceholder={t(
+                  "transactionForm.placeholders.searchCategories",
+                )}
+                emptyMessage={t("transactionForm.placeholders.noCategories")}
+                clearLabel={t("transactionForm.placeholders.clearSelection")}
+                toggleLabel={t("transactionForm.placeholders.toggleOptions")}
+                onChange={(value) => setValue("categoryId", value ?? "")}
               />
             ) : null}
           </CardContent>
@@ -621,64 +663,321 @@ function SelectField({
 }
 
 function WalletSelect({
+  clearLabel,
   disabled,
+  emptyMessage,
   error,
   id,
   label,
   onChange,
   placeholder,
+  searchPlaceholder,
+  toggleLabel,
   optionalLabel,
   value,
+  walletTypeLabels,
   wallets,
 }: {
+  clearLabel: string;
   disabled?: boolean;
+  emptyMessage: string;
   error?: string;
   id: string;
   label: string;
   onChange(value: string): void;
   placeholder: string;
+  searchPlaceholder: string;
+  toggleLabel: string;
   optionalLabel?: string;
   value: string;
+  walletTypeLabels: Record<v1.finance.WalletType, string>;
   wallets: v1.finance.WalletOption[];
 }) {
   return (
     <div>
-      <Label id={`${id}-label`}>{label}</Label>
-      <Select
-        value={value || (optionalLabel ? "none" : null)}
+      <Label htmlFor={id} id={`${id}-label`}>
+        {label}
+      </Label>
+      <SearchSelect
+        id={id}
+        ariaLabelledBy={`${id}-label`}
+        ariaInvalid={Boolean(error)}
+        ariaDescribedBy={error ? `${id}-error` : undefined}
+        value={value || null}
         disabled={disabled}
+        clearable={Boolean(optionalLabel)}
+        options={wallets.map((wallet) => ({
+          value: wallet.id,
+          label: walletLabel(wallet),
+          icon: wallet.type === "USER" ? UserIcon : WalletCardsIcon,
+          description: wallet.owner
+            ? wallet.owner.email
+            : walletTypeLabels[wallet.type],
+          keywords: wallet.owner ? [wallet.owner.email] : undefined,
+        }))}
+        renderOption={(option) => <FinanceSelectorOptionRow {...option} />}
+        placeholder={optionalLabel ?? placeholder}
+        searchPlaceholder={searchPlaceholder}
+        emptyMessage={emptyMessage}
+        clearLabel={clearLabel}
+        toggleLabel={toggleLabel}
+        className="mt-1"
+        onValueChange={(nextValue) => onChange(nextValue ?? "")}
+      />
+      {error ? (
+        <p id={`${id}-error`} className="mt-1 text-xs text-destructive">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function CounterpartySelect({
+  clearLabel,
+  disabled,
+  emptyMessage,
+  error,
+  errorMessage,
+  id,
+  label,
+  loadMoreLabel,
+  loadingMessage,
+  minSearchMessage,
+  onChange,
+  placeholder,
+  searchPlaceholder,
+  toggleLabel,
+  transactionType,
+  value,
+}: {
+  clearLabel: string;
+  disabled?: boolean;
+  emptyMessage: string;
+  error?: string;
+  errorMessage: string;
+  id: string;
+  label: string;
+  loadMoreLabel: string;
+  loadingMessage: string;
+  minSearchMessage: string;
+  onChange(value: string): void;
+  placeholder: string;
+  searchPlaceholder: string;
+  toggleLabel: string;
+  transactionType: "INCOME" | "EXPENSE";
+  value: string;
+}) {
+  const [items, setItems] = useState<
+    v1.finance.FinancialCounterpartySearchItem[]
+  >([]);
+  const [selectedItem, setSelectedItem] = useState<
+    v1.finance.FinancialCounterpartySearchItem | undefined
+  >();
+  const [query, setQuery] = useState("");
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [searchFailed, setSearchFailed] = useState(false);
+
+  const search = useCallback(
+    async (searchQuery: string, context: { signal: AbortSignal }) => {
+      const normalizedQuery = searchQuery.replace(/\s+/g, " ").trim();
+      setQuery(normalizedQuery);
+      setSearchFailed(false);
+
+      if (normalizedQuery.length === 1) {
+        setItems([]);
+        setNextCursor(null);
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      try {
+        const result = await fetchCounterparties(normalizedQuery, {
+          signal: context.signal,
+          transactionType,
+        });
+        if (context.signal.aborted) return;
+        setItems(result.items);
+        setNextCursor(result.nextCursor);
+      } catch {
+        if (context.signal.aborted) return;
+        setItems([]);
+        setNextCursor(null);
+        setSearchFailed(true);
+      } finally {
+        if (!context.signal.aborted) setLoading(false);
+      }
+    },
+    [transactionType],
+  );
+
+  async function loadMore() {
+    if (!nextCursor || loadingMore) return;
+    setLoadingMore(true);
+    setSearchFailed(false);
+    try {
+      const result = await fetchCounterparties(query, {
+        cursor: nextCursor,
+        transactionType,
+      });
+      setItems((current) => {
+        const byId = new Map(current.map((item) => [item.id, item]));
+        for (const item of result.items) byId.set(item.id, item);
+        return [...byId.values()];
+      });
+      setNextCursor(result.nextCursor);
+    } catch {
+      setSearchFailed(true);
+    } finally {
+      setLoadingMore(false);
+    }
+  }
+
+  const options = items.map(counterpartyOption);
+  const preservedSelection = selectedItem
+    ? counterpartyOption(selectedItem)
+    : undefined;
+
+  return (
+    <div>
+      <Label htmlFor={id} id={`${id}-label`}>
+        {label}
+      </Label>
+      <SearchSelect
+        id={id}
+        ariaLabelledBy={`${id}-label`}
+        ariaInvalid={Boolean(error)}
+        ariaDescribedBy={error ? `${id}-error` : undefined}
+        value={value || null}
+        selectedOption={preservedSelection}
+        disabled={disabled}
+        clearable
+        options={options}
+        renderOption={(option) => <FinanceSelectorOptionRow {...option} />}
+        serverSearch
+        loading={loading}
+        loadingMore={loadingMore}
+        hasMore={Boolean(nextCursor)}
+        errorMessage={searchFailed ? errorMessage : null}
+        placeholder={placeholder}
+        searchPlaceholder={searchPlaceholder}
+        emptyMessage={query.length === 1 ? minSearchMessage : emptyMessage}
+        loadingMessage={loadingMessage}
+        loadMoreLabel={loadMoreLabel}
+        clearLabel={clearLabel}
+        toggleLabel={toggleLabel}
+        className="mt-1"
+        onSearchQueryChange={search}
+        onLoadMore={() => void loadMore()}
         onValueChange={(nextValue) => {
-          if (nextValue) onChange(nextValue === "none" ? "" : nextValue);
+          setSelectedItem(items.find((item) => item.id === nextValue));
+          onChange(nextValue ?? "");
         }}
-      >
-        <SelectTrigger
-          id={id}
-          aria-labelledby={`${id}-label`}
-          aria-invalid={Boolean(error)}
-          className="mt-1 w-full"
-        >
-          <SelectValue placeholder={placeholder} />
-        </SelectTrigger>
-        <SelectContent>
-          {optionalLabel ? (
-            <SelectItem value="none">{optionalLabel}</SelectItem>
-          ) : null}
-          {wallets.map((wallet) => (
-            <SelectItem key={wallet.id} value={wallet.id}>
-              {walletLabel(wallet)}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      {error ? <p className="mt-1 text-xs text-destructive">{error}</p> : null}
+      />
+      {error ? (
+        <p id={`${id}-error`} className="mt-1 text-xs text-destructive">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function counterpartyOption(item: v1.finance.FinancialCounterpartySearchItem) {
+  return {
+    value: item.id,
+    label: item.label,
+    description: [item.description, item.identifierMasked]
+      .filter(Boolean)
+      .join(" · "),
+    icon: item.kind === "PERSON" ? UserIcon : Building2Icon,
+  };
+}
+
+async function fetchCounterparties(
+  search: string,
+  options: {
+    cursor?: string;
+    signal?: AbortSignal;
+    transactionType: "INCOME" | "EXPENSE";
+  },
+) {
+  const params = new URLSearchParams({
+    search,
+    pageSize: "20",
+    transactionType: options.transactionType,
+  });
+  if (options.cursor) params.set("cursor", options.cursor);
+
+  return webApi.fetch(
+    `${v1.finance.ROUTES.counterparties.search}?${params}`,
+    v1.finance.financialCounterpartySearchResultSchema,
+    { cache: "no-store", signal: options.signal },
+  );
+}
+
+function SearchSelectField({
+  clearLabel,
+  disabled,
+  emptyMessage,
+  error,
+  id,
+  label,
+  onChange,
+  options,
+  placeholder,
+  searchPlaceholder,
+  toggleLabel,
+  value,
+}: {
+  clearLabel: string;
+  disabled?: boolean;
+  emptyMessage: string;
+  error?: string;
+  id: string;
+  label: string;
+  onChange(value: string | null): void;
+  options: Array<{ label: string; value: string }>;
+  placeholder: string;
+  searchPlaceholder: string;
+  toggleLabel: string;
+  value: string | null;
+}) {
+  return (
+    <div>
+      <Label htmlFor={id} id={`${id}-label`}>
+        {label}
+      </Label>
+      <SearchSelect
+        id={id}
+        ariaLabelledBy={`${id}-label`}
+        ariaInvalid={Boolean(error)}
+        ariaDescribedBy={error ? `${id}-error` : undefined}
+        value={value}
+        disabled={disabled}
+        options={options}
+        placeholder={placeholder}
+        searchPlaceholder={searchPlaceholder}
+        emptyMessage={emptyMessage}
+        clearLabel={clearLabel}
+        toggleLabel={toggleLabel}
+        className="mt-1"
+        onValueChange={onChange}
+      />
+      {error ? (
+        <p id={`${id}-error`} className="mt-1 text-xs text-destructive">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }
 
 function walletLabel(wallet: v1.finance.WalletOption): string {
-  return wallet.owner
-    ? `${financeUserLabel(wallet.owner)} · ${wallet.name}`
-    : wallet.name;
+  return wallet.owner ? financeUserLabel(wallet.owner) : wallet.name;
 }
 
 function clearErrorsForKey(

@@ -26,6 +26,7 @@ import { getRequestMetadata } from "../common/http/request-metadata";
 import { CreateCompanyWalletInput } from "./dto/create-company-wallet.input";
 import { CreateFinancialCategoryInput } from "./dto/create-financial-category.input";
 import { CreateMoneyTransactionInput } from "./dto/create-money-transaction.input";
+import { FinancialCounterpartySearchResult } from "./dto/financial-counterparty-search-result";
 import { FinancialCategory } from "./dto/financial-category";
 import { FinancialCategoryList } from "./dto/financial-category-list";
 import { FinanceSummary } from "./dto/finance-summary";
@@ -37,6 +38,7 @@ import { MoneyTransaction } from "./dto/money-transaction";
 import { MoneyTransactionList } from "./dto/money-transaction-list";
 import { OutstandingPersonalClaimList } from "./dto/outstanding-personal-claim-list";
 import { ReverseMoneyTransactionInput } from "./dto/reverse-money-transaction.input";
+import { SearchFinancialCounterpartiesQuery } from "./dto/search-financial-counterparties.query";
 import { UpdateFinancialCategoryInput } from "./dto/update-financial-category.input";
 import { Wallet } from "./dto/wallet";
 import { WalletOptionList } from "./dto/wallet-option-list";
@@ -48,6 +50,7 @@ import {
 } from "./finance.mapper";
 import { FinanceReportingService } from "./finance-reporting.service";
 import { FinanceService } from "./finance.service";
+import { CounterpartySearchService } from "./counterparty-search.service";
 
 @ApiTags("finance")
 @ApiCookieAuth(v1.auth.ACCESS_TOKEN_COOKIE)
@@ -58,7 +61,20 @@ export class FinanceController {
   constructor(
     private readonly finance: FinanceService,
     private readonly financeReporting: FinanceReportingService,
+    private readonly counterpartySearch: CounterpartySearchService,
   ) {}
+
+  @Get("counterparties/search")
+  @ApiOperation({
+    operationId: "FinanceController_searchCounterparties_v1",
+    summary: "Search people and companies for finance selectors",
+  })
+  @ZodResponse({ type: FinancialCounterpartySearchResult })
+  searchCounterparties(
+    @Query() query: SearchFinancialCounterpartiesQuery,
+  ): Promise<v1.finance.FinancialCounterpartySearchResult> {
+    return this.counterpartySearch.search(query);
+  }
 
   @Post("wallets")
   @ApiOperation({
