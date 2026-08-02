@@ -193,6 +193,40 @@ describe("PersonsPage", () => {
     expect(window.location.search).toBe("?search=hopper");
   });
 
+  it("submits search with Enter and clears an applied search", async () => {
+    mocks.apiFetch
+      .mockResolvedValueOnce(personList([], { total: 0 }))
+      .mockResolvedValueOnce(personList([person]));
+    const browser = userEvent.setup();
+
+    renderPersons();
+    const search = screen.getByLabelText("Search persons");
+    expect(search).toHaveAttribute("enterkeyhint", "search");
+
+    await browser.type(search, "hopper{Enter}");
+    await waitFor(() =>
+      expect(mocks.apiFetch).toHaveBeenCalledWith(
+        `${v1.persons.ROUTES.list}?page=1&pageSize=25&search=hopper`,
+        v1.persons.personListSchema,
+        { cache: "no-store" },
+      ),
+    );
+    expect(await screen.findByText("No persons found.")).toBeInTheDocument();
+
+    await browser.click(
+      screen.getByRole("button", { name: "Clear person search" }),
+    );
+    await waitFor(() =>
+      expect(mocks.apiFetch).toHaveBeenLastCalledWith(
+        `${v1.persons.ROUTES.list}?page=1&pageSize=25`,
+        v1.persons.personListSchema,
+        { cache: "no-store" },
+      ),
+    );
+    expect(search).toHaveValue("");
+    expect(window.location.search).toBe("");
+  });
+
   it("resets accumulated results when search changes", async () => {
     const nextPerson = personRecord({
       id: "person-2",
@@ -250,8 +284,12 @@ describe("PersonsPage", () => {
     await browser.click(screen.getByRole("button", { name: "Filters" }));
     await browser.type(screen.getByLabelText("Country"), "ro");
     await browser.type(screen.getByLabelText("Issuing country"), "us");
-    await browser.type(screen.getByLabelText("Expires from"), "2030-01-01");
-    await browser.type(screen.getByLabelText("Expires to"), "2030-12-31");
+    await browser.type(screen.getByLabelText("Expires from"), "01");
+    await browser.type(screen.getByLabelText("Expires from MM"), "01");
+    await browser.type(screen.getByLabelText("Expires from YYYY"), "2030");
+    await browser.type(screen.getByLabelText("Expires to"), "31");
+    await browser.type(screen.getByLabelText("Expires to MM"), "12");
+    await browser.type(screen.getByLabelText("Expires to YYYY"), "2030");
     await browser.click(screen.getByRole("button", { name: "Apply" }));
 
     await waitFor(() =>
@@ -266,7 +304,9 @@ describe("PersonsPage", () => {
     );
   });
 
-  it("initializes toolbar controls from the URL query", () => {
+  it("initializes toolbar controls from the URL query", async () => {
+    const browser = userEvent.setup();
+
     renderPersons(personList([person]), "en", {
       page: 1,
       pageSize: 25,
@@ -278,11 +318,15 @@ describe("PersonsPage", () => {
     });
 
     expect(screen.getByLabelText("Search persons")).toHaveValue("ada");
-    expect(screen.getByLabelText("Country")).toHaveValue("RO");
-    expect(screen.getByLabelText("Issuing country")).toHaveValue("US");
     expect(screen.getByRole("combobox", { name: "Sort" })).toHaveTextContent(
       "Email Z-A",
     );
+    const filtersButton = screen.getByRole("button", { name: "Filters" });
+    expect(filtersButton).toHaveTextContent("2");
+
+    await browser.click(filtersButton);
+    expect(screen.getByLabelText("Country")).toHaveValue("RO");
+    expect(screen.getByLabelText("Issuing country")).toHaveValue("US");
   });
 
   it("resets URL-backed filters", async () => {
@@ -302,6 +346,7 @@ describe("PersonsPage", () => {
       "/en/persons?search=ada&countryCode=RO",
     );
 
+    await browser.click(screen.getByRole("button", { name: "Filters" }));
     await browser.click(screen.getByRole("button", { name: "Reset" }));
 
     await waitFor(() =>

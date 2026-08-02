@@ -186,13 +186,13 @@ export function DocumentFormDialog({
             />
             <TextInputField
               label={t("fields.documentIssuedOn")}
-              type="date"
+              date
               value={form.issuedOn}
               onChange={(value) => setValue("issuedOn", value)}
             />
             <TextInputField
               label={t("fields.documentExpiresOn")}
-              type="date"
+              date
               value={form.expiresOn}
               onChange={(value) => setValue("expiresOn", value)}
             />

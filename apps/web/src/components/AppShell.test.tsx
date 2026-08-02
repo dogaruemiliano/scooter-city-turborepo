@@ -28,6 +28,7 @@ class TestPointerEvent extends MouseEvent {
 const mocks = vi.hoisted(() => ({
   apiFetch: vi.fn(),
   pathname: "/",
+  back: vi.fn(),
   push: vi.fn(),
   refresh: vi.fn(),
 }));
@@ -42,6 +43,7 @@ vi.mock("next/navigation", () => ({
   usePathname: () => mocks.pathname,
   useSearchParams: () => new URLSearchParams(),
   useRouter: () => ({
+    back: mocks.back,
     push: mocks.push,
     refresh: mocks.refresh,
   }),
@@ -60,7 +62,28 @@ vi.mock("../i18n/navigation", () => ({
 
 beforeEach(() => {
   mocks.apiFetch.mockReset();
+  mocks.apiFetch.mockResolvedValue({
+    id: "wallet-1",
+    type: "USER",
+    ownerUserId: "user-1",
+    owner: null,
+    cardHolderUserId: null,
+    cardHolder: null,
+    name: "Personal wallet",
+    isActive: true,
+    balances: [
+      {
+        bucket: "USER_SETTLEMENT",
+        currency: "RON",
+        balance: "1250.50",
+        updatedAt: "2026-08-01T09:00:00.000Z",
+      },
+    ],
+    createdAt: "2026-08-01T09:00:00.000Z",
+    updatedAt: "2026-08-01T09:00:00.000Z",
+  });
   mocks.pathname = "/";
+  mocks.back.mockReset();
   mocks.push.mockReset();
   mocks.refresh.mockReset();
 
@@ -103,10 +126,12 @@ describe("AppShell", () => {
       screen.queryByRole("link", { name: "Finanțe" }),
     ).not.toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: "Portofelul meu" }),
-    ).toHaveAttribute("href", "/account/wallet");
+      screen.queryByRole("link", { name: "Portofelul meu" }),
+    ).not.toBeInTheDocument();
     expect(screen.getByText("Emilia Stone")).toBeInTheDocument();
-    expect(screen.getByText("emilia.stone@example.com")).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Sold personal: 1\.250,50\s+lei/),
+    ).toBeVisible();
     expect(
       within(screen.getByRole("banner")).getByText("Scooter City"),
     ).toBeInTheDocument();
@@ -220,6 +245,87 @@ describe("AppShell", () => {
     );
   });
 
+  it("shows a back button instead of the mobile navigation trigger on nested routes", async () => {
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: 390,
+    });
+    mocks.pathname = "/persons/new";
+
+    renderAppShell({
+      id: "admin-1",
+      email: "admin@example.com",
+      roles: ["ADMIN"],
+    });
+
+    const backButton = await screen.findByRole("button", { name: "Înapoi" });
+
+    expect(
+      screen.queryByRole("button", { name: "Open navigation" }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(backButton);
+
+    expect(mocks.back).toHaveBeenCalledOnce();
+  });
+
+  it("keeps the mobile navigation trigger on routes listed in the sidebar", async () => {
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: 390,
+    });
+    mocks.pathname = "/finance/transactions";
+
+    renderAppShell({
+      id: "admin-1",
+      email: "admin@example.com",
+      roles: ["ADMIN"],
+    });
+
+    expect(
+      await screen.findByRole("button", { name: "Open navigation" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Înapoi" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("closes the mobile drawer when My wallet is pressed in the account menu", async () => {
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: 390,
+    });
+
+    renderAppShell();
+
+    const trigger = await screen.findByRole("button", {
+      name: "Open navigation",
+    });
+
+    fireEvent.click(trigger);
+
+    await waitFor(() =>
+      expect(trigger).toHaveAttribute("aria-expanded", "true"),
+    );
+
+    fireEvent.mouseDown(
+      screen.getByRole("button", { name: "Deschide meniul contului" }),
+    );
+
+    const walletLink = await screen.findByRole("menuitem", {
+      name: "Portofelul meu",
+    });
+
+    walletLink.addEventListener("click", (event) => event.preventDefault(), {
+      once: true,
+    });
+    fireEvent.click(walletLink);
+
+    await waitFor(() =>
+      expect(trigger).toHaveAttribute("aria-expanded", "false"),
+    );
+  });
+
   it("renders the Romanian persons navigation and title for admins", () => {
     mocks.pathname = "/persons";
 
@@ -240,10 +346,12 @@ describe("AppShell", () => {
       "href",
       "/scooters",
     );
-    expect(screen.getByRole("link", { name: "Finanțe" })).toHaveAttribute(
-      "href",
-      "/finance",
-    );
+    expect(
+      screen.getByRole("link", { name: "Prezentare generală" }),
+    ).toHaveAttribute("href", "/finance");
+    expect(screen.queryByText("General")).not.toBeInTheDocument();
+    expect(screen.getByText("Operațiuni")).toBeInTheDocument();
+    expect(screen.getByText("Finanțe")).toBeInTheDocument();
   });
 
   it("renders finance navigation and static finance page titles for admins", () => {
@@ -255,13 +363,75 @@ describe("AppShell", () => {
       roles: ["ADMIN"],
     });
 
-    expect(screen.getByRole("link", { name: "Finanțe" })).toHaveAttribute(
-      "href",
-      "/finance",
-    );
+    expect(
+      screen.getByRole("link", { name: "Prezentare generală" }),
+    ).toHaveAttribute("href", "/finance");
+    expect(
+      screen.getByRole("link", { name: "Configurare firmă" }),
+    ).toHaveAttribute("href", "/finance/settings/business");
+    expect(
+      screen.queryByRole("link", { name: "Portofele" }),
+    ).not.toBeInTheDocument();
     expect(
       within(screen.getByRole("banner")).getByText("Tranzacție nouă"),
     ).toBeInTheDocument();
+  });
+
+  it("renders the compact expense page title in English and Romanian", () => {
+    mocks.pathname = "/en/finance/expenses/new";
+
+    const { unmount } = renderAppShell({
+      id: "admin-1",
+      email: "admin@example.com",
+      roles: ["ADMIN"],
+    });
+
+    expect(
+      within(screen.getByRole("banner")).getByText("Add expense"),
+    ).toBeInTheDocument();
+
+    unmount();
+    mocks.pathname = "/finance/expenses/new";
+
+    renderAppShell({
+      id: "admin-1",
+      email: "admin@example.com",
+      roles: ["ADMIN"],
+    });
+
+    expect(
+      within(screen.getByRole("banner")).getByText("Adaugă cheltuială"),
+    ).toBeInTheDocument();
+  });
+
+  it("renders expense-list and business-settings page titles", () => {
+    mocks.pathname = "/en/finance/expenses";
+
+    const { unmount } = renderAppShell({
+      id: "admin-1",
+      email: "admin@example.com",
+      roles: ["ADMIN"],
+    });
+
+    expect(
+      within(screen.getByRole("banner")).getByText("Expenses"),
+    ).toBeInTheDocument();
+
+    unmount();
+    mocks.pathname = "/finance/settings/business";
+
+    renderAppShell({
+      id: "admin-1",
+      email: "admin@example.com",
+      roles: ["ADMIN"],
+    });
+
+    expect(
+      within(screen.getByRole("banner")).getByText("Setări financiare firmă"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Configurare firmă" }),
+    ).toHaveAttribute("aria-current", "page");
   });
 
   it("uses finance detail titles for nested routes", () => {

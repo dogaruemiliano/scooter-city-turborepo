@@ -268,7 +268,7 @@ export function ScooterCreateForm({ scootersHref }: ScooterCreateFormProps) {
           href={scootersHref}
           className={buttonVariants({
             variant: "ghost",
-            className: "w-fit text-muted-foreground",
+            className: "hidden w-fit text-muted-foreground md:inline-flex",
           })}
         >
           <ArrowLeftIcon data-icon="inline-start" />

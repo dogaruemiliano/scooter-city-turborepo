@@ -151,7 +151,7 @@ export function ScooterDetailPage({
           href={scootersHref}
           className={cn(
             buttonVariants({ variant: "ghost" }),
-            "w-fit text-muted-foreground",
+            "hidden w-fit text-muted-foreground md:inline-flex",
           )}
         >
           <ArrowLeftIcon data-icon="inline-start" />

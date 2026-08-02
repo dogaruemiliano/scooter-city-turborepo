@@ -110,6 +110,7 @@ export const scootersCatalog = {
     },
     filters: {
       title: "Filters",
+      description: "Narrow the scooter list using one or more filters.",
       recordStatus: "Record status",
       powertrainType: "Powertrain",
       registrationType: "Registration",
@@ -152,6 +153,7 @@ export const scootersCatalog = {
     list: {
       empty: "No scooters found.",
       searchLabel: "Search scooters",
+      clearSearchLabel: "Clear scooter search",
       rowsPerPage: "Rows per page",
       ccValue: "{cc} cc",
       kwValue: "{kw} kW",
@@ -287,6 +289,8 @@ export const scootersCatalog = {
     },
     filters: {
       title: "Filtre",
+      description:
+        "Restrânge lista de scutere folosind unul sau mai multe filtre.",
       recordStatus: "Stare înregistrare",
       powertrainType: "Propulsie",
       registrationType: "Înmatriculare",
@@ -329,6 +333,7 @@ export const scootersCatalog = {
     list: {
       empty: "Nu au fost găsite scutere.",
       searchLabel: "Caută scutere",
+      clearSearchLabel: "Șterge căutarea scuterelor",
       rowsPerPage: "Rânduri pe pagină",
       ccValue: "{cc} cc",
       kwValue: "{kw} kW",

@@ -2,13 +2,30 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import {
+  ArrowLeftRightIcon,
+  ArrowLeftIcon,
+  BikeIcon,
+  Building2Icon,
+  ChartPieIcon,
+  HandCoinsIcon,
+  LayoutDashboardIcon,
+  ReceiptTextIcon,
+  Settings2Icon,
+  TagsIcon,
+  UsersRoundIcon,
+  WalletCardsIcon,
+  type LucideIcon,
+} from "lucide-react";
+import { v1 } from "@repo/api-shared";
 import type { SupportedLocale } from "@repo/i18n";
 import {
   Avatar,
   AvatarFallback,
+  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuGroup,
@@ -28,6 +45,7 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarInset,
   SidebarMenu,
@@ -43,6 +61,8 @@ import { useLogout } from "./auth/LogoutButton";
 import { useSession } from "./auth/SessionProvider";
 import { LanguageMenuSub } from "./LanguageSwitcher";
 import { PageTitleOverrideContext } from "./PageTitleOverride";
+import { webApi } from "../lib/api";
+import { formatMoney } from "../lib/finance-format";
 import {
   applyThemePreference,
   type ThemePreference,
@@ -55,13 +75,70 @@ import {
   localizePath,
 } from "../i18n/paths";
 
-const NAVIGATION = [
-  { href: "/", labelKey: "dashboard" },
-  { href: "/account/wallet", labelKey: "myWallet" },
-  { href: "/finance", labelKey: "finance", requiredRole: "ADMIN" },
-  { href: "/persons", labelKey: "persons", requiredRole: "ADMIN" },
-  { href: "/scooters", labelKey: "scooters", requiredRole: "ADMIN" },
+const DASHBOARD_NAVIGATION_ITEM = {
+  href: "/",
+  labelKey: "dashboard",
+  icon: LayoutDashboardIcon,
+  exact: true,
+} as const;
+
+const NAVIGATION_GROUPS = [
+  {
+    labelKey: "operationsGroup",
+    requiredRole: "ADMIN",
+    items: [
+      { href: "/persons", labelKey: "persons", icon: UsersRoundIcon },
+      { href: "/scooters", labelKey: "scooters", icon: BikeIcon },
+    ],
+  },
+  {
+    labelKey: "financeGroup",
+    requiredRole: "ADMIN",
+    items: [
+      {
+        href: "/finance",
+        labelKey: "financeOverview",
+        icon: ChartPieIcon,
+        exact: true,
+      },
+      {
+        href: "/finance/transactions",
+        labelKey: "financeTransactions",
+        icon: ArrowLeftRightIcon,
+      },
+      {
+        href: "/finance/expenses",
+        labelKey: "financeExpenses",
+        icon: ReceiptTextIcon,
+      },
+      {
+        href: "/finance/companies",
+        labelKey: "financeCompanies",
+        icon: Building2Icon,
+      },
+      {
+        href: "/finance/categories",
+        labelKey: "financeCategories",
+        icon: TagsIcon,
+      },
+      {
+        href: "/finance/claims",
+        labelKey: "financeClaims",
+        icon: HandCoinsIcon,
+      },
+      {
+        href: "/finance/settings/business",
+        labelKey: "businessConfiguration",
+        icon: Settings2Icon,
+      },
+    ],
+  },
 ] as const;
+
+const SIDEBAR_ROOT_ROUTES: ReadonlySet<string> = new Set([
+  DASHBOARD_NAVIGATION_ITEM.href,
+  ...NAVIGATION_GROUPS.flatMap((group) => group.items.map((item) => item.href)),
+]);
 
 const PAGE_TITLES: Record<string, string> = {
   "/": "dashboard",
@@ -70,7 +147,9 @@ const PAGE_TITLES: Record<string, string> = {
   "/finance": "finance",
   "/finance/transactions": "financeTransactions",
   "/finance/transactions/new": "newFinanceTransaction",
-  "/finance/wallets": "financeWallets",
+  "/finance/expenses": "financeExpenses",
+  "/finance/expenses/new": "newFinanceExpense",
+  "/finance/settings/business": "financeBusinessSettings",
   "/finance/companies": "financeCompanies",
   "/finance/categories": "financeCategories",
   "/finance/claims": "financeClaims",
@@ -113,13 +192,35 @@ export function AppShell({
         />
         <SidebarInset>
           <header className="sticky top-0 z-sticky flex h-12 shrink-0 items-center gap-2 border-b border-border bg-background px-4">
-            <SidebarTrigger />
+            <HeaderNavigationButton pathname={routePathname} />
             <span className="text-sm font-medium">{pageTitle}</span>
           </header>
           <div className="flex flex-1 flex-col">{children}</div>
         </SidebarInset>
       </SidebarProvider>
     </PageTitleOverrideContext.Provider>
+  );
+}
+
+function HeaderNavigationButton({ pathname }: { pathname: string }) {
+  const t = useTranslations("appShell.actions");
+  const router = useRouter();
+  const { isMobile } = useSidebar();
+
+  if (!isMobile || SIDEBAR_ROOT_ROUTES.has(pathname)) {
+    return <SidebarTrigger />;
+  }
+
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      aria-label={t("back")}
+      onClick={() => router.back()}
+    >
+      <ArrowLeftIcon aria-hidden="true" />
+    </Button>
   );
 }
 
@@ -134,10 +235,10 @@ function AppSidebar({
 }) {
   const tNav = useTranslations("appShell.nav");
   const { user } = useSession();
-  const navigation = NAVIGATION.filter(
-    (item) =>
-      !("requiredRole" in item) ||
-      user?.roles.includes(item.requiredRole) === true,
+  const navigationGroups = NAVIGATION_GROUPS.filter(
+    (group) =>
+      !("requiredRole" in group) ||
+      user?.roles.includes(group.requiredRole) === true,
   );
 
   return (
@@ -212,23 +313,65 @@ function AppSidebar({
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navigation.map((item) => (
-                <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton
-                    isActive={isActiveNavigationItem(pathname, item.href)}
-                    render={<Link href={localizePath(item.href, locale)} />}
-                  >
-                    <span>{tNav(item.labelKey)}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  tooltip={tNav(DASHBOARD_NAVIGATION_ITEM.labelKey)}
+                  isActive={isActiveNavigationItem(
+                    pathname,
+                    DASHBOARD_NAVIGATION_ITEM.href,
+                    DASHBOARD_NAVIGATION_ITEM.exact,
+                  )}
+                  render={
+                    <Link
+                      href={localizePath(
+                        DASHBOARD_NAVIGATION_ITEM.href,
+                        locale,
+                      )}
+                    />
+                  }
+                >
+                  <LayoutDashboardIcon aria-hidden="true" />
+                  <span>{tNav(DASHBOARD_NAVIGATION_ITEM.labelKey)}</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {navigationGroups.map((group) => (
+          <SidebarGroup key={group.labelKey}>
+            <SidebarGroupLabel>{tNav(group.labelKey)}</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {group.items.map((item) => {
+                  const label = tNav(item.labelKey);
+                  const Icon = item.icon;
+                  return (
+                    <SidebarMenuItem key={item.href}>
+                      <SidebarMenuButton
+                        tooltip={label}
+                        isActive={isActiveNavigationItem(
+                          pathname,
+                          item.href,
+                          "exact" in item && item.exact,
+                        )}
+                        render={<Link href={localizePath(item.href, locale)} />}
+                      >
+                        <Icon aria-hidden="true" />
+                        <span>{label}</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ))}
       </SidebarContent>
 
       <SidebarFooter>
         <AccountMenu
+          key={user?.id ?? "signed-out"}
           locale={locale}
           initialThemePreference={initialThemePreference}
         />
@@ -238,8 +381,15 @@ function AppSidebar({
   );
 }
 
-function isActiveNavigationItem(pathname: string, href: string): boolean {
-  return pathname === href || (href !== "/" && pathname.startsWith(`${href}/`));
+function isActiveNavigationItem(
+  pathname: string,
+  href: string,
+  exact = false,
+): boolean {
+  return (
+    pathname === href ||
+    (!exact && href !== "/" && pathname.startsWith(`${href}/`))
+  );
 }
 
 function AccountMenu({
@@ -254,13 +404,55 @@ function AccountMenu({
   const tLogout = useTranslations("auth.logout");
   const { isMobile } = useSidebar();
   const { user } = useSession();
+  const userId = user?.id;
   const { busy, logout } = useLogout();
   const [themePreference, setThemePreference] = useState(
     initialThemePreference,
   );
+  const [personalWallet, setPersonalWallet] = useState<v1.finance.Wallet>();
+  const [walletUnavailable, setWalletUnavailable] = useState(false);
   const email = user?.email ?? tAccount("noActiveSession");
   const displayName = user ? displayNameFromUser(user) : tAccount("account");
   const initials = user ? initialsFromUser(user) : "?";
+  const personalBalance = personalWallet?.balances.find(
+    (balance) => balance.bucket === "USER_SETTLEMENT",
+  );
+  const balanceSummary =
+    walletUnavailable || (personalWallet && !personalBalance)
+      ? tAccount("balanceUnavailable")
+      : personalBalance
+        ? tAccount("balanceValue", {
+            amount: formatMoney(
+              personalBalance.balance,
+              personalBalance.currency,
+              locale,
+            ),
+          })
+        : tAccount("balanceLoading");
+
+  useEffect(() => {
+    if (!userId) {
+      return;
+    }
+
+    const controller = new AbortController();
+
+    void webApi
+      .fetch(v1.finance.ROUTES.wallets.mine, v1.finance.walletSchema, {
+        cache: "no-store",
+        signal: controller.signal,
+      })
+      .then(setPersonalWallet)
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
+
+        setWalletUnavailable(true);
+      });
+
+    return () => controller.abort();
+  }, [userId]);
 
   function changeTheme(nextPreference: unknown) {
     if (!isThemePreference(nextPreference)) {
@@ -290,7 +482,7 @@ function AccountMenu({
             <span className="flex min-w-0 flex-1 flex-col">
               <span className="truncate font-medium">{displayName}</span>
               <span className="truncate text-xs text-muted-foreground">
-                {email}
+                {balanceSummary}
               </span>
             </span>
             <span className="ml-auto text-muted-foreground" aria-hidden="true">
@@ -310,18 +502,18 @@ function AccountMenu({
                 </span>
                 <span className="truncate font-normal">{email}</span>
               </DropdownMenuLabel>
-              <DropdownMenuItem
-                render={<Link href={localizePath("/account/wallet", locale)} />}
+              <AccountMenuLinkItem
+                href={localizePath("/account/wallet", locale)}
+                icon={WalletCardsIcon}
               >
                 {tAccount("myWallet")}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                render={
-                  <Link href={localizePath("/account/settings", locale)} />
-                }
+              </AccountMenuLinkItem>
+              <AccountMenuLinkItem
+                href={localizePath("/account/settings", locale)}
+                icon={Settings2Icon}
               >
                 {tAccount("accountSettings")}
-              </DropdownMenuItem>
+              </AccountMenuLinkItem>
               <DropdownMenuSub>
                 <DropdownMenuSubTrigger>
                   {tTheme("label")}
@@ -360,6 +552,28 @@ function AccountMenu({
         </DropdownMenu>
       </SidebarMenuItem>
     </SidebarMenu>
+  );
+}
+
+function AccountMenuLinkItem({
+  href,
+  icon: Icon,
+  children,
+}: {
+  href: string;
+  icon: LucideIcon;
+  children: ReactNode;
+}) {
+  const { setOpenMobile } = useSidebar();
+
+  return (
+    <DropdownMenuItem
+      onClick={() => setOpenMobile(false)}
+      render={<Link href={href} />}
+    >
+      <Icon aria-hidden="true" />
+      {children}
+    </DropdownMenuItem>
   );
 }
 

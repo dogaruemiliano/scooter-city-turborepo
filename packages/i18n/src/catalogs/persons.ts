@@ -219,6 +219,7 @@ export const personsCatalog = {
     },
     filters: {
       title: "Filters",
+      description: "Narrow the person list using one or more filters.",
       recordStatus: "Record status",
       documentType: "Document type",
       documentStatus: "Document status",
@@ -270,6 +271,7 @@ export const personsCatalog = {
     list: {
       empty: "No persons found.",
       searchLabel: "Search persons",
+      clearSearchLabel: "Clear person search",
       rowsPerPage: "Rows per page",
       noDocuments: "No documents",
       created: "Created",
@@ -513,6 +515,8 @@ export const personsCatalog = {
     },
     filters: {
       title: "Filtre",
+      description:
+        "Restrânge lista de persoane folosind unul sau mai multe filtre.",
       recordStatus: "Stare înregistrare",
       documentType: "Tip document",
       documentStatus: "Stare document",
@@ -564,6 +568,7 @@ export const personsCatalog = {
     list: {
       empty: "Nu s-au găsit persoane.",
       searchLabel: "Caută persoane",
+      clearSearchLabel: "Șterge căutarea persoanelor",
       rowsPerPage: "Rânduri pe pagină",
       noDocuments: "Fără documente",
       created: "Creată",

@@ -139,7 +139,7 @@ export function PersonFormDialog({
             />
             <TextInputField
               label={t("fields.dateOfBirth")}
-              type="date"
+              date
               value={form.dateOfBirth}
               onChange={(value) => setValue("dateOfBirth", value)}
             />

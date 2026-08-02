@@ -2,16 +2,10 @@
 
 import { ApiError, v1 } from "@repo/api-shared";
 import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
   Alert,
   AlertDescription,
   AlertTitle,
-  Button,
   buttonVariants,
-  Input,
   Label,
   Select,
   SelectContent,
@@ -19,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@repo/ui/components";
-import { CheckIcon, PlusIcon, RotateCcwIcon } from "lucide-react";
+import { PlusIcon } from "lucide-react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import {
@@ -27,11 +21,12 @@ import {
   useEffect,
   useRef,
   useState,
-  type FormEvent,
   type ReactNode,
 } from "react";
 
 import { InfiniteListFooter } from "@/components/InfiniteListFooter";
+import { ListFilterSheet } from "@/components/ListFilterSheet";
+import { ListSearchInput } from "@/components/ListSearchInput";
 import { webApi } from "@/lib/api";
 import { ScooterList } from "./ScooterList";
 
@@ -246,14 +241,38 @@ function ScootersPageContent({
     };
   }, [clearSearchDebounce, draftQuery.search, loadScooters, query]);
 
-  async function searchScooters(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function searchScooters() {
     clearSearchDebounce();
+    const search = normalizedSearch(draftQuery.search);
+    if (search === normalizedSearch(query.search)) return;
+
     await loadScooters({
       ...draftQuery,
+      search: search || undefined,
       page: 1,
       pageSize: LIST_PAGE_SIZE,
     });
+  }
+
+  async function clearScootersSearch() {
+    clearSearchDebounce();
+    setDraftQuery((current) => ({
+      ...current,
+      search: undefined,
+      sort: current.sort === "relevance" ? undefined : current.sort,
+    }));
+
+    if (!query.search) return;
+    await loadScooters(
+      {
+        ...query,
+        search: undefined,
+        sort: query.sort === "relevance" ? undefined : query.sort,
+        page: 1,
+        pageSize: LIST_PAGE_SIZE,
+      },
+      { history: "replace" },
+    );
   }
 
   async function changeSort(value: string | null) {
@@ -312,197 +331,180 @@ function ScootersPageContent({
       ) : null}
 
       <div className="flex flex-col gap-4">
-        <form
-          className="grid w-full gap-3"
-          onSubmit={(event) => void searchScooters(event)}
-        >
-          <Accordion
-            defaultValue={
-              hasOperationalFilters(initialQuery) ? ["filters"] : []
-            }
-          >
-            <AccordionItem value="filters">
-              <div className="grid w-full gap-3 lg:grid-cols-2 lg:items-end">
-                <div className="flex w-full flex-col gap-2 sm:flex-row lg:max-w-md">
-                  <Label htmlFor="scooters-search" className="sr-only">
-                    {t("list.searchLabel")}
-                  </Label>
-                  <Input
-                    id="scooters-search"
-                    type="search"
-                    placeholder={t("placeholders.search")}
-                    value={draftQuery.search ?? ""}
-                    onChange={(event) => {
-                      const search = event.target.value || undefined;
-                      setDraftQuery((current) => ({
-                        ...current,
-                        search,
-                        sort:
-                          current.sort === "relevance" && !search
-                            ? undefined
-                            : current.sort,
-                      }));
-                    }}
-                  />
-                  <Button type="submit" disabled={listLoading}>
-                    <CheckIcon data-icon="inline-start" />
-                    {t("actions.apply")}
-                  </Button>
-                </div>
+        <div className="grid w-full gap-3 lg:grid-cols-2 lg:items-end">
+          <div className="w-full lg:max-w-md">
+            <ListSearchInput
+              id="scooters-search"
+              label={t("list.searchLabel")}
+              clearLabel={t("list.clearSearchLabel")}
+              placeholder={t("placeholders.search")}
+              value={draftQuery.search ?? ""}
+              disabled={listLoading}
+              onChange={(search) => {
+                setDraftQuery((current) => ({
+                  ...current,
+                  search: search || undefined,
+                  sort:
+                    current.sort === "relevance" && !search
+                      ? undefined
+                      : current.sort,
+                }));
+              }}
+              onClear={clearScootersSearch}
+              onSearch={searchScooters}
+            />
+          </div>
 
-                <div className="flex w-full items-center justify-between gap-4 lg:justify-end">
-                  <div className="min-w-0">
-                    <Label htmlFor="scooters-sort" className="sr-only">
-                      {t("filters.sort")}
-                    </Label>
-                    <Select
-                      value={effectiveListSort(draftQuery)}
-                      onValueChange={(value) => void changeSort(value)}
+          <div className="flex w-full items-center justify-between gap-4 lg:justify-end">
+            <div className="min-w-0">
+              <Label htmlFor="scooters-sort" className="sr-only">
+                {t("filters.sort")}
+              </Label>
+              <Select
+                value={effectiveListSort(draftQuery)}
+                onValueChange={(value) => void changeSort(value)}
+              >
+                <SelectTrigger
+                  id="scooters-sort"
+                  className="w-auto border-transparent bg-transparent px-0 text-muted-foreground hover:text-foreground focus-visible:border-transparent"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {v1.scooters.SCOOTER_LIST_SORTS.filter(
+                    (sort) => sort !== "relevance" || draftQuery.search,
+                  ).map((sort) => (
+                    <SelectItem key={sort} value={sort}>
+                      {t(`listSorts.${sort}`)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <ListFilterSheet
+              appliedCount={operationalFilterCount(query)}
+              applyLabel={t("actions.apply")}
+              description={t("filters.description")}
+              disabled={listLoading}
+              formId="scooters-filter-form"
+              onApply={() =>
+                loadScooters({
+                  ...draftQuery,
+                  page: 1,
+                  pageSize: LIST_PAGE_SIZE,
+                })
+              }
+              onReset={resetFilters}
+              resetLabel={t("filters.reset")}
+              title={t("filters.title")}
+            >
+              <div className="grid gap-4 sm:grid-cols-2">
+                <FilterField
+                  id="scooters-record-status"
+                  label={t("filters.recordStatus")}
+                >
+                  <Select
+                    value={
+                      draftQuery.includeDeleted ? ALL_FILTERS : ACTIVE_RECORDS
+                    }
+                    onValueChange={(value) =>
+                      setDraftValue("includeDeleted", value === ALL_FILTERS)
+                    }
+                  >
+                    <SelectTrigger
+                      id="scooters-record-status"
+                      className="w-full"
                     >
-                      <SelectTrigger
-                        id="scooters-sort"
-                        className="w-auto border-transparent bg-transparent px-0 text-muted-foreground hover:text-foreground focus-visible:border-transparent"
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {v1.scooters.SCOOTER_LIST_SORTS.filter(
-                          (sort) => sort !== "relevance" || draftQuery.search,
-                        ).map((sort) => (
-                          <SelectItem key={sort} value={sort}>
-                            {t(`listSorts.${sort}`)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={ACTIVE_RECORDS}>
+                        {t("recordStatus.active")}
+                      </SelectItem>
+                      <SelectItem value={ALL_FILTERS}>
+                        {t("recordStatus.all")}
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </FilterField>
 
-                  <AccordionTrigger className="h-8 flex-none items-center justify-center border-transparent bg-transparent px-0 py-0 text-muted-foreground hover:text-foreground hover:no-underline focus-visible:border-transparent">
-                    {t("filters.title")}
-                  </AccordionTrigger>
-                </div>
+                <FilterField
+                  id="scooters-powertrain-type"
+                  label={t("filters.powertrainType")}
+                >
+                  <Select
+                    value={draftQuery.powertrainType ?? ALL_FILTERS}
+                    onValueChange={(value) =>
+                      setDraftValue(
+                        "powertrainType",
+                        value === ALL_FILTERS
+                          ? undefined
+                          : (value as v1.scooters.ScooterPowertrainType),
+                      )
+                    }
+                  >
+                    <SelectTrigger
+                      id="scooters-powertrain-type"
+                      className="w-full"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={ALL_FILTERS}>
+                        {t("filters.all")}
+                      </SelectItem>
+                      {v1.scooters.SCOOTER_POWERTRAIN_TYPES.map((type) => (
+                        <SelectItem key={type} value={type}>
+                          {t(`powertrainTypes.${type}`)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </FilterField>
+
+                <FilterField
+                  id="scooters-registration-type"
+                  label={t("filters.registrationType")}
+                >
+                  <Select
+                    value={draftQuery.registrationType ?? ALL_FILTERS}
+                    onValueChange={(value) =>
+                      setDraftValue(
+                        "registrationType",
+                        value === ALL_FILTERS
+                          ? undefined
+                          : (value as v1.scooters.ScooterRegistrationType),
+                      )
+                    }
+                  >
+                    <SelectTrigger
+                      id="scooters-registration-type"
+                      className="w-full"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={ALL_FILTERS}>
+                        {t("filters.all")}
+                      </SelectItem>
+                      {v1.scooters.SCOOTER_REGISTRATION_TYPES.map(
+                        (registrationType) => (
+                          <SelectItem
+                            key={registrationType}
+                            value={registrationType}
+                          >
+                            {t(`registrationTypes.${registrationType}`)}
+                          </SelectItem>
+                        ),
+                      )}
+                    </SelectContent>
+                  </Select>
+                </FilterField>
               </div>
-
-              <AccordionContent>
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                  <FilterField
-                    id="scooters-record-status"
-                    label={t("filters.recordStatus")}
-                  >
-                    <Select
-                      value={
-                        draftQuery.includeDeleted ? ALL_FILTERS : ACTIVE_RECORDS
-                      }
-                      onValueChange={(value) =>
-                        setDraftValue("includeDeleted", value === ALL_FILTERS)
-                      }
-                    >
-                      <SelectTrigger
-                        id="scooters-record-status"
-                        className="w-full"
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={ACTIVE_RECORDS}>
-                          {t("recordStatus.active")}
-                        </SelectItem>
-                        <SelectItem value={ALL_FILTERS}>
-                          {t("recordStatus.all")}
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </FilterField>
-
-                  <FilterField
-                    id="scooters-powertrain-type"
-                    label={t("filters.powertrainType")}
-                  >
-                    <Select
-                      value={draftQuery.powertrainType ?? ALL_FILTERS}
-                      onValueChange={(value) =>
-                        setDraftValue(
-                          "powertrainType",
-                          value === ALL_FILTERS
-                            ? undefined
-                            : (value as v1.scooters.ScooterPowertrainType),
-                        )
-                      }
-                    >
-                      <SelectTrigger
-                        id="scooters-powertrain-type"
-                        className="w-full"
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={ALL_FILTERS}>
-                          {t("filters.all")}
-                        </SelectItem>
-                        {v1.scooters.SCOOTER_POWERTRAIN_TYPES.map((type) => (
-                          <SelectItem key={type} value={type}>
-                            {t(`powertrainTypes.${type}`)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </FilterField>
-
-                  <FilterField
-                    id="scooters-registration-type"
-                    label={t("filters.registrationType")}
-                  >
-                    <Select
-                      value={draftQuery.registrationType ?? ALL_FILTERS}
-                      onValueChange={(value) =>
-                        setDraftValue(
-                          "registrationType",
-                          value === ALL_FILTERS
-                            ? undefined
-                            : (value as v1.scooters.ScooterRegistrationType),
-                        )
-                      }
-                    >
-                      <SelectTrigger
-                        id="scooters-registration-type"
-                        className="w-full"
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={ALL_FILTERS}>
-                          {t("filters.all")}
-                        </SelectItem>
-                        {v1.scooters.SCOOTER_REGISTRATION_TYPES.map(
-                          (registrationType) => (
-                            <SelectItem
-                              key={registrationType}
-                              value={registrationType}
-                            >
-                              {t(`registrationTypes.${registrationType}`)}
-                            </SelectItem>
-                          ),
-                        )}
-                      </SelectContent>
-                    </Select>
-                  </FilterField>
-                </div>
-
-                <div className="mt-3 flex justify-end">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={listLoading}
-                    onClick={() => void resetFilters()}
-                  >
-                    <RotateCcwIcon data-icon="inline-start" />
-                    {t("filters.reset")}
-                  </Button>
-                </div>
-              </AccordionContent>
-            </AccordionItem>
-          </Accordion>
-        </form>
+            </ListFilterSheet>
+          </div>
+        </div>
 
         <ScooterList items={list.items} />
 
@@ -595,10 +597,16 @@ function isDefaultSort(
   return sort === (query.search ? "relevance" : "vinAsc");
 }
 
-function hasOperationalFilters(query: v1.scooters.ListScootersQuery): boolean {
-  return Boolean(
-    query.includeDeleted || query.powertrainType || query.registrationType,
-  );
+function operationalFilterCount(query: v1.scooters.ListScootersQuery): number {
+  return [
+    query.includeDeleted,
+    query.powertrainType,
+    query.registrationType,
+  ].filter(Boolean).length;
+}
+
+function normalizedSearch(value: string | undefined): string {
+  return value?.replace(/\s+/g, " ").trim() ?? "";
 }
 
 function FilterField({
