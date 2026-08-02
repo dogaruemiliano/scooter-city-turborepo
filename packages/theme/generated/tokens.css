@@ -259,10 +259,6 @@
   --color-amber-800: oklch(0.473 0.137 46.201);
   --color-amber-900: oklch(0.414 0.112 45.904);
   --color-amber-950: oklch(0.279 0.077 45.635);
-  --color-google-blue: oklch(0.630 0.180 259.956);
-  --color-google-red: oklch(0.626 0.206 29.077);
-  --color-google-yellow: oklch(0.830 0.170 83.993);
-  --color-google-green: oklch(0.648 0.160 148.495);
 
   --spacing-0: 0;
   --spacing-1: 0.25rem;
@@ -275,6 +271,7 @@
   --spacing-8: 2rem;
   --spacing-9: 2.25rem;
   --spacing-10: 2.5rem;
+  --spacing-11: 2.75rem;
   --spacing-12: 3rem;
   --spacing-16: 4rem;
   --spacing-18: 4.5rem;

@@ -33,7 +33,7 @@ function AccordionTrigger({
       <AccordionPrimitive.Trigger
         data-slot="accordion-trigger"
         className={cn(
-          "group/accordion-trigger relative flex flex-1 items-start justify-between rounded-lg border border-transparent py-2.5 text-left text-sm font-medium transition-all duration-fast ease-standard outline-none hover:underline focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring aria-disabled:pointer-events-none aria-disabled:opacity-50 **:data-[slot=accordion-trigger-icon]:ml-auto **:data-[slot=accordion-trigger-icon]:size-4 **:data-[slot=accordion-trigger-icon]:text-muted-foreground",
+          "group/accordion-trigger relative flex min-h-12 flex-1 items-center justify-between rounded-lg border border-transparent py-3 text-left text-base font-medium transition-all duration-fast ease-standard outline-none hover:underline focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring aria-disabled:pointer-events-none aria-disabled:opacity-50 md:min-h-10 md:py-2.5 md:text-sm **:data-[slot=accordion-trigger-icon]:ml-auto **:data-[slot=accordion-trigger-icon]:size-4 **:data-[slot=accordion-trigger-icon]:text-muted-foreground",
           className,
         )}
         {...props}
@@ -60,7 +60,7 @@ function AccordionContent({
   return (
     <AccordionPrimitive.Panel
       data-slot="accordion-content"
-      className="overflow-hidden text-sm duration-fast ease-standard data-open:animate-accordion-down data-closed:animate-accordion-up"
+      className="overflow-hidden text-sm duration-fast ease-standard data-open:animate-accordion-down data-closed:animate-accordion-up motion-reduce:animate-none"
       {...props}
     >
       <div

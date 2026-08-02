@@ -66,6 +66,7 @@ export interface SearchSelectProps {
   ariaLabelledBy?: string;
   ariaDescribedBy?: string;
   ariaInvalid?: boolean;
+  ariaRequired?: boolean;
   clearLabel?: string;
   toggleLabel?: string;
   id?: string;
@@ -100,6 +101,7 @@ function SearchSelect({
   ariaLabelledBy,
   ariaDescribedBy,
   ariaInvalid,
+  ariaRequired,
   clearLabel = "Clear selection",
   toggleLabel = "Toggle options",
   id,
@@ -193,6 +195,7 @@ function SearchSelect({
           aria-labelledby={ariaLabelledBy}
           aria-describedby={ariaDescribedBy}
           aria-invalid={ariaInvalid}
+          aria-required={ariaRequired}
           placeholder={selectedOption ? searchPlaceholder : placeholder}
           className="h-full min-w-0 flex-1 bg-transparent px-2 text-base outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed md:text-sm"
         />

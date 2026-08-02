@@ -26,7 +26,10 @@ function OTPField({
     <OTPFieldPrimitive.Root
       data-slot="otp-field"
       aria-invalid={invalid || undefined}
-      className={cn("flex items-center gap-2", className)}
+      className={cn(
+        "flex w-full items-center justify-center gap-1 md:w-auto md:gap-2",
+        className,
+      )}
       length={length}
       {...props}
     >
@@ -37,7 +40,7 @@ function OTPField({
           aria-invalid={invalid || undefined}
           autoFocus={autoFocus && index === 0}
           className={cn(
-            "size-10 rounded-lg border border-input bg-background text-center text-base font-medium transition-colors duration-fast ease-standard outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:bg-disabled disabled:text-disabled-foreground aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive data-invalid:border-destructive data-invalid:ring-2 data-invalid:ring-destructive",
+            "h-12 min-w-0 max-w-12 flex-1 basis-12 rounded-lg border border-input bg-background text-center text-base font-medium transition-colors duration-fast ease-standard outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:bg-disabled disabled:text-disabled-foreground aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive data-invalid:border-destructive data-invalid:ring-2 data-invalid:ring-destructive md:size-11 md:flex-none",
             inputClassName,
           )}
         />

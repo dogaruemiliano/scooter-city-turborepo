@@ -165,7 +165,7 @@ function PhoneNumberInput({
             aria-invalid={isInvalid || undefined}
             aria-label={countrySelectLabel}
             autoComplete="tel-country-code"
-            className="h-8 appearance-none rounded-l-lg border-0 bg-transparent py-1 pr-8 pl-2.5 text-base outline-none disabled:cursor-not-allowed disabled:text-disabled-foreground md:text-sm"
+            className="h-12 appearance-none rounded-l-lg border-0 bg-transparent py-2 pr-10 pl-3 text-base outline-none disabled:cursor-not-allowed disabled:text-disabled-foreground md:h-11 md:pr-8 md:text-sm"
             disabled={disabled}
             required={required}
             value={parts.country}
@@ -192,7 +192,7 @@ function PhoneNumberInput({
           aria-labelledby={ariaLabelledBy}
           autoComplete={autoComplete}
           className={cn(
-            "h-8 w-full min-w-0 rounded-r-lg border-0 border-l border-input bg-transparent px-2.5 py-1 text-base outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:text-disabled-foreground md:text-sm",
+            "h-12 w-full min-w-0 rounded-r-lg border-0 border-l border-input bg-transparent px-3 py-2 text-base outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:text-disabled-foreground md:h-11 md:text-sm",
           )}
           disabled={disabled}
           inputMode="numeric"
