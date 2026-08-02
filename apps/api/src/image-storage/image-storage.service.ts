@@ -31,12 +31,17 @@ import { S3_CLIENT, S3_PRESIGNER } from "./image-storage.constants";
 import type { S3Presigner } from "./image-storage.module";
 import {
   IMAGE_STORAGE_PROVIDER_S3,
+  SUPPORTED_DOCUMENT_CONTENT_TYPES,
   SUPPORTED_IMAGE_CONTENT_TYPES,
+  type PresignedDocumentUpload,
   type PresignedImageUpload,
+  type PresignDocumentUploadInput,
   type PresignImageUploadInput,
   type ReadStoredImageResult,
+  type StoredDocument,
   type StoreImageInput,
   type StoredImage,
+  type SupportedDocumentContentType,
   type SupportedImageContentType,
 } from "./image-storage.types";
 
@@ -44,7 +49,8 @@ const CONTENT_TYPE_EXTENSIONS = {
   "image/jpeg": "jpg",
   "image/png": "png",
   "image/webp": "webp",
-} satisfies Record<SupportedImageContentType, string>;
+  "application/pdf": "pdf",
+} satisfies Record<SupportedDocumentContentType, string>;
 
 const UPLOAD_TOKEN_VERSION = 1;
 const SHA_256_HEX_PATTERN = /^[a-f0-9]{64}$/i;
@@ -65,9 +71,12 @@ interface UploadTokenPayload {
   provider: typeof IMAGE_STORAGE_PROVIDER_S3;
   bucket: string;
   storageKey: string;
-  contentType: SupportedImageContentType;
+  contentType: SupportedDocumentContentType;
   byteSize: number;
   checksumSha256: string;
+  imageWidth?: number | null;
+  imageHeight?: number | null;
+  pageCount?: number | null;
   scope: string;
   exp: number;
 }
@@ -81,7 +90,9 @@ export class ImageStorageService {
   ) {}
 
   async storeImage(input: StoreImageInput): Promise<StoredImage> {
-    const contentType = this.requireSupportedContentType(input.contentType);
+    const contentType = this.requireSupportedImageContentType(
+      input.contentType,
+    );
     this.assertValidByteSize(input.byteSize);
 
     const storageKey = this.generateStorageKey(contentType);
@@ -119,7 +130,25 @@ export class ImageStorageService {
   async createPresignedUpload(
     input: PresignImageUploadInput,
   ): Promise<PresignedImageUpload> {
-    const contentType = this.requireSupportedContentType(input.contentType);
+    const contentType = this.requireSupportedImageContentType(
+      input.contentType,
+    );
+    return this.createPresignedObjectUpload(input, contentType);
+  }
+
+  async createPresignedDocumentUpload(
+    input: PresignDocumentUploadInput,
+  ): Promise<PresignedDocumentUpload> {
+    const contentType = this.requireSupportedDocumentContentType(
+      input.contentType,
+    );
+    return this.createPresignedObjectUpload(input, contentType);
+  }
+
+  private async createPresignedObjectUpload(
+    input: PresignDocumentUploadInput,
+    contentType: SupportedDocumentContentType,
+  ): Promise<PresignedDocumentUpload> {
     this.assertValidByteSize(input.byteSize);
     const checksumSha256 = this.requireSha256Hex(input.checksumSha256);
     const checksumSha256Base64 = Buffer.from(checksumSha256, "hex").toString(
@@ -154,6 +183,9 @@ export class ImageStorageService {
       contentType,
       byteSize: input.byteSize,
       checksumSha256,
+      imageWidth: input.imageWidth ?? null,
+      imageHeight: input.imageHeight ?? null,
+      pageCount: input.pageCount ?? null,
       scope: input.scope,
       exp: Math.floor(expiresAt.getTime() / 1000),
     });
@@ -188,6 +220,24 @@ export class ImageStorageService {
     uploadToken: string,
     scope: string,
   ): Promise<StoredImage> {
+    const stored = await this.completePresignedObjectUpload(uploadToken, scope);
+    const contentType = this.requireSupportedImageContentType(
+      stored.contentType,
+    );
+    return { ...stored, contentType };
+  }
+
+  async completePresignedDocumentUpload(
+    uploadToken: string,
+    scope: string,
+  ): Promise<StoredDocument> {
+    return this.completePresignedObjectUpload(uploadToken, scope);
+  }
+
+  private async completePresignedObjectUpload(
+    uploadToken: string,
+    scope: string,
+  ): Promise<StoredDocument> {
     const payload = this.verifyUploadToken(uploadToken, scope);
     this.assertSafeStorageKey(payload.storageKey);
 
@@ -224,6 +274,9 @@ export class ImageStorageService {
       contentType: payload.contentType,
       byteSize: payload.byteSize,
       checksumSha256: payload.checksumSha256,
+      imageWidth: payload.imageWidth ?? null,
+      imageHeight: payload.imageHeight ?? null,
+      pageCount: payload.pageCount ?? null,
     };
   }
 
@@ -254,6 +307,14 @@ export class ImageStorageService {
     }
   }
 
+  readDocument(storageKey: string): Promise<ReadStoredImageResult> {
+    return this.readImage(storageKey);
+  }
+
+  deleteDocument(storageKey: string): Promise<void> {
+    return this.deleteImage(storageKey);
+  }
+
   async deleteImage(storageKey: string): Promise<void> {
     this.assertSafeStorageKey(storageKey);
     try {
@@ -268,7 +329,7 @@ export class ImageStorageService {
     }
   }
 
-  private requireSupportedContentType(
+  private requireSupportedImageContentType(
     contentType: string,
   ): SupportedImageContentType {
     if (
@@ -282,6 +343,20 @@ export class ImageStorageService {
     throw new BadRequestException("Unsupported image content type");
   }
 
+  private requireSupportedDocumentContentType(
+    contentType: string,
+  ): SupportedDocumentContentType {
+    if (
+      SUPPORTED_DOCUMENT_CONTENT_TYPES.includes(
+        contentType as SupportedDocumentContentType,
+      )
+    ) {
+      return contentType as SupportedDocumentContentType;
+    }
+
+    throw new BadRequestException("Unsupported document content type");
+  }
+
   private assertValidByteSize(byteSize: number): void {
     if (!Number.isInteger(byteSize) || byteSize <= 0) {
       throw new BadRequestException("Image file is empty");
@@ -292,7 +367,9 @@ export class ImageStorageService {
     }
   }
 
-  private generateStorageKey(contentType: SupportedImageContentType): string {
+  private generateStorageKey(
+    contentType: SupportedDocumentContentType,
+  ): string {
     const now = new Date();
     const year = now.getUTCFullYear();
     const month = String(now.getUTCMonth() + 1).padStart(2, "0");
@@ -510,19 +587,27 @@ function isUploadTokenPayload(value: unknown): value is UploadTokenPayload {
   }
 
   const payload = value as Partial<UploadTokenPayload>;
+  const nullablePositiveInteger = (field: unknown): boolean =>
+    field === undefined ||
+    field === null ||
+    (typeof field === "number" && Number.isInteger(field) && field > 0);
+
   return (
     payload.v === UPLOAD_TOKEN_VERSION &&
     payload.provider === IMAGE_STORAGE_PROVIDER_S3 &&
     typeof payload.bucket === "string" &&
     typeof payload.storageKey === "string" &&
-    SUPPORTED_IMAGE_CONTENT_TYPES.includes(
-      payload.contentType as SupportedImageContentType,
+    SUPPORTED_DOCUMENT_CONTENT_TYPES.includes(
+      payload.contentType as SupportedDocumentContentType,
     ) &&
     typeof payload.byteSize === "number" &&
     Number.isInteger(payload.byteSize) &&
     payload.byteSize > 0 &&
     typeof payload.checksumSha256 === "string" &&
     SHA_256_HEX_PATTERN.test(payload.checksumSha256) &&
+    nullablePositiveInteger(payload.imageWidth) &&
+    nullablePositiveInteger(payload.imageHeight) &&
+    nullablePositiveInteger(payload.pageCount) &&
     typeof payload.scope === "string" &&
     typeof payload.exp === "number" &&
     Number.isInteger(payload.exp)

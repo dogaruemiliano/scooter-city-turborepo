@@ -5,10 +5,19 @@ import {
 } from "@nestjs/common";
 import { v1 } from "@repo/api-shared";
 
-import { CounterpartyType, Prisma } from "../generated/prisma/client";
+import {
+  CounterpartyType,
+  MoneyTransactionStatus,
+  MoneyTransactionType,
+  Prisma,
+} from "../generated/prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
+import { normalizeTaxIdentifier } from "./tax-identifier";
 
-const companyInclude = { counterparty: { select: { id: true } } } as const;
+const companyInclude = {
+  counterparty: { select: { id: true } },
+  businessLegalEntity: { select: { id: true } },
+} as const;
 
 @Injectable()
 export class CompaniesService {
@@ -94,6 +103,75 @@ export class CompaniesService {
     }
   }
 
+  async stats(id: string, query: v1.finance.CompanyStatsQuery) {
+    const company = await this.get(id);
+    if (!company.counterparty) {
+      throw new NotFoundException("Company counterparty not found");
+    }
+    const to = new Date();
+    const from = activityPeriodStart(query.period, to);
+    const rows = await this.prisma.moneyTransaction.groupBy({
+      by: ["type", "currency"],
+      where: {
+        ...(company.businessLegalEntity
+          ? {
+              balanceChanges: {
+                some: {
+                  wallet: {
+                    businessLegalEntities: {
+                      some: { legalEntityId: company.businessLegalEntity.id },
+                    },
+                  },
+                },
+              },
+            }
+          : { counterpartyId: company.counterparty.id }),
+        status: MoneyTransactionStatus.POSTED,
+        type: {
+          in: [MoneyTransactionType.INCOME, MoneyTransactionType.EXPENSE],
+        },
+        occurredAt: {
+          ...(from ? { gte: from } : {}),
+          lt: to,
+        },
+      },
+      _sum: { amount: true },
+      _count: { _all: true },
+    });
+    const totals = new Map<
+      string,
+      { income: Prisma.Decimal; expenses: Prisma.Decimal }
+    >();
+    let transactionCount = 0;
+
+    for (const row of rows) {
+      transactionCount += row._count._all;
+      const total = totals.get(row.currency) ?? {
+        income: new Prisma.Decimal(0),
+        expenses: new Prisma.Decimal(0),
+      };
+      const amount = row._sum.amount ?? new Prisma.Decimal(0);
+      if (row.type === MoneyTransactionType.INCOME) total.income = amount;
+      if (row.type === MoneyTransactionType.EXPENSE) total.expenses = amount;
+      totals.set(row.currency, total);
+    }
+
+    return {
+      period: query.period,
+      from: from?.toISOString() ?? null,
+      to: to.toISOString(),
+      transactionCount,
+      totals: [...totals.entries()]
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([currency, total]) => ({
+          currency,
+          income: total.income.toFixed(2),
+          expenses: total.expenses.toFixed(2),
+          net: total.income.minus(total.expenses).toFixed(2),
+        })),
+    } satisfies v1.finance.CompanyStats;
+  }
+
   private handleWriteError(error: unknown): never {
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -105,6 +183,24 @@ export class CompaniesService {
     }
     throw error;
   }
+}
+
+function activityPeriodStart(
+  period: v1.finance.CompanyActivityPeriod,
+  now: Date,
+): Date | null {
+  if (period === "ALL") return null;
+  const start = new Date(now);
+  start.setUTCHours(0, 0, 0, 0);
+  if (period === "WEEK") {
+    const dayFromMonday = (start.getUTCDay() + 6) % 7;
+    start.setUTCDate(start.getUTCDate() - dayFromMonday);
+  } else if (period === "MONTH") {
+    start.setUTCDate(1);
+  } else if (period === "YEAR") {
+    start.setUTCMonth(0, 1);
+  }
+  return start;
 }
 
 function createCompanyData(input: v1.finance.CreateCompanyInput) {
@@ -133,12 +229,4 @@ function normalizePhone(value: string | null | undefined): string | null {
   if (!value) return null;
   const digits = value.replace(/\D/g, "");
   return digits || null;
-}
-
-function normalizeTaxIdentifier(
-  value: string | null | undefined,
-): string | null {
-  if (!value) return null;
-  const normalized = value.toUpperCase().replace(/[^A-Z0-9]/g, "");
-  return normalized || null;
 }

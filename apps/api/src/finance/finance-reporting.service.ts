@@ -3,6 +3,8 @@ import { v1 } from "@repo/api-shared";
 
 import type { Prisma } from "../generated/prisma/client";
 import {
+  ExpensePostingRole,
+  ExpenseStatus,
   MoneyTransactionStatus,
   MoneyTransactionType,
   Prisma as PrismaRuntime,
@@ -79,11 +81,25 @@ export class FinanceReportingService {
           by: ["type", "currency"],
           where: {
             ...postedInPeriod,
-            type: {
-              in: [MoneyTransactionType.INCOME, MoneyTransactionType.EXPENSE],
-            },
+            OR: [
+              { type: MoneyTransactionType.INCOME },
+              {
+                type: MoneyTransactionType.EXPENSE,
+                expensePostings: {
+                  none: { role: ExpensePostingRole.EXPENSE_PAYMENT },
+                },
+              },
+            ],
           },
           _sum: { amount: true },
+        });
+        const specializedExpenseTotals = await tx.expense.groupBy({
+          by: ["currency"],
+          where: {
+            status: ExpenseStatus.POSTED,
+            occurredOn: { gte: from, lt: to },
+          },
+          _sum: { grossAmount: true },
         });
         const paymentMethods = await tx.moneyTransaction.groupBy({
           by: ["paymentMethod", "currency"],
@@ -98,8 +114,19 @@ export class FinanceReportingService {
           where: {
             ...postedInPeriod,
             type: MoneyTransactionType.EXPENSE,
+            expensePostings: {
+              none: { role: ExpensePostingRole.EXPENSE_PAYMENT },
+            },
           },
           _sum: { amount: true },
+        });
+        const specializedExpenseCategories = await tx.expense.groupBy({
+          by: ["categoryId", "currency"],
+          where: {
+            status: ExpenseStatus.POSTED,
+            occurredOn: { gte: from, lt: to },
+          },
+          _sum: { grossAmount: true },
         });
         const billingStatuses = await tx.moneyTransaction.groupBy({
           by: ["billingStatus", "currency"],
@@ -118,7 +145,42 @@ export class FinanceReportingService {
           _sum: { amount: true },
         });
 
-        const categoryIds = expenseCategories.flatMap((row) =>
+        const mergedExpenseCategories = new Map<
+          string,
+          {
+            categoryId: string | null;
+            currency: string;
+            amount: Prisma.Decimal;
+          }
+        >();
+        const addExpenseCategory = (
+          categoryId: string | null,
+          currency: string,
+          value: Prisma.Decimal | null,
+        ) => {
+          const key = `${categoryId ?? ""}:${currency}`;
+          const current = mergedExpenseCategories.get(key);
+          mergedExpenseCategories.set(key, {
+            categoryId,
+            currency,
+            amount: (current?.amount ?? new PrismaRuntime.Decimal(0)).plus(
+              value ?? 0,
+            ),
+          });
+        };
+        expenseCategories.forEach((row) =>
+          addExpenseCategory(row.categoryId, row.currency, row._sum.amount),
+        );
+        specializedExpenseCategories.forEach((row) =>
+          addExpenseCategory(
+            row.categoryId,
+            row.currency,
+            row._sum.grossAmount,
+          ),
+        );
+        const combinedExpenseCategories = [...mergedExpenseCategories.values()];
+
+        const categoryIds = combinedExpenseCategories.flatMap((row) =>
           row.categoryId ? [row.categoryId] : [],
         );
         const categories = await tx.financialCategory.findMany({
@@ -277,11 +339,28 @@ export class FinanceReportingService {
             amount: amount(row._sum.amount),
           }))
           .sort(byCurrency);
-        const expenses = totals
+        const expenseAmounts = new Map<string, Prisma.Decimal>();
+        const addExpenseAmount = (
+          currency: string,
+          value: Prisma.Decimal | null,
+        ) => {
+          expenseAmounts.set(
+            currency,
+            (expenseAmounts.get(currency) ?? new PrismaRuntime.Decimal(0)).plus(
+              value ?? 0,
+            ),
+          );
+        };
+        totals
           .filter((row) => row.type === MoneyTransactionType.EXPENSE)
-          .map((row) => ({
-            currency: row.currency,
-            amount: amount(row._sum.amount),
+          .forEach((row) => addExpenseAmount(row.currency, row._sum.amount));
+        specializedExpenseTotals.forEach((row) =>
+          addExpenseAmount(row.currency, row._sum.grossAmount),
+        );
+        const expenses = [...expenseAmounts.entries()]
+          .map(([currency, value]) => ({
+            currency,
+            amount: amount(value),
           }))
           .sort(byCurrency);
         const totalCurrencies = [
@@ -385,13 +464,13 @@ export class FinanceReportingService {
                 `${second.currency}:${second.paymentMethod ?? ""}`,
               ),
             ),
-          expensesByCategory: expenseCategories
+          expensesByCategory: combinedExpenseCategories
             .map((row) => ({
               category: row.categoryId
                 ? (categoryById.get(row.categoryId) ?? null)
                 : null,
               currency: row.currency,
-              amount: amount(row._sum.amount),
+              amount: amount(row.amount),
             }))
             .sort((first, second) =>
               [

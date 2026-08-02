@@ -8,8 +8,16 @@ export const SUPPORTED_IMAGE_CONTENT_TYPES = [
   "image/webp",
 ] as const;
 
+export const SUPPORTED_DOCUMENT_CONTENT_TYPES = [
+  ...SUPPORTED_IMAGE_CONTENT_TYPES,
+  "application/pdf",
+] as const;
+
 export type SupportedImageContentType =
   (typeof SUPPORTED_IMAGE_CONTENT_TYPES)[number];
+
+export type SupportedDocumentContentType =
+  (typeof SUPPORTED_DOCUMENT_CONTENT_TYPES)[number];
 
 export interface StoreImageInput {
   buffer: Buffer;
@@ -24,6 +32,12 @@ export interface PresignImageUploadInput {
   scope: string;
 }
 
+export interface PresignDocumentUploadInput extends PresignImageUploadInput {
+  imageWidth?: number | null;
+  imageHeight?: number | null;
+  pageCount?: number | null;
+}
+
 export interface StoredImage {
   provider: typeof IMAGE_STORAGE_PROVIDER_S3;
   bucket: string;
@@ -31,6 +45,18 @@ export interface StoredImage {
   contentType: SupportedImageContentType;
   byteSize: number;
   checksumSha256: string;
+}
+
+export interface StoredDocument {
+  provider: typeof IMAGE_STORAGE_PROVIDER_S3;
+  bucket: string;
+  storageKey: string;
+  contentType: SupportedDocumentContentType;
+  byteSize: number;
+  checksumSha256: string;
+  imageWidth: number | null;
+  imageHeight: number | null;
+  pageCount: number | null;
 }
 
 export interface ReadStoredImageResult {
@@ -50,3 +76,5 @@ export interface PresignedImageUpload {
   expiresAt: Date;
   maxBytes: number;
 }
+
+export type PresignedDocumentUpload = PresignedImageUpload;

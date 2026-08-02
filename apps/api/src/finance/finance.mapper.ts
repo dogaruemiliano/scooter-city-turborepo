@@ -1,9 +1,12 @@
 import { v1 } from "@repo/api-shared";
 
 import type {
+  Company,
+  Counterparty,
   FinancialCategory,
   MoneyTransaction,
   MoneyTransactionReference,
+  Person,
   User,
   Wallet,
   WalletBalance,
@@ -12,6 +15,7 @@ import type {
 
 export type WalletWithDetails = Wallet & {
   owner: Pick<User, "id" | "email" | "firstName" | "lastName"> | null;
+  cardHolder: Pick<User, "id" | "email" | "firstName" | "lastName"> | null;
   balances: WalletBalance[];
 };
 
@@ -21,12 +25,21 @@ type WalletSummary = Pick<Wallet, "id" | "type" | "name" | "ownerUserId"> & {
   owner: UserSummary | null;
 };
 
+type CounterpartySummary = Pick<Counterparty, "id" | "type"> & {
+  person: Pick<Person, "email" | "firstName" | "lastName"> | null;
+  company: Pick<Company, "legalForm" | "legalName"> | null;
+};
+
 export type MoneyTransactionWithDetails = MoneyTransaction & {
   category: CategorySummary | null;
   counterparty: UserSummary | null;
+  counterpartyEntity: CounterpartySummary | null;
   recipient: UserSummary | null;
+  recipientCounterparty: CounterpartySummary | null;
   debtor: UserSummary | null;
+  debtorCounterparty: CounterpartySummary | null;
   creditor: UserSummary | null;
+  creditorCounterparty: CounterpartySummary | null;
   recordedBy: UserSummary | null;
   balanceChanges: Array<
     WalletBalanceChange & {
@@ -52,6 +65,19 @@ function toUserSummary(row: UserSummary | null) {
     : null;
 }
 
+export function toCounterpartySummary(row: CounterpartySummary | null) {
+  if (!row) return null;
+  const personName = row.person
+    ? [row.person.firstName, row.person.lastName].filter(Boolean).join(" ")
+    : "";
+  return {
+    id: row.id,
+    kind: row.type,
+    label:
+      (row.company?.legalName ?? personName) || row.person?.email || row.id,
+  };
+}
+
 export function toWallet(row: WalletWithDetails): v1.finance.Wallet {
   return {
     id: row.id,
@@ -65,6 +91,8 @@ export function toWallet(row: WalletWithDetails): v1.finance.Wallet {
           lastName: row.owner.lastName,
         }
       : null,
+    cardHolderUserId: row.cardHolderUserId,
+    cardHolder: toUserSummary(row.cardHolder),
     name: row.name,
     isActive: row.isActive,
     balances: row.balances.map((balance) => ({
@@ -102,15 +130,19 @@ export function toMoneyTransaction(
     counterpartyUserId: row.counterpartyUserId,
     counterpartyId: row.counterpartyId,
     counterparty: toUserSummary(row.counterparty),
+    counterpartyEntity: toCounterpartySummary(row.counterpartyEntity),
     recipientUserId: row.recipientUserId,
     recipientCounterpartyId: row.recipientCounterpartyId,
     recipient: toUserSummary(row.recipient),
+    recipientCounterparty: toCounterpartySummary(row.recipientCounterparty),
     debtorUserId: row.debtorUserId,
     debtorCounterpartyId: row.debtorCounterpartyId,
     debtor: toUserSummary(row.debtor),
+    debtorCounterparty: toCounterpartySummary(row.debtorCounterparty),
     creditorUserId: row.creditorUserId,
     creditorCounterpartyId: row.creditorCounterpartyId,
     creditor: toUserSummary(row.creditor),
+    creditorCounterparty: toCounterpartySummary(row.creditorCounterparty),
     recordedByUserId: row.recordedByUserId,
     recordedBy: toUserSummary(row.recordedBy),
     occurredAt: row.occurredAt.toISOString(),

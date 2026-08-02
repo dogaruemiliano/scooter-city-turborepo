@@ -26,6 +26,8 @@ import {
   WalletType,
 } from "../generated/prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
+import { categoryCodeFromPath } from "./category-code";
+import { sortFinancialCategories } from "./category-sort";
 import type {
   MoneyTransactionWithDetails,
   WalletWithDetails,
@@ -78,6 +80,7 @@ export class FinanceService {
         data: {
           type: input.type,
           name: input.name,
+          cardHolderUserId: input.cardHolderUserId,
         },
         include: this.walletInclude(),
       });
@@ -192,10 +195,9 @@ export class FinanceService {
     return wallet;
   }
 
-  listCategories(): Promise<FinancialCategory[]> {
-    return this.prisma.financialCategory.findMany({
-      orderBy: [{ name: "asc" }, { id: "asc" }],
-    });
+  async listCategories(): Promise<FinancialCategory[]> {
+    const categories = await this.prisma.financialCategory.findMany();
+    return sortFinancialCategories(categories);
   }
 
   async createCategory(
@@ -204,10 +206,17 @@ export class FinanceService {
   ): Promise<FinancialCategory> {
     try {
       return await this.prisma.$transaction(async (tx) => {
-        await this.assertCategoryParent(tx, input.parentCategoryId ?? null);
+        const parent = await this.assertCategoryParent(
+          tx,
+          input.parentCategoryId ?? null,
+        );
         const category = await tx.financialCategory.create({
           data: {
-            code: input.code,
+            code: categoryCodeFromPath({
+              kind: input.kind,
+              name: input.name,
+              parentCode: parent?.code,
+            }),
             name: input.name,
             kind: input.kind,
             parentCategoryId: input.parentCategoryId ?? null,
@@ -243,13 +252,33 @@ export class FinanceService {
       if (input.parentCategoryId === id) {
         throw new BadRequestException("A category cannot be its own parent");
       }
-      if (input.parentCategoryId !== undefined) {
-        await this.assertCategoryParent(tx, input.parentCategoryId);
-      }
+      const pathChanged =
+        input.name !== undefined ||
+        input.kind !== undefined ||
+        input.parentCategoryId !== undefined;
+      const parent = pathChanged
+        ? await this.assertCategoryParent(
+            tx,
+            input.parentCategoryId !== undefined
+              ? input.parentCategoryId
+              : existing.parentCategoryId,
+          )
+        : null;
 
       const updated = await tx.financialCategory.update({
         where: { id },
-        data: input,
+        data: {
+          ...input,
+          ...(pathChanged
+            ? {
+                code: categoryCodeFromPath({
+                  kind: input.kind ?? existing.kind,
+                  name: input.name ?? existing.name,
+                  parentCode: parent?.code,
+                }),
+              }
+            : {}),
+        },
       });
       await this.audit.recordRequired(tx, {
         type: AuditEventType.FINANCIAL_CATEGORY_UPDATED,
@@ -378,6 +407,15 @@ export class FinanceService {
         include: this.transactionInclude(),
       });
       if (!original) throw new NotFoundException("Money transaction not found");
+      const expensePosting = await tx.expensePosting.findUnique({
+        where: { moneyTransactionId: original.id },
+        select: { expenseId: true, role: true },
+      });
+      if (expensePosting) {
+        throw new ConflictException(
+          "Expense-generated transactions must be reversed through the expense lifecycle",
+        );
+      }
       if (original.status !== MoneyTransactionStatus.POSTED) {
         throw new ConflictException(
           "Only a posted transaction can be reversed",
@@ -1058,6 +1096,9 @@ export class FinanceService {
       "counterpartyId",
       "counterpartyUserId",
     );
+    if (!input.counterpartyId && !input.counterpartyUserId) {
+      throw new BadRequestException("INCOME requires a payer");
+    }
     this.assertPaymentMethodRequired(input);
     if (input.financialScope === MoneyTransactionScope.COMPANY) {
       this.assertExactBalanceChanges(input, [
@@ -1093,6 +1134,7 @@ export class FinanceService {
   private assertExpenseShape(
     input: v1.finance.CreateMoneyTransactionInput,
   ): void {
+    this.assertCategoryRequired(input);
     this.assertAllowedPartyFields(input, [
       "counterpartyId",
       "counterpartyUserId",
@@ -1102,6 +1144,15 @@ export class FinanceService {
       "counterpartyId",
       "counterpartyUserId",
     );
+    if (
+      !input.counterpartyId &&
+      !input.counterpartyUserId &&
+      !input.description
+    ) {
+      throw new BadRequestException(
+        "An expense without a recipient requires a description",
+      );
+    }
     this.assertPaymentMethodRequired(input);
     if (input.financialScope === MoneyTransactionScope.COMPANY) {
       this.assertExactBalanceChanges(input, [
@@ -1287,6 +1338,14 @@ export class FinanceService {
   ): void {
     if (input.categoryId != null) {
       throw new BadRequestException(`${input.type} cannot have a category`);
+    }
+  }
+
+  private assertCategoryRequired(
+    input: v1.finance.CreateMoneyTransactionInput,
+  ): void {
+    if (!input.categoryId) {
+      throw new BadRequestException(`${input.type} requires a category`);
     }
   }
 
@@ -1579,9 +1638,49 @@ export class FinanceService {
   private transactionWhere(
     query: v1.finance.ListMoneyTransactionsQuery,
   ): Prisma.MoneyTransactionWhereInput {
+    const participantFilters: Prisma.MoneyTransactionWhereInput[] = [];
+    if (query.userId) {
+      participantFilters.push({
+        OR: [
+          { counterpartyUserId: query.userId },
+          { recipientUserId: query.userId },
+          { debtorUserId: query.userId },
+          { creditorUserId: query.userId },
+          {
+            balanceChanges: {
+              some: { wallet: { ownerUserId: query.userId } },
+            },
+          },
+        ],
+      });
+    }
+    if (query.counterpartyId) {
+      participantFilters.push({
+        OR: [
+          { counterpartyId: query.counterpartyId },
+          { recipientCounterpartyId: query.counterpartyId },
+          { debtorCounterpartyId: query.counterpartyId },
+          { creditorCounterpartyId: query.counterpartyId },
+        ],
+      });
+    }
+    if (query.businessLegalEntityId) {
+      participantFilters.push({
+        balanceChanges: {
+          some: {
+            wallet: {
+              businessLegalEntities: {
+                some: { legalEntityId: query.businessLegalEntityId },
+              },
+            },
+          },
+        },
+      });
+    }
+
     return {
       status: query.status,
-      type: query.type,
+      type: query.types ? { in: query.types } : query.type,
       financialScope: query.financialScope,
       paymentMethod: query.paymentMethod,
       billingStatus: query.billingStatus,
@@ -1590,23 +1689,7 @@ export class FinanceService {
       ...(query.walletId
         ? { balanceChanges: { some: { walletId: query.walletId } } }
         : {}),
-      ...(query.userId
-        ? {
-            OR: [
-              { counterpartyUserId: query.userId },
-              { recipientUserId: query.userId },
-              { debtorUserId: query.userId },
-              { creditorUserId: query.userId },
-              {
-                balanceChanges: {
-                  some: {
-                    wallet: { ownerUserId: query.userId },
-                  },
-                },
-              },
-            ],
-          }
-        : {}),
+      ...(participantFilters.length > 0 ? { AND: participantFilters } : {}),
       occurredAt:
         query.from || query.to
           ? {
@@ -1812,15 +1895,16 @@ export class FinanceService {
   private async assertCategoryParent(
     tx: Prisma.TransactionClient,
     parentCategoryId: string | null,
-  ): Promise<void> {
-    if (!parentCategoryId) return;
+  ): Promise<{ code: string } | null> {
+    if (!parentCategoryId) return null;
     const parent = await tx.financialCategory.findUnique({
       where: { id: parentCategoryId },
-      select: { isActive: true },
+      select: { code: true, isActive: true },
     });
     if (!parent?.isActive) {
       throw new BadRequestException("Parent financial category is not active");
     }
+    return parent;
   }
 
   private async recordTransactionAudit(
@@ -1860,6 +1944,14 @@ export class FinanceService {
           lastName: true,
         },
       },
+      cardHolder: {
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+        },
+      },
       balances: {
         orderBy: [{ bucket: "asc" }, { currency: "asc" }],
       },
@@ -1873,6 +1965,8 @@ export class FinanceService {
       name: true,
       isActive: true,
       owner: { select: this.userSummarySelect() },
+      cardHolderUserId: true,
+      cardHolder: { select: this.userSummarySelect() },
     } satisfies Prisma.WalletSelect;
   }
 
@@ -1887,9 +1981,13 @@ export class FinanceService {
         },
       },
       counterparty: { select: this.userSummarySelect() },
+      counterpartyEntity: { select: this.counterpartySummarySelect() },
       recipient: { select: this.userSummarySelect() },
+      recipientCounterparty: { select: this.counterpartySummarySelect() },
       debtor: { select: this.userSummarySelect() },
+      debtorCounterparty: { select: this.counterpartySummarySelect() },
       creditor: { select: this.userSummarySelect() },
+      creditorCounterparty: { select: this.counterpartySummarySelect() },
       recordedBy: { select: this.userSummarySelect() },
       balanceChanges: {
         include: {
@@ -1914,6 +2012,26 @@ export class FinanceService {
         take: 1,
       },
     } satisfies Prisma.MoneyTransactionInclude;
+  }
+
+  private counterpartySummarySelect() {
+    return {
+      id: true,
+      type: true,
+      person: {
+        select: {
+          email: true,
+          firstName: true,
+          lastName: true,
+        },
+      },
+      company: {
+        select: {
+          legalName: true,
+          legalForm: true,
+        },
+      },
+    } satisfies Prisma.CounterpartySelect;
   }
 
   private userSummarySelect() {
@@ -1959,7 +2077,9 @@ export class FinanceService {
 
   private handleCategoryWriteError(error: unknown): never {
     if (this.isUniqueConflict(error)) {
-      throw new ConflictException("Financial category code already exists");
+      throw new ConflictException(
+        "A financial category with this or a similar name already exists",
+      );
     }
     throw error;
   }

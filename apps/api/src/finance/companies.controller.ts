@@ -22,6 +22,8 @@ import { CompaniesService } from "./companies.service";
 import { toCompany } from "./company.mapper";
 import { Company } from "./dto/company";
 import { CompanyList } from "./dto/company-list";
+import { CompanyStats } from "./dto/company-stats";
+import { CompanyStatsQuery } from "./dto/company-stats.query";
 import { CreateCompanyInput } from "./dto/create-company.input";
 import { ListCompaniesQuery } from "./dto/list-companies.query";
 import { UpdateCompanyInput } from "./dto/update-company.input";
@@ -55,6 +57,19 @@ export class CompaniesController {
   ): Promise<v1.finance.CompanyList> {
     const result = await this.companies.list(query);
     return { ...result, items: result.items.map(toCompany) };
+  }
+
+  @Get(":id/stats")
+  @ApiOperation({
+    operationId: "CompaniesController_stats_v1",
+    summary: "Get company income and expense statistics",
+  })
+  @ZodResponse({ type: CompanyStats })
+  async stats(
+    @Param("id") id: string,
+    @Query() query: CompanyStatsQuery,
+  ): Promise<v1.finance.CompanyStats> {
+    return this.companies.stats(id, query);
   }
 
   @Get(":id")

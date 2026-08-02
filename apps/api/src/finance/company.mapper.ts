@@ -1,9 +1,14 @@
 import type { v1 } from "@repo/api-shared";
 
-import type { Company, Counterparty } from "../generated/prisma/client";
+import type {
+  BusinessLegalEntity,
+  Company,
+  Counterparty,
+} from "../generated/prisma/client";
 
 type CompanyWithCounterparty = Company & {
   counterparty: Pick<Counterparty, "id"> | null;
+  businessLegalEntity: Pick<BusinessLegalEntity, "id"> | null;
 };
 
 export function toCompany(row: CompanyWithCounterparty): v1.finance.Company {
@@ -14,7 +19,9 @@ export function toCompany(row: CompanyWithCounterparty): v1.finance.Company {
   return {
     id: row.id,
     counterpartyId: row.counterparty.id,
+    businessLegalEntityId: row.businessLegalEntity?.id ?? null,
     legalName: row.legalName,
+    legalForm: row.legalForm,
     tradingName: row.tradingName,
     taxIdentifier: row.taxIdentifier,
     registrationNumber: row.registrationNumber,

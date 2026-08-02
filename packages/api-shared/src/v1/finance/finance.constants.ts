@@ -97,7 +97,7 @@ export const BILLING_STATUSES = [
 
 export type BillingStatus = (typeof BILLING_STATUSES)[number];
 
-export const FINANCIAL_CATEGORY_KINDS = ["INCOME", "EXPENSE", "BOTH"] as const;
+export const FINANCIAL_CATEGORY_KINDS = ["INCOME", "EXPENSE"] as const;
 
 export type FinancialCategoryKind = (typeof FINANCIAL_CATEGORY_KINDS)[number];
 
@@ -105,6 +105,28 @@ export const FINANCIAL_COUNTERPARTY_KINDS = ["PERSON", "COMPANY"] as const;
 
 export type FinancialCounterpartyKind =
   (typeof FINANCIAL_COUNTERPARTY_KINDS)[number];
+
+export const COMPANY_LEGAL_FORMS = [
+  "SRL",
+  "SA",
+  "PFA",
+  "II",
+  "IF",
+  "ONG",
+  "OTHER",
+] as const;
+
+export type CompanyLegalForm = (typeof COMPANY_LEGAL_FORMS)[number];
+
+export const COMPANY_ACTIVITY_PERIODS = [
+  "DAY",
+  "WEEK",
+  "MONTH",
+  "YEAR",
+  "ALL",
+] as const;
+
+export type CompanyActivityPeriod = (typeof COMPANY_ACTIVITY_PERIODS)[number];
 
 export const ROUTES = {
   summary: "/v1/finance/summary",
@@ -128,6 +150,7 @@ export const ROUTES = {
     create: "/v1/finance/companies",
     get: (id: string): string => `/v1/finance/companies/${id}`,
     update: (id: string): string => `/v1/finance/companies/${id}`,
+    stats: (id: string): string => `/v1/finance/companies/${id}/stats`,
   },
   transactions: {
     list: "/v1/finance/transactions",

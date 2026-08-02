@@ -11,6 +11,7 @@ function validTransactionInput() {
     financialScope: "COMPANY",
     paymentMethod: "CASH",
     billingStatus: "BILLED",
+    counterpartyId: "counterparty-1",
     idempotencyKey: "rental-payment-123",
     postImmediately: true,
     balanceChanges: [
@@ -53,6 +54,99 @@ const financeCategorySummary = {
   kind: "INCOME",
 } as const;
 
+test("financial category creation accepts user-facing fields without a code", () => {
+  const parsed = finance.createFinancialCategoryInputSchema.parse({
+    name: "Rental income",
+    kind: "INCOME",
+    parentCategoryId: null,
+  });
+
+  assert.deepEqual(parsed, {
+    name: "Rental income",
+    kind: "INCOME",
+    parentCategoryId: null,
+  });
+  assert.equal(
+    finance.createFinancialCategoryInputSchema.safeParse({
+      ...parsed,
+      code: "MANUAL_CODE",
+    }).success,
+    false,
+  );
+  assert.equal(
+    finance.createFinancialCategoryInputSchema.safeParse({
+      ...parsed,
+      kind: "BOTH",
+    }).success,
+    false,
+  );
+});
+
+test("company contracts require a supported legal form", () => {
+  const company = {
+    legalName: "Scooter City",
+    legalForm: "ONG",
+  };
+
+  assert.equal(
+    finance.createCompanyInputSchema.safeParse(company).success,
+    true,
+  );
+  assert.equal(
+    finance.createCompanyInputSchema.safeParse({ legalName: "Scooter City" })
+      .success,
+    false,
+  );
+  assert.equal(
+    finance.createCompanyInputSchema.safeParse({
+      ...company,
+      legalForm: "SNC",
+    }).success,
+    false,
+  );
+});
+
+test("company activity contracts support period totals and counterparty filtering", () => {
+  assert.deepEqual(finance.companyStatsQuerySchema.parse({}), {
+    period: "MONTH",
+  });
+  assert.equal(
+    finance.companyStatsSchema.safeParse({
+      period: "YEAR",
+      from: "2026-01-01T00:00:00.000Z",
+      to: "2026-08-02T12:00:00.000Z",
+      transactionCount: 2,
+      totals: [
+        {
+          currency: "RON",
+          income: "250.00",
+          expenses: "100.00",
+          net: "150.00",
+        },
+      ],
+    }).success,
+    true,
+  );
+  assert.equal(
+    finance.listMoneyTransactionsQuerySchema.parse({
+      counterpartyId: "counterparty-1",
+    }).counterpartyId,
+    "counterparty-1",
+  );
+  assert.equal(
+    finance.listMoneyTransactionsQuerySchema.parse({
+      businessLegalEntityId: "legal-entity-1",
+    }).businessLegalEntityId,
+    "legal-entity-1",
+  );
+  assert.deepEqual(
+    finance.listMoneyTransactionsQuerySchema.parse({
+      types: "INCOME,EXPENSE",
+    }).types,
+    ["INCOME", "EXPENSE"],
+  );
+});
+
 test("finance transaction input normalizes currency and reference type", () => {
   const parsed = finance.createMoneyTransactionInputSchema.parse(
     validTransactionInput(),
@@ -88,6 +182,74 @@ test("finance transaction input allows at most one primary reference", () => {
   });
 
   assert.equal(result.success, false);
+});
+
+test("finance transaction input requires a category for expenses", () => {
+  const expense = {
+    ...validTransactionInput(),
+    type: "EXPENSE",
+    balanceChanges: [
+      {
+        walletId: "wallet-1",
+        bucket: "BUSINESS_FUNDS",
+        currency: "RON",
+        amountDelta: "-125.50",
+      },
+    ],
+  } as const;
+
+  assert.equal(
+    finance.createMoneyTransactionInputSchema.safeParse(expense).success,
+    false,
+  );
+  assert.equal(
+    finance.createMoneyTransactionInputSchema.safeParse({
+      ...expense,
+      categoryId: "category-1",
+      description: "Cash expense without a known recipient",
+    }).success,
+    true,
+  );
+});
+
+test("finance transaction input requires a payer for income", () => {
+  const income = validTransactionInput();
+  const result = finance.createMoneyTransactionInputSchema.safeParse({
+    ...income,
+    counterpartyId: null,
+  });
+
+  assert.equal(result.success, false);
+  assert.equal(result.error?.issues[0]?.path[0], "counterpartyId");
+});
+
+test("finance transaction input requires a description for an expense without a recipient", () => {
+  const expense = {
+    ...validTransactionInput(),
+    type: "EXPENSE",
+    categoryId: "category-1",
+    counterpartyId: null,
+    balanceChanges: [
+      {
+        walletId: "wallet-1",
+        bucket: "BUSINESS_FUNDS",
+        currency: "RON",
+        amountDelta: "-125.50",
+      },
+    ],
+  } as const;
+
+  assert.equal(
+    finance.createMoneyTransactionInputSchema.safeParse(expense).success,
+    false,
+  );
+  assert.equal(
+    finance.createMoneyTransactionInputSchema.safeParse({
+      ...expense,
+      description: "Cash expense without a known recipient",
+    }).success,
+    true,
+  );
 });
 
 test("finance money inputs reject zero and excessive precision", () => {
@@ -254,6 +416,8 @@ test("wallet option contracts stay lightweight and cursor-paginated", () => {
     name: "Personal wallet",
     isActive: true,
     owner: financeUserSummary,
+    cardHolderUserId: null,
+    cardHolder: null,
   } as const;
   assert.deepEqual(
     finance.walletOptionListSchema.parse({
@@ -510,9 +674,17 @@ test("finance transaction responses include compact relation summaries", () => {
     recordedByUserId: financeUserSummary.id,
     category: financeCategorySummary,
     counterparty: financeUserSummary,
+    counterpartyEntity: {
+      id: "counterparty-1",
+      kind: "COMPANY",
+      label: "Scooter City SRL",
+    },
     recipient: financeUserSummary,
+    recipientCounterparty: null,
     debtor: financeUserSummary,
+    debtorCounterparty: null,
     creditor: financeUserSummary,
+    creditorCounterparty: null,
     recordedBy: financeUserSummary,
     occurredAt: "2026-07-29T12:00:00.000Z",
     description: null,
@@ -538,6 +710,7 @@ test("finance transaction responses include compact relation summaries", () => {
 
   assert.equal(parsed.categoryId, parsed.category?.id);
   assert.equal(parsed.counterpartyUserId, parsed.counterparty?.id);
+  assert.equal(parsed.counterpartyEntity?.label, "Scooter City SRL");
   assert.equal(
     parsed.balanceChanges[0]?.walletId,
     parsed.balanceChanges[0]?.wallet.id,

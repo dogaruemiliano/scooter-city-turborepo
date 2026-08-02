@@ -246,6 +246,53 @@ describe("ImageStorageService", () => {
     expect(send.mock.calls[0]?.[0]).toBeInstanceOf(HeadObjectCommand);
   });
 
+  it("supports checksum-bound private PDF uploads without widening image APIs", async () => {
+    const checksumSha256 = createHash("sha256")
+      .update("%PDF-test")
+      .digest("hex");
+    const send = jest.fn((command: unknown) => {
+      if (command instanceof HeadObjectCommand) {
+        return {
+          ContentType: "application/pdf",
+          ContentLength: 9,
+        };
+      }
+      return {};
+    }) as SendMock;
+    const { service } = createService(send);
+
+    const upload = await service.createPresignedDocumentUpload({
+      contentType: "application/pdf",
+      byteSize: 9,
+      checksumSha256,
+      pageCount: 2,
+      scope: "expense-document:expense-1:document-1:original:user-1",
+    });
+
+    expect(upload.storageKey).toMatch(
+      /^document-photos-test\/\d{4}\/\d{2}\/\d{2}\/.+\.pdf$/,
+    );
+    await expect(
+      service.completePresignedUpload(
+        upload.uploadToken,
+        "expense-document:expense-1:document-1:original:user-1",
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    const completed = await service.completePresignedDocumentUpload(
+      upload.uploadToken,
+      "expense-document:expense-1:document-1:original:user-1",
+    );
+    expect(completed).toMatchObject({
+      contentType: "application/pdf",
+      byteSize: 9,
+      checksumSha256,
+      imageWidth: null,
+      imageHeight: null,
+      pageCount: 2,
+    });
+  });
+
   it("rejects unsupported content types, oversized files, and unsafe keys", async () => {
     const { service } = createService();
 

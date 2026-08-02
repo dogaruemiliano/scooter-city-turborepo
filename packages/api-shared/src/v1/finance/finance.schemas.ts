@@ -6,6 +6,8 @@ import {
 } from "../common/common.schemas";
 import {
   BILLING_STATUSES,
+  COMPANY_ACTIVITY_PERIODS,
+  COMPANY_LEGAL_FORMS,
   COMPANY_WALLET_TYPES,
   CREATABLE_MONEY_TRANSACTION_TYPES,
   FINANCIAL_CATEGORY_KINDS,
@@ -20,7 +22,6 @@ import {
 import type { WalletType } from "./finance.constants";
 
 const MAX_NAME_LENGTH = 120;
-const MAX_CODE_LENGTH = 80;
 const MAX_DESCRIPTION_LENGTH = 2_000;
 const MAX_IDEMPOTENCY_KEY_LENGTH = 200;
 const MAX_REFERENCE_TYPE_LENGTH = 80;
@@ -45,8 +46,8 @@ const signedAggregateMoneyPattern = /^-?(?:0|[1-9]\d*)(?:\.\d{1,2})?$/;
 export const currencySchema = z
   .string()
   .trim()
-  .transform((value) => value.toUpperCase())
-  .pipe(z.string().regex(/^[A-Z]{3}$/))
+  .toUpperCase()
+  .regex(/^[A-Z]{3}$/)
   .default("RON");
 
 export const moneyAmountSchema = z.string().trim().regex(unsignedMoneyPattern, {
@@ -118,6 +119,19 @@ export const financeUserSummarySchema = z
 
 export type FinanceUserSummary = z.infer<typeof financeUserSummarySchema>;
 
+export const financeCounterpartySummarySchema = z
+  .object({
+    id: z.string(),
+    kind: z.enum(FINANCIAL_COUNTERPARTY_KINDS),
+    label: z.string(),
+  })
+  .strict()
+  .meta({ id: "FinanceCounterpartySummary" });
+
+export type FinanceCounterpartySummary = z.infer<
+  typeof financeCounterpartySummarySchema
+>;
+
 export const financeWalletSummarySchema = z
   .object({
     id: z.string(),
@@ -162,6 +176,8 @@ export const walletSchema = z
     type: walletTypeSchema,
     ownerUserId: z.string().nullable(),
     owner: walletOwnerSchema.nullable(),
+    cardHolderUserId: z.string().nullable(),
+    cardHolder: financeUserSummarySchema.nullable(),
     name: z.string(),
     isActive: z.boolean(),
     balances: z.array(walletBalanceSchema),
@@ -190,6 +206,8 @@ export const walletOptionSchema = z
     name: z.string(),
     isActive: z.boolean(),
     owner: financeUserSummarySchema.nullable(),
+    cardHolderUserId: z.string().nullable(),
+    cardHolder: financeUserSummarySchema.nullable(),
   })
   .strict()
   .meta({ id: "WalletOption" });
@@ -243,7 +261,9 @@ export const companySchema = z
   .object({
     id: z.string(),
     counterpartyId: z.string(),
+    businessLegalEntityId: z.string().nullable(),
     legalName: z.string(),
+    legalForm: z.enum(COMPANY_LEGAL_FORMS),
     tradingName: z.string().nullable(),
     taxIdentifier: z.string().nullable(),
     registrationNumber: z.string().nullable(),
@@ -279,6 +299,7 @@ export type CompanyList = z.infer<typeof companyListSchema>;
 
 const companyFieldsSchema = z.object({
   legalName: z.string().trim().min(1).max(MAX_COMPANY_TEXT_LENGTH),
+  legalForm: z.enum(COMPANY_LEGAL_FORMS),
   tradingName: optionalCompanyTextSchema,
   taxIdentifier: optionalCompanyTextSchema,
   registrationNumber: optionalCompanyTextSchema,
@@ -336,6 +357,33 @@ export const listCompaniesQuerySchema = z
   .strict()
   .meta({ id: "ListCompaniesQuery" });
 export type ListCompaniesQuery = z.infer<typeof listCompaniesQuerySchema>;
+
+export const companyStatsQuerySchema = z
+  .object({
+    period: z.enum(COMPANY_ACTIVITY_PERIODS).default("MONTH"),
+  })
+  .strict()
+  .meta({ id: "CompanyStatsQuery" });
+export type CompanyStatsQuery = z.infer<typeof companyStatsQuerySchema>;
+
+export const companyStatsSchema = z
+  .object({
+    period: z.enum(COMPANY_ACTIVITY_PERIODS),
+    from: z.iso.datetime({ offset: true }).nullable(),
+    to: z.iso.datetime({ offset: true }),
+    transactionCount: z.number().int().min(0),
+    totals: z.array(
+      z.object({
+        currency: currencySchema,
+        income: aggregateMoneyAmountSchema,
+        expenses: aggregateMoneyAmountSchema,
+        net: signedAggregateMoneyAmountSchema,
+      }),
+    ),
+  })
+  .strict()
+  .meta({ id: "CompanyStats" });
+export type CompanyStats = z.infer<typeof companyStatsSchema>;
 
 export const searchFinancialCounterpartiesQuerySchema = z
   .object({
@@ -477,6 +525,7 @@ export const createCompanyWalletInputSchema = z
   .object({
     type: companyWalletTypeSchema,
     name: z.string().trim().min(1).max(MAX_NAME_LENGTH),
+    cardHolderUserId: z.string().min(1).optional(),
   })
   .strict()
   .meta({ id: "CreateCompanyWalletInput" });
@@ -508,16 +557,6 @@ export const financialCategoryListSchema = z
 
 export const createFinancialCategoryInputSchema = z
   .object({
-    code: z
-      .string()
-      .trim()
-      .transform((value) => value.toUpperCase())
-      .pipe(
-        z
-          .string()
-          .regex(/^[A-Z][A-Z0-9_]*$/)
-          .max(MAX_CODE_LENGTH),
-      ),
     name: z.string().trim().min(1).max(MAX_NAME_LENGTH),
     kind: financialCategoryKindSchema,
     parentCategoryId: z.string().nullable().optional(),
@@ -566,7 +605,7 @@ export const moneyTransactionReferenceInputSchema = z
       .trim()
       .min(1)
       .max(MAX_REFERENCE_TYPE_LENGTH)
-      .transform((value) => value.toUpperCase()),
+      .toUpperCase(),
     referenceId: z.string().trim().min(1).max(MAX_REFERENCE_ID_LENGTH),
     isPrimary: z.boolean().default(false),
   })
@@ -610,6 +649,39 @@ export const createMoneyTransactionInputSchema = z
   })
   .strict()
   .superRefine((input, ctx) => {
+    if (
+      input.type === "INCOME" &&
+      !input.counterpartyId &&
+      !input.counterpartyUserId
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["counterpartyId"],
+        message: "An income transaction requires a payer.",
+      });
+    }
+
+    if (input.type === "EXPENSE" && !input.categoryId) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["categoryId"],
+        message: "An expense requires a category.",
+      });
+    }
+
+    if (
+      input.type === "EXPENSE" &&
+      !input.counterpartyId &&
+      !input.counterpartyUserId &&
+      !input.description
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["description"],
+        message: "An expense without a recipient requires a description.",
+      });
+    }
+
     const primaryReferences = input.references.filter(
       (reference) => reference.isPrimary,
     );
@@ -701,9 +773,17 @@ export const moneyTransactionSchema = z
     recordedByUserId: z.string().nullable(),
     category: financeCategorySummarySchema.nullable(),
     counterparty: financeUserSummarySchema.nullable(),
+    counterpartyEntity: financeCounterpartySummarySchema.nullable().optional(),
     recipient: financeUserSummarySchema.nullable(),
+    recipientCounterparty: financeCounterpartySummarySchema
+      .nullable()
+      .optional(),
     debtor: financeUserSummarySchema.nullable(),
+    debtorCounterparty: financeCounterpartySummarySchema.nullable().optional(),
     creditor: financeUserSummarySchema.nullable(),
+    creditorCounterparty: financeCounterpartySummarySchema
+      .nullable()
+      .optional(),
     recordedBy: financeUserSummarySchema.nullable(),
     occurredAt: z.iso.datetime({ offset: true }),
     description: z.string().nullable(),
@@ -737,11 +817,25 @@ export const listMoneyTransactionsQuerySchema = z
     pageSize: z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).default(25),
     status: moneyTransactionStatusSchema.optional(),
     type: moneyTransactionTypeSchema.optional(),
+    types: z
+      .preprocess(
+        (value) =>
+          typeof value === "string"
+            ? value
+                .split(",")
+                .map((item) => item.trim())
+                .filter(Boolean)
+            : value,
+        z.array(moneyTransactionTypeSchema).min(1),
+      )
+      .optional(),
     financialScope: moneyTransactionScopeSchema.optional(),
     paymentMethod: paymentMethodSchema.optional(),
     billingStatus: billingStatusSchema.optional(),
     walletId: z.string().optional(),
     userId: z.string().optional(),
+    counterpartyId: z.string().optional(),
+    businessLegalEntityId: z.string().optional(),
     recordedByUserId: z.string().optional(),
     categoryId: z.string().optional(),
     from: z.iso
@@ -755,6 +849,13 @@ export const listMoneyTransactionsQuerySchema = z
   })
   .strict()
   .superRefine((query, ctx) => {
+    if (query.type !== undefined && query.types !== undefined) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["types"],
+        message: "Use either type or types, not both.",
+      });
+    }
     if (
       query.from !== undefined &&
       query.to !== undefined &&

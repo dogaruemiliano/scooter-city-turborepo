@@ -29,6 +29,11 @@ interface TestSession {
   userId: string;
 }
 
+interface AdminRoleSnapshot {
+  id: string;
+  roles: string[];
+}
+
 describe("Finance HTTP surface (e2e)", () => {
   let app: INestApplication;
   let prisma: PrismaService;
@@ -48,12 +53,22 @@ describe("Finance HTTP surface (e2e)", () => {
   let companyProcessorWallet: v1.finance.Wallet;
   let rentalIncomeCategory: v1.finance.FinancialCategory;
   let operatingExpenseCategory: v1.finance.FinancialCategory;
+  let expenseEvidenceEntity: v1.finance.BusinessLegalEntity;
+  let expenseEvidenceOwner: v1.finance.BusinessOwner;
+  let expenseEvidencePayee: v1.finance.Company;
+  let expenseEvidenceCategory: v1.finance.FinancialCategory;
+  let expenseEvidenceCashWalletId: string;
+  let expenseEvidenceCardWalletId: string;
 
   const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const suiteStartedAt = new Date().toISOString();
+  const expenseEvidenceTaxIdentifier = `RO${Date.now()}${Math.floor(
+    Math.random() * 1_000,
+  )}`;
   const createdUserIds: string[] = [];
   const createdWalletIds: string[] = [];
   const createdCategoryIds: string[] = [];
+  let existingAdminRoleSnapshots: AdminRoleSnapshot[] = [];
 
   const server = () => app.getHttpServer() as Server;
 
@@ -115,6 +130,102 @@ describe("Finance HTTP surface (e2e)", () => {
     );
   }
 
+  function claimsForSuiteAdmins(
+    body: unknown,
+  ): v1.finance.OutstandingPersonalClaim[] {
+    const suiteAdminIds = new Set([admin.userId, secondAdmin.userId]);
+    const { items } = body as {
+      items: v1.finance.OutstandingPersonalClaim[];
+    };
+
+    return items.filter(
+      (claim) =>
+        suiteAdminIds.has(claim.debtorUserId) &&
+        suiteAdminIds.has(claim.creditorUserId),
+    );
+  }
+
+  function expensePayload(input: {
+    key: string;
+    source: v1.finance.ExpensePaymentSource;
+    target?: v1.finance.ExpenseAttributionTarget;
+    documents?: v1.finance.ExpenseDocumentInput[];
+  }): v1.finance.CreateExpenseInput {
+    const target = input.target ?? "BUSINESS";
+    const isPersonal = input.source === "PERSONAL_FUNDS";
+    return {
+      legalEntityId: expenseEvidenceEntity.id,
+      payeeId: expenseEvidencePayee.counterpartyId,
+      categoryId: expenseEvidenceCategory.id,
+      occurredOn: "2040-01-15",
+      taxPointOn: "2040-01-15",
+      currency: "RON",
+      grossAmount: "25.00",
+      idempotencyKey: `expense-e2e:${runId}:${input.key}`,
+      postImmediately: false,
+      payment: {
+        source: input.source,
+        companyWalletId: isPersonal
+          ? null
+          : input.source === "COMPANY_CASH_DESK"
+            ? expenseEvidenceCashWalletId
+            : expenseEvidenceCardWalletId,
+        fundedByUserId: isPersonal ? admin.userId : null,
+        paidByUserId: admin.userId,
+        amount: "25.00",
+        paidOn: "2040-01-15",
+      },
+      attribution: {
+        target,
+        businessOwnerId: target === "OWNER" ? expenseEvidenceOwner.id : null,
+      },
+      taxLines: [],
+      references: [],
+      documents: input.documents ?? [],
+    };
+  }
+
+  async function createExpenseDraft(input: {
+    key: string;
+    source: v1.finance.ExpensePaymentSource;
+    target?: v1.finance.ExpenseAttributionTarget;
+    documents?: v1.finance.ExpenseDocumentInput[];
+  }): Promise<v1.finance.Expense> {
+    const response = await authenticate(
+      req().post(v1.finance.EXPENSE_ROUTES.create).send(expensePayload(input)),
+      admin,
+    );
+    expect(response.status).toBe(201);
+    return response.body as v1.finance.Expense;
+  }
+
+  async function attachExpenseDocumentOriginal(
+    documentId: string,
+    key: string,
+  ): Promise<void> {
+    const asset = await prisma.mediaAsset.create({
+      data: {
+        provider: "e2e",
+        bucket: "expense-e2e",
+        storageKey: `expense-e2e/${runId}/${key}`,
+        contentType: "image/jpeg",
+        byteSize: 1,
+        checksumSha256: "a".repeat(64),
+        uploadedByUserId: admin.userId,
+      },
+      select: { id: true },
+    });
+    await prisma.expenseDocumentAsset.create({
+      data: {
+        documentId,
+        assetId: asset.id,
+        role: "ORIGINAL",
+        imageWidth: 1,
+        imageHeight: 1,
+      },
+    });
+  }
+
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule],
@@ -128,6 +239,28 @@ describe("Finance HTTP surface (e2e)", () => {
     prisma = app.get(PrismaService);
     users = app.get(UsersService);
     coreAuth = app.get(CoreAuthService);
+
+    // The API E2E command runs suites in-band. Isolate the active-admin set
+    // atomically so personal-income claim generation sees only this suite's
+    // two admins, while preserving every pre-existing user's exact roles.
+    existingAdminRoleSnapshots = await prisma.$transaction(async (tx) => {
+      const snapshots = await tx.user.findMany({
+        where: { roles: { has: "ADMIN" }, deletedAt: null },
+        select: { id: true, roles: true },
+        orderBy: { id: "asc" },
+      });
+
+      for (const snapshot of snapshots) {
+        await tx.user.update({
+          where: { id: snapshot.id },
+          data: {
+            roles: snapshot.roles.filter((role) => role !== "ADMIN"),
+          },
+        });
+      }
+
+      return snapshots;
+    });
 
     admin = await freshSession(["ADMIN"], {
       firstName: "Ada",
@@ -150,9 +283,240 @@ describe("Finance HTTP surface (e2e)", () => {
       secondAdminWallet.id,
       customerWallet.id,
     );
+
+    const entityResponse = await authenticate(
+      req()
+        .post(v1.finance.EXPENSE_ROUTES.legalEntities.create)
+        .send({
+          company: {
+            legalName: `Expense Evidence Entity ${runId}`,
+            legalForm: "SRL",
+            taxIdentifier: expenseEvidenceTaxIdentifier,
+          },
+          defaultCurrency: "RON",
+          walletIds: [],
+          bankAccounts: [
+            {
+              name: "Expense evidence card account",
+              cardHolderUserId: admin.userId,
+            },
+          ],
+        }),
+      admin,
+    );
+    expect(entityResponse.status).toBe(201);
+    expenseEvidenceEntity =
+      entityResponse.body as v1.finance.BusinessLegalEntity;
+    const cashWallet = expenseEvidenceEntity.wallets.find(
+      (wallet) => wallet.type === "COMPANY_CASH",
+    );
+    const cardWallet = expenseEvidenceEntity.wallets.find(
+      (wallet) => wallet.type === "COMPANY_BANK",
+    );
+    if (!cashWallet || !cardWallet) {
+      throw new Error(
+        "Expense evidence entity must expose cash and card wallets",
+      );
+    }
+    expenseEvidenceCashWalletId = cashWallet.id;
+    expenseEvidenceCardWalletId = cardWallet.id;
+    createdWalletIds.push(...expenseEvidenceEntity.wallets.map(({ id }) => id));
+
+    const ownerResponse = await authenticate(
+      req()
+        .post(
+          v1.finance.EXPENSE_ROUTES.legalEntities.owners.create(
+            expenseEvidenceEntity.id,
+          ),
+        )
+        .send({ userId: admin.userId, effectiveFrom: "2000-01-01" }),
+      admin,
+    );
+    expect(ownerResponse.status).toBe(201);
+    expenseEvidenceOwner = ownerResponse.body as v1.finance.BusinessOwner;
+
+    const payeeResponse = await authenticate(
+      req()
+        .post(v1.finance.ROUTES.companies.create)
+        .send({
+          legalName: `Expense Evidence Vendor ${runId}`,
+          legalForm: "SRL",
+          taxIdentifier: `${expenseEvidenceTaxIdentifier}1`,
+        }),
+      admin,
+    );
+    expect(payeeResponse.status).toBe(201);
+    expenseEvidencePayee = payeeResponse.body as v1.finance.Company;
+
+    const categoryResponse = await authenticate(
+      req()
+        .post(v1.finance.ROUTES.categories.create)
+        .send({ name: `Expense evidence ${runId}`, kind: "EXPENSE" }),
+      admin,
+    );
+    expect(categoryResponse.status).toBe(201);
+    expenseEvidenceCategory =
+      categoryResponse.body as v1.finance.FinancialCategory;
+    createdCategoryIds.push(expenseEvidenceCategory.id);
   });
 
   afterAll(async () => {
+    let expenseCleanupError: unknown;
+    if (prisma) {
+      try {
+        await prisma.$transaction(async (tx) => {
+          // Expense history is deliberately append-only in production. This
+          // transaction-local PostgreSQL setting disables user triggers only on
+          // this E2E connection so the suite can remove its own isolated rows.
+          await tx.$executeRawUnsafe(
+            "SET LOCAL session_replication_role = 'replica'",
+          );
+          const expenses = await tx.expense.findMany({
+            where: {
+              idempotencyKey: { startsWith: `expense-e2e:${runId}:` },
+            },
+            select: { id: true },
+          });
+          const expenseIds = expenses.map(({ id }) => id);
+          if (expenseIds.length === 0) return;
+
+          const [postings, documents, pools, snapshots, claims] =
+            await Promise.all([
+              tx.expensePosting.findMany({
+                where: { expenseId: { in: expenseIds } },
+                select: { moneyTransactionId: true },
+              }),
+              tx.expenseDocument.findMany({
+                where: { expenseId: { in: expenseIds } },
+                select: { id: true },
+              }),
+              tx.expenseCostPool.findMany({
+                where: { expenseId: { in: expenseIds } },
+                select: { id: true },
+              }),
+              tx.expenseTaxSnapshot.findMany({
+                where: { expenseId: { in: expenseIds } },
+                select: { id: true },
+              }),
+              tx.expenseReimbursementClaim.findMany({
+                where: { expenseId: { in: expenseIds } },
+                select: { id: true },
+              }),
+            ]);
+          const transactionIds = postings.map(
+            ({ moneyTransactionId }) => moneyTransactionId,
+          );
+          const documentIds = documents.map(({ id }) => id);
+          const poolIds = pools.map(({ id }) => id);
+          const snapshotIds = snapshots.map(({ id }) => id);
+          const claimIds = claims.map(({ id }) => id);
+          const assetLinks =
+            documentIds.length === 0
+              ? []
+              : await tx.expenseDocumentAsset.findMany({
+                  where: { documentId: { in: documentIds } },
+                  select: { assetId: true },
+                });
+
+          await tx.expensePosting.deleteMany({
+            where: { expenseId: { in: expenseIds } },
+          });
+          if (transactionIds.length > 0) {
+            await tx.moneyTransactionReference.deleteMany({
+              where: { moneyTransactionId: { in: transactionIds } },
+            });
+            await tx.walletBalanceChange.deleteMany({
+              where: { moneyTransactionId: { in: transactionIds } },
+            });
+            await tx.moneyTransaction.deleteMany({
+              where: { id: { in: transactionIds } },
+            });
+          }
+          if (claimIds.length > 0) {
+            await tx.expenseReimbursementSettlement.deleteMany({
+              where: { claimId: { in: claimIds } },
+            });
+            await tx.expenseReimbursementClaim.deleteMany({
+              where: { id: { in: claimIds } },
+            });
+          }
+          if (documentIds.length > 0) {
+            await tx.expenseDocumentAsset.deleteMany({
+              where: { documentId: { in: documentIds } },
+            });
+            await tx.expenseDocument.deleteMany({
+              where: { id: { in: documentIds } },
+            });
+          }
+          if (snapshotIds.length > 0) {
+            await tx.expenseTaxLine.deleteMany({
+              where: { taxSnapshotId: { in: snapshotIds } },
+            });
+            await tx.expenseTaxSnapshot.deleteMany({
+              where: { id: { in: snapshotIds } },
+            });
+          }
+          await tx.expenseReference.deleteMany({
+            where: { expenseId: { in: expenseIds } },
+          });
+          if (poolIds.length > 0) {
+            await tx.expenseCostAttribution.deleteMany({
+              where: { costPoolId: { in: poolIds } },
+            });
+            await tx.expenseCostPool.deleteMany({
+              where: { id: { in: poolIds } },
+            });
+          }
+          await tx.expensePayment.deleteMany({
+            where: { expenseId: { in: expenseIds } },
+          });
+          await tx.expense.deleteMany({ where: { id: { in: expenseIds } } });
+          if (assetLinks.length > 0) {
+            await tx.mediaAsset.deleteMany({
+              where: { id: { in: assetLinks.map(({ assetId }) => assetId) } },
+            });
+          }
+        });
+
+        if (expenseEvidenceEntity) {
+          await prisma.$transaction(async (tx) => {
+            await tx.businessOwner.deleteMany({
+              where: { legalEntityId: expenseEvidenceEntity.id },
+            });
+            await tx.businessLegalEntityWallet.deleteMany({
+              where: { legalEntityId: expenseEvidenceEntity.id },
+            });
+            await tx.businessLegalEntity.delete({
+              where: { id: expenseEvidenceEntity.id },
+            });
+
+            const companyIds = [
+              expenseEvidenceEntity.companyId,
+              expenseEvidencePayee?.id,
+            ].filter((id): id is string => Boolean(id));
+            await tx.counterparty.deleteMany({
+              where: { companyId: { in: companyIds } },
+            });
+            await tx.company.deleteMany({ where: { id: { in: companyIds } } });
+          });
+        }
+      } catch (error) {
+        expenseCleanupError = error;
+      }
+    }
+
+    if (prisma && existingAdminRoleSnapshots.length > 0) {
+      await prisma.$transaction(
+        existingAdminRoleSnapshots.map((snapshot) =>
+          prisma.user.update({
+            where: { id: snapshot.id },
+            data: { roles: snapshot.roles },
+          }),
+        ),
+      );
+      existingAdminRoleSnapshots = [];
+    }
+
     if (prisma && createdUserIds.length > 0) {
       const transactionRows = await prisma.moneyTransaction.findMany({
         where: {
@@ -215,6 +579,10 @@ describe("Finance HTTP surface (e2e)", () => {
       await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
     }
     await app?.close();
+    if (expenseCleanupError instanceof Error) throw expenseCleanupError;
+    if (expenseCleanupError) {
+      throw new Error("Expense fixture cleanup failed");
+    }
   });
 
   async function getWalletForUser(
@@ -279,8 +647,7 @@ describe("Finance HTTP surface (e2e)", () => {
       req()
         .post(v1.finance.ROUTES.categories.create)
         .send({
-          code: `RENTAL_${runId.replaceAll("-", "_").toUpperCase()}`,
-          name: "Rental income",
+          name: `Rental income ${runId}`,
           kind: "INCOME",
         }),
       admin,
@@ -293,8 +660,7 @@ describe("Finance HTTP surface (e2e)", () => {
       req()
         .post(v1.finance.ROUTES.categories.create)
         .send({
-          code: `OPERATING_${runId.replaceAll("-", "_").toUpperCase()}`,
-          name: "Operating expense",
+          name: `Operating expense ${runId}`,
           kind: "EXPENSE",
         }),
       admin,
@@ -344,7 +710,7 @@ describe("Finance HTTP surface (e2e)", () => {
     expect(draft.status).toBe("DRAFT");
     expect(draft.category).toMatchObject({
       id: rentalIncomeCategory.id,
-      name: "Rental income",
+      name: rentalIncomeCategory.name,
       kind: "INCOME",
     });
     expect(draft.counterparty).toMatchObject({
@@ -435,7 +801,10 @@ describe("Finance HTTP surface (e2e)", () => {
     const detail = detailResponse.body as v1.finance.MoneyTransaction;
     expect(detail).toMatchObject({
       id: draft.id,
-      category: { id: rentalIncomeCategory.id, name: "Rental income" },
+      category: {
+        id: rentalIncomeCategory.id,
+        name: rentalIncomeCategory.name,
+      },
       counterparty: { id: customer.userId, firstName: "Customer" },
       recordedBy: { id: admin.userId, firstName: "Ada" },
       balanceChanges: [
@@ -626,6 +995,7 @@ describe("Finance HTTP surface (e2e)", () => {
           paymentMethod: "BANK_TRANSFER",
           billingStatus: "BILLED",
           categoryId: rentalIncomeCategory.id,
+          counterpartyUserId: customer.userId,
           idempotencyKey: `finance:${runId}:bank-income`,
           postImmediately: true,
           balanceChanges: [
@@ -840,6 +1210,28 @@ describe("Finance HTTP surface (e2e)", () => {
   it("rejects generic transaction payloads that contradict their declared type", async () => {
     const malformedTransactions = [
       {
+        name: "expense without category",
+        input: {
+          type: "EXPENSE",
+          amount: "10.00",
+          currency: "RON",
+          financialScope: "COMPANY",
+          paymentMethod: "CASH",
+          billingStatus: "BILLED",
+          idempotencyKey: `finance:${runId}:invalid-categoryless-expense`,
+          postImmediately: true,
+          balanceChanges: [
+            {
+              walletId: companyCashWallet.id,
+              bucket: "BUSINESS_FUNDS",
+              currency: "RON",
+              amountDelta: "-10.00",
+            },
+          ],
+          references: [],
+        },
+      },
+      {
         name: "positive expense",
         input: {
           type: "EXPENSE",
@@ -1052,10 +1444,7 @@ describe("Finance HTTP surface (e2e)", () => {
       admin,
     );
     expect(claimsResponse.status).toBe(200);
-    expect(
-      (claimsResponse.body as { items: v1.finance.OutstandingPersonalClaim[] })
-        .items,
-    ).toEqual([
+    expect(claimsForSuiteAdmins(claimsResponse.body)).toEqual([
       {
         debtorUserId: admin.userId,
         creditorUserId: secondAdmin.userId,
@@ -1151,13 +1540,7 @@ describe("Finance HTTP surface (e2e)", () => {
       admin,
     );
     expect(settledClaimsResponse.status).toBe(200);
-    expect(
-      (
-        settledClaimsResponse.body as {
-          items: v1.finance.OutstandingPersonalClaim[];
-        }
-      ).items,
-    ).toEqual([]);
+    expect(claimsForSuiteAdmins(settledClaimsResponse.body)).toEqual([]);
 
     const settledIncomeReversalResponse = await authenticate(
       req()
@@ -1179,6 +1562,7 @@ describe("Finance HTTP surface (e2e)", () => {
           financialScope: "ADMIN_PERSONAL",
           paymentMethod: "CASH",
           billingStatus: "NOT_BILLED",
+          counterpartyUserId: customer.userId,
           idempotencyKey: `finance:${runId}:second-admin-personal-income`,
           postImmediately: true,
           balanceChanges: [
@@ -1205,6 +1589,7 @@ describe("Finance HTTP surface (e2e)", () => {
           financialScope: "ADMIN_PERSONAL",
           paymentMethod: "CASH",
           billingStatus: "NOT_BILLED",
+          counterpartyUserId: customer.userId,
           idempotencyKey: `finance:${runId}:first-admin-personal-income`,
           postImmediately: true,
           balanceChanges: [
@@ -1226,13 +1611,7 @@ describe("Finance HTTP surface (e2e)", () => {
       admin,
     );
     expect(netClaimsResponse.status).toBe(200);
-    expect(
-      (
-        netClaimsResponse.body as {
-          items: v1.finance.OutstandingPersonalClaim[];
-        }
-      ).items,
-    ).toEqual([
+    expect(claimsForSuiteAdmins(netClaimsResponse.body)).toEqual([
       {
         debtorUserId: secondAdmin.userId,
         creditorUserId: admin.userId,
@@ -1326,13 +1705,7 @@ describe("Finance HTTP surface (e2e)", () => {
       admin,
     );
     expect(finalClaimsResponse.status).toBe(200);
-    expect(
-      (
-        finalClaimsResponse.body as {
-          items: v1.finance.OutstandingPersonalClaim[];
-        }
-      ).items,
-    ).toEqual([]);
+    expect(claimsForSuiteAdmins(finalClaimsResponse.body)).toEqual([]);
   });
 
   it("filters and paginates wallet selectors without returning every wallet", async () => {
@@ -1524,6 +1897,8 @@ describe("Finance HTTP surface (e2e)", () => {
           type: "USER",
           name: "Personal wallet",
           isActive: true,
+          cardHolderUserId: null,
+          cardHolder: null,
           owner: {
             id: admin.userId,
             email: admin.email,
@@ -1535,7 +1910,15 @@ describe("Finance HTTP surface (e2e)", () => {
       nextCursor: null,
     });
     expect(Object.keys(ownerSearchBody.items[0]).sort()).toEqual(
-      ["id", "type", "name", "isActive", "owner"].sort(),
+      [
+        "id",
+        "type",
+        "name",
+        "isActive",
+        "owner",
+        "cardHolderUserId",
+        "cardHolder",
+      ].sort(),
     );
     expect(ownerSearchBody.items[0]).not.toHaveProperty("balances");
 
@@ -1591,6 +1974,8 @@ describe("Finance HTTP surface (e2e)", () => {
           name: duplicateName,
           isActive: false,
           owner: null,
+          cardHolderUserId: null,
+          cardHolder: null,
         },
       ],
       nextCursor: null,
@@ -1890,6 +2275,20 @@ describe("Finance HTTP surface (e2e)", () => {
   });
 
   it("uses half-open timestamp ranges, separates currencies, and protects the summary route", async () => {
+    const unusualExpenseCategoryResponse = await authenticate(
+      req()
+        .post(v1.finance.ROUTES.categories.create)
+        .send({
+          name: `Other expenses ${runId}`,
+          kind: "EXPENSE",
+        }),
+      admin,
+    );
+    expect(unusualExpenseCategoryResponse.status).toBe(201);
+    const unusualExpenseCategory =
+      unusualExpenseCategoryResponse.body as v1.finance.FinancialCategory;
+    createdCategoryIds.push(unusualExpenseCategory.id);
+
     async function recordIncome(input: {
       key: string;
       amount: string;
@@ -1908,6 +2307,7 @@ describe("Finance HTTP surface (e2e)", () => {
             paymentMethod: "CASH",
             billingStatus: "BILLED",
             categoryId: rentalIncomeCategory.id,
+            counterpartyUserId: customer.userId,
             occurredAt: input.occurredAt,
             idempotencyKey: `finance:${runId}:summary-boundary:${input.key}`,
             postImmediately: input.postImmediately,
@@ -1971,7 +2371,7 @@ describe("Finance HTTP surface (e2e)", () => {
         idempotencyKey: `finance:${runId}:summary-null-payment-method`,
       },
     });
-    const uncategorizedExpense = await authenticate(
+    const unusualExpense = await authenticate(
       req()
         .post(v1.finance.ROUTES.transactions.create)
         .send({
@@ -1981,8 +2381,9 @@ describe("Finance HTTP surface (e2e)", () => {
           financialScope: "COMPANY",
           paymentMethod: "CASH",
           billingStatus: "BILLED",
+          categoryId: unusualExpenseCategory.id,
           occurredAt: "2026-01-01T11:00:00.000+02:00",
-          idempotencyKey: `finance:${runId}:summary-uncategorized-expense`,
+          idempotencyKey: `finance:${runId}:summary-unusual-expense`,
           postImmediately: true,
           balanceChanges: [
             {
@@ -1996,7 +2397,7 @@ describe("Finance HTTP surface (e2e)", () => {
         }),
       admin,
     );
-    expect(uncategorizedExpense.status).toBe(201);
+    expect(unusualExpense.status).toBe(201);
 
     const response = await authenticate(
       req().get(
@@ -2022,7 +2423,12 @@ describe("Finance HTTP surface (e2e)", () => {
     expect(boundarySummary.expensesByCategory).toEqual([
       {
         currency: "EUR",
-        category: null,
+        category: {
+          id: unusualExpenseCategory.id,
+          code: unusualExpenseCategory.code,
+          name: unusualExpenseCategory.name,
+          kind: "EXPENSE",
+        },
         amount: "5.00",
       },
     ]);
@@ -2077,5 +2483,195 @@ describe("Finance HTTP surface (e2e)", () => {
       customer,
     );
     expect(forbidden.status).toBe(403);
+  });
+
+  it("keeps incomplete company-funded expenses editable as drafts", async () => {
+    const draft = await createExpenseDraft({
+      key: "incomplete-company-card-draft",
+      source: "COMPANY_CARD",
+    });
+
+    expect(draft).toMatchObject({
+      status: "DRAFT",
+      payment: {
+        source: "COMPANY_CARD",
+        companyWalletId: expenseEvidenceCardWalletId,
+      },
+      documents: [],
+    });
+  });
+
+  it("posts a cash expense attributed to an owner when matched fiscal evidence has a live original", async () => {
+    const draft = await createExpenseDraft({
+      key: "cash-owner-with-original",
+      source: "COMPANY_CASH_DESK",
+      target: "OWNER",
+      documents: [
+        {
+          type: "FISCAL_RECEIPT",
+          documentNumber: `CASH-${runId}`,
+          issuedOn: "2040-01-15",
+          buyerTaxIdentifier: expenseEvidenceTaxIdentifier,
+          buyerCuiStatus: "MATCHED",
+          reviewStatus: "CONFIRMED",
+        },
+      ],
+    });
+    const fiscalDocument = draft.documents[0];
+    if (!fiscalDocument) throw new Error("Expected a fiscal document");
+    await attachExpenseDocumentOriginal(
+      fiscalDocument.id,
+      "cash-owner-fiscal-original",
+    );
+
+    const response = await authenticate(
+      req()
+        .post(v1.finance.EXPENSE_ROUTES.post(draft.id))
+        .send({
+          idempotencyKey: `expense-e2e:${runId}:cash-owner-post`,
+        }),
+      admin,
+    );
+
+    expect(response.status).toBe(201);
+    expect(response.body).toMatchObject({
+      id: draft.id,
+      status: "POSTED",
+      payment: { source: "COMPANY_CASH_DESK" },
+      costPool: {
+        attribution: {
+          target: "OWNER",
+          businessOwnerId: expenseEvidenceOwner.id,
+        },
+      },
+      postings: [{ role: "EXPENSE_PAYMENT" }],
+    });
+  });
+
+  it("rejects a company-card post when its POS receipt has no live original", async () => {
+    const draft = await createExpenseDraft({
+      key: "card-missing-pos-original",
+      source: "COMPANY_CARD",
+      documents: [
+        {
+          type: "INVOICE",
+          documentNumber: `CARD-${runId}`,
+          issuedOn: "2040-01-15",
+          buyerTaxIdentifier: expenseEvidenceTaxIdentifier,
+          buyerCuiStatus: "MATCHED",
+          reviewStatus: "CONFIRMED",
+        },
+        {
+          type: "POS_RECEIPT",
+          documentNumber: `POS-${runId}`,
+          issuedOn: "2040-01-15",
+          buyerCuiStatus: "NOT_APPLICABLE",
+          reviewStatus: "CONFIRMED",
+        },
+      ],
+    });
+    const fiscalDocument = draft.documents.find(
+      (document) => document.type === "INVOICE",
+    );
+    if (!fiscalDocument) throw new Error("Expected an invoice");
+    await attachExpenseDocumentOriginal(
+      fiscalDocument.id,
+      "card-fiscal-original",
+    );
+
+    const response = await authenticate(
+      req()
+        .post(v1.finance.EXPENSE_ROUTES.post(draft.id))
+        .send({ idempotencyKey: `expense-e2e:${runId}:card-post` }),
+      admin,
+    );
+
+    expect(response.status).toBe(400);
+    const errorBody = response.body as {
+      error: { code: string; message: string };
+    };
+    expect(errorBody.error.code).toBe("BAD_REQUEST");
+    expect(errorBody.error.message).toContain("POS receipt");
+    expect(
+      await prisma.expense.findUnique({
+        where: { id: draft.id },
+        select: { status: true },
+      }),
+    ).toEqual({ status: "DRAFT" });
+  });
+
+  it("posts a personal-funds expense without receipt evidence", async () => {
+    const draft = await createExpenseDraft({
+      key: "personal-no-evidence",
+      source: "PERSONAL_FUNDS",
+    });
+
+    const response = await authenticate(
+      req()
+        .post(v1.finance.EXPENSE_ROUTES.post(draft.id))
+        .send({ idempotencyKey: `expense-e2e:${runId}:personal-post` }),
+      admin,
+    );
+
+    expect(response.status).toBe(201);
+    expect(response.body).toMatchObject({
+      status: "POSTED",
+      payment: {
+        source: "PERSONAL_FUNDS",
+        fundedByUserId: admin.userId,
+        fundingTreatment: "REIMBURSABLE",
+      },
+      documents: [],
+      reimbursementClaim: {
+        claimantUserId: admin.userId,
+        status: "OPEN",
+        originalAmount: "25.00",
+      },
+    });
+  });
+
+  it("rejects matched company-buyer evidence on a personal-funds expense", async () => {
+    const draft = await createExpenseDraft({
+      key: "personal-matched-buyer",
+      source: "PERSONAL_FUNDS",
+      documents: [
+        {
+          type: "FISCAL_RECEIPT",
+          documentNumber: `PERSONAL-${runId}`,
+          issuedOn: "2040-01-15",
+          buyerTaxIdentifier: expenseEvidenceTaxIdentifier,
+          buyerCuiStatus: "MATCHED",
+          reviewStatus: "CONFIRMED",
+        },
+      ],
+    });
+    const fiscalDocument = draft.documents[0];
+    if (!fiscalDocument) throw new Error("Expected a fiscal document");
+    await attachExpenseDocumentOriginal(
+      fiscalDocument.id,
+      "personal-fiscal-original",
+    );
+
+    const response = await authenticate(
+      req()
+        .post(v1.finance.EXPENSE_ROUTES.post(draft.id))
+        .send({
+          idempotencyKey: `expense-e2e:${runId}:personal-matched-post`,
+        }),
+      admin,
+    );
+
+    expect(response.status).toBe(400);
+    const errorBody = response.body as {
+      error: { code: string; message: string };
+    };
+    expect(errorBody.error.code).toBe("BAD_REQUEST");
+    expect(errorBody.error.message).toContain("matched company-buyer evidence");
+    expect(
+      await prisma.expense.findUnique({
+        where: { id: draft.id },
+        select: { status: true },
+      }),
+    ).toEqual({ status: "DRAFT" });
   });
 });
