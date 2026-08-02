@@ -52,17 +52,18 @@ export default async function TransactionsRoutePage({
 
   return (
     <TransactionsPage
+      key={transactionsListPath(query)}
       filters={filters}
       list={list}
       locale={locale}
       newTransactionHref={localizePath(`${TRANSACTIONS_PATH}/new`, locale)}
+      query={query}
       transactionsHref={transactionsHref}
     />
   );
 }
 
 export interface TransactionListFilters {
-  page: number;
   status?: v1.finance.MoneyTransactionStatus;
   type?: v1.finance.MoneyTransactionType;
   financialScope?: v1.finance.MoneyTransactionScope;
@@ -80,7 +81,6 @@ function transactionFilters(
   const validRange = !from || !to || from <= to;
 
   return {
-    page: positiveInteger(firstSearchParam(searchParams.page)) ?? 1,
     status: enumValue(
       v1.finance.moneyTransactionStatusSchema,
       firstSearchParam(searchParams.status),
@@ -113,7 +113,7 @@ function transactionQuery(
   const to = filters.to ? startOfNextUtcDay(filters.to) : undefined;
   const validRange = !from || !to || Date.parse(from) < Date.parse(to);
   const parsed = v1.finance.listMoneyTransactionsQuerySchema.safeParse({
-    page: filters.page,
+    page: 1,
     pageSize: PAGE_SIZE,
     status: filters.status,
     type: filters.type,
@@ -127,7 +127,7 @@ function transactionQuery(
   return parsed.success
     ? parsed.data
     : v1.finance.listMoneyTransactionsQuerySchema.parse({
-        page: filters.page,
+        page: 1,
         pageSize: PAGE_SIZE,
       });
 }
@@ -162,12 +162,6 @@ function enumValue<Output>(
   if (!value) return undefined;
   const result = schema.safeParse(value);
   return result.success ? result.data : undefined;
-}
-
-function positiveInteger(value: string | undefined): number | undefined {
-  if (!value || !/^[1-9]\d*$/.test(value)) return undefined;
-  const parsed = Number.parseInt(value, 10);
-  return Number.isSafeInteger(parsed) ? parsed : undefined;
 }
 
 function dateOnly(value: string | undefined): string | undefined {

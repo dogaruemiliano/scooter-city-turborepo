@@ -1,12 +1,9 @@
+"use client";
+
 import { v1 } from "@repo/api-shared";
 import type { SupportedLocale } from "@repo/i18n";
 import {
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  Input,
+  DatePartsField,
   Label,
   Table,
   TableBody,
@@ -17,17 +14,20 @@ import {
   buttonVariants,
 } from "@repo/ui/components";
 import { cn } from "@repo/ui/lib/utils";
-import { ArrowRightIcon, FilterIcon, PlusIcon } from "lucide-react";
+import { ArrowRightIcon, PlusIcon } from "lucide-react";
 import Link from "next/link";
-import { getTranslations } from "next-intl/server";
+import { useTranslations } from "next-intl";
+import { startTransition, useCallback, useRef, useState } from "react";
 
+import { InfiniteListFooter } from "@/components/InfiniteListFooter";
+import { UrlFilterSheet } from "@/components/UrlFilterSheet";
+import { webApi } from "@/lib/api";
 import {
   financeUserLabel,
   formatFinanceDateTime,
-  formatMoney,
+  formatTransactionAmount,
 } from "@/lib/finance-format";
 import { FinanceEmptyState } from "../../_components/FinanceEmptyState";
-import { FinancePageHeader } from "../../_components/FinancePageHeader";
 import { FinanceStatusBadge } from "../../_components/FinanceStatusBadge";
 import type { TransactionListFilters } from "../page";
 
@@ -36,149 +36,172 @@ interface TransactionsPageProps {
   list: v1.finance.MoneyTransactionList;
   locale: SupportedLocale;
   newTransactionHref: string;
+  query: v1.finance.ListMoneyTransactionsQuery;
   transactionsHref: string;
 }
 
 const SELECT_CLASS_NAME =
-  "mt-1 h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring";
+  "mt-1 h-12 w-full rounded-lg border border-input bg-background px-3 text-base outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring md:h-11 md:text-sm";
 
-export async function TransactionsPage({
+export function TransactionsPage({
   filters,
   list,
   locale,
   newTransactionHref,
+  query,
   transactionsHref,
 }: TransactionsPageProps) {
-  const t = await getTranslations({ locale, namespace: "finance" });
-  const totalPages = Math.max(1, Math.ceil(list.total / list.pageSize));
+  const t = useTranslations("finance");
+  const [items, setItems] = useState(() => list.items);
+  const [total, setTotal] = useState(list.total);
+  const [loading, setLoading] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [exhausted, setExhausted] = useState(
+    () => list.items.length >= list.total,
+  );
+  const nextPageRef = useRef(list.page + 1);
+  const loadingRef = useRef(false);
+  const hasMore = !exhausted && items.length < total;
+
+  const loadMore = useCallback(async () => {
+    if (loadingRef.current || !hasMore) return;
+    loadingRef.current = true;
+    setLoading(true);
+    setLoadFailed(false);
+    try {
+      const next = await webApi.fetch(
+        transactionsListPath(query, nextPageRef.current),
+        v1.finance.moneyTransactionListSchema,
+        { cache: "no-store" },
+      );
+      nextPageRef.current += 1;
+      setTotal(next.total);
+      startTransition(() => {
+        setItems((current) => {
+          const knownIds = new Set(current.map((item) => item.id));
+          const additions = next.items.filter((item) => !knownIds.has(item.id));
+          return [...current, ...additions];
+        });
+      });
+      if (next.items.length === 0 || next.page * next.pageSize >= next.total) {
+        setExhausted(true);
+      }
+    } catch {
+      setLoadFailed(true);
+    } finally {
+      loadingRef.current = false;
+      setLoading(false);
+    }
+  }, [hasMore, query]);
 
   return (
     <div className="mx-auto flex w-full max-w-screen-xl flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
-      <FinancePageHeader
-        title={t("transactions.title")}
-        description={t("transactions.description")}
-        action={
-          <Link
-            href={newTransactionHref}
-            className={buttonVariants({ variant: "default" })}
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-col items-start gap-2">
+          <UrlFilterSheet
+            appliedCount={transactionFilterCount(filters)}
+            applyLabel={t("transactions.filters.apply")}
+            baseHref={transactionsHref}
+            description={t("transactions.filters.description")}
+            formId="transactions-filter-form"
+            resetLabel={t("transactions.filters.reset")}
+            title={t("transactions.filters.title")}
           >
-            <PlusIcon data-icon="inline-start" />
-            {t("transactions.new")}
-          </Link>
-        }
-      />
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <FilterIcon className="size-4 text-muted-foreground" />
-            {t("transactions.filters.title")}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form className="grid gap-4 md:grid-cols-3 xl:grid-cols-4">
-            <NativeSelect
-              label={t("transactions.filters.status")}
-              name="status"
-              value={filters.status}
-              options={v1.finance.MONEY_TRANSACTION_STATUSES.map((status) => ({
-                value: status,
-                label: t(`enums.transactionStatuses.${status}`),
-              }))}
-              allLabel={t("transactions.filters.all")}
-            />
-            <NativeSelect
-              label={t("transactions.filters.type")}
-              name="type"
-              value={filters.type}
-              options={v1.finance.MONEY_TRANSACTION_TYPES.map((type) => ({
-                value: type,
-                label: t(`enums.transactionTypes.${type}`),
-              }))}
-              allLabel={t("transactions.filters.all")}
-            />
-            <NativeSelect
-              label={t("transactions.filters.scope")}
-              name="financialScope"
-              value={filters.financialScope}
-              options={v1.finance.MONEY_TRANSACTION_SCOPES.map((scope) => ({
-                value: scope,
-                label: t(`enums.financialScopes.${scope}`),
-              }))}
-              allLabel={t("transactions.filters.all")}
-            />
-            <NativeSelect
-              label={t("transactions.filters.paymentMethod")}
-              name="paymentMethod"
-              value={filters.paymentMethod}
-              options={v1.finance.PAYMENT_METHODS.map((method) => ({
-                value: method,
-                label: t(`enums.paymentMethods.${method}`),
-              }))}
-              allLabel={t("transactions.filters.all")}
-            />
-            <NativeSelect
-              label={t("transactions.filters.billingStatus")}
-              name="billingStatus"
-              value={filters.billingStatus}
-              options={v1.finance.BILLING_STATUSES.map((status) => ({
-                value: status,
-                label: t(`enums.billingStatuses.${status}`),
-              }))}
-              allLabel={t("transactions.filters.all")}
-            />
-            <div>
-              <Label htmlFor="transactions-from">
-                {t("transactions.filters.from")}
-              </Label>
-              <Input
-                id="transactions-from"
-                className="mt-1"
-                name="from"
-                type="date"
-                defaultValue={filters.from}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <NativeSelect
+                label={t("transactions.filters.status")}
+                name="status"
+                value={filters.status}
+                options={v1.finance.MONEY_TRANSACTION_STATUSES.map(
+                  (status) => ({
+                    value: status,
+                    label: t(`enums.transactionStatuses.${status}`),
+                  }),
+                )}
+                allLabel={t("transactions.filters.all")}
               />
-            </div>
-            <div>
-              <Label htmlFor="transactions-to">
-                {t("transactions.filters.to")}
-              </Label>
-              <Input
-                id="transactions-to"
-                className="mt-1"
-                name="to"
-                type="date"
-                defaultValue={filters.to}
+              <NativeSelect
+                label={t("transactions.filters.type")}
+                name="type"
+                value={filters.type}
+                options={v1.finance.MONEY_TRANSACTION_TYPES.map((type) => ({
+                  value: type,
+                  label: t(`enums.transactionTypes.${type}`),
+                }))}
+                allLabel={t("transactions.filters.all")}
               />
+              <NativeSelect
+                label={t("transactions.filters.scope")}
+                name="financialScope"
+                value={filters.financialScope}
+                options={v1.finance.MONEY_TRANSACTION_SCOPES.map((scope) => ({
+                  value: scope,
+                  label: t(`enums.financialScopes.${scope}`),
+                }))}
+                allLabel={t("transactions.filters.all")}
+              />
+              <NativeSelect
+                label={t("transactions.filters.paymentMethod")}
+                name="paymentMethod"
+                value={filters.paymentMethod}
+                options={v1.finance.PAYMENT_METHODS.map((method) => ({
+                  value: method,
+                  label: t(`enums.paymentMethods.${method}`),
+                }))}
+                allLabel={t("transactions.filters.all")}
+              />
+              <NativeSelect
+                label={t("transactions.filters.billingStatus")}
+                name="billingStatus"
+                value={filters.billingStatus}
+                options={v1.finance.BILLING_STATUSES.map((status) => ({
+                  value: status,
+                  label: t(`enums.billingStatuses.${status}`),
+                }))}
+                allLabel={t("transactions.filters.all")}
+              />
+              <div>
+                <Label htmlFor="transactions-from-day">
+                  {t("transactions.filters.from")}
+                </Label>
+                <DatePartsField
+                  baseId="transactions-from"
+                  className="mt-1"
+                  label={t("transactions.filters.from")}
+                  locale={locale}
+                  name="from"
+                  defaultValue={filters.from}
+                />
+              </div>
+              <div>
+                <Label htmlFor="transactions-to-day">
+                  {t("transactions.filters.to")}
+                </Label>
+                <DatePartsField
+                  baseId="transactions-to"
+                  className="mt-1"
+                  label={t("transactions.filters.to")}
+                  locale={locale}
+                  name="to"
+                  defaultValue={filters.to}
+                />
+              </div>
             </div>
-            <div className="flex items-end gap-2">
-              <Button type="submit" className="flex-1">
-                {t("transactions.filters.apply")}
-              </Button>
-              <Link
-                href={transactionsHref}
-                className={buttonVariants({ variant: "outline" })}
-              >
-                {t("transactions.filters.reset")}
-              </Link>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
-
-      <div className="flex items-center justify-between gap-4">
-        <p className="text-sm text-muted-foreground">
-          {t("transactions.results", { count: list.total })}
-        </p>
-        <p className="text-sm text-muted-foreground">
-          {t("transactions.pagination.page", {
-            page: list.page,
-            totalPages,
-          })}
-        </p>
+          </UrlFilterSheet>
+          <p className="text-sm text-muted-foreground">
+            {t("transactions.results", { count: total })}
+          </p>
+        </div>
+        <Link
+          href={newTransactionHref}
+          className={cn(buttonVariants({ variant: "default" }), "shrink-0")}
+        >
+          <PlusIcon data-icon="inline-start" />
+          {t("transactions.new")}
+        </Link>
       </div>
 
-      {list.items.length === 0 ? (
+      {items.length === 0 ? (
         <FinanceEmptyState>
           <p className="font-medium text-foreground">
             {t("transactions.emptyTitle")}
@@ -188,62 +211,88 @@ export async function TransactionsPage({
       ) : (
         <>
           <div className="hidden overflow-hidden rounded-lg border border-border md:block">
-            <Table>
+            <Table className="table-fixed">
               <TableHeader>
                 <TableRow>
-                  <TableHead>{t("transactions.table.occurredAt")}</TableHead>
-                  <TableHead>{t("transactions.table.type")}</TableHead>
-                  <TableHead>{t("transactions.table.status")}</TableHead>
-                  <TableHead>{t("transactions.table.amount")}</TableHead>
-                  <TableHead>{t("transactions.table.scope")}</TableHead>
-                  <TableHead>{t("transactions.table.counterparty")}</TableHead>
-                  <TableHead className="text-right">
-                    {t("transactions.table.actions")}
+                  <TableHead>{t("transactions.table.transaction")}</TableHead>
+                  <TableHead>{t("transactions.table.direction")}</TableHead>
+                  <TableHead className="w-36 text-right">
+                    {t("transactions.table.amount")}
                   </TableHead>
+                  <TableHead className="w-12" />
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {list.items.map((transaction) => (
+                {items.map((transaction) => (
                   <TableRow key={transaction.id}>
-                    <TableCell>
-                      {formatFinanceDateTime(transaction.occurredAt, locale)}
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      {t(`enums.transactionTypes.${transaction.type}`)}
-                    </TableCell>
-                    <TableCell>
-                      <FinanceStatusBadge
-                        status={transaction.status}
-                        label={t(
-                          `enums.transactionStatuses.${transaction.status}`,
-                        )}
-                      />
-                    </TableCell>
-                    <TableCell className="font-medium tabular-nums">
-                      {formatMoney(
-                        transaction.amount,
-                        transaction.currency,
-                        locale,
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {t(`enums.financialScopes.${transaction.financialScope}`)}
-                    </TableCell>
-                    <TableCell>
-                      {transactionPartyLabel(transaction, t)}
-                    </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="min-w-0">
                       <Link
                         href={`${transactionsHref}/${encodeURIComponent(
                           transaction.id,
                         )}`}
-                        className={buttonVariants({
-                          variant: "ghost",
-                          size: "sm",
-                        })}
+                        className="block truncate font-medium hover:underline"
                       >
-                        {t("transactions.table.view")}
-                        <ArrowRightIcon data-icon="inline-end" />
+                        {transaction.description ??
+                          formatFinanceDateTime(transaction.occurredAt, locale)}
+                      </Link>
+                      <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                        {transaction.description ? (
+                          <span>
+                            {formatFinanceDateTime(
+                              transaction.occurredAt,
+                              locale,
+                            )}
+                          </span>
+                        ) : null}
+                        {transaction.status !== "POSTED" ? (
+                          <FinanceStatusBadge
+                            status={transaction.status}
+                            label={t(
+                              `enums.transactionStatuses.${transaction.status}`,
+                            )}
+                          />
+                        ) : null}
+                        {!isBasicMoneyType(transaction.type) ? (
+                          <span>
+                            {t(`enums.transactionTypes.${transaction.type}`)}
+                          </span>
+                        ) : null}
+                      </div>
+                    </TableCell>
+                    <TableCell className="min-w-0 text-sm text-muted-foreground">
+                      <div
+                        className="truncate"
+                        title={transactionDirectionLabel(transaction, t)}
+                      >
+                        {transactionDirectionLabel(transaction, t)}
+                      </div>
+                    </TableCell>
+                    <TableCell
+                      className={cn(
+                        "text-right font-medium tabular-nums",
+                        transaction.type === "EXPENSE" && "text-destructive",
+                        transaction.type === "INCOME" && "text-success",
+                      )}
+                    >
+                      {formatTransactionAmount(
+                        transaction.amount,
+                        transaction.currency,
+                        locale,
+                        transaction.type,
+                      )}
+                    </TableCell>
+                    <TableCell className="px-1">
+                      <Link
+                        href={`${transactionsHref}/${encodeURIComponent(
+                          transaction.id,
+                        )}`}
+                        aria-label={t("transactions.table.view")}
+                        className={cn(
+                          buttonVariants({ variant: "ghost", size: "icon-sm" }),
+                          "text-muted-foreground",
+                        )}
+                      >
+                        <ArrowRightIcon />
                       </Link>
                     </TableCell>
                   </TableRow>
@@ -252,88 +301,86 @@ export async function TransactionsPage({
             </Table>
           </div>
 
-          <div className="grid gap-3 md:hidden">
-            {list.items.map((transaction) => (
+          <div className="grid gap-2 md:hidden">
+            {items.map((transaction) => (
               <Link
                 key={transaction.id}
                 href={`${transactionsHref}/${encodeURIComponent(
                   transaction.id,
                 )}`}
-                className="rounded-lg border border-border bg-card p-4 transition-colors duration-fast ease-standard hover:bg-muted"
+                className="flex min-w-0 items-center gap-2 overflow-hidden rounded-xl border border-border bg-card px-3 py-2.5 transition-colors duration-fast ease-standard hover:bg-muted"
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-medium">
-                      {t(`enums.transactionTypes.${transaction.type}`)}
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {formatFinanceDateTime(transaction.occurredAt, locale)}
-                    </p>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">
+                    {transaction.description ??
+                      formatFinanceDateTime(transaction.occurredAt, locale)}
+                  </p>
+                  <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                    {transaction.description ? (
+                      <span>
+                        {formatFinanceDateTime(transaction.occurredAt, locale)}
+                      </span>
+                    ) : null}
+                    <span className="min-w-0 max-w-full break-words">
+                      {transactionDirectionLabel(transaction, t)}
+                    </span>
+                    {transaction.status !== "POSTED" ? (
+                      <FinanceStatusBadge
+                        status={transaction.status}
+                        label={t(
+                          `enums.transactionStatuses.${transaction.status}`,
+                        )}
+                      />
+                    ) : null}
+                    {!isBasicMoneyType(transaction.type) ? (
+                      <span>
+                        {t(`enums.transactionTypes.${transaction.type}`)}
+                      </span>
+                    ) : null}
                   </div>
-                  <FinanceStatusBadge
-                    status={transaction.status}
-                    label={t(`enums.transactionStatuses.${transaction.status}`)}
-                  />
                 </div>
-                <p className="mt-4 text-lg font-semibold tabular-nums">
-                  {formatMoney(
+                <span
+                  className={cn(
+                    "min-w-0 truncate text-right font-medium tabular-nums",
+                    transaction.type === "EXPENSE" && "text-destructive",
+                    transaction.type === "INCOME" && "text-success",
+                  )}
+                >
+                  {formatTransactionAmount(
                     transaction.amount,
                     transaction.currency,
                     locale,
+                    transaction.type,
                   )}
-                </p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {transactionPartyLabel(transaction, t)}
-                </p>
+                </span>
               </Link>
             ))}
           </div>
         </>
       )}
 
-      <nav
-        aria-label={t("transactions.pagination.label")}
-        className="flex items-center justify-between gap-4"
-      >
-        {list.page > 1 ? (
-          <Link
-            href={pageHref(transactionsHref, filters, list.page - 1)}
-            className={buttonVariants({ variant: "outline" })}
-          >
-            {t("transactions.pagination.previous")}
-          </Link>
-        ) : (
-          <span
-            className={cn(
-              buttonVariants({ variant: "outline" }),
-              "pointer-events-none opacity-50",
-            )}
-            aria-disabled="true"
-          >
-            {t("transactions.pagination.previous")}
-          </span>
-        )}
-        {list.page < totalPages ? (
-          <Link
-            href={pageHref(transactionsHref, filters, list.page + 1)}
-            className={buttonVariants({ variant: "outline" })}
-          >
-            {t("transactions.pagination.next")}
-          </Link>
-        ) : (
-          <span
-            className={cn(
-              buttonVariants({ variant: "outline" }),
-              "pointer-events-none opacity-50",
-            )}
-            aria-disabled="true"
-          >
-            {t("transactions.pagination.next")}
-          </span>
-        )}
-      </nav>
+      {items.length > 0 ? (
+        <InfiniteListFooter
+          hasMore={hasMore}
+          loading={loading}
+          error={loadFailed ? t("feedback.genericError") : null}
+          onLoadMore={loadMore}
+        />
+      ) : null}
     </div>
   );
+}
+
+function transactionFilterCount(filters: TransactionListFilters): number {
+  return [
+    filters.status,
+    filters.type,
+    filters.financialScope,
+    filters.paymentMethod,
+    filters.billingStatus,
+    filters.from,
+    filters.to,
+  ].filter(Boolean).length;
 }
 
 function NativeSelect({
@@ -370,45 +417,108 @@ function NativeSelect({
   );
 }
 
-function pageHref(
-  basePath: string,
-  filters: TransactionListFilters,
+function transactionsListPath(
+  query: v1.finance.ListMoneyTransactionsQuery,
   page: number,
 ): string {
-  const params = new URLSearchParams();
-  if (page > 1) params.set("page", String(page));
-  if (filters.status) params.set("status", filters.status);
-  if (filters.type) params.set("type", filters.type);
-  if (filters.financialScope) {
-    params.set("financialScope", filters.financialScope);
+  const params = new URLSearchParams({
+    page: String(page),
+    pageSize: String(query.pageSize),
+  });
+  if (query.status) params.set("status", query.status);
+  if (query.type) params.set("type", query.type);
+  if (query.financialScope) {
+    params.set("financialScope", query.financialScope);
   }
-  if (filters.paymentMethod) {
-    params.set("paymentMethod", filters.paymentMethod);
+  if (query.paymentMethod) {
+    params.set("paymentMethod", query.paymentMethod);
   }
-  if (filters.billingStatus) {
-    params.set("billingStatus", filters.billingStatus);
+  if (query.billingStatus) {
+    params.set("billingStatus", query.billingStatus);
   }
-  if (filters.from) params.set("from", filters.from);
-  if (filters.to) params.set("to", filters.to);
-  const query = params.toString();
-  return query ? `${basePath}?${query}` : basePath;
+  if (query.from) params.set("from", query.from);
+  if (query.to) params.set("to", query.to);
+  return `${v1.finance.ROUTES.transactions.list}?${params}`;
 }
 
-function transactionPartyLabel(
+function isBasicMoneyType(type: v1.finance.MoneyTransactionType): boolean {
+  return type === "INCOME" || type === "EXPENSE";
+}
+
+function transactionDirectionLabel(
   transaction: v1.finance.MoneyTransaction,
-  t: Awaited<ReturnType<typeof getTranslations>>,
+  t: ReturnType<typeof useTranslations>,
 ): string {
-  if (transaction.debtor && transaction.creditor) {
-    return `${financeUserLabel(transaction.debtor)} → ${financeUserLabel(
-      transaction.creditor,
-    )}`;
+  const counterparty = partyLabel(
+    transaction.counterpartyEntity,
+    transaction.counterparty,
+  );
+  const recipient = partyLabel(
+    transaction.recipientCounterparty,
+    transaction.recipient,
+  );
+  const debtor = partyLabel(transaction.debtorCounterparty, transaction.debtor);
+  const creditor = partyLabel(
+    transaction.creditorCounterparty,
+    transaction.creditor,
+  );
+  const sourceWallet = transaction.balanceChanges.find((change) =>
+    change.amountDelta.startsWith("-"),
+  )?.wallet.name;
+  const destinationWallet = transaction.balanceChanges.find(
+    (change) => !change.amountDelta.startsWith("-"),
+  )?.wallet.name;
+
+  if (debtor || creditor) {
+    return directionalLabel(debtor, creditor, t);
   }
-  const person =
-    transaction.counterparty ??
-    transaction.recipient ??
-    transaction.creditor ??
-    transaction.debtor;
-  return person
-    ? financeUserLabel(person)
-    : t("transactions.table.noCounterparty");
+
+  switch (transaction.type) {
+    case "INCOME":
+    case "USER_PAYMENT":
+    case "GUARANTEE_RECEIVED":
+      return directionalLabel(counterparty ?? sourceWallet, undefined, t);
+    case "EXPENSE":
+    case "USER_CHARGE":
+    case "GUARANTEE_REFUNDED":
+    case "REFUND":
+      return directionalLabel(undefined, counterparty ?? recipient, t);
+    case "REIMBURSEMENT":
+    case "PERSONAL_EXTRACTION":
+    case "COMPANY_DISTRIBUTION":
+      return directionalLabel(undefined, recipient ?? counterparty, t);
+    case "TRANSFER":
+    case "PERSONAL_FUNDS_SPLIT":
+      return directionalLabel(sourceWallet, destinationWallet, t);
+    case "ADJUSTMENT":
+    case "REVERSAL":
+    case "PERSONAL_FUNDS_CLAIM":
+      return directionalLabel(
+        counterparty ?? sourceWallet,
+        recipient ?? destinationWallet,
+        t,
+      );
+  }
+}
+
+function partyLabel(
+  entity: v1.finance.FinanceCounterpartySummary | null | undefined,
+  user: v1.finance.FinanceUserSummary | null,
+): string | undefined {
+  return entity?.label ?? (user ? financeUserLabel(user) : undefined);
+}
+
+function directionalLabel(
+  from: string | undefined,
+  to: string | undefined,
+  t: ReturnType<typeof useTranslations>,
+): string {
+  const fromLabel = from
+    ? t("transactions.table.fromParty", { party: from })
+    : null;
+  const toLabel = to ? t("transactions.table.toParty", { party: to }) : null;
+  return (
+    [fromLabel, toLabel].filter(Boolean).join(" → ") ||
+    t("transactions.table.noCounterparty")
+  );
 }

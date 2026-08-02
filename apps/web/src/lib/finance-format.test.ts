@@ -4,6 +4,7 @@ import {
   financeUserLabel,
   formatFinanceDateTime,
   formatMoney,
+  formatTransactionAmount,
 } from "./finance-format";
 
 describe("finance formatting", () => {
@@ -19,6 +20,15 @@ describe("finance formatting", () => {
 
   it("falls back without coercing invalid API values", () => {
     expect(formatMoney("unknown", "RON", "en")).toBe("unknown RON");
+  });
+
+  it("renders expense transactions as negative amounts", () => {
+    expect(formatTransactionAmount("125.50", "RON", "ro", "EXPENSE")).toContain(
+      "-125,50",
+    );
+    expect(
+      formatTransactionAmount("125.50", "RON", "ro", "INCOME"),
+    ).not.toContain("-");
   });
 
   it("uses a person's name when available and email otherwise", () => {

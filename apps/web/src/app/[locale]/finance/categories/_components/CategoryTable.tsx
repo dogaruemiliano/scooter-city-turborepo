@@ -1,11 +1,8 @@
 "use client";
 
-import { ApiError, v1 } from "@repo/api-shared";
+import { v1 } from "@repo/api-shared";
 import {
-  Alert,
-  AlertDescription,
   Badge,
-  Switch,
   Table,
   TableBody,
   TableCell,
@@ -13,13 +10,74 @@ import {
   TableHeader,
   TableRow,
 } from "@repo/ui/components";
-import { useRouter } from "next/navigation";
+import { CornerDownRightIcon, GitForkIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useState } from "react";
 
-import { webApi } from "@/lib/api";
 import { FinanceEmptyState } from "../../_components/FinanceEmptyState";
 import { EditCategoryDialog } from "./EditCategoryDialog";
+
+const categoryKindClassNames = {
+  INCOME: "border-success-subtle bg-success-subtle text-success",
+  EXPENSE: "border-destructive-subtle bg-destructive-subtle text-destructive",
+} as const satisfies Record<v1.finance.FinancialCategoryKind, string>;
+
+function CategoryKindBadge({
+  kind,
+  label,
+}: {
+  kind: v1.finance.FinancialCategoryKind;
+  label: string;
+}) {
+  return (
+    <Badge variant="outline" className={categoryKindClassNames[kind]}>
+      {label}
+    </Badge>
+  );
+}
+
+function CategoryCardContent({
+  category,
+  parentName,
+  rootLabel,
+  kindLabel,
+}: {
+  category: v1.finance.FinancialCategory;
+  parentName?: string;
+  rootLabel: string;
+  kindLabel: string;
+}) {
+  return (
+    <span className="flex w-full min-w-0 items-center justify-between gap-3">
+      <span className="flex min-w-0 flex-1 flex-col items-start gap-0.5">
+        <span className="flex min-h-4 max-w-full items-center gap-1 text-xs text-muted-foreground">
+          {parentName ? (
+            <>
+              <CornerDownRightIcon
+                aria-hidden="true"
+                className="size-3.5 shrink-0"
+                data-icon="hierarchy-connector"
+              />
+              <span className="truncate">{parentName}</span>
+            </>
+          ) : (
+            <>
+              <GitForkIcon
+                aria-hidden="true"
+                className="size-3.5"
+                data-icon="hierarchy-root"
+              />
+              <span className="sr-only">{rootLabel}</span>
+            </>
+          )}
+        </span>
+        <span className="max-w-full truncate font-medium text-foreground">
+          {category.name}
+        </span>
+      </span>
+      <CategoryKindBadge kind={category.kind} label={kindLabel} />
+    </span>
+  );
+}
 
 export function CategoryTable({
   categories,
@@ -27,76 +85,21 @@ export function CategoryTable({
   categories: v1.finance.FinancialCategory[];
 }) {
   const t = useTranslations("finance");
-  const router = useRouter();
-  const [busyId, setBusyId] = useState<string>();
-  const [feedback, setFeedback] = useState<
-    { kind: "success" | "error"; message: string } | undefined
-  >();
   const categoryById = new Map(
     categories.map((category) => [category.id, category]),
   );
-
-  async function setCategoryActive(
-    category: v1.finance.FinancialCategory,
-    isActive: boolean,
-  ) {
-    const input = v1.finance.updateFinancialCategoryInputSchema.parse({
-      isActive,
-    });
-    setBusyId(category.id);
-    setFeedback(undefined);
-
-    try {
-      await webApi.fetch(
-        v1.finance.ROUTES.categories.update(category.id),
-        v1.finance.financialCategorySchema,
-        {
-          method: "PATCH",
-          json: input,
-        },
-      );
-      setFeedback({
-        kind: "success",
-        message: t("categories.update.success"),
-      });
-      router.refresh();
-    } catch (error) {
-      setFeedback({
-        kind: "error",
-        message:
-          error instanceof ApiError
-            ? error.message
-            : t("feedback.genericError"),
-      });
-    } finally {
-      setBusyId(undefined);
-    }
-  }
 
   if (categories.length === 0) {
     return <FinanceEmptyState>{t("categories.list.empty")}</FinanceEmptyState>;
   }
 
   return (
-    <section className="space-y-4">
-      {feedback ? (
-        <Alert variant={feedback.kind === "error" ? "destructive" : "default"}>
-          <AlertDescription>{feedback.message}</AlertDescription>
-        </Alert>
-      ) : null}
-
-      <div className="overflow-hidden rounded-xl border border-border bg-card">
+    <section>
+      <div className="hidden overflow-hidden rounded-xl border border-border bg-card md:block">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>{t("categories.columns.code")}</TableHead>
               <TableHead>{t("categories.columns.name")}</TableHead>
-              <TableHead>{t("categories.columns.kind")}</TableHead>
-              <TableHead>{t("categories.columns.parent")}</TableHead>
-              <TableHead>{t("categories.columns.status")}</TableHead>
-              <TableHead className="text-right">
-                {t("categories.columns.actions")}
-              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -104,45 +107,29 @@ export function CategoryTable({
               const parent = category.parentCategoryId
                 ? categoryById.get(category.parentCategoryId)
                 : undefined;
-              const busy = busyId === category.id;
 
               return (
                 <TableRow key={category.id}>
-                  <TableCell className="font-mono text-xs font-medium">
-                    {category.code}
-                  </TableCell>
-                  <TableCell className="font-medium">{category.name}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline">
-                      {t(`enums.categoryKinds.${category.kind}`)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {parent?.name ?? t("categories.create.noParent")}
-                  </TableCell>
-                  <TableCell>
-                    {category.isActive
-                      ? t("common.active")
-                      : t("common.inactive")}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="inline-flex items-center gap-2">
-                      <EditCategoryDialog
-                        category={category}
-                        categories={categories}
-                      />
-                      <span className="sr-only">
-                        {`${t("categories.columns.status")}: ${category.name}`}
-                      </span>
-                      <Switch
-                        checked={category.isActive}
-                        disabled={busy}
-                        aria-label={`${t("categories.columns.status")}: ${category.name}`}
-                        onCheckedChange={(checked) =>
-                          void setCategoryActive(category, checked)
-                        }
-                      />
-                    </div>
+                  <TableCell className="p-0">
+                    <EditCategoryDialog
+                      category={category}
+                      categories={categories}
+                      trigger={
+                        <button
+                          type="button"
+                          className="flex min-h-16 w-full items-center px-2 py-2 text-left outline-none transition-colors duration-fast ease-standard focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                        >
+                          <CategoryCardContent
+                            category={category}
+                            parentName={parent?.name}
+                            rootLabel={t("categories.list.parentCategory")}
+                            kindLabel={t(
+                              `enums.categoryKinds.${category.kind}`,
+                            )}
+                          />
+                        </button>
+                      }
+                    />
                   </TableCell>
                 </TableRow>
               );
@@ -150,6 +137,39 @@ export function CategoryTable({
           </TableBody>
         </Table>
       </div>
+
+      <ul className="grid gap-2 md:hidden">
+        {categories.map((category) => {
+          const parent = category.parentCategoryId
+            ? categoryById.get(category.parentCategoryId)
+            : undefined;
+
+          return (
+            <li
+              key={category.id}
+              className="overflow-hidden rounded-xl border border-border bg-card transition-colors duration-fast ease-standard hover:bg-muted"
+            >
+              <EditCategoryDialog
+                category={category}
+                categories={categories}
+                trigger={
+                  <button
+                    type="button"
+                    className="flex min-h-16 w-full items-center p-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                  >
+                    <CategoryCardContent
+                      category={category}
+                      parentName={parent?.name}
+                      rootLabel={t("categories.list.parentCategory")}
+                      kindLabel={t(`enums.categoryKinds.${category.kind}`)}
+                    />
+                  </button>
+                }
+              />
+            </li>
+          );
+        })}
+      </ul>
     </section>
   );
 }

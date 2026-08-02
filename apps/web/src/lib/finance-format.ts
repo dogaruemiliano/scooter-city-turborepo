@@ -1,3 +1,4 @@
+import type { v1 } from "@repo/api-shared";
 import type { SupportedLocale } from "@repo/i18n";
 
 const NUMBER_FORMAT_LOCALES = {
@@ -51,6 +52,17 @@ export function formatMoney(
   }
 
   return parts.map((part) => part.value).join("");
+}
+
+export function formatTransactionAmount(
+  amount: string,
+  currency: string,
+  locale: SupportedLocale,
+  type: v1.finance.MoneyTransactionType,
+): string {
+  const signedAmount =
+    type === "EXPENSE" ? `-${amount.replace(/^-/, "")}` : amount;
+  return formatMoney(signedAmount, currency, locale);
 }
 
 export function formatFinanceDateTime(

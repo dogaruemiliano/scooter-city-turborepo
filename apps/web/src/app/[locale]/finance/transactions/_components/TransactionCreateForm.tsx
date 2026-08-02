@@ -6,17 +6,23 @@ import {
   AlertDescription,
   AlertTitle,
   Button,
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
   Checkbox,
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
   Input,
+  InputGroup,
+  InputGroupInput,
+  InputGroupSelectTrigger,
   Label,
   SearchSelect,
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -25,6 +31,7 @@ import {
 } from "@repo/ui/components";
 import { cn } from "@repo/ui/lib/utils";
 import {
+  ArrowDownIcon,
   ArrowLeftIcon,
   ArrowRightIcon,
   Building2Icon,
@@ -40,10 +47,10 @@ import { PageTitleOverride } from "@/components/PageTitleOverride";
 import { financeUserLabel } from "@/lib/finance-format";
 import { FinanceSelectorOptionRow } from "../../_components/FinanceSelectorOptionRow";
 import { webApi } from "@/lib/api";
-import { FinancePageHeader } from "../../_components/FinancePageHeader";
 import {
   buildTransactionInput,
   createTransactionFormState,
+  preferredTransactionWalletId,
   walletFieldRecipe,
   walletMatchesRole,
   type TransactionFormErrors,
@@ -78,6 +85,8 @@ const CATEGORY_TYPES = new Set<v1.finance.CreatableMoneyTransactionType>([
   "USER_CHARGE",
 ]);
 
+const TRANSACTION_CURRENCIES = ["RON", "EUR", "USD"] as const;
+
 export function TransactionCreateForm({
   adminWalletIds,
   categories,
@@ -89,12 +98,29 @@ export function TransactionCreateForm({
   const t = useTranslations("finance");
   const router = useRouter();
   const formId = useId();
-  const [form, setForm] = useState<TransactionFormState>(() =>
-    createTransactionFormState(wallets, prefill),
-  );
+  const [form, setForm] = useState<TransactionFormState>(() => {
+    const initial = createTransactionFormState(wallets, {
+      ...prefill,
+      type: prefill.type === "EXPENSE" ? "EXPENSE" : "INCOME",
+    });
+    const primaryWalletId =
+      initial.primaryWalletId ||
+      preferredTransactionWalletId(initial, wallets, new Set(adminWalletIds));
+    const primaryWallet = wallets.find(
+      (wallet) => wallet.id === primaryWalletId,
+    );
+    return {
+      ...initial,
+      primaryWalletId,
+      financialScope:
+        primaryWallet?.type === "USER" ? "ADMIN_PERSONAL" : "COMPANY",
+    };
+  });
   const [errors, setErrors] = useState<TransactionFormErrors>({});
   const [feedback, setFeedback] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [unidentifiedRecipientInput, setUnidentifiedRecipientInput] =
+    useState<v1.finance.CreateMoneyTransactionInput | null>(null);
   const adminWalletIdSet = useMemo(
     () => new Set(adminWalletIds),
     [adminWalletIds],
@@ -103,19 +129,11 @@ export function TransactionCreateForm({
   const primaryWallets = wallets.filter((wallet) =>
     walletMatchesRole(wallet, recipe.primaryRole, adminWalletIdSet),
   );
-  const secondaryWallets = recipe.secondaryRole
-    ? wallets.filter((wallet) =>
-        walletMatchesRole(wallet, recipe.secondaryRole!, adminWalletIdSet),
-      )
-    : [];
   const visibleCategories = categories.filter((category) => {
     if (!category.isActive) return false;
     if (form.type === "EXPENSE") return category.kind !== "INCOME";
     return category.kind !== "EXPENSE";
   });
-  const showScope = form.type === "INCOME" || form.type === "EXPENSE";
-  const showBucket = form.type === "TRANSFER" || form.type === "ADJUSTMENT";
-  const showDirection = form.type === "ADJUSTMENT";
   const showPaymentMethod =
     PAYMENT_METHOD_TYPES.has(form.type) &&
     !(form.type === "INCOME" && form.financialScope === "ADMIN_PERSONAL");
@@ -143,9 +161,15 @@ export function TransactionCreateForm({
           field:
             field === "amount"
               ? t("transactionForm.fields.amount")
-              : field === "occurredAt"
-                ? t("transactionForm.fields.occurredAt")
-                : t("transactionForm.fields.wallet"),
+              : field === "category"
+                ? t("transactionForm.fields.category")
+                : field === "counterparty"
+                  ? t("transactionForm.fields.payer")
+                  : field === "description"
+                    ? t("transactionForm.fields.description")
+                    : field === "occurredAt"
+                      ? t("transactionForm.fields.occurredAt")
+                      : t("transactionForm.fields.wallet"),
         }),
       differentWalletsMessage: t("transactionForm.validation.differentWallets"),
       differentPeopleMessage: t("transactionForm.validation.differentPeople"),
@@ -158,6 +182,17 @@ export function TransactionCreateForm({
       return;
     }
 
+    if (form.type === "EXPENSE" && !form.counterpartyId) {
+      setUnidentifiedRecipientInput(candidate.input);
+      return;
+    }
+
+    await createTransaction(candidate.input);
+  }
+
+  async function createTransaction(
+    input: v1.finance.CreateMoneyTransactionInput,
+  ) {
     setCreating(true);
     try {
       const transaction = await webApi.fetch(
@@ -165,7 +200,7 @@ export function TransactionCreateForm({
         v1.finance.moneyTransactionSchema,
         {
           method: "POST",
-          json: candidate.input,
+          json: input,
         },
       );
       router.push(`${transactionsHref}/${encodeURIComponent(transaction.id)}`);
@@ -181,6 +216,13 @@ export function TransactionCreateForm({
     }
   }
 
+  async function confirmUnidentifiedRecipient() {
+    if (!unidentifiedRecipientInput) return;
+    const input = unidentifiedRecipientInput;
+    setUnidentifiedRecipientInput(null);
+    await createTransaction(input);
+  }
+
   function setValue<Key extends keyof TransactionFormState>(
     key: Key,
     value: TransactionFormState[Key],
@@ -189,36 +231,45 @@ export function TransactionCreateForm({
     setErrors((current) => clearErrorsForKey(current, key));
   }
 
-  function changeType(type: v1.finance.CreatableMoneyTransactionType) {
-    const reset = createTransactionFormState(wallets, { type });
+  function selectFlowWallet(walletId: string) {
+    const wallet = wallets.find((candidate) => candidate.id === walletId);
     setForm((current) => ({
-      ...reset,
-      amount: current.amount,
-      currency: current.currency,
-      occurredAt: current.occurredAt,
-      description: current.description,
-      postImmediately: current.postImmediately,
-      referenceType: current.referenceType,
-      referenceId: current.referenceId,
+      ...current,
+      primaryWalletId: walletId,
+      financialScope: wallet?.type === "USER" ? "ADMIN_PERSONAL" : "COMPANY",
+    }));
+    setErrors((current) => ({ ...current, primaryWalletId: undefined }));
+  }
+
+  function swapDirection() {
+    setForm((current) => ({
+      ...current,
+      type: current.type === "INCOME" ? "EXPENSE" : "INCOME",
+      billingStatus:
+        current.type === "INCOME" ? "NOT_APPLICABLE" : current.billingStatus,
+      categoryId: "",
     }));
     setErrors({});
     setFeedback(null);
   }
 
-  function changeRoutingValue<Key extends "bucket" | "financialScope">(
-    key: Key,
-    value: TransactionFormState[Key],
-  ) {
-    setForm((current) => ({
-      ...current,
-      [key]: value,
-      primaryWalletId: "",
-      secondaryWalletId: "",
-    }));
+  function changePaymentMethod(value: v1.finance.PaymentMethod) {
+    setForm((current) => {
+      const next = { ...current, paymentMethod: value };
+      const preferredWalletId = preferredTransactionWalletId(
+        next,
+        wallets,
+        adminWalletIdSet,
+      );
+      return {
+        ...next,
+        primaryWalletId: preferredWalletId || current.primaryWalletId,
+      };
+    });
     setErrors((current) => ({
       ...current,
+      paymentMethod: undefined,
       primaryWalletId: undefined,
-      secondaryWalletId: undefined,
     }));
   }
 
@@ -229,256 +280,157 @@ export function TransactionCreateForm({
         href={transactionsHref}
         className={cn(
           buttonVariants({ variant: "ghost" }),
-          "w-fit text-muted-foreground",
+          "hidden w-fit text-muted-foreground md:inline-flex",
         )}
       >
         <ArrowLeftIcon data-icon="inline-start" />
         {t("transactionForm.back")}
       </Link>
-      <FinancePageHeader
-        title={t("transactionForm.title")}
-        description={t("transactionForm.description")}
-      />
-
       <form
         className="grid gap-6"
         noValidate
         onSubmit={(event) => void submit(event)}
       >
-        <Card>
-          <CardHeader>
-            <CardTitle>{t("transactionForm.sections.transaction")}</CardTitle>
-            <CardDescription>
-              {t(`transactionForm.typeHelp.${form.type}`)}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-4 md:grid-cols-2">
-            <SelectField
-              id={`${formId}-type`}
-              label={t("transactionForm.fields.type")}
-              value={form.type}
-              disabled={creating}
-              items={v1.finance.CREATABLE_MONEY_TRANSACTION_TYPES.map(
-                (type) => ({
-                  value: type,
-                  label: t(`enums.transactionTypes.${type}`),
-                }),
-              )}
-              onChange={(value) =>
-                changeType(value as v1.finance.CreatableMoneyTransactionType)
-              }
-            />
-            <TextField
-              id={`${formId}-amount`}
-              label={t("transactionForm.fields.amount")}
-              value={form.amount}
-              inputMode="decimal"
+        <div className="mx-auto grid w-full max-w-screen-md gap-8">
+          <div className="relative grid gap-3">
+            <FlowRow
+              sign={form.type === "INCOME" ? "+" : "−"}
+              amountId={`${formId}-source-amount`}
+              amount={form.amount}
+              amountLabel={t("transactionForm.fields.sourceAmount")}
+              currency={form.currency}
+              currencyId={`${formId}-source-currency`}
+              currencyLabel={t("transactionForm.fields.currency")}
               disabled={creating}
               error={errors.amount}
-              onChange={(value) => setValue("amount", value)}
-            />
-            <TextField
-              id={`${formId}-currency`}
-              label={t("transactionForm.fields.currency")}
-              value={form.currency}
-              autoCapitalize="characters"
-              disabled={creating}
-              maxLength={3}
-              error={errors.currency}
-              onChange={(value) => setValue("currency", value.toUpperCase())}
-            />
-            {showScope ? (
-              <SelectField
-                id={`${formId}-scope`}
-                label={t("transactionForm.fields.scope")}
-                value={form.financialScope}
+              autoFocus
+              onAmountChange={(value) => setValue("amount", value)}
+              onCurrencyChange={(value) => setValue("currency", value)}
+            >
+              <FlowWalletSelect
+                id={`${formId}-wallet`}
+                label={t("transactionForm.fields.wallet")}
+                value={form.primaryWalletId}
+                wallets={primaryWallets}
                 disabled={creating}
-                items={(["COMPANY", "ADMIN_PERSONAL"] as const).map(
-                  (scope) => ({
-                    value: scope,
-                    label: t(`enums.financialScopes.${scope}`),
-                  }),
-                )}
-                onChange={(value) =>
-                  changeRoutingValue(
-                    "financialScope",
-                    value as TransactionFormState["financialScope"],
-                  )
-                }
-              />
-            ) : null}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>{t("transactionForm.sections.routing")}</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-4 md:grid-cols-2">
-            {showBucket ? (
-              <SelectField
-                id={`${formId}-bucket`}
-                label={t("transactionForm.fields.bucket")}
-                value={form.bucket}
-                disabled={creating}
-                items={v1.finance.WALLET_BALANCE_BUCKETS.map((bucket) => ({
-                  value: bucket,
-                  label: t(`enums.balanceBuckets.${bucket}`),
-                }))}
-                onChange={(value) =>
-                  changeRoutingValue(
-                    "bucket",
-                    value as v1.finance.WalletBalanceBucket,
-                  )
-                }
-              />
-            ) : null}
-            {showDirection ? (
-              <SelectField
-                id={`${formId}-direction`}
-                label={t("transactionForm.fields.direction")}
-                value={form.direction}
-                disabled={creating}
-                items={(["POSITIVE", "NEGATIVE"] as const).map((direction) => ({
-                  value: direction,
-                  label: t(`enums.directions.${direction}`),
-                }))}
-                onChange={(value) =>
-                  setValue(
-                    "direction",
-                    value as TransactionFormState["direction"],
-                  )
-                }
-              />
-            ) : null}
-            <WalletSelect
-              id={`${formId}-primary-wallet`}
-              label={t(`transactionForm.fields.${recipe.primaryLabel}`)}
-              value={form.primaryWalletId}
-              wallets={primaryWallets}
-              disabled={creating}
-              error={errors.primaryWalletId}
-              placeholder={t("transactionForm.placeholders.select")}
-              searchPlaceholder={t(
-                "transactionForm.placeholders.searchWallets",
-              )}
-              emptyMessage={t("transactionForm.placeholders.noWallets")}
-              clearLabel={t("transactionForm.placeholders.clearSelection")}
-              toggleLabel={t("transactionForm.placeholders.toggleOptions")}
-              walletTypeLabels={walletTypeLabels}
-              onChange={(value) => setValue("primaryWalletId", value)}
-            />
-            {recipe.secondaryRole && recipe.secondaryLabel ? (
-              <WalletSelect
-                id={`${formId}-secondary-wallet`}
-                label={t(`transactionForm.fields.${recipe.secondaryLabel}`)}
-                value={form.secondaryWalletId}
-                wallets={secondaryWallets}
-                disabled={creating}
-                error={errors.secondaryWalletId}
-                placeholder={t("transactionForm.placeholders.select")}
-                searchPlaceholder={t(
-                  "transactionForm.placeholders.searchWallets",
-                )}
-                emptyMessage={t("transactionForm.placeholders.noWallets")}
-                clearLabel={t("transactionForm.placeholders.clearSelection")}
-                toggleLabel={t("transactionForm.placeholders.toggleOptions")}
+                error={errors.primaryWalletId}
                 walletTypeLabels={walletTypeLabels}
-                onChange={(value) => setValue("secondaryWalletId", value)}
+                t={t}
+                onChange={selectFlowWallet}
               />
-            ) : null}
-            {form.type === "INCOME" || form.type === "EXPENSE" ? (
-              <CounterpartySelect
-                key={form.type}
+            </FlowRow>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="absolute left-1/2 top-1/2 z-10 size-12 -translate-x-1/2 -translate-y-1/2 rounded-full bg-background shadow-md"
+              disabled={creating}
+              aria-label={t("transactionForm.swapDirection")}
+              onClick={swapDirection}
+            >
+              <ArrowDownIcon
+                className={cn(
+                  "transition-transform duration-normal ease-standard",
+                  form.type === "INCOME" && "rotate-180",
+                )}
+              />
+            </Button>
+            <FlowRow
+              sign={form.type === "INCOME" ? "−" : "+"}
+              amountId={`${formId}-destination-amount`}
+              amount={form.amount}
+              amountLabel={t("transactionForm.fields.destinationAmount")}
+              currency={form.currency}
+              currencyId={`${formId}-destination-currency`}
+              currencyLabel={t("transactionForm.fields.currency")}
+              disabled={creating}
+              error={errors.amount}
+              onAmountChange={(value) => setValue("amount", value)}
+              onCurrencyChange={(value) => setValue("currency", value)}
+            >
+              <FlowCounterpartySelect
+                key={`counterparty-${form.type}`}
                 id={`${formId}-counterparty`}
-                transactionType={form.type}
-                label={t("transactionForm.fields.counterparty")}
+                label={t(
+                  form.type === "INCOME"
+                    ? "transactionForm.fields.payer"
+                    : "transactionForm.fields.recipient",
+                )}
+                transactionType={form.type === "EXPENSE" ? "EXPENSE" : "INCOME"}
                 value={form.counterpartyId}
                 disabled={creating}
                 error={errors.counterpartyId}
-                placeholder={t("transactionForm.placeholders.optional")}
-                searchPlaceholder={t(
-                  "transactionForm.placeholders.searchCounterparties",
-                )}
-                emptyMessage={t(
-                  "transactionForm.placeholders.noCounterparties",
-                )}
-                minSearchMessage={t(
-                  "transactionForm.placeholders.counterpartySearchHint",
-                )}
-                loadingMessage={t(
-                  "transactionForm.placeholders.searchingCounterparties",
-                )}
-                errorMessage={t(
-                  "transactionForm.placeholders.counterpartySearchError",
-                )}
-                loadMoreLabel={t("transactionForm.placeholders.loadMore")}
-                clearLabel={t("transactionForm.placeholders.clearSelection")}
-                toggleLabel={t("transactionForm.placeholders.toggleOptions")}
+                required={form.type === "INCOME"}
+                t={t}
                 onChange={(value) => setValue("counterpartyId", value)}
               />
-            ) : null}
-            {showPaymentMethod ? (
-              <SelectField
-                id={`${formId}-payment-method`}
-                label={t("transactionForm.fields.paymentMethod")}
-                value={form.paymentMethod}
-                disabled={creating}
-                error={errors.paymentMethod}
-                items={v1.finance.PAYMENT_METHODS.map((method) => ({
-                  value: method,
-                  label: t(`enums.paymentMethods.${method}`),
-                }))}
-                onChange={(value) =>
-                  setValue("paymentMethod", value as v1.finance.PaymentMethod)
-                }
-              />
-            ) : null}
-            {showBillingStatus ? (
-              <SelectField
-                id={`${formId}-billing-status`}
-                label={t("transactionForm.fields.billingStatus")}
-                value={form.billingStatus}
-                disabled={creating}
-                error={errors.billingStatus}
-                items={v1.finance.BILLING_STATUSES.map((status) => ({
-                  value: status,
-                  label: t(`enums.billingStatuses.${status}`),
-                }))}
-                onChange={(value) =>
-                  setValue("billingStatus", value as v1.finance.BillingStatus)
-                }
-              />
-            ) : null}
-            {showCategory ? (
-              <SearchSelectField
-                id={`${formId}-category`}
-                label={t("transactionForm.fields.category")}
-                value={form.categoryId || null}
-                disabled={creating}
-                error={errors.categoryId}
-                options={visibleCategories.map((category) => ({
-                  value: category.id,
-                  label: category.name,
-                }))}
-                placeholder={t("transactionForm.placeholders.optional")}
-                searchPlaceholder={t(
-                  "transactionForm.placeholders.searchCategories",
-                )}
-                emptyMessage={t("transactionForm.placeholders.noCategories")}
-                clearLabel={t("transactionForm.placeholders.clearSelection")}
-                toggleLabel={t("transactionForm.placeholders.toggleOptions")}
-                onChange={(value) => setValue("categoryId", value ?? "")}
-              />
-            ) : null}
-          </CardContent>
-        </Card>
+            </FlowRow>
+          </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>{t("transactionForm.sections.details")}</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 border-t border-border pt-8 md:grid-cols-2">
+            <div className="contents">
+              {showPaymentMethod ? (
+                <SelectField
+                  id={`${formId}-payment-method`}
+                  label={t("transactionForm.fields.paymentMethod")}
+                  value={form.paymentMethod}
+                  disabled={creating}
+                  error={errors.paymentMethod}
+                  items={v1.finance.PAYMENT_METHODS.map((method) => ({
+                    value: method,
+                    label: t(`enums.paymentMethods.${method}`),
+                  }))}
+                  onChange={(value) =>
+                    changePaymentMethod(value as v1.finance.PaymentMethod)
+                  }
+                />
+              ) : null}
+              {showBillingStatus ? (
+                <SelectField
+                  id={`${formId}-billing-status`}
+                  label={t("transactionForm.fields.billingStatus")}
+                  value={form.billingStatus}
+                  disabled={creating}
+                  error={errors.billingStatus}
+                  items={v1.finance.BILLING_STATUSES.map((status) => ({
+                    value: status,
+                    label: t(`enums.billingStatuses.${status}`),
+                  }))}
+                  onChange={(value) =>
+                    setValue("billingStatus", value as v1.finance.BillingStatus)
+                  }
+                />
+              ) : null}
+              {showCategory ? (
+                <SearchSelectField
+                  id={`${formId}-category`}
+                  label={t("transactionForm.fields.category")}
+                  value={form.categoryId || null}
+                  required={form.type === "EXPENSE"}
+                  disabled={creating}
+                  error={errors.categoryId}
+                  options={visibleCategories.map((category) => ({
+                    value: category.id,
+                    label: category.name,
+                  }))}
+                  placeholder={t(
+                    form.type === "EXPENSE"
+                      ? "transactionForm.placeholders.select"
+                      : "transactionForm.placeholders.optional",
+                  )}
+                  searchPlaceholder={t(
+                    "transactionForm.placeholders.searchCategories",
+                  )}
+                  emptyMessage={t("transactionForm.placeholders.noCategories")}
+                  clearLabel={t("transactionForm.placeholders.clearSelection")}
+                  toggleLabel={t("transactionForm.placeholders.toggleOptions")}
+                  onChange={(value) => setValue("categoryId", value ?? "")}
+                />
+              ) : null}
+            </div>
+          </div>
+
+          <div className="grid gap-4 border-t border-border pt-8 md:grid-cols-2">
             <TextField
               id={`${formId}-occurred-at`}
               label={t("transactionForm.fields.occurredAt")}
@@ -533,8 +485,8 @@ export function TransactionCreateForm({
               error={errors.reference}
               onChange={(value) => setValue("referenceId", value)}
             />
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
         {feedback ? (
           <Alert variant="destructive">
@@ -579,7 +531,186 @@ export function TransactionCreateForm({
           </div>
         </div>
       </form>
+      <Dialog
+        open={unidentifiedRecipientInput !== null}
+        onOpenChange={(open) => {
+          if (!open && !creating) setUnidentifiedRecipientInput(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {t("transactionForm.unidentifiedRecipient.title")}
+            </DialogTitle>
+            <DialogDescription>
+              {t("transactionForm.unidentifiedRecipient.description")}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose
+              render={<Button variant="outline" disabled={creating} />}
+            >
+              {t("transactionForm.unidentifiedRecipient.back")}
+            </DialogClose>
+            <Button
+              type="button"
+              disabled={creating}
+              onClick={() => void confirmUnidentifiedRecipient()}
+            >
+              {t("transactionForm.unidentifiedRecipient.confirm")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
+  );
+}
+
+function FlowRow({
+  amount,
+  amountId,
+  amountLabel,
+  autoFocus = false,
+  children,
+  currency,
+  currencyId,
+  currencyLabel,
+  disabled,
+  error,
+  onAmountChange,
+  onCurrencyChange,
+  sign,
+}: {
+  amount: string;
+  amountId: string;
+  amountLabel: string;
+  autoFocus?: boolean;
+  children: React.ReactNode;
+  currency: string;
+  currencyId: string;
+  currencyLabel: string;
+  disabled: boolean;
+  error?: string;
+  onAmountChange(value: string): void;
+  onCurrencyChange(value: string): void;
+  sign: "+" | "−";
+}) {
+  return (
+    <div className="grid min-h-32 items-center gap-4 rounded-xl bg-muted/50 p-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] sm:p-6">
+      <div className="[&_[data-slot=label]]:sr-only">{children}</div>
+      <div>
+        <Label className="sr-only" htmlFor={amountId}>
+          {amountLabel}
+        </Label>
+        <InputGroup className="h-14 border-none bg-transparent shadow-none">
+          <span
+            className={cn(
+              "pl-2 text-3xl font-semibold",
+              sign === "+" ? "text-success" : "text-destructive",
+            )}
+            aria-hidden="true"
+          >
+            {sign}
+          </span>
+          <InputGroupInput
+            id={amountId}
+            value={amount}
+            inputMode="decimal"
+            disabled={disabled}
+            aria-invalid={Boolean(error)}
+            aria-describedby={error ? `${amountId}-error` : undefined}
+            autoFocus={autoFocus}
+            className="text-right text-3xl font-semibold tracking-tight"
+            onChange={(event) => onAmountChange(event.currentTarget.value)}
+          />
+          <Select
+            value={currency}
+            disabled={disabled}
+            onValueChange={(value) => onCurrencyChange(value ?? "RON")}
+          >
+            <InputGroupSelectTrigger id={currencyId} aria-label={currencyLabel}>
+              <SelectValue />
+            </InputGroupSelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                {TRANSACTION_CURRENCIES.map((option) => (
+                  <SelectItem key={option} value={option}>
+                    {option}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </InputGroup>
+        {error ? (
+          <p id={`${amountId}-error`} className="mt-1 text-xs text-destructive">
+            {error}
+          </p>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function FlowWalletSelect({
+  t,
+  ...props
+}: Omit<
+  React.ComponentProps<typeof WalletSelect>,
+  | "clearLabel"
+  | "emptyMessage"
+  | "placeholder"
+  | "searchPlaceholder"
+  | "toggleLabel"
+> & { t: ReturnType<typeof useTranslations> }) {
+  return (
+    <WalletSelect
+      {...props}
+      placeholder={t("transactionForm.placeholders.select")}
+      searchPlaceholder={t("transactionForm.placeholders.searchWallets")}
+      emptyMessage={t("transactionForm.placeholders.noWallets")}
+      clearLabel={t("transactionForm.placeholders.clearSelection")}
+      toggleLabel={t("transactionForm.placeholders.toggleOptions")}
+    />
+  );
+}
+
+function FlowCounterpartySelect({
+  required = false,
+  t,
+  ...props
+}: Omit<
+  React.ComponentProps<typeof CounterpartySelect>,
+  | "clearLabel"
+  | "emptyMessage"
+  | "errorMessage"
+  | "loadMoreLabel"
+  | "loadingMessage"
+  | "minSearchMessage"
+  | "placeholder"
+  | "searchPlaceholder"
+  | "toggleLabel"
+> & { t: ReturnType<typeof useTranslations> }) {
+  return (
+    <CounterpartySelect
+      {...props}
+      required={required}
+      placeholder={t(
+        required
+          ? "transactionForm.placeholders.selectPayer"
+          : "transactionForm.placeholders.optionalCounterparty",
+      )}
+      searchPlaceholder={t("transactionForm.placeholders.searchCounterparties")}
+      emptyMessage={t("transactionForm.placeholders.noCounterparties")}
+      minSearchMessage={t(
+        "transactionForm.placeholders.counterpartySearchHint",
+      )}
+      loadingMessage={t("transactionForm.placeholders.searchingCounterparties")}
+      errorMessage={t("transactionForm.placeholders.counterpartySearchError")}
+      loadMoreLabel={t("transactionForm.placeholders.loadMore")}
+      clearLabel={t("transactionForm.placeholders.clearSelection")}
+      toggleLabel={t("transactionForm.placeholders.toggleOptions")}
+    />
   );
 }
 
@@ -746,6 +877,7 @@ function CounterpartySelect({
   minSearchMessage,
   onChange,
   placeholder,
+  required = false,
   searchPlaceholder,
   toggleLabel,
   transactionType,
@@ -763,6 +895,7 @@ function CounterpartySelect({
   minSearchMessage: string;
   onChange(value: string): void;
   placeholder: string;
+  required?: boolean;
   searchPlaceholder: string;
   toggleLabel: string;
   transactionType: "INCOME" | "EXPENSE";
@@ -850,6 +983,7 @@ function CounterpartySelect({
         id={id}
         ariaLabelledBy={`${id}-label`}
         ariaInvalid={Boolean(error)}
+        ariaRequired={required}
         ariaDescribedBy={error ? `${id}-error` : undefined}
         value={value || null}
         selectedOption={preservedSelection}
@@ -929,6 +1063,7 @@ function SearchSelectField({
   onChange,
   options,
   placeholder,
+  required = false,
   searchPlaceholder,
   toggleLabel,
   value,
@@ -942,6 +1077,7 @@ function SearchSelectField({
   onChange(value: string | null): void;
   options: Array<{ label: string; value: string }>;
   placeholder: string;
+  required?: boolean;
   searchPlaceholder: string;
   toggleLabel: string;
   value: string | null;
@@ -955,6 +1091,7 @@ function SearchSelectField({
         id={id}
         ariaLabelledBy={`${id}-label`}
         ariaInvalid={Boolean(error)}
+        ariaRequired={required}
         ariaDescribedBy={error ? `${id}-error` : undefined}
         value={value}
         disabled={disabled}
@@ -963,6 +1100,7 @@ function SearchSelectField({
         searchPlaceholder={searchPlaceholder}
         emptyMessage={emptyMessage}
         clearLabel={clearLabel}
+        clearable={!required}
         toggleLabel={toggleLabel}
         className="mt-1"
         onValueChange={onChange}

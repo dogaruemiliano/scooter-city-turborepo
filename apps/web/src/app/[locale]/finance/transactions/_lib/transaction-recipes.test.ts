@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 import {
   buildTransactionInput,
   createTransactionFormState,
+  preferredTransactionWalletId,
+  walletMatchesRole,
   type TransactionFormState,
 } from "./transaction-recipes";
 
@@ -198,6 +200,18 @@ describe("transaction recipes", () => {
     expect(result.errors.secondaryWalletId).toBe("different wallets");
   });
 
+  it("requires a category for expenses", () => {
+    const result = build(
+      formFor("EXPENSE", {
+        categoryId: "",
+        primaryWalletId: companyCash.id,
+      }),
+    );
+
+    expect(result.input).toBeUndefined();
+    expect(result.errors.categoryId).toBe("category required");
+  });
+
   it("allows one admin wallet to route different buckets when the backend does", () => {
     const result = build(
       formFor("REIMBURSEMENT", {
@@ -258,15 +272,60 @@ describe("transaction recipes", () => {
     },
   );
 
-  it("leaves the income counterparty empty when none is selected", () => {
+  it("requires a payer for income", () => {
     const result = build(
       formFor("INCOME", {
         primaryWalletId: companyCash.id,
+        counterpartyId: "",
       }),
     );
 
-    expect(result.errors).toEqual({});
-    expect(result.input?.counterpartyId).toBeNull();
+    expect(result.input).toBeUndefined();
+    expect(result.errors.counterpartyId).toBe("counterparty required");
+  });
+
+  it("requires a description for an expense without a recipient", () => {
+    const result = build(
+      formFor("EXPENSE", {
+        primaryWalletId: companyCash.id,
+        counterpartyId: "",
+        description: "",
+      }),
+    );
+
+    expect(result.input).toBeUndefined();
+    expect(result.errors.description).toBe("description required");
+  });
+
+  it("does not offer payment processors as business-funds wallets", () => {
+    const processor = wallet("processor", "PAYMENT_PROCESSOR");
+    const adminIds = new Set([adminOneWallet.id]);
+
+    expect(walletMatchesRole(processor, "BUSINESS_FUNDS", adminIds)).toBe(
+      false,
+    );
+    expect(walletMatchesRole(companyBank, "BUSINESS_FUNDS", adminIds)).toBe(
+      true,
+    );
+  });
+
+  it("defaults cash movements to the administrator wallet", () => {
+    const form = createTransactionFormState(wallets, { type: "INCOME" });
+
+    expect(
+      preferredTransactionWalletId(form, wallets, new Set([adminOneWallet.id])),
+    ).toBe(adminOneWallet.id);
+  });
+
+  it("defaults company card expenses to the company bank wallet", () => {
+    const form = {
+      ...createTransactionFormState(wallets, { type: "EXPENSE" }),
+      paymentMethod: "POS" as const,
+    };
+
+    expect(
+      preferredTransactionWalletId(form, wallets, new Set([adminOneWallet.id])),
+    ).toBe(companyBank.id);
   });
 });
 
@@ -288,6 +347,10 @@ function formFor(
   return {
     ...createTransactionFormState(wallets, { type }),
     amount: "25.50",
+    categoryId: type === "EXPENSE" ? "category-1" : "",
+    counterpartyId: type === "INCOME" ? "counterparty-1" : "",
+    description:
+      type === "EXPENSE" ? "Cash expense without a known recipient" : "",
     ...withoutUndefined(overrides),
   };
 }
@@ -302,6 +365,8 @@ function wallet(
     type,
     name: id,
     isActive: true,
+    cardHolderUserId: null,
+    cardHolder: null,
     owner: ownerId
       ? {
           id: ownerId,

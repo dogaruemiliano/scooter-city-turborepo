@@ -1,11 +1,9 @@
 import { v1 } from "@repo/api-shared";
 import { messages } from "@repo/i18n";
 import type { Metadata } from "next";
-import { getTranslations } from "next-intl/server";
 
 import { resolveRouteLocale } from "@/i18n/paths";
 import { webApi } from "@/lib/api";
-import { FinancePageHeader } from "../_components/FinancePageHeader";
 import {
   financeCookieHeader,
   handleFinanceApiErrors,
@@ -43,15 +41,11 @@ export default async function CategoriesPage({ params }: CategoriesPageProps) {
       },
     ),
   );
-  const t = await getTranslations({ locale, namespace: "finance" });
-
   return (
     <main className="mx-auto flex w-full max-w-screen-xl flex-1 flex-col gap-8 px-4 py-6 sm:px-6 lg:px-8">
-      <FinancePageHeader
-        title={t("categories.title")}
-        description={t("categories.description")}
-        action={<CreateCategoryDialog categories={categories.items} />}
-      />
+      <div className="flex justify-end">
+        <CreateCategoryDialog categories={categories.items} />
+      </div>
       <CategoryTable categories={categories.items} />
     </main>
   );

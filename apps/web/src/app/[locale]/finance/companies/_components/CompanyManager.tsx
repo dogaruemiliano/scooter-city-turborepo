@@ -16,7 +16,11 @@ import {
   DialogTrigger,
   Input,
   Label,
-  Switch,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Table,
   TableBody,
   TableCell,
@@ -25,150 +29,161 @@ import {
   TableRow,
   Textarea,
 } from "@repo/ui/components";
-import { Building2Icon, PencilIcon, PlusIcon } from "lucide-react";
+import { ArrowRightIcon, PlusIcon } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useId, useState, type FormEvent } from "react";
 
 import { webApi } from "@/lib/api";
 import { FinanceEmptyState } from "../../_components/FinanceEmptyState";
+import {
+  CompanyLegalFormIcon,
+  companyDisplayName,
+} from "./CompanyLegalFormIcon";
+
+function CompanyIdentity({
+  company,
+  href,
+}: {
+  company: v1.finance.Company;
+  href: string;
+}) {
+  const t = useTranslations("finance");
+  const displayName = companyDisplayName(
+    company,
+    t(`enums.companyLegalForms.${company.legalForm}`),
+  );
+  return (
+    <Link
+      href={href}
+      className="group flex min-w-0 flex-1 items-center gap-3 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground transition-colors group-hover:text-foreground">
+        <CompanyLegalFormIcon legalForm={company.legalForm} />
+      </span>
+      <div className="min-w-0">
+        <div className="truncate font-medium text-foreground">
+          {displayName}
+        </div>
+        <div className="truncate text-xs text-muted-foreground">
+          {t("companies.fields.taxIdentifier")}:{" "}
+          {company.taxIdentifier ?? t("common.notProvided")}
+        </div>
+      </div>
+      <ArrowRightIcon className="ml-auto size-4 shrink-0 text-muted-foreground opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100" />
+    </Link>
+  );
+}
 
 export function CompanyManager({
   companies,
+  companiesHref,
 }: {
   companies: v1.finance.Company[];
+  companiesHref: string;
 }) {
   const t = useTranslations("finance");
-  const router = useRouter();
-  const [feedback, setFeedback] = useState<string>();
-  const [busyId, setBusyId] = useState<string>();
-
-  async function setActive(company: v1.finance.Company, isActive: boolean) {
-    setBusyId(company.id);
-    setFeedback(undefined);
-    try {
-      await webApi.fetch(
-        v1.finance.ROUTES.companies.update(company.id),
-        v1.finance.companySchema,
-        { method: "PATCH", json: { isActive } },
-      );
-      router.refresh();
-    } catch (error) {
-      setFeedback(
-        error instanceof ApiError ? error.message : t("feedback.genericError"),
-      );
-    } finally {
-      setBusyId(undefined);
-    }
-  }
 
   return (
     <section className="space-y-4">
       <div className="flex justify-end">
-        <CompanyDialog />
+        <CreateCompanyDialog />
       </div>
-      {feedback ? (
-        <Alert variant="destructive">
-          <AlertDescription>{feedback}</AlertDescription>
-        </Alert>
-      ) : null}
       {companies.length === 0 ? (
         <FinanceEmptyState>{t("companies.empty")}</FinanceEmptyState>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-border bg-card">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t("companies.columns.company")}</TableHead>
-                <TableHead>{t("companies.columns.identifier")}</TableHead>
-                <TableHead>{t("companies.columns.contact")}</TableHead>
-                <TableHead>{t("companies.columns.status")}</TableHead>
-                <TableHead className="text-right">
-                  {t("companies.columns.actions")}
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {companies.map((company) => (
-                <TableRow key={company.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <Building2Icon className="size-4 text-muted-foreground" />
-                      <div>
-                        <div className="font-medium">
-                          {company.tradingName ?? company.legalName}
-                        </div>
-                        {company.tradingName ? (
-                          <div className="text-xs text-muted-foreground">
-                            {company.legalName}
-                          </div>
-                        ) : null}
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {company.taxIdentifier ??
-                      company.registrationNumber ??
-                      t("common.notProvided")}
-                  </TableCell>
-                  <TableCell>
-                    <div>
-                      {company.email ??
-                        company.phone ??
-                        t("common.notProvided")}
-                    </div>
-                    {company.email && company.phone ? (
-                      <div className="text-xs text-muted-foreground">
-                        {company.phone}
-                      </div>
-                    ) : null}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={company.isActive ? "default" : "secondary"}>
-                      {t(
-                        company.isActive ? "common.active" : "common.inactive",
-                      )}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="inline-flex items-center gap-2">
-                      <CompanyDialog company={company} />
-                      <Switch
-                        checked={company.isActive}
-                        disabled={busyId === company.id}
-                        aria-label={`${t("companies.columns.status")}: ${company.legalName}`}
-                        onCheckedChange={(value) =>
-                          void setActive(company, value)
-                        }
-                      />
-                    </div>
-                  </TableCell>
+        <>
+          <div className="hidden overflow-hidden rounded-xl border border-border bg-card md:block">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t("companies.columns.company")}</TableHead>
+                  <TableHead>{t("companies.columns.identifier")}</TableHead>
+                  <TableHead>{t("companies.columns.contact")}</TableHead>
+                  <TableHead>{t("companies.columns.status")}</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+              </TableHeader>
+              <TableBody>
+                {companies.map((company) => (
+                  <TableRow key={company.id}>
+                    <TableCell>
+                      <CompanyIdentity
+                        company={company}
+                        href={`${companiesHref}/${encodeURIComponent(company.id)}`}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      {company.taxIdentifier ??
+                        company.registrationNumber ??
+                        t("common.notProvided")}
+                    </TableCell>
+                    <TableCell>
+                      <div>
+                        {company.email ??
+                          company.phone ??
+                          t("common.notProvided")}
+                      </div>
+                      {company.email && company.phone ? (
+                        <div className="text-xs text-muted-foreground">
+                          {company.phone}
+                        </div>
+                      ) : null}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={company.isActive ? "default" : "secondary"}
+                      >
+                        {t(
+                          company.isActive
+                            ? "common.active"
+                            : "common.inactive",
+                        )}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          <ul className="grid gap-2 md:hidden">
+            {companies.map((company) => (
+              <li
+                key={company.id}
+                className="overflow-hidden rounded-xl border border-border bg-card"
+              >
+                <article className="p-3">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <CompanyIdentity
+                      company={company}
+                      href={`${companiesHref}/${encodeURIComponent(company.id)}`}
+                    />
+                  </div>
+                </article>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
     </section>
   );
 }
 
-function CompanyDialog({ company }: { company?: v1.finance.Company }) {
+function CreateCompanyDialog() {
   const t = useTranslations("finance");
   const router = useRouter();
   const formId = useId();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
+  const [legalForm, setLegalForm] =
+    useState<v1.finance.CompanyLegalForm>("SRL");
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const raw = Object.fromEntries(form.entries());
-    const parsed = (
-      company
-        ? v1.finance.updateCompanyInputSchema
-        : v1.finance.createCompanyInputSchema
-    ).safeParse(raw);
+    const raw = { ...Object.fromEntries(form.entries()), legalForm };
+    const parsed = v1.finance.createCompanyInputSchema.safeParse(raw);
     if (!parsed.success) {
       setError(t("companies.form.invalid"));
       return;
@@ -177,11 +192,9 @@ function CompanyDialog({ company }: { company?: v1.finance.Company }) {
     setError(undefined);
     try {
       await webApi.fetch(
-        company
-          ? v1.finance.ROUTES.companies.update(company.id)
-          : v1.finance.ROUTES.companies.create,
+        v1.finance.ROUTES.companies.create,
         v1.finance.companySchema,
-        { method: company ? "PATCH" : "POST", json: parsed.data },
+        { method: "POST", json: parsed.data },
       );
       setOpen(false);
       router.refresh();
@@ -208,35 +221,14 @@ function CompanyDialog({ company }: { company?: v1.finance.Company }) {
   ] as const;
   return (
     <Dialog open={open} onOpenChange={(value) => !busy && setOpen(value)}>
-      <DialogTrigger
-        render={
-          <Button
-            type="button"
-            variant={company ? "ghost" : "default"}
-            size={company ? "icon" : "default"}
-            aria-label={company ? t("companies.edit") : undefined}
-          />
-        }
-      >
-        {company ? (
-          <PencilIcon />
-        ) : (
-          <>
-            <PlusIcon data-icon="inline-start" />
-            {t("companies.create")}
-          </>
-        )}
+      <DialogTrigger render={<Button type="button" variant="default" />}>
+        <PlusIcon data-icon="inline-start" />
+        {t("companies.create")}
       </DialogTrigger>
       <DialogContent className="max-h-screen overflow-y-auto">
         <form id={formId} onSubmit={submit} className="contents">
           <DialogHeader>
-            <DialogTitle>
-              {t(
-                company
-                  ? "companies.form.editTitle"
-                  : "companies.form.createTitle",
-              )}
-            </DialogTitle>
+            <DialogTitle>{t("companies.form.createTitle")}</DialogTitle>
             <DialogDescription>
               {t("companies.form.description")}
             </DialogDescription>
@@ -247,6 +239,32 @@ function CompanyDialog({ company }: { company?: v1.finance.Company }) {
             </Alert>
           ) : null}
           <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-2">
+              <Label id={`${formId}-legal-form`}>
+                {t("companies.fields.legalForm")}
+              </Label>
+              <Select
+                value={legalForm}
+                onValueChange={(value) =>
+                  setLegalForm(value as v1.finance.CompanyLegalForm)
+                }
+                disabled={busy}
+              >
+                <SelectTrigger
+                  aria-labelledby={`${formId}-legal-form`}
+                  className="w-full"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {v1.finance.COMPANY_LEGAL_FORMS.map((value) => (
+                    <SelectItem key={value} value={value}>
+                      {t(`enums.companyLegalForms.${value}`)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             {fields.map(([name, label, required]) => (
               <div key={name} className="grid gap-2">
                 <Label htmlFor={`${formId}-${name}`}>
@@ -255,7 +273,7 @@ function CompanyDialog({ company }: { company?: v1.finance.Company }) {
                 <Input
                   id={`${formId}-${name}`}
                   name={name}
-                  defaultValue={company?.[name] ?? ""}
+                  defaultValue=""
                   required={required}
                   disabled={busy}
                 />
@@ -268,7 +286,7 @@ function CompanyDialog({ company }: { company?: v1.finance.Company }) {
               <Textarea
                 id={`${formId}-notes`}
                 name="notes"
-                defaultValue={company?.notes ?? ""}
+                defaultValue=""
                 disabled={busy}
               />
             </div>

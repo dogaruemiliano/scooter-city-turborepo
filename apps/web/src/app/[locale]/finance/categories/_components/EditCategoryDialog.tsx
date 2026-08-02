@@ -4,15 +4,15 @@ import { ApiError, v1 } from "@repo/api-shared";
 import {
   Alert,
   AlertDescription,
+  BottomSheet,
+  BottomSheetBody,
+  BottomSheetClose,
+  BottomSheetContent,
+  BottomSheetFooter,
+  BottomSheetHeader,
+  BottomSheetTitle,
+  BottomSheetTrigger,
   Button,
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
   Input,
   Label,
   Select,
@@ -20,11 +20,18 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Switch,
 } from "@repo/ui/components";
-import { PencilIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { useId, useState, type FormEvent } from "react";
+import {
+  useId,
+  useState,
+  type KeyboardEvent,
+  type FormEvent,
+  type ReactElement,
+  type ReactNode,
+} from "react";
 
 import { webApi } from "@/lib/api";
 import { activeCategoryParentOptions } from "../_lib/category-edit";
@@ -32,25 +39,122 @@ import { activeCategoryParentOptions } from "../_lib/category-edit";
 type CategoryKind = v1.finance.FinancialCategoryKind;
 
 const NO_PARENT = "none";
+const CATEGORY_KIND_OPTIONS = ["INCOME", "EXPENSE"] as const;
+
+const categoryKindIndicatorClassNames = {
+  INCOME: "translate-x-0 bg-success",
+  EXPENSE: "translate-x-full bg-destructive",
+} as const satisfies Record<CategoryKind, string>;
+
+const categoryKindLabelClassNames = {
+  INCOME: {
+    idle: "text-success",
+    selected: "text-success-foreground",
+  },
+  EXPENSE: {
+    idle: "text-destructive",
+    selected: "text-destructive-foreground",
+  },
+} as const satisfies Record<CategoryKind, { idle: string; selected: string }>;
+
+function CategoryKindSwitch({
+  value,
+  disabled,
+  label,
+  getOptionLabel,
+  onChange,
+}: {
+  value: CategoryKind;
+  disabled: boolean;
+  label: string;
+  getOptionLabel: (kind: CategoryKind) => string;
+  onChange: (kind: CategoryKind) => void;
+}) {
+  function selectWithKeyboard(
+    event: KeyboardEvent<HTMLButtonElement>,
+    kind: CategoryKind,
+  ) {
+    const currentIndex = CATEGORY_KIND_OPTIONS.indexOf(kind);
+    const lastIndex = CATEGORY_KIND_OPTIONS.length - 1;
+    let nextIndex: number | undefined;
+
+    if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+      nextIndex = currentIndex === 0 ? lastIndex : currentIndex - 1;
+    } else if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+      nextIndex = currentIndex === lastIndex ? 0 : currentIndex + 1;
+    } else if (event.key === "Home") {
+      nextIndex = 0;
+    } else if (event.key === "End") {
+      nextIndex = lastIndex;
+    }
+
+    if (nextIndex === undefined) return;
+
+    event.preventDefault();
+    const nextKind = CATEGORY_KIND_OPTIONS[nextIndex];
+    if (!nextKind) return;
+
+    onChange(nextKind);
+    event.currentTarget.parentElement
+      ?.querySelectorAll<HTMLButtonElement>("[role='radio']")
+      [nextIndex]?.focus();
+  }
+
+  return (
+    <div
+      role="radiogroup"
+      aria-label={label}
+      className="relative grid min-h-12 w-full grid-cols-2 rounded-lg border border-input bg-muted p-1 outline-none focus-within:border-ring focus-within:ring-2 focus-within:ring-ring"
+    >
+      <span
+        aria-hidden="true"
+        className={`absolute inset-y-1 left-1 w-[calc((100%-var(--spacing-2))/2)] rounded-md transition-[transform,background-color] duration-normal ease-standard motion-reduce:transition-none ${categoryKindIndicatorClassNames[value]}`}
+      />
+      {CATEGORY_KIND_OPTIONS.map((kind) => (
+        <button
+          key={kind}
+          type="button"
+          role="radio"
+          aria-checked={value === kind}
+          tabIndex={value === kind ? 0 : -1}
+          disabled={disabled}
+          className={`relative z-raised min-h-10 rounded-md px-2 text-sm font-medium outline-none transition-colors duration-normal ease-standard focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:text-disabled-foreground motion-reduce:transition-none ${
+            categoryKindLabelClassNames[kind][
+              value === kind ? "selected" : "idle"
+            ]
+          }`}
+          onClick={() => onChange(kind)}
+          onKeyDown={(event) => selectWithKeyboard(event, kind)}
+        >
+          {getOptionLabel(kind)}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export function EditCategoryDialog({
   category,
   categories,
+  trigger,
 }: {
   category: v1.finance.FinancialCategory;
   categories: v1.finance.FinancialCategory[];
+  trigger: ReactElement<{ children?: ReactNode }>;
 }) {
   const t = useTranslations("finance");
   const router = useRouter();
   const nameId = useId();
   const kindId = useId();
   const parentId = useId();
+  const statusId = useId();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(category.name);
   const [kind, setKind] = useState<CategoryKind>(category.kind);
   const [parentCategoryId, setParentCategoryId] = useState(
     category.parentCategoryId ?? NO_PARENT,
   );
+  const [isActive, setIsActive] = useState(category.isActive);
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<
     { kind: "success" | "error"; message: string } | undefined
@@ -68,6 +172,7 @@ export function EditCategoryDialog({
     setName(category.name);
     setKind(category.kind);
     setParentCategoryId(category.parentCategoryId ?? NO_PARENT);
+    setIsActive(category.isActive);
     setFeedback(undefined);
   }
 
@@ -85,6 +190,7 @@ export function EditCategoryDialog({
     const input = v1.finance.updateFinancialCategoryInputSchema.safeParse({
       name,
       kind,
+      isActive,
       ...(parentCategoryId === initialParentCategoryId
         ? {}
         : {
@@ -130,38 +236,28 @@ export function EditCategoryDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={changeOpen}>
-      <DialogTrigger
-        render={
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            aria-label={`${t("categories.edit.trigger")}: ${category.name}`}
-          />
-        }
+    <BottomSheet open={open} onOpenChange={changeOpen}>
+      <BottomSheetTrigger
+        render={trigger}
+        aria-label={`${t("categories.edit.trigger")}: ${category.name}`}
       >
-        <PencilIcon data-icon="inline-start" />
-        {t("categories.edit.trigger")}
-      </DialogTrigger>
-      <DialogContent>
+        {trigger.props.children}
+      </BottomSheetTrigger>
+      <BottomSheetContent>
         <form onSubmit={updateCategory} className="contents">
-          <DialogHeader>
-            <DialogTitle>{t("categories.edit.title")}</DialogTitle>
-            <DialogDescription>
-              {t("categories.edit.description")}
-            </DialogDescription>
-          </DialogHeader>
+          <BottomSheetHeader>
+            <BottomSheetTitle>{t("categories.edit.title")}</BottomSheetTitle>
+          </BottomSheetHeader>
 
-          {feedback ? (
-            <Alert
-              variant={feedback.kind === "error" ? "destructive" : "default"}
-            >
-              <AlertDescription>{feedback.message}</AlertDescription>
-            </Alert>
-          ) : null}
+          <BottomSheetBody>
+            {feedback ? (
+              <Alert
+                variant={feedback.kind === "error" ? "destructive" : "default"}
+              >
+                <AlertDescription>{feedback.message}</AlertDescription>
+              </Alert>
+            ) : null}
 
-          <div className="grid gap-4">
             <div className="grid gap-2">
               <Label htmlFor={nameId}>{t("categories.edit.name")}</Label>
               <Input
@@ -175,22 +271,13 @@ export function EditCategoryDialog({
             </div>
             <div className="grid gap-2">
               <Label id={kindId}>{t("categories.edit.kind")}</Label>
-              <Select
+              <CategoryKindSwitch
                 value={kind}
-                onValueChange={(value) => setKind(value as CategoryKind)}
                 disabled={busy}
-              >
-                <SelectTrigger aria-labelledby={kindId} className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {v1.finance.FINANCIAL_CATEGORY_KINDS.map((value) => (
-                    <SelectItem key={value} value={value}>
-                      {t(`enums.categoryKinds.${value}`)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                label={t("categories.edit.kind")}
+                getOptionLabel={(value) => t(`enums.categoryKinds.${value}`)}
+                onChange={setKind}
+              />
             </div>
             <div className="grid gap-2">
               <Label id={parentId}>{t("categories.edit.parent")}</Label>
@@ -219,24 +306,40 @@ export function EditCategoryDialog({
                 </SelectContent>
               </Select>
             </div>
-          </div>
+            <div className="flex min-h-12 items-center justify-between gap-3 rounded-lg border border-input bg-background px-3 py-2">
+              <div className="grid gap-0.5">
+                <Label htmlFor={statusId}>
+                  {t("categories.columns.status")}
+                </Label>
+                <span className="text-xs text-muted-foreground">
+                  {isActive ? t("common.active") : t("common.inactive")}
+                </span>
+              </div>
+              <Switch
+                id={statusId}
+                checked={isActive}
+                disabled={busy}
+                onCheckedChange={setIsActive}
+              />
+            </div>
+          </BottomSheetBody>
 
-          <DialogFooter>
-            <DialogClose
+          <BottomSheetFooter>
+            <BottomSheetClose
               render={
                 <Button type="button" variant="outline" disabled={busy} />
               }
             >
               {t("common.cancel")}
-            </DialogClose>
+            </BottomSheetClose>
             <Button type="submit" disabled={busy}>
               {busy
                 ? t("categories.edit.submitting")
                 : t("categories.edit.submit")}
             </Button>
-          </DialogFooter>
+          </BottomSheetFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+      </BottomSheetContent>
+    </BottomSheet>
   );
 }

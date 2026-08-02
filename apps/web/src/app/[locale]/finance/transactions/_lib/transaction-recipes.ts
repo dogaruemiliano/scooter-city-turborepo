@@ -75,7 +75,15 @@ export interface WalletFieldRecipe {
 interface BuildOptions {
   idempotencyKey: string;
   wallets: readonly v1.finance.WalletOption[];
-  requiredMessage(field: "amount" | "occurredAt" | "wallet"): string;
+  requiredMessage(
+    field:
+      | "amount"
+      | "category"
+      | "counterparty"
+      | "description"
+      | "occurredAt"
+      | "wallet",
+  ): string;
   differentWalletsMessage: string;
   differentPeopleMessage: string;
   referencePairMessage: string;
@@ -223,12 +231,39 @@ export function walletMatchesRole(
     case "ADMIN_PERSONAL":
       return wallet.type === "USER" && adminWalletIds.has(wallet.id);
     case "BUSINESS_FUNDS":
-      return wallet.type !== "USER" || adminWalletIds.has(wallet.id);
+      return (
+        (wallet.type !== "USER" && wallet.type !== "PAYMENT_PROCESSOR") ||
+        adminWalletIds.has(wallet.id)
+      );
     case "COMPANY_GUARANTEE":
-      return wallet.type !== "USER";
+      return wallet.type !== "USER" && wallet.type !== "PAYMENT_PROCESSOR";
     case "USER_SETTLEMENT":
       return wallet.type === "USER";
   }
+}
+
+export function preferredTransactionWalletId(
+  form: Pick<TransactionFormState, "financialScope" | "paymentMethod" | "type">,
+  wallets: readonly v1.finance.WalletOption[],
+  adminWalletIds: ReadonlySet<string>,
+): string {
+  if (form.paymentMethod === "CASH") {
+    return (
+      wallets.find(
+        (wallet) => wallet.type === "USER" && adminWalletIds.has(wallet.id),
+      )?.id ?? ""
+    );
+  }
+
+  if (
+    form.type === "EXPENSE" &&
+    form.financialScope === "COMPANY" &&
+    form.paymentMethod === "POS"
+  ) {
+    return wallets.find((wallet) => wallet.type === "COMPANY_BANK")?.id ?? "";
+  }
+
+  return "";
 }
 
 export function buildTransactionInput(
@@ -244,6 +279,19 @@ export function buildTransactionInput(
   );
 
   if (!form.amount.trim()) errors.amount = options.requiredMessage("amount");
+  if (form.type === "INCOME" && !form.counterpartyId) {
+    errors.counterpartyId = options.requiredMessage("counterparty");
+  }
+  if (form.type === "EXPENSE" && !form.categoryId) {
+    errors.categoryId = options.requiredMessage("category");
+  }
+  if (
+    form.type === "EXPENSE" &&
+    !form.counterpartyId &&
+    !form.description.trim()
+  ) {
+    errors.description = options.requiredMessage("description");
+  }
   if (!primaryWallet) {
     errors.primaryWalletId = options.requiredMessage("wallet");
   }
@@ -337,7 +385,7 @@ export function buildTransactionInput(
         financialScope: form.financialScope,
         paymentMethod: form.paymentMethod,
         billingStatus: form.billingStatus,
-        categoryId: form.categoryId || null,
+        categoryId: form.categoryId,
         counterpartyId: form.counterpartyId || null,
         balanceChanges: [
           change(

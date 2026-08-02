@@ -11,7 +11,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-  Input,
+  DatePartsField,
   Label,
   Table,
   TableBody,
@@ -34,7 +34,6 @@ import { cn } from "@repo/ui/lib/utils";
 import { claimSettlementHref } from "../_lib/links";
 import type { FinancePeriod } from "../_lib/period";
 import { FinanceEmptyState } from "./FinanceEmptyState";
-import { FinancePageHeader } from "./FinancePageHeader";
 import { FinanceStatusBadge } from "./FinanceStatusBadge";
 
 interface FinanceOverviewProps {
@@ -54,34 +53,33 @@ export async function FinanceOverview({
 }: FinanceOverviewProps) {
   const t = await getTranslations({ locale, namespace: "finance" });
   const transactionsHref = localizePath("/finance/transactions", locale);
+  const newExpenseHref = localizePath("/finance/expenses/new", locale);
   const newTransactionHref = localizePath("/finance/transactions/new", locale);
   const claimsHref = localizePath("/finance/claims", locale);
   const companiesHref = localizePath("/finance/companies", locale);
 
   return (
     <main className="mx-auto flex w-full max-w-screen-xl flex-1 flex-col gap-8 px-4 py-6 sm:px-6 lg:px-8">
-      <FinancePageHeader
-        title={t("overview.title")}
-        description={t("overview.description")}
-        action={
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              nativeButton={false}
-              render={<Link href={companiesHref} />}
-            >
-              {t("overview.manageCompanies")}
-            </Button>
-            <Button
-              nativeButton={false}
-              render={<Link href={newTransactionHref} />}
-            >
-              <PlusIcon data-icon="inline-start" />
-              {t("overview.newTransaction")}
-            </Button>
-          </div>
-        }
-      />
+      <div className="flex flex-wrap justify-end gap-2">
+        <Button
+          variant="outline"
+          nativeButton={false}
+          render={<Link href={companiesHref} />}
+        >
+          {t("overview.manageCompanies")}
+        </Button>
+        <Button
+          variant="outline"
+          nativeButton={false}
+          render={<Link href={newTransactionHref} />}
+        >
+          {t("overview.advancedTransaction")}
+        </Button>
+        <Button nativeButton={false} render={<Link href={newExpenseHref} />}>
+          <PlusIcon data-icon="inline-start" />
+          {t("overview.newExpense")}
+        </Button>
+      </div>
 
       {period.usedFallback ? (
         <Alert variant="destructive">
@@ -95,22 +93,26 @@ export async function FinanceOverview({
       >
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="finance-from">{t("overview.period.from")}</Label>
-            <Input
-              id="finance-from"
+            <Label htmlFor="finance-from-day">
+              {t("overview.period.from")}
+            </Label>
+            <DatePartsField
+              baseId="finance-from"
+              label={t("overview.period.from")}
+              locale={locale}
               name="from"
-              type="date"
               defaultValue={period.fromDate}
               aria-describedby="finance-period-hint"
               required
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="finance-to">{t("overview.period.to")}</Label>
-            <Input
-              id="finance-to"
+            <Label htmlFor="finance-to-day">{t("overview.period.to")}</Label>
+            <DatePartsField
+              baseId="finance-to"
+              label={t("overview.period.to")}
+              locale={locale}
               name="to"
-              type="date"
               defaultValue={period.toDate}
               aria-describedby="finance-period-hint"
               required

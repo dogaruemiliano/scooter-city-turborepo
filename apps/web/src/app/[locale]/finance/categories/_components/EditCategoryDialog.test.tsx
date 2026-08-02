@@ -56,6 +56,7 @@ describe("EditCategoryDialog", () => {
       <NextIntlClientProvider locale="en" messages={messages.en}>
         <EditCategoryDialog
           category={category}
+          trigger={<button type="button">Rental income</button>}
           categories={[
             category,
             {
@@ -77,9 +78,20 @@ describe("EditCategoryDialog", () => {
     const dialog = await screen.findByRole("dialog", {
       name: "Edit category",
     });
+    expect(
+      within(dialog).queryByText(
+        "Update the category name, kind, or place in the hierarchy.",
+      ),
+    ).toBeNull();
+    expect(within(dialog).getAllByRole("radio")).toHaveLength(2);
+    expect(
+      within(dialog).queryByRole("radio", { name: "Income and expense" }),
+    ).toBeNull();
     const name = within(dialog).getByLabelText("Name");
     await browser.clear(name);
     await browser.type(name, "Scooter rental income");
+    await browser.click(within(dialog).getByRole("radio", { name: "Expense" }));
+    await browser.click(within(dialog).getByRole("switch", { name: "Status" }));
     await browser.click(
       within(dialog).getByRole("button", { name: "Save changes" }),
     );
@@ -92,7 +104,8 @@ describe("EditCategoryDialog", () => {
           method: "PATCH",
           json: {
             name: "Scooter rental income",
-            kind: "INCOME",
+            kind: "EXPENSE",
+            isActive: false,
           },
         },
       ),

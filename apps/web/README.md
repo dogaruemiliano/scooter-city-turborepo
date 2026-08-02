@@ -84,7 +84,6 @@ Cookie-authenticated mutations must go through `apiFetch` or manually include
 | `/scooters`             | Admin scooter inventory and registration operations.                |
 | `/finance`              | Admin financial overview, current balances, and outstanding claims. |
 | `/finance/transactions` | Admin ledger list, transaction workflows, posting, and reversal.    |
-| `/finance/wallets`      | Admin user/company wallet inventory and company-wallet creation.    |
 | `/finance/categories`   | Admin income/expense category management.                           |
 | `/finance/claims`       | Admin personal-funds claim review and settlement entry points.      |
 

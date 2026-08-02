@@ -25,6 +25,8 @@ export const financeCatalog = {
       title: "Finance overview",
       description:
         "Track company funds, operating activity, and outstanding settlements.",
+      newExpense: "Add expense",
+      advancedTransaction: "Advanced transaction",
       newTransaction: "New transaction",
       manageCompanies: "Companies",
       period: {
@@ -82,30 +84,6 @@ export const financeCatalog = {
       },
     },
     wallets: {
-      title: "Wallets",
-      description:
-        "Review company and user wallets together with their current balances.",
-      createButton: "Create company wallet",
-      filters: {
-        search: "Search wallets",
-        type: "Wallet type",
-        status: "Status",
-        ownerRole: "Owner role",
-        allAdmins: "All administrators",
-      },
-      list: {
-        empty: "No wallets match the selected filters.",
-        total: "{total} wallets",
-        view: "View wallet",
-        columns: {
-          name: "Wallet",
-          type: "Type",
-          owner: "Owner",
-          status: "Status",
-          balances: "Balances",
-          actions: "Actions",
-        },
-      },
       fields: {
         bucket: "Balance type",
         currency: "Currency",
@@ -114,7 +92,8 @@ export const financeCatalog = {
       detail: {
         title: "Wallet details",
         description: "Wallet ownership, status, and balance history snapshot.",
-        back: "Back to wallets",
+        back: "Back to finance overview",
+        type: "Wallet type",
         balances: "Current balances",
         balancesDescription:
           "Balances are grouped by operational purpose and currency.",
@@ -124,17 +103,6 @@ export const financeCatalog = {
         owner: "Owner",
         createdAt: "Created",
         updatedAt: "Last updated",
-      },
-      create: {
-        title: "Create company wallet",
-        description:
-          "Add a cash, bank, or payment processor wallet to the company ledger.",
-        name: "Wallet name",
-        type: "Wallet type",
-        submit: "Create wallet",
-        submitting: "Creating...",
-        success: "The company wallet was created.",
-        error: "The company wallet could not be created.",
       },
     },
     companies: {
@@ -153,6 +121,7 @@ export const financeCatalog = {
       },
       fields: {
         legalName: "Legal name",
+        legalForm: "Legal form",
         tradingName: "Trading name",
         taxIdentifier: "Tax identifier",
         registrationNumber: "Registration number",
@@ -170,6 +139,37 @@ export const financeCatalog = {
           "Company counterparties are organizations you pay, invoice, or track obligations for. They are not wallets.",
         invalid: "Check the company details and try again.",
       },
+      detail: {
+        back: "Back to companies",
+        description:
+          "Company details, financial activity, and linked transactions.",
+        information: "Company information",
+        statistics: "Financial activity",
+        statisticsDescription:
+          "Posted income and expenses for the selected period.",
+        transactions: "Transactions",
+        noTransactions: "No transactions are linked to this company.",
+        transactionCount:
+          "{count, plural, =0 {No transactions} one {# transaction} other {# transactions}}",
+        income: "Income",
+        expenses: "Expenses",
+        net: "Net",
+        periodLabel: "Financial activity period",
+        periodAbbreviations: {
+          DAY: "Today",
+          WEEK: "WTD",
+          MONTH: "MTD",
+          YEAR: "YTD",
+          ALL: "All",
+        },
+        periods: {
+          DAY: "Today",
+          WEEK: "This week",
+          MONTH: "This month",
+          YEAR: "This year",
+          ALL: "All time",
+        },
+      },
     },
     categories: {
       title: "Financial categories",
@@ -178,9 +178,9 @@ export const financeCatalog = {
       createButton: "Create category",
       list: {
         empty: "No financial categories have been created.",
+        parentCategory: "Parent category",
       },
       columns: {
-        code: "Code",
         name: "Name",
         kind: "Kind",
         parent: "Parent category",
@@ -190,7 +190,6 @@ export const financeCatalog = {
       create: {
         title: "Create category",
         description: "Add a reusable category for income, expenses, or both.",
-        code: "Code",
         name: "Name",
         kind: "Kind",
         parent: "Parent category",
@@ -202,8 +201,6 @@ export const financeCatalog = {
       edit: {
         trigger: "Edit category",
         title: "Edit category",
-        description:
-          "Update the category name, kind, or place in the hierarchy.",
         name: "Name",
         kind: "Kind",
         parent: "Parent category",
@@ -243,6 +240,14 @@ export const financeCatalog = {
       inactive: "Inactive",
       noBalances: "There are no balances yet.",
       balanceUpdated: "Last updated",
+      historyTitle: "Transaction history",
+      historyDescription: "See where money in your wallet came from or went.",
+      noTransactions: "No transactions yet",
+      noTransactionsDescription:
+        "Wallet activity will appear here after it is posted.",
+      today: "Today",
+      yesterday: "Yesterday",
+      paginationLabel: "Wallet transaction pagination",
     },
     transactions: {
       title: "Transactions",
@@ -254,7 +259,8 @@ export const financeCatalog = {
         "Change the filters or record a new transaction to get started.",
       results: "{count} transactions",
       filters: {
-        title: "Filter transactions",
+        title: "Filters",
+        description: "Narrow the transaction list using one or more filters.",
         status: "Status",
         type: "Type",
         scope: "Financial scope",
@@ -267,12 +273,17 @@ export const financeCatalog = {
         all: "All",
       },
       table: {
+        transaction: "Transaction",
+        direction: "From / to",
+        fromParty: "From {party}",
+        toParty: "To {party}",
         occurredAt: "Occurred",
         type: "Type",
         status: "Status",
         amount: "Amount",
         scope: "Scope",
         counterparty: "Counterparty",
+        payer: "Payer",
         noCounterparty: "No counterparty",
         recordedBy: "Recorded by",
         actions: "Actions",
@@ -350,6 +361,357 @@ export const financeCatalog = {
         },
       },
     },
+    expenses: {
+      list: {
+        title: "Expenses",
+        description: "Review business expenses and their posting status.",
+        new: "Add expense",
+        recent: "Recorded expenses",
+        empty: "No expenses have been recorded yet.",
+        unknownPayee: "Unknown payee",
+        columns: {
+          date: "Date",
+          payee: "Payee",
+          category: "Category",
+          status: "Status",
+          amount: "Amount",
+        },
+      },
+      statuses: {
+        DRAFT: "Draft",
+        POSTED: "Posted",
+        REVERSED: "Reversed",
+      },
+      setupRequired: {
+        title: "Set up the operating company first",
+        description:
+          "An expense must belong to a configured business legal entity.",
+        details:
+          "Link or create the operating company, assign its company wallets, and configure formal owners and VAT periods before recording expenses.",
+        action: "Open business setup",
+      },
+      form: {
+        title: "Add expense",
+        description:
+          "Record a company expense quickly. Start with the amount and the CUI shown on the receipt.",
+        backToExpenses: "Back to expenses",
+        grossAmount: "Gross amount",
+        required: "(required)",
+        companyCuiQuestion: "Did you add the company CUI to the receipt?",
+        companyCuiHelp:
+          "This answer determines the source of funds and the evidence required.",
+        binary: {
+          yes: "Yes",
+          no: "No",
+        },
+        paymentMethod: "Payment method",
+        paymentMethods: {
+          cash: "Cash",
+          companyCard: "Company card",
+        },
+        currency: "Currency",
+        entity: "Operating company",
+        expenseDate: "Expense date",
+        category: "Category",
+        paidFrom: "Paid from",
+        companyCard: "Company card",
+        cashDesk: "Central cash desk",
+        fundedBy: "Funded by",
+        payee: "Payee (supplier or person)",
+        beneficiary: "Real beneficiary / Expense for",
+        specificOwner: "Specific owner",
+        relatedRecord: "Related scooter (optional)",
+        moreDetails: "More details (optional)",
+        advancedDetails: "Document and VAT details (optional)",
+        paidBy: "Paid by",
+        walletSelected: "Company wallet",
+        emptyCategories: {
+          title: "No expense categories available",
+          description:
+            "Create at least one expense category before recording this expense.",
+          action: "Manage categories",
+        },
+        emptyWallet: {
+          title: "No compatible company wallet",
+          description:
+            "Assign a wallet for this payment method in business settings.",
+          action: "Open business settings",
+        },
+        personalFunds: {
+          title: "Personal funds",
+          description:
+            "The expense is recorded as paid by {name} from personal funds for the company.",
+          currentUser: "the current user",
+        },
+        currentUser: "{name} (you)",
+        advancedTransaction: "Advanced transaction",
+        continue: "Continue",
+        back: "Back",
+        record: "Record expense",
+        recording: "Recording...",
+        completing: "Completing saved draft...",
+        retryCompletion: "Retry completion",
+        paymentSources: {
+          COMPANY_CARD: "Company card",
+          COMPANY_CASH_DESK: "Central cash desk",
+          PERSONAL_FUNDS: "Personal funds",
+        },
+        fundingTreatments: {
+          REIMBURSABLE: "Reimbursable",
+          NON_REIMBURSABLE: "Not reimbursable",
+        },
+        attribution: {
+          BUSINESS: "Company",
+          OWNER: "Associate",
+          businessHelp: "Included in the company's operating P&L.",
+          ownerHelp:
+            "Attributed to this associate and excluded from operating P&L.",
+          noOwners:
+            "No formal owners are configured for this company and date.",
+        },
+        placeholders: {
+          amount: "Enter amount",
+          entity: "Select operating company",
+          category: "Select category",
+          wallet: "Select company wallet",
+          noWallet: "No compatible wallet is assigned",
+          funder: "Select funder",
+          owner: "Select owner",
+          paidBy: "Select payer",
+          relatedRecord: "Search scooters",
+          documentType: "Select type",
+          documentNumber: "Enter document number",
+          supplierCui: "Enter supplier CUI",
+          buyerCuiStatus: "Select status",
+          buyerCui: "Enter the buyer CUI found",
+        },
+        search: {
+          payeePlaceholder: "Search by name or CUI",
+          scooterPlaceholder: "Search by plate, VIN, brand, or model",
+          noPayees: "No payees found.",
+          noScooters: "No scooters found.",
+          loading: "Searching...",
+          failed: "Search failed. Try again.",
+          clear: "Clear selection",
+          toggle: "Toggle options",
+        },
+        rules: {
+          title: "Rules to keep in mind",
+          shortTitle: "Rules",
+          personalOwner:
+            "Personal funds attributed to a specific owner are not reimbursable.",
+        },
+        evidence: {
+          title: "Receipt or invoice",
+          requiredHelp:
+            "Attach the fiscal receipt or invoice. Company card payments also require the POS receipt.",
+          optionalHelp:
+            "You can record the expense without a document or attach one if you have it.",
+          fiscalLabel: "Fiscal receipt / invoice",
+          posLabel: "POS receipt",
+          required: "(required)",
+          optional: "(optional)",
+          takePhoto: "Take a photo",
+          chooseFile: "Choose file",
+          replaceFile: "Replace file",
+          remove: "Remove file",
+          notAvailable: "Not available",
+          unavailableSelected: "No evidence will be attached.",
+          formats: "JPG, PNG, or PDF · Maximum 10 MB",
+          preparing: "Preparing and checking file...",
+          tooLarge: "The file must be 10 MB or smaller.",
+          unsupported: "Choose a JPG, PNG, or PDF file.",
+          prepareFailed: "The file could not be prepared.",
+        },
+        document: {
+          title: "Document details (entered manually)",
+          help: "Correct or complete these values manually when needed. They are not extracted automatically yet.",
+          noFile: "Attach a document to enter its fiscal details.",
+          type: "Document type",
+          number: "Document number",
+          date: "Document date",
+          supplierCui: "Supplier CUI",
+          buyerCuiStatus: "Buyer CUI status",
+          buyerCuiFound: "Buyer CUI found on document",
+          types: {
+            INVOICE: "Invoice",
+            FISCAL_RECEIPT: "Fiscal receipt",
+          },
+          cuiStatuses: {
+            MATCHED: "Matches operating company",
+            MISSING: "Missing",
+            MISMATCH: "Does not match",
+            NOT_APPLICABLE: "Not applicable",
+          },
+        },
+        vat: {
+          title: "VAT summary ({currency})",
+          registered: "VAT registered on the document date",
+          notRegistered:
+            "Not VAT registered on the document date; recoverable VAT is zero.",
+          noCompanyCui:
+            "The receipt has no company CUI; recoverable VAT is zero.",
+          addLine: "Add VAT line",
+          line: "VAT line {number}",
+          removeLine: "Remove line",
+          removeLineNumber: "Remove VAT line {number}",
+          netAmount: "Net amount",
+          rate: "VAT rate (%)",
+          amount: "VAT amount",
+          recoverable: "Recoverable VAT",
+          recognizedCost: "Recognized cost",
+          total: "Total",
+        },
+        review: {
+          title: "Review summary",
+          warningsTitle: "Review these differences",
+          warnings: {
+            DOCUMENT_DATE_DIFFERS:
+              "The document date differs from the expense date.",
+            BUYER_CUI_MISSING: "The buyer CUI is missing.",
+            BUYER_CUI_MISMATCH:
+              "The buyer CUI does not match the operating company.",
+            VAT_TOTAL_DIFFERS:
+              "The VAT-line total differs from the gross amount.",
+          },
+        },
+        summary: {
+          title: "Expense summary",
+          amount: "Gross amount",
+          date: "Date",
+          category: "Category",
+          paidFrom: "Paid from",
+          payee: "Payee",
+          beneficiary: "Who benefited?",
+          relatedRecord: "Related scooter",
+          paidBy: "Paid by",
+          reimbursement: "Reimbursement",
+          empty: "—",
+        },
+        validation: {
+          required: "This field is required.",
+          invalidAmount:
+            "Enter an amount greater than zero with up to 2 decimals.",
+          invalidCombination: "Choose a valid payment and beneficiary.",
+          companyTaxIdentifierMissing:
+            "The selected company has no CUI configured. Add its CUI in business settings before using Yes.",
+          invalidVatLine:
+            "Complete every VAT line with valid net, rate, and VAT amounts.",
+        },
+        feedback: {
+          title: "Expense not recorded",
+          completionTitle: "Expense completion pending",
+          invalid: "Review the expense details and try again.",
+          generic: "The expense could not be recorded. Try again.",
+          evidencePreparing:
+            "Wait until every selected document has finished preparing, then record the expense.",
+          completionPending:
+            "Draft {expenseId} is saved, but completion did not finish. Its fields and evidence are locked; retry to safely continue from the saved draft.",
+        },
+      },
+      businessSetup: {
+        title: "Business finance setup",
+        description:
+          "Configure the operating company used by compact expenses.",
+        manage: {
+          title: "Manage business tax settings",
+          description:
+            "Review the operating company and maintain its formal owners and VAT registration periods.",
+          company: "Configured operating company",
+          cui: "Company CUI: {cui}",
+          missingCui: "This company has no CUI and must be corrected first.",
+          activeVat: "VAT {number}, active since {from}.",
+          scheduledVat: "VAT {number}, scheduled from {from}.",
+          notVatRegistered: "No VAT registration is active today.",
+          endOn: "Registration ends on (exclusive)",
+          startRegistration: "Start VAT registration",
+          startingRegistration: "Starting VAT registration...",
+          endRegistration: "End VAT registration",
+          endingRegistration: "Ending VAT registration...",
+          updateRegistration: "Update scheduled registration",
+          updatingRegistration: "Updating scheduled registration...",
+          backToExpense: "Back to expense",
+        },
+        effectiveFrom: "Effective from",
+        company: {
+          title: "Operating company",
+          description: "Create a company or link an existing company record.",
+          source: "Company record",
+          modes: { NEW: "Create new", EXISTING: "Use existing" },
+          existing: "Existing company",
+          select: "Select company",
+          legalName: "Legal name",
+          legalForm: "Legal form",
+          taxIdentifier: "CUI / tax identifier",
+          currency: "Default currency",
+        },
+        wallets: {
+          title: "Company wallets",
+          description:
+            "The cash desk is created automatically. Add each card account separately.",
+          cash: "Cash desk",
+          cashDescription:
+            "Created automatically as the company's default cash location.",
+          included: "Included",
+          accountName: "Account or card name",
+          cardHolder: "Card holder",
+          newAccount: "New card account",
+          addAccount: "Add card account",
+          removeAccount: "Remove account",
+        },
+        owners: {
+          title: "Formal owners",
+          description:
+            "Select only users who are legally/formally owners. Administrators are not inferred as owners.",
+          empty: "No active users are available.",
+          remove: "Remove associate",
+          manageDescription:
+            "Add and end dated formal-owner periods for this operating company.",
+          effectiveFrom: "Owner effective from",
+          select: "Select formal owner",
+          selectRequired: "Select a formal owner to add.",
+          activePeriod: "Active since {from}",
+          scheduledPeriod: "Scheduled from {from}",
+          endOn: "Owner period ends on (exclusive)",
+          end: "End owner period",
+          ending: "Ending owner period...",
+          add: "Add owner period",
+          adding: "Adding owner period...",
+          noneConfigured: "No current or scheduled formal-owner periods.",
+        },
+        users: {
+          select: "Select a user",
+          search: "Search by name or email",
+          empty: "No users found.",
+          loading: "Searching users…",
+          loadMore: "Load more",
+          searchError: "Users could not be loaded.",
+          clear: "Clear selection",
+          toggle: "Toggle user list",
+        },
+        vat: {
+          title: "VAT registration",
+          description: "Record VAT registration only when it applies.",
+          registered: "The company is VAT registered",
+          countryCode: "Country code",
+          number: "VAT number",
+          effectiveFrom: "VAT effective from",
+        },
+        save: "Save setup",
+        saving: "Saving...",
+        saveDescription:
+          "You can manage owners and VAT periods later from this page.",
+        feedback: {
+          title: "Setup not saved",
+          error: "The business finance setup could not be saved.",
+          required: "Complete the required company and CUI fields.",
+          partial:
+            "Operating company {entityId} was saved, but owner or VAT setup is incomplete. Reloading the saved setup so you can finish it.",
+          ownerError: "The formal-owner period could not be saved.",
+          vatError: "The VAT registration period could not be saved.",
+        },
+      },
+    },
     transactionForm: {
       title: "New transaction",
       description:
@@ -360,6 +722,7 @@ export const financeCatalog = {
       creating: "Creating...",
       postImmediately: "Post immediately",
       saveDraft: "Save as draft",
+      swapDirection: "Swap source and destination",
       sections: {
         transaction: "Transaction",
         routing: "Money routing",
@@ -368,6 +731,8 @@ export const financeCatalog = {
       fields: {
         type: "Transaction type",
         amount: "Amount",
+        sourceAmount: "Source amount",
+        destinationAmount: "Destination amount",
         currency: "Currency",
         scope: "Financial scope",
         paymentMethod: "Payment method",
@@ -384,6 +749,9 @@ export const financeCatalog = {
         bucket: "Balance type",
         direction: "Direction",
         counterparty: "Counterparty",
+        source: "Source",
+        payer: "Payer",
+        destination: "Destination",
         recipient: "Recipient",
         debtor: "Debtor",
         creditor: "Creditor",
@@ -395,6 +763,8 @@ export const financeCatalog = {
       placeholders: {
         select: "Select an option",
         optional: "Optional",
+        optionalCounterparty: "Select a counterparty (optional)",
+        selectPayer: "Select a payer",
         searchWallets: "Search wallets",
         searchCounterparties: "Search people or companies",
         searchCategories: "Search categories",
@@ -410,6 +780,10 @@ export const financeCatalog = {
       },
       optionTypes: {
         person: "Person",
+      },
+      flow: {
+        INCOME: "Income",
+        EXPENSE: "Expense",
       },
       typeHelp: {
         INCOME:
@@ -441,6 +815,13 @@ export const financeCatalog = {
         errorTitle: "Transaction not created",
         genericError: "The transaction could not be created. Try again.",
       },
+      unidentifiedRecipient: {
+        title: "Save without a recipient?",
+        description:
+          "This expense will be recorded with no recipient. Its description will remain the explanation for the unidentified payment.",
+        back: "Go back",
+        confirm: "Save without recipient",
+      },
       validation: {
         required: "{field} is required.",
         differentWallets: "Choose two different wallets.",
@@ -450,6 +831,15 @@ export const financeCatalog = {
       },
     },
     enums: {
+      companyLegalForms: {
+        SRL: "SRL",
+        SA: "SA",
+        PFA: "PFA",
+        II: "II",
+        IF: "IF",
+        ONG: "ONG",
+        OTHER: "Other",
+      },
       walletTypes: {
         USER: "User wallet",
         COMPANY_CASH: "Company cash",
@@ -465,7 +855,6 @@ export const financeCatalog = {
       categoryKinds: {
         INCOME: "Income",
         EXPENSE: "Expense",
-        BOTH: "Income and expense",
       },
       transactionTypes: {
         INCOME: "Income",
@@ -558,6 +947,8 @@ export const financeCatalog = {
       title: "Prezentare financiară",
       description:
         "Urmărește fondurile companiei, activitatea operațională și decontările restante.",
+      newExpense: "Adaugă cheltuială",
+      advancedTransaction: "Tranzacție avansată",
       newTransaction: "Tranzacție nouă",
       manageCompanies: "Companii",
       period: {
@@ -616,30 +1007,6 @@ export const financeCatalog = {
       },
     },
     wallets: {
-      title: "Portofele",
-      description:
-        "Consultă portofelele companiei și utilizatorilor împreună cu soldurile curente.",
-      createButton: "Creează portofel companie",
-      filters: {
-        search: "Caută portofele",
-        type: "Tip portofel",
-        status: "Stare",
-        ownerRole: "Rol proprietar",
-        allAdmins: "Toți administratorii",
-      },
-      list: {
-        empty: "Niciun portofel nu corespunde filtrelor selectate.",
-        total: "{total} portofele",
-        view: "Vezi portofelul",
-        columns: {
-          name: "Portofel",
-          type: "Tip",
-          owner: "Proprietar",
-          status: "Stare",
-          balances: "Solduri",
-          actions: "Acțiuni",
-        },
-      },
       fields: {
         bucket: "Tip sold",
         currency: "Monedă",
@@ -649,7 +1016,8 @@ export const financeCatalog = {
         title: "Detalii portofel",
         description:
           "Proprietatea, starea și instantaneul soldurilor portofelului.",
-        back: "Înapoi la portofele",
+        back: "Înapoi la prezentarea financiară",
+        type: "Tip portofel",
         balances: "Solduri curente",
         balancesDescription:
           "Soldurile sunt grupate după scopul operațional și monedă.",
@@ -659,17 +1027,6 @@ export const financeCatalog = {
         owner: "Proprietar",
         createdAt: "Creat",
         updatedAt: "Ultima actualizare",
-      },
-      create: {
-        title: "Creează portofel companie",
-        description:
-          "Adaugă în registrul companiei un portofel de numerar, bancar sau de procesator de plăți.",
-        name: "Nume portofel",
-        type: "Tip portofel",
-        submit: "Creează portofelul",
-        submitting: "Se creează...",
-        success: "Portofelul companiei a fost creat.",
-        error: "Portofelul companiei nu a putut fi creat.",
       },
     },
     companies: {
@@ -688,6 +1045,7 @@ export const financeCatalog = {
       },
       fields: {
         legalName: "Denumire juridică",
+        legalForm: "Formă juridică",
         tradingName: "Denumire comercială",
         taxIdentifier: "CUI",
         registrationNumber: "Număr de înregistrare",
@@ -705,6 +1063,37 @@ export const financeCatalog = {
           "Companiile sunt organizațiile pe care le plătești, le facturezi sau pentru care urmărești obligații. Nu sunt portofele.",
         invalid: "Verifică datele companiei și încearcă din nou.",
       },
+      detail: {
+        back: "Înapoi la companii",
+        description:
+          "Datele companiei, activitatea financiară și tranzacțiile asociate.",
+        information: "Informații companie",
+        statistics: "Activitate financiară",
+        statisticsDescription:
+          "Venituri și cheltuieli înregistrate în perioada selectată.",
+        transactions: "Tranzacții",
+        noTransactions: "Nu există tranzacții asociate acestei companii.",
+        transactionCount:
+          "{count, plural, =0 {Nicio tranzacție} one {# tranzacție} few {# tranzacții} other {# de tranzacții}}",
+        income: "Venituri",
+        expenses: "Cheltuieli",
+        net: "Net",
+        periodLabel: "Perioada activității financiare",
+        periodAbbreviations: {
+          DAY: "Azi",
+          WEEK: "Săpt.",
+          MONTH: "Lună",
+          YEAR: "An",
+          ALL: "Tot",
+        },
+        periods: {
+          DAY: "Astăzi",
+          WEEK: "Săptămâna aceasta",
+          MONTH: "Luna aceasta",
+          YEAR: "Anul acesta",
+          ALL: "Tot timpul",
+        },
+      },
     },
     categories: {
       title: "Categorii financiare",
@@ -713,9 +1102,9 @@ export const financeCatalog = {
       createButton: "Creează categorie",
       list: {
         empty: "Nu a fost creată nicio categorie financiară.",
+        parentCategory: "Categorie părinte",
       },
       columns: {
-        code: "Cod",
         name: "Nume",
         kind: "Tip",
         parent: "Categorie părinte",
@@ -726,7 +1115,6 @@ export const financeCatalog = {
         title: "Creează categorie",
         description:
           "Adaugă o categorie reutilizabilă pentru venituri, cheltuieli sau ambele.",
-        code: "Cod",
         name: "Nume",
         kind: "Tip",
         parent: "Categorie părinte",
@@ -738,8 +1126,6 @@ export const financeCatalog = {
       edit: {
         trigger: "Editează categoria",
         title: "Editează categoria",
-        description:
-          "Actualizează numele, tipul sau locul categoriei în ierarhie.",
         name: "Nume",
         kind: "Tip",
         parent: "Categorie părinte",
@@ -779,6 +1165,15 @@ export const financeCatalog = {
       inactive: "Inactiv",
       noBalances: "Nu există solduri încă.",
       balanceUpdated: "Ultima actualizare",
+      historyTitle: "Istoricul tranzacțiilor",
+      historyDescription:
+        "Vezi de unde au venit banii din portofel sau unde au fost trimiși.",
+      noTransactions: "Nu există tranzacții încă",
+      noTransactionsDescription:
+        "Activitatea portofelului va apărea aici după înregistrare.",
+      today: "Astăzi",
+      yesterday: "Ieri",
+      paginationLabel: "Paginarea tranzacțiilor portofelului",
     },
     transactions: {
       title: "Tranzacții",
@@ -790,7 +1185,9 @@ export const financeCatalog = {
         "Modifică filtrele sau înregistrează o tranzacție nouă pentru a începe.",
       results: "{count} tranzacții",
       filters: {
-        title: "Filtrează tranzacțiile",
+        title: "Filtre",
+        description:
+          "Restrânge lista de tranzacții folosind unul sau mai multe filtre.",
         status: "Stare",
         type: "Tip",
         scope: "Domeniu financiar",
@@ -803,12 +1200,17 @@ export const financeCatalog = {
         all: "Toate",
       },
       table: {
+        transaction: "Tranzacție",
+        direction: "De la / către",
+        fromParty: "De la {party}",
+        toParty: "Către {party}",
         occurredAt: "Data operațiunii",
         type: "Tip",
         status: "Stare",
         amount: "Sumă",
         scope: "Domeniu",
         counterparty: "Contraparte",
+        payer: "Plătitor",
         noCounterparty: "Fără contraparte",
         recordedBy: "Înregistrată de",
         actions: "Acțiuni",
@@ -887,6 +1289,362 @@ export const financeCatalog = {
         },
       },
     },
+    expenses: {
+      list: {
+        title: "Cheltuieli",
+        description:
+          "Consultă cheltuielile firmei și starea înregistrării lor.",
+        new: "Adaugă cheltuială",
+        recent: "Cheltuieli înregistrate",
+        empty: "Nu a fost înregistrată nicio cheltuială.",
+        unknownPayee: "Beneficiar necunoscut",
+        columns: {
+          date: "Data",
+          payee: "Beneficiar plată",
+          category: "Categorie",
+          status: "Stare",
+          amount: "Sumă",
+        },
+      },
+      statuses: {
+        DRAFT: "Schiță",
+        POSTED: "Înregistrată",
+        REVERSED: "Stornată",
+      },
+      setupRequired: {
+        title: "Configurează mai întâi firma operatoare",
+        description:
+          "O cheltuială trebuie să aparțină unei entități juridice configurate.",
+        details:
+          "Leagă sau creează firma operatoare, atribuie portofelele firmei și configurează asociații formali și perioadele de TVA înainte de a înregistra cheltuieli.",
+        action: "Deschide configurarea firmei",
+      },
+      form: {
+        title: "Adaugă cheltuială",
+        description:
+          "Înregistrează rapid o cheltuială a firmei. Începe cu suma și CUI-ul de pe bon.",
+        backToExpenses: "Înapoi la cheltuieli",
+        grossAmount: "Sumă brută",
+        required: "(obligatoriu)",
+        companyCuiQuestion: "Ai pus CUI pe bon?",
+        companyCuiHelp:
+          "Răspunsul stabilește sursa banilor și documentele obligatorii.",
+        binary: {
+          yes: "Da",
+          no: "Nu",
+        },
+        paymentMethod: "Metoda de plată",
+        paymentMethods: {
+          cash: "Cash",
+          companyCard: "Card firmă",
+        },
+        currency: "Monedă",
+        entity: "Firma operatoare",
+        expenseDate: "Data cheltuielii",
+        category: "Categorie",
+        paidFrom: "Plătit din",
+        companyCard: "Cardul firmei",
+        cashDesk: "Casieria centrală",
+        fundedBy: "Finanțat de",
+        payee: "Beneficiar plată (furnizor sau persoană)",
+        beneficiary: "Beneficiar real / Cheltuială pentru",
+        specificOwner: "Asociat specific",
+        relatedRecord: "Scuter asociat (opțional)",
+        moreDetails: "Mai multe detalii (opțional)",
+        advancedDetails: "Detalii document și TVA (opțional)",
+        paidBy: "Plătit de",
+        walletSelected: "Portofelul firmei",
+        emptyCategories: {
+          title: "Nu există categorii de cheltuieli",
+          description:
+            "Creează cel puțin o categorie de cheltuieli înainte să înregistrezi această cheltuială.",
+          action: "Gestionează categoriile",
+        },
+        emptyWallet: {
+          title: "Nu există un portofel compatibil al firmei",
+          description:
+            "Atribuie un portofel pentru această metodă de plată în setările firmei.",
+          action: "Deschide setările firmei",
+        },
+        personalFunds: {
+          title: "Fonduri personale",
+          description:
+            "Cheltuiala este înregistrată ca fiind plătită de {name}, din fonduri personale, pentru companie.",
+          currentUser: "utilizatorul curent",
+        },
+        currentUser: "{name} (tu)",
+        advancedTransaction: "Tranzacție avansată",
+        continue: "Continuă",
+        back: "Înapoi",
+        record: "Înregistrează cheltuiala",
+        recording: "Se înregistrează...",
+        completing: "Se finalizează schița salvată...",
+        retryCompletion: "Reîncearcă finalizarea",
+        paymentSources: {
+          COMPANY_CARD: "Cardul firmei",
+          COMPANY_CASH_DESK: "Casieria centrală",
+          PERSONAL_FUNDS: "Fonduri personale",
+        },
+        fundingTreatments: {
+          REIMBURSABLE: "Rambursabilă",
+          NON_REIMBURSABLE: "Nerambursabilă",
+        },
+        attribution: {
+          BUSINESS: "Companie",
+          OWNER: "Asociat",
+          businessHelp: "Este inclusă în P&L-ul operațional al firmei.",
+          ownerHelp:
+            "Este atribuită acestui asociat și exclusă din P&L-ul operațional.",
+          noOwners:
+            "Nu există asociați formali configurați pentru această firmă și dată.",
+        },
+        placeholders: {
+          amount: "Introdu suma",
+          entity: "Selectează firma operatoare",
+          category: "Selectează categoria",
+          wallet: "Selectează portofelul firmei",
+          noWallet: "Nu este atribuit niciun portofel compatibil",
+          funder: "Selectează finanțatorul",
+          owner: "Selectează asociatul",
+          paidBy: "Selectează plătitorul",
+          relatedRecord: "Caută scutere",
+          documentType: "Selectează tipul",
+          documentNumber: "Introdu numărul documentului",
+          supplierCui: "Introdu CUI-ul furnizorului",
+          buyerCuiStatus: "Selectează starea",
+          buyerCui: "Introdu CUI-ul cumpărătorului de pe document",
+        },
+        search: {
+          payeePlaceholder: "Caută după nume sau CUI",
+          scooterPlaceholder: "Caută după număr, VIN, marcă sau model",
+          noPayees: "Nu au fost găsiți beneficiari.",
+          noScooters: "Nu au fost găsite scutere.",
+          loading: "Se caută...",
+          failed: "Căutarea a eșuat. Încearcă din nou.",
+          clear: "Șterge selecția",
+          toggle: "Deschide opțiunile",
+        },
+        rules: {
+          title: "Reguli de reținut",
+          shortTitle: "Reguli",
+          personalOwner:
+            "Fondurile personale atribuite unui asociat specific nu sunt rambursabile.",
+        },
+        evidence: {
+          title: "Bon sau factură",
+          requiredHelp:
+            "Atașează bonul fiscal sau factura. Pentru plata cu cardul firmei este obligatoriu și bonul POS.",
+          optionalHelp:
+            "Poți înregistra cheltuiala fără document sau poți atașa unul dacă îl ai.",
+          fiscalLabel: "Bon fiscal / factură",
+          posLabel: "Bon POS",
+          required: "(obligatoriu)",
+          optional: "(opțional)",
+          takePhoto: "Fotografiază",
+          chooseFile: "Alege fișier",
+          replaceFile: "Înlocuiește fișierul",
+          remove: "Șterge fișierul",
+          notAvailable: "Indisponibil",
+          unavailableSelected: "Nu va fi atașată nicio dovadă.",
+          formats: "JPG, PNG sau PDF · Maximum 10 MB",
+          preparing: "Fișierul este pregătit și verificat...",
+          tooLarge: "Fișierul trebuie să aibă cel mult 10 MB.",
+          unsupported: "Alege un fișier JPG, PNG sau PDF.",
+          prepareFailed: "Fișierul nu a putut fi pregătit.",
+        },
+        document: {
+          title: "Detalii document (introduse manual)",
+          help: "Corectează sau completează manual aceste valori când este necesar. Încă nu sunt extrase automat.",
+          noFile: "Atașează un document pentru a introduce detaliile fiscale.",
+          type: "Tip document",
+          number: "Număr document",
+          date: "Data documentului",
+          supplierCui: "CUI furnizor",
+          buyerCuiStatus: "Starea CUI-ului cumpărătorului",
+          buyerCuiFound: "CUI cumpărător găsit pe document",
+          types: {
+            INVOICE: "Factură",
+            FISCAL_RECEIPT: "Bon fiscal",
+          },
+          cuiStatuses: {
+            MATCHED: "Corespunde firmei operatoare",
+            MISSING: "Lipsește",
+            MISMATCH: "Nu corespunde",
+            NOT_APPLICABLE: "Nu se aplică",
+          },
+        },
+        vat: {
+          title: "Sumar TVA ({currency})",
+          registered: "Înregistrată în scopuri de TVA la data documentului",
+          notRegistered:
+            "Neînregistrată în scopuri de TVA la data documentului; TVA recuperabil este zero.",
+          noCompanyCui:
+            "Bonul nu are CUI-ul firmei; TVA-ul recuperabil este zero.",
+          addLine: "Adaugă linie TVA",
+          line: "Linia TVA {number}",
+          removeLine: "Șterge linia",
+          removeLineNumber: "Șterge linia TVA {number}",
+          netAmount: "Sumă netă",
+          rate: "Cotă TVA (%)",
+          amount: "Sumă TVA",
+          recoverable: "TVA recuperabil",
+          recognizedCost: "Cost recunoscut",
+          total: "Total",
+        },
+        review: {
+          title: "Sumar pentru verificare",
+          warningsTitle: "Verifică aceste diferențe",
+          warnings: {
+            DOCUMENT_DATE_DIFFERS:
+              "Data documentului diferă de data cheltuielii.",
+            BUYER_CUI_MISSING: "CUI-ul cumpărătorului lipsește.",
+            BUYER_CUI_MISMATCH:
+              "CUI-ul cumpărătorului nu corespunde firmei operatoare.",
+            VAT_TOTAL_DIFFERS: "Totalul liniilor TVA diferă de suma brută.",
+          },
+        },
+        summary: {
+          title: "Sumar cheltuială",
+          amount: "Sumă brută",
+          date: "Data",
+          category: "Categorie",
+          paidFrom: "Plătit din",
+          payee: "Beneficiar plată",
+          beneficiary: "Cine a beneficiat?",
+          relatedRecord: "Scuter asociat",
+          paidBy: "Plătit de",
+          reimbursement: "Rambursare",
+          empty: "—",
+        },
+        validation: {
+          required: "Acest câmp este obligatoriu.",
+          invalidAmount:
+            "Introdu o sumă mai mare decât zero, cu cel mult 2 zecimale.",
+          invalidCombination: "Alege o plată și un beneficiar valide.",
+          companyTaxIdentifierMissing:
+            "Firma selectată nu are CUI configurat. Adaugă CUI-ul în setările firmei înainte să alegi Da.",
+          invalidVatLine:
+            "Completează fiecare linie TVA cu sume nete, cote și sume TVA valide.",
+        },
+        feedback: {
+          title: "Cheltuiala nu a fost înregistrată",
+          completionTitle: "Finalizarea cheltuielii este în așteptare",
+          invalid: "Verifică detaliile cheltuielii și încearcă din nou.",
+          generic: "Cheltuiala nu a putut fi înregistrată. Încearcă din nou.",
+          evidencePreparing:
+            "Așteaptă pregătirea tuturor documentelor selectate, apoi înregistrează cheltuiala.",
+          completionPending:
+            "Schița {expenseId} este salvată, dar finalizarea nu s-a încheiat. Câmpurile și dovezile sunt blocate; reîncearcă pentru a continua în siguranță din schița salvată.",
+        },
+      },
+      businessSetup: {
+        title: "Configurare financiară firmă",
+        description:
+          "Configurează firma operatoare folosită pentru cheltuielile compacte.",
+        manage: {
+          title: "Gestionează setările fiscale ale firmei",
+          description:
+            "Verifică firma operatoare și menține perioadele asociaților formali și de înregistrare în scopuri de TVA.",
+          company: "Firma operatoare configurată",
+          cui: "CUI firmă: {cui}",
+          missingCui:
+            "Această firmă nu are CUI și trebuie corectată mai întâi.",
+          activeVat: "TVA {number}, activ din {from}.",
+          scheduledVat: "TVA {number}, programat din {from}.",
+          notVatRegistered: "Astăzi nu este activă nicio înregistrare TVA.",
+          endOn: "Înregistrarea se încheie la (exclusiv)",
+          startRegistration: "Începe înregistrarea TVA",
+          startingRegistration: "Se începe înregistrarea TVA...",
+          endRegistration: "Încheie înregistrarea TVA",
+          endingRegistration: "Se încheie înregistrarea TVA...",
+          updateRegistration: "Actualizează înregistrarea programată",
+          updatingRegistration: "Se actualizează înregistrarea programată...",
+          backToExpense: "Înapoi la cheltuială",
+        },
+        effectiveFrom: "În vigoare de la",
+        company: {
+          title: "Firma operatoare",
+          description: "Creează o firmă sau leagă o firmă existentă.",
+          source: "Înregistrarea firmei",
+          modes: {
+            NEW: "Creează firmă",
+            EXISTING: "Folosește firma existentă",
+          },
+          existing: "Firmă existentă",
+          select: "Selectează firma",
+          legalName: "Denumire juridică",
+          legalForm: "Formă juridică",
+          taxIdentifier: "CUI / identificator fiscal",
+          currency: "Monedă implicită",
+        },
+        wallets: {
+          title: "Portofelele firmei",
+          description:
+            "Caseria este creată automat. Adaugă separat fiecare cont de card.",
+          cash: "Caserie",
+          cashDescription:
+            "Creată automat ca locație implicită pentru numerarul firmei.",
+          included: "Inclusă",
+          accountName: "Denumirea contului sau a cardului",
+          cardHolder: "Deținătorul cardului",
+          newAccount: "Cont de card nou",
+          addAccount: "Adaugă un cont de card",
+          removeAccount: "Elimină contul",
+        },
+        owners: {
+          title: "Asociați formali",
+          description:
+            "Selectează doar utilizatorii care sunt asociați legali/formali. Administratorii nu sunt considerați automat asociați.",
+          empty: "Nu există utilizatori activi disponibili.",
+          remove: "Elimină asociatul",
+          manageDescription:
+            "Adaugă și încheie perioade datate pentru asociații formali ai acestei firme operatoare.",
+          effectiveFrom: "Asociat în vigoare de la",
+          select: "Selectează asociatul formal",
+          selectRequired: "Selectează un asociat formal de adăugat.",
+          activePeriod: "Activ din {from}",
+          scheduledPeriod: "Programat din {from}",
+          endOn: "Perioada asociatului se încheie la (exclusiv)",
+          end: "Încheie perioada asociatului",
+          ending: "Se încheie perioada asociatului...",
+          add: "Adaugă perioada asociatului",
+          adding: "Se adaugă perioada asociatului...",
+          noneConfigured:
+            "Nu există perioade curente sau programate pentru asociați formali.",
+        },
+        users: {
+          select: "Selectează un utilizator",
+          search: "Caută după nume sau e-mail",
+          empty: "Nu a fost găsit niciun utilizator.",
+          loading: "Se caută utilizatorii…",
+          loadMore: "Încarcă mai mulți",
+          searchError: "Utilizatorii nu au putut fi încărcați.",
+          clear: "Șterge selecția",
+          toggle: "Deschide lista de utilizatori",
+        },
+        vat: {
+          title: "Înregistrare TVA",
+          description: "Înregistrează perioada TVA numai când se aplică.",
+          registered: "Firma este înregistrată în scopuri de TVA",
+          countryCode: "Cod țară",
+          number: "Număr TVA",
+          effectiveFrom: "TVA în vigoare de la",
+        },
+        save: "Salvează configurarea",
+        saving: "Se salvează...",
+        saveDescription:
+          "Asociații și perioadele TVA pot fi gestionate ulterior din această pagină.",
+        feedback: {
+          title: "Configurarea nu a fost salvată",
+          error: "Configurarea financiară a firmei nu a putut fi salvată.",
+          required: "Completează câmpurile obligatorii ale firmei și CUI-ul.",
+          partial:
+            "Firma operatoare {entityId} a fost salvată, dar configurarea asociatului sau a TVA este incompletă. Configurarea salvată se reîncarcă pentru a o putea finaliza.",
+          ownerError: "Perioada asociatului formal nu a putut fi salvată.",
+          vatError: "Perioada de înregistrare TVA nu a putut fi salvată.",
+        },
+      },
+    },
     transactionForm: {
       title: "Tranzacție nouă",
       description:
@@ -897,6 +1655,7 @@ export const financeCatalog = {
       creating: "Se creează...",
       postImmediately: "Înregistrează definitiv imediat",
       saveDraft: "Salvează ca schiță",
+      swapDirection: "Inversează sursa și destinația",
       sections: {
         transaction: "Tranzacție",
         routing: "Rutarea banilor",
@@ -905,6 +1664,8 @@ export const financeCatalog = {
       fields: {
         type: "Tip tranzacție",
         amount: "Sumă",
+        sourceAmount: "Suma de la sursă",
+        destinationAmount: "Suma la destinație",
         currency: "Monedă",
         scope: "Domeniu financiar",
         paymentMethod: "Metodă de plată",
@@ -921,6 +1682,9 @@ export const financeCatalog = {
         bucket: "Tip sold",
         direction: "Direcție",
         counterparty: "Contraparte",
+        source: "Sursă",
+        payer: "Plătitor",
+        destination: "Destinație",
         recipient: "Destinatar",
         debtor: "Debitor",
         creditor: "Creditor",
@@ -932,6 +1696,8 @@ export const financeCatalog = {
       placeholders: {
         select: "Selectează o opțiune",
         optional: "Opțional",
+        optionalCounterparty: "Alege contrapartea (opțional)",
+        selectPayer: "Alege plătitorul",
         searchWallets: "Caută portofele",
         searchCounterparties: "Caută persoane sau companii",
         searchCategories: "Caută categorii",
@@ -947,6 +1713,10 @@ export const financeCatalog = {
       },
       optionTypes: {
         person: "Persoană",
+      },
+      flow: {
+        INCOME: "Venit",
+        EXPENSE: "Cheltuială",
       },
       typeHelp: {
         INCOME:
@@ -979,6 +1749,13 @@ export const financeCatalog = {
         errorTitle: "Tranzacția nu a fost creată",
         genericError: "Tranzacția nu a putut fi creată. Încearcă din nou.",
       },
+      unidentifiedRecipient: {
+        title: "Salvezi fără destinatar?",
+        description:
+          "Cheltuiala va fi înregistrată fără destinatar. Descrierea va rămâne explicația plății neidentificate.",
+        back: "Înapoi la tranzacție",
+        confirm: "Salvează fără destinatar",
+      },
       validation: {
         required: "Câmpul {field} este obligatoriu.",
         differentWallets: "Alege două portofele diferite.",
@@ -988,6 +1765,15 @@ export const financeCatalog = {
       },
     },
     enums: {
+      companyLegalForms: {
+        SRL: "SRL",
+        SA: "SA",
+        PFA: "PFA",
+        II: "II",
+        IF: "IF",
+        ONG: "ONG",
+        OTHER: "Alt tip",
+      },
       walletTypes: {
         USER: "Portofel utilizator",
         COMPANY_CASH: "Numerar companie",
@@ -1003,7 +1789,6 @@ export const financeCatalog = {
       categoryKinds: {
         INCOME: "Venit",
         EXPENSE: "Cheltuială",
-        BOTH: "Venit și cheltuială",
       },
       transactionTypes: {
         INCOME: "Venit",
@@ -1030,7 +1815,7 @@ export const financeCatalog = {
       financialScopes: {
         COMPANY: "Companie",
         ADMIN_PERSONAL: "Personal administrator",
-        CUSTOMER_HELD: "Fonduri deținute pentru client",
+        CUSTOMER_HELD: "Garanții clienți",
       },
       paymentMethods: {
         CASH: "Numerar",

@@ -10,7 +10,7 @@ const category = (
   id,
   code: id.toUpperCase(),
   name: `Category ${id}`,
-  kind: "BOTH",
+  kind: "EXPENSE",
   parentCategoryId: null,
   isActive,
   createdAt: "2026-07-29T08:00:00.000Z",

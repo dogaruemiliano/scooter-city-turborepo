@@ -43,7 +43,6 @@ import {
 } from "@/lib/finance-format";
 import { webApi } from "@/lib/api";
 import { FinanceEmptyState } from "../../_components/FinanceEmptyState";
-import { FinancePageHeader } from "../../_components/FinancePageHeader";
 import { FinanceStatusBadge } from "../../_components/FinanceStatusBadge";
 import { availableTransactionActions } from "../_lib/transaction-actions";
 
@@ -152,50 +151,45 @@ export function TransactionDetailPage({
   return (
     <div className="mx-auto flex w-full max-w-screen-xl flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
       <PageTitleOverride title={title} />
-      <Link
-        href={transactionsHref}
-        className={cn(
-          buttonVariants({ variant: "ghost" }),
-          "w-fit text-muted-foreground",
-        )}
-      >
-        <ArrowLeftIcon data-icon="inline-start" />
-        {t("transactions.detail.back")}
-      </Link>
-
-      <FinancePageHeader
-        title={title}
-        description={formatMoney(current.amount, current.currency, locale)}
-        action={
-          <div className="flex flex-wrap items-center gap-2">
-            <FinanceStatusBadge
-              status={current.status}
-              label={t(`enums.transactionStatuses.${current.status}`)}
-            />
-            {canPost ? (
-              <Button
-                type="button"
-                disabled={busyAction !== null}
-                onClick={() => setPostDialogOpen(true)}
-              >
-                <CheckCircle2Icon data-icon="inline-start" />
-                {t("transactions.detail.actions.post")}
-              </Button>
-            ) : null}
-            {canReverse ? (
-              <Button
-                type="button"
-                variant="outline"
-                disabled={busyAction !== null}
-                onClick={() => setReverseDialogOpen(true)}
-              >
-                <RotateCcwIcon data-icon="inline-start" />
-                {t("transactions.detail.actions.reverse")}
-              </Button>
-            ) : null}
-          </div>
-        }
-      />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Link
+          href={transactionsHref}
+          className={cn(
+            buttonVariants({ variant: "ghost" }),
+            "hidden w-fit text-muted-foreground md:inline-flex",
+          )}
+        >
+          <ArrowLeftIcon data-icon="inline-start" />
+          {t("transactions.detail.back")}
+        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <FinanceStatusBadge
+            status={current.status}
+            label={t(`enums.transactionStatuses.${current.status}`)}
+          />
+          {canPost ? (
+            <Button
+              type="button"
+              disabled={busyAction !== null}
+              onClick={() => setPostDialogOpen(true)}
+            >
+              <CheckCircle2Icon data-icon="inline-start" />
+              {t("transactions.detail.actions.post")}
+            </Button>
+          ) : null}
+          {canReverse ? (
+            <Button
+              type="button"
+              variant="outline"
+              disabled={busyAction !== null}
+              onClick={() => setReverseDialogOpen(true)}
+            >
+              <RotateCcwIcon data-icon="inline-start" />
+              {t("transactions.detail.actions.reverse")}
+            </Button>
+          ) : null}
+        </div>
+      </div>
 
       {feedback ? (
         <Alert variant={feedback.kind === "error" ? "destructive" : "default"}>

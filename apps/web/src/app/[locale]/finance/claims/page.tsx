@@ -1,11 +1,9 @@
 import { v1 } from "@repo/api-shared";
 import { messages } from "@repo/i18n";
 import type { Metadata } from "next";
-import { getTranslations } from "next-intl/server";
 
 import { resolveRouteLocale } from "@/i18n/paths";
 import { webApi } from "@/lib/api";
-import { FinancePageHeader } from "../_components/FinancePageHeader";
 import {
   financeCookieHeader,
   handleFinanceApiErrors,
@@ -42,14 +40,8 @@ export default async function ClaimsPage({ params }: ClaimsPageProps) {
       },
     ),
   );
-  const t = await getTranslations({ locale, namespace: "finance" });
-
   return (
     <main className="mx-auto flex w-full max-w-screen-xl flex-1 flex-col gap-8 px-4 py-6 sm:px-6 lg:px-8">
-      <FinancePageHeader
-        title={t("claims.title")}
-        description={t("claims.description")}
-      />
       <ClaimsTable locale={locale} claims={claims.items} />
     </main>
   );
