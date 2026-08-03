@@ -22,12 +22,13 @@ import { v1 } from "@repo/api-shared";
 import { ZodResponse } from "nestjs-zod";
 
 import { RequireRoles } from "../common/decorators/roles.decorator";
+import { MaintenanceQueryService } from "../maintenance/maintenance-query.service";
 import { CreateScooterInput } from "./dto/create-scooter.input";
 import { ListScootersQuery } from "./dto/list-scooters.query";
 import { Scooter } from "./dto/scooter";
 import { ScooterList } from "./dto/scooter-list";
 import { UpdateScooterInput } from "./dto/update-scooter.input";
-import { toScooter } from "./scooters.mapper";
+import { toScooter, toScooterListItem } from "./scooters.mapper";
 import { ScootersService } from "./scooters.service";
 
 @ApiTags("scooters")
@@ -36,7 +37,10 @@ import { ScootersService } from "./scooters.service";
 @RequireRoles("ADMIN")
 @Controller({ path: "scooters", version: "1" })
 export class ScootersController {
-  constructor(private readonly scooters: ScootersService) {}
+  constructor(
+    private readonly scooters: ScootersService,
+    private readonly maintenanceQueries: MaintenanceQueryService,
+  ) {}
 
   @Post()
   @ApiOperation({
@@ -60,9 +64,13 @@ export class ScootersController {
     @Query() query: ListScootersQuery,
   ): Promise<v1.scooters.ScooterList> {
     const result = await this.scooters.list(query);
+    const attentionSummaries =
+      await this.maintenanceQueries.getAttentionSummaries(result.items);
     return {
       ...result,
-      items: result.items.map(toScooter),
+      items: result.items.map((row) =>
+        toScooterListItem(row, attentionSummaries.get(row.id)!),
+      ),
     };
   }
 

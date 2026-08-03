@@ -19,6 +19,7 @@ import {
   TagsIcon,
   UsersRoundIcon,
   WalletCardsIcon,
+  WrenchIcon,
   type LucideIcon,
 } from "lucide-react";
 import { v1 } from "@repo/api-shared";
@@ -90,6 +91,7 @@ const NAVIGATION_GROUPS = [
     items: [
       { href: "/persons", labelKey: "persons", icon: UsersRoundIcon },
       { href: "/scooters", labelKey: "scooters", icon: BikeIcon },
+      { href: "/service", labelKey: "service", icon: WrenchIcon },
     ],
   },
   {
@@ -158,6 +160,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/persons/new": "newPerson",
   "/scooters": "scooters",
   "/scooters/new": "newScooter",
+  "/service": "service",
 };
 
 export function AppShell({

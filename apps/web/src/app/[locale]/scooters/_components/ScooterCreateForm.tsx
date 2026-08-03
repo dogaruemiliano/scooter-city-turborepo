@@ -64,6 +64,7 @@ export function ScooterCreateForm({ scootersHref }: ScooterCreateFormProps) {
       invalidPlateNumber: () => t("feedback.validation.invalidPlateNumber"),
       engineCcRequired: () => t("feedback.validation.engineCcRequired"),
       engineCcElectric: () => t("feedback.validation.engineCcElectric"),
+      invalidMileage: () => t("feedback.validation.invalidMileage"),
     });
 
     if (candidate.errors) {
@@ -242,6 +243,8 @@ export function ScooterCreateForm({ scootersHref }: ScooterCreateFormProps) {
         return t("fields.engineCc");
       case "powerKw":
         return t("fields.powerKw");
+      case "currentMileageKm":
+        return t("fields.currentMileageKm");
       case "purchasedOn":
         return t("fields.purchasedOn");
       case "registrationType":

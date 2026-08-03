@@ -98,6 +98,7 @@ function PersonsPageContent({
       options: {
         clearFeedback?: boolean;
         history?: "push" | "replace";
+        preserveDraft?: boolean;
       } = {},
     ) => {
       const parsedQuery = v1.persons.listPersonsQuerySchema.parse({
@@ -129,7 +130,9 @@ function PersonsPageContent({
         updatePersonsUrl(parsedQuery, options.history ?? "push");
         setList(nextList);
         setQuery(parsedQuery);
-        setDraftQuery(parsedQuery);
+        if (!options.preserveDraft) {
+          setDraftQuery(parsedQuery);
+        }
       } catch (error) {
         if (requestId !== requestIdRef.current) {
           return;
@@ -229,7 +232,7 @@ function PersonsPageContent({
           page: 1,
           pageSize: LIST_PAGE_SIZE,
         },
-        { history: "replace" },
+        { history: "replace", preserveDraft: true },
       );
     }, delay);
     searchDebounceTimeoutRef.current = timeoutId;
@@ -340,7 +343,6 @@ function PersonsPageContent({
               clearLabel={t("list.clearSearchLabel")}
               placeholder={t("placeholders.search")}
               value={draftQuery.search ?? ""}
-              disabled={listLoading}
               onChange={(search) => {
                 setDraftQuery((current) => ({
                   ...current,

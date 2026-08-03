@@ -42,6 +42,7 @@ const scooter: v1.scooters.Scooter = {
   registeredOn: null,
   registrationExpiresOn: null,
   requiredDriverLicenseType: "none",
+  currentMileageKm: 1_200,
   notes: "Maker papers received",
   createdAt: "2026-06-25T10:00:00.000Z",
   updatedAt: "2026-06-25T11:00:00.000Z",
@@ -73,12 +74,323 @@ describe("ScooterDetailPage", () => {
     expect(screen.getByText("White")).toBeInTheDocument();
     expect(screen.getAllByText("125 cc")[0]).toBeInTheDocument();
     expect(screen.getAllByText("Unregistered")[0]).toBeInTheDocument();
+    expect(screen.queryByText("Active")).not.toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Add registration" }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "More actions" }),
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Maintenance and repairs" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("1,200 km")).toBeInTheDocument();
+  });
+
+  it("shows a status badge only for deleted scooters", () => {
+    renderDetail("en", { ...scooter, deletedAt: "2026-08-03T12:00:00.000Z" });
+
+    expect(
+      screen
+        .getAllByText("Deleted")
+        .some((element) => element.dataset.slot === "badge"),
+    ).toBe(true);
+  });
+
+  it("reports an issue through the strict shared contract", async () => {
+    mocks.apiFetch.mockResolvedValueOnce({});
+    const browser = userEvent.setup();
+
+    renderDetail();
+    await browser.click(screen.getByRole("button", { name: "Add issue" }));
+    const dialog = await screen.findByRole("dialog", {
+      name: "Report an issue",
+    });
+    await browser.type(
+      within(dialog).getByLabelText("Issue title"),
+      "Front brake rubbing",
+    );
+    await browser.type(
+      within(dialog).getByLabelText("Description"),
+      "Noise under light braking",
+    );
+    await browser.click(
+      within(dialog).getByRole("button", { name: "Add issue" }),
+    );
+
+    await waitFor(() =>
+      expect(mocks.apiFetch).toHaveBeenCalledWith(
+        v1.maintenance.ROUTES.issues.create(scooter.id),
+        v1.maintenance.scooterIssueSchema,
+        {
+          method: "POST",
+          json: {
+            title: "Front brake rubbing",
+            description: "Noise under light braking",
+            severity: "MEDIUM",
+          },
+        },
+      ),
+    );
+    expect(mocks.refresh).toHaveBeenCalledOnce();
+  });
+
+  it("shows issue API failures inside the open dialog and keeps its fields", async () => {
+    mocks.apiFetch.mockRejectedValueOnce(new Error("Workshop API unavailable"));
+    const browser = userEvent.setup();
+
+    renderDetail();
+    await browser.click(screen.getByRole("button", { name: "Add issue" }));
+    const dialog = await screen.findByRole("dialog", {
+      name: "Report an issue",
+    });
+    const titleInput = within(dialog).getByLabelText("Issue title");
+    await browser.type(titleInput, "Front brake rubbing");
+    await browser.click(
+      within(dialog).getByRole("button", { name: "Add issue" }),
+    );
+
+    expect(await within(dialog).findByText("Issue not saved")).toBeVisible();
+    expect(within(dialog).getByText("Workshop API unavailable")).toBeVisible();
+    expect(titleInput).toHaveValue("Front brake rubbing");
+  });
+
+  it("records maintenance while leaving calculated deadlines to the API", async () => {
+    mocks.apiFetch.mockResolvedValueOnce({});
+    const browser = userEvent.setup();
+    const type = maintenanceType();
+
+    renderDetail("en", scooter, maintenanceOverview(), [type]);
+    await browser.click(
+      screen.getByRole("button", { name: "Add maintenance" }),
+    );
+    const dialog = await screen.findByRole("dialog", {
+      name: "Add maintenance",
+    });
+    expect(dialog).toHaveClass(
+      "max-h-[calc(100svh-var(--spacing-8))]",
+      "overflow-y-auto",
+    );
+    await replaceDateParts(browser, dialog, "Performed on", "2026-07-10");
+    const mileage = within(dialog).getByLabelText("Mileage when performed");
+    await browser.clear(mileage);
+    await browser.type(mileage, "1250");
+    await browser.click(
+      within(dialog).getByRole("button", { name: "Add maintenance" }),
+    );
+
+    await waitFor(() =>
+      expect(mocks.apiFetch).toHaveBeenCalledWith(
+        v1.maintenance.ROUTES.records.create(scooter.id),
+        v1.maintenance.maintenanceRecordSchema,
+        {
+          method: "POST",
+          json: {
+            maintenanceTypeId: type.id,
+            performedAt: "2026-07-10",
+            performedKm: 1_250,
+          },
+        },
+      ),
+    );
+    expect(mocks.refresh).toHaveBeenCalledOnce();
+  });
+
+  it("submits manual maintenance deadlines when provided", async () => {
+    mocks.apiFetch.mockResolvedValueOnce({});
+    const browser = userEvent.setup();
+    const type = maintenanceType();
+
+    renderDetail("en", scooter, maintenanceOverview(), [type]);
+    await browser.click(
+      screen.getByRole("button", { name: "Add maintenance" }),
+    );
+    const dialog = await screen.findByRole("dialog", {
+      name: "Add maintenance",
+    });
+    await replaceDateParts(browser, dialog, "Performed on", "2026-07-10");
+    const mileage = within(dialog).getByLabelText("Mileage when performed");
+    await browser.clear(mileage);
+    await browser.type(mileage, "1250");
+    await browser.type(
+      within(dialog).getByLabelText("Manual next due mileage"),
+      "4250",
+    );
+    await replaceDateParts(
+      browser,
+      dialog,
+      "Manual next due date",
+      "2027-01-10",
+    );
+    await browser.click(
+      within(dialog).getByRole("button", { name: "Add maintenance" }),
+    );
+
+    await waitFor(() =>
+      expect(mocks.apiFetch).toHaveBeenCalledWith(
+        v1.maintenance.ROUTES.records.create(scooter.id),
+        v1.maintenance.maintenanceRecordSchema,
+        expect.objectContaining({
+          json: expect.objectContaining({
+            nextDueKm: 4_250,
+            nextDueAt: "2027-01-10",
+          }),
+        }),
+      ),
+    );
+  });
+
+  it("shows maintenance API failures inside the open dialog and keeps its fields", async () => {
+    mocks.apiFetch.mockRejectedValueOnce(
+      new Error("Maintenance API unavailable"),
+    );
+    const browser = userEvent.setup();
+    const type = maintenanceType();
+
+    renderDetail("en", scooter, maintenanceOverview(), [type]);
+    await browser.click(
+      screen.getByRole("button", { name: "Add maintenance" }),
+    );
+    const dialog = await screen.findByRole("dialog", {
+      name: "Add maintenance",
+    });
+    const mileage = within(dialog).getByLabelText("Mileage when performed");
+    await browser.clear(mileage);
+    await browser.type(mileage, "1300");
+    await browser.click(
+      within(dialog).getByRole("button", { name: "Add maintenance" }),
+    );
+
+    expect(
+      await within(dialog).findByText("Maintenance not saved"),
+    ).toBeVisible();
+    expect(
+      within(dialog).getByText("Maintenance API unavailable"),
+    ).toBeVisible();
+    expect(mileage).toHaveValue(1_300);
+  });
+
+  it("resets maintenance form defaults when reopened", async () => {
+    const browser = userEvent.setup();
+    const type = maintenanceType();
+
+    renderDetail("en", scooter, maintenanceOverview(), [type]);
+    await browser.click(
+      screen.getByRole("button", { name: "Add maintenance" }),
+    );
+    let dialog = await screen.findByRole("dialog", { name: "Add maintenance" });
+    const mileage = within(dialog).getByLabelText("Mileage when performed");
+    await browser.clear(mileage);
+    await browser.type(mileage, "9999");
+    await browser.click(within(dialog).getByRole("button", { name: "Cancel" }));
+
+    await browser.click(
+      screen.getByRole("button", { name: "Add maintenance" }),
+    );
+    dialog = await screen.findByRole("dialog", { name: "Add maintenance" });
+    expect(within(dialog).getByLabelText("Mileage when performed")).toHaveValue(
+      1_200,
+    );
+  });
+
+  it("shows both deadline dimensions and date-only maintenance activity", () => {
+    const type = maintenanceType();
+    const record = maintenanceRecord(type);
+    const status: v1.maintenance.MaintenanceTypeStatus = {
+      maintenanceType: type,
+      latestRecord: record,
+      status: "OVERDUE",
+    };
+
+    renderDetail(
+      "en",
+      scooter,
+      maintenanceOverview({
+        maintenanceStatuses: [status],
+        overdueMaintenance: [status],
+        activity: [
+          {
+            kind: "ISSUE_REPORTED",
+            occurredAt: "2026-07-12T09:00:00.000Z",
+            title: "Brake lever loose",
+            severity: "HIGH",
+            issueId: "issue-1",
+            maintenanceRecordId: null,
+            performedKm: null,
+          },
+          {
+            kind: "ISSUE_FIXED",
+            occurredAt: "2026-07-11T09:00:00.000Z",
+            title: "Brake lever loose",
+            severity: "HIGH",
+            issueId: "issue-1",
+            maintenanceRecordId: null,
+            performedKm: null,
+          },
+          {
+            kind: "MAINTENANCE_COMPLETED",
+            occurredAt: "2026-07-10T00:00:00.000Z",
+            title: type.name,
+            issueId: null,
+            maintenanceRecordId: record.id,
+            performedKm: record.performedKm,
+          },
+        ],
+      }),
+      [type],
+    );
+
+    expect(screen.getByText("Mileage: 4,250 km")).toBeInTheDocument();
+    expect(screen.getByText("Date: Jan 10, 2027")).toBeInTheDocument();
+    const activityTitle = screen.getByText(
+      "Maintenance completed: Engine oil change",
+    );
+    const activityItem = activityTitle.closest("li");
+    expect(activityItem).not.toBeNull();
+    expect(within(activityItem!).getByText(/Jul 10, 2026/)).toBeInTheDocument();
+    expect(within(activityItem!).queryByText(/12:00/)).not.toBeInTheDocument();
+
+    const reportedItem = screen
+      .getByText("Issue reported: Brake lever loose")
+      .closest("li");
+    const fixedItem = screen
+      .getByText("Issue fixed: Brake lever loose")
+      .closest("li");
+    expect(
+      reportedItem?.querySelector(
+        '[data-activity-kind="ISSUE_REPORTED"][data-variant="destructive"]',
+      ),
+    ).not.toBeNull();
+    expect(
+      fixedItem?.querySelector(
+        '[data-activity-kind="ISSUE_FIXED"][data-variant="secondary"]',
+      ),
+    ).not.toBeNull();
+    expect(
+      activityItem?.querySelector(
+        '[data-activity-kind="MAINTENANCE_COMPLETED"][data-variant="outline"]',
+      ),
+    ).not.toBeNull();
+  });
+
+  it("marks an open issue as fixed", async () => {
+    mocks.apiFetch.mockResolvedValueOnce({});
+    const browser = userEvent.setup();
+    const issue = scooterIssue();
+
+    renderDetail("en", scooter, maintenanceOverview({ openIssues: [issue] }));
+    await browser.click(
+      screen.getByRole("button", { name: "Mark Brake lever loose fixed" }),
+    );
+
+    await waitFor(() =>
+      expect(mocks.apiFetch).toHaveBeenCalledWith(
+        v1.maintenance.ROUTES.issues.fix(scooter.id, issue.id),
+        v1.maintenance.scooterIssueSchema,
+        { method: "POST", json: {} },
+      ),
+    );
+    expect(mocks.refresh).toHaveBeenCalledOnce();
   });
 
   it("adds scooter registration from the focused dialog", async () => {
@@ -158,8 +470,16 @@ describe("ScooterDetailPage", () => {
     expect(within(dialog).getByLabelText("Purchased on YYYY")).toHaveValue(
       "2026",
     );
+    expect(within(dialog).getByLabelText("Current mileage (km)")).toHaveValue(
+      1_200,
+    );
     await browser.clear(within(dialog).getByLabelText("Color"));
     await browser.type(within(dialog).getByLabelText("Color"), "Blue");
+    await browser.clear(within(dialog).getByLabelText("Current mileage (km)"));
+    await browser.type(
+      within(dialog).getByLabelText("Current mileage (km)"),
+      "1350",
+    );
     await browser.click(within(dialog).getByRole("button", { name: "Save" }));
 
     await waitFor(() =>
@@ -168,7 +488,10 @@ describe("ScooterDetailPage", () => {
         v1.scooters.scooterSchema,
         expect.objectContaining({
           method: "PATCH",
-          json: expect.objectContaining({ color: "Blue" }),
+          json: expect.objectContaining({
+            color: "Blue",
+            currentMileageKm: 1_350,
+          }),
         }),
       ),
     );
@@ -218,15 +541,86 @@ describe("ScooterDetailPage", () => {
 function renderDetail(
   locale: SupportedLocale = "en",
   scooterOverride: v1.scooters.Scooter = scooter,
+  overview: v1.maintenance.ScooterMaintenanceOverview = maintenanceOverview(),
+  maintenanceTypes: v1.maintenance.MaintenanceTypeList = [],
 ) {
   return render(
     <NextIntlClientProvider locale={locale} messages={messages[locale]}>
       <ScooterDetailPage
         scooter={scooterOverride}
         scootersHref={locale === "en" ? "/en/scooters" : "/scooters"}
+        maintenanceOverview={overview}
+        maintenanceTypes={maintenanceTypes}
       />
     </NextIntlClientProvider>,
   );
+}
+
+function maintenanceOverview(
+  overrides: Partial<v1.maintenance.ScooterMaintenanceOverview> = {},
+): v1.maintenance.ScooterMaintenanceOverview {
+  return {
+    scooterId: scooter.id,
+    currentMileageKm: scooter.currentMileageKm,
+    openIssues: [],
+    issueCounts: { LOW: 0, MEDIUM: 0, HIGH: 0, CRITICAL: 0 },
+    hasBlockingIssues: false,
+    maintenanceAttentionRequired: false,
+    recommendedOperationalStatus: "AVAILABLE",
+    maintenanceStatuses: [],
+    overdueMaintenance: [],
+    dueSoonMaintenance: [],
+    activity: [],
+    ...overrides,
+  };
+}
+
+function maintenanceType(): v1.maintenance.MaintenanceType {
+  return {
+    id: "maintenance-type-1",
+    code: "ENGINE_OIL",
+    name: "Engine oil change",
+    intervalKm: 3_000,
+    intervalMonths: 6,
+    isActive: true,
+    createdAt: "2026-06-01T10:00:00.000Z",
+    updatedAt: "2026-06-01T10:00:00.000Z",
+  };
+}
+
+function maintenanceRecord(
+  type: v1.maintenance.MaintenanceType,
+): v1.maintenance.MaintenanceRecord {
+  return {
+    id: "maintenance-record-1",
+    scooterId: scooter.id,
+    maintenanceTypeId: type.id,
+    maintenanceType: type,
+    performedAt: "2026-07-10",
+    performedKm: 1_250,
+    notes: null,
+    nextDueKm: 4_250,
+    nextDueAt: "2027-01-10",
+    recordedByUserId: "user-1",
+    createdAt: "2026-07-10T10:00:00.000Z",
+    updatedAt: "2026-07-10T10:00:00.000Z",
+  };
+}
+
+function scooterIssue(): v1.maintenance.ScooterIssue {
+  return {
+    id: "issue-1",
+    scooterId: scooter.id,
+    title: "Brake lever loose",
+    description: null,
+    severity: "HIGH",
+    status: "OPEN",
+    reportedAt: "2026-07-01T10:00:00.000Z",
+    resolvedAt: null,
+    reportedByUserId: "user-1",
+    createdAt: "2026-07-01T10:00:00.000Z",
+    updatedAt: "2026-07-01T10:00:00.000Z",
+  };
 }
 
 async function chooseSelectOption(
@@ -252,4 +646,23 @@ async function fillDateParts(
     within(dialog).getByLabelText(`${label} YYYY`),
     year ?? "",
   );
+}
+
+async function replaceDateParts(
+  browser: ReturnType<typeof userEvent.setup>,
+  dialog: HTMLElement,
+  label: string,
+  value: string,
+) {
+  const [year, month, day] = value.split("-");
+  const dayInput = within(dialog).getByLabelText(label);
+  const monthInput = within(dialog).getByLabelText(`${label} MM`);
+  const yearInput = within(dialog).getByLabelText(`${label} YYYY`);
+
+  await browser.clear(dayInput);
+  await browser.type(dayInput, day ?? "");
+  await browser.clear(monthInput);
+  await browser.type(monthInput, month ?? "");
+  await browser.clear(yearInput);
+  await browser.type(yearInput, year ?? "");
 }

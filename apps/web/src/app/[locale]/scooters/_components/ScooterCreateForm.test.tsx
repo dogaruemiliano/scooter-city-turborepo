@@ -43,6 +43,7 @@ const createdScooter: v1.scooters.Scooter = {
   registeredOn: null,
   registrationExpiresOn: null,
   requiredDriverLicenseType: "none",
+  currentMileageKm: null,
   notes: "Maker papers received",
   createdAt: "2026-06-25T10:00:00.000Z",
   updatedAt: "2026-06-25T10:00:00.000Z",
@@ -83,6 +84,7 @@ describe("ScooterCreateForm", () => {
     expect(screen.getByLabelText("Engine cc")).toHaveValue(
       Number(DEFAULT_COMBUSTION_ENGINE_CC),
     );
+    expect(screen.getByLabelText("Current mileage (km)")).toHaveValue(null);
   });
 
   it("hides and clears engine cc for electric scooters", async () => {
@@ -173,6 +175,7 @@ describe("ScooterCreateForm", () => {
             powertrainType: "combustion",
             engineCc: 125,
             powerKw: 8.5,
+            currentMileageKm: null,
             purchasedOn: v1.common.dateOnlyToday(),
             registrationType: "unregistered",
             plateNumber: null,
@@ -187,6 +190,50 @@ describe("ScooterCreateForm", () => {
     expect(mocks.push).toHaveBeenCalledWith("/en/scooters");
     expect(mocks.refresh).toHaveBeenCalledOnce();
   });
+
+  it("submits an optional nonnegative whole-number mileage", async () => {
+    mocks.apiFetch.mockResolvedValueOnce({
+      ...createdScooter,
+      currentMileageKm: 4_200,
+    });
+    const browser = userEvent.setup();
+
+    renderCreateForm();
+    await fillRequiredScooterForm(browser);
+    await browser.type(screen.getByLabelText("Current mileage (km)"), "4200");
+    await browser.click(screen.getByRole("button", { name: "Create scooter" }));
+
+    await waitFor(() =>
+      expect(mocks.apiFetch).toHaveBeenCalledWith(
+        v1.scooters.ROUTES.create,
+        v1.scooters.scooterSchema,
+        expect.objectContaining({
+          json: expect.objectContaining({ currentMileageKm: 4_200 }),
+        }),
+      ),
+    );
+  });
+
+  it.each(["12.5", "-1"])(
+    "rejects invalid mileage %s before submitting",
+    async (value) => {
+      const browser = userEvent.setup();
+
+      renderCreateForm();
+      await fillRequiredScooterForm(browser);
+      await browser.type(screen.getByLabelText("Current mileage (km)"), value);
+      await browser.click(
+        screen.getByRole("button", { name: "Create scooter" }),
+      );
+
+      expect(
+        await screen.findAllByText(
+          "Current mileage must be a nonnegative whole number.",
+        ),
+      ).toHaveLength(2);
+      expect(mocks.apiFetch).not.toHaveBeenCalled();
+    },
+  );
 
   it("submits a registered national scooter payload", async () => {
     mocks.apiFetch.mockResolvedValueOnce({

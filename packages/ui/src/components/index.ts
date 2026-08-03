@@ -11,6 +11,7 @@ export * from "./country-select";
 export * from "./date-parts-input";
 export * from "./dialog";
 export * from "./dropdown-menu";
+export * from "./field";
 export * from "./input";
 export * from "./input-group";
 export * from "./label";

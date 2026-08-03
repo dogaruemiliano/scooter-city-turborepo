@@ -22,6 +22,7 @@ import { FinanceModule } from "./finance/finance.module";
 import { loadEnv } from "./config/env";
 import { HealthModule } from "./health/health.module";
 import { MailerModule } from "./mailer/mailer.module";
+import { MaintenanceModule } from "./maintenance/maintenance.module";
 import { PersonsModule } from "./persons/persons.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { ScootersModule } from "./scooters/scooters.module";
@@ -48,6 +49,7 @@ const env = loadEnv();
     // Public-surface modules.
     HealthModule,
     PersonsModule,
+    MaintenanceModule,
     ScootersModule,
     FinanceModule,
     AuthModule.forRoot(buildAuthConfig(env)),

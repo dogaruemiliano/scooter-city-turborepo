@@ -51,6 +51,7 @@ const scooter: v1.scooters.Scooter = {
   registeredOn: null,
   registrationExpiresOn: null,
   requiredDriverLicenseType: "none",
+  currentMileageKm: null,
   notes: "Maker papers received",
   createdAt: "2026-06-25T10:00:00.000Z",
   updatedAt: "2026-06-25T11:00:00.000Z",

@@ -159,6 +159,19 @@ export function ScooterFormFields({
           disabled={disabled}
           onChange={(value) => onSetValue("powerKw", value)}
         />
+        <TextField
+          id={`${formId}-current-mileage-km`}
+          label={t("fields.currentMileageKm")}
+          type="number"
+          inputMode="numeric"
+          min={0}
+          step={1}
+          value={form.currentMileageKm}
+          error={errors.currentMileageKm}
+          placeholder={t("placeholders.currentMileageKm")}
+          disabled={disabled}
+          onChange={(value) => onSetValue("currentMileageKm", value)}
+        />
       </FormSection>
 
       {includeRegistration ? (

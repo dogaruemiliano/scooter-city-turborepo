@@ -10,6 +10,7 @@ export const appShellCatalog = {
       myWallet: "My wallet",
       persons: "Persons",
       scooters: "Scooters",
+      service: "Service",
       financeOverview: "Overview",
       financeTransactions: "Transactions",
       financeExpenses: "Expenses",
@@ -36,6 +37,7 @@ export const appShellCatalog = {
       persons: "Persons",
       newPerson: "Add person",
       scooters: "Scooters",
+      service: "Service",
       newScooter: "Add scooter",
     },
     workspace: {
@@ -64,6 +66,7 @@ export const appShellCatalog = {
       myWallet: "Portofelul meu",
       persons: "Persoane",
       scooters: "Scutere",
+      service: "Service",
       financeOverview: "Prezentare generală",
       financeTransactions: "Tranzacții",
       financeExpenses: "Cheltuieli",
@@ -90,6 +93,7 @@ export const appShellCatalog = {
       persons: "Persoane",
       newPerson: "Adaugă persoană",
       scooters: "Scutere",
+      service: "Service",
       newScooter: "Adaugă scuter",
     },
     workspace: {

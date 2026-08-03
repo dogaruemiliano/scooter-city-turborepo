@@ -12,6 +12,10 @@ import {
   requiredTrimmedStringSchema,
 } from "../common/common.schemas";
 import {
+  mileageKmSchema,
+  scooterMaintenanceAttentionSummarySchema,
+} from "../maintenance/maintenance.schemas";
+import {
   SCOOTER_LIST_SORTS,
   SCOOTER_POWERTRAIN_TYPES,
   SCOOTER_REGISTRATION_TYPES,
@@ -190,6 +194,7 @@ export const scooterSchema = z
     registeredOn: z.string().nullable(),
     registrationExpiresOn: z.string().nullable(),
     requiredDriverLicenseType: scooterRequiredDriverLicenseTypeSchema,
+    currentMileageKm: mileageKmSchema.nullable(),
     notes: z.string().nullable(),
     createdAt: z.string().describe("ISO timestamp of scooter creation."),
     updatedAt: z.string().describe("ISO timestamp of last scooter update."),
@@ -226,6 +231,7 @@ export const createScooterInputSchema = z
     registrationExpiresOn: dateOnlySchema.nullable().optional(),
     requiredDriverLicenseType:
       scooterRequiredDriverLicenseTypeSchema.optional(),
+    currentMileageKm: mileageKmSchema.nullable().optional(),
     notes: notesSchema.optional(),
   })
   .strict()
@@ -265,6 +271,7 @@ export const updateScooterInputSchema = z
     registrationExpiresOn: dateOnlySchema.nullable().optional(),
     requiredDriverLicenseType:
       scooterRequiredDriverLicenseTypeSchema.optional(),
+    currentMileageKm: mileageKmSchema.nullable().optional(),
     notes: notesSchema.optional(),
   })
   .strict()
@@ -293,9 +300,17 @@ export const listScootersQuerySchema = z
 
 export type ListScootersQuery = z.infer<typeof listScootersQuerySchema>;
 
+export const scooterListItemSchema = scooterSchema
+  .extend({
+    attentionSummary: scooterMaintenanceAttentionSummarySchema,
+  })
+  .meta({ id: "ScooterListItem" });
+
+export type ScooterListItem = z.infer<typeof scooterListItemSchema>;
+
 export const scooterListSchema = z
   .object({
-    items: z.array(scooterSchema),
+    items: z.array(scooterListItemSchema),
     page: z.number().int().min(1),
     pageSize: z.number().int().min(1).max(MAX_PAGE_SIZE),
     total: z.number().int().min(0),

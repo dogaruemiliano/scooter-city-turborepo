@@ -45,7 +45,7 @@ vi.mock("@/lib/api", () => ({
   },
 }));
 
-const scooter: v1.scooters.Scooter = {
+const scooter: v1.scooters.ScooterListItem = {
   id: "scooter-1",
   vin: "JYARN23E0RA123456",
   brand: "Yamaha",
@@ -61,10 +61,12 @@ const scooter: v1.scooters.Scooter = {
   registeredOn: null,
   registrationExpiresOn: null,
   requiredDriverLicenseType: "none",
+  currentMileageKm: null,
   notes: null,
   createdAt: "2026-06-25T10:00:00.000Z",
   updatedAt: "2026-06-25T10:00:00.000Z",
   deletedAt: null,
+  attentionSummary: healthyAttentionSummary(),
 };
 
 beforeEach(() => {
@@ -132,6 +134,22 @@ describe("ScootersPage", () => {
     );
     expect(await screen.findByText("No scooters found.")).toBeInTheDocument();
     expect(window.location.search).toBe("?search=yamah");
+  });
+
+  it("keeps the search focused and editable while results load", async () => {
+    mocks.apiFetch.mockReturnValueOnce(new Promise(() => {}));
+    const browser = userEvent.setup();
+
+    renderScooters();
+    const search = screen.getByLabelText("Search scooters");
+    await browser.type(search, "yamah");
+
+    await waitFor(() => expect(mocks.apiFetch).toHaveBeenCalledOnce());
+    expect(search).toHaveFocus();
+    expect(search).toBeEnabled();
+
+    await browser.type(search, "a");
+    expect(search).toHaveValue("yamaha");
   });
 
   it("resets accumulated results when search changes", async () => {
@@ -343,7 +361,7 @@ function renderScooters(
 }
 
 function scooterList(
-  items: v1.scooters.Scooter[],
+  items: v1.scooters.ScooterListItem[],
   overrides: Partial<v1.scooters.ScooterList> = {},
 ): v1.scooters.ScooterList {
   return {
@@ -355,10 +373,21 @@ function scooterList(
 }
 
 function scooterRecord(
-  overrides: Partial<v1.scooters.Scooter> = {},
-): v1.scooters.Scooter {
+  overrides: Partial<v1.scooters.ScooterListItem> = {},
+): v1.scooters.ScooterListItem {
   return {
     ...scooter,
     ...overrides,
+  };
+}
+
+function healthyAttentionSummary(): v1.maintenance.ScooterMaintenanceAttentionSummary {
+  return {
+    highestOpenIssueSeverity: null,
+    hasBlockingIssues: false,
+    hasOverdueMaintenance: false,
+    hasMaintenanceDueSoon: false,
+    maintenanceAttentionRequired: false,
+    recommendedOperationalStatus: "AVAILABLE",
   };
 }

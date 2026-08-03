@@ -16,7 +16,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { localizePath, resolveRouteLocale } from "@/i18n/paths";
 
 interface ScooterListProps {
-  items: v1.scooters.Scooter[];
+  items: v1.scooters.ScooterListItem[];
 }
 
 const inlineIconClassName = "size-4 shrink-0";

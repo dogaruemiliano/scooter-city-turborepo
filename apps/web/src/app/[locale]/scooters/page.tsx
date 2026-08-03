@@ -52,7 +52,8 @@ export default async function ScootersRoutePage({
     notFound();
   }
 
-  const initialList = await scootersFromApi(locale, initialQuery);
+  const cookieHeader = (await cookies()).toString();
+  const initialList = await scootersFromApi(locale, initialQuery, cookieHeader);
 
   return (
     <ScootersPage
@@ -66,9 +67,8 @@ export default async function ScootersRoutePage({
 async function scootersFromApi(
   locale: ReturnType<typeof resolveRouteLocale>,
   query: v1.scooters.ListScootersQuery,
+  cookieHeader: string,
 ): Promise<v1.scooters.ScooterList> {
-  const cookieHeader = (await cookies()).toString();
-
   try {
     return await webApi.fetch(
       scootersListPath(query),

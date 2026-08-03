@@ -9,6 +9,7 @@ import {
   Label,
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -97,6 +98,7 @@ function ScootersPageContent({
       options: {
         clearFeedback?: boolean;
         history?: "push" | "replace";
+        preserveDraft?: boolean;
       } = {},
     ) => {
       const parsedQuery = v1.scooters.listScootersQuerySchema.parse({
@@ -128,7 +130,9 @@ function ScootersPageContent({
         updateScootersUrl(parsedQuery, options.history ?? "push");
         setList(nextList);
         setQuery(parsedQuery);
-        setDraftQuery(parsedQuery);
+        if (!options.preserveDraft) {
+          setDraftQuery(parsedQuery);
+        }
       } catch (error) {
         if (requestId !== requestIdRef.current) {
           return;
@@ -228,7 +232,7 @@ function ScootersPageContent({
           page: 1,
           pageSize: LIST_PAGE_SIZE,
         },
-        { history: "replace" },
+        { history: "replace", preserveDraft: true },
       );
     }, delay);
     searchDebounceTimeoutRef.current = timeoutId;
@@ -339,7 +343,6 @@ function ScootersPageContent({
               clearLabel={t("list.clearSearchLabel")}
               placeholder={t("placeholders.search")}
               value={draftQuery.search ?? ""}
-              disabled={listLoading}
               onChange={(search) => {
                 setDraftQuery((current) => ({
                   ...current,
@@ -371,13 +374,15 @@ function ScootersPageContent({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {v1.scooters.SCOOTER_LIST_SORTS.filter(
-                    (sort) => sort !== "relevance" || draftQuery.search,
-                  ).map((sort) => (
-                    <SelectItem key={sort} value={sort}>
-                      {t(`listSorts.${sort}`)}
-                    </SelectItem>
-                  ))}
+                  <SelectGroup>
+                    {v1.scooters.SCOOTER_LIST_SORTS.filter(
+                      (sort) => sort !== "relevance" || draftQuery.search,
+                    ).map((sort) => (
+                      <SelectItem key={sort} value={sort}>
+                        {t(`listSorts.${sort}`)}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
                 </SelectContent>
               </Select>
             </div>
@@ -419,12 +424,14 @@ function ScootersPageContent({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value={ACTIVE_RECORDS}>
-                        {t("recordStatus.active")}
-                      </SelectItem>
-                      <SelectItem value={ALL_FILTERS}>
-                        {t("recordStatus.all")}
-                      </SelectItem>
+                      <SelectGroup>
+                        <SelectItem value={ACTIVE_RECORDS}>
+                          {t("recordStatus.active")}
+                        </SelectItem>
+                        <SelectItem value={ALL_FILTERS}>
+                          {t("recordStatus.all")}
+                        </SelectItem>
+                      </SelectGroup>
                     </SelectContent>
                   </Select>
                 </FilterField>
@@ -451,14 +458,16 @@ function ScootersPageContent({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value={ALL_FILTERS}>
-                        {t("filters.all")}
-                      </SelectItem>
-                      {v1.scooters.SCOOTER_POWERTRAIN_TYPES.map((type) => (
-                        <SelectItem key={type} value={type}>
-                          {t(`powertrainTypes.${type}`)}
+                      <SelectGroup>
+                        <SelectItem value={ALL_FILTERS}>
+                          {t("filters.all")}
                         </SelectItem>
-                      ))}
+                        {v1.scooters.SCOOTER_POWERTRAIN_TYPES.map((type) => (
+                          <SelectItem key={type} value={type}>
+                            {t(`powertrainTypes.${type}`)}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
                     </SelectContent>
                   </Select>
                 </FilterField>
@@ -485,19 +494,21 @@ function ScootersPageContent({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value={ALL_FILTERS}>
-                        {t("filters.all")}
-                      </SelectItem>
-                      {v1.scooters.SCOOTER_REGISTRATION_TYPES.map(
-                        (registrationType) => (
-                          <SelectItem
-                            key={registrationType}
-                            value={registrationType}
-                          >
-                            {t(`registrationTypes.${registrationType}`)}
-                          </SelectItem>
-                        ),
-                      )}
+                      <SelectGroup>
+                        <SelectItem value={ALL_FILTERS}>
+                          {t("filters.all")}
+                        </SelectItem>
+                        {v1.scooters.SCOOTER_REGISTRATION_TYPES.map(
+                          (registrationType) => (
+                            <SelectItem
+                              key={registrationType}
+                              value={registrationType}
+                            >
+                              {t(`registrationTypes.${registrationType}`)}
+                            </SelectItem>
+                          ),
+                        )}
+                      </SelectGroup>
                     </SelectContent>
                   </Select>
                 </FilterField>

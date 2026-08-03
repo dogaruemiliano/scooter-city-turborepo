@@ -22,9 +22,20 @@ export function toScooter(row: ScooterRow): v1.scooters.Scooter {
     registrationExpiresOn: toDateOnlyString(row.registrationExpiresOn),
     requiredDriverLicenseType:
       row.requiredDriverLicenseType as v1.scooters.ScooterRequiredDriverLicenseType,
+    currentMileageKm: row.currentMileageKm,
     notes: row.notes,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     deletedAt: row.deletedAt?.toISOString() ?? null,
+  };
+}
+
+export function toScooterListItem(
+  row: ScooterRow,
+  attentionSummary: v1.maintenance.ScooterMaintenanceAttentionSummary,
+): v1.scooters.ScooterListItem {
+  return {
+    ...toScooter(row),
+    attentionSummary,
   };
 }

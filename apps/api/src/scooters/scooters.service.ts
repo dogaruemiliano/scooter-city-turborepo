@@ -204,6 +204,7 @@ export class ScootersService {
         registrationExpiresOn: input.registrationExpiresOn ?? null,
         requiredDriverLicenseType: input.requiredDriverLicenseType ?? "none",
       }),
+      currentMileageKm: input.currentMileageKm ?? null,
       notes: input.notes,
     };
   }
@@ -230,6 +231,7 @@ export class ScootersService {
       ...this.toRegistrationWriteData(
         this.toNextRegistrationState(existing, input),
       ),
+      currentMileageKm: input.currentMileageKm,
       notes: input.notes,
     };
   }

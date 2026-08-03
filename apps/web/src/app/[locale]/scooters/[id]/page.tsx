@@ -51,12 +51,18 @@ export default async function ScooterRoutePage({
   }
 
   const cookieHeader = (await cookies()).toString();
-  const scooter = await scooterFromApi(locale, id, detailPath, cookieHeader);
+  const [scooter, maintenanceOverview, maintenanceTypes] = await Promise.all([
+    scooterFromApi(locale, id, detailPath, cookieHeader),
+    maintenanceOverviewFromApi(locale, id, detailPath, cookieHeader),
+    maintenanceTypesFromApi(locale, detailPath, cookieHeader),
+  ]);
 
   return (
     <ScooterDetailPage
       scooter={scooter}
       scootersHref={localizePath(SCOOTERS_PATH, locale)}
+      maintenanceOverview={maintenanceOverview}
+      maintenanceTypes={maintenanceTypes}
     />
   );
 }
@@ -89,6 +95,56 @@ const scooterFromApi = cache(async function scooterFromApi(
     throw error;
   }
 });
+
+async function maintenanceOverviewFromApi(
+  locale: ReturnType<typeof resolveRouteLocale>,
+  id: string,
+  detailPath: string,
+  cookieHeader: string,
+): Promise<v1.maintenance.ScooterMaintenanceOverview> {
+  try {
+    return await webApi.fetch(
+      v1.maintenance.ROUTES.overview(id),
+      v1.maintenance.scooterMaintenanceOverviewSchema,
+      { headers: { cookie: cookieHeader }, cache: "no-store" },
+    );
+  } catch (error) {
+    handleMaintenanceFetchError(error, locale, detailPath);
+  }
+}
+
+async function maintenanceTypesFromApi(
+  locale: ReturnType<typeof resolveRouteLocale>,
+  detailPath: string,
+  cookieHeader: string,
+): Promise<v1.maintenance.MaintenanceTypeList> {
+  try {
+    return await webApi.fetch(
+      v1.maintenance.ROUTES.types.list,
+      v1.maintenance.maintenanceTypeListSchema,
+      { headers: { cookie: cookieHeader }, cache: "no-store" },
+    );
+  } catch (error) {
+    handleMaintenanceFetchError(error, locale, detailPath);
+  }
+}
+
+function handleMaintenanceFetchError(
+  error: unknown,
+  locale: ReturnType<typeof resolveRouteLocale>,
+  detailPath: string,
+): never {
+  if (error instanceof ApiError && error.status === 401) {
+    redirect(getLocalizedSignInPath(locale, detailPath));
+  }
+  if (
+    error instanceof ApiError &&
+    (error.status === 403 || error.status === 404)
+  ) {
+    notFound();
+  }
+  throw error;
+}
 
 function scooterDetailPath(
   id: string,

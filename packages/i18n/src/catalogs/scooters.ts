@@ -1,5 +1,12 @@
 export const scootersCatalog = {
   en: {
+    routeStates: {
+      loadingLabel: "Loading scooters",
+      errorTitle: "Scooters could not be loaded",
+      errorDescription:
+        "The scooter registry is temporarily unavailable. Try loading this page again.",
+      retry: "Try again",
+    },
     actions: {
       add: "Add scooter",
       create: "Create scooter",
@@ -35,6 +42,7 @@ export const scootersCatalog = {
         invalid: "Enter a valid {field}.",
         invalidVin: "VIN must be 17 characters and cannot contain I, O, or Q.",
         invalidNumber: "{field} must be a valid number.",
+        invalidMileage: "Current mileage must be a nonnegative whole number.",
         maxLength: "{field} must be {max} characters or fewer.",
         engineCcRequired: "Engine cc is required for combustion scooters.",
         engineCcElectric: "Engine cc is only allowed for combustion scooters.",
@@ -67,6 +75,157 @@ export const scootersCatalog = {
           "This soft-deletes the scooter and hides the detail page.",
       },
     },
+    maintenance: {
+      title: "Maintenance and repairs",
+      description:
+        "Track faults, completed work, and the next service deadlines.",
+      actions: {
+        addIssue: "Add issue",
+        addRecord: "Add maintenance",
+        adding: "Adding...",
+        markFixed: "Mark fixed",
+        markFixedIssue: "Mark {title} fixed",
+        fixing: "Marking fixed...",
+      },
+      feedback: {
+        issueCreatedTitle: "Issue reported",
+        issueCreatedMessage: "The issue was added to this scooter.",
+        issueFixedTitle: "Issue fixed",
+        issueFixedMessage: "The issue was marked as fixed.",
+        issueErrorTitle: "Issue not saved",
+        recordCreatedTitle: "Maintenance added",
+        recordCreatedMessage:
+          "The maintenance intervention was added to the history.",
+        recordErrorTitle: "Maintenance not saved",
+      },
+      blocking: {
+        title: "Recommended unavailable",
+        description:
+          "This scooter has a high or critical open issue. Keep it unavailable until the issue is fixed.",
+      },
+      summary: {
+        currentMileage: "Current mileage",
+        openIssues: "Open issues",
+        recommendation: "Operational recommendation",
+      },
+      operationalStatuses: {
+        AVAILABLE: "Available",
+        UNAVAILABLE: "Unavailable",
+      },
+      values: {
+        unknown: "Unknown",
+        kilometers: "{value, number} km",
+      },
+      issues: {
+        title: "Open issues",
+        description: "Reported faults that still need attention.",
+        empty: "There are no open issues.",
+        reportedAt: "Reported {date}",
+      },
+      issueSeverities: {
+        LOW: "Low",
+        MEDIUM: "Medium",
+        HIGH: "High",
+        CRITICAL: "Critical",
+      },
+      schedule: {
+        title: "Maintenance schedule",
+        description:
+          "Latest intervention and calculated status for every active maintenance type.",
+        empty: "No maintenance types are active.",
+        lastPerformed: "Last completed {date} at {mileage, number} km",
+        nextDue: "Next due: {mileage} / {date}",
+        deadlineMileage: "Mileage: {mileage, number} km",
+        deadlineDate: "Date: {date}",
+        noRecord: "No intervention has been recorded yet.",
+        overdueTitle: "Overdue",
+        overdueEmpty: "No maintenance is overdue.",
+        dueSoonTitle: "Due soon",
+        dueSoonEmpty: "No maintenance is due soon.",
+      },
+      statuses: {
+        OK: "OK",
+        DUE_SOON: "Due soon",
+        OVERDUE: "Overdue",
+        UNKNOWN: "Unknown",
+      },
+      activity: {
+        title: "Maintenance history",
+        description: "Issues and interventions in chronological order.",
+        empty: "There is no maintenance activity yet.",
+        kinds: {
+          ISSUE_REPORTED: "Issue reported: {title}",
+          ISSUE_FIXED: "Issue fixed: {title}",
+          ISSUE_REOPENED: "Issue reopened: {title}",
+          MAINTENANCE_COMPLETED: "Maintenance completed: {title}",
+        },
+      },
+      dialogs: {
+        issue: {
+          title: "Report an issue",
+          description:
+            "Describe the fault and choose how urgently it needs attention.",
+        },
+        record: {
+          title: "Add maintenance",
+          description:
+            "Record a completed intervention. Default deadlines are calculated by the API.",
+        },
+      },
+      fields: {
+        issueTitle: "Issue title",
+        issueDescription: "Description",
+        severity: "Severity",
+        maintenanceType: "Maintenance type",
+        performedAt: "Performed on",
+        performedKm: "Mileage when performed",
+        performedKmDescription:
+          "Historical lower mileage is allowed and will not reduce the current mileage.",
+        recordNotes: "Notes",
+        nextDueKm: "Manual next due mileage",
+        nextDueAt: "Manual next due date",
+        manualDeadlineDescription:
+          "Optional. Leave empty to use the maintenance type default.",
+      },
+      deadlinePreview: {
+        title: "Default deadline preview",
+        description:
+          "Manual values below take priority. Otherwise the API will use {mileage} / {date}.",
+      },
+      validation: {
+        invalidField: "Enter a valid {field}.",
+      },
+      dashboard: {
+        title: "Fleet maintenance",
+        description: "A compact view of scooters that need attention.",
+        stats: {
+          total: "Total scooters",
+          openIssues: "With open issues",
+          blocking: "Recommended unavailable",
+          overdue: "Overdue maintenance",
+          dueSoon: "Maintenance due soon",
+        },
+        attentionTitle: "Priority attention",
+        attentionDescription:
+          "Ordered by safety impact and maintenance urgency.",
+        empty: "No scooters currently require attention.",
+        priorityReasons: {
+          CRITICAL_ISSUE: "Critical issue",
+          HIGH_ISSUE: "High issue",
+          OVERDUE_MAINTENANCE: "Overdue maintenance",
+          MEDIUM_ISSUE: "Medium issue",
+          MAINTENANCE_DUE_SOON: "Maintenance due soon",
+          LOW_ISSUE: "Low issue",
+        },
+      },
+      indicators: {
+        blocking: "Unavailable recommended",
+        overdue: "Maintenance overdue",
+        dueSoon: "Maintenance due soon",
+        issueSeverity: "{severity} issue",
+        healthy: "No known issues",
+      },
+    },
     sections: {
       identity: "Identity",
       technical: "Technical",
@@ -83,6 +242,7 @@ export const scootersCatalog = {
       powertrainType: "Powertrain",
       engineCc: "Engine cc",
       powerKw: "Power (kW)",
+      currentMileageKm: "Current mileage (km)",
       purchasedOn: "Purchased on",
       registrationType: "Registration type",
       plateNumber: "Plate number",
@@ -101,6 +261,7 @@ export const scootersCatalog = {
       purchasedOn: "YYYY-MM-DD",
       engineCc: "125",
       powerKw: "8.5",
+      currentMileageKm: "4200",
       plateNumber: {
         national: "CJ 12 ABC",
         local: "LOCAL-123",
@@ -173,6 +334,13 @@ export const scootersCatalog = {
     },
   },
   ro: {
+    routeStates: {
+      loadingLabel: "Se încarcă scuterele",
+      errorTitle: "Scuterele nu au putut fi încărcate",
+      errorDescription:
+        "Registrul de scutere este temporar indisponibil. Încearcă să încarci pagina din nou.",
+      retry: "Încearcă din nou",
+    },
     actions: {
       add: "Adaugă scuter",
       create: "Creează scuterul",
@@ -209,6 +377,8 @@ export const scootersCatalog = {
         invalidVin:
           "VIN-ul trebuie să aibă 17 caractere și nu poate conține I, O sau Q.",
         invalidNumber: "{field} trebuie să fie un număr valid.",
+        invalidMileage:
+          "Kilometrajul curent trebuie să fie un număr întreg pozitiv sau zero.",
         maxLength: "{field} trebuie să aibă cel mult {max} caractere.",
         engineCcRequired:
           "Capacitatea cilindrică este obligatorie pentru scuterele cu combustie.",
@@ -246,6 +416,157 @@ export const scootersCatalog = {
           "Această acțiune șterge logic scuterul și ascunde pagina de detalii.",
       },
     },
+    maintenance: {
+      title: "Întreținere și reparații",
+      description:
+        "Urmărește defecțiunile, lucrările efectuate și următoarele termene de service.",
+      actions: {
+        addIssue: "Adaugă problemă",
+        addRecord: "Adaugă întreținere",
+        adding: "Se adaugă...",
+        markFixed: "Marchează rezolvată",
+        markFixedIssue: "Marchează problema {title} ca rezolvată",
+        fixing: "Se marchează...",
+      },
+      feedback: {
+        issueCreatedTitle: "Problemă raportată",
+        issueCreatedMessage: "Problema a fost adăugată acestui scuter.",
+        issueFixedTitle: "Problemă rezolvată",
+        issueFixedMessage: "Problema a fost marcată ca rezolvată.",
+        issueErrorTitle: "Problema nu a fost salvată",
+        recordCreatedTitle: "Întreținere adăugată",
+        recordCreatedMessage:
+          "Intervenția de întreținere a fost adăugată în istoric.",
+        recordErrorTitle: "Întreținerea nu a fost salvată",
+      },
+      blocking: {
+        title: "Recomandat indisponibil",
+        description:
+          "Acest scuter are o problemă deschisă gravă sau critică. Păstrează-l indisponibil până la rezolvare.",
+      },
+      summary: {
+        currentMileage: "Kilometraj curent",
+        openIssues: "Probleme deschise",
+        recommendation: "Recomandare operațională",
+      },
+      operationalStatuses: {
+        AVAILABLE: "Disponibil",
+        UNAVAILABLE: "Indisponibil",
+      },
+      values: {
+        unknown: "Necunoscut",
+        kilometers: "{value, number} km",
+      },
+      issues: {
+        title: "Probleme deschise",
+        description: "Defecțiuni raportate care necesită încă atenție.",
+        empty: "Nu există probleme deschise.",
+        reportedAt: "Raportată {date}",
+      },
+      issueSeverities: {
+        LOW: "Redusă",
+        MEDIUM: "Medie",
+        HIGH: "Gravă",
+        CRITICAL: "Critică",
+      },
+      schedule: {
+        title: "Plan de întreținere",
+        description:
+          "Ultima intervenție și starea calculată pentru fiecare tip activ de întreținere.",
+        empty: "Nu există tipuri active de întreținere.",
+        lastPerformed: "Ultima intervenție {date} la {mileage, number} km",
+        nextDue: "Următorul termen: {mileage} / {date}",
+        deadlineMileage: "Kilometraj: {mileage, number} km",
+        deadlineDate: "Data: {date}",
+        noRecord: "Nu a fost înregistrată nicio intervenție.",
+        overdueTitle: "Depășite",
+        overdueEmpty: "Nicio întreținere nu este depășită.",
+        dueSoonTitle: "Scadente în curând",
+        dueSoonEmpty: "Nicio întreținere nu este scadentă în curând.",
+      },
+      statuses: {
+        OK: "În regulă",
+        DUE_SOON: "Scadent în curând",
+        OVERDUE: "Depășit",
+        UNKNOWN: "Necunoscut",
+      },
+      activity: {
+        title: "Istoric de întreținere",
+        description: "Probleme și intervenții în ordine cronologică.",
+        empty: "Nu există încă activitate de întreținere.",
+        kinds: {
+          ISSUE_REPORTED: "Problemă raportată: {title}",
+          ISSUE_FIXED: "Problemă rezolvată: {title}",
+          ISSUE_REOPENED: "Problemă redeschisă: {title}",
+          MAINTENANCE_COMPLETED: "Întreținere efectuată: {title}",
+        },
+      },
+      dialogs: {
+        issue: {
+          title: "Raportează o problemă",
+          description:
+            "Descrie defecțiunea și alege cât de urgent trebuie rezolvată.",
+        },
+        record: {
+          title: "Adaugă întreținere",
+          description:
+            "Înregistrează o intervenție efectuată. Termenele implicite sunt calculate de API.",
+        },
+      },
+      fields: {
+        issueTitle: "Titlul problemei",
+        issueDescription: "Descriere",
+        severity: "Severitate",
+        maintenanceType: "Tip de întreținere",
+        performedAt: "Efectuată la data",
+        performedKm: "Kilometraj la intervenție",
+        performedKmDescription:
+          "Un kilometraj istoric mai mic este permis și nu va reduce kilometrajul curent.",
+        recordNotes: "Notițe",
+        nextDueKm: "Kilometraj manual pentru următorul termen",
+        nextDueAt: "Data manuală a următorului termen",
+        manualDeadlineDescription:
+          "Opțional. Lasă necompletat pentru valoarea implicită a tipului.",
+      },
+      deadlinePreview: {
+        title: "Previzualizarea termenului implicit",
+        description:
+          "Valorile manuale de mai jos au prioritate. Altfel, API-ul va folosi {mileage} / {date}.",
+      },
+      validation: {
+        invalidField: "Introdu o valoare validă pentru {field}.",
+      },
+      dashboard: {
+        title: "Întreținerea flotei",
+        description: "O vedere compactă a scuterelor care necesită atenție.",
+        stats: {
+          total: "Total scutere",
+          openIssues: "Cu probleme deschise",
+          blocking: "Recomandate indisponibile",
+          overdue: "Întreținere depășită",
+          dueSoon: "Întreținere scadentă curând",
+        },
+        attentionTitle: "Atenție prioritară",
+        attentionDescription:
+          "Ordonate după impactul asupra siguranței și urgența întreținerii.",
+        empty: "Niciun scuter nu necesită atenție în acest moment.",
+        priorityReasons: {
+          CRITICAL_ISSUE: "Problemă critică",
+          HIGH_ISSUE: "Problemă gravă",
+          OVERDUE_MAINTENANCE: "Întreținere depășită",
+          MEDIUM_ISSUE: "Problemă medie",
+          MAINTENANCE_DUE_SOON: "Întreținere scadentă curând",
+          LOW_ISSUE: "Problemă redusă",
+        },
+      },
+      indicators: {
+        blocking: "Recomandat indisponibil",
+        overdue: "Întreținere depășită",
+        dueSoon: "Întreținere scadentă curând",
+        issueSeverity: "Problemă {severity}",
+        healthy: "Fără probleme cunoscute",
+      },
+    },
     sections: {
       identity: "Identificare",
       technical: "Tehnic",
@@ -262,6 +583,7 @@ export const scootersCatalog = {
       powertrainType: "Propulsie",
       engineCc: "Capacitate cilindrică (cc)",
       powerKw: "Putere (kW)",
+      currentMileageKm: "Kilometraj curent (km)",
       purchasedOn: "Achiziționat la",
       registrationType: "Tip înmatriculare",
       plateNumber: "Număr de înmatriculare",
@@ -280,6 +602,7 @@ export const scootersCatalog = {
       purchasedOn: "ZZ/LL/AAAA",
       engineCc: "125",
       powerKw: "8,5",
+      currentMileageKm: "4200",
       plateNumber: {
         national: "CJ 12 ABC",
         local: "LOCAL-123",

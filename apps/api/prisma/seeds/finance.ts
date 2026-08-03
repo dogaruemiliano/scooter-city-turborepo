@@ -975,25 +975,32 @@ async function ensureOperatingCompany(
     update: { effectiveTo: null },
   });
 
-  await tx.vatRegistrationPeriod.upsert({
+  const vatPeriodKey = {
+    legalEntityId: legalEntity.id,
+    countryCode: "RO",
+    vatNumber: OPERATING_COMPANY_SEED.taxIdentifier,
+    effectiveFrom: OPERATING_COMPANY_EFFECTIVE_FROM,
+  };
+  const existingVatPeriod = await tx.vatRegistrationPeriod.findUnique({
     where: {
-      legalEntityId_countryCode_vatNumber_effectiveFrom: {
-        legalEntityId: legalEntity.id,
-        countryCode: "RO",
-        vatNumber: OPERATING_COMPANY_SEED.taxIdentifier,
-        effectiveFrom: OPERATING_COMPANY_EFFECTIVE_FROM,
-      },
+      legalEntityId_countryCode_vatNumber_effectiveFrom: vatPeriodKey,
     },
-    create: {
-      id: FINANCE_SEED_IDS.operatingCompanyVatPeriod,
-      legalEntityId: legalEntity.id,
-      countryCode: "RO",
-      vatNumber: OPERATING_COMPANY_SEED.taxIdentifier,
-      effectiveFrom: OPERATING_COMPANY_EFFECTIVE_FROM,
-      createdAt,
-    },
-    update: { effectiveTo: null },
+    select: { id: true },
   });
+
+  if (!existingVatPeriod) {
+    // Do not replace this with an upsert. PostgreSQL runs row-level BEFORE
+    // INSERT triggers before resolving ON CONFLICT, so an upsert rerun would
+    // trip the posted-expense history guard even when this exact row exists.
+    // Existing periods are operator-managed and must retain their end date.
+    await tx.vatRegistrationPeriod.create({
+      data: {
+        id: FINANCE_SEED_IDS.operatingCompanyVatPeriod,
+        ...vatPeriodKey,
+        createdAt,
+      },
+    });
+  }
 
   return legalEntity.id;
 }

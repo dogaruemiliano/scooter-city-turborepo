@@ -193,6 +193,22 @@ describe("PersonsPage", () => {
     expect(window.location.search).toBe("?search=hopper");
   });
 
+  it("keeps the search focused and editable while results load", async () => {
+    mocks.apiFetch.mockReturnValueOnce(new Promise(() => {}));
+    const browser = userEvent.setup();
+
+    renderPersons();
+    const search = screen.getByLabelText("Search persons");
+    await browser.type(search, "hopper");
+
+    await waitFor(() => expect(mocks.apiFetch).toHaveBeenCalledOnce());
+    expect(search).toHaveFocus();
+    expect(search).toBeEnabled();
+
+    await browser.type(search, "s");
+    expect(search).toHaveValue("hoppers");
+  });
+
   it("submits search with Enter and clears an applied search", async () => {
     mocks.apiFetch
       .mockResolvedValueOnce(personList([], { total: 0 }))

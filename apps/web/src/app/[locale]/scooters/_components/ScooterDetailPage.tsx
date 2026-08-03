@@ -51,10 +51,13 @@ import {
   type ScooterFormIssue,
   type ScooterFormState,
 } from "./scooter-form";
+import { ScooterMaintenanceSection } from "./ScooterMaintenanceSection";
 
 interface ScooterDetailPageProps {
   scooter: v1.scooters.Scooter;
   scootersHref: string;
+  maintenanceOverview: v1.maintenance.ScooterMaintenanceOverview;
+  maintenanceTypes: v1.maintenance.MaintenanceTypeList;
 }
 
 interface Feedback {
@@ -68,6 +71,8 @@ type ScooterTranslations = ReturnType<typeof useTranslations>;
 export function ScooterDetailPage({
   scooter,
   scootersHref,
+  maintenanceOverview,
+  maintenanceTypes,
 }: ScooterDetailPageProps) {
   const t = useTranslations("scooters");
   const locale = useLocale();
@@ -167,11 +172,9 @@ export function ScooterDetailPage({
           </div>
           <div className="flex flex-col gap-2 md:items-end">
             <div className="flex flex-wrap gap-2 md:justify-end">
-              <Badge variant="outline">
-                {scooter.deletedAt
-                  ? t("recordStatus.deleted")
-                  : t("recordStatus.active")}
-              </Badge>
+              {scooter.deletedAt ? (
+                <Badge variant="outline">{t("recordStatus.deleted")}</Badge>
+              ) : null}
               <PowertrainBadge scooter={scooter} />
               <Badge variant="outline">
                 {t(`registrationTypes.${scooter.registrationType}`)}
@@ -336,6 +339,12 @@ export function ScooterDetailPage({
         />
       </DetailSection>
 
+      <ScooterMaintenanceSection
+        scooter={scooter}
+        overview={maintenanceOverview}
+        maintenanceTypes={maintenanceTypes}
+      />
+
       <ScooterFormDialog
         key={`edit-scooter-${editDialogKey}`}
         scooter={scooter}
@@ -410,6 +419,7 @@ function ScooterFormDialog({
       invalidPlateNumber: () => t("feedback.validation.invalidPlateNumber"),
       engineCcRequired: () => t("feedback.validation.engineCcRequired"),
       engineCcElectric: () => t("feedback.validation.engineCcElectric"),
+      invalidMileage: () => t("feedback.validation.invalidMileage"),
     });
 
     if (candidate.errors) {
@@ -442,14 +452,12 @@ function ScooterFormDialog({
       return;
     }
 
-    const {
-      registrationType: _registrationType,
-      plateNumber: _plateNumber,
-      registeredOn: _registeredOn,
-      registrationExpiresOn: _registrationExpiresOn,
-      requiredDriverLicenseType: _requiredDriverLicenseType,
-      ...generalInput
-    } = input.data;
+    const generalInput = { ...input.data };
+    delete generalInput.registrationType;
+    delete generalInput.plateNumber;
+    delete generalInput.registeredOn;
+    delete generalInput.registrationExpiresOn;
+    delete generalInput.requiredDriverLicenseType;
 
     if (await onSubmit(generalInput)) {
       onOpenChange(false);
@@ -575,6 +583,7 @@ function ScooterRegistrationDialog({
       invalidPlateNumber: () => t("feedback.validation.invalidPlateNumber"),
       engineCcRequired: () => t("feedback.validation.engineCcRequired"),
       engineCcElectric: () => t("feedback.validation.engineCcElectric"),
+      invalidMileage: () => t("feedback.validation.invalidMileage"),
     });
 
     if (candidate.errors) {
@@ -736,14 +745,12 @@ function DetailSection({
   children: ReactNode;
 }) {
   return (
-    <section className="grid min-w-0 gap-4 rounded-lg bg-muted p-4 md:grid-cols-3 md:gap-6">
+    <section className="flex min-w-0 flex-col gap-4 rounded-lg bg-muted p-4">
       <div className="flex items-center gap-2">
         <CarFrontIcon aria-hidden="true" className="size-4 shrink-0" />
         <h2 className="text-base font-semibold md:text-sm">{title}</h2>
       </div>
-      <dl className="grid min-w-0 gap-4 sm:grid-cols-2 md:col-span-2">
-        {children}
-      </dl>
+      <dl className="grid min-w-0 gap-4 sm:grid-cols-2">{children}</dl>
     </section>
   );
 }
@@ -855,6 +862,8 @@ function fieldLabel(
       return t("fields.engineCc");
     case "powerKw":
       return t("fields.powerKw");
+    case "currentMileageKm":
+      return t("fields.currentMileageKm");
     case "purchasedOn":
       return t("fields.purchasedOn");
     case "registrationType":
