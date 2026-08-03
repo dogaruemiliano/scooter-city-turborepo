@@ -4,7 +4,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import {
   ArrowLeftRightIcon,
   ArrowLeftIcon,
@@ -411,6 +412,10 @@ function AccountMenu({
   );
   const [personalWallet, setPersonalWallet] = useState<v1.finance.Wallet>();
   const [walletUnavailable, setWalletUnavailable] = useState(false);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [nestedMenuOpen, setNestedMenuOpen] = useState(false);
+  const accountTriggerRef = useRef<HTMLButtonElement>(null);
+  const accountMenuContentRef = useRef<HTMLDivElement>(null);
   const email = user?.email ?? tAccount("noActiveSession");
   const displayName = user ? displayNameFromUser(user) : tAccount("account");
   const initials = user ? initialsFromUser(user) : "?";
@@ -464,94 +469,150 @@ function AccountMenu({
   }
 
   return (
-    <SidebarMenu>
-      <SidebarMenuItem>
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            render={
-              <SidebarMenuButton
-                size="lg"
-                aria-label={tAccount("open")}
-                className="data-popup-open:bg-sidebar-accent data-popup-open:text-sidebar-accent-foreground"
-              />
-            }
+    <>
+      {accountMenuOpen ? (
+        <MenuLayerOverlay
+          layer="account"
+          target={
+            accountTriggerRef.current?.closest<HTMLElement>(
+              '[data-slot="sidebar-inner"], [data-slot="sidebar"][data-mobile="true"]',
+            ) ?? null
+          }
+        />
+      ) : null}
+      {nestedMenuOpen ? (
+        <MenuLayerOverlay
+          layer="nested"
+          target={accountMenuContentRef.current}
+        />
+      ) : null}
+      <SidebarMenu>
+        <SidebarMenuItem className={accountMenuOpen ? "z-modal" : undefined}>
+          <DropdownMenu
+            open={accountMenuOpen}
+            onOpenChange={(open) => {
+              setAccountMenuOpen(open);
+              if (!open) {
+                setNestedMenuOpen(false);
+              }
+            }}
           >
-            <Avatar size="md">
-              <AvatarFallback>{initials}</AvatarFallback>
-            </Avatar>
-            <span className="flex min-w-0 flex-1 flex-col">
-              <span className="truncate font-medium">{displayName}</span>
-              <span className="truncate text-xs text-muted-foreground">
-                {balanceSummary}
-              </span>
-            </span>
-            <span className="ml-auto text-muted-foreground" aria-hidden="true">
-              ...
-            </span>
-          </DropdownMenuTrigger>
-
-          <DropdownMenuContent
-            side={isMobile ? "bottom" : "right"}
-            align="end"
-            className="min-w-64"
-          >
-            <DropdownMenuGroup>
-              <DropdownMenuLabel className="flex flex-col">
-                <span className="truncate text-sm font-medium text-popover-foreground">
-                  {displayName}
-                </span>
-                <span className="truncate font-normal">{email}</span>
-              </DropdownMenuLabel>
-              <AccountMenuLinkItem
-                href={localizePath("/account/wallet", locale)}
-                icon={WalletCardsIcon}
-              >
-                {tAccount("myWallet")}
-              </AccountMenuLinkItem>
-              <AccountMenuLinkItem
-                href={localizePath("/account/settings", locale)}
-                icon={Settings2Icon}
-              >
-                {tAccount("accountSettings")}
-              </AccountMenuLinkItem>
-              <DropdownMenuSub>
-                <DropdownMenuSubTrigger>
-                  {tTheme("label")}
-                  <span className="ml-auto capitalize text-muted-foreground">
-                    {tTheme(`options.${themePreference}`)}
-                  </span>
-                </DropdownMenuSubTrigger>
-                <DropdownMenuSubContent>
-                  <DropdownMenuRadioGroup
-                    value={themePreference}
-                    onValueChange={changeTheme}
-                  >
-                    <DropdownMenuRadioItem value="light">
-                      {tTheme("options.light")}
-                    </DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="dark">
-                      {tTheme("options.dark")}
-                    </DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="system">
-                      {tTheme("options.system")}
-                    </DropdownMenuRadioItem>
-                  </DropdownMenuRadioGroup>
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
-              <LanguageMenuSub />
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              variant="destructive"
-              disabled={busy}
-              onClick={() => void logout()}
+            <DropdownMenuTrigger
+              render={
+                <SidebarMenuButton
+                  ref={accountTriggerRef}
+                  size="lg"
+                  aria-label={tAccount("open")}
+                  className="data-popup-open:bg-sidebar-accent data-popup-open:text-sidebar-accent-foreground"
+                />
+              }
             >
-              {busy ? tLogout("busy") : tLogout("label")}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </SidebarMenuItem>
-    </SidebarMenu>
+              <Avatar size="md">
+                <AvatarFallback>{initials}</AvatarFallback>
+              </Avatar>
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="truncate font-medium">{displayName}</span>
+                <span className="truncate text-xs text-muted-foreground">
+                  {balanceSummary}
+                </span>
+              </span>
+              <span
+                className="ml-auto text-muted-foreground"
+                aria-hidden="true"
+              >
+                ...
+              </span>
+            </DropdownMenuTrigger>
+
+            <DropdownMenuContent
+              ref={accountMenuContentRef}
+              side={isMobile ? "bottom" : "right"}
+              align="end"
+              className="relative min-w-64"
+            >
+              <DropdownMenuGroup>
+                <DropdownMenuLabel className="flex flex-col">
+                  <span className="truncate text-sm font-medium text-popover-foreground">
+                    {displayName}
+                  </span>
+                  <span className="truncate font-normal">{email}</span>
+                </DropdownMenuLabel>
+                <AccountMenuLinkItem
+                  href={localizePath("/account/wallet", locale)}
+                  icon={WalletCardsIcon}
+                >
+                  {tAccount("myWallet")}
+                </AccountMenuLinkItem>
+                <AccountMenuLinkItem
+                  href={localizePath("/account/settings", locale)}
+                  icon={Settings2Icon}
+                >
+                  {tAccount("accountSettings")}
+                </AccountMenuLinkItem>
+                <DropdownMenuSub onOpenChange={setNestedMenuOpen}>
+                  <DropdownMenuSubTrigger>
+                    {tTheme("label")}
+                    <span className="ml-auto capitalize text-muted-foreground">
+                      {tTheme(`options.${themePreference}`)}
+                    </span>
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent>
+                    <DropdownMenuRadioGroup
+                      value={themePreference}
+                      onValueChange={changeTheme}
+                    >
+                      <DropdownMenuRadioItem value="light">
+                        {tTheme("options.light")}
+                      </DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="dark">
+                        {tTheme("options.dark")}
+                      </DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="system">
+                        {tTheme("options.system")}
+                      </DropdownMenuRadioItem>
+                    </DropdownMenuRadioGroup>
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+                <LanguageMenuSub onOpenChange={setNestedMenuOpen} />
+              </DropdownMenuGroup>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                variant="destructive"
+                disabled={busy}
+                onClick={() => void logout()}
+              >
+                {busy ? tLogout("busy") : tLogout("label")}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </SidebarMenuItem>
+      </SidebarMenu>
+    </>
+  );
+}
+
+function MenuLayerOverlay({
+  layer,
+  target,
+}: {
+  layer: "account" | "nested";
+  target: HTMLElement | null;
+}) {
+  if (!target) {
+    return null;
+  }
+
+  return createPortal(
+    <div
+      aria-hidden="true"
+      data-slot={`${layer}-menu-overlay`}
+      className={
+        layer === "nested"
+          ? "pointer-events-none absolute inset-0 z-nested-overlay bg-scrim"
+          : "pointer-events-none absolute inset-0 z-overlay bg-scrim"
+      }
+    />,
+    target,
   );
 }
 

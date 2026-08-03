@@ -82,13 +82,17 @@ function LanguageOptionContent({ option }: { option: LanguageOption }) {
   );
 }
 
-export function LanguageMenuSub() {
+export function LanguageMenuSub({
+  onOpenChange,
+}: {
+  onOpenChange?: (open: boolean) => void;
+}) {
   const t = useTranslations("language");
   const options = useLanguageOptions();
   const current = options.find((option) => option.current) ?? options[0]!;
 
   return (
-    <DropdownMenuSub>
+    <DropdownMenuSub onOpenChange={onOpenChange}>
       <DropdownMenuSubTrigger>
         {t("label")}
         <span className="ml-auto text-muted-foreground">{current.label}</span>

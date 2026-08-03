@@ -10,6 +10,8 @@ export const zIndex = {
   overlay: 1200,
   modal: 1300,
   popover: 1400,
+  nestedOverlay: 1450,
+  nestedPopover: 1475,
   toast: 1500,
   tooltip: 1600,
 } as const;

@@ -333,6 +333,8 @@
   --z-overlay: 1200;
   --z-modal: 1300;
   --z-popover: 1400;
+  --z-nested-overlay: 1450;
+  --z-nested-popover: 1475;
   --z-toast: 1500;
   --z-tooltip: 1600;
 
@@ -452,6 +454,14 @@
 
 @utility z-popover {
   z-index: var(--z-popover);
+}
+
+@utility z-nested-overlay {
+  z-index: var(--z-nested-overlay);
+}
+
+@utility z-nested-popover {
+  z-index: var(--z-nested-popover);
 }
 
 @utility z-toast {

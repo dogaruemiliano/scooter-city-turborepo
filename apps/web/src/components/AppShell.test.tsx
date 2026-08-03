@@ -211,6 +211,51 @@ describe("AppShell", () => {
     );
   });
 
+  it("layers overlays behind the account menu and its language submenu", async () => {
+    renderAppShell();
+
+    expect(
+      document.querySelector('[data-slot="account-menu-overlay"]'),
+    ).not.toBeInTheDocument();
+
+    fireEvent.mouseDown(
+      screen.getByRole("button", { name: "Deschide meniul contului" }),
+    );
+
+    expect(
+      await screen.findByRole("menuitem", { name: /Limbă/ }),
+    ).toBeInTheDocument();
+    expect(
+      document.querySelector('[data-slot="account-menu-overlay"]'),
+    ).toHaveClass("z-overlay", "bg-scrim");
+    expect(
+      document.querySelector('[data-slot="account-menu-overlay"]')
+        ?.parentElement,
+    ).toHaveAttribute("data-slot", "sidebar-inner");
+    expect(
+      screen
+        .getByRole("button", { name: "Deschide meniul contului" })
+        .closest('[data-slot="sidebar-menu-item"]'),
+    ).toHaveClass("z-modal");
+
+    const languageSubmenu = screen.getByRole("menuitem", { name: /Limbă/ });
+    languageSubmenu.focus();
+    fireEvent.keyDown(languageSubmenu, { key: "ArrowRight" });
+
+    await waitFor(() =>
+      expect(
+        document.querySelector('[data-slot="nested-menu-overlay"]'),
+      ).toHaveClass("z-nested-overlay", "bg-scrim"),
+    );
+    expect(
+      document.querySelector('[data-slot="nested-menu-overlay"]')
+        ?.parentElement,
+    ).toHaveAttribute("data-slot", "dropdown-menu-content");
+    expect(
+      screen.getByRole("menu", { name: /Limbă/ }).parentElement,
+    ).toHaveClass("z-nested-popover");
+  });
+
   it("closes the mobile drawer when a navigation link is pressed", async () => {
     Object.defineProperty(window, "innerWidth", {
       configurable: true,

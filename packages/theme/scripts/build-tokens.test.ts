@@ -41,10 +41,14 @@ test("CSS exposes a utility for every semantic z-index token", () => {
   const css = buildCss();
 
   for (const [name, value] of Object.entries(zIndex)) {
-    assert.match(css, new RegExp(`--z-${name}: ${value};`));
+    const cssName = name.replace(/([a-z])([A-Z])/g, "$1-$2").toLowerCase();
+
+    assert.match(css, new RegExp(`--z-${cssName}: ${value};`));
     assert.match(
       css,
-      new RegExp(`@utility z-${name} \\{\\n  z-index: var\\(--z-${name}\\);`),
+      new RegExp(
+        `@utility z-${cssName} \\{\\n  z-index: var\\(--z-${cssName}\\);`,
+      ),
     );
   }
 });
