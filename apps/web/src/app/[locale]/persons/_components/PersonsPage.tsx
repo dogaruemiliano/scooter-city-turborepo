@@ -29,6 +29,7 @@ import {
 import { InfiniteListFooter } from "@/components/InfiniteListFooter";
 import { ListFilterSheet } from "@/components/ListFilterSheet";
 import { ListSearchInput } from "@/components/ListSearchInput";
+import { ListSortSelect } from "@/components/ListSortSelect";
 import { webApi } from "@/lib/api";
 import { PersonList } from "./PersonList";
 
@@ -359,31 +360,16 @@ function PersonsPageContent({
           </div>
 
           <div className="flex w-full items-center justify-between gap-4 lg:justify-end">
-            <div className="min-w-0">
-              <Label htmlFor="persons-sort" className="sr-only">
-                {t("filters.sort")}
-              </Label>
-              <Select
-                value={effectiveListSort(draftQuery)}
-                onValueChange={(value) => void changeSort(value)}
-              >
-                <SelectTrigger
-                  id="persons-sort"
-                  className="w-auto border-transparent bg-transparent px-0 text-muted-foreground hover:text-foreground focus-visible:border-transparent"
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {v1.persons.PERSON_LIST_SORTS.filter(
-                    (sort) => sort !== "relevance" || draftQuery.search,
-                  ).map((sort) => (
-                    <SelectItem key={sort} value={sort}>
-                      {t(`listSorts.${sort}`)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <ListSortSelect
+              id="persons-sort"
+              label={t("filters.sort")}
+              value={effectiveListSort(draftQuery)}
+              values={v1.persons.PERSON_LIST_SORTS.filter(
+                (sort) => sort !== "relevance" || draftQuery.search,
+              )}
+              getOptionLabel={(sort) => t(`listSorts.${sort}`)}
+              onValueChange={(value) => void changeSort(value)}
+            />
 
             <ListFilterSheet
               appliedCount={operationalFilterCount(query)}
