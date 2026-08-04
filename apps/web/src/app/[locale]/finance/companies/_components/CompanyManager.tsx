@@ -16,6 +16,7 @@ import {
   DialogTrigger,
   Input,
   Label,
+  PhoneNumberInput,
   Select,
   SelectContent,
   SelectItem,
@@ -32,7 +33,7 @@ import {
 import { ArrowRightIcon, PlusIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useId, useState, type FormEvent } from "react";
 
 import { webApi } from "@/lib/api";
@@ -172,6 +173,7 @@ export function CompanyManager({
 
 function CreateCompanyDialog() {
   const t = useTranslations("finance");
+  const locale = useLocale();
   const router = useRouter();
   const formId = useId();
   const [open, setOpen] = useState(false);
@@ -265,20 +267,37 @@ function CreateCompanyDialog() {
                 </SelectContent>
               </Select>
             </div>
-            {fields.map(([name, label, required]) => (
-              <div key={name} className="grid gap-2">
-                <Label htmlFor={`${formId}-${name}`}>
-                  {t(`companies.fields.${label}`)}
-                </Label>
-                <Input
-                  id={`${formId}-${name}`}
-                  name={name}
-                  defaultValue=""
-                  required={required}
-                  disabled={busy}
-                />
-              </div>
-            ))}
+            {fields.map(([name, label, required]) =>
+              name === "phone" ? (
+                <div key={name} className="grid gap-2">
+                  <Label htmlFor={`${formId}-phone`}>
+                    {t("companies.fields.phone")}
+                  </Label>
+                  <PhoneNumberInput
+                    id={`${formId}-phone`}
+                    name="phone"
+                    locale={locale}
+                    placeholder={t("companies.fields.phone")}
+                    countrySelectLabel={t("companies.fields.phoneCountry")}
+                    numberInputLabel={t("companies.fields.phone")}
+                    disabled={busy}
+                  />
+                </div>
+              ) : (
+                <div key={name} className="grid gap-2">
+                  <Label htmlFor={`${formId}-${name}`}>
+                    {t(`companies.fields.${label}`)}
+                  </Label>
+                  <Input
+                    id={`${formId}-${name}`}
+                    name={name}
+                    defaultValue=""
+                    required={required}
+                    disabled={busy}
+                  />
+                </div>
+              ),
+            )}
             <div className="grid gap-2 sm:col-span-2">
               <Label htmlFor={`${formId}-notes`}>
                 {t("companies.fields.notes")}
