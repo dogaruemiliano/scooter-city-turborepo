@@ -23,7 +23,8 @@
  *   await api.fetch(v1.auth.ROUTES.logout, z.void(), { method: "POST" });
  *
  * On the API's normalized error envelope `{ error: { code, message, ... } }`,
- * throws `ApiError` with `status`, `code`, and the original `details`.
+ * throws `ApiError` with `status`, `code`, `requestId`, and the original
+ * `details`.
  */
 import type { ZodType } from "zod";
 
@@ -83,18 +84,21 @@ export class ApiError extends Error {
   readonly status: number;
   readonly code: string | undefined;
   readonly details: unknown;
+  readonly requestId: string | undefined;
 
   constructor(
     status: number,
     message: string,
     code?: string,
     details?: unknown,
+    requestId?: string,
   ) {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.code = code;
     this.details = details;
+    this.requestId = requestId;
   }
 }
 
@@ -103,6 +107,7 @@ interface ErrorEnvelope {
     code?: string;
     message?: string;
     details?: unknown;
+    requestId?: string;
   };
 }
 
@@ -259,6 +264,7 @@ export async function apiFetch<T>(
       envelope?.error?.message ?? `HTTP ${res.status} ${res.statusText}`,
       envelope?.error?.code,
       envelope?.error?.details,
+      envelope?.error?.requestId,
     );
   }
 

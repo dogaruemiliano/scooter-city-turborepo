@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { v1 } from "@repo/api-shared";
+import { Logger } from "nestjs-pino";
 
 import { AuditService } from "../audit/audit.service";
 import { AuditEventType } from "../audit/audit.types";
@@ -69,6 +70,7 @@ export class PersonsService {
     private readonly prisma: PrismaService,
     private readonly imageStorage: ImageStorageService,
     private readonly audit: AuditService,
+    private readonly logger: Logger,
   ) {}
 
   async create(
@@ -590,26 +592,53 @@ export class PersonsService {
     input: v1.persons.CreatePersonDocumentPhotoDraftUploadUrlInput,
     uploadedByUserId: string,
   ): Promise<v1.persons.PersonDocumentPhotoUploadUrl> {
-    const upload = await this.imageStorage.createPresignedUpload({
-      ...input,
-      scope: this.draftDocumentPhotoUploadScope(uploadedByUserId),
-    });
+    const logContext = {
+      event: "person_document_photo_draft_upload_url",
+      uploadedByUserId,
+      contentType: input.contentType,
+      byteSize: input.byteSize,
+    };
 
-    await this.prisma.draftUpload.create({
-      data: {
-        user: { connect: { id: uploadedByUserId } },
-        provider: upload.provider,
-        bucket: upload.bucket,
-        storageKey: upload.storageKey,
-        contentType: input.contentType,
-        byteSize: input.byteSize,
-        checksumSha256: input.checksumSha256.trim().toLowerCase(),
-        purpose: DRAFT_DOCUMENT_PHOTO_PURPOSE,
-        expiresAt: upload.expiresAt,
-      },
-    });
+    this.logger.debug(logContext, "Creating document-photo draft upload URL");
 
-    return this.toPublicUploadUrl(upload);
+    try {
+      const upload = await this.imageStorage.createPresignedUpload({
+        ...input,
+        scope: this.draftDocumentPhotoUploadScope(uploadedByUserId),
+      });
+
+      const draftUpload = await this.prisma.draftUpload.create({
+        data: {
+          user: { connect: { id: uploadedByUserId } },
+          provider: upload.provider,
+          bucket: upload.bucket,
+          storageKey: upload.storageKey,
+          contentType: input.contentType,
+          byteSize: input.byteSize,
+          checksumSha256: input.checksumSha256.trim().toLowerCase(),
+          purpose: DRAFT_DOCUMENT_PHOTO_PURPOSE,
+          expiresAt: upload.expiresAt,
+        },
+      });
+
+      this.logger.log(
+        {
+          ...logContext,
+          draftUploadId: draftUpload.id,
+          provider: upload.provider,
+          expiresAt: upload.expiresAt.toISOString(),
+        },
+        "Created document-photo draft upload URL",
+      );
+
+      return this.toPublicUploadUrl(upload);
+    } catch (error) {
+      this.logger.error(
+        { ...logContext, ...errorLogFields(error) },
+        "Failed to create document-photo draft upload URL",
+      );
+      throw error;
+    }
   }
 
   async completeDocumentPhotoUpload(
@@ -1922,4 +1951,23 @@ function isMediaAssetStorageKeyConflict(
   }
 
   return false;
+}
+
+function errorLogFields(error: unknown): {
+  errorName: string;
+  errorMessage: string;
+  errorStack?: string;
+} {
+  if (error instanceof Error) {
+    return {
+      errorName: error.name,
+      errorMessage: error.message,
+      ...(error.stack ? { errorStack: error.stack } : {}),
+    };
+  }
+
+  return {
+    errorName: typeof error,
+    errorMessage: String(error),
+  };
 }

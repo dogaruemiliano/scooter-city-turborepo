@@ -24,6 +24,7 @@ import {
   timingSafeEqual,
 } from "node:crypto";
 import { Readable } from "node:stream";
+import { Logger } from "nestjs-pino";
 
 import { ENV } from "../config/config.module";
 import type { Env } from "../config/env";
@@ -87,6 +88,7 @@ export class ImageStorageService {
     @Inject(ENV) private readonly env: Env,
     @Inject(S3_CLIENT) private readonly s3: S3Client,
     @Inject(S3_PRESIGNER) private readonly presigner: S3Presigner,
+    private readonly logger: Logger,
   ) {}
 
   async storeImage(input: StoreImageInput): Promise<StoredImage> {
@@ -114,6 +116,18 @@ export class ImageStorageService {
     try {
       await this.s3.send(new PutObjectCommand(putInput));
     } catch (error) {
+      this.logger.error(
+        {
+          event: "image_storage_put_failed",
+          provider: IMAGE_STORAGE_PROVIDER_S3,
+          region: this.env.IMAGE_STORAGE_S3_REGION,
+          contentType,
+          byteSize: input.byteSize,
+          kmsEnabled: Boolean(this.env.IMAGE_STORAGE_S3_KMS_KEY_ID),
+          ...s3ErrorDiagnostics(error),
+        },
+        "Failed to store object in S3",
+      );
       throwS3StorageError(error);
     }
 
@@ -200,6 +214,18 @@ export class ImageStorageService {
         },
       );
     } catch (error) {
+      this.logger.error(
+        {
+          event: "image_storage_presign_failed",
+          provider: IMAGE_STORAGE_PROVIDER_S3,
+          region: this.env.IMAGE_STORAGE_S3_REGION,
+          contentType,
+          byteSize: input.byteSize,
+          kmsEnabled: Boolean(this.env.IMAGE_STORAGE_S3_KMS_KEY_ID),
+          ...s3ErrorDiagnostics(error),
+        },
+        "Failed to create presigned S3 upload URL",
+      );
       throwS3StorageError(error);
     }
 
@@ -579,6 +605,45 @@ function s3ErrorName(error: unknown): string | null {
 
   const name = (error as { name?: unknown }).name;
   return typeof name === "string" && name.length > 0 ? name : null;
+}
+
+function s3ErrorDiagnostics(error: unknown): {
+  errorName: string | null;
+  errorMessage: string;
+  errorStack?: string;
+  awsRequestId?: string;
+  awsHttpStatusCode?: number;
+  awsAttempts?: number;
+} {
+  const metadata =
+    typeof error === "object" && error !== null && "$metadata" in error
+      ? (
+          error as {
+            $metadata?: {
+              requestId?: unknown;
+              httpStatusCode?: unknown;
+              attempts?: unknown;
+            };
+          }
+        ).$metadata
+      : undefined;
+
+  return {
+    errorName: s3ErrorName(error),
+    errorMessage: error instanceof Error ? error.message : String(error),
+    ...(error instanceof Error && error.stack
+      ? { errorStack: error.stack }
+      : {}),
+    ...(typeof metadata?.requestId === "string"
+      ? { awsRequestId: metadata.requestId }
+      : {}),
+    ...(typeof metadata?.httpStatusCode === "number"
+      ? { awsHttpStatusCode: metadata.httpStatusCode }
+      : {}),
+    ...(typeof metadata?.attempts === "number"
+      ? { awsAttempts: metadata.attempts }
+      : {}),
+  };
 }
 
 function isUploadTokenPayload(value: unknown): value is UploadTokenPayload {

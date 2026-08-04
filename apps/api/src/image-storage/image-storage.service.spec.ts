@@ -12,6 +12,7 @@ import {
 } from "@nestjs/common";
 import { createHash } from "node:crypto";
 import { Readable } from "node:stream";
+import type { Logger } from "nestjs-pino";
 
 import { loadEnv, type Env } from "../config/env";
 import type { S3Presigner, S3PresignOptions } from "./image-storage.module";
@@ -22,6 +23,9 @@ type PresignMock = jest.Mock<
   Promise<string>,
   [PutObjectCommand, number, S3PresignOptions?]
 >;
+interface LoggerMock {
+  error: jest.Mock;
+}
 
 function s3Error(name: string): Error & { name: string } {
   const error = new Error(name) as Error & { name: string };
@@ -47,7 +51,12 @@ function createService(
   send?: SendMock,
   env = testEnv(),
   presign?: PresignMock,
-): { service: ImageStorageService; send: SendMock; presign: PresignMock } {
+): {
+  service: ImageStorageService;
+  send: SendMock;
+  presign: PresignMock;
+  logger: LoggerMock;
+} {
   const mockSend: SendMock =
     send ??
     jest.fn((command: unknown) => {
@@ -68,6 +77,7 @@ function createService(
         )}&expires=${expiresIn}`,
       );
     });
+  const logger: LoggerMock = { error: jest.fn() };
   return {
     service: new ImageStorageService(
       env,
@@ -77,9 +87,11 @@ function createService(
       {
         getSignedUrl: mockPresign,
       } satisfies S3Presigner,
+      logger as unknown as Logger,
     ),
     send: mockSend,
     presign: mockPresign,
+    logger,
   };
 }
 
@@ -244,6 +256,54 @@ describe("ImageStorageService", () => {
       checksumSha256,
     });
     expect(send.mock.calls[0]?.[0]).toBeInstanceOf(HeadObjectCommand);
+  });
+
+  it("logs actionable S3 diagnostics when presigning fails", async () => {
+    const presignError = Object.assign(new Error("signature mismatch"), {
+      name: "SignatureDoesNotMatch",
+      $metadata: {
+        requestId: "aws-request-123",
+        httpStatusCode: 403,
+        attempts: 1,
+      },
+    });
+    const presign: PresignMock = jest.fn(
+      (
+        command: PutObjectCommand,
+        expiresIn: number,
+        options?: S3PresignOptions,
+      ) => {
+        void command;
+        void expiresIn;
+        void options;
+        return Promise.reject(presignError);
+      },
+    );
+    const { service, logger } = createService(undefined, testEnv(), presign);
+    const checksumSha256 = createHash("sha256").update("stored").digest("hex");
+
+    await expect(
+      service.createPresignedUpload({
+        contentType: "image/png",
+        byteSize: 6,
+        checksumSha256,
+        scope: "person-document-photo-draft:user-1",
+      }),
+    ).rejects.toBeInstanceOf(ServiceUnavailableException);
+
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "image_storage_presign_failed",
+        errorName: "SignatureDoesNotMatch",
+        errorMessage: "signature mismatch",
+        awsRequestId: "aws-request-123",
+        awsHttpStatusCode: 403,
+        awsAttempts: 1,
+        contentType: "image/png",
+        byteSize: 6,
+      }),
+      "Failed to create presigned S3 upload URL",
+    );
   });
 
   it("supports checksum-bound private PDF uploads without widening image APIs", async () => {
