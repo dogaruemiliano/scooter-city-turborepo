@@ -10,7 +10,7 @@ export default function ServiceLoading() {
     <div
       aria-busy="true"
       aria-label={t("routeStates.loadingLabel")}
-      className="mx-auto flex w-full max-w-screen-xl flex-1 flex-col gap-6 px-6 py-10"
+      className="mx-auto flex w-full max-w-screen-xl flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10"
     >
       <span className="sr-only">{t("routeStates.loadingLabel")}</span>
       <section aria-hidden="true" className="flex flex-col gap-4">

@@ -48,8 +48,7 @@ export function ScooterList({ items }: ScooterListProps) {
           <li
             key={scooter.id}
             className={cn(
-              canOpenDetail &&
-                "group/scooter-card relative rounded-xl focus-within:ring-2 focus-within:ring-ring",
+              canOpenDetail && "group/scooter-card relative rounded-xl",
             )}
           >
             {canOpenDetail ? (
@@ -65,7 +64,7 @@ export function ScooterList({ items }: ScooterListProps) {
               size="sm"
               className={cn(
                 canOpenDetail &&
-                  "pointer-events-none transition-colors group-hover/scooter-card:bg-muted",
+                  "pointer-events-none transition-colors group-hover/scooter-card:bg-muted group-focus-within/scooter-card:bg-muted/60",
               )}
             >
               <CardHeader className="gap-3">

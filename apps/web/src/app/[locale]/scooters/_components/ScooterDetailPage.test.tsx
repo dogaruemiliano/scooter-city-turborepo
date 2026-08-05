@@ -76,11 +76,20 @@ describe("ScooterDetailPage", () => {
     expect(screen.getAllByText("Unregistered")[0]).toBeInTheDocument();
     expect(screen.queryByText("Active")).not.toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Add registration" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "More actions" }),
-    ).toBeInTheDocument();
+      screen.queryByRole("button", { name: "Add registration" }),
+    ).not.toBeInTheDocument();
+    const moreActionsButton = screen.getByRole("button", {
+      name: "More actions",
+    });
+    expect(moreActionsButton).toBeInTheDocument();
+    expect(moreActionsButton).toHaveTextContent("");
+    expect(moreActionsButton).not.toHaveClass("border-border");
+    expect(moreActionsButton.querySelector("svg")).toHaveClass(
+      "lucide-ellipsis-vertical",
+    );
+    expect(moreActionsButton.parentElement).toContainElement(
+      screen.getByRole("heading", { name: "Yamaha NMAX" }),
+    );
     expect(
       screen.getByRole("heading", { name: "Maintenance and repairs" }),
     ).toBeInTheDocument();
@@ -404,9 +413,8 @@ describe("ScooterDetailPage", () => {
     const browser = userEvent.setup();
 
     renderDetail();
-    await browser.click(
-      screen.getByRole("button", { name: "Add registration" }),
-    );
+    await browser.click(screen.getByRole("button", { name: "More actions" }));
+    await browser.click(await screen.findByText("Add registration"));
     const dialog = await screen.findByRole("dialog", {
       name: "Add registration",
     });
@@ -438,7 +446,9 @@ describe("ScooterDetailPage", () => {
     expect(mocks.refresh).toHaveBeenCalledOnce();
   });
 
-  it("shows edit registration for registered scooters", () => {
+  it("shows edit registration for registered scooters", async () => {
+    const browser = userEvent.setup();
+
     renderDetail("en", {
       ...scooter,
       registrationType: "national",
@@ -447,9 +457,9 @@ describe("ScooterDetailPage", () => {
       requiredDriverLicenseType: "A1",
     });
 
-    expect(
-      screen.getByRole("button", { name: "Edit registration" }),
-    ).toBeInTheDocument();
+    await browser.click(screen.getByRole("button", { name: "More actions" }));
+    expect(await screen.findByText("Edit registration")).toBeInTheDocument();
+    expect(screen.queryByText("Add registration")).not.toBeInTheDocument();
     expect(screen.getAllByText("National")[0]).toBeInTheDocument();
     expect(screen.getByText("CJ 12 ABC")).toBeInTheDocument();
     expect(

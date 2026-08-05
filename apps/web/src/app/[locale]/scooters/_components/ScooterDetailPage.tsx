@@ -11,12 +11,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
   buttonVariants,
 } from "@repo/ui/components";
 import { cn } from "@repo/ui/lib/utils";
@@ -24,7 +18,6 @@ import {
   ArrowLeftIcon,
   BatteryChargingIcon,
   CarFrontIcon,
-  EllipsisIcon,
   GaugeIcon,
   PencilIcon,
   Trash2Icon,
@@ -34,6 +27,7 @@ import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { useId, useState, type FormEvent, type ReactNode } from "react";
 
+import { MoreActionsMenu } from "@/components/MoreActionsMenu";
 import { PageTitleOverride } from "@/components/PageTitleOverride";
 import { webApi } from "@/lib/api";
 import { FeedbackAlert, formErrorsFromIssues } from "./ScooterCreateForm";
@@ -163,71 +157,60 @@ export function ScooterDetailPage({
           {t("actions.backToList")}
         </Link>
 
-        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div className="flex min-w-0 items-start justify-between gap-3">
           <div className="min-w-0">
             <h1 className="break-words text-2xl font-semibold">{title}</h1>
             <p className="break-words text-sm text-muted-foreground">
               {scooter.vin}
             </p>
           </div>
-          <div className="flex flex-col gap-2 md:items-end">
-            <div className="flex flex-wrap gap-2 md:justify-end">
-              {scooter.deletedAt ? (
-                <Badge variant="outline">{t("recordStatus.deleted")}</Badge>
-              ) : null}
-              <PowertrainBadge scooter={scooter} />
-              <Badge variant="outline">
-                {t(`registrationTypes.${scooter.registrationType}`)}
-              </Badge>
-            </div>
-            <div className="flex flex-wrap gap-2 md:justify-end">
-              <Button
-                type="button"
-                variant="outline"
-                disabled={busyAction !== null}
-                onClick={() => {
-                  setRegistrationDialogKey((current) => current + 1);
-                  setRegistrationOpen(true);
-                }}
-              >
-                <PencilIcon data-icon="inline-start" />
-                {registrationActionLabel}
-              </Button>
-              <DropdownMenu>
-                <DropdownMenuTrigger
-                  render={<Button variant="outline" size="lg" />}
-                >
-                  <EllipsisIcon data-icon="inline-start" />
-                  {t("actions.moreActions")}
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-auto min-w-48">
-                  <DropdownMenuGroup>
-                    <DropdownMenuItem
-                      disabled={busyAction !== null}
-                      onClick={() => {
-                        setEditDialogKey((current) => current + 1);
-                        setEditOpen(true);
-                      }}
-                    >
-                      <PencilIcon data-icon="inline-start" />
-                      {t("actions.editScooter")}
-                    </DropdownMenuItem>
-                  </DropdownMenuGroup>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuGroup>
-                    <DropdownMenuItem
-                      variant="destructive"
-                      disabled={busyAction !== null}
-                      onClick={() => setDeleteOpen(true)}
-                    >
-                      <Trash2Icon data-icon="inline-start" />
-                      {t("actions.deleteScooter")}
-                    </DropdownMenuItem>
-                  </DropdownMenuGroup>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </div>
+          <MoreActionsMenu
+            ariaLabel={t("actions.moreActions")}
+            groups={[
+              [
+                {
+                  key: "registration",
+                  label: registrationActionLabel,
+                  icon: <PencilIcon data-icon="inline-start" />,
+                  disabled: busyAction !== null,
+                  onClick: () => {
+                    setRegistrationDialogKey((current) => current + 1);
+                    setRegistrationOpen(true);
+                  },
+                },
+                {
+                  key: "edit",
+                  label: t("actions.editScooter"),
+                  icon: <PencilIcon data-icon="inline-start" />,
+                  disabled: busyAction !== null,
+                  onClick: () => {
+                    setEditDialogKey((current) => current + 1);
+                    setEditOpen(true);
+                  },
+                },
+              ],
+              [
+                {
+                  key: "delete",
+                  label: t("actions.deleteScooter"),
+                  icon: <Trash2Icon data-icon="inline-start" />,
+                  variant: "destructive",
+                  disabled: busyAction !== null,
+                  onClick: () => setDeleteOpen(true),
+                },
+              ],
+            ]}
+          />
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {scooter.deletedAt ? (
+            <Badge variant="outline">{t("recordStatus.deleted")}</Badge>
+          ) : null}
+          <PowertrainBadge scooter={scooter} />
+          <Badge variant="outline">
+            {t(`registrationTypes.${scooter.registrationType}`)}
+          </Badge>
         </div>
       </div>
 

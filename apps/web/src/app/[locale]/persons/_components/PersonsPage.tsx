@@ -320,7 +320,7 @@ function PersonsPageContent({
   const hasMore = list.items.length < list.total;
 
   return (
-    <div className="mx-auto flex w-full max-w-screen-xl flex-1 flex-col gap-6 px-6 py-10">
+    <div className="mx-auto flex w-full max-w-screen-xl flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
       <div className="flex justify-end">
         <Link href={createHref} className={buttonVariants()}>
           <UserPlusIcon data-icon="inline-start" />

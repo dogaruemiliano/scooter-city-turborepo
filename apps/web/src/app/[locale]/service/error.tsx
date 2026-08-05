@@ -18,7 +18,7 @@ export default function ServiceError({ reset }: ServiceErrorProps) {
   const t = useTranslations("service");
 
   return (
-    <div className="mx-auto flex w-full max-w-screen-xl flex-1 px-6 py-10">
+    <div className="mx-auto flex w-full max-w-screen-xl flex-1 px-4 py-6 sm:px-6 sm:py-10">
       <Alert variant="destructive">
         <CircleAlertIcon aria-hidden="true" />
         <AlertTitle>{t("routeStates.errorTitle")}</AlertTitle>
