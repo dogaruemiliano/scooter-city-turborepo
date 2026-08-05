@@ -12,6 +12,7 @@ import type { AnchorHTMLAttributes, ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AppShell } from "./AppShell";
+import { PageHeaderActions } from "./PageHeaderActions";
 import { PageTitleOverride } from "./PageTitleOverride";
 import { SessionProvider } from "./auth/SessionProvider";
 import type { SessionIdentity } from "../lib/auth-types";
@@ -211,7 +212,7 @@ describe("AppShell", () => {
     );
   });
 
-  it("layers overlays behind the account menu and its language submenu", async () => {
+  it("layers an overlay behind the account menu", async () => {
     renderAppShell();
 
     expect(
@@ -238,22 +239,41 @@ describe("AppShell", () => {
         .closest('[data-slot="sidebar-menu-item"]'),
     ).toHaveClass("z-modal");
 
-    const languageSubmenu = screen.getByRole("menuitem", { name: /Limbă/ });
-    languageSubmenu.focus();
-    fireEvent.keyDown(languageSubmenu, { key: "ArrowRight" });
+    expect(
+      document.querySelector('[data-slot="nested-menu-overlay"]'),
+    ).not.toBeInTheDocument();
+  });
 
-    await waitFor(() =>
-      expect(
-        document.querySelector('[data-slot="nested-menu-overlay"]'),
-      ).toHaveClass("z-nested-overlay", "bg-scrim"),
+  it("toggles the theme and language submenus closed on a second click", async () => {
+    renderAppShell();
+
+    fireEvent.mouseDown(
+      screen.getByRole("button", { name: "Deschide meniul contului" }),
     );
-    expect(
-      document.querySelector('[data-slot="nested-menu-overlay"]')
-        ?.parentElement,
-    ).toHaveAttribute("data-slot", "dropdown-menu-content");
-    expect(
-      screen.getByRole("menu", { name: /Limbă/ }).parentElement,
-    ).toHaveClass("z-nested-popover");
+
+    const themeTrigger = await screen.findByRole("menuitem", { name: /Temă/ });
+    expect(themeTrigger).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.mouseDown(themeTrigger);
+    await waitFor(() =>
+      expect(themeTrigger).toHaveAttribute("aria-expanded", "true"),
+    );
+
+    fireEvent.mouseDown(themeTrigger);
+    await waitFor(() =>
+      expect(themeTrigger).toHaveAttribute("aria-expanded", "false"),
+    );
+
+    const languageTrigger = screen.getByRole("menuitem", { name: /Limbă/ });
+    fireEvent.mouseDown(languageTrigger);
+    await waitFor(() =>
+      expect(languageTrigger).toHaveAttribute("aria-expanded", "true"),
+    );
+
+    fireEvent.mouseDown(languageTrigger);
+    await waitFor(() =>
+      expect(languageTrigger).toHaveAttribute("aria-expanded", "false"),
+    );
   });
 
   it("closes the mobile drawer when a navigation link is pressed", async () => {
@@ -581,6 +601,41 @@ describe("AppShell", () => {
       expect(
         within(screen.getByRole("banner")).getByText("Ada Lovelace"),
       ).toBeInTheDocument(),
+    );
+  });
+
+  it("renders page actions on the right side of the mobile header", async () => {
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: 375,
+    });
+    mocks.pathname = "/persons/person-1";
+
+    renderAppShell(
+      {
+        id: "admin-1",
+        email: "admin@example.com",
+        roles: ["ADMIN"],
+      },
+      <>
+        <PageTitleOverride title="Ada Lovelace" />
+        <PageHeaderActions>
+          <button type="button" aria-label="More actions">
+            Actions
+          </button>
+        </PageHeaderActions>
+        <div>Page content</div>
+      </>,
+    );
+
+    const header = screen.getByRole("banner");
+    await waitFor(() =>
+      expect(
+        within(header).getByRole("button", { name: "More actions" }),
+      ).toBeInTheDocument(),
+    );
+    expect(within(header).getByRole("button", { name: "More actions" })).toBe(
+      header.lastElementChild?.firstElementChild,
     );
   });
 });

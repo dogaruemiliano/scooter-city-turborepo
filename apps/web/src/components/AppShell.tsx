@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import {
   ArrowLeftRightIcon,
@@ -62,11 +62,16 @@ import {
 import { useLogout } from "./auth/LogoutButton";
 import { useSession } from "./auth/SessionProvider";
 import { LanguageMenuSub } from "./LanguageSwitcher";
+import {
+  PageHeaderActionsContext,
+  type PageHeaderActionsContextValue,
+} from "./PageHeaderActions";
 import { PageTitleOverrideContext } from "./PageTitleOverride";
 import { webApi } from "../lib/api";
 import { formatMoney } from "../lib/finance-format";
 import {
   applyThemePreference,
+  isThemePreference,
   type ThemePreference,
 } from "../lib/theme-cookie";
 import type { SessionIdentity } from "../lib/auth-types";
@@ -189,20 +194,61 @@ export function AppShell({
   return (
     <PageTitleOverrideContext.Provider value={setPageTitleOverride}>
       <SidebarProvider>
-        <AppSidebar
+        <AppShellContent
           locale={locale}
           pathname={routePathname}
+          pageTitle={pageTitle}
           initialThemePreference={initialThemePreference}
-        />
-        <SidebarInset>
-          <header className="sticky top-0 z-sticky flex h-12 shrink-0 items-center gap-2 border-b border-border bg-background px-4">
-            <HeaderNavigationButton pathname={routePathname} />
-            <span className="text-sm font-medium">{pageTitle}</span>
-          </header>
-          <div className="flex flex-1 flex-col">{children}</div>
-        </SidebarInset>
+        >
+          {children}
+        </AppShellContent>
       </SidebarProvider>
     </PageTitleOverrideContext.Provider>
+  );
+}
+
+function AppShellContent({
+  children,
+  locale,
+  pathname,
+  pageTitle,
+  initialThemePreference,
+}: {
+  children: ReactNode;
+  locale: SupportedLocale;
+  pathname: string;
+  pageTitle: string;
+  initialThemePreference: ThemePreference;
+}) {
+  const { isMobile } = useSidebar();
+  const [pageHeaderActionsTarget, setPageHeaderActionsTarget] =
+    useState<HTMLDivElement | null>(null);
+  const pageHeaderActionsContext = useMemo<PageHeaderActionsContextValue>(
+    () => ({ isMobile, target: pageHeaderActionsTarget }),
+    [isMobile, pageHeaderActionsTarget],
+  );
+
+  return (
+    <PageHeaderActionsContext.Provider value={pageHeaderActionsContext}>
+      <AppSidebar
+        locale={locale}
+        pathname={pathname}
+        initialThemePreference={initialThemePreference}
+      />
+      <SidebarInset>
+        <header className="sticky top-0 z-sticky flex h-12 shrink-0 items-center gap-2 border-b border-border bg-background px-4">
+          <HeaderNavigationButton pathname={pathname} />
+          <span className="min-w-0 flex-1 truncate text-sm font-medium">
+            {pageTitle}
+          </span>
+          <div
+            ref={setPageHeaderActionsTarget}
+            className="ml-auto flex shrink-0 md:hidden"
+          />
+        </header>
+        <div className="flex flex-1 flex-col">{children}</div>
+      </SidebarInset>
+    </PageHeaderActionsContext.Provider>
   );
 }
 
@@ -416,9 +462,7 @@ function AccountMenu({
   const [personalWallet, setPersonalWallet] = useState<v1.finance.Wallet>();
   const [walletUnavailable, setWalletUnavailable] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
-  const [nestedMenuOpen, setNestedMenuOpen] = useState(false);
   const accountTriggerRef = useRef<HTMLButtonElement>(null);
-  const accountMenuContentRef = useRef<HTMLDivElement>(null);
   const email = user?.email ?? tAccount("noActiveSession");
   const displayName = user ? displayNameFromUser(user) : tAccount("account");
   const initials = user ? initialsFromUser(user) : "?";
@@ -475,7 +519,6 @@ function AccountMenu({
     <>
       {accountMenuOpen ? (
         <MenuLayerOverlay
-          layer="account"
           target={
             accountTriggerRef.current?.closest<HTMLElement>(
               '[data-slot="sidebar-inner"], [data-slot="sidebar"][data-mobile="true"]',
@@ -483,22 +526,11 @@ function AccountMenu({
           }
         />
       ) : null}
-      {nestedMenuOpen ? (
-        <MenuLayerOverlay
-          layer="nested"
-          target={accountMenuContentRef.current}
-        />
-      ) : null}
       <SidebarMenu>
         <SidebarMenuItem className={accountMenuOpen ? "z-modal" : undefined}>
           <DropdownMenu
             open={accountMenuOpen}
-            onOpenChange={(open) => {
-              setAccountMenuOpen(open);
-              if (!open) {
-                setNestedMenuOpen(false);
-              }
-            }}
+            onOpenChange={setAccountMenuOpen}
           >
             <DropdownMenuTrigger
               render={
@@ -528,10 +560,9 @@ function AccountMenu({
             </DropdownMenuTrigger>
 
             <DropdownMenuContent
-              ref={accountMenuContentRef}
               side={isMobile ? "bottom" : "right"}
               align="end"
-              className="relative min-w-64"
+              className="min-w-64"
             >
               <DropdownMenuGroup>
                 <DropdownMenuLabel className="flex flex-col">
@@ -552,8 +583,8 @@ function AccountMenu({
                 >
                   {tAccount("accountSettings")}
                 </AccountMenuLinkItem>
-                <DropdownMenuSub onOpenChange={setNestedMenuOpen}>
-                  <DropdownMenuSubTrigger>
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger openOnHover={false}>
                     {tTheme("label")}
                     <span className="ml-auto capitalize text-muted-foreground">
                       {tTheme(`options.${themePreference}`)}
@@ -570,13 +601,16 @@ function AccountMenu({
                       <DropdownMenuRadioItem value="dark">
                         {tTheme("options.dark")}
                       </DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="minimal">
+                        {tTheme("options.minimal")}
+                      </DropdownMenuRadioItem>
                       <DropdownMenuRadioItem value="system">
                         {tTheme("options.system")}
                       </DropdownMenuRadioItem>
                     </DropdownMenuRadioGroup>
                   </DropdownMenuSubContent>
                 </DropdownMenuSub>
-                <LanguageMenuSub onOpenChange={setNestedMenuOpen} />
+                <LanguageMenuSub />
               </DropdownMenuGroup>
               <DropdownMenuSeparator />
               <DropdownMenuItem
@@ -594,13 +628,7 @@ function AccountMenu({
   );
 }
 
-function MenuLayerOverlay({
-  layer,
-  target,
-}: {
-  layer: "account" | "nested";
-  target: HTMLElement | null;
-}) {
+function MenuLayerOverlay({ target }: { target: HTMLElement | null }) {
   if (!target) {
     return null;
   }
@@ -608,12 +636,8 @@ function MenuLayerOverlay({
   return createPortal(
     <div
       aria-hidden="true"
-      data-slot={`${layer}-menu-overlay`}
-      className={
-        layer === "nested"
-          ? "pointer-events-none absolute inset-0 z-nested-overlay bg-scrim"
-          : "pointer-events-none absolute inset-0 z-overlay bg-scrim"
-      }
+      data-slot="account-menu-overlay"
+      className="pointer-events-none absolute inset-0 z-overlay bg-scrim"
     />,
     target,
   );
@@ -651,10 +675,6 @@ function getNestedFinancePageTitle(pathname: string): string | undefined {
   }
 
   return undefined;
-}
-
-function isThemePreference(value: unknown): value is ThemePreference {
-  return value === "light" || value === "dark" || value === "system";
 }
 
 function displayNameFromUser(user: SessionIdentity): string {

@@ -4,8 +4,14 @@ import { useTranslations } from "next-intl";
 import { useState } from "react";
 import {
   applyThemePreference,
+  EXPLICIT_THEMES,
   type ThemePreference,
 } from "../lib/theme-cookie";
+
+const THEME_OPTIONS: readonly ThemePreference[] = [
+  ...EXPLICIT_THEMES,
+  "system",
+];
 
 export function ThemeToggle({
   initialPreference,
@@ -26,7 +32,7 @@ export function ThemeToggle({
       aria-label={t("label")}
       className="inline-flex items-center gap-1 rounded-full border border-border p-1"
     >
-      {(["light", "dark", "system"] as const).map((option) => {
+      {THEME_OPTIONS.map((option) => {
         const selected = pref === option;
         return (
           <button
