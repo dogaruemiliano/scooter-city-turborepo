@@ -44,13 +44,13 @@ const flattenColors = (
 
 const assertColorContract = () => {
   const lightKeys = Object.keys(semanticColors.light).sort();
-  const darkKeys = Object.keys(semanticColors.dark).sort();
-
-  if (lightKeys.join("|") !== darkKeys.join("|")) {
-    throw new Error("Light and dark semantic color keys must match.");
-  }
 
   for (const [scheme, colors] of Object.entries(semanticColors)) {
+    const schemeKeys = Object.keys(colors).sort();
+    if (lightKeys.join("|") !== schemeKeys.join("|")) {
+      throw new Error(`Light and ${scheme} semantic color keys must match.`);
+    }
+
     for (const [name, value] of Object.entries(colors)) {
       if (!parse(value)) {
         throw new Error(`Invalid ${scheme} color "${name}": ${value}`);
@@ -100,6 +100,10 @@ export function buildCss(): string {
   lines.push(...cssColorLines(semanticColors.dark, "  "));
   lines.push("}", "");
 
+  lines.push(":root[data-theme='minimal'], .minimal {");
+  lines.push(...cssColorLines(semanticColors.minimal, "  "));
+  lines.push("}", "");
+
   lines.push("@theme {");
   for (const [name, value] of flattenColors(primitives, "--color")) {
     lines.push(`  ${name}: ${value};`);
@@ -130,6 +134,7 @@ export function buildCss(): string {
   lines.push("");
   for (const [key, value] of Object.entries(motion.duration)) {
     lines.push(`  --duration-${kebab(key)}: ${value}ms;`);
+    lines.push(`  --transition-duration-${kebab(key)}: ${value}ms;`);
   }
   for (const [key, value] of Object.entries(motion.easing)) {
     lines.push(`  --ease-${kebab(key)}: ${value};`);

@@ -10,7 +10,7 @@ import { motion } from "./tokens/motion";
 import { zIndex } from "./tokens/z-index";
 import { breakpoints } from "./tokens/breakpoints";
 
-export type ColorScheme = "light" | "dark";
+export type ColorScheme = "light" | "dark" | "minimal";
 
 /**
  * Combined token set. Use `tokens.color[scheme]` to get the active color palette.
