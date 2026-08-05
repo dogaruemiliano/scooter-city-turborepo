@@ -108,8 +108,6 @@ const SEED_AUDIT_ACTOR = {
   email: null,
   name: "Seed data",
 } as const;
-const REDACTED_VALUE = "[redacted]";
-const SET_VALUE = "[set]";
 const USER_WALLET_SUFFIX = "personal wallet";
 
 type PersonDocumentSeed = {
@@ -821,7 +819,7 @@ function personSeedAuditChanges(seed: PersonSeed) {
     createSeedChange("region", seed.region),
     createSeedChange("postalCode", seed.postalCode),
     createSeedChange("countryCode", seed.countryCode),
-    createSeedChange("notes", seed.notes ? SET_VALUE : null),
+    createSeedChange("notes", seed.notes),
   ]);
 }
 
@@ -836,7 +834,7 @@ function documentSeedAuditChanges(seed: PersonDocumentSeed) {
     createSeedChange("document.issuedOn", dateOnlyString(seed.issuedOn)),
     createSeedChange("document.expiresOn", dateOnlyString(seed.expiresOn)),
     createSeedChange("document.status", seed.status),
-    createSeedChange("document.notes", seed.notes ? SET_VALUE : null),
+    createSeedChange("document.notes", seed.notes),
   ]);
 }
 
@@ -866,7 +864,7 @@ function maskSensitiveSeedValue(value: string | null): string | null {
   }
 
   const visibleLength = Math.min(4, value.length);
-  return `${REDACTED_VALUE} ${value.slice(-visibleLength)}`;
+  return `${"*".repeat(value.length - visibleLength)}${value.slice(-visibleLength)}`;
 }
 
 function dateOnlyString(value: Date | null): string | null {

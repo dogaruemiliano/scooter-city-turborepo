@@ -45,8 +45,6 @@ interface SearchCountRow {
 
 const PERSON_AUDIT_TARGET_TYPE = "person";
 const PERSON_AUDIT_EVENT_LIMIT = 50;
-const REDACTED_VALUE = "[redacted]";
-const SET_VALUE = "[set]";
 const PERSON_EMAIL_CONFLICT_CODE = "PERSON_EMAIL_CONFLICT";
 const PERSON_PHONE_CONFLICT_CODE = "PERSON_PHONE_CONFLICT";
 const DRAFT_DOCUMENT_PHOTO_PURPOSE = "person-document-photo";
@@ -388,6 +386,10 @@ export class PersonsService {
         );
         if (!existing) {
           throw new NotFoundException("Person document not found");
+        }
+
+        if (!documentInputHasChanges(existing, input)) {
+          return existing;
         }
 
         if (input.type && input.type !== existing.type) {
@@ -965,6 +967,21 @@ export class PersonsService {
       changes: v1.persons.PersonAuditFieldChange[];
     },
   ): Promise<void> {
+    if (
+      input.type === AuditEventType.PERSON_DOCUMENT_UPDATED &&
+      input.changes.length === 0
+    ) {
+      this.logger.warn(
+        {
+          personId: input.personId,
+          documentId: input.document?.id,
+          auditType: input.type,
+        },
+        "Skipping empty person-document update audit",
+      );
+      return;
+    }
+
     const meta = {
       actor: this.auditActor(input.context),
       document: input.document ? this.documentSummary(input.document) : null,
@@ -1026,10 +1043,38 @@ export class PersonsService {
     existing: PersonDocument,
     updated: PersonDocument,
   ): v1.persons.PersonAuditFieldChange[] {
-    return diffAuditValues(
-      documentAuditValues(existing),
-      documentAuditValues(updated),
-    );
+    return compactChanges([
+      createValueChange("document.type", existing.type, updated.type),
+      createValueChange("document.series", existing.series, updated.series),
+      createSensitiveValueChange(
+        "document.number",
+        existing.number,
+        updated.number,
+      ),
+      createSensitiveValueChange("document.cnp", existing.cnp, updated.cnp),
+      createValueChange(
+        "document.issuingCountryCode",
+        existing.issuingCountryCode,
+        updated.issuingCountryCode,
+      ),
+      createValueChange(
+        "document.issuedBy",
+        existing.issuedBy,
+        updated.issuedBy,
+      ),
+      createValueChange(
+        "document.issuedOn",
+        toDateOnlyString(existing.issuedOn),
+        toDateOnlyString(updated.issuedOn),
+      ),
+      createValueChange(
+        "document.expiresOn",
+        toDateOnlyString(existing.expiresOn),
+        toDateOnlyString(updated.expiresOn),
+      ),
+      createValueChange("document.status", existing.status, updated.status),
+      createValueChange("document.notes", existing.notes, updated.notes),
+    ]);
   }
 
   private documentReplacementChanges(
@@ -1723,7 +1768,7 @@ function personAuditValues(person: PersonWithDocuments): AuditValue[] {
     { field: "region", value: person.region },
     { field: "postalCode", value: person.postalCode },
     { field: "countryCode", value: person.countryCode },
-    { field: "notes", value: person.notes ? SET_VALUE : null },
+    { field: "notes", value: person.notes },
   ];
 }
 
@@ -1747,8 +1792,36 @@ function documentAuditValues(document: PersonDocument): AuditValue[] {
       value: toDateOnlyString(document.expiresOn),
     },
     { field: "document.status", value: document.status },
-    { field: "document.notes", value: document.notes ? SET_VALUE : null },
+    { field: "document.notes", value: document.notes },
   ];
+}
+
+function documentInputHasChanges(
+  existing: PersonDocument,
+  input: v1.persons.UpdatePersonDocumentInput,
+): boolean {
+  return (
+    definedValueChanged(input.type, existing.type) ||
+    definedValueChanged(input.series, existing.series) ||
+    definedValueChanged(input.number, existing.number) ||
+    definedValueChanged(input.cnp, existing.cnp) ||
+    definedValueChanged(
+      input.issuingCountryCode,
+      existing.issuingCountryCode,
+    ) ||
+    definedValueChanged(input.issuedBy, existing.issuedBy) ||
+    definedValueChanged(input.issuedOn, toDateOnlyString(existing.issuedOn)) ||
+    definedValueChanged(
+      input.expiresOn,
+      toDateOnlyString(existing.expiresOn),
+    ) ||
+    definedValueChanged(input.status, existing.status) ||
+    definedValueChanged(input.notes, existing.notes)
+  );
+}
+
+function definedValueChanged<T>(next: T | undefined, current: T): boolean {
+  return next !== undefined && next !== current;
 }
 
 function createChange(
@@ -1760,6 +1833,28 @@ function createChange(
   }
 
   return { field, oldValue: null, newValue: value };
+}
+
+function createValueChange(
+  field: string,
+  oldValue: string | null,
+  newValue: string | null,
+): v1.persons.PersonAuditFieldChange | null {
+  return oldValue === newValue ? null : { field, oldValue, newValue };
+}
+
+function createSensitiveValueChange(
+  field: string,
+  oldRawValue: string | null,
+  newRawValue: string | null,
+): v1.persons.PersonAuditFieldChange | null {
+  if (oldRawValue === newRawValue) {
+    return null;
+  }
+
+  const oldValue = maskSensitiveAuditValue(oldRawValue);
+  const newValue = maskSensitiveAuditValue(newRawValue);
+  return { field, oldValue, newValue };
 }
 
 function diffAuditValues(
@@ -1790,7 +1885,7 @@ function maskSensitiveAuditValue(value: string | null): string | null {
   }
 
   const visibleLength = Math.min(4, value.length);
-  return `${REDACTED_VALUE} ${value.slice(-visibleLength)}`;
+  return `${"*".repeat(value.length - visibleLength)}${value.slice(-visibleLength)}`;
 }
 
 function toPersonAuditEvent(row: AuditEvent): v1.persons.PersonAuditEvent {

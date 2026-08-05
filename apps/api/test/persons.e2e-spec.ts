@@ -343,6 +343,21 @@ describe("Persons HTTP surface (e2e)", () => {
         userId: session.userId,
       }),
     );
+    expect(
+      auditEvents.find((event) => event.type === "PERSON_DOCUMENT_CREATED")
+        ?.changes,
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          field: "document.number",
+          newValue: "**3456",
+        }),
+        expect.objectContaining({
+          field: "document.cnp",
+          newValue: "*********3450",
+        }),
+      ]),
+    );
     expectAuditPayloadToOmit(auditEvents, ["123456", "1900228123450"]);
 
     const duplicateInitialDocumentRes = await req()
@@ -398,12 +413,50 @@ describe("Persons HTTP surface (e2e)", () => {
     const updateDocumentRes = await req()
       .patch(v1.persons.ROUTES.documents.update(created.id, driverLicense.id))
       .set("Cookie", [`access_token=${session.accessToken}`])
-      .send({ status: "verified" });
+      .send({ status: "unverified" });
     const updatedDocument = v1.persons.personDocumentSchema.parse(
       updateDocumentRes.body,
     );
     expect(updateDocumentRes.status).toBe(200);
-    expect(updatedDocument.status).toBe("verified");
+    expect(updatedDocument.status).toBe("unverified");
+
+    const documentUpdateAuditsBeforeNoop = (
+      await listAuditEvents(created.id, session.accessToken)
+    ).filter((event) => event.type === "PERSON_DOCUMENT_UPDATED");
+    expect(documentUpdateAuditsBeforeNoop).toHaveLength(1);
+    expect(documentUpdateAuditsBeforeNoop[0]?.changes).toEqual([
+      expect.objectContaining({
+        field: "document.status",
+        oldValue: "verified",
+        newValue: "unverified",
+      }),
+    ]);
+    const noOpDocumentUpdateRes = await req()
+      .patch(v1.persons.ROUTES.documents.update(created.id, driverLicense.id))
+      .set("Cookie", [`access_token=${session.accessToken}`])
+      .send({
+        type: updatedDocument.type,
+        series: updatedDocument.series,
+        number: updatedDocument.number,
+        cnp: updatedDocument.cnp,
+        issuingCountryCode: updatedDocument.issuingCountryCode,
+        issuedBy: updatedDocument.issuedBy,
+        issuedOn: updatedDocument.issuedOn,
+        expiresOn: updatedDocument.expiresOn,
+        status: updatedDocument.status,
+        notes: updatedDocument.notes,
+      });
+    const unchangedDocument = v1.persons.personDocumentSchema.parse(
+      noOpDocumentUpdateRes.body,
+    );
+
+    expect(noOpDocumentUpdateRes.status).toBe(200);
+    expect(unchangedDocument.updatedAt).toBe(updatedDocument.updatedAt);
+    expect(
+      (await listAuditEvents(created.id, session.accessToken)).filter(
+        (event) => event.type === "PERSON_DOCUMENT_UPDATED",
+      ),
+    ).toHaveLength(documentUpdateAuditsBeforeNoop.length);
 
     const duplicateDocumentUpdateRes = await req()
       .patch(
@@ -561,13 +614,21 @@ describe("Persons HTTP surface (e2e)", () => {
     expect(replacementEvent?.replacement?.newDocument.id).toBe(
       replacementDocument.id,
     );
+    expect(replacementEvent?.changes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          field: "document.notes",
+          oldValue: null,
+          newValue: "Replacement copy collected.",
+        }),
+      ]),
+    );
     expectAuditPayloadToOmit(auditEvents, [
       "123456",
       "1900228123450",
       "B7654321",
       "B7654322",
       "B7654323",
-      "Replacement copy collected.",
     ]);
 
     const deleteRes = await req()
