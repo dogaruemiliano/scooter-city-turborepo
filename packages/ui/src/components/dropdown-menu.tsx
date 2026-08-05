@@ -24,20 +24,17 @@ function DropdownMenuContent({
   alignOffset = 0,
   side = "bottom",
   sideOffset = tokens.spacing[1],
-  positionerClassName,
   className,
   ...props
 }: MenuPrimitive.Popup.Props &
   Pick<
     MenuPrimitive.Positioner.Props,
     "align" | "alignOffset" | "side" | "sideOffset"
-  > & {
-    positionerClassName?: string;
-  }) {
+  >) {
   return (
     <MenuPrimitive.Portal>
       <MenuPrimitive.Positioner
-        className={cn("isolate z-popover outline-none", positionerClassName)}
+        className="isolate z-popover outline-none"
         align={align}
         alignOffset={alignOffset}
         side={side}
@@ -142,7 +139,6 @@ function DropdownMenuSubContent({
   return (
     <DropdownMenuContent
       data-slot="dropdown-menu-sub-content"
-      positionerClassName="z-nested-popover"
       className={cn(
         "w-auto min-w-24 rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-lg duration-fast ease-standard data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
         className,

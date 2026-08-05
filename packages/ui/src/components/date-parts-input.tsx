@@ -17,6 +17,7 @@ export interface DatePartsInputProps {
   className?: string;
   disabled?: boolean;
   invalid?: boolean;
+  required?: boolean;
   label: string;
   locale?: string;
   value: DateParts;
@@ -29,6 +30,7 @@ export function DatePartsInput({
   className,
   disabled = false,
   invalid = false,
+  required = false,
   label,
   locale,
   value,
@@ -58,11 +60,15 @@ export function DatePartsInput({
   }
 
   return (
-    <div className={cn("flex w-full items-center gap-2", className)}>
+    <div
+      data-disabled={disabled || undefined}
+      className={cn("flex w-full items-center gap-2", className)}
+    >
       <Input
         id={`${baseId}-day`}
         aria-describedby={ariaDescribedBy}
         aria-invalid={ariaInvalid}
+        aria-required={required || undefined}
         aria-label={label}
         disabled={disabled}
         inputMode="numeric"
@@ -74,7 +80,13 @@ export function DatePartsInput({
           changePart("day", event.target.value, 2, monthRef.current)
         }
       />
-      <span aria-hidden="true" className="text-muted-foreground">
+      <span
+        aria-hidden="true"
+        className={cn(
+          "text-muted-foreground",
+          disabled && "text-disabled-foreground",
+        )}
+      >
         /
       </span>
       <Input
@@ -82,6 +94,7 @@ export function DatePartsInput({
         id={`${baseId}-month`}
         aria-describedby={ariaDescribedBy}
         aria-invalid={ariaInvalid}
+        aria-required={required || undefined}
         aria-label={`${label} ${monthPlaceholder}`}
         disabled={disabled}
         inputMode="numeric"
@@ -93,7 +106,13 @@ export function DatePartsInput({
           changePart("month", event.target.value, 2, yearRef.current)
         }
       />
-      <span aria-hidden="true" className="text-muted-foreground">
+      <span
+        aria-hidden="true"
+        className={cn(
+          "text-muted-foreground",
+          disabled && "text-disabled-foreground",
+        )}
+      >
         /
       </span>
       <Input
@@ -101,6 +120,7 @@ export function DatePartsInput({
         id={`${baseId}-year`}
         aria-describedby={ariaDescribedBy}
         aria-invalid={ariaInvalid}
+        aria-required={required || undefined}
         aria-label={`${label} ${yearPlaceholder}`}
         disabled={disabled}
         inputMode="numeric"
@@ -174,6 +194,7 @@ export function DatePartsField({
         className={className}
         disabled={disabled}
         invalid={invalid}
+        required={required}
         label={label}
         locale={locale}
         value={parts}

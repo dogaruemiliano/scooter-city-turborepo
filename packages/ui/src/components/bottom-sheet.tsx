@@ -127,9 +127,10 @@ function BottomSheetContent({
       >
         <BottomSheetPrimitive.Popup
           data-slot="bottom-sheet-popup"
+          data-swipe-axis="y"
           data-snap-points={hasSnapPoints ? "" : undefined}
           className={cn(
-            "group/bottom-sheet pointer-events-auto fixed inset-x-0 bottom-0 z-modal flex h-(--drawer-content-height) max-h-(--bottom-sheet-max-height) min-h-0 w-full origin-bottom transform-[translate3d(0,var(--bottom-sheet-translate-y),0)] flex-col rounded-t-2xl border-t border-border bg-popover text-sm text-popover-foreground shadow-lg transition-[transform,height,opacity] duration-normal ease-standard will-change-transform outline-none select-none [--bottom-sheet-closed-transform:translate3d(0,calc(100%+var(--spacing-px)),0)] [--bottom-sheet-max-height:calc(100dvh-var(--spacing-12))] [--bottom-sheet-translate-y:calc(var(--drawer-snap-point-offset,0px)+var(--drawer-swipe-movement-y))] [--drawer-content-height:var(--bottom-sheet-height,auto)] data-ending-style:transform-(--bottom-sheet-closed-transform) data-snap-points:[--drawer-content-height:100dvh] data-starting-style:transform-(--bottom-sheet-closed-transform) data-swiping:duration-0 lg:inset-x-auto lg:top-1/2 lg:bottom-auto lg:left-1/2 lg:h-auto lg:max-h-[calc(100dvh-var(--spacing-24))] lg:w-96 lg:max-w-[calc(100vw-var(--spacing-12))] lg:origin-center lg:transform-[translate3d(-50%,calc(-50%+var(--bottom-sheet-translate-y)),0)] lg:rounded-2xl lg:border lg:[--bottom-sheet-closed-transform:translate3d(-50%,-50%,0)] lg:[--bottom-sheet-max-height:calc(100dvh-var(--spacing-24))] lg:[--bottom-sheet-translate-y:var(--drawer-swipe-movement-y)] lg:[--drawer-content-height:auto] lg:data-ending-style:opacity-0 lg:data-snap-points:[--drawer-content-height:auto] lg:data-starting-style:opacity-0",
+            "group/bottom-sheet pointer-events-auto fixed inset-x-0 bottom-0 z-modal flex h-(--drawer-content-height) max-h-(--bottom-sheet-max-height) min-h-0 w-full origin-bottom transform-[translate3d(0,var(--bottom-sheet-translate-y,0px),0)] flex-col rounded-t-2xl border-t border-border bg-popover text-sm text-popover-foreground shadow-lg transition-[transform,height,opacity] duration-normal ease-decelerate will-change-transform outline-none select-none [interpolate-size:allow-keywords] [--bottom-sheet-closed-transform:translate3d(0,calc(100%+var(--spacing-px)),0)] [--bottom-sheet-max-height:calc(100dvh-var(--spacing-12))] [--bottom-sheet-stack-offset:0] [--bottom-sheet-translate-y:calc(var(--drawer-snap-point-offset,0px)+var(--drawer-swipe-movement-y,0px)-var(--bottom-sheet-stack-offset))] [--drawer-content-height:var(--bottom-sheet-height,auto)] data-ending-style:transform-(--bottom-sheet-closed-transform) data-ending-style:opacity-[0.9999] data-nested-drawer-open:overflow-hidden data-nested-drawer-open:[--bottom-sheet-stack-offset:var(--spacing-3)] data-snap-points:[--drawer-content-height:100dvh] data-starting-style:transform-(--bottom-sheet-closed-transform) data-swiping:duration-0 lg:inset-x-auto lg:top-1/2 lg:bottom-auto lg:left-1/2 lg:h-auto lg:max-h-[calc(100dvh-var(--spacing-24))] lg:w-96 lg:max-w-[calc(100vw-var(--spacing-12))] lg:origin-center lg:transform-[translate3d(-50%,calc(-50%+var(--bottom-sheet-translate-y,0px)),0)] lg:rounded-2xl lg:border lg:[--bottom-sheet-closed-transform:translate3d(-50%,-50%,0)] lg:[--bottom-sheet-max-height:calc(100dvh-var(--spacing-24))] lg:[--bottom-sheet-translate-y:var(--drawer-swipe-movement-y,0px)] lg:[--drawer-content-height:auto] lg:data-ending-style:opacity-0 lg:data-nested-drawer-open:[--bottom-sheet-stack-offset:0] lg:data-snap-points:[--drawer-content-height:auto] lg:data-starting-style:opacity-0",
             className,
           )}
           {...props}
@@ -160,12 +161,22 @@ function BottomSheetHeader({
   );
 }
 
-function BottomSheetBody({ className, ...props }: React.ComponentProps<"div">) {
+function BottomSheetBody({
+  className,
+  safeAreaBottom = false,
+  ...props
+}: React.ComponentProps<"div"> & {
+  /** Adds bottom safe-area padding for sheets that do not render a footer. */
+  safeAreaBottom?: boolean;
+}) {
   return (
     <div
       data-slot="bottom-sheet-body"
       className={cn(
-        "flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain px-4 pb-4",
+        "flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain px-4",
+        safeAreaBottom
+          ? "pb-[max(var(--spacing-4),env(safe-area-inset-bottom))]"
+          : "pb-4",
         className,
       )}
       {...props}

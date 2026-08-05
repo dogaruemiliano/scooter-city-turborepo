@@ -55,6 +55,50 @@ export const Default: Story = {
   ),
 };
 
+export const Nested: Story = {
+  render: () => (
+    <BottomSheet>
+      <BottomSheetTrigger render={<Button variant="outline" />}>
+        Open drawer stack
+      </BottomSheetTrigger>
+      <BottomSheetContent>
+        <BottomSheetHeader>
+          <BottomSheetTitle>Document details</BottomSheetTitle>
+          <BottomSheetDescription>
+            Edit the document, then open its photo workflow.
+          </BottomSheetDescription>
+        </BottomSheetHeader>
+        <BottomSheetBody>
+          <BottomSheet>
+            <BottomSheetTrigger render={<Button variant="outline" />}>
+              Add front photo
+            </BottomSheetTrigger>
+            <BottomSheetContent>
+              <BottomSheetHeader>
+                <BottomSheetTitle>Front photo</BottomSheetTitle>
+                <BottomSheetDescription>
+                  Take a photo or choose an existing image.
+                </BottomSheetDescription>
+              </BottomSheetHeader>
+              <BottomSheetBody>
+                <div className="h-64 rounded-lg bg-muted" />
+              </BottomSheetBody>
+              <BottomSheetFooter>
+                <BottomSheetClose render={<Button />}>Done</BottomSheetClose>
+              </BottomSheetFooter>
+            </BottomSheetContent>
+          </BottomSheet>
+        </BottomSheetBody>
+        <BottomSheetFooter>
+          <BottomSheetClose render={<Button variant="text" />}>
+            Cancel
+          </BottomSheetClose>
+        </BottomSheetFooter>
+      </BottomSheetContent>
+    </BottomSheet>
+  ),
+};
+
 function SnapPointsExample() {
   const [snapPoint, setSnapPoint] =
     React.useState<BottomSheetPrimitiveSnapPoint | null>(0.5);

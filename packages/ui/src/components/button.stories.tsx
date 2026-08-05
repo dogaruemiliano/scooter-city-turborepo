@@ -21,6 +21,8 @@ const meta = {
         "outline",
         "secondary",
         "ghost",
+        "text",
+        "success",
         "destructive",
         "link",
       ],
@@ -58,6 +60,8 @@ export const Variants: Story = {
       <Button variant="secondary">Secondary</Button>
       <Button variant="outline">Outline</Button>
       <Button variant="ghost">Ghost</Button>
+      <Button variant="text">Text</Button>
+      <Button variant="success">Success</Button>
       <Button variant="destructive">Destructive</Button>
       <Button variant="link">Link</Button>
     </div>
