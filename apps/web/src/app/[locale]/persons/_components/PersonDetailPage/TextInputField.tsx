@@ -13,6 +13,8 @@ export function TextInputField({
   date = false,
   type = "text",
   className,
+  disabled = false,
+  required = false,
 }: {
   label: string;
   value: string;
@@ -20,19 +22,44 @@ export function TextInputField({
   date?: boolean;
   type?: string;
   className?: string;
+  disabled?: boolean;
+  required?: boolean;
 }) {
   const id = useId();
   const locale = useLocale();
 
   if (date) {
     return (
-      <div className={cn("grid gap-2", className)}>
-        <Label htmlFor={`${id}-day`}>{label}</Label>
+      <div
+        data-disabled={disabled || undefined}
+        className={cn("grid gap-2", className)}
+      >
+        <Label
+          htmlFor={`${id}-day`}
+          className={cn(
+            "flex items-center gap-1",
+            disabled && "text-disabled-foreground",
+          )}
+        >
+          {label}
+          {required ? (
+            <span
+              aria-hidden="true"
+              className={
+                disabled ? "text-disabled-foreground" : "text-destructive"
+              }
+            >
+              *
+            </span>
+          ) : null}
+        </Label>
         <DatePartsField
           baseId={id}
           label={label}
           locale={locale}
           value={value}
+          disabled={disabled}
+          required={required}
           onChange={onChange}
         />
       </div>
@@ -40,12 +67,35 @@ export function TextInputField({
   }
 
   return (
-    <div className={cn("grid gap-2", className)}>
-      <Label htmlFor={id}>{label}</Label>
+    <div
+      data-disabled={disabled || undefined}
+      className={cn("grid gap-2", className)}
+    >
+      <Label
+        htmlFor={id}
+        className={cn(
+          "flex items-center gap-1",
+          disabled && "text-disabled-foreground",
+        )}
+      >
+        {label}
+        {required ? (
+          <span
+            aria-hidden="true"
+            className={
+              disabled ? "text-disabled-foreground" : "text-destructive"
+            }
+          >
+            *
+          </span>
+        ) : null}
+      </Label>
       <Input
         id={id}
         type={type}
         value={value}
+        disabled={disabled}
+        required={required}
         onChange={(event) => onChange(event.target.value)}
       />
     </div>

@@ -2,7 +2,7 @@ import { v1 } from "@repo/api-shared";
 import { buildDateOnly } from "@repo/ui/lib/date-parts";
 
 import { documentFieldErrorKey } from "./errors";
-import { isBlankOptionalDocument } from "./form-state";
+import { isBlankDocumentDraft } from "./form-state";
 import type {
   CreatePersonDocumentFormState,
   CreatePersonFormState,
@@ -56,7 +56,7 @@ export function createPersonInput(
   const documents: Record<string, unknown>[] = [];
 
   for (const document of form.documents) {
-    if (!document.required && isBlankOptionalDocument(document)) {
+    if (!document.required && isBlankDocumentDraft(document)) {
       continue;
     }
 
@@ -111,7 +111,7 @@ function createDocumentInput(document: CreatePersonDocumentFormState): {
     };
   }
 
-  if (expiresOn.error) {
+  if (document.hasExpiryDate && expiresOn.error) {
     return {
       input,
       error: {
@@ -132,7 +132,7 @@ function createDocumentInput(document: CreatePersonDocumentFormState): {
   addOptional(input, "issuingCountryCode", document.issuingCountryCode);
   addOptional(input, "issuedBy", document.issuedBy);
   addOptional(input, "issuedOn", issuedOn.value);
-  addOptional(input, "expiresOn", expiresOn.value);
+  input.expiresOn = document.hasExpiryDate ? expiresOn.value : null;
   addOptional(input, "notes", document.notes);
   const photoTokens = documentPhotoUploadTokens(document.photos);
   if (Object.keys(photoTokens).length > 0) {

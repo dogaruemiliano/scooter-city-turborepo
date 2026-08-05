@@ -5,6 +5,7 @@ export function FormField({
   id,
   label,
   required = false,
+  disabled = false,
   error,
   className,
   children,
@@ -12,20 +13,34 @@ export function FormField({
   id: string;
   label: string;
   required?: boolean;
+  disabled?: boolean;
   error?: string;
   className?: string;
   children: ReactNode;
 }) {
   return (
     <div
+      data-disabled={disabled || undefined}
       className={["flex min-w-0 flex-col gap-2", className]
         .filter(Boolean)
         .join(" ")}
     >
-      <div className="flex items-center gap-1">
+      <div
+        className={[
+          "flex items-center gap-1",
+          disabled ? "text-disabled-foreground" : undefined,
+        ]
+          .filter(Boolean)
+          .join(" ")}
+      >
         <Label htmlFor={id}>{label}</Label>
         {required ? (
-          <span aria-hidden="true" className="text-destructive">
+          <span
+            aria-hidden="true"
+            className={
+              disabled ? "text-disabled-foreground" : "text-destructive"
+            }
+          >
             *
           </span>
         ) : null}

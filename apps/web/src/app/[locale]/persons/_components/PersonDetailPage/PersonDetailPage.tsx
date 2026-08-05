@@ -2,16 +2,14 @@
 
 import { v1 } from "@repo/api-shared";
 import { useRouter } from "next/navigation";
-import { useLocale, useTranslations } from "next-intl";
+import { useLocale } from "next-intl";
 import { useState } from "react";
 
 import { PageTitleOverride } from "@/components/PageTitleOverride";
 import { webApi } from "@/lib/api";
 
 import { ActivitySection } from "./ActivitySection";
-import { FeedbackAlert } from "./FeedbackAlert";
 import {
-  apiErrorFeedback,
   getRentalReadiness,
   removeDocumentPhoto,
   upsertDocumentPhoto,
@@ -25,7 +23,6 @@ import { PersonProfileSection } from "./PersonProfileSection";
 import { ReadinessSection } from "./ReadinessSection";
 import type {
   DocumentPhotosByDocumentId,
-  Feedback,
   PersonDetailPageProps,
 } from "./types";
 
@@ -35,13 +32,10 @@ export function PersonDetailPage({
   documentPhotos,
   personsHref,
 }: PersonDetailPageProps) {
-  const t = useTranslations("persons");
   const locale = useLocale();
   const router = useRouter();
   const readiness = getRentalReadiness(person);
-  const readinessIsReady = readiness.issues.length === 0;
   const title = `${person.firstName} ${person.lastName}`;
-  const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [photosByDocumentId, setPhotosByDocumentId] =
     useState<DocumentPhotosByDocumentId>(() => documentPhotos);
@@ -49,7 +43,6 @@ export function PersonDetailPage({
   async function updatePerson(
     input: v1.persons.UpdatePersonInput,
   ): Promise<boolean> {
-    setFeedback(null);
     setBusyAction("person:update");
     try {
       await webApi.fetch(
@@ -57,21 +50,9 @@ export function PersonDetailPage({
         v1.persons.personSchema,
         { method: "PATCH", json: input },
       );
-      setFeedback({
-        kind: "success",
-        title: t("feedback.updateSuccessTitle"),
-        messages: [t("feedback.updateSuccessMessage")],
-      });
       router.refresh();
       return true;
-    } catch (error) {
-      setFeedback(
-        apiErrorFeedback(
-          error,
-          t("feedback.updateErrorTitle"),
-          t("feedback.genericError"),
-        ),
-      );
+    } catch {
       return false;
     } finally {
       setBusyAction(null);
@@ -79,7 +60,6 @@ export function PersonDetailPage({
   }
 
   async function deletePerson(): Promise<boolean> {
-    setFeedback(null);
     setBusyAction("person:delete");
     try {
       await webApi.fetch(
@@ -92,14 +72,7 @@ export function PersonDetailPage({
       router.replace(personsHref);
       router.refresh();
       return true;
-    } catch (error) {
-      setFeedback(
-        apiErrorFeedback(
-          error,
-          t("feedback.deleteErrorTitle"),
-          t("feedback.genericError"),
-        ),
-      );
+    } catch {
       return false;
     } finally {
       setBusyAction(null);
@@ -109,7 +82,6 @@ export function PersonDetailPage({
   async function createDocument(
     input: v1.persons.CreatePersonDocumentInput,
   ): Promise<boolean> {
-    setFeedback(null);
     setBusyAction("document:create");
     try {
       await webApi.fetch(
@@ -117,21 +89,9 @@ export function PersonDetailPage({
         v1.persons.personDocumentSchema,
         { method: "POST", json: input },
       );
-      setFeedback({
-        kind: "success",
-        title: t("feedback.documentSuccessTitle"),
-        messages: [t("feedback.documentSuccessMessage")],
-      });
       router.refresh();
       return true;
-    } catch (error) {
-      setFeedback(
-        apiErrorFeedback(
-          error,
-          t("feedback.updateErrorTitle"),
-          t("feedback.genericError"),
-        ),
-      );
+    } catch {
       return false;
     } finally {
       setBusyAction(null);
@@ -142,7 +102,6 @@ export function PersonDetailPage({
     documentId: string,
     input: v1.persons.UpdatePersonDocumentInput,
   ): Promise<boolean> {
-    setFeedback(null);
     setBusyAction(`document:update:${documentId}`);
     try {
       await webApi.fetch(
@@ -150,54 +109,9 @@ export function PersonDetailPage({
         v1.persons.personDocumentSchema,
         { method: "PATCH", json: input },
       );
-      setFeedback({
-        kind: "success",
-        title: t("feedback.documentSuccessTitle"),
-        messages: [t("feedback.documentSuccessMessage")],
-      });
       router.refresh();
       return true;
-    } catch (error) {
-      setFeedback(
-        apiErrorFeedback(
-          error,
-          t("feedback.updateErrorTitle"),
-          t("feedback.genericError"),
-        ),
-      );
-      return false;
-    } finally {
-      setBusyAction(null);
-    }
-  }
-
-  async function replaceDocument(
-    documentId: string,
-    input: v1.persons.CreatePersonDocumentInput,
-  ): Promise<boolean> {
-    setFeedback(null);
-    setBusyAction(`document:replace:${documentId}`);
-    try {
-      await webApi.fetch(
-        v1.persons.ROUTES.documents.replace(person.id, documentId),
-        v1.persons.personDocumentSchema,
-        { method: "POST", json: input },
-      );
-      setFeedback({
-        kind: "success",
-        title: t("feedback.documentSuccessTitle"),
-        messages: [t("feedback.documentSuccessMessage")],
-      });
-      router.refresh();
-      return true;
-    } catch (error) {
-      setFeedback(
-        apiErrorFeedback(
-          error,
-          t("feedback.updateErrorTitle"),
-          t("feedback.genericError"),
-        ),
-      );
+    } catch {
       return false;
     } finally {
       setBusyAction(null);
@@ -205,7 +119,6 @@ export function PersonDetailPage({
   }
 
   async function deleteDocument(documentId: string): Promise<boolean> {
-    setFeedback(null);
     setBusyAction(`document:delete:${documentId}`);
     try {
       await webApi.fetch(
@@ -213,21 +126,9 @@ export function PersonDetailPage({
         v1.common.noContentSchema,
         { method: "DELETE" },
       );
-      setFeedback({
-        kind: "success",
-        title: t("feedback.deleteSuccessTitle"),
-        messages: [t("feedback.documentSuccessMessage")],
-      });
       router.refresh();
       return true;
-    } catch (error) {
-      setFeedback(
-        apiErrorFeedback(
-          error,
-          t("feedback.deleteErrorTitle"),
-          t("feedback.genericError"),
-        ),
-      );
+    } catch {
       return false;
     } finally {
       setBusyAction(null);
@@ -239,7 +140,6 @@ export function PersonDetailPage({
     slot: v1.persons.PersonDocumentPhotoSlot,
     file: File,
   ): Promise<boolean> {
-    setFeedback(null);
     setBusyAction(`document-photo:upload:${documentId}:${slot}`);
     try {
       const formData = new FormData();
@@ -254,20 +154,8 @@ export function PersonDetailPage({
       setPhotosByDocumentId((current) =>
         upsertDocumentPhoto(current, documentId, photo),
       );
-      setFeedback({
-        kind: "success",
-        title: t("feedback.documentPhotoSuccessTitle"),
-        messages: [t("feedback.documentPhotoSuccessMessage")],
-      });
       return true;
-    } catch (error) {
-      setFeedback(
-        apiErrorFeedback(
-          error,
-          t("feedback.updateErrorTitle"),
-          t("feedback.genericError"),
-        ),
-      );
+    } catch {
       return false;
     } finally {
       setBusyAction(null);
@@ -278,7 +166,6 @@ export function PersonDetailPage({
     documentId: string,
     slot: v1.persons.PersonDocumentPhotoSlot,
   ): Promise<boolean> {
-    setFeedback(null);
     setBusyAction(`document-photo:delete:${documentId}:${slot}`);
     try {
       await webApi.fetch(
@@ -290,20 +177,8 @@ export function PersonDetailPage({
       setPhotosByDocumentId((current) =>
         removeDocumentPhoto(current, documentId, slot),
       );
-      setFeedback({
-        kind: "success",
-        title: t("feedback.deleteSuccessTitle"),
-        messages: [t("feedback.documentPhotoDeletedMessage")],
-      });
       return true;
-    } catch (error) {
-      setFeedback(
-        apiErrorFeedback(
-          error,
-          t("feedback.deleteErrorTitle"),
-          t("feedback.genericError"),
-        ),
-      );
+    } catch {
       return false;
     } finally {
       setBusyAction(null);
@@ -316,14 +191,10 @@ export function PersonDetailPage({
       <PersonDetailHeader
         person={person}
         personsHref={personsHref}
-        readinessIsReady={readinessIsReady}
         busyAction={busyAction}
         onUpdatePerson={updatePerson}
-        onCreateDocument={createDocument}
         onDeletePerson={deletePerson}
       />
-
-      {feedback ? <FeedbackAlert feedback={feedback} /> : null}
 
       <ReadinessSection issues={readiness.issues} />
       <PersonProfileSection person={person} locale={locale} />
@@ -335,8 +206,8 @@ export function PersonDetailPage({
         photosByDocumentId={photosByDocumentId}
         locale={locale}
         busyAction={busyAction}
+        onCreateDocument={createDocument}
         onUpdateDocument={updateDocument}
-        onReplaceDocument={replaceDocument}
         onDeleteDocument={deleteDocument}
         onUploadDocumentPhoto={uploadDocumentPhoto}
         onDeleteDocumentPhoto={deleteDocumentPhoto}

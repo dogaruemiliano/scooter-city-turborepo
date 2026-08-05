@@ -124,9 +124,16 @@ describe("PersonsPage", () => {
     ).not.toBeInTheDocument();
     expect(screen.getByText("ada@example.com")).toBeInTheDocument();
     expect(screen.getByText("+40712345678")).toBeInTheDocument();
-    expect(screen.getByText("National ID")).toBeInTheDocument();
+    expect(screen.queryByText("National ID")).not.toBeInTheDocument();
     expect(screen.queryByText("exp. Jan 31, 2030")).not.toBeInTheDocument();
-    expect(screen.getByText("Verified")).toBeInTheDocument();
+    expect(screen.queryByText("Verified")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("img", { name: "Identity document: Valid" }),
+    ).toHaveClass("text-success");
+    expect(
+      screen.getByRole("img", { name: "Driver license: Not present" }),
+    ).toHaveClass("text-disabled-foreground");
+    expect(screen.getAllByRole("img")).toHaveLength(2);
     expect(screen.queryByLabelText("Expires on")).not.toBeInTheDocument();
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
     expect(screen.queryByText("Rows per page")).not.toBeInTheDocument();
@@ -141,8 +148,16 @@ describe("PersonsPage", () => {
     ).not.toBeInTheDocument();
     expect(screen.queryByText("Înregistrări persoane")).not.toBeInTheDocument();
     expect(screen.queryByText("Se afișează 1-1 din 1")).not.toBeInTheDocument();
-    expect(screen.getByText("Carte de identitate")).toBeInTheDocument();
-    expect(screen.getByText("Verificat")).toBeInTheDocument();
+    expect(
+      screen.getByRole("img", {
+        name: "Document de identitate: Valid",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("img", {
+        name: "Permis de conducere: Lipsește",
+      }),
+    ).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: "Vezi Ada Lovelace" }),
     ).toHaveAttribute("href", "/persons/person-1");
@@ -157,6 +172,56 @@ describe("PersonsPage", () => {
     expect(
       screen.getByRole("link", { name: "Adaugă persoană" }),
     ).toHaveAttribute("href", "/persons/new");
+  });
+
+  it("colors expired and unverified document slots", () => {
+    const identityDocument = person.documents[0]!;
+
+    renderPersons(
+      personList([
+        {
+          ...person,
+          documents: [
+            {
+              ...identityDocument,
+              expiresOn: "2020-01-31",
+            },
+            {
+              ...identityDocument,
+              id: "document-2",
+              type: "driverLicense",
+              expiresOn: "2030-01-31",
+              status: "unverified",
+            },
+          ],
+        },
+      ]),
+    );
+
+    expect(
+      screen.getByRole("img", { name: "Identity document: Expired" }),
+    ).toHaveClass("text-destructive");
+    expect(
+      screen.getByRole("img", { name: "Driver license: Unverified" }),
+    ).toHaveClass("text-warning");
+    expect(screen.getAllByRole("img")).toHaveLength(2);
+  });
+
+  it("uses the destructive state for a rejected document", () => {
+    const identityDocument = person.documents[0]!;
+
+    renderPersons(
+      personList([
+        {
+          ...person,
+          documents: [{ ...identityDocument, status: "rejected" }],
+        },
+      ]),
+    );
+
+    expect(
+      screen.getByRole("img", { name: "Identity document: Rejected" }),
+    ).toHaveClass("text-destructive");
   });
 
   it("collapses operational filters by default", async () => {

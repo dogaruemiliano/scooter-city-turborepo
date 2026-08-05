@@ -1,6 +1,7 @@
 import { ApiError, v1 } from "@repo/api-shared";
 import { messages } from "@repo/i18n";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -134,6 +135,11 @@ beforeEach(() => {
   mocks.redirect.mockImplementation((path: string) => {
     throw new Error(`NEXT_REDIRECT:${path}`);
   });
+
+  Object.defineProperty(window, "PointerEvent", {
+    configurable: true,
+    value: MouseEvent,
+  });
 });
 
 describe("PersonRoutePage", () => {
@@ -185,6 +191,8 @@ describe("PersonRoutePage", () => {
   });
 
   it("renders a fetched person detail page", async () => {
+    const browser = userEvent.setup();
+
     mocks.apiFetch
       .mockResolvedValueOnce(person)
       .mockResolvedValueOnce([])
@@ -237,8 +245,11 @@ describe("PersonRoutePage", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("ada@example.com")).toBeInTheDocument();
     expect(screen.getByText("National ID")).toBeInTheDocument();
+    await browser.click(
+      screen.getByRole("button", { name: "View National ID" }),
+    );
     expect(
-      screen.getByRole("img", { name: "Front document photo" }),
+      await screen.findByRole("img", { name: "Front document photo" }),
     ).toHaveAttribute(
       "src",
       `https://api.test${identityFrontPhoto.contentUrl}`,

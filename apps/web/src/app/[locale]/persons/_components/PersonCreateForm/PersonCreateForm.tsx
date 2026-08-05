@@ -242,6 +242,8 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
           return t("fields.documentIssuedBy");
         case "issuedOn":
           return t("fields.documentIssuedOn");
+        case "hasExpiryDate":
+          return t("fields.documentHasExpiryDate");
         case "expiresOn":
           return t("fields.documentExpiresOn");
         case "status":
@@ -331,6 +333,7 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
           disabled={creating}
           onSetDocumentValue={setDocumentValue}
           onSetDocumentPhoto={setDocumentPhoto}
+          onSetDocument={setDocument}
         />
         <NotesField
           formId={formId}
@@ -411,6 +414,15 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
     clearFieldError(documentFieldErrorKey(documentKey, key));
   }
 
+  function setDocument(document: CreatePersonDocumentFormState) {
+    setForm((current) => ({
+      ...current,
+      documents: current.documents.map((currentDocument) =>
+        currentDocument.key === document.key ? document : currentDocument,
+      ),
+    }));
+  }
+
   function setDocumentPhoto(
     documentKey: string,
     slot: v1.persons.PersonDocumentPhotoSlot,
@@ -455,6 +467,7 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
         };
       }),
     }));
+    setFeedback(null);
   }
 
   async function uploadDocumentPhotoDraft(
@@ -463,8 +476,23 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
     file: File,
     uploadId: string,
   ): Promise<void> {
+    let stage: DocumentPhotoUploadStage = "checksum";
+    let storageResponse: StorageUploadResponseDiagnostics | null = null;
+    const logContext = {
+      documentKey,
+      slot,
+      uploadId,
+      contentType: file.type || "unknown",
+      byteSize: file.size,
+      secureContext: window.isSecureContext,
+      online: navigator.onLine,
+    };
+
+    console.debug("[person-document-photo] draft upload started", logContext);
+
     try {
       const checksumSha256 = await sha256Hex(file);
+      stage = "signed-url";
       const upload = await webApi.fetch(
         v1.persons.ROUTES.documents.photos.createDraftUploadUrl,
         v1.persons.personDocumentPhotoUploadUrlSchema,
@@ -478,14 +506,33 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
         },
       );
 
+      console.debug("[person-document-photo] signed URL received", {
+        ...logContext,
+        method: upload.method,
+        expiresAt: upload.expiresAt,
+        maxBytes: upload.maxBytes,
+        uploadHeaderNames: Object.keys(upload.headers).sort(),
+      });
+
+      stage = "storage-put";
       const uploadResponse = await fetch(upload.uploadUrl, {
         method: upload.method,
         headers: upload.headers,
         body: file,
       });
+      storageResponse = storageUploadResponseDiagnostics(uploadResponse);
       if (!uploadResponse.ok) {
-        throw new Error(t("feedback.documentPhotoDraftUploadErrorMessage"));
+        throw new Error(
+          `Storage upload returned HTTP ${uploadResponse.status}${
+            uploadResponse.statusText ? ` ${uploadResponse.statusText}` : ""
+          }`,
+        );
       }
+
+      console.info("[person-document-photo] draft upload completed", {
+        ...logContext,
+        ...storageResponse,
+      });
 
       setDocumentPhotoUploadState(documentKey, slot, uploadId, {
         id: uploadId,
@@ -494,6 +541,25 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
         uploadToken: upload.uploadToken,
       });
     } catch (error) {
+      console.error(
+        "[person-document-photo] draft upload failed",
+        {
+          ...logContext,
+          stage,
+          ...(storageResponse ?? {}),
+          errorName: error instanceof Error ? error.name : typeof error,
+          errorMessage: error instanceof Error ? error.message : String(error),
+          ...(error instanceof ApiError
+            ? {
+                apiStatus: error.status,
+                apiCode: error.code,
+                apiRequestId: error.requestId,
+              }
+            : {}),
+        },
+        error,
+      );
+
       const message =
         error instanceof ApiError
           ? error.message
@@ -638,4 +704,24 @@ async function sha256Hex(file: File): Promise<string> {
   return [...new Uint8Array(digest)]
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");
+}
+
+type DocumentPhotoUploadStage = "checksum" | "signed-url" | "storage-put";
+
+interface StorageUploadResponseDiagnostics {
+  storageStatus: number;
+  storageStatusText: string;
+  storageRequestId: string | null;
+  storageExtendedRequestId: string | null;
+}
+
+function storageUploadResponseDiagnostics(
+  response: Response,
+): StorageUploadResponseDiagnostics {
+  return {
+    storageStatus: response.status,
+    storageStatusText: response.statusText,
+    storageRequestId: response.headers.get("x-amz-request-id"),
+    storageExtendedRequestId: response.headers.get("x-amz-id-2"),
+  };
 }

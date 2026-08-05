@@ -1,6 +1,12 @@
 import { ApiError, v1 } from "@repo/api-shared";
 import { messages, type SupportedLocale } from "@repo/i18n";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -79,7 +85,7 @@ beforeEach(() => {
 });
 
 describe("PersonCreateForm", () => {
-  it("renders Romanian citizen defaults with fixed document slots", () => {
+  it("renders Romanian citizen defaults with document cards", () => {
     renderCreateForm();
 
     expect(
@@ -94,6 +100,10 @@ describe("PersonCreateForm", () => {
     expect(requiredLabel("Phone")).toHaveTextContent(/Phone\s*\*/);
     expect(requiredLabel("Country")).toHaveTextContent(/Country\s*\*/);
     expect(screen.getByLabelText("Phone country")).toHaveValue("RO");
+    expect(screen.getByLabelText("Phone")).toHaveAttribute(
+      "placeholder",
+      "Phone number",
+    );
     expect(screen.getByLabelText("Country")).toHaveValue("RO");
     expect(screen.getByLabelText("County")).toBeInTheDocument();
     expect(
@@ -104,29 +114,20 @@ describe("PersonCreateForm", () => {
     ).toHaveAttribute("aria-pressed", "false");
     expect(screen.queryByLabelText("Date of birth")).not.toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: "National ID" }),
-    ).toBeInTheDocument();
+      screen.getByRole("button", { name: "Add National ID" }),
+    ).toHaveAttribute("type", "button");
     expect(
-      screen.getByRole("heading", { name: "Driver license" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "Add document" }),
-    ).not.toBeInTheDocument();
-    expect(screen.getAllByPlaceholderText("DD")[0]).toHaveAttribute(
-      "inputmode",
-      "numeric",
-    );
-    expect(screen.getAllByPlaceholderText("MM")[0]).toHaveAttribute(
-      "inputmode",
-      "numeric",
-    );
-    expect(screen.getAllByPlaceholderText("YYYY")[0]).toHaveAttribute(
-      "inputmode",
-      "numeric",
-    );
+      screen.getByRole("button", { name: "Add Driver license" }),
+    ).toHaveAttribute("type", "button");
+    expect(screen.queryByLabelText("Series")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Number")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("CNP")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Issued on")).not.toBeInTheDocument();
   });
 
-  it("renders Romanian create page copy and localized date placeholders", () => {
+  it("renders Romanian create page copy and localized document sheet", async () => {
+    const browser = userEvent.setup();
+
     renderCreateForm("ro");
 
     expect(
@@ -139,29 +140,50 @@ describe("PersonCreateForm", () => {
     expect(screen.getByLabelText("Telefon")).toBeInTheDocument();
     expect(screen.getByLabelText("Țară")).toHaveValue("RO");
     expect(screen.getByLabelText("Județ")).toBeInTheDocument();
-    expect(screen.getAllByPlaceholderText("ZZ")[0]).toBeInTheDocument();
-    expect(screen.getAllByPlaceholderText("LL")[0]).toBeInTheDocument();
-    expect(screen.getAllByPlaceholderText("AAAA")[0]).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Cetățean român" }),
     ).toHaveAttribute("aria-pressed", "true");
-    expect(
-      screen.getByRole("heading", { name: "Carte de identitate" }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Carte de identitate")).toBeInTheDocument();
     expect(screen.queryByLabelText("Tip document")).not.toBeInTheDocument();
     expect(screen.queryByText("nationalId")).not.toBeInTheDocument();
-    expect(screen.getByLabelText("Serie")).toBeInTheDocument();
-    expect(screen.getByLabelText("Număr")).toBeInTheDocument();
-    expect(screen.getByLabelText("CNP")).toBeInTheDocument();
-    expect(screen.getByLabelText("Emis de")).toBeInTheDocument();
-    expect(screen.getByLabelText("Emis la")).toBeInTheDocument();
-    expect(
-      screen.getAllByRole("combobox", { name: "Stare document" })[0],
-    ).toBeInTheDocument();
+    expect(screen.queryByLabelText("Serie")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Număr")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("CNP")).not.toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Creează persoana" }),
     ).toBeInTheDocument();
+
+    await browser.click(
+      screen.getByRole("button", { name: /Carte de identitate/ }),
+    );
+    const dialog = await screen.findByRole("dialog", {
+      name: "Adaugă document",
+    });
+
+    expect(within(dialog).getByLabelText("Serie")).toBeInTheDocument();
+    expect(within(dialog).getByLabelText("Număr")).toBeInTheDocument();
+    expect(within(dialog).getByLabelText("CNP")).toBeInTheDocument();
+    expect(within(dialog).getByLabelText("Emis de")).toBeInTheDocument();
+    expect(within(dialog).getByLabelText("Emis la")).toBeInTheDocument();
+    expect(
+      within(dialog).getByRole("combobox", { name: "Stare document" }),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getByRole("switch", {
+        name: "Documentul are data de expirare?",
+      }),
+    ).toBeChecked();
+    expect(within(dialog).getAllByPlaceholderText("ZZ")[0]).toHaveAttribute(
+      "inputmode",
+      "numeric",
+    );
+    expect(within(dialog).getAllByPlaceholderText("LL")[0]).toHaveAttribute(
+      "inputmode",
+      "numeric",
+    );
+    expect(within(dialog).getAllByPlaceholderText("AAAA")[0]).toHaveAttribute(
+      "inputmode",
+      "numeric",
+    );
   });
 
   it("switches to foreign citizen identity document mode", async () => {
@@ -175,19 +197,129 @@ describe("PersonCreateForm", () => {
 
     expect(screen.getByLabelText("Date of birth")).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: "Passport" }),
+      screen.getByRole("button", { name: "Add Passport" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: "Driver license" }),
+      screen.getByRole("button", { name: "Add Driver license" }),
     ).toBeInTheDocument();
-    expect(screen.getByLabelText("Document type")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Document type")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("CNP")).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("heading", { name: "National ID" }),
+      screen.queryByRole("button", { name: /National ID/ }),
     ).not.toBeInTheDocument();
+
+    await browser.click(screen.getByRole("button", { name: "Add Passport" }));
+    const dialog = await screen.findByRole("dialog", { name: "Add document" });
+
+    expect(within(dialog).getByLabelText("Document type")).toBeInTheDocument();
+    expect(within(dialog).queryByLabelText("CNP")).not.toBeInTheDocument();
+  });
+
+  it("opens a driving licence sheet with number as its only identifier", async () => {
+    const browser = userEvent.setup();
+
+    renderCreateForm();
+    await browser.click(
+      screen.getByRole("button", { name: "Add Driver license" }),
+    );
+    const dialog = await screen.findByRole("dialog", { name: "Add document" });
+
+    expect(within(dialog).queryByLabelText("Document type")).toBeNull();
+    expect(within(dialog).queryByLabelText("Series")).toBeNull();
+    expect(within(dialog).queryByLabelText("CNP")).toBeNull();
     expect(
-      screen.queryByRole("button", { name: "Add document" }),
-    ).not.toBeInTheDocument();
+      within(dialog).getByLabelText("Document number"),
+    ).toBeInTheDocument();
+  });
+
+  it("opens an animated document sheet, saves, and rolls back cancel without submitting", async () => {
+    const browser = userEvent.setup();
+
+    renderCreateForm();
+    fireEvent.click(screen.getByRole("button", { name: "Add National ID" }));
+
+    expect(
+      document.querySelector('[data-slot="bottom-sheet-popup"]'),
+    ).toHaveAttribute("data-starting-style");
+    const addDialog = await screen.findByRole("dialog", {
+      name: "Add document",
+    });
+    const saveButton = within(addDialog).getByRole("button", { name: "Save" });
+    const expirySwitch = within(addDialog).getByRole("switch", {
+      name: "Document has expiry date?",
+    });
+
+    expect(saveButton).toHaveAttribute("type", "button");
+    expect(expirySwitch).toBeChecked();
+    expect(within(addDialog).getByLabelText("Expires on")).toHaveAttribute(
+      "aria-required",
+      "true",
+    );
+    await browser.click(saveButton);
+    expect(addDialog).toBeInTheDocument();
+    expect(
+      within(addDialog).getByText("Expires on is required."),
+    ).toBeInTheDocument();
+    changeDialogField(addDialog, "Number", "123456");
+    changeDialogField(addDialog, "CNP", "1900228123450");
+    fillDialogDateParts(addDialog, "Expires on", {
+      day: "31",
+      month: "01",
+      year: "2030",
+    });
+    await browser.click(expirySwitch);
+    expect(expirySwitch).not.toBeChecked();
+    expect(within(addDialog).queryByText("No expiration date")).toBeNull();
+    expect(within(addDialog).getByLabelText("Expires on")).toBeDisabled();
+    expect(within(addDialog).getByLabelText("Expires on MM")).toBeDisabled();
+    expect(within(addDialog).getByLabelText("Expires on YYYY")).toBeDisabled();
+    expect(within(addDialog).getByLabelText("Expires on")).toHaveValue("31");
+    await browser.click(saveButton);
+
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "Add document" }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(mocks.apiFetch).not.toHaveBeenCalled();
+    expect(mocks.push).not.toHaveBeenCalled();
+
+    await browser.click(
+      screen.getByRole("button", { name: "Edit National ID" }),
+    );
+    const editDialog = await screen.findByRole("dialog", {
+      name: "Edit document",
+    });
+
+    expect(within(editDialog).getByLabelText("Number")).toHaveValue("123456");
+    expect(within(editDialog).getByLabelText("CNP")).toHaveValue(
+      "1900228123450",
+    );
+    expect(within(editDialog).getByLabelText("Expires on")).toHaveValue("31");
+    expect(within(editDialog).getByLabelText("Expires on")).toBeDisabled();
+    expect(
+      within(editDialog).getByRole("switch", {
+        name: "Document has expiry date?",
+      }),
+    ).not.toBeChecked();
+    changeDialogField(editDialog, "Number", "654321");
+    await saveDocumentSheet(browser, editDialog);
+
+    const savedEditDialog = await openNationalIdSheet(browser);
+    expect(within(savedEditDialog).getByLabelText("Number")).toHaveValue(
+      "654321",
+    );
+    changeDialogField(savedEditDialog, "Number", "999999");
+    await browser.click(
+      within(savedEditDialog).getByRole("button", { name: "Cancel" }),
+    );
+    await waitFor(() => expect(savedEditDialog).not.toBeInTheDocument());
+
+    const restoredEditDialog = await openNationalIdSheet(browser);
+    expect(within(restoredEditDialog).getByLabelText("Number")).toHaveValue(
+      "654321",
+    );
+    expect(mocks.apiFetch).not.toHaveBeenCalled();
   });
 
   it("keeps year digits as typed without leading zero padding", async () => {
@@ -301,14 +433,23 @@ describe("PersonCreateForm", () => {
 
     renderCreateForm();
     await fillFullCreateForm(browser);
-    await browser.upload(
-      screen.getAllByLabelText("Front photo upload")[0]!,
-      file,
-    );
+    const documentDialog = await openNationalIdSheet(browser);
+    await chooseDocumentPhotoFromFiles(browser, documentDialog, file);
     await waitFor(() => expect(mocks.s3Fetch).toHaveBeenCalledOnce());
     expect(
-      screen.getByRole("img", { name: "Front document photo" }),
+      within(documentDialog).getByRole("img", {
+        name: "Front document photo",
+      }),
     ).toBeInTheDocument();
+    expect(
+      within(documentDialog).getByRole("button", {
+        name: "Change Front photo",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(documentDialog).getByRole("button", { name: "Add Back photo" }),
+    ).toBeInTheDocument();
+    await saveDocumentSheet(browser, documentDialog);
     await waitFor(() =>
       expect(
         screen.getByRole("button", { name: "Create person" }),
@@ -356,6 +497,9 @@ describe("PersonCreateForm", () => {
   }, 10_000);
 
   it("shows photo upload feedback when draft document photo upload fails", async () => {
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
     const draftUpload: v1.persons.PersonDocumentPhotoUploadUrl = {
       uploadUrl: "https://s3.test/upload/front",
       uploadToken: "draft-front-token",
@@ -374,10 +518,8 @@ describe("PersonCreateForm", () => {
 
     renderCreateForm();
     await fillFullCreateForm(browser);
-    await browser.upload(
-      screen.getAllByLabelText("Front photo upload")[0]!,
-      file,
-    );
+    const documentDialog = await openNationalIdSheet(browser);
+    await chooseDocumentPhotoFromFiles(browser, documentDialog, file);
 
     expect(await screen.findByText("Photos not uploaded")).toBeInTheDocument();
     expect(
@@ -385,12 +527,124 @@ describe("PersonCreateForm", () => {
         "The selected document photo was not uploaded. Try selecting it again.",
       ),
     ).toBeInTheDocument();
-    await browser.click(screen.getByRole("button", { name: "Create person" }));
+    expect(
+      within(documentDialog).getByRole("button", { name: "Save" }),
+    ).toBeDisabled();
 
     expect(mocks.apiFetch).toHaveBeenCalledTimes(1);
+    expect(consoleError).toHaveBeenCalledWith(
+      "[person-document-photo] draft upload failed",
+      expect.objectContaining({
+        slot: "front",
+        contentType: "image/png",
+        byteSize: 5,
+        stage: "storage-put",
+        storageStatus: 500,
+        errorMessage: "Storage upload returned HTTP 500",
+      }),
+      expect.any(Error),
+    );
     expect(mocks.push).not.toHaveBeenCalled();
     expect(mocks.refresh).not.toHaveBeenCalled();
+    consoleError.mockRestore();
   }, 10_000);
+
+  it("logs checksum failures before an upload request reaches the API", async () => {
+    const checksumError = new TypeError("SubtleCrypto is unavailable");
+    const digest = vi
+      .spyOn(crypto.subtle, "digest")
+      .mockRejectedValueOnce(checksumError);
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    const browser = userEvent.setup();
+    const file = new File(["photo"], "front.png", { type: "image/png" });
+
+    renderCreateForm();
+    const documentDialog = await openNationalIdSheet(browser);
+    await chooseDocumentPhotoFromFiles(browser, documentDialog, file);
+
+    await waitFor(() =>
+      expect(consoleError).toHaveBeenCalledWith(
+        "[person-document-photo] draft upload failed",
+        expect.objectContaining({
+          slot: "front",
+          contentType: "image/png",
+          byteSize: 5,
+          stage: "checksum",
+          errorName: "TypeError",
+          errorMessage: "SubtleCrypto is unavailable",
+        }),
+        checksumError,
+      ),
+    );
+    expect(mocks.apiFetch).not.toHaveBeenCalled();
+
+    digest.mockRestore();
+    consoleError.mockRestore();
+  });
+
+  it("nests the photo chooser, keeps fallback sources available, and cancels only the child sheet", async () => {
+    const browser = userEvent.setup();
+    Object.defineProperty(navigator, "mediaDevices", {
+      configurable: true,
+      value: undefined,
+    });
+
+    renderCreateForm();
+    const documentDialog = await openNationalIdSheet(browser);
+    expect(
+      within(documentDialog).getByRole("button", { name: "Add Back photo" }),
+    ).toBeInTheDocument();
+    await browser.click(
+      within(documentDialog).getByRole("button", {
+        name: "Add Front photo",
+      }),
+    );
+    const photoDialog = await screen.findByRole("dialog", {
+      name: "Front photo",
+    });
+
+    await waitFor(() =>
+      expect(documentDialog).toHaveAttribute("data-nested-drawer-open"),
+    );
+    expect(
+      await within(photoDialog).findByText("Camera unavailable"),
+    ).toBeInTheDocument();
+    const galleryInput = within(photoDialog).getByLabelText(
+      "Choose from gallery",
+    );
+    const filesInput = within(photoDialog).getByLabelText("Choose from files");
+
+    expect(galleryInput).toHaveAttribute("type", "file");
+    expect(galleryInput).toHaveAttribute("accept", "image/*");
+    expect(filesInput).toHaveAttribute("type", "file");
+    expect(filesInput).toHaveAttribute(
+      "accept",
+      "image/jpeg,image/png,image/webp",
+    );
+    expect(
+      within(photoDialog).getByRole("button", {
+        name: "Choose from gallery",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(photoDialog).getByRole("button", { name: "Choose from files" }),
+    ).toBeInTheDocument();
+
+    await browser.click(
+      within(photoDialog).getByRole("button", { name: "Cancel" }),
+    );
+    await waitFor(() => expect(photoDialog).not.toBeInTheDocument());
+
+    expect(documentDialog).toBeInTheDocument();
+    expect(
+      within(documentDialog).getByRole("button", {
+        name: "Add Front photo",
+      }),
+    ).toBeInTheDocument();
+    expect(mocks.apiFetch).not.toHaveBeenCalled();
+  });
 
   it("rejects an invalid non-normalizable phone", async () => {
     const browser = userEvent.setup();
@@ -458,13 +712,24 @@ describe("PersonCreateForm", () => {
 
     renderCreateForm();
     await fillRequiredFields(browser);
-    await browser.type(screen.getByLabelText("CNP"), "123");
+    let documentDialog = await openNationalIdSheet(browser);
+    changeDialogField(documentDialog, "CNP", "123");
+    await browser.click(
+      within(documentDialog).getByRole("switch", {
+        name: "Document has expiry date?",
+      }),
+    );
+    await saveDocumentSheet(browser, documentDialog);
     await browser.click(screen.getByRole("button", { name: "Create person" }));
 
-    const cnpInput = screen.getByLabelText("CNP");
     const cnpError = "Enter a valid CNP.";
 
-    expect(await screen.findAllByText(cnpError)).toHaveLength(2);
+    expect(await screen.findByText("Person not created")).toBeInTheDocument();
+    expect(screen.getAllByText(cnpError).length).toBeGreaterThan(0);
+    documentDialog = await openNationalIdSheet(browser);
+    const cnpInput = within(documentDialog).getByLabelText("CNP");
+
+    expect(screen.getAllByText(cnpError).length).toBeGreaterThanOrEqual(2);
     expect(cnpInput).toHaveAttribute("aria-invalid", "true");
     expect(cnpInput).toHaveAccessibleDescription(cnpError);
     expect(mocks.apiFetch).not.toHaveBeenCalled();
@@ -503,10 +768,18 @@ describe("PersonCreateForm", () => {
     const browser = userEvent.setup();
 
     renderCreateForm();
-    await browser.type(screen.getByLabelText("CNP"), "5100626123456");
+    let documentDialog = await openNationalIdSheet(browser);
+    changeDialogField(documentDialog, "CNP", "5100626123456");
+    await browser.click(
+      within(documentDialog).getByRole("switch", {
+        name: "Document has expiry date?",
+      }),
+    );
+    await saveDocumentSheet(browser, documentDialog);
+    documentDialog = await openNationalIdSheet(browser);
 
     expect(
-      await screen.findByText(
+      await within(documentDialog).findByText(
         "This person is under 18 years old. Review eligibility before continuing.",
       ),
     ).toBeInTheDocument();
@@ -551,7 +824,7 @@ describe("PersonCreateForm", () => {
 
     renderCreateForm();
     await fillRequiredFields(browser);
-    await browser.type(screen.getByLabelText("CNP"), "1900228123450");
+    await saveNationalIdDocument(browser, { cnp: "1900228123450" });
     await browser.click(screen.getByRole("button", { name: "Create person" }));
 
     expect(await screen.findByText("Conflict")).toBeInTheDocument();
@@ -570,7 +843,7 @@ describe("PersonCreateForm", () => {
 
     renderCreateForm();
     await fillRequiredFields(browser);
-    await browser.type(screen.getByLabelText("CNP"), "1900228123450");
+    await saveNationalIdDocument(browser, { cnp: "1900228123450" });
     await browser.click(screen.getByRole("button", { name: "Create person" }));
 
     const phoneInput = screen.getByLabelText("Phone");
@@ -590,7 +863,7 @@ describe("PersonCreateForm", () => {
 
     renderCreateForm();
     await fillRequiredFields(browser);
-    await browser.type(screen.getByLabelText("CNP"), "1900228123450");
+    await saveNationalIdDocument(browser, { cnp: "1900228123450" });
     await browser.click(screen.getByRole("button", { name: "Create person" }));
 
     const emailInput = screen.getByLabelText("Email");
@@ -632,23 +905,125 @@ async function fillFullCreateForm(
   changeField("Address line 2", "Apt 4");
   changeField("City", "Bucharest");
   changeField("Postal code", "010101");
-  changeField("Series", "rx");
-  changeField("Number", "123456");
-  changeField("CNP", "1900228123450");
-  changeField("Issued by", "SPCLEP Bucuresti");
-  await fillDateParts(browser, "Issued on", {
-    day: "15",
-    month: "01",
-    year: "2024",
+  await saveNationalIdDocument(browser, {
+    series: "rx",
+    number: "123456",
+    cnp: "1900228123450",
+    issuedBy: "SPCLEP Bucuresti",
+    issuedOn: { day: "15", month: "01", year: "2024" },
+    expiresOn: { day: "31", month: "01", year: "2030" },
   });
-  await fillDateParts(browser, "Expires on", {
-    day: "31",
-    month: "01",
-    year: "2030",
+  changeField("Notes", "Frequent rider");
+}
+
+async function saveNationalIdDocument(
+  browser: ReturnType<typeof userEvent.setup>,
+  values: {
+    series?: string;
+    number?: string;
+    cnp?: string;
+    issuedBy?: string;
+    issuedOn?: { day: string; month: string; year: string };
+    expiresOn?: { day: string; month: string; year: string };
+  },
+) {
+  const dialog = await openNationalIdSheet(browser);
+
+  if (values.series !== undefined) {
+    changeDialogField(dialog, "Series", values.series);
+  }
+  if (values.number !== undefined) {
+    changeDialogField(dialog, "Number", values.number);
+  }
+  if (values.cnp !== undefined) {
+    changeDialogField(dialog, "CNP", values.cnp);
+  }
+  if (values.issuedBy !== undefined) {
+    changeDialogField(dialog, "Issued by", values.issuedBy);
+  }
+  if (values.issuedOn) {
+    fillDialogDateParts(dialog, "Issued on", values.issuedOn);
+  }
+  if (values.expiresOn) {
+    fillDialogDateParts(dialog, "Expires on", values.expiresOn);
+  } else {
+    await browser.click(
+      within(dialog).getByRole("switch", {
+        name: "Document has expiry date?",
+      }),
+    );
+  }
+
+  await saveDocumentSheet(browser, dialog);
+}
+
+async function openNationalIdSheet(
+  browser: ReturnType<typeof userEvent.setup>,
+): Promise<HTMLElement> {
+  const addButton = screen.queryByRole("button", { name: "Add National ID" });
+  const dialogTitle = addButton ? "Add document" : "Edit document";
+
+  await browser.click(
+    addButton ?? screen.getByRole("button", { name: "Edit National ID" }),
+  );
+
+  return screen.findByRole("dialog", { name: dialogTitle });
+}
+
+async function chooseDocumentPhotoFromFiles(
+  browser: ReturnType<typeof userEvent.setup>,
+  documentDialog: HTMLElement,
+  file: File,
+) {
+  await browser.click(
+    within(documentDialog).getByRole("button", { name: "Add Front photo" }),
+  );
+  const photoDialog = await screen.findByRole("dialog", {
+    name: "Front photo",
   });
-  const notesFields = screen.getAllByLabelText("Notes");
-  fireEvent.change(notesFields[notesFields.length - 1]!, {
-    target: { value: "Frequent rider" },
+
+  await browser.upload(
+    within(photoDialog).getByLabelText("Choose from files"),
+    file,
+  );
+  expect(
+    within(photoDialog).getByRole("img", { name: "Front document photo" }),
+  ).toBeInTheDocument();
+  await browser.click(
+    within(photoDialog).getByRole("button", { name: "Use photo" }),
+  );
+  await waitFor(() => expect(photoDialog).not.toBeInTheDocument());
+}
+
+async function saveDocumentSheet(
+  browser: ReturnType<typeof userEvent.setup>,
+  dialog: HTMLElement,
+) {
+  const saveButton = within(dialog).getByRole("button", { name: "Save" });
+  await waitFor(() => expect(saveButton).toBeEnabled());
+  await browser.click(saveButton);
+  await waitFor(() => expect(dialog).not.toBeInTheDocument());
+}
+
+function changeDialogField(dialog: HTMLElement, label: string, value: string) {
+  fireEvent.change(within(dialog).getByLabelText(label), {
+    target: { value },
+  });
+}
+
+function fillDialogDateParts(
+  dialog: HTMLElement,
+  label: string,
+  value: { day: string; month: string; year: string },
+) {
+  fireEvent.change(within(dialog).getByLabelText(label), {
+    target: { value: value.day },
+  });
+  fireEvent.change(within(dialog).getByLabelText(`${label} MM`), {
+    target: { value: value.month },
+  });
+  fireEvent.change(within(dialog).getByLabelText(`${label} YYYY`), {
+    target: { value: value.year },
   });
 }
 

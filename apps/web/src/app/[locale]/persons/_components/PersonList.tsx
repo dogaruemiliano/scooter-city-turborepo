@@ -4,11 +4,7 @@ import { v1 } from "@repo/api-shared";
 import { Badge, Card, CardHeader, CardTitle } from "@repo/ui/components";
 import { cn } from "@repo/ui/lib/utils";
 import {
-  BadgeAlertIcon,
-  BadgeCheckIcon,
   CarFrontIcon,
-  CircleAlertIcon,
-  FileTextIcon,
   IdCardIcon,
   MailIcon,
   PhoneIcon,
@@ -18,36 +14,39 @@ import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
 
 import { localizePath, resolveRouteLocale } from "@/i18n/paths";
+import { isPersonDocumentExpired } from "./document-status";
 
 interface PersonListProps {
   items: v1.persons.Person[];
 }
 
 const inlineIconClassName = "size-4 shrink-0";
-const documentStatusClasses = {
-  unverified: "border-warning-subtle text-warning",
-  verified: "border-success-subtle text-success",
-  rejected: "border-destructive-subtle text-destructive",
-  expired: "border-destructive-subtle text-destructive",
-} as const satisfies Record<v1.persons.PersonDocumentStatus, string>;
-const documentStatusIcons = {
-  unverified: CircleAlertIcon,
-  verified: BadgeCheckIcon,
-  rejected: BadgeAlertIcon,
-  expired: BadgeAlertIcon,
-} as const satisfies Record<v1.persons.PersonDocumentStatus, LucideIcon>;
-const documentTypeIcons = {
-  passport: IdCardIcon,
-  nationalId: IdCardIcon,
-  driverLicense: CarFrontIcon,
-  residencePermit: IdCardIcon,
-  other: FileTextIcon,
-} as const satisfies Record<v1.persons.PersonDocumentType, LucideIcon>;
+type DocumentIndicatorState =
+  | "missing"
+  | "valid"
+  | "unverified"
+  | "expired"
+  | "rejected";
+
+const documentIndicatorClasses = {
+  missing: "border-border bg-muted text-disabled-foreground",
+  valid: "border-success-subtle bg-success-subtle text-success",
+  unverified: "border-warning-subtle bg-warning-subtle text-warning",
+  expired: "border-destructive-subtle bg-destructive-subtle text-destructive",
+  rejected: "border-destructive-subtle bg-destructive-subtle text-destructive",
+} as const satisfies Record<DocumentIndicatorState, string>;
 
 export function PersonList({ items }: PersonListProps) {
   const t = useTranslations("persons");
   const locale = useLocale();
   const routeLocale = resolveRouteLocale(locale);
+  const documentStateText = {
+    missing: t("list.documentNotPresent"),
+    valid: t("documentExpiries.valid"),
+    unverified: t("documentStatuses.unverified"),
+    expired: t("documentStatuses.expired"),
+    rejected: t("documentStatuses.rejected"),
+  } as const satisfies Record<DocumentIndicatorState, string>;
 
   if (items.length === 0) {
     return (
@@ -66,13 +65,35 @@ export function PersonList({ items }: PersonListProps) {
           `/persons/${encodeURIComponent(person.id)}`,
           routeLocale,
         );
+        const activeDocuments = person.documents.filter(
+          (document) => !document.deletedAt,
+        );
+        const identityDocument = activeDocuments.find((document) =>
+          v1.persons.isPersonIdentityDocumentType(document.type),
+        );
+        const driverLicense = activeDocuments.find(
+          (document) => document.type === "driverLicense",
+        );
+        const documentIndicators = [
+          {
+            key: "identity",
+            document: identityDocument,
+            icon: IdCardIcon,
+            label: t("list.identityDocument"),
+          },
+          {
+            key: "driverLicense",
+            document: driverLicense,
+            icon: CarFrontIcon,
+            label: t("documentTypes.driverLicense"),
+          },
+        ] as const;
 
         return (
           <li
             key={person.id}
             className={cn(
-              canOpenDetail &&
-                "group/person-card relative rounded-xl focus-within:ring-2 focus-within:ring-ring",
+              canOpenDetail && "group/person-card relative rounded-xl",
             )}
           >
             {canOpenDetail ? (
@@ -88,7 +109,7 @@ export function PersonList({ items }: PersonListProps) {
               size="sm"
               className={cn(
                 canOpenDetail &&
-                  "pointer-events-none transition-colors group-hover/person-card:bg-muted",
+                  "pointer-events-none transition-colors group-hover/person-card:bg-muted group-focus-within/person-card:bg-muted/60",
               )}
             >
               <CardHeader className="gap-3">
@@ -122,28 +143,25 @@ export function PersonList({ items }: PersonListProps) {
                       )}
                     </div>
                     <div className="min-w-0 md:flex md:flex-1 md:justify-end">
-                      {person.documents.length > 0 ? (
-                        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap md:justify-end">
-                          {person.documents.map((document) => (
-                            <DocumentCard
-                              key={document.id}
-                              document={document}
-                              typeText={t(`documentTypes.${document.type}`)}
-                              statusText={t(
-                                `documentStatuses.${document.status}`,
-                              )}
+                      <div className="flex items-center gap-2 md:justify-end">
+                        {documentIndicators.map((indicator) => {
+                          const state = getDocumentIndicatorState(
+                            indicator.document,
+                          );
+
+                          return (
+                            <DocumentStatusIndicator
+                              key={indicator.key}
+                              icon={indicator.icon}
+                              label={t("list.documentIndicatorLabel", {
+                                document: indicator.label,
+                                status: documentStateText[state],
+                              })}
+                              state={state}
                             />
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 text-sm text-disabled-foreground md:justify-end">
-                          <FileTextIcon
-                            aria-hidden="true"
-                            className={inlineIconClassName}
-                          />
-                          {t("list.noDocuments")}
-                        </span>
-                      )}
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -156,40 +174,45 @@ export function PersonList({ items }: PersonListProps) {
   );
 }
 
-function DocumentCard({
-  document,
-  typeText,
-  statusText,
+function DocumentStatusIndicator({
+  icon: Icon,
+  label,
+  state,
 }: {
-  document: v1.persons.PersonDocument;
-  typeText: string;
-  statusText: string;
+  icon: LucideIcon;
+  label: string;
+  state: DocumentIndicatorState;
 }) {
-  const TypeIcon = documentTypeIcons[document.type];
-  const StatusIcon = documentStatusIcons[document.status];
-
   return (
-    <div
+    <span
+      aria-label={label}
+      role="img"
       className={cn(
-        "flex min-w-0 flex-col gap-2 rounded-lg border p-2.5 text-sm",
-        documentStatusClasses[document.status],
+        "inline-flex size-8 shrink-0 items-center justify-center rounded-md border",
+        documentIndicatorClasses[state],
       )}
     >
-      <div className="flex items-center justify-between gap-2">
-        <span className="inline-flex min-w-0 items-center gap-1.5 text-foreground">
-          <TypeIcon aria-label={typeText} className={inlineIconClassName} />
-          <span className="truncate font-medium">{typeText}</span>
-        </span>
-        <Badge
-          variant="outline"
-          className={cn("shrink-0", documentStatusClasses[document.status])}
-        >
-          <StatusIcon aria-label={statusText} data-icon="inline-start" />
-          {statusText}
-        </Badge>
-      </div>
-    </div>
+      <Icon aria-hidden="true" className={inlineIconClassName} />
+    </span>
   );
+}
+
+function getDocumentIndicatorState(
+  document: v1.persons.PersonDocument | undefined,
+): DocumentIndicatorState {
+  if (!document) {
+    return "missing";
+  }
+
+  if (document.status === "rejected") {
+    return "rejected";
+  }
+
+  if (isPersonDocumentExpired(document)) {
+    return "expired";
+  }
+
+  return document.status === "verified" ? "valid" : "unverified";
 }
 
 function formatDate(value: string, locale: string): string {
