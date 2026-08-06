@@ -71,6 +71,9 @@ export async function loadExpenseFormBootstrap(options: {
   ]);
   const owners = ownerLists.flatMap((list) => list.items);
   const vatPeriods = vatPeriodLists.flatMap((list) => list.items);
+  const categoryById = new Map(
+    categoryList.items.map((category) => [category.id, category]),
+  );
 
   return {
     entities: entities.items.map(mapEntity),
@@ -78,12 +81,17 @@ export async function loadExpenseFormBootstrap(options: {
     owners: owners.map(mapOwner),
     categories: categoryList.items
       .filter((category) => category.isActive && category.kind === "EXPENSE")
-      .map(
-        (category): ExpenseCategoryOption => ({
+      .map((category): ExpenseCategoryOption => {
+        const parent = category.parentCategoryId
+          ? categoryById.get(category.parentCategoryId)
+          : undefined;
+        return {
           id: category.id,
-          label: category.name,
-        }),
-      ),
+          label: parent ? `${parent.name} › ${category.name}` : category.name,
+          parentCategoryId: category.parentCategoryId,
+          icon: category.icon,
+        };
+      }),
     vatPeriods: vatPeriods.map(
       (period): ExpenseVatPeriodOption => ({
         id: period.id,

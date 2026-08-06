@@ -35,6 +35,9 @@ export interface ExpenseOwnerOption {
 export interface ExpenseCategoryOption {
   id: string;
   label: string;
+  /** Absent for options built before hierarchy/icon support (e.g. test fixtures). */
+  parentCategoryId?: string | null;
+  icon?: string | null;
 }
 
 export interface ExpenseVatPeriodOption {

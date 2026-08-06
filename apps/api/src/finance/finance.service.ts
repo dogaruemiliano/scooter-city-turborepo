@@ -219,6 +219,7 @@ export class FinanceService {
             }),
             name: input.name,
             kind: input.kind,
+            icon: input.icon ?? null,
             parentCategoryId: input.parentCategoryId ?? null,
           },
         });

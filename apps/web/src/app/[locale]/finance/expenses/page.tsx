@@ -105,7 +105,7 @@ export default async function ExpensesPage({ params }: ExpensesPageProps) {
 
                     <div className="flex min-w-0 items-center justify-between gap-4">
                       <p className="truncate text-sm text-muted-foreground">
-                        {expense.category.name}
+                        {expense.category?.name ?? t("list.unknownCategory")}
                       </p>
                       <FinanceStatusBadge
                         status={expense.status}
@@ -136,7 +136,9 @@ export default async function ExpensesPage({ params }: ExpensesPageProps) {
                         <TableCell>
                           {expense.payee?.label ?? t("list.unknownPayee")}
                         </TableCell>
-                        <TableCell>{expense.category.name}</TableCell>
+                        <TableCell>
+                          {expense.category?.name ?? t("list.unknownCategory")}
+                        </TableCell>
                         <TableCell>
                           <FinanceStatusBadge
                             status={expense.status}

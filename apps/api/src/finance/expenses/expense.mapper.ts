@@ -59,7 +59,7 @@ export type BusinessOwnerRecord = Prisma.BusinessOwnerGetPayload<{
 
 export const expenseInclude = {
   category: {
-    select: { id: true, code: true, name: true, kind: true },
+    select: { id: true, code: true, name: true, kind: true, icon: true },
   },
   payee: {
     include: {
@@ -94,6 +94,7 @@ export const expenseInclude = {
   },
   postings: { orderBy: { createdAt: "asc" } },
   reimbursementClaim: true,
+  scooterAllocations: { orderBy: { createdAt: "asc" } },
 } satisfies Prisma.ExpenseInclude;
 
 export type ExpenseRecord = Prisma.ExpenseGetPayload<{
@@ -286,6 +287,11 @@ export function toExpense(record: ExpenseRecord): v1.finance.Expense {
     reimbursementClaim: record.reimbursementClaim
       ? toExpenseReimbursementClaim(record.reimbursementClaim)
       : null,
+    scooterAllocations: record.scooterAllocations.map((allocation) => ({
+      id: allocation.id,
+      scooterId: allocation.scooterId,
+      allocatedGrossAmount: money(allocation.allocatedGrossAmount),
+    })),
   };
 }
 
@@ -328,6 +334,7 @@ function required<T>(value: T | null, label: string, expenseId: string): T {
 function toPayee(
   payee: ExpenseRecord["payee"],
 ): v1.finance.FinancialCounterpartySearchItem | null {
+  if (!payee) return null;
   if (payee.person) {
     const phoneMasked = maskSuffix(payee.person.phone);
     return {

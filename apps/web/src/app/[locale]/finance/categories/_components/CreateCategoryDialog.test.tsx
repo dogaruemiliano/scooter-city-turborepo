@@ -74,6 +74,7 @@ describe("CreateCategoryDialog", () => {
           json: {
             name: "Rental income",
             kind: "EXPENSE",
+            icon: null,
             parentCategoryId: null,
           },
         },

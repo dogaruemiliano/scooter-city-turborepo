@@ -10,10 +10,15 @@ import {
   TableHeader,
   TableRow,
 } from "@repo/ui/components";
-import { CornerDownRightIcon, GitForkIcon } from "lucide-react";
+import {
+  CornerDownRightIcon,
+  GitForkIcon,
+  type LucideIcon,
+} from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { FinanceEmptyState } from "../../_components/FinanceEmptyState";
+import { categoryIconComponent } from "../../_lib/category-icons";
 import { EditCategoryDialog } from "./EditCategoryDialog";
 
 const categoryKindClassNames = {
@@ -37,17 +42,24 @@ function CategoryKindBadge({
 
 function CategoryCardContent({
   category,
+  Icon,
   parentName,
   rootLabel,
   kindLabel,
 }: {
   category: v1.finance.FinancialCategory;
+  Icon?: LucideIcon;
   parentName?: string;
   rootLabel: string;
   kindLabel: string;
 }) {
   return (
     <span className="flex w-full min-w-0 items-center justify-between gap-3">
+      {Icon ? (
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+          <Icon aria-hidden="true" />
+        </span>
+      ) : null}
       <span className="flex min-w-0 flex-1 flex-col items-start gap-0.5">
         <span className="flex min-h-4 max-w-full items-center gap-1 text-xs text-muted-foreground">
           {parentName ? (
@@ -107,6 +119,7 @@ export function CategoryTable({
               const parent = category.parentCategoryId
                 ? categoryById.get(category.parentCategoryId)
                 : undefined;
+              const Icon = categoryIconComponent(category.icon);
 
               return (
                 <TableRow key={category.id}>
@@ -121,6 +134,7 @@ export function CategoryTable({
                         >
                           <CategoryCardContent
                             category={category}
+                            Icon={Icon}
                             parentName={parent?.name}
                             rootLabel={t("categories.list.parentCategory")}
                             kindLabel={t(
@@ -143,6 +157,7 @@ export function CategoryTable({
           const parent = category.parentCategoryId
             ? categoryById.get(category.parentCategoryId)
             : undefined;
+          const Icon = categoryIconComponent(category.icon);
 
           return (
             <li
@@ -159,6 +174,7 @@ export function CategoryTable({
                   >
                     <CategoryCardContent
                       category={category}
+                      Icon={Icon}
                       parentName={parent?.name}
                       rootLabel={t("categories.list.parentCategory")}
                       kindLabel={t(`enums.categoryKinds.${category.kind}`)}

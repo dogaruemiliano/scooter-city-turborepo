@@ -16,8 +16,8 @@ vi.mock("../_components/ExpenseCounterpartySelect", () => ({
   ExpenseCounterpartySelect: () => <div>Payee field</div>,
 }));
 
-vi.mock("../_components/ExpenseScooterSelect", () => ({
-  ExpenseScooterSelect: () => <div>Scooter field</div>,
+vi.mock("../_components/ExpenseScooterAllocationEditor", () => ({
+  ExpenseScooterAllocationEditor: () => <div>Scooter allocation field</div>,
 }));
 
 describe("ExpenseDetailsStep quick classification", () => {

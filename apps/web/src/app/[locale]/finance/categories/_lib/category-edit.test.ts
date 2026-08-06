@@ -11,6 +11,7 @@ const category = (
   code: id.toUpperCase(),
   name: `Category ${id}`,
   kind: "EXPENSE",
+  icon: null,
   parentCategoryId: null,
   isActive,
   createdAt: "2026-07-29T08:00:00.000Z",

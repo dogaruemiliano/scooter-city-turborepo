@@ -221,11 +221,131 @@ describe("expense posting evidence", () => {
           taxLines: [],
           references: [],
           documents: [],
+          scooterAllocations: [],
         },
         { actorUserId: "user-1" },
       ),
     ).rejects.toThrow(
       "Company-funded expenses require a confirmed invoice or fiscal receipt",
     );
+  });
+});
+
+describe("expense fact validation", () => {
+  function buildValidateFactsTx() {
+    return {
+      businessLegalEntity: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: "entity-1",
+          defaultCurrency: "RON",
+          company: { taxIdentifier: "RO12345678" },
+        }),
+      },
+      counterparty: { findFirst: jest.fn().mockResolvedValue(null) },
+      financialCategory: { findFirst: jest.fn().mockResolvedValue(null) },
+      scooter: {
+        findMany: jest
+          .fn()
+          .mockImplementation(
+            ({ where }: { where: { id: { in: string[] } } }) =>
+              Promise.resolve(where.id.in.map((id) => ({ id }))),
+          ),
+      },
+      user: { findFirst: jest.fn().mockResolvedValue({ id: "user-1" }) },
+      wallet: {
+        findFirst: jest.fn().mockResolvedValue({ type: "COMPANY_CASH" }),
+      },
+      businessOwner: { findFirst: jest.fn().mockResolvedValue(null) },
+      vatRegistrationPeriod: { findMany: jest.fn().mockResolvedValue([]) },
+    };
+  }
+
+  function baseFacts() {
+    const occurredOn = new Date("2026-08-03T00:00:00.000Z");
+    return {
+      legalEntityId: "entity-1",
+      occurredOn,
+      taxPointOn: occurredOn,
+      grossAmount: new Prisma.Decimal("100.00"),
+      currency: "RON",
+      payeeId: null,
+      categoryId: null,
+      scooterAllocations: [] as Array<{
+        scooterId: string;
+        amount: Prisma.Decimal;
+      }>,
+      payment: {
+        source: ExpensePaymentSource.COMPANY_CASH_DESK,
+        companyWalletId: "wallet-1",
+        fundedByUserId: null,
+        paidByUserId: "user-1",
+        amount: new Prisma.Decimal("100.00"),
+        paidOn: occurredOn,
+      },
+      attribution: {
+        target: ExpenseAttributionTarget.BUSINESS,
+        businessOwnerId: null,
+      },
+      taxLines: [] as unknown[],
+      documents: [] as unknown[],
+    };
+  }
+
+  function callValidateFacts(tx: unknown, facts: unknown) {
+    const service = new ExpensesService({} as never);
+    return (
+      service as unknown as {
+        validateFacts: (
+          tx: unknown,
+          facts: unknown,
+        ) => Promise<{
+          treatment: ExpenseFundingTreatment;
+          tax: {
+            recognizedCostAmount: Prisma.Decimal;
+            fiscalDeductibleAmount: Prisma.Decimal;
+          };
+        }>;
+      }
+    ).validateFacts(tx, facts);
+  }
+
+  it("rejects scooter allocations whose sum does not equal the gross amount", async () => {
+    const tx = buildValidateFactsTx();
+    const facts = {
+      ...baseFacts(),
+      scooterAllocations: [
+        { scooterId: "scooter-1", amount: new Prisma.Decimal("40.00") },
+        { scooterId: "scooter-2", amount: new Prisma.Decimal("40.00") },
+      ],
+    };
+
+    await expect(callValidateFacts(tx, facts)).rejects.toThrow(
+      "Scooter allocation amounts must equal the expense gross amount",
+    );
+  });
+
+  it("accepts scooter allocations that sum to the gross amount", async () => {
+    const tx = buildValidateFactsTx();
+    const facts = {
+      ...baseFacts(),
+      scooterAllocations: [
+        { scooterId: "scooter-1", amount: new Prisma.Decimal("50.00") },
+        { scooterId: "scooter-2", amount: new Prisma.Decimal("50.00") },
+      ],
+    };
+
+    await expect(callValidateFacts(tx, facts)).resolves.toBeDefined();
+    expect(tx.scooter.findMany).toHaveBeenCalledTimes(1);
+  });
+
+  it("skips payee and category lookups for a quick-entry expense", async () => {
+    const tx = buildValidateFactsTx();
+
+    const result = await callValidateFacts(tx, baseFacts());
+
+    expect(tx.counterparty.findFirst).not.toHaveBeenCalled();
+    expect(tx.financialCategory.findFirst).not.toHaveBeenCalled();
+    expect(result.tax.recognizedCostAmount.toFixed(2)).toBe("100.00");
+    expect(result.tax.fiscalDeductibleAmount.toFixed(2)).toBe("0.00");
   });
 });
