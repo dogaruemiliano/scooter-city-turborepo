@@ -57,6 +57,7 @@ enum MoneyTransactionType {
   PERSONAL_FUNDS_SPLIT
   PERSONAL_FUNDS_CLAIM
   COMPANY_DISTRIBUTION
+  CAPITAL_CONTRIBUTION
   REFUND
   ADJUSTMENT
   REVERSAL
@@ -298,6 +299,7 @@ model User {
   companyCardsHeld           Wallet[]                         @relation("CompanyCardHolder")
   scooterIssuesReported      ScooterIssue[]                   @relation("ScooterIssueReportedBy")
   maintenanceRecordsRecorded MaintenanceRecord[]              @relation("MaintenanceRecordRecordedBy")
+  scooterSalesRecorded       ScooterSale[]                    @relation("ScooterSaleCreatedBy")
 
   @@index([email])
   @@index([phone])
@@ -359,6 +361,7 @@ model Counterparty {
   transactionsAsDebtor       MoneyTransaction[] @relation("MoneyTransactionUnifiedDebtor")
   transactionsAsCreditor     MoneyTransaction[] @relation("MoneyTransactionUnifiedCreditor")
   expensesAsPayee            Expense[]          @relation("ExpensePayee")
+  scooterSalesAsBuyer        ScooterSale[]      @relation("ScooterSaleBuyer")
 
   @@index([type, isActive])
 }
@@ -500,6 +503,8 @@ model FinancialCategory {
   id               String                @id @default(cuid())
   code             String                @unique
   name             String
+  /// Lucide icon name (e.g. "wrench"), resolved to a component on the client.
+  icon             String?
   kind             FinancialCategoryKind
   parentCategoryId String?
   parentCategory   FinancialCategory?    @relation("FinancialCategoryTree", fields: [parentCategoryId], references: [id], onDelete: SetNull)
@@ -607,10 +612,12 @@ model Expense {
   id                     String              @id @default(cuid())
   legalEntityId          String
   legalEntity            BusinessLegalEntity @relation(fields: [legalEntityId], references: [id], onDelete: Restrict)
-  payeeId                String
-  payee                  Counterparty        @relation("ExpensePayee", fields: [payeeId], references: [id], onDelete: Restrict)
-  categoryId             String
-  category               FinancialCategory   @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  /// Optional: unset for a quick-entry expense with no known recipient.
+  payeeId                String?
+  payee                  Counterparty?       @relation("ExpensePayee", fields: [payeeId], references: [id], onDelete: Restrict)
+  /// Optional: unset for a quick-entry expense not yet categorized.
+  categoryId             String?
+  category               FinancialCategory?  @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   status                 ExpenseStatus       @default(DRAFT)
   occurredOn             DateTime            @db.Date
   taxPointOn             DateTime            @db.Date
@@ -643,6 +650,7 @@ model Expense {
   documents          ExpenseDocument[]
   postings           ExpensePosting[]
   reimbursementClaim ExpenseReimbursementClaim?
+  scooterAllocations ExpenseScooterAllocation[]
 
   @@index([legalEntityId, status, occurredOn])
   @@index([payeeId, occurredOn])
@@ -747,6 +755,23 @@ model ExpenseTaxLine {
   createdAt               DateTime           @default(now())
 
   @@index([taxSnapshotId])
+}
+
+/// Per-scooter split of an expense's cost. One row per scooter covered by a
+/// single payment, so one bill (e.g. a bulk purchase or a shared transport
+/// fee) can fund many scooters, evenly or with a custom amount each.
+model ExpenseScooterAllocation {
+  id                   String   @id @default(cuid())
+  expenseId            String
+  expense              Expense  @relation(fields: [expenseId], references: [id], onDelete: Restrict)
+  scooterId            String
+  scooter              Scooter  @relation(fields: [scooterId], references: [id], onDelete: Restrict)
+  allocatedGrossAmount Decimal  @db.Decimal(19, 2)
+  createdAt            DateTime @default(now())
+
+  @@unique([expenseId, scooterId])
+  @@index([scooterId])
+  @@index([expenseId])
 }
 
 /// Polymorphic domain link following MoneyTransactionReference semantics.
@@ -966,6 +991,8 @@ model Scooter {
   deletedAt                 DateTime?
   issues                    ScooterIssue[]
   maintenanceRecords        MaintenanceRecord[]
+  expenseAllocations        ExpenseScooterAllocation[]
+  sale                      ScooterSale?
 
   @@unique([plateNumberNormalized], map: "Scooter_active_plateNumberNormalized_key", where: raw("\"deletedAt\" IS NULL AND \"plateNumberNormalized\" IS NOT NULL"))
   @@index([deletedAt])
@@ -974,6 +1001,38 @@ model Scooter {
   @@index([requiredDriverLicenseType, deletedAt])
   @@index([brand, model])
   @@index([purchasedOn])
+}
+
+/// One scooter sold to a buyer. Compact v1: at most one sale per scooter.
+/// paidAmount is rebuildable from the USER_CHARGE/USER_PAYMENT
+/// MoneyTransactions linked back via MoneyTransactionReference
+/// (referenceType "SCOOTER_SALE"), the same way WalletBalance is rebuildable
+/// from WalletBalanceChange.
+model ScooterSale {
+  id                  String            @id @default(cuid())
+  scooterId           String            @unique
+  scooter             Scooter           @relation(fields: [scooterId], references: [id], onDelete: Restrict)
+  buyerCounterpartyId String
+  buyerCounterparty   Counterparty      @relation("ScooterSaleBuyer", fields: [buyerCounterpartyId], references: [id], onDelete: Restrict)
+  saleAmount          Decimal           @db.Decimal(19, 2)
+  paidAmount          Decimal           @default(0) @db.Decimal(19, 2)
+  currency            String            @default("RON") @db.Char(3)
+  status              ScooterSaleStatus @default(OPEN)
+  soldOn              DateTime          @db.Date
+  notes               String?
+  createdByUserId     String
+  createdBy           User              @relation("ScooterSaleCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  @@index([buyerCounterpartyId, status])
+}
+
+enum ScooterSaleStatus {
+  OPEN
+  PARTIALLY_PAID
+  PAID
+  CANCELLED
 }
 
 /// A reported fleet issue. Resolution intentionally stays lightweight for the
