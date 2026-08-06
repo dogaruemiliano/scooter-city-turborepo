@@ -27,6 +27,12 @@ export interface ExpenseVatLineDraft {
   vatAmount: string;
 }
 
+export interface ExpenseScooterAllocationDraft {
+  scooterId: string;
+  label: string;
+  amount: string;
+}
+
 export interface ExpenseFormState {
   hasCompanyCui: ExpenseCompanyCuiAnswer;
   businessEntityId: string;
@@ -40,8 +46,7 @@ export interface ExpenseFormState {
   payeeCounterpartyId: string;
   attributionTarget: ExpenseAttributionTarget;
   businessOwnerId: string;
-  relatedRecordType: string;
-  relatedRecordId: string;
+  scooterAllocations: ExpenseScooterAllocationDraft[];
   paidByUserId: string;
   documentType: ExpenseDocumentType;
   documentNumber: string;
@@ -54,7 +59,11 @@ export interface ExpenseFormState {
 
 export type ExpenseFormField = Exclude<
   keyof ExpenseFormState,
-  "hasCompanyCui" | "paymentSource" | "attributionTarget" | "vatLines"
+  | "hasCompanyCui"
+  | "paymentSource"
+  | "attributionTarget"
+  | "vatLines"
+  | "scooterAllocations"
 >;
 
 export type ExpenseFormAction =
@@ -83,7 +92,8 @@ export type ExpenseFormAction =
       id: string;
       field: Exclude<keyof ExpenseVatLineDraft, "id">;
       value: string;
-    };
+    }
+  | { type: "SET_SCOOTER_ALLOCATIONS"; value: ExpenseScooterAllocationDraft[] };
 
 export interface ExpenseFormErrors {
   hasCompanyCui?: string;
@@ -184,8 +194,7 @@ export function createExpenseFormState(options: {
     payeeCounterpartyId: "",
     attributionTarget: "BUSINESS",
     businessOwnerId: "",
-    relatedRecordType: "",
-    relatedRecordId: "",
+    scooterAllocations: [],
     paidByUserId: options.currentUserId ?? "",
     documentType: "FISCAL_RECEIPT",
     documentNumber: "",
@@ -251,6 +260,8 @@ export function expenseFormReducer(
             : line,
         ),
       };
+    case "SET_SCOOTER_ALLOCATIONS":
+      return { ...state, scooterAllocations: action.value };
   }
 }
 
@@ -600,17 +611,11 @@ export function buildCompactExpensePayload(
         ? { businessOwnerId: state.businessOwnerId }
         : {}),
     },
-    ...(state.relatedRecordType.trim() && state.relatedRecordId.trim()
-      ? {
-          references: [
-            {
-              referenceType: state.relatedRecordType.trim(),
-              referenceId: state.relatedRecordId.trim(),
-              isPrimary: true,
-            },
-          ],
-        }
-      : { references: [] }),
+    references: [],
+    scooterAllocations: state.scooterAllocations.map((allocation) => ({
+      scooterId: allocation.scooterId,
+      amount: normalizeMoney(allocation.amount),
+    })),
     documents: [
       ...(fiscalEvidence
         ? [
@@ -672,6 +677,68 @@ export function buildCompactExpensePayload(
   return result.success ? result.data : null;
 }
 
+export type QuickExpensePaymentSource = Extract<
+  ExpensePaymentSource,
+  "PERSONAL_FUNDS" | "COMPANY_CASH_DESK" | "COMPANY_CARD"
+>;
+
+export interface QuickExpenseFormInput {
+  categoryId: string;
+  companyWalletId: string;
+  currency: string;
+  currentUserId: string;
+  description: string;
+  grossAmount: string;
+  idempotencyKey: string;
+  legalEntityId: string;
+  occurredOn: string;
+  paymentSource: QuickExpensePaymentSource;
+  scooterAllocations: ExpenseScooterAllocationDraft[];
+}
+
+/**
+ * Builds the payload for the ultra-lightweight "just spent money" entry
+ * point: no payee, an optional category, and a single personal/business
+ * payment toggle. Reuses the same `POST /finance/expenses` contract as the
+ * full form.
+ */
+export function buildQuickExpensePayload(
+  input: QuickExpenseFormInput,
+): CompactExpenseCreatePayload | null {
+  const payment: v1.finance.ExpensePaymentInput = {
+    source: input.paymentSource,
+    paidByUserId: input.currentUserId,
+    amount: normalizeMoney(input.grossAmount),
+    paidOn: input.occurredOn,
+    ...(input.paymentSource === "PERSONAL_FUNDS"
+      ? { fundedByUserId: input.currentUserId }
+      : { companyWalletId: input.companyWalletId }),
+  };
+
+  const candidate: v1.finance.CreateExpenseInput = {
+    idempotencyKey: input.idempotencyKey,
+    legalEntityId: input.legalEntityId,
+    grossAmount: normalizeMoney(input.grossAmount),
+    currency: input.currency.trim().toUpperCase(),
+    occurredOn: input.occurredOn,
+    ...(input.categoryId ? { categoryId: input.categoryId } : {}),
+    payment,
+    attribution: { target: "BUSINESS" },
+    notes: input.description.trim() || undefined,
+    references: [],
+    documents: [],
+    taxLines: [],
+    scooterAllocations: input.scooterAllocations.map((allocation) => ({
+      scooterId: allocation.scooterId,
+      amount: normalizeMoney(allocation.amount),
+    })),
+    postImmediately: true,
+  };
+
+  const result = v1.finance.createExpenseInputSchema.safeParse(candidate);
+  return result.success ? result.data : null;
+}
+
 export function expenseVatSummary(
   state: Pick<ExpenseFormState, "grossAmount" | "vatLines">,
   isVatRegistered = false,
@@ -725,6 +792,38 @@ export function hasExpenseFormErrors(errors: ExpenseFormErrors): boolean {
   return Object.values(errors).some(Boolean);
 }
 
+/**
+ * Splits a gross amount evenly across the given rows, assigning any leftover
+ * cent remainder to the last row so the split always sums exactly to the
+ * gross amount.
+ */
+export function splitScooterAllocationsEvenly(
+  rows: ExpenseScooterAllocationDraft[],
+  grossAmount: string,
+): ExpenseScooterAllocationDraft[] {
+  if (rows.length === 0) return rows;
+
+  const totalMinor = moneyToMinor(grossAmount) ?? 0;
+  const shareMinor = Math.floor(totalMinor / rows.length);
+  const remainderMinor = totalMinor - shareMinor * rows.length;
+
+  return rows.map((row, index) => ({
+    ...row,
+    amount: minorToMoney(
+      index === rows.length - 1 ? shareMinor + remainderMinor : shareMinor,
+    ),
+  }));
+}
+
+export function scooterAllocationTotalMinor(
+  rows: readonly ExpenseScooterAllocationDraft[],
+): number {
+  return rows.reduce(
+    (total, row) => total + (moneyToMinor(row.amount) ?? 0),
+    0,
+  );
+}
+
 function isValidVatLine(line: ExpenseVatLineDraft): boolean {
   if (!MONEY_PATTERN.test(line.netAmount.trim())) return false;
   if (!MONEY_PATTERN.test(line.vatAmount.trim())) return false;
@@ -774,7 +873,7 @@ function moneyToMinor(value: string): number | null {
   return Number.isSafeInteger(result) ? result : null;
 }
 
-function minorToMoney(value: number): string {
+export function minorToMoney(value: number): string {
   return `${Math.trunc(value / 100)}.${String(Math.abs(value % 100)).padStart(2, "0")}`;
 }
 

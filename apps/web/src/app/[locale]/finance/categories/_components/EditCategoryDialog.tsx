@@ -34,11 +34,16 @@ import {
 } from "react";
 
 import { webApi } from "@/lib/api";
+import {
+  CATEGORY_ICON_COMPONENTS,
+  CATEGORY_ICON_NAMES,
+} from "../../_lib/category-icons";
 import { activeCategoryParentOptions } from "../_lib/category-edit";
 
 type CategoryKind = v1.finance.FinancialCategoryKind;
 
 const NO_PARENT = "none";
+const NO_ICON = "none";
 const CATEGORY_KIND_OPTIONS = ["INCOME", "EXPENSE"] as const;
 
 const categoryKindIndicatorClassNames = {
@@ -146,11 +151,13 @@ export function EditCategoryDialog({
   const router = useRouter();
   const nameId = useId();
   const kindId = useId();
+  const iconId = useId();
   const parentId = useId();
   const statusId = useId();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(category.name);
   const [kind, setKind] = useState<CategoryKind>(category.kind);
+  const [icon, setIcon] = useState(category.icon ?? NO_ICON);
   const [parentCategoryId, setParentCategoryId] = useState(
     category.parentCategoryId ?? NO_PARENT,
   );
@@ -171,6 +178,7 @@ export function EditCategoryDialog({
   function resetForm() {
     setName(category.name);
     setKind(category.kind);
+    setIcon(category.icon ?? NO_ICON);
     setParentCategoryId(category.parentCategoryId ?? NO_PARENT);
     setIsActive(category.isActive);
     setFeedback(undefined);
@@ -187,10 +195,12 @@ export function EditCategoryDialog({
     event.preventDefault();
     setFeedback(undefined);
     const initialParentCategoryId = category.parentCategoryId ?? NO_PARENT;
+    const initialIcon = category.icon ?? NO_ICON;
     const input = v1.finance.updateFinancialCategoryInputSchema.safeParse({
       name,
       kind,
       isActive,
+      ...(icon === initialIcon ? {} : { icon: icon === NO_ICON ? null : icon }),
       ...(parentCategoryId === initialParentCategoryId
         ? {}
         : {
@@ -278,6 +288,32 @@ export function EditCategoryDialog({
                 getOptionLabel={(value) => t(`enums.categoryKinds.${value}`)}
                 onChange={setKind}
               />
+            </div>
+            <div className="grid gap-2">
+              <Label id={iconId}>{t("categories.edit.icon")}</Label>
+              <Select
+                value={icon}
+                onValueChange={(value) => setIcon(String(value))}
+                disabled={busy}
+              >
+                <SelectTrigger aria-labelledby={iconId} className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_ICON}>
+                    {t("categories.edit.noIcon")}
+                  </SelectItem>
+                  {CATEGORY_ICON_NAMES.map((name) => {
+                    const Icon = CATEGORY_ICON_COMPONENTS[name];
+                    return (
+                      <SelectItem key={name} value={name}>
+                        <Icon aria-hidden="true" className="size-4" />
+                        {t(`categories.icons.${name}`)}
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
             </div>
             <div className="grid gap-2">
               <Label id={parentId}>{t("categories.edit.parent")}</Label>

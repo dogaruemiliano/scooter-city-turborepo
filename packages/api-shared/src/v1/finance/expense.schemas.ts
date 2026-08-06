@@ -37,6 +37,7 @@ const MAX_DOCUMENT_TEXT_LENGTH = 255;
 const MAX_REFERENCES = 20;
 const MAX_DOCUMENTS = 20;
 const MAX_TAX_LINES = 20;
+const MAX_SCOOTER_ALLOCATIONS = 200;
 
 const optionalText = (max = MAX_DOCUMENT_TEXT_LENGTH) =>
   z.preprocess(
@@ -169,6 +170,16 @@ export const expenseAttributionInputSchema = z
   });
 export type ExpenseAttributionInput = z.infer<
   typeof expenseAttributionInputSchema
+>;
+
+export const expenseScooterAllocationInputSchema = z
+  .object({
+    scooterId: idSchema,
+    amount: positiveMoneyAmountSchema,
+  })
+  .strict();
+export type ExpenseScooterAllocationInput = z.infer<
+  typeof expenseScooterAllocationInputSchema
 >;
 
 export const expenseTaxLineInputSchema = z
@@ -344,8 +355,10 @@ export type CompleteExpenseDocumentUploadInput = z.infer<
 export const createExpenseInputSchema = z
   .object({
     legalEntityId: idSchema,
-    payeeId: idSchema,
-    categoryId: idSchema,
+    /** Optional: unset for a quick-entry expense with no known recipient. */
+    payeeId: idSchema.optional(),
+    /** Optional: unset for a quick-entry expense not yet categorized. */
+    categoryId: idSchema.optional(),
     occurredOn: dateSchema,
     taxPointOn: dateSchema.optional(),
     currency: currencySchema,
@@ -364,6 +377,10 @@ export const createExpenseInputSchema = z
     documents: z
       .array(expenseDocumentInputSchema)
       .max(MAX_DOCUMENTS)
+      .default([]),
+    scooterAllocations: z
+      .array(expenseScooterAllocationInputSchema)
+      .max(MAX_SCOOTER_ALLOCATIONS)
       .default([]),
   })
   .strict()
@@ -405,6 +422,30 @@ export const createExpenseInputSchema = z
         path: ["references"],
         message: "Only one primary reference is allowed.",
       });
+    }
+    if (input.scooterAllocations.length > 0) {
+      if (
+        addMoney(
+          input.scooterAllocations.map((allocation) => allocation.amount),
+        ) !== moneyMinor(input.grossAmount)
+      ) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["scooterAllocations"],
+          message:
+            "Scooter allocation amounts must equal the expense gross amount.",
+        });
+      }
+      const scooterIds = input.scooterAllocations.map(
+        (allocation) => allocation.scooterId,
+      );
+      if (new Set(scooterIds).size !== scooterIds.length) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["scooterAllocations"],
+          message: "Each scooter can only be allocated once per expense.",
+        });
+      }
     }
   })
   .meta({ id: "CreateExpenseInput" });
@@ -790,6 +831,17 @@ export const expenseReferenceSchema = moneyTransactionReferenceInputSchema
   .extend({ id: idSchema })
   .strict();
 
+export const expenseScooterAllocationSchema = z
+  .object({
+    id: idSchema,
+    scooterId: idSchema,
+    allocatedGrossAmount: moneyAmountSchema,
+  })
+  .strict();
+export type ExpenseScooterAllocation = z.infer<
+  typeof expenseScooterAllocationSchema
+>;
+
 export const expenseDocumentAssetSchema = z
   .object({
     id: idSchema,
@@ -881,10 +933,10 @@ export const expenseSchema = z
   .object({
     id: idSchema,
     legalEntityId: idSchema,
-    payeeId: idSchema,
+    payeeId: idSchema.nullable(),
     payee: financialCounterpartySearchItemSchema.nullable(),
-    categoryId: idSchema,
-    category: financeCategorySummarySchema,
+    categoryId: idSchema.nullable(),
+    category: financeCategorySummarySchema.nullable(),
     status: expenseStatusSchema,
     occurredOn: dateSchema,
     taxPointOn: dateSchema,
@@ -910,6 +962,7 @@ export const expenseSchema = z
     documents: z.array(expenseDocumentSchema),
     postings: z.array(expensePostingSchema),
     reimbursementClaim: expenseReimbursementClaimSchema.nullable(),
+    scooterAllocations: z.array(expenseScooterAllocationSchema),
   })
   .strict()
   .meta({ id: "Expense" });

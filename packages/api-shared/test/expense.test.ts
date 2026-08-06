@@ -186,6 +186,54 @@ test("document asset link primitives expose original and normalized roles", () =
   );
 });
 
+test("payee and category are optional for quick-entry expenses", () => {
+  const value = input("PERSONAL_FUNDS", "BUSINESS");
+  const { payeeId: _payeeId, categoryId: _categoryId, ...rest } = value;
+
+  assert.equal(finance.createExpenseInputSchema.safeParse(rest).success, true);
+  assert.equal(finance.createExpenseInputSchema.safeParse(value).success, true);
+});
+
+test("scooter allocation amounts must sum to the expense gross amount", () => {
+  const value = input("COMPANY_CARD", "BUSINESS");
+
+  assert.equal(
+    finance.createExpenseInputSchema.safeParse({
+      ...value,
+      scooterAllocations: [
+        { scooterId: "scooter-1", amount: "59.50" },
+        { scooterId: "scooter-2", amount: "59.50" },
+      ],
+    }).success,
+    true,
+  );
+  assert.equal(
+    finance.createExpenseInputSchema.safeParse({
+      ...value,
+      scooterAllocations: [
+        { scooterId: "scooter-1", amount: "50.00" },
+        { scooterId: "scooter-2", amount: "59.50" },
+      ],
+    }).success,
+    false,
+  );
+});
+
+test("scooter allocations cannot repeat the same scooter", () => {
+  const value = input("COMPANY_CARD", "BUSINESS");
+
+  assert.equal(
+    finance.createExpenseInputSchema.safeParse({
+      ...value,
+      scooterAllocations: [
+        { scooterId: "scooter-1", amount: "60.00" },
+        { scooterId: "scooter-1", amount: "59.00" },
+      ],
+    }).success,
+    false,
+  );
+});
+
 test("legal entity input creates or links exactly one company", () => {
   const base = { defaultCurrency: "RON", walletIds: [] };
   assert.equal(

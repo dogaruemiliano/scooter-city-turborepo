@@ -182,6 +182,7 @@ describe("Finance HTTP surface (e2e)", () => {
       taxLines: [],
       references: [],
       documents: input.documents ?? [],
+      scooterAllocations: [],
     };
   }
 

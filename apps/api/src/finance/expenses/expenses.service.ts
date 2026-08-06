@@ -120,8 +120,11 @@ interface ExpenseFacts {
   taxPointOn: Date;
   grossAmount: Prisma.Decimal;
   currency: string;
-  payeeId: string;
-  categoryId: string;
+  /** Absent for a quick-entry expense with no known recipient. */
+  payeeId: string | null;
+  /** Absent for a quick-entry expense not yet categorized. */
+  categoryId: string | null;
+  scooterAllocations: Array<{ scooterId: string; amount: Prisma.Decimal }>;
   payment: {
     source: v1.finance.ExpensePaymentSource;
     companyWalletId: string | null;
@@ -268,6 +271,12 @@ export class ExpensesService {
                 notes: document.notes ?? null,
               })),
             },
+            scooterAllocations: {
+              create: facts.scooterAllocations.map((allocation) => ({
+                scooterId: allocation.scooterId,
+                allocatedGrossAmount: allocation.amount,
+              })),
+            },
           },
           include: expenseInclude,
         });
@@ -367,6 +376,10 @@ export class ExpensesService {
           currency: current.currency,
           payeeId: input.payeeId ?? current.payeeId,
           categoryId: input.categoryId ?? current.categoryId,
+          scooterAllocations: current.scooterAllocations.map((allocation) => ({
+            scooterId: allocation.scooterId,
+            amount: allocation.allocatedGrossAmount,
+          })),
           payment: input.payment
             ? {
                 source: input.payment.source,
@@ -807,6 +820,12 @@ export class ExpensesService {
       currency: current.currency,
       payeeId: current.payeeId,
       categoryId: current.categoryId,
+      scooterAllocations: (current.scooterAllocations ?? []).map(
+        (allocation) => ({
+          scooterId: allocation.scooterId,
+          amount: allocation.allocatedGrossAmount,
+        }),
+      ),
       payment: {
         source: payment.source,
         companyWalletId: payment.companyWalletId,
@@ -957,8 +976,12 @@ export class ExpensesService {
       taxPointOn: date(input.taxPointOn ?? input.occurredOn),
       grossAmount: new Prisma.Decimal(input.grossAmount),
       currency: input.currency,
-      payeeId: input.payeeId,
-      categoryId: input.categoryId,
+      payeeId: input.payeeId ?? null,
+      categoryId: input.categoryId ?? null,
+      scooterAllocations: input.scooterAllocations.map((allocation) => ({
+        scooterId: allocation.scooterId,
+        amount: new Prisma.Decimal(allocation.amount),
+      })),
       payment: {
         source: input.payment.source,
         companyWalletId: input.payment.companyWalletId ?? null,
@@ -1011,31 +1034,61 @@ export class ExpensesService {
     }
 
     const [payee, category] = await Promise.all([
-      tx.counterparty.findFirst({
-        where: {
-          id: facts.payeeId,
-          isActive: true,
-          OR: [
-            { person: { deletedAt: null } },
-            { company: { deletedAt: null, isActive: true } },
-          ],
-        },
-        select: { id: true },
-      }),
-      tx.financialCategory.findFirst({
-        where: {
-          id: facts.categoryId,
-          isActive: true,
-          kind: FinancialCategoryKind.EXPENSE,
-        },
-        select: { id: true },
-      }),
+      facts.payeeId
+        ? tx.counterparty.findFirst({
+            where: {
+              id: facts.payeeId,
+              isActive: true,
+              OR: [
+                { person: { deletedAt: null } },
+                { company: { deletedAt: null, isActive: true } },
+              ],
+            },
+            select: { id: true },
+          })
+        : null,
+      facts.categoryId
+        ? tx.financialCategory.findFirst({
+            where: {
+              id: facts.categoryId,
+              isActive: true,
+              kind: FinancialCategoryKind.EXPENSE,
+            },
+            select: { id: true },
+          })
+        : null,
     ]);
-    if (!payee) throw new BadRequestException("Expense payee is not active");
-    if (!category) {
+    if (facts.payeeId && !payee) {
+      throw new BadRequestException("Expense payee is not active");
+    }
+    if (facts.categoryId && !category) {
       throw new BadRequestException(
         "Expense category is not active or eligible",
       );
+    }
+
+    if (facts.scooterAllocations.length > 0) {
+      const allocatedSum = facts.scooterAllocations.reduce(
+        (total, allocation) => total.plus(allocation.amount),
+        new Prisma.Decimal(0),
+      );
+      if (!allocatedSum.equals(facts.grossAmount)) {
+        throw new BadRequestException(
+          "Scooter allocation amounts must equal the expense gross amount",
+        );
+      }
+      const scooterIds = facts.scooterAllocations.map(
+        (allocation) => allocation.scooterId,
+      );
+      const activeScooters = await tx.scooter.findMany({
+        where: { id: { in: scooterIds }, deletedAt: null },
+        select: { id: true },
+      });
+      if (activeScooters.length !== new Set(scooterIds).size) {
+        throw new BadRequestException(
+          "One or more allocated scooters were not found",
+        );
+      }
     }
 
     await this.assertActiveAdmin(
@@ -1142,6 +1195,36 @@ export class ExpensesService {
     facts: ExpenseFacts,
     expectedBuyerTaxIdentifier: string | null,
   ): Promise<TaxComputation> {
+    const expected = normalizeTaxIdentifier(expectedBuyerTaxIdentifier);
+    if (!expected) {
+      throw new BadRequestException(
+        "Business legal entity requires a valid tax identifier",
+      );
+    }
+
+    if (facts.categoryId === null) {
+      // Quick-entry expenses have no category to carry a deductible-VAT rate,
+      // so no VAT recovery is claimed: the full gross amount is recognized as
+      // cost with zero fiscal deductibility until the expense is categorized
+      // (e.g. later, by the planned auto-categorizer). This is a deliberate
+      // accounting decision, not a placeholder.
+      return {
+        vatRegistrationPeriodId: null,
+        vatRegistrationCountryCode: null,
+        vatRegistrationNumber: null,
+        legalEntityTaxIdentifier: expected,
+        isVatRegistered: false,
+        grossAmount: facts.grossAmount,
+        netAmount: facts.grossAmount,
+        vatAmount: new Prisma.Decimal(0),
+        recoverableVatAmount: new Prisma.Decimal(0),
+        nonRecoverableVatAmount: new Prisma.Decimal(0),
+        recognizedCostAmount: facts.grossAmount,
+        fiscalDeductibleAmount: new Prisma.Decimal(0),
+        lines: [],
+      };
+    }
+
     const periods = await tx.vatRegistrationPeriod.findMany({
       where: {
         legalEntityId: facts.legalEntityId,
@@ -1155,12 +1238,6 @@ export class ExpensesService {
       throw new ConflictException("VAT registration periods overlap");
     }
     const vatPeriod = periods[0] ?? null;
-    const expected = normalizeTaxIdentifier(expectedBuyerTaxIdentifier);
-    if (!expected) {
-      throw new BadRequestException(
-        "Business legal entity requires a valid tax identifier",
-      );
-    }
     const hasQualifyingEvidence = facts.documents.some(
       (document) =>
         FISCAL_EVIDENCE_TYPES.has(document.type) &&

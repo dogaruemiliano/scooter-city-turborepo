@@ -40,6 +40,7 @@ import {
   normalizeExpenseAmountInput,
   type ExpenseFormAction,
   type ExpenseFormErrors,
+  type ExpenseFormField,
   type ExpenseFormState,
 } from "../_lib/expense-form";
 import {
@@ -47,8 +48,9 @@ import {
   walletsForExpenseSource,
   type ExpenseFormBootstrap,
 } from "../_lib/expense-options";
+import { ExpenseCategorySelect } from "./ExpenseCategorySelect";
 import { ExpenseCounterpartySelect } from "./ExpenseCounterpartySelect";
-import { ExpenseScooterSelect } from "./ExpenseScooterSelect";
+import { ExpenseScooterAllocationEditor } from "./ExpenseScooterAllocationEditor";
 
 interface ExpenseDetailsStepProps {
   bootstrap: ExpenseFormBootstrap;
@@ -93,13 +95,8 @@ export function ExpenseDetailsStep({
     (user) => user.id === bootstrap.currentUserId,
   );
 
-  const setField = (
-    field: Exclude<
-      keyof ExpenseFormState,
-      "hasCompanyCui" | "paymentSource" | "attributionTarget" | "vatLines"
-    >,
-    value: string,
-  ) => dispatch({ type: "SET_FIELD", field, value });
+  const setField = (field: ExpenseFormField, value: string) =>
+    dispatch({ type: "SET_FIELD", field, value });
 
   useEffect(() => {
     if (
@@ -333,19 +330,14 @@ export function ExpenseDetailsStep({
               }}
             />
             <div className="flex min-w-0 flex-col gap-3">
-              <SelectField
+              <ExpenseCategorySelect
                 id="expense-category"
                 label={t("category")}
+                categories={bootstrap.categories}
                 value={state.categoryId}
-                items={bootstrap.categories.map((item) => ({
-                  value: item.id,
-                  label: item.label,
-                }))}
                 disabled={disabled}
                 error={errors.categoryId}
-                placeholder={t("placeholders.category")}
                 required
-                requiredLabel={t("required")}
                 onChange={(value) => setField("categoryId", value)}
               />
               {bootstrap.categories.length === 0 ? (
@@ -448,14 +440,15 @@ export function ExpenseDetailsStep({
             />
           ) : null}
 
-          <ExpenseScooterSelect
-            id="expense-related-record"
-            value={state.relatedRecordId}
+          <ExpenseScooterAllocationEditor
+            id="expense-scooter-allocations"
+            currency={state.currency}
+            grossAmount={state.grossAmount}
             disabled={disabled}
-            onChange={(id) => {
-              setField("relatedRecordId", id);
-              setField("relatedRecordType", id ? "SCOOTER" : "");
-            }}
+            value={state.scooterAllocations}
+            onChange={(next) =>
+              dispatch({ type: "SET_SCOOTER_ALLOCATIONS", value: next })
+            }
           />
 
           {state.hasCompanyCui === "YES" ? (

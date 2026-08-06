@@ -10,6 +10,7 @@ import {
   COMPANY_LEGAL_FORMS,
   COMPANY_WALLET_TYPES,
   CREATABLE_MONEY_TRANSACTION_TYPES,
+  FINANCIAL_CATEGORY_ICONS,
   FINANCIAL_CATEGORY_KINDS,
   FINANCIAL_COUNTERPARTY_KINDS,
   MONEY_TRANSACTION_SCOPES,
@@ -107,6 +108,7 @@ export const moneyTransactionScopeSchema = z.enum(MONEY_TRANSACTION_SCOPES);
 export const paymentMethodSchema = z.enum(PAYMENT_METHODS);
 export const billingStatusSchema = z.enum(BILLING_STATUSES);
 export const financialCategoryKindSchema = z.enum(FINANCIAL_CATEGORY_KINDS);
+export const financialCategoryIconSchema = z.enum(FINANCIAL_CATEGORY_ICONS);
 
 export const financeUserSummarySchema = z
   .object({
@@ -150,6 +152,8 @@ export const financeCategorySummarySchema = z
     code: z.string(),
     name: z.string(),
     kind: financialCategoryKindSchema,
+    /** Optional so summaries selected without the column stay valid. */
+    icon: z.string().nullable().optional(),
   })
   .meta({ id: "FinanceCategorySummary" });
 
@@ -540,6 +544,8 @@ export const financialCategorySchema = z
     code: z.string(),
     name: z.string(),
     kind: financialCategoryKindSchema,
+    /** Lucide icon name (e.g. "wrench"), resolved to a component on the client. */
+    icon: z.string().nullable(),
     parentCategoryId: z.string().nullable(),
     isActive: z.boolean(),
     createdAt: z.iso.datetime({ offset: true }),
@@ -559,6 +565,7 @@ export const createFinancialCategoryInputSchema = z
   .object({
     name: z.string().trim().min(1).max(MAX_NAME_LENGTH),
     kind: financialCategoryKindSchema,
+    icon: financialCategoryIconSchema.nullable().optional(),
     parentCategoryId: z.string().nullable().optional(),
   })
   .strict()
@@ -572,6 +579,7 @@ export const updateFinancialCategoryInputSchema = z
   .object({
     name: z.string().trim().min(1).max(MAX_NAME_LENGTH).optional(),
     kind: financialCategoryKindSchema.optional(),
+    icon: financialCategoryIconSchema.nullable().optional(),
     parentCategoryId: z.string().nullable().optional(),
     isActive: z.boolean().optional(),
   })

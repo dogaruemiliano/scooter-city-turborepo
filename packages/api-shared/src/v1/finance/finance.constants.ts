@@ -101,6 +101,42 @@ export const FINANCIAL_CATEGORY_KINDS = ["INCOME", "EXPENSE"] as const;
 
 export type FinancialCategoryKind = (typeof FINANCIAL_CATEGORY_KINDS)[number];
 
+/**
+ * Curated Lucide icon names selectable for a financial category. Stored as a
+ * plain string column, so this list can grow without a migration; keep it in
+ * sync with the icon lookup map consumed on the client.
+ */
+export const FINANCIAL_CATEGORY_ICONS = [
+  "wrench",
+  "truck",
+  "fuel",
+  "shield",
+  "receipt",
+  "wallet",
+  "bike",
+  "zap",
+  "tag",
+  "building-2",
+  "users",
+  "banknote",
+  "car",
+  "package",
+  "phone",
+  "wifi",
+  "home",
+  "heart",
+  "gift",
+  "megaphone",
+  "credit-card",
+  "piggy-bank",
+  "alert-triangle",
+  "scale",
+  "graduation-cap",
+  "file-text",
+] as const;
+
+export type FinancialCategoryIcon = (typeof FINANCIAL_CATEGORY_ICONS)[number];
+
 export const FINANCIAL_COUNTERPARTY_KINDS = ["PERSON", "COMPANY"] as const;
 
 export type FinancialCounterpartyKind =
