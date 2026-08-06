@@ -37,6 +37,7 @@ export interface TransactionFormState {
   postImmediately: boolean;
   referenceType: string;
   referenceId: string;
+  repaysOwedBalance: boolean;
 }
 
 export interface TransactionPrefill {
@@ -127,6 +128,7 @@ export function createTransactionFormState(
     postImmediately: true,
     referenceType: "",
     referenceId: "",
+    repaysOwedBalance: false,
   };
 }
 
@@ -211,6 +213,13 @@ export function walletFieldRecipe(
         secondaryRole: "USER_SETTLEMENT",
         primaryLabel: "sourceWallet",
         secondaryLabel: "recipientWallet",
+      };
+    case "CAPITAL_CONTRIBUTION":
+      return {
+        primaryRole: "ADMIN_PERSONAL",
+        secondaryRole: "BUSINESS_FUNDS",
+        primaryLabel: "sourceWallet",
+        secondaryLabel: "companyWallet",
       };
     case "ADJUSTMENT":
       return {
@@ -518,6 +527,40 @@ export function buildTransactionInput(
         recipientUserId: ownerId(secondaryWallet!),
         balanceChanges: [
           change(primaryWallet.id, "BUSINESS_FUNDS", form.currency, negative),
+          ...(form.repaysOwedBalance
+            ? [
+                change(
+                  secondaryWallet!.id,
+                  "USER_SETTLEMENT",
+                  form.currency,
+                  negative,
+                ),
+              ]
+            : []),
+        ],
+      };
+      break;
+    case "CAPITAL_CONTRIBUTION":
+      candidate = {
+        ...common,
+        financialScope: "COMPANY",
+        paymentMethod: form.paymentMethod,
+        billingStatus: "NOT_APPLICABLE",
+        counterpartyUserId: ownerId(primaryWallet),
+        balanceChanges: [
+          change(
+            primaryWallet.id,
+            "ADMIN_PERSONAL_FUNDS",
+            form.currency,
+            negative,
+          ),
+          change(
+            secondaryWallet!.id,
+            "BUSINESS_FUNDS",
+            form.currency,
+            positive,
+          ),
+          change(primaryWallet.id, "USER_SETTLEMENT", form.currency, positive),
         ],
       };
       break;

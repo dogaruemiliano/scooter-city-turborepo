@@ -525,4 +525,72 @@ export class FinanceReportingService {
       },
     );
   }
+
+  async getOwnerBalances(): Promise<v1.finance.OwnerBalanceList> {
+    const now = new Date();
+    const activeOwners = await this.prisma.businessOwner.findMany({
+      where: {
+        effectiveFrom: { lte: now },
+        OR: [{ effectiveTo: null }, { effectiveTo: { gt: now } }],
+        user: { deletedAt: null },
+      },
+      select: { userId: true },
+      distinct: ["userId"],
+    });
+    const ownerUserIds = activeOwners.map((owner) => owner.userId);
+    if (ownerUserIds.length === 0) return { items: [] };
+
+    const balances = await this.prisma.walletBalance.findMany({
+      where: {
+        bucket: WalletBalanceBucket.USER_SETTLEMENT,
+        wallet: { ownerUserId: { in: ownerUserIds } },
+      },
+      select: {
+        currency: true,
+        balance: true,
+        wallet: {
+          select: {
+            ownerUserId: true,
+            owner: { select: FINANCE_USER_SUMMARY_SELECT },
+          },
+        },
+      },
+    });
+
+    const items = balances
+      .filter(
+        (row): row is typeof row & { wallet: { ownerUserId: string } } =>
+          row.wallet.ownerUserId !== null && row.wallet.owner !== null,
+      )
+      .map((row) => ({
+        userId: row.wallet.ownerUserId,
+        user: {
+          id: row.wallet.owner!.id,
+          email: row.wallet.owner!.email,
+          firstName: row.wallet.owner!.firstName,
+          lastName: row.wallet.owner!.lastName,
+        },
+        currency: row.currency,
+        amount: row.balance.toFixed(2),
+      }))
+      .sort((first, second) =>
+        [
+          first.user.lastName ?? "",
+          first.user.firstName ?? "",
+          first.user.email,
+          first.currency,
+        ]
+          .join(":")
+          .localeCompare(
+            [
+              second.user.lastName ?? "",
+              second.user.firstName ?? "",
+              second.user.email,
+              second.currency,
+            ].join(":"),
+          ),
+      );
+
+    return { items };
+  }
 }

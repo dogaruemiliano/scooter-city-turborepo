@@ -37,6 +37,7 @@ export const MONEY_TRANSACTION_TYPES = [
   "PERSONAL_FUNDS_SPLIT",
   "PERSONAL_FUNDS_CLAIM",
   "COMPANY_DISTRIBUTION",
+  "CAPITAL_CONTRIBUTION",
   "REFUND",
   "ADJUSTMENT",
   "REVERSAL",
@@ -56,6 +57,7 @@ export const CREATABLE_MONEY_TRANSACTION_TYPES = [
   "PERSONAL_EXTRACTION",
   "PERSONAL_FUNDS_SPLIT",
   "COMPANY_DISTRIBUTION",
+  "CAPITAL_CONTRIBUTION",
   "REFUND",
   "ADJUSTMENT",
 ] as const satisfies readonly MoneyTransactionType[];
@@ -161,5 +163,8 @@ export const ROUTES = {
   },
   claims: {
     outstanding: "/v1/finance/claims/outstanding",
+  },
+  owners: {
+    balances: "/v1/finance/owners/balances",
   },
 } as const;

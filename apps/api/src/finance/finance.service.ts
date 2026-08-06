@@ -965,14 +965,49 @@ export class FinanceService {
         return;
       case MoneyTransactionType.COMPANY_DISTRIBUTION:
         this.assertScope(input, MoneyTransactionScope.COMPANY);
-        this.assertExactBalanceChanges(input, [
-          {
-            bucket: WalletBalanceBucket.BUSINESS_FUNDS,
-            direction: "NEGATIVE",
-          },
-        ]);
+        if (input.balanceChanges.length === 2) {
+          this.assertExactBalanceChanges(input, [
+            {
+              bucket: WalletBalanceBucket.BUSINESS_FUNDS,
+              direction: "NEGATIVE",
+            },
+            {
+              bucket: WalletBalanceBucket.USER_SETTLEMENT,
+              direction: "NEGATIVE",
+            },
+          ]);
+        } else {
+          this.assertExactBalanceChanges(input, [
+            {
+              bucket: WalletBalanceBucket.BUSINESS_FUNDS,
+              direction: "NEGATIVE",
+            },
+          ]);
+        }
         this.assertRequiredPartyField(input, "recipientUserId");
         this.assertAllowedPartyFields(input, ["recipientUserId"]);
+        this.assertNotApplicableBilling(input);
+        this.assertPaymentMethodRequired(input);
+        this.assertCategoryAbsent(input);
+        return;
+      case MoneyTransactionType.CAPITAL_CONTRIBUTION:
+        this.assertScope(input, MoneyTransactionScope.COMPANY);
+        this.assertExactBalanceChanges(input, [
+          {
+            bucket: WalletBalanceBucket.ADMIN_PERSONAL_FUNDS,
+            direction: "NEGATIVE",
+          },
+          {
+            bucket: WalletBalanceBucket.BUSINESS_FUNDS,
+            direction: "POSITIVE",
+          },
+          {
+            bucket: WalletBalanceBucket.USER_SETTLEMENT,
+            direction: "POSITIVE",
+          },
+        ]);
+        this.assertRequiredPartyField(input, "counterpartyUserId");
+        this.assertAllowedPartyFields(input, ["counterpartyUserId"]);
         this.assertNotApplicableBilling(input);
         this.assertPaymentMethodRequired(input);
         this.assertCategoryAbsent(input);
@@ -1079,6 +1114,49 @@ export class FinanceService {
       ) {
         throw new BadRequestException(
           "The reimbursement destination must be the recipient's admin wallet",
+        );
+      }
+    }
+
+    if (
+      input.type === MoneyTransactionType.COMPANY_DISTRIBUTION &&
+      input.balanceChanges.length === 2
+    ) {
+      const settlement = this.findBalanceChange(
+        input,
+        WalletBalanceBucket.USER_SETTLEMENT,
+        "NEGATIVE",
+      );
+      const wallet = wallets.get(settlement.walletId);
+      if (
+        wallet?.type !== WalletType.USER ||
+        wallet.ownerUserId !== input.recipientUserId
+      ) {
+        throw new BadRequestException(
+          "The distribution's settlement wallet must belong to the recipient",
+        );
+      }
+    }
+
+    if (input.type === MoneyTransactionType.CAPITAL_CONTRIBUTION) {
+      const personalSource = this.findBalanceChange(
+        input,
+        WalletBalanceBucket.ADMIN_PERSONAL_FUNDS,
+        "NEGATIVE",
+      );
+      const settlementCredit = this.findBalanceChange(
+        input,
+        WalletBalanceBucket.USER_SETTLEMENT,
+        "POSITIVE",
+      );
+      if (
+        wallets.get(personalSource.walletId)?.ownerUserId !==
+          input.counterpartyUserId ||
+        wallets.get(settlementCredit.walletId)?.ownerUserId !==
+          input.counterpartyUserId
+      ) {
+        throw new BadRequestException(
+          "The capital contribution's personal and settlement wallets must belong to the contributing owner",
         );
       }
     }

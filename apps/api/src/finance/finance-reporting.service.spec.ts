@@ -110,3 +110,98 @@ describe("FinanceReportingService specialized expenses", () => {
     });
   });
 });
+
+describe("FinanceReportingService owner balances", () => {
+  it("groups USER_SETTLEMENT balances by currently active owner, sorted by name", async () => {
+    const businessOwnerFindMany = jest
+      .fn()
+      .mockResolvedValue([{ userId: "owner-1" }, { userId: "owner-2" }]);
+    const walletBalanceFindMany = jest.fn().mockResolvedValue([
+      {
+        currency: "RON",
+        balance: new Prisma.Decimal(150),
+        wallet: {
+          ownerUserId: "owner-1",
+          owner: {
+            id: "owner-1",
+            email: "owner1@example.com",
+            firstName: "Ada",
+            lastName: "Lovelace",
+          },
+        },
+      },
+      {
+        currency: "RON",
+        balance: new Prisma.Decimal(0),
+        wallet: {
+          ownerUserId: "owner-2",
+          owner: {
+            id: "owner-2",
+            email: "owner2@example.com",
+            firstName: "Grace",
+            lastName: "Hopper",
+          },
+        },
+      },
+    ]);
+    const prisma = {
+      businessOwner: { findMany: businessOwnerFindMany },
+      walletBalance: { findMany: walletBalanceFindMany },
+    } as unknown as PrismaService;
+
+    const result = await new FinanceReportingService(prisma).getOwnerBalances();
+
+    expect(result.items).toEqual([
+      {
+        userId: "owner-2",
+        user: {
+          id: "owner-2",
+          email: "owner2@example.com",
+          firstName: "Grace",
+          lastName: "Hopper",
+        },
+        currency: "RON",
+        amount: "0.00",
+      },
+      {
+        userId: "owner-1",
+        user: {
+          id: "owner-1",
+          email: "owner1@example.com",
+          firstName: "Ada",
+          lastName: "Lovelace",
+        },
+        currency: "RON",
+        amount: "150.00",
+      },
+    ]);
+    expect(businessOwnerFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ user: { deletedAt: null } }),
+        distinct: ["userId"],
+      }),
+    );
+    expect(walletBalanceFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          bucket: "USER_SETTLEMENT",
+          wallet: { ownerUserId: { in: ["owner-1", "owner-2"] } },
+        }),
+      }),
+    );
+  });
+
+  it("skips the wallet-balance lookup when there are no currently active owners", async () => {
+    const businessOwnerFindMany = jest.fn().mockResolvedValue([]);
+    const walletBalanceFindMany = jest.fn();
+    const prisma = {
+      businessOwner: { findMany: businessOwnerFindMany },
+      walletBalance: { findMany: walletBalanceFindMany },
+    } as unknown as PrismaService;
+
+    const result = await new FinanceReportingService(prisma).getOwnerBalances();
+
+    expect(result.items).toEqual([]);
+    expect(walletBalanceFindMany).not.toHaveBeenCalled();
+  });
+});

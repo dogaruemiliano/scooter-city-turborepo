@@ -230,6 +230,21 @@ export const financeCatalog = {
         actions: "Actions",
       },
       settle: "Settle claim",
+      viewOwners: "View owner balances",
+    },
+    owners: {
+      title: "Owner balances",
+      description:
+        "How much the company currently owes each active owner, based on posted capital contributions and distributions.",
+      viewClaims: "View personal claims",
+      list: {
+        empty: "There are no owner balances to display.",
+      },
+      columns: {
+        owner: "Owner",
+        currency: "Currency",
+        amount: "Owed to owner",
+      },
     },
     personalWallet: {
       title: "My wallet",
@@ -724,6 +739,7 @@ export const financeCatalog = {
       postImmediately: "Post immediately",
       saveDraft: "Save as draft",
       swapDirection: "Swap source and destination",
+      repaysOwedBalance: "This repays an owed balance",
       sections: {
         transaction: "Transaction",
         routing: "Money routing",
@@ -808,6 +824,8 @@ export const financeCatalog = {
           "Settle an outstanding personal claim between administrators.",
         COMPANY_DISTRIBUTION:
           "Record a distribution of company funds to a recipient.",
+        CAPITAL_CONTRIBUTION:
+          "Record capital an owner contributed to the company as a debt owed back to them.",
         REFUND: "Record a customer refund from a company wallet.",
         ADJUSTMENT:
           "Apply a deliberate corrective movement to a selected wallet balance.",
@@ -870,6 +888,7 @@ export const financeCatalog = {
         PERSONAL_FUNDS_SPLIT: "Personal funds settlement",
         PERSONAL_FUNDS_CLAIM: "Personal funds claim",
         COMPANY_DISTRIBUTION: "Company distribution",
+        CAPITAL_CONTRIBUTION: "Capital contribution",
         REFUND: "Refund",
         ADJUSTMENT: "Adjustment",
         REVERSAL: "Reversal",
@@ -1156,6 +1175,21 @@ export const financeCatalog = {
         actions: "Acțiuni",
       },
       settle: "Decontează creanța",
+      viewOwners: "Vezi soldurile asociaților",
+    },
+    owners: {
+      title: "Solduri asociați",
+      description:
+        "Cât datorează în prezent compania fiecărui asociat activ, pe baza aporturilor de capital și distribuirilor înregistrate.",
+      viewClaims: "Vezi creanțele personale",
+      list: {
+        empty: "Nu există solduri de asociați de afișat.",
+      },
+      columns: {
+        owner: "Asociat",
+        currency: "Monedă",
+        amount: "Datorat asociatului",
+      },
     },
     personalWallet: {
       title: "Portofelul meu",
@@ -1658,6 +1692,7 @@ export const financeCatalog = {
       postImmediately: "Înregistrează definitiv imediat",
       saveDraft: "Salvează ca schiță",
       swapDirection: "Inversează sursa și destinația",
+      repaysOwedBalance: "Aceasta decontează un sold datorat",
       sections: {
         transaction: "Tranzacție",
         routing: "Rutarea banilor",
@@ -1742,6 +1777,8 @@ export const financeCatalog = {
           "Decontează o creanță personală restantă între administratori.",
         COMPANY_DISTRIBUTION:
           "Înregistrează distribuirea fondurilor companiei către un destinatar.",
+        CAPITAL_CONTRIBUTION:
+          "Înregistrează capitalul adus de un asociat în companie, ca datorie a companiei față de acesta.",
         REFUND:
           "Înregistrează o restituire către client dintr-un portofel al companiei.",
         ADJUSTMENT:
@@ -1805,6 +1842,7 @@ export const financeCatalog = {
         PERSONAL_FUNDS_SPLIT: "Decontare fonduri personale",
         PERSONAL_FUNDS_CLAIM: "Creanță de fonduri personale",
         COMPANY_DISTRIBUTION: "Distribuire fonduri companie",
+        CAPITAL_CONTRIBUTION: "Aport de capital",
         REFUND: "Restituire",
         ADJUSTMENT: "Ajustare",
         REVERSAL: "Stornare",
