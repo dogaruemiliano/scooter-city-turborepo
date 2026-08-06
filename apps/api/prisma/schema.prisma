@@ -974,6 +974,7 @@ model Scooter {
   color                     String?
   manufactureYear           Int
   powertrainType            String
+  engineType                String?
   engineCc                  Int?
   powerKw                   Float?
   purchasedOn               DateTime            @db.Date
