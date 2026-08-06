@@ -54,14 +54,45 @@ export default async function ScootersRoutePage({
 
   const cookieHeader = (await cookies()).toString();
   const initialList = await scootersFromApi(locale, initialQuery, cookieHeader);
+  const initialSoldScooterIds = await soldScooterIdsFromApi(
+    initialList.items.map((item) => item.id),
+    cookieHeader,
+  );
 
   return (
     <ScootersPage
       createHref={localizePath(SCOOTERS_NEW_PATH, locale)}
       initialList={initialList}
       initialQuery={initialQuery}
+      initialSoldScooterIds={initialSoldScooterIds}
     />
   );
+}
+
+async function soldScooterIdsFromApi(
+  scooterIds: string[],
+  cookieHeader: string,
+): Promise<string[]> {
+  if (scooterIds.length === 0) return [];
+
+  try {
+    const params = new URLSearchParams({
+      scooterIds: scooterIds.join(","),
+      pageSize: String(scooterIds.length),
+    });
+    const sales = await webApi.fetch(
+      `${v1.finance.SCOOTER_SALE_ROUTES.list}?${params}`,
+      v1.finance.scooterSaleListSchema,
+      { headers: { cookie: cookieHeader }, cache: "no-store" },
+    );
+    return sales.items
+      .filter((sale) => sale.status !== "CANCELLED")
+      .map((sale) => sale.scooterId);
+  } catch {
+    // Non-critical: the "Sold" badge is a convenience indicator, so a
+    // failure here should not block rendering the scooter list.
+    return [];
+  }
 }
 
 async function scootersFromApi(

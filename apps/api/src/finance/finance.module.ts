@@ -9,9 +9,15 @@ import { CounterpartySearchService } from "./counterparty-search.service";
 import { ExpensesModule } from "./expenses/expenses.module";
 import { FinanceReportingService } from "./finance-reporting.service";
 import { FinanceService } from "./finance.service";
+import { ScooterSalesModule } from "./scooter-sales/scooter-sales.module";
 
 @Module({
-  imports: [ExpenseDocumentsModule, ExpenseReportingModule, ExpensesModule],
+  imports: [
+    ExpenseDocumentsModule,
+    ExpenseReportingModule,
+    ExpensesModule,
+    ScooterSalesModule,
+  ],
   controllers: [FinanceController, MyFinanceController, CompaniesController],
   providers: [
     FinanceService,

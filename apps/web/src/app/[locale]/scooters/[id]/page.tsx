@@ -51,10 +51,18 @@ export default async function ScooterRoutePage({
   }
 
   const cookieHeader = (await cookies()).toString();
-  const [scooter, maintenanceOverview, maintenanceTypes] = await Promise.all([
+  const [
+    scooter,
+    maintenanceOverview,
+    maintenanceTypes,
+    financials,
+    companyWallets,
+  ] = await Promise.all([
     scooterFromApi(locale, id, detailPath, cookieHeader),
     maintenanceOverviewFromApi(locale, id, detailPath, cookieHeader),
     maintenanceTypesFromApi(locale, detailPath, cookieHeader),
+    scooterFinancialsFromApi(locale, id, detailPath, cookieHeader),
+    companyWalletOptionsFromApi(locale, detailPath, cookieHeader),
   ]);
 
   return (
@@ -63,6 +71,8 @@ export default async function ScooterRoutePage({
       scootersHref={localizePath(SCOOTERS_PATH, locale)}
       maintenanceOverview={maintenanceOverview}
       maintenanceTypes={maintenanceTypes}
+      financials={financials}
+      companyWallets={companyWallets.items}
     />
   );
 }
@@ -109,7 +119,7 @@ async function maintenanceOverviewFromApi(
       { headers: { cookie: cookieHeader }, cache: "no-store" },
     );
   } catch (error) {
-    handleMaintenanceFetchError(error, locale, detailPath);
+    handleDetailFetchError(error, locale, detailPath);
   }
 }
 
@@ -125,11 +135,49 @@ async function maintenanceTypesFromApi(
       { headers: { cookie: cookieHeader }, cache: "no-store" },
     );
   } catch (error) {
-    handleMaintenanceFetchError(error, locale, detailPath);
+    handleDetailFetchError(error, locale, detailPath);
   }
 }
 
-function handleMaintenanceFetchError(
+async function scooterFinancialsFromApi(
+  locale: ReturnType<typeof resolveRouteLocale>,
+  id: string,
+  detailPath: string,
+  cookieHeader: string,
+): Promise<v1.finance.ScooterFinancials> {
+  try {
+    return await webApi.fetch(
+      v1.finance.SCOOTER_SALE_ROUTES.scooterFinancials(id),
+      v1.finance.scooterFinancialsSchema,
+      { headers: { cookie: cookieHeader }, cache: "no-store" },
+    );
+  } catch (error) {
+    handleDetailFetchError(error, locale, detailPath);
+  }
+}
+
+async function companyWalletOptionsFromApi(
+  locale: ReturnType<typeof resolveRouteLocale>,
+  detailPath: string,
+  cookieHeader: string,
+): Promise<v1.finance.WalletOptionList> {
+  const params = new URLSearchParams({
+    companyOnly: "true",
+    isActive: "true",
+    pageSize: "50",
+  });
+  try {
+    return await webApi.fetch(
+      `${v1.finance.ROUTES.walletOptions}?${params}`,
+      v1.finance.walletOptionListSchema,
+      { headers: { cookie: cookieHeader }, cache: "no-store" },
+    );
+  } catch (error) {
+    handleDetailFetchError(error, locale, detailPath);
+  }
+}
+
+function handleDetailFetchError(
   error: unknown,
   locale: ReturnType<typeof resolveRouteLocale>,
   detailPath: string,

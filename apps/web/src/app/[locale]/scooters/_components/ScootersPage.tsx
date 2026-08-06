@@ -20,6 +20,7 @@ import { useTranslations } from "next-intl";
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ReactNode,
@@ -36,6 +37,8 @@ interface ScootersPageProps {
   createHref: string;
   initialList: v1.scooters.ScooterList;
   initialQuery: v1.scooters.ListScootersQuery;
+  /** Scooter IDs with an active sale, resolved for `initialList`. */
+  initialSoldScooterIds?: string[];
 }
 
 interface Feedback {
@@ -53,6 +56,7 @@ export function ScootersPage({
   createHref,
   initialList,
   initialQuery,
+  initialSoldScooterIds,
 }: ScootersPageProps) {
   return (
     <ScootersPageContent
@@ -60,6 +64,7 @@ export function ScootersPage({
       createHref={createHref}
       initialList={initialList}
       initialQuery={initialQuery}
+      initialSoldScooterIds={initialSoldScooterIds}
     />
   );
 }
@@ -68,9 +73,14 @@ function ScootersPageContent({
   createHref,
   initialList,
   initialQuery,
+  initialSoldScooterIds = [],
 }: ScootersPageProps) {
   const t = useTranslations("scooters");
   const [list, setList] = useState(initialList);
+  const soldScooterIds = useMemo(
+    () => new Set(initialSoldScooterIds),
+    [initialSoldScooterIds],
+  );
   const [query, setQuery] =
     useState<v1.scooters.ListScootersQuery>(initialQuery);
   const [draftQuery, setDraftQuery] =
@@ -501,7 +511,7 @@ function ScootersPageContent({
           </div>
         </div>
 
-        <ScooterList items={list.items} />
+        <ScooterList items={list.items} soldScooterIds={soldScooterIds} />
 
         <InfiniteListFooter
           hasMore={hasMore && !listLoading}

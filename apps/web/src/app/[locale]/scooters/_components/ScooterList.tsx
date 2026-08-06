@@ -14,14 +14,24 @@ import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
 
 import { localizePath, resolveRouteLocale } from "@/i18n/paths";
+import { ScooterSoldBadge } from "./ScooterSalesSection";
 
 interface ScooterListProps {
   items: v1.scooters.ScooterListItem[];
+  /** Scooters known to have an active (non-cancelled) sale. Best-effort: only
+   * covers scooters resolved by the caller, e.g. the initial server-rendered
+   * page — freshly loaded scooters (search, infinite scroll) may not be
+   * reflected until the page reloads. */
+  soldScooterIds?: ReadonlySet<string>;
 }
 
 const inlineIconClassName = "size-4 shrink-0";
+const EMPTY_SOLD_SCOOTER_IDS: ReadonlySet<string> = new Set();
 
-export function ScooterList({ items }: ScooterListProps) {
+export function ScooterList({
+  items,
+  soldScooterIds = EMPTY_SOLD_SCOOTER_IDS,
+}: ScooterListProps) {
   const t = useTranslations("scooters");
   const locale = useLocale();
   const routeLocale = resolveRouteLocale(locale);
@@ -110,6 +120,9 @@ export function ScooterList({ items }: ScooterListProps) {
                     ) : null}
 
                     <div className="flex min-w-0 flex-wrap gap-2 sm:col-span-2 md:col-span-3 md:justify-end">
+                      {soldScooterIds.has(scooter.id) ? (
+                        <ScooterSoldBadge />
+                      ) : null}
                       <PowertrainBadge scooter={scooter} />
                       <Badge variant="outline">
                         {t(`registrationTypes.${scooter.registrationType}`)}

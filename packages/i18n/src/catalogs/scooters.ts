@@ -226,6 +226,105 @@ export const scootersCatalog = {
         healthy: "No known issues",
       },
     },
+    sales: {
+      badge: "Sold",
+      title: "Sale & receivable",
+      description: "Track who bought this scooter and how much they still owe.",
+      actions: {
+        sell: "Sell this scooter",
+        selling: "Selling...",
+        recordPayment: "Record payment",
+        recording: "Recording...",
+        cancelSale: "Cancel sale",
+        cancelling: "Cancelling...",
+        cancel: "Cancel",
+      },
+      feedback: {
+        saleCreatedTitle: "Scooter sold",
+        saleCreatedMessage:
+          "The sale was recorded and the buyer's wallet was charged.",
+        saleErrorTitle: "Sale not recorded",
+        paymentCreatedTitle: "Payment recorded",
+        paymentCreatedMessage: "The payment was applied to the sale balance.",
+        paymentErrorTitle: "Payment not recorded",
+        cancelSuccessTitle: "Sale cancelled",
+        cancelErrorTitle: "Sale not cancelled",
+        genericError: "Something went wrong. Try again.",
+      },
+      dialogs: {
+        sell: {
+          title: "Sell this scooter",
+          description:
+            "Record the buyer and sale price. The buyer's wallet is charged immediately.",
+        },
+        payment: {
+          title: "Record payment",
+          description: "Record a payment from the buyer toward the sale.",
+        },
+        cancel: {
+          title: "Cancel this sale?",
+          description:
+            "This cancels the sale record. It does not reverse any payments already posted, and this scooter cannot be sold again afterward.",
+        },
+      },
+      fields: {
+        buyer: "Buyer",
+        saleAmount: "Sale amount",
+        soldOn: "Sold on",
+        notes: "Notes",
+        paymentAmount: "Payment amount",
+        paidOn: "Paid on",
+        paymentMethod: "Payment method",
+        companyWallet: "Deposit to wallet",
+      },
+      paymentMethods: {
+        CASH: "Cash",
+        POS: "Card (POS)",
+        BANK_TRANSFER: "Bank transfer",
+        ONLINE_PAYMENT: "Online payment",
+      },
+      statuses: {
+        OPEN: "Awaiting payment",
+        PARTIALLY_PAID: "Partially paid",
+        PAID: "Paid in full",
+        CANCELLED: "Cancelled",
+      },
+      receivable: {
+        title: "Sale & receivable",
+        empty: "This scooter has not been sold yet.",
+        buyer: "Buyer",
+        status: "Status",
+        saleAmount: "Sale amount",
+        paidAmount: "Amount paid",
+        outstandingAmount: "Amount owed",
+        soldOn: "Sold on",
+      },
+      costs: {
+        title: "Costs",
+        description:
+          "Purchase, transport, repairs, and other costs allocated to this scooter.",
+        empty: "No costs have been allocated to this scooter yet.",
+        uncategorized: "Uncategorized",
+        total: "Total",
+        rentalIncomeTitle: "Rental income",
+        rentalIncomeDescription:
+          "Reserved for future rental income tracking once the rentals module exists.",
+      },
+      search: {
+        buyerPlaceholder: "Search buyer name, email, or phone",
+        noBuyers: "No matching people found.",
+        loading: "Searching...",
+        failed: "Search failed. Try again.",
+        clear: "Clear",
+        toggle: "Toggle buyer search",
+      },
+      validation: {
+        required: "{field} is required.",
+        invalid: "Enter a valid {field}.",
+        buyerRequired: "Select a buyer.",
+        walletRequired: "Select a wallet.",
+      },
+    },
     sections: {
       identity: "Identity",
       technical: "Technical",
@@ -565,6 +664,107 @@ export const scootersCatalog = {
         dueSoon: "Întreținere scadentă curând",
         issueSeverity: "Problemă {severity}",
         healthy: "Fără probleme cunoscute",
+      },
+    },
+    sales: {
+      badge: "Vândut",
+      title: "Vânzare și sumă de încasat",
+      description:
+        "Urmărește cine a cumpărat acest scuter și cât mai are de plătit.",
+      actions: {
+        sell: "Vinde acest scuter",
+        selling: "Se vinde...",
+        recordPayment: "Înregistrează plata",
+        recording: "Se înregistrează...",
+        cancelSale: "Anulează vânzarea",
+        cancelling: "Se anulează...",
+        cancel: "Anulează",
+      },
+      feedback: {
+        saleCreatedTitle: "Scuter vândut",
+        saleCreatedMessage:
+          "Vânzarea a fost înregistrată și portofelul cumpărătorului a fost taxat.",
+        saleErrorTitle: "Vânzarea nu a fost înregistrată",
+        paymentCreatedTitle: "Plată înregistrată",
+        paymentCreatedMessage: "Plata a fost aplicată soldului vânzării.",
+        paymentErrorTitle: "Plata nu a fost înregistrată",
+        cancelSuccessTitle: "Vânzare anulată",
+        cancelErrorTitle: "Vânzarea nu a fost anulată",
+        genericError: "Ceva nu a mers bine. Încearcă din nou.",
+      },
+      dialogs: {
+        sell: {
+          title: "Vinde acest scuter",
+          description:
+            "Înregistrează cumpărătorul și prețul de vânzare. Portofelul cumpărătorului este taxat imediat.",
+        },
+        payment: {
+          title: "Înregistrează plata",
+          description:
+            "Înregistrează o plată de la cumpărător pentru această vânzare.",
+        },
+        cancel: {
+          title: "Anulezi această vânzare?",
+          description:
+            "Această acțiune anulează înregistrarea vânzării. Nu inversează plățile deja înregistrate, iar acest scuter nu va mai putea fi vândut din nou.",
+        },
+      },
+      fields: {
+        buyer: "Cumpărător",
+        saleAmount: "Preț de vânzare",
+        soldOn: "Vândut la data",
+        notes: "Notițe",
+        paymentAmount: "Suma plății",
+        paidOn: "Plătit la data",
+        paymentMethod: "Metodă de plată",
+        companyWallet: "Depune în portofelul",
+      },
+      paymentMethods: {
+        CASH: "Numerar",
+        POS: "Card (POS)",
+        BANK_TRANSFER: "Transfer bancar",
+        ONLINE_PAYMENT: "Plată online",
+      },
+      statuses: {
+        OPEN: "În așteptarea plății",
+        PARTIALLY_PAID: "Parțial plătit",
+        PAID: "Plătit integral",
+        CANCELLED: "Anulat",
+      },
+      receivable: {
+        title: "Vânzare și sumă de încasat",
+        empty: "Acest scuter nu a fost încă vândut.",
+        buyer: "Cumpărător",
+        status: "Stare",
+        saleAmount: "Preț de vânzare",
+        paidAmount: "Sumă plătită",
+        outstandingAmount: "Sumă restantă",
+        soldOn: "Vândut la data",
+      },
+      costs: {
+        title: "Costuri",
+        description:
+          "Achiziție, transport, reparații și alte costuri alocate acestui scuter.",
+        empty: "Nu au fost alocate costuri acestui scuter încă.",
+        uncategorized: "Necategorizat",
+        total: "Total",
+        rentalIncomeTitle: "Venituri din închiriere",
+        rentalIncomeDescription:
+          "Rezervat pentru urmărirea viitoare a veniturilor din închiriere, odată ce modulul de închirieri va exista.",
+      },
+      search: {
+        buyerPlaceholder: "Caută nume, email sau telefon cumpărător",
+        noBuyers: "Nu au fost găsite persoane potrivite.",
+        loading: "Se caută...",
+        failed: "Căutarea a eșuat. Încearcă din nou.",
+        clear: "Șterge",
+        toggle: "Comută căutarea cumpărătorului",
+      },
+      validation: {
+        required: "{field} este obligatoriu.",
+        invalid: "Introdu o valoare validă pentru {field}.",
+        buyerRequired: "Selectează un cumpărător.",
+        walletRequired: "Selectează un portofel.",
       },
     },
     sections: {

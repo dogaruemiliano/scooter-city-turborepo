@@ -46,12 +46,15 @@ import {
   type ScooterFormState,
 } from "./scooter-form";
 import { ScooterMaintenanceSection } from "./ScooterMaintenanceSection";
+import { ScooterSalesSection, ScooterSoldBadge } from "./ScooterSalesSection";
 
 interface ScooterDetailPageProps {
   scooter: v1.scooters.Scooter;
   scootersHref: string;
   maintenanceOverview: v1.maintenance.ScooterMaintenanceOverview;
   maintenanceTypes: v1.maintenance.MaintenanceTypeList;
+  financials: v1.finance.ScooterFinancials;
+  companyWallets: v1.finance.WalletOption[];
 }
 
 interface Feedback {
@@ -67,6 +70,8 @@ export function ScooterDetailPage({
   scootersHref,
   maintenanceOverview,
   maintenanceTypes,
+  financials,
+  companyWallets,
 }: ScooterDetailPageProps) {
   const t = useTranslations("scooters");
   const locale = useLocale();
@@ -207,6 +212,9 @@ export function ScooterDetailPage({
           {scooter.deletedAt ? (
             <Badge variant="outline">{t("recordStatus.deleted")}</Badge>
           ) : null}
+          {financials.sale && financials.sale.status !== "CANCELLED" ? (
+            <ScooterSoldBadge />
+          ) : null}
           <PowertrainBadge scooter={scooter} />
           <Badge variant="outline">
             {t(`registrationTypes.${scooter.registrationType}`)}
@@ -321,6 +329,12 @@ export function ScooterDetailPage({
           className="sm:col-span-2"
         />
       </DetailSection>
+
+      <ScooterSalesSection
+        scooter={scooter}
+        financials={financials}
+        companyWallets={companyWallets}
+      />
 
       <ScooterMaintenanceSection
         scooter={scooter}
