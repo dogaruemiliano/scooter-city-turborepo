@@ -76,6 +76,7 @@ const PAYMENT_METHOD_TYPES = new Set<v1.finance.CreatableMoneyTransactionType>([
   "REIMBURSEMENT",
   "PERSONAL_EXTRACTION",
   "COMPANY_DISTRIBUTION",
+  "CAPITAL_CONTRIBUTION",
   "REFUND",
 ]);
 
@@ -129,6 +130,15 @@ export function TransactionCreateForm({
   const primaryWallets = wallets.filter((wallet) =>
     walletMatchesRole(wallet, recipe.primaryRole, adminWalletIdSet),
   );
+  const secondaryWallets = recipe.secondaryRole
+    ? wallets.filter((wallet) =>
+        walletMatchesRole(wallet, recipe.secondaryRole!, adminWalletIdSet),
+      )
+    : [];
+  const useSecondaryWalletSelector =
+    form.type === "COMPANY_DISTRIBUTION" ||
+    form.type === "CAPITAL_CONTRIBUTION";
+  const showRepaysOwedBalance = form.type === "COMPANY_DISTRIBUTION";
   const visibleCategories = categories.filter((category) => {
     if (!category.isActive) return false;
     if (form.type === "EXPENSE") return category.kind !== "INCOME";
@@ -348,22 +358,40 @@ export function TransactionCreateForm({
               onAmountChange={(value) => setValue("amount", value)}
               onCurrencyChange={(value) => setValue("currency", value)}
             >
-              <FlowCounterpartySelect
-                key={`counterparty-${form.type}`}
-                id={`${formId}-counterparty`}
-                label={t(
-                  form.type === "INCOME"
-                    ? "transactionForm.fields.payer"
-                    : "transactionForm.fields.recipient",
-                )}
-                transactionType={form.type === "EXPENSE" ? "EXPENSE" : "INCOME"}
-                value={form.counterpartyId}
-                disabled={creating}
-                error={errors.counterpartyId}
-                required={form.type === "INCOME"}
-                t={t}
-                onChange={(value) => setValue("counterpartyId", value)}
-              />
+              {useSecondaryWalletSelector ? (
+                <FlowWalletSelect
+                  id={`${formId}-secondary-wallet`}
+                  label={t(
+                    `transactionForm.fields.${recipe.secondaryLabel ?? "wallet"}`,
+                  )}
+                  value={form.secondaryWalletId}
+                  wallets={secondaryWallets}
+                  disabled={creating}
+                  error={errors.secondaryWalletId}
+                  walletTypeLabels={walletTypeLabels}
+                  t={t}
+                  onChange={(value) => setValue("secondaryWalletId", value)}
+                />
+              ) : (
+                <FlowCounterpartySelect
+                  key={`counterparty-${form.type}`}
+                  id={`${formId}-counterparty`}
+                  label={t(
+                    form.type === "INCOME"
+                      ? "transactionForm.fields.payer"
+                      : "transactionForm.fields.recipient",
+                  )}
+                  transactionType={
+                    form.type === "EXPENSE" ? "EXPENSE" : "INCOME"
+                  }
+                  value={form.counterpartyId}
+                  disabled={creating}
+                  error={errors.counterpartyId}
+                  required={form.type === "INCOME"}
+                  t={t}
+                  onChange={(value) => setValue("counterpartyId", value)}
+                />
+              )}
             </FlowRow>
           </div>
 
@@ -429,6 +457,22 @@ export function TransactionCreateForm({
               ) : null}
             </div>
           </div>
+
+          {showRepaysOwedBalance ? (
+            <div className="flex items-center gap-2 border-t border-border pt-8">
+              <Checkbox
+                id={`${formId}-repays-owed-balance`}
+                checked={form.repaysOwedBalance}
+                disabled={creating}
+                onCheckedChange={(checked) =>
+                  setValue("repaysOwedBalance", checked)
+                }
+              />
+              <Label htmlFor={`${formId}-repays-owed-balance`}>
+                {t("transactionForm.repaysOwedBalance")}
+              </Label>
+            </div>
+          ) : null}
 
           <div className="grid gap-4 border-t border-border pt-8 md:grid-cols-2">
             <TextField

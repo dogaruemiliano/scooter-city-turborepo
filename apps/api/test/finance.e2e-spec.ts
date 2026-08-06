@@ -1708,6 +1708,315 @@ describe("Finance HTTP surface (e2e)", () => {
     expect(claimsForSuiteAdmins(finalClaimsResponse.body)).toEqual([]);
   });
 
+  it("rejects malformed capital contribution and distribution-repayment shapes", async () => {
+    const contributor = await freshSession(["ADMIN"], {
+      firstName: "Rosalind",
+      lastName: "Franklin",
+    });
+    const contributorWallet = await getWalletForUser(contributor);
+    createdWalletIds.push(contributorWallet.id);
+
+    const malformedTransactions = [
+      {
+        name: "capital contribution missing the settlement credit",
+        input: {
+          type: "CAPITAL_CONTRIBUTION",
+          amount: "10.00",
+          currency: "RON",
+          financialScope: "COMPANY",
+          paymentMethod: "BANK_TRANSFER",
+          billingStatus: "NOT_APPLICABLE",
+          counterpartyUserId: contributor.userId,
+          idempotencyKey: `finance:${runId}:invalid-capital-contribution-shape`,
+          postImmediately: true,
+          balanceChanges: [
+            {
+              walletId: contributorWallet.id,
+              bucket: "ADMIN_PERSONAL_FUNDS",
+              currency: "RON",
+              amountDelta: "-10.00",
+            },
+            {
+              walletId: companyBankWallet.id,
+              bucket: "BUSINESS_FUNDS",
+              currency: "RON",
+              amountDelta: "10.00",
+            },
+          ],
+          references: [],
+        },
+      },
+      {
+        name: "company distribution repaying the wrong direction",
+        input: {
+          type: "COMPANY_DISTRIBUTION",
+          amount: "10.00",
+          currency: "RON",
+          financialScope: "COMPANY",
+          paymentMethod: "BANK_TRANSFER",
+          billingStatus: "NOT_APPLICABLE",
+          recipientUserId: contributor.userId,
+          idempotencyKey: `finance:${runId}:invalid-distribution-repayment-shape`,
+          postImmediately: true,
+          balanceChanges: [
+            {
+              walletId: companyBankWallet.id,
+              bucket: "BUSINESS_FUNDS",
+              currency: "RON",
+              amountDelta: "-10.00",
+            },
+            {
+              walletId: contributorWallet.id,
+              bucket: "USER_SETTLEMENT",
+              currency: "RON",
+              amountDelta: "10.00",
+            },
+          ],
+          references: [],
+        },
+      },
+      {
+        name: "company distribution with three balance changes",
+        input: {
+          type: "COMPANY_DISTRIBUTION",
+          amount: "10.00",
+          currency: "RON",
+          financialScope: "COMPANY",
+          paymentMethod: "BANK_TRANSFER",
+          billingStatus: "NOT_APPLICABLE",
+          recipientUserId: contributor.userId,
+          idempotencyKey: `finance:${runId}:invalid-distribution-three-changes`,
+          postImmediately: true,
+          balanceChanges: [
+            {
+              walletId: companyBankWallet.id,
+              bucket: "BUSINESS_FUNDS",
+              currency: "RON",
+              amountDelta: "-10.00",
+            },
+            {
+              walletId: contributorWallet.id,
+              bucket: "USER_SETTLEMENT",
+              currency: "RON",
+              amountDelta: "-5.00",
+            },
+            {
+              walletId: contributorWallet.id,
+              bucket: "ADMIN_PERSONAL_FUNDS",
+              currency: "RON",
+              amountDelta: "-5.00",
+            },
+          ],
+          references: [],
+        },
+      },
+    ] as const;
+
+    for (const malformed of malformedTransactions) {
+      const response = await authenticate(
+        req().post(v1.finance.ROUTES.transactions.create).send(malformed.input),
+        admin,
+      );
+      expect({ name: malformed.name, status: response.status }).toEqual({
+        name: malformed.name,
+        status: 400,
+      });
+    }
+  });
+
+  it("records a capital contribution as a debt owed back to the contributing owner, then lets a distribution repay it", async () => {
+    const contributor = await freshSession(["ADMIN"], {
+      firstName: "Marie",
+      lastName: "Curie",
+    });
+    const contributorWallet = await getWalletForUser(contributor);
+    createdWalletIds.push(contributorWallet.id);
+
+    const contributionResponse = await authenticate(
+      req()
+        .post(v1.finance.ROUTES.transactions.create)
+        .send({
+          type: "CAPITAL_CONTRIBUTION",
+          amount: "400.00",
+          currency: "RON",
+          financialScope: "COMPANY",
+          paymentMethod: "BANK_TRANSFER",
+          billingStatus: "NOT_APPLICABLE",
+          counterpartyUserId: contributor.userId,
+          idempotencyKey: `finance:${runId}:capital-contribution`,
+          postImmediately: true,
+          balanceChanges: [
+            {
+              walletId: contributorWallet.id,
+              bucket: "ADMIN_PERSONAL_FUNDS",
+              currency: "RON",
+              amountDelta: "-400.00",
+            },
+            {
+              walletId: companyBankWallet.id,
+              bucket: "BUSINESS_FUNDS",
+              currency: "RON",
+              amountDelta: "400.00",
+            },
+            {
+              walletId: contributorWallet.id,
+              bucket: "USER_SETTLEMENT",
+              currency: "RON",
+              amountDelta: "400.00",
+            },
+          ],
+          references: [],
+        }),
+      admin,
+    );
+    expect(contributionResponse.status).toBe(201);
+
+    const contributorAfterContribution = await getWallet(contributorWallet.id);
+    expect(balance(contributorAfterContribution, "ADMIN_PERSONAL_FUNDS")).toBe(
+      "-400.00",
+    );
+    expect(balance(contributorAfterContribution, "USER_SETTLEMENT")).toBe(
+      "400.00",
+    );
+
+    const beforeOwnershipResponse = await authenticate(
+      req().get(v1.finance.ROUTES.owners.balances),
+      admin,
+    );
+    expect(beforeOwnershipResponse.status).toBe(200);
+    const beforeOwnershipBody = beforeOwnershipResponse.body as {
+      items: v1.finance.OwnerBalance[];
+    };
+    expect(
+      beforeOwnershipBody.items.some(
+        (item) => item.userId === contributor.userId,
+      ),
+    ).toBe(false);
+
+    const ownerRegistrationResponse = await authenticate(
+      req()
+        .post(
+          v1.finance.EXPENSE_ROUTES.legalEntities.owners.create(
+            expenseEvidenceEntity.id,
+          ),
+        )
+        .send({ userId: contributor.userId, effectiveFrom: "2000-01-01" }),
+      admin,
+    );
+    expect(ownerRegistrationResponse.status).toBe(201);
+
+    const afterOwnershipResponse = await authenticate(
+      req().get(v1.finance.ROUTES.owners.balances),
+      admin,
+    );
+    expect(afterOwnershipResponse.status).toBe(200);
+    const afterOwnershipBody = afterOwnershipResponse.body as {
+      items: v1.finance.OwnerBalance[];
+    };
+    expect(afterOwnershipBody.items).toContainEqual({
+      userId: contributor.userId,
+      user: {
+        id: contributor.userId,
+        email: contributor.email,
+        firstName: "Marie",
+        lastName: "Curie",
+      },
+      currency: "RON",
+      amount: "400.00",
+    });
+
+    const repaymentDistributionResponse = await authenticate(
+      req()
+        .post(v1.finance.ROUTES.transactions.create)
+        .send({
+          type: "COMPANY_DISTRIBUTION",
+          amount: "150.00",
+          currency: "RON",
+          financialScope: "COMPANY",
+          paymentMethod: "BANK_TRANSFER",
+          billingStatus: "NOT_APPLICABLE",
+          recipientUserId: contributor.userId,
+          idempotencyKey: `finance:${runId}:distribution-repayment`,
+          postImmediately: true,
+          balanceChanges: [
+            {
+              walletId: companyBankWallet.id,
+              bucket: "BUSINESS_FUNDS",
+              currency: "RON",
+              amountDelta: "-150.00",
+            },
+            {
+              walletId: contributorWallet.id,
+              bucket: "USER_SETTLEMENT",
+              currency: "RON",
+              amountDelta: "-150.00",
+            },
+          ],
+          references: [],
+        }),
+      admin,
+    );
+    expect(repaymentDistributionResponse.status).toBe(201);
+
+    const contributorAfterRepayment = await getWallet(contributorWallet.id);
+    expect(balance(contributorAfterRepayment, "USER_SETTLEMENT")).toBe(
+      "250.00",
+    );
+
+    const afterRepaymentBalancesResponse = await authenticate(
+      req().get(v1.finance.ROUTES.owners.balances),
+      admin,
+    );
+    const afterRepaymentBody = afterRepaymentBalancesResponse.body as {
+      items: v1.finance.OwnerBalance[];
+    };
+    expect(afterRepaymentBody.items).toContainEqual({
+      userId: contributor.userId,
+      user: {
+        id: contributor.userId,
+        email: contributor.email,
+        firstName: "Marie",
+        lastName: "Curie",
+      },
+      currency: "RON",
+      amount: "250.00",
+    });
+
+    const pureDistributionResponse = await authenticate(
+      req()
+        .post(v1.finance.ROUTES.transactions.create)
+        .send({
+          type: "COMPANY_DISTRIBUTION",
+          amount: "50.00",
+          currency: "RON",
+          financialScope: "COMPANY",
+          paymentMethod: "BANK_TRANSFER",
+          billingStatus: "NOT_APPLICABLE",
+          recipientUserId: contributor.userId,
+          idempotencyKey: `finance:${runId}:pure-distribution`,
+          postImmediately: true,
+          balanceChanges: [
+            {
+              walletId: companyBankWallet.id,
+              bucket: "BUSINESS_FUNDS",
+              currency: "RON",
+              amountDelta: "-50.00",
+            },
+          ],
+          references: [],
+        }),
+      admin,
+    );
+    expect(pureDistributionResponse.status).toBe(201);
+
+    const contributorAfterPureDistribution = await getWallet(
+      contributorWallet.id,
+    );
+    expect(balance(contributorAfterPureDistribution, "USER_SETTLEMENT")).toBe(
+      "250.00",
+    );
+  });
+
   it("filters and paginates wallet selectors without returning every wallet", async () => {
     const ownerSearch = await authenticate(
       req().get(

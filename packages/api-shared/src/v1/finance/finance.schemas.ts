@@ -1028,3 +1028,24 @@ export const outstandingPersonalClaimListSchema = z
     items: z.array(outstandingPersonalClaimSchema),
   })
   .meta({ id: "OutstandingPersonalClaimList" });
+
+export const ownerBalanceSchema = z
+  .object({
+    userId: z.string(),
+    user: financeUserSummarySchema,
+    currency: currencySchema,
+    amount: signedAggregateMoneyAmountSchema,
+  })
+  .strict()
+  .meta({ id: "OwnerBalance" });
+
+export type OwnerBalance = z.infer<typeof ownerBalanceSchema>;
+
+export const ownerBalanceListSchema = z
+  .object({
+    items: z.array(ownerBalanceSchema),
+  })
+  .strict()
+  .meta({ id: "OwnerBalanceList" });
+
+export type OwnerBalanceList = z.infer<typeof ownerBalanceListSchema>;

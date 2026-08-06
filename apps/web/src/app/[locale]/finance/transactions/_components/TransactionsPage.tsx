@@ -477,6 +477,7 @@ function transactionDirectionLabel(
     case "INCOME":
     case "USER_PAYMENT":
     case "GUARANTEE_RECEIVED":
+    case "CAPITAL_CONTRIBUTION":
       return directionalLabel(counterparty ?? sourceWallet, undefined, t);
     case "EXPENSE":
     case "USER_CHARGE":

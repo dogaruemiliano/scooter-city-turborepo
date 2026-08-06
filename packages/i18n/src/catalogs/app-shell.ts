@@ -17,6 +17,7 @@ export const appShellCatalog = {
       financeCompanies: "Companies",
       financeCategories: "Categories",
       financeClaims: "Personal claims",
+      financeOwners: "Owner balances",
       businessConfiguration: "Business configuration",
     },
     pages: {
@@ -32,6 +33,7 @@ export const appShellCatalog = {
       financeWallet: "Wallet details",
       financeCategories: "Financial categories",
       financeClaims: "Personal claims",
+      financeOwners: "Owner balances",
       financeTransaction: "Transaction details",
       accountSettings: "Account settings",
       persons: "Persons",
@@ -73,6 +75,7 @@ export const appShellCatalog = {
       financeCompanies: "Companii",
       financeCategories: "Categorii",
       financeClaims: "Creanțe personale",
+      financeOwners: "Solduri asociați",
       businessConfiguration: "Configurare firmă",
     },
     pages: {
@@ -88,6 +91,7 @@ export const appShellCatalog = {
       financeWallet: "Detalii portofel",
       financeCategories: "Categorii financiare",
       financeClaims: "Creanțe personale",
+      financeOwners: "Solduri asociați",
       financeTransaction: "Detalii tranzacție",
       accountSettings: "Setări cont",
       persons: "Persoane",

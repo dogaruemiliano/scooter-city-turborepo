@@ -13,6 +13,7 @@ import {
   Building2Icon,
   ChartPieIcon,
   HandCoinsIcon,
+  LandmarkIcon,
   LayoutDashboardIcon,
   ReceiptTextIcon,
   Settings2Icon,
@@ -135,6 +136,11 @@ const NAVIGATION_GROUPS = [
         icon: HandCoinsIcon,
       },
       {
+        href: "/finance/owners",
+        labelKey: "financeOwners",
+        icon: LandmarkIcon,
+      },
+      {
         href: "/finance/settings/business",
         labelKey: "businessConfiguration",
         icon: Settings2Icon,
@@ -161,6 +167,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/finance/companies": "financeCompanies",
   "/finance/categories": "financeCategories",
   "/finance/claims": "financeClaims",
+  "/finance/owners": "financeOwners",
   "/persons": "persons",
   "/persons/new": "newPerson",
   "/scooters": "scooters",

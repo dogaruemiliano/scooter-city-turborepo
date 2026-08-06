@@ -37,6 +37,7 @@ import { ListWalletsQuery } from "./dto/list-wallets.query";
 import { MoneyTransaction } from "./dto/money-transaction";
 import { MoneyTransactionList } from "./dto/money-transaction-list";
 import { OutstandingPersonalClaimList } from "./dto/outstanding-personal-claim-list";
+import { OwnerBalanceList } from "./dto/owner-balance-list";
 import { ReverseMoneyTransactionInput } from "./dto/reverse-money-transaction.input";
 import { SearchFinancialCounterpartiesQuery } from "./dto/search-financial-counterparties.query";
 import { UpdateFinancialCategoryInput } from "./dto/update-financial-category.input";
@@ -289,6 +290,16 @@ export class FinanceController {
     items: v1.finance.OutstandingPersonalClaim[];
   }> {
     return { items: await this.finance.listOutstandingClaims() };
+  }
+
+  @Get("owners/balances")
+  @ApiOperation({
+    operationId: "FinanceController_getOwnerBalances_v1",
+    summary: "Get how much the company currently owes each active owner",
+  })
+  @ZodResponse({ type: OwnerBalanceList })
+  async getOwnerBalances(): Promise<v1.finance.OwnerBalanceList> {
+    return this.financeReporting.getOwnerBalances();
   }
 }
 
