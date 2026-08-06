@@ -16,4 +16,16 @@ export const SCOOTER_SALE_ROUTES = {
   cancel: (id: string): string => `/v1/finance/scooter-sales/${id}/cancel`,
   scooterFinancials: (scooterId: string): string =>
     `/v1/finance/scooters/${scooterId}/financials`,
+  document: {
+    get: (saleId: string): string =>
+      `/v1/finance/scooter-sales/${saleId}/document`,
+    upsert: (saleId: string): string =>
+      `/v1/finance/scooter-sales/${saleId}/document`,
+    uploadUrl: (saleId: string): string =>
+      `/v1/finance/scooter-sales/${saleId}/document/upload-url`,
+    completeUpload: (saleId: string): string =>
+      `/v1/finance/scooter-sales/${saleId}/document/complete-upload`,
+    content: (saleId: string): string =>
+      `/v1/finance/scooter-sales/${saleId}/document/content`,
+  },
 } as const;

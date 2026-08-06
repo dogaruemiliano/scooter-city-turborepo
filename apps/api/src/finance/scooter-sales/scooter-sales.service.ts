@@ -169,7 +169,9 @@ export class ScooterSalesService {
           throw new ConflictException("Sale is already fully paid");
         }
 
-        const amount = new Prisma.Decimal(input.amount);
+        const businessAmount = new Prisma.Decimal(input.businessAmount);
+        const personalAmount = new Prisma.Decimal(input.personalAmount);
+        const amount = businessAmount.plus(personalAmount);
         const outstanding = current.saleAmount.minus(current.paidAmount);
         if (amount.greaterThan(outstanding)) {
           throw new BadRequestException(
@@ -177,21 +179,35 @@ export class ScooterSalesService {
           );
         }
 
-        const wallet = await tx.wallet.findFirst({
-          where: {
-            id: input.companyWalletId,
-            isActive: true,
-            type: { not: WalletType.USER },
-          },
-          select: { id: true },
-        });
-        if (!wallet) {
-          throw new BadRequestException(
-            "Payment wallet must be an active company wallet",
-          );
+        const paidOn = date(input.paidOn);
+
+        let companyWallet: { id: string } | null = null;
+        if (businessAmount.greaterThan(0)) {
+          companyWallet = await tx.wallet.findFirst({
+            where: {
+              id: input.companyWalletId,
+              isActive: true,
+              type: { not: WalletType.USER },
+            },
+            select: { id: true },
+          });
+          if (!companyWallet) {
+            throw new BadRequestException(
+              "Payment wallet must be an active company wallet",
+            );
+          }
         }
 
         const buyer = await this.resolveBuyer(tx, current.buyerCounterpartyId);
+
+        let personalOwner: { userId: string; walletId: string } | null = null;
+        if (personalAmount.greaterThan(0)) {
+          personalOwner = await this.resolvePersonalOwner(
+            tx,
+            input.personalOwnerUserId!,
+            paidOn,
+          );
+        }
 
         await tx.moneyTransaction.create({
           data: {
@@ -203,19 +219,34 @@ export class ScooterSalesService {
             paymentMethod: input.paymentMethod,
             billingStatus: BillingStatus.NOT_APPLICABLE,
             counterpartyUserId: buyer.userId,
+            recipientUserId: personalOwner?.userId,
             recordedByUserId: context.actorUserId,
-            occurredAt: date(input.paidOn),
+            occurredAt: paidOn,
             description:
               input.notes ?? `Payment for scooter sale ${current.id}`,
             idempotencyKey: input.idempotencyKey,
             balanceChanges: {
               create: [
-                {
-                  walletId: wallet.id,
-                  bucket: WalletBalanceBucket.BUSINESS_FUNDS,
-                  currency: current.currency,
-                  amountDelta: amount,
-                },
+                ...(companyWallet
+                  ? [
+                      {
+                        walletId: companyWallet.id,
+                        bucket: WalletBalanceBucket.BUSINESS_FUNDS,
+                        currency: current.currency,
+                        amountDelta: businessAmount,
+                      },
+                    ]
+                  : []),
+                ...(personalOwner
+                  ? [
+                      {
+                        walletId: personalOwner.walletId,
+                        bucket: WalletBalanceBucket.ADMIN_PERSONAL_FUNDS,
+                        currency: current.currency,
+                        amountDelta: personalAmount,
+                      },
+                    ]
+                  : []),
                 {
                   walletId: buyer.walletId,
                   bucket: WalletBalanceBucket.USER_SETTLEMENT,
@@ -233,13 +264,24 @@ export class ScooterSalesService {
             },
           },
         });
-        await this.applyWalletDelta(
-          tx,
-          wallet.id,
-          WalletBalanceBucket.BUSINESS_FUNDS,
-          current.currency,
-          amount,
-        );
+        if (companyWallet) {
+          await this.applyWalletDelta(
+            tx,
+            companyWallet.id,
+            WalletBalanceBucket.BUSINESS_FUNDS,
+            current.currency,
+            businessAmount,
+          );
+        }
+        if (personalOwner) {
+          await this.applyWalletDelta(
+            tx,
+            personalOwner.walletId,
+            WalletBalanceBucket.ADMIN_PERSONAL_FUNDS,
+            current.currency,
+            personalAmount,
+          );
+        }
         await this.applyWalletDelta(
           tx,
           buyer.walletId,
@@ -253,6 +295,8 @@ export class ScooterSalesService {
           where: { id: current.id },
           data: {
             paidAmount,
+            paidBusinessAmount: current.paidBusinessAmount.plus(businessAmount),
+            paidPersonalAmount: current.paidPersonalAmount.plus(personalAmount),
             status: paidAmount.greaterThanOrEqualTo(current.saleAmount)
               ? ScooterSaleStatus.PAID
               : ScooterSaleStatus.PARTIALLY_PAID,
@@ -448,6 +492,36 @@ export class ScooterSalesService {
     }
 
     return { userId: counterparty.person.userId, walletId: wallet.id };
+  }
+
+  private async resolvePersonalOwner(
+    tx: Prisma.TransactionClient,
+    personalOwnerUserId: string,
+    asOf: Date,
+  ): Promise<{ userId: string; walletId: string }> {
+    const owner = await tx.businessOwner.findFirst({
+      where: {
+        userId: personalOwnerUserId,
+        effectiveFrom: { lte: asOf },
+        OR: [{ effectiveTo: null }, { effectiveTo: { gte: asOf } }],
+      },
+      select: { userId: true },
+    });
+    if (!owner) {
+      throw new BadRequestException(
+        "personalOwnerUserId must be an active business owner as of paidOn",
+      );
+    }
+
+    const wallet = await tx.wallet.findFirst({
+      where: { ownerUserId: owner.userId, isActive: true },
+      select: { id: true },
+    });
+    if (!wallet) {
+      throw new BadRequestException("Owner does not have an active wallet");
+    }
+
+    return { userId: owner.userId, walletId: wallet.id };
   }
 
   private async applyWalletDelta(

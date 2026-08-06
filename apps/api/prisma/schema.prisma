@@ -272,34 +272,35 @@ model User {
   /// preserving the User row and its business history.
   deletedAt     DateTime?
 
-  sessions                   Session[]
-  refreshTokens              RefreshToken[]
-  otpChallenges              OtpChallenge[]
-  authAccounts               AuthAccount[]
-  auditEvents                AuditEvent[]
-  mediaAssets                MediaAsset[]
-  draftUploads               DraftUpload[]
-  person                     Person?
-  wallet                     Wallet?                          @relation("WalletOwner")
-  transactionsRecorded       MoneyTransaction[]               @relation("MoneyTransactionRecordedBy")
-  transactionsAsCounterparty MoneyTransaction[]               @relation("MoneyTransactionCounterparty")
-  transactionsAsRecipient    MoneyTransaction[]               @relation("MoneyTransactionRecipient")
-  transactionsAsDebtor       MoneyTransaction[]               @relation("MoneyTransactionDebtor")
-  transactionsAsCreditor     MoneyTransaction[]               @relation("MoneyTransactionCreditor")
-  businessOwnerships         BusinessOwner[]                  @relation("BusinessOwnerUser")
-  expensesCreated            Expense[]                        @relation("ExpenseCreatedBy")
-  expensesUpdated            Expense[]                        @relation("ExpenseUpdatedBy")
-  expensesPosted             Expense[]                        @relation("ExpensePostedBy")
-  expensesReversed           Expense[]                        @relation("ExpenseReversedBy")
-  expensePaymentsFunded      ExpensePayment[]                 @relation("ExpensePaymentFundedBy")
-  expensePaymentsPaid        ExpensePayment[]                 @relation("ExpensePaymentPaidBy")
-  reimbursementClaims        ExpenseReimbursementClaim[]      @relation("ExpenseClaimant")
-  reimbursementSettlements   ExpenseReimbursementSettlement[] @relation("ExpenseSettlementPaidBy")
-  expenseDocumentsReviewed   ExpenseDocument[]                @relation("ExpenseDocumentReviewedBy")
-  companyCardsHeld           Wallet[]                         @relation("CompanyCardHolder")
-  scooterIssuesReported      ScooterIssue[]                   @relation("ScooterIssueReportedBy")
-  maintenanceRecordsRecorded MaintenanceRecord[]              @relation("MaintenanceRecordRecordedBy")
-  scooterSalesRecorded       ScooterSale[]                    @relation("ScooterSaleCreatedBy")
+  sessions                    Session[]
+  refreshTokens               RefreshToken[]
+  otpChallenges               OtpChallenge[]
+  authAccounts                AuthAccount[]
+  auditEvents                 AuditEvent[]
+  mediaAssets                 MediaAsset[]
+  draftUploads                DraftUpload[]
+  person                      Person?
+  wallet                      Wallet?                          @relation("WalletOwner")
+  transactionsRecorded        MoneyTransaction[]               @relation("MoneyTransactionRecordedBy")
+  transactionsAsCounterparty  MoneyTransaction[]               @relation("MoneyTransactionCounterparty")
+  transactionsAsRecipient     MoneyTransaction[]               @relation("MoneyTransactionRecipient")
+  transactionsAsDebtor        MoneyTransaction[]               @relation("MoneyTransactionDebtor")
+  transactionsAsCreditor      MoneyTransaction[]               @relation("MoneyTransactionCreditor")
+  businessOwnerships          BusinessOwner[]                  @relation("BusinessOwnerUser")
+  expensesCreated             Expense[]                        @relation("ExpenseCreatedBy")
+  expensesUpdated             Expense[]                        @relation("ExpenseUpdatedBy")
+  expensesPosted              Expense[]                        @relation("ExpensePostedBy")
+  expensesReversed            Expense[]                        @relation("ExpenseReversedBy")
+  expensePaymentsFunded       ExpensePayment[]                 @relation("ExpensePaymentFundedBy")
+  expensePaymentsPaid         ExpensePayment[]                 @relation("ExpensePaymentPaidBy")
+  reimbursementClaims         ExpenseReimbursementClaim[]      @relation("ExpenseClaimant")
+  reimbursementSettlements    ExpenseReimbursementSettlement[] @relation("ExpenseSettlementPaidBy")
+  expenseDocumentsReviewed    ExpenseDocument[]                @relation("ExpenseDocumentReviewedBy")
+  companyCardsHeld            Wallet[]                         @relation("CompanyCardHolder")
+  scooterIssuesReported       ScooterIssue[]                   @relation("ScooterIssueReportedBy")
+  maintenanceRecordsRecorded  MaintenanceRecord[]              @relation("MaintenanceRecordRecordedBy")
+  scooterSalesRecorded        ScooterSale[]                    @relation("ScooterSaleCreatedBy")
+  scooterSaleDocumentsCreated ScooterSaleDocument[]            @relation("ScooterSaleDocumentCreatedBy")
 
   @@index([email])
   @@index([phone])
@@ -506,6 +507,7 @@ model FinancialCategory {
   /// Lucide icon name (e.g. "wrench"), resolved to a component on the client.
   icon             String?
   kind             FinancialCategoryKind
+  keywords         String[]              @default([])
   parentCategoryId String?
   parentCategory   FinancialCategory?    @relation("FinancialCategoryTree", fields: [parentCategoryId], references: [id], onDelete: SetNull)
   children         FinancialCategory[]   @relation("FinancialCategoryTree")
@@ -913,6 +915,7 @@ model MediaAsset {
   deletedAt             DateTime?
   documentPhotos        PersonDocumentPhoto[]
   expenseDocumentAssets ExpenseDocumentAsset[]
+  scooterSaleDocument   ScooterSaleDocument?
 
   @@index([provider, bucket])
   @@index([uploadedByUserId])
@@ -967,8 +970,8 @@ model PersonDocumentPhoto {
 
 /// Scooter inventory record with Romanian registration metadata.
 model Scooter {
-  id                        String              @id @default(cuid())
-  vin                       String              @unique
+  id                        String                     @id @default(cuid())
+  vin                       String                     @unique
   brand                     String
   model                     String
   color                     String?
@@ -976,18 +979,18 @@ model Scooter {
   powertrainType            String
   engineCc                  Int?
   powerKw                   Float?
-  purchasedOn               DateTime            @db.Date
-  registrationType          String              @default("unregistered")
+  purchasedOn               DateTime                   @db.Date
+  registrationType          String                     @default("unregistered")
   plateNumber               String?
   plateNumberNormalized     String?
-  registeredOn              DateTime?           @db.Date
-  registrationExpiresOn     DateTime?           @db.Date
-  requiredDriverLicenseType String              @default("none")
+  registeredOn              DateTime?                  @db.Date
+  registrationExpiresOn     DateTime?                  @db.Date
+  requiredDriverLicenseType String                     @default("none")
   /// Enforced as non-negative by the maintenance migration CHECK constraint.
   currentMileageKm          Int?
   notes                     String?
-  createdAt                 DateTime            @default(now())
-  updatedAt                 DateTime            @updatedAt
+  createdAt                 DateTime                   @default(now())
+  updatedAt                 DateTime                   @updatedAt
   deletedAt                 DateTime?
   issues                    ScooterIssue[]
   maintenanceRecords        MaintenanceRecord[]
@@ -1016,6 +1019,8 @@ model ScooterSale {
   buyerCounterparty   Counterparty      @relation("ScooterSaleBuyer", fields: [buyerCounterpartyId], references: [id], onDelete: Restrict)
   saleAmount          Decimal           @db.Decimal(19, 2)
   paidAmount          Decimal           @default(0) @db.Decimal(19, 2)
+  paidBusinessAmount  Decimal           @default(0) @db.Decimal(19, 2)
+  paidPersonalAmount  Decimal           @default(0) @db.Decimal(19, 2)
   currency            String            @default("RON") @db.Char(3)
   status              ScooterSaleStatus @default(OPEN)
   soldOn              DateTime          @db.Date
@@ -1025,7 +1030,30 @@ model ScooterSale {
   createdAt           DateTime          @default(now())
   updatedAt           DateTime          @updatedAt
 
+  document ScooterSaleDocument?
+
   @@index([buyerCounterpartyId, status])
+}
+
+/// The bill/invoice issued for a scooter sale. Compact v1: one document, one
+/// attached file per sale (unlike ExpenseDocument, which supports multiple
+/// documents and asset roles per expense).
+model ScooterSaleDocument {
+  id              String      @id @default(cuid())
+  scooterSaleId   String      @unique
+  scooterSale     ScooterSale @relation(fields: [scooterSaleId], references: [id], onDelete: Cascade)
+  assetId         String?     @unique
+  asset           MediaAsset? @relation(fields: [assetId], references: [id], onDelete: SetNull)
+  imageWidth      Int?
+  imageHeight     Int?
+  pageCount       Int?
+  documentNumber  String?
+  issuedOn        DateTime?   @db.Date
+  notes           String?
+  createdByUserId String
+  createdBy       User        @relation("ScooterSaleDocumentCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
 }
 
 enum ScooterSaleStatus {

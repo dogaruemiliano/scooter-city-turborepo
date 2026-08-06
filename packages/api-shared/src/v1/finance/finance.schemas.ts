@@ -546,6 +546,7 @@ export const financialCategorySchema = z
     kind: financialCategoryKindSchema,
     /** Lucide icon name (e.g. "wrench"), resolved to a component on the client. */
     icon: z.string().nullable(),
+    keywords: z.array(z.string().trim()).default([]),
     parentCategoryId: z.string().nullable(),
     isActive: z.boolean(),
     createdAt: z.iso.datetime({ offset: true }),
@@ -566,6 +567,7 @@ export const createFinancialCategoryInputSchema = z
     name: z.string().trim().min(1).max(MAX_NAME_LENGTH),
     kind: financialCategoryKindSchema,
     icon: financialCategoryIconSchema.nullable().optional(),
+    keywords: z.array(z.string().trim().min(1)).default([]),
     parentCategoryId: z.string().nullable().optional(),
   })
   .strict()
@@ -580,6 +582,7 @@ export const updateFinancialCategoryInputSchema = z
     name: z.string().trim().min(1).max(MAX_NAME_LENGTH).optional(),
     kind: financialCategoryKindSchema.optional(),
     icon: financialCategoryIconSchema.nullable().optional(),
+    keywords: z.array(z.string().trim().min(1)).optional(),
     parentCategoryId: z.string().nullable().optional(),
     isActive: z.boolean().optional(),
   })

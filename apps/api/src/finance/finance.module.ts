@@ -9,6 +9,7 @@ import { CounterpartySearchService } from "./counterparty-search.service";
 import { ExpensesModule } from "./expenses/expenses.module";
 import { FinanceReportingService } from "./finance-reporting.service";
 import { FinanceService } from "./finance.service";
+import { ScooterSaleDocumentsModule } from "./scooter-sale-documents/scooter-sale-documents.module";
 import { ScooterSalesModule } from "./scooter-sales/scooter-sales.module";
 
 @Module({
@@ -17,6 +18,7 @@ import { ScooterSalesModule } from "./scooter-sales/scooter-sales.module";
     ExpenseReportingModule,
     ExpensesModule,
     ScooterSalesModule,
+    ScooterSaleDocumentsModule,
   ],
   controllers: [FinanceController, MyFinanceController, CompaniesController],
   providers: [

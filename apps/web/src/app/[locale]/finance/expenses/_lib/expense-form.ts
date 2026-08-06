@@ -20,6 +20,8 @@ export type ExpenseBuyerCuiStatus = v1.finance.ExpenseBuyerCuiStatus;
 
 export type ExpenseCompanyCuiAnswer = "YES" | "NO" | "";
 
+export type ExpenseEntryMode = "QUICK" | "FULL";
+
 export interface ExpenseVatLineDraft {
   id: string;
   netAmount: string;
@@ -34,12 +36,14 @@ export interface ExpenseScooterAllocationDraft {
 }
 
 export interface ExpenseFormState {
+  mode: ExpenseEntryMode;
   hasCompanyCui: ExpenseCompanyCuiAnswer;
   businessEntityId: string;
   grossAmount: string;
   currency: string;
   expenseDate: string;
   categoryId: string;
+  notes: string;
   paymentSource: ExpensePaymentSource;
   companyWalletId: string;
   fundedByUserId: string;
@@ -59,6 +63,7 @@ export interface ExpenseFormState {
 
 export type ExpenseFormField = Exclude<
   keyof ExpenseFormState,
+  | "mode"
   | "hasCompanyCui"
   | "paymentSource"
   | "attributionTarget"
@@ -71,6 +76,11 @@ export type ExpenseFormAction =
       type: "SET_FIELD";
       field: ExpenseFormField;
       value: string;
+    }
+  | {
+      type: "SET_MODE";
+      value: ExpenseEntryMode;
+      currentUserId: string;
     }
   | {
       type: "SET_COMPANY_CUI_ANSWER";
@@ -102,6 +112,7 @@ export interface ExpenseFormErrors {
   currency?: string;
   expenseDate?: string;
   categoryId?: string;
+  notes?: string;
   paymentCombination?: string;
   companyWalletId?: string;
   fundedByUserId?: string;
@@ -182,12 +193,14 @@ export function createExpenseFormState(options: {
   today: string;
 }): ExpenseFormState {
   return {
+    mode: "FULL",
     hasCompanyCui: "",
     businessEntityId: options.defaultBusinessEntityId ?? "",
     grossAmount: "",
     currency: options.defaultCurrency ?? "RON",
     expenseDate: options.today,
     categoryId: "",
+    notes: "",
     paymentSource: "COMPANY_CARD",
     companyWalletId: "",
     fundedByUserId: "",
@@ -213,6 +226,8 @@ export function expenseFormReducer(
   switch (action.type) {
     case "SET_FIELD":
       return { ...state, [action.field]: action.value };
+    case "SET_MODE":
+      return changeExpenseEntryMode(state, action.value, action.currentUserId);
     case "SET_COMPANY_CUI_ANSWER":
       return changeExpenseCompanyCuiAnswer(
         state,
@@ -277,6 +292,27 @@ export function clearExpenseErrorsForAction(
   switch (action.type) {
     case "SET_FIELD":
       clear(action.field as keyof ExpenseFormErrors);
+      break;
+    case "SET_MODE":
+      clear(
+        "hasCompanyCui",
+        "categoryId",
+        "notes",
+        "paymentCombination",
+        "payeeCounterpartyId",
+        "businessOwnerId",
+        "fundedByUserId",
+        "paidByUserId",
+        "companyWalletId",
+        "fiscalEvidence",
+        "posEvidence",
+        "documentType",
+        "documentNumber",
+        "documentDate",
+        "buyerCuiStatus",
+        "documentBuyerCui",
+        "vatLines",
+      );
       break;
     case "SET_COMPANY_CUI_ANSWER":
       clear(
@@ -360,6 +396,30 @@ export function resetExpenseFiscalAssertions(
           : "NOT_REVIEWED",
     vatLines: [],
   };
+}
+
+export function changeExpenseEntryMode(
+  state: ExpenseFormState,
+  mode: ExpenseEntryMode,
+  currentUserId: string,
+): ExpenseFormState {
+  if (mode === state.mode) return state;
+
+  if (mode === "QUICK") {
+    return resetExpenseFiscalAssertions({
+      ...state,
+      mode,
+      hasCompanyCui: "",
+      payeeCounterpartyId: "",
+      attributionTarget: "BUSINESS",
+      businessOwnerId: "",
+      paidByUserId: currentUserId,
+      fundedByUserId:
+        state.paymentSource === "PERSONAL_FUNDS" ? currentUserId : "",
+    });
+  }
+
+  return { ...state, mode };
 }
 
 export function changeExpenseCompanyCuiAnswer(
@@ -474,7 +534,6 @@ export function validateExpenseDetails(
 ): ExpenseFormErrors {
   const errors: ExpenseFormErrors = {};
 
-  if (!state.hasCompanyCui) errors.hasCompanyCui = requiredMessage;
   if (!state.businessEntityId) errors.businessEntityId = requiredMessage;
   if (!POSITIVE_MONEY_PATTERN.test(state.grossAmount.trim())) {
     errors.grossAmount = invalidAmountMessage;
@@ -483,6 +542,16 @@ export function validateExpenseDetails(
     errors.currency = requiredMessage;
   }
   if (!isValidDateOnly(state.expenseDate)) errors.expenseDate = requiredMessage;
+
+  if (state.mode === "QUICK") {
+    if (!state.notes.trim()) errors.notes = requiredMessage;
+    if (state.paymentSource !== "PERSONAL_FUNDS" && !state.companyWalletId) {
+      errors.companyWalletId = requiredMessage;
+    }
+    return errors;
+  }
+
+  if (!state.hasCompanyCui) errors.hasCompanyCui = requiredMessage;
   if (!state.categoryId) errors.categoryId = requiredMessage;
   if (
     (state.hasCompanyCui === "YES" &&
@@ -521,6 +590,8 @@ export function validateExpenseEvidence(
   requiredMessage: string,
   invalidVatMessage: string,
 ): ExpenseFormErrors {
+  if (state.mode === "QUICK") return {};
+
   const errors: ExpenseFormErrors = {};
 
   if (state.hasCompanyCui === "YES" && !evidence.fiscalEvidence) {
@@ -563,6 +634,10 @@ export function buildCompactExpensePayload(
   state: ExpenseFormState,
   options: BuildExpensePayloadOptions,
 ): CompactExpenseCreatePayload | null {
+  if (state.mode === "QUICK") {
+    return buildQuickModePayload(state, options.idempotencyKey);
+  }
+
   const fiscalEvidence = options.fiscalEvidence;
   if (
     !state.hasCompanyCui ||
@@ -682,53 +757,44 @@ export type QuickExpensePaymentSource = Extract<
   "PERSONAL_FUNDS" | "COMPANY_CASH_DESK" | "COMPANY_CARD"
 >;
 
-export interface QuickExpenseFormInput {
-  categoryId: string;
-  companyWalletId: string;
-  currency: string;
-  currentUserId: string;
-  description: string;
-  grossAmount: string;
-  idempotencyKey: string;
-  legalEntityId: string;
-  occurredOn: string;
-  paymentSource: QuickExpensePaymentSource;
-  scooterAllocations: ExpenseScooterAllocationDraft[];
-}
-
 /**
  * Builds the payload for the ultra-lightweight "just spent money" entry
- * point: no payee, an optional category, and a single personal/business
+ * mode: no payee, an optional category, and a single personal/business
  * payment toggle. Reuses the same `POST /finance/expenses` contract as the
- * full form.
+ * full form, driven by the same shared `ExpenseFormState`.
  */
-export function buildQuickExpensePayload(
-  input: QuickExpenseFormInput,
+function buildQuickModePayload(
+  state: ExpenseFormState,
+  idempotencyKey: string,
 ): CompactExpenseCreatePayload | null {
+  if (state.paymentSource !== "PERSONAL_FUNDS" && !state.companyWalletId) {
+    return null;
+  }
+
   const payment: v1.finance.ExpensePaymentInput = {
-    source: input.paymentSource,
-    paidByUserId: input.currentUserId,
-    amount: normalizeMoney(input.grossAmount),
-    paidOn: input.occurredOn,
-    ...(input.paymentSource === "PERSONAL_FUNDS"
-      ? { fundedByUserId: input.currentUserId }
-      : { companyWalletId: input.companyWalletId }),
+    source: state.paymentSource,
+    paidByUserId: state.paidByUserId,
+    amount: normalizeMoney(state.grossAmount),
+    paidOn: state.expenseDate,
+    ...(state.paymentSource === "PERSONAL_FUNDS"
+      ? { fundedByUserId: state.fundedByUserId }
+      : { companyWalletId: state.companyWalletId }),
   };
 
   const candidate: v1.finance.CreateExpenseInput = {
-    idempotencyKey: input.idempotencyKey,
-    legalEntityId: input.legalEntityId,
-    grossAmount: normalizeMoney(input.grossAmount),
-    currency: input.currency.trim().toUpperCase(),
-    occurredOn: input.occurredOn,
-    ...(input.categoryId ? { categoryId: input.categoryId } : {}),
+    idempotencyKey,
+    legalEntityId: state.businessEntityId,
+    grossAmount: normalizeMoney(state.grossAmount),
+    currency: state.currency.trim().toUpperCase(),
+    occurredOn: state.expenseDate,
+    ...(state.categoryId ? { categoryId: state.categoryId } : {}),
     payment,
     attribution: { target: "BUSINESS" },
-    notes: input.description.trim() || undefined,
+    notes: state.notes.trim() || undefined,
     references: [],
     documents: [],
     taxLines: [],
-    scooterAllocations: input.scooterAllocations.map((allocation) => ({
+    scooterAllocations: state.scooterAllocations.map((allocation) => ({
       scooterId: allocation.scooterId,
       amount: normalizeMoney(allocation.amount),
     })),

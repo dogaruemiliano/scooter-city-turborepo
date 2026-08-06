@@ -22,28 +22,43 @@ import {
   FieldGroup,
   FieldLabel,
   Input,
+  Label,
   Select,
   SelectContent,
   SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Switch,
   Textarea,
 } from "@repo/ui/components";
 import {
   BanknoteIcon,
   CoinsIcon,
+  FileTextIcon,
   HandshakeIcon,
   ReceiptTextIcon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
-import { useId, useState, type FormEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useId,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+  type ReactNode,
+} from "react";
 
 import {
   cancelScooterSale,
+  getPersonalOwnerOptions,
+  getScooterSaleDocument,
+  prepareScooterSaleBill,
   recordScooterSalePayment,
   sellScooter,
+  SCOOTER_SALE_BILL_CONTENT_TYPES,
+  uploadScooterSaleBill,
 } from "../_lib/scooter-sale-api";
 import { ScooterBuyerSelect } from "./ScooterBuyerSelect";
 import { FeedbackAlert } from "./ScooterCreateForm";
@@ -61,7 +76,12 @@ interface MutationFeedback {
 }
 
 type SaleField = "buyerCounterpartyId" | "saleAmount" | "soldOn";
-type PaymentField = "amount" | "paidOn" | "companyWalletId";
+type PaymentField =
+  | "amount"
+  | "paidOn"
+  | "companyWalletId"
+  | "personalAmount"
+  | "personalOwnerUserId";
 
 export function ScooterSalesSection({
   scooter,
@@ -301,6 +321,22 @@ export function ScooterSalesSection({
                 value={formatMoney(sale.paidAmount, sale.currency, locale)}
               />
               <ReceivableField
+                label={t("receivable.paidBusinessAmount")}
+                value={formatMoney(
+                  sale.paidBusinessAmount,
+                  sale.currency,
+                  locale,
+                )}
+              />
+              <ReceivableField
+                label={t("receivable.paidPersonalAmount")}
+                value={formatMoney(
+                  sale.paidPersonalAmount,
+                  sale.currency,
+                  locale,
+                )}
+              />
+              <ReceivableField
                 label={t("receivable.outstandingAmount")}
                 value={formatMoney(
                   sale.outstandingAmount,
@@ -316,6 +352,8 @@ export function ScooterSalesSection({
           </CardContent>
         ) : null}
       </Card>
+
+      {sale ? <ScooterSaleBillCard saleId={sale.id} /> : null}
 
       <SellScooterDialog
         key={`sell-scooter-${sellDialogKey}`}
@@ -520,6 +558,10 @@ function RecordScooterPaymentDialog({
   const locale = useLocale();
   const formId = useId();
   const [amount, setAmount] = useState(sale.outstandingAmount);
+  const [splitWithOwner, setSplitWithOwner] = useState(false);
+  const [personalAmount, setPersonalAmount] = useState("0.00");
+  const [personalOwnerUserId, setPersonalOwnerUserId] = useState("");
+  const [owners, setOwners] = useState<v1.finance.OwnerBalance[]>([]);
   const [paidOn, setPaidOn] = useState(todayDateOnly);
   const [paymentMethod, setPaymentMethod] =
     useState<v1.finance.PaymentMethod>("BANK_TRANSFER");
@@ -535,25 +577,45 @@ function RecordScooterPaymentDialog({
     onOpenChange(nextOpen);
     if (nextOpen) {
       setAmount(sale.outstandingAmount);
+      setSplitWithOwner(false);
+      setPersonalAmount("0.00");
+      setPersonalOwnerUserId("");
       setPaidOn(todayDateOnly());
       setPaymentMethod("BANK_TRANSFER");
       setCompanyWalletId(companyWallets[0]?.id ?? "");
       setErrors({});
+      getPersonalOwnerOptions()
+        .then(setOwners)
+        .catch(() => setOwners([]));
     }
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const effectivePersonalAmount = splitWithOwner ? personalAmount : "0.00";
+    const businessAmount = subtractMoney(amount, effectivePersonalAmount);
     const result = v1.finance.recordScooterSalePaymentInputSchema.safeParse({
-      amount,
+      businessAmount,
+      personalAmount: effectivePersonalAmount,
+      personalOwnerUserId: splitWithOwner
+        ? personalOwnerUserId || undefined
+        : undefined,
       paidOn,
       paymentMethod,
-      companyWalletId,
+      companyWalletId: companyWalletId || undefined,
       idempotencyKey: `${sale.id}:payment:${crypto.randomUUID()}`,
     });
 
     if (!result.success) {
-      setErrors(paymentErrors(result.error.issues, companyWalletId, t));
+      setErrors(
+        paymentErrors(
+          result.error.issues,
+          companyWalletId,
+          splitWithOwner,
+          personalOwnerUserId,
+          t,
+        ),
+      );
       return;
     }
 
@@ -591,6 +653,78 @@ function RecordScooterPaymentDialog({
               />
               <FieldError>{errors.amount}</FieldError>
             </Field>
+            <div className="flex min-h-12 items-center justify-between gap-3 rounded-lg border border-input bg-background px-3 py-2">
+              <div className="grid gap-0.5">
+                <Label htmlFor={`${formId}-split-with-owner`}>
+                  {t("fields.splitWithOwner")}
+                </Label>
+                <span className="text-xs text-muted-foreground">
+                  {t("fields.splitWithOwnerDescription")}
+                </span>
+              </div>
+              <Switch
+                id={`${formId}-split-with-owner`}
+                checked={splitWithOwner}
+                disabled={busy}
+                onCheckedChange={setSplitWithOwner}
+              />
+            </div>
+            {splitWithOwner ? (
+              <>
+                <Field
+                  data-invalid={Boolean(errors.personalAmount) || undefined}
+                >
+                  <FieldLabel htmlFor={`${formId}-personal-amount`}>
+                    {t("fields.personalAmount")}
+                  </FieldLabel>
+                  <Input
+                    id={`${formId}-personal-amount`}
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    inputMode="decimal"
+                    value={personalAmount}
+                    disabled={busy}
+                    aria-invalid={Boolean(errors.personalAmount) || undefined}
+                    onChange={(event) => setPersonalAmount(event.target.value)}
+                  />
+                  <FieldError>{errors.personalAmount}</FieldError>
+                </Field>
+                <Field
+                  data-invalid={
+                    Boolean(errors.personalOwnerUserId) || undefined
+                  }
+                >
+                  <FieldLabel htmlFor={`${formId}-personal-owner`}>
+                    {t("fields.personalOwner")}
+                  </FieldLabel>
+                  <Select
+                    value={personalOwnerUserId}
+                    disabled={busy}
+                    onValueChange={(value) =>
+                      value && setPersonalOwnerUserId(value)
+                    }
+                  >
+                    <SelectTrigger
+                      id={`${formId}-personal-owner`}
+                      className="w-full"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {owners.map((owner) => (
+                          <SelectItem key={owner.userId} value={owner.userId}>
+                            {ownerLabel(owner.user)}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                  <FieldError>{errors.personalOwnerUserId}</FieldError>
+                </Field>
+              </>
+            ) : null}
             <Field data-invalid={Boolean(errors.paidOn) || undefined}>
               <FieldLabel htmlFor={`${formId}-paid-on-day`}>
                 {t("fields.paidOn")}
@@ -677,6 +811,115 @@ function RecordScooterPaymentDialog({
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function ScooterSaleBillCard({ saleId }: { saleId: string }) {
+  const t = useTranslations("scooters.sales");
+  const inputId = useId();
+  const [billDocument, setDocument] = useState<
+    v1.finance.ScooterSaleDocument | null | undefined
+  >(undefined);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getScooterSaleDocument(saleId)
+      .then((doc) => {
+        if (!cancelled) setDocument(doc);
+      })
+      .catch(() => {
+        if (!cancelled) setDocument(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [saleId]);
+
+  async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    setUploading(true);
+    setError(null);
+    try {
+      const evidence = await prepareScooterSaleBill(file);
+      const updated = await uploadScooterSaleBill(saleId, evidence);
+      setDocument(updated);
+    } catch (uploadError) {
+      setError(
+        uploadError instanceof Error &&
+          (uploadError.message === "UNSUPPORTED_TYPE" ||
+            uploadError.message === "FILE_TOO_LARGE")
+          ? t(`bill.errors.${uploadError.message}`)
+          : t("bill.errors.uploadFailed"),
+      );
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  const asset = billDocument?.asset ?? null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t("bill.title")}</CardTitle>
+        <CardDescription>{t("bill.description")}</CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3">
+        {billDocument === undefined ? (
+          <p className="text-sm text-muted-foreground">{t("bill.loading")}</p>
+        ) : asset ? (
+          <div className="flex items-center gap-3 rounded-lg border border-border p-3">
+            <FileTextIcon
+              aria-hidden="true"
+              className="size-8 shrink-0 text-muted-foreground"
+            />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium">
+                {t("bill.attached")}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {asset.contentType} · {Math.ceil(asset.byteSize / 1024)} KB
+              </p>
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">{t("bill.empty")}</p>
+        )}
+
+        {error ? <p className="text-sm text-destructive">{error}</p> : null}
+
+        <div>
+          <Label htmlFor={inputId} className="sr-only">
+            {t("bill.title")}
+          </Label>
+          <input
+            id={inputId}
+            type="file"
+            accept={SCOOTER_SALE_BILL_CONTENT_TYPES.join(",")}
+            disabled={uploading}
+            onChange={(event) => void handleFileChange(event)}
+            className="hidden"
+          />
+          <Button
+            type="button"
+            variant="outline"
+            disabled={uploading}
+            onClick={() => document.getElementById(inputId)?.click()}
+          >
+            {uploading
+              ? t("bill.uploading")
+              : asset
+                ? t("bill.replace")
+                : t("bill.attach")}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -809,21 +1052,43 @@ function saleErrors(
 function paymentErrors(
   issues: ReadonlyArray<{ path: PropertyKey[] }>,
   companyWalletId: string,
+  splitWithOwner: boolean,
+  personalOwnerUserId: string,
   t: ReturnType<typeof useTranslations>,
 ): Partial<Record<PaymentField, string>> {
   const result: Partial<Record<PaymentField, string>> = {};
-  if (!companyWalletId) {
-    result.companyWalletId = t("validation.walletRequired");
+  if (splitWithOwner && !personalOwnerUserId) {
+    result.personalOwnerUserId = t("validation.ownerRequired");
   }
   for (const issue of issues) {
     const field = issue.path[0];
-    if ((field === "amount" || field === "paidOn") && !result[field]) {
-      result[field] = t("validation.invalid", {
-        field: t(field === "amount" ? "fields.paymentAmount" : "fields.paidOn"),
+    if (field === "businessAmount" && !result.amount) {
+      result.amount = t("validation.invalid", {
+        field: t("fields.paymentAmount"),
       });
+    } else if (field === "personalAmount" && !result.personalAmount) {
+      result.personalAmount = t("validation.invalid", {
+        field: t("fields.personalAmount"),
+      });
+    } else if (field === "paidOn" && !result.paidOn) {
+      result.paidOn = t("validation.invalid", { field: t("fields.paidOn") });
+    } else if (field === "companyWalletId" && !result.companyWalletId) {
+      result.companyWalletId = t("validation.walletRequired");
+    } else if (field === "personalOwnerUserId" && !result.personalOwnerUserId) {
+      result.personalOwnerUserId = t("validation.ownerRequired");
     }
   }
   return result;
+}
+
+function subtractMoney(a: string, b: string): string {
+  const cents = Math.round(Number(a) * 100) - Math.round(Number(b) * 100);
+  return (cents / 100).toFixed(2);
+}
+
+function ownerLabel(user: v1.finance.FinanceUserSummary): string {
+  const name = [user.firstName, user.lastName].filter(Boolean).join(" ").trim();
+  return name || user.email;
 }
 
 function todayDateOnly(): string {

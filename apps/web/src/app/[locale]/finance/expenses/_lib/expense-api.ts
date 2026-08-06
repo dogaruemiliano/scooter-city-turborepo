@@ -3,6 +3,7 @@
 import { v1 } from "@repo/api-shared";
 
 import { webApi } from "@/lib/api";
+import { prepareFileEvidence } from "@/lib/file-evidence";
 import type {
   CompactExpenseCreatePayload,
   ExpenseEvidenceReference,
@@ -196,35 +197,10 @@ export async function recordExpense(
 export async function prepareExpenseEvidence(
   file: File,
 ): Promise<SelectedExpenseEvidence> {
-  if (
-    !EXPENSE_EVIDENCE_CONTENT_TYPES.includes(
-      file.type as ExpenseEvidenceContentType,
-    )
-  ) {
-    throw new Error("UNSUPPORTED_TYPE");
-  }
-  if (file.size > EXPENSE_EVIDENCE_MAX_BYTES) {
-    throw new Error("FILE_TOO_LARGE");
-  }
-
-  const bytes = await file.arrayBuffer();
-  const digest = await crypto.subtle.digest("SHA-256", bytes);
-  const sha256 = Array.from(new Uint8Array(digest), (byte) =>
-    byte.toString(16).padStart(2, "0"),
-  ).join("");
-  const mediaMetadata =
-    file.type === "application/pdf"
-      ? { pageCount: countPdfPages(bytes) }
-      : await imageDimensions(file);
-
-  return {
-    file,
-    fileName: file.name,
-    contentType: file.type,
-    byteSize: file.size,
-    sha256,
-    ...mediaMetadata,
-  };
+  return prepareFileEvidence(file, {
+    allowedContentTypes: EXPENSE_EVIDENCE_CONTENT_TYPES,
+    maxBytes: EXPENSE_EVIDENCE_MAX_BYTES,
+  });
 }
 
 export async function createBusinessSetup(
@@ -439,21 +415,4 @@ async function uploadExpenseEvidence(
       }),
     },
   );
-}
-
-async function imageDimensions(
-  file: File,
-): Promise<{ imageWidth: number; imageHeight: number }> {
-  const bitmap = await createImageBitmap(file);
-  try {
-    return { imageWidth: bitmap.width, imageHeight: bitmap.height };
-  } finally {
-    bitmap.close();
-  }
-}
-
-function countPdfPages(bytes: ArrayBuffer): number {
-  const content = new TextDecoder("latin1").decode(bytes);
-  const pageObjects = content.match(/\/Type\s*\/Page(?!s)\b/g);
-  return Math.max(1, pageObjects?.length ?? 0);
 }

@@ -55,8 +55,6 @@ import { ExpenseDetailsStep } from "./ExpenseDetailsStep";
 import { ExpenseEvidenceStep } from "./ExpenseEvidenceStep";
 import { QuickExpenseForm } from "./QuickExpenseForm";
 
-type ExpenseEntryMode = "QUICK" | "FULL";
-
 interface ExpenseCreateFlowProps {
   advancedTransactionHref: string;
   bootstrap: ExpenseFormBootstrap;
@@ -89,7 +87,6 @@ export function ExpenseCreateFlow({
 }: ExpenseCreateFlowProps) {
   const t = useTranslations("finance.expenses.form");
   const router = useRouter();
-  const [mode, setMode] = useState<ExpenseEntryMode>("FULL");
   const [state, dispatch] = useReducer(
     expenseFormReducer,
     bootstrap,
@@ -304,11 +301,17 @@ export function ExpenseCreateFlow({
 
       <ToggleGroup
         aria-label={t("mode.label")}
-        value={[mode]}
+        value={[state.mode]}
         className="grid w-full grid-cols-2"
         onValueChange={(values) => {
           const next = values[0];
-          if (next === "QUICK" || next === "FULL") setMode(next);
+          if (next === "QUICK" || next === "FULL") {
+            handleAction({
+              type: "SET_MODE",
+              value: next,
+              currentUserId: bootstrap.currentUserId,
+            });
+          }
         }}
       >
         <ToggleGroupItem value="QUICK" size="lg">
@@ -319,97 +322,96 @@ export function ExpenseCreateFlow({
         </ToggleGroupItem>
       </ToggleGroup>
 
-      {mode === "QUICK" ? (
-        <div className="overflow-hidden rounded-xl border border-border bg-card">
+      <form
+        noValidate
+        aria-busy={submitting || evidencePreparing}
+        onSubmit={(event) => void submit(event)}
+        className="overflow-hidden rounded-xl border border-border bg-card"
+      >
+        {state.mode === "QUICK" ? (
           <QuickExpenseForm
             bootstrap={bootstrap}
-            idempotencyKey={idempotencyKey}
-            onRecorded={() => {
-              router.push(expensesHref);
-              router.refresh();
-            }}
-          />
-        </div>
-      ) : (
-        <form
-          noValidate
-          aria-busy={submitting || evidencePreparing}
-          onSubmit={(event) => void submit(event)}
-          className="overflow-hidden rounded-xl border border-border bg-card"
-        >
-          <ExpenseDetailsStep
-            bootstrap={bootstrap}
-            categoriesHref={categoriesHref}
             state={state}
             errors={errors}
             dispatch={handleAction}
             disabled={formDisabled}
-            settingsHref={settingsHref}
-            onBusinessEntityChange={(businessEntityId, currency) =>
-              handleAction({
-                type: "SET_BUSINESS_ENTITY",
-                businessEntityId,
-                currency,
-              })
-            }
-            onCompanyCuiAnswerChange={(value) =>
-              handleAction({
-                type: "SET_COMPANY_CUI_ANSWER",
-                value,
-                currentUserId: bootstrap.currentUserId,
-              })
-            }
           />
-
-          {state.hasCompanyCui ? (
-            <ExpenseEvidenceStep
+        ) : (
+          <>
+            <ExpenseDetailsStep
+              bootstrap={bootstrap}
+              categoriesHref={categoriesHref}
               state={state}
               errors={errors}
               dispatch={handleAction}
               disabled={formDisabled}
-              fiscalEvidence={fiscalEvidence}
-              posEvidence={posEvidence}
-              isVatRegistered={isVatRegistered}
-              onFiscalEvidenceChange={handleFiscalEvidenceChange}
-              onFiscalProcessingChange={handleFiscalProcessingChange}
-              onPosEvidenceChange={handlePosEvidenceChange}
-              onPosProcessingChange={handlePosProcessingChange}
+              settingsHref={settingsHref}
+              onBusinessEntityChange={(businessEntityId, currency) =>
+                handleAction({
+                  type: "SET_BUSINESS_ENTITY",
+                  businessEntityId,
+                  currency,
+                })
+              }
+              onCompanyCuiAnswerChange={(value) =>
+                handleAction({
+                  type: "SET_COMPANY_CUI_ANSWER",
+                  value,
+                  currentUserId: bootstrap.currentUserId,
+                })
+              }
             />
-          ) : null}
 
-          <footer className="flex flex-col-reverse gap-3 border-t border-border bg-muted p-4 sm:flex-row sm:items-center sm:justify-between sm:p-6">
-            <Button
-              type="button"
-              variant="ghost"
-              nativeButton={false}
-              render={<Link href={advancedTransactionHref} />}
-            >
-              {t("advancedTransaction")}
-            </Button>
-            <Button type="submit" disabled={submitting || evidencePreparing}>
-              {submitting || evidencePreparing ? (
-                <LoaderCircleIcon
-                  aria-hidden="true"
-                  data-icon="inline-start"
-                  className="animate-spin"
-                />
-              ) : null}
-              {evidencePreparing
-                ? t("evidence.preparing")
-                : submitting
-                  ? pendingCompletion
-                    ? t("completing")
-                    : t("recording")
-                  : pendingCompletion
-                    ? t("retryCompletion")
-                    : t("record")}
-              {submitting || evidencePreparing ? null : (
-                <CheckIcon data-icon="inline-end" />
-              )}
-            </Button>
-          </footer>
-        </form>
-      )}
+            {state.hasCompanyCui ? (
+              <ExpenseEvidenceStep
+                state={state}
+                errors={errors}
+                dispatch={handleAction}
+                disabled={formDisabled}
+                fiscalEvidence={fiscalEvidence}
+                posEvidence={posEvidence}
+                isVatRegistered={isVatRegistered}
+                onFiscalEvidenceChange={handleFiscalEvidenceChange}
+                onFiscalProcessingChange={handleFiscalProcessingChange}
+                onPosEvidenceChange={handlePosEvidenceChange}
+                onPosProcessingChange={handlePosProcessingChange}
+              />
+            ) : null}
+          </>
+        )}
+
+        <footer className="flex flex-col-reverse gap-3 border-t border-border bg-muted p-4 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+          <Button
+            type="button"
+            variant="ghost"
+            nativeButton={false}
+            render={<Link href={advancedTransactionHref} />}
+          >
+            {t("advancedTransaction")}
+          </Button>
+          <Button type="submit" disabled={submitting || evidencePreparing}>
+            {submitting || evidencePreparing ? (
+              <LoaderCircleIcon
+                aria-hidden="true"
+                data-icon="inline-start"
+                className="animate-spin"
+              />
+            ) : null}
+            {evidencePreparing
+              ? t("evidence.preparing")
+              : submitting
+                ? pendingCompletion
+                  ? t("completing")
+                  : t("recording")
+                : pendingCompletion
+                  ? t("retryCompletion")
+                  : t("record")}
+            {submitting || evidencePreparing ? null : (
+              <CheckIcon data-icon="inline-end" />
+            )}
+          </Button>
+        </footer>
+      </form>
     </main>
   );
 }

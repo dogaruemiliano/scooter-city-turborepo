@@ -42,6 +42,8 @@ export function toScooterSale(
     buyer: toBuyer(record.buyerCounterparty),
     saleAmount: money(record.saleAmount),
     paidAmount: money(record.paidAmount),
+    paidBusinessAmount: money(record.paidBusinessAmount),
+    paidPersonalAmount: money(record.paidPersonalAmount),
     outstandingAmount: money(record.saleAmount.minus(record.paidAmount)),
     currency: record.currency,
     status: record.status,

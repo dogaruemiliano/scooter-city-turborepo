@@ -48,6 +48,7 @@ import {
   walletsForExpenseSource,
   type ExpenseFormBootstrap,
 } from "../_lib/expense-options";
+import { CategorySelect } from "../../_components/CategorySelect";
 import { ExpenseCategorySelect } from "./ExpenseCategorySelect";
 import { ExpenseCounterpartySelect } from "./ExpenseCounterpartySelect";
 import { ExpenseScooterAllocationEditor } from "./ExpenseScooterAllocationEditor";

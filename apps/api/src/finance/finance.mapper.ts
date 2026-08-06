@@ -187,6 +187,7 @@ export function toFinancialCategory(
     name: row.name,
     kind: row.kind,
     icon: row.icon,
+    keywords: row.keywords,
     parentCategoryId: row.parentCategoryId,
     isActive: row.isActive,
     createdAt: row.createdAt.toISOString(),

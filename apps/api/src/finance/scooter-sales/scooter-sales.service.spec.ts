@@ -26,6 +26,8 @@ function fakeSale(overrides: Record<string, unknown> = {}) {
     buyerCounterparty: BUYER_COUNTERPARTY,
     saleAmount: new Prisma.Decimal("300.00"),
     paidAmount: new Prisma.Decimal("0.00"),
+    paidBusinessAmount: new Prisma.Decimal("0.00"),
+    paidPersonalAmount: new Prisma.Decimal("0.00"),
     currency: "RON",
     status: "OPEN",
     soldOn: new Date("2026-01-10T00:00:00.000Z"),
@@ -52,6 +54,9 @@ function buildTx(overrides: Record<string, unknown> = {}) {
     },
     wallet: {
       findFirst: jest.fn().mockResolvedValue({ id: "wallet-buyer" }),
+    },
+    businessOwner: {
+      findFirst: jest.fn().mockResolvedValue({ userId: "user-owner" }),
     },
     moneyTransaction: { create: jest.fn().mockResolvedValue({ id: "mt-1" }) },
     walletBalance: { upsert: jest.fn().mockResolvedValue({}) },
@@ -181,6 +186,7 @@ describe("ScooterSalesService.recordPayment", () => {
     });
     const updated = fakeSale({
       paidAmount: new Prisma.Decimal("100.00"),
+      paidBusinessAmount: new Prisma.Decimal("100.00"),
       status: "PARTIALLY_PAID",
     });
     const tx = buildTx({
@@ -202,7 +208,8 @@ describe("ScooterSalesService.recordPayment", () => {
     const result = await service.recordPayment(
       "sale-1",
       {
-        amount: "100.00",
+        businessAmount: "100.00",
+        personalAmount: "0.00",
         paidOn: "2026-01-15",
         paymentMethod: "BANK_TRANSFER",
         companyWalletId: "wallet-company",
@@ -222,6 +229,120 @@ describe("ScooterSalesService.recordPayment", () => {
       }),
     );
     expect(tx.walletBalance.upsert).toHaveBeenCalledTimes(2);
+    expect(tx.businessOwner.findFirst).not.toHaveBeenCalled();
+  });
+
+  it("splits a payment between the company wallet and a personal owner", async () => {
+    const current = fakeSale({
+      saleAmount: new Prisma.Decimal("300.00"),
+      paidAmount: new Prisma.Decimal("0.00"),
+      status: "OPEN",
+    });
+    const updated = fakeSale({
+      paidAmount: new Prisma.Decimal("100.00"),
+      paidBusinessAmount: new Prisma.Decimal("60.00"),
+      paidPersonalAmount: new Prisma.Decimal("40.00"),
+      status: "PARTIALLY_PAID",
+    });
+    const tx = buildTx({
+      scooterSale: {
+        findUnique: jest.fn().mockResolvedValue(current),
+        create: jest.fn(),
+        update: jest.fn().mockResolvedValue(updated),
+      },
+      wallet: {
+        findFirst: jest
+          .fn()
+          .mockResolvedValueOnce({ id: "wallet-company" })
+          .mockResolvedValueOnce({ id: "wallet-buyer" })
+          .mockResolvedValueOnce({ id: "wallet-owner" }),
+      },
+    });
+    const prisma = buildPrisma(tx);
+    const service = new ScooterSalesService(prisma);
+
+    const result = await service.recordPayment(
+      "sale-1",
+      {
+        businessAmount: "60.00",
+        personalAmount: "40.00",
+        personalOwnerUserId: "user-owner",
+        paidOn: "2026-01-15",
+        paymentMethod: "BANK_TRANSFER",
+        companyWalletId: "wallet-company",
+        idempotencyKey: "payment-split",
+        notes: null,
+      },
+      ACTOR,
+    );
+
+    expect(result.status).toBe("PARTIALLY_PAID");
+    expect(tx.businessOwner.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ userId: "user-owner" }),
+      }),
+    );
+    const [[createArgs]] = tx.moneyTransaction.create.mock.calls;
+    expect(createArgs.data.recipientUserId).toBe("user-owner");
+    const changes = createArgs.data.balanceChanges.create;
+    expect(changes).toHaveLength(3);
+    expect(changes[0]).toEqual(
+      expect.objectContaining({
+        walletId: "wallet-company",
+        bucket: "BUSINESS_FUNDS",
+      }),
+    );
+    expect(changes[0].amountDelta.toString()).toBe("60");
+    expect(changes[1]).toEqual(
+      expect.objectContaining({
+        walletId: "wallet-owner",
+        bucket: "ADMIN_PERSONAL_FUNDS",
+      }),
+    );
+    expect(changes[1].amountDelta.toString()).toBe("40");
+    expect(changes[2]).toEqual(
+      expect.objectContaining({
+        walletId: "wallet-buyer",
+        bucket: "USER_SETTLEMENT",
+      }),
+    );
+    expect(changes[2].amountDelta.toString()).toBe("100");
+    expect(tx.walletBalance.upsert).toHaveBeenCalledTimes(3);
+  });
+
+  it("rejects a personal split to a user who is not an active business owner", async () => {
+    const current = fakeSale({
+      saleAmount: new Prisma.Decimal("300.00"),
+      paidAmount: new Prisma.Decimal("0.00"),
+      status: "OPEN",
+    });
+    const tx = buildTx({
+      scooterSale: {
+        findUnique: jest.fn().mockResolvedValue(current),
+        create: jest.fn(),
+        update: jest.fn(),
+      },
+      businessOwner: { findFirst: jest.fn().mockResolvedValue(null) },
+    });
+    const prisma = buildPrisma(tx);
+    const service = new ScooterSalesService(prisma);
+
+    await expect(
+      service.recordPayment(
+        "sale-1",
+        {
+          businessAmount: "0.00",
+          personalAmount: "40.00",
+          personalOwnerUserId: "user-not-owner",
+          paidOn: "2026-01-15",
+          paymentMethod: "BANK_TRANSFER",
+          idempotencyKey: "payment-bad-owner",
+          notes: null,
+        },
+        ACTOR,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(tx.scooterSale.update).not.toHaveBeenCalled();
   });
 
   it("rejects a payment that would exceed the outstanding balance", async () => {
@@ -244,7 +365,8 @@ describe("ScooterSalesService.recordPayment", () => {
       service.recordPayment(
         "sale-1",
         {
-          amount: "100.00",
+          businessAmount: "100.00",
+          personalAmount: "0.00",
           paidOn: "2026-01-15",
           paymentMethod: "BANK_TRANSFER",
           companyWalletId: "wallet-company",
@@ -280,7 +402,8 @@ describe("ScooterSalesService.recordPayment", () => {
     const result = await service.recordPayment(
       "sale-1",
       {
-        amount: "100.00",
+        businessAmount: "100.00",
+        personalAmount: "0.00",
         paidOn: "2026-01-20",
         paymentMethod: "CASH",
         companyWalletId: "wallet-company",
@@ -314,7 +437,8 @@ describe("ScooterSalesService.recordPayment", () => {
       service.recordPayment(
         "sale-1",
         {
-          amount: "50.00",
+          businessAmount: "50.00",
+          personalAmount: "0.00",
           paidOn: "2026-01-20",
           paymentMethod: "CASH",
           companyWalletId: "wallet-company",

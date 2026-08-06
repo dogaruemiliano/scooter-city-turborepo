@@ -119,12 +119,17 @@ type FinanceCategorySeed = {
   name: string;
   kind: FinancialCategoryKind;
   parentKey?: string;
+  keywords?: readonly string[];
 };
 
 type FinanceCategorySeedGroup = {
   kind: FinancialCategoryKind;
   parent: { key: string; name: string };
-  children: ReadonlyArray<{ key: string; name: string }>;
+  children: ReadonlyArray<{
+    key: string;
+    name: string;
+    keywords?: readonly string[];
+  }>;
 };
 
 type FinanceSeedContext = {
@@ -333,27 +338,107 @@ const CATEGORY_GROUPS: readonly FinanceCategorySeedGroup[] = [
     kind: FinancialCategoryKind.EXPENSE,
     parent: { key: "SCOOTERS", name: "Scutere" },
     children: [
-      { key: "SCOOTER_ACCESSORIES", name: "Accesorii" },
-      { key: "SCOOTER_PURCHASE", name: "Achiziție scuter" },
-      { key: "SCOOTER_TIRES", name: "Anvelope" },
-      { key: "SCOOTER_INSURANCE", name: "Asigurare RCA" },
-      { key: "SCOOTER_BATTERY", name: "Baterie" },
-      { key: "FUEL", name: "Carburant" },
-      { key: "SCOOTER_CASCO", name: "CASCO" },
-      { key: "SCOOTER_WRAP", name: "Colantare" },
-      { key: "SCOOTER_GPS", name: "GPS" },
-      { key: "SCOOTER_TAX", name: "Impozit" },
-      { key: "SCOOTER_REGISTRATION", name: "Înmatriculare" },
-      { key: "SCOOTER_ITP", name: "ITP" },
-      { key: "LUBRICANTS", name: "Lubrifianți" },
-      { key: "SCOOTER_PARTS", name: "Piese de schimb" },
-      { key: "SCOOTER_RAR", name: "RAR" },
-      { key: "SCOOTER_REPAIRS", name: "Reparații" },
-      { key: "MAINTENANCE", name: "Revizie" },
-      { key: "CLEANING", name: "Spălătorie" },
-      { key: "SCOOTER_PARKING_FEES", name: "Taxe de parcare" },
-      { key: "SCOOTER_TRANSPORT", name: "Transport scuter" },
-      { key: "SCOOTER_PAINTING", name: "Vopsire" },
+      {
+        key: "SCOOTER_ACCESSORIES",
+        name: "Accesorii",
+        keywords: ["Piese", "Componente"],
+      },
+      {
+        key: "SCOOTER_PURCHASE",
+        name: "Achiziție scuter",
+        keywords: ["Cumparare", "Cumpărare", "Inchiriere"],
+      },
+      {
+        key: "SCOOTER_TIRES",
+        name: "Anvelope",
+        keywords: ["Pneuri", "Cauciuc"],
+      },
+      {
+        key: "SCOOTER_INSURANCE",
+        name: "Asigurare RCA",
+        keywords: ["RCA", "Asigurare", "Polita"],
+      },
+      {
+        key: "SCOOTER_BATTERY",
+        name: "Baterie",
+        keywords: ["Acumulator", "Baterii"],
+      },
+      {
+        key: "FUEL",
+        name: "Carburant",
+        keywords: ["Benzina", "Motorina", "Combustibil", "Benzină", "Motorină"],
+      },
+      { key: "SCOOTER_CASCO", name: "CASCO", keywords: ["Asigurare", "Casco"] },
+      {
+        key: "SCOOTER_WRAP",
+        name: "Colantare",
+        keywords: ["Sticker", "Decal", "Print"],
+      },
+      {
+        key: "SCOOTER_GPS",
+        name: "GPS",
+        keywords: ["Localizare", "Tracker", "Urmarire"],
+      },
+      {
+        key: "SCOOTER_TAX",
+        name: "Impozit",
+        keywords: ["Taxa", "Impozit", "Obligatie"],
+      },
+      {
+        key: "SCOOTER_REGISTRATION",
+        name: "Înmatriculare",
+        keywords: ["Placa", "Inmatriculare", "Înregistrare"],
+      },
+      {
+        key: "SCOOTER_ITP",
+        name: "ITP",
+        keywords: ["Inspectie", "Examinare", "Test"],
+      },
+      {
+        key: "LUBRICANTS",
+        name: "Lubrifianți",
+        keywords: ["Ulei", "Grasime", "Lubrifiant"],
+      },
+      {
+        key: "SCOOTER_PARTS",
+        name: "Piese de schimb",
+        keywords: ["Piese", "Componente", "Piesa"],
+      },
+      {
+        key: "SCOOTER_RAR",
+        name: "RAR",
+        keywords: ["Inspectie", "Aprobire", "Examinare"],
+      },
+      {
+        key: "SCOOTER_REPAIRS",
+        name: "Reparații",
+        keywords: ["Reparatie", "Fixare", "Service"],
+      },
+      {
+        key: "MAINTENANCE",
+        name: "Revizie",
+        keywords: ["Intretinere", "Mentenanta", "Îngrijire"],
+      },
+      {
+        key: "CLEANING",
+        name: "Spălătorie",
+        keywords: ["Spalare", "Curatare", "Detailing"],
+      },
+      {
+        key: "SCOOTER_PARKING_FEES",
+        name: "Taxe de parcare",
+        keywords: ["Parcare", "Taxa"],
+      },
+      {
+        key: "SCOOTER_TRANSPORT",
+        name: "Transport scuter",
+        keywords: ["Transport", "Logistica", "Deplasare"],
+      },
+      {
+        key: "SCOOTER_PAINTING",
+        name: "Vopsire",
+        keywords: ["Vopsea", "Paint", "Vopsit"],
+      },
     ],
   },
   {
@@ -579,6 +664,7 @@ const CATEGORY_SEEDS: readonly FinanceCategorySeed[] = [...CATEGORY_GROUPS]
         key: child.key,
         name: child.name,
         kind,
+        keywords: child.keywords,
         parentKey: parent.key,
       })),
   ]);
@@ -1026,6 +1112,7 @@ async function ensureCategory(
     code,
     name: category.name,
     kind: category.kind,
+    keywords: [...(category.keywords ?? [])],
     parentCategoryId,
     isActive: true,
     createdAt,

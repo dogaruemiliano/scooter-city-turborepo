@@ -38,6 +38,7 @@ export interface ExpenseCategoryOption {
   /** Absent for options built before hierarchy/icon support (e.g. test fixtures). */
   parentCategoryId?: string | null;
   icon?: string | null;
+  keywords?: readonly string[];
 }
 
 export interface ExpenseVatPeriodOption {

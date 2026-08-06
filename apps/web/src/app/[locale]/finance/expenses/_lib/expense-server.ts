@@ -90,6 +90,7 @@ export async function loadExpenseFormBootstrap(options: {
           label: parent ? `${parent.name} › ${category.name}` : category.name,
           parentCategoryId: category.parentCategoryId,
           icon: category.icon,
+          keywords: category.keywords,
         };
       }),
     vatPeriods: vatPeriods.map(

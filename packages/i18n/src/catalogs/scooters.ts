@@ -276,6 +276,11 @@ export const scootersCatalog = {
         paidOn: "Paid on",
         paymentMethod: "Payment method",
         companyWallet: "Deposit to wallet",
+        splitWithOwner: "Split with a personal owner",
+        splitWithOwnerDescription:
+          "Part of this payment goes to the business, the rest goes directly to an owner.",
+        personalAmount: "Personal amount",
+        personalOwner: "Personal owner",
       },
       paymentMethods: {
         CASH: "Cash",
@@ -296,8 +301,27 @@ export const scootersCatalog = {
         status: "Status",
         saleAmount: "Sale amount",
         paidAmount: "Amount paid",
+        paidBusinessAmount: "Paid to business",
+        paidPersonalAmount: "Paid to owner",
         outstandingAmount: "Amount owed",
         soldOn: "Sold on",
+      },
+      bill: {
+        title: "Sale bill",
+        description:
+          "The bill issued for this sale, covering the business's portion.",
+        loading: "Loading...",
+        empty: "No bill has been attached yet.",
+        attached: "Bill attached",
+        attach: "Attach bill",
+        replace: "Replace bill",
+        uploading: "Uploading...",
+        errors: {
+          UNSUPPORTED_TYPE:
+            "Unsupported file type. Use a JPG, PNG, WEBP, or PDF file.",
+          FILE_TOO_LARGE: "File is too large. Maximum size is 10 MB.",
+          uploadFailed: "The bill could not be uploaded. Try again.",
+        },
       },
       costs: {
         title: "Costs",
@@ -323,6 +347,7 @@ export const scootersCatalog = {
         invalid: "Enter a valid {field}.",
         buyerRequired: "Select a buyer.",
         walletRequired: "Select a wallet.",
+        ownerRequired: "Select an owner.",
       },
     },
     sections: {
@@ -718,6 +743,11 @@ export const scootersCatalog = {
         paidOn: "Plătit la data",
         paymentMethod: "Metodă de plată",
         companyWallet: "Depune în portofelul",
+        splitWithOwner: "Împarte cu un proprietar personal",
+        splitWithOwnerDescription:
+          "O parte din această plată merge la firmă, restul direct la un proprietar.",
+        personalAmount: "Sumă personală",
+        personalOwner: "Proprietar personal",
       },
       paymentMethods: {
         CASH: "Numerar",
@@ -738,8 +768,28 @@ export const scootersCatalog = {
         status: "Stare",
         saleAmount: "Preț de vânzare",
         paidAmount: "Sumă plătită",
+        paidBusinessAmount: "Plătit către firmă",
+        paidPersonalAmount: "Plătit către proprietar",
         outstandingAmount: "Sumă restantă",
         soldOn: "Vândut la data",
+      },
+      bill: {
+        title: "Factura vânzării",
+        description:
+          "Factura emisă pentru această vânzare, pentru partea firmei.",
+        loading: "Se încarcă...",
+        empty: "Nu a fost atașată nicio factură încă.",
+        attached: "Factură atașată",
+        attach: "Atașează factura",
+        replace: "Înlocuiește factura",
+        uploading: "Se încarcă...",
+        errors: {
+          UNSUPPORTED_TYPE:
+            "Tip de fișier neacceptat. Folosește un fișier JPG, PNG, WEBP sau PDF.",
+          FILE_TOO_LARGE:
+            "Fișierul este prea mare. Dimensiunea maximă este 10 MB.",
+          uploadFailed: "Factura nu a putut fi încărcată. Încearcă din nou.",
+        },
       },
       costs: {
         title: "Costuri",
@@ -765,6 +815,7 @@ export const scootersCatalog = {
         invalid: "Introdu o valoare validă pentru {field}.",
         buyerRequired: "Selectează un cumpărător.",
         walletRequired: "Selectează un portofel.",
+        ownerRequired: "Selectează un proprietar.",
       },
     },
     sections: {

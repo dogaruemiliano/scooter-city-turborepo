@@ -220,6 +220,7 @@ export class FinanceService {
             name: input.name,
             kind: input.kind,
             icon: input.icon ?? null,
+            keywords: input.keywords ?? [],
             parentCategoryId: input.parentCategoryId ?? null,
           },
         });

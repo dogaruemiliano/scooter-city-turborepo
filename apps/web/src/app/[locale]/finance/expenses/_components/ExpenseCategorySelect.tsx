@@ -1,10 +1,8 @@
 "use client";
 
-import { Label, SearchSelect } from "@repo/ui/components";
 import { useTranslations } from "next-intl";
 
-import { FinanceSelectorOptionRow } from "../../_components/FinanceSelectorOptionRow";
-import { categoryIconComponent } from "../../_lib/category-icons";
+import { CategorySelect } from "../../_components/CategorySelect";
 import type { ExpenseCategoryOption } from "../_lib/expense-options";
 
 interface ExpenseCategorySelectProps {
@@ -18,7 +16,7 @@ interface ExpenseCategorySelectProps {
   value: string;
 }
 
-/** Category picker shared by the full and quick expense forms: hierarchy-labelled options with icons. */
+/** Category picker shared by the full and quick expense forms: bottom-sheet with search and keyword support. */
 export function ExpenseCategorySelect({
   categories,
   disabled,
@@ -30,47 +28,20 @@ export function ExpenseCategorySelect({
   value,
 }: ExpenseCategorySelectProps) {
   const t = useTranslations("finance.expenses.form");
-  const options = categories.map((category) => ({
-    value: category.id,
-    label: category.label,
-    icon: categoryIconComponent(category.icon),
-  }));
 
   return (
-    <div className="flex flex-col gap-2">
-      <Label htmlFor={id} id={`${id}-label`}>
-        {label}{" "}
-        {required ? (
-          <>
-            <span aria-hidden="true" className="text-destructive">
-              *
-            </span>
-            <span className="sr-only">{t("required")}</span>
-          </>
-        ) : null}
-      </Label>
-      <SearchSelect
-        id={id}
-        ariaLabelledBy={`${id}-label`}
-        ariaInvalid={Boolean(error)}
-        ariaRequired={required}
-        ariaDescribedBy={error ? `${id}-error` : undefined}
-        value={value || null}
-        disabled={disabled || categories.length === 0}
-        options={options}
-        renderOption={(option) => <FinanceSelectorOptionRow {...option} />}
-        placeholder={t("placeholders.category")}
-        searchPlaceholder={t("placeholders.category")}
-        emptyMessage={t("search.noCategories")}
-        clearLabel={t("search.clear")}
-        toggleLabel={t("search.toggle")}
-        onValueChange={(next) => onChange(next ?? "")}
-      />
-      {error ? (
-        <p id={`${id}-error`} role="alert" className="text-xs text-destructive">
-          {error}
-        </p>
-      ) : null}
-    </div>
+    <CategorySelect
+      id={id}
+      label={label}
+      value={value || null}
+      categories={categories}
+      disabled={disabled || categories.length === 0}
+      error={error}
+      placeholder={t("placeholders.category")}
+      searchPlaceholder={t("placeholders.category")}
+      emptyMessage={t("search.noCategories")}
+      required={required}
+      onChange={(next) => onChange(next ?? "")}
+    />
   );
 }
