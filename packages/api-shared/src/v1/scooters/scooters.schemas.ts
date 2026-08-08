@@ -25,6 +25,7 @@ import {
 const MAX_VIN_LENGTH = 17;
 const MAX_TEXT_LENGTH = 120;
 const MAX_COLOR_LENGTH = 50;
+const MAX_ENGINE_TYPE_LENGTH = 100;
 const MAX_NOTES_LENGTH = 2_000;
 const MAX_SEARCH_LENGTH = 200;
 const MAX_PAGE_SIZE = 100;
@@ -100,6 +101,9 @@ const vinSchema = z
       }),
   );
 const nullableColorSchema = nullableTrimmedStringSchema(MAX_COLOR_LENGTH);
+const nullableEngineTypeSchema = nullableTrimmedStringSchema(
+  MAX_ENGINE_TYPE_LENGTH,
+);
 const notesSchema = nullableTrimmedStringSchema(MAX_NOTES_LENGTH);
 const purchasedOnSchema = dateOnlySchema.refine(
   (value) => value <= dateOnlyToday(),
@@ -186,6 +190,7 @@ export const scooterSchema = z
     color: z.string().nullable(),
     manufactureYear: z.number().int(),
     powertrainType: scooterPowertrainTypeSchema,
+    engineType: z.string().nullable(),
     engineCc: z.number().int().positive().nullable(),
     powerKw: z.number().positive().nullable(),
     purchasedOn: z.string(),
@@ -216,6 +221,7 @@ export const createScooterInputSchema = z
       .min(MIN_MANUFACTURE_YEAR)
       .max(MAX_MANUFACTURE_YEAR),
     powertrainType: scooterPowertrainTypeSchema,
+    engineType: nullableEngineTypeSchema.optional(),
     engineCc: z
       .number()
       .int()
@@ -256,6 +262,7 @@ export const updateScooterInputSchema = z
       .max(MAX_MANUFACTURE_YEAR)
       .optional(),
     powertrainType: scooterPowertrainTypeSchema.optional(),
+    engineType: nullableEngineTypeSchema.optional(),
     engineCc: z
       .number()
       .int()

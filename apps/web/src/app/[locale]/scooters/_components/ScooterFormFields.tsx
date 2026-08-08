@@ -134,6 +134,15 @@ export function ScooterFormFields({
             </p>
           ) : null}
         </div>
+        <TextField
+          id={`${formId}-engine-type`}
+          label={t("fields.engineType")}
+          value={form.engineType}
+          error={errors.engineType}
+          placeholder={t("placeholders.engineType")}
+          disabled={disabled}
+          onChange={(value) => onSetValue("engineType", value)}
+        />
         {form.powertrainType === "combustion" ? (
           <TextField
             id={`${formId}-engine-cc`}

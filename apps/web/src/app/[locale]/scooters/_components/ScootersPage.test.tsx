@@ -53,6 +53,7 @@ const scooter: v1.scooters.ScooterListItem = {
   color: "White",
   manufactureYear: 2026,
   powertrainType: "combustion",
+  engineType: null,
   engineCc: 125,
   powerKw: 8.5,
   purchasedOn: "2026-01-15",

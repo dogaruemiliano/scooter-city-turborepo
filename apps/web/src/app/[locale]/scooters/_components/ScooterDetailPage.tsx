@@ -249,6 +249,10 @@ export function ScooterDetailPage({
           value={t(`powertrainTypes.${scooter.powertrainType}`)}
         />
         <DetailField
+          label={t("fields.engineType")}
+          value={scooter.engineType ?? t("detail.emptyValue")}
+        />
+        <DetailField
           label={t("fields.engineCc")}
           value={
             scooter.engineCc
@@ -855,6 +859,8 @@ function fieldLabel(
       return t("fields.manufactureYear");
     case "powertrainType":
       return t("fields.powertrainType");
+    case "engineType":
+      return t("fields.engineType");
     case "engineCc":
       return t("fields.engineCc");
     case "powerKw":

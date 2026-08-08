@@ -15,6 +15,7 @@ export type ScooterFormField =
   | "color"
   | "manufactureYear"
   | "powertrainType"
+  | "engineType"
   | "engineCc"
   | "powerKw"
   | "currentMileageKm"
@@ -35,6 +36,7 @@ export interface ScooterFormState {
   color: string;
   manufactureYear: string;
   powertrainType: v1.scooters.ScooterPowertrainType;
+  engineType: string;
   engineCc: string;
   powerKw: string;
   currentMileageKm: string;
@@ -73,6 +75,7 @@ export function createEmptyScooterForm(): ScooterFormState {
     color: "",
     manufactureYear: "",
     powertrainType: "combustion",
+    engineType: "",
     engineCc: DEFAULT_COMBUSTION_ENGINE_CC,
     powerKw: "",
     currentMileageKm: "",
@@ -96,6 +99,7 @@ export function scooterFormFromScooter(
     color: scooter.color ?? "",
     manufactureYear: String(scooter.manufactureYear),
     powertrainType: scooter.powertrainType,
+    engineType: scooter.engineType ?? "",
     engineCc: scooter.engineCc == null ? "" : String(scooter.engineCc),
     powerKw: scooter.powerKw == null ? "" : String(scooter.powerKw),
     currentMileageKm:
@@ -175,6 +179,7 @@ export function buildScooterInputCandidate(
     color: form.color,
     manufactureYear,
     powertrainType: form.powertrainType,
+    engineType: blank(form.engineType) ? null : form.engineType,
     powerKw: powerKw ?? null,
     currentMileageKm: currentMileageKm ?? null,
     purchasedOn: purchasedOn.value,
@@ -244,6 +249,7 @@ export function isScooterFormField(value: string): value is ScooterFormField {
     value === "color" ||
     value === "manufactureYear" ||
     value === "powertrainType" ||
+    value === "engineType" ||
     value === "engineCc" ||
     value === "powerKw" ||
     value === "currentMileageKm" ||

@@ -12,6 +12,7 @@ export function toScooter(row: ScooterRow): v1.scooters.Scooter {
     color: row.color,
     manufactureYear: row.manufactureYear,
     powertrainType: row.powertrainType as v1.scooters.ScooterPowertrainType,
+    engineType: row.engineType,
     engineCc: row.engineCc,
     powerKw: row.powerKw,
     purchasedOn: toDateOnlyString(row.purchasedOn)!,

@@ -194,6 +194,7 @@ export class ScootersService {
       color: input.color,
       manufactureYear: input.manufactureYear,
       powertrainType: input.powertrainType,
+      engineType: input.engineType ?? null,
       engineCc: input.powertrainType === "electric" ? null : input.engineCc,
       powerKw: input.powerKw ?? null,
       purchasedOn: toDateOnlyDate(input.purchasedOn)!,
@@ -222,6 +223,7 @@ export class ScootersService {
       color: input.color,
       manufactureYear: input.manufactureYear,
       powertrainType: input.powertrainType,
+      engineType: input.engineType,
       engineCc: nextPowertrainType === "electric" ? null : nextEngineCc,
       powerKw: input.powerKw,
       purchasedOn:
