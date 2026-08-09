@@ -16,13 +16,34 @@ interface LatestMaintenanceIdRow {
   id: string;
 }
 
-type ServiceScooterRow = Pick<
-  Scooter,
-  "id" | "vin" | "brand" | "model" | "currentMileageKm"
->;
+interface ServiceScooterRow {
+  id: string;
+  vin: string;
+  brand: string;
+  model: string;
+  currentMileageKm: number | null;
+}
+
+interface RawServiceScooterRow {
+  id: string;
+  vin: string;
+  brand: { name: string };
+  model: string;
+  currentMileageKm: number | null;
+}
+
+function toServiceScooterRow(row: RawServiceScooterRow): ServiceScooterRow {
+  return {
+    id: row.id,
+    vin: row.vin,
+    brand: row.brand.name,
+    model: row.model,
+    currentMileageKm: row.currentMileageKm,
+  };
+}
 
 type FleetIssueRow = Parameters<typeof toScooterIssue>[0] & {
-  scooter: ServiceScooterRow;
+  scooter: RawServiceScooterRow;
 };
 
 type ServiceScheduleRecordRow = MaintenanceRecordWithType & {
@@ -75,8 +96,10 @@ export class MaintenanceQueryService {
             {
               scooter: {
                 brand: {
-                  contains: query.search,
-                  mode: "insensitive" as const,
+                  name: {
+                    contains: query.search,
+                    mode: "insensitive" as const,
+                  },
                 },
               },
             },
@@ -114,7 +137,7 @@ export class MaintenanceQueryService {
             select: {
               id: true,
               vin: true,
-              brand: true,
+              brand: { select: { name: true } },
               model: true,
               currentMileageKm: true,
             },
@@ -129,7 +152,7 @@ export class MaintenanceQueryService {
     return {
       items: (items as FleetIssueRow[]).map((item) => ({
         issue: toScooterIssue(item),
-        scooter: item.scooter,
+        scooter: toServiceScooterRow(item.scooter),
       })),
       page: query.page,
       pageSize: query.pageSize,
@@ -276,17 +299,18 @@ export class MaintenanceQueryService {
   async dashboard(
     now = new Date(),
   ): Promise<v1.maintenance.FleetMaintenanceDashboard> {
-    const scooters = await this.prisma.scooter.findMany({
+    const rawScooters = await this.prisma.scooter.findMany({
       where: { deletedAt: null },
       select: {
         id: true,
         vin: true,
-        brand: true,
+        brand: { select: { name: true } },
         model: true,
         currentMileageKm: true,
       },
       orderBy: [{ vin: "asc" }, { id: "asc" }],
     });
+    const scooters = rawScooters.map(toServiceScooterRow);
     const summaries = await this.getAttentionSummaries(scooters, now);
     let scootersWithOpenIssues = 0;
     let scootersWithBlockingIssues = 0;
@@ -463,7 +487,7 @@ export class MaintenanceQueryService {
       ? Prisma.sql`
           AND (
             scooter.vin ILIKE ${`%${search}%`}
-            OR scooter.brand ILIKE ${`%${search}%`}
+            OR brand.name ILIKE ${`%${search}%`}
             OR scooter.model ILIKE ${`%${search}%`}
             OR COALESCE(scooter."plateNumber", '') ILIKE ${`%${search}%`}
             OR type.name ILIKE ${`%${search}%`}
@@ -482,6 +506,8 @@ export class MaintenanceQueryService {
         INNER JOIN "Scooter" AS scooter
           ON scooter.id = record."scooterId"
           AND scooter."deletedAt" IS NULL
+        INNER JOIN "ScooterBrand" AS brand
+          ON brand.id = scooter."brandId"
         WHERE TRUE
         ${searchCondition}
         ORDER BY
@@ -497,7 +523,7 @@ export class MaintenanceQueryService {
       return [];
     }
 
-    return this.prisma.maintenanceRecord.findMany({
+    const records = await this.prisma.maintenanceRecord.findMany({
       where: { id: { in: ids } },
       include: {
         maintenanceType: true,
@@ -505,13 +531,18 @@ export class MaintenanceQueryService {
           select: {
             id: true,
             vin: true,
-            brand: true,
+            brand: { select: { name: true } },
             model: true,
             currentMileageKm: true,
           },
         },
       },
     });
+
+    return records.map((record) => ({
+      ...record,
+      scooter: toServiceScooterRow(record.scooter),
+    }));
   }
 
   private buildActivity(

@@ -38,6 +38,7 @@ vi.mock("next/navigation", () => ({
 const scooter: v1.scooters.Scooter = {
   id: "scooter-1",
   vin: "JYARN23E0RA123456",
+  brandId: "brand-yamaha",
   brand: "Yamaha",
   model: "NMAX",
   color: "White",
@@ -47,6 +48,8 @@ const scooter: v1.scooters.Scooter = {
   engineCc: 125,
   powerKw: 8.5,
   purchasedOn: "2026-01-15",
+  purchasePrice: null,
+  purchaseCurrency: null,
   registrationType: "unregistered",
   plateNumber: null,
   registeredOn: null,

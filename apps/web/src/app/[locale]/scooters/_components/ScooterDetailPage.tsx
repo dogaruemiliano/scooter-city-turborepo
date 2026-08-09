@@ -11,18 +11,15 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  buttonVariants,
 } from "@repo/ui/components";
 import { cn } from "@repo/ui/lib/utils";
 import {
-  ArrowLeftIcon,
   BatteryChargingIcon,
   CarFrontIcon,
   GaugeIcon,
   PencilIcon,
   Trash2Icon,
 } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { useId, useState, type FormEvent, type ReactNode } from "react";
@@ -55,6 +52,7 @@ interface ScooterDetailPageProps {
   maintenanceTypes: v1.maintenance.MaintenanceTypeList;
   financials: v1.finance.ScooterFinancials;
   companyWallets: v1.finance.WalletOption[];
+  brands: v1.scooterBrands.ScooterBrand[];
 }
 
 interface Feedback {
@@ -72,6 +70,7 @@ export function ScooterDetailPage({
   maintenanceTypes,
   financials,
   companyWallets,
+  brands,
 }: ScooterDetailPageProps) {
   const t = useTranslations("scooters");
   const locale = useLocale();
@@ -151,17 +150,6 @@ export function ScooterDetailPage({
     <div className="mx-auto flex w-full max-w-screen-xl flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
       <PageTitleOverride title={title} />
       <div className="flex flex-col gap-4">
-        <Link
-          href={scootersHref}
-          className={cn(
-            buttonVariants({ variant: "ghost" }),
-            "hidden w-fit text-muted-foreground md:inline-flex",
-          )}
-        >
-          <ArrowLeftIcon data-icon="inline-start" />
-          {t("actions.backToList")}
-        </Link>
-
         <div className="flex min-w-0 items-start justify-between gap-3">
           <div className="min-w-0">
             <h1 className="break-words text-2xl font-semibold">{title}</h1>
@@ -308,7 +296,23 @@ export function ScooterDetailPage({
       <DetailSection title={t("sections.purchase")}>
         <DetailField
           label={t("fields.purchasedOn")}
-          value={formatDate(scooter.purchasedOn, locale)}
+          value={
+            scooter.purchasedOn
+              ? formatDate(scooter.purchasedOn, locale)
+              : t("detail.purchaseNotRecorded")
+          }
+        />
+        <DetailField
+          label={t("detail.fields.purchasePrice")}
+          value={
+            scooter.purchasePrice && scooter.purchaseCurrency
+              ? formatMoney(
+                  scooter.purchasePrice,
+                  scooter.purchaseCurrency,
+                  locale,
+                )
+              : t("detail.purchaseNotRecorded")
+          }
         />
         <DetailField
           label={t("detail.fields.createdAt")}
@@ -349,6 +353,7 @@ export function ScooterDetailPage({
       <ScooterFormDialog
         key={`edit-scooter-${editDialogKey}`}
         scooter={scooter}
+        brands={brands}
         busy={busyAction === "scooter:update"}
         open={editOpen}
         onOpenChange={setEditOpen}
@@ -374,12 +379,14 @@ export function ScooterDetailPage({
 
 function ScooterFormDialog({
   scooter,
+  brands,
   busy,
   open,
   onOpenChange,
   onSubmit,
 }: {
   scooter: v1.scooters.Scooter;
+  brands: v1.scooterBrands.ScooterBrand[];
   busy: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -514,6 +521,7 @@ function ScooterFormDialog({
             formId={formId}
             form={form}
             errors={fieldErrors}
+            brands={brands}
             disabled={busy}
             includeRegistration={false}
             onSetValue={setFormValue}
@@ -810,10 +818,6 @@ function formatValidationIssue(
     return t("feedback.validation.invalidPlateNumber");
   }
 
-  if (field === "purchasedOn" && issue.message.includes("today")) {
-    return t("feedback.validation.purchasedOnPastOrToday");
-  }
-
   if (field === "registeredOn" && issue.message.includes("today")) {
     return t("feedback.validation.registeredOnPastOrToday");
   }
@@ -849,7 +853,7 @@ function fieldLabel(
   switch (field) {
     case "vin":
       return t("fields.vin");
-    case "brand":
+    case "brandId":
       return t("fields.brand");
     case "model":
       return t("fields.model");
@@ -867,8 +871,6 @@ function fieldLabel(
       return t("fields.powerKw");
     case "currentMileageKm":
       return t("fields.currentMileageKm");
-    case "purchasedOn":
-      return t("fields.purchasedOn");
     case "registrationType":
       return t("fields.registrationType");
     case "plateNumber":
@@ -899,4 +901,11 @@ function formatDateTime(value: string, locale: string): string {
     timeStyle: "short",
     timeZone: "UTC",
   }).format(new Date(value));
+}
+
+function formatMoney(value: string, currency: string, locale: string): string {
+  return new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency,
+  }).format(Number(value));
 }

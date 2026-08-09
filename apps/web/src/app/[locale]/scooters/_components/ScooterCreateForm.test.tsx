@@ -27,9 +27,21 @@ vi.mock("next/navigation", () => ({
   }),
 }));
 
+const brands: v1.scooterBrands.ScooterBrand[] = [
+  {
+    id: "brand-1",
+    name: "Yamaha",
+    code: "YAM",
+    scooterCount: 0,
+    createdAt: "2026-06-25T10:00:00.000Z",
+    updatedAt: "2026-06-25T10:00:00.000Z",
+  },
+];
+
 const createdScooter: v1.scooters.Scooter = {
   id: "scooter-1",
   vin: "JYARN23E0RA123456",
+  brandId: "brand-1",
   brand: "Yamaha",
   model: "NMAX",
   color: "White",
@@ -38,7 +50,9 @@ const createdScooter: v1.scooters.Scooter = {
   engineType: null,
   engineCc: 125,
   powerKw: 8.5,
-  purchasedOn: v1.common.dateOnlyToday(),
+  purchasedOn: null,
+  purchasePrice: null,
+  purchaseCurrency: null,
   registrationType: "unregistered",
   plateNumber: null,
   registeredOn: null,
@@ -66,12 +80,8 @@ describe("ScooterCreateForm", () => {
   it("renders combustion defaults with required scooter fields", () => {
     renderCreateForm();
 
-    expect(
-      screen.getByRole("heading", { name: "Add scooter" }),
-    ).toBeInTheDocument();
     expect(screen.getByText("Identity")).toBeInTheDocument();
     expect(screen.getByText("Technical")).toBeInTheDocument();
-    expect(screen.getByText("Purchase")).toBeInTheDocument();
     expect(requiredLabel("Color")).toHaveTextContent(/Color\s*\*/);
     expect(screen.getByRole("button", { name: "Combustion" })).toHaveAttribute(
       "aria-pressed",
@@ -121,38 +131,6 @@ describe("ScooterCreateForm", () => {
     expect(mocks.apiFetch).not.toHaveBeenCalled();
   });
 
-  it("renders the Romanian purchase date placeholders", () => {
-    renderCreateForm("ro");
-
-    expect(screen.getByLabelText("Achiziționat la")).toHaveAttribute(
-      "placeholder",
-      "ZZ",
-    );
-    expect(screen.getByLabelText("Achiziționat la LL")).toHaveAttribute(
-      "placeholder",
-      "LL",
-    );
-    expect(screen.getByLabelText("Achiziționat la AAAA")).toHaveAttribute(
-      "placeholder",
-      "AAAA",
-    );
-  });
-
-  it("rejects future purchase dates before submitting", async () => {
-    const browser = userEvent.setup();
-
-    renderCreateForm();
-    await fillRequiredScooterForm(browser, {
-      purchasedOn: addDateOnlyDays(v1.common.dateOnlyToday(), 1),
-    });
-    await browser.click(screen.getByRole("button", { name: "Create scooter" }));
-
-    expect(
-      await screen.findAllByText("Purchased on must be today or earlier."),
-    ).toHaveLength(2);
-    expect(mocks.apiFetch).not.toHaveBeenCalled();
-  });
-
   it("submits the normalized create payload", async () => {
     mocks.apiFetch.mockResolvedValueOnce(createdScooter);
     const browser = userEvent.setup();
@@ -169,7 +147,7 @@ describe("ScooterCreateForm", () => {
           method: "POST",
           json: {
             vin: "JYARN23E0RA123456",
-            brand: "Yamaha",
+            brandId: "brand-1",
             model: "NMAX",
             color: "White",
             manufactureYear: 2026,
@@ -178,7 +156,6 @@ describe("ScooterCreateForm", () => {
             engineCc: 125,
             powerKw: 8.5,
             currentMileageKm: null,
-            purchasedOn: v1.common.dateOnlyToday(),
             registrationType: "unregistered",
             plateNumber: null,
             registeredOn: null,
@@ -341,28 +318,33 @@ function renderCreateForm(locale: SupportedLocale = "en") {
     <NextIntlClientProvider locale={locale} messages={messages[locale]}>
       <ScooterCreateForm
         scootersHref={locale === "en" ? "/en/scooters" : "/scooters"}
+        brands={brands}
       />
     </NextIntlClientProvider>,
   );
 }
 
+async function selectBrand(
+  browser: ReturnType<typeof userEvent.setup>,
+  name: string,
+) {
+  await browser.click(screen.getByLabelText("Brand"));
+  await browser.click(
+    await screen.findByRole("button", { name: new RegExp(name) }),
+  );
+}
+
 async function fillRequiredScooterForm(
   browser: ReturnType<typeof userEvent.setup>,
-  overrides: { purchasedOn?: string } = {},
 ) {
   await browser.type(screen.getByLabelText("VIN"), "jyarn23e0ra123456");
-  await browser.type(screen.getByLabelText("Brand"), "Yamaha");
+  await selectBrand(browser, "Yamaha");
   await browser.type(screen.getByLabelText("Model"), "NMAX");
   await browser.type(screen.getByLabelText("Color"), "White");
   await browser.type(screen.getByLabelText("Manufacture year"), "2026");
   await browser.clear(screen.getByLabelText("Engine cc"));
   await browser.type(screen.getByLabelText("Engine cc"), "125");
   await browser.type(screen.getByLabelText("Power (kW)"), "8.5");
-  await fillDateParts(
-    browser,
-    "Purchased on",
-    overrides.purchasedOn ?? v1.common.dateOnlyToday(),
-  );
   await browser.type(screen.getByLabelText("Notes"), "Maker papers received");
 }
 
@@ -389,10 +371,4 @@ async function fillDateParts(
 
 function requiredLabel(text: string) {
   return screen.getByText(text).closest("div") ?? screen.getByText(text);
-}
-
-function addDateOnlyDays(value: string, days: number): string {
-  const date = new Date(`${value}T00:00:00.000Z`);
-  date.setUTCDate(date.getUTCDate() + days);
-  return date.toISOString().slice(0, 10);
 }

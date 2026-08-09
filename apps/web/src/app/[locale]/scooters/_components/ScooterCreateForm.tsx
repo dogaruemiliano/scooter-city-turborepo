@@ -8,7 +8,6 @@ import {
   Button,
   buttonVariants,
 } from "@repo/ui/components";
-import { ArrowLeftIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -30,6 +29,7 @@ import {
 
 interface ScooterCreateFormProps {
   scootersHref: string;
+  brands: v1.scooterBrands.ScooterBrand[];
 }
 
 export interface Feedback {
@@ -38,7 +38,10 @@ export interface Feedback {
   messages: string[];
 }
 
-export function ScooterCreateForm({ scootersHref }: ScooterCreateFormProps) {
+export function ScooterCreateForm({
+  scootersHref,
+  brands,
+}: ScooterCreateFormProps) {
   const t = useTranslations("scooters");
   const router = useRouter();
   const formId = useId();
@@ -193,10 +196,6 @@ export function ScooterCreateForm({ scootersHref }: ScooterCreateFormProps) {
       return t("feedback.validation.invalidPlateNumber");
     }
 
-    if (field === "purchasedOn" && issue.message.includes("today")) {
-      return t("feedback.validation.purchasedOnPastOrToday");
-    }
-
     if (field === "registeredOn" && issue.message.includes("today")) {
       return t("feedback.validation.registeredOnPastOrToday");
     }
@@ -229,7 +228,7 @@ export function ScooterCreateForm({ scootersHref }: ScooterCreateFormProps) {
     switch (field) {
       case "vin":
         return t("fields.vin");
-      case "brand":
+      case "brandId":
         return t("fields.brand");
       case "model":
         return t("fields.model");
@@ -245,8 +244,6 @@ export function ScooterCreateForm({ scootersHref }: ScooterCreateFormProps) {
         return t("fields.powerKw");
       case "currentMileageKm":
         return t("fields.currentMileageKm");
-      case "purchasedOn":
-        return t("fields.purchasedOn");
       case "registrationType":
         return t("fields.registrationType");
       case "plateNumber":
@@ -266,25 +263,6 @@ export function ScooterCreateForm({ scootersHref }: ScooterCreateFormProps) {
 
   return (
     <div className="mx-auto flex w-full max-w-screen-lg flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
-      <div className="flex flex-col gap-4">
-        <Link
-          href={scootersHref}
-          className={buttonVariants({
-            variant: "ghost",
-            className: "hidden w-fit text-muted-foreground md:inline-flex",
-          })}
-        >
-          <ArrowLeftIcon data-icon="inline-start" />
-          {t("actions.backToList")}
-        </Link>
-        <div>
-          <h1 className="text-2xl font-semibold">{t("createPage.title")}</h1>
-          <p className="text-sm text-muted-foreground">
-            {t("createPage.description")}
-          </p>
-        </div>
-      </div>
-
       <form
         className="grid gap-6"
         noValidate
@@ -294,6 +272,7 @@ export function ScooterCreateForm({ scootersHref }: ScooterCreateFormProps) {
           formId={formId}
           form={form}
           errors={fieldErrors}
+          brands={brands}
           disabled={creating}
           onSetValue={setFormValue}
         />

@@ -26,7 +26,10 @@ describe("Scooters HTTP surface (e2e)", () => {
 
   const createdUserIds: string[] = [];
   const createdVins: string[] = [];
+  const createdBrandIds: string[] = [];
   let vinSeq = Math.floor(Math.random() * 7_000_000) + 1_000_000;
+  let yamahaBrand: { id: string; name: string };
+  let hondaBrand: { id: string; name: string };
 
   const server = () => app.getHttpServer() as Server;
 
@@ -59,6 +62,13 @@ describe("Scooters HTTP surface (e2e)", () => {
     prisma = app.get(PrismaService);
     users = app.get(UsersService);
     coreAuth = app.get(CoreAuthService);
+
+    const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    yamahaBrand = await createBrand(
+      `Yamaha-${suffix}`,
+      `YAM${suffix.slice(-3)}`,
+    );
+    hondaBrand = await createBrand(`Honda-${suffix}`, `HON${suffix.slice(-3)}`);
   });
 
   afterAll(async () => {
@@ -67,11 +77,25 @@ describe("Scooters HTTP surface (e2e)", () => {
         where: { vin: { in: createdVins } },
       });
     }
+    if (prisma && createdBrandIds.length > 0) {
+      await prisma.scooterBrand.deleteMany({
+        where: { id: { in: createdBrandIds } },
+      });
+    }
     if (prisma && createdUserIds.length > 0) {
       await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
     }
     await app?.close();
   });
+
+  async function createBrand(
+    name: string,
+    code: string,
+  ): Promise<{ id: string; name: string }> {
+    const brand = await prisma.scooterBrand.create({ data: { name, code } });
+    createdBrandIds.push(brand.id);
+    return { id: brand.id, name: brand.name };
+  }
 
   async function freshSession(roles: string[]): Promise<IssuedSession> {
     const user = await users.createOne({
@@ -98,14 +122,13 @@ describe("Scooters HTTP surface (e2e)", () => {
   ): v1.scooters.CreateScooterInput {
     return {
       vin: uniqueVin(),
-      brand: "Yamaha",
+      brandId: yamahaBrand.id,
       model: "NMAX 125",
       color: "blue",
       manufactureYear: 2025,
       powertrainType: "combustion",
       engineCc: 125,
       powerKw: 8.5,
-      purchasedOn: "2026-07-14",
       notes: "Factory papers received.",
       ...overrides,
     };
@@ -138,14 +161,17 @@ describe("Scooters HTTP surface (e2e)", () => {
     expect(created).toEqual(
       expect.objectContaining({
         vin: input.vin,
-        brand: "Yamaha",
+        brandId: yamahaBrand.id,
+        brand: yamahaBrand.name,
         model: "NMAX 125",
         color: "blue",
         manufactureYear: 2025,
         powertrainType: "combustion",
         engineCc: 125,
         powerKw: 8.5,
-        purchasedOn: "2026-07-14",
+        purchasedOn: null,
+        purchasePrice: null,
+        purchaseCurrency: null,
         registrationType: "unregistered",
         plateNumber: null,
         registeredOn: null,
@@ -227,13 +253,13 @@ describe("Scooters HTTP surface (e2e)", () => {
     const yamahaRes = await req()
       .post(v1.scooters.ROUTES.create)
       .set("Cookie", [`access_token=${admin.accessToken}`])
-      .send(scooterInput({ brand: "Yamaha", model: "NMAX 125" }));
+      .send(scooterInput({ brandId: yamahaBrand.id, model: "NMAX 125" }));
     const hondaRes = await req()
       .post(v1.scooters.ROUTES.create)
       .set("Cookie", [`access_token=${admin.accessToken}`])
       .send(
         scooterInput({
-          brand: "Honda",
+          brandId: hondaBrand.id,
           model: "PCX Electric",
           powertrainType: "electric",
           engineCc: undefined,

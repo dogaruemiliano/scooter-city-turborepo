@@ -106,7 +106,9 @@ export function ScooterList({
                         className={inlineIconClassName}
                       />
                       <span className="truncate">
-                        {formatDate(scooter.purchasedOn, locale)}
+                        {scooter.purchasedOn
+                          ? formatDate(scooter.purchasedOn, locale)
+                          : t("detail.purchaseNotRecorded")}
                       </span>
                     </span>
                     {scooter.plateNumber ? (

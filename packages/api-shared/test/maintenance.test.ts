@@ -480,14 +480,18 @@ function scooterFixture() {
   return {
     id: "scooter-1",
     vin: "JYARN23E0RA123456",
+    brandId: "brand-1",
     brand: "Yamaha",
     model: "NMAX",
     color: "White",
     manufactureYear: 2026,
     powertrainType: "combustion" as const,
+    engineType: null,
     engineCc: 125,
     powerKw: 9.5,
-    purchasedOn: performedAt,
+    purchasedOn: null,
+    purchasePrice: null,
+    purchaseCurrency: null,
     registrationType: "unregistered" as const,
     plateNumber: null,
     registeredOn: null,
@@ -504,11 +508,10 @@ function scooterFixture() {
 function baseScooterInput() {
   return {
     vin: "JYARN23E0RA123456",
-    brand: "Yamaha",
+    brandId: "brand-1",
     model: "NMAX",
     manufactureYear: 2026,
     powertrainType: "combustion",
     engineCc: 125,
-    purchasedOn: performedAt,
   };
 }

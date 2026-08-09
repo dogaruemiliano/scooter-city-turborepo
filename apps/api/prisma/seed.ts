@@ -165,7 +165,6 @@ type ScooterSeed = {
   powertrainType: ScooterPowertrainType;
   engineCc: number | null;
   powerKw: number | null;
-  purchasedOn: Date;
   registrationType: ScooterRegistrationType;
   plateNumber: string | null;
   plateNumberNormalized: string | null;
@@ -418,6 +417,24 @@ const GENERATED_ELECTRIC_SCOOTER_MODELS = [
   { brand: "Askoll", model: "eS2" },
 ] as const;
 
+const SCOOTER_BRAND_CODES: Record<string, string> = {
+  Piaggio: "PIA",
+  Kymco: "KYM",
+  SYM: "SYM",
+  Yamaha: "YAM",
+  Honda: "HON",
+  Keeway: "KEE",
+  Aprilia: "APR",
+  Peugeot: "PEU",
+  Rieju: "RIE",
+  Znen: "ZNE",
+  NIU: "NIU",
+  Silence: "SIL",
+  Horwin: "HOR",
+  "Super Soco": "SUP",
+  Askoll: "ASK",
+};
+
 const GENERATED_SCOOTER_COLORS = [
   "white",
   "black",
@@ -662,15 +679,38 @@ function seedUserWalletUpsert(ownerName: string) {
   };
 }
 
+function slugifyBrandName(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+}
+
+async function seedScooterBrands(): Promise<Map<string, string>> {
+  const brandNameToId = new Map<string, string>();
+  for (const [name, code] of Object.entries(SCOOTER_BRAND_CODES)) {
+    const id = `seed-scooter-brand-${slugifyBrandName(name)}`;
+    await prisma.scooterBrand.upsert({
+      where: { id },
+      create: { id, name, code },
+      update: { name, code },
+    });
+    brandNameToId.set(name, id);
+  }
+  return brandNameToId;
+}
+
 async function seedScooters(): Promise<void> {
+  const brandNameToId = await seedScooterBrands();
   for (const seed of SCOOTER_SEEDS) {
+    const brandId = brandNameToId.get(seed.brand);
+    if (!brandId) {
+      throw new Error(`Unknown scooter brand in seed data: ${seed.brand}`);
+    }
     await prisma.scooter.upsert({
       where: { id: seed.id },
       create: {
         id: seed.id,
-        ...scooterData(seed),
+        ...scooterData(seed, brandId),
       },
-      update: scooterData(seed),
+      update: scooterData(seed, brandId),
     });
   }
 }
@@ -784,17 +824,16 @@ function personDocumentData(seed: PersonDocumentSeed) {
   };
 }
 
-function scooterData(seed: ScooterSeed) {
+function scooterData(seed: ScooterSeed, brandId: string) {
   return {
     vin: seed.vin,
-    brand: seed.brand,
+    brandId,
     model: seed.model,
     color: seed.color,
     manufactureYear: seed.manufactureYear,
     powertrainType: seed.powertrainType,
     engineCc: seed.engineCc,
     powerKw: seed.powerKw,
-    purchasedOn: seed.purchasedOn,
     registrationType: seed.registrationType,
     plateNumber: seed.plateNumber,
     plateNumberNormalized: seed.plateNumberNormalized,
@@ -940,7 +979,6 @@ function buildGeneratedScooterSeeds(count: number): ScooterSeed[] {
       powertrainType: isElectric ? "electric" : "combustion",
       engineCc: isElectric ? null : is125Cc ? 125 : 50,
       powerKw: isElectric ? 3.2 : is125Cc ? 8.5 : 2.8,
-      purchasedOn: generatedScooterPurchasedOn(ordinal),
       registrationType: "unregistered",
       plateNumber: null,
       plateNumberNormalized: null,
@@ -1089,13 +1127,6 @@ function generatedScooterModel({
 
 function generatedScooterVin(ordinal: number): string {
   return `LXYTCKP05P${5_000_000 + ordinal}`;
-}
-
-function generatedScooterPurchasedOn(ordinal: number): Date {
-  const month = ((ordinal - 1) % 12) + 1;
-  const day = ((ordinal - 1) % 27) + 1;
-
-  return dateOnly(`${2025 + (ordinal % 2)}-${pad2(month)}-${pad2(day)}`);
 }
 
 function generatedScooterNotes({

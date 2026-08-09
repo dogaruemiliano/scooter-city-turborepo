@@ -29,6 +29,7 @@ vi.mock("next/navigation", () => ({
 const scooter: v1.scooters.Scooter = {
   id: "scooter-1",
   vin: "JYARN23E0RA123456",
+  brandId: "brand-yamaha",
   brand: "Yamaha",
   model: "NMAX",
   color: "White",
@@ -38,6 +39,8 @@ const scooter: v1.scooters.Scooter = {
   engineCc: 125,
   powerKw: 8.5,
   purchasedOn: "2026-01-15",
+  purchasePrice: "1500.00",
+  purchaseCurrency: "RON",
   registrationType: "unregistered",
   plateNumber: null,
   registeredOn: null,
@@ -65,9 +68,6 @@ describe("ScooterDetailPage", () => {
   it("renders scooter details and actions", () => {
     renderDetail();
 
-    expect(
-      screen.getByRole("link", { name: "Back to scooters" }),
-    ).toHaveAttribute("href", "/en/scooters");
     expect(
       screen.getByRole("heading", { name: "Yamaha NMAX" }),
     ).toBeInTheDocument();
@@ -476,11 +476,6 @@ describe("ScooterDetailPage", () => {
     await browser.click(screen.getByRole("button", { name: "More actions" }));
     await browser.click(await screen.findByText("Edit scooter"));
     const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByLabelText("Purchased on")).toHaveValue("15");
-    expect(within(dialog).getByLabelText("Purchased on MM")).toHaveValue("01");
-    expect(within(dialog).getByLabelText("Purchased on YYYY")).toHaveValue(
-      "2026",
-    );
     expect(within(dialog).getByLabelText("Current mileage (km)")).toHaveValue(
       1_200,
     );
@@ -556,6 +551,16 @@ function renderDetail(
   maintenanceTypes: v1.maintenance.MaintenanceTypeList = [],
   financials: v1.finance.ScooterFinancials = scooterFinancials(),
   companyWallets: v1.finance.WalletOption[] = [],
+  brands: v1.scooterBrands.ScooterBrand[] = [
+    {
+      id: "brand-yamaha",
+      name: "Yamaha",
+      code: "YAM",
+      scooterCount: 1,
+      createdAt: "2026-06-25T10:00:00.000Z",
+      updatedAt: "2026-06-25T10:00:00.000Z",
+    },
+  ],
 ) {
   return render(
     <NextIntlClientProvider locale={locale} messages={messages[locale]}>
@@ -566,6 +571,7 @@ function renderDetail(
         maintenanceTypes={maintenanceTypes}
         financials={financials}
         companyWallets={companyWallets}
+        brands={brands}
       />
     </NextIntlClientProvider>,
   );

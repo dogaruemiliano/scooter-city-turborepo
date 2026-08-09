@@ -10,7 +10,7 @@ export const DEFAULT_COMBUSTION_ENGINE_CC = "50";
 
 export type ScooterFormField =
   | "vin"
-  | "brand"
+  | "brandId"
   | "model"
   | "color"
   | "manufactureYear"
@@ -19,7 +19,6 @@ export type ScooterFormField =
   | "engineCc"
   | "powerKw"
   | "currentMileageKm"
-  | "purchasedOn"
   | "registrationType"
   | "plateNumber"
   | "registeredOn"
@@ -31,7 +30,7 @@ export type ScooterFormErrors = Partial<Record<ScooterFormField, string>>;
 
 export interface ScooterFormState {
   vin: string;
-  brand: string;
+  brandId: string;
   model: string;
   color: string;
   manufactureYear: string;
@@ -40,7 +39,6 @@ export interface ScooterFormState {
   engineCc: string;
   powerKw: string;
   currentMileageKm: string;
-  purchasedOn: DateParts;
   registrationType: v1.scooters.ScooterRegistrationType;
   plateNumber: string;
   registeredOn: DateParts;
@@ -70,7 +68,7 @@ interface ScooterFormMessages {
 export function createEmptyScooterForm(): ScooterFormState {
   return {
     vin: "",
-    brand: "",
+    brandId: "",
     model: "",
     color: "",
     manufactureYear: "",
@@ -79,7 +77,6 @@ export function createEmptyScooterForm(): ScooterFormState {
     engineCc: DEFAULT_COMBUSTION_ENGINE_CC,
     powerKw: "",
     currentMileageKm: "",
-    purchasedOn: emptyDateParts(),
     registrationType: "unregistered",
     plateNumber: "",
     registeredOn: emptyDateParts(),
@@ -94,7 +91,7 @@ export function scooterFormFromScooter(
 ): ScooterFormState {
   return {
     vin: scooter.vin,
-    brand: scooter.brand,
+    brandId: scooter.brandId,
     model: scooter.model,
     color: scooter.color ?? "",
     manufactureYear: String(scooter.manufactureYear),
@@ -104,7 +101,6 @@ export function scooterFormFromScooter(
     powerKw: scooter.powerKw == null ? "" : String(scooter.powerKw),
     currentMileageKm:
       scooter.currentMileageKm == null ? "" : String(scooter.currentMileageKm),
-    purchasedOn: dateOnlyToDateParts(scooter.purchasedOn),
     registrationType: scooter.registrationType,
     plateNumber: scooter.plateNumber ?? "",
     registeredOn: dateOnlyToDateParts(scooter.registeredOn),
@@ -122,7 +118,6 @@ export function buildScooterInputCandidate(
   errors?: ScooterFormErrors;
 } {
   const errors: ScooterFormErrors = {};
-  const purchasedOn = buildDateOnly(form.purchasedOn);
   const manufactureYear = numberField(
     form.manufactureYear,
     "manufactureYear",
@@ -154,14 +149,12 @@ export function buildScooterInputCandidate(
   );
   const registration = buildRegistrationInput(form, messages, errors);
 
-  if (blank(form.color)) {
-    errors.color = messages.required("color");
+  if (blank(form.brandId)) {
+    errors.brandId = messages.required("brandId");
   }
 
-  if (purchasedOn.error) {
-    errors.purchasedOn = messages.invalidDate("purchasedOn");
-  } else if (!purchasedOn.value) {
-    errors.purchasedOn = messages.required("purchasedOn");
+  if (blank(form.color)) {
+    errors.color = messages.required("color");
   }
 
   if (form.powertrainType === "electric" && form.engineCc.trim().length > 0) {
@@ -174,7 +167,7 @@ export function buildScooterInputCandidate(
 
   const input: Record<string, unknown> = {
     vin: form.vin,
-    brand: form.brand,
+    brandId: form.brandId,
     model: form.model,
     color: form.color,
     manufactureYear,
@@ -182,7 +175,6 @@ export function buildScooterInputCandidate(
     engineType: blank(form.engineType) ? null : form.engineType,
     powerKw: powerKw ?? null,
     currentMileageKm: currentMileageKm ?? null,
-    purchasedOn: purchasedOn.value,
     ...registration.input,
   };
 
@@ -244,7 +236,7 @@ export function fieldFromIssue(
 export function isScooterFormField(value: string): value is ScooterFormField {
   return (
     value === "vin" ||
-    value === "brand" ||
+    value === "brandId" ||
     value === "model" ||
     value === "color" ||
     value === "manufactureYear" ||
@@ -253,7 +245,6 @@ export function isScooterFormField(value: string): value is ScooterFormField {
     value === "engineCc" ||
     value === "powerKw" ||
     value === "currentMileageKm" ||
-    value === "purchasedOn" ||
     value === "registrationType" ||
     value === "plateNumber" ||
     value === "registeredOn" ||

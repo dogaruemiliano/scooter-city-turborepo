@@ -16,6 +16,7 @@ export const scootersCatalog = {
       delete: "Delete",
       deleting: "Deleting...",
       cancel: "Cancel",
+      close: "Close",
       apply: "Apply",
       backToList: "Back to scooters",
       viewDetails: "View {name}",
@@ -48,7 +49,6 @@ export const scootersCatalog = {
         engineCcElectric: "Engine cc is only allowed for combustion scooters.",
         invalidPlateNumber:
           "Plate number does not match the selected registration type.",
-        purchasedOnPastOrToday: "Purchased on must be today or earlier.",
         registeredOnPastOrToday: "Registered on must be today or earlier.",
         registrationExpiresOnAfterRegisteredOn:
           "Registration expiry must be on or after the registration date.",
@@ -62,8 +62,10 @@ export const scootersCatalog = {
     detail: {
       description: "Scooter record",
       emptyValue: "Not provided",
+      purchaseNotRecorded: "Not recorded",
       fields: {
         scooterId: "Scooter ID",
+        purchasePrice: "Purchase price",
         createdAt: "Created",
         updatedAt: "Updated",
         deletedAt: "Deleted",
@@ -383,8 +385,7 @@ export const scootersCatalog = {
       model: "NMAX",
       color: "White",
       manufactureYear: "2026",
-      purchasedOn: "YYYY-MM-DD",
-      engineType: "Single-cylinder",
+      engineType: "GY6",
       engineCc: "125",
       powerKw: "8.5",
       currentMileageKm: "4200",
@@ -458,6 +459,50 @@ export const scootersCatalog = {
       nextAria: "Go to next page",
       more: "More pages",
     },
+    brandPicker: {
+      placeholder: "Select brand",
+      search: "Search brands",
+      empty: "No brands found",
+      addNew: "Add new brand",
+    },
+    brands: {
+      list: {
+        createButton: "Add new brand",
+        empty: "No brands found.",
+        scooterCount:
+          "{count, plural, =0 {No scooters} one {# scooter} other {# scooters}}",
+        delete: "Delete brand",
+        deleteBlocked:
+          "This brand is used by existing scooters and cannot be deleted.",
+        deleteError: "The brand could not be deleted.",
+      },
+      columns: {
+        name: "Name",
+      },
+      create: {
+        title: "Add new brand",
+      },
+      edit: {
+        title: "Edit brand",
+        description: "Update the brand name and code.",
+        trigger: "Edit brand",
+      },
+      form: {
+        name: "Name",
+        code: "Code",
+        submit: "Create brand",
+        save: "Save",
+        error: "The brand could not be saved.",
+        inUseWarning:
+          "{count, plural, one {# scooter uses} other {# scooters use}} this brand. Changing the code means existing stickers must be reprinted.",
+      },
+      confirm: {
+        title: "Are you sure you want to modify this?",
+        description:
+          "Scooters already use this brand. If you change the name or code, existing printed stickers will no longer match and must be reprinted.",
+        confirm: "Yes, save changes",
+      },
+    },
   },
   ro: {
     routeStates: {
@@ -476,6 +521,7 @@ export const scootersCatalog = {
       delete: "Șterge",
       deleting: "Se șterge...",
       cancel: "Anulează",
+      close: "Închide",
       apply: "Aplică",
       backToList: "Înapoi la scutere",
       viewDetails: "Vezi {name}",
@@ -512,8 +558,6 @@ export const scootersCatalog = {
           "Capacitatea cilindrică este permisă doar pentru scuterele cu combustie.",
         invalidPlateNumber:
           "Numărul de înmatriculare nu corespunde tipului selectat.",
-        purchasedOnPastOrToday:
-          "Data achiziției trebuie să fie astăzi sau mai veche.",
         registeredOnPastOrToday:
           "Data înmatriculării trebuie să fie astăzi sau mai veche.",
         registrationExpiresOnAfterRegisteredOn:
@@ -529,8 +573,10 @@ export const scootersCatalog = {
     detail: {
       description: "Înregistrare scuter",
       emptyValue: "Necompletat",
+      purchaseNotRecorded: "Neînregistrat",
       fields: {
         scooterId: "ID scuter",
+        purchasePrice: "Preț de achiziție",
         createdAt: "Creat",
         updatedAt: "Actualizat",
         deletedAt: "Șters",
@@ -853,8 +899,7 @@ export const scootersCatalog = {
       model: "NMAX",
       color: "Alb",
       manufactureYear: "2026",
-      purchasedOn: "ZZ/LL/AAAA",
-      engineType: "Monocilindric",
+      engineType: "GY6",
       engineCc: "125",
       powerKw: "8,5",
       currentMileageKm: "4200",
@@ -928,6 +973,50 @@ export const scootersCatalog = {
       next: "Următor",
       nextAria: "Mergi la pagina următoare",
       more: "Mai multe pagini",
+    },
+    brandPicker: {
+      placeholder: "Selectează brandul",
+      search: "Caută branduri",
+      empty: "Niciun brand găsit",
+      addNew: "Adaugă brand nou",
+    },
+    brands: {
+      list: {
+        createButton: "Adaugă brand nou",
+        empty: "Niciun brand găsit.",
+        scooterCount:
+          "{count, plural, =0 {Niciun scuter} one {# scuter} few {# scutere} other {# de scutere}}",
+        delete: "Șterge brandul",
+        deleteBlocked:
+          "Acest brand este folosit de scutere existente și nu poate fi șters.",
+        deleteError: "Brandul nu a putut fi șters.",
+      },
+      columns: {
+        name: "Nume",
+      },
+      create: {
+        title: "Adaugă brand nou",
+      },
+      edit: {
+        title: "Editează brandul",
+        description: "Actualizează numele și codul brandului.",
+        trigger: "Editează brandul",
+      },
+      form: {
+        name: "Nume",
+        code: "Cod",
+        submit: "Creează brandul",
+        save: "Salvează",
+        error: "Brandul nu a putut fi salvat.",
+        inUseWarning:
+          "{count, plural, one {# scuter folosește} few {# scutere folosesc} other {# de scutere folosesc}} acest brand. Dacă schimbi codul, etichetele deja printate trebuie reprintate.",
+      },
+      confirm: {
+        title: "Sigur vrei să modifici acest brand?",
+        description:
+          "Scutere existente folosesc deja acest brand. Dacă schimbi numele sau codul, etichetele deja printate nu se vor mai potrivi și trebuie reprintate.",
+        confirm: "Da, salvează modificările",
+      },
     },
   },
 } as const;

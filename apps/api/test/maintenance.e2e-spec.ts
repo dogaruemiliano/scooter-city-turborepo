@@ -48,6 +48,8 @@ describe("Scooter maintenance HTTP surface (e2e)", () => {
   const createdUserIds: string[] = [];
   const createdScooterIds: string[] = [];
   const createdMaintenanceTypeIds: string[] = [];
+  const createdBrandIds: string[] = [];
+  let hondaBrand: { id: string; name: string };
   const maintenanceTypes = {} as Record<
     MaintenanceTypeKey,
     MaintenanceTypeFixture
@@ -128,6 +130,12 @@ describe("Scooter maintenance HTTP surface (e2e)", () => {
       intervalKm: null,
       intervalMonths: null,
     });
+
+    const brand = await prisma.scooterBrand.create({
+      data: { name: `Honda-${runToken}`, code: `HND${runToken.slice(-3)}` },
+    });
+    createdBrandIds.push(brand.id);
+    hondaBrand = { id: brand.id, name: brand.name };
   });
 
   afterAll(async () => {
@@ -140,6 +148,11 @@ describe("Scooter maintenance HTTP surface (e2e)", () => {
       });
       await prisma.scooter.deleteMany({
         where: { id: { in: createdScooterIds } },
+      });
+    }
+    if (prisma && createdBrandIds.length > 0) {
+      await prisma.scooterBrand.deleteMany({
+        where: { id: { in: createdBrandIds } },
       });
     }
     if (prisma && createdMaintenanceTypeIds.length > 0) {
@@ -207,12 +220,11 @@ describe("Scooter maintenance HTTP surface (e2e)", () => {
   ): v1.scooters.CreateScooterInput {
     return {
       vin: uniqueVin(),
-      brand: "Honda",
+      brandId: hondaBrand.id,
       model: "PCX 125",
       manufactureYear: 2025,
       powertrainType: "combustion",
       engineCc: 125,
-      purchasedOn: "2026-01-10",
       ...overrides,
     };
   }

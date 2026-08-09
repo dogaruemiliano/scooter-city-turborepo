@@ -770,6 +770,7 @@ model ExpenseScooterAllocation {
   scooter              Scooter  @relation(fields: [scooterId], references: [id], onDelete: Restrict)
   allocatedGrossAmount Decimal  @db.Decimal(19, 2)
   createdAt            DateTime @default(now())
+  purchasingScooter    Scooter? @relation("ScooterPurchaseAllocation")
 
   @@unique([expenseId, scooterId])
   @@index([scooterId])
@@ -968,11 +969,23 @@ model PersonDocumentPhoto {
   @@index([slot])
 }
 
+/// Scooter brand/manufacturer catalog. `code` is a short curated identifier
+/// (not derived automatically) used as part of the printed fleet sticker.
+model ScooterBrand {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  code      String    @unique
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  scooters  Scooter[]
+}
+
 /// Scooter inventory record with Romanian registration metadata.
 model Scooter {
   id                        String                     @id @default(cuid())
   vin                       String                     @unique
-  brand                     String
+  brandId                   String
+  brand                     ScooterBrand               @relation(fields: [brandId], references: [id], onDelete: Restrict)
   model                     String
   color                     String?
   manufactureYear           Int
@@ -980,7 +993,6 @@ model Scooter {
   engineType                String?
   engineCc                  Int?
   powerKw                   Float?
-  purchasedOn               DateTime                   @db.Date
   registrationType          String                     @default("unregistered")
   plateNumber               String?
   plateNumberNormalized     String?
@@ -997,14 +1009,18 @@ model Scooter {
   maintenanceRecords        MaintenanceRecord[]
   expenseAllocations        ExpenseScooterAllocation[]
   sale                      ScooterSale?
+  /// The single ExpenseScooterAllocation (if any) whose expense is a posted
+  /// scooter-purchase expense. Set/cleared by ExpensesService when the
+  /// linked expense is posted/reversed; never edited directly.
+  purchaseAllocationId      String?                    @unique
+  purchaseAllocation        ExpenseScooterAllocation?  @relation("ScooterPurchaseAllocation", fields: [purchaseAllocationId], references: [id], onDelete: SetNull)
 
   @@unique([plateNumberNormalized], map: "Scooter_active_plateNumberNormalized_key", where: raw("\"deletedAt\" IS NULL AND \"plateNumberNormalized\" IS NOT NULL"))
   @@index([deletedAt])
   @@index([powertrainType, deletedAt])
   @@index([registrationType, deletedAt])
   @@index([requiredDriverLicenseType, deletedAt])
-  @@index([brand, model])
-  @@index([purchasedOn])
+  @@index([brandId, model])
 }
 
 /// One scooter sold to a buyer. Compact v1: at most one sale per scooter.
