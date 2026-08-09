@@ -130,14 +130,23 @@ export const financeCatalog = {
         phoneCountry: "Phone country",
         address: "Address",
         city: "City",
-        countryCode: "Country code",
+        country: "Country",
         notes: "Notes",
       },
+      countryPicker: {
+        search: "Search countries",
+        clearSearch: "Clear search",
+        empty: "No countries found",
+      },
       form: {
+        sections: {
+          identity: "Identity",
+          registration: "Registration",
+          contact: "Contact",
+          address: "Address",
+        },
         createTitle: "Add company",
         editTitle: "Edit company",
-        description:
-          "Company counterparties are organizations you pay, invoice, or track obligations for. They are not wallets.",
         invalid: "Check the company details and try again.",
       },
       detail: {
@@ -1136,14 +1145,23 @@ export const financeCatalog = {
         phoneCountry: "Țară telefon",
         address: "Adresă",
         city: "Oraș",
-        countryCode: "Cod țară",
+        country: "Țară",
         notes: "Notițe",
       },
+      countryPicker: {
+        search: "Caută țări",
+        clearSearch: "Șterge căutarea",
+        empty: "Nicio țară găsită",
+      },
       form: {
+        sections: {
+          identity: "Identitate",
+          registration: "Înregistrare",
+          contact: "Contact",
+          address: "Adresă",
+        },
         createTitle: "Adaugă companie",
         editTitle: "Editează compania",
-        description:
-          "Companiile sunt organizațiile pe care le plătești, le facturezi sau pentru care urmărești obligații. Nu sunt portofele.",
         invalid: "Verifică datele companiei și încearcă din nou.",
       },
       detail: {

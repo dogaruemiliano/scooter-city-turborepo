@@ -4,12 +4,12 @@ import {
   Input,
   PhoneNumberInput,
   type PhoneNumberInputChangeDetails,
+  FormSection,
 } from "@repo/ui/components";
 import { useTranslations } from "next-intl";
 
 import { fieldErrorId, invalidAria } from "./errors";
 import { FormField } from "./FormField";
-import { FormSection } from "./FormSection";
 import { Under18Warning } from "./Under18Warning";
 import type {
   CreatePersonFormState,

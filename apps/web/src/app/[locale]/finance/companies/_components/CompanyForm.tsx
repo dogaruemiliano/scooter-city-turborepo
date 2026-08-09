@@ -6,6 +6,9 @@ import {
   AlertDescription,
   Button,
   buttonVariants,
+  CountrySheetSelect,
+  DEFAULT_COUNTRY,
+  FormSection,
   Input,
   Label,
   PhoneNumberInput,
@@ -15,25 +18,31 @@ import {
   SelectTrigger,
   SelectValue,
   Textarea,
+  type CountryCode,
 } from "@repo/ui/components";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
-import { useId, useState, type FormEvent } from "react";
+import { useId, useState, type ComponentProps, type FormEvent } from "react";
 
+import { PageTitleOverride } from "@/components/PageTitleOverride";
 import { webApi } from "@/lib/api";
 
-const FIELDS = [
-  ["legalName", "legalName", true],
-  ["tradingName", "tradingName", false],
-  ["taxIdentifier", "taxIdentifier", false],
-  ["registrationNumber", "registrationNumber", false],
-  ["email", "email", false],
-  ["phone", "phone", false],
-  ["addressLine1", "address", false],
-  ["city", "city", false],
-  ["countryCode", "countryCode", false],
-] as const;
+/**
+ * Required marker rendered beside — not inside — the label, so the label's text
+ * stays clean for accessible-name lookups. Coloured like the label rather than
+ * destructive: it flags a field, it does not report an error.
+ */
+function RequiredLabel({ children, ...props }: ComponentProps<"label">) {
+  return (
+    <div className="flex items-center gap-1">
+      <Label {...props}>{children}</Label>
+      <span aria-hidden="true" className="text-foreground">
+        *
+      </span>
+    </div>
+  );
+}
 
 export function CompanyForm({
   company,
@@ -53,11 +62,18 @@ export function CompanyForm({
   const [legalForm, setLegalForm] = useState<v1.finance.CompanyLegalForm>(
     company?.legalForm ?? "SRL",
   );
+  const [countryCode, setCountryCode] = useState<CountryCode>(
+    (company?.countryCode as CountryCode | null) ?? DEFAULT_COUNTRY,
+  );
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const raw = { ...Object.fromEntries(form.entries()), legalForm };
+    const raw = {
+      ...Object.fromEntries(form.entries()),
+      legalForm,
+      countryCode,
+    };
     const parsed = isEdit
       ? v1.finance.updateCompanyInputSchema.safeParse(raw)
       : v1.finance.createCompanyInputSchema.safeParse(raw);
@@ -89,29 +105,26 @@ export function CompanyForm({
 
   return (
     <div className="mx-auto flex w-full max-w-screen-lg flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold">
-          {isEdit
+      <PageTitleOverride
+        title={
+          isEdit
             ? t("companies.form.editTitle")
-            : t("companies.form.createTitle")}
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          {t("companies.form.description")}
-        </p>
-      </div>
+            : t("companies.form.createTitle")
+        }
+      />
 
-      <form id={formId} onSubmit={submit} className="grid gap-6">
+      <form id={formId} onSubmit={submit} className="grid gap-8">
         {error ? (
           <Alert variant="destructive">
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         ) : null}
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <FormSection title={t("companies.form.sections.identity")}>
           <div className="grid gap-2">
-            <Label id={`${formId}-legal-form`}>
+            <RequiredLabel id={`${formId}-legal-form`}>
               {t("companies.fields.legalForm")}
-            </Label>
+            </RequiredLabel>
             <Select
               value={legalForm}
               onValueChange={(value) =>
@@ -134,38 +147,101 @@ export function CompanyForm({
               </SelectContent>
             </Select>
           </div>
-          {FIELDS.map(([name, label, required]) =>
-            name === "phone" ? (
-              <div key={name} className="grid gap-2">
-                <Label htmlFor={`${formId}-phone`}>
-                  {t("companies.fields.phone")}
-                </Label>
-                <PhoneNumberInput
-                  id={`${formId}-phone`}
-                  name="phone"
-                  locale={locale}
-                  placeholder={t("companies.fields.phone")}
-                  countrySelectLabel={t("companies.fields.phoneCountry")}
-                  numberInputLabel={t("companies.fields.phone")}
-                  defaultValue={company?.phone ?? ""}
-                  disabled={busy}
-                />
-              </div>
-            ) : (
-              <div key={name} className="grid gap-2">
-                <Label htmlFor={`${formId}-${name}`}>
-                  {t(`companies.fields.${label}`)}
-                </Label>
-                <Input
-                  id={`${formId}-${name}`}
-                  name={name}
-                  defaultValue={company?.[name] ?? ""}
-                  required={required}
-                  disabled={busy}
-                />
-              </div>
-            ),
-          )}
+          <TextField
+            formId={formId}
+            name="legalName"
+            label={t("companies.fields.legalName")}
+            defaultValue={company?.legalName ?? ""}
+            disabled={busy}
+            required
+          />
+          <TextField
+            formId={formId}
+            name="tradingName"
+            label={t("companies.fields.tradingName")}
+            defaultValue={company?.tradingName ?? ""}
+            disabled={busy}
+          />
+        </FormSection>
+
+        <FormSection title={t("companies.form.sections.registration")}>
+          <TextField
+            formId={formId}
+            name="taxIdentifier"
+            label={t("companies.fields.taxIdentifier")}
+            defaultValue={company?.taxIdentifier ?? ""}
+            disabled={busy}
+          />
+          <TextField
+            formId={formId}
+            name="registrationNumber"
+            label={t("companies.fields.registrationNumber")}
+            defaultValue={company?.registrationNumber ?? ""}
+            disabled={busy}
+          />
+        </FormSection>
+
+        <FormSection title={t("companies.form.sections.contact")}>
+          <TextField
+            formId={formId}
+            name="email"
+            label={t("companies.fields.email")}
+            defaultValue={company?.email ?? ""}
+            disabled={busy}
+          />
+          <div className="grid gap-2">
+            <Label htmlFor={`${formId}-phone`}>
+              {t("companies.fields.phone")}
+            </Label>
+            <PhoneNumberInput
+              id={`${formId}-phone`}
+              name="phone"
+              locale={locale}
+              placeholder={t("companies.fields.phone")}
+              countrySelectLabel={t("companies.fields.phoneCountry")}
+              numberInputLabel={t("companies.fields.phone")}
+              defaultValue={company?.phone ?? ""}
+              disabled={busy}
+            />
+          </div>
+        </FormSection>
+
+        <FormSection title={t("companies.form.sections.address")}>
+          <TextField
+            formId={formId}
+            name="addressLine1"
+            label={t("companies.fields.address")}
+            defaultValue={company?.addressLine1 ?? ""}
+            disabled={busy}
+          />
+          <TextField
+            formId={formId}
+            name="city"
+            label={t("companies.fields.city")}
+            defaultValue={company?.city ?? ""}
+            disabled={busy}
+          />
+          <div className="grid gap-2">
+            <Label id={`${formId}-country-label`}>
+              {t("companies.fields.country")}
+            </Label>
+            <CountrySheetSelect
+              id={`${formId}-country`}
+              labelledById={`${formId}-country-label`}
+              label={t("companies.fields.country")}
+              value={countryCode}
+              locale={locale}
+              onValueChange={setCountryCode}
+              disabled={busy}
+              searchPlaceholder={t("companies.countryPicker.search")}
+              clearSearchLabel={t("companies.countryPicker.clearSearch")}
+              emptyMessage={t("companies.countryPicker.empty")}
+              closeLabel={t("common.close")}
+            />
+          </div>
+        </FormSection>
+
+        <FormSection>
           <div className="grid gap-2 sm:col-span-2">
             <Label htmlFor={`${formId}-notes`}>
               {t("companies.fields.notes")}
@@ -177,7 +253,7 @@ export function CompanyForm({
               disabled={busy}
             />
           </div>
-        </div>
+        </FormSection>
 
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <Link
@@ -195,6 +271,41 @@ export function CompanyForm({
           </Button>
         </div>
       </form>
+    </div>
+  );
+}
+
+function TextField({
+  formId,
+  name,
+  label,
+  defaultValue,
+  disabled,
+  required,
+}: {
+  formId: string;
+  name: string;
+  label: string;
+  defaultValue: string;
+  disabled?: boolean;
+  required?: boolean;
+}) {
+  const id = `${formId}-${name}`;
+
+  return (
+    <div className="grid gap-2">
+      {required ? (
+        <RequiredLabel htmlFor={id}>{label}</RequiredLabel>
+      ) : (
+        <Label htmlFor={id}>{label}</Label>
+      )}
+      <Input
+        id={id}
+        name={name}
+        defaultValue={defaultValue}
+        required={required}
+        disabled={disabled}
+      />
     </div>
   );
 }

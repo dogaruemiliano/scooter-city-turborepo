@@ -7,6 +7,8 @@ import {
   AlertTitle,
   Button,
   buttonVariants,
+  CountrySheetSelect,
+  FormSection,
   Label,
   PhoneNumberInput,
 } from "@repo/ui/components";
@@ -31,6 +33,7 @@ export function PersonEditForm({ person, personHref }: PersonEditFormProps) {
   const locale = useLocale();
   const router = useRouter();
   const phoneId = useId();
+  const countryId = useId();
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(() => personFormState(person));
   const [error, setError] = useState<string | null>(null);
@@ -89,7 +92,7 @@ export function PersonEditForm({ person, personHref }: PersonEditFormProps) {
   return (
     <div className="mx-auto flex w-full max-w-screen-lg flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
       <form
-        className="grid gap-6"
+        className="grid gap-8"
         noValidate
         onSubmit={(event) => void submit(event)}
       >
@@ -100,7 +103,7 @@ export function PersonEditForm({ person, personHref }: PersonEditFormProps) {
           </Alert>
         ) : null}
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <FormSection title={t("sections.contact")}>
           <TextInputField
             label={t("fields.firstName")}
             value={form.firstName}
@@ -135,11 +138,26 @@ export function PersonEditForm({ person, personHref }: PersonEditFormProps) {
             value={form.dateOfBirth}
             onChange={(value) => setValue("dateOfBirth", value)}
           />
-          <TextInputField
-            label={t("fields.countryCode")}
-            value={form.countryCode}
-            onChange={(value) => setValue("countryCode", value)}
-          />
+        </FormSection>
+
+        <FormSection title={t("sections.address")}>
+          <div className="grid gap-2">
+            <Label id={`${countryId}-label`}>{t("fields.country")}</Label>
+            <CountrySheetSelect
+              id={countryId}
+              label={t("fields.country")}
+              labelledById={`${countryId}-label`}
+              locale={locale}
+              value={form.countryCode}
+              placeholder={t("placeholders.country")}
+              onValueChange={(value) => setValue("countryCode", value)}
+              disabled={saving}
+              searchPlaceholder={t("countryPicker.search")}
+              clearSearchLabel={t("countryPicker.clearSearch")}
+              emptyMessage={t("countryPicker.empty")}
+              closeLabel={t("actions.close")}
+            />
+          </div>
           <TextInputField
             label={t("fields.region")}
             value={form.region}
@@ -167,13 +185,16 @@ export function PersonEditForm({ person, personHref }: PersonEditFormProps) {
             className="sm:col-span-2"
             onChange={(value) => setValue("addressLine2", value)}
           />
+        </FormSection>
+
+        <FormSection>
           <TextareaField
             label={t("fields.notes")}
             value={form.notes}
             className="sm:col-span-2"
             onChange={(value) => setValue("notes", value)}
           />
-        </div>
+        </FormSection>
 
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <Link
