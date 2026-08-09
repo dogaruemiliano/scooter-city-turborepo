@@ -1,7 +1,14 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
+import { CalendarIcon } from "lucide-react";
 
+import { Button } from "@repo/ui/components/button";
+import {
+  CalendarPicker,
+  type CalendarPickerLabels,
+} from "@repo/ui/components/calendar-picker";
 import { Input } from "@repo/ui/components/input";
 import {
   buildDateOnly,
@@ -11,7 +18,21 @@ import {
 } from "@repo/ui/lib/date-parts";
 import { cn } from "@repo/ui/lib/utils";
 
-export interface DatePartsInputProps {
+/** Props shared by the typed date parts and the calendar picker beside them. */
+export interface DatePartsCalendarProps {
+  /** Accessible name of the button that opens the calendar. */
+  calendarTriggerLabel?: string;
+  /** Calendar surface heading. Defaults to the field label. */
+  calendarTitle?: ReactNode;
+  calendarDescription?: ReactNode;
+  calendarLabels?: CalendarPickerLabels;
+  maxYear?: number;
+  minYear?: number;
+}
+
+const DEFAULT_CALENDAR_TRIGGER_LABEL = "Open calendar";
+
+export interface DatePartsInputProps extends DatePartsCalendarProps {
   baseId: string;
   "aria-describedby"?: string;
   className?: string;
@@ -27,9 +48,15 @@ export interface DatePartsInputProps {
 export function DatePartsInput({
   baseId,
   "aria-describedby": ariaDescribedBy,
+  calendarDescription,
+  calendarLabels,
+  calendarTitle,
+  calendarTriggerLabel = DEFAULT_CALENDAR_TRIGGER_LABEL,
   className,
   disabled = false,
   invalid = false,
+  maxYear,
+  minYear,
   required = false,
   label,
   locale,
@@ -130,11 +157,32 @@ export function DatePartsInput({
         className="min-w-0 flex-1"
         onChange={(event) => changePart("year", event.target.value, 4)}
       />
+      <CalendarPicker
+        description={calendarDescription}
+        labels={calendarLabels}
+        locale={locale}
+        maxYear={maxYear}
+        minYear={minYear}
+        title={calendarTitle ?? label}
+        value={buildDateOnly(value).value ?? null}
+        onValueChange={(nextValue) => onChange(dateOnlyToDateParts(nextValue))}
+        renderTrigger={
+          <Button
+            aria-label={calendarTriggerLabel}
+            className="shrink-0"
+            disabled={disabled}
+            size="icon"
+            type="button"
+            variant="outline"
+          />
+        }
+        triggerLabel={<CalendarIcon aria-hidden="true" />}
+      />
     </div>
   );
 }
 
-export interface DatePartsFieldProps {
+export interface DatePartsFieldProps extends DatePartsCalendarProps {
   baseId: string;
   "aria-describedby"?: string;
   className?: string;
@@ -156,12 +204,18 @@ export interface DatePartsFieldProps {
 export function DatePartsField({
   baseId,
   "aria-describedby": ariaDescribedBy,
+  calendarDescription,
+  calendarLabels,
+  calendarTitle,
+  calendarTriggerLabel,
   className,
   defaultValue,
   disabled,
   invalid,
   label,
   locale,
+  maxYear,
+  minYear,
   name,
   onChange,
   required,
@@ -191,9 +245,15 @@ export function DatePartsField({
       <DatePartsInput
         baseId={baseId}
         aria-describedby={ariaDescribedBy}
+        calendarDescription={calendarDescription}
+        calendarLabels={calendarLabels}
+        calendarTitle={calendarTitle}
+        calendarTriggerLabel={calendarTriggerLabel}
         className={className}
         disabled={disabled}
         invalid={invalid}
+        maxYear={maxYear}
+        minYear={minYear}
         required={required}
         label={label}
         locale={locale}

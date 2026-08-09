@@ -17,7 +17,6 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-  DatePartsField,
   Dialog,
   DialogClose,
   DialogContent,
@@ -70,6 +69,7 @@ import {
 } from "../_lib/scooter-sale-api";
 import { ScooterBuyerSelect } from "./ScooterBuyerSelect";
 import { FeedbackAlert } from "./ScooterCreateForm";
+import { DatePartsField } from "@/components/DateField";
 
 interface ScooterSalesSectionProps {
   scooter: v1.scooters.Scooter;

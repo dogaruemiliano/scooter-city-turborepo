@@ -9,7 +9,6 @@ import {
   BottomSheetTitle,
   Button,
   CountrySelect,
-  DatePartsInput,
   Input,
   Select,
   SelectContent,
@@ -34,6 +33,7 @@ import type {
   SetPersonDocumentValue,
 } from "./types";
 import { Under18Warning } from "./Under18Warning";
+import { DatePartsInput } from "@/components/DateField";
 
 const documentPhotoSlots = [
   "front",

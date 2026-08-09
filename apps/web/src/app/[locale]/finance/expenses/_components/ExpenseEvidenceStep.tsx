@@ -9,7 +9,6 @@ import {
   AlertDescription,
   AlertTitle,
   Button,
-  DatePartsField,
   Input,
   Label,
   Select,
@@ -32,6 +31,7 @@ import {
   type ExpenseFormState,
 } from "../_lib/expense-form";
 import { ExpenseEvidencePicker } from "./ExpenseEvidencePicker";
+import { DatePartsField } from "@/components/DateField";
 
 const ADVANCED_DOCUMENT_ITEM = "advanced-document-details";
 

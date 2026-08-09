@@ -6,7 +6,6 @@ import {
   AlertDescription,
   AlertTitle,
   buttonVariants,
-  DatePartsField,
   Input,
   Label,
   Select,
@@ -32,6 +31,7 @@ import { ListSearchInput } from "@/components/ListSearchInput";
 import { ListSortSelect } from "@/components/ListSortSelect";
 import { webApi } from "@/lib/api";
 import { PersonList } from "./PersonList";
+import { DatePartsField } from "@/components/DateField";
 
 interface PersonsPageProps {
   createHref: string;

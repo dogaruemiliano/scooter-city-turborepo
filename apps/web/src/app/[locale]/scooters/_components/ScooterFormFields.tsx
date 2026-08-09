@@ -3,7 +3,6 @@
 import { v1 } from "@repo/api-shared";
 import {
   Button,
-  DatePartsInput,
   Input,
   Label,
   Select,
@@ -19,6 +18,7 @@ import type { ComponentProps, ReactNode } from "react";
 
 import { BrandSelect } from "./BrandSelect";
 import type { ScooterFormErrors, ScooterFormState } from "./scooter-form";
+import { DatePartsInput } from "@/components/DateField";
 
 interface ScooterFormFieldsProps {
   formId: string;

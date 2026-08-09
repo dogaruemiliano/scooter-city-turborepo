@@ -9,7 +9,6 @@ import {
   AlertDescription,
   AlertTitle,
   Button,
-  DatePartsField,
   Input,
   InputGroup,
   InputGroupInput,
@@ -51,6 +50,7 @@ import {
 import { ExpenseCategorySelect } from "./ExpenseCategorySelect";
 import { ExpenseCounterpartySelect } from "./ExpenseCounterpartySelect";
 import { ExpenseScooterAllocationEditor } from "./ExpenseScooterAllocationEditor";
+import { DatePartsField } from "@/components/DateField";
 
 interface ExpenseDetailsStepProps {
   bootstrap: ExpenseFormBootstrap;

@@ -8,6 +8,15 @@ import {
   ChevronRightIcon,
 } from "lucide-react";
 
+import {
+  BottomSheet,
+  BottomSheetBody,
+  BottomSheetContent,
+  BottomSheetDescription,
+  BottomSheetHeader,
+  BottomSheetTitle,
+  BottomSheetTrigger,
+} from "@repo/ui/components/bottom-sheet";
 import { Button } from "@repo/ui/components/button";
 import { Card, CardContent } from "@repo/ui/components/card";
 import {
@@ -18,14 +27,6 @@ import {
   PopoverTitle,
   PopoverTrigger,
 } from "@repo/ui/components/popover";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@repo/ui/components/sheet";
 import { useIsMobile } from "@repo/ui/hooks/use-mobile";
 import { cn } from "@repo/ui/lib/utils";
 
@@ -54,6 +55,25 @@ type CalendarView = {
 
 type CalendarPickerMode = "calendar" | "month-year";
 
+/** Accessible names for the picker chrome, so apps can localize them. */
+export type CalendarPickerLabels = {
+  chooseMonthAndYear: string;
+  done: string;
+  month: string;
+  nextMonth: string;
+  previousMonth: string;
+  year: string;
+};
+
+const DEFAULT_LABELS: CalendarPickerLabels = {
+  chooseMonthAndYear: "Choose month and year",
+  done: "Done",
+  month: "Month",
+  nextMonth: "Next month",
+  previousMonth: "Previous month",
+  year: "Year",
+};
+
 export type CalendarPickerProps = {
   title: React.ReactNode;
   renderTrigger: React.ReactElement;
@@ -64,6 +84,7 @@ export type CalendarPickerProps = {
   defaultSelectorOpen?: boolean;
   defaultValue?: string | null;
   description?: React.ReactNode;
+  labels?: CalendarPickerLabels;
   locale?: string;
   maxYear?: number;
   minYear?: number;
@@ -82,6 +103,7 @@ export function CalendarPicker({
   defaultSelectorOpen = false,
   defaultValue = null,
   description,
+  labels = DEFAULT_LABELS,
   locale,
   maxYear = DEFAULT_MAX_YEAR,
   minYear = DEFAULT_MIN_YEAR,
@@ -161,6 +183,7 @@ export function CalendarPicker({
     <CalendarPickerPanel
       className={contentClassName}
       description={description}
+      labels={labels}
       locale={resolvedLocale}
       mode={mode}
       onModeChange={setMode}
@@ -178,19 +201,12 @@ export function CalendarPicker({
 
   if (isMobile) {
     return (
-      <Sheet open={resolvedOpen} onOpenChange={setResolvedOpen}>
-        <SheetTrigger render={renderTrigger}>{triggerLabel}</SheetTrigger>
-        <SheetContent
-          side="bottom"
-          className={cn(
-            "max-h-[calc(100svh-var(--spacing-8))] overflow-y-auto rounded-t-2xl p-4 pb-6",
-            className,
-          )}
-          showCloseButton={false}
-        >
-          {panel}
-        </SheetContent>
-      </Sheet>
+      <BottomSheet open={resolvedOpen} onOpenChange={setResolvedOpen}>
+        <BottomSheetTrigger render={renderTrigger}>
+          {triggerLabel}
+        </BottomSheetTrigger>
+        <BottomSheetContent className={className}>{panel}</BottomSheetContent>
+      </BottomSheet>
     );
   }
 
@@ -210,6 +226,7 @@ export function CalendarPicker({
 function CalendarPickerPanel({
   className,
   description,
+  labels,
   locale,
   mode,
   onModeChange,
@@ -225,6 +242,7 @@ function CalendarPickerPanel({
 }: {
   className?: string;
   description?: React.ReactNode;
+  labels: CalendarPickerLabels;
   locale: string;
   mode: CalendarPickerMode;
   onModeChange: (mode: CalendarPickerMode) => void;
@@ -238,65 +256,82 @@ function CalendarPickerPanel({
   weekStartsOn: 0 | 1;
   yearRange: YearRange;
 }) {
-  return (
-    <div className={cn("flex flex-col gap-4", className)}>
-      {surface === "sheet" ? (
-        <SheetHeader className="items-center p-0 text-center">
-          <SheetTitle className="text-2xl font-bold">{title}</SheetTitle>
-          {description ? (
-            <SheetDescription className="max-w-prose">
-              {description}
-            </SheetDescription>
-          ) : null}
-        </SheetHeader>
-      ) : (
-        <PopoverHeader className="items-center text-center">
-          <PopoverTitle className="text-lg font-semibold">{title}</PopoverTitle>
-          {description ? (
-            <PopoverDescription className="max-w-prose">
-              {description}
-            </PopoverDescription>
-          ) : null}
-        </PopoverHeader>
-      )}
+  const calendar = (
+    <Card className="border-transparent bg-muted py-4 shadow-none">
+      <CardContent className="flex flex-col gap-5 px-3">
+        <CalendarHeader
+          labels={labels}
+          locale={locale}
+          mode={mode}
+          onModeChange={onModeChange}
+          onViewChange={onViewChange}
+          view={view}
+          yearRange={yearRange}
+        />
 
-      <Card className="border-transparent bg-muted py-4 shadow-none">
-        <CardContent className="flex flex-col gap-5 px-3">
-          <CalendarHeader
+        {mode === "month-year" ? (
+          <MonthYearSelector
+            labels={labels}
             locale={locale}
-            mode={mode}
-            onModeChange={onModeChange}
+            onDone={() => onModeChange("calendar")}
             onViewChange={onViewChange}
             view={view}
             yearRange={yearRange}
           />
+        ) : (
+          <MonthGrid
+            locale={locale}
+            onSelectDate={onSelectDate}
+            selectedDate={selectedDate}
+            todayDate={todayDate}
+            view={view}
+            weekStartsOn={weekStartsOn}
+            yearRange={yearRange}
+          />
+        )}
+      </CardContent>
+    </Card>
+  );
 
-          {mode === "month-year" ? (
-            <MonthYearSelector
-              locale={locale}
-              onDone={() => onModeChange("calendar")}
-              onViewChange={onViewChange}
-              view={view}
-              yearRange={yearRange}
-            />
-          ) : (
-            <MonthGrid
-              locale={locale}
-              onSelectDate={onSelectDate}
-              selectedDate={selectedDate}
-              todayDate={todayDate}
-              view={view}
-              weekStartsOn={weekStartsOn}
-              yearRange={yearRange}
-            />
-          )}
-        </CardContent>
-      </Card>
+  if (surface === "sheet") {
+    return (
+      <>
+        <BottomSheetHeader className="items-center text-center">
+          <BottomSheetTitle className="text-2xl font-bold">
+            {title}
+          </BottomSheetTitle>
+          {description ? (
+            <BottomSheetDescription className="max-w-prose">
+              {description}
+            </BottomSheetDescription>
+          ) : null}
+        </BottomSheetHeader>
+
+        <BottomSheetBody className={className} safeAreaBottom>
+          {calendar}
+        </BottomSheetBody>
+      </>
+    );
+  }
+
+  return (
+    <div className={cn("flex flex-col gap-4", className)}>
+      <PopoverHeader className="items-center text-center">
+        <PopoverTitle className="text-lg font-semibold">{title}</PopoverTitle>
+        {description ? (
+          <PopoverDescription className="max-w-prose">
+            {description}
+          </PopoverDescription>
+        ) : null}
+      </PopoverHeader>
+
+      {calendar}
     </div>
   );
 }
 
 function CalendarHeader({
+  labels,
   locale,
   mode,
   onModeChange,
@@ -304,6 +339,7 @@ function CalendarHeader({
   view,
   yearRange,
 }: {
+  labels: CalendarPickerLabels;
   locale: string;
   mode: CalendarPickerMode;
   onModeChange: (mode: CalendarPickerMode) => void;
@@ -321,7 +357,7 @@ function CalendarHeader({
   return (
     <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2">
       <Button
-        aria-label="Previous month"
+        aria-label={labels.previousMonth}
         disabled={selectorOpen || !canGoPrevious}
         onClick={() => onViewChange(previousView)}
         size="icon-lg"
@@ -333,7 +369,7 @@ function CalendarHeader({
 
       <Button
         aria-expanded={selectorOpen}
-        aria-label="Choose month and year"
+        aria-label={labels.chooseMonthAndYear}
         className={cn(
           "justify-self-center text-lg font-semibold",
           selectorOpen && "text-primary hover:text-primary",
@@ -353,7 +389,7 @@ function CalendarHeader({
       </Button>
 
       <Button
-        aria-label="Next month"
+        aria-label={labels.nextMonth}
         disabled={selectorOpen || !canGoNext}
         onClick={() => onViewChange(nextView)}
         size="icon-lg"
@@ -463,12 +499,14 @@ function MonthGrid({
 }
 
 function MonthYearSelector({
+  labels,
   locale,
   onDone,
   onViewChange,
   view,
   yearRange,
 }: {
+  labels: CalendarPickerLabels;
   locale: string;
   onDone: () => void;
   onViewChange: (view: CalendarView) => void;
@@ -508,7 +546,7 @@ function MonthYearSelector({
           className="pointer-events-none absolute inset-x-0 top-1/2 z-raised h-12 -translate-y-1/2 rounded-full bg-secondary"
         />
         <WheelColumn
-          ariaLabel="Month"
+          ariaLabel={labels.month}
           onScrollValueChange={(monthIndex) =>
             onViewChange({ ...view, monthIndex })
           }
@@ -518,7 +556,7 @@ function MonthYearSelector({
           selectedValue={view.monthIndex}
         />
         <WheelColumn
-          ariaLabel="Year"
+          ariaLabel={labels.year}
           onScrollValueChange={(year) => onViewChange({ ...view, year })}
           onSelect={(year) => onViewChange({ ...view, year })}
           options={yearOptions}
@@ -528,7 +566,7 @@ function MonthYearSelector({
       </div>
 
       <Button className="mt-5 w-full" onClick={onDone} type="button">
-        Done
+        {labels.done}
       </Button>
     </div>
   );
@@ -855,18 +893,32 @@ function formatDateOnly(date: DateOnly): string {
 }
 
 function formatMonthYear(view: CalendarView, locale: string): string {
-  return new Intl.DateTimeFormat(locale, {
-    month: "long",
-    timeZone: "UTC",
-    year: "numeric",
-  }).format(new Date(Date.UTC(view.year, view.monthIndex, 1)));
+  return capitalizeFirst(
+    new Intl.DateTimeFormat(locale, {
+      month: "long",
+      timeZone: "UTC",
+      year: "numeric",
+    }).format(new Date(Date.UTC(view.year, view.monthIndex, 1))),
+    locale,
+  );
 }
 
 function formatMonthName(monthIndex: number, locale: string): string {
-  return new Intl.DateTimeFormat(locale, {
-    month: "long",
-    timeZone: "UTC",
-  }).format(new Date(Date.UTC(2026, monthIndex, 1)));
+  return capitalizeFirst(
+    new Intl.DateTimeFormat(locale, {
+      month: "long",
+      timeZone: "UTC",
+    }).format(new Date(Date.UTC(2026, monthIndex, 1))),
+    locale,
+  );
+}
+
+/**
+ * Locales such as Romanian format month names in lower case; the picker
+ * presents them as standalone labels, so lift the first letter.
+ */
+function capitalizeFirst(value: string, locale: string): string {
+  return value.slice(0, 1).toLocaleUpperCase(locale) + value.slice(1);
 }
 
 function formatFullDate(date: DateOnly, locale: string): string {

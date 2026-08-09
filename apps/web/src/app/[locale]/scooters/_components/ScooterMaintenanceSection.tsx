@@ -20,7 +20,6 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-  DatePartsField,
   Field,
   FieldDescription,
   FieldError,
@@ -51,6 +50,7 @@ import { useId, useState, type FormEvent, type ReactNode } from "react";
 
 import { webApi } from "@/lib/api";
 import { FeedbackAlert } from "./ScooterCreateForm";
+import { DatePartsField } from "@/components/DateField";
 
 interface ScooterMaintenanceSectionProps {
   scooter: v1.scooters.Scooter;

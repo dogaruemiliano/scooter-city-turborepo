@@ -3,7 +3,6 @@
 import {
   Input,
   PhoneNumberInput,
-  DatePartsInput,
   type PhoneNumberInputChangeDetails,
 } from "@repo/ui/components";
 import { useTranslations } from "next-intl";
@@ -17,6 +16,7 @@ import type {
   FormErrors,
   SetPersonFormValue,
 } from "./types";
+import { DatePartsInput } from "@/components/DateField";
 
 export function ContactSection({
   formId,

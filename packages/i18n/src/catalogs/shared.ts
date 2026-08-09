@@ -7,6 +7,15 @@ export const sharedCatalog = {
       loadMore: "Load more",
       retry: "Retry",
     },
+    datePicker: {
+      chooseMonthAndYear: "Choose month and year",
+      done: "Done",
+      month: "Month",
+      nextMonth: "Next month",
+      open: "Open calendar",
+      previousMonth: "Previous month",
+      year: "Year",
+    },
     errors: {
       forbidden: "You do not have access to this resource.",
       generic: "Something went wrong. Please try again.",
@@ -27,6 +36,15 @@ export const sharedCatalog = {
       continue: "Continuă",
       loadMore: "Încarcă mai multe",
       retry: "Încearcă din nou",
+    },
+    datePicker: {
+      chooseMonthAndYear: "Alege luna și anul",
+      done: "Gata",
+      month: "Luna",
+      nextMonth: "Luna următoare",
+      open: "Deschide calendarul",
+      previousMonth: "Luna anterioară",
+      year: "Anul",
     },
     errors: {
       forbidden: "Nu ai acces la această resursă.",
