@@ -87,6 +87,8 @@ export function BrandSelect({
               type="button"
               id={id}
               disabled={disabled}
+              // eslint-disable-next-line jsx-a11y/role-supports-aria-props -- this trigger gates a required selection, so assistive tech benefits from aria-required despite the strict role=button mapping
+              aria-required={required || undefined}
               data-invalid={error ? true : undefined}
               aria-describedby={error ? `${id}-error` : undefined}
               className="flex w-full items-center justify-between gap-2 rounded-lg border border-input bg-background px-3 py-2 text-base text-left outline-none transition-colors duration-fast ease-standard focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:bg-disabled disabled:text-disabled-foreground data-invalid:border-destructive data-invalid:ring-2 data-invalid:ring-destructive md:text-sm"

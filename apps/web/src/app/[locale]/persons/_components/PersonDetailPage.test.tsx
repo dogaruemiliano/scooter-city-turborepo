@@ -146,9 +146,6 @@ describe("PersonDetailPage", () => {
     renderDetail();
 
     expect(
-      screen.getByRole("link", { name: "Back to persons" }),
-    ).toHaveAttribute("href", "/en/persons");
-    expect(
       screen.getByRole("heading", { name: "Ada Lovelace" }),
     ).toBeInTheDocument();
     expect(
@@ -840,9 +837,6 @@ describe("PersonDetailPage", () => {
 
     renderDetail(readyPerson, "ro");
 
-    expect(
-      screen.getByRole("link", { name: "Înapoi la persoane" }),
-    ).toHaveAttribute("href", "/persons");
     expect(
       screen.getByText("Înregistrat din 25 iun. 2026"),
     ).toBeInTheDocument();

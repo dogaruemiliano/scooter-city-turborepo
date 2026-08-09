@@ -64,6 +64,7 @@ test("financial category creation accepts user-facing fields without a code", ()
   assert.deepEqual(parsed, {
     name: "Rental income",
     kind: "INCOME",
+    keywords: [],
     parentCategoryId: null,
   });
   assert.equal(

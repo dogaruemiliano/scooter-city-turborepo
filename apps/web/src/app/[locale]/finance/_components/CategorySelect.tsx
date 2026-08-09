@@ -163,6 +163,8 @@ export function CategorySelect({
               type="button"
               id={id}
               disabled={disabled || categories.length === 0}
+              // eslint-disable-next-line jsx-a11y/role-supports-aria-props -- this trigger gates a required selection, so assistive tech benefits from aria-required despite the strict role=button mapping
+              aria-required={required || undefined}
               data-invalid={error ? true : undefined}
               aria-describedby={error ? `${id}-error` : undefined}
               className={cn(

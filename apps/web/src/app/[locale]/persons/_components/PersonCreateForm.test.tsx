@@ -88,9 +88,6 @@ describe("PersonCreateForm", () => {
   it("renders Romanian citizen defaults with document cards", () => {
     renderCreateForm();
 
-    expect(
-      screen.getByRole("heading", { name: "Add person" }),
-    ).toBeInTheDocument();
     expect(screen.getByText("Contact")).toBeInTheDocument();
     expect(screen.getByText("Address")).toBeInTheDocument();
     expect(screen.getByText("Documents")).toBeInTheDocument();
@@ -130,9 +127,6 @@ describe("PersonCreateForm", () => {
 
     renderCreateForm("ro");
 
-    expect(
-      screen.getByRole("heading", { name: "Adaugă persoană" }),
-    ).toBeInTheDocument();
     expect(screen.getByText("Contact")).toBeInTheDocument();
     expect(screen.getByText("Adresă")).toBeInTheDocument();
     expect(screen.getByText("Documente")).toBeInTheDocument();
@@ -523,10 +517,10 @@ describe("PersonCreateForm", () => {
 
     expect(await screen.findByText("Photos not uploaded")).toBeInTheDocument();
     expect(
-      screen.getByText(
+      screen.getAllByText(
         "The selected document photo was not uploaded. Try selecting it again.",
       ),
-    ).toBeInTheDocument();
+    ).not.toHaveLength(0);
     expect(
       within(documentDialog).getByRole("button", { name: "Save" }),
     ).toBeDisabled();

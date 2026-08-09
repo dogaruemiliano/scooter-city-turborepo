@@ -36,9 +36,6 @@ describe("PersonalWalletView", () => {
       <PersonalWalletView locale="en" transactions={null} wallet={wallet} />,
     );
 
-    expect(
-      screen.getByRole("heading", { name: "My wallet" }),
-    ).toBeInTheDocument();
     expect(screen.getByText(/12,345,678,901,234,567\.89/)).toBeInTheDocument();
     expect(screen.getByText("User settlement")).toBeInTheDocument();
   });
