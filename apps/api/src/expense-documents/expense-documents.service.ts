@@ -174,6 +174,7 @@ export class ExpenseDocumentsService {
 
     const upload = await this.imageStorage.createPresignedDocumentUpload({
       ...input,
+      category: "expense-invoice",
       scope: expenseDocumentUploadScope({
         expenseId,
         documentId,

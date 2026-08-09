@@ -19,10 +19,20 @@ export type SupportedImageContentType =
 export type SupportedDocumentContentType =
   (typeof SUPPORTED_DOCUMENT_CONTENT_TYPES)[number];
 
+export const DOCUMENT_STORAGE_CATEGORIES = [
+  "personal-document",
+  "expense-invoice",
+  "scooter-sale-document",
+] as const;
+
+export type DocumentStorageCategory =
+  (typeof DOCUMENT_STORAGE_CATEGORIES)[number];
+
 export interface StoreImageInput {
   buffer: Buffer;
   contentType: string;
   byteSize: number;
+  category: DocumentStorageCategory;
 }
 
 export interface PresignImageUploadInput {
@@ -30,6 +40,7 @@ export interface PresignImageUploadInput {
   byteSize: number;
   checksumSha256: string;
   scope: string;
+  category: DocumentStorageCategory;
 }
 
 export interface PresignDocumentUploadInput extends PresignImageUploadInput {

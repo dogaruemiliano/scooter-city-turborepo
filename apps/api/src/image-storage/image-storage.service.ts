@@ -38,6 +38,7 @@ import {
   type PresignedImageUpload,
   type PresignDocumentUploadInput,
   type PresignImageUploadInput,
+  type DocumentStorageCategory,
   type ReadStoredImageResult,
   type StoredDocument,
   type StoreImageInput,
@@ -97,7 +98,7 @@ export class ImageStorageService {
     );
     this.assertValidByteSize(input.byteSize);
 
-    const storageKey = this.generateStorageKey(contentType);
+    const storageKey = this.generateStorageKey(contentType, input.category);
     const checksumSha256 = createHash("sha256")
       .update(input.buffer)
       .digest("hex");
@@ -168,7 +169,7 @@ export class ImageStorageService {
     const checksumSha256Base64 = Buffer.from(checksumSha256, "hex").toString(
       "base64",
     );
-    const storageKey = this.generateStorageKey(contentType);
+    const storageKey = this.generateStorageKey(contentType, input.category);
     const expiresAt = this.createExpiresAt();
     const requestHeaders: Record<string, string> = {
       "Content-Type": contentType,
@@ -395,14 +396,23 @@ export class ImageStorageService {
 
   private generateStorageKey(
     contentType: SupportedDocumentContentType,
+    category: DocumentStorageCategory,
   ): string {
     const now = new Date();
     const year = now.getUTCFullYear();
     const month = String(now.getUTCMonth() + 1).padStart(2, "0");
     const day = String(now.getUTCDate()).padStart(2, "0");
     const extension = CONTENT_TYPE_EXTENSIONS[contentType];
+    const fileName = `${randomUUID()}.${extension}`;
 
-    return `${this.prefix}/${year}/${month}/${day}/${randomUUID()}.${extension}`;
+    switch (category) {
+      case "personal-document":
+        return `${this.prefix}/personal-documents/${year}/${fileName}`;
+      case "expense-invoice":
+        return `${this.prefix}/invoices/${year}-${month}/${fileName}`;
+      case "scooter-sale-document":
+        return `${this.prefix}/${year}/${month}/${day}/${fileName}`;
+    }
   }
 
   private requireSha256Hex(value: string): string {

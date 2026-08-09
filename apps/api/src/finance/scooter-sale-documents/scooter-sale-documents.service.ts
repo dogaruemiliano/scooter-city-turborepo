@@ -66,6 +66,7 @@ export class ScooterSaleDocumentsService {
 
     const upload = await this.imageStorage.createPresignedDocumentUpload({
       ...input,
+      category: "scooter-sale-document",
       scope: scooterSaleDocumentUploadScope({
         scooterSaleId,
         uploadedByUserId,

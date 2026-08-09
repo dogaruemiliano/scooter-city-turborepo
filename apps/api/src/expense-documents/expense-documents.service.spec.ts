@@ -192,6 +192,7 @@ describe("ExpenseDocumentsService", () => {
       byteSize: 512,
       checksumSha256: "a".repeat(64),
       pageCount: 3,
+      category: "expense-invoice",
       scope: "expense-document:expense-1:document-1:original:user-1",
     });
   });

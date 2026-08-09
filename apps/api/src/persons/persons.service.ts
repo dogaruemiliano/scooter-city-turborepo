@@ -543,6 +543,7 @@ export class PersonsService {
         buffer: file.buffer,
         contentType: file.mimetype,
         byteSize: file.size,
+        category: "personal-document",
       });
       const result = await this.replaceDocumentPhotoWithStoredImage(
         documentId,
@@ -579,6 +580,7 @@ export class PersonsService {
 
     const upload = await this.imageStorage.createPresignedUpload({
       ...input,
+      category: "personal-document",
       scope: this.documentPhotoUploadScope(
         personId,
         documentId,
@@ -606,6 +608,7 @@ export class PersonsService {
     try {
       const upload = await this.imageStorage.createPresignedUpload({
         ...input,
+        category: "personal-document",
         scope: this.draftDocumentPhotoUploadScope(uploadedByUserId),
       });
 

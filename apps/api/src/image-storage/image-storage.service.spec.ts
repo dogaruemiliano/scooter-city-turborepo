@@ -104,6 +104,7 @@ describe("ImageStorageService", () => {
       buffer,
       contentType: "image/png",
       byteSize: buffer.length,
+      category: "personal-document",
     });
 
     expect(stored).toMatchObject({
@@ -114,7 +115,7 @@ describe("ImageStorageService", () => {
       checksumSha256: createHash("sha256").update(buffer).digest("hex"),
     });
     expect(stored.storageKey).toMatch(
-      /^document-photos-test\/\d{4}\/\d{2}\/\d{2}\/.+\.png$/,
+      /^document-photos-test\/personal-documents\/\d{4}\/.+\.png$/,
     );
 
     const command = send.mock.calls[0]?.[0] as PutObjectCommand;
@@ -141,6 +142,7 @@ describe("ImageStorageService", () => {
       buffer: Buffer.from("image-bytes"),
       contentType: "image/jpeg",
       byteSize: 11,
+      category: "personal-document",
     });
 
     const command = send.mock.calls[0]?.[0] as PutObjectCommand;
@@ -161,6 +163,7 @@ describe("ImageStorageService", () => {
         buffer: Buffer.from("image-bytes"),
         contentType: "image/png",
         byteSize: 11,
+        category: "personal-document",
       }),
     ).rejects.toMatchObject({
       response: {
@@ -173,6 +176,7 @@ describe("ImageStorageService", () => {
         buffer: Buffer.from("image-bytes"),
         contentType: "image/png",
         byteSize: 11,
+        category: "personal-document",
       }),
     ).rejects.toBeInstanceOf(ServiceUnavailableException);
   });
@@ -219,6 +223,7 @@ describe("ImageStorageService", () => {
       contentType: "image/png",
       byteSize: 6,
       checksumSha256,
+      category: "personal-document",
       scope: "person-document-photo:person-1:document-1:front:user-1",
     });
 
@@ -287,6 +292,7 @@ describe("ImageStorageService", () => {
         contentType: "image/png",
         byteSize: 6,
         checksumSha256,
+        category: "personal-document",
         scope: "person-document-photo-draft:user-1",
       }),
     ).rejects.toBeInstanceOf(ServiceUnavailableException);
@@ -326,11 +332,12 @@ describe("ImageStorageService", () => {
       byteSize: 9,
       checksumSha256,
       pageCount: 2,
+      category: "expense-invoice",
       scope: "expense-document:expense-1:document-1:original:user-1",
     });
 
     expect(upload.storageKey).toMatch(
-      /^document-photos-test\/\d{4}\/\d{2}\/\d{2}\/.+\.pdf$/,
+      /^document-photos-test\/invoices\/\d{4}-\d{2}\/.+\.pdf$/,
     );
     await expect(
       service.completePresignedUpload(
@@ -361,6 +368,7 @@ describe("ImageStorageService", () => {
         buffer: Buffer.from("text"),
         contentType: "text/plain",
         byteSize: 4,
+        category: "personal-document",
       }),
     ).rejects.toBeInstanceOf(BadRequestException);
 
@@ -369,6 +377,7 @@ describe("ImageStorageService", () => {
         buffer: Buffer.alloc(33),
         contentType: "image/jpeg",
         byteSize: 33,
+        category: "personal-document",
       }),
     ).rejects.toBeInstanceOf(PayloadTooLargeException);
 
