@@ -57,12 +57,14 @@ export default async function ScooterRoutePage({
     maintenanceTypes,
     financials,
     companyWallets,
+    brands,
   ] = await Promise.all([
     scooterFromApi(locale, id, detailPath, cookieHeader),
     maintenanceOverviewFromApi(locale, id, detailPath, cookieHeader),
     maintenanceTypesFromApi(locale, detailPath, cookieHeader),
     scooterFinancialsFromApi(locale, id, detailPath, cookieHeader),
     companyWalletOptionsFromApi(locale, detailPath, cookieHeader),
+    scooterBrandsFromApi(locale, detailPath, cookieHeader),
   ]);
 
   return (
@@ -73,6 +75,7 @@ export default async function ScooterRoutePage({
       maintenanceTypes={maintenanceTypes}
       financials={financials}
       companyWallets={companyWallets.items}
+      brands={brands.items}
     />
   );
 }
@@ -170,6 +173,22 @@ async function companyWalletOptionsFromApi(
     return await webApi.fetch(
       `${v1.finance.ROUTES.walletOptions}?${params}`,
       v1.finance.walletOptionListSchema,
+      { headers: { cookie: cookieHeader }, cache: "no-store" },
+    );
+  } catch (error) {
+    handleDetailFetchError(error, locale, detailPath);
+  }
+}
+
+async function scooterBrandsFromApi(
+  locale: ReturnType<typeof resolveRouteLocale>,
+  detailPath: string,
+  cookieHeader: string,
+): Promise<v1.scooterBrands.ScooterBrandList> {
+  try {
+    return await webApi.fetch(
+      v1.scooterBrands.ROUTES.list,
+      v1.scooterBrands.scooterBrandListSchema,
       { headers: { cookie: cookieHeader }, cache: "no-store" },
     );
   } catch (error) {

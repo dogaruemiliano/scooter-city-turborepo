@@ -17,6 +17,7 @@ import {
   LayoutDashboardIcon,
   ReceiptTextIcon,
   Settings2Icon,
+  TagIcon,
   TagsIcon,
   UsersRoundIcon,
   WalletCardsIcon,
@@ -101,6 +102,14 @@ const NAVIGATION_GROUPS = [
     ],
   },
   {
+    labelKey: "scootersGroup",
+    requiredRole: "ADMIN",
+    items: [
+      { href: "/scooters", labelKey: "scooterList", icon: BikeIcon },
+      { href: "/scooters/brands", labelKey: "scooterBrands", icon: TagIcon },
+    ],
+  },
+  {
     labelKey: "financeGroup",
     requiredRole: "ADMIN",
     items: [
@@ -172,6 +181,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/persons/new": "newPerson",
   "/scooters": "scooters",
   "/scooters/new": "newScooter",
+  "/scooters/brands": "scooterBrands",
   "/service": "service",
 };
 

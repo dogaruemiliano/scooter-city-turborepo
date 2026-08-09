@@ -25,6 +25,7 @@ import { MailerModule } from "./mailer/mailer.module";
 import { MaintenanceModule } from "./maintenance/maintenance.module";
 import { PersonsModule } from "./persons/persons.module";
 import { PrismaModule } from "./prisma/prisma.module";
+import { ScooterBrandsModule } from "./scooter-brands/scooter-brands.module";
 import { ScootersModule } from "./scooters/scooters.module";
 import { SmsModule } from "./sms/sms.module";
 import { UsersModule } from "./users/users.module";
@@ -51,6 +52,7 @@ const env = loadEnv();
     PersonsModule,
     MaintenanceModule,
     ScootersModule,
+    ScooterBrandsModule,
     FinanceModule,
     AuthModule.forRoot(buildAuthConfig(env)),
   ],
