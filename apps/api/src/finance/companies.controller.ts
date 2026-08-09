@@ -1,7 +1,9 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
+  HttpCode,
   HttpStatus,
   Param,
   Patch,
@@ -11,6 +13,7 @@ import {
 import {
   ApiBearerAuth,
   ApiCookieAuth,
+  ApiNoContentResponse,
   ApiOperation,
   ApiTags,
 } from "@nestjs/swagger";
@@ -93,5 +96,16 @@ export class CompaniesController {
     @Body() input: UpdateCompanyInput,
   ): Promise<v1.finance.Company> {
     return toCompany(await this.companies.update(id, input));
+  }
+
+  @Delete(":id")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    operationId: "CompaniesController_delete_v1",
+    summary: "Soft-delete one active company counterparty",
+  })
+  @ApiNoContentResponse()
+  async delete(@Param("id") id: string): Promise<void> {
+    await this.companies.softDelete(id);
   }
 }

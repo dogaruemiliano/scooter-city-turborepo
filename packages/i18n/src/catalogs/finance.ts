@@ -145,6 +145,12 @@ export const financeCatalog = {
         description:
           "Company details, financial activity, and linked transactions.",
         information: "Company information",
+        moreActions: "More actions",
+        delete: "Delete company",
+        deleting: "Deleting...",
+        deleteTitle: "Delete this company?",
+        deleteDescription:
+          "The company is hidden from lists and can no longer be selected as a counterparty. Existing transactions keep referencing it.",
         statistics: "Financial activity",
         statisticsDescription:
           "Posted income and expenses for the selected period.",
@@ -1145,6 +1151,12 @@ export const financeCatalog = {
         description:
           "Datele companiei, activitatea financiară și tranzacțiile asociate.",
         information: "Informații companie",
+        moreActions: "Mai multe acțiuni",
+        delete: "Șterge compania",
+        deleting: "Se șterge...",
+        deleteTitle: "Ștergi această companie?",
+        deleteDescription:
+          "Compania dispare din liste și nu mai poate fi aleasă drept contraparte. Tranzacțiile existente rămân legate de ea.",
         statistics: "Activitate financiară",
         statisticsDescription:
           "Venituri și cheltuieli înregistrate în perioada selectată.",

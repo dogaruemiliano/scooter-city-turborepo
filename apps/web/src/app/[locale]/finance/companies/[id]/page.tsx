@@ -16,7 +16,7 @@ import {
   buttonVariants,
 } from "@repo/ui/components";
 import { cn } from "@repo/ui/lib/utils";
-import { EqualIcon, MinusIcon, PencilIcon, PlusIcon } from "lucide-react";
+import { EqualIcon, MinusIcon, PlusIcon } from "lucide-react";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 
@@ -35,6 +35,7 @@ import {
   handleFinanceApiErrors,
   requireFinanceAdmin,
 } from "../../_lib/server";
+import { CompanyDetailActions } from "../_components/CompanyDetailActions";
 import { companyDisplayName } from "../_components/CompanyLegalFormIcon";
 
 const COMPANIES_PATH = "/finance/companies";
@@ -109,13 +110,11 @@ export default async function CompanyDetailPage({
             {t(company.isActive ? "common.active" : "common.inactive")}
           </Badge>
         </div>
-        <Link
-          href={localizePath(`${routePath}/edit`, locale)}
-          className={buttonVariants({ variant: "outline", size: "sm" })}
-        >
-          <PencilIcon data-icon="inline-start" />
-          {t("companies.form.editTitle")}
-        </Link>
+        <CompanyDetailActions
+          companyId={company.id}
+          companiesHref={localizePath(COMPANIES_PATH, locale)}
+          editHref={localizePath(`${routePath}/edit`, locale)}
+        />
       </div>
 
       <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">

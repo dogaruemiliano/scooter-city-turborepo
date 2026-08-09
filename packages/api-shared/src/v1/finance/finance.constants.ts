@@ -188,6 +188,7 @@ export const ROUTES = {
     create: "/v1/finance/companies",
     get: (id: string): string => `/v1/finance/companies/${id}`,
     update: (id: string): string => `/v1/finance/companies/${id}`,
+    delete: (id: string): string => `/v1/finance/companies/${id}`,
     stats: (id: string): string => `/v1/finance/companies/${id}/stats`,
   },
   transactions: {

@@ -126,3 +126,52 @@ describe("CompaniesService statistics", () => {
     );
   });
 });
+
+describe("CompaniesService soft delete", () => {
+  it("stamps deletedAt and deactivates the counterparty in one transaction", async () => {
+    const companyUpdate = jest.fn().mockResolvedValue({});
+    const counterpartyUpdate = jest.fn().mockResolvedValue({});
+    const tx = {
+      company: { update: companyUpdate },
+      counterparty: { update: counterpartyUpdate },
+    };
+    const prisma = {
+      company: {
+        findFirst: jest
+          .fn<Promise<unknown>, [unknown]>()
+          .mockResolvedValue({ id: "company-1" }),
+      },
+      $transaction: jest
+        .fn()
+        .mockImplementation((run: (client: unknown) => unknown) => run(tx)),
+    } as unknown as PrismaService;
+
+    await new CompaniesService(prisma).softDelete("company-1");
+
+    expect(companyUpdate).toHaveBeenCalledWith({
+      where: { id: "company-1" },
+      data: { deletedAt: expect.any(Date) as unknown },
+    });
+    expect(counterpartyUpdate).toHaveBeenCalledWith({
+      where: { companyId: "company-1" },
+      data: { isActive: false },
+    });
+  });
+
+  it("rejects a company that is already deleted", async () => {
+    const transaction = jest.fn();
+    const prisma = {
+      company: {
+        findFirst: jest
+          .fn<Promise<unknown>, [unknown]>()
+          .mockResolvedValue(null),
+      },
+      $transaction: transaction,
+    } as unknown as PrismaService;
+
+    await expect(
+      new CompaniesService(prisma).softDelete("company-1"),
+    ).rejects.toThrow("Company not found");
+    expect(transaction).not.toHaveBeenCalled();
+  });
+});
