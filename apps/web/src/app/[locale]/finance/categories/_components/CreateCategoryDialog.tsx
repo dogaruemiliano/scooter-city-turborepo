@@ -224,7 +224,10 @@ export function CreateCategoryDialog({
             </div>
           </BottomSheetBody>
 
-          <BottomSheetFooter>
+          <BottomSheetFooter className="sm:flex-row-reverse sm:justify-start">
+            <Button type="submit" disabled={busy}>
+              {t("categories.create.submit")}
+            </Button>
             <BottomSheetClose
               render={
                 <Button type="button" variant="outline" disabled={busy} />
@@ -232,9 +235,6 @@ export function CreateCategoryDialog({
             >
               {t("common.cancel")}
             </BottomSheetClose>
-            <Button type="submit" disabled={busy}>
-              {t("categories.create.submit")}
-            </Button>
           </BottomSheetFooter>
         </form>
       </BottomSheetContent>

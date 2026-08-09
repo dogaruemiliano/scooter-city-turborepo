@@ -360,7 +360,12 @@ export function EditCategoryDialog({
             </div>
           </BottomSheetBody>
 
-          <BottomSheetFooter>
+          <BottomSheetFooter className="sm:flex-row-reverse sm:justify-start">
+            <Button type="submit" disabled={busy}>
+              {busy
+                ? t("categories.edit.submitting")
+                : t("categories.edit.submit")}
+            </Button>
             <BottomSheetClose
               render={
                 <Button type="button" variant="outline" disabled={busy} />
@@ -368,11 +373,6 @@ export function EditCategoryDialog({
             >
               {t("common.cancel")}
             </BottomSheetClose>
-            <Button type="submit" disabled={busy}>
-              {busy
-                ? t("categories.edit.submitting")
-                : t("categories.edit.submit")}
-            </Button>
           </BottomSheetFooter>
         </form>
       </BottomSheetContent>
