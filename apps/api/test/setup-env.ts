@@ -31,7 +31,10 @@ const TEST_ENV: Record<string, string> = {
   SMTP_PORT: "1025",
   SMTP_USER: "test-user",
   SMTP_PASSWORD: "test-password",
-  HEALTH_MAX_HEAP_MB: "1024",
+  // `--runInBand` shares one process across every e2e suite, so the heap
+  // accumulates well past any production-realistic ceiling. Keep the check
+  // wired up without letting suite ordering decide whether /healthz is "up".
+  HEALTH_MAX_HEAP_MB: "8192",
   OTP_DELIVERY_QUOTA_PER_TARGET_PER_HOUR: "10000",
   OTP_DELIVERY_QUOTA_PER_TARGET_PER_DAY: "10000",
   OTP_DELIVERY_QUOTA_PER_IP_PER_HOUR: "10000",

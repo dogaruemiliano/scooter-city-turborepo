@@ -47,7 +47,11 @@ describe("Persons HTTP surface (e2e)", () => {
   const createdPersonPhones: string[] = [];
   const s3Objects = new Map<string, StoredS3Object>();
   const presignedPutKeys: string[] = [];
-  let phoneSeq = 10_000_000;
+  // Emails already vary per run via `Date.now()`. Phones must too: a fixed
+  // start makes every run reuse `+40710000001...`, so re-running against a
+  // database that still holds an earlier run's rows collides on the unique
+  // phone and fails the very first create with a 409.
+  let phoneSeq = 10_000_000 + Math.floor(Math.random() * 89_000_000);
 
   const fakeS3 = {
     send: jest.fn((command: unknown) => {
@@ -192,14 +196,24 @@ describe("Persons HTTP surface (e2e)", () => {
       prisma &&
       (createdPersonEmails.length > 0 || createdPersonPhones.length > 0)
     ) {
-      await prisma.person.deleteMany({
-        where: {
-          OR: [
-            { email: { in: createdPersonEmails } },
-            { phone: { in: createdPersonPhones } },
-          ],
-        },
-      });
+      const personWhere = {
+        OR: [
+          { email: { in: createdPersonEmails } },
+          { phone: { in: createdPersonPhones } },
+        ],
+      };
+      const personIds = (
+        await prisma.person.findMany({
+          where: personWhere,
+          select: { id: true },
+        })
+      ).map(({ id }) => id);
+      if (personIds.length > 0) {
+        await prisma.counterparty.deleteMany({
+          where: { personId: { in: personIds } },
+        });
+      }
+      await prisma.person.deleteMany({ where: personWhere });
     }
     if (prisma && createdUserIds.length > 0) {
       await prisma.draftUpload.deleteMany({

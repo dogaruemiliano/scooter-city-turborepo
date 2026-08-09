@@ -867,6 +867,24 @@ export class PersonsService {
 
     const existingUser = emailUser ?? phoneUser;
     if (existingUser) {
+      const existingPerson = await tx.person.findUnique({
+        where: { userId: existingUser.id },
+      });
+      if (existingPerson) {
+        if (emailUser) {
+          throw new ConflictException({
+            code: PERSON_EMAIL_CONFLICT_CODE,
+            message: "Email already exists",
+            details: { field: "email" },
+          });
+        }
+        throw new ConflictException({
+          code: PERSON_PHONE_CONFLICT_CODE,
+          message: "Phone already exists",
+          details: { field: "phone" },
+        });
+      }
+
       if (
         existingUser.email !== input.email ||
         (existingUser.phone !== null && existingUser.phone !== input.phone)
@@ -874,13 +892,6 @@ export class PersonsService {
         throw new ConflictException(
           "Person identity does not match the existing user",
         );
-      }
-
-      const existingPerson = await tx.person.findUnique({
-        where: { userId: existingUser.id },
-      });
-      if (existingPerson) {
-        throw new ConflictException("User is already linked to a person");
       }
 
       const user = await tx.user.update({

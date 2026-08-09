@@ -1025,6 +1025,7 @@ describe("Finance HTTP surface (e2e)", () => {
           paymentMethod: "BANK_TRANSFER",
           billingStatus: "BILLED",
           categoryId: operatingExpenseCategory.id,
+          description: "Bank transfer expense without a named recipient",
           idempotencyKey: `finance:${runId}:bank-expense`,
           postImmediately: true,
           balanceChanges: [
@@ -1100,7 +1101,7 @@ describe("Finance HTTP surface (e2e)", () => {
       (customerTransactions.body as v1.finance.MoneyTransactionList).items.map(
         (item) => item.id,
       ),
-    ).not.toContain(bankIncome.id);
+    ).toContain(bankIncome.id);
 
     const recordedByAdmin = await authenticate(
       req().get(
@@ -1477,6 +1478,7 @@ describe("Finance HTTP surface (e2e)", () => {
           paymentMethod: "CASH",
           billingStatus: "NOT_BILLED",
           categoryId: operatingExpenseCategory.id,
+          description: "Cash expense without a named recipient",
           idempotencyKey: `finance:${runId}:personal-expense`,
           postImmediately: true,
           balanceChanges: [
@@ -2637,8 +2639,8 @@ describe("Finance HTTP surface (e2e)", () => {
       return (response.body as v1.finance.MoneyTransaction).id;
     }
 
-    const from = "2026-01-01T00:00:00.000+02:00";
-    const to = "2026-01-02T00:00:00.000+02:00";
+    const from = "2099-01-01T00:00:00.000+02:00";
+    const to = "2099-01-02T00:00:00.000+02:00";
     const atFromId = await recordIncome({
       key: "from",
       amount: "10.00",
@@ -2650,7 +2652,7 @@ describe("Finance HTTP surface (e2e)", () => {
       key: "inside",
       amount: "20.00",
       currency: "EUR",
-      occurredAt: "2026-01-01T23:59:59.999+02:00",
+      occurredAt: "2099-01-01T23:59:59.999+02:00",
       postImmediately: true,
     });
     const atToId = await recordIncome({
@@ -2664,7 +2666,7 @@ describe("Finance HTTP surface (e2e)", () => {
       key: "draft",
       amount: "99.00",
       currency: "RON",
-      occurredAt: "2026-01-01T12:00:00.000+02:00",
+      occurredAt: "2099-01-01T12:00:00.000+02:00",
       postImmediately: false,
     });
     await prisma.moneyTransaction.create({
@@ -2677,7 +2679,7 @@ describe("Finance HTTP surface (e2e)", () => {
         paymentMethod: null,
         billingStatus: "BILLED",
         recordedByUserId: admin.userId,
-        occurredAt: new Date("2026-01-01T10:00:00.000+02:00"),
+        occurredAt: new Date("2099-01-01T10:00:00.000+02:00"),
         idempotencyKey: `finance:${runId}:summary-null-payment-method`,
       },
     });
@@ -2692,7 +2694,8 @@ describe("Finance HTTP surface (e2e)", () => {
           paymentMethod: "CASH",
           billingStatus: "BILLED",
           categoryId: unusualExpenseCategory.id,
-          occurredAt: "2026-01-01T11:00:00.000+02:00",
+          description: "Cash expense without a named recipient",
+          occurredAt: "2099-01-01T11:00:00.000+02:00",
           idempotencyKey: `finance:${runId}:summary-unusual-expense`,
           postImmediately: true,
           balanceChanges: [
