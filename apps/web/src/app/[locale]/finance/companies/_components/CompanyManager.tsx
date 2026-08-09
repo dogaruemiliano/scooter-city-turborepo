@@ -1,42 +1,20 @@
 "use client";
 
-import { ApiError, v1 } from "@repo/api-shared";
+import { v1 } from "@repo/api-shared";
 import {
-  Alert,
-  AlertDescription,
   Badge,
-  Button,
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  Input,
-  Label,
-  PhoneNumberInput,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  buttonVariants,
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
-  Textarea,
 } from "@repo/ui/components";
 import { ArrowRightIcon, PlusIcon } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useLocale, useTranslations } from "next-intl";
-import { useId, useState, type FormEvent } from "react";
+import { useTranslations } from "next-intl";
 
-import { webApi } from "@/lib/api";
 import { FinanceEmptyState } from "../../_components/FinanceEmptyState";
 import {
   CompanyLegalFormIcon,
@@ -89,7 +67,13 @@ export function CompanyManager({
   return (
     <section className="space-y-4">
       <div className="flex justify-end">
-        <CreateCompanyDialog />
+        <Link
+          href={`${companiesHref}/new`}
+          className={buttonVariants({ variant: "default" })}
+        >
+          <PlusIcon data-icon="inline-start" />
+          {t("companies.create")}
+        </Link>
       </div>
       {companies.length === 0 ? (
         <FinanceEmptyState>{t("companies.empty")}</FinanceEmptyState>
@@ -168,162 +152,5 @@ export function CompanyManager({
         </>
       )}
     </section>
-  );
-}
-
-function CreateCompanyDialog() {
-  const t = useTranslations("finance");
-  const locale = useLocale();
-  const router = useRouter();
-  const formId = useId();
-  const [open, setOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string>();
-  const [legalForm, setLegalForm] =
-    useState<v1.finance.CompanyLegalForm>("SRL");
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const raw = { ...Object.fromEntries(form.entries()), legalForm };
-    const parsed = v1.finance.createCompanyInputSchema.safeParse(raw);
-    if (!parsed.success) {
-      setError(t("companies.form.invalid"));
-      return;
-    }
-    setBusy(true);
-    setError(undefined);
-    try {
-      await webApi.fetch(
-        v1.finance.ROUTES.companies.create,
-        v1.finance.companySchema,
-        { method: "POST", json: parsed.data },
-      );
-      setOpen(false);
-      router.refresh();
-    } catch (caught) {
-      setError(
-        caught instanceof ApiError
-          ? caught.message
-          : t("feedback.genericError"),
-      );
-    } finally {
-      setBusy(false);
-    }
-  }
-  const fields = [
-    ["legalName", "legalName", true],
-    ["tradingName", "tradingName", false],
-    ["taxIdentifier", "taxIdentifier", false],
-    ["registrationNumber", "registrationNumber", false],
-    ["email", "email", false],
-    ["phone", "phone", false],
-    ["addressLine1", "address", false],
-    ["city", "city", false],
-    ["countryCode", "countryCode", false],
-  ] as const;
-  return (
-    <Dialog open={open} onOpenChange={(value) => !busy && setOpen(value)}>
-      <DialogTrigger render={<Button type="button" variant="default" />}>
-        <PlusIcon data-icon="inline-start" />
-        {t("companies.create")}
-      </DialogTrigger>
-      <DialogContent className="max-h-screen overflow-y-auto">
-        <form id={formId} onSubmit={submit} className="contents">
-          <DialogHeader>
-            <DialogTitle>{t("companies.form.createTitle")}</DialogTitle>
-            <DialogDescription>
-              {t("companies.form.description")}
-            </DialogDescription>
-          </DialogHeader>
-          {error ? (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          ) : null}
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="grid gap-2">
-              <Label id={`${formId}-legal-form`}>
-                {t("companies.fields.legalForm")}
-              </Label>
-              <Select
-                value={legalForm}
-                onValueChange={(value) =>
-                  setLegalForm(value as v1.finance.CompanyLegalForm)
-                }
-                disabled={busy}
-              >
-                <SelectTrigger
-                  aria-labelledby={`${formId}-legal-form`}
-                  className="w-full"
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {v1.finance.COMPANY_LEGAL_FORMS.map((value) => (
-                    <SelectItem key={value} value={value}>
-                      {t(`enums.companyLegalForms.${value}`)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            {fields.map(([name, label, required]) =>
-              name === "phone" ? (
-                <div key={name} className="grid gap-2">
-                  <Label htmlFor={`${formId}-phone`}>
-                    {t("companies.fields.phone")}
-                  </Label>
-                  <PhoneNumberInput
-                    id={`${formId}-phone`}
-                    name="phone"
-                    locale={locale}
-                    placeholder={t("companies.fields.phone")}
-                    countrySelectLabel={t("companies.fields.phoneCountry")}
-                    numberInputLabel={t("companies.fields.phone")}
-                    disabled={busy}
-                  />
-                </div>
-              ) : (
-                <div key={name} className="grid gap-2">
-                  <Label htmlFor={`${formId}-${name}`}>
-                    {t(`companies.fields.${label}`)}
-                  </Label>
-                  <Input
-                    id={`${formId}-${name}`}
-                    name={name}
-                    defaultValue=""
-                    required={required}
-                    disabled={busy}
-                  />
-                </div>
-              ),
-            )}
-            <div className="grid gap-2 sm:col-span-2">
-              <Label htmlFor={`${formId}-notes`}>
-                {t("companies.fields.notes")}
-              </Label>
-              <Textarea
-                id={`${formId}-notes`}
-                name="notes"
-                defaultValue=""
-                disabled={busy}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <DialogClose
-              render={
-                <Button type="button" variant="outline" disabled={busy} />
-              }
-            >
-              {t("common.cancel")}
-            </DialogClose>
-            <Button type="submit" disabled={busy}>
-              {t("common.save")}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
   );
 }

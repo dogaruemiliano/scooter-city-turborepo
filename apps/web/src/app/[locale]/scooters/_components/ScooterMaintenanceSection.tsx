@@ -6,6 +6,14 @@ import {
   AlertDescription,
   AlertTitle,
   Badge,
+  BottomSheet,
+  BottomSheetBody,
+  BottomSheetClose,
+  BottomSheetContent,
+  BottomSheetDescription,
+  BottomSheetFooter,
+  BottomSheetHeader,
+  BottomSheetTitle,
   Button,
   Card,
   CardContent,
@@ -13,13 +21,6 @@ import {
   CardHeader,
   CardTitle,
   DatePartsField,
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
   Field,
   FieldDescription,
   FieldError,
@@ -721,92 +722,100 @@ function IssueDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={changeOpen}>
-      <DialogContent>
-        <form noValidate onSubmit={(event) => void submit(event)}>
-          <DialogHeader>
-            <DialogTitle>{t("maintenance.dialogs.issue.title")}</DialogTitle>
-            <DialogDescription>
+    <BottomSheet open={open} onOpenChange={changeOpen}>
+      <BottomSheetContent className="lg:w-xl">
+        <form
+          noValidate
+          onSubmit={(event) => void submit(event)}
+          className="contents"
+        >
+          <BottomSheetHeader>
+            <BottomSheetTitle>
+              {t("maintenance.dialogs.issue.title")}
+            </BottomSheetTitle>
+            <BottomSheetDescription>
               {t("maintenance.dialogs.issue.description")}
-            </DialogDescription>
-          </DialogHeader>
-          {errorFeedback ? <FeedbackAlert feedback={errorFeedback} /> : null}
-          <FieldGroup className="py-4">
-            <Field data-invalid={Boolean(errors.title) || undefined}>
-              <FieldLabel htmlFor={`${formId}-issue-title`}>
-                {t("maintenance.fields.issueTitle")}
-              </FieldLabel>
-              <Input
-                id={`${formId}-issue-title`}
-                value={title}
-                disabled={busy}
-                aria-invalid={Boolean(errors.title) || undefined}
-                onChange={(event) => setTitle(event.target.value)}
-              />
-              <FieldError>{errors.title}</FieldError>
-            </Field>
-            <Field data-invalid={Boolean(errors.description) || undefined}>
-              <FieldLabel htmlFor={`${formId}-issue-description`}>
-                {t("maintenance.fields.issueDescription")}
-              </FieldLabel>
-              <Textarea
-                id={`${formId}-issue-description`}
-                value={description}
-                disabled={busy}
-                aria-invalid={Boolean(errors.description) || undefined}
-                onChange={(event) => setDescription(event.target.value)}
-              />
-              <FieldError>{errors.description}</FieldError>
-            </Field>
-            <Field data-invalid={Boolean(errors.severity) || undefined}>
-              <FieldLabel htmlFor={`${formId}-issue-severity`}>
-                {t("maintenance.fields.severity")}
-              </FieldLabel>
-              <Select
-                value={severity}
-                disabled={busy}
-                onValueChange={(value) =>
-                  value &&
-                  setSeverity(value as v1.maintenance.ScooterIssueSeverity)
-                }
-              >
-                <SelectTrigger
-                  id={`${formId}-issue-severity`}
-                  className="w-full"
-                  aria-invalid={Boolean(errors.severity) || undefined}
+            </BottomSheetDescription>
+          </BottomSheetHeader>
+          <BottomSheetBody>
+            {errorFeedback ? <FeedbackAlert feedback={errorFeedback} /> : null}
+            <FieldGroup>
+              <Field data-invalid={Boolean(errors.title) || undefined}>
+                <FieldLabel htmlFor={`${formId}-issue-title`}>
+                  {t("maintenance.fields.issueTitle")}
+                </FieldLabel>
+                <Input
+                  id={`${formId}-issue-title`}
+                  value={title}
+                  disabled={busy}
+                  aria-invalid={Boolean(errors.title) || undefined}
+                  onChange={(event) => setTitle(event.target.value)}
+                />
+                <FieldError>{errors.title}</FieldError>
+              </Field>
+              <Field data-invalid={Boolean(errors.description) || undefined}>
+                <FieldLabel htmlFor={`${formId}-issue-description`}>
+                  {t("maintenance.fields.issueDescription")}
+                </FieldLabel>
+                <Textarea
+                  id={`${formId}-issue-description`}
+                  value={description}
+                  disabled={busy}
+                  aria-invalid={Boolean(errors.description) || undefined}
+                  onChange={(event) => setDescription(event.target.value)}
+                />
+                <FieldError>{errors.description}</FieldError>
+              </Field>
+              <Field data-invalid={Boolean(errors.severity) || undefined}>
+                <FieldLabel htmlFor={`${formId}-issue-severity`}>
+                  {t("maintenance.fields.severity")}
+                </FieldLabel>
+                <Select
+                  value={severity}
+                  disabled={busy}
+                  onValueChange={(value) =>
+                    value &&
+                    setSeverity(value as v1.maintenance.ScooterIssueSeverity)
+                  }
                 >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {v1.maintenance.SCOOTER_ISSUE_SEVERITIES.map((value) => (
-                      <SelectItem key={value} value={value}>
-                        {t(`maintenance.issueSeverities.${value}`)}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-              <FieldError>{errors.severity}</FieldError>
-            </Field>
-          </FieldGroup>
-          <DialogFooter>
-            <DialogClose
-              render={
-                <Button type="button" variant="outline" disabled={busy} />
-              }
-            >
-              {t("actions.cancel")}
-            </DialogClose>
+                  <SelectTrigger
+                    id={`${formId}-issue-severity`}
+                    className="w-full"
+                    aria-invalid={Boolean(errors.severity) || undefined}
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {v1.maintenance.SCOOTER_ISSUE_SEVERITIES.map((value) => (
+                        <SelectItem key={value} value={value}>
+                          {t(`maintenance.issueSeverities.${value}`)}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+                <FieldError>{errors.severity}</FieldError>
+              </Field>
+            </FieldGroup>
+          </BottomSheetBody>
+          <BottomSheetFooter className="sm:flex-row-reverse sm:justify-start">
             <Button type="submit" disabled={busy}>
               {busy
                 ? t("maintenance.actions.adding")
                 : t("maintenance.actions.addIssue")}
             </Button>
-          </DialogFooter>
+            <BottomSheetClose
+              render={
+                <Button type="button" variant="outline" disabled={busy} />
+              }
+            >
+              {t("actions.cancel")}
+            </BottomSheetClose>
+          </BottomSheetFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+      </BottomSheetContent>
+    </BottomSheet>
   );
 }
 
@@ -890,173 +899,185 @@ function MaintenanceRecordDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={changeOpen}>
-      <DialogContent className="max-h-[calc(100svh-var(--spacing-8))] overflow-y-auto sm:max-w-2xl">
-        <form noValidate onSubmit={(event) => void submit(event)}>
-          <DialogHeader>
-            <DialogTitle>{t("maintenance.dialogs.record.title")}</DialogTitle>
-            <DialogDescription>
+    <BottomSheet open={open} onOpenChange={changeOpen}>
+      <BottomSheetContent className="lg:w-2xl">
+        <form
+          noValidate
+          onSubmit={(event) => void submit(event)}
+          className="contents"
+        >
+          <BottomSheetHeader>
+            <BottomSheetTitle>
+              {t("maintenance.dialogs.record.title")}
+            </BottomSheetTitle>
+            <BottomSheetDescription>
               {t("maintenance.dialogs.record.description")}
-            </DialogDescription>
-          </DialogHeader>
-          {errorFeedback ? <FeedbackAlert feedback={errorFeedback} /> : null}
-          <FieldGroup className="py-4">
-            <Field
-              data-invalid={Boolean(errors.maintenanceTypeId) || undefined}
-            >
-              <FieldLabel htmlFor={`${formId}-maintenance-type`}>
-                {t("maintenance.fields.maintenanceType")}
-              </FieldLabel>
-              <Select
-                value={maintenanceTypeId}
-                disabled={busy}
-                onValueChange={(value) => value && setMaintenanceTypeId(value)}
+            </BottomSheetDescription>
+          </BottomSheetHeader>
+          <BottomSheetBody>
+            {errorFeedback ? <FeedbackAlert feedback={errorFeedback} /> : null}
+            <FieldGroup>
+              <Field
+                data-invalid={Boolean(errors.maintenanceTypeId) || undefined}
               >
-                <SelectTrigger
-                  id={`${formId}-maintenance-type`}
-                  className="w-full"
-                  aria-invalid={Boolean(errors.maintenanceTypeId) || undefined}
+                <FieldLabel htmlFor={`${formId}-maintenance-type`}>
+                  {t("maintenance.fields.maintenanceType")}
+                </FieldLabel>
+                <Select
+                  value={maintenanceTypeId}
+                  disabled={busy}
+                  onValueChange={(value) =>
+                    value && setMaintenanceTypeId(value)
+                  }
                 >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {maintenanceTypes.map((type) => (
-                      <SelectItem key={type.id} value={type.id}>
-                        {type.name}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-              <FieldError>{errors.maintenanceTypeId}</FieldError>
-            </Field>
-            <Field data-invalid={Boolean(errors.performedAt) || undefined}>
-              <FieldLabel htmlFor={`${formId}-performed-at-day`}>
-                {t("maintenance.fields.performedAt")}
-              </FieldLabel>
-              <DatePartsField
-                baseId={`${formId}-performed-at`}
-                label={t("maintenance.fields.performedAt")}
-                locale={locale}
-                value={performedAt}
-                disabled={busy}
-                invalid={Boolean(errors.performedAt)}
-                onChange={setPerformedAt}
-              />
-              <FieldError>{errors.performedAt}</FieldError>
-            </Field>
-            <Field data-invalid={Boolean(errors.performedKm) || undefined}>
-              <FieldLabel htmlFor={`${formId}-performed-km`}>
-                {t("maintenance.fields.performedKm")}
-              </FieldLabel>
-              <Input
-                id={`${formId}-performed-km`}
-                type="number"
-                min={0}
-                inputMode="numeric"
-                value={performedKm}
-                disabled={busy}
-                aria-invalid={Boolean(errors.performedKm) || undefined}
-                onChange={(event) => setPerformedKm(event.target.value)}
-              />
-              <FieldDescription>
-                {t("maintenance.fields.performedKmDescription")}
-              </FieldDescription>
-              <FieldError>{errors.performedKm}</FieldError>
-            </Field>
-            <Field data-invalid={Boolean(errors.notes) || undefined}>
-              <FieldLabel htmlFor={`${formId}-notes`}>
-                {t("maintenance.fields.recordNotes")}
-              </FieldLabel>
-              <Textarea
-                id={`${formId}-notes`}
-                value={notes}
-                disabled={busy}
-                aria-invalid={Boolean(errors.notes) || undefined}
-                onChange={(event) => setNotes(event.target.value)}
-              />
-              <FieldError>{errors.notes}</FieldError>
-            </Field>
+                  <SelectTrigger
+                    id={`${formId}-maintenance-type`}
+                    className="w-full"
+                    aria-invalid={
+                      Boolean(errors.maintenanceTypeId) || undefined
+                    }
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {maintenanceTypes.map((type) => (
+                        <SelectItem key={type.id} value={type.id}>
+                          {type.name}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+                <FieldError>{errors.maintenanceTypeId}</FieldError>
+              </Field>
+              <Field data-invalid={Boolean(errors.performedAt) || undefined}>
+                <FieldLabel htmlFor={`${formId}-performed-at-day`}>
+                  {t("maintenance.fields.performedAt")}
+                </FieldLabel>
+                <DatePartsField
+                  baseId={`${formId}-performed-at`}
+                  label={t("maintenance.fields.performedAt")}
+                  locale={locale}
+                  value={performedAt}
+                  disabled={busy}
+                  invalid={Boolean(errors.performedAt)}
+                  onChange={setPerformedAt}
+                />
+                <FieldError>{errors.performedAt}</FieldError>
+              </Field>
+              <Field data-invalid={Boolean(errors.performedKm) || undefined}>
+                <FieldLabel htmlFor={`${formId}-performed-km`}>
+                  {t("maintenance.fields.performedKm")}
+                </FieldLabel>
+                <Input
+                  id={`${formId}-performed-km`}
+                  type="number"
+                  min={0}
+                  inputMode="numeric"
+                  value={performedKm}
+                  disabled={busy}
+                  aria-invalid={Boolean(errors.performedKm) || undefined}
+                  onChange={(event) => setPerformedKm(event.target.value)}
+                />
+                <FieldDescription>
+                  {t("maintenance.fields.performedKmDescription")}
+                </FieldDescription>
+                <FieldError>{errors.performedKm}</FieldError>
+              </Field>
+              <Field data-invalid={Boolean(errors.notes) || undefined}>
+                <FieldLabel htmlFor={`${formId}-notes`}>
+                  {t("maintenance.fields.recordNotes")}
+                </FieldLabel>
+                <Textarea
+                  id={`${formId}-notes`}
+                  value={notes}
+                  disabled={busy}
+                  aria-invalid={Boolean(errors.notes) || undefined}
+                  onChange={(event) => setNotes(event.target.value)}
+                />
+                <FieldError>{errors.notes}</FieldError>
+              </Field>
 
-            {preview ? (
-              <Alert>
-                <CalendarClockIcon aria-hidden="true" />
-                <AlertTitle>
-                  {t("maintenance.deadlinePreview.title")}
-                </AlertTitle>
-                <AlertDescription>
-                  {t("maintenance.deadlinePreview.description", {
-                    mileage:
-                      preview.nextDueKm === null
-                        ? t("maintenance.values.unknown")
-                        : t("maintenance.values.kilometers", {
-                            value: preview.nextDueKm,
-                          }),
-                    date:
-                      preview.nextDueAt === null
-                        ? t("maintenance.values.unknown")
-                        : formatDate(preview.nextDueAt, locale),
-                  })}
-                </AlertDescription>
-              </Alert>
-            ) : null}
+              {preview ? (
+                <Alert>
+                  <CalendarClockIcon aria-hidden="true" />
+                  <AlertTitle>
+                    {t("maintenance.deadlinePreview.title")}
+                  </AlertTitle>
+                  <AlertDescription>
+                    {t("maintenance.deadlinePreview.description", {
+                      mileage:
+                        preview.nextDueKm === null
+                          ? t("maintenance.values.unknown")
+                          : t("maintenance.values.kilometers", {
+                              value: preview.nextDueKm,
+                            }),
+                      date:
+                        preview.nextDueAt === null
+                          ? t("maintenance.values.unknown")
+                          : formatDate(preview.nextDueAt, locale),
+                    })}
+                  </AlertDescription>
+                </Alert>
+              ) : null}
 
-            <Field data-invalid={Boolean(errors.nextDueKm) || undefined}>
-              <FieldLabel htmlFor={`${formId}-next-due-km`}>
-                {t("maintenance.fields.nextDueKm")}
-              </FieldLabel>
-              <Input
-                id={`${formId}-next-due-km`}
-                type="number"
-                min={0}
-                inputMode="numeric"
-                value={nextDueKm}
-                disabled={busy}
-                aria-invalid={Boolean(errors.nextDueKm) || undefined}
-                onChange={(event) => setNextDueKm(event.target.value)}
-              />
-              <FieldDescription>
-                {t("maintenance.fields.manualDeadlineDescription")}
-              </FieldDescription>
-              <FieldError>{errors.nextDueKm}</FieldError>
-            </Field>
-            <Field data-invalid={Boolean(errors.nextDueAt) || undefined}>
-              <FieldLabel htmlFor={`${formId}-next-due-at-day`}>
-                {t("maintenance.fields.nextDueAt")}
-              </FieldLabel>
-              <DatePartsField
-                baseId={`${formId}-next-due-at`}
-                label={t("maintenance.fields.nextDueAt")}
-                locale={locale}
-                value={nextDueAt}
-                disabled={busy}
-                invalid={Boolean(errors.nextDueAt)}
-                onChange={setNextDueAt}
-              />
-              <FieldDescription>
-                {t("maintenance.fields.manualDeadlineDescription")}
-              </FieldDescription>
-              <FieldError>{errors.nextDueAt}</FieldError>
-            </Field>
-          </FieldGroup>
-          <DialogFooter>
-            <DialogClose
-              render={
-                <Button type="button" variant="outline" disabled={busy} />
-              }
-            >
-              {t("actions.cancel")}
-            </DialogClose>
+              <Field data-invalid={Boolean(errors.nextDueKm) || undefined}>
+                <FieldLabel htmlFor={`${formId}-next-due-km`}>
+                  {t("maintenance.fields.nextDueKm")}
+                </FieldLabel>
+                <Input
+                  id={`${formId}-next-due-km`}
+                  type="number"
+                  min={0}
+                  inputMode="numeric"
+                  value={nextDueKm}
+                  disabled={busy}
+                  aria-invalid={Boolean(errors.nextDueKm) || undefined}
+                  onChange={(event) => setNextDueKm(event.target.value)}
+                />
+                <FieldDescription>
+                  {t("maintenance.fields.manualDeadlineDescription")}
+                </FieldDescription>
+                <FieldError>{errors.nextDueKm}</FieldError>
+              </Field>
+              <Field data-invalid={Boolean(errors.nextDueAt) || undefined}>
+                <FieldLabel htmlFor={`${formId}-next-due-at-day`}>
+                  {t("maintenance.fields.nextDueAt")}
+                </FieldLabel>
+                <DatePartsField
+                  baseId={`${formId}-next-due-at`}
+                  label={t("maintenance.fields.nextDueAt")}
+                  locale={locale}
+                  value={nextDueAt}
+                  disabled={busy}
+                  invalid={Boolean(errors.nextDueAt)}
+                  onChange={setNextDueAt}
+                />
+                <FieldDescription>
+                  {t("maintenance.fields.manualDeadlineDescription")}
+                </FieldDescription>
+                <FieldError>{errors.nextDueAt}</FieldError>
+              </Field>
+            </FieldGroup>
+          </BottomSheetBody>
+          <BottomSheetFooter className="sm:flex-row-reverse sm:justify-start">
             <Button type="submit" disabled={busy}>
               {busy
                 ? t("maintenance.actions.adding")
                 : t("maintenance.actions.addRecord")}
             </Button>
-          </DialogFooter>
+            <BottomSheetClose
+              render={
+                <Button type="button" variant="outline" disabled={busy} />
+              }
+            >
+              {t("actions.cancel")}
+            </BottomSheetClose>
+          </BottomSheetFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+      </BottomSheetContent>
+    </BottomSheet>
   );
 }
 

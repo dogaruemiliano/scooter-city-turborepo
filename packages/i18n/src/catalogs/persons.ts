@@ -73,6 +73,10 @@ export const personsCatalog = {
         fallback: "Check this field.",
       },
     },
+    editPage: {
+      title: "Edit person",
+      description: "Update contact, address and notes for this person.",
+    },
     createPage: {
       title: "Add person",
       description: "Create a standalone rental person record.",
@@ -393,6 +397,11 @@ export const personsCatalog = {
           "Este permis un singur document de identitate și un singur permis de conducere.",
         fallback: "Verifică acest câmp.",
       },
+    },
+    editPage: {
+      title: "Editează persoana",
+      description:
+        "Actualizează datele de contact, adresa și notițele acestei persoane.",
     },
     createPage: {
       title: "Adaugă persoană",

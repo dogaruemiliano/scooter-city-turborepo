@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   apiFetch: vi.fn(),
   refresh: vi.fn(),
   replace: vi.fn(),
+  push: vi.fn(),
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -30,6 +31,7 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({
     refresh: mocks.refresh,
     replace: mocks.replace,
+    push: mocks.push,
   }),
 }));
 
@@ -424,43 +426,17 @@ describe("PersonDetailPage", () => {
     ).toBeInTheDocument();
   });
 
-  it("updates the person from the edit dialog", async () => {
-    mocks.apiFetch.mockResolvedValueOnce({
-      ...readyPerson,
-      firstName: "Grace",
-    });
+  it("navigates to the edit page from the actions menu", async () => {
     const browser = userEvent.setup();
 
     renderDetail();
     await browser.click(screen.getByRole("button", { name: "More actions" }));
     await browser.click(await screen.findByText("Edit person"));
-    const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByLabelText("Phone country")).toHaveValue("RO");
-    expect(within(dialog).getByLabelText("Phone")).toHaveValue("712345678");
-    expect(within(dialog).getByLabelText("Phone")).toHaveAttribute(
-      "placeholder",
-      "Phone number",
-    );
-    await browser.clear(within(dialog).getByLabelText("First name"));
-    await browser.type(within(dialog).getByLabelText("First name"), "Grace");
-    await browser.clear(within(dialog).getByLabelText("Phone"));
-    await browser.type(within(dialog).getByLabelText("Phone"), "700111222");
-    await browser.click(within(dialog).getByRole("button", { name: "Save" }));
 
-    await waitFor(() =>
-      expect(mocks.apiFetch).toHaveBeenCalledWith(
-        v1.persons.ROUTES.update(readyPerson.id),
-        v1.persons.personSchema,
-        expect.objectContaining({
-          method: "PATCH",
-          json: expect.objectContaining({
-            firstName: "Grace",
-            phone: "+40700111222",
-          }),
-        }),
-      ),
+    expect(mocks.push).toHaveBeenCalledWith(
+      `/en/persons/${readyPerson.id}/edit`,
     );
-    expect(mocks.refresh).toHaveBeenCalledOnce();
+    expect(mocks.apiFetch).not.toHaveBeenCalled();
   });
 
   it("requires an expiration date or saves an explicit no-expiry value", async () => {

@@ -40,25 +40,6 @@ export function PersonDetailPage({
   const [photosByDocumentId, setPhotosByDocumentId] =
     useState<DocumentPhotosByDocumentId>(() => documentPhotos);
 
-  async function updatePerson(
-    input: v1.persons.UpdatePersonInput,
-  ): Promise<boolean> {
-    setBusyAction("person:update");
-    try {
-      await webApi.fetch(
-        v1.persons.ROUTES.update(person.id),
-        v1.persons.personSchema,
-        { method: "PATCH", json: input },
-      );
-      router.refresh();
-      return true;
-    } catch {
-      return false;
-    } finally {
-      setBusyAction(null);
-    }
-  }
-
   async function deletePerson(): Promise<boolean> {
     setBusyAction("person:delete");
     try {
@@ -191,7 +172,7 @@ export function PersonDetailPage({
       <PersonDetailHeader
         person={person}
         busyAction={busyAction}
-        onUpdatePerson={updatePerson}
+        personsHref={personsHref}
         onDeletePerson={deletePerson}
       />
 

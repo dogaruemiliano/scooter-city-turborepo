@@ -4,6 +4,7 @@ import { v1 } from "@repo/api-shared";
 import { Badge } from "@repo/ui/components";
 import { PencilIcon, Trash2Icon } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { MoreActionsMenu } from "@/components/MoreActionsMenu";
@@ -11,24 +12,23 @@ import { MoreActionsMenu } from "@/components/MoreActionsMenu";
 import { ConfirmationDialog } from "./ConfirmationDialog";
 import { formatDate } from "./helpers";
 import { PersonContactSheet } from "./PersonContactSheet";
-import { PersonFormDialog } from "./PersonFormDialog";
 
 export function PersonDetailHeader({
   person,
+  personsHref,
   busyAction,
-  onUpdatePerson,
   onDeletePerson,
 }: {
   person: v1.persons.Person;
+  personsHref: string;
   busyAction: string | null;
-  onUpdatePerson: (input: v1.persons.UpdatePersonInput) => Promise<boolean>;
   onDeletePerson: () => Promise<boolean>;
 }) {
   const t = useTranslations("persons");
   const locale = useLocale();
+  const router = useRouter();
   const fullName = `${person.firstName} ${person.lastName}`;
-  const [editPersonOpen, setEditPersonOpen] = useState(false);
-  const [editPersonDialogKey, setEditPersonDialogKey] = useState(0);
+  const personEditHref = `${personsHref}/${encodeURIComponent(person.id)}/edit`;
   const [deletePersonOpen, setDeletePersonOpen] = useState(false);
 
   return (
@@ -53,10 +53,7 @@ export function PersonDetailHeader({
                   label: t("actions.editPerson"),
                   icon: <PencilIcon data-icon="inline-start" />,
                   disabled: busyAction !== null,
-                  onClick: () => {
-                    setEditPersonDialogKey((current) => current + 1);
-                    setEditPersonOpen(true);
-                  },
+                  onClick: () => router.push(personEditHref),
                 },
               ],
               [
@@ -84,15 +81,6 @@ export function PersonDetailHeader({
           </div>
         </div>
 
-        <PersonFormDialog
-          key={`edit-person-${editPersonDialogKey}`}
-          person={person}
-          busy={busyAction === "person:update"}
-          open={editPersonOpen}
-          onOpenChange={setEditPersonOpen}
-          renderTrigger={false}
-          onSubmit={onUpdatePerson}
-        />
         <ConfirmationDialog
           open={deletePersonOpen}
           onOpenChange={setDeletePersonOpen}

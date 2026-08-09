@@ -3,6 +3,14 @@
 import { v1 } from "@repo/api-shared";
 import {
   Badge,
+  BottomSheet,
+  BottomSheetBody,
+  BottomSheetClose,
+  BottomSheetContent,
+  BottomSheetDescription,
+  BottomSheetFooter,
+  BottomSheetHeader,
+  BottomSheetTitle,
   Button,
   Card,
   CardContent,
@@ -445,93 +453,99 @@ function SellScooterDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={changeOpen}>
-      <DialogContent>
-        <form noValidate onSubmit={(event) => void submit(event)}>
-          <DialogHeader>
-            <DialogTitle>{t("dialogs.sell.title")}</DialogTitle>
-            <DialogDescription>
+    <BottomSheet open={open} onOpenChange={changeOpen}>
+      <BottomSheetContent className="lg:w-xl">
+        <form
+          noValidate
+          onSubmit={(event) => void submit(event)}
+          className="contents"
+        >
+          <BottomSheetHeader>
+            <BottomSheetTitle>{t("dialogs.sell.title")}</BottomSheetTitle>
+            <BottomSheetDescription>
               {t("dialogs.sell.description")}
-            </DialogDescription>
-          </DialogHeader>
-          {errorFeedback ? <FeedbackAlert feedback={errorFeedback} /> : null}
-          <FieldGroup className="py-4">
-            <Field
-              data-invalid={Boolean(errors.buyerCounterpartyId) || undefined}
-            >
-              <ScooterBuyerSelect
-                id={`${formId}-buyer`}
-                value={buyerCounterpartyId}
-                disabled={busy}
-                error={errors.buyerCounterpartyId}
-                onChange={(id) => {
-                  setBuyerCounterpartyId(id);
-                  setErrors((current) => ({
-                    ...current,
-                    buyerCounterpartyId: undefined,
-                  }));
-                }}
-              />
-            </Field>
-            <Field data-invalid={Boolean(errors.saleAmount) || undefined}>
-              <FieldLabel htmlFor={`${formId}-sale-amount`}>
-                {t("fields.saleAmount")}
-              </FieldLabel>
-              <Input
-                id={`${formId}-sale-amount`}
-                type="number"
-                min={0}
-                step="0.01"
-                inputMode="decimal"
-                value={saleAmount}
-                disabled={busy}
-                aria-invalid={Boolean(errors.saleAmount) || undefined}
-                onChange={(event) => setSaleAmount(event.target.value)}
-              />
-              <FieldError>{errors.saleAmount}</FieldError>
-            </Field>
-            <Field data-invalid={Boolean(errors.soldOn) || undefined}>
-              <FieldLabel htmlFor={`${formId}-sold-on-day`}>
-                {t("fields.soldOn")}
-              </FieldLabel>
-              <DatePartsField
-                baseId={`${formId}-sold-on`}
-                label={t("fields.soldOn")}
-                locale={locale}
-                value={soldOn}
-                disabled={busy}
-                invalid={Boolean(errors.soldOn)}
-                onChange={setSoldOn}
-              />
-              <FieldError>{errors.soldOn}</FieldError>
-            </Field>
-            <Field>
-              <FieldLabel htmlFor={`${formId}-notes`}>
-                {t("fields.notes")}
-              </FieldLabel>
-              <Textarea
-                id={`${formId}-notes`}
-                value={notes}
-                disabled={busy}
-                onChange={(event) => setNotes(event.target.value)}
-              />
-            </Field>
-          </FieldGroup>
-          <DialogFooter>
-            <DialogClose
+            </BottomSheetDescription>
+          </BottomSheetHeader>
+          <BottomSheetBody>
+            {errorFeedback ? <FeedbackAlert feedback={errorFeedback} /> : null}
+            <FieldGroup>
+              <Field
+                data-invalid={Boolean(errors.buyerCounterpartyId) || undefined}
+              >
+                <ScooterBuyerSelect
+                  id={`${formId}-buyer`}
+                  value={buyerCounterpartyId}
+                  disabled={busy}
+                  error={errors.buyerCounterpartyId}
+                  onChange={(id) => {
+                    setBuyerCounterpartyId(id);
+                    setErrors((current) => ({
+                      ...current,
+                      buyerCounterpartyId: undefined,
+                    }));
+                  }}
+                />
+              </Field>
+              <Field data-invalid={Boolean(errors.saleAmount) || undefined}>
+                <FieldLabel htmlFor={`${formId}-sale-amount`}>
+                  {t("fields.saleAmount")}
+                </FieldLabel>
+                <Input
+                  id={`${formId}-sale-amount`}
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  inputMode="decimal"
+                  value={saleAmount}
+                  disabled={busy}
+                  aria-invalid={Boolean(errors.saleAmount) || undefined}
+                  onChange={(event) => setSaleAmount(event.target.value)}
+                />
+                <FieldError>{errors.saleAmount}</FieldError>
+              </Field>
+              <Field data-invalid={Boolean(errors.soldOn) || undefined}>
+                <FieldLabel htmlFor={`${formId}-sold-on-day`}>
+                  {t("fields.soldOn")}
+                </FieldLabel>
+                <DatePartsField
+                  baseId={`${formId}-sold-on`}
+                  label={t("fields.soldOn")}
+                  locale={locale}
+                  value={soldOn}
+                  disabled={busy}
+                  invalid={Boolean(errors.soldOn)}
+                  onChange={setSoldOn}
+                />
+                <FieldError>{errors.soldOn}</FieldError>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor={`${formId}-notes`}>
+                  {t("fields.notes")}
+                </FieldLabel>
+                <Textarea
+                  id={`${formId}-notes`}
+                  value={notes}
+                  disabled={busy}
+                  onChange={(event) => setNotes(event.target.value)}
+                />
+              </Field>
+            </FieldGroup>
+          </BottomSheetBody>
+          <BottomSheetFooter className="sm:flex-row-reverse sm:justify-start">
+            <Button type="submit" disabled={busy}>
+              {busy ? t("actions.selling") : t("actions.sell")}
+            </Button>
+            <BottomSheetClose
               render={
                 <Button type="button" variant="outline" disabled={busy} />
               }
             >
               {t("actions.cancel")}
-            </DialogClose>
-            <Button type="submit" disabled={busy}>
-              {busy ? t("actions.selling") : t("actions.sell")}
-            </Button>
-          </DialogFooter>
+            </BottomSheetClose>
+          </BottomSheetFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+      </BottomSheetContent>
+    </BottomSheet>
   );
 }
 
@@ -625,192 +639,202 @@ function RecordScooterPaymentDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={changeOpen}>
-      <DialogContent>
-        <form noValidate onSubmit={(event) => void submit(event)}>
-          <DialogHeader>
-            <DialogTitle>{t("dialogs.payment.title")}</DialogTitle>
-            <DialogDescription>
+    <BottomSheet open={open} onOpenChange={changeOpen}>
+      <BottomSheetContent className="lg:w-xl">
+        <form
+          noValidate
+          onSubmit={(event) => void submit(event)}
+          className="contents"
+        >
+          <BottomSheetHeader>
+            <BottomSheetTitle>{t("dialogs.payment.title")}</BottomSheetTitle>
+            <BottomSheetDescription>
               {t("dialogs.payment.description")}
-            </DialogDescription>
-          </DialogHeader>
-          {errorFeedback ? <FeedbackAlert feedback={errorFeedback} /> : null}
-          <FieldGroup className="py-4">
-            <Field data-invalid={Boolean(errors.amount) || undefined}>
-              <FieldLabel htmlFor={`${formId}-payment-amount`}>
-                {t("fields.paymentAmount")}
-              </FieldLabel>
-              <Input
-                id={`${formId}-payment-amount`}
-                type="number"
-                min={0}
-                step="0.01"
-                inputMode="decimal"
-                value={amount}
-                disabled={busy}
-                aria-invalid={Boolean(errors.amount) || undefined}
-                onChange={(event) => setAmount(event.target.value)}
-              />
-              <FieldError>{errors.amount}</FieldError>
-            </Field>
-            <div className="flex min-h-12 items-center justify-between gap-3 rounded-lg border border-input bg-background px-3 py-2">
-              <div className="grid gap-0.5">
-                <Label htmlFor={`${formId}-split-with-owner`}>
-                  {t("fields.splitWithOwner")}
-                </Label>
-                <span className="text-xs text-muted-foreground">
-                  {t("fields.splitWithOwnerDescription")}
-                </span>
+            </BottomSheetDescription>
+          </BottomSheetHeader>
+          <BottomSheetBody>
+            {errorFeedback ? <FeedbackAlert feedback={errorFeedback} /> : null}
+            <FieldGroup>
+              <Field data-invalid={Boolean(errors.amount) || undefined}>
+                <FieldLabel htmlFor={`${formId}-payment-amount`}>
+                  {t("fields.paymentAmount")}
+                </FieldLabel>
+                <Input
+                  id={`${formId}-payment-amount`}
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  inputMode="decimal"
+                  value={amount}
+                  disabled={busy}
+                  aria-invalid={Boolean(errors.amount) || undefined}
+                  onChange={(event) => setAmount(event.target.value)}
+                />
+                <FieldError>{errors.amount}</FieldError>
+              </Field>
+              <div className="flex min-h-12 items-center justify-between gap-3 rounded-lg border border-input bg-background px-3 py-2">
+                <div className="grid gap-0.5">
+                  <Label htmlFor={`${formId}-split-with-owner`}>
+                    {t("fields.splitWithOwner")}
+                  </Label>
+                  <span className="text-xs text-muted-foreground">
+                    {t("fields.splitWithOwnerDescription")}
+                  </span>
+                </div>
+                <Switch
+                  id={`${formId}-split-with-owner`}
+                  checked={splitWithOwner}
+                  disabled={busy}
+                  onCheckedChange={setSplitWithOwner}
+                />
               </div>
-              <Switch
-                id={`${formId}-split-with-owner`}
-                checked={splitWithOwner}
-                disabled={busy}
-                onCheckedChange={setSplitWithOwner}
-              />
-            </div>
-            {splitWithOwner ? (
-              <>
-                <Field
-                  data-invalid={Boolean(errors.personalAmount) || undefined}
-                >
-                  <FieldLabel htmlFor={`${formId}-personal-amount`}>
-                    {t("fields.personalAmount")}
-                  </FieldLabel>
-                  <Input
-                    id={`${formId}-personal-amount`}
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    inputMode="decimal"
-                    value={personalAmount}
-                    disabled={busy}
-                    aria-invalid={Boolean(errors.personalAmount) || undefined}
-                    onChange={(event) => setPersonalAmount(event.target.value)}
-                  />
-                  <FieldError>{errors.personalAmount}</FieldError>
-                </Field>
-                <Field
-                  data-invalid={
-                    Boolean(errors.personalOwnerUserId) || undefined
-                  }
-                >
-                  <FieldLabel htmlFor={`${formId}-personal-owner`}>
-                    {t("fields.personalOwner")}
-                  </FieldLabel>
-                  <Select
-                    value={personalOwnerUserId}
-                    disabled={busy}
-                    onValueChange={(value) =>
-                      value && setPersonalOwnerUserId(value)
+              {splitWithOwner ? (
+                <>
+                  <Field
+                    data-invalid={Boolean(errors.personalAmount) || undefined}
+                  >
+                    <FieldLabel htmlFor={`${formId}-personal-amount`}>
+                      {t("fields.personalAmount")}
+                    </FieldLabel>
+                    <Input
+                      id={`${formId}-personal-amount`}
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      inputMode="decimal"
+                      value={personalAmount}
+                      disabled={busy}
+                      aria-invalid={Boolean(errors.personalAmount) || undefined}
+                      onChange={(event) =>
+                        setPersonalAmount(event.target.value)
+                      }
+                    />
+                    <FieldError>{errors.personalAmount}</FieldError>
+                  </Field>
+                  <Field
+                    data-invalid={
+                      Boolean(errors.personalOwnerUserId) || undefined
                     }
                   >
-                    <SelectTrigger
-                      id={`${formId}-personal-owner`}
-                      className="w-full"
+                    <FieldLabel htmlFor={`${formId}-personal-owner`}>
+                      {t("fields.personalOwner")}
+                    </FieldLabel>
+                    <Select
+                      value={personalOwnerUserId}
+                      disabled={busy}
+                      onValueChange={(value) =>
+                        value && setPersonalOwnerUserId(value)
+                      }
                     >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {owners.map((owner) => (
-                          <SelectItem key={owner.userId} value={owner.userId}>
-                            {ownerLabel(owner.user)}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                  <FieldError>{errors.personalOwnerUserId}</FieldError>
-                </Field>
-              </>
-            ) : null}
-            <Field data-invalid={Boolean(errors.paidOn) || undefined}>
-              <FieldLabel htmlFor={`${formId}-paid-on-day`}>
-                {t("fields.paidOn")}
-              </FieldLabel>
-              <DatePartsField
-                baseId={`${formId}-paid-on`}
-                label={t("fields.paidOn")}
-                locale={locale}
-                value={paidOn}
-                disabled={busy}
-                invalid={Boolean(errors.paidOn)}
-                onChange={setPaidOn}
-              />
-              <FieldError>{errors.paidOn}</FieldError>
-            </Field>
-            <Field>
-              <FieldLabel htmlFor={`${formId}-payment-method`}>
-                {t("fields.paymentMethod")}
-              </FieldLabel>
-              <Select
-                value={paymentMethod}
-                disabled={busy}
-                onValueChange={(value) =>
-                  value && setPaymentMethod(value as v1.finance.PaymentMethod)
-                }
-              >
-                <SelectTrigger
-                  id={`${formId}-payment-method`}
-                  className="w-full"
+                      <SelectTrigger
+                        id={`${formId}-personal-owner`}
+                        className="w-full"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          {owners.map((owner) => (
+                            <SelectItem key={owner.userId} value={owner.userId}>
+                              {ownerLabel(owner.user)}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                    <FieldError>{errors.personalOwnerUserId}</FieldError>
+                  </Field>
+                </>
+              ) : null}
+              <Field data-invalid={Boolean(errors.paidOn) || undefined}>
+                <FieldLabel htmlFor={`${formId}-paid-on-day`}>
+                  {t("fields.paidOn")}
+                </FieldLabel>
+                <DatePartsField
+                  baseId={`${formId}-paid-on`}
+                  label={t("fields.paidOn")}
+                  locale={locale}
+                  value={paidOn}
+                  disabled={busy}
+                  invalid={Boolean(errors.paidOn)}
+                  onChange={setPaidOn}
+                />
+                <FieldError>{errors.paidOn}</FieldError>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor={`${formId}-payment-method`}>
+                  {t("fields.paymentMethod")}
+                </FieldLabel>
+                <Select
+                  value={paymentMethod}
+                  disabled={busy}
+                  onValueChange={(value) =>
+                    value && setPaymentMethod(value as v1.finance.PaymentMethod)
+                  }
                 >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {v1.finance.PAYMENT_METHODS.map((method) => (
-                      <SelectItem key={method} value={method}>
-                        {t(`paymentMethods.${method}`)}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </Field>
-            <Field data-invalid={Boolean(errors.companyWalletId) || undefined}>
-              <FieldLabel htmlFor={`${formId}-company-wallet`}>
-                {t("fields.companyWallet")}
-              </FieldLabel>
-              <Select
-                value={companyWalletId}
-                disabled={busy}
-                onValueChange={(value) => value && setCompanyWalletId(value)}
+                  <SelectTrigger
+                    id={`${formId}-payment-method`}
+                    className="w-full"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {v1.finance.PAYMENT_METHODS.map((method) => (
+                        <SelectItem key={method} value={method}>
+                          {t(`paymentMethods.${method}`)}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field
+                data-invalid={Boolean(errors.companyWalletId) || undefined}
               >
-                <SelectTrigger
-                  id={`${formId}-company-wallet`}
-                  className="w-full"
+                <FieldLabel htmlFor={`${formId}-company-wallet`}>
+                  {t("fields.companyWallet")}
+                </FieldLabel>
+                <Select
+                  value={companyWalletId}
+                  disabled={busy}
+                  onValueChange={(value) => value && setCompanyWalletId(value)}
                 >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {companyWallets.map((wallet) => (
-                      <SelectItem key={wallet.id} value={wallet.id}>
-                        {wallet.name}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-              <FieldError>{errors.companyWalletId}</FieldError>
-            </Field>
-          </FieldGroup>
-          <DialogFooter>
-            <DialogClose
+                  <SelectTrigger
+                    id={`${formId}-company-wallet`}
+                    className="w-full"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {companyWallets.map((wallet) => (
+                        <SelectItem key={wallet.id} value={wallet.id}>
+                          {wallet.name}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+                <FieldError>{errors.companyWalletId}</FieldError>
+              </Field>
+            </FieldGroup>
+          </BottomSheetBody>
+          <BottomSheetFooter className="sm:flex-row-reverse sm:justify-start">
+            <Button type="submit" disabled={busy}>
+              {busy ? t("actions.recording") : t("actions.recordPayment")}
+            </Button>
+            <BottomSheetClose
               render={
                 <Button type="button" variant="outline" disabled={busy} />
               }
             >
               {t("actions.cancel")}
-            </DialogClose>
-            <Button type="submit" disabled={busy}>
-              {busy ? t("actions.recording") : t("actions.recordPayment")}
-            </Button>
-          </DialogFooter>
+            </BottomSheetClose>
+          </BottomSheetFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+      </BottomSheetContent>
+    </BottomSheet>
   );
 }
 
