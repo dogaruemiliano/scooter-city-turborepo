@@ -30,6 +30,7 @@ const category: v1.finance.FinancialCategory = {
   name: "Rental income",
   kind: "INCOME",
   icon: null,
+  keywords: [],
   parentCategoryId: null,
   isActive: true,
   createdAt: "2026-07-29T08:00:00.000Z",

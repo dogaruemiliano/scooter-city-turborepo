@@ -12,6 +12,7 @@ const category = (
   name: `Category ${id}`,
   kind: "EXPENSE",
   icon: null,
+  keywords: [],
   parentCategoryId: null,
   isActive,
   createdAt: "2026-07-29T08:00:00.000Z",
