@@ -93,12 +93,15 @@ const DASHBOARD_NAVIGATION_ITEM = {
 
 const NAVIGATION_GROUPS = [
   {
-    labelKey: "operationsGroup",
+    labelKey: "entitiesGroup",
     requiredRole: "ADMIN",
     items: [
       { href: "/persons", labelKey: "persons", icon: UsersRoundIcon },
-      { href: "/scooters", labelKey: "scooters", icon: BikeIcon },
-      { href: "/service", labelKey: "service", icon: WrenchIcon },
+      {
+        href: "/finance/companies",
+        labelKey: "companies",
+        icon: Building2Icon,
+      },
     ],
   },
   {
@@ -106,6 +109,7 @@ const NAVIGATION_GROUPS = [
     requiredRole: "ADMIN",
     items: [
       { href: "/scooters", labelKey: "scooterList", icon: BikeIcon },
+      { href: "/service", labelKey: "service", icon: WrenchIcon },
       { href: "/scooters/brands", labelKey: "scooterBrands", icon: TagIcon },
     ],
   },
@@ -128,11 +132,6 @@ const NAVIGATION_GROUPS = [
         href: "/finance/expenses",
         labelKey: "financeExpenses",
         icon: ReceiptTextIcon,
-      },
-      {
-        href: "/finance/companies",
-        labelKey: "financeCompanies",
-        icon: Building2Icon,
       },
       {
         href: "/finance/categories",
@@ -162,6 +161,11 @@ const SIDEBAR_ROOT_ROUTES: ReadonlySet<string> = new Set([
   DASHBOARD_NAVIGATION_ITEM.href,
   ...NAVIGATION_GROUPS.flatMap((group) => group.items.map((item) => item.href)),
 ]);
+
+const ALL_NAVIGATION_HREFS: readonly string[] = [
+  DASHBOARD_NAVIGATION_ITEM.href,
+  ...NAVIGATION_GROUPS.flatMap((group) => group.items.map((item) => item.href)),
+];
 
 const PAGE_TITLES: Record<string, string> = {
   "/": "dashboard",
@@ -448,15 +452,32 @@ function AppSidebar({
   );
 }
 
+function matchesHref(pathname: string, href: string): boolean {
+  return pathname === href || (href !== "/" && pathname.startsWith(`${href}/`));
+}
+
+function getBestMatchingHref(pathname: string): string | null {
+  let best: string | null = null;
+  for (const href of ALL_NAVIGATION_HREFS) {
+    if (
+      matchesHref(pathname, href) &&
+      (best === null || href.length > best.length)
+    ) {
+      best = href;
+    }
+  }
+  return best;
+}
+
 function isActiveNavigationItem(
   pathname: string,
   href: string,
   exact = false,
 ): boolean {
-  return (
-    pathname === href ||
-    (!exact && href !== "/" && pathname.startsWith(`${href}/`))
-  );
+  if (exact) {
+    return pathname === href;
+  }
+  return getBestMatchingHref(pathname) === href;
 }
 
 function AccountMenu({

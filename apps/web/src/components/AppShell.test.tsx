@@ -419,7 +419,8 @@ describe("AppShell", () => {
       screen.getByRole("link", { name: "Prezentare generală" }),
     ).toHaveAttribute("href", "/finance");
     expect(screen.queryByText("General")).not.toBeInTheDocument();
-    expect(screen.getByText("Operațiuni")).toBeInTheDocument();
+    expect(screen.getByText("Entități")).toBeInTheDocument();
+    expect(screen.getAllByText("Scutere").length).toBeGreaterThan(0);
     expect(screen.getByText("Finanțe")).toBeInTheDocument();
   });
 
