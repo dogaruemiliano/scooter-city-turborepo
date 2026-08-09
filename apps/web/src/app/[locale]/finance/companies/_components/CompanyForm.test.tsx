@@ -5,7 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { CompanyCreateForm } from "./CompanyCreateForm";
+import { CompanyForm } from "./CompanyForm";
 
 const mocks = vi.hoisted(() => ({
   apiFetch: vi.fn(),
@@ -55,7 +55,7 @@ beforeEach(() => {
   mocks.push.mockReset();
 });
 
-describe("CompanyCreateForm", () => {
+describe("CompanyForm", () => {
   it("creates a company with the shared international phone input", async () => {
     mocks.apiFetch.mockResolvedValueOnce(company);
     const browser = userEvent.setup();
@@ -91,12 +91,74 @@ describe("CompanyCreateForm", () => {
     expect(mocks.push).toHaveBeenCalledWith("/en/finance/companies");
     expect(mocks.refresh).toHaveBeenCalledOnce();
   });
+
+  it("prefills every field when editing", () => {
+    renderEditForm();
+
+    expect(screen.getByLabelText("Legal name")).toHaveValue(company.legalName);
+    expect(screen.getByLabelText("Trading name")).toHaveValue(
+      company.tradingName,
+    );
+    expect(screen.getByLabelText("Tax identifier")).toHaveValue(
+      company.taxIdentifier,
+    );
+    expect(screen.getByLabelText("Registration number")).toHaveValue(
+      company.registrationNumber,
+    );
+    expect(screen.getByLabelText("Email")).toHaveValue(company.email);
+    expect(screen.getByLabelText("Phone")).toHaveValue("700111222");
+    expect(screen.getByLabelText("Phone country")).toHaveValue("RO");
+    expect(screen.getByLabelText("Address")).toHaveValue(company.addressLine1);
+    expect(screen.getByLabelText("City")).toHaveValue(company.city);
+    expect(screen.getByLabelText("Country code")).toHaveValue(
+      company.countryCode,
+    );
+  });
+
+  it("PATCHes the edited company and returns to its detail page", async () => {
+    mocks.apiFetch.mockResolvedValueOnce({ ...company, city: "Cluj" });
+    const browser = userEvent.setup();
+
+    renderEditForm();
+    await browser.clear(screen.getByLabelText("City"));
+    await browser.type(screen.getByLabelText("City"), "Cluj");
+    await browser.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() =>
+      expect(mocks.apiFetch).toHaveBeenCalledWith(
+        v1.finance.ROUTES.companies.update(company.id),
+        v1.finance.companySchema,
+        expect.objectContaining({
+          method: "PATCH",
+          json: expect.objectContaining({
+            legalName: company.legalName,
+            city: "Cluj",
+          }),
+        }),
+      ),
+    );
+    expect(mocks.push).toHaveBeenCalledWith(
+      `/en/finance/companies/${company.id}`,
+    );
+    expect(mocks.refresh).toHaveBeenCalledOnce();
+  });
 });
+
+function renderEditForm() {
+  return render(
+    <NextIntlClientProvider locale="en" messages={messages.en}>
+      <CompanyForm
+        company={company}
+        cancelHref={`/en/finance/companies/${company.id}`}
+      />
+    </NextIntlClientProvider>,
+  );
+}
 
 function renderCreateForm() {
   return render(
     <NextIntlClientProvider locale="en" messages={messages.en}>
-      <CompanyCreateForm companiesHref="/en/finance/companies" />
+      <CompanyForm cancelHref="/en/finance/companies" />
     </NextIntlClientProvider>,
   );
 }

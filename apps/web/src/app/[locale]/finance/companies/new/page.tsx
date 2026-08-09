@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 
 import { localizePath, resolveRouteLocale } from "@/i18n/paths";
 import { requireFinanceAdmin } from "../../_lib/server";
-import { CompanyCreateForm } from "../_components/CompanyCreateForm";
+import { CompanyForm } from "../_components/CompanyForm";
 
 const COMPANIES_PATH = "/finance/companies";
 const COMPANIES_NEW_PATH = "/finance/companies/new";
@@ -27,7 +27,7 @@ export default async function NewCompanyPage({
 
   return (
     <main className="flex w-full flex-1 flex-col">
-      <CompanyCreateForm companiesHref={localizePath(COMPANIES_PATH, locale)} />
+      <CompanyForm cancelHref={localizePath(COMPANIES_PATH, locale)} />
     </main>
   );
 }

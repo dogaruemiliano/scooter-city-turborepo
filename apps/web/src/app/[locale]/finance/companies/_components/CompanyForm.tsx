@@ -35,25 +35,32 @@ const FIELDS = [
   ["countryCode", "countryCode", false],
 ] as const;
 
-export function CompanyCreateForm({
-  companiesHref,
+export function CompanyForm({
+  company,
+  cancelHref,
 }: {
-  companiesHref: string;
+  /** Omit to create a new company; pass one to edit it. */
+  company?: v1.finance.Company;
+  cancelHref: string;
 }) {
   const t = useTranslations("finance");
   const locale = useLocale();
   const router = useRouter();
   const formId = useId();
+  const isEdit = company !== undefined;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
-  const [legalForm, setLegalForm] =
-    useState<v1.finance.CompanyLegalForm>("SRL");
+  const [legalForm, setLegalForm] = useState<v1.finance.CompanyLegalForm>(
+    company?.legalForm ?? "SRL",
+  );
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const raw = { ...Object.fromEntries(form.entries()), legalForm };
-    const parsed = v1.finance.createCompanyInputSchema.safeParse(raw);
+    const parsed = isEdit
+      ? v1.finance.updateCompanyInputSchema.safeParse(raw)
+      : v1.finance.createCompanyInputSchema.safeParse(raw);
     if (!parsed.success) {
       setError(t("companies.form.invalid"));
       return;
@@ -62,11 +69,13 @@ export function CompanyCreateForm({
     setError(undefined);
     try {
       await webApi.fetch(
-        v1.finance.ROUTES.companies.create,
+        isEdit
+          ? v1.finance.ROUTES.companies.update(company.id)
+          : v1.finance.ROUTES.companies.create,
         v1.finance.companySchema,
-        { method: "POST", json: parsed.data },
+        { method: isEdit ? "PATCH" : "POST", json: parsed.data },
       );
-      router.push(companiesHref);
+      router.push(cancelHref);
       router.refresh();
     } catch (caught) {
       setError(
@@ -82,7 +91,9 @@ export function CompanyCreateForm({
     <div className="mx-auto flex w-full max-w-screen-lg flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
       <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold">
-          {t("companies.form.createTitle")}
+          {isEdit
+            ? t("companies.form.editTitle")
+            : t("companies.form.createTitle")}
         </h1>
         <p className="text-sm text-muted-foreground">
           {t("companies.form.description")}
@@ -136,6 +147,7 @@ export function CompanyCreateForm({
                   placeholder={t("companies.fields.phone")}
                   countrySelectLabel={t("companies.fields.phoneCountry")}
                   numberInputLabel={t("companies.fields.phone")}
+                  defaultValue={company?.phone ?? ""}
                   disabled={busy}
                 />
               </div>
@@ -147,7 +159,7 @@ export function CompanyCreateForm({
                 <Input
                   id={`${formId}-${name}`}
                   name={name}
-                  defaultValue=""
+                  defaultValue={company?.[name] ?? ""}
                   required={required}
                   disabled={busy}
                 />
@@ -161,7 +173,7 @@ export function CompanyCreateForm({
             <Textarea
               id={`${formId}-notes`}
               name="notes"
-              defaultValue=""
+              defaultValue={company?.notes ?? ""}
               disabled={busy}
             />
           </div>
@@ -169,7 +181,7 @@ export function CompanyCreateForm({
 
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <Link
-            href={companiesHref}
+            href={cancelHref}
             className={buttonVariants({
               variant: "outline",
               className: busy ? "pointer-events-none opacity-60" : "",
