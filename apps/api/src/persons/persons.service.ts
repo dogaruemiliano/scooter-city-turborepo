@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { v1 } from "@repo/api-shared";
+import { Logger } from "nestjs-pino";
 
 import { AuditService } from "../audit/audit.service";
 import { AuditEventType } from "../audit/audit.types";
@@ -21,8 +22,13 @@ import type {
   DraftUpload,
   PersonDocument,
   Prisma,
+  User,
 } from "../generated/prisma/client";
 import { Prisma as PrismaRuntime } from "../generated/prisma/client";
+import {
+  ensureUserWallet,
+  userWalletCreateInput,
+} from "../finance/user-wallet";
 import { PrismaService } from "../prisma/prisma.service";
 import type {
   PersonDocumentPhotoWithAsset,
@@ -39,8 +45,6 @@ interface SearchCountRow {
 
 const PERSON_AUDIT_TARGET_TYPE = "person";
 const PERSON_AUDIT_EVENT_LIMIT = 50;
-const REDACTED_VALUE = "[redacted]";
-const SET_VALUE = "[set]";
 const PERSON_EMAIL_CONFLICT_CODE = "PERSON_EMAIL_CONFLICT";
 const PERSON_PHONE_CONFLICT_CODE = "PERSON_PHONE_CONFLICT";
 const DRAFT_DOCUMENT_PHOTO_PURPOSE = "person-document-photo";
@@ -64,6 +68,7 @@ export class PersonsService {
     private readonly prisma: PrismaService,
     private readonly imageStorage: ImageStorageService,
     private readonly audit: AuditService,
+    private readonly logger: Logger,
   ) {}
 
   async create(
@@ -77,8 +82,13 @@ export class PersonsService {
 
     try {
       return await this.prisma.$transaction(async (tx) => {
+        const user = await this.resolvePersonUser(tx, input);
         const created = await tx.person.create({
-          data: this.toCreateData(input),
+          data: {
+            ...this.toCreateData(input),
+            user: { connect: { id: user.id } },
+            counterparty: { create: { type: "PERSON" } },
+          },
           include: this.personInclude(),
         });
         const documentsByType = new Map(
@@ -245,6 +255,15 @@ export class PersonsService {
           data: this.toUpdateData(input),
           include: this.personInclude(),
         });
+        await tx.user.update({
+          where: { id: existing.userId },
+          data: {
+            email: updated.email,
+            phone: updated.phone,
+            firstName: updated.firstName,
+            lastName: updated.lastName,
+          },
+        });
 
         await this.recordPersonAudit(tx, {
           type: AuditEventType.PERSON_UPDATED,
@@ -367,6 +386,10 @@ export class PersonsService {
         );
         if (!existing) {
           throw new NotFoundException("Person document not found");
+        }
+
+        if (!documentInputHasChanges(existing, input)) {
+          return existing;
         }
 
         if (input.type && input.type !== existing.type) {
@@ -520,6 +543,7 @@ export class PersonsService {
         buffer: file.buffer,
         contentType: file.mimetype,
         byteSize: file.size,
+        category: "personal-document",
       });
       const result = await this.replaceDocumentPhotoWithStoredImage(
         documentId,
@@ -556,6 +580,7 @@ export class PersonsService {
 
     const upload = await this.imageStorage.createPresignedUpload({
       ...input,
+      category: "personal-document",
       scope: this.documentPhotoUploadScope(
         personId,
         documentId,
@@ -571,26 +596,54 @@ export class PersonsService {
     input: v1.persons.CreatePersonDocumentPhotoDraftUploadUrlInput,
     uploadedByUserId: string,
   ): Promise<v1.persons.PersonDocumentPhotoUploadUrl> {
-    const upload = await this.imageStorage.createPresignedUpload({
-      ...input,
-      scope: this.draftDocumentPhotoUploadScope(uploadedByUserId),
-    });
+    const logContext = {
+      event: "person_document_photo_draft_upload_url",
+      uploadedByUserId,
+      contentType: input.contentType,
+      byteSize: input.byteSize,
+    };
 
-    await this.prisma.draftUpload.create({
-      data: {
-        user: { connect: { id: uploadedByUserId } },
-        provider: upload.provider,
-        bucket: upload.bucket,
-        storageKey: upload.storageKey,
-        contentType: input.contentType,
-        byteSize: input.byteSize,
-        checksumSha256: input.checksumSha256.trim().toLowerCase(),
-        purpose: DRAFT_DOCUMENT_PHOTO_PURPOSE,
-        expiresAt: upload.expiresAt,
-      },
-    });
+    this.logger.debug(logContext, "Creating document-photo draft upload URL");
 
-    return this.toPublicUploadUrl(upload);
+    try {
+      const upload = await this.imageStorage.createPresignedUpload({
+        ...input,
+        category: "personal-document",
+        scope: this.draftDocumentPhotoUploadScope(uploadedByUserId),
+      });
+
+      const draftUpload = await this.prisma.draftUpload.create({
+        data: {
+          user: { connect: { id: uploadedByUserId } },
+          provider: upload.provider,
+          bucket: upload.bucket,
+          storageKey: upload.storageKey,
+          contentType: input.contentType,
+          byteSize: input.byteSize,
+          checksumSha256: input.checksumSha256.trim().toLowerCase(),
+          purpose: DRAFT_DOCUMENT_PHOTO_PURPOSE,
+          expiresAt: upload.expiresAt,
+        },
+      });
+
+      this.logger.log(
+        {
+          ...logContext,
+          draftUploadId: draftUpload.id,
+          provider: upload.provider,
+          expiresAt: upload.expiresAt.toISOString(),
+        },
+        "Created document-photo draft upload URL",
+      );
+
+      return this.toPublicUploadUrl(upload);
+    } catch (error) {
+      this.logger.error(
+        { ...logContext, ...errorLogFields(error) },
+        "Failed to create document-photo draft upload URL",
+      );
+      throw error;
+    }
   }
 
   async completeDocumentPhotoUpload(
@@ -772,7 +825,7 @@ export class PersonsService {
 
   private toCreateData(
     input: v1.persons.CreatePersonInput,
-  ): Prisma.PersonCreateInput {
+  ): Prisma.PersonCreateWithoutUserInput {
     return {
       email: input.email,
       phone: input.phone,
@@ -795,6 +848,73 @@ export class PersonsService {
           : undefined,
       notes: input.notes,
     };
+  }
+
+  private async resolvePersonUser(
+    tx: Prisma.TransactionClient,
+    input: v1.persons.CreatePersonInput,
+  ): Promise<User> {
+    const [emailUser, phoneUser] = await Promise.all([
+      tx.user.findUnique({ where: { email: input.email } }),
+      tx.user.findUnique({ where: { phone: input.phone } }),
+    ]);
+
+    if (emailUser && phoneUser && emailUser.id !== phoneUser.id) {
+      throw new ConflictException(
+        "Person email and phone belong to different users",
+      );
+    }
+
+    const existingUser = emailUser ?? phoneUser;
+    if (existingUser) {
+      const existingPerson = await tx.person.findUnique({
+        where: { userId: existingUser.id },
+      });
+      if (existingPerson) {
+        if (emailUser) {
+          throw new ConflictException({
+            code: PERSON_EMAIL_CONFLICT_CODE,
+            message: "Email already exists",
+            details: { field: "email" },
+          });
+        }
+        throw new ConflictException({
+          code: PERSON_PHONE_CONFLICT_CODE,
+          message: "Phone already exists",
+          details: { field: "phone" },
+        });
+      }
+
+      if (
+        existingUser.email !== input.email ||
+        (existingUser.phone !== null && existingUser.phone !== input.phone)
+      ) {
+        throw new ConflictException(
+          "Person identity does not match the existing user",
+        );
+      }
+
+      const user = await tx.user.update({
+        where: { id: existingUser.id },
+        data: {
+          phone: existingUser.phone ?? input.phone,
+          firstName: input.firstName,
+          lastName: input.lastName,
+        },
+      });
+      await ensureUserWallet(tx, user.id);
+      return user;
+    }
+
+    return tx.user.create({
+      data: {
+        email: input.email,
+        phone: input.phone,
+        firstName: input.firstName,
+        lastName: input.lastName,
+        wallet: userWalletCreateInput(),
+      },
+    });
   }
 
   private toUpdateData(
@@ -861,6 +981,21 @@ export class PersonsService {
       changes: v1.persons.PersonAuditFieldChange[];
     },
   ): Promise<void> {
+    if (
+      input.type === AuditEventType.PERSON_DOCUMENT_UPDATED &&
+      input.changes.length === 0
+    ) {
+      this.logger.warn(
+        {
+          personId: input.personId,
+          documentId: input.document?.id,
+          auditType: input.type,
+        },
+        "Skipping empty person-document update audit",
+      );
+      return;
+    }
+
     const meta = {
       actor: this.auditActor(input.context),
       document: input.document ? this.documentSummary(input.document) : null,
@@ -922,10 +1057,38 @@ export class PersonsService {
     existing: PersonDocument,
     updated: PersonDocument,
   ): v1.persons.PersonAuditFieldChange[] {
-    return diffAuditValues(
-      documentAuditValues(existing),
-      documentAuditValues(updated),
-    );
+    return compactChanges([
+      createValueChange("document.type", existing.type, updated.type),
+      createValueChange("document.series", existing.series, updated.series),
+      createSensitiveValueChange(
+        "document.number",
+        existing.number,
+        updated.number,
+      ),
+      createSensitiveValueChange("document.cnp", existing.cnp, updated.cnp),
+      createValueChange(
+        "document.issuingCountryCode",
+        existing.issuingCountryCode,
+        updated.issuingCountryCode,
+      ),
+      createValueChange(
+        "document.issuedBy",
+        existing.issuedBy,
+        updated.issuedBy,
+      ),
+      createValueChange(
+        "document.issuedOn",
+        toDateOnlyString(existing.issuedOn),
+        toDateOnlyString(updated.issuedOn),
+      ),
+      createValueChange(
+        "document.expiresOn",
+        toDateOnlyString(existing.expiresOn),
+        toDateOnlyString(updated.expiresOn),
+      ),
+      createValueChange("document.status", existing.status, updated.status),
+      createValueChange("document.notes", existing.notes, updated.notes),
+    ]);
   }
 
   private documentReplacementChanges(
@@ -1619,7 +1782,7 @@ function personAuditValues(person: PersonWithDocuments): AuditValue[] {
     { field: "region", value: person.region },
     { field: "postalCode", value: person.postalCode },
     { field: "countryCode", value: person.countryCode },
-    { field: "notes", value: person.notes ? SET_VALUE : null },
+    { field: "notes", value: person.notes },
   ];
 }
 
@@ -1643,8 +1806,36 @@ function documentAuditValues(document: PersonDocument): AuditValue[] {
       value: toDateOnlyString(document.expiresOn),
     },
     { field: "document.status", value: document.status },
-    { field: "document.notes", value: document.notes ? SET_VALUE : null },
+    { field: "document.notes", value: document.notes },
   ];
+}
+
+function documentInputHasChanges(
+  existing: PersonDocument,
+  input: v1.persons.UpdatePersonDocumentInput,
+): boolean {
+  return (
+    definedValueChanged(input.type, existing.type) ||
+    definedValueChanged(input.series, existing.series) ||
+    definedValueChanged(input.number, existing.number) ||
+    definedValueChanged(input.cnp, existing.cnp) ||
+    definedValueChanged(
+      input.issuingCountryCode,
+      existing.issuingCountryCode,
+    ) ||
+    definedValueChanged(input.issuedBy, existing.issuedBy) ||
+    definedValueChanged(input.issuedOn, toDateOnlyString(existing.issuedOn)) ||
+    definedValueChanged(
+      input.expiresOn,
+      toDateOnlyString(existing.expiresOn),
+    ) ||
+    definedValueChanged(input.status, existing.status) ||
+    definedValueChanged(input.notes, existing.notes)
+  );
+}
+
+function definedValueChanged<T>(next: T | undefined, current: T): boolean {
+  return next !== undefined && next !== current;
 }
 
 function createChange(
@@ -1656,6 +1847,28 @@ function createChange(
   }
 
   return { field, oldValue: null, newValue: value };
+}
+
+function createValueChange(
+  field: string,
+  oldValue: string | null,
+  newValue: string | null,
+): v1.persons.PersonAuditFieldChange | null {
+  return oldValue === newValue ? null : { field, oldValue, newValue };
+}
+
+function createSensitiveValueChange(
+  field: string,
+  oldRawValue: string | null,
+  newRawValue: string | null,
+): v1.persons.PersonAuditFieldChange | null {
+  if (oldRawValue === newRawValue) {
+    return null;
+  }
+
+  const oldValue = maskSensitiveAuditValue(oldRawValue);
+  const newValue = maskSensitiveAuditValue(newRawValue);
+  return { field, oldValue, newValue };
 }
 
 function diffAuditValues(
@@ -1686,7 +1899,7 @@ function maskSensitiveAuditValue(value: string | null): string | null {
   }
 
   const visibleLength = Math.min(4, value.length);
-  return `${REDACTED_VALUE} ${value.slice(-visibleLength)}`;
+  return `${"*".repeat(value.length - visibleLength)}${value.slice(-visibleLength)}`;
 }
 
 function toPersonAuditEvent(row: AuditEvent): v1.persons.PersonAuditEvent {
@@ -1847,4 +2060,23 @@ function isMediaAssetStorageKeyConflict(
   }
 
   return false;
+}
+
+function errorLogFields(error: unknown): {
+  errorName: string;
+  errorMessage: string;
+  errorStack?: string;
+} {
+  if (error instanceof Error) {
+    return {
+      errorName: error.name,
+      errorMessage: error.message,
+      ...(error.stack ? { errorStack: error.stack } : {}),
+    };
+  }
+
+  return {
+    errorName: typeof error,
+    errorMessage: String(error),
+  };
 }

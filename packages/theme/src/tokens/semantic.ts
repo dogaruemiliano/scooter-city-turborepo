@@ -69,7 +69,7 @@ const light = {
 const dark: Record<keyof typeof light, string> = {
   background: p.mist[950],
   foreground: p.mist[50],
-  card: p.mist[900],
+  card: p.mist[925],
   cardForeground: p.mist[50],
   popover: p.mist[900],
   popoverForeground: p.mist[50],
@@ -132,6 +132,11 @@ const dark: Record<keyof typeof light, string> = {
   scrim: "oklch(0 0 0 / 65%)",
 };
 
-export const semanticColors = { light, dark } as const;
+const minimal: Record<keyof typeof light, string> = {
+  ...dark,
+  card: p.mist[950],
+};
+
+export const semanticColors = { light, dark, minimal } as const;
 
 export type ThemeColors = typeof light;

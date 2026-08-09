@@ -80,6 +80,7 @@ export const PERSON_DOCUMENT_FORM_FIELD_KEYS =
     "issuingCountryCode",
     "issuedBy",
     "issuedOn",
+    "hasExpiryDate",
     "expiresOn",
     "status",
     "notes",

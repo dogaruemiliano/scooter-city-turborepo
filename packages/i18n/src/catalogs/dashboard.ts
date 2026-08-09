@@ -1,8 +1,12 @@
 export const dashboardCatalog = {
   en: {
-    placeholder: "Dashboard coming soon.",
+    title: "Your dashboard is taking shape",
+    description:
+      "Soon, your most important fleet activity will come together in one clear view.",
   },
   ro: {
-    placeholder: "Panoul principal va fi disponibil in curand.",
+    title: "Panoul tău prinde contur",
+    description:
+      "În curând, cele mai importante informații despre flotă vor fi reunite într-o singură privire.",
   },
 } as const;

@@ -51,12 +51,31 @@ export default async function ScooterRoutePage({
   }
 
   const cookieHeader = (await cookies()).toString();
-  const scooter = await scooterFromApi(locale, id, detailPath, cookieHeader);
+  const [
+    scooter,
+    maintenanceOverview,
+    maintenanceTypes,
+    financials,
+    companyWallets,
+    brands,
+  ] = await Promise.all([
+    scooterFromApi(locale, id, detailPath, cookieHeader),
+    maintenanceOverviewFromApi(locale, id, detailPath, cookieHeader),
+    maintenanceTypesFromApi(locale, detailPath, cookieHeader),
+    scooterFinancialsFromApi(locale, id, detailPath, cookieHeader),
+    companyWalletOptionsFromApi(locale, detailPath, cookieHeader),
+    scooterBrandsFromApi(locale, detailPath, cookieHeader),
+  ]);
 
   return (
     <ScooterDetailPage
       scooter={scooter}
       scootersHref={localizePath(SCOOTERS_PATH, locale)}
+      maintenanceOverview={maintenanceOverview}
+      maintenanceTypes={maintenanceTypes}
+      financials={financials}
+      companyWallets={companyWallets.items}
+      brands={brands.items}
     />
   );
 }
@@ -89,6 +108,110 @@ const scooterFromApi = cache(async function scooterFromApi(
     throw error;
   }
 });
+
+async function maintenanceOverviewFromApi(
+  locale: ReturnType<typeof resolveRouteLocale>,
+  id: string,
+  detailPath: string,
+  cookieHeader: string,
+): Promise<v1.maintenance.ScooterMaintenanceOverview> {
+  try {
+    return await webApi.fetch(
+      v1.maintenance.ROUTES.overview(id),
+      v1.maintenance.scooterMaintenanceOverviewSchema,
+      { headers: { cookie: cookieHeader }, cache: "no-store" },
+    );
+  } catch (error) {
+    handleDetailFetchError(error, locale, detailPath);
+  }
+}
+
+async function maintenanceTypesFromApi(
+  locale: ReturnType<typeof resolveRouteLocale>,
+  detailPath: string,
+  cookieHeader: string,
+): Promise<v1.maintenance.MaintenanceTypeList> {
+  try {
+    return await webApi.fetch(
+      v1.maintenance.ROUTES.types.list,
+      v1.maintenance.maintenanceTypeListSchema,
+      { headers: { cookie: cookieHeader }, cache: "no-store" },
+    );
+  } catch (error) {
+    handleDetailFetchError(error, locale, detailPath);
+  }
+}
+
+async function scooterFinancialsFromApi(
+  locale: ReturnType<typeof resolveRouteLocale>,
+  id: string,
+  detailPath: string,
+  cookieHeader: string,
+): Promise<v1.finance.ScooterFinancials> {
+  try {
+    return await webApi.fetch(
+      v1.finance.SCOOTER_SALE_ROUTES.scooterFinancials(id),
+      v1.finance.scooterFinancialsSchema,
+      { headers: { cookie: cookieHeader }, cache: "no-store" },
+    );
+  } catch (error) {
+    handleDetailFetchError(error, locale, detailPath);
+  }
+}
+
+async function companyWalletOptionsFromApi(
+  locale: ReturnType<typeof resolveRouteLocale>,
+  detailPath: string,
+  cookieHeader: string,
+): Promise<v1.finance.WalletOptionList> {
+  const params = new URLSearchParams({
+    companyOnly: "true",
+    isActive: "true",
+    pageSize: "50",
+  });
+  try {
+    return await webApi.fetch(
+      `${v1.finance.ROUTES.walletOptions}?${params}`,
+      v1.finance.walletOptionListSchema,
+      { headers: { cookie: cookieHeader }, cache: "no-store" },
+    );
+  } catch (error) {
+    handleDetailFetchError(error, locale, detailPath);
+  }
+}
+
+async function scooterBrandsFromApi(
+  locale: ReturnType<typeof resolveRouteLocale>,
+  detailPath: string,
+  cookieHeader: string,
+): Promise<v1.scooterBrands.ScooterBrandList> {
+  try {
+    return await webApi.fetch(
+      v1.scooterBrands.ROUTES.list,
+      v1.scooterBrands.scooterBrandListSchema,
+      { headers: { cookie: cookieHeader }, cache: "no-store" },
+    );
+  } catch (error) {
+    handleDetailFetchError(error, locale, detailPath);
+  }
+}
+
+function handleDetailFetchError(
+  error: unknown,
+  locale: ReturnType<typeof resolveRouteLocale>,
+  detailPath: string,
+): never {
+  if (error instanceof ApiError && error.status === 401) {
+    redirect(getLocalizedSignInPath(locale, detailPath));
+  }
+  if (
+    error instanceof ApiError &&
+    (error.status === 403 || error.status === 404)
+  ) {
+    notFound();
+  }
+  throw error;
+}
 
 function scooterDetailPath(
   id: string,

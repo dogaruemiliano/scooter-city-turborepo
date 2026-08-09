@@ -285,8 +285,8 @@ test("person audit schemas expose safe activity metadata and routes", () => {
     changes: [
       {
         field: "document.number",
-        oldValue: "[redacted] 3456",
-        newValue: "[redacted] 9999",
+        oldValue: "**3456",
+        newValue: "**9999",
       },
     ],
     createdAt: "2026-06-26T10:00:00.000Z",

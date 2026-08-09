@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist_Mono, Manrope } from "next/font/google";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
@@ -33,6 +33,13 @@ export const metadata: Metadata = {
   appleWebApp: {
     title: "ScooterCity",
   },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export function generateStaticParams() {

@@ -14,14 +14,24 @@ import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
 
 import { localizePath, resolveRouteLocale } from "@/i18n/paths";
+import { ScooterSoldBadge } from "./ScooterSalesSection";
 
 interface ScooterListProps {
-  items: v1.scooters.Scooter[];
+  items: v1.scooters.ScooterListItem[];
+  /** Scooters known to have an active (non-cancelled) sale. Best-effort: only
+   * covers scooters resolved by the caller, e.g. the initial server-rendered
+   * page — freshly loaded scooters (search, infinite scroll) may not be
+   * reflected until the page reloads. */
+  soldScooterIds?: ReadonlySet<string>;
 }
 
 const inlineIconClassName = "size-4 shrink-0";
+const EMPTY_SOLD_SCOOTER_IDS: ReadonlySet<string> = new Set();
 
-export function ScooterList({ items }: ScooterListProps) {
+export function ScooterList({
+  items,
+  soldScooterIds = EMPTY_SOLD_SCOOTER_IDS,
+}: ScooterListProps) {
   const t = useTranslations("scooters");
   const locale = useLocale();
   const routeLocale = resolveRouteLocale(locale);
@@ -48,8 +58,7 @@ export function ScooterList({ items }: ScooterListProps) {
           <li
             key={scooter.id}
             className={cn(
-              canOpenDetail &&
-                "group/scooter-card relative rounded-xl focus-within:ring-2 focus-within:ring-ring",
+              canOpenDetail && "group/scooter-card relative rounded-xl",
             )}
           >
             {canOpenDetail ? (
@@ -65,7 +74,7 @@ export function ScooterList({ items }: ScooterListProps) {
               size="sm"
               className={cn(
                 canOpenDetail &&
-                  "pointer-events-none transition-colors group-hover/scooter-card:bg-muted",
+                  "pointer-events-none transition-colors group-hover/scooter-card:bg-muted group-focus-within/scooter-card:bg-muted/60",
               )}
             >
               <CardHeader className="gap-3">
@@ -97,7 +106,9 @@ export function ScooterList({ items }: ScooterListProps) {
                         className={inlineIconClassName}
                       />
                       <span className="truncate">
-                        {formatDate(scooter.purchasedOn, locale)}
+                        {scooter.purchasedOn
+                          ? formatDate(scooter.purchasedOn, locale)
+                          : t("detail.purchaseNotRecorded")}
                       </span>
                     </span>
                     {scooter.plateNumber ? (
@@ -111,6 +122,9 @@ export function ScooterList({ items }: ScooterListProps) {
                     ) : null}
 
                     <div className="flex min-w-0 flex-wrap gap-2 sm:col-span-2 md:col-span-3 md:justify-end">
+                      {soldScooterIds.has(scooter.id) ? (
+                        <ScooterSoldBadge />
+                      ) : null}
                       <PowertrainBadge scooter={scooter} />
                       <Badge variant="outline">
                         {t(`registrationTypes.${scooter.registrationType}`)}

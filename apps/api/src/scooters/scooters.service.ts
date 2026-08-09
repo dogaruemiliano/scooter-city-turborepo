@@ -11,6 +11,21 @@ import type { Prisma, Scooter } from "../generated/prisma/client";
 import { Prisma as PrismaRuntime } from "../generated/prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 
+const scooterInclude = {
+  brand: true,
+  purchaseAllocation: {
+    include: { expense: { select: { occurredOn: true, currency: true } } },
+  },
+} as const;
+
+type ScooterWithBrand = Scooter & {
+  brand: { name: string };
+  purchaseAllocation: {
+    allocatedGrossAmount: Prisma.Decimal;
+    expense: { occurredOn: Date; currency: string };
+  } | null;
+};
+
 interface SearchIdRow {
   id: string;
 }
@@ -34,7 +49,9 @@ interface RegistrationState {
 export class ScootersService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(input: v1.scooters.CreateScooterInput): Promise<Scooter> {
+  async create(
+    input: v1.scooters.CreateScooterInput,
+  ): Promise<ScooterWithBrand> {
     this.assertValidPowertrain(input.powertrainType, input.engineCc);
 
     try {
@@ -43,6 +60,7 @@ export class ScootersService {
 
       return await this.prisma.scooter.create({
         data,
+        include: scooterInclude,
       });
     } catch (error) {
       this.handleWriteError(error);
@@ -50,7 +68,7 @@ export class ScootersService {
   }
 
   async list(query: v1.scooters.ListScootersQuery): Promise<{
-    items: Scooter[];
+    items: ScooterWithBrand[];
     page: number;
     pageSize: number;
     total: number;
@@ -64,6 +82,7 @@ export class ScootersService {
       this.prisma.scooter.count({ where }),
       this.prisma.scooter.findMany({
         where,
+        include: scooterInclude,
         orderBy: this.toScooterOrderBy(query),
         skip: (query.page - 1) * query.pageSize,
         take: query.pageSize,
@@ -74,7 +93,7 @@ export class ScootersService {
   }
 
   private async search(query: v1.scooters.ListScootersQuery): Promise<{
-    items: Scooter[];
+    items: ScooterWithBrand[];
     page: number;
     pageSize: number;
     total: number;
@@ -109,6 +128,7 @@ export class ScootersService {
     const order = new Map(ids.map((id, index) => [id, index]));
     const items = await this.prisma.scooter.findMany({
       where: { id: { in: ids } },
+      include: scooterInclude,
     });
     items.sort((first, second) => order.get(first.id)! - order.get(second.id)!);
 
@@ -120,16 +140,17 @@ export class ScootersService {
     };
   }
 
-  async findActiveById(id: string): Promise<Scooter | null> {
+  async findActiveById(id: string): Promise<ScooterWithBrand | null> {
     return this.prisma.scooter.findFirst({
       where: { id, deletedAt: null },
+      include: scooterInclude,
     });
   }
 
   async update(
     id: string,
     input: v1.scooters.UpdateScooterInput,
-  ): Promise<Scooter> {
+  ): Promise<ScooterWithBrand> {
     try {
       const existing = await this.prisma.scooter.findFirst({
         where: { id, deletedAt: null },
@@ -164,7 +185,11 @@ export class ScootersService {
         id,
       );
 
-      return await this.prisma.scooter.update({ where: { id }, data });
+      return await this.prisma.scooter.update({
+        where: { id },
+        data,
+        include: scooterInclude,
+      });
     } catch (error) {
       this.handleWriteError(error);
     }
@@ -189,14 +214,14 @@ export class ScootersService {
   ): Prisma.ScooterCreateInput {
     return {
       vin: input.vin,
-      brand: input.brand,
+      brand: { connect: { id: input.brandId } },
       model: input.model,
       color: input.color,
       manufactureYear: input.manufactureYear,
       powertrainType: input.powertrainType,
+      engineType: input.engineType ?? null,
       engineCc: input.powertrainType === "electric" ? null : input.engineCc,
       powerKw: input.powerKw ?? null,
-      purchasedOn: toDateOnlyDate(input.purchasedOn)!,
       ...this.toRegistrationWriteData({
         registrationType: input.registrationType ?? "unregistered",
         plateNumber: input.plateNumber ?? null,
@@ -204,6 +229,7 @@ export class ScootersService {
         registrationExpiresOn: input.registrationExpiresOn ?? null,
         requiredDriverLicenseType: input.requiredDriverLicenseType ?? "none",
       }),
+      currentMileageKm: input.currentMileageKm ?? null,
       notes: input.notes,
     };
   }
@@ -216,20 +242,21 @@ export class ScootersService {
   ): Prisma.ScooterUpdateInput {
     return {
       vin: input.vin,
-      brand: input.brand,
+      brand:
+        input.brandId === undefined
+          ? undefined
+          : { connect: { id: input.brandId } },
       model: input.model,
       color: input.color,
       manufactureYear: input.manufactureYear,
       powertrainType: input.powertrainType,
+      engineType: input.engineType,
       engineCc: nextPowertrainType === "electric" ? null : nextEngineCc,
       powerKw: input.powerKw,
-      purchasedOn:
-        input.purchasedOn === undefined
-          ? undefined
-          : toDateOnlyDate(input.purchasedOn)!,
       ...this.toRegistrationWriteData(
         this.toNextRegistrationState(existing, input),
       ),
+      currentMileageKm: input.currentMileageKm,
       notes: input.notes,
     };
   }
@@ -378,7 +405,7 @@ export class ScootersService {
     const pattern = `%${term}%`;
     const scooterText = PrismaRuntime.sql`lower(
       coalesce(s.vin, '') || ' ' ||
-      coalesce(s.brand, '') || ' ' ||
+      coalesce(sb.name, '') || ' ' ||
       coalesce(s.model, '') || ' ' ||
       coalesce(s.color, '') || ' ' ||
       coalesce(s."manufactureYear"::text, '') || ' ' ||
@@ -397,14 +424,17 @@ export class ScootersService {
         SELECT
           s.id,
           s.vin,
-          s.brand,
+          sb.name AS brand,
           s.model,
           s."manufactureYear",
-          s."purchasedOn",
+          pe."occurredOn" AS "purchasedOn",
           s."createdAt",
           s."updatedAt",
           ${scooterText} AS scooter_text
         FROM "Scooter" s
+        JOIN "ScooterBrand" sb ON sb.id = s."brandId"
+        LEFT JOIN "ExpenseScooterAllocation" pa ON pa.id = s."purchaseAllocationId"
+        LEFT JOIN "Expense" pe ON pe.id = pa."expenseId"
         WHERE ${this.toScooterFilterSql(query)}
       ),
       scored AS (
@@ -474,17 +504,23 @@ export class ScootersService {
       case "vinDesc":
         return [{ vin: "desc" }, { id: "asc" }];
       case "brandAsc":
-        return [{ brand: "asc" }, { model: "asc" }, { vin: "asc" }];
+        return [{ brand: { name: "asc" } }, { model: "asc" }, { vin: "asc" }];
       case "brandDesc":
-        return [{ brand: "desc" }, { model: "desc" }, { vin: "asc" }];
+        return [{ brand: { name: "desc" } }, { model: "desc" }, { vin: "asc" }];
       case "manufactureYearDesc":
         return [{ manufactureYear: "desc" }, { vin: "asc" }];
       case "manufactureYearAsc":
         return [{ manufactureYear: "asc" }, { vin: "asc" }];
       case "purchasedOnDesc":
-        return [{ purchasedOn: "desc" }, { vin: "asc" }];
+        return [
+          { purchaseAllocation: { expense: { occurredOn: "desc" } } },
+          { vin: "asc" },
+        ];
       case "purchasedOnAsc":
-        return [{ purchasedOn: "asc" }, { vin: "asc" }];
+        return [
+          { purchaseAllocation: { expense: { occurredOn: "asc" } } },
+          { vin: "asc" },
+        ];
       case "createdAtDesc":
         return [{ createdAt: "desc" }, { id: "asc" }];
       case "createdAtAsc":

@@ -1,14 +1,14 @@
-// Auth subsystem schema. Business models land in later PRs.
+// Auth, fleet, and financial subsystem schema.
 //
 // Design references:
 // - docs/adr/0002-cookie-based-sessions.md         (cookies, no authjs)
 // - docs/adr/0003-multi-instance-refresh-rotation.md (previous_jti + pendingTokenHash)
 // - docs/auth/sessions-and-audit.md                 (this PR — what each table is for)
 //
-// Every model that ties to a user uses `onDelete: Cascade` so DELETE /v1/auth/me
-// in PR 5 wipes the user's full footprint atomically. The single exception is
-// AuditEvent which uses `SetNull` — we keep audit history after account deletion
-// for compliance / forensics; rows are simply detached from the gone user.
+// Account deletion is a soft-delete of User plus explicit removal of
+// authentication-owned records. Person uses `Restrict` as a database-level
+// guard against accidental hard deletion. Audit and financial records remain
+// linked to the preserved User row.
 
 // Canonical Prisma 7 generator block. See AGENTS.md → prisma-verify-rule.
 // - `prisma-client` (not the deprecated `prisma-client-js`)
@@ -30,13 +30,167 @@ datasource db {
   provider = "postgresql"
 }
 
+enum WalletType {
+  USER
+  COMPANY_CASH
+  COMPANY_BANK
+  PAYMENT_PROCESSOR
+}
+
+enum WalletBalanceBucket {
+  USER_SETTLEMENT
+  BUSINESS_FUNDS
+  ADMIN_PERSONAL_FUNDS
+  CUSTOMER_GUARANTEE_FUNDS
+}
+
+enum MoneyTransactionType {
+  INCOME
+  EXPENSE
+  TRANSFER
+  USER_CHARGE
+  USER_PAYMENT
+  GUARANTEE_RECEIVED
+  GUARANTEE_REFUNDED
+  REIMBURSEMENT
+  PERSONAL_EXTRACTION
+  PERSONAL_FUNDS_SPLIT
+  PERSONAL_FUNDS_CLAIM
+  COMPANY_DISTRIBUTION
+  CAPITAL_CONTRIBUTION
+  REFUND
+  ADJUSTMENT
+  REVERSAL
+}
+
+enum MoneyTransactionStatus {
+  DRAFT
+  POSTED
+  REVERSED
+}
+
+enum MoneyTransactionScope {
+  COMPANY
+  ADMIN_PERSONAL
+  CUSTOMER_HELD
+}
+
+enum PaymentMethod {
+  CASH
+  POS
+  BANK_TRANSFER
+  ONLINE_PAYMENT
+}
+
+enum BillingStatus {
+  BILLED
+  NOT_BILLED
+  NOT_APPLICABLE
+}
+
+enum FinancialCategoryKind {
+  INCOME
+  EXPENSE
+}
+
+enum CounterpartyType {
+  PERSON
+  COMPANY
+}
+
+enum CompanyLegalForm {
+  SRL
+  SA
+  PFA
+  II
+  IF
+  ONG
+  OTHER
+}
+
+enum ExpenseStatus {
+  DRAFT
+  POSTED
+  REVERSED
+}
+
+enum ExpensePaymentSource {
+  COMPANY_CARD
+  COMPANY_CASH_DESK
+  PERSONAL_FUNDS
+}
+
+enum ExpenseFundingTreatment {
+  REIMBURSABLE
+  NON_REIMBURSABLE
+}
+
+enum ExpenseAttributionTarget {
+  BUSINESS
+  OWNER
+}
+
+enum ExpenseDocumentType {
+  FISCAL_RECEIPT
+  INVOICE
+  POS_RECEIPT
+  CREDIT_NOTE
+  OTHER
+}
+
+enum ExpenseDocumentReviewStatus {
+  PENDING
+  CONFIRMED
+  REJECTED
+}
+
+enum ExpenseBuyerCuiStatus {
+  NOT_REVIEWED
+  MATCHED
+  MISSING
+  MISMATCH
+  NOT_APPLICABLE
+}
+
+enum ExpenseDocumentAssetRole {
+  ORIGINAL
+  NORMALIZED
+}
+
+enum ExpensePostingRole {
+  EXPENSE_PAYMENT
+  EXPENSE_REVERSAL
+  REIMBURSEMENT_SETTLEMENT
+}
+
+enum ExpenseReimbursementStatus {
+  OPEN
+  PARTIALLY_SETTLED
+  SETTLED
+  CANCELLED
+}
+
+enum ScooterIssueSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum ScooterIssueStatus {
+  OPEN
+  FIXED
+}
+
 /// Admin-managed person record used by rental flows.
 ///
-/// This is intentionally separate from `User`: a person can exist before
-/// they have an app account, and a future linking flow can connect them by
-/// the required unique email.
+/// `Person` remains separate from authentication details, but every person is
+/// backed by exactly one User. Person creation must create both records in one
+/// database transaction.
 model Person {
   id           String           @id @default(cuid())
+  userId       String           @unique
+  user         User             @relation(fields: [userId], references: [id], onDelete: Restrict)
   email        String           @unique
   phone        String           @unique
   firstName    String
@@ -53,9 +207,11 @@ model Person {
   updatedAt    DateTime         @updatedAt
   deletedAt    DateTime?
   documents    PersonDocument[]
+  counterparty Counterparty?
 
   @@index([deletedAt])
   @@index([lastName, firstName])
+  @@index([countryCode, deletedAt])
 }
 
 /// KYC/rental document belonging to a Person.
@@ -85,6 +241,7 @@ model PersonDocument {
   @@unique([personId, type], map: "person_document_active_type_unique", where: { deletedAt: null })
   @@unique([personId], map: "person_document_active_identity_unique", where: raw("\"deletedAt\" IS NULL AND \"type\" IN ('passport', 'nationalId', 'residencePermit', 'other')"))
   @@index([personId, deletedAt])
+  @@index([personId, type, status, issuingCountryCode, expiresOn], map: "PersonDocument_active_filters_idx", where: { deletedAt: null })
   @@index([type])
   @@index([status])
   @@index([expiresOn])
@@ -111,20 +268,633 @@ model User {
   roles         String[]  @default([])
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
-  /// Soft-delete marker. Hard cascade still runs via DELETE /v1/auth/me; this
-  /// column is reserved for "deactivate" flows that may land later.
+  /// Account deactivation marker. DELETE /v1/auth/me sets this value while
+  /// preserving the User row and its business history.
   deletedAt     DateTime?
 
-  sessions      Session[]
-  refreshTokens RefreshToken[]
-  otpChallenges OtpChallenge[]
-  authAccounts  AuthAccount[]
-  auditEvents   AuditEvent[]
-  mediaAssets   MediaAsset[]
-  draftUploads  DraftUpload[]
+  sessions                    Session[]
+  refreshTokens               RefreshToken[]
+  otpChallenges               OtpChallenge[]
+  authAccounts                AuthAccount[]
+  auditEvents                 AuditEvent[]
+  mediaAssets                 MediaAsset[]
+  draftUploads                DraftUpload[]
+  person                      Person?
+  wallet                      Wallet?                          @relation("WalletOwner")
+  transactionsRecorded        MoneyTransaction[]               @relation("MoneyTransactionRecordedBy")
+  transactionsAsCounterparty  MoneyTransaction[]               @relation("MoneyTransactionCounterparty")
+  transactionsAsRecipient     MoneyTransaction[]               @relation("MoneyTransactionRecipient")
+  transactionsAsDebtor        MoneyTransaction[]               @relation("MoneyTransactionDebtor")
+  transactionsAsCreditor      MoneyTransaction[]               @relation("MoneyTransactionCreditor")
+  businessOwnerships          BusinessOwner[]                  @relation("BusinessOwnerUser")
+  expensesCreated             Expense[]                        @relation("ExpenseCreatedBy")
+  expensesUpdated             Expense[]                        @relation("ExpenseUpdatedBy")
+  expensesPosted              Expense[]                        @relation("ExpensePostedBy")
+  expensesReversed            Expense[]                        @relation("ExpenseReversedBy")
+  expensePaymentsFunded       ExpensePayment[]                 @relation("ExpensePaymentFundedBy")
+  expensePaymentsPaid         ExpensePayment[]                 @relation("ExpensePaymentPaidBy")
+  reimbursementClaims         ExpenseReimbursementClaim[]      @relation("ExpenseClaimant")
+  reimbursementSettlements    ExpenseReimbursementSettlement[] @relation("ExpenseSettlementPaidBy")
+  expenseDocumentsReviewed    ExpenseDocument[]                @relation("ExpenseDocumentReviewedBy")
+  companyCardsHeld            Wallet[]                         @relation("CompanyCardHolder")
+  scooterIssuesReported       ScooterIssue[]                   @relation("ScooterIssueReportedBy")
+  maintenanceRecordsRecorded  MaintenanceRecord[]              @relation("MaintenanceRecordRecordedBy")
+  scooterSalesRecorded        ScooterSale[]                    @relation("ScooterSaleCreatedBy")
+  scooterSaleDocumentsCreated ScooterSaleDocument[]            @relation("ScooterSaleDocumentCreatedBy")
 
   @@index([email])
   @@index([phone])
+}
+
+/// An external legal entity that can pay, be paid, owe money, or be owed.
+///
+/// Company is deliberately not a Wallet: this row identifies who the business
+/// trades with, while Wallet continues to identify where money is held.
+model Company {
+  id                      String               @id @default(cuid())
+  legalName               String
+  legalForm               CompanyLegalForm     @default(SRL)
+  tradingName             String?
+  taxIdentifier           String?
+  taxIdentifierNormalized String?              @unique
+  registrationNumber      String?
+  email                   String?
+  phone                   String?
+  phoneNormalized         String?
+  addressLine1            String?
+  addressLine2            String?
+  city                    String?
+  region                  String?
+  postalCode              String?
+  countryCode             String?
+  notes                   String?
+  isActive                Boolean              @default(true)
+  createdAt               DateTime             @default(now())
+  updatedAt               DateTime             @updatedAt
+  deletedAt               DateTime?
+  counterparty            Counterparty?
+  businessLegalEntity     BusinessLegalEntity?
+
+  @@index([legalName])
+  @@index([phoneNormalized])
+  @@index([isActive, deletedAt])
+  @@index([countryCode, deletedAt])
+}
+
+/// Stable financial identity shared by people and companies.
+///
+/// Exactly one of personId/companyId is populated. The database migration
+/// enforces that invariant with a CHECK constraint in addition to the unique
+/// one-to-one relations represented here.
+model Counterparty {
+  id        String           @id @default(cuid())
+  type      CounterpartyType
+  personId  String?          @unique
+  person    Person?          @relation(fields: [personId], references: [id], onDelete: Restrict)
+  companyId String?          @unique
+  company   Company?         @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  isActive  Boolean          @default(true)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  transactionsAsCounterparty MoneyTransaction[] @relation("MoneyTransactionUnifiedCounterparty")
+  transactionsAsRecipient    MoneyTransaction[] @relation("MoneyTransactionUnifiedRecipient")
+  transactionsAsDebtor       MoneyTransaction[] @relation("MoneyTransactionUnifiedDebtor")
+  transactionsAsCreditor     MoneyTransaction[] @relation("MoneyTransactionUnifiedCreditor")
+  expensesAsPayee            Expense[]          @relation("ExpensePayee")
+  scooterSalesAsBuyer        ScooterSale[]      @relation("ScooterSaleBuyer")
+
+  @@index([type, isActive])
+}
+
+/// A tracked money location or a user's single financial wallet.
+///
+/// USER wallets have an owner. Company cash, bank, and payment-processor
+/// wallets do not. The unique ownerUserId enforces at most one wallet per user;
+/// user creation is responsible for creating it.
+model Wallet {
+  id               String     @id @default(cuid())
+  type             WalletType
+  ownerUserId      String?    @unique
+  owner            User?      @relation("WalletOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  cardHolderUserId String?
+  cardHolder       User?      @relation("CompanyCardHolder", fields: [cardHolderUserId], references: [id], onDelete: Restrict)
+  name             String
+  isActive         Boolean    @default(true)
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  balances                 WalletBalance[]
+  balanceChanges           WalletBalanceChange[]
+  businessLegalEntities    BusinessLegalEntityWallet[]
+  expensePayments          ExpensePayment[]
+  reimbursementSettlements ExpenseReimbursementSettlement[]
+
+  @@index([type, isActive])
+  @@index([cardHolderUserId])
+}
+
+/// Fast, rebuildable current balance for one wallet, bucket, and currency.
+///
+/// USER_SETTLEMENT is from the user's perspective: positive means the company
+/// owes the user; negative means the user owes the company.
+model WalletBalance {
+  id        String              @id @default(cuid())
+  walletId  String
+  wallet    Wallet              @relation(fields: [walletId], references: [id], onDelete: Restrict)
+  bucket    WalletBalanceBucket
+  currency  String              @default("RON") @db.Char(3)
+  balance   Decimal             @default(0) @db.Decimal(19, 2)
+  updatedAt DateTime            @updatedAt
+
+  @@unique([walletId, bucket, currency])
+  @@index([bucket, currency])
+}
+
+/// User-facing financial event describing why money or an obligation changed.
+///
+/// Only POSTED transactions affect WalletBalance. Posted rows are immutable;
+/// corrections are represented by a new REVERSAL transaction.
+model MoneyTransaction {
+  id                      String                 @id @default(cuid())
+  type                    MoneyTransactionType
+  status                  MoneyTransactionStatus @default(DRAFT)
+  amount                  Decimal                @db.Decimal(19, 2)
+  currency                String                 @default("RON") @db.Char(3)
+  financialScope          MoneyTransactionScope
+  paymentMethod           PaymentMethod?
+  billingStatus           BillingStatus          @default(NOT_APPLICABLE)
+  categoryId              String?
+  category                FinancialCategory?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  counterpartyUserId      String?
+  counterparty            User?                  @relation("MoneyTransactionCounterparty", fields: [counterpartyUserId], references: [id], onDelete: SetNull)
+  counterpartyId          String?
+  counterpartyEntity      Counterparty?          @relation("MoneyTransactionUnifiedCounterparty", fields: [counterpartyId], references: [id], onDelete: SetNull)
+  recipientUserId         String?
+  recipient               User?                  @relation("MoneyTransactionRecipient", fields: [recipientUserId], references: [id], onDelete: SetNull)
+  recipientCounterpartyId String?
+  recipientCounterparty   Counterparty?          @relation("MoneyTransactionUnifiedRecipient", fields: [recipientCounterpartyId], references: [id], onDelete: SetNull)
+  debtorUserId            String?
+  debtor                  User?                  @relation("MoneyTransactionDebtor", fields: [debtorUserId], references: [id], onDelete: SetNull)
+  debtorCounterpartyId    String?
+  debtorCounterparty      Counterparty?          @relation("MoneyTransactionUnifiedDebtor", fields: [debtorCounterpartyId], references: [id], onDelete: SetNull)
+  creditorUserId          String?
+  creditor                User?                  @relation("MoneyTransactionCreditor", fields: [creditorUserId], references: [id], onDelete: SetNull)
+  creditorCounterpartyId  String?
+  creditorCounterparty    Counterparty?          @relation("MoneyTransactionUnifiedCreditor", fields: [creditorCounterpartyId], references: [id], onDelete: SetNull)
+  recordedByUserId        String?
+  recordedBy              User?                  @relation("MoneyTransactionRecordedBy", fields: [recordedByUserId], references: [id], onDelete: SetNull)
+  occurredAt              DateTime
+  description             String?
+  idempotencyKey          String                 @unique
+  /// Source event that automatically generated this transaction. A
+  /// PERSONAL_FUNDS_CLAIM points to the ADMIN_PERSONAL income that created it.
+  originTransactionId     String?
+  originTransaction       MoneyTransaction?      @relation("MoneyTransactionOrigin", fields: [originTransactionId], references: [id], onDelete: Restrict)
+  generatedTransactions   MoneyTransaction[]     @relation("MoneyTransactionOrigin")
+  reversalOfTransactionId String?
+  reversalOf              MoneyTransaction?      @relation("MoneyTransactionReversal", fields: [reversalOfTransactionId], references: [id], onDelete: Restrict)
+  reversals               MoneyTransaction[]     @relation("MoneyTransactionReversal")
+  createdAt               DateTime               @default(now())
+  updatedAt               DateTime               @updatedAt
+
+  balanceChanges  WalletBalanceChange[]
+  references      MoneyTransactionReference[]
+  expensePostings ExpensePosting[]
+
+  @@index([status, occurredAt])
+  @@index([financialScope, billingStatus, occurredAt])
+  @@index([paymentMethod, occurredAt])
+  @@index([categoryId, occurredAt])
+  @@index([counterpartyUserId, occurredAt])
+  @@index([counterpartyId, occurredAt])
+  @@index([counterpartyId, type, status])
+  @@index([recipientUserId, occurredAt])
+  @@index([recipientCounterpartyId, occurredAt])
+  @@index([debtorUserId, creditorUserId, occurredAt])
+  @@index([debtorCounterpartyId, creditorCounterpartyId, occurredAt])
+  @@index([recordedByUserId, occurredAt])
+  @@index([originTransactionId])
+  @@index([reversalOfTransactionId])
+}
+
+/// Exact signed balance effect produced by a MoneyTransaction.
+///
+/// A collection or extraction can have one row, a transfer has two rows, and
+/// events such as guarantees can affect both a money location and a user's
+/// settlement balance without duplicating the parent transaction.
+model WalletBalanceChange {
+  id                 String              @id @default(cuid())
+  moneyTransactionId String
+  moneyTransaction   MoneyTransaction    @relation(fields: [moneyTransactionId], references: [id], onDelete: Restrict)
+  walletId           String
+  wallet             Wallet              @relation(fields: [walletId], references: [id], onDelete: Restrict)
+  bucket             WalletBalanceBucket
+  currency           String              @default("RON") @db.Char(3)
+  amountDelta        Decimal             @db.Decimal(19, 2)
+  createdAt          DateTime            @default(now())
+
+  @@unique([moneyTransactionId, walletId, bucket, currency])
+  @@index([walletId, bucket, currency, createdAt])
+}
+
+/// Configurable reporting category. Categories are data rather than enums so
+/// the business can add scooter and company categories without a migration.
+model FinancialCategory {
+  id               String                @id @default(cuid())
+  code             String                @unique
+  name             String
+  /// Lucide icon name (e.g. "wrench"), resolved to a component on the client.
+  icon             String?
+  kind             FinancialCategoryKind
+  keywords         String[]              @default([])
+  parentCategoryId String?
+  parentCategory   FinancialCategory?    @relation("FinancialCategoryTree", fields: [parentCategoryId], references: [id], onDelete: SetNull)
+  children         FinancialCategory[]   @relation("FinancialCategoryTree")
+  isActive         Boolean               @default(true)
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+
+  transactions MoneyTransaction[]
+  expenses     Expense[]
+
+  @@index([parentCategoryId])
+  @@index([kind, isActive])
+}
+
+/// Polymorphic link from a financial event to its source domain records.
+///
+/// Prisma does not model polymorphic foreign keys, so referenceType and
+/// referenceId are validated by the financial application service.
+model MoneyTransactionReference {
+  id                 String           @id @default(cuid())
+  moneyTransactionId String
+  moneyTransaction   MoneyTransaction @relation(fields: [moneyTransactionId], references: [id], onDelete: Restrict)
+  referenceType      String
+  referenceId        String
+  isPrimary          Boolean          @default(false)
+  createdAt          DateTime         @default(now())
+
+  @@unique([moneyTransactionId, referenceType, referenceId])
+  @@index([referenceType, referenceId])
+  @@index([moneyTransactionId, isPrimary])
+}
+
+/// One company configured as an operating legal entity for expense posting.
+model BusinessLegalEntity {
+  id              String   @id @default(cuid())
+  companyId       String   @unique
+  company         Company  @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  defaultCurrency String   @default("RON") @db.Char(3)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  wallets                BusinessLegalEntityWallet[]
+  owners                 BusinessOwner[]
+  vatRegistrationPeriods VatRegistrationPeriod[]
+  expenses               Expense[]
+  reimbursementClaims    ExpenseReimbursementClaim[]
+
+  @@index([isActive])
+}
+
+/// Explicit assignment of an existing company money-location wallet.
+model BusinessLegalEntityWallet {
+  id            String              @id @default(cuid())
+  legalEntityId String
+  legalEntity   BusinessLegalEntity @relation(fields: [legalEntityId], references: [id], onDelete: Cascade)
+  walletId      String              @unique
+  wallet        Wallet              @relation(fields: [walletId], references: [id], onDelete: Restrict)
+  createdAt     DateTime            @default(now())
+
+  @@unique([legalEntityId, walletId])
+  @@index([legalEntityId])
+}
+
+/// Effective-dated, explicit owner membership. ADMIN role is never inferred.
+model BusinessOwner {
+  id            String              @id @default(cuid())
+  legalEntityId String
+  legalEntity   BusinessLegalEntity @relation(fields: [legalEntityId], references: [id], onDelete: Restrict)
+  userId        String
+  user          User                @relation("BusinessOwnerUser", fields: [userId], references: [id], onDelete: Restrict)
+  effectiveFrom DateTime            @db.Date
+  effectiveTo   DateTime?           @db.Date
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  attributions ExpenseCostAttribution[]
+
+  @@unique([legalEntityId, userId, effectiveFrom])
+  @@index([legalEntityId, effectiveFrom, effectiveTo])
+  @@index([userId, effectiveFrom, effectiveTo])
+}
+
+/// VAT-registration facts used to produce immutable posting-time snapshots.
+model VatRegistrationPeriod {
+  id            String              @id @default(cuid())
+  legalEntityId String
+  legalEntity   BusinessLegalEntity @relation(fields: [legalEntityId], references: [id], onDelete: Restrict)
+  countryCode   String              @db.Char(2)
+  vatNumber     String
+  effectiveFrom DateTime            @db.Date
+  effectiveTo   DateTime?           @db.Date
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  taxSnapshots ExpenseTaxSnapshot[]
+
+  @@unique([legalEntityId, countryCode, vatNumber, effectiveFrom])
+  @@index([legalEntityId, effectiveFrom, effectiveTo])
+}
+
+/// Accounting expense aggregate. Drafts are editable; posted snapshots are not.
+model Expense {
+  id                     String              @id @default(cuid())
+  legalEntityId          String
+  legalEntity            BusinessLegalEntity @relation(fields: [legalEntityId], references: [id], onDelete: Restrict)
+  /// Optional: unset for a quick-entry expense with no known recipient.
+  payeeId                String?
+  payee                  Counterparty?       @relation("ExpensePayee", fields: [payeeId], references: [id], onDelete: Restrict)
+  /// Optional: unset for a quick-entry expense not yet categorized.
+  categoryId             String?
+  category               FinancialCategory?  @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  status                 ExpenseStatus       @default(DRAFT)
+  occurredOn             DateTime            @db.Date
+  taxPointOn             DateTime            @db.Date
+  currency               String              @default("RON") @db.Char(3)
+  grossAmount            Decimal             @db.Decimal(19, 2)
+  recognizedCostAmount   Decimal             @db.Decimal(19, 2)
+  fiscalDeductibleAmount Decimal             @db.Decimal(19, 2)
+  notes                  String?
+  idempotencyKey         String              @unique
+  postIdempotencyKey     String?             @unique
+  reverseIdempotencyKey  String?             @unique
+  createdByUserId        String
+  createdBy              User                @relation("ExpenseCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  updatedByUserId        String
+  updatedBy              User                @relation("ExpenseUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: Restrict)
+  postedByUserId         String?
+  postedBy               User?               @relation("ExpensePostedBy", fields: [postedByUserId], references: [id], onDelete: SetNull)
+  postedAt               DateTime?
+  reversedByUserId       String?
+  reversedBy             User?               @relation("ExpenseReversedBy", fields: [reversedByUserId], references: [id], onDelete: SetNull)
+  reversedAt             DateTime?
+  reversalReason         String?
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
+
+  payment            ExpensePayment?
+  costPool           ExpenseCostPool?
+  taxSnapshot        ExpenseTaxSnapshot?
+  references         ExpenseReference[]
+  documents          ExpenseDocument[]
+  postings           ExpensePosting[]
+  reimbursementClaim ExpenseReimbursementClaim?
+  scooterAllocations ExpenseScooterAllocation[]
+
+  @@index([legalEntityId, status, occurredOn])
+  @@index([payeeId, occurredOn])
+  @@index([categoryId, occurredOn])
+  @@index([status, taxPointOn])
+}
+
+/// One compact-v1 payment whose funder, payer and beneficiary stay independent.
+model ExpensePayment {
+  id               String                  @id @default(cuid())
+  expenseId        String                  @unique
+  expense          Expense                 @relation(fields: [expenseId], references: [id], onDelete: Restrict)
+  source           ExpensePaymentSource
+  companyWalletId  String?
+  companyWallet    Wallet?                 @relation(fields: [companyWalletId], references: [id], onDelete: Restrict)
+  fundedByUserId   String?
+  fundedBy         User?                   @relation("ExpensePaymentFundedBy", fields: [fundedByUserId], references: [id], onDelete: Restrict)
+  paidByUserId     String
+  paidBy           User                    @relation("ExpensePaymentPaidBy", fields: [paidByUserId], references: [id], onDelete: Restrict)
+  amount           Decimal                 @db.Decimal(19, 2)
+  paidOn           DateTime                @db.Date
+  fundingTreatment ExpenseFundingTreatment
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+
+  posting            ExpensePosting?
+  reimbursementClaim ExpenseReimbursementClaim?
+
+  @@index([source, paidOn])
+  @@index([companyWalletId, paidOn])
+  @@index([fundedByUserId, paidOn])
+  @@index([paidByUserId, paidOn])
+}
+
+/// Compact v1 has one pool per expense; the shape permits later expansion.
+model ExpenseCostPool {
+  id                   String   @id @default(cuid())
+  expenseId            String   @unique
+  expense              Expense  @relation(fields: [expenseId], references: [id], onDelete: Restrict)
+  grossAmount          Decimal  @db.Decimal(19, 2)
+  recognizedCostAmount Decimal  @db.Decimal(19, 2)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  attribution ExpenseCostAttribution?
+}
+
+/// Exactly one 100% business or formal-owner allocation in compact v1.
+model ExpenseCostAttribution {
+  id                            String                   @id @default(cuid())
+  costPoolId                    String                   @unique
+  costPool                      ExpenseCostPool          @relation(fields: [costPoolId], references: [id], onDelete: Restrict)
+  target                        ExpenseAttributionTarget
+  businessOwnerId               String?
+  businessOwner                 BusinessOwner?           @relation(fields: [businessOwnerId], references: [id], onDelete: Restrict)
+  percentage                    Decimal                  @default(100) @db.Decimal(7, 4)
+  allocatedGrossAmount          Decimal                  @db.Decimal(19, 2)
+  allocatedRecognizedCostAmount Decimal                  @db.Decimal(19, 2)
+  createdAt                     DateTime                 @default(now())
+  updatedAt                     DateTime                 @updatedAt
+
+  @@index([target, businessOwnerId])
+}
+
+/// Immutable tax treatment calculated from the effective VAT period.
+model ExpenseTaxSnapshot {
+  id                         String                 @id @default(cuid())
+  expenseId                  String                 @unique
+  expense                    Expense                @relation(fields: [expenseId], references: [id], onDelete: Restrict)
+  vatRegistrationPeriodId    String?
+  vatRegistrationPeriod      VatRegistrationPeriod? @relation(fields: [vatRegistrationPeriodId], references: [id], onDelete: Restrict)
+  vatRegistrationCountryCode String?                @db.Char(2)
+  vatRegistrationNumber      String?
+  legalEntityTaxIdentifier   String
+  isVatRegistered            Boolean
+  taxPointOn                 DateTime               @db.Date
+  grossAmount                Decimal                @db.Decimal(19, 2)
+  netAmount                  Decimal                @db.Decimal(19, 2)
+  vatAmount                  Decimal                @db.Decimal(19, 2)
+  recoverableVatAmount       Decimal                @db.Decimal(19, 2)
+  nonRecoverableVatAmount    Decimal                @db.Decimal(19, 2)
+  recognizedCostAmount       Decimal                @db.Decimal(19, 2)
+  createdAt                  DateTime               @default(now())
+
+  lines ExpenseTaxLine[]
+
+  @@index([vatRegistrationPeriodId])
+  @@index([taxPointOn, isVatRegistered])
+}
+
+model ExpenseTaxLine {
+  id                      String             @id @default(cuid())
+  taxSnapshotId           String
+  taxSnapshot             ExpenseTaxSnapshot @relation(fields: [taxSnapshotId], references: [id], onDelete: Restrict)
+  vatRate                 Decimal            @db.Decimal(7, 4)
+  netAmount               Decimal            @db.Decimal(19, 2)
+  vatAmount               Decimal            @db.Decimal(19, 2)
+  grossAmount             Decimal            @db.Decimal(19, 2)
+  deductiblePercent       Decimal            @db.Decimal(7, 4)
+  recoverableVatAmount    Decimal            @db.Decimal(19, 2)
+  nonRecoverableVatAmount Decimal            @db.Decimal(19, 2)
+  createdAt               DateTime           @default(now())
+
+  @@index([taxSnapshotId])
+}
+
+/// Per-scooter split of an expense's cost. One row per scooter covered by a
+/// single payment, so one bill (e.g. a bulk purchase or a shared transport
+/// fee) can fund many scooters, evenly or with a custom amount each.
+model ExpenseScooterAllocation {
+  id                   String   @id @default(cuid())
+  expenseId            String
+  expense              Expense  @relation(fields: [expenseId], references: [id], onDelete: Restrict)
+  scooterId            String
+  scooter              Scooter  @relation(fields: [scooterId], references: [id], onDelete: Restrict)
+  allocatedGrossAmount Decimal  @db.Decimal(19, 2)
+  createdAt            DateTime @default(now())
+  purchasingScooter    Scooter? @relation("ScooterPurchaseAllocation")
+
+  @@unique([expenseId, scooterId])
+  @@index([scooterId])
+  @@index([expenseId])
+}
+
+/// Polymorphic domain link following MoneyTransactionReference semantics.
+model ExpenseReference {
+  id            String   @id @default(cuid())
+  expenseId     String
+  expense       Expense  @relation(fields: [expenseId], references: [id], onDelete: Restrict)
+  referenceType String
+  referenceId   String
+  isPrimary     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  @@unique([expenseId, referenceType, referenceId])
+  @@index([referenceType, referenceId])
+  @@index([expenseId, isPrimary])
+}
+
+/// Manually reviewed source document. OCR is intentionally out of scope.
+model ExpenseDocument {
+  id                    String                      @id @default(cuid())
+  expenseId             String
+  expense               Expense                     @relation(fields: [expenseId], references: [id], onDelete: Restrict)
+  type                  ExpenseDocumentType
+  documentSeries        String?
+  documentNumber        String?
+  supplierName          String?
+  supplierTaxIdentifier String?
+  buyerTaxIdentifier    String?
+  issuedOn              DateTime?                   @db.Date
+  buyerCuiStatus        ExpenseBuyerCuiStatus       @default(NOT_REVIEWED)
+  reviewStatus          ExpenseDocumentReviewStatus @default(PENDING)
+  reviewedByUserId      String?
+  reviewedBy            User?                       @relation("ExpenseDocumentReviewedBy", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+  reviewedAt            DateTime?
+  notes                 String?
+  createdAt             DateTime                    @default(now())
+  updatedAt             DateTime                    @updatedAt
+
+  assets ExpenseDocumentAsset[]
+
+  @@index([expenseId, type])
+  @@index([reviewStatus, buyerCuiStatus])
+  @@index([reviewedByUserId])
+}
+
+model ExpenseDocumentAsset {
+  id          String                   @id @default(cuid())
+  documentId  String
+  document    ExpenseDocument          @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  assetId     String                   @unique
+  asset       MediaAsset               @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  role        ExpenseDocumentAssetRole
+  imageWidth  Int?
+  imageHeight Int?
+  pageCount   Int?
+  createdAt   DateTime                 @default(now())
+
+  @@unique([documentId, role])
+  @@index([documentId])
+}
+
+/// Liability exists only for PERSONAL_FUNDS + BUSINESS expenses.
+model ExpenseReimbursementClaim {
+  id               String                     @id @default(cuid())
+  expenseId        String                     @unique
+  expense          Expense                    @relation(fields: [expenseId], references: [id], onDelete: Restrict)
+  expensePaymentId String                     @unique
+  expensePayment   ExpensePayment             @relation(fields: [expensePaymentId], references: [id], onDelete: Restrict)
+  legalEntityId    String
+  legalEntity      BusinessLegalEntity        @relation(fields: [legalEntityId], references: [id], onDelete: Restrict)
+  claimantUserId   String
+  claimant         User                       @relation("ExpenseClaimant", fields: [claimantUserId], references: [id], onDelete: Restrict)
+  status           ExpenseReimbursementStatus @default(OPEN)
+  originalAmount   Decimal                    @db.Decimal(19, 2)
+  settledAmount    Decimal                    @default(0) @db.Decimal(19, 2)
+  currency         String                     @default("RON") @db.Char(3)
+  createdAt        DateTime                   @default(now())
+  updatedAt        DateTime                   @updatedAt
+
+  settlements ExpenseReimbursementSettlement[]
+
+  @@index([legalEntityId, status, createdAt])
+  @@index([claimantUserId, status])
+}
+
+model ExpenseReimbursementSettlement {
+  id              String                    @id @default(cuid())
+  claimId         String
+  claim           ExpenseReimbursementClaim @relation(fields: [claimId], references: [id], onDelete: Restrict)
+  amount          Decimal                   @db.Decimal(19, 2)
+  companyWalletId String
+  companyWallet   Wallet                    @relation(fields: [companyWalletId], references: [id], onDelete: Restrict)
+  paidOn          DateTime                  @db.Date
+  paidByUserId    String
+  paidBy          User                      @relation("ExpenseSettlementPaidBy", fields: [paidByUserId], references: [id], onDelete: Restrict)
+  idempotencyKey  String                    @unique
+  notes           String?
+  createdAt       DateTime                  @default(now())
+
+  posting ExpensePosting?
+
+  @@index([claimId, paidOn])
+  @@index([companyWalletId, paidOn])
+}
+
+/// Explicit link to generated ledger rows prevents expense double counting.
+model ExpensePosting {
+  id                        String                          @id @default(cuid())
+  expenseId                 String
+  expense                   Expense                         @relation(fields: [expenseId], references: [id], onDelete: Restrict)
+  paymentId                 String?                         @unique
+  payment                   ExpensePayment?                 @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  reimbursementSettlementId String?                         @unique
+  reimbursementSettlement   ExpenseReimbursementSettlement? @relation(fields: [reimbursementSettlementId], references: [id], onDelete: Restrict)
+  role                      ExpensePostingRole
+  moneyTransactionId        String                          @unique
+  moneyTransaction          MoneyTransaction                @relation(fields: [moneyTransactionId], references: [id], onDelete: Restrict)
+  createdAt                 DateTime                        @default(now())
+
+  @@index([expenseId, role])
 }
 
 /// Private media object metadata.
@@ -133,18 +903,20 @@ model User {
 /// the server-only storage key and public-safe metadata that API responses can
 /// expose through domain-specific resources such as PersonDocumentPhoto.
 model MediaAsset {
-  id               String                @id @default(cuid())
-  provider         String
-  bucket           String
-  storageKey       String                @unique
-  contentType      String
-  byteSize         Int
-  checksumSha256   String
-  uploadedByUserId String?
-  uploadedByUser   User?                 @relation(fields: [uploadedByUserId], references: [id], onDelete: SetNull)
-  createdAt        DateTime              @default(now())
-  deletedAt        DateTime?
-  documentPhotos   PersonDocumentPhoto[]
+  id                    String                 @id @default(cuid())
+  provider              String
+  bucket                String
+  storageKey            String                 @unique
+  contentType           String
+  byteSize              Int
+  checksumSha256        String
+  uploadedByUserId      String?
+  uploadedByUser        User?                  @relation(fields: [uploadedByUserId], references: [id], onDelete: SetNull)
+  createdAt             DateTime               @default(now())
+  deletedAt             DateTime?
+  documentPhotos        PersonDocumentPhoto[]
+  expenseDocumentAssets ExpenseDocumentAsset[]
+  scooterSaleDocument   ScooterSaleDocument?
 
   @@index([provider, bucket])
   @@index([uploadedByUserId])
@@ -197,36 +969,184 @@ model PersonDocumentPhoto {
   @@index([slot])
 }
 
+/// Scooter brand/manufacturer catalog. `code` is a short curated identifier
+/// (not derived automatically) used as part of the printed fleet sticker.
+model ScooterBrand {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  code      String    @unique
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  scooters  Scooter[]
+}
+
 /// Scooter inventory record with Romanian registration metadata.
 model Scooter {
-  id                        String    @id @default(cuid())
-  vin                       String    @unique
-  brand                     String
+  id                        String                     @id @default(cuid())
+  vin                       String                     @unique
+  brandId                   String
+  brand                     ScooterBrand               @relation(fields: [brandId], references: [id], onDelete: Restrict)
   model                     String
   color                     String?
   manufactureYear           Int
   powertrainType            String
+  engineType                String?
   engineCc                  Int?
   powerKw                   Float?
-  purchasedOn               DateTime  @db.Date
-  registrationType          String    @default("unregistered")
+  registrationType          String                     @default("unregistered")
   plateNumber               String?
   plateNumberNormalized     String?
-  registeredOn              DateTime? @db.Date
-  registrationExpiresOn     DateTime? @db.Date
-  requiredDriverLicenseType String    @default("none")
+  registeredOn              DateTime?                  @db.Date
+  registrationExpiresOn     DateTime?                  @db.Date
+  requiredDriverLicenseType String                     @default("none")
+  /// Enforced as non-negative by the maintenance migration CHECK constraint.
+  currentMileageKm          Int?
   notes                     String?
-  createdAt                 DateTime  @default(now())
-  updatedAt                 DateTime  @updatedAt
+  createdAt                 DateTime                   @default(now())
+  updatedAt                 DateTime                   @updatedAt
   deletedAt                 DateTime?
+  issues                    ScooterIssue[]
+  maintenanceRecords        MaintenanceRecord[]
+  expenseAllocations        ExpenseScooterAllocation[]
+  sale                      ScooterSale?
+  /// The single ExpenseScooterAllocation (if any) whose expense is a posted
+  /// scooter-purchase expense. Set/cleared by ExpensesService when the
+  /// linked expense is posted/reversed; never edited directly.
+  purchaseAllocationId      String?                    @unique
+  purchaseAllocation        ExpenseScooterAllocation?  @relation("ScooterPurchaseAllocation", fields: [purchaseAllocationId], references: [id], onDelete: SetNull)
 
   @@unique([plateNumberNormalized], map: "Scooter_active_plateNumberNormalized_key", where: raw("\"deletedAt\" IS NULL AND \"plateNumberNormalized\" IS NOT NULL"))
   @@index([deletedAt])
   @@index([powertrainType, deletedAt])
   @@index([registrationType, deletedAt])
   @@index([requiredDriverLicenseType, deletedAt])
-  @@index([brand, model])
-  @@index([purchasedOn])
+  @@index([brandId, model])
+}
+
+/// One scooter sold to a buyer. Compact v1: at most one sale per scooter.
+/// paidAmount is rebuildable from the USER_CHARGE/USER_PAYMENT
+/// MoneyTransactions linked back via MoneyTransactionReference
+/// (referenceType "SCOOTER_SALE"), the same way WalletBalance is rebuildable
+/// from WalletBalanceChange.
+model ScooterSale {
+  id                  String            @id @default(cuid())
+  scooterId           String            @unique
+  scooter             Scooter           @relation(fields: [scooterId], references: [id], onDelete: Restrict)
+  buyerCounterpartyId String
+  buyerCounterparty   Counterparty      @relation("ScooterSaleBuyer", fields: [buyerCounterpartyId], references: [id], onDelete: Restrict)
+  saleAmount          Decimal           @db.Decimal(19, 2)
+  paidAmount          Decimal           @default(0) @db.Decimal(19, 2)
+  paidBusinessAmount  Decimal           @default(0) @db.Decimal(19, 2)
+  paidPersonalAmount  Decimal           @default(0) @db.Decimal(19, 2)
+  currency            String            @default("RON") @db.Char(3)
+  status              ScooterSaleStatus @default(OPEN)
+  soldOn              DateTime          @db.Date
+  notes               String?
+  createdByUserId     String
+  createdBy           User              @relation("ScooterSaleCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  document ScooterSaleDocument?
+
+  @@index([buyerCounterpartyId, status])
+}
+
+/// The bill/invoice issued for a scooter sale. Compact v1: one document, one
+/// attached file per sale (unlike ExpenseDocument, which supports multiple
+/// documents and asset roles per expense).
+model ScooterSaleDocument {
+  id              String      @id @default(cuid())
+  scooterSaleId   String      @unique
+  scooterSale     ScooterSale @relation(fields: [scooterSaleId], references: [id], onDelete: Cascade)
+  assetId         String?     @unique
+  asset           MediaAsset? @relation(fields: [assetId], references: [id], onDelete: SetNull)
+  imageWidth      Int?
+  imageHeight     Int?
+  pageCount       Int?
+  documentNumber  String?
+  issuedOn        DateTime?   @db.Date
+  notes           String?
+  createdByUserId String
+  createdBy       User        @relation("ScooterSaleDocumentCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+}
+
+enum ScooterSaleStatus {
+  OPEN
+  PARTIALLY_PAID
+  PAID
+  CANCELLED
+}
+
+/// A reported fleet issue. Resolution intentionally stays lightweight for the
+/// MVP: FIXED issues record their resolution time without a separate workflow.
+model ScooterIssue {
+  id               String               @id @default(cuid())
+  scooterId        String
+  scooter          Scooter              @relation(fields: [scooterId], references: [id], onDelete: Restrict)
+  title            String
+  description      String?
+  severity         ScooterIssueSeverity
+  status           ScooterIssueStatus   @default(OPEN)
+  reportedAt       DateTime             @default(now())
+  resolvedAt       DateTime?
+  reportedByUserId String?
+  reportedBy       User?                @relation("ScooterIssueReportedBy", fields: [reportedByUserId], references: [id], onDelete: SetNull)
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  @@index([scooterId, status, severity(sort: Desc), reportedAt(sort: Desc)])
+  @@index([status, reportedAt(sort: Desc)])
+  @@index([severity, reportedAt(sort: Desc)])
+  @@index([reportedAt(sort: Desc)])
+  @@index([reportedByUserId])
+}
+
+/// Admin-editable service definition. Seeded intervals are conservative
+/// examples only; the applicable manufacturer schedule remains authoritative.
+model MaintenanceType {
+  id             String              @id @default(cuid())
+  name           String
+  code           String              @unique
+  /// Positive when set; enforced by a database CHECK constraint.
+  intervalKm     Int?
+  /// Positive when set; enforced by a database CHECK constraint.
+  intervalMonths Int?
+  isActive       Boolean             @default(true)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  records        MaintenanceRecord[]
+
+  @@index([isActive, name])
+}
+
+/// One completed service item for one scooter. A service visit that performs
+/// multiple items creates one record per MaintenanceType.
+model MaintenanceRecord {
+  id                String          @id @default(cuid())
+  scooterId         String
+  scooter           Scooter         @relation(fields: [scooterId], references: [id], onDelete: Restrict)
+  maintenanceTypeId String
+  maintenanceType   MaintenanceType @relation(fields: [maintenanceTypeId], references: [id], onDelete: Restrict)
+  performedAt       DateTime        @db.Date
+  /// Enforced as non-negative by the maintenance migration CHECK constraint.
+  performedKm       Int
+  notes             String?
+  /// Enforced as non-negative when set by a database CHECK constraint.
+  nextDueKm         Int?
+  nextDueAt         DateTime?       @db.Date
+  recordedByUserId  String?
+  recordedBy        User?           @relation("MaintenanceRecordRecordedBy", fields: [recordedByUserId], references: [id], onDelete: SetNull)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@index([scooterId, maintenanceTypeId, performedAt(sort: Desc), createdAt(sort: Desc)])
+  @@index([scooterId, performedAt(sort: Desc), createdAt(sort: Desc)])
+  @@index([maintenanceTypeId, performedAt(sort: Desc)])
+  @@index([nextDueAt])
+  @@index([recordedByUserId])
 }
 
 /// First-class session record. One row per "logged-in device". Refresh-token
@@ -356,8 +1276,8 @@ model AuthAccount {
   @@index([userId])
 }
 
-/// Append-only audit log. Survives user deletion (userId becomes null) so
-/// forensics + compliance reports can reconstruct activity after the fact.
+/// Append-only audit log. Account deactivation preserves both the row and its
+/// User relation so forensics + compliance reports retain their actor context.
 ///
 /// `type` values are defined in TS by `AuditEventType` and include:
 /// SIGNUP, LOGIN_SUCCESS, LOGIN_FAIL, EMAIL_VERIFIED, OAUTH_LINKED,

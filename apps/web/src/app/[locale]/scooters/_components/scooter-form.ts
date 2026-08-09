@@ -10,14 +10,15 @@ export const DEFAULT_COMBUSTION_ENGINE_CC = "50";
 
 export type ScooterFormField =
   | "vin"
-  | "brand"
+  | "brandId"
   | "model"
   | "color"
   | "manufactureYear"
   | "powertrainType"
+  | "engineType"
   | "engineCc"
   | "powerKw"
-  | "purchasedOn"
+  | "currentMileageKm"
   | "registrationType"
   | "plateNumber"
   | "registeredOn"
@@ -29,14 +30,15 @@ export type ScooterFormErrors = Partial<Record<ScooterFormField, string>>;
 
 export interface ScooterFormState {
   vin: string;
-  brand: string;
+  brandId: string;
   model: string;
   color: string;
   manufactureYear: string;
   powertrainType: v1.scooters.ScooterPowertrainType;
+  engineType: string;
   engineCc: string;
   powerKw: string;
-  purchasedOn: DateParts;
+  currentMileageKm: string;
   registrationType: v1.scooters.ScooterRegistrationType;
   plateNumber: string;
   registeredOn: DateParts;
@@ -60,19 +62,21 @@ interface ScooterFormMessages {
   invalidPlateNumber: () => string;
   engineCcRequired: () => string;
   engineCcElectric: () => string;
+  invalidMileage: () => string;
 }
 
 export function createEmptyScooterForm(): ScooterFormState {
   return {
     vin: "",
-    brand: "",
+    brandId: "",
     model: "",
     color: "",
     manufactureYear: "",
     powertrainType: "combustion",
+    engineType: "",
     engineCc: DEFAULT_COMBUSTION_ENGINE_CC,
     powerKw: "",
-    purchasedOn: emptyDateParts(),
+    currentMileageKm: "",
     registrationType: "unregistered",
     plateNumber: "",
     registeredOn: emptyDateParts(),
@@ -87,14 +91,16 @@ export function scooterFormFromScooter(
 ): ScooterFormState {
   return {
     vin: scooter.vin,
-    brand: scooter.brand,
+    brandId: scooter.brandId,
     model: scooter.model,
     color: scooter.color ?? "",
     manufactureYear: String(scooter.manufactureYear),
     powertrainType: scooter.powertrainType,
+    engineType: scooter.engineType ?? "",
     engineCc: scooter.engineCc == null ? "" : String(scooter.engineCc),
     powerKw: scooter.powerKw == null ? "" : String(scooter.powerKw),
-    purchasedOn: dateOnlyToDateParts(scooter.purchasedOn),
+    currentMileageKm:
+      scooter.currentMileageKm == null ? "" : String(scooter.currentMileageKm),
     registrationType: scooter.registrationType,
     plateNumber: scooter.plateNumber ?? "",
     registeredOn: dateOnlyToDateParts(scooter.registeredOn),
@@ -112,7 +118,6 @@ export function buildScooterInputCandidate(
   errors?: ScooterFormErrors;
 } {
   const errors: ScooterFormErrors = {};
-  const purchasedOn = buildDateOnly(form.purchasedOn);
   const manufactureYear = numberField(
     form.manufactureYear,
     "manufactureYear",
@@ -137,16 +142,19 @@ export function buildScooterInputCandidate(
     messages,
     errors,
   );
+  const currentMileageKm = optionalMileageField(
+    form.currentMileageKm,
+    messages,
+    errors,
+  );
   const registration = buildRegistrationInput(form, messages, errors);
+
+  if (blank(form.brandId)) {
+    errors.brandId = messages.required("brandId");
+  }
 
   if (blank(form.color)) {
     errors.color = messages.required("color");
-  }
-
-  if (purchasedOn.error) {
-    errors.purchasedOn = messages.invalidDate("purchasedOn");
-  } else if (!purchasedOn.value) {
-    errors.purchasedOn = messages.required("purchasedOn");
   }
 
   if (form.powertrainType === "electric" && form.engineCc.trim().length > 0) {
@@ -159,13 +167,14 @@ export function buildScooterInputCandidate(
 
   const input: Record<string, unknown> = {
     vin: form.vin,
-    brand: form.brand,
+    brandId: form.brandId,
     model: form.model,
     color: form.color,
     manufactureYear,
     powertrainType: form.powertrainType,
+    engineType: blank(form.engineType) ? null : form.engineType,
     powerKw: powerKw ?? null,
-    purchasedOn: purchasedOn.value,
+    currentMileageKm: currentMileageKm ?? null,
     ...registration.input,
   };
 
@@ -227,14 +236,15 @@ export function fieldFromIssue(
 export function isScooterFormField(value: string): value is ScooterFormField {
   return (
     value === "vin" ||
-    value === "brand" ||
+    value === "brandId" ||
     value === "model" ||
     value === "color" ||
     value === "manufactureYear" ||
     value === "powertrainType" ||
+    value === "engineType" ||
     value === "engineCc" ||
     value === "powerKw" ||
-    value === "purchasedOn" ||
+    value === "currentMileageKm" ||
     value === "registrationType" ||
     value === "plateNumber" ||
     value === "registeredOn" ||
@@ -360,6 +370,24 @@ function optionalNumberField(
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) {
     errors[field] = messages.invalidNumber(field);
+    return undefined;
+  }
+
+  return numeric;
+}
+
+function optionalMileageField(
+  value: string,
+  messages: Pick<ScooterFormMessages, "invalidMileage">,
+  errors: ScooterFormErrors,
+): number | undefined {
+  if (blank(value)) {
+    return undefined;
+  }
+
+  const numeric = Number(value);
+  if (!Number.isInteger(numeric) || numeric < 0) {
+    errors.currentMileageKm = messages.invalidMileage();
     return undefined;
   }
 

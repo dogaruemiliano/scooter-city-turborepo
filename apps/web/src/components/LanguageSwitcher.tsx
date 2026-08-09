@@ -89,7 +89,7 @@ export function LanguageMenuSub() {
 
   return (
     <DropdownMenuSub>
-      <DropdownMenuSubTrigger>
+      <DropdownMenuSubTrigger openOnHover={false}>
         {t("label")}
         <span className="ml-auto text-muted-foreground">{current.label}</span>
       </DropdownMenuSubTrigger>

@@ -4,6 +4,10 @@ import { v1 } from "@repo/api-shared";
 import {
   Badge,
   Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
   Dialog,
   DialogClose,
   DialogContent,
@@ -11,29 +15,20 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-  buttonVariants,
 } from "@repo/ui/components";
 import { cn } from "@repo/ui/lib/utils";
 import {
-  ArrowLeftIcon,
   BatteryChargingIcon,
   CarFrontIcon,
-  EllipsisIcon,
   GaugeIcon,
   PencilIcon,
   Trash2Icon,
 } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { useId, useState, type FormEvent, type ReactNode } from "react";
 
+import { MoreActionsMenu } from "@/components/MoreActionsMenu";
 import { PageTitleOverride } from "@/components/PageTitleOverride";
 import { webApi } from "@/lib/api";
 import { FeedbackAlert, formErrorsFromIssues } from "./ScooterCreateForm";
@@ -51,10 +46,17 @@ import {
   type ScooterFormIssue,
   type ScooterFormState,
 } from "./scooter-form";
+import { ScooterMaintenanceSection } from "./ScooterMaintenanceSection";
+import { ScooterSalesSection, ScooterSoldBadge } from "./ScooterSalesSection";
 
 interface ScooterDetailPageProps {
   scooter: v1.scooters.Scooter;
   scootersHref: string;
+  maintenanceOverview: v1.maintenance.ScooterMaintenanceOverview;
+  maintenanceTypes: v1.maintenance.MaintenanceTypeList;
+  financials: v1.finance.ScooterFinancials;
+  companyWallets: v1.finance.WalletOption[];
+  brands: v1.scooterBrands.ScooterBrand[];
 }
 
 interface Feedback {
@@ -68,6 +70,11 @@ type ScooterTranslations = ReturnType<typeof useTranslations>;
 export function ScooterDetailPage({
   scooter,
   scootersHref,
+  maintenanceOverview,
+  maintenanceTypes,
+  financials,
+  companyWallets,
+  brands,
 }: ScooterDetailPageProps) {
   const t = useTranslations("scooters");
   const locale = useLocale();
@@ -147,84 +154,63 @@ export function ScooterDetailPage({
     <div className="mx-auto flex w-full max-w-screen-xl flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
       <PageTitleOverride title={title} />
       <div className="flex flex-col gap-4">
-        <Link
-          href={scootersHref}
-          className={cn(
-            buttonVariants({ variant: "ghost" }),
-            "w-fit text-muted-foreground",
-          )}
-        >
-          <ArrowLeftIcon data-icon="inline-start" />
-          {t("actions.backToList")}
-        </Link>
-
-        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div className="flex min-w-0 items-start justify-between gap-3">
           <div className="min-w-0">
             <h1 className="break-words text-2xl font-semibold">{title}</h1>
             <p className="break-words text-sm text-muted-foreground">
               {scooter.vin}
             </p>
           </div>
-          <div className="flex flex-col gap-2 md:items-end">
-            <div className="flex flex-wrap gap-2 md:justify-end">
-              <Badge variant="outline">
-                {scooter.deletedAt
-                  ? t("recordStatus.deleted")
-                  : t("recordStatus.active")}
-              </Badge>
-              <PowertrainBadge scooter={scooter} />
-              <Badge variant="outline">
-                {t(`registrationTypes.${scooter.registrationType}`)}
-              </Badge>
-            </div>
-            <div className="flex flex-wrap gap-2 md:justify-end">
-              <Button
-                type="button"
-                variant="outline"
-                disabled={busyAction !== null}
-                onClick={() => {
-                  setRegistrationDialogKey((current) => current + 1);
-                  setRegistrationOpen(true);
-                }}
-              >
-                <PencilIcon data-icon="inline-start" />
-                {registrationActionLabel}
-              </Button>
-              <DropdownMenu>
-                <DropdownMenuTrigger
-                  render={<Button variant="outline" size="lg" />}
-                >
-                  <EllipsisIcon data-icon="inline-start" />
-                  {t("actions.moreActions")}
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-auto min-w-48">
-                  <DropdownMenuGroup>
-                    <DropdownMenuItem
-                      disabled={busyAction !== null}
-                      onClick={() => {
-                        setEditDialogKey((current) => current + 1);
-                        setEditOpen(true);
-                      }}
-                    >
-                      <PencilIcon data-icon="inline-start" />
-                      {t("actions.editScooter")}
-                    </DropdownMenuItem>
-                  </DropdownMenuGroup>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuGroup>
-                    <DropdownMenuItem
-                      variant="destructive"
-                      disabled={busyAction !== null}
-                      onClick={() => setDeleteOpen(true)}
-                    >
-                      <Trash2Icon data-icon="inline-start" />
-                      {t("actions.deleteScooter")}
-                    </DropdownMenuItem>
-                  </DropdownMenuGroup>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </div>
+          <MoreActionsMenu
+            ariaLabel={t("actions.moreActions")}
+            groups={[
+              [
+                {
+                  key: "registration",
+                  label: registrationActionLabel,
+                  icon: <PencilIcon data-icon="inline-start" />,
+                  disabled: busyAction !== null,
+                  onClick: () => {
+                    setRegistrationDialogKey((current) => current + 1);
+                    setRegistrationOpen(true);
+                  },
+                },
+                {
+                  key: "edit",
+                  label: t("actions.editScooter"),
+                  icon: <PencilIcon data-icon="inline-start" />,
+                  disabled: busyAction !== null,
+                  onClick: () => {
+                    setEditDialogKey((current) => current + 1);
+                    setEditOpen(true);
+                  },
+                },
+              ],
+              [
+                {
+                  key: "delete",
+                  label: t("actions.deleteScooter"),
+                  icon: <Trash2Icon data-icon="inline-start" />,
+                  variant: "destructive",
+                  disabled: busyAction !== null,
+                  onClick: () => setDeleteOpen(true),
+                },
+              ],
+            ]}
+          />
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {scooter.deletedAt ? (
+            <Badge variant="outline">{t("recordStatus.deleted")}</Badge>
+          ) : null}
+          {financials.sale && financials.sale.status !== "CANCELLED" ? (
+            <ScooterSoldBadge />
+          ) : null}
+          <PowertrainBadge scooter={scooter} />
+          <Badge variant="outline">
+            {t(`registrationTypes.${scooter.registrationType}`)}
+          </Badge>
         </div>
       </div>
 
@@ -253,6 +239,10 @@ export function ScooterDetailPage({
         <DetailField
           label={t("fields.powertrainType")}
           value={t(`powertrainTypes.${scooter.powertrainType}`)}
+        />
+        <DetailField
+          label={t("fields.engineType")}
+          value={scooter.engineType ?? t("detail.emptyValue")}
         />
         <DetailField
           label={t("fields.engineCc")}
@@ -310,7 +300,23 @@ export function ScooterDetailPage({
       <DetailSection title={t("sections.purchase")}>
         <DetailField
           label={t("fields.purchasedOn")}
-          value={formatDate(scooter.purchasedOn, locale)}
+          value={
+            scooter.purchasedOn
+              ? formatDate(scooter.purchasedOn, locale)
+              : t("detail.purchaseNotRecorded")
+          }
+        />
+        <DetailField
+          label={t("detail.fields.purchasePrice")}
+          value={
+            scooter.purchasePrice && scooter.purchaseCurrency
+              ? formatMoney(
+                  scooter.purchasePrice,
+                  scooter.purchaseCurrency,
+                  locale,
+                )
+              : t("detail.purchaseNotRecorded")
+          }
         />
         <DetailField
           label={t("detail.fields.createdAt")}
@@ -336,9 +342,22 @@ export function ScooterDetailPage({
         />
       </DetailSection>
 
+      <ScooterSalesSection
+        scooter={scooter}
+        financials={financials}
+        companyWallets={companyWallets}
+      />
+
+      <ScooterMaintenanceSection
+        scooter={scooter}
+        overview={maintenanceOverview}
+        maintenanceTypes={maintenanceTypes}
+      />
+
       <ScooterFormDialog
         key={`edit-scooter-${editDialogKey}`}
         scooter={scooter}
+        brands={brands}
         busy={busyAction === "scooter:update"}
         open={editOpen}
         onOpenChange={setEditOpen}
@@ -364,12 +383,14 @@ export function ScooterDetailPage({
 
 function ScooterFormDialog({
   scooter,
+  brands,
   busy,
   open,
   onOpenChange,
   onSubmit,
 }: {
   scooter: v1.scooters.Scooter;
+  brands: v1.scooterBrands.ScooterBrand[];
   busy: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -410,6 +431,7 @@ function ScooterFormDialog({
       invalidPlateNumber: () => t("feedback.validation.invalidPlateNumber"),
       engineCcRequired: () => t("feedback.validation.engineCcRequired"),
       engineCcElectric: () => t("feedback.validation.engineCcElectric"),
+      invalidMileage: () => t("feedback.validation.invalidMileage"),
     });
 
     if (candidate.errors) {
@@ -442,14 +464,12 @@ function ScooterFormDialog({
       return;
     }
 
-    const {
-      registrationType: _registrationType,
-      plateNumber: _plateNumber,
-      registeredOn: _registeredOn,
-      registrationExpiresOn: _registrationExpiresOn,
-      requiredDriverLicenseType: _requiredDriverLicenseType,
-      ...generalInput
-    } = input.data;
+    const generalInput = { ...input.data };
+    delete generalInput.registrationType;
+    delete generalInput.plateNumber;
+    delete generalInput.registeredOn;
+    delete generalInput.registrationExpiresOn;
+    delete generalInput.requiredDriverLicenseType;
 
     if (await onSubmit(generalInput)) {
       onOpenChange(false);
@@ -505,6 +525,7 @@ function ScooterFormDialog({
             formId={formId}
             form={form}
             errors={fieldErrors}
+            brands={brands}
             disabled={busy}
             includeRegistration={false}
             onSetValue={setFormValue}
@@ -575,6 +596,7 @@ function ScooterRegistrationDialog({
       invalidPlateNumber: () => t("feedback.validation.invalidPlateNumber"),
       engineCcRequired: () => t("feedback.validation.engineCcRequired"),
       engineCcElectric: () => t("feedback.validation.engineCcElectric"),
+      invalidMileage: () => t("feedback.validation.invalidMileage"),
     });
 
     if (candidate.errors) {
@@ -736,15 +758,17 @@ function DetailSection({
   children: ReactNode;
 }) {
   return (
-    <section className="grid min-w-0 gap-4 rounded-lg bg-muted p-4 md:grid-cols-3 md:gap-6">
-      <div className="flex items-center gap-2">
-        <CarFrontIcon aria-hidden="true" className="size-4 shrink-0" />
-        <h2 className="text-base font-semibold md:text-sm">{title}</h2>
-      </div>
-      <dl className="grid min-w-0 gap-4 sm:grid-cols-2 md:col-span-2">
-        {children}
-      </dl>
-    </section>
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <CarFrontIcon aria-hidden="true" className="size-4 shrink-0" />
+          <h2 className="text-base font-semibold md:text-sm">{title}</h2>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <dl className="grid min-w-0 gap-4 sm:grid-cols-2">{children}</dl>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -802,10 +826,6 @@ function formatValidationIssue(
     return t("feedback.validation.invalidPlateNumber");
   }
 
-  if (field === "purchasedOn" && issue.message.includes("today")) {
-    return t("feedback.validation.purchasedOnPastOrToday");
-  }
-
   if (field === "registeredOn" && issue.message.includes("today")) {
     return t("feedback.validation.registeredOnPastOrToday");
   }
@@ -841,7 +861,7 @@ function fieldLabel(
   switch (field) {
     case "vin":
       return t("fields.vin");
-    case "brand":
+    case "brandId":
       return t("fields.brand");
     case "model":
       return t("fields.model");
@@ -851,12 +871,14 @@ function fieldLabel(
       return t("fields.manufactureYear");
     case "powertrainType":
       return t("fields.powertrainType");
+    case "engineType":
+      return t("fields.engineType");
     case "engineCc":
       return t("fields.engineCc");
     case "powerKw":
       return t("fields.powerKw");
-    case "purchasedOn":
-      return t("fields.purchasedOn");
+    case "currentMileageKm":
+      return t("fields.currentMileageKm");
     case "registrationType":
       return t("fields.registrationType");
     case "plateNumber":
@@ -887,4 +909,11 @@ function formatDateTime(value: string, locale: string): string {
     timeStyle: "short",
     timeZone: "UTC",
   }).format(new Date(value));
+}
+
+function formatMoney(value: string, currency: string, locale: string): string {
+  return new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency,
+  }).format(Number(value));
 }

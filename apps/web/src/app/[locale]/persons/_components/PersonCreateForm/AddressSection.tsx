@@ -69,7 +69,7 @@ export function AddressSection({
             )}
             aria-invalid={invalidAria(fieldErrors.region)}
             name="region"
-            className="h-8 w-full rounded-lg border border-input bg-background px-2.5 py-1 text-base transition-colors duration-fast ease-standard outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:bg-disabled disabled:text-disabled-foreground aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive md:text-sm"
+            className="h-12 w-full rounded-lg border border-input bg-background px-3 py-2 text-base transition-colors duration-fast ease-standard outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:bg-disabled disabled:text-disabled-foreground aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive md:h-11 md:text-sm"
             value={form.region}
             onChange={(event) => {
               onSetFormValue("region", event.target.value);

@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  allowedDevOrigins: ["172.20.10.3", "localhost", "127.0.0.1", "0.0.0.0"],
   reactCompiler: true,
 };
 

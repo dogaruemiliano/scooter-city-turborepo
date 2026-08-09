@@ -4,6 +4,7 @@ import type { SupportedLocale } from "@repo/i18n";
 
 import { AuditService } from "../../../audit/audit.service";
 import { AuditEventType } from "../../../audit/audit.types";
+import { userWalletCreateInput } from "../../../finance/user-wallet";
 import { CoreAuthService } from "../core-auth/core-auth.service";
 import type { IssueSessionResult } from "../core-auth/core-auth.types";
 import {
@@ -68,6 +69,9 @@ export class EmailOtpService {
         let user = await tx.user.findUnique({
           where: { email: challenge.target },
         });
+        if (user?.deletedAt) {
+          throw new UnauthorizedException(GENERIC_INVALID_MESSAGE);
+        }
         const created = user === null;
         const emailVerifiedNow = created || user?.emailVerified === null;
 
@@ -76,6 +80,7 @@ export class EmailOtpService {
             data: {
               email: challenge.target,
               emailVerified: now,
+              wallet: userWalletCreateInput(),
             },
           });
         } else if (emailVerifiedNow) {

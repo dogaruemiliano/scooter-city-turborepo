@@ -17,12 +17,14 @@ import { cn } from "@repo/ui/lib/utils";
 import { useLocale, useTranslations } from "next-intl";
 import type { ComponentProps, ReactNode } from "react";
 
+import { BrandSelect } from "./BrandSelect";
 import type { ScooterFormErrors, ScooterFormState } from "./scooter-form";
 
 interface ScooterFormFieldsProps {
   formId: string;
   form: ScooterFormState;
   errors: ScooterFormErrors;
+  brands: v1.scooterBrands.ScooterBrand[];
   disabled?: boolean;
   includeRegistration?: boolean;
   onSetValue: <Key extends keyof ScooterFormState>(
@@ -35,12 +37,12 @@ export function ScooterFormFields({
   formId,
   form,
   errors,
+  brands,
   disabled,
   includeRegistration = true,
   onSetValue,
 }: ScooterFormFieldsProps) {
   const t = useTranslations("scooters");
-  const locale = useLocale();
 
   function changePowertrain(powertrainType: v1.scooters.ScooterPowertrainType) {
     onSetValue("powertrainType", powertrainType);
@@ -63,15 +65,15 @@ export function ScooterFormFields({
           disabled={disabled}
           onChange={(value) => onSetValue("vin", value.toUpperCase())}
         />
-        <TextField
+        <BrandSelect
           id={`${formId}-brand`}
           label={t("fields.brand")}
           required
-          value={form.brand}
-          error={errors.brand}
-          placeholder={t("placeholders.brand")}
+          value={form.brandId}
+          error={errors.brandId}
+          brands={brands}
           disabled={disabled}
-          onChange={(value) => onSetValue("brand", value)}
+          onChange={(value) => onSetValue("brandId", value)}
         />
         <TextField
           id={`${formId}-model`}
@@ -134,6 +136,15 @@ export function ScooterFormFields({
             </p>
           ) : null}
         </div>
+        <TextField
+          id={`${formId}-engine-type`}
+          label={t("fields.engineType")}
+          value={form.engineType}
+          error={errors.engineType}
+          placeholder={t("placeholders.engineType")}
+          disabled={disabled}
+          onChange={(value) => onSetValue("engineType", value)}
+        />
         {form.powertrainType === "combustion" ? (
           <TextField
             id={`${formId}-engine-cc`}
@@ -159,6 +170,19 @@ export function ScooterFormFields({
           disabled={disabled}
           onChange={(value) => onSetValue("powerKw", value)}
         />
+        <TextField
+          id={`${formId}-current-mileage-km`}
+          label={t("fields.currentMileageKm")}
+          type="number"
+          inputMode="numeric"
+          min={0}
+          step={1}
+          value={form.currentMileageKm}
+          error={errors.currentMileageKm}
+          placeholder={t("placeholders.currentMileageKm")}
+          disabled={disabled}
+          onChange={(value) => onSetValue("currentMileageKm", value)}
+        />
       </FormSection>
 
       {includeRegistration ? (
@@ -170,30 +194,6 @@ export function ScooterFormFields({
           onSetValue={onSetValue}
         />
       ) : null}
-
-      <FormSection title={t("sections.purchase")}>
-        <Field
-          id={`${formId}-purchased-on-day`}
-          label={t("fields.purchasedOn")}
-          required
-          error={errors.purchasedOn}
-        >
-          <DatePartsInput
-            baseId={`${formId}-purchased-on`}
-            aria-describedby={
-              errors.purchasedOn
-                ? `${formId}-purchased-on-day-error`
-                : undefined
-            }
-            disabled={disabled}
-            invalid={Boolean(errors.purchasedOn)}
-            label={t("fields.purchasedOn")}
-            locale={locale}
-            value={form.purchasedOn}
-            onChange={(value) => onSetValue("purchasedOn", value)}
-          />
-        </Field>
-      </FormSection>
 
       <FormSection title={t("sections.notes")}>
         <div className="sm:col-span-2">
@@ -218,7 +218,7 @@ export function ScooterRegistrationFormFields({
   errors,
   disabled,
   onSetValue,
-}: ScooterFormFieldsProps) {
+}: Omit<ScooterFormFieldsProps, "brands" | "includeRegistration">) {
   const t = useTranslations("scooters");
   const locale = useLocale();
 

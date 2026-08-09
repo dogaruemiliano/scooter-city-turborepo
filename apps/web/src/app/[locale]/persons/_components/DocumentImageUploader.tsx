@@ -1,9 +1,9 @@
 "use client";
 
-import { CheckIcon, ImagePlusIcon, PencilIcon } from "lucide-react";
+import { CheckIcon, ImagePlusIcon, RotateCcwIcon } from "lucide-react";
 import { useRef, type KeyboardEvent, type ReactNode } from "react";
 
-import { Badge, Input, Label } from "@repo/ui/components";
+import { Badge, Button, Input, Label } from "@repo/ui/components";
 import { cn } from "@repo/ui/lib/utils";
 
 type DocumentImageUploaderProps = {
@@ -12,12 +12,14 @@ type DocumentImageUploaderProps = {
   addLabel: string;
   alt: string;
   disabled?: boolean;
+  errorMessage?: string | null;
   formatsLabel?: string;
   imageUrl?: string | null;
   inputId: string;
   missingLabel: string;
   onFileSelected: (file: File | null) => void;
-  replaceLabel: string;
+  onRetry?: () => void;
+  retryLabel?: string;
   slotLabel: string;
   uploadLabel: string;
 };
@@ -28,12 +30,14 @@ export function DocumentImageUploader({
   addLabel,
   alt,
   disabled = false,
+  errorMessage,
   formatsLabel,
   imageUrl,
   inputId,
   missingLabel,
   onFileSelected,
-  replaceLabel,
+  onRetry,
+  retryLabel,
   slotLabel,
   uploadLabel,
 }: DocumentImageUploaderProps) {
@@ -123,17 +127,31 @@ export function DocumentImageUploader({
             {hasImage ? slotLabel : missingLabel}
           </Badge>
         </span>
-
-        {hasImage ? (
-          <span className="absolute bottom-2 left-2 right-2 flex items-center justify-between gap-2 rounded-md bg-background/95 px-2 py-1 text-xs font-medium text-foreground shadow-sm">
-            <span className="min-w-0 truncate">{replaceLabel}</span>
-            <PencilIcon
-              className="size-3.5 shrink-0 text-muted-foreground transition-colors group-hover:text-foreground"
-              aria-hidden="true"
-            />
-          </span>
-        ) : null}
       </Label>
+      {errorMessage && onRetry && retryLabel ? (
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-lg bg-scrim">
+          <span role="alert" className="sr-only">
+            {errorMessage}
+          </span>
+          <Button
+            type="button"
+            variant="destructive"
+            size="icon"
+            className="pointer-events-auto"
+            aria-label={retryLabel}
+            onClick={onRetry}
+            disabled={disabled}
+          >
+            <RotateCcwIcon aria-hidden="true" />
+          </Button>
+          <span
+            aria-hidden="true"
+            className="text-sm font-medium text-primary-foreground"
+          >
+            {retryLabel}
+          </span>
+        </div>
+      ) : null}
       {action ? <div className="absolute right-2 top-2">{action}</div> : null}
     </div>
   );

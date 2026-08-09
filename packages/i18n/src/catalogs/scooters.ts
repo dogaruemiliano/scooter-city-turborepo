@@ -1,5 +1,12 @@
 export const scootersCatalog = {
   en: {
+    routeStates: {
+      loadingLabel: "Loading scooters",
+      errorTitle: "Scooters could not be loaded",
+      errorDescription:
+        "The scooter registry is temporarily unavailable. Try loading this page again.",
+      retry: "Try again",
+    },
     actions: {
       add: "Add scooter",
       create: "Create scooter",
@@ -9,6 +16,7 @@ export const scootersCatalog = {
       delete: "Delete",
       deleting: "Deleting...",
       cancel: "Cancel",
+      close: "Close",
       apply: "Apply",
       backToList: "Back to scooters",
       viewDetails: "View {name}",
@@ -35,12 +43,12 @@ export const scootersCatalog = {
         invalid: "Enter a valid {field}.",
         invalidVin: "VIN must be 17 characters and cannot contain I, O, or Q.",
         invalidNumber: "{field} must be a valid number.",
+        invalidMileage: "Current mileage must be a nonnegative whole number.",
         maxLength: "{field} must be {max} characters or fewer.",
         engineCcRequired: "Engine cc is required for combustion scooters.",
         engineCcElectric: "Engine cc is only allowed for combustion scooters.",
         invalidPlateNumber:
           "Plate number does not match the selected registration type.",
-        purchasedOnPastOrToday: "Purchased on must be today or earlier.",
         registeredOnPastOrToday: "Registered on must be today or earlier.",
         registrationExpiresOnAfterRegisteredOn:
           "Registration expiry must be on or after the registration date.",
@@ -54,8 +62,10 @@ export const scootersCatalog = {
     detail: {
       description: "Scooter record",
       emptyValue: "Not provided",
+      purchaseNotRecorded: "Not recorded",
       fields: {
         scooterId: "Scooter ID",
+        purchasePrice: "Purchase price",
         createdAt: "Created",
         updatedAt: "Updated",
         deletedAt: "Deleted",
@@ -65,6 +75,281 @@ export const scootersCatalog = {
         deleteScooterTitle: "Delete scooter?",
         deleteScooterDescription:
           "This soft-deletes the scooter and hides the detail page.",
+      },
+    },
+    maintenance: {
+      title: "Maintenance and repairs",
+      description:
+        "Track faults, completed work, and the next service deadlines.",
+      actions: {
+        addIssue: "Add issue",
+        addRecord: "Add maintenance",
+        adding: "Adding...",
+        markFixed: "Mark fixed",
+        markFixedIssue: "Mark {title} fixed",
+        fixing: "Marking fixed...",
+      },
+      feedback: {
+        issueCreatedTitle: "Issue reported",
+        issueCreatedMessage: "The issue was added to this scooter.",
+        issueFixedTitle: "Issue fixed",
+        issueFixedMessage: "The issue was marked as fixed.",
+        issueErrorTitle: "Issue not saved",
+        recordCreatedTitle: "Maintenance added",
+        recordCreatedMessage:
+          "The maintenance intervention was added to the history.",
+        recordErrorTitle: "Maintenance not saved",
+      },
+      blocking: {
+        title: "Recommended unavailable",
+        description:
+          "This scooter has a high or critical open issue. Keep it unavailable until the issue is fixed.",
+      },
+      summary: {
+        currentMileage: "Current mileage",
+        openIssues: "Open issues",
+        recommendation: "Operational recommendation",
+      },
+      operationalStatuses: {
+        AVAILABLE: "Available",
+        UNAVAILABLE: "Unavailable",
+      },
+      values: {
+        unknown: "Unknown",
+        kilometers: "{value, number} km",
+      },
+      issues: {
+        title: "Open issues",
+        description: "Reported faults that still need attention.",
+        empty: "There are no open issues.",
+        reportedAt: "Reported {date}",
+      },
+      issueSeverities: {
+        LOW: "Low",
+        MEDIUM: "Medium",
+        HIGH: "High",
+        CRITICAL: "Critical",
+      },
+      schedule: {
+        title: "Maintenance schedule",
+        description:
+          "Latest intervention and calculated status for every active maintenance type.",
+        empty: "No maintenance types are active.",
+        lastPerformed: "Last completed {date} at {mileage, number} km",
+        nextDue: "Next due: {mileage} / {date}",
+        deadlineMileage: "Mileage: {mileage, number} km",
+        deadlineDate: "Date: {date}",
+        noRecord: "No intervention has been recorded yet.",
+        overdueTitle: "Overdue",
+        overdueEmpty: "No maintenance is overdue.",
+        dueSoonTitle: "Due soon",
+        dueSoonEmpty: "No maintenance is due soon.",
+      },
+      statuses: {
+        OK: "OK",
+        DUE_SOON: "Due soon",
+        OVERDUE: "Overdue",
+        UNKNOWN: "Unknown",
+      },
+      activity: {
+        title: "Maintenance history",
+        description: "Issues and interventions in chronological order.",
+        empty: "There is no maintenance activity yet.",
+        kinds: {
+          ISSUE_REPORTED: "Issue reported: {title}",
+          ISSUE_FIXED: "Issue fixed: {title}",
+          ISSUE_REOPENED: "Issue reopened: {title}",
+          MAINTENANCE_COMPLETED: "Maintenance completed: {title}",
+        },
+      },
+      dialogs: {
+        issue: {
+          title: "Report an issue",
+          description:
+            "Describe the fault and choose how urgently it needs attention.",
+        },
+        record: {
+          title: "Add maintenance",
+          description:
+            "Record a completed intervention. Default deadlines are calculated by the API.",
+        },
+      },
+      fields: {
+        issueTitle: "Issue title",
+        issueDescription: "Description",
+        severity: "Severity",
+        maintenanceType: "Maintenance type",
+        performedAt: "Performed on",
+        performedKm: "Mileage when performed",
+        performedKmDescription:
+          "Historical lower mileage is allowed and will not reduce the current mileage.",
+        recordNotes: "Notes",
+        nextDueKm: "Manual next due mileage",
+        nextDueAt: "Manual next due date",
+        manualDeadlineDescription:
+          "Optional. Leave empty to use the maintenance type default.",
+      },
+      deadlinePreview: {
+        title: "Default deadline preview",
+        description:
+          "Manual values below take priority. Otherwise the API will use {mileage} / {date}.",
+      },
+      validation: {
+        invalidField: "Enter a valid {field}.",
+      },
+      dashboard: {
+        title: "Fleet maintenance",
+        description: "A compact view of scooters that need attention.",
+        stats: {
+          total: "Total scooters",
+          openIssues: "With open issues",
+          blocking: "Recommended unavailable",
+          overdue: "Overdue maintenance",
+          dueSoon: "Maintenance due soon",
+        },
+        attentionTitle: "Priority attention",
+        attentionDescription:
+          "Ordered by safety impact and maintenance urgency.",
+        empty: "No scooters currently require attention.",
+        priorityReasons: {
+          CRITICAL_ISSUE: "Critical issue",
+          HIGH_ISSUE: "High issue",
+          OVERDUE_MAINTENANCE: "Overdue maintenance",
+          MEDIUM_ISSUE: "Medium issue",
+          MAINTENANCE_DUE_SOON: "Maintenance due soon",
+          LOW_ISSUE: "Low issue",
+        },
+      },
+      indicators: {
+        blocking: "Unavailable recommended",
+        overdue: "Maintenance overdue",
+        dueSoon: "Maintenance due soon",
+        issueSeverity: "{severity} issue",
+        healthy: "No known issues",
+      },
+    },
+    sales: {
+      badge: "Sold",
+      title: "Sale & receivable",
+      description: "Track who bought this scooter and how much they still owe.",
+      actions: {
+        sell: "Sell this scooter",
+        selling: "Selling...",
+        recordPayment: "Record payment",
+        recording: "Recording...",
+        cancelSale: "Cancel sale",
+        cancelling: "Cancelling...",
+        cancel: "Cancel",
+      },
+      feedback: {
+        saleCreatedTitle: "Scooter sold",
+        saleCreatedMessage:
+          "The sale was recorded and the buyer's wallet was charged.",
+        saleErrorTitle: "Sale not recorded",
+        paymentCreatedTitle: "Payment recorded",
+        paymentCreatedMessage: "The payment was applied to the sale balance.",
+        paymentErrorTitle: "Payment not recorded",
+        cancelSuccessTitle: "Sale cancelled",
+        cancelErrorTitle: "Sale not cancelled",
+        genericError: "Something went wrong. Try again.",
+      },
+      dialogs: {
+        sell: {
+          title: "Sell this scooter",
+          description:
+            "Record the buyer and sale price. The buyer's wallet is charged immediately.",
+        },
+        payment: {
+          title: "Record payment",
+          description: "Record a payment from the buyer toward the sale.",
+        },
+        cancel: {
+          title: "Cancel this sale?",
+          description:
+            "This cancels the sale record. It does not reverse any payments already posted, and this scooter cannot be sold again afterward.",
+        },
+      },
+      fields: {
+        buyer: "Buyer",
+        saleAmount: "Sale amount",
+        soldOn: "Sold on",
+        notes: "Notes",
+        paymentAmount: "Payment amount",
+        paidOn: "Paid on",
+        paymentMethod: "Payment method",
+        companyWallet: "Deposit to wallet",
+        splitWithOwner: "Split with a personal owner",
+        splitWithOwnerDescription:
+          "Part of this payment goes to the business, the rest goes directly to an owner.",
+        personalAmount: "Personal amount",
+        personalOwner: "Personal owner",
+      },
+      paymentMethods: {
+        CASH: "Cash",
+        POS: "Card (POS)",
+        BANK_TRANSFER: "Bank transfer",
+        ONLINE_PAYMENT: "Online payment",
+      },
+      statuses: {
+        OPEN: "Awaiting payment",
+        PARTIALLY_PAID: "Partially paid",
+        PAID: "Paid in full",
+        CANCELLED: "Cancelled",
+      },
+      receivable: {
+        title: "Sale & receivable",
+        empty: "This scooter has not been sold yet.",
+        buyer: "Buyer",
+        status: "Status",
+        saleAmount: "Sale amount",
+        paidAmount: "Amount paid",
+        paidBusinessAmount: "Paid to business",
+        paidPersonalAmount: "Paid to owner",
+        outstandingAmount: "Amount owed",
+        soldOn: "Sold on",
+      },
+      bill: {
+        title: "Sale bill",
+        description:
+          "The bill issued for this sale, covering the business's portion.",
+        loading: "Loading...",
+        empty: "No bill has been attached yet.",
+        attached: "Bill attached",
+        attach: "Attach bill",
+        replace: "Replace bill",
+        uploading: "Uploading...",
+        errors: {
+          UNSUPPORTED_TYPE:
+            "Unsupported file type. Use a JPG, PNG, WEBP, or PDF file.",
+          FILE_TOO_LARGE: "File is too large. Maximum size is 10 MB.",
+          uploadFailed: "The bill could not be uploaded. Try again.",
+        },
+      },
+      costs: {
+        title: "Costs",
+        description:
+          "Purchase, transport, repairs, and other costs allocated to this scooter.",
+        empty: "No costs have been allocated to this scooter yet.",
+        uncategorized: "Uncategorized",
+        total: "Total",
+        rentalIncomeTitle: "Rental income",
+        rentalIncomeDescription:
+          "Reserved for future rental income tracking once the rentals module exists.",
+      },
+      search: {
+        buyerPlaceholder: "Search buyer name, email, or phone",
+        noBuyers: "No matching people found.",
+        loading: "Searching...",
+        failed: "Search failed. Try again.",
+        clear: "Clear",
+        toggle: "Toggle buyer search",
+      },
+      validation: {
+        required: "{field} is required.",
+        invalid: "Enter a valid {field}.",
+        buyerRequired: "Select a buyer.",
+        walletRequired: "Select a wallet.",
+        ownerRequired: "Select an owner.",
       },
     },
     sections: {
@@ -81,8 +366,10 @@ export const scootersCatalog = {
       color: "Color",
       manufactureYear: "Manufacture year",
       powertrainType: "Powertrain",
+      engineType: "Engine type",
       engineCc: "Engine cc",
       powerKw: "Power (kW)",
+      currentMileageKm: "Current mileage (km)",
       purchasedOn: "Purchased on",
       registrationType: "Registration type",
       plateNumber: "Plate number",
@@ -98,9 +385,10 @@ export const scootersCatalog = {
       model: "NMAX",
       color: "White",
       manufactureYear: "2026",
-      purchasedOn: "YYYY-MM-DD",
+      engineType: "GY6",
       engineCc: "125",
       powerKw: "8.5",
+      currentMileageKm: "4200",
       plateNumber: {
         national: "CJ 12 ABC",
         local: "LOCAL-123",
@@ -110,6 +398,7 @@ export const scootersCatalog = {
     },
     filters: {
       title: "Filters",
+      description: "Narrow the scooter list using one or more filters.",
       recordStatus: "Record status",
       powertrainType: "Powertrain",
       registrationType: "Registration",
@@ -152,6 +441,7 @@ export const scootersCatalog = {
     list: {
       empty: "No scooters found.",
       searchLabel: "Search scooters",
+      clearSearchLabel: "Clear scooter search",
       rowsPerPage: "Rows per page",
       ccValue: "{cc} cc",
       kwValue: "{kw} kW",
@@ -169,8 +459,59 @@ export const scootersCatalog = {
       nextAria: "Go to next page",
       more: "More pages",
     },
+    brandPicker: {
+      placeholder: "Select brand",
+      search: "Search brands",
+      empty: "No brands found",
+      addNew: "Add new brand",
+    },
+    brands: {
+      list: {
+        createButton: "Add new brand",
+        empty: "No brands found.",
+        scooterCount:
+          "{count, plural, =0 {No scooters} one {# scooter} other {# scooters}}",
+        delete: "Delete brand",
+        deleteBlocked:
+          "This brand is used by existing scooters and cannot be deleted.",
+        deleteError: "The brand could not be deleted.",
+      },
+      columns: {
+        name: "Name",
+      },
+      create: {
+        title: "Add new brand",
+      },
+      edit: {
+        title: "Edit brand",
+        description: "Update the brand name and code.",
+        trigger: "Edit brand",
+      },
+      form: {
+        name: "Name",
+        code: "Code",
+        submit: "Create brand",
+        save: "Save",
+        error: "The brand could not be saved.",
+        inUseWarning:
+          "{count, plural, one {# scooter uses} other {# scooters use}} this brand. Changing the code means existing stickers must be reprinted.",
+      },
+      confirm: {
+        title: "Are you sure you want to modify this?",
+        description:
+          "Scooters already use this brand. If you change the name or code, existing printed stickers will no longer match and must be reprinted.",
+        confirm: "Yes, save changes",
+      },
+    },
   },
   ro: {
+    routeStates: {
+      loadingLabel: "Se încarcă scuterele",
+      errorTitle: "Scuterele nu au putut fi încărcate",
+      errorDescription:
+        "Registrul de scutere este temporar indisponibil. Încearcă să încarci pagina din nou.",
+      retry: "Încearcă din nou",
+    },
     actions: {
       add: "Adaugă scuter",
       create: "Creează scuterul",
@@ -180,6 +521,7 @@ export const scootersCatalog = {
       delete: "Șterge",
       deleting: "Se șterge...",
       cancel: "Anulează",
+      close: "Închide",
       apply: "Aplică",
       backToList: "Înapoi la scutere",
       viewDetails: "Vezi {name}",
@@ -207,6 +549,8 @@ export const scootersCatalog = {
         invalidVin:
           "VIN-ul trebuie să aibă 17 caractere și nu poate conține I, O sau Q.",
         invalidNumber: "{field} trebuie să fie un număr valid.",
+        invalidMileage:
+          "Kilometrajul curent trebuie să fie un număr întreg pozitiv sau zero.",
         maxLength: "{field} trebuie să aibă cel mult {max} caractere.",
         engineCcRequired:
           "Capacitatea cilindrică este obligatorie pentru scuterele cu combustie.",
@@ -214,8 +558,6 @@ export const scootersCatalog = {
           "Capacitatea cilindrică este permisă doar pentru scuterele cu combustie.",
         invalidPlateNumber:
           "Numărul de înmatriculare nu corespunde tipului selectat.",
-        purchasedOnPastOrToday:
-          "Data achiziției trebuie să fie astăzi sau mai veche.",
         registeredOnPastOrToday:
           "Data înmatriculării trebuie să fie astăzi sau mai veche.",
         registrationExpiresOnAfterRegisteredOn:
@@ -231,8 +573,10 @@ export const scootersCatalog = {
     detail: {
       description: "Înregistrare scuter",
       emptyValue: "Necompletat",
+      purchaseNotRecorded: "Neînregistrat",
       fields: {
         scooterId: "ID scuter",
+        purchasePrice: "Preț de achiziție",
         createdAt: "Creat",
         updatedAt: "Actualizat",
         deletedAt: "Șters",
@@ -242,6 +586,284 @@ export const scootersCatalog = {
         deleteScooterTitle: "Ștergi scuterul?",
         deleteScooterDescription:
           "Această acțiune șterge logic scuterul și ascunde pagina de detalii.",
+      },
+    },
+    maintenance: {
+      title: "Întreținere și reparații",
+      description:
+        "Urmărește defecțiunile, lucrările efectuate și următoarele termene de service.",
+      actions: {
+        addIssue: "Adaugă problemă",
+        addRecord: "Adaugă întreținere",
+        adding: "Se adaugă...",
+        markFixed: "Marchează rezolvată",
+        markFixedIssue: "Marchează problema {title} ca rezolvată",
+        fixing: "Se marchează...",
+      },
+      feedback: {
+        issueCreatedTitle: "Problemă raportată",
+        issueCreatedMessage: "Problema a fost adăugată acestui scuter.",
+        issueFixedTitle: "Problemă rezolvată",
+        issueFixedMessage: "Problema a fost marcată ca rezolvată.",
+        issueErrorTitle: "Problema nu a fost salvată",
+        recordCreatedTitle: "Întreținere adăugată",
+        recordCreatedMessage:
+          "Intervenția de întreținere a fost adăugată în istoric.",
+        recordErrorTitle: "Întreținerea nu a fost salvată",
+      },
+      blocking: {
+        title: "Recomandat indisponibil",
+        description:
+          "Acest scuter are o problemă deschisă gravă sau critică. Păstrează-l indisponibil până la rezolvare.",
+      },
+      summary: {
+        currentMileage: "Kilometraj curent",
+        openIssues: "Probleme deschise",
+        recommendation: "Recomandare operațională",
+      },
+      operationalStatuses: {
+        AVAILABLE: "Disponibil",
+        UNAVAILABLE: "Indisponibil",
+      },
+      values: {
+        unknown: "Necunoscut",
+        kilometers: "{value, number} km",
+      },
+      issues: {
+        title: "Probleme deschise",
+        description: "Defecțiuni raportate care necesită încă atenție.",
+        empty: "Nu există probleme deschise.",
+        reportedAt: "Raportată {date}",
+      },
+      issueSeverities: {
+        LOW: "Redusă",
+        MEDIUM: "Medie",
+        HIGH: "Gravă",
+        CRITICAL: "Critică",
+      },
+      schedule: {
+        title: "Plan de întreținere",
+        description:
+          "Ultima intervenție și starea calculată pentru fiecare tip activ de întreținere.",
+        empty: "Nu există tipuri active de întreținere.",
+        lastPerformed: "Ultima intervenție {date} la {mileage, number} km",
+        nextDue: "Următorul termen: {mileage} / {date}",
+        deadlineMileage: "Kilometraj: {mileage, number} km",
+        deadlineDate: "Data: {date}",
+        noRecord: "Nu a fost înregistrată nicio intervenție.",
+        overdueTitle: "Depășite",
+        overdueEmpty: "Nicio întreținere nu este depășită.",
+        dueSoonTitle: "Scadente în curând",
+        dueSoonEmpty: "Nicio întreținere nu este scadentă în curând.",
+      },
+      statuses: {
+        OK: "În regulă",
+        DUE_SOON: "Scadent în curând",
+        OVERDUE: "Depășit",
+        UNKNOWN: "Necunoscut",
+      },
+      activity: {
+        title: "Istoric de întreținere",
+        description: "Probleme și intervenții în ordine cronologică.",
+        empty: "Nu există încă activitate de întreținere.",
+        kinds: {
+          ISSUE_REPORTED: "Problemă raportată: {title}",
+          ISSUE_FIXED: "Problemă rezolvată: {title}",
+          ISSUE_REOPENED: "Problemă redeschisă: {title}",
+          MAINTENANCE_COMPLETED: "Întreținere efectuată: {title}",
+        },
+      },
+      dialogs: {
+        issue: {
+          title: "Raportează o problemă",
+          description:
+            "Descrie defecțiunea și alege cât de urgent trebuie rezolvată.",
+        },
+        record: {
+          title: "Adaugă întreținere",
+          description:
+            "Înregistrează o intervenție efectuată. Termenele implicite sunt calculate de API.",
+        },
+      },
+      fields: {
+        issueTitle: "Titlul problemei",
+        issueDescription: "Descriere",
+        severity: "Severitate",
+        maintenanceType: "Tip de întreținere",
+        performedAt: "Efectuată la data",
+        performedKm: "Kilometraj la intervenție",
+        performedKmDescription:
+          "Un kilometraj istoric mai mic este permis și nu va reduce kilometrajul curent.",
+        recordNotes: "Notițe",
+        nextDueKm: "Kilometraj manual pentru următorul termen",
+        nextDueAt: "Data manuală a următorului termen",
+        manualDeadlineDescription:
+          "Opțional. Lasă necompletat pentru valoarea implicită a tipului.",
+      },
+      deadlinePreview: {
+        title: "Previzualizarea termenului implicit",
+        description:
+          "Valorile manuale de mai jos au prioritate. Altfel, API-ul va folosi {mileage} / {date}.",
+      },
+      validation: {
+        invalidField: "Introdu o valoare validă pentru {field}.",
+      },
+      dashboard: {
+        title: "Întreținerea flotei",
+        description: "O vedere compactă a scuterelor care necesită atenție.",
+        stats: {
+          total: "Total scutere",
+          openIssues: "Cu probleme deschise",
+          blocking: "Recomandate indisponibile",
+          overdue: "Întreținere depășită",
+          dueSoon: "Întreținere scadentă curând",
+        },
+        attentionTitle: "Atenție prioritară",
+        attentionDescription:
+          "Ordonate după impactul asupra siguranței și urgența întreținerii.",
+        empty: "Niciun scuter nu necesită atenție în acest moment.",
+        priorityReasons: {
+          CRITICAL_ISSUE: "Problemă critică",
+          HIGH_ISSUE: "Problemă gravă",
+          OVERDUE_MAINTENANCE: "Întreținere depășită",
+          MEDIUM_ISSUE: "Problemă medie",
+          MAINTENANCE_DUE_SOON: "Întreținere scadentă curând",
+          LOW_ISSUE: "Problemă redusă",
+        },
+      },
+      indicators: {
+        blocking: "Recomandat indisponibil",
+        overdue: "Întreținere depășită",
+        dueSoon: "Întreținere scadentă curând",
+        issueSeverity: "Problemă {severity}",
+        healthy: "Fără probleme cunoscute",
+      },
+    },
+    sales: {
+      badge: "Vândut",
+      title: "Vânzare și sumă de încasat",
+      description:
+        "Urmărește cine a cumpărat acest scuter și cât mai are de plătit.",
+      actions: {
+        sell: "Vinde acest scuter",
+        selling: "Se vinde...",
+        recordPayment: "Înregistrează plata",
+        recording: "Se înregistrează...",
+        cancelSale: "Anulează vânzarea",
+        cancelling: "Se anulează...",
+        cancel: "Anulează",
+      },
+      feedback: {
+        saleCreatedTitle: "Scuter vândut",
+        saleCreatedMessage:
+          "Vânzarea a fost înregistrată și portofelul cumpărătorului a fost taxat.",
+        saleErrorTitle: "Vânzarea nu a fost înregistrată",
+        paymentCreatedTitle: "Plată înregistrată",
+        paymentCreatedMessage: "Plata a fost aplicată soldului vânzării.",
+        paymentErrorTitle: "Plata nu a fost înregistrată",
+        cancelSuccessTitle: "Vânzare anulată",
+        cancelErrorTitle: "Vânzarea nu a fost anulată",
+        genericError: "Ceva nu a mers bine. Încearcă din nou.",
+      },
+      dialogs: {
+        sell: {
+          title: "Vinde acest scuter",
+          description:
+            "Înregistrează cumpărătorul și prețul de vânzare. Portofelul cumpărătorului este taxat imediat.",
+        },
+        payment: {
+          title: "Înregistrează plata",
+          description:
+            "Înregistrează o plată de la cumpărător pentru această vânzare.",
+        },
+        cancel: {
+          title: "Anulezi această vânzare?",
+          description:
+            "Această acțiune anulează înregistrarea vânzării. Nu inversează plățile deja înregistrate, iar acest scuter nu va mai putea fi vândut din nou.",
+        },
+      },
+      fields: {
+        buyer: "Cumpărător",
+        saleAmount: "Preț de vânzare",
+        soldOn: "Vândut la data",
+        notes: "Notițe",
+        paymentAmount: "Suma plății",
+        paidOn: "Plătit la data",
+        paymentMethod: "Metodă de plată",
+        companyWallet: "Depune în portofelul",
+        splitWithOwner: "Împarte cu un proprietar personal",
+        splitWithOwnerDescription:
+          "O parte din această plată merge la firmă, restul direct la un proprietar.",
+        personalAmount: "Sumă personală",
+        personalOwner: "Proprietar personal",
+      },
+      paymentMethods: {
+        CASH: "Numerar",
+        POS: "Card (POS)",
+        BANK_TRANSFER: "Transfer bancar",
+        ONLINE_PAYMENT: "Plată online",
+      },
+      statuses: {
+        OPEN: "În așteptarea plății",
+        PARTIALLY_PAID: "Parțial plătit",
+        PAID: "Plătit integral",
+        CANCELLED: "Anulat",
+      },
+      receivable: {
+        title: "Vânzare și sumă de încasat",
+        empty: "Acest scuter nu a fost încă vândut.",
+        buyer: "Cumpărător",
+        status: "Stare",
+        saleAmount: "Preț de vânzare",
+        paidAmount: "Sumă plătită",
+        paidBusinessAmount: "Plătit către firmă",
+        paidPersonalAmount: "Plătit către proprietar",
+        outstandingAmount: "Sumă restantă",
+        soldOn: "Vândut la data",
+      },
+      bill: {
+        title: "Factura vânzării",
+        description:
+          "Factura emisă pentru această vânzare, pentru partea firmei.",
+        loading: "Se încarcă...",
+        empty: "Nu a fost atașată nicio factură încă.",
+        attached: "Factură atașată",
+        attach: "Atașează factura",
+        replace: "Înlocuiește factura",
+        uploading: "Se încarcă...",
+        errors: {
+          UNSUPPORTED_TYPE:
+            "Tip de fișier neacceptat. Folosește un fișier JPG, PNG, WEBP sau PDF.",
+          FILE_TOO_LARGE:
+            "Fișierul este prea mare. Dimensiunea maximă este 10 MB.",
+          uploadFailed: "Factura nu a putut fi încărcată. Încearcă din nou.",
+        },
+      },
+      costs: {
+        title: "Costuri",
+        description:
+          "Achiziție, transport, reparații și alte costuri alocate acestui scuter.",
+        empty: "Nu au fost alocate costuri acestui scuter încă.",
+        uncategorized: "Necategorizat",
+        total: "Total",
+        rentalIncomeTitle: "Venituri din închiriere",
+        rentalIncomeDescription:
+          "Rezervat pentru urmărirea viitoare a veniturilor din închiriere, odată ce modulul de închirieri va exista.",
+      },
+      search: {
+        buyerPlaceholder: "Caută nume, email sau telefon cumpărător",
+        noBuyers: "Nu au fost găsite persoane potrivite.",
+        loading: "Se caută...",
+        failed: "Căutarea a eșuat. Încearcă din nou.",
+        clear: "Șterge",
+        toggle: "Comută căutarea cumpărătorului",
+      },
+      validation: {
+        required: "{field} este obligatoriu.",
+        invalid: "Introdu o valoare validă pentru {field}.",
+        buyerRequired: "Selectează un cumpărător.",
+        walletRequired: "Selectează un portofel.",
+        ownerRequired: "Selectează un proprietar.",
       },
     },
     sections: {
@@ -258,8 +880,10 @@ export const scootersCatalog = {
       color: "Culoare",
       manufactureYear: "An fabricație",
       powertrainType: "Propulsie",
+      engineType: "Tip motor",
       engineCc: "Capacitate cilindrică (cc)",
       powerKw: "Putere (kW)",
+      currentMileageKm: "Kilometraj curent (km)",
       purchasedOn: "Achiziționat la",
       registrationType: "Tip înmatriculare",
       plateNumber: "Număr de înmatriculare",
@@ -275,9 +899,10 @@ export const scootersCatalog = {
       model: "NMAX",
       color: "Alb",
       manufactureYear: "2026",
-      purchasedOn: "ZZ/LL/AAAA",
+      engineType: "GY6",
       engineCc: "125",
       powerKw: "8,5",
+      currentMileageKm: "4200",
       plateNumber: {
         national: "CJ 12 ABC",
         local: "LOCAL-123",
@@ -287,6 +912,8 @@ export const scootersCatalog = {
     },
     filters: {
       title: "Filtre",
+      description:
+        "Restrânge lista de scutere folosind unul sau mai multe filtre.",
       recordStatus: "Stare înregistrare",
       powertrainType: "Propulsie",
       registrationType: "Înmatriculare",
@@ -329,6 +956,7 @@ export const scootersCatalog = {
     list: {
       empty: "Nu au fost găsite scutere.",
       searchLabel: "Caută scutere",
+      clearSearchLabel: "Șterge căutarea scuterelor",
       rowsPerPage: "Rânduri pe pagină",
       ccValue: "{cc} cc",
       kwValue: "{kw} kW",
@@ -345,6 +973,50 @@ export const scootersCatalog = {
       next: "Următor",
       nextAria: "Mergi la pagina următoare",
       more: "Mai multe pagini",
+    },
+    brandPicker: {
+      placeholder: "Selectează brandul",
+      search: "Caută branduri",
+      empty: "Niciun brand găsit",
+      addNew: "Adaugă brand nou",
+    },
+    brands: {
+      list: {
+        createButton: "Adaugă brand nou",
+        empty: "Niciun brand găsit.",
+        scooterCount:
+          "{count, plural, =0 {Niciun scuter} one {# scuter} few {# scutere} other {# de scutere}}",
+        delete: "Șterge brandul",
+        deleteBlocked:
+          "Acest brand este folosit de scutere existente și nu poate fi șters.",
+        deleteError: "Brandul nu a putut fi șters.",
+      },
+      columns: {
+        name: "Nume",
+      },
+      create: {
+        title: "Adaugă brand nou",
+      },
+      edit: {
+        title: "Editează brandul",
+        description: "Actualizează numele și codul brandului.",
+        trigger: "Editează brandul",
+      },
+      form: {
+        name: "Nume",
+        code: "Cod",
+        submit: "Creează brandul",
+        save: "Salvează",
+        error: "Brandul nu a putut fi salvat.",
+        inUseWarning:
+          "{count, plural, one {# scuter folosește} few {# scutere folosesc} other {# de scutere folosesc}} acest brand. Dacă schimbi codul, etichetele deja printate trebuie reprintate.",
+      },
+      confirm: {
+        title: "Sigur vrei să modifici acest brand?",
+        description:
+          "Scutere existente folosesc deja acest brand. Dacă schimbi numele sau codul, etichetele deja printate nu se vor mai potrivi și trebuie reprintate.",
+        confirm: "Da, salvează modificările",
+      },
     },
   },
 } as const;

@@ -52,7 +52,7 @@ function CountrySelect({
     <div className="relative flex w-full">
       <select
         className={cn(
-          "h-8 w-full appearance-none rounded-lg border border-input bg-background py-1 pr-8 pl-2.5 text-base transition-colors duration-fast ease-standard outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:bg-disabled disabled:text-disabled-foreground aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive md:text-sm",
+          "h-12 w-full appearance-none rounded-lg border border-input bg-background py-2 pr-10 pl-3 text-base transition-colors duration-fast ease-standard outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:bg-disabled disabled:text-disabled-foreground aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive md:h-11 md:pr-8 md:text-sm",
           className,
         )}
         value={selectedValue}

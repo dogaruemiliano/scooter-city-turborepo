@@ -197,7 +197,7 @@ session plumbing. The main unfinished areas are:
 - Apple server-to-server token revocation.
 - Deployment runbooks, production infrastructure, backups, and secret rotation.
 - Application monitoring, tracing, alerting, and audit export tooling.
-- Product-specific domain modules beyond users/auth/account settings.
+- Remaining product domains such as rentals and purchase workflows.
 
 See [docs/missing-work.md](docs/missing-work.md) for the fuller backlog.
 

@@ -124,9 +124,16 @@ describe("PersonsPage", () => {
     ).not.toBeInTheDocument();
     expect(screen.getByText("ada@example.com")).toBeInTheDocument();
     expect(screen.getByText("+40712345678")).toBeInTheDocument();
-    expect(screen.getByText("National ID")).toBeInTheDocument();
+    expect(screen.queryByText("National ID")).not.toBeInTheDocument();
     expect(screen.queryByText("exp. Jan 31, 2030")).not.toBeInTheDocument();
-    expect(screen.getByText("Verified")).toBeInTheDocument();
+    expect(screen.queryByText("Verified")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("img", { name: "Identity document: Valid" }),
+    ).toHaveClass("text-success");
+    expect(
+      screen.getByRole("img", { name: "Driver license: Not present" }),
+    ).toHaveClass("text-disabled-foreground");
+    expect(screen.getAllByRole("img")).toHaveLength(2);
     expect(screen.queryByLabelText("Expires on")).not.toBeInTheDocument();
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
     expect(screen.queryByText("Rows per page")).not.toBeInTheDocument();
@@ -141,8 +148,16 @@ describe("PersonsPage", () => {
     ).not.toBeInTheDocument();
     expect(screen.queryByText("Înregistrări persoane")).not.toBeInTheDocument();
     expect(screen.queryByText("Se afișează 1-1 din 1")).not.toBeInTheDocument();
-    expect(screen.getByText("Carte de identitate")).toBeInTheDocument();
-    expect(screen.getByText("Verificat")).toBeInTheDocument();
+    expect(
+      screen.getByRole("img", {
+        name: "Document de identitate: Valid",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("img", {
+        name: "Permis de conducere: Lipsește",
+      }),
+    ).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: "Vezi Ada Lovelace" }),
     ).toHaveAttribute("href", "/persons/person-1");
@@ -157,6 +172,56 @@ describe("PersonsPage", () => {
     expect(
       screen.getByRole("link", { name: "Adaugă persoană" }),
     ).toHaveAttribute("href", "/persons/new");
+  });
+
+  it("colors expired and unverified document slots", () => {
+    const identityDocument = person.documents[0]!;
+
+    renderPersons(
+      personList([
+        {
+          ...person,
+          documents: [
+            {
+              ...identityDocument,
+              expiresOn: "2020-01-31",
+            },
+            {
+              ...identityDocument,
+              id: "document-2",
+              type: "driverLicense",
+              expiresOn: "2030-01-31",
+              status: "unverified",
+            },
+          ],
+        },
+      ]),
+    );
+
+    expect(
+      screen.getByRole("img", { name: "Identity document: Expired" }),
+    ).toHaveClass("text-destructive");
+    expect(
+      screen.getByRole("img", { name: "Driver license: Unverified" }),
+    ).toHaveClass("text-warning");
+    expect(screen.getAllByRole("img")).toHaveLength(2);
+  });
+
+  it("uses the destructive state for a rejected document", () => {
+    const identityDocument = person.documents[0]!;
+
+    renderPersons(
+      personList([
+        {
+          ...person,
+          documents: [{ ...identityDocument, status: "rejected" }],
+        },
+      ]),
+    );
+
+    expect(
+      screen.getByRole("img", { name: "Identity document: Rejected" }),
+    ).toHaveClass("text-destructive");
   });
 
   it("collapses operational filters by default", async () => {
@@ -191,6 +256,56 @@ describe("PersonsPage", () => {
     );
     expect(await screen.findByText("No persons found.")).toBeInTheDocument();
     expect(window.location.search).toBe("?search=hopper");
+  });
+
+  it("keeps the search focused and editable while results load", async () => {
+    mocks.apiFetch.mockReturnValueOnce(new Promise(() => {}));
+    const browser = userEvent.setup();
+
+    renderPersons();
+    const search = screen.getByLabelText("Search persons");
+    await browser.type(search, "hopper");
+
+    await waitFor(() => expect(mocks.apiFetch).toHaveBeenCalledOnce());
+    expect(search).toHaveFocus();
+    expect(search).toBeEnabled();
+
+    await browser.type(search, "s");
+    expect(search).toHaveValue("hoppers");
+  });
+
+  it("submits search with Enter and clears an applied search", async () => {
+    mocks.apiFetch
+      .mockResolvedValueOnce(personList([], { total: 0 }))
+      .mockResolvedValueOnce(personList([person]));
+    const browser = userEvent.setup();
+
+    renderPersons();
+    const search = screen.getByLabelText("Search persons");
+    expect(search).toHaveAttribute("enterkeyhint", "search");
+
+    await browser.type(search, "hopper{Enter}");
+    await waitFor(() =>
+      expect(mocks.apiFetch).toHaveBeenCalledWith(
+        `${v1.persons.ROUTES.list}?page=1&pageSize=25&search=hopper`,
+        v1.persons.personListSchema,
+        { cache: "no-store" },
+      ),
+    );
+    expect(await screen.findByText("No persons found.")).toBeInTheDocument();
+
+    await browser.click(
+      screen.getByRole("button", { name: "Clear person search" }),
+    );
+    await waitFor(() =>
+      expect(mocks.apiFetch).toHaveBeenLastCalledWith(
+        `${v1.persons.ROUTES.list}?page=1&pageSize=25`,
+        v1.persons.personListSchema,
+        { cache: "no-store" },
+      ),
+    );
+    expect(search).toHaveValue("");
+    expect(window.location.search).toBe("");
   });
 
   it("resets accumulated results when search changes", async () => {
@@ -250,8 +365,12 @@ describe("PersonsPage", () => {
     await browser.click(screen.getByRole("button", { name: "Filters" }));
     await browser.type(screen.getByLabelText("Country"), "ro");
     await browser.type(screen.getByLabelText("Issuing country"), "us");
-    await browser.type(screen.getByLabelText("Expires from"), "2030-01-01");
-    await browser.type(screen.getByLabelText("Expires to"), "2030-12-31");
+    await browser.type(screen.getByLabelText("Expires from"), "01");
+    await browser.type(screen.getByLabelText("Expires from MM"), "01");
+    await browser.type(screen.getByLabelText("Expires from YYYY"), "2030");
+    await browser.type(screen.getByLabelText("Expires to"), "31");
+    await browser.type(screen.getByLabelText("Expires to MM"), "12");
+    await browser.type(screen.getByLabelText("Expires to YYYY"), "2030");
     await browser.click(screen.getByRole("button", { name: "Apply" }));
 
     await waitFor(() =>
@@ -266,7 +385,9 @@ describe("PersonsPage", () => {
     );
   });
 
-  it("initializes toolbar controls from the URL query", () => {
+  it("initializes toolbar controls from the URL query", async () => {
+    const browser = userEvent.setup();
+
     renderPersons(personList([person]), "en", {
       page: 1,
       pageSize: 25,
@@ -278,11 +399,15 @@ describe("PersonsPage", () => {
     });
 
     expect(screen.getByLabelText("Search persons")).toHaveValue("ada");
-    expect(screen.getByLabelText("Country")).toHaveValue("RO");
-    expect(screen.getByLabelText("Issuing country")).toHaveValue("US");
     expect(screen.getByRole("combobox", { name: "Sort" })).toHaveTextContent(
       "Email Z-A",
     );
+    const filtersButton = screen.getByRole("button", { name: "Filters" });
+    expect(filtersButton).toHaveTextContent("2");
+
+    await browser.click(filtersButton);
+    expect(screen.getByLabelText("Country")).toHaveValue("RO");
+    expect(screen.getByLabelText("Issuing country")).toHaveValue("US");
   });
 
   it("resets URL-backed filters", async () => {
@@ -302,6 +427,7 @@ describe("PersonsPage", () => {
       "/en/persons?search=ada&countryCode=RO",
     );
 
+    await browser.click(screen.getByRole("button", { name: "Filters" }));
     await browser.click(screen.getByRole("button", { name: "Reset" }));
 
     await waitFor(() =>

@@ -8,12 +8,6 @@ export interface PersonDetailPageProps {
   personsHref: string;
 }
 
-export interface Feedback {
-  kind: "error" | "success";
-  title: string;
-  messages: string[];
-}
-
 export type PersonsTranslations = ReturnType<typeof useTranslations>;
 
 export type ReadinessIssue =
@@ -51,6 +45,7 @@ export interface DocumentFormState {
   issuingCountryCode: string;
   issuedBy: string;
   issuedOn: string;
+  hasExpiryDate: boolean;
   expiresOn: string;
   status: v1.persons.PersonDocumentStatus;
   notes: string;

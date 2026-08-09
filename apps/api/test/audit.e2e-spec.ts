@@ -1,7 +1,7 @@
 /**
  * AuditService writes one row per `record()` call. Verifies the
- * SetNull-on-user-delete cascade (audit history survives account
- * removal) end-to-end.
+ * account-deactivation behavior (audit history remains attached to the
+ * preserved user) end-to-end.
  */
 import type { INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
@@ -65,7 +65,7 @@ describe("AuditService (e2e)", () => {
     expect(rows[0]?.userId).toBeNull();
   });
 
-  it("survives a user delete (SetNull on userId)", async () => {
+  it("stays linked to a user after account deactivation", async () => {
     const user = await users.createOne({
       email: `audit-user-${Date.now()}@example.com`,
     });
@@ -80,13 +80,13 @@ describe("AuditService (e2e)", () => {
       meta: { method: "test" },
     });
 
-    await users.deleteOne(user.id);
-    // userId becomes null after deletion; the row stays.
+    await users.deactivateAccount(user.id);
     const after = await prisma.auditEvent.findMany({
       where: { type: uniqueType },
     });
     expect(after).toHaveLength(1);
-    expect(after[0]?.userId).toBeNull();
+    expect(after[0]?.userId).toBe(user.id);
+    expect((await users.findById(user.id))?.deletedAt).toBeInstanceOf(Date);
   });
 
   it("uses the AuditEventType vocabulary for real flows (smoke)", async () => {

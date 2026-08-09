@@ -37,6 +37,7 @@ export type PersonDocumentFormFieldKey =
   | "issuingCountryCode"
   | "issuedBy"
   | "issuedOn"
+  | "hasExpiryDate"
   | "expiresOn"
   | "status"
   | "notes";
@@ -101,6 +102,7 @@ export interface CreatePersonDocumentFormState {
   issuingCountryCode: CountryCode;
   issuedBy: string;
   issuedOn: DateParts;
+  hasExpiryDate: boolean;
   expiresOn: DateParts;
   status: v1.persons.PersonDocumentStatus;
   photos: PersonDocumentPhotoDraftUploads;
@@ -135,6 +137,10 @@ export type SetPersonDocumentValue = <Key extends PersonDocumentFormFieldKey>(
   documentKey: string,
   key: Key,
   value: CreatePersonDocumentFormState[Key],
+) => void;
+
+export type SetPersonDocument = (
+  document: CreatePersonDocumentFormState,
 ) => void;
 
 export type SetPersonDocumentPhoto = (

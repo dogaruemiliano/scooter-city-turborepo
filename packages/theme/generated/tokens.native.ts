@@ -70,7 +70,7 @@ export const tokens = {
     dark: {
       background: "#090B0C",
       foreground: "#F9FBFB",
-      card: "#161B1D",
+      card: "#0F1314",
       cardForeground: "#F9FBFB",
       popover: "#161B1D",
       popoverForeground: "#F9FBFB",
@@ -145,6 +145,7 @@ export const tokens = {
     "8": 32,
     "9": 36,
     "10": 40,
+    "11": 44,
     "12": 48,
     "16": 64,
     "18": 72,

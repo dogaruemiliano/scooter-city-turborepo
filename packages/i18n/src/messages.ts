@@ -3,11 +3,13 @@ import { apiCatalog } from "./catalogs/api";
 import { appShellCatalog } from "./catalogs/app-shell";
 import { authCatalog } from "./catalogs/auth";
 import { dashboardCatalog } from "./catalogs/dashboard";
+import { financeCatalog } from "./catalogs/finance";
 import { languageCatalog } from "./catalogs/language";
 import { mobilePlatformCatalog } from "./catalogs/mobile-platform";
 import { personsCatalog } from "./catalogs/persons";
 import { sharedCatalog } from "./catalogs/shared";
 import { scootersCatalog } from "./catalogs/scooters";
+import { serviceCatalog } from "./catalogs/service";
 import { themeCatalog } from "./catalogs/theme";
 
 export type MessageTree = {
@@ -22,10 +24,12 @@ export const messages = {
     auth: authCatalog.en,
     appShell: appShellCatalog.en,
     dashboard: dashboardCatalog.en,
+    finance: financeCatalog.en,
     theme: themeCatalog.en,
     language: languageCatalog.en,
     persons: personsCatalog.en,
     scooters: scootersCatalog.en,
+    service: serviceCatalog.en,
     api: apiCatalog.en,
     mobilePlatform: mobilePlatformCatalog.en,
   },
@@ -34,10 +38,12 @@ export const messages = {
     auth: authCatalog.ro,
     appShell: appShellCatalog.ro,
     dashboard: dashboardCatalog.ro,
+    finance: financeCatalog.ro,
     theme: themeCatalog.ro,
     language: languageCatalog.ro,
     persons: personsCatalog.ro,
     scooters: scootersCatalog.ro,
+    service: serviceCatalog.ro,
     api: apiCatalog.ro,
     mobilePlatform: mobilePlatformCatalog.ro,
   },

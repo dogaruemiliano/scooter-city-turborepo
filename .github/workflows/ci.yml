@@ -55,6 +55,11 @@ jobs:
       - name: Unit tests
         run: pnpm test
 
+      - name: Web production build
+        env:
+          NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL || 'https://api.ci.placeholder.invalid' }}
+        run: pnpm --filter web build
+
       - name: Prisma migrate + seed (E2E DB)
         env:
           DATABASE_URL: postgresql://app:app@localhost:5434/app

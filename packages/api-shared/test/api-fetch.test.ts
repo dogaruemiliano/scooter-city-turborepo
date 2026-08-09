@@ -4,6 +4,7 @@ import { afterEach, test } from "node:test";
 import { z } from "zod";
 
 import {
+  ApiError,
   apiFetch,
   configureAuthAdapter,
   createApiClient,
@@ -116,5 +117,30 @@ test("raw apiFetch rejects relative paths without an explicit base URL", async (
   await assert.rejects(
     apiFetch("/v1/auth/me", z.unknown()),
     /requires options\.baseUrl or createApiClient/,
+  );
+});
+
+test("preserves API request IDs on normalized errors", async () => {
+  globalThis.fetch = async () =>
+    Response.json(
+      {
+        error: {
+          code: "IMAGE_STORAGE_UNAVAILABLE",
+          message: "Image storage is unavailable",
+          requestId: "request-upload-123",
+        },
+      },
+      { status: 503 },
+    );
+
+  await assert.rejects(
+    apiFetch("https://api.example.com/v1/uploads", z.unknown()),
+    (error: unknown) => {
+      assert.ok(error instanceof ApiError);
+      assert.equal(error.status, 503);
+      assert.equal(error.code, "IMAGE_STORAGE_UNAVAILABLE");
+      assert.equal(error.requestId, "request-upload-123");
+      return true;
+    },
   );
 });

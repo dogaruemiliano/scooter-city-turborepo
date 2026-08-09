@@ -2,13 +2,40 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
+import { createPortal } from "react-dom";
+import {
+  ArrowLeftRightIcon,
+  ArrowLeftIcon,
+  BikeIcon,
+  Building2Icon,
+  ChartPieIcon,
+  HandCoinsIcon,
+  LandmarkIcon,
+  LayoutDashboardIcon,
+  ReceiptTextIcon,
+  Settings2Icon,
+  TagIcon,
+  TagsIcon,
+  UsersRoundIcon,
+  WalletCardsIcon,
+  WrenchIcon,
+  type LucideIcon,
+} from "lucide-react";
+import { v1 } from "@repo/api-shared";
 import type { SupportedLocale } from "@repo/i18n";
 import {
   Avatar,
   AvatarFallback,
+  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuGroup,
@@ -28,6 +55,7 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarInset,
   SidebarMenu,
@@ -42,9 +70,16 @@ import {
 import { useLogout } from "./auth/LogoutButton";
 import { useSession } from "./auth/SessionProvider";
 import { LanguageMenuSub } from "./LanguageSwitcher";
+import {
+  PageHeaderActionsContext,
+  type PageHeaderActionsContextValue,
+} from "./PageHeaderActions";
 import { PageTitleOverrideContext } from "./PageTitleOverride";
+import { webApi } from "../lib/api";
+import { formatMoney } from "../lib/finance-format";
 import {
   applyThemePreference,
+  isThemePreference,
   type ThemePreference,
 } from "../lib/theme-cookie";
 import type { SessionIdentity } from "../lib/auth-types";
@@ -55,19 +90,109 @@ import {
   localizePath,
 } from "../i18n/paths";
 
-const NAVIGATION = [
-  { href: "/", labelKey: "dashboard" },
-  { href: "/persons", labelKey: "persons", requiredRole: "ADMIN" },
-  { href: "/scooters", labelKey: "scooters", requiredRole: "ADMIN" },
+const DASHBOARD_NAVIGATION_ITEM = {
+  href: "/",
+  labelKey: "dashboard",
+  icon: LayoutDashboardIcon,
+  exact: true,
+} as const;
+
+const NAVIGATION_GROUPS = [
+  {
+    labelKey: "entitiesGroup",
+    requiredRole: "ADMIN",
+    items: [
+      { href: "/persons", labelKey: "persons", icon: UsersRoundIcon },
+      {
+        href: "/finance/companies",
+        labelKey: "companies",
+        icon: Building2Icon,
+      },
+    ],
+  },
+  {
+    labelKey: "scootersGroup",
+    requiredRole: "ADMIN",
+    items: [
+      { href: "/scooters", labelKey: "scooterList", icon: BikeIcon },
+      { href: "/service", labelKey: "service", icon: WrenchIcon },
+      { href: "/scooters/brands", labelKey: "scooterBrands", icon: TagIcon },
+    ],
+  },
+  {
+    labelKey: "financeGroup",
+    requiredRole: "ADMIN",
+    items: [
+      {
+        href: "/finance",
+        labelKey: "financeOverview",
+        icon: ChartPieIcon,
+        exact: true,
+      },
+      {
+        href: "/finance/transactions",
+        labelKey: "financeTransactions",
+        icon: ArrowLeftRightIcon,
+      },
+      {
+        href: "/finance/expenses",
+        labelKey: "financeExpenses",
+        icon: ReceiptTextIcon,
+      },
+      {
+        href: "/finance/categories",
+        labelKey: "financeCategories",
+        icon: TagsIcon,
+      },
+      {
+        href: "/finance/claims",
+        labelKey: "financeClaims",
+        icon: HandCoinsIcon,
+      },
+      {
+        href: "/finance/owners",
+        labelKey: "financeOwners",
+        icon: LandmarkIcon,
+      },
+      {
+        href: "/finance/settings/business",
+        labelKey: "businessConfiguration",
+        icon: Settings2Icon,
+      },
+    ],
+  },
 ] as const;
+
+const SIDEBAR_ROOT_ROUTES: ReadonlySet<string> = new Set([
+  DASHBOARD_NAVIGATION_ITEM.href,
+  ...NAVIGATION_GROUPS.flatMap((group) => group.items.map((item) => item.href)),
+]);
+
+const ALL_NAVIGATION_HREFS: readonly string[] = [
+  DASHBOARD_NAVIGATION_ITEM.href,
+  ...NAVIGATION_GROUPS.flatMap((group) => group.items.map((item) => item.href)),
+];
 
 const PAGE_TITLES: Record<string, string> = {
   "/": "dashboard",
+  "/account/wallet": "myWallet",
   "/account/settings": "accountSettings",
+  "/finance": "finance",
+  "/finance/transactions": "financeTransactions",
+  "/finance/transactions/new": "newFinanceTransaction",
+  "/finance/expenses": "financeExpenses",
+  "/finance/expenses/new": "newFinanceExpense",
+  "/finance/settings/business": "financeBusinessSettings",
+  "/finance/companies": "financeCompanies",
+  "/finance/categories": "financeCategories",
+  "/finance/claims": "financeClaims",
+  "/finance/owners": "financeOwners",
   "/persons": "persons",
   "/persons/new": "newPerson",
   "/scooters": "scooters",
   "/scooters/new": "newScooter",
+  "/scooters/brands": "scooterBrands",
+  "/service": "service",
 };
 
 export function AppShell({
@@ -84,7 +209,8 @@ export function AppShell({
   const pathname = usePathname();
   const routePathname = getUnprefixedPathname(pathname);
   const locale = getLocaleFromPathname(pathname);
-  const pageTitleKey = PAGE_TITLES[routePathname];
+  const pageTitleKey =
+    PAGE_TITLES[routePathname] ?? getNestedFinancePageTitle(routePathname);
   const pageTitle =
     pageTitleOverride ?? (pageTitleKey ? tPages(pageTitleKey) : "Scooter City");
 
@@ -95,20 +221,83 @@ export function AppShell({
   return (
     <PageTitleOverrideContext.Provider value={setPageTitleOverride}>
       <SidebarProvider>
-        <AppSidebar
+        <AppShellContent
           locale={locale}
           pathname={routePathname}
+          pageTitle={pageTitle}
           initialThemePreference={initialThemePreference}
-        />
-        <SidebarInset>
-          <header className="sticky top-0 z-sticky flex h-12 shrink-0 items-center gap-2 border-b border-border bg-background px-4">
-            <SidebarTrigger />
-            <span className="text-sm font-medium">{pageTitle}</span>
-          </header>
-          <div className="flex flex-1 flex-col">{children}</div>
-        </SidebarInset>
+        >
+          {children}
+        </AppShellContent>
       </SidebarProvider>
     </PageTitleOverrideContext.Provider>
+  );
+}
+
+function AppShellContent({
+  children,
+  locale,
+  pathname,
+  pageTitle,
+  initialThemePreference,
+}: {
+  children: ReactNode;
+  locale: SupportedLocale;
+  pathname: string;
+  pageTitle: string;
+  initialThemePreference: ThemePreference;
+}) {
+  const { isMobile } = useSidebar();
+  const [pageHeaderActionsTarget, setPageHeaderActionsTarget] =
+    useState<HTMLDivElement | null>(null);
+  const pageHeaderActionsContext = useMemo<PageHeaderActionsContextValue>(
+    () => ({ isMobile, target: pageHeaderActionsTarget }),
+    [isMobile, pageHeaderActionsTarget],
+  );
+
+  return (
+    <PageHeaderActionsContext.Provider value={pageHeaderActionsContext}>
+      <AppSidebar
+        locale={locale}
+        pathname={pathname}
+        initialThemePreference={initialThemePreference}
+      />
+      <SidebarInset>
+        <header className="sticky top-0 z-sticky flex h-12 shrink-0 items-center gap-2 border-b border-border bg-background px-4">
+          <HeaderNavigationButton pathname={pathname} />
+          <span className="min-w-0 flex-1 truncate text-sm font-medium">
+            {pageTitle}
+          </span>
+          <div
+            ref={setPageHeaderActionsTarget}
+            className="ml-auto flex shrink-0 md:hidden"
+          />
+        </header>
+        <div className="flex flex-1 flex-col">{children}</div>
+      </SidebarInset>
+    </PageHeaderActionsContext.Provider>
+  );
+}
+
+function HeaderNavigationButton({ pathname }: { pathname: string }) {
+  const t = useTranslations("appShell.actions");
+  const router = useRouter();
+  const { isMobile } = useSidebar();
+
+  if (!isMobile || SIDEBAR_ROOT_ROUTES.has(pathname)) {
+    return <SidebarTrigger />;
+  }
+
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      aria-label={t("back")}
+      onClick={() => router.back()}
+    >
+      <ArrowLeftIcon aria-hidden="true" />
+    </Button>
   );
 }
 
@@ -123,10 +312,10 @@ function AppSidebar({
 }) {
   const tNav = useTranslations("appShell.nav");
   const { user } = useSession();
-  const navigation = NAVIGATION.filter(
-    (item) =>
-      !("requiredRole" in item) ||
-      user?.roles.includes(item.requiredRole) === true,
+  const navigationGroups = NAVIGATION_GROUPS.filter(
+    (group) =>
+      !("requiredRole" in group) ||
+      user?.roles.includes(group.requiredRole) === true,
   );
 
   return (
@@ -201,23 +390,65 @@ function AppSidebar({
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navigation.map((item) => (
-                <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton
-                    isActive={isActiveNavigationItem(pathname, item.href)}
-                    render={<Link href={localizePath(item.href, locale)} />}
-                  >
-                    <span>{tNav(item.labelKey)}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  tooltip={tNav(DASHBOARD_NAVIGATION_ITEM.labelKey)}
+                  isActive={isActiveNavigationItem(
+                    pathname,
+                    DASHBOARD_NAVIGATION_ITEM.href,
+                    DASHBOARD_NAVIGATION_ITEM.exact,
+                  )}
+                  render={
+                    <Link
+                      href={localizePath(
+                        DASHBOARD_NAVIGATION_ITEM.href,
+                        locale,
+                      )}
+                    />
+                  }
+                >
+                  <LayoutDashboardIcon aria-hidden="true" />
+                  <span>{tNav(DASHBOARD_NAVIGATION_ITEM.labelKey)}</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {navigationGroups.map((group) => (
+          <SidebarGroup key={group.labelKey}>
+            <SidebarGroupLabel>{tNav(group.labelKey)}</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {group.items.map((item) => {
+                  const label = tNav(item.labelKey);
+                  const Icon = item.icon;
+                  return (
+                    <SidebarMenuItem key={item.href}>
+                      <SidebarMenuButton
+                        tooltip={label}
+                        isActive={isActiveNavigationItem(
+                          pathname,
+                          item.href,
+                          "exact" in item && item.exact,
+                        )}
+                        render={<Link href={localizePath(item.href, locale)} />}
+                      >
+                        <Icon aria-hidden="true" />
+                        <span>{label}</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ))}
       </SidebarContent>
 
       <SidebarFooter>
         <AccountMenu
+          key={user?.id ?? "signed-out"}
           locale={locale}
           initialThemePreference={initialThemePreference}
         />
@@ -227,8 +458,32 @@ function AppSidebar({
   );
 }
 
-function isActiveNavigationItem(pathname: string, href: string): boolean {
+function matchesHref(pathname: string, href: string): boolean {
   return pathname === href || (href !== "/" && pathname.startsWith(`${href}/`));
+}
+
+function getBestMatchingHref(pathname: string): string | null {
+  let best: string | null = null;
+  for (const href of ALL_NAVIGATION_HREFS) {
+    if (
+      matchesHref(pathname, href) &&
+      (best === null || href.length > best.length)
+    ) {
+      best = href;
+    }
+  }
+  return best;
+}
+
+function isActiveNavigationItem(
+  pathname: string,
+  href: string,
+  exact = false,
+): boolean {
+  if (exact) {
+    return pathname === href;
+  }
+  return getBestMatchingHref(pathname) === href;
 }
 
 function AccountMenu({
@@ -243,13 +498,65 @@ function AccountMenu({
   const tLogout = useTranslations("auth.logout");
   const { isMobile } = useSidebar();
   const { user } = useSession();
+  const userId = user?.id;
   const { busy, logout } = useLogout();
   const [themePreference, setThemePreference] = useState(
     initialThemePreference,
   );
+  const [personalWallet, setPersonalWallet] = useState<v1.finance.Wallet>();
+  const [walletUnavailable, setWalletUnavailable] = useState(false);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [accountMenuOverlayTarget, setAccountMenuOverlayTarget] =
+    useState<HTMLElement | null>(null);
+  const accountTriggerRef = useCallback((node: HTMLButtonElement | null) => {
+    setAccountMenuOverlayTarget(
+      node?.closest<HTMLElement>(
+        '[data-slot="sidebar-inner"], [data-slot="sidebar"][data-mobile="true"]',
+      ) ?? null,
+    );
+  }, []);
   const email = user?.email ?? tAccount("noActiveSession");
   const displayName = user ? displayNameFromUser(user) : tAccount("account");
   const initials = user ? initialsFromUser(user) : "?";
+  const personalBalance = personalWallet?.balances.find(
+    (balance) => balance.bucket === "USER_SETTLEMENT",
+  );
+  const balanceSummary =
+    walletUnavailable || (personalWallet && !personalBalance)
+      ? tAccount("balanceUnavailable")
+      : personalBalance
+        ? tAccount("balanceValue", {
+            amount: formatMoney(
+              personalBalance.balance,
+              personalBalance.currency,
+              locale,
+            ),
+          })
+        : tAccount("balanceLoading");
+
+  useEffect(() => {
+    if (!userId) {
+      return;
+    }
+
+    const controller = new AbortController();
+
+    void webApi
+      .fetch(v1.finance.ROUTES.wallets.mine, v1.finance.walletSchema, {
+        cache: "no-store",
+        signal: controller.signal,
+      })
+      .then(setPersonalWallet)
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
+
+        setWalletUnavailable(true);
+      });
+
+    return () => controller.abort();
+  }, [userId]);
 
   function changeTheme(nextPreference: unknown) {
     if (!isThemePreference(nextPreference)) {
@@ -261,94 +568,159 @@ function AccountMenu({
   }
 
   return (
-    <SidebarMenu>
-      <SidebarMenuItem>
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            render={
-              <SidebarMenuButton
-                size="lg"
-                aria-label={tAccount("open")}
-                className="data-popup-open:bg-sidebar-accent data-popup-open:text-sidebar-accent-foreground"
-              />
-            }
+    <>
+      {accountMenuOpen ? (
+        <MenuLayerOverlay target={accountMenuOverlayTarget} />
+      ) : null}
+      <SidebarMenu>
+        <SidebarMenuItem className={accountMenuOpen ? "z-modal" : undefined}>
+          <DropdownMenu
+            open={accountMenuOpen}
+            onOpenChange={setAccountMenuOpen}
           >
-            <Avatar size="md">
-              <AvatarFallback>{initials}</AvatarFallback>
-            </Avatar>
-            <span className="flex min-w-0 flex-1 flex-col">
-              <span className="truncate font-medium">{displayName}</span>
-              <span className="truncate text-xs text-muted-foreground">
-                {email}
-              </span>
-            </span>
-            <span className="ml-auto text-muted-foreground" aria-hidden="true">
-              ...
-            </span>
-          </DropdownMenuTrigger>
-
-          <DropdownMenuContent
-            side={isMobile ? "bottom" : "right"}
-            align="end"
-            className="min-w-64"
-          >
-            <DropdownMenuGroup>
-              <DropdownMenuLabel className="flex flex-col">
-                <span className="truncate text-sm font-medium text-popover-foreground">
-                  {displayName}
-                </span>
-                <span className="truncate font-normal">{email}</span>
-              </DropdownMenuLabel>
-              <DropdownMenuItem
-                render={
-                  <Link href={localizePath("/account/settings", locale)} />
-                }
-              >
-                {tAccount("accountSettings")}
-              </DropdownMenuItem>
-              <DropdownMenuSub>
-                <DropdownMenuSubTrigger>
-                  {tTheme("label")}
-                  <span className="ml-auto capitalize text-muted-foreground">
-                    {tTheme(`options.${themePreference}`)}
-                  </span>
-                </DropdownMenuSubTrigger>
-                <DropdownMenuSubContent>
-                  <DropdownMenuRadioGroup
-                    value={themePreference}
-                    onValueChange={changeTheme}
-                  >
-                    <DropdownMenuRadioItem value="light">
-                      {tTheme("options.light")}
-                    </DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="dark">
-                      {tTheme("options.dark")}
-                    </DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="system">
-                      {tTheme("options.system")}
-                    </DropdownMenuRadioItem>
-                  </DropdownMenuRadioGroup>
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
-              <LanguageMenuSub />
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              variant="destructive"
-              disabled={busy}
-              onClick={() => void logout()}
+            <DropdownMenuTrigger
+              render={
+                <SidebarMenuButton
+                  ref={accountTriggerRef}
+                  size="lg"
+                  aria-label={tAccount("open")}
+                  className="data-popup-open:bg-sidebar-accent data-popup-open:text-sidebar-accent-foreground"
+                />
+              }
             >
-              {busy ? tLogout("busy") : tLogout("label")}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </SidebarMenuItem>
-    </SidebarMenu>
+              <Avatar size="md">
+                <AvatarFallback>{initials}</AvatarFallback>
+              </Avatar>
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="truncate font-medium">{displayName}</span>
+                <span className="truncate text-xs text-muted-foreground">
+                  {balanceSummary}
+                </span>
+              </span>
+              <span
+                className="ml-auto text-muted-foreground"
+                aria-hidden="true"
+              >
+                ...
+              </span>
+            </DropdownMenuTrigger>
+
+            <DropdownMenuContent
+              side={isMobile ? "bottom" : "right"}
+              align="end"
+              className="min-w-64"
+            >
+              <DropdownMenuGroup>
+                <DropdownMenuLabel className="flex flex-col">
+                  <span className="truncate text-sm font-medium text-popover-foreground">
+                    {displayName}
+                  </span>
+                  <span className="truncate font-normal">{email}</span>
+                </DropdownMenuLabel>
+                <AccountMenuLinkItem
+                  href={localizePath("/account/wallet", locale)}
+                  icon={WalletCardsIcon}
+                >
+                  {tAccount("myWallet")}
+                </AccountMenuLinkItem>
+                <AccountMenuLinkItem
+                  href={localizePath("/account/settings", locale)}
+                  icon={Settings2Icon}
+                >
+                  {tAccount("accountSettings")}
+                </AccountMenuLinkItem>
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger openOnHover={false}>
+                    {tTheme("label")}
+                    <span className="ml-auto capitalize text-muted-foreground">
+                      {tTheme(`options.${themePreference}`)}
+                    </span>
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent>
+                    <DropdownMenuRadioGroup
+                      value={themePreference}
+                      onValueChange={changeTheme}
+                    >
+                      <DropdownMenuRadioItem value="light">
+                        {tTheme("options.light")}
+                      </DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="dark">
+                        {tTheme("options.dark")}
+                      </DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="minimal">
+                        {tTheme("options.minimal")}
+                      </DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="system">
+                        {tTheme("options.system")}
+                      </DropdownMenuRadioItem>
+                    </DropdownMenuRadioGroup>
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+                <LanguageMenuSub />
+              </DropdownMenuGroup>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                variant="destructive"
+                disabled={busy}
+                onClick={() => void logout()}
+              >
+                {busy ? tLogout("busy") : tLogout("label")}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </SidebarMenuItem>
+      </SidebarMenu>
+    </>
   );
 }
 
-function isThemePreference(value: unknown): value is ThemePreference {
-  return value === "light" || value === "dark" || value === "system";
+function MenuLayerOverlay({ target }: { target: HTMLElement | null }) {
+  if (!target) {
+    return null;
+  }
+
+  return createPortal(
+    <div
+      aria-hidden="true"
+      data-slot="account-menu-overlay"
+      className="pointer-events-none absolute inset-0 z-overlay bg-scrim"
+    />,
+    target,
+  );
+}
+
+function AccountMenuLinkItem({
+  href,
+  icon: Icon,
+  children,
+}: {
+  href: string;
+  icon: LucideIcon;
+  children: ReactNode;
+}) {
+  const { setOpenMobile } = useSidebar();
+
+  return (
+    <DropdownMenuItem
+      onClick={() => setOpenMobile(false)}
+      render={<Link href={href} />}
+    >
+      <Icon aria-hidden="true" />
+      {children}
+    </DropdownMenuItem>
+  );
+}
+
+function getNestedFinancePageTitle(pathname: string): string | undefined {
+  if (pathname.startsWith("/finance/transactions/")) {
+    return "financeTransaction";
+  }
+
+  if (pathname.startsWith("/finance/wallets/")) {
+    return "financeWallet";
+  }
+
+  return undefined;
 }
 
 function displayNameFromUser(user: SessionIdentity): string {

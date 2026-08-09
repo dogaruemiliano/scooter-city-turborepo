@@ -14,6 +14,8 @@ constants, schemas, and `apiFetch`.
 - Hydrate session state through `src/components/auth/SessionProvider.tsx`.
 - Verify access JWTs on the server through `src/lib/auth-server.ts`.
 - Refresh expired browser sessions through the web auth adapter.
+- Provide admin operations for persons, scooters, and the finance ledger.
+- Provide every authenticated user with a read-only personal-wallet view.
 - Consume shared components from `@repo/ui` and theme CSS from `@repo/theme`.
 
 ## Local Development
@@ -45,14 +47,15 @@ must match the API's `GOOGLE_CLIENT_ID_WEB`.
 
 ## Useful Commands
 
-| Command                        | Purpose                                  |
-| ------------------------------ | ---------------------------------------- |
-| `pnpm --filter web dev`        | Run Next.js on port 3001.                |
-| `pnpm --filter web build`      | Build the production web app.            |
-| `pnpm --filter web start`      | Serve the production build on port 3001. |
-| `pnpm --filter web lint`       | Run ESLint.                              |
-| `pnpm --filter web test`       | Run Vitest tests.                        |
-| `pnpm --filter web test:watch` | Run Vitest in watch mode.                |
+| Command                         | Purpose                                  |
+| ------------------------------- | ---------------------------------------- |
+| `pnpm --filter web dev`         | Run Next.js on port 3001.                |
+| `pnpm --filter web build`       | Build the production web app.            |
+| `pnpm --filter web check-types` | Type-check the web app without emitting. |
+| `pnpm --filter web start`       | Serve the production build on port 3001. |
+| `pnpm --filter web lint`        | Run ESLint.                              |
+| `pnpm --filter web test`        | Run Vitest tests.                        |
+| `pnpm --filter web test:watch`  | Run Vitest in watch mode.                |
 
 ## Auth Integration
 
@@ -71,11 +74,18 @@ Cookie-authenticated mutations must go through `apiFetch` or manually include
 
 ## Routes
 
-| Route               | Purpose                                                          |
-| ------------------- | ---------------------------------------------------------------- |
-| `/`                 | Localized dashboard entry.                                       |
-| `/sign-in`          | Email OTP and Google sign-in when enabled/configured.            |
-| `/account/settings` | Profile, linked providers, sessions, logout-all, delete account. |
+| Route                   | Purpose                                                             |
+| ----------------------- | ------------------------------------------------------------------- |
+| `/`                     | Localized dashboard entry.                                          |
+| `/sign-in`              | Email OTP and Google sign-in when enabled/configured.               |
+| `/account/settings`     | Profile, linked providers, sessions, logout-all, delete account.    |
+| `/account/wallet`       | Current authenticated user's personal wallet and balances.          |
+| `/persons`              | Admin person and identity-document operations.                      |
+| `/scooters`             | Admin scooter inventory and registration operations.                |
+| `/finance`              | Admin financial overview, current balances, and outstanding claims. |
+| `/finance/transactions` | Admin ledger list, transaction workflows, posting, and reversal.    |
+| `/finance/categories`   | Admin income/expense category management.                           |
+| `/finance/claims`       | Admin personal-funds claim review and settlement entry points.      |
 
 Apple sign-in has API support but no web UI yet. See
 [../../docs/missing-work.md](../../docs/missing-work.md).

@@ -13,6 +13,9 @@
  */
 export * as auth from "./auth";
 export * as common from "./common";
+export * as finance from "./finance";
+export * as maintenance from "./maintenance";
 export * as persons from "./persons";
+export * as scooterBrands from "./scooter-brands";
 export * as scooters from "./scooters";
 export * as users from "./users";

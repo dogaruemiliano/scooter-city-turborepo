@@ -12,6 +12,7 @@ import {
 } from "@nestjs/common";
 import { createHash } from "node:crypto";
 import { Readable } from "node:stream";
+import type { Logger } from "nestjs-pino";
 
 import { loadEnv, type Env } from "../config/env";
 import type { S3Presigner, S3PresignOptions } from "./image-storage.module";
@@ -22,6 +23,9 @@ type PresignMock = jest.Mock<
   Promise<string>,
   [PutObjectCommand, number, S3PresignOptions?]
 >;
+interface LoggerMock {
+  error: jest.Mock;
+}
 
 function s3Error(name: string): Error & { name: string } {
   const error = new Error(name) as Error & { name: string };
@@ -47,7 +51,12 @@ function createService(
   send?: SendMock,
   env = testEnv(),
   presign?: PresignMock,
-): { service: ImageStorageService; send: SendMock; presign: PresignMock } {
+): {
+  service: ImageStorageService;
+  send: SendMock;
+  presign: PresignMock;
+  logger: LoggerMock;
+} {
   const mockSend: SendMock =
     send ??
     jest.fn((command: unknown) => {
@@ -68,6 +77,7 @@ function createService(
         )}&expires=${expiresIn}`,
       );
     });
+  const logger: LoggerMock = { error: jest.fn() };
   return {
     service: new ImageStorageService(
       env,
@@ -77,9 +87,11 @@ function createService(
       {
         getSignedUrl: mockPresign,
       } satisfies S3Presigner,
+      logger as unknown as Logger,
     ),
     send: mockSend,
     presign: mockPresign,
+    logger,
   };
 }
 
@@ -92,6 +104,7 @@ describe("ImageStorageService", () => {
       buffer,
       contentType: "image/png",
       byteSize: buffer.length,
+      category: "personal-document",
     });
 
     expect(stored).toMatchObject({
@@ -102,7 +115,7 @@ describe("ImageStorageService", () => {
       checksumSha256: createHash("sha256").update(buffer).digest("hex"),
     });
     expect(stored.storageKey).toMatch(
-      /^document-photos-test\/\d{4}\/\d{2}\/\d{2}\/.+\.png$/,
+      /^document-photos-test\/personal-documents\/\d{4}\/.+\.png$/,
     );
 
     const command = send.mock.calls[0]?.[0] as PutObjectCommand;
@@ -129,6 +142,7 @@ describe("ImageStorageService", () => {
       buffer: Buffer.from("image-bytes"),
       contentType: "image/jpeg",
       byteSize: 11,
+      category: "personal-document",
     });
 
     const command = send.mock.calls[0]?.[0] as PutObjectCommand;
@@ -149,6 +163,7 @@ describe("ImageStorageService", () => {
         buffer: Buffer.from("image-bytes"),
         contentType: "image/png",
         byteSize: 11,
+        category: "personal-document",
       }),
     ).rejects.toMatchObject({
       response: {
@@ -161,6 +176,7 @@ describe("ImageStorageService", () => {
         buffer: Buffer.from("image-bytes"),
         contentType: "image/png",
         byteSize: 11,
+        category: "personal-document",
       }),
     ).rejects.toBeInstanceOf(ServiceUnavailableException);
   });
@@ -207,6 +223,7 @@ describe("ImageStorageService", () => {
       contentType: "image/png",
       byteSize: 6,
       checksumSha256,
+      category: "personal-document",
       scope: "person-document-photo:person-1:document-1:front:user-1",
     });
 
@@ -246,6 +263,103 @@ describe("ImageStorageService", () => {
     expect(send.mock.calls[0]?.[0]).toBeInstanceOf(HeadObjectCommand);
   });
 
+  it("logs actionable S3 diagnostics when presigning fails", async () => {
+    const presignError = Object.assign(new Error("signature mismatch"), {
+      name: "SignatureDoesNotMatch",
+      $metadata: {
+        requestId: "aws-request-123",
+        httpStatusCode: 403,
+        attempts: 1,
+      },
+    });
+    const presign: PresignMock = jest.fn(
+      (
+        command: PutObjectCommand,
+        expiresIn: number,
+        options?: S3PresignOptions,
+      ) => {
+        void command;
+        void expiresIn;
+        void options;
+        return Promise.reject(presignError);
+      },
+    );
+    const { service, logger } = createService(undefined, testEnv(), presign);
+    const checksumSha256 = createHash("sha256").update("stored").digest("hex");
+
+    await expect(
+      service.createPresignedUpload({
+        contentType: "image/png",
+        byteSize: 6,
+        checksumSha256,
+        category: "personal-document",
+        scope: "person-document-photo-draft:user-1",
+      }),
+    ).rejects.toBeInstanceOf(ServiceUnavailableException);
+
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "image_storage_presign_failed",
+        errorName: "SignatureDoesNotMatch",
+        errorMessage: "signature mismatch",
+        awsRequestId: "aws-request-123",
+        awsHttpStatusCode: 403,
+        awsAttempts: 1,
+        contentType: "image/png",
+        byteSize: 6,
+      }),
+      "Failed to create presigned S3 upload URL",
+    );
+  });
+
+  it("supports checksum-bound private PDF uploads without widening image APIs", async () => {
+    const checksumSha256 = createHash("sha256")
+      .update("%PDF-test")
+      .digest("hex");
+    const send = jest.fn((command: unknown) => {
+      if (command instanceof HeadObjectCommand) {
+        return {
+          ContentType: "application/pdf",
+          ContentLength: 9,
+        };
+      }
+      return {};
+    }) as SendMock;
+    const { service } = createService(send);
+
+    const upload = await service.createPresignedDocumentUpload({
+      contentType: "application/pdf",
+      byteSize: 9,
+      checksumSha256,
+      pageCount: 2,
+      category: "expense-invoice",
+      scope: "expense-document:expense-1:document-1:original:user-1",
+    });
+
+    expect(upload.storageKey).toMatch(
+      /^document-photos-test\/invoices\/\d{4}-\d{2}\/.+\.pdf$/,
+    );
+    await expect(
+      service.completePresignedUpload(
+        upload.uploadToken,
+        "expense-document:expense-1:document-1:original:user-1",
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    const completed = await service.completePresignedDocumentUpload(
+      upload.uploadToken,
+      "expense-document:expense-1:document-1:original:user-1",
+    );
+    expect(completed).toMatchObject({
+      contentType: "application/pdf",
+      byteSize: 9,
+      checksumSha256,
+      imageWidth: null,
+      imageHeight: null,
+      pageCount: 2,
+    });
+  });
+
   it("rejects unsupported content types, oversized files, and unsafe keys", async () => {
     const { service } = createService();
 
@@ -254,6 +368,7 @@ describe("ImageStorageService", () => {
         buffer: Buffer.from("text"),
         contentType: "text/plain",
         byteSize: 4,
+        category: "personal-document",
       }),
     ).rejects.toBeInstanceOf(BadRequestException);
 
@@ -262,6 +377,7 @@ describe("ImageStorageService", () => {
         buffer: Buffer.alloc(33),
         contentType: "image/jpeg",
         byteSize: 33,
+        category: "personal-document",
       }),
     ).rejects.toBeInstanceOf(PayloadTooLargeException);
 

@@ -6,6 +6,7 @@ import { generateMetadata as generatePersonsMetadata } from "./persons/page";
 import { generateMetadata as generateNewPersonMetadata } from "./persons/new/page";
 import { generateMetadata as generateScootersMetadata } from "./scooters/page";
 import { generateMetadata as generateNewScooterMetadata } from "./scooters/new/page";
+import { generateMetadata as generateServiceMetadata } from "./service/page";
 import { generateMetadata as generateSignInMetadata } from "./sign-in/page";
 
 const mocks = vi.hoisted(() => ({
@@ -74,6 +75,9 @@ describe("localized route metadata", () => {
     );
     await expect(metadataTitle(generateNewScooterMetadata, "ro")).resolves.toBe(
       "Adaugă scuter",
+    );
+    await expect(metadataTitle(generateServiceMetadata, "ro")).resolves.toBe(
+      "Service",
     );
     await expect(metadataTitle(generateSignInMetadata, "ro")).resolves.toBe(
       "Autentificare",

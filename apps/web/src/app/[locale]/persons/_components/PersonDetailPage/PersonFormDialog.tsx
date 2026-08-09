@@ -13,10 +13,12 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  Label,
+  PhoneNumberInput,
 } from "@repo/ui/components";
 import { PencilIcon } from "lucide-react";
-import { useTranslations } from "next-intl";
-import { useState, type FormEvent } from "react";
+import { useLocale, useTranslations } from "next-intl";
+import { useId, useState, type FormEvent } from "react";
 
 import { blankToNull, personFormState } from "./helpers";
 import { TextareaField } from "./TextareaField";
@@ -39,6 +41,8 @@ export function PersonFormDialog({
   onSubmit: (input: v1.persons.UpdatePersonInput) => Promise<boolean>;
 }) {
   const t = useTranslations("persons");
+  const locale = useLocale();
+  const phoneId = useId();
   const [internalOpen, setInternalOpen] = useState(false);
   const [form, setForm] = useState(() => personFormState(person));
   const [error, setError] = useState<string | null>(null);
@@ -132,14 +136,21 @@ export function PersonFormDialog({
               value={form.email}
               onChange={(value) => setValue("email", value)}
             />
-            <TextInputField
-              label={t("fields.phone")}
-              value={form.phone}
-              onChange={(value) => setValue("phone", value)}
-            />
+            <div className="grid gap-2">
+              <Label htmlFor={phoneId}>{t("fields.phone")}</Label>
+              <PhoneNumberInput
+                id={phoneId}
+                value={form.phone}
+                locale={locale}
+                placeholder={t("placeholders.phone")}
+                countrySelectLabel={t("fields.phoneCountry")}
+                numberInputLabel={t("fields.phone")}
+                onValueChange={(value) => setValue("phone", value)}
+              />
+            </div>
             <TextInputField
               label={t("fields.dateOfBirth")}
-              type="date"
+              date
               value={form.dateOfBirth}
               onChange={(value) => setValue("dateOfBirth", value)}
             />

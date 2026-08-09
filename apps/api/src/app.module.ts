@@ -18,11 +18,14 @@ import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
 import { pinoConfig } from "./common/logger/pino.config";
 import { RequestIdMiddleware } from "./common/middleware/request-id.middleware";
 import { ConfigModule } from "./config/config.module";
+import { FinanceModule } from "./finance/finance.module";
 import { loadEnv } from "./config/env";
 import { HealthModule } from "./health/health.module";
 import { MailerModule } from "./mailer/mailer.module";
+import { MaintenanceModule } from "./maintenance/maintenance.module";
 import { PersonsModule } from "./persons/persons.module";
 import { PrismaModule } from "./prisma/prisma.module";
+import { ScooterBrandsModule } from "./scooter-brands/scooter-brands.module";
 import { ScootersModule } from "./scooters/scooters.module";
 import { SmsModule } from "./sms/sms.module";
 import { UsersModule } from "./users/users.module";
@@ -47,7 +50,10 @@ const env = loadEnv();
     // Public-surface modules.
     HealthModule,
     PersonsModule,
+    MaintenanceModule,
     ScootersModule,
+    ScooterBrandsModule,
+    FinanceModule,
     AuthModule.forRoot(buildAuthConfig(env)),
   ],
   providers: [

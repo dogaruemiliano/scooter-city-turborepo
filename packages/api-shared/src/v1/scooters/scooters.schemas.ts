@@ -12,6 +12,10 @@ import {
   requiredTrimmedStringSchema,
 } from "../common/common.schemas";
 import {
+  mileageKmSchema,
+  scooterMaintenanceAttentionSummarySchema,
+} from "../maintenance/maintenance.schemas";
+import {
   SCOOTER_LIST_SORTS,
   SCOOTER_POWERTRAIN_TYPES,
   SCOOTER_REGISTRATION_TYPES,
@@ -21,6 +25,7 @@ import {
 const MAX_VIN_LENGTH = 17;
 const MAX_TEXT_LENGTH = 120;
 const MAX_COLOR_LENGTH = 50;
+const MAX_ENGINE_TYPE_LENGTH = 100;
 const MAX_NOTES_LENGTH = 2_000;
 const MAX_SEARCH_LENGTH = 200;
 const MAX_PAGE_SIZE = 100;
@@ -29,7 +34,6 @@ const MAX_MANUFACTURE_YEAR = new Date().getUTCFullYear() + 1;
 const MAX_ENGINE_CC = 2_000;
 const MAX_POWER_KW = 200;
 const MAX_PLATE_INPUT_LENGTH = 64;
-const PURCHASED_ON_FUTURE_MESSAGE = "Purchase date must be today or earlier.";
 const REGISTERED_ON_FUTURE_MESSAGE =
   "Registration date must be today or earlier.";
 const REGISTRATION_EXPIRES_ON_ORDER_MESSAGE =
@@ -96,13 +100,10 @@ const vinSchema = z
       }),
   );
 const nullableColorSchema = nullableTrimmedStringSchema(MAX_COLOR_LENGTH);
-const notesSchema = nullableTrimmedStringSchema(MAX_NOTES_LENGTH);
-const purchasedOnSchema = dateOnlySchema.refine(
-  (value) => value <= dateOnlyToday(),
-  {
-    message: PURCHASED_ON_FUTURE_MESSAGE,
-  },
+const nullableEngineTypeSchema = nullableTrimmedStringSchema(
+  MAX_ENGINE_TYPE_LENGTH,
 );
+const notesSchema = nullableTrimmedStringSchema(MAX_NOTES_LENGTH);
 const registeredOnSchema = dateOnlySchema.refine(
   (value) => value <= dateOnlyToday(),
   {
@@ -177,19 +178,32 @@ export const scooterSchema = z
   .object({
     id: z.string(),
     vin: z.string(),
-    brand: z.string(),
+    brandId: z.string(),
+    brand: z.string().describe("Display name of the scooter's brand."),
     model: z.string(),
     color: z.string().nullable(),
     manufactureYear: z.number().int(),
     powertrainType: scooterPowertrainTypeSchema,
+    engineType: z.string().nullable(),
     engineCc: z.number().int().positive().nullable(),
     powerKw: z.number().positive().nullable(),
-    purchasedOn: z.string(),
+    purchasedOn: z
+      .string()
+      .nullable()
+      .describe(
+        "Derived from the scooter's linked posted purchase expense; null if none is linked.",
+      ),
+    purchasePrice: z
+      .string()
+      .nullable()
+      .describe("Derived from the linked purchase expense's allocation."),
+    purchaseCurrency: z.string().nullable(),
     registrationType: scooterRegistrationTypeSchema,
     plateNumber: z.string().nullable(),
     registeredOn: z.string().nullable(),
     registrationExpiresOn: z.string().nullable(),
     requiredDriverLicenseType: scooterRequiredDriverLicenseTypeSchema,
+    currentMileageKm: mileageKmSchema.nullable(),
     notes: z.string().nullable(),
     createdAt: z.string().describe("ISO timestamp of scooter creation."),
     updatedAt: z.string().describe("ISO timestamp of last scooter update."),
@@ -202,7 +216,7 @@ export type Scooter = z.infer<typeof scooterSchema>;
 export const createScooterInputSchema = z
   .object({
     vin: vinSchema,
-    brand: requiredTrimmedStringSchema(MAX_TEXT_LENGTH),
+    brandId: requiredTrimmedStringSchema(MAX_TEXT_LENGTH),
     model: requiredTrimmedStringSchema(MAX_TEXT_LENGTH),
     color: nullableColorSchema.optional(),
     manufactureYear: z
@@ -211,6 +225,7 @@ export const createScooterInputSchema = z
       .min(MIN_MANUFACTURE_YEAR)
       .max(MAX_MANUFACTURE_YEAR),
     powertrainType: scooterPowertrainTypeSchema,
+    engineType: nullableEngineTypeSchema.optional(),
     engineCc: z
       .number()
       .int()
@@ -219,13 +234,13 @@ export const createScooterInputSchema = z
       .nullable()
       .optional(),
     powerKw: z.number().positive().max(MAX_POWER_KW).nullable().optional(),
-    purchasedOn: purchasedOnSchema,
     registrationType: scooterRegistrationTypeSchema.optional(),
     plateNumber: plateNumberInputSchema.optional(),
     registeredOn: registeredOnSchema.nullable().optional(),
     registrationExpiresOn: dateOnlySchema.nullable().optional(),
     requiredDriverLicenseType:
       scooterRequiredDriverLicenseTypeSchema.optional(),
+    currentMileageKm: mileageKmSchema.nullable().optional(),
     notes: notesSchema.optional(),
   })
   .strict()
@@ -240,7 +255,7 @@ export type CreateScooterInput = z.infer<typeof createScooterInputSchema>;
 export const updateScooterInputSchema = z
   .object({
     vin: vinSchema.optional(),
-    brand: requiredTrimmedStringSchema(MAX_TEXT_LENGTH).optional(),
+    brandId: requiredTrimmedStringSchema(MAX_TEXT_LENGTH).optional(),
     model: requiredTrimmedStringSchema(MAX_TEXT_LENGTH).optional(),
     color: nullableColorSchema.optional(),
     manufactureYear: z
@@ -250,6 +265,7 @@ export const updateScooterInputSchema = z
       .max(MAX_MANUFACTURE_YEAR)
       .optional(),
     powertrainType: scooterPowertrainTypeSchema.optional(),
+    engineType: nullableEngineTypeSchema.optional(),
     engineCc: z
       .number()
       .int()
@@ -258,13 +274,13 @@ export const updateScooterInputSchema = z
       .nullable()
       .optional(),
     powerKw: z.number().positive().max(MAX_POWER_KW).nullable().optional(),
-    purchasedOn: purchasedOnSchema.optional(),
     registrationType: scooterRegistrationTypeSchema.optional(),
     plateNumber: plateNumberInputSchema.optional(),
     registeredOn: registeredOnSchema.nullable().optional(),
     registrationExpiresOn: dateOnlySchema.nullable().optional(),
     requiredDriverLicenseType:
       scooterRequiredDriverLicenseTypeSchema.optional(),
+    currentMileageKm: mileageKmSchema.nullable().optional(),
     notes: notesSchema.optional(),
   })
   .strict()
@@ -293,9 +309,17 @@ export const listScootersQuerySchema = z
 
 export type ListScootersQuery = z.infer<typeof listScootersQuerySchema>;
 
+export const scooterListItemSchema = scooterSchema
+  .extend({
+    attentionSummary: scooterMaintenanceAttentionSummarySchema,
+  })
+  .meta({ id: "ScooterListItem" });
+
+export type ScooterListItem = z.infer<typeof scooterListItemSchema>;
+
 export const scooterListSchema = z
   .object({
-    items: z.array(scooterSchema),
+    items: z.array(scooterListItemSchema),
     page: z.number().int().min(1),
     pageSize: z.number().int().min(1).max(MAX_PAGE_SIZE),
     total: z.number().int().min(0),

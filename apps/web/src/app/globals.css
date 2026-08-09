@@ -5,11 +5,13 @@
   display: none;
 }
 
-:root[data-theme="dark"] [data-sidebar-logo-theme="normal"] {
+:root:is([data-theme="dark"], [data-theme="minimal"])
+  [data-sidebar-logo-theme="normal"] {
   display: none;
 }
 
-:root[data-theme="dark"] [data-sidebar-logo-theme="light"] {
+:root:is([data-theme="dark"], [data-theme="minimal"])
+  [data-sidebar-logo-theme="light"] {
   display: block;
 }
 

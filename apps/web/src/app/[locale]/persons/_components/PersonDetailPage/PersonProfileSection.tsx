@@ -35,15 +35,6 @@ export function PersonProfileSection({
           t("detail.emptyValue"),
         )}
       />
-      <DetailField label={t("detail.fields.personId")} value={person.id} />
-      <DetailField
-        label={t("detail.fields.createdAt")}
-        value={formatDateTime(person.createdAt, locale)}
-      />
-      <DetailField
-        label={t("detail.fields.updatedAt")}
-        value={formatDateTime(person.updatedAt, locale)}
-      />
       {person.deletedAt ? (
         <DetailField
           label={t("detail.fields.deletedAt")}

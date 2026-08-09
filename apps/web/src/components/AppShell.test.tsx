@@ -12,6 +12,7 @@ import type { AnchorHTMLAttributes, ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AppShell } from "./AppShell";
+import { PageHeaderActions } from "./PageHeaderActions";
 import { PageTitleOverride } from "./PageTitleOverride";
 import { SessionProvider } from "./auth/SessionProvider";
 import type { SessionIdentity } from "../lib/auth-types";
@@ -28,6 +29,7 @@ class TestPointerEvent extends MouseEvent {
 const mocks = vi.hoisted(() => ({
   apiFetch: vi.fn(),
   pathname: "/",
+  back: vi.fn(),
   push: vi.fn(),
   refresh: vi.fn(),
 }));
@@ -42,6 +44,7 @@ vi.mock("next/navigation", () => ({
   usePathname: () => mocks.pathname,
   useSearchParams: () => new URLSearchParams(),
   useRouter: () => ({
+    back: mocks.back,
     push: mocks.push,
     refresh: mocks.refresh,
   }),
@@ -60,7 +63,28 @@ vi.mock("../i18n/navigation", () => ({
 
 beforeEach(() => {
   mocks.apiFetch.mockReset();
+  mocks.apiFetch.mockResolvedValue({
+    id: "wallet-1",
+    type: "USER",
+    ownerUserId: "user-1",
+    owner: null,
+    cardHolderUserId: null,
+    cardHolder: null,
+    name: "Personal wallet",
+    isActive: true,
+    balances: [
+      {
+        bucket: "USER_SETTLEMENT",
+        currency: "RON",
+        balance: "1250.50",
+        updatedAt: "2026-08-01T09:00:00.000Z",
+      },
+    ],
+    createdAt: "2026-08-01T09:00:00.000Z",
+    updatedAt: "2026-08-01T09:00:00.000Z",
+  });
   mocks.pathname = "/";
+  mocks.back.mockReset();
   mocks.push.mockReset();
   mocks.refresh.mockReset();
 
@@ -99,8 +123,16 @@ describe("AppShell", () => {
     expect(
       screen.queryByRole("link", { name: "Persoane" }),
     ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Finanțe" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Portofelul meu" }),
+    ).not.toBeInTheDocument();
     expect(screen.getByText("Emilia Stone")).toBeInTheDocument();
-    expect(screen.getByText("emilia.stone@example.com")).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Sold personal: 1\.250,50\s+lei/),
+    ).toBeVisible();
     expect(
       within(screen.getByRole("banner")).getByText("Scooter City"),
     ).toBeInTheDocument();
@@ -109,6 +141,9 @@ describe("AppShell", () => {
       screen.getByRole("button", { name: "Deschide meniul contului" }),
     );
 
+    expect(
+      await screen.findByRole("menuitem", { name: "Portofelul meu" }),
+    ).toHaveAttribute("href", "/account/wallet");
     expect(
       await screen.findByRole("menuitem", { name: "Setări cont" }),
     ).toHaveAttribute("href", "/account/settings");
@@ -171,6 +206,74 @@ describe("AppShell", () => {
     expect(
       await screen.findByRole("menuitem", { name: "Account settings" }),
     ).toHaveAttribute("href", "/en/account/settings");
+    expect(screen.getByRole("menuitem", { name: "My wallet" })).toHaveAttribute(
+      "href",
+      "/en/account/wallet",
+    );
+  });
+
+  it("layers an overlay behind the account menu", async () => {
+    renderAppShell();
+
+    expect(
+      document.querySelector('[data-slot="account-menu-overlay"]'),
+    ).not.toBeInTheDocument();
+
+    fireEvent.mouseDown(
+      screen.getByRole("button", { name: "Deschide meniul contului" }),
+    );
+
+    expect(
+      await screen.findByRole("menuitem", { name: /Limbă/ }),
+    ).toBeInTheDocument();
+    expect(
+      document.querySelector('[data-slot="account-menu-overlay"]'),
+    ).toHaveClass("z-overlay", "bg-scrim");
+    expect(
+      document.querySelector('[data-slot="account-menu-overlay"]')
+        ?.parentElement,
+    ).toHaveAttribute("data-slot", "sidebar-inner");
+    expect(
+      screen
+        .getByRole("button", { name: "Deschide meniul contului" })
+        .closest('[data-slot="sidebar-menu-item"]'),
+    ).toHaveClass("z-modal");
+
+    expect(
+      document.querySelector('[data-slot="nested-menu-overlay"]'),
+    ).not.toBeInTheDocument();
+  });
+
+  it("toggles the theme and language submenus closed on a second click", async () => {
+    renderAppShell();
+
+    fireEvent.mouseDown(
+      screen.getByRole("button", { name: "Deschide meniul contului" }),
+    );
+
+    const themeTrigger = await screen.findByRole("menuitem", { name: /Temă/ });
+    expect(themeTrigger).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.mouseDown(themeTrigger);
+    await waitFor(() =>
+      expect(themeTrigger).toHaveAttribute("aria-expanded", "true"),
+    );
+
+    fireEvent.mouseDown(themeTrigger);
+    await waitFor(() =>
+      expect(themeTrigger).toHaveAttribute("aria-expanded", "false"),
+    );
+
+    const languageTrigger = screen.getByRole("menuitem", { name: /Limbă/ });
+    fireEvent.mouseDown(languageTrigger);
+    await waitFor(() =>
+      expect(languageTrigger).toHaveAttribute("aria-expanded", "true"),
+    );
+
+    fireEvent.mouseDown(languageTrigger);
+    await waitFor(() =>
+      expect(languageTrigger).toHaveAttribute("aria-expanded", "false"),
+    );
   });
 
   it("closes the mobile drawer when a navigation link is pressed", async () => {
@@ -207,6 +310,87 @@ describe("AppShell", () => {
     );
   });
 
+  it("shows a back button instead of the mobile navigation trigger on nested routes", async () => {
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: 390,
+    });
+    mocks.pathname = "/persons/new";
+
+    renderAppShell({
+      id: "admin-1",
+      email: "admin@example.com",
+      roles: ["ADMIN"],
+    });
+
+    const backButton = await screen.findByRole("button", { name: "Înapoi" });
+
+    expect(
+      screen.queryByRole("button", { name: "Open navigation" }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(backButton);
+
+    expect(mocks.back).toHaveBeenCalledOnce();
+  });
+
+  it("keeps the mobile navigation trigger on routes listed in the sidebar", async () => {
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: 390,
+    });
+    mocks.pathname = "/finance/transactions";
+
+    renderAppShell({
+      id: "admin-1",
+      email: "admin@example.com",
+      roles: ["ADMIN"],
+    });
+
+    expect(
+      await screen.findByRole("button", { name: "Open navigation" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Înapoi" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("closes the mobile drawer when My wallet is pressed in the account menu", async () => {
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: 390,
+    });
+
+    renderAppShell();
+
+    const trigger = await screen.findByRole("button", {
+      name: "Open navigation",
+    });
+
+    fireEvent.click(trigger);
+
+    await waitFor(() =>
+      expect(trigger).toHaveAttribute("aria-expanded", "true"),
+    );
+
+    fireEvent.mouseDown(
+      screen.getByRole("button", { name: "Deschide meniul contului" }),
+    );
+
+    const walletLink = await screen.findByRole("menuitem", {
+      name: "Portofelul meu",
+    });
+
+    walletLink.addEventListener("click", (event) => event.preventDefault(), {
+      once: true,
+    });
+    fireEvent.click(walletLink);
+
+    await waitFor(() =>
+      expect(trigger).toHaveAttribute("aria-expanded", "false"),
+    );
+  });
+
   it("renders the Romanian persons navigation and title for admins", () => {
     mocks.pathname = "/persons";
 
@@ -227,6 +411,111 @@ describe("AppShell", () => {
       "href",
       "/scooters",
     );
+    expect(screen.getByRole("link", { name: "Service" })).toHaveAttribute(
+      "href",
+      "/service",
+    );
+    expect(
+      screen.getByRole("link", { name: "Prezentare generală" }),
+    ).toHaveAttribute("href", "/finance");
+    expect(screen.queryByText("General")).not.toBeInTheDocument();
+    expect(screen.getByText("Entități")).toBeInTheDocument();
+    expect(screen.getAllByText("Scutere").length).toBeGreaterThan(0);
+    expect(screen.getByText("Finanțe")).toBeInTheDocument();
+  });
+
+  it("renders finance navigation and static finance page titles for admins", () => {
+    mocks.pathname = "/finance/transactions/new";
+
+    renderAppShell({
+      id: "admin-1",
+      email: "admin@example.com",
+      roles: ["ADMIN"],
+    });
+
+    expect(
+      screen.getByRole("link", { name: "Prezentare generală" }),
+    ).toHaveAttribute("href", "/finance");
+    expect(
+      screen.getByRole("link", { name: "Configurare firmă" }),
+    ).toHaveAttribute("href", "/finance/settings/business");
+    expect(
+      screen.queryByRole("link", { name: "Portofele" }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole("banner")).getByText("Tranzacție nouă"),
+    ).toBeInTheDocument();
+  });
+
+  it("renders the compact expense page title in English and Romanian", () => {
+    mocks.pathname = "/en/finance/expenses/new";
+
+    const { unmount } = renderAppShell({
+      id: "admin-1",
+      email: "admin@example.com",
+      roles: ["ADMIN"],
+    });
+
+    expect(
+      within(screen.getByRole("banner")).getByText("Add expense"),
+    ).toBeInTheDocument();
+
+    unmount();
+    mocks.pathname = "/finance/expenses/new";
+
+    renderAppShell({
+      id: "admin-1",
+      email: "admin@example.com",
+      roles: ["ADMIN"],
+    });
+
+    expect(
+      within(screen.getByRole("banner")).getByText("Adaugă cheltuială"),
+    ).toBeInTheDocument();
+  });
+
+  it("renders expense-list and business-settings page titles", () => {
+    mocks.pathname = "/en/finance/expenses";
+
+    const { unmount } = renderAppShell({
+      id: "admin-1",
+      email: "admin@example.com",
+      roles: ["ADMIN"],
+    });
+
+    expect(
+      within(screen.getByRole("banner")).getByText("Expenses"),
+    ).toBeInTheDocument();
+
+    unmount();
+    mocks.pathname = "/finance/settings/business";
+
+    renderAppShell({
+      id: "admin-1",
+      email: "admin@example.com",
+      roles: ["ADMIN"],
+    });
+
+    expect(
+      within(screen.getByRole("banner")).getByText("Setări financiare firmă"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Configurare firmă" }),
+    ).toHaveAttribute("aria-current", "page");
+  });
+
+  it("uses finance detail titles for nested routes", () => {
+    mocks.pathname = "/en/finance/wallets/wallet-1";
+
+    renderAppShell({
+      id: "admin-1",
+      email: "admin@example.com",
+      roles: ["ADMIN"],
+    });
+
+    expect(
+      within(screen.getByRole("banner")).getByText("Wallet details"),
+    ).toBeInTheDocument();
   });
 
   it("renders the new person page title for admin nested person routes", () => {
@@ -272,6 +561,28 @@ describe("AppShell", () => {
     ).toBeInTheDocument();
   });
 
+  it("renders Service in operations and marks its route active", () => {
+    mocks.pathname = "/service";
+
+    renderAppShell({
+      id: "admin-1",
+      email: "admin@example.com",
+      roles: ["ADMIN"],
+    });
+
+    expect(screen.getByRole("link", { name: "Service" })).toHaveAttribute(
+      "href",
+      "/service",
+    );
+    expect(screen.getByRole("link", { name: "Service" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(
+      within(screen.getByRole("banner")).getByText("Service"),
+    ).toBeInTheDocument();
+  });
+
   it("renders a dynamic page title override", async () => {
     mocks.pathname = "/persons/person-1";
 
@@ -291,6 +602,41 @@ describe("AppShell", () => {
       expect(
         within(screen.getByRole("banner")).getByText("Ada Lovelace"),
       ).toBeInTheDocument(),
+    );
+  });
+
+  it("renders page actions on the right side of the mobile header", async () => {
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: 375,
+    });
+    mocks.pathname = "/persons/person-1";
+
+    renderAppShell(
+      {
+        id: "admin-1",
+        email: "admin@example.com",
+        roles: ["ADMIN"],
+      },
+      <>
+        <PageTitleOverride title="Ada Lovelace" />
+        <PageHeaderActions>
+          <button type="button" aria-label="More actions">
+            Actions
+          </button>
+        </PageHeaderActions>
+        <div>Page content</div>
+      </>,
+    );
+
+    const header = screen.getByRole("banner");
+    await waitFor(() =>
+      expect(
+        within(header).getByRole("button", { name: "More actions" }),
+      ).toBeInTheDocument(),
+    );
+    expect(within(header).getByRole("button", { name: "More actions" })).toBe(
+      header.lastElementChild?.firstElementChild,
     );
   });
 });

@@ -19,6 +19,8 @@
  *
  *   | Email                          | Purpose                       | Notes                               |
  *   |--------------------------------|-------------------------------|-------------------------------------|
+ *   | admin@email.com                | Local admin access            | ADMIN role                          |
+ *   | finance-admin@example.com      | Finance fixture administrator | ADMIN role, realistic ledger data   |
  *   | test-email-otp@example.com     | Email-OTP flow                | no OAuth links                      |
  *   | test-sms@example.com           | SMS-OTP flow                  | phone +40700000001                  |
  *   | test-google@example.com        | Google OAuth                  | linked AuthAccount row              |
@@ -50,6 +52,8 @@ import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
 
 import { PrismaClient } from "../src/generated/prisma/client";
+import { seedFinance } from "./seeds/finance";
+import { seedMaintenance } from "./seeds/maintenance";
 
 if (process.env.NODE_ENV === "production") {
   console.error(
@@ -73,6 +77,7 @@ const adapter = new PrismaPg({
 const prisma = new PrismaClient({ adapter });
 
 const FIXED_IDS = {
+  admin: "seed-user-admin",
   emailOtp: "seed-user-email-otp",
   sms: "seed-user-sms",
   google: "seed-user-google",
@@ -103,8 +108,7 @@ const SEED_AUDIT_ACTOR = {
   email: null,
   name: "Seed data",
 } as const;
-const REDACTED_VALUE = "[redacted]";
-const SET_VALUE = "[set]";
+const USER_WALLET_SUFFIX = "personal wallet";
 
 type PersonDocumentSeed = {
   id: string;
@@ -161,7 +165,6 @@ type ScooterSeed = {
   powertrainType: ScooterPowertrainType;
   engineCc: number | null;
   powerKw: number | null;
-  purchasedOn: Date;
   registrationType: ScooterRegistrationType;
   plateNumber: string | null;
   plateNumberNormalized: string | null;
@@ -414,6 +417,24 @@ const GENERATED_ELECTRIC_SCOOTER_MODELS = [
   { brand: "Askoll", model: "eS2" },
 ] as const;
 
+const SCOOTER_BRAND_CODES: Record<string, string> = {
+  Piaggio: "PIA",
+  Kymco: "KYM",
+  SYM: "SYM",
+  Yamaha: "YAM",
+  Honda: "HON",
+  Keeway: "KEE",
+  Aprilia: "APR",
+  Peugeot: "PEU",
+  Rieju: "RIE",
+  Znen: "ZNE",
+  NIU: "NIU",
+  Silence: "SIL",
+  Horwin: "HOR",
+  "Super Soco": "SUP",
+  Askoll: "ASK",
+};
+
 const GENERATED_SCOOTER_COLORS = [
   "white",
   "black",
@@ -439,6 +460,24 @@ const SCOOTER_SEEDS: ScooterSeed[] = buildGeneratedScooterSeeds(
 async function main(): Promise<void> {
   const now = new Date();
 
+  // Local admin user. The production guard above prevents this account from
+  // being created in production environments.
+  await prisma.user.upsert({
+    where: { email: "admin@email.com" },
+    create: {
+      id: FIXED_IDS.admin,
+      email: "admin@email.com",
+      firstName: "Admin",
+      roles: ["ADMIN"],
+      wallet: seedUserWalletCreate("Admin"),
+    },
+    update: {
+      roles: ["ADMIN"],
+      deletedAt: null,
+      wallet: seedUserWalletUpsert("Admin"),
+    },
+  });
+
   // Email-OTP user — no OAuth links.
   await prisma.user.upsert({
     where: { id: FIXED_IDS.emailOtp },
@@ -447,8 +486,13 @@ async function main(): Promise<void> {
       email: "test-email-otp@example.com",
       firstName: "Test",
       lastName: "EmailOtp",
+      wallet: seedUserWalletCreate("Test EmailOtp"),
     },
-    update: {},
+    update: {
+      roles: [],
+      deletedAt: null,
+      wallet: seedUserWalletUpsert("Test EmailOtp"),
+    },
   });
 
   // SMS-OTP user — has phone, no email-verified.
@@ -460,8 +504,14 @@ async function main(): Promise<void> {
       phone: "+40700000001",
       firstName: "Test",
       lastName: "Sms",
+      wallet: seedUserWalletCreate("Test Sms"),
     },
-    update: { phone: "+40700000001" },
+    update: {
+      phone: "+40700000001",
+      roles: [],
+      deletedAt: null,
+      wallet: seedUserWalletUpsert("Test Sms"),
+    },
   });
 
   // OAuth-linked users — one AuthAccount row each.
@@ -481,6 +531,9 @@ async function main(): Promise<void> {
   ];
 
   for (const seed of oauthSeeds) {
+    const providerName =
+      seed.provider.charAt(0).toUpperCase() + seed.provider.slice(1);
+    const userName = `Test ${providerName}`;
     await prisma.user.upsert({
       where: { id: seed.id },
       create: {
@@ -488,10 +541,15 @@ async function main(): Promise<void> {
         email: seed.email,
         emailVerified: now,
         firstName: "Test",
-        lastName:
-          seed.provider.charAt(0).toUpperCase() + seed.provider.slice(1),
+        lastName: providerName,
+        wallet: seedUserWalletCreate(userName),
       },
-      update: { emailVerified: now },
+      update: {
+        emailVerified: now,
+        roles: [],
+        deletedAt: null,
+        wallet: seedUserWalletUpsert(userName),
+      },
     });
 
     await prisma.authAccount.upsert({
@@ -513,21 +571,47 @@ async function main(): Promise<void> {
 
   await seedPersons();
   await seedScooters();
+  await seedMaintenance(prisma);
+  await seedFinance(prisma);
 
   console.log(
-    `Seeded ${Object.keys(FIXED_IDS).length} users, ${PERSON_SEEDS.length} persons, and ${SCOOTER_SEEDS.length} scooters.`,
+    `Seeded ${Object.keys(FIXED_IDS).length + 1} core users, ${PERSON_SEEDS.length} persons, ${SCOOTER_SEEDS.length} scooters, and the finance fixture.`,
   );
 }
 
 async function seedPersons(): Promise<void> {
   for (const seed of PERSON_SEEDS) {
+    const user = await prisma.user.upsert({
+      where: { email: seed.email },
+      create: {
+        id: `seed-user-${seed.id}`,
+        email: seed.email,
+        phone: seed.phone,
+        firstName: seed.firstName,
+        lastName: seed.lastName,
+        wallet: seedUserWalletCreate(`${seed.firstName} ${seed.lastName}`),
+      },
+      update: {
+        phone: seed.phone,
+        firstName: seed.firstName,
+        lastName: seed.lastName,
+        roles: [],
+        deletedAt: null,
+        wallet: seedUserWalletUpsert(`${seed.firstName} ${seed.lastName}`),
+      },
+    });
+
     await prisma.person.upsert({
       where: { id: seed.id },
       create: {
         id: seed.id,
         ...personData(seed),
+        user: { connect: { id: user.id } },
       },
-      update: personData(seed),
+      update: {
+        ...personData(seed),
+        user: { connect: { id: user.id } },
+      },
     });
 
     await prisma.personDocument.deleteMany({
@@ -556,15 +640,77 @@ async function seedPersons(): Promise<void> {
   }
 }
 
+function personalWalletName(ownerName: string): string {
+  return `${ownerName} — ${USER_WALLET_SUFFIX}`;
+}
+
+function seedUserWalletCreate(ownerName: string) {
+  return {
+    create: {
+      type: "USER" as const,
+      name: personalWalletName(ownerName),
+      balances: {
+        create: {
+          bucket: "USER_SETTLEMENT" as const,
+          currency: "RON",
+          balance: 0,
+        },
+      },
+    },
+  };
+}
+
+function seedUserWalletUpsert(ownerName: string) {
+  return {
+    upsert: {
+      create: {
+        type: "USER" as const,
+        name: personalWalletName(ownerName),
+        balances: {
+          create: {
+            bucket: "USER_SETTLEMENT" as const,
+            currency: "RON",
+            balance: 0,
+          },
+        },
+      },
+      update: { name: personalWalletName(ownerName) },
+    },
+  };
+}
+
+function slugifyBrandName(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+}
+
+async function seedScooterBrands(): Promise<Map<string, string>> {
+  const brandNameToId = new Map<string, string>();
+  for (const [name, code] of Object.entries(SCOOTER_BRAND_CODES)) {
+    const id = `seed-scooter-brand-${slugifyBrandName(name)}`;
+    await prisma.scooterBrand.upsert({
+      where: { id },
+      create: { id, name, code },
+      update: { name, code },
+    });
+    brandNameToId.set(name, id);
+  }
+  return brandNameToId;
+}
+
 async function seedScooters(): Promise<void> {
+  const brandNameToId = await seedScooterBrands();
   for (const seed of SCOOTER_SEEDS) {
+    const brandId = brandNameToId.get(seed.brand);
+    if (!brandId) {
+      throw new Error(`Unknown scooter brand in seed data: ${seed.brand}`);
+    }
     await prisma.scooter.upsert({
       where: { id: seed.id },
       create: {
         id: seed.id,
-        ...scooterData(seed),
+        ...scooterData(seed, brandId),
       },
-      update: scooterData(seed),
+      update: scooterData(seed, brandId),
     });
   }
 }
@@ -678,17 +824,16 @@ function personDocumentData(seed: PersonDocumentSeed) {
   };
 }
 
-function scooterData(seed: ScooterSeed) {
+function scooterData(seed: ScooterSeed, brandId: string) {
   return {
     vin: seed.vin,
-    brand: seed.brand,
+    brandId,
     model: seed.model,
     color: seed.color,
     manufactureYear: seed.manufactureYear,
     powertrainType: seed.powertrainType,
     engineCc: seed.engineCc,
     powerKw: seed.powerKw,
-    purchasedOn: seed.purchasedOn,
     registrationType: seed.registrationType,
     plateNumber: seed.plateNumber,
     plateNumberNormalized: seed.plateNumberNormalized,
@@ -713,7 +858,7 @@ function personSeedAuditChanges(seed: PersonSeed) {
     createSeedChange("region", seed.region),
     createSeedChange("postalCode", seed.postalCode),
     createSeedChange("countryCode", seed.countryCode),
-    createSeedChange("notes", seed.notes ? SET_VALUE : null),
+    createSeedChange("notes", seed.notes),
   ]);
 }
 
@@ -728,7 +873,7 @@ function documentSeedAuditChanges(seed: PersonDocumentSeed) {
     createSeedChange("document.issuedOn", dateOnlyString(seed.issuedOn)),
     createSeedChange("document.expiresOn", dateOnlyString(seed.expiresOn)),
     createSeedChange("document.status", seed.status),
-    createSeedChange("document.notes", seed.notes ? SET_VALUE : null),
+    createSeedChange("document.notes", seed.notes),
   ]);
 }
 
@@ -758,7 +903,7 @@ function maskSensitiveSeedValue(value: string | null): string | null {
   }
 
   const visibleLength = Math.min(4, value.length);
-  return `${REDACTED_VALUE} ${value.slice(-visibleLength)}`;
+  return `${"*".repeat(value.length - visibleLength)}${value.slice(-visibleLength)}`;
 }
 
 function dateOnlyString(value: Date | null): string | null {
@@ -834,7 +979,6 @@ function buildGeneratedScooterSeeds(count: number): ScooterSeed[] {
       powertrainType: isElectric ? "electric" : "combustion",
       engineCc: isElectric ? null : is125Cc ? 125 : 50,
       powerKw: isElectric ? 3.2 : is125Cc ? 8.5 : 2.8,
-      purchasedOn: generatedScooterPurchasedOn(ordinal),
       registrationType: "unregistered",
       plateNumber: null,
       plateNumberNormalized: null,
@@ -983,13 +1127,6 @@ function generatedScooterModel({
 
 function generatedScooterVin(ordinal: number): string {
   return `LXYTCKP05P${5_000_000 + ordinal}`;
-}
-
-function generatedScooterPurchasedOn(ordinal: number): Date {
-  const month = ((ordinal - 1) % 12) + 1;
-  const day = ((ordinal - 1) % 27) + 1;
-
-  return dateOnly(`${2025 + (ordinal % 2)}-${pad2(month)}-${pad2(day)}`);
 }
 
 function generatedScooterNotes({

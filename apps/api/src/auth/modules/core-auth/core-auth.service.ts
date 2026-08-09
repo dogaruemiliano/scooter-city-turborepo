@@ -88,16 +88,31 @@ export class CoreAuthService {
     tx: Prisma.TransactionClient,
     input: IssueSessionInput,
   ): Promise<IssueSessionResult> {
+    const activeUser = await tx.user.findFirst({
+      where: {
+        id: input.user.id,
+        deletedAt: null,
+      },
+      select: {
+        id: true,
+        email: true,
+        roles: true,
+      },
+    });
+    if (!activeUser) {
+      throw new UnauthorizedException("Account is unavailable");
+    }
+
     const session = await tx.session.create({
       data: {
-        userId: input.user.id,
+        userId: activeUser.id,
         userAgent: input.userAgent ?? null,
         ip: input.ip ?? null,
       },
     });
 
     const pair = await this.mintAndPersistPair(tx, {
-      user: input.user,
+      user: activeUser,
       sessionId: session.id,
     });
 
@@ -156,6 +171,7 @@ export class CoreAuthService {
           id: row.sessionId,
           userId: row.userId,
           revokedAt: null,
+          user: { deletedAt: null },
         },
         select: { id: true },
       });
@@ -367,10 +383,16 @@ export class CoreAuthService {
     tx: Prisma.TransactionClient,
     previousRow: LockedRefreshTokenRow,
   ): Promise<TokenPair> {
-    const user = await tx.user.findUniqueOrThrow({
-      where: { id: previousRow.userId },
+    const user = await tx.user.findFirst({
+      where: {
+        id: previousRow.userId,
+        deletedAt: null,
+      },
       select: { id: true, email: true, roles: true },
     });
+    if (!user) {
+      throw new UnauthorizedException("Account is unavailable");
+    }
 
     const pair = await this.mintAndPersistPair(tx, {
       user,

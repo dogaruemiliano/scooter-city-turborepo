@@ -12,13 +12,17 @@ import { PassportStrategy } from "@nestjs/passport";
 import { Strategy } from "passport-jwt";
 
 import type { AuthPrincipal, JwtPayload } from "../auth.types";
+import { PrismaService } from "../../prisma/prisma.service";
 import { accessTokenExtractor } from "../utils/jwt-extractors";
 import type { KeyRing } from "../utils/keys";
 import { KEY_RING } from "../utils/keys.module";
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, "jwt") {
-  constructor(@Inject(KEY_RING) ring: KeyRing) {
+  constructor(
+    @Inject(KEY_RING) ring: KeyRing,
+    private readonly prisma: PrismaService,
+  ) {
     super({
       jwtFromRequest: accessTokenExtractor,
       ignoreExpiration: false,
@@ -43,7 +47,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, "jwt") {
     });
   }
 
-  validate(payload: JwtPayload): AuthPrincipal {
+  async validate(payload: JwtPayload): Promise<AuthPrincipal> {
     if (
       payload.tokenType !== "access" ||
       typeof payload.sub !== "string" ||
@@ -53,6 +57,23 @@ export class JwtStrategy extends PassportStrategy(Strategy, "jwt") {
       !payload.roles.every((role) => typeof role === "string")
     ) {
       throw new UnauthorizedException("Invalid access token");
+    }
+
+    // JWT signature verification proves who received the token, but it cannot
+    // tell us whether the account or session was revoked after issuance.
+    // This lookup makes logout and account deactivation effective immediately
+    // instead of waiting for JWT_ACCESS_TTL to expire.
+    const activeSession = await this.prisma.session.findFirst({
+      where: {
+        id: payload.sid,
+        userId: payload.sub,
+        revokedAt: null,
+        user: { deletedAt: null },
+      },
+      select: { id: true },
+    });
+    if (!activeSession) {
+      throw new UnauthorizedException("Session is no longer active");
     }
 
     return {

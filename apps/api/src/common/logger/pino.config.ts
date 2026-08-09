@@ -9,11 +9,48 @@
  */
 import type { Params } from "nestjs-pino";
 
+const FINANCE_SEARCH_PATHS = new Set([
+  "/v1/finance/wallet-options",
+  "/v1/finance/wallets",
+]);
+
+function redactFinanceWalletSearch(
+  url: string | undefined,
+): string | undefined {
+  if (!url) return url;
+
+  const queryStart = url.indexOf("?");
+  const path = url.slice(0, queryStart).replace(/\/$/, "");
+  if (queryStart < 0 || !FINANCE_SEARCH_PATHS.has(path)) {
+    return url;
+  }
+
+  return url.replace(
+    /([?&])([^=&#]*)(=)([^&#]*)/g,
+    (match, separator: string, rawKey: string, equals: string) => {
+      try {
+        const decodedKey = decodeURIComponent(rawKey.replace(/\+/g, " "));
+        return decodedKey.toLowerCase() === "search"
+          ? `${separator}${rawKey}${equals}[redacted]`
+          : match;
+      } catch {
+        return match;
+      }
+    },
+  );
+}
+
 export function pinoConfig(nodeEnv: string): Params {
   const isProd = nodeEnv === "production";
   return {
     pinoHttp: {
       level: isProd ? "info" : "debug",
+      serializers: {
+        req: (req: { url?: string }) => {
+          req.url = redactFinanceWalletSearch(req.url);
+          return req;
+        },
+      },
       transport: isProd
         ? undefined
         : {
@@ -29,6 +66,7 @@ export function pinoConfig(nodeEnv: string): Params {
         paths: [
           "req.headers.authorization",
           "req.headers.cookie",
+          "req.query.search",
           'res.headers["set-cookie"]',
         ],
         censor: "[redacted]",

@@ -1,13 +1,13 @@
-import { ApiError, v1 } from "@repo/api-shared";
+import { v1 } from "@repo/api-shared";
 
 import type {
   DocumentFormState,
   DocumentPhotosByDocumentId,
-  Feedback,
   PersonFormState,
   PersonsTranslations,
   ReadinessIssue,
 } from "./types";
+import { isPersonDocumentExpired } from "../document-status";
 
 export function getRentalReadiness(person: v1.persons.Person): {
   issues: ReadinessIssue[];
@@ -31,7 +31,7 @@ export function getRentalReadiness(person: v1.persons.Person): {
     issues.push("hasRejected");
   }
 
-  if (documents.some(isExpiredDocument)) {
+  if (documents.some((document) => isPersonDocumentExpired(document))) {
     issues.push("hasExpired");
   }
 
@@ -62,6 +62,27 @@ export function formatOptionalDate(
   fallback: string,
 ): string {
   return value ? formatDate(value, locale) : fallback;
+}
+
+export function formatCountryName(
+  countryCode: string | null,
+  locale: string,
+  fallback: string,
+): string {
+  if (!countryCode || typeof Intl.DisplayNames !== "function") {
+    return fallback;
+  }
+
+  try {
+    const displayNames = new Intl.DisplayNames([locale, "en"], {
+      type: "region",
+    });
+    const countryName = displayNames.of(countryCode);
+
+    return countryName && countryName !== countryCode ? countryName : fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 export function formatDate(value: string, locale: string): string {
@@ -98,19 +119,68 @@ export function personFormState(person: v1.persons.Person): PersonFormState {
 
 export function documentFormState(
   document?: v1.persons.PersonDocument,
+  initialType: v1.persons.PersonDocumentType = "nationalId",
 ): DocumentFormState {
   return {
-    type: document?.type ?? "nationalId",
+    type: document?.type ?? initialType,
     series: document?.series ?? "",
     number: document?.number ?? "",
     cnp: document?.cnp ?? "",
     issuingCountryCode: document?.issuingCountryCode ?? "",
     issuedBy: document?.issuedBy ?? "",
     issuedOn: document?.issuedOn ?? "",
+    hasExpiryDate: document ? document.expiresOn !== null : true,
     expiresOn: document?.expiresOn ?? "",
     status: document?.status ?? "verified",
     notes: document?.notes ?? "",
   };
+}
+
+export function documentFormInput(
+  form: DocumentFormState,
+): v1.persons.UpdatePersonDocumentInput {
+  return {
+    type: form.type,
+    series: blankToNull(form.series),
+    number: blankToNull(form.number),
+    cnp: blankToNull(form.cnp),
+    issuingCountryCode: blankToNull(form.issuingCountryCode),
+    issuedBy: blankToNull(form.issuedBy),
+    issuedOn: blankToNull(form.issuedOn),
+    expiresOn: form.hasExpiryDate ? blankToNull(form.expiresOn) : null,
+    status: form.status,
+    notes: blankToNull(form.notes),
+  };
+}
+
+export function documentFormHasChanges(
+  form: DocumentFormState,
+  document?: v1.persons.PersonDocument,
+): boolean {
+  if (!document) {
+    return true;
+  }
+
+  const parsed = v1.persons.updatePersonDocumentInputSchema.safeParse(
+    documentFormInput(form),
+  );
+  if (!parsed.success) {
+    return true;
+  }
+
+  const input = parsed.data;
+  return (
+    input.type !== document.type ||
+    input.series !== document.series ||
+    input.number !== document.number ||
+    input.cnp !== document.cnp ||
+    input.issuingCountryCode !== document.issuingCountryCode ||
+    input.issuedBy !== document.issuedBy ||
+    input.issuedOn !== document.issuedOn ||
+    input.expiresOn !== document.expiresOn ||
+    input.status !== document.status ||
+    input.notes !== document.notes
+  );
 }
 
 export function upsertDocumentPhoto(
@@ -150,18 +220,6 @@ export function blankToNull(value: string): string | null {
   return trimmed.length > 0 ? trimmed : null;
 }
 
-export function apiErrorFeedback(
-  error: unknown,
-  title: string,
-  fallback: string,
-): Feedback {
-  return {
-    kind: "error",
-    title,
-    messages: [error instanceof ApiError ? error.message : fallback],
-  };
-}
-
 export function actorLabel(
   actor: v1.persons.PersonAuditActor,
   t: PersonsTranslations,
@@ -195,40 +253,6 @@ export function formatAuditChange(
   }
 
   return t("detail.activity.cleared", { field });
-}
-
-function isExpiredDocument(document: v1.persons.PersonDocument): boolean {
-  if (document.status === "expired") {
-    return true;
-  }
-
-  if (!document.expiresOn) {
-    return false;
-  }
-
-  const expiryDate = dateOnlyToUtcTime(document.expiresOn);
-  if (expiryDate == null) {
-    return false;
-  }
-
-  const now = new Date();
-  const today = Date.UTC(
-    now.getUTCFullYear(),
-    now.getUTCMonth(),
-    now.getUTCDate(),
-  );
-
-  return expiryDate < today;
-}
-
-function dateOnlyToUtcTime(value: string): number | null {
-  const [year, month, day] = value.split("-").map(Number);
-
-  if (!year || !month || !day) {
-    return null;
-  }
-
-  return Date.UTC(year, month - 1, day);
 }
 
 function sortDocumentPhotos(

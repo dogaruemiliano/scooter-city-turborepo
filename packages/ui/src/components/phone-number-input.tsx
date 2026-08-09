@@ -82,7 +82,6 @@ function PhoneNumberInput({
   onValueChange,
 }: PhoneNumberInputProps) {
   const fallbackCountry = normalizeCountry(defaultCountry);
-  const isControlled = value !== undefined;
   const generatedId = React.useId();
   const errorId = errorMessage ? `${generatedId}-error` : undefined;
   const describedBy = [ariaDescribedBy, errorId].filter(Boolean).join(" ");
@@ -91,19 +90,26 @@ function PhoneNumberInput({
     () => getCountryOptions(locale),
     [locale],
   );
-  const [uncontrolledParts, setUncontrolledParts] = React.useState(() =>
-    parsePhoneValue(defaultValue, fallbackCountry),
+  const [parts, setParts] = React.useState(() =>
+    parsePhoneValue(value ?? defaultValue, fallbackCountry),
   );
-  const parts = isControlled
-    ? parsePhoneValue(value, fallbackCountry)
-    : uncontrolledParts;
   const countryCallingCode = getCountryCallingCode(parts.country);
   const phoneValue = formatPhoneValue(parts);
 
-  function commitParts(nextParts: PhoneNumberParts) {
-    if (!isControlled) {
-      setUncontrolledParts(nextParts);
+  React.useEffect(() => {
+    if (value === undefined) {
+      return;
     }
+
+    setParts((currentParts) =>
+      formatPhoneValue(currentParts) === value
+        ? currentParts
+        : parsePhoneValue(value, fallbackCountry),
+    );
+  }, [fallbackCountry, value]);
+
+  function commitParts(nextParts: PhoneNumberParts) {
+    setParts(nextParts);
 
     onValueChange?.(formatPhoneValue(nextParts), {
       country: nextParts.country,
@@ -165,7 +171,7 @@ function PhoneNumberInput({
             aria-invalid={isInvalid || undefined}
             aria-label={countrySelectLabel}
             autoComplete="tel-country-code"
-            className="h-8 appearance-none rounded-l-lg border-0 bg-transparent py-1 pr-8 pl-2.5 text-base outline-none disabled:cursor-not-allowed disabled:text-disabled-foreground md:text-sm"
+            className="h-12 appearance-none rounded-l-lg border-0 bg-transparent py-2 pr-10 pl-3 text-base outline-none disabled:cursor-not-allowed disabled:text-disabled-foreground md:h-11 md:pr-8 md:text-sm"
             disabled={disabled}
             required={required}
             value={parts.country}
@@ -192,13 +198,13 @@ function PhoneNumberInput({
           aria-labelledby={ariaLabelledBy}
           autoComplete={autoComplete}
           className={cn(
-            "h-8 w-full min-w-0 rounded-r-lg border-0 border-l border-input bg-transparent px-2.5 py-1 text-base outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:text-disabled-foreground md:text-sm",
+            "h-12 w-full min-w-0 rounded-r-lg border-0 border-l border-input bg-transparent px-3 py-2 text-base outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:text-disabled-foreground md:h-11 md:text-sm",
           )}
           disabled={disabled}
-          inputMode="numeric"
-          placeholder={placeholder}
+          inputMode="tel"
+          placeholder={placeholder ?? numberInputLabel}
           required={required}
-          type="text"
+          type="tel"
           value={parts.nationalNumber}
           onBlur={handleNationalNumberBlur}
           onChange={handleNationalNumberChange}

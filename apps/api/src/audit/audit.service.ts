@@ -8,8 +8,8 @@
  *
  * `userId` is nullable. Some events have no logged-in subject yet
  * (anti-enum signup attempts, OAuth verification fails before a user is
- * matched). The schema allows `null` and cascades to `SetNull` on user
- * deletion so historical events survive account removal — see
+ * matched). Account deactivation preserves the User link; `SetNull` remains
+ * a fallback for exceptional administrative hard deletion — see
  * [docs/auth/sessions-and-audit.md](../../../../docs/auth/sessions-and-audit.md).
  */
 import { Injectable } from "@nestjs/common";

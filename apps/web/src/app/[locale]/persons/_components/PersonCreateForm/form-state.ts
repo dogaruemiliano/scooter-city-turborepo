@@ -83,6 +83,7 @@ export function createDocumentDraft(
     issuingCountryCode: "RO",
     issuedBy: "",
     issuedOn: emptyDateParts(),
+    hasExpiryDate: true,
     expiresOn: emptyDateParts(),
     status: "verified",
     photos: {},
@@ -90,9 +91,7 @@ export function createDocumentDraft(
   };
 }
 
-export function isBlankOptionalDocument(
-  document: CreatePersonDocumentFormState,
-) {
+export function isBlankDocumentDraft(document: CreatePersonDocumentFormState) {
   return (
     !hasSelectedDocumentPhoto(document) &&
     document.series.trim().length === 0 &&
