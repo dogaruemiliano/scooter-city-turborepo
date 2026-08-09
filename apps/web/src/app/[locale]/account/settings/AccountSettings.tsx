@@ -202,13 +202,6 @@ export function AccountSettings({
 
   return (
     <div className="mx-auto flex w-full max-w-screen-lg flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
-      <div>
-        <h1 className="text-2xl font-semibold">Account settings</h1>
-        <p className="text-sm text-muted-foreground">
-          Manage your profile, sign-in methods, and active sessions.
-        </p>
-      </div>
-
       {feedback ? (
         <Alert variant={feedback.kind === "error" ? "destructive" : "default"}>
           <AlertTitle>{feedback.title}</AlertTitle>

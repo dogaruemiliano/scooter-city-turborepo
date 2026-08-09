@@ -179,14 +179,6 @@ function InitialBusinessSetupForm({
   return (
     <main className="mx-auto flex w-full max-w-screen-xl flex-1 flex-col gap-8 px-4 py-6 sm:px-6 sm:py-10">
       <PageTitleOverride title={t("title")} />
-      <div className="max-w-3xl">
-        <h1 className="text-2xl font-semibold tracking-tight text-balance sm:text-3xl">
-          {t("title")}
-        </h1>
-        <p className="mt-2 text-base leading-relaxed text-muted-foreground">
-          {t("description")}
-        </p>
-      </div>
 
       {feedback ? (
         <Alert variant="destructive">

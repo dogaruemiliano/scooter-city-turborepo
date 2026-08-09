@@ -41,15 +41,6 @@ export function PersonalWalletView({
 
   return (
     <main className="mx-auto flex w-full max-w-screen-xl flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
-      <header className="flex flex-col gap-2">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          {t.personalWallet.title}
-        </h1>
-        <p className="max-w-2xl text-sm text-muted-foreground">
-          {t.personalWallet.description}
-        </p>
-      </header>
-
       <Card>
         <CardHeader>
           <div className="flex flex-wrap items-center justify-between gap-3">
