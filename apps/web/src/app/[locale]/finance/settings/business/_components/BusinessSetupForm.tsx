@@ -6,6 +6,15 @@ import {
   AlertDescription,
   AlertTitle,
   Badge,
+  BottomSheet,
+  BottomSheetBody,
+  BottomSheetClose,
+  BottomSheetContent,
+  BottomSheetDescription,
+  BottomSheetFooter,
+  BottomSheetHeader,
+  BottomSheetTitle,
+  BottomSheetTrigger,
   Button,
   Card,
   CardContent,
@@ -30,11 +39,11 @@ import {
   CircleCheckIcon,
   LandmarkIcon,
   LoaderCircleIcon,
+  LogOutIcon,
   PlusIcon,
   Trash2Icon,
   UserRoundCheckIcon,
 } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { useRef, useState, type FormEvent } from "react";
@@ -521,10 +530,7 @@ function InitialBusinessSetupForm({
   );
 }
 
-function VatRegistrationManager({
-  bootstrap,
-  newExpenseHref,
-}: BusinessSetupFormProps) {
+function VatRegistrationManager({ bootstrap }: BusinessSetupFormProps) {
   const t = useTranslations("finance.expenses.businessSetup");
   const [entityId, setEntityId] = useState(bootstrap.entities[0]?.id ?? "");
   const entity = bootstrap.entities.find((item) => item.id === entityId);
@@ -538,14 +544,6 @@ function VatRegistrationManager({
   return (
     <main className="mx-auto flex w-full max-w-screen-xl flex-1 flex-col gap-8 px-4 py-6 sm:px-6 sm:py-10">
       <PageTitleOverride title={t("manage.title")} />
-      <div className="max-w-3xl">
-        <h1 className="text-2xl font-semibold tracking-tight text-balance sm:text-3xl">
-          {t("manage.title")}
-        </h1>
-        <p className="mt-2 text-base leading-relaxed text-muted-foreground">
-          {t("manage.description")}
-        </p>
-      </div>
 
       <div className="grid items-start gap-6 lg:grid-cols-2">
         <Card className="lg:col-span-2">
@@ -557,7 +555,7 @@ function VatRegistrationManager({
                 : t("manage.missingCui")}
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex flex-col gap-6">
             <SelectField
               id="manage-business-entity"
               label={t("company.title")}
@@ -569,41 +567,33 @@ function VatRegistrationManager({
               }))}
               onChange={setEntityId}
             />
+
+            <OwnerPeriodsSection
+              key={`owners-${entityId}`}
+              entityId={entityId}
+              owners={owners}
+              today={bootstrap.today}
+              users={bootstrap.users}
+              usersNextCursor={bootstrap.usersNextCursor}
+            />
           </CardContent>
         </Card>
 
-        <OwnerPeriodsCard
-          key={`owners-${entityId}`}
-          entityId={entityId}
-          owners={owners}
-          today={bootstrap.today}
-          users={bootstrap.users}
-          usersNextCursor={bootstrap.usersNextCursor}
-        />
-
-        <VatPeriodsCard
-          key={`vat-${entityId}`}
-          canManage={Boolean(entity?.taxIdentifier)}
-          entityId={entityId}
-          periods={vatPeriods}
-          today={bootstrap.today}
-        />
-
         <div className="lg:col-span-2">
-          <Button
-            variant="outline"
-            nativeButton={false}
-            render={<Link href={newExpenseHref} />}
-          >
-            {t("manage.backToExpense")}
-          </Button>
+          <VatPeriodsCard
+            key={`vat-${entityId}`}
+            canManage={Boolean(entity?.taxIdentifier)}
+            entityId={entityId}
+            periods={vatPeriods}
+            today={bootstrap.today}
+          />
         </div>
       </div>
     </main>
   );
 }
 
-function OwnerPeriodsCard({
+function OwnerPeriodsSection({
   entityId,
   owners,
   today,
@@ -617,16 +607,39 @@ function OwnerPeriodsCard({
   usersNextCursor: string | null;
 }) {
   const t = useTranslations("finance.expenses.businessSetup");
+  const commonT = useTranslations("finance.common");
   const router = useRouter();
   const openOwners = owners.filter(
     (owner) => owner.effectiveTo === null || owner.effectiveTo > today,
   );
   const unavailableUserIds = new Set(openOwners.map((owner) => owner.userId));
+  const [addOpen, setAddOpen] = useState(false);
   const [ownerUserId, setOwnerUserId] = useState("");
   const [effectiveFrom, setEffectiveFrom] = useState(today);
+  const [endOwnerId, setEndOwnerId] = useState<string | null>(null);
   const [endDates, setEndDates] = useState<Record<string, string>>({});
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const selectedEndOwner =
+    openOwners.find((owner) => owner.id === endOwnerId) ?? null;
+
+  function changeAddOpen(nextOpen: boolean) {
+    if (pendingAction) return;
+    setAddOpen(nextOpen);
+    if (nextOpen) {
+      setOwnerUserId("");
+      setEffectiveFrom(today);
+      setFeedback(null);
+    }
+  }
+
+  function changeEndOpen(nextOpen: boolean) {
+    if (pendingAction) return;
+    if (!nextOpen) {
+      setEndOwnerId(null);
+      setFeedback(null);
+    }
+  }
 
   async function addOwner(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -641,7 +654,7 @@ function OwnerPeriodsCard({
         userId: ownerUserId,
         effectiveFrom,
       });
-      setOwnerUserId("");
+      setAddOpen(false);
       router.refresh();
     } catch (error) {
       setFeedback(
@@ -662,6 +675,7 @@ function OwnerPeriodsCard({
     setPendingAction(`end-${owner.id}`);
     try {
       await endBusinessOwner(entityId, owner.id, effectiveTo);
+      setEndOwnerId(null);
       router.refresh();
     } catch (error) {
       setFeedback(
@@ -673,120 +687,202 @@ function OwnerPeriodsCard({
   }
 
   return (
-    <Card>
-      <CardHeader className="border-b">
-        <CardTitle>{t("owners.title")}</CardTitle>
-        <CardDescription>{t("owners.manageDescription")}</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-5">
-        {feedback ? <InlineError message={feedback} /> : null}
-        {openOwners.length > 0 ? (
-          <div className="flex flex-col gap-3">
-            {openOwners.map((owner) => {
-              const ending = pendingAction === `end-${owner.id}`;
-              const scheduled = owner.effectiveFrom > today;
-              return (
-                <div
-                  key={owner.id}
-                  className="grid gap-3 rounded-lg bg-muted p-4 lg:grid-cols-2 lg:items-end"
+    <div className="flex flex-col gap-4 border-t border-border pt-6">
+      <h3 className="text-sm font-medium">{t("owners.title")}</h3>
+
+      {feedback && !addOpen && !endOwnerId ? (
+        <InlineError message={feedback} />
+      ) : null}
+
+      {openOwners.length > 0 ? (
+        <div className="flex flex-col divide-y divide-border">
+          {openOwners.map((owner) => {
+            const scheduled = owner.effectiveFrom > today;
+            return (
+              <div
+                key={owner.id}
+                className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">{owner.label}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {scheduled
+                      ? t("owners.scheduledPeriod", {
+                          from: owner.effectiveFrom,
+                        })
+                      : t("owners.activePeriod", {
+                          from: owner.effectiveFrom,
+                        })}
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={t("owners.end")}
+                  disabled={Boolean(pendingAction)}
+                  onClick={() => {
+                    setFeedback(null);
+                    setEndOwnerId(owner.id);
+                  }}
                 >
-                  <div>
-                    <p className="text-sm font-medium">{owner.label}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {scheduled
-                        ? t("owners.scheduledPeriod", {
-                            from: owner.effectiveFrom,
-                          })
-                        : t("owners.activePeriod", {
-                            from: owner.effectiveFrom,
-                          })}
-                    </p>
-                  </div>
-                  <form
-                    className="flex flex-col gap-3 sm:flex-row sm:items-end"
-                    onSubmit={(event) => void endOwner(event, owner)}
-                  >
-                    <div className="min-w-0 flex-1">
-                      <TextField
-                        id={`owner-${owner.id}-effective-to`}
-                        label={t("owners.endOn")}
-                        date
-                        value={
-                          endDates[owner.id] ?? ownerDefaultEnd(owner, today)
-                        }
-                        required
-                        disabled={Boolean(pendingAction)}
-                        onChange={(value) =>
-                          setEndDates((current) => ({
-                            ...current,
-                            [owner.id]: value,
-                          }))
-                        }
-                      />
-                    </div>
+                  <LogOutIcon aria-hidden="true" />
+                </Button>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          {t("owners.noneConfigured")}
+        </p>
+      )}
+
+      <BottomSheet open={addOpen} onOpenChange={changeAddOpen}>
+        <BottomSheetTrigger
+          render={
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="self-start gap-1.5 px-0 text-muted-foreground hover:bg-transparent hover:text-foreground"
+            />
+          }
+        >
+          <PlusIcon />
+          {t("owners.addButton")}
+        </BottomSheetTrigger>
+        <BottomSheetContent>
+          <form onSubmit={(event) => void addOwner(event)} className="contents">
+            <BottomSheetHeader>
+              <BottomSheetTitle>{t("owners.addTitle")}</BottomSheetTitle>
+              <BottomSheetDescription>
+                {t("owners.description")}
+              </BottomSheetDescription>
+            </BottomSheetHeader>
+            <BottomSheetBody>
+              {feedback ? <InlineError message={feedback} /> : null}
+              <ServerUserSearchSelect
+                id="manage-owner-user"
+                label={t("owners.select")}
+                value={ownerUserId || null}
+                initialUsers={users}
+                initialNextCursor={usersNextCursor}
+                excludedUserIds={[...unavailableUserIds]}
+                disabled={Boolean(pendingAction)}
+                onChange={(value) => setOwnerUserId(value ?? "")}
+              />
+              <TextField
+                id="manage-owner-effective-from"
+                label={t("owners.effectiveFrom")}
+                date
+                value={effectiveFrom}
+                required
+                disabled={Boolean(pendingAction)}
+                onChange={setEffectiveFrom}
+              />
+            </BottomSheetBody>
+            <BottomSheetFooter className="sm:flex-row-reverse sm:justify-start">
+              <Button type="submit" disabled={Boolean(pendingAction)}>
+                {pendingAction === "add" ? (
+                  <LoaderCircleIcon
+                    aria-hidden="true"
+                    data-icon="inline-start"
+                    className="animate-spin"
+                  />
+                ) : null}
+                {pendingAction === "add" ? t("owners.adding") : t("owners.add")}
+              </Button>
+              <BottomSheetClose
+                render={
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={Boolean(pendingAction)}
+                  />
+                }
+              >
+                {commonT("cancel")}
+              </BottomSheetClose>
+            </BottomSheetFooter>
+          </form>
+        </BottomSheetContent>
+      </BottomSheet>
+
+      <BottomSheet
+        open={Boolean(selectedEndOwner)}
+        onOpenChange={changeEndOpen}
+      >
+        {selectedEndOwner ? (
+          <BottomSheetContent>
+            <form
+              onSubmit={(event) => void endOwner(event, selectedEndOwner)}
+              className="contents"
+            >
+              <BottomSheetHeader>
+                <BottomSheetTitle>
+                  {t("owners.endTitle", { name: selectedEndOwner.label })}
+                </BottomSheetTitle>
+                <BottomSheetDescription>
+                  {t("owners.endDescription")}
+                </BottomSheetDescription>
+              </BottomSheetHeader>
+              <BottomSheetBody>
+                {feedback && endOwnerId ? (
+                  <InlineError message={feedback} />
+                ) : null}
+                <TextField
+                  id={`owner-${selectedEndOwner.id}-effective-to`}
+                  label={t("owners.endOn")}
+                  date
+                  value={
+                    endDates[selectedEndOwner.id] ??
+                    ownerDefaultEnd(selectedEndOwner, today)
+                  }
+                  required
+                  disabled={Boolean(pendingAction)}
+                  onChange={(value) =>
+                    setEndDates((current) => ({
+                      ...current,
+                      [selectedEndOwner.id]: value,
+                    }))
+                  }
+                />
+              </BottomSheetBody>
+              <BottomSheetFooter className="sm:flex-row-reverse sm:justify-start">
+                <Button
+                  type="submit"
+                  variant="destructive"
+                  disabled={Boolean(pendingAction)}
+                >
+                  {pendingAction === `end-${selectedEndOwner.id}` ? (
+                    <LoaderCircleIcon
+                      aria-hidden="true"
+                      data-icon="inline-start"
+                      className="animate-spin"
+                    />
+                  ) : null}
+                  {pendingAction === `end-${selectedEndOwner.id}`
+                    ? t("owners.ending")
+                    : t("owners.end")}
+                </Button>
+                <BottomSheetClose
+                  render={
                     <Button
-                      type="submit"
+                      type="button"
                       variant="outline"
                       disabled={Boolean(pendingAction)}
-                    >
-                      {ending ? (
-                        <LoaderCircleIcon
-                          aria-hidden="true"
-                          data-icon="inline-start"
-                          className="animate-spin"
-                        />
-                      ) : null}
-                      {ending ? t("owners.ending") : t("owners.end")}
-                    </Button>
-                  </form>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            {t("owners.noneConfigured")}
-          </p>
-        )}
-
-        <form
-          className="grid gap-4 border-t border-border pt-5 sm:grid-cols-2"
-          onSubmit={(event) => void addOwner(event)}
-        >
-          <ServerUserSearchSelect
-            id="manage-owner-user"
-            label={t("owners.select")}
-            value={ownerUserId || null}
-            initialUsers={users}
-            initialNextCursor={usersNextCursor}
-            excludedUserIds={[...unavailableUserIds]}
-            disabled={Boolean(pendingAction)}
-            onChange={(value) => setOwnerUserId(value ?? "")}
-          />
-          <TextField
-            id="manage-owner-effective-from"
-            label={t("owners.effectiveFrom")}
-            date
-            value={effectiveFrom}
-            required
-            disabled={Boolean(pendingAction)}
-            onChange={setEffectiveFrom}
-          />
-          <div className="sm:col-span-2 sm:flex sm:justify-end">
-            <Button type="submit" disabled={Boolean(pendingAction)}>
-              {pendingAction === "add" ? (
-                <LoaderCircleIcon
-                  aria-hidden="true"
-                  data-icon="inline-start"
-                  className="animate-spin"
-                />
-              ) : null}
-              {pendingAction === "add" ? t("owners.adding") : t("owners.add")}
-            </Button>
-          </div>
-        </form>
-      </CardContent>
-    </Card>
+                    />
+                  }
+                >
+                  {commonT("cancel")}
+                </BottomSheetClose>
+              </BottomSheetFooter>
+            </form>
+          </BottomSheetContent>
+        ) : null}
+      </BottomSheet>
+    </div>
   );
 }
 

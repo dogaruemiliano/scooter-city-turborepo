@@ -700,7 +700,6 @@ export const financeCatalog = {
           endingRegistration: "Ending VAT registration...",
           updateRegistration: "Update scheduled registration",
           updatingRegistration: "Updating scheduled registration...",
-          backToExpense: "Back to expense",
         },
         effectiveFrom: "Effective from",
         company: {
@@ -735,13 +734,16 @@ export const financeCatalog = {
             "Select only users who are legally/formally owners. Administrators are not inferred as owners.",
           empty: "No active users are available.",
           remove: "Remove associate",
-          manageDescription:
-            "Add and end dated formal-owner periods for this operating company.",
+          addButton: "Add owner",
+          addTitle: "Add formal owner",
           effectiveFrom: "Owner effective from",
           select: "Select formal owner",
           selectRequired: "Select a formal owner to add.",
           activePeriod: "Active since {from}",
           scheduledPeriod: "Scheduled from {from}",
+          endTitle: "End {name}'s owner period",
+          endDescription:
+            "This marks the day this person stops being a formal owner of the company. Nothing is deleted — a new owner period can be started again later if needed.",
           endOn: "Owner period ends on (exclusive)",
           end: "End owner period",
           ending: "Ending owner period...",
@@ -1703,7 +1705,6 @@ export const financeCatalog = {
           endingRegistration: "Se încheie înregistrarea TVA...",
           updateRegistration: "Actualizează înregistrarea programată",
           updatingRegistration: "Se actualizează înregistrarea programată...",
-          backToExpense: "Înapoi la cheltuială",
         },
         effectiveFrom: "În vigoare de la",
         company: {
@@ -1741,13 +1742,16 @@ export const financeCatalog = {
             "Selectează doar utilizatorii care sunt asociați legali/formali. Administratorii nu sunt considerați automat asociați.",
           empty: "Nu există utilizatori activi disponibili.",
           remove: "Elimină asociatul",
-          manageDescription:
-            "Adaugă și încheie perioade datate pentru asociații formali ai acestei firme operatoare.",
+          addButton: "Adaugă asociat",
+          addTitle: "Adaugă asociat formal",
           effectiveFrom: "Asociat în vigoare de la",
           select: "Selectează asociatul formal",
           selectRequired: "Selectează un asociat formal de adăugat.",
           activePeriod: "Activ din {from}",
           scheduledPeriod: "Programat din {from}",
+          endTitle: "Încheie perioada asociatului {name}",
+          endDescription:
+            "Aceasta marchează ziua din care persoana nu mai este asociat formal al firmei. Nu se șterge nimic — o nouă perioadă de asociat poate fi începută din nou mai târziu, dacă e nevoie.",
           endOn: "Perioada asociatului se încheie la (exclusiv)",
           end: "Încheie perioada asociatului",
           ending: "Se încheie perioada asociatului...",

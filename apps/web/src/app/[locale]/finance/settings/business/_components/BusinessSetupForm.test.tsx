@@ -16,7 +16,8 @@ vi.mock("next/navigation", () => ({
 }));
 
 describe("BusinessSetupForm", () => {
-  it("manages a scheduled VAT period without offering an overlapping new period", () => {
+  it("manages a scheduled VAT period without offering an overlapping new period", async () => {
+    const browser = userEvent.setup();
     renderForm({
       ...emptyBootstrap,
       entities: [
@@ -72,6 +73,22 @@ describe("BusinessSetupForm", () => {
     expect(
       screen.getByRole("button", { name: "End owner period" }),
     ).toBeInTheDocument();
+
+    await browser.click(
+      screen.getByRole("button", { name: "End owner period" }),
+    );
+
+    expect(
+      screen.getByRole("button", { name: "End owner period" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByLabelText("Owner period ends on (exclusive)"),
+    ).toBeInTheDocument();
+
+    await browser.click(screen.getByRole("button", { name: "Cancel" }));
+
+    await browser.click(screen.getByRole("button", { name: "Add owner" }));
+
     expect(
       screen.getByRole("button", { name: "Add owner period" }),
     ).toBeInTheDocument();
