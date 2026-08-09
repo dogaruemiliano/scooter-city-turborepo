@@ -1,7 +1,6 @@
 import { v1 } from "@repo/api-shared";
 import {
   Badge,
-  Button,
   Card,
   CardAction,
   CardContent,
@@ -17,7 +16,7 @@ import {
   buttonVariants,
 } from "@repo/ui/components";
 import { cn } from "@repo/ui/lib/utils";
-import { ArrowLeftIcon, EqualIcon, MinusIcon, PlusIcon } from "lucide-react";
+import { EqualIcon, MinusIcon, PlusIcon } from "lucide-react";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 
@@ -86,7 +85,6 @@ export default async function CompanyDetailPage({
     ),
   ]);
   const t = await getTranslations({ locale, namespace: "finance" });
-  const companiesHref = localizePath(COMPANIES_PATH, locale);
   const detailHref = localizePath(routePath, locale);
   const displayName = companyDisplayName(
     company,
@@ -101,16 +99,7 @@ export default async function CompanyDetailPage({
   return (
     <main className="mx-auto flex w-full max-w-screen-xl flex-1 flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
       <PageTitleOverride title={displayName} />
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <Button
-          variant="ghost"
-          className="hidden w-fit md:inline-flex"
-          nativeButton={false}
-          render={<Link href={companiesHref} />}
-        >
-          <ArrowLeftIcon data-icon="inline-start" />
-          {t("companies.detail.back")}
-        </Button>
+      <div className="flex flex-wrap items-center justify-end gap-3">
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">
             {t("companies.fields.taxIdentifier")}:{" "}

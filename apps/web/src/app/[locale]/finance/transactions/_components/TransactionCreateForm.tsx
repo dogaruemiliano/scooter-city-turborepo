@@ -32,7 +32,6 @@ import {
 import { cn } from "@repo/ui/lib/utils";
 import {
   ArrowDownIcon,
-  ArrowLeftIcon,
   ArrowRightIcon,
   Building2Icon,
   UserIcon,
@@ -286,16 +285,6 @@ export function TransactionCreateForm({
   return (
     <div className="mx-auto flex w-full max-w-screen-xl flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
       <PageTitleOverride title={t("transactionForm.title")} />
-      <Link
-        href={transactionsHref}
-        className={cn(
-          buttonVariants({ variant: "ghost" }),
-          "hidden w-fit text-muted-foreground md:inline-flex",
-        )}
-      >
-        <ArrowLeftIcon data-icon="inline-start" />
-        {t("transactionForm.back")}
-      </Link>
       <form
         className="grid gap-6"
         noValidate

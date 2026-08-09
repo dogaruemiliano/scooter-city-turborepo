@@ -1,7 +1,6 @@
 import { v1 } from "@repo/api-shared";
 import {
   Badge,
-  Button,
   Card,
   CardContent,
   CardDescription,
@@ -14,11 +13,9 @@ import {
   TableHeader,
   TableRow,
 } from "@repo/ui/components";
-import { ArrowLeftIcon } from "lucide-react";
-import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 
-import { localizePath, resolveRouteLocale } from "@/i18n/paths";
+import { resolveRouteLocale } from "@/i18n/paths";
 import { webApi } from "@/lib/api";
 import { PageTitleOverride } from "@/components/PageTitleOverride";
 import {
@@ -60,16 +57,7 @@ export default async function WalletDetailPage({
   return (
     <main className="mx-auto flex w-full max-w-screen-lg flex-1 flex-col gap-8 px-4 py-6 sm:px-6 lg:px-8">
       <PageTitleOverride title={wallet.name} />
-      <div className="flex items-center justify-between gap-3">
-        <Button
-          variant="ghost"
-          className="hidden w-fit md:inline-flex"
-          nativeButton={false}
-          render={<Link href={localizePath("/finance", locale)} />}
-        >
-          <ArrowLeftIcon data-icon="inline-start" />
-          {t("wallets.detail.back")}
-        </Button>
+      <div className="flex items-center justify-end gap-3">
         <Badge variant={wallet.isActive ? "secondary" : "outline"}>
           {wallet.isActive ? t("common.active") : t("common.inactive")}
         </Badge>

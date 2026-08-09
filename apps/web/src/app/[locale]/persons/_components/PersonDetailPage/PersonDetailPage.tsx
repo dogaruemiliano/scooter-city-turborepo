@@ -190,7 +190,6 @@ export function PersonDetailPage({
       <PageTitleOverride title={title} />
       <PersonDetailHeader
         person={person}
-        personsHref={personsHref}
         busyAction={busyAction}
         onUpdatePerson={updatePerson}
         onDeletePerson={deletePerson}

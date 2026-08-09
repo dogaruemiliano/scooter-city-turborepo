@@ -1,10 +1,8 @@
 "use client";
 
 import { v1 } from "@repo/api-shared";
-import { Badge, buttonVariants } from "@repo/ui/components";
-import { cn } from "@repo/ui/lib/utils";
-import { ArrowLeftIcon, PencilIcon, Trash2Icon } from "lucide-react";
-import Link from "next/link";
+import { Badge } from "@repo/ui/components";
+import { PencilIcon, Trash2Icon } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useState } from "react";
 
@@ -17,13 +15,11 @@ import { PersonFormDialog } from "./PersonFormDialog";
 
 export function PersonDetailHeader({
   person,
-  personsHref,
   busyAction,
   onUpdatePerson,
   onDeletePerson,
 }: {
   person: v1.persons.Person;
-  personsHref: string;
   busyAction: string | null;
   onUpdatePerson: (input: v1.persons.UpdatePersonInput) => Promise<boolean>;
   onDeletePerson: () => Promise<boolean>;
@@ -37,17 +33,6 @@ export function PersonDetailHeader({
 
   return (
     <div className="flex flex-col gap-4">
-      <Link
-        href={personsHref}
-        className={cn(
-          buttonVariants({ variant: "ghost" }),
-          "hidden w-fit text-muted-foreground md:inline-flex",
-        )}
-      >
-        <ArrowLeftIcon data-icon="inline-start" />
-        {t("actions.backToList")}
-      </Link>
-
       <div className="flex flex-col gap-3">
         {person.deletedAt ? (
           <div className="flex flex-wrap gap-2">

@@ -289,15 +289,6 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
 
   return (
     <div className="mx-auto flex w-full max-w-screen-lg flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
-      <div className="flex flex-col gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold">{t("createPage.title")}</h1>
-          <p className="text-sm text-muted-foreground">
-            {t("createPage.description")}
-          </p>
-        </div>
-      </div>
-
       <form
         className="grid gap-6"
         noValidate

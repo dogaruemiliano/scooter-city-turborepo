@@ -26,10 +26,9 @@ import {
   TableHeader,
   TableRow,
   Textarea,
-  buttonVariants,
 } from "@repo/ui/components";
 import { cn } from "@repo/ui/lib/utils";
-import { ArrowLeftIcon, CheckCircle2Icon, RotateCcwIcon } from "lucide-react";
+import { CheckCircle2Icon, RotateCcwIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -151,17 +150,7 @@ export function TransactionDetailPage({
   return (
     <div className="mx-auto flex w-full max-w-screen-xl flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
       <PageTitleOverride title={title} />
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <Link
-          href={transactionsHref}
-          className={cn(
-            buttonVariants({ variant: "ghost" }),
-            "hidden w-fit text-muted-foreground md:inline-flex",
-          )}
-        >
-          <ArrowLeftIcon data-icon="inline-start" />
-          {t("transactions.detail.back")}
-        </Link>
+      <div className="flex flex-wrap items-center justify-end gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <FinanceStatusBadge
             status={current.status}
