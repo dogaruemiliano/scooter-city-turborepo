@@ -250,6 +250,7 @@ describe("expense fact validation", () => {
             ({ where }: { where: { id: { in: string[] } } }) =>
               Promise.resolve(where.id.in.map((id) => ({ id }))),
           ),
+        findFirst: jest.fn().mockResolvedValue(null),
       },
       user: { findFirst: jest.fn().mockResolvedValue({ id: "user-1" }) },
       wallet: {
@@ -347,5 +348,49 @@ describe("expense fact validation", () => {
     expect(tx.financialCategory.findFirst).not.toHaveBeenCalled();
     expect(result.tax.recognizedCostAmount.toFixed(2)).toBe("100.00");
     expect(result.tax.fiscalDeductibleAmount.toFixed(2)).toBe("0.00");
+  });
+
+  const SCOOTER_PURCHASE_CATEGORY_ID = "seed-finance-category-scooter-purchase";
+
+  it("rejects a purchase-category expense allocated to an already-linked scooter", async () => {
+    const tx = buildValidateFactsTx();
+    tx.financialCategory.findFirst.mockResolvedValue({
+      id: SCOOTER_PURCHASE_CATEGORY_ID,
+    });
+    tx.scooter.findFirst.mockResolvedValue({ id: "scooter-1" });
+    const facts = {
+      ...baseFacts(),
+      categoryId: SCOOTER_PURCHASE_CATEGORY_ID,
+      scooterAllocations: [
+        { scooterId: "scooter-1", amount: new Prisma.Decimal("100.00") },
+      ],
+    };
+
+    await expect(callValidateFacts(tx, facts)).rejects.toThrow(
+      "One or more scooters already have a linked purchase expense",
+    );
+  });
+
+  it("allows a purchase-category expense when no target scooter is already linked", async () => {
+    const tx = buildValidateFactsTx();
+    tx.financialCategory.findFirst.mockResolvedValue({
+      id: SCOOTER_PURCHASE_CATEGORY_ID,
+    });
+    const facts = {
+      ...baseFacts(),
+      categoryId: SCOOTER_PURCHASE_CATEGORY_ID,
+      scooterAllocations: [
+        { scooterId: "scooter-1", amount: new Prisma.Decimal("100.00") },
+      ],
+    };
+
+    await expect(callValidateFacts(tx, facts)).resolves.toBeDefined();
+    expect(tx.scooter.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          purchaseAllocationId: { not: null },
+        }),
+      }),
+    );
   });
 });

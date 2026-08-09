@@ -41,6 +41,15 @@ const FISCAL_EVIDENCE_TYPES = new Set<v1.finance.ExpenseDocumentType>([
   "FISCAL_RECEIPT",
   "INVOICE",
 ]);
+/**
+ * The seeded "Achiziție scuter" (scooter purchase) FinancialCategory id
+ * (apps/api/prisma/seeds/finance.ts, financeCategorySeedId("SCOOTER_PURCHASE")).
+ * A posted expense in this category links its allocated scooters'
+ * `Scooter.purchaseAllocationId` — see postInTx/reverse below. Matched by id,
+ * not by the generated `code` column, since `code` is regenerated from the
+ * category's current name on every rename.
+ */
+const SCOOTER_PURCHASE_CATEGORY_ID = "seed-finance-category-scooter-purchase";
 
 interface ExpensePostingEvidenceDocument {
   type: v1.finance.ExpenseDocumentType;
@@ -608,6 +617,20 @@ export class ExpensesService {
             updatedByUserId: context.actorUserId,
           },
         });
+
+        if (current.scooterAllocations.length > 0) {
+          await tx.scooter.updateMany({
+            where: {
+              purchaseAllocationId: {
+                in: current.scooterAllocations.map(
+                  (allocation) => allocation.id,
+                ),
+              },
+            },
+            data: { purchaseAllocationId: null },
+          });
+        }
+
         return this.getRecord(tx, id);
       });
       return toExpense(reversed);
@@ -966,6 +989,16 @@ export class ExpensesService {
         updatedByUserId: context.actorUserId,
       },
     });
+
+    if (current.categoryId === SCOOTER_PURCHASE_CATEGORY_ID) {
+      for (const allocation of current.scooterAllocations) {
+        await tx.scooter.update({
+          where: { id: allocation.scooterId },
+          data: { purchaseAllocationId: allocation.id },
+        });
+      }
+    }
+
     return this.getRecord(tx, current.id);
   }
 
@@ -1088,6 +1121,21 @@ export class ExpensesService {
         throw new BadRequestException(
           "One or more allocated scooters were not found",
         );
+      }
+
+      if (facts.categoryId === SCOOTER_PURCHASE_CATEGORY_ID) {
+        const alreadyLinked = await tx.scooter.findFirst({
+          where: {
+            id: { in: scooterIds },
+            purchaseAllocationId: { not: null },
+          },
+          select: { id: true },
+        });
+        if (alreadyLinked) {
+          throw new BadRequestException(
+            "One or more scooters already have a linked purchase expense",
+          );
+        }
       }
     }
 
