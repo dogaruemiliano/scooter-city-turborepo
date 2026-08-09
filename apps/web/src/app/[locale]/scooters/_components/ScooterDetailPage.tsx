@@ -4,6 +4,10 @@ import { v1 } from "@repo/api-shared";
 import {
   Badge,
   Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
   Dialog,
   DialogClose,
   DialogContent,
@@ -754,13 +758,17 @@ function DetailSection({
   children: ReactNode;
 }) {
   return (
-    <section className="flex min-w-0 flex-col gap-4 rounded-lg bg-muted p-4">
-      <div className="flex items-center gap-2">
-        <CarFrontIcon aria-hidden="true" className="size-4 shrink-0" />
-        <h2 className="text-base font-semibold md:text-sm">{title}</h2>
-      </div>
-      <dl className="grid min-w-0 gap-4 sm:grid-cols-2">{children}</dl>
-    </section>
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <CarFrontIcon aria-hidden="true" className="size-4 shrink-0" />
+          <h2 className="text-base font-semibold md:text-sm">{title}</h2>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <dl className="grid min-w-0 gap-4 sm:grid-cols-2">{children}</dl>
+      </CardContent>
+    </Card>
   );
 }
 

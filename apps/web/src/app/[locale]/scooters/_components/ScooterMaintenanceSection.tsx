@@ -239,32 +239,36 @@ export function ScooterMaintenanceSection({
         </Alert>
       ) : null}
 
-      <div className="grid gap-3 md:grid-cols-3">
-        <SummaryCard
-          icon={<GaugeIcon aria-hidden="true" />}
-          title={t("maintenance.summary.currentMileage")}
-          value={
-            overview.currentMileageKm === null
-              ? t("maintenance.values.unknown")
-              : t("maintenance.values.kilometers", {
-                  value: overview.currentMileageKm,
-                })
-          }
-        />
-        <SummaryCard
-          icon={<AlertTriangleIcon aria-hidden="true" />}
-          title={t("maintenance.summary.openIssues")}
-          value={String(overview.openIssues.length)}
-        />
-        <SummaryCard
-          icon={<WrenchIcon aria-hidden="true" />}
-          title={t("maintenance.summary.recommendation")}
-          value={t(
-            `maintenance.operationalStatuses.${overview.recommendedOperationalStatus}`,
-          )}
-          destructive={overview.recommendedOperationalStatus === "UNAVAILABLE"}
-        />
-      </div>
+      <Card size="sm">
+        <CardContent className="flex flex-col gap-3">
+          <SummaryRow
+            icon={<GaugeIcon aria-hidden="true" />}
+            label={t("maintenance.summary.currentMileage")}
+            value={
+              overview.currentMileageKm === null
+                ? t("maintenance.values.unknown")
+                : t("maintenance.values.kilometers", {
+                    value: overview.currentMileageKm,
+                  })
+            }
+          />
+          <SummaryRow
+            icon={<AlertTriangleIcon aria-hidden="true" />}
+            label={t("maintenance.summary.openIssues")}
+            value={String(overview.openIssues.length)}
+          />
+          <SummaryRow
+            icon={<WrenchIcon aria-hidden="true" />}
+            label={t("maintenance.summary.recommendation")}
+            value={t(
+              `maintenance.operationalStatuses.${overview.recommendedOperationalStatus}`,
+            )}
+            destructive={
+              overview.recommendedOperationalStatus === "UNAVAILABLE"
+            }
+          />
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
@@ -542,31 +546,25 @@ function DeadlineListCard({
   );
 }
 
-function SummaryCard({
+function SummaryRow({
   icon,
-  title,
+  label,
   value,
   destructive = false,
 }: {
   icon: ReactNode;
-  title: string;
+  label: string;
   value: string;
   destructive?: boolean;
 }) {
   return (
-    <Card size="sm">
-      <CardHeader>
-        <CardDescription className="flex items-center gap-2">
-          {icon}
-          {title}
-        </CardDescription>
-        <CardTitle>
-          <Badge variant={destructive ? "destructive" : "secondary"}>
-            {value}
-          </Badge>
-        </CardTitle>
-      </CardHeader>
-    </Card>
+    <div className="flex items-center justify-between gap-2">
+      <span className="flex items-center gap-2 text-sm text-muted-foreground">
+        {icon}
+        {label}
+      </span>
+      <Badge variant={destructive ? "destructive" : "secondary"}>{value}</Badge>
+    </div>
   );
 }
 
