@@ -4,7 +4,7 @@ import { CompaniesService } from "./companies.service";
 
 describe("CompaniesService statistics", () => {
   it("aggregates posted income and expenses for only the company counterparty", async () => {
-    const groupBy = jest.fn().mockResolvedValue([
+    const groupBy = jest.fn<Promise<unknown[]>, [unknown]>().mockResolvedValue([
       {
         type: MoneyTransactionType.INCOME,
         currency: "RON",
@@ -20,7 +20,7 @@ describe("CompaniesService statistics", () => {
     ]);
     const prisma = {
       company: {
-        findFirst: jest.fn().mockResolvedValue({
+        findFirst: jest.fn<Promise<unknown>, [unknown]>().mockResolvedValue({
           id: "company-1",
           counterparty: { id: "counterparty-1" },
           businessLegalEntity: null,
@@ -38,8 +38,10 @@ describe("CompaniesService statistics", () => {
         where: expect.objectContaining({
           counterpartyId: "counterparty-1",
           status: "POSTED",
-          occurredAt: expect.not.objectContaining({ gte: expect.anything() }),
-        }),
+          occurredAt: expect.not.objectContaining({
+            gte: expect.anything() as unknown,
+          }) as unknown,
+        }) as unknown,
       }),
     );
     expect(result).toEqual(
@@ -60,7 +62,7 @@ describe("CompaniesService statistics", () => {
   });
 
   it("aggregates operating-company activity through its assigned wallets", async () => {
-    const groupBy = jest.fn().mockResolvedValue([
+    const groupBy = jest.fn<Promise<unknown[]>, [unknown]>().mockResolvedValue([
       {
         type: MoneyTransactionType.INCOME,
         currency: "RON",
@@ -76,7 +78,7 @@ describe("CompaniesService statistics", () => {
     ]);
     const prisma = {
       company: {
-        findFirst: jest.fn().mockResolvedValue({
+        findFirst: jest.fn<Promise<unknown>, [unknown]>().mockResolvedValue({
           id: "company-jusem",
           counterparty: { id: "counterparty-jusem" },
           businessLegalEntity: { id: "legal-entity-jusem" },
@@ -103,12 +105,12 @@ describe("CompaniesService statistics", () => {
           },
           status: "POSTED",
           type: { in: ["INCOME", "EXPENSE"] },
-        }),
+        }) as unknown,
       }),
     );
-    expect(groupBy.mock.calls[0]?.[0].where).not.toHaveProperty(
-      "counterpartyId",
-    );
+    expect(
+      (groupBy.mock.calls[0]?.[0] as { where?: unknown } | undefined)?.where,
+    ).not.toHaveProperty("counterpartyId");
     expect(result).toEqual(
       expect.objectContaining({
         transactionCount: 6,

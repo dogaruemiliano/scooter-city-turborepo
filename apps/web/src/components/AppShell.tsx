@@ -4,7 +4,13 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import { createPortal } from "react-dom";
 import {
   ArrowLeftRightIcon,
@@ -500,7 +506,15 @@ function AccountMenu({
   const [personalWallet, setPersonalWallet] = useState<v1.finance.Wallet>();
   const [walletUnavailable, setWalletUnavailable] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
-  const accountTriggerRef = useRef<HTMLButtonElement>(null);
+  const [accountMenuOverlayTarget, setAccountMenuOverlayTarget] =
+    useState<HTMLElement | null>(null);
+  const accountTriggerRef = useCallback((node: HTMLButtonElement | null) => {
+    setAccountMenuOverlayTarget(
+      node?.closest<HTMLElement>(
+        '[data-slot="sidebar-inner"], [data-slot="sidebar"][data-mobile="true"]',
+      ) ?? null,
+    );
+  }, []);
   const email = user?.email ?? tAccount("noActiveSession");
   const displayName = user ? displayNameFromUser(user) : tAccount("account");
   const initials = user ? initialsFromUser(user) : "?";
@@ -556,13 +570,7 @@ function AccountMenu({
   return (
     <>
       {accountMenuOpen ? (
-        <MenuLayerOverlay
-          target={
-            accountTriggerRef.current?.closest<HTMLElement>(
-              '[data-slot="sidebar-inner"], [data-slot="sidebar"][data-mobile="true"]',
-            ) ?? null
-          }
-        />
+        <MenuLayerOverlay target={accountMenuOverlayTarget} />
       ) : null}
       <SidebarMenu>
         <SidebarMenuItem className={accountMenuOpen ? "z-modal" : undefined}>

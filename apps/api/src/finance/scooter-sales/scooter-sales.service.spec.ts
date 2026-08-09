@@ -6,6 +6,25 @@ import { ScooterSalesService } from "./scooter-sales.service";
 
 const ACTOR = { actorUserId: "admin-1" };
 
+type BalanceChangeCreateInput = {
+  walletId: string;
+  bucket: string;
+  currency: string;
+  amountDelta: Prisma.Decimal;
+};
+
+type MoneyTransactionCreateArgs = {
+  data: {
+    type: string;
+    counterpartyUserId?: string;
+    recipientUserId?: string;
+    amount: Prisma.Decimal;
+    balanceChanges: {
+      create: BalanceChangeCreateInput | BalanceChangeCreateInput[];
+    };
+  };
+};
+
 const BUYER_COUNTERPARTY = {
   id: "counterparty-buyer",
   person: {
@@ -58,7 +77,11 @@ function buildTx(overrides: Record<string, unknown> = {}) {
     businessOwner: {
       findFirst: jest.fn().mockResolvedValue({ userId: "user-owner" }),
     },
-    moneyTransaction: { create: jest.fn().mockResolvedValue({ id: "mt-1" }) },
+    moneyTransaction: {
+      create: jest
+        .fn<Promise<{ id: string }>, [MoneyTransactionCreateArgs]>()
+        .mockResolvedValue({ id: "mt-1" }),
+    },
     walletBalance: { upsert: jest.fn().mockResolvedValue({}) },
     ...overrides,
   };
@@ -111,9 +134,9 @@ describe("ScooterSalesService.createSale", () => {
         currency: "RON",
       }),
     );
-    expect(createArgs.data.balanceChanges.create.amountDelta.toString()).toBe(
-      "-300",
-    );
+    const balanceChange = createArgs.data.balanceChanges
+      .create as BalanceChangeCreateInput;
+    expect(balanceChange.amountDelta.toString()).toBe("-300");
     expect(tx.walletBalance.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
@@ -225,7 +248,7 @@ describe("ScooterSalesService.recordPayment", () => {
       expect.objectContaining({
         data: expect.objectContaining({
           status: "PARTIALLY_PAID",
-        }),
+        }) as unknown,
       }),
     );
     expect(tx.walletBalance.upsert).toHaveBeenCalledTimes(2);
@@ -279,12 +302,13 @@ describe("ScooterSalesService.recordPayment", () => {
     expect(result.status).toBe("PARTIALLY_PAID");
     expect(tx.businessOwner.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ userId: "user-owner" }),
+        where: expect.objectContaining({ userId: "user-owner" }) as unknown,
       }),
     );
     const [[createArgs]] = tx.moneyTransaction.create.mock.calls;
     expect(createArgs.data.recipientUserId).toBe("user-owner");
-    const changes = createArgs.data.balanceChanges.create;
+    const changes = createArgs.data.balanceChanges
+      .create as BalanceChangeCreateInput[];
     expect(changes).toHaveLength(3);
     expect(changes[0]).toEqual(
       expect.objectContaining({
@@ -416,7 +440,7 @@ describe("ScooterSalesService.recordPayment", () => {
     expect(result.status).toBe("PAID");
     expect(tx.scooterSale.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ status: "PAID" }),
+        data: expect.objectContaining({ status: "PAID" }) as unknown,
       }),
     );
   });
@@ -453,39 +477,39 @@ describe("ScooterSalesService.recordPayment", () => {
 
 describe("ScooterSalesService.getScooterFinancials", () => {
   it("groups allocated costs by category and currency, ignoring non-posted expenses", async () => {
+    const allocationFindMany = jest.fn<Promise<unknown[]>, [unknown]>();
+    allocationFindMany.mockResolvedValue([
+      {
+        allocatedGrossAmount: new Prisma.Decimal("210.00"),
+        expense: {
+          currency: "RON",
+          categoryId: "cat-purchase",
+          category: { name: "Purchase" },
+        },
+      },
+      {
+        allocatedGrossAmount: new Prisma.Decimal("70.00"),
+        expense: {
+          currency: "RON",
+          categoryId: "cat-transport",
+          category: { name: "Transport" },
+        },
+      },
+      {
+        allocatedGrossAmount: new Prisma.Decimal("35.00"),
+        expense: { currency: "RON", categoryId: null, category: null },
+      },
+    ]);
     const prisma = {
       scooter: { findUnique: jest.fn().mockResolvedValue({ id: "scooter-1" }) },
-      expenseScooterAllocation: {
-        findMany: jest.fn().mockResolvedValue([
-          {
-            allocatedGrossAmount: new Prisma.Decimal("210.00"),
-            expense: {
-              currency: "RON",
-              categoryId: "cat-purchase",
-              category: { name: "Purchase" },
-            },
-          },
-          {
-            allocatedGrossAmount: new Prisma.Decimal("70.00"),
-            expense: {
-              currency: "RON",
-              categoryId: "cat-transport",
-              category: { name: "Transport" },
-            },
-          },
-          {
-            allocatedGrossAmount: new Prisma.Decimal("35.00"),
-            expense: { currency: "RON", categoryId: null, category: null },
-          },
-        ]),
-      },
+      expenseScooterAllocation: { findMany: allocationFindMany },
       scooterSale: { findUnique: jest.fn().mockResolvedValue(null) },
     } as unknown as PrismaService;
     const service = new ScooterSalesService(prisma);
 
     const result = await service.getScooterFinancials("scooter-1");
 
-    expect(prisma.expenseScooterAllocation.findMany).toHaveBeenCalledWith(
+    expect(allocationFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { scooterId: "scooter-1", expense: { status: "POSTED" } },
       }),

@@ -74,13 +74,13 @@ describe("FinanceService operating-company activity", () => {
             },
           },
         ],
-      }),
+      }) as unknown,
     });
     expect(findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
           type: { in: ["INCOME", "EXPENSE"] },
-        }),
+        }) as unknown,
       }),
     );
   });

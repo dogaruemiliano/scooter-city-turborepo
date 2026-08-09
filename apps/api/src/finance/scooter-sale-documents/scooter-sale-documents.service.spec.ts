@@ -99,8 +99,12 @@ describe("ScooterSaleDocumentsService", () => {
     expect(documentUpsert).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { scooterSaleId: "sale-1" },
-        create: expect.objectContaining({ documentNumber: "BILL-1" }),
-        update: expect.objectContaining({ documentNumber: "BILL-1" }),
+        create: expect.objectContaining({
+          documentNumber: "BILL-1",
+        }) as unknown,
+        update: expect.objectContaining({
+          documentNumber: "BILL-1",
+        }) as unknown,
       }),
     );
   });
@@ -139,7 +143,7 @@ describe("ScooterSaleDocumentsService", () => {
         data: expect.objectContaining({
           scooterSale: { connect: { id: "sale-1" } },
           createdBy: { connect: { id: "user-1" } },
-        }),
+        }) as unknown,
       }),
     );
     expect(createPresignedDocumentUpload).toHaveBeenCalledWith(
@@ -177,13 +181,18 @@ describe("ScooterSaleDocumentsService", () => {
 
     expect(mediaCreate).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ storageKey: "private/new.pdf" }),
+        data: expect.objectContaining({
+          storageKey: "private/new.pdf",
+        }) as unknown,
       }),
     );
     expect(documentUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { scooterSaleId: "sale-1" },
-        data: expect.objectContaining({ assetId: "asset-new", pageCount: 2 }),
+        data: expect.objectContaining({
+          assetId: "asset-new",
+          pageCount: 2,
+        }) as unknown,
       }),
     );
     expect(mediaUpdate).toHaveBeenCalledWith(

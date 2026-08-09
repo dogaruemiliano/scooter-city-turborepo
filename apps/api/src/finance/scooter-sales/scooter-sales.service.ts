@@ -325,7 +325,6 @@ export class ScooterSalesService {
   async cancelSale(
     scooterSaleId: string,
     input: v1.finance.CancelScooterSaleInput,
-    _context: ScooterSaleContext,
   ): Promise<v1.finance.ScooterSale> {
     try {
       const updated = await this.runSerializable(async (tx) => {

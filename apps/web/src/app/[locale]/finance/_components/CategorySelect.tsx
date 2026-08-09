@@ -139,6 +139,9 @@ export function CategorySelect({
 
   const parentRef = useRef<HTMLDivElement>(null);
 
+  // TanStack Virtual's returned functions can't be memoized by the compiler;
+  // `virtualizer` isn't passed to any memoized child, so this is safe.
+  // eslint-disable-next-line react-hooks/incompatible-library
   const virtualizer = useVirtualizer({
     count: groupedAndFlattenedItems.length,
     getScrollElement: () => parentRef.current,
@@ -160,10 +163,10 @@ export function CategorySelect({
               type="button"
               id={id}
               disabled={disabled || categories.length === 0}
-              aria-invalid={Boolean(error)}
+              data-invalid={error ? true : undefined}
               aria-describedby={error ? `${id}-error` : undefined}
               className={cn(
-                "flex w-full items-center justify-between gap-2 rounded-lg border border-input bg-background px-3 py-2 text-base text-left outline-none transition-colors duration-fast ease-standard focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:bg-disabled disabled:text-disabled-foreground aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive md:text-sm",
+                "flex w-full items-center justify-between gap-2 rounded-lg border border-input bg-background px-3 py-2 text-base text-left outline-none transition-colors duration-fast ease-standard focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:bg-disabled disabled:text-disabled-foreground data-invalid:border-destructive data-invalid:ring-2 data-invalid:ring-destructive md:text-sm",
               )}
             >
               <span className="truncate text-foreground">{triggerLabel}</span>

@@ -177,7 +177,9 @@ describe("FinanceReportingService owner balances", () => {
     ]);
     expect(businessOwnerFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ user: { deletedAt: null } }),
+        where: expect.objectContaining({
+          user: { deletedAt: null },
+        }) as unknown,
         distinct: ["userId"],
       }),
     );
@@ -186,7 +188,7 @@ describe("FinanceReportingService owner balances", () => {
         where: expect.objectContaining({
           bucket: "USER_SETTLEMENT",
           wallet: { ownerUserId: { in: ["owner-1", "owner-2"] } },
-        }),
+        }) as unknown,
       }),
     );
   });

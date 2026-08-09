@@ -96,9 +96,8 @@ export class ScooterSalesController {
   cancel(
     @Param("id") id: string,
     @Body() input: CancelScooterSaleInput,
-    @CurrentUser() actor: AuthPrincipal,
   ): Promise<v1.finance.ScooterSale> {
-    return this.scooterSales.cancelSale(id, input, { actorUserId: actor.id });
+    return this.scooterSales.cancelSale(id, input);
   }
 }
 

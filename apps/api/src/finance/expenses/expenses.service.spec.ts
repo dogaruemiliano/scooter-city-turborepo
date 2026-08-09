@@ -389,7 +389,7 @@ describe("expense fact validation", () => {
       expect.objectContaining({
         where: expect.objectContaining({
           purchaseAllocationId: { not: null },
-        }),
+        }) as unknown,
       }),
     );
   });
