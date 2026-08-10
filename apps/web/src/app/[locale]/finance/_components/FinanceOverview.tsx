@@ -11,7 +11,6 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-  DatePartsField,
   Label,
   Table,
   TableBody,
@@ -35,6 +34,7 @@ import { claimSettlementHref } from "../_lib/links";
 import type { FinancePeriod } from "../_lib/period";
 import { FinanceEmptyState } from "./FinanceEmptyState";
 import { FinanceStatusBadge } from "./FinanceStatusBadge";
+import { DatePartsField } from "@/components/DateField";
 
 interface FinanceOverviewProps {
   locale: SupportedLocale;

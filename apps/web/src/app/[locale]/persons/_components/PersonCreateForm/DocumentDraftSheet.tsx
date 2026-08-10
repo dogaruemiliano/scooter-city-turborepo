@@ -8,8 +8,7 @@ import {
   BottomSheetHeader,
   BottomSheetTitle,
   Button,
-  CountrySelect,
-  DatePartsInput,
+  CountrySheetSelect,
   Input,
   Select,
   SelectContent,
@@ -34,6 +33,7 @@ import type {
   SetPersonDocumentValue,
 } from "./types";
 import { Under18Warning } from "./Under18Warning";
+import { DatePartsInput } from "@/components/DateField";
 
 const documentPhotoSlots = [
   "front",
@@ -312,19 +312,24 @@ export function DocumentDraftSheet({
               label={t("fields.documentIssuingCountryCode")}
               error={issuingCountryCodeError}
             >
-              <CountrySelect
+              <CountrySheetSelect
                 id={`${documentId}-country`}
-                aria-describedby={fieldErrorId(
+                label={t("fields.documentIssuingCountryCode")}
+                labelledById={`${documentId}-country-label`}
+                describedById={fieldErrorId(
                   `${documentId}-country`,
                   issuingCountryCodeError,
                 )}
-                aria-invalid={invalidAria(issuingCountryCodeError)}
-                name="documentIssuingCountryCode"
+                invalid={Boolean(issuingCountryCodeError)}
                 locale={locale}
                 value={document.issuingCountryCode}
                 onValueChange={(value) =>
                   onSetDocumentValue(document.key, "issuingCountryCode", value)
                 }
+                searchPlaceholder={t("countryPicker.search")}
+                clearSearchLabel={t("countryPicker.clearSearch")}
+                emptyMessage={t("countryPicker.empty")}
+                closeLabel={t("actions.close")}
               />
             </FormField>
           )}

@@ -2,9 +2,10 @@
 
 import { useId } from "react";
 
-import { DatePartsField, Input, Label } from "@repo/ui/components";
+import { Input, Label } from "@repo/ui/components";
 import { cn } from "@repo/ui/lib/utils";
-import { useLocale } from "next-intl";
+
+import { DatePartsField } from "@/components/DateField";
 
 export function TextInputField({
   label,
@@ -26,7 +27,6 @@ export function TextInputField({
   required?: boolean;
 }) {
   const id = useId();
-  const locale = useLocale();
 
   if (date) {
     return (
@@ -43,12 +43,7 @@ export function TextInputField({
         >
           {label}
           {required ? (
-            <span
-              aria-hidden="true"
-              className={
-                disabled ? "text-disabled-foreground" : "text-destructive"
-              }
-            >
+            <span aria-hidden="true" className="text-current">
               *
             </span>
           ) : null}
@@ -56,7 +51,6 @@ export function TextInputField({
         <DatePartsField
           baseId={id}
           label={label}
-          locale={locale}
           value={value}
           disabled={disabled}
           required={required}
@@ -80,12 +74,7 @@ export function TextInputField({
       >
         {label}
         {required ? (
-          <span
-            aria-hidden="true"
-            className={
-              disabled ? "text-disabled-foreground" : "text-destructive"
-            }
-          >
+          <span aria-hidden="true" className="text-current">
             *
           </span>
         ) : null}

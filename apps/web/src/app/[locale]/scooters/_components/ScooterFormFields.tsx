@@ -3,7 +3,7 @@
 import { v1 } from "@repo/api-shared";
 import {
   Button,
-  DatePartsInput,
+  FormSection,
   Input,
   Label,
   Select,
@@ -19,6 +19,7 @@ import type { ComponentProps, ReactNode } from "react";
 
 import { BrandSelect } from "./BrandSelect";
 import type { ScooterFormErrors, ScooterFormState } from "./scooter-form";
+import { DatePartsInput } from "@/components/DateField";
 
 interface ScooterFormFieldsProps {
   formId: string;
@@ -195,7 +196,7 @@ export function ScooterFormFields({
         />
       ) : null}
 
-      <FormSection title={t("sections.notes")}>
+      <FormSection>
         <div className="sm:col-span-2">
           <TextareaField
             id={`${formId}-notes`}
@@ -361,21 +362,6 @@ export function ScooterRegistrationFormFields({
   );
 }
 
-function FormSection({
-  title,
-  children,
-}: {
-  title: string;
-  children: ReactNode;
-}) {
-  return (
-    <section className="grid min-w-0 gap-4 rounded-lg bg-muted p-4">
-      <h2 className="text-base font-semibold">{title}</h2>
-      <div className="grid min-w-0 gap-4 sm:grid-cols-2">{children}</div>
-    </section>
-  );
-}
-
 function TextField({
   id,
   label,
@@ -460,7 +446,7 @@ function Field({
       <div className="flex items-center gap-1">
         <Label htmlFor={id}>{label}</Label>
         {required ? (
-          <span aria-hidden="true" className="text-destructive">
+          <span aria-hidden="true" className="text-foreground">
             *
           </span>
         ) : null}

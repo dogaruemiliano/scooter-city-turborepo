@@ -4,7 +4,19 @@ import * as React from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { Button } from "@repo/ui/components/button";
-import { CalendarPicker } from "@repo/ui/components/calendar-picker";
+import {
+  CalendarPicker,
+  type CalendarPickerLabels,
+} from "@repo/ui/components/calendar-picker";
+
+const ROMANIAN_LABELS: CalendarPickerLabels = {
+  chooseMonthAndYear: "Alege luna și anul",
+  done: "Gata",
+  month: "Luna",
+  nextMonth: "Luna următoare",
+  previousMonth: "Luna anterioară",
+  year: "Anul",
+};
 
 const meta = {
   title: "Shadcn/Calendar Picker",
@@ -36,6 +48,7 @@ function CalendarPickerDemo({
   defaultOpen,
   defaultSelectorOpen,
   description,
+  labels,
   locale = "en",
   maxYear = 2100,
   minYear = 1900,
@@ -47,6 +60,7 @@ function CalendarPickerDemo({
   defaultOpen?: boolean;
   defaultSelectorOpen?: boolean;
   description?: React.ReactNode;
+  labels?: CalendarPickerLabels;
   locale?: string;
   maxYear?: number;
   minYear?: number;
@@ -68,6 +82,7 @@ function CalendarPickerDemo({
         defaultOpen={defaultOpen}
         defaultSelectorOpen={defaultSelectorOpen}
         description={description}
+        labels={labels}
         locale={locale}
         maxYear={maxYear}
         minYear={minYear}
@@ -134,6 +149,22 @@ export const DarkOpen: Story = {
       minYear={args.minYear}
       theme="dark"
       title={args.title}
+      today={args.today}
+    />
+  ),
+};
+
+export const LocalizedLabels: Story = {
+  render: (args) => (
+    <CalendarPickerDemo
+      defaultOpen
+      defaultSelectorOpen
+      description="Alege prima zi inclusă în export."
+      labels={ROMANIAN_LABELS}
+      locale="ro"
+      maxYear={args.maxYear}
+      minYear={args.minYear}
+      title="De la"
       today={args.today}
     />
   ),

@@ -3,6 +3,13 @@
 import { v1 } from "@repo/api-shared";
 import {
   Badge,
+  BottomSheet,
+  BottomSheetBody,
+  BottomSheetClose,
+  BottomSheetContent,
+  BottomSheetFooter,
+  BottomSheetHeader,
+  BottomSheetTitle,
   Button,
   Card,
   CardContent,
@@ -32,18 +39,14 @@ import { MoreActionsMenu } from "@/components/MoreActionsMenu";
 import { PageTitleOverride } from "@/components/PageTitleOverride";
 import { webApi } from "@/lib/api";
 import { FeedbackAlert, formErrorsFromIssues } from "./ScooterCreateForm";
+import { ScooterRegistrationFormFields } from "./ScooterFormFields";
 import {
-  ScooterFormFields,
-  ScooterRegistrationFormFields,
-} from "./ScooterFormFields";
-import {
-  buildScooterInputCandidate,
   buildScooterRegistrationInputCandidate,
   fieldFromIssue,
+  fieldLabel,
+  formatValidationIssue,
   scooterFormFromScooter,
   type ScooterFormErrors,
-  type ScooterFormField,
-  type ScooterFormIssue,
   type ScooterFormState,
 } from "./scooter-form";
 import { ScooterMaintenanceSection } from "./ScooterMaintenanceSection";
@@ -56,7 +59,6 @@ interface ScooterDetailPageProps {
   maintenanceTypes: v1.maintenance.MaintenanceTypeList;
   financials: v1.finance.ScooterFinancials;
   companyWallets: v1.finance.WalletOption[];
-  brands: v1.scooterBrands.ScooterBrand[];
 }
 
 interface Feedback {
@@ -65,8 +67,6 @@ interface Feedback {
   messages: string[];
 }
 
-type ScooterTranslations = ReturnType<typeof useTranslations>;
-
 export function ScooterDetailPage({
   scooter,
   scootersHref,
@@ -74,19 +74,17 @@ export function ScooterDetailPage({
   maintenanceTypes,
   financials,
   companyWallets,
-  brands,
 }: ScooterDetailPageProps) {
   const t = useTranslations("scooters");
   const locale = useLocale();
   const router = useRouter();
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
-  const [editOpen, setEditOpen] = useState(false);
-  const [editDialogKey, setEditDialogKey] = useState(0);
   const [registrationOpen, setRegistrationOpen] = useState(false);
   const [registrationDialogKey, setRegistrationDialogKey] = useState(0);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const title = `${scooter.brand} ${scooter.model}`;
+  const scooterEditHref = `${scootersHref}/${encodeURIComponent(scooter.id)}/edit`;
   const registrationActionLabel =
     scooter.registrationType === "unregistered"
       ? t("actions.addRegistration")
@@ -180,10 +178,7 @@ export function ScooterDetailPage({
                   label: t("actions.editScooter"),
                   icon: <PencilIcon data-icon="inline-start" />,
                   disabled: busyAction !== null,
-                  onClick: () => {
-                    setEditDialogKey((current) => current + 1);
-                    setEditOpen(true);
-                  },
+                  onClick: () => router.push(scooterEditHref),
                 },
               ],
               [
@@ -354,15 +349,6 @@ export function ScooterDetailPage({
         maintenanceTypes={maintenanceTypes}
       />
 
-      <ScooterFormDialog
-        key={`edit-scooter-${editDialogKey}`}
-        scooter={scooter}
-        brands={brands}
-        busy={busyAction === "scooter:update"}
-        open={editOpen}
-        onOpenChange={setEditOpen}
-        onSubmit={updateScooter}
-      />
       <ScooterRegistrationDialog
         key={`edit-scooter-registration-${registrationDialogKey}`}
         scooter={scooter}
@@ -378,173 +364,6 @@ export function ScooterDetailPage({
         onConfirm={deleteScooter}
       />
     </div>
-  );
-}
-
-function ScooterFormDialog({
-  scooter,
-  brands,
-  busy,
-  open,
-  onOpenChange,
-  onSubmit,
-}: {
-  scooter: v1.scooters.Scooter;
-  brands: v1.scooterBrands.ScooterBrand[];
-  busy: boolean;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onSubmit: (input: v1.scooters.UpdateScooterInput) => Promise<boolean>;
-}) {
-  const t = useTranslations("scooters");
-  const formId = useId();
-  const [form, setForm] = useState(() => scooterFormFromScooter(scooter));
-  const [fieldErrors, setFieldErrors] = useState<ScooterFormErrors>({});
-  const [error, setError] = useState<string | null>(null);
-
-  function changeOpen(nextOpen: boolean) {
-    if (busy) return;
-    onOpenChange(nextOpen);
-    if (nextOpen) {
-      setForm(scooterFormFromScooter(scooter));
-      setFieldErrors({});
-      setError(null);
-    }
-  }
-
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setFieldErrors({});
-    setError(null);
-
-    const candidate = buildScooterInputCandidate(form, {
-      required: (field) =>
-        t("feedback.validation.required", { field: fieldLabel(field, t) }),
-      invalidDate: (field) =>
-        t("feedback.validation.invalid", {
-          field: fieldLabel(field, t),
-        }),
-      invalidNumber: (field) =>
-        t("feedback.validation.invalidNumber", {
-          field: fieldLabel(field, t),
-        }),
-      invalidPlateNumber: () => t("feedback.validation.invalidPlateNumber"),
-      engineCcRequired: () => t("feedback.validation.engineCcRequired"),
-      engineCcElectric: () => t("feedback.validation.engineCcElectric"),
-      invalidMileage: () => t("feedback.validation.invalidMileage"),
-    });
-
-    if (candidate.errors) {
-      setFieldErrors(candidate.errors);
-      setError(
-        Object.values(candidate.errors)[0] ?? t("feedback.genericError"),
-      );
-      return;
-    }
-
-    const input = v1.scooters.updateScooterInputSchema.safeParse(
-      candidate.input,
-    );
-
-    if (!input.success) {
-      const nextFieldErrors = formErrorsFromIssues(
-        input.error.issues,
-        (issue, field) => formatValidationIssue(issue, field, t),
-      );
-      setFieldErrors(nextFieldErrors);
-      setError(
-        input.error.issues[0]
-          ? formatValidationIssue(
-              input.error.issues[0],
-              fieldFromIssue(input.error.issues[0]),
-              t,
-            )
-          : t("feedback.genericError"),
-      );
-      return;
-    }
-
-    const generalInput = { ...input.data };
-    delete generalInput.registrationType;
-    delete generalInput.plateNumber;
-    delete generalInput.registeredOn;
-    delete generalInput.registrationExpiresOn;
-    delete generalInput.requiredDriverLicenseType;
-
-    if (await onSubmit(generalInput)) {
-      onOpenChange(false);
-    }
-  }
-
-  function setFormValue<Key extends keyof ScooterFormState>(
-    key: Key,
-    value: ScooterFormState[Key],
-  ) {
-    setForm((current) => ({ ...current, [key]: value }));
-    setFieldErrors((current) => {
-      if (!current[key]) {
-        return current;
-      }
-      const next = { ...current };
-      delete next[key];
-      return next;
-    });
-    if (key === "powertrainType") {
-      setFieldErrors((current) => {
-        if (!current.engineCc) {
-          return current;
-        }
-        const next = { ...current };
-        delete next.engineCc;
-        return next;
-      });
-    }
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={changeOpen}>
-      <DialogContent className="sm:max-w-2xl">
-        <form
-          className="grid gap-4"
-          noValidate
-          onSubmit={(event) => void submit(event)}
-        >
-          <DialogHeader>
-            <DialogTitle>{t("detail.dialogs.editScooterTitle")}</DialogTitle>
-          </DialogHeader>
-          {error ? (
-            <FeedbackAlert
-              feedback={{
-                kind: "error",
-                title: t("feedback.updateErrorTitle"),
-                messages: [error],
-              }}
-            />
-          ) : null}
-          <ScooterFormFields
-            formId={formId}
-            form={form}
-            errors={fieldErrors}
-            brands={brands}
-            disabled={busy}
-            includeRegistration={false}
-            onSetValue={setFormValue}
-          />
-          <DialogFooter>
-            <DialogClose
-              render={
-                <Button type="button" variant="outline" disabled={busy} />
-              }
-            >
-              {t("actions.cancel")}
-            </DialogClose>
-            <Button type="submit" disabled={busy}>
-              {busy ? t("actions.saving") : t("actions.save")}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
   );
 }
 
@@ -655,47 +474,49 @@ function ScooterRegistrationDialog({
       : t("actions.editRegistration");
 
   return (
-    <Dialog open={open} onOpenChange={changeOpen}>
-      <DialogContent className="sm:max-w-2xl">
+    <BottomSheet open={open} onOpenChange={changeOpen}>
+      <BottomSheetContent className="lg:w-xl">
         <form
-          className="grid gap-4"
+          className="contents"
           noValidate
           onSubmit={(event) => void submit(event)}
         >
-          <DialogHeader>
-            <DialogTitle>{title}</DialogTitle>
-          </DialogHeader>
-          {error ? (
-            <FeedbackAlert
-              feedback={{
-                kind: "error",
-                title: t("feedback.updateErrorTitle"),
-                messages: [error],
-              }}
+          <BottomSheetHeader>
+            <BottomSheetTitle>{title}</BottomSheetTitle>
+          </BottomSheetHeader>
+          <BottomSheetBody>
+            {error ? (
+              <FeedbackAlert
+                feedback={{
+                  kind: "error",
+                  title: t("feedback.updateErrorTitle"),
+                  messages: [error],
+                }}
+              />
+            ) : null}
+            <ScooterRegistrationFormFields
+              formId={formId}
+              form={form}
+              errors={fieldErrors}
+              disabled={busy}
+              onSetValue={setFormValue}
             />
-          ) : null}
-          <ScooterRegistrationFormFields
-            formId={formId}
-            form={form}
-            errors={fieldErrors}
-            disabled={busy}
-            onSetValue={setFormValue}
-          />
-          <DialogFooter>
-            <DialogClose
+          </BottomSheetBody>
+          <BottomSheetFooter className="sm:flex-row-reverse sm:justify-start">
+            <Button type="submit" disabled={busy}>
+              {busy ? t("actions.saving") : t("actions.save")}
+            </Button>
+            <BottomSheetClose
               render={
                 <Button type="button" variant="outline" disabled={busy} />
               }
             >
               {t("actions.cancel")}
-            </DialogClose>
-            <Button type="submit" disabled={busy}>
-              {busy ? t("actions.saving") : t("actions.save")}
-            </Button>
-          </DialogFooter>
+            </BottomSheetClose>
+          </BottomSheetFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+      </BottomSheetContent>
+    </BottomSheet>
   );
 }
 
@@ -802,98 +623,6 @@ function PowertrainBadge({ scooter }: { scooter: v1.scooters.Scooter }) {
         : t(`powertrainTypes.${scooter.powertrainType}`)}
     </Badge>
   );
-}
-
-function formatValidationIssue(
-  issue: ScooterFormIssue,
-  field: ScooterFormField | null,
-  t: ScooterTranslations,
-): string {
-  if (field === "vin") {
-    return t("feedback.validation.invalidVin");
-  }
-
-  if (field === "engineCc") {
-    if (issue.message.includes("required")) {
-      return t("feedback.validation.engineCcRequired");
-    }
-    if (issue.message.includes("only allowed")) {
-      return t("feedback.validation.engineCcElectric");
-    }
-  }
-
-  if (field === "plateNumber") {
-    return t("feedback.validation.invalidPlateNumber");
-  }
-
-  if (field === "registeredOn" && issue.message.includes("today")) {
-    return t("feedback.validation.registeredOnPastOrToday");
-  }
-
-  if (field === "registrationExpiresOn" && issue.message.includes("after")) {
-    return t("feedback.validation.registrationExpiresOnAfterRegisteredOn");
-  }
-
-  const label = fieldLabel(field, t);
-  if (issue.code === "too_small" && issue.minimum === 1) {
-    return t("feedback.validation.required", { field: label });
-  }
-
-  if (
-    issue.code === "too_big" &&
-    (typeof issue.maximum === "number" || typeof issue.maximum === "bigint")
-  ) {
-    return t("feedback.validation.maxLength", {
-      field: label,
-      max: Number(issue.maximum),
-    });
-  }
-
-  return issue.code === "invalid_format" || issue.code === "custom"
-    ? t("feedback.validation.invalid", { field: label })
-    : t("feedback.validation.fallback");
-}
-
-function fieldLabel(
-  field: ScooterFormField | null,
-  t: ScooterTranslations,
-): string {
-  switch (field) {
-    case "vin":
-      return t("fields.vin");
-    case "brandId":
-      return t("fields.brand");
-    case "model":
-      return t("fields.model");
-    case "color":
-      return t("fields.color");
-    case "manufactureYear":
-      return t("fields.manufactureYear");
-    case "powertrainType":
-      return t("fields.powertrainType");
-    case "engineType":
-      return t("fields.engineType");
-    case "engineCc":
-      return t("fields.engineCc");
-    case "powerKw":
-      return t("fields.powerKw");
-    case "currentMileageKm":
-      return t("fields.currentMileageKm");
-    case "registrationType":
-      return t("fields.registrationType");
-    case "plateNumber":
-      return t("fields.plateNumber");
-    case "registeredOn":
-      return t("fields.registeredOn");
-    case "registrationExpiresOn":
-      return t("fields.registrationExpiresOn");
-    case "requiredDriverLicenseType":
-      return t("fields.requiredDriverLicenseType");
-    case "notes":
-      return t("fields.notes");
-    default:
-      return t("createPage.title");
-  }
 }
 
 function formatDate(value: string, locale: string): string {

@@ -6,8 +6,7 @@ import {
   AlertDescription,
   AlertTitle,
   buttonVariants,
-  DatePartsField,
-  Input,
+  CountrySheetSelect,
   Label,
   Select,
   SelectContent,
@@ -32,6 +31,7 @@ import { ListSearchInput } from "@/components/ListSearchInput";
 import { ListSortSelect } from "@/components/ListSortSelect";
 import { webApi } from "@/lib/api";
 import { PersonList } from "./PersonList";
+import { DatePartsField } from "@/components/DateField";
 
 interface PersonsPageProps {
   createHref: string;
@@ -558,17 +558,22 @@ function PersonsPageContent({
                   id="persons-country"
                   label={t("filters.countryCode")}
                 >
-                  <Input
+                  <CountrySheetSelect
                     id="persons-country"
-                    value={draftQuery.countryCode ?? ""}
-                    maxLength={2}
-                    placeholder={t("placeholders.countryCode")}
-                    onChange={(event) =>
-                      setDraftValue(
-                        "countryCode",
-                        countryCodeInput(event.target.value),
-                      )
+                    label={t("filters.countryCode")}
+                    labelledById="persons-country-label"
+                    locale={locale}
+                    value={draftQuery.countryCode}
+                    placeholder={t("filters.all")}
+                    onValueChange={(value) =>
+                      setDraftValue("countryCode", value)
                     }
+                    onClear={() => setDraftValue("countryCode", undefined)}
+                    clearOptionLabel={t("filters.all")}
+                    searchPlaceholder={t("countryPicker.search")}
+                    clearSearchLabel={t("countryPicker.clearSearch")}
+                    emptyMessage={t("countryPicker.empty")}
+                    closeLabel={t("actions.close")}
                   />
                 </FilterField>
 
@@ -576,17 +581,24 @@ function PersonsPageContent({
                   id="persons-document-issuing-country"
                   label={t("filters.documentIssuingCountryCode")}
                 >
-                  <Input
+                  <CountrySheetSelect
                     id="persons-document-issuing-country"
-                    value={draftQuery.documentIssuingCountryCode ?? ""}
-                    maxLength={2}
-                    placeholder={t("placeholders.countryCode")}
-                    onChange={(event) =>
-                      setDraftValue(
-                        "documentIssuingCountryCode",
-                        countryCodeInput(event.target.value),
-                      )
+                    label={t("filters.documentIssuingCountryCode")}
+                    labelledById="persons-document-issuing-country-label"
+                    locale={locale}
+                    value={draftQuery.documentIssuingCountryCode}
+                    placeholder={t("filters.all")}
+                    onValueChange={(value) =>
+                      setDraftValue("documentIssuingCountryCode", value)
                     }
+                    onClear={() =>
+                      setDraftValue("documentIssuingCountryCode", undefined)
+                    }
+                    clearOptionLabel={t("filters.all")}
+                    searchPlaceholder={t("countryPicker.search")}
+                    clearSearchLabel={t("countryPicker.clearSearch")}
+                    emptyMessage={t("countryPicker.empty")}
+                    closeLabel={t("actions.close")}
                   />
                 </FilterField>
               </div>
@@ -672,11 +684,6 @@ function appendPersonsQueryParams(
   if (query.includeDeleted) params.set("includeDeleted", "true");
 }
 
-function countryCodeInput(value: string): string | undefined {
-  const normalized = value.replace(/[^a-z]/gi, "").toUpperCase();
-  return normalized.length > 0 ? normalized : undefined;
-}
-
 function effectiveRecordStatus(
   query: v1.persons.ListPersonsQuery,
 ): v1.persons.PersonRecordStatus {
@@ -733,7 +740,9 @@ function FilterField({
 }) {
   return (
     <div className="flex min-w-0 flex-col gap-2">
-      <Label htmlFor={id}>{label}</Label>
+      <Label id={`${id}-label`} htmlFor={id}>
+        {label}
+      </Label>
       {children}
     </div>
   );

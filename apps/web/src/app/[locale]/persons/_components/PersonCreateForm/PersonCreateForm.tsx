@@ -211,6 +211,10 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
       });
     }
 
+    if (issue.message === v1.common.FUTURE_DATE_MESSAGE) {
+      return t("feedback.validation.futureDate", { field: label });
+    }
+
     return issue.code === "invalid_format" || issue.code === "custom"
       ? t("feedback.validation.invalid", { field: label })
       : t("feedback.validation.fallback");

@@ -101,7 +101,9 @@ describe("PersonCreateForm", () => {
       "placeholder",
       "Phone number",
     );
-    expect(screen.getByLabelText("Country")).toHaveValue("RO");
+    expect(screen.getByRole("button", { name: "Country" })).toHaveTextContent(
+      "Romania",
+    );
     expect(screen.getByLabelText("County")).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Romanian citizen" }),
@@ -132,7 +134,9 @@ describe("PersonCreateForm", () => {
     expect(screen.getByText("Documente")).toBeInTheDocument();
     expect(screen.getByLabelText("Prenume")).toBeInTheDocument();
     expect(screen.getByLabelText("Telefon")).toBeInTheDocument();
-    expect(screen.getByLabelText("Țară")).toHaveValue("RO");
+    expect(screen.getByRole("button", { name: "Țară" })).toHaveTextContent(
+      "România",
+    );
     expect(screen.getByLabelText("Județ")).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Cetățean român" }),
@@ -805,7 +809,14 @@ describe("PersonCreateForm", () => {
     renderCreateForm();
     expect(screen.getByLabelText("County")).toBeInTheDocument();
 
-    await browser.selectOptions(screen.getByLabelText("Country"), "US");
+    await browser.click(screen.getByRole("button", { name: "Country" }));
+    await browser.type(
+      await screen.findByPlaceholderText("Search countries"),
+      "united states",
+    );
+    await browser.click(
+      await screen.findByRole("button", { name: "United States" }),
+    );
 
     expect(screen.queryByLabelText("County")).not.toBeInTheDocument();
     expect(screen.getByLabelText("Region")).toBeInTheDocument();

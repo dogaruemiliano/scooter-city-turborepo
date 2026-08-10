@@ -23,11 +23,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-function SheetExample({
-  side = "right",
-}: {
-  side?: "top" | "right" | "bottom" | "left";
-}) {
+function SheetExample({ side = "right" }: { side?: "left" | "right" }) {
   return (
     <Sheet>
       <SheetTrigger render={<Button variant="outline" />}>
@@ -59,12 +55,4 @@ export const Right: Story = {
 
 export const Left: Story = {
   render: () => <SheetExample side="left" />,
-};
-
-export const Top: Story = {
-  render: () => <SheetExample side="top" />,
-};
-
-export const Bottom: Story = {
-  render: () => <SheetExample side="bottom" />,
 };

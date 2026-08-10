@@ -35,6 +35,7 @@ import {
   handleFinanceApiErrors,
   requireFinanceAdmin,
 } from "../../_lib/server";
+import { CompanyDetailActions } from "../_components/CompanyDetailActions";
 import { companyDisplayName } from "../_components/CompanyLegalFormIcon";
 
 const COMPANIES_PATH = "/finance/companies";
@@ -109,6 +110,11 @@ export default async function CompanyDetailPage({
             {t(company.isActive ? "common.active" : "common.inactive")}
           </Badge>
         </div>
+        <CompanyDetailActions
+          companyId={company.id}
+          companiesHref={localizePath(COMPANIES_PATH, locale)}
+          editHref={localizePath(`${routePath}/edit`, locale)}
+        />
       </div>
 
       <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">

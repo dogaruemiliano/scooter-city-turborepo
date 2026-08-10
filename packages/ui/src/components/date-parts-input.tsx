@@ -1,7 +1,14 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
+import { CalendarIcon } from "lucide-react";
 
+import { Button } from "@repo/ui/components/button";
+import {
+  CalendarPicker,
+  type CalendarPickerLabels,
+} from "@repo/ui/components/calendar-picker";
 import { Input } from "@repo/ui/components/input";
 import {
   buildDateOnly,
@@ -11,7 +18,25 @@ import {
 } from "@repo/ui/lib/date-parts";
 import { cn } from "@repo/ui/lib/utils";
 
-export interface DatePartsInputProps {
+/** Props shared by the typed date parts and the calendar picker beside them. */
+export interface DatePartsCalendarProps {
+  /** Accessible name of the button that opens the calendar. */
+  calendarTriggerLabel?: string;
+  /** Calendar surface heading. Defaults to the field label. */
+  calendarTitle?: ReactNode;
+  calendarDescription?: ReactNode;
+  calendarLabels?: CalendarPickerLabels;
+  /** Latest selectable day, ISO `YYYY-MM-DD`. Later days render disabled. */
+  maxDate?: string;
+  /** Earliest selectable day, ISO `YYYY-MM-DD`. */
+  minDate?: string;
+  maxYear?: number;
+  minYear?: number;
+}
+
+const DEFAULT_CALENDAR_TRIGGER_LABEL = "Open calendar";
+
+export interface DatePartsInputProps extends DatePartsCalendarProps {
   baseId: string;
   "aria-describedby"?: string;
   className?: string;
@@ -21,19 +46,29 @@ export interface DatePartsInputProps {
   label: string;
   locale?: string;
   value: DateParts;
+  onBlur?: () => void;
   onChange: (value: DateParts) => void;
 }
 
 export function DatePartsInput({
   baseId,
   "aria-describedby": ariaDescribedBy,
+  calendarDescription,
+  calendarLabels,
+  calendarTitle,
+  calendarTriggerLabel = DEFAULT_CALENDAR_TRIGGER_LABEL,
   className,
   disabled = false,
   invalid = false,
+  maxDate,
+  maxYear,
+  minDate,
+  minYear,
   required = false,
   label,
   locale,
   value,
+  onBlur,
   onChange,
 }: DatePartsInputProps) {
   const monthRef = useRef<HTMLInputElement>(null);
@@ -63,6 +98,13 @@ export function DatePartsInput({
     <div
       data-disabled={disabled || undefined}
       className={cn("flex w-full items-center gap-2", className)}
+      // The three parts are one field: only report a blur that leaves them all,
+      // so tabbing from day to month does not trigger validation.
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) {
+          onBlur?.();
+        }
+      }}
     >
       <Input
         id={`${baseId}-day`}
@@ -130,11 +172,34 @@ export function DatePartsInput({
         className="min-w-0 flex-1"
         onChange={(event) => changePart("year", event.target.value, 4)}
       />
+      <CalendarPicker
+        description={calendarDescription}
+        labels={calendarLabels}
+        locale={locale}
+        maxDate={maxDate}
+        maxYear={maxYear}
+        minDate={minDate}
+        minYear={minYear}
+        title={calendarTitle ?? label}
+        value={buildDateOnly(value).value ?? null}
+        onValueChange={(nextValue) => onChange(dateOnlyToDateParts(nextValue))}
+        renderTrigger={
+          <Button
+            aria-label={calendarTriggerLabel}
+            className="shrink-0"
+            disabled={disabled}
+            size="icon"
+            type="button"
+            variant="outline"
+          />
+        }
+        triggerLabel={<CalendarIcon aria-hidden="true" />}
+      />
     </div>
   );
 }
 
-export interface DatePartsFieldProps {
+export interface DatePartsFieldProps extends DatePartsCalendarProps {
   baseId: string;
   "aria-describedby"?: string;
   className?: string;
@@ -146,6 +211,7 @@ export interface DatePartsFieldProps {
   required?: boolean;
   value?: string;
   defaultValue?: string;
+  onBlur?: () => void;
   onChange?: (value: string) => void;
 }
 
@@ -156,13 +222,22 @@ export interface DatePartsFieldProps {
 export function DatePartsField({
   baseId,
   "aria-describedby": ariaDescribedBy,
+  calendarDescription,
+  calendarLabels,
+  calendarTitle,
+  calendarTriggerLabel,
   className,
   defaultValue,
   disabled,
   invalid,
   label,
   locale,
+  maxDate,
+  maxYear,
+  minDate,
+  minYear,
   name,
+  onBlur,
   onChange,
   required,
   value,
@@ -191,13 +266,22 @@ export function DatePartsField({
       <DatePartsInput
         baseId={baseId}
         aria-describedby={ariaDescribedBy}
+        calendarDescription={calendarDescription}
+        calendarLabels={calendarLabels}
+        calendarTitle={calendarTitle}
+        calendarTriggerLabel={calendarTriggerLabel}
         className={className}
         disabled={disabled}
         invalid={invalid}
+        maxDate={maxDate}
+        maxYear={maxYear}
+        minDate={minDate}
+        minYear={minYear}
         required={required}
         label={label}
         locale={locale}
         value={parts}
+        onBlur={onBlur}
         onChange={changeParts}
       />
       {name ? (

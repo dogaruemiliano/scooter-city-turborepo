@@ -3,7 +3,6 @@
 import { v1 } from "@repo/api-shared";
 import type { SupportedLocale } from "@repo/i18n";
 import {
-  DatePartsField,
   Label,
   Table,
   TableBody,
@@ -30,6 +29,8 @@ import {
 import { FinanceEmptyState } from "../../_components/FinanceEmptyState";
 import { FinanceStatusBadge } from "../../_components/FinanceStatusBadge";
 import type { TransactionListFilters } from "../page";
+
+import { DatePartsField } from "@/components/DateField";
 
 interface TransactionsPageProps {
   filters: TransactionListFilters;

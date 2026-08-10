@@ -1,12 +1,15 @@
 "use client";
 
-import { BottomSheet, BottomSheetContent } from "@repo/ui/components";
+import {
+  BottomSheet,
+  BottomSheetContent,
+  FormSection,
+} from "@repo/ui/components";
 import { useTranslations } from "next-intl";
 import { useRef, useState } from "react";
 
 import { DocumentDraftCard } from "./DocumentDraftCard";
 import { DocumentDraftSheet } from "./DocumentDraftSheet";
-import { FormSection } from "./FormSection";
 import { isBlankDocumentDraft } from "./form-state";
 import type {
   CreatePersonDocumentFormState,

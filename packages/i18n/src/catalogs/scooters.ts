@@ -59,6 +59,10 @@ export const scootersCatalog = {
       title: "Add scooter",
       description: "Add a scooter after purchase with optional registration.",
     },
+    editPage: {
+      title: "Edit scooter",
+      description: "Update scooter details. Registration is edited separately.",
+    },
     detail: {
       description: "Scooter record",
       emptyValue: "Not provided",
@@ -569,6 +573,11 @@ export const scootersCatalog = {
       title: "Adaugă scuter",
       description:
         "Adaugă un scuter după achiziție, cu înmatriculare opțională.",
+    },
+    editPage: {
+      title: "Editează scuterul",
+      description:
+        "Actualizează datele scuterului. Înmatricularea se editează separat.",
     },
     detail: {
       description: "Înregistrare scuter",

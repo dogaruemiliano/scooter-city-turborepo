@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   apiFetch: vi.fn(),
   refresh: vi.fn(),
   replace: vi.fn(),
+  push: vi.fn(),
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -23,6 +24,7 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({
     refresh: mocks.refresh,
     replace: mocks.replace,
+    push: mocks.push,
   }),
 }));
 
@@ -177,8 +179,7 @@ describe("ScooterDetailPage", () => {
     const dialog = await screen.findByRole("dialog", {
       name: "Add maintenance",
     });
-    expect(dialog).toHaveClass(
-      "max-h-[calc(100svh-var(--spacing-8))]",
+    expect(dialog.querySelector('[data-slot="bottom-sheet-body"]')).toHaveClass(
       "overflow-y-auto",
     );
     await replaceDateParts(browser, dialog, "Performed on", "2026-07-10");
@@ -468,55 +469,14 @@ describe("ScooterDetailPage", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("updates the scooter from the edit dialog", async () => {
-    mocks.apiFetch.mockResolvedValueOnce({ ...scooter, color: "Blue" });
+  it("navigates to the edit page from the actions menu", async () => {
     const browser = userEvent.setup();
 
     renderDetail();
     await browser.click(screen.getByRole("button", { name: "More actions" }));
     await browser.click(await screen.findByText("Edit scooter"));
-    const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByLabelText("Current mileage (km)")).toHaveValue(
-      1_200,
-    );
-    await browser.clear(within(dialog).getByLabelText("Color"));
-    await browser.type(within(dialog).getByLabelText("Color"), "Blue");
-    await browser.clear(within(dialog).getByLabelText("Current mileage (km)"));
-    await browser.type(
-      within(dialog).getByLabelText("Current mileage (km)"),
-      "1350",
-    );
-    await browser.click(within(dialog).getByRole("button", { name: "Save" }));
 
-    await waitFor(() =>
-      expect(mocks.apiFetch).toHaveBeenCalledWith(
-        v1.scooters.ROUTES.update(scooter.id),
-        v1.scooters.scooterSchema,
-        expect.objectContaining({
-          method: "PATCH",
-          json: expect.objectContaining({
-            color: "Blue",
-            currentMileageKm: 1_350,
-          }),
-        }),
-      ),
-    );
-    expect(mocks.refresh).toHaveBeenCalledOnce();
-  });
-
-  it("requires color in the edit dialog before PATCH", async () => {
-    const browser = userEvent.setup();
-
-    renderDetail();
-    await browser.click(screen.getByRole("button", { name: "More actions" }));
-    await browser.click(await screen.findByText("Edit scooter"));
-    const dialog = await screen.findByRole("dialog");
-    await browser.clear(within(dialog).getByLabelText("Color"));
-    await browser.click(within(dialog).getByRole("button", { name: "Save" }));
-
-    expect(
-      (await within(dialog).findAllByText("Color is required."))[0],
-    ).toBeInTheDocument();
+    expect(mocks.push).toHaveBeenCalledWith(`/en/scooters/${scooter.id}/edit`);
     expect(mocks.apiFetch).not.toHaveBeenCalled();
   });
 
@@ -551,16 +511,6 @@ function renderDetail(
   maintenanceTypes: v1.maintenance.MaintenanceTypeList = [],
   financials: v1.finance.ScooterFinancials = scooterFinancials(),
   companyWallets: v1.finance.WalletOption[] = [],
-  brands: v1.scooterBrands.ScooterBrand[] = [
-    {
-      id: "brand-yamaha",
-      name: "Yamaha",
-      code: "YAM",
-      scooterCount: 1,
-      createdAt: "2026-06-25T10:00:00.000Z",
-      updatedAt: "2026-06-25T10:00:00.000Z",
-    },
-  ],
 ) {
   return render(
     <NextIntlClientProvider locale={locale} messages={messages[locale]}>
@@ -571,7 +521,6 @@ function renderDetail(
         maintenanceTypes={maintenanceTypes}
         financials={financials}
         companyWallets={companyWallets}
-        brands={brands}
       />
     </NextIntlClientProvider>,
   );

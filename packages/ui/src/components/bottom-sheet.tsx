@@ -173,7 +173,9 @@ function BottomSheetBody({
     <div
       data-slot="bottom-sheet-body"
       className={cn(
-        "flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain px-4",
+        // `pt-1` keeps the focus ring of a first-child field (a search input,
+        // typically) from being clipped against the header by `overflow-y`.
+        "flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain px-4 pt-1",
         safeAreaBottom
           ? "pb-[max(var(--spacing-4),env(safe-area-inset-bottom))]"
           : "pb-4",

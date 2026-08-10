@@ -103,6 +103,24 @@ export class CompaniesService {
     }
   }
 
+  async softDelete(id: string): Promise<void> {
+    await this.get(id);
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.company.update({
+        where: { id },
+        data: { deletedAt: new Date() },
+      });
+      // Keep the counterparty out of pickers, mirroring the isActive cascade
+      // in update(). Counterparty rows are never deleted: transactions,
+      // expenses and sales reference them with onDelete: Restrict.
+      await tx.counterparty.update({
+        where: { companyId: id },
+        data: { isActive: false },
+      });
+    });
+  }
+
   async stats(id: string, query: v1.finance.CompanyStatsQuery) {
     const company = await this.get(id);
     if (!company.counterparty) {

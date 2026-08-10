@@ -1,7 +1,6 @@
 import { v1 } from "@repo/api-shared";
 import { messages } from "@repo/i18n";
-import { render, screen, waitFor, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { render, screen, within } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -108,40 +107,13 @@ describe("CompanyManager", () => {
     expect(container.querySelector(".lucide-heart-handshake")).not.toBeNull();
   });
 
-  it("creates a company with the shared international phone input", async () => {
-    mocks.apiFetch.mockResolvedValueOnce(company);
-    const browser = userEvent.setup();
-
+  it("links to the create page instead of opening a dialog", () => {
     renderCompanyManager();
-    await browser.click(screen.getByRole("button", { name: "Add company" }));
-    const dialog = await screen.findByRole("dialog");
 
-    expect(within(dialog).getByLabelText("Phone country")).toHaveValue("RO");
-    expect(within(dialog).getByLabelText("Phone")).toHaveAttribute(
-      "placeholder",
-      "Phone",
+    expect(screen.getByRole("link", { name: "Add company" })).toHaveAttribute(
+      "href",
+      "/en/finance/companies/new",
     );
-
-    await browser.type(
-      within(dialog).getByLabelText("Legal name"),
-      "Example Company SRL",
-    );
-    await browser.type(within(dialog).getByLabelText("Phone"), "700111222");
-    await browser.click(within(dialog).getByRole("button", { name: "Save" }));
-
-    await waitFor(() =>
-      expect(mocks.apiFetch).toHaveBeenCalledWith(
-        v1.finance.ROUTES.companies.create,
-        v1.finance.companySchema,
-        expect.objectContaining({
-          method: "POST",
-          json: expect.objectContaining({
-            legalName: "Example Company SRL",
-            phone: "+40700111222",
-          }),
-        }),
-      ),
-    );
-    expect(mocks.refresh).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 });

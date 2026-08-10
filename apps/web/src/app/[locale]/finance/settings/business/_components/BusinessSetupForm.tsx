@@ -23,7 +23,6 @@ import {
   CardHeader,
   CardTitle,
   Checkbox,
-  DatePartsField,
   Input,
   Label,
   SearchSelect,
@@ -68,6 +67,7 @@ import type {
   ExpenseOwnerOption,
   ExpenseUserOption,
 } from "../../../expenses/_lib/expense-options";
+import { DatePartsField } from "@/components/DateField";
 
 interface BusinessSetupFormProps {
   bootstrap: BusinessSetupBootstrap;

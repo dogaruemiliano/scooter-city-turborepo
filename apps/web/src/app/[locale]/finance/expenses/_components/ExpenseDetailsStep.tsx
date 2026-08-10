@@ -9,7 +9,6 @@ import {
   AlertDescription,
   AlertTitle,
   Button,
-  DatePartsField,
   Input,
   InputGroup,
   InputGroupInput,
@@ -51,6 +50,7 @@ import {
 import { ExpenseCategorySelect } from "./ExpenseCategorySelect";
 import { ExpenseCounterpartySelect } from "./ExpenseCounterpartySelect";
 import { ExpenseScooterAllocationEditor } from "./ExpenseScooterAllocationEditor";
+import { DatePartsField } from "@/components/DateField";
 
 interface ExpenseDetailsStepProps {
   bootstrap: ExpenseFormBootstrap;
@@ -699,7 +699,7 @@ function SelectField({
 function RequiredLabel({ children }: { children: string }) {
   return (
     <>
-      <span aria-hidden="true" className="text-destructive">
+      <span aria-hidden="true" className="text-foreground">
         *
       </span>
       <span className="sr-only">{children}</span>

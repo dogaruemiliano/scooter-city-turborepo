@@ -5,6 +5,7 @@ import {
   emptyDateParts,
   type DateParts,
 } from "@repo/ui/lib/date-parts";
+import type { useTranslations } from "next-intl";
 
 export const DEFAULT_COMBUSTION_ENGINE_CC = "50";
 
@@ -392,4 +393,98 @@ function optionalMileageField(
   }
 
   return numeric;
+}
+
+export type ScooterTranslations = ReturnType<typeof useTranslations>;
+
+export function formatValidationIssue(
+  issue: ScooterFormIssue,
+  field: ScooterFormField | null,
+  t: ScooterTranslations,
+): string {
+  if (field === "vin") {
+    return t("feedback.validation.invalidVin");
+  }
+
+  if (field === "engineCc") {
+    if (issue.message.includes("required")) {
+      return t("feedback.validation.engineCcRequired");
+    }
+    if (issue.message.includes("only allowed")) {
+      return t("feedback.validation.engineCcElectric");
+    }
+  }
+
+  if (field === "plateNumber") {
+    return t("feedback.validation.invalidPlateNumber");
+  }
+
+  if (field === "registeredOn" && issue.message.includes("today")) {
+    return t("feedback.validation.registeredOnPastOrToday");
+  }
+
+  if (field === "registrationExpiresOn" && issue.message.includes("after")) {
+    return t("feedback.validation.registrationExpiresOnAfterRegisteredOn");
+  }
+
+  const label = fieldLabel(field, t);
+  if (issue.code === "too_small" && issue.minimum === 1) {
+    return t("feedback.validation.required", { field: label });
+  }
+
+  if (
+    issue.code === "too_big" &&
+    (typeof issue.maximum === "number" || typeof issue.maximum === "bigint")
+  ) {
+    return t("feedback.validation.maxLength", {
+      field: label,
+      max: Number(issue.maximum),
+    });
+  }
+
+  return issue.code === "invalid_format" || issue.code === "custom"
+    ? t("feedback.validation.invalid", { field: label })
+    : t("feedback.validation.fallback");
+}
+
+export function fieldLabel(
+  field: ScooterFormField | null,
+  t: ScooterTranslations,
+): string {
+  switch (field) {
+    case "vin":
+      return t("fields.vin");
+    case "brandId":
+      return t("fields.brand");
+    case "model":
+      return t("fields.model");
+    case "color":
+      return t("fields.color");
+    case "manufactureYear":
+      return t("fields.manufactureYear");
+    case "powertrainType":
+      return t("fields.powertrainType");
+    case "engineType":
+      return t("fields.engineType");
+    case "engineCc":
+      return t("fields.engineCc");
+    case "powerKw":
+      return t("fields.powerKw");
+    case "currentMileageKm":
+      return t("fields.currentMileageKm");
+    case "registrationType":
+      return t("fields.registrationType");
+    case "plateNumber":
+      return t("fields.plateNumber");
+    case "registeredOn":
+      return t("fields.registeredOn");
+    case "registrationExpiresOn":
+      return t("fields.registrationExpiresOn");
+    case "requiredDriverLicenseType":
+      return t("fields.requiredDriverLicenseType");
+    case "notes":
+      return t("fields.notes");
+    default:
+      return t("createPage.title");
+  }
 }

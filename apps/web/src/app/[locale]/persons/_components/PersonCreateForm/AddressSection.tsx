@@ -1,12 +1,16 @@
 "use client";
 
-import { CountrySelect, Input, type CountryCode } from "@repo/ui/components";
+import {
+  CountrySheetSelect,
+  Input,
+  type CountryCode,
+  FormSection,
+} from "@repo/ui/components";
 import { useTranslations } from "next-intl";
 
 import { ROMANIAN_COUNTIES } from "./constants";
 import { fieldErrorId, invalidAria } from "./errors";
 import { FormField } from "./FormField";
-import { FormSection } from "./FormSection";
 import type {
   CreatePersonFormState,
   FormErrors,
@@ -43,16 +47,20 @@ export function AddressSection({
         required
         error={countryCodeError}
       >
-        <CountrySelect
+        <CountrySheetSelect
           id={`${formId}-country`}
-          aria-describedby={fieldErrorId(`${formId}-country`, countryCodeError)}
-          aria-invalid={invalidAria(countryCodeError)}
-          name="countryCode"
-          autoComplete="country"
+          label={t("fields.country")}
+          labelledById={`${formId}-country-label`}
+          describedById={fieldErrorId(`${formId}-country`, countryCodeError)}
+          invalid={Boolean(countryCodeError)}
           locale={locale}
           required
           value={form.countryCode}
           onValueChange={onChangeCountry}
+          searchPlaceholder={t("countryPicker.search")}
+          clearSearchLabel={t("countryPicker.clearSearch")}
+          emptyMessage={t("countryPicker.empty")}
+          closeLabel={t("actions.close")}
         />
       </FormField>
       {form.countryCode === "RO" ? (

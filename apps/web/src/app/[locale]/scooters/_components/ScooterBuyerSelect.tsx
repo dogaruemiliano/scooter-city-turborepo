@@ -65,7 +65,7 @@ export function ScooterBuyerSelect({
     <div className="flex flex-col gap-2">
       <Label htmlFor={id} id={`${id}-label`}>
         {t("fields.buyer")}{" "}
-        <span aria-hidden="true" className="text-destructive">
+        <span aria-hidden="true" className="text-foreground">
           *
         </span>
         <span className="sr-only">

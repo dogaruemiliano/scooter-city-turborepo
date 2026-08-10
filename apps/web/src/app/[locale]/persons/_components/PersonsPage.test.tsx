@@ -363,8 +363,8 @@ describe("PersonsPage", () => {
 
     renderPersons();
     await browser.click(screen.getByRole("button", { name: "Filters" }));
-    await browser.type(screen.getByLabelText("Country"), "ro");
-    await browser.type(screen.getByLabelText("Issuing country"), "us");
+    await pickCountry(browser, "Country", "Romania");
+    await pickCountry(browser, "Issuing country", "United States");
     await browser.type(screen.getByLabelText("Expires from"), "01");
     await browser.type(screen.getByLabelText("Expires from MM"), "01");
     await browser.type(screen.getByLabelText("Expires from YYYY"), "2030");
@@ -406,8 +406,12 @@ describe("PersonsPage", () => {
     expect(filtersButton).toHaveTextContent("2");
 
     await browser.click(filtersButton);
-    expect(screen.getByLabelText("Country")).toHaveValue("RO");
-    expect(screen.getByLabelText("Issuing country")).toHaveValue("US");
+    expect(screen.getByRole("button", { name: "Country" })).toHaveTextContent(
+      "Romania",
+    );
+    expect(
+      screen.getByRole("button", { name: "Issuing country" }),
+    ).toHaveTextContent("United States");
   });
 
   it("resets URL-backed filters", async () => {
@@ -534,6 +538,18 @@ describe("PersonsPage", () => {
     expect(await screen.findByText("Grace Hopper")).toBeInTheDocument();
   });
 });
+
+async function pickCountry(
+  browser: ReturnType<typeof userEvent.setup>,
+  triggerName: string,
+  countryName: string,
+) {
+  await browser.click(screen.getByRole("button", { name: triggerName }));
+
+  const search = await screen.findByPlaceholderText("Search countries");
+  await browser.type(search, countryName);
+  await browser.click(await screen.findByRole("button", { name: countryName }));
+}
 
 function renderPersons(
   initialList = personList([person]),
