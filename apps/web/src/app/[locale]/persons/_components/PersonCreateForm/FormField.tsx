@@ -33,14 +33,11 @@ export function FormField({
           .filter(Boolean)
           .join(" ")}
       >
-        <Label htmlFor={id}>{label}</Label>
+        <Label id={`${id}-label`} htmlFor={id}>
+          {label}
+        </Label>
         {required ? (
-          <span
-            aria-hidden="true"
-            className={
-              disabled ? "text-disabled-foreground" : "text-destructive"
-            }
-          >
+          <span aria-hidden="true" className="text-current">
             *
           </span>
         ) : null}

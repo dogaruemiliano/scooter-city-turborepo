@@ -1,4 +1,5 @@
 import { v1 } from "@repo/api-shared";
+import { getCountryName } from "@repo/ui/lib/countries";
 
 import type {
   DocumentFormState,
@@ -69,20 +70,7 @@ export function formatCountryName(
   locale: string,
   fallback: string,
 ): string {
-  if (!countryCode || typeof Intl.DisplayNames !== "function") {
-    return fallback;
-  }
-
-  try {
-    const displayNames = new Intl.DisplayNames([locale, "en"], {
-      type: "region",
-    });
-    const countryName = displayNames.of(countryCode);
-
-    return countryName && countryName !== countryCode ? countryName : fallback;
-  } catch {
-    return fallback;
-  }
+  return getCountryName(countryCode, locale) ?? fallback;
 }
 
 export function formatDate(value: string, locale: string): string {

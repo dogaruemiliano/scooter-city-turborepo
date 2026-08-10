@@ -110,9 +110,96 @@ describe("CompanyForm", () => {
     expect(screen.getByLabelText("Phone country")).toHaveValue("RO");
     expect(screen.getByLabelText("Address")).toHaveValue(company.addressLine1);
     expect(screen.getByLabelText("City")).toHaveValue(company.city);
-    expect(screen.getByLabelText("Country code")).toHaveValue(
-      company.countryCode,
+    expect(screen.getByRole("button", { name: /^Country/ })).toHaveTextContent(
+      "Romania",
     );
+  });
+
+  it("defaults the country to Romania and submits it as a code", async () => {
+    mocks.apiFetch.mockResolvedValueOnce(company);
+    const browser = userEvent.setup();
+
+    renderCreateForm();
+
+    expect(screen.getByRole("button", { name: /^Country/ })).toHaveTextContent(
+      "Romania",
+    );
+
+    await browser.type(
+      screen.getByLabelText("Legal name"),
+      "Example Company SRL",
+    );
+    await browser.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() =>
+      expect(mocks.apiFetch).toHaveBeenCalledWith(
+        v1.finance.ROUTES.companies.create,
+        v1.finance.companySchema,
+        expect.objectContaining({
+          json: expect.objectContaining({ countryCode: "RO" }),
+        }),
+      ),
+    );
+  });
+
+  it("picks a different country from the bottom sheet", async () => {
+    mocks.apiFetch.mockResolvedValueOnce(company);
+    const browser = userEvent.setup();
+
+    renderCreateForm();
+
+    await browser.type(
+      screen.getByLabelText("Legal name"),
+      "Example Company SRL",
+    );
+    await browser.click(screen.getByRole("button", { name: /^Country/ }));
+
+    const search = await screen.findByPlaceholderText("Search countries");
+    await waitFor(() => expect(search).toHaveFocus());
+
+    await browser.type(search, "Germ");
+    await browser.click(await screen.findByRole("button", { name: "Germany" }));
+
+    expect(screen.getByRole("button", { name: /^Country/ })).toHaveTextContent(
+      "Germany",
+    );
+
+    await browser.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() =>
+      expect(mocks.apiFetch).toHaveBeenCalledWith(
+        v1.finance.ROUTES.companies.create,
+        v1.finance.companySchema,
+        expect.objectContaining({
+          json: expect.objectContaining({ countryCode: "DE" }),
+        }),
+      ),
+    );
+  });
+
+  it("finds countries through typos, diacritics, and the other locale", async () => {
+    const browser = userEvent.setup();
+
+    renderCreateForm("ro");
+
+    await browser.click(screen.getByRole("button", { name: /^Țară/ }));
+    const search = await screen.findByPlaceholderText("Caută țări");
+
+    // Typed without the diacritic, and with a missing letter.
+    await browser.type(search, "Rmania");
+    expect(
+      await screen.findByRole("button", { name: "România" }),
+    ).toBeInTheDocument();
+
+    await browser.clear(search);
+    await browser.type(search, "Germany");
+    expect(
+      await screen.findByRole("button", { name: "Germania" }),
+    ).toBeInTheDocument();
+
+    await browser.clear(search);
+    await browser.type(search, "zzzzzz");
+    expect(await screen.findByText("Nicio țară găsită")).toBeInTheDocument();
   });
 
   it("PATCHes the edited company and returns to its detail page", async () => {
@@ -155,10 +242,10 @@ function renderEditForm() {
   );
 }
 
-function renderCreateForm() {
+function renderCreateForm(locale: "en" | "ro" = "en") {
   return render(
-    <NextIntlClientProvider locale="en" messages={messages.en}>
-      <CompanyForm cancelHref="/en/finance/companies" />
+    <NextIntlClientProvider locale={locale} messages={messages[locale]}>
+      <CompanyForm cancelHref={`/${locale}/finance/companies`} />
     </NextIntlClientProvider>,
   );
 }

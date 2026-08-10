@@ -26,6 +26,10 @@ export interface DatePartsCalendarProps {
   calendarTitle?: ReactNode;
   calendarDescription?: ReactNode;
   calendarLabels?: CalendarPickerLabels;
+  /** Latest selectable day, ISO `YYYY-MM-DD`. Later days render disabled. */
+  maxDate?: string;
+  /** Earliest selectable day, ISO `YYYY-MM-DD`. */
+  minDate?: string;
   maxYear?: number;
   minYear?: number;
 }
@@ -42,6 +46,7 @@ export interface DatePartsInputProps extends DatePartsCalendarProps {
   label: string;
   locale?: string;
   value: DateParts;
+  onBlur?: () => void;
   onChange: (value: DateParts) => void;
 }
 
@@ -55,12 +60,15 @@ export function DatePartsInput({
   className,
   disabled = false,
   invalid = false,
+  maxDate,
   maxYear,
+  minDate,
   minYear,
   required = false,
   label,
   locale,
   value,
+  onBlur,
   onChange,
 }: DatePartsInputProps) {
   const monthRef = useRef<HTMLInputElement>(null);
@@ -90,6 +98,13 @@ export function DatePartsInput({
     <div
       data-disabled={disabled || undefined}
       className={cn("flex w-full items-center gap-2", className)}
+      // The three parts are one field: only report a blur that leaves them all,
+      // so tabbing from day to month does not trigger validation.
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) {
+          onBlur?.();
+        }
+      }}
     >
       <Input
         id={`${baseId}-day`}
@@ -161,7 +176,9 @@ export function DatePartsInput({
         description={calendarDescription}
         labels={calendarLabels}
         locale={locale}
+        maxDate={maxDate}
         maxYear={maxYear}
+        minDate={minDate}
         minYear={minYear}
         title={calendarTitle ?? label}
         value={buildDateOnly(value).value ?? null}
@@ -194,6 +211,7 @@ export interface DatePartsFieldProps extends DatePartsCalendarProps {
   required?: boolean;
   value?: string;
   defaultValue?: string;
+  onBlur?: () => void;
   onChange?: (value: string) => void;
 }
 
@@ -214,9 +232,12 @@ export function DatePartsField({
   invalid,
   label,
   locale,
+  maxDate,
   maxYear,
+  minDate,
   minYear,
   name,
+  onBlur,
   onChange,
   required,
   value,
@@ -252,12 +273,15 @@ export function DatePartsField({
         className={className}
         disabled={disabled}
         invalid={invalid}
+        maxDate={maxDate}
         maxYear={maxYear}
+        minDate={minDate}
         minYear={minYear}
         required={required}
         label={label}
         locale={locale}
         value={parts}
+        onBlur={onBlur}
         onChange={changeParts}
       />
       {name ? (

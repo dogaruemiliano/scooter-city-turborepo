@@ -69,7 +69,7 @@ export function ExpenseCounterpartySelect({
     <div className="flex flex-col gap-2">
       <Label htmlFor={id} id={`${id}-label`}>
         {t("payee")}{" "}
-        <span aria-hidden="true" className="text-destructive">
+        <span aria-hidden="true" className="text-foreground">
           *
         </span>
         <span className="sr-only">{t("required")}</span>

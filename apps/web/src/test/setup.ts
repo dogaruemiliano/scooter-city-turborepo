@@ -18,6 +18,12 @@ if (!window.matchMedia) {
   }));
 }
 
+// jsdom implements no layout, so it has no scrollIntoView. The calendar's
+// month/year wheel calls it to centre the selected option on mount.
+if (!Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = vi.fn();
+}
+
 afterEach(() => {
   cleanup();
 });

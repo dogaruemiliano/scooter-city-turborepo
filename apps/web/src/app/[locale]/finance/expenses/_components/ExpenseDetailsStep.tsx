@@ -699,7 +699,7 @@ function SelectField({
 function RequiredLabel({ children }: { children: string }) {
   return (
     <>
-      <span aria-hidden="true" className="text-destructive">
+      <span aria-hidden="true" className="text-foreground">
         *
       </span>
       <span className="sr-only">{children}</span>

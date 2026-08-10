@@ -86,6 +86,10 @@ export type CalendarPickerProps = {
   description?: React.ReactNode;
   labels?: CalendarPickerLabels;
   locale?: string;
+  /** Latest selectable day, ISO `YYYY-MM-DD`. Later days render disabled. */
+  maxDate?: string;
+  /** Earliest selectable day, ISO `YYYY-MM-DD`. */
+  minDate?: string;
   maxYear?: number;
   minYear?: number;
   onOpenChange?: (open: boolean) => void;
@@ -105,6 +109,8 @@ export function CalendarPicker({
   description,
   labels = DEFAULT_LABELS,
   locale,
+  maxDate,
+  minDate,
   maxYear = DEFAULT_MAX_YEAR,
   minYear = DEFAULT_MIN_YEAR,
   onOpenChange,
@@ -179,8 +185,14 @@ export function CalendarPicker({
     [onValueChange, setResolvedOpen, value],
   );
 
+  const bounds = React.useMemo<DateBounds>(
+    () => ({ maxDate, minDate }),
+    [maxDate, minDate],
+  );
+
   const panel = (
     <CalendarPickerPanel
+      bounds={bounds}
       className={contentClassName}
       description={description}
       labels={labels}
@@ -224,6 +236,7 @@ export function CalendarPicker({
 }
 
 function CalendarPickerPanel({
+  bounds,
   className,
   description,
   labels,
@@ -240,6 +253,7 @@ function CalendarPickerPanel({
   weekStartsOn,
   yearRange,
 }: {
+  bounds: DateBounds;
   className?: string;
   description?: React.ReactNode;
   labels: CalendarPickerLabels;
@@ -260,6 +274,7 @@ function CalendarPickerPanel({
     <Card className="border-transparent bg-muted py-4 shadow-none">
       <CardContent className="flex flex-col gap-5 px-3">
         <CalendarHeader
+          bounds={bounds}
           labels={labels}
           locale={locale}
           mode={mode}
@@ -280,6 +295,7 @@ function CalendarPickerPanel({
           />
         ) : (
           <MonthGrid
+            bounds={bounds}
             locale={locale}
             onSelectDate={onSelectDate}
             selectedDate={selectedDate}
@@ -331,6 +347,7 @@ function CalendarPickerPanel({
 }
 
 function CalendarHeader({
+  bounds,
   labels,
   locale,
   mode,
@@ -339,6 +356,7 @@ function CalendarHeader({
   view,
   yearRange,
 }: {
+  bounds: DateBounds;
   labels: CalendarPickerLabels;
   locale: string;
   mode: CalendarPickerMode;
@@ -349,8 +367,10 @@ function CalendarHeader({
 }) {
   const previousView = addMonths(view, -1, yearRange);
   const nextView = addMonths(view, 1, yearRange);
-  const canGoPrevious = !isSameView(previousView, view);
-  const canGoNext = !isSameView(nextView, view);
+  const canGoPrevious =
+    !isSameView(previousView, view) && hasSelectableDay(previousView, bounds);
+  const canGoNext =
+    !isSameView(nextView, view) && hasSelectableDay(nextView, bounds);
   const monthYearLabel = formatMonthYear(view, locale);
   const selectorOpen = mode === "month-year";
 
@@ -403,6 +423,7 @@ function CalendarHeader({
 }
 
 function MonthGrid({
+  bounds,
   locale,
   onSelectDate,
   selectedDate,
@@ -411,6 +432,7 @@ function MonthGrid({
   weekStartsOn,
   yearRange,
 }: {
+  bounds: DateBounds;
   locale: string;
   onSelectDate: (date: DateOnly) => void;
   selectedDate: DateOnly | null;
@@ -462,7 +484,7 @@ function MonthGrid({
               : false;
             const isToday = isSameDate(date, todayDate);
             const isCurrentMonth = date.monthIndex === view.monthIndex;
-            const isDisabled = isDateOutsideYearRange(date, yearRange);
+            const isDisabled = isDateDisabled(date, yearRange, bounds);
 
             return (
               <div
@@ -948,6 +970,49 @@ function isSameView(left: CalendarView, right: CalendarView): boolean {
 
 function isDateOutsideYearRange(date: DateOnly, yearRange: YearRange): boolean {
   return date.year < yearRange.minYear || date.year > yearRange.maxYear;
+}
+
+/** Selectable-day window, independent of the coarser year range. */
+type DateBounds = {
+  maxDate?: string;
+  minDate?: string;
+};
+
+function isDateDisabled(
+  date: DateOnly,
+  yearRange: YearRange,
+  bounds: DateBounds,
+): boolean {
+  if (isDateOutsideYearRange(date, yearRange)) {
+    return true;
+  }
+
+  // ISO date-only strings sort chronologically, so plain comparison is enough.
+  const value = formatDateOnly(date);
+
+  return (
+    (bounds.minDate !== undefined && value < bounds.minDate) ||
+    (bounds.maxDate !== undefined && value > bounds.maxDate)
+  );
+}
+
+/** True when a month contains at least one day inside the bounds. */
+function hasSelectableDay(view: CalendarView, bounds: DateBounds): boolean {
+  const firstDay = formatDateOnly({
+    day: 1,
+    monthIndex: view.monthIndex,
+    year: view.year,
+  });
+  const lastDay = formatDateOnly({
+    day: new Date(Date.UTC(view.year, view.monthIndex + 1, 0)).getUTCDate(),
+    monthIndex: view.monthIndex,
+    year: view.year,
+  });
+
+  return (
+    (bounds.maxDate === undefined || firstDay <= bounds.maxDate) &&
+    (bounds.minDate === undefined || lastDay >= bounds.minDate)
+  );
 }
 
 function getCenteredWheelValue(element: HTMLElement): number | null {

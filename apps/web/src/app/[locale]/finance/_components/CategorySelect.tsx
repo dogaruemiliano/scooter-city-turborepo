@@ -58,6 +58,7 @@ export function CategorySelect({
 }: CategorySelectProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const selectedCategory = useMemo(
     () => categories.find((c) => c.id === value),
@@ -153,7 +154,7 @@ export function CategorySelect({
     <div className="flex flex-col gap-2">
       <Label htmlFor={id}>
         {label}
-        {required ? <span className="text-destructive">*</span> : null}
+        {required ? <span className="text-current">*</span> : null}
       </Label>
 
       <BottomSheet open={open} onOpenChange={setOpen}>
@@ -180,7 +181,7 @@ export function CategorySelect({
           }
         />
 
-        <BottomSheetContent>
+        <BottomSheetContent initialFocus={searchInputRef}>
           <BottomSheetHeader>
             <BottomSheetTitle>{label}</BottomSheetTitle>
           </BottomSheetHeader>
@@ -193,6 +194,7 @@ export function CategorySelect({
                   className="pointer-events-none size-4 shrink-0 text-muted-foreground"
                 />
                 <input
+                  ref={searchInputRef}
                   type="text"
                   placeholder={searchPlaceholder}
                   value={query}

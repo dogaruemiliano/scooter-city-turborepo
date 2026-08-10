@@ -43,12 +43,7 @@ export function TextInputField({
         >
           {label}
           {required ? (
-            <span
-              aria-hidden="true"
-              className={
-                disabled ? "text-disabled-foreground" : "text-destructive"
-              }
-            >
+            <span aria-hidden="true" className="text-current">
               *
             </span>
           ) : null}
@@ -79,12 +74,7 @@ export function TextInputField({
       >
         {label}
         {required ? (
-          <span
-            aria-hidden="true"
-            className={
-              disabled ? "text-disabled-foreground" : "text-destructive"
-            }
-          >
+          <span aria-hidden="true" className="text-current">
             *
           </span>
         ) : null}

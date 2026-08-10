@@ -16,7 +16,7 @@ import {
 import { cn } from "@repo/ui/lib/utils";
 import { ChevronDownIcon, PlusIcon, SearchIcon, XIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import { BrandFormSheet } from "./BrandFormSheet";
 
@@ -44,6 +44,7 @@ export function BrandSelect({
   const t = useTranslations("scooters");
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const selected = useMemo(
     () => brands.find((brand) => brand.id === value),
@@ -74,7 +75,7 @@ export function BrandSelect({
       <div className="flex items-center gap-1">
         <Label htmlFor={id}>{label}</Label>
         {required ? (
-          <span aria-hidden="true" className="text-destructive">
+          <span aria-hidden="true" className="text-foreground">
             *
           </span>
         ) : null}
@@ -102,7 +103,7 @@ export function BrandSelect({
           />
         </BottomSheetTrigger>
 
-        <BottomSheetContent>
+        <BottomSheetContent initialFocus={searchInputRef}>
           <BottomSheetHeader className="flex flex-row items-center justify-between gap-2">
             <BottomSheetTitle>{label}</BottomSheetTitle>
             <BrandFormSheet
@@ -128,6 +129,7 @@ export function BrandSelect({
                   className="pointer-events-none size-4 shrink-0 text-muted-foreground"
                 />
                 <input
+                  ref={searchInputRef}
                   type="text"
                   placeholder={t("brandPicker.search")}
                   value={query}

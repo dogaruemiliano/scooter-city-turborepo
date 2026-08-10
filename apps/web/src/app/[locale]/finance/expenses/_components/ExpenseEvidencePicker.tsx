@@ -85,7 +85,7 @@ export function ExpenseEvidencePicker({
         <span className="font-normal text-muted-foreground">
           {required ? (
             <>
-              <span aria-hidden="true" className="text-destructive">
+              <span aria-hidden="true" className="text-foreground">
                 *
               </span>
               <span className="sr-only">{t("required")}</span>

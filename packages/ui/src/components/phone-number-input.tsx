@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import {
-  getCountries,
   getCountryCallingCode,
   isSupportedCountry,
   parsePhoneNumberFromString,
@@ -10,6 +9,7 @@ import {
 } from "libphonenumber-js";
 import { ChevronDownIcon } from "lucide-react";
 
+import { COUNTRIES, resolveCountryNameLocale } from "@repo/ui/lib/countries";
 import { cn } from "@repo/ui/lib/utils";
 
 const DEFAULT_COUNTRY = "RO" satisfies CountryCode;
@@ -273,38 +273,14 @@ function normalizeCountry(country: CountryCode | undefined) {
 }
 
 function getCountryOptions(locale: string | undefined): CountryOption[] {
-  const displayNames = getDisplayNames(locale);
+  const nameLocale = resolveCountryNameLocale(locale);
 
-  return getCountries()
-    .map((country) => {
-      const countryName = displayNames?.of(country) ?? country;
-      const callingCode = getCountryCallingCode(country);
-
-      return {
-        country,
-        label: `${countryName} (+${callingCode})`,
-      };
-    })
-    .sort((first, second) =>
-      first.label.localeCompare(second.label, locale ?? DEFAULT_LOCALE),
-    );
-}
-
-function getDisplayNames(locale: string | undefined) {
-  if (typeof Intl.DisplayNames !== "function") {
-    return undefined;
-  }
-
-  try {
-    return new Intl.DisplayNames(
-      locale ? [locale, DEFAULT_LOCALE] : [DEFAULT_LOCALE],
-      {
-        type: "region",
-      },
-    );
-  } catch {
-    return undefined;
-  }
+  return COUNTRIES.map((entry) => ({
+    country: entry.code,
+    label: `${entry.names[nameLocale]} (+${getCountryCallingCode(entry.code)})`,
+  })).sort((first, second) =>
+    first.label.localeCompare(second.label, locale ?? DEFAULT_LOCALE),
+  );
 }
 
 export { PhoneNumberInput };

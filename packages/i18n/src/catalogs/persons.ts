@@ -66,6 +66,7 @@ export const personsCatalog = {
         invalidPhone:
           "Enter a phone number in international format, e.g. +40712345678.",
         invalidCnp: "Enter a valid CNP.",
+        futureDate: "{field} cannot be in the future.",
         maxLength: "{field} must be {max} characters or fewer.",
         duplicateDocumentTypes: "Document types must be unique.",
         documentSlotLimit:
@@ -240,10 +241,16 @@ export const personsCatalog = {
     },
     placeholders: {
       countryCode: "RO",
+      country: "Select country",
       county: "Select county",
       documentType: "Select document type",
       phone: "Phone number",
       search: "Search name, email, or phone",
+    },
+    countryPicker: {
+      search: "Search countries",
+      clearSearch: "Clear search",
+      empty: "No countries found",
     },
     filters: {
       title: "Filters",
@@ -391,6 +398,7 @@ export const personsCatalog = {
         invalidPhone:
           "Introdu un număr de telefon în format internațional, de exemplu +40712345678.",
         invalidCnp: "Introdu un CNP valid.",
+        futureDate: "{field} nu poate fi în viitor.",
         maxLength: "{field} trebuie să aibă cel mult {max} caractere.",
         duplicateDocumentTypes: "Tipurile de documente trebuie să fie unice.",
         documentSlotLimit:
@@ -568,10 +576,16 @@ export const personsCatalog = {
     },
     placeholders: {
       countryCode: "RO",
+      country: "Selectează țara",
       county: "Selectează județul",
       documentType: "Selectează tipul documentului",
       phone: "Număr de telefon",
       search: "Caută nume, email sau telefon",
+    },
+    countryPicker: {
+      search: "Caută țări",
+      clearSearch: "Șterge căutarea",
+      empty: "Nicio țară găsită",
     },
     filters: {
       title: "Filtre",

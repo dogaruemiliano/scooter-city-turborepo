@@ -63,9 +63,26 @@ export const dateOnlySchema = z
     message: "Date must be a valid calendar date.",
   });
 
+/**
+ * Issue message raised by {@link pastDateOnlySchema}. Clients match on it to
+ * swap in a localized message, so schema and UI cannot drift apart.
+ */
+export const FUTURE_DATE_MESSAGE = "Date cannot be in the future.";
+
+/** Calendar date that cannot be later than today, such as a date of birth. */
+export const pastDateOnlySchema = dateOnlySchema.refine(
+  (value) => !isFutureDateOnly(value),
+  { message: FUTURE_DATE_MESSAGE },
+);
+
 /** Current UTC calendar date as an ISO date-only string. */
 export function dateOnlyToday(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+/** True when the date-only string falls after the current UTC calendar day. */
+export function isFutureDateOnly(value: string, today = dateOnlyToday()) {
+  return value > today;
 }
 
 /** Coerces common query-string boolean values. */
