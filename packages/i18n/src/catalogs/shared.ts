@@ -28,6 +28,16 @@ export const sharedCatalog = {
       loading: "Loading...",
       saving: "Saving...",
     },
+    validation: {
+      fallback: "Check this field.",
+      futureDate: "{field} cannot be in the future.",
+      invalid: "Enter a valid {field}.",
+      maxLength: "{field} must be {max} characters or fewer.",
+      minLength: "{field} must be at least {min} characters.",
+      required: "{field} is required.",
+      summary:
+        "{count, plural, one {# field needs attention} other {# fields need attention}}.",
+    },
   },
   ro: {
     actions: {
@@ -57,6 +67,16 @@ export const sharedCatalog = {
     status: {
       loading: "Se încarcă...",
       saving: "Se salvează...",
+    },
+    validation: {
+      fallback: "Verifică acest câmp.",
+      futureDate: "{field} nu poate fi în viitor.",
+      invalid: "Introdu o valoare validă pentru {field}.",
+      maxLength: "{field} trebuie să aibă cel mult {max} caractere.",
+      minLength: "{field} trebuie să aibă cel puțin {min} caractere.",
+      required: "{field} este obligatoriu.",
+      summary:
+        "{count, plural, one {# câmp necesită atenție} few {# câmpuri necesită atenție} other {# de câmpuri necesită atenție}}.",
     },
   },
 } as const;
