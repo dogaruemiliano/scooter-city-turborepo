@@ -187,17 +187,6 @@ export const scooterSchema = z
     engineType: z.string().nullable(),
     engineCc: z.number().int().positive().nullable(),
     powerKw: z.number().positive().nullable(),
-    purchasedOn: z
-      .string()
-      .nullable()
-      .describe(
-        "Derived from the scooter's linked posted purchase expense; null if none is linked.",
-      ),
-    purchasePrice: z
-      .string()
-      .nullable()
-      .describe("Derived from the linked purchase expense's allocation."),
-    purchaseCurrency: z.string().nullable(),
     registrationType: scooterRegistrationTypeSchema,
     plateNumber: z.string().nullable(),
     registeredOn: z.string().nullable(),

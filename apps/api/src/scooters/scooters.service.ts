@@ -13,17 +13,10 @@ import { PrismaService } from "../prisma/prisma.service";
 
 const scooterInclude = {
   brand: true,
-  purchaseAllocation: {
-    include: { expense: { select: { occurredOn: true, currency: true } } },
-  },
 } as const;
 
 type ScooterWithBrand = Scooter & {
   brand: { name: string };
-  purchaseAllocation: {
-    allocatedGrossAmount: Prisma.Decimal;
-    expense: { occurredOn: Date; currency: string };
-  } | null;
 };
 
 interface SearchIdRow {
@@ -427,14 +420,11 @@ export class ScootersService {
           sb.name AS brand,
           s.model,
           s."manufactureYear",
-          pe."occurredOn" AS "purchasedOn",
           s."createdAt",
           s."updatedAt",
           ${scooterText} AS scooter_text
         FROM "Scooter" s
         JOIN "ScooterBrand" sb ON sb.id = s."brandId"
-        LEFT JOIN "ExpenseScooterAllocation" pa ON pa.id = s."purchaseAllocationId"
-        LEFT JOIN "Expense" pe ON pe.id = pa."expenseId"
         WHERE ${this.toScooterFilterSql(query)}
       ),
       scored AS (
@@ -444,7 +434,6 @@ export class ScootersService {
           b.brand,
           b.model,
           b."manufactureYear",
-          b."purchasedOn",
           b."createdAt",
           b."updatedAt",
           word_similarity(${term}, b.scooter_text) AS score
@@ -511,16 +500,6 @@ export class ScootersService {
         return [{ manufactureYear: "desc" }, { vin: "asc" }];
       case "manufactureYearAsc":
         return [{ manufactureYear: "asc" }, { vin: "asc" }];
-      case "purchasedOnDesc":
-        return [
-          { purchaseAllocation: { expense: { occurredOn: "desc" } } },
-          { vin: "asc" },
-        ];
-      case "purchasedOnAsc":
-        return [
-          { purchaseAllocation: { expense: { occurredOn: "asc" } } },
-          { vin: "asc" },
-        ];
       case "createdAtDesc":
         return [{ createdAt: "desc" }, { id: "asc" }];
       case "createdAtAsc":
@@ -551,10 +530,6 @@ export class ScootersService {
         return PrismaRuntime.sql`"manufactureYear" DESC, score DESC, id ASC`;
       case "manufactureYearAsc":
         return PrismaRuntime.sql`"manufactureYear" ASC, score DESC, id ASC`;
-      case "purchasedOnDesc":
-        return PrismaRuntime.sql`"purchasedOn" DESC, score DESC, id ASC`;
-      case "purchasedOnAsc":
-        return PrismaRuntime.sql`"purchasedOn" ASC, score DESC, id ASC`;
       case "createdAtDesc":
         return PrismaRuntime.sql`"createdAt" DESC, score DESC, id ASC`;
       case "createdAtAsc":

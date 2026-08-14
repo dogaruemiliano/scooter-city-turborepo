@@ -99,10 +99,7 @@ export function TransactionCreateForm({
   const router = useRouter();
   const formId = useId();
   const [form, setForm] = useState<TransactionFormState>(() => {
-    const initial = createTransactionFormState(wallets, {
-      ...prefill,
-      type: prefill.type === "EXPENSE" ? "EXPENSE" : "INCOME",
-    });
+    const initial = createTransactionFormState(wallets, prefill);
     const primaryWalletId =
       initial.primaryWalletId ||
       preferredTransactionWalletId(initial, wallets, new Set(adminWalletIds));

@@ -44,7 +44,6 @@ describe("Core auth HTTP surface (e2e)", () => {
 
   const createdUserIds: string[] = [];
   const createdPersonIds: string[] = [];
-  const createdMoneyTransactionIds: string[] = [];
 
   const server = () => app.getHttpServer() as Server;
 
@@ -94,11 +93,6 @@ describe("Core auth HTTP surface (e2e)", () => {
     if (createdPersonIds.length > 0) {
       await prisma.person.deleteMany({
         where: { id: { in: createdPersonIds } },
-      });
-    }
-    if (createdMoneyTransactionIds.length > 0) {
-      await prisma.moneyTransaction.deleteMany({
-        where: { id: { in: createdMoneyTransactionIds } },
       });
     }
     if (createdUserIds.length > 0) {
@@ -402,11 +396,7 @@ describe("Core auth HTTP surface (e2e)", () => {
     const issued = await freshSession();
     const userBefore = await prisma.user.findUniqueOrThrow({
       where: { id: issued.userId },
-      include: { wallet: true },
     });
-    if (!userBefore.wallet) {
-      throw new Error("Expected a wallet for the account-deletion fixture");
-    }
     const otherSession = await coreAuth.issueSession({ user: userBefore });
     const person = await prisma.person.create({
       data: {
@@ -438,19 +428,6 @@ describe("Core auth HTTP surface (e2e)", () => {
         nextSendAt: new Date(Date.now() + 30_000),
       },
     });
-    const transaction = await prisma.moneyTransaction.create({
-      data: {
-        type: "ADJUSTMENT",
-        amount: "25.00",
-        financialScope: "COMPANY",
-        counterpartyUserId: issued.userId,
-        occurredAt: new Date(),
-        description: "Account deletion history fixture",
-        idempotencyKey: `delete-me-history-${issued.userId}`,
-      },
-    });
-    createdMoneyTransactionIds.push(transaction.id);
-
     const res = await req()
       .delete("/v1/auth/me")
       .set("Cookie", [`access_token=${issued.accessToken}`]);
@@ -461,17 +438,6 @@ describe("Core auth HTTP surface (e2e)", () => {
     expect(
       await prisma.person.findUnique({ where: { id: person.id } }),
     ).not.toBeNull();
-    expect(
-      await prisma.wallet.findUnique({
-        where: { id: userBefore.wallet.id },
-      }),
-    ).not.toBeNull();
-    expect(
-      await prisma.moneyTransaction.findUnique({
-        where: { id: transaction.id },
-        select: { counterpartyUserId: true },
-      }),
-    ).toEqual({ counterpartyUserId: issued.userId });
     expect(
       await prisma.session.count({ where: { userId: issued.userId } }),
     ).toBe(0);

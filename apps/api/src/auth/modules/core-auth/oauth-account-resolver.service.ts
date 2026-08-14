@@ -1,7 +1,6 @@
 import { Injectable, UnauthorizedException } from "@nestjs/common";
 import type { v1 } from "@repo/api-shared";
 
-import { userWalletCreateInput } from "../../../finance/user-wallet";
 import { Prisma, type User } from "../../../generated/prisma/client";
 import { PrismaService } from "../../../prisma/prisma.service";
 
@@ -180,7 +179,6 @@ export class OAuthAccountResolver {
         emailVerified: new Date(),
         firstName: input.firstName,
         lastName: input.lastName,
-        wallet: userWalletCreateInput(),
         authAccounts: {
           create: {
             provider: input.provider,

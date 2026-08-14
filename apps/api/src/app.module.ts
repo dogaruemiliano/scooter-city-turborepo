@@ -18,7 +18,6 @@ import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
 import { pinoConfig } from "./common/logger/pino.config";
 import { RequestIdMiddleware } from "./common/middleware/request-id.middleware";
 import { ConfigModule } from "./config/config.module";
-import { FinanceModule } from "./finance/finance.module";
 import { loadEnv } from "./config/env";
 import { HealthModule } from "./health/health.module";
 import { MailerModule } from "./mailer/mailer.module";
@@ -53,7 +52,6 @@ const env = loadEnv();
     MaintenanceModule,
     ScootersModule,
     ScooterBrandsModule,
-    FinanceModule,
     AuthModule.forRoot(buildAuthConfig(env)),
   ],
   providers: [

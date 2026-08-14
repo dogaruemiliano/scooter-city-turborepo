@@ -1,14 +1,10 @@
 import { v1 } from "@repo/api-shared";
 
 import { toDateOnlyString } from "../common/dates/date-only";
-import type { Prisma, Scooter as ScooterRow } from "../generated/prisma/client";
+import type { Scooter as ScooterRow } from "../generated/prisma/client";
 
 type ScooterRowWithBrand = ScooterRow & {
   brand: { name: string };
-  purchaseAllocation: {
-    allocatedGrossAmount: Prisma.Decimal;
-    expense: { occurredOn: Date; currency: string };
-  } | null;
 };
 
 export function toScooter(row: ScooterRowWithBrand): v1.scooters.Scooter {
@@ -24,13 +20,6 @@ export function toScooter(row: ScooterRowWithBrand): v1.scooters.Scooter {
     engineType: row.engineType,
     engineCc: row.engineCc,
     powerKw: row.powerKw,
-    purchasedOn: row.purchaseAllocation
-      ? toDateOnlyString(row.purchaseAllocation.expense.occurredOn)
-      : null,
-    purchasePrice: row.purchaseAllocation
-      ? row.purchaseAllocation.allocatedGrossAmount.toFixed(2)
-      : null,
-    purchaseCurrency: row.purchaseAllocation?.expense.currency ?? null,
     registrationType:
       row.registrationType as v1.scooters.ScooterRegistrationType,
     plateNumber: row.plateNumber,

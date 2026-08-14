@@ -20,7 +20,6 @@
  *   | Email                          | Purpose                       | Notes                               |
  *   |--------------------------------|-------------------------------|-------------------------------------|
  *   | admin@email.com                | Local admin access            | ADMIN role                          |
- *   | finance-admin@example.com      | Finance fixture administrator | ADMIN role, realistic ledger data   |
  *   | test-email-otp@example.com     | Email-OTP flow                | no OAuth links                      |
  *   | test-sms@example.com           | SMS-OTP flow                  | phone +40700000001                  |
  *   | test-google@example.com        | Google OAuth                  | linked AuthAccount row              |
@@ -52,7 +51,6 @@ import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
 
 import { PrismaClient } from "../src/generated/prisma/client";
-import { seedFinance } from "./seeds/finance";
 import { seedMaintenance } from "./seeds/maintenance";
 
 if (process.env.NODE_ENV === "production") {
@@ -108,7 +106,6 @@ const SEED_AUDIT_ACTOR = {
   email: null,
   name: "Seed data",
 } as const;
-const USER_WALLET_SUFFIX = "personal wallet";
 
 type PersonDocumentSeed = {
   id: string;
@@ -469,12 +466,10 @@ async function main(): Promise<void> {
       email: "admin@email.com",
       firstName: "Admin",
       roles: ["ADMIN"],
-      wallet: seedUserWalletCreate("Admin"),
     },
     update: {
       roles: ["ADMIN"],
       deletedAt: null,
-      wallet: seedUserWalletUpsert("Admin"),
     },
   });
 
@@ -486,12 +481,10 @@ async function main(): Promise<void> {
       email: "test-email-otp@example.com",
       firstName: "Test",
       lastName: "EmailOtp",
-      wallet: seedUserWalletCreate("Test EmailOtp"),
     },
     update: {
       roles: [],
       deletedAt: null,
-      wallet: seedUserWalletUpsert("Test EmailOtp"),
     },
   });
 
@@ -504,13 +497,11 @@ async function main(): Promise<void> {
       phone: "+40700000001",
       firstName: "Test",
       lastName: "Sms",
-      wallet: seedUserWalletCreate("Test Sms"),
     },
     update: {
       phone: "+40700000001",
       roles: [],
       deletedAt: null,
-      wallet: seedUserWalletUpsert("Test Sms"),
     },
   });
 
@@ -533,7 +524,6 @@ async function main(): Promise<void> {
   for (const seed of oauthSeeds) {
     const providerName =
       seed.provider.charAt(0).toUpperCase() + seed.provider.slice(1);
-    const userName = `Test ${providerName}`;
     await prisma.user.upsert({
       where: { id: seed.id },
       create: {
@@ -542,13 +532,11 @@ async function main(): Promise<void> {
         emailVerified: now,
         firstName: "Test",
         lastName: providerName,
-        wallet: seedUserWalletCreate(userName),
       },
       update: {
         emailVerified: now,
         roles: [],
         deletedAt: null,
-        wallet: seedUserWalletUpsert(userName),
       },
     });
 
@@ -572,10 +560,9 @@ async function main(): Promise<void> {
   await seedPersons();
   await seedScooters();
   await seedMaintenance(prisma);
-  await seedFinance(prisma);
 
   console.log(
-    `Seeded ${Object.keys(FIXED_IDS).length + 1} core users, ${PERSON_SEEDS.length} persons, ${SCOOTER_SEEDS.length} scooters, and the finance fixture.`,
+    `Seeded ${Object.keys(FIXED_IDS).length + 1} core users, ${PERSON_SEEDS.length} persons, and ${SCOOTER_SEEDS.length} scooters.`,
   );
 }
 
@@ -589,7 +576,6 @@ async function seedPersons(): Promise<void> {
         phone: seed.phone,
         firstName: seed.firstName,
         lastName: seed.lastName,
-        wallet: seedUserWalletCreate(`${seed.firstName} ${seed.lastName}`),
       },
       update: {
         phone: seed.phone,
@@ -597,7 +583,6 @@ async function seedPersons(): Promise<void> {
         lastName: seed.lastName,
         roles: [],
         deletedAt: null,
-        wallet: seedUserWalletUpsert(`${seed.firstName} ${seed.lastName}`),
       },
     });
 
@@ -638,45 +623,6 @@ async function seedPersons(): Promise<void> {
 
     await seedPersonAuditEvents(seed);
   }
-}
-
-function personalWalletName(ownerName: string): string {
-  return `${ownerName} — ${USER_WALLET_SUFFIX}`;
-}
-
-function seedUserWalletCreate(ownerName: string) {
-  return {
-    create: {
-      type: "USER" as const,
-      name: personalWalletName(ownerName),
-      balances: {
-        create: {
-          bucket: "USER_SETTLEMENT" as const,
-          currency: "RON",
-          balance: 0,
-        },
-      },
-    },
-  };
-}
-
-function seedUserWalletUpsert(ownerName: string) {
-  return {
-    upsert: {
-      create: {
-        type: "USER" as const,
-        name: personalWalletName(ownerName),
-        balances: {
-          create: {
-            bucket: "USER_SETTLEMENT" as const,
-            currency: "RON",
-            balance: 0,
-          },
-        },
-      },
-      update: { name: personalWalletName(ownerName) },
-    },
-  };
 }
 
 function slugifyBrandName(name: string): string {
