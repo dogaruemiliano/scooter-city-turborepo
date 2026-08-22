@@ -1,19 +1,15 @@
-import type { v1 } from "@repo/api-shared";
-import type { SupportedLocale } from "@repo/i18n";
-
-import { localizePath } from "@/i18n/paths";
-
-export function claimSettlementHref(
-  claim: v1.finance.OutstandingPersonalClaim,
-  locale: SupportedLocale,
-): string {
-  const params = new URLSearchParams({
-    type: "PERSONAL_FUNDS_SPLIT",
-    debtorUserId: claim.debtorUserId,
-    creditorUserId: claim.creditorUserId,
-    amount: claim.amount,
-    currency: claim.currency,
-  });
-
-  return localizePath(`/finance/transactions/new?${params}`, locale);
-}
+/**
+ * In-app finance paths, unlocalized. Wrap with `localizePath` at the call
+ * site — these are the route shapes, not hrefs.
+ */
+export const FINANCE_PATHS = {
+  overview: "/finance",
+  expenses: "/finance/expenses",
+  newExpense: "/finance/expenses/new",
+  newFunding: "/finance/funding/new",
+  operations: "/finance/operations",
+  operation: (operationId: string): string =>
+    `/finance/operations/${encodeURIComponent(operationId)}`,
+  accounts: "/finance/accounts",
+  settlement: "/finance/settlement",
+} as const;

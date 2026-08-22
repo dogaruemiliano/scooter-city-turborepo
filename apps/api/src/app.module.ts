@@ -19,6 +19,7 @@ import { pinoConfig } from "./common/logger/pino.config";
 import { RequestIdMiddleware } from "./common/middleware/request-id.middleware";
 import { ConfigModule } from "./config/config.module";
 import { loadEnv } from "./config/env";
+import { FinanceModule } from "./finance/finance.module";
 import { HealthModule } from "./health/health.module";
 import { MailerModule } from "./mailer/mailer.module";
 import { MaintenanceModule } from "./maintenance/maintenance.module";
@@ -48,6 +49,7 @@ const env = loadEnv();
 
     // Public-surface modules.
     HealthModule,
+    FinanceModule,
     PersonsModule,
     MaintenanceModule,
     ScootersModule,

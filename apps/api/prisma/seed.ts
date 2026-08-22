@@ -51,6 +51,7 @@ import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
 
 import { PrismaClient } from "../src/generated/prisma/client";
+import { seedFinance } from "./seeds/finance";
 import { seedMaintenance } from "./seeds/maintenance";
 
 if (process.env.NODE_ENV === "production") {
@@ -560,6 +561,7 @@ async function main(): Promise<void> {
   await seedPersons();
   await seedScooters();
   await seedMaintenance(prisma);
+  await seedFinance(prisma);
 
   console.log(
     `Seeded ${Object.keys(FIXED_IDS).length + 1} core users, ${PERSON_SEEDS.length} persons, and ${SCOOTER_SEEDS.length} scooters.`,

@@ -4,19 +4,12 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import {
   ArrowLeftRightIcon,
   ArrowLeftIcon,
   BikeIcon,
-  Building2Icon,
   ChartPieIcon,
   HandCoinsIcon,
   LandmarkIcon,
@@ -24,13 +17,10 @@ import {
   ReceiptTextIcon,
   Settings2Icon,
   TagIcon,
-  TagsIcon,
   UsersRoundIcon,
-  WalletCardsIcon,
   WrenchIcon,
   type LucideIcon,
 } from "lucide-react";
-import { v1 } from "@repo/api-shared";
 import type { SupportedLocale } from "@repo/i18n";
 import {
   Avatar,
@@ -75,8 +65,6 @@ import {
   type PageHeaderActionsContextValue,
 } from "./PageHeaderActions";
 import { PageTitleOverrideContext } from "./PageTitleOverride";
-import { webApi } from "../lib/api";
-import { formatMoney } from "../lib/finance-format";
 import {
   applyThemePreference,
   isThemePreference,
@@ -101,14 +89,7 @@ const NAVIGATION_GROUPS = [
   {
     labelKey: "entitiesGroup",
     requiredRole: "ADMIN",
-    items: [
-      { href: "/persons", labelKey: "persons", icon: UsersRoundIcon },
-      {
-        href: "/finance/companies",
-        labelKey: "companies",
-        icon: Building2Icon,
-      },
-    ],
+    items: [{ href: "/persons", labelKey: "persons", icon: UsersRoundIcon }],
   },
   {
     labelKey: "scootersGroup",
@@ -130,34 +111,24 @@ const NAVIGATION_GROUPS = [
         exact: true,
       },
       {
-        href: "/finance/transactions",
-        labelKey: "financeTransactions",
-        icon: ArrowLeftRightIcon,
-      },
-      {
         href: "/finance/expenses",
         labelKey: "financeExpenses",
         icon: ReceiptTextIcon,
       },
       {
-        href: "/finance/categories",
-        labelKey: "financeCategories",
-        icon: TagsIcon,
+        href: "/finance/operations",
+        labelKey: "financeOperations",
+        icon: ArrowLeftRightIcon,
       },
       {
-        href: "/finance/claims",
-        labelKey: "financeClaims",
-        icon: HandCoinsIcon,
-      },
-      {
-        href: "/finance/owners",
-        labelKey: "financeOwners",
+        href: "/finance/accounts",
+        labelKey: "financeAccounts",
         icon: LandmarkIcon,
       },
       {
-        href: "/finance/settings/business",
-        labelKey: "businessConfiguration",
-        icon: Settings2Icon,
+        href: "/finance/settlement",
+        labelKey: "financeSettlement",
+        icon: HandCoinsIcon,
       },
     ],
   },
@@ -175,18 +146,14 @@ const ALL_NAVIGATION_HREFS: readonly string[] = [
 
 const PAGE_TITLES: Record<string, string> = {
   "/": "dashboard",
-  "/account/wallet": "myWallet",
   "/account/settings": "accountSettings",
   "/finance": "finance",
-  "/finance/transactions": "financeTransactions",
-  "/finance/transactions/new": "newFinanceTransaction",
   "/finance/expenses": "financeExpenses",
   "/finance/expenses/new": "newFinanceExpense",
-  "/finance/settings/business": "financeBusinessSettings",
-  "/finance/companies": "financeCompanies",
-  "/finance/categories": "financeCategories",
-  "/finance/claims": "financeClaims",
-  "/finance/owners": "financeOwners",
+  "/finance/funding/new": "newFinanceFunding",
+  "/finance/operations": "financeOperations",
+  "/finance/accounts": "financeAccounts",
+  "/finance/settlement": "financeSettlement",
   "/persons": "persons",
   "/persons/new": "newPerson",
   "/scooters": "scooters",
@@ -498,13 +465,10 @@ function AccountMenu({
   const tLogout = useTranslations("auth.logout");
   const { isMobile } = useSidebar();
   const { user } = useSession();
-  const userId = user?.id;
   const { busy, logout } = useLogout();
   const [themePreference, setThemePreference] = useState(
     initialThemePreference,
   );
-  const [personalWallet, setPersonalWallet] = useState<v1.finance.Wallet>();
-  const [walletUnavailable, setWalletUnavailable] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [accountMenuOverlayTarget, setAccountMenuOverlayTarget] =
     useState<HTMLElement | null>(null);
@@ -518,45 +482,6 @@ function AccountMenu({
   const email = user?.email ?? tAccount("noActiveSession");
   const displayName = user ? displayNameFromUser(user) : tAccount("account");
   const initials = user ? initialsFromUser(user) : "?";
-  const personalBalance = personalWallet?.balances.find(
-    (balance) => balance.bucket === "USER_SETTLEMENT",
-  );
-  const balanceSummary =
-    walletUnavailable || (personalWallet && !personalBalance)
-      ? tAccount("balanceUnavailable")
-      : personalBalance
-        ? tAccount("balanceValue", {
-            amount: formatMoney(
-              personalBalance.balance,
-              personalBalance.currency,
-              locale,
-            ),
-          })
-        : tAccount("balanceLoading");
-
-  useEffect(() => {
-    if (!userId) {
-      return;
-    }
-
-    const controller = new AbortController();
-
-    void webApi
-      .fetch(v1.finance.ROUTES.wallets.mine, v1.finance.walletSchema, {
-        cache: "no-store",
-        signal: controller.signal,
-      })
-      .then(setPersonalWallet)
-      .catch((error: unknown) => {
-        if (error instanceof DOMException && error.name === "AbortError") {
-          return;
-        }
-
-        setWalletUnavailable(true);
-      });
-
-    return () => controller.abort();
-  }, [userId]);
 
   function changeTheme(nextPreference: unknown) {
     if (!isThemePreference(nextPreference)) {
@@ -594,7 +519,7 @@ function AccountMenu({
               <span className="flex min-w-0 flex-1 flex-col">
                 <span className="truncate font-medium">{displayName}</span>
                 <span className="truncate text-xs text-muted-foreground">
-                  {balanceSummary}
+                  {email}
                 </span>
               </span>
               <span
@@ -617,12 +542,6 @@ function AccountMenu({
                   </span>
                   <span className="truncate font-normal">{email}</span>
                 </DropdownMenuLabel>
-                <AccountMenuLinkItem
-                  href={localizePath("/account/wallet", locale)}
-                  icon={WalletCardsIcon}
-                >
-                  {tAccount("myWallet")}
-                </AccountMenuLinkItem>
                 <AccountMenuLinkItem
                   href={localizePath("/account/settings", locale)}
                   icon={Settings2Icon}
@@ -712,12 +631,8 @@ function AccountMenuLinkItem({
 }
 
 function getNestedFinancePageTitle(pathname: string): string | undefined {
-  if (pathname.startsWith("/finance/transactions/")) {
-    return "financeTransaction";
-  }
-
-  if (pathname.startsWith("/finance/wallets/")) {
-    return "financeWallet";
+  if (pathname.startsWith("/finance/operations/")) {
+    return "financeOperation";
   }
 
   return undefined;

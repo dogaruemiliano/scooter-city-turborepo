@@ -2,55 +2,65 @@ import { describe, expect, it } from "vitest";
 
 import {
   financeUserLabel,
-  formatFinanceDateTime,
-  formatMoney,
-  formatTransactionAmount,
+  formatBasisPoints,
+  formatMinorAmount,
+  formatSignedMinorAmount,
 } from "./finance-format";
 
-describe("finance formatting", () => {
-  it("formats values beyond Number.MAX_SAFE_INTEGER without losing digits", () => {
-    expect(formatMoney("12345678901234567.89", "RON", "en")).toBe(
-      "lei 12,345,678,901,234,567.89",
-    );
+describe("formatMinorAmount", () => {
+  it("renders minor units as major-unit currency", () => {
+    expect(formatMinorAmount(30_000, "RON", "en")).toContain("300.00");
+    expect(formatMinorAmount(30_005, "RON", "en")).toContain("300.05");
   });
 
-  it("preserves negative sub-unit balances", () => {
-    expect(formatMoney("-0.50", "RON", "ro")).toContain("-0,50");
+  it("keeps both decimal places for whole amounts", () => {
+    expect(formatMinorAmount(0, "RON", "en")).toContain("0.00");
   });
 
-  it("falls back without coercing invalid API values", () => {
-    expect(formatMoney("unknown", "RON", "en")).toBe("unknown RON");
+  it("uses the locale's own separators", () => {
+    expect(formatMinorAmount(123_456, "RON", "ro")).toContain("1.234,56");
+  });
+});
+
+describe("formatSignedMinorAmount", () => {
+  it("marks direction explicitly, since that is the point", () => {
+    expect(formatSignedMinorAmount(30_000, "RON", "en")).toMatch(/^\+/);
+    expect(formatSignedMinorAmount(-30_000, "RON", "en")).toMatch(/^−/);
   });
 
-  it("renders expense transactions as negative amounts", () => {
-    expect(formatTransactionAmount("125.50", "RON", "ro", "EXPENSE")).toContain(
-      "-125,50",
-    );
-    expect(
-      formatTransactionAmount("125.50", "RON", "ro", "INCOME"),
-    ).not.toContain("-");
+  it("leaves zero unsigned", () => {
+    const formatted = formatSignedMinorAmount(0, "RON", "en");
+    expect(formatted.startsWith("+")).toBe(false);
+    expect(formatted.startsWith("−")).toBe(false);
   });
+});
 
-  it("uses a person's name when available and email otherwise", () => {
+describe("formatBasisPoints", () => {
+  it("renders ownership shares as percentages", () => {
+    expect(formatBasisPoints(5_000, "en")).toBe("50%");
+    expect(formatBasisPoints(10_000, "en")).toBe("100%");
+    expect(formatBasisPoints(3_333, "en")).toBe("33.33%");
+  });
+});
+
+describe("financeUserLabel", () => {
+  it("prefers a name", () => {
     expect(
       financeUserLabel({
-        email: "ana@example.com",
-        firstName: "Ana",
-        lastName: "Pop",
+        email: "iusti@example.com",
+        firstName: "Iusti",
+        lastName: "Popa",
       }),
-    ).toBe("Ana Pop");
+    ).toBe("Iusti Popa");
+  });
+
+  it("falls back to the email when no name is on record", () => {
     expect(
       financeUserLabel({
-        email: "ana@example.com",
+        email: "iusti@example.com",
         firstName: null,
         lastName: null,
       }),
-    ).toBe("ana@example.com");
-  });
-
-  it("formats API instants using the requested locale", () => {
-    expect(formatFinanceDateTime("2026-07-29T10:15:00.000Z", "en")).toContain(
-      "29 Jul 2026",
-    );
+    ).toBe("iusti@example.com");
   });
 });

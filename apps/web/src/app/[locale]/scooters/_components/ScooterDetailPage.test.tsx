@@ -40,9 +40,6 @@ const scooter: v1.scooters.Scooter = {
   engineType: null,
   engineCc: 125,
   powerKw: 8.5,
-  purchasedOn: "2026-01-15",
-  purchasePrice: "1500.00",
-  purchaseCurrency: "RON",
   registrationType: "unregistered",
   plateNumber: null,
   registeredOn: null,
@@ -509,8 +506,6 @@ function renderDetail(
   scooterOverride: v1.scooters.Scooter = scooter,
   overview: v1.maintenance.ScooterMaintenanceOverview = maintenanceOverview(),
   maintenanceTypes: v1.maintenance.MaintenanceTypeList = [],
-  financials: v1.finance.ScooterFinancials = scooterFinancials(),
-  companyWallets: v1.finance.WalletOption[] = [],
 ) {
   return render(
     <NextIntlClientProvider locale={locale} messages={messages[locale]}>
@@ -519,23 +514,9 @@ function renderDetail(
         scootersHref={locale === "en" ? "/en/scooters" : "/scooters"}
         maintenanceOverview={overview}
         maintenanceTypes={maintenanceTypes}
-        financials={financials}
-        companyWallets={companyWallets}
       />
     </NextIntlClientProvider>,
   );
-}
-
-function scooterFinancials(
-  overrides: Partial<v1.finance.ScooterFinancials> = {},
-): v1.finance.ScooterFinancials {
-  return {
-    scooterId: scooter.id,
-    costBreakdown: [],
-    totalCost: [],
-    sale: null,
-    ...overrides,
-  };
 }
 
 function maintenanceOverview(

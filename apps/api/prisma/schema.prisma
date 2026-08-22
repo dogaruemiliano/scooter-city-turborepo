@@ -142,6 +142,25 @@ model User {
   scooterIssuesReported      ScooterIssue[]      @relation("ScooterIssueReportedBy")
   maintenanceRecordsRecorded MaintenanceRecord[] @relation("MaintenanceRecordRecordedBy")
 
+  // Finance module. A User acting inside a finance book is an "associate";
+  // there is deliberately no separate Associate table (see
+  // docs/finance/financial-system-architecture.md §5).
+  financeBookMemberships     FinanceBookMember[]       @relation("FinanceBookMemberAssociate")
+  ledgerAccounts             LedgerAccount[]           @relation("LedgerAccountAssociate")
+  financialOperationsCreated FinancialOperation[]      @relation("FinancialOperationCreatedBy")
+  costObjectsOwned           CostObject[]              @relation("CostObjectOwner")
+  costObjectsBenefiting      CostObject[]              @relation("CostObjectDefaultBeneficiary")
+  expensePaymentsFunded      ExpensePayment[]          @relation("ExpensePaymentPayer")
+  economicAllocations        EconomicAllocation[]      @relation("EconomicAllocationAssociate")
+  associateFundings          AssociateFunding[]        @relation("AssociateFundingAssociate")
+  reimbursements             Reimbursement[]           @relation("ReimbursementAssociate")
+  personalUses               PersonalUse[]             @relation("PersonalUseAssociate")
+  settlementRunsCreated      SettlementRun[]           @relation("SettlementRunCreatedBy")
+  settlementShareSnapshots   SettlementShareSnapshot[] @relation("SettlementShareAssociate")
+  settlementLines            SettlementLine[]          @relation("SettlementLineAssociate")
+  settlementTransfersOut     SettlementTransfer[]      @relation("SettlementTransferFrom")
+  settlementTransfersIn      SettlementTransfer[]      @relation("SettlementTransferTo")
+
   @@index([email])
   @@index([phone])
 }
@@ -481,4 +500,611 @@ model AuditEvent {
   @@index([userId, type, createdAt])
   @@index([type, createdAt])
   @@index([targetType, targetId, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Financial module
+//
+// Design reference: docs/finance/financial-system-architecture.md
+//
+// Two conceptual books (COMPANY, ASSOCIATE_POOL) over one double-entry
+// ledger. `FinanceBook` is NOT multi-tenancy — ScooterCity is a single
+// company. A `User` acting inside a book is called an "associate".
+//
+// Invariants that PostgreSQL enforces live in the migration SQL
+// (20260815xxxxxx_add_financial_module). Application code validates the same
+// rules first so users get readable errors; the database is the last line.
+// ---------------------------------------------------------------------------
+
+enum FinanceBookType {
+  COMPANY
+  ASSOCIATE_POOL
+}
+
+enum FinancialOperationKind {
+  EXPENSE
+  INCOME
+  TRANSFER
+  ASSOCIATE_FUNDING
+  REIMBURSEMENT
+  PERSONAL_USE
+  REVERSAL
+}
+
+enum FinancialOperationStatus {
+  DRAFT
+  POSTED
+  REVERSED
+}
+
+enum LedgerAccountCategory {
+  ASSET
+  LIABILITY
+  EQUITY
+  REVENUE
+  EXPENSE
+}
+
+enum LedgerAccountRole {
+  BANK
+  CASH_REGISTER
+
+  COMPANY_CASH_CUSTODY
+  ASSOCIATE_POOL_CASH_CUSTODY
+
+  PAYABLE_TO_ASSOCIATE
+  RECEIVABLE_FROM_ASSOCIATE
+  ASSOCIATE_LOAN_PAYABLE
+  CONTRIBUTED_CAPITAL
+
+  OPERATING_EXPENSE
+  NON_OPERATIONAL_COMPANY_EXPENSE
+  ASSOCIATE_POOL_EXPENSE
+
+  FIXED_ASSET
+
+  RENTAL_REVENUE
+  SCOOTER_SALE_REVENUE
+  ASSOCIATE_POOL_REVENUE
+}
+
+enum ExpenseTreatment {
+  OPERATING_EXPENSE
+  NON_OPERATIONAL_COMPANY_EXPENSE
+  CAPITAL_ASSET
+  ASSOCIATE_POOL_EXPENSE
+}
+
+enum ExpensePaymentSourceType {
+  BOOK_ACCOUNT
+  ASSOCIATE_PERSONAL_FUNDS
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  BANK_TRANSFER
+  ONLINE
+  OTHER
+}
+
+enum EconomicAllocationType {
+  COMMON
+  ASSOCIATE_SPECIFIC
+}
+
+enum IncomeType {
+  RENTAL
+  SCOOTER_SALE
+}
+
+enum AssociateFundingType {
+  LOAN
+  CAPITAL_CONTRIBUTION
+}
+
+enum ReimbursementType {
+  EXPENSE_ADVANCE_REPAYMENT
+  ASSOCIATE_LOAN_REPAYMENT
+  ASSOCIATE_RECEIVABLE_REPAYMENT
+}
+
+enum CostObjectType {
+  SCOOTER
+  VEHICLE
+  PROPERTY
+  OFFICE
+  FLEET
+  EQUIPMENT
+  OTHER
+}
+
+enum CostObjectOwnershipType {
+  COMPANY
+  ASSOCIATE
+  SHARED
+  EXTERNAL
+}
+
+enum FinancialDocumentType {
+  RECEIPT
+  INVOICE
+  CONTRACT
+  OTHER
+}
+
+enum SettlementRunKind {
+  COMPANY_SPECIFIC_BENEFIT
+  ASSOCIATE_POOL_CASH
+}
+
+enum SettlementRunStatus {
+  DRAFT
+  CONFIRMED
+  PARTIALLY_SETTLED
+  SETTLED
+  CANCELLED
+}
+
+enum SettlementTransferStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+}
+
+/// One of the two financial books. Exactly one row per `FinanceBookType`.
+model FinanceBook {
+  id                 String               @id @default(cuid())
+  name               String
+  type               FinanceBookType      @unique
+  functionalCurrency String               @default("RON")
+  members            FinanceBookMember[]
+  accounts           LedgerAccount[]
+  operations         FinancialOperation[]
+  expenseCategories  ExpenseCategory[]
+  costObjects        CostObject[]
+  settlementRuns     SettlementRun[]
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+}
+
+/// An associate's ownership share of one book, valid over a time range.
+/// Active shares must total exactly 10,000 basis points.
+model FinanceBookMember {
+  id               String      @id @default(cuid())
+  bookId           String
+  associateId      String
+  /// 5000 means 50.00%.
+  shareBasisPoints Int
+  validFrom        DateTime    @default(now())
+  validUntil       DateTime?
+  book             FinanceBook @relation(fields: [bookId], references: [id], onDelete: Restrict)
+  associate        User        @relation("FinanceBookMemberAssociate", fields: [associateId], references: [id], onDelete: Restrict)
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  @@index([bookId, validFrom, validUntil])
+  @@index([associateId])
+}
+
+/// A ledger account. `role` carries the accounting meaning; `category`
+/// determines posting sign. The role/category pairing is validated in
+/// application code (see finance §6) and by a database CHECK constraint.
+model LedgerAccount {
+  id                        String                @id @default(cuid())
+  bookId                    String
+  code                      String
+  name                      String
+  category                  LedgerAccountCategory
+  role                      LedgerAccountRole
+  /// Set on accounts tied to one associate: company/pool cash custody,
+  /// payable, receivable, and loan payable. Never a personal wealth account.
+  associateId               String?
+  isDefault                 Boolean               @default(false)
+  isActive                  Boolean               @default(true)
+  isSystem                  Boolean               @default(false)
+  book                      FinanceBook           @relation(fields: [bookId], references: [id], onDelete: Restrict)
+  associate                 User?                 @relation("LedgerAccountAssociate", fields: [associateId], references: [id], onDelete: Restrict)
+  postings                  JournalPosting[]
+  expensePaymentSources     ExpensePayment[]      @relation("ExpensePaymentSourceAccount")
+  incomeDestinations        Income[]              @relation("IncomeDestinationAccount")
+  transfersFrom             MoneyTransfer[]       @relation("TransferFromAccount")
+  transfersTo               MoneyTransfer[]       @relation("TransferToAccount")
+  fundingDestinations       AssociateFunding[]    @relation("FundingDestinationAccount")
+  reimbursementCashAccounts Reimbursement[]       @relation("ReimbursementCashAccount")
+  reimbursementObligations  Reimbursement[]       @relation("ReimbursementObligationAccount")
+  personalUseSources        PersonalUse[]         @relation("PersonalUseSourceAccount")
+  createdAt                 DateTime              @default(now())
+  updatedAt                 DateTime              @updatedAt
+
+  @@unique([bookId, code])
+  @@index([bookId, role])
+  @@index([bookId, associateId])
+}
+
+/// The business operation. Answers "what happened". The kind-specific detail
+/// lives in exactly one of the optional detail relations below.
+model FinancialOperation {
+  id                    String                   @id @default(cuid())
+  bookId                String
+  kind                  FinancialOperationKind
+  status                FinancialOperationStatus @default(DRAFT)
+  occurredAt            DateTime
+  description           String?
+  /// Identifies the client command/request, not the database record.
+  idempotencyKey        String
+  createdById           String
+  postedAt              DateTime?
+  /// Present only on a REVERSAL operation.
+  reversalOfOperationId String?                  @unique
+  book                  FinanceBook              @relation(fields: [bookId], references: [id], onDelete: Restrict)
+  createdBy             User                     @relation("FinancialOperationCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  reversalOf            FinancialOperation?      @relation("FinancialOperationReversal", fields: [reversalOfOperationId], references: [id], onDelete: Restrict)
+  reversedBy            FinancialOperation?      @relation("FinancialOperationReversal")
+  expense               Expense?
+  income                Income?
+  transfer              MoneyTransfer?
+  associateFunding      AssociateFunding?
+  reimbursement         Reimbursement?
+  personalUse           PersonalUse?
+  allocations           EconomicAllocation[]
+  documents             FinancialDocument[]
+  journalEntry          JournalEntry?
+  settlementRuns        SettlementOperation[]
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @updatedAt
+
+  @@unique([bookId, idempotencyKey])
+  @@index([bookId, occurredAt])
+  @@index([bookId, kind, status])
+  @@index([status])
+}
+
+/// Admin-managed expense taxonomy. `defaultTreatment` is a UI convenience;
+/// the persisted expense always carries an explicit treatment.
+model ExpenseCategory {
+  id               String            @id @default(cuid())
+  bookId           String
+  code             String
+  name             String
+  defaultTreatment ExpenseTreatment?
+  isActive         Boolean           @default(true)
+  book             FinanceBook       @relation(fields: [bookId], references: [id], onDelete: Restrict)
+  expenses         Expense[]
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  @@unique([bookId, code])
+  @@index([bookId, isActive])
+}
+
+/// What object, vehicle, property, or activity a cost belonged to.
+/// Its defaults prefill the expense form; they never drive posting logic.
+model CostObject {
+  id                            String                  @id @default(cuid())
+  bookId                        String
+  code                          String
+  name                          String
+  type                          CostObjectType
+  ownershipType                 CostObjectOwnershipType
+  /// Required when ownershipType = ASSOCIATE.
+  ownerAssociateId              String?
+  /// Optional soft link to an existing domain entity, e.g. "SCOOTER" + id.
+  externalEntityType            String?
+  externalEntityId              String?
+  /// UI defaults only. Every expense still persists explicit allocations.
+  defaultAllocationType         EconomicAllocationType?
+  defaultBeneficiaryAssociateId String?
+  isActive                      Boolean                 @default(true)
+  book                          FinanceBook             @relation(fields: [bookId], references: [id], onDelete: Restrict)
+  ownerAssociate                User?                   @relation("CostObjectOwner", fields: [ownerAssociateId], references: [id], onDelete: Restrict)
+  defaultBeneficiaryAssociate   User?                   @relation("CostObjectDefaultBeneficiary", fields: [defaultBeneficiaryAssociateId], references: [id], onDelete: Restrict)
+  expenses                      Expense[]
+  createdAt                     DateTime                @default(now())
+  updatedAt                     DateTime                @updatedAt
+
+  @@unique([bookId, code])
+  @@index([bookId, type])
+  @@index([ownerAssociateId])
+  @@index([externalEntityType, externalEntityId])
+}
+
+/// Expense detail for a `FinancialOperation` of kind EXPENSE. Every row here
+/// is a legitimate book expense by definition; strictly personal purchases
+/// are `PersonalUse` instead.
+model Expense {
+  id           String             @id @default(cuid())
+  operationId  String             @unique
+  amountMinor  Int
+  treatment    ExpenseTreatment
+  categoryId   String
+  costObjectId String?
+  operation    FinancialOperation @relation(fields: [operationId], references: [id], onDelete: Restrict)
+  category     ExpenseCategory    @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  costObject   CostObject?        @relation(fields: [costObjectId], references: [id], onDelete: Restrict)
+  payments     ExpensePayment[]
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  @@index([categoryId])
+  @@index([costObjectId])
+  @@index([treatment])
+}
+
+/// Who paid, and from where. `ASSOCIATE_PERSONAL_FUNDS` records that the
+/// associate advanced their own money — `paymentMethod` is metadata, not a
+/// personal ledger account. Payments never imply who benefited.
+model ExpensePayment {
+  id               String                   @id @default(cuid())
+  expenseId        String
+  sourceType       ExpensePaymentSourceType
+  amountMinor      Int
+  paymentMethod    PaymentMethod
+  /// Required when sourceType = BOOK_ACCOUNT.
+  sourceAccountId  String?
+  /// Required when sourceType = ASSOCIATE_PERSONAL_FUNDS.
+  payerAssociateId String?
+  expense          Expense                  @relation(fields: [expenseId], references: [id], onDelete: Restrict)
+  sourceAccount    LedgerAccount?           @relation("ExpensePaymentSourceAccount", fields: [sourceAccountId], references: [id], onDelete: Restrict)
+  payerAssociate   User?                    @relation("ExpensePaymentPayer", fields: [payerAssociateId], references: [id], onDelete: Restrict)
+  createdAt        DateTime                 @default(now())
+
+  @@index([expenseId])
+  @@index([payerAssociateId])
+  @@index([sourceAccountId])
+}
+
+/// Who received the economic benefit. Independent of who paid.
+/// COMMON lines never create associate settlement; ASSOCIATE_SPECIFIC do.
+model EconomicAllocation {
+  id          String                 @id @default(cuid())
+  operationId String
+  type        EconomicAllocationType
+  amountMinor Int
+  /// Required only when type = ASSOCIATE_SPECIFIC.
+  associateId String?
+  operation   FinancialOperation     @relation(fields: [operationId], references: [id], onDelete: Restrict)
+  associate   User?                  @relation("EconomicAllocationAssociate", fields: [associateId], references: [id], onDelete: Restrict)
+  createdAt   DateTime               @default(now())
+
+  @@index([operationId])
+  @@index([associateId])
+}
+
+/// Supporting paperwork. Metadata only — a document never determines which
+/// book owns an operation.
+model FinancialDocument {
+  id             String                @id @default(cuid())
+  operationId    String
+  type           FinancialDocumentType
+  documentNumber String?
+  issuedAt       DateTime?
+  supplierName   String?
+  supplierTaxId  String?
+  storageKey     String?
+  notes          String?
+  operation      FinancialOperation    @relation(fields: [operationId], references: [id], onDelete: Restrict)
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  @@index([operationId])
+}
+
+/// Income detail for a `FinancialOperation` of kind INCOME.
+model Income {
+  id                   String             @id @default(cuid())
+  operationId          String             @unique
+  type                 IncomeType
+  amountMinor          Int
+  paymentMethod        PaymentMethod
+  destinationAccountId String
+  /// Soft links to existing domain rows; kept nullable while rentals are
+  /// not yet modelled in this schema.
+  rentalId             String?
+  scooterId            String?
+  operation            FinancialOperation @relation(fields: [operationId], references: [id], onDelete: Restrict)
+  destinationAccount   LedgerAccount      @relation("IncomeDestinationAccount", fields: [destinationAccountId], references: [id], onDelete: Restrict)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  @@index([destinationAccountId])
+  @@index([rentalId])
+  @@index([scooterId])
+}
+
+/// Movement between two asset accounts of the same book. Never touches
+/// revenue, expense, profit, or settlement.
+model MoneyTransfer {
+  id            String             @id @default(cuid())
+  operationId   String             @unique
+  amountMinor   Int
+  fromAccountId String
+  toAccountId   String
+  operation     FinancialOperation @relation(fields: [operationId], references: [id], onDelete: Restrict)
+  fromAccount   LedgerAccount      @relation("TransferFromAccount", fields: [fromAccountId], references: [id], onDelete: Restrict)
+  toAccount     LedgerAccount      @relation("TransferToAccount", fields: [toAccountId], references: [id], onDelete: Restrict)
+  createdAt     DateTime           @default(now())
+
+  @@index([fromAccountId])
+  @@index([toAccountId])
+}
+
+/// An associate lending money to the book. Debt, never revenue.
+model AssociateFunding {
+  id                   String               @id @default(cuid())
+  operationId          String               @unique
+  type                 AssociateFundingType @default(LOAN)
+  associateId          String
+  destinationAccountId String
+  amountMinor          Int
+  reference            String?
+  notes                String?
+  operation            FinancialOperation   @relation(fields: [operationId], references: [id], onDelete: Restrict)
+  associate            User                 @relation("AssociateFundingAssociate", fields: [associateId], references: [id], onDelete: Restrict)
+  destinationAccount   LedgerAccount        @relation("FundingDestinationAccount", fields: [destinationAccountId], references: [id], onDelete: Restrict)
+  createdAt            DateTime             @default(now())
+
+  @@index([associateId])
+  @@index([destinationAccountId])
+}
+
+/// Settling an obligation between the book and an associate. Never creates
+/// an expense or revenue.
+model Reimbursement {
+  id                  String             @id @default(cuid())
+  operationId         String             @unique
+  type                ReimbursementType
+  associateId         String
+  amountMinor         Int
+  /// Source account for liability repayment; destination for receivable
+  /// repayment.
+  cashAccountId       String
+  /// PAYABLE_TO_ASSOCIATE, ASSOCIATE_LOAN_PAYABLE, or
+  /// RECEIVABLE_FROM_ASSOCIATE.
+  obligationAccountId String
+  operation           FinancialOperation @relation(fields: [operationId], references: [id], onDelete: Restrict)
+  associate           User               @relation("ReimbursementAssociate", fields: [associateId], references: [id], onDelete: Restrict)
+  cashAccount         LedgerAccount      @relation("ReimbursementCashAccount", fields: [cashAccountId], references: [id], onDelete: Restrict)
+  obligationAccount   LedgerAccount      @relation("ReimbursementObligationAccount", fields: [obligationAccountId], references: [id], onDelete: Restrict)
+  createdAt           DateTime           @default(now())
+
+  @@index([associateId])
+  @@index([cashAccountId])
+  @@index([obligationAccountId])
+}
+
+/// Book money spent on something that does not belong to the book. Creates a
+/// receivable from the associate, never an expense.
+model PersonalUse {
+  id              String             @id @default(cuid())
+  operationId     String             @unique
+  associateId     String
+  sourceAccountId String
+  amountMinor     Int
+  operation       FinancialOperation @relation(fields: [operationId], references: [id], onDelete: Restrict)
+  associate       User               @relation("PersonalUseAssociate", fields: [associateId], references: [id], onDelete: Restrict)
+  sourceAccount   LedgerAccount      @relation("PersonalUseSourceAccount", fields: [sourceAccountId], references: [id], onDelete: Restrict)
+  createdAt       DateTime           @default(now())
+
+  @@index([associateId])
+  @@index([sourceAccountId])
+}
+
+/// The double-entry record for one posted operation. Immutable once written.
+model JournalEntry {
+  id          String             @id @default(cuid())
+  operationId String             @unique
+  postedAt    DateTime           @default(now())
+  operation   FinancialOperation @relation(fields: [operationId], references: [id], onDelete: Restrict)
+  postings    JournalPosting[]
+  createdAt   DateTime           @default(now())
+}
+
+/// One ledger line. Positive = debit, negative = credit; the lines of an
+/// entry always sum to zero.
+model JournalPosting {
+  id                String        @id @default(cuid())
+  journalEntryId    String
+  accountId         String
+  lineNumber        Int
+  signedAmountMinor Int
+  description       String?
+  journalEntry      JournalEntry  @relation(fields: [journalEntryId], references: [id], onDelete: Restrict)
+  account           LedgerAccount @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  createdAt         DateTime      @default(now())
+
+  @@unique([journalEntryId, lineNumber])
+  @@index([journalEntryId])
+  @@index([accountId])
+}
+
+/// One settlement calculation over a period. Company-benefit settlement and
+/// pool-cash settlement stay separate runs and are never netted in the ledger.
+model SettlementRun {
+  id             String                    @id @default(cuid())
+  bookId         String
+  kind           SettlementRunKind
+  status         SettlementRunStatus       @default(DRAFT)
+  /// Half-open period: [periodStart, periodEnd).
+  periodStart    DateTime
+  periodEnd      DateTime
+  createdById    String
+  calculatedAt   DateTime                  @default(now())
+  confirmedAt    DateTime?
+  completedAt    DateTime?
+  book           FinanceBook               @relation(fields: [bookId], references: [id], onDelete: Restrict)
+  createdBy      User                      @relation("SettlementRunCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  shareSnapshots SettlementShareSnapshot[]
+  lines          SettlementLine[]
+  transfers      SettlementTransfer[]
+  operations     SettlementOperation[]
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
+
+  @@index([bookId, kind, periodStart, periodEnd])
+  @@index([status])
+}
+
+/// Ownership shares frozen at calculation time, so a later share change
+/// cannot rewrite a historical settlement.
+model SettlementShareSnapshot {
+  id               String        @id @default(cuid())
+  settlementRunId  String
+  associateId      String
+  shareBasisPoints Int
+  settlementRun    SettlementRun @relation(fields: [settlementRunId], references: [id], onDelete: Restrict)
+  associate        User          @relation("SettlementShareAssociate", fields: [associateId], references: [id], onDelete: Restrict)
+
+  @@unique([settlementRunId, associateId])
+  @@index([associateId])
+}
+
+/// One associate's position in a settlement run.
+model SettlementLine {
+  id                  String        @id @default(cuid())
+  settlementRunId     String
+  associateId         String
+  /// COMPANY_SPECIFIC_BENEFIT: specific benefit received.
+  /// ASSOCIATE_POOL_CASH: pool cash currently held.
+  actualAmountMinor   Int
+  expectedAmountMinor Int
+  /// Positive = associate must receive. Negative = associate must pay.
+  adjustmentMinor     Int
+  settlementRun       SettlementRun @relation(fields: [settlementRunId], references: [id], onDelete: Restrict)
+  associate           User          @relation("SettlementLineAssociate", fields: [associateId], references: [id], onDelete: Restrict)
+
+  @@unique([settlementRunId, associateId])
+  @@index([associateId])
+}
+
+/// A private associate-to-associate payment that squares a settlement run.
+/// Distinct from any company reimbursement obligation.
+model SettlementTransfer {
+  id              String                   @id @default(cuid())
+  settlementRunId String
+  fromAssociateId String
+  toAssociateId   String
+  amountMinor     Int
+  status          SettlementTransferStatus @default(PENDING)
+  paymentMethod   PaymentMethod?
+  completedAt     DateTime?
+  notes           String?
+  settlementRun   SettlementRun            @relation(fields: [settlementRunId], references: [id], onDelete: Restrict)
+  fromAssociate   User                     @relation("SettlementTransferFrom", fields: [fromAssociateId], references: [id], onDelete: Restrict)
+  toAssociate     User                     @relation("SettlementTransferTo", fields: [toAssociateId], references: [id], onDelete: Restrict)
+
+  @@index([settlementRunId])
+  @@index([fromAssociateId])
+  @@index([toAssociateId])
+}
+
+/// Marks an operation as already consumed by a settlement run, so a later
+/// run cannot double-count it.
+model SettlementOperation {
+  settlementRunId String
+  operationId     String             @unique
+  settlementRun   SettlementRun      @relation(fields: [settlementRunId], references: [id], onDelete: Restrict)
+  operation       FinancialOperation @relation(fields: [operationId], references: [id], onDelete: Restrict)
+
+  @@id([settlementRunId, operationId])
 }

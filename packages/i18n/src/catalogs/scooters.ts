@@ -360,7 +360,7 @@ export const scootersCatalog = {
       identity: "Identity",
       technical: "Technical",
       registration: "Registration",
-      purchase: "Purchase",
+      record: "Record",
       notes: "Notes",
     },
     fields: {
@@ -879,7 +879,7 @@ export const scootersCatalog = {
       identity: "Identificare",
       technical: "Tehnic",
       registration: "Înmatriculare",
-      purchase: "Achiziție",
+      record: "Înregistrare",
       notes: "Notițe",
     },
     fields: {
