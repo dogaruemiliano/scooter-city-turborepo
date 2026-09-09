@@ -8,10 +8,13 @@ describe("FinanceController role requirements", () => {
   const reflector = new Reflector();
 
   it.each([
+    // Metadata belongs to the original methods; these references are never invoked.
+    /* eslint-disable @typescript-eslint/unbound-method */
     FinanceController.prototype.getCompanyIdentity,
     FinanceController.prototype.upsertCompanyIdentity,
     FinanceController.prototype.getCompanyAssociates,
     FinanceController.prototype.updateCompanyAssociates,
+    /* eslint-enable @typescript-eslint/unbound-method */
   ])("restricts company management handlers to SUPER_ADMIN", (handler) => {
     expect(
       reflector.getAllAndOverride<string[]>(REQUIRED_ROLES_KEY, [
@@ -24,6 +27,7 @@ describe("FinanceController role requirements", () => {
   it("keeps the remaining finance handlers available to ADMIN users", () => {
     expect(
       reflector.getAllAndOverride<string[]>(REQUIRED_ROLES_KEY, [
+        // eslint-disable-next-line @typescript-eslint/unbound-method -- Inspect the original method's metadata without invoking it.
         FinanceController.prototype.listBooks,
         FinanceController,
       ]),
