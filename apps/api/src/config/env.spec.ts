@@ -53,4 +53,27 @@ describe("environment schema", () => {
       loadEnv(validEnv({ IMAGE_STORAGE_UPLOAD_TOKEN_SECRET: "" })),
     ).toThrow("IMAGE_STORAGE_UPLOAD_TOKEN_SECRET");
   });
+
+  it("keeps document extraction disabled by default", () => {
+    const source = validEnv();
+    delete source.DOCUMENT_EXTRACTION_DRIVER;
+
+    expect(loadEnv(source).DOCUMENT_EXTRACTION_DRIVER).toBe("disabled");
+  });
+
+  it("accepts Textract expense analysis and rejects the fake in production", () => {
+    expect(
+      loadEnv(validEnv({ DOCUMENT_EXTRACTION_DRIVER: "textract" }))
+        .DOCUMENT_EXTRACTION_DRIVER,
+    ).toBe("textract");
+
+    expect(() =>
+      loadEnv(
+        validEnv({
+          NODE_ENV: "production",
+          DOCUMENT_EXTRACTION_DRIVER: "fake",
+        }),
+      ),
+    ).toThrow("DOCUMENT_EXTRACTION_DRIVER");
+  });
 });
