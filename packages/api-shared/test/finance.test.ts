@@ -78,6 +78,36 @@ test("formats minor units back to a canonical major-unit string", () => {
   assert.equal(v1.finance.formatMinorToMajor(-5), "-0.05");
 });
 
+test("older normalized expense extractions default to a receipt", () => {
+  const emptyCandidate = { value: null, confidence: null, evidence: [] };
+  const parsed = v1.finance.normalizedExpenseExtractionSchema.parse({
+    amountMinor: emptyCandidate,
+    occurredAt: emptyCandidate,
+    currency: emptyCandidate,
+    supplierName: emptyCandidate,
+    supplierTaxIdentifier: emptyCandidate,
+    customerName: emptyCandidate,
+    customerTaxIdentifier: emptyCandidate,
+    documentNumber: emptyCandidate,
+    companyMatch: { status: "UNKNOWN", matchedBy: null, evidence: [] },
+    suggestedBookType: null,
+    suggestedPaymentMethod: null,
+    suggestedAllocationType: null,
+    suggestedCategoryCode: null,
+    suggestionEvidence: {
+      bookType: [],
+      paymentMethod: [],
+      allocationType: [],
+      categoryCode: [],
+    },
+    explanations: [],
+  });
+
+  assert.equal(parsed.suggestedDocumentType, "RECEIPT");
+  assert.deepEqual(parsed.documentSeries, emptyCandidate);
+  assert.deepEqual(parsed.suggestionEvidence.documentType, []);
+});
+
 test("expense payment input is a discriminated union on the source type", () => {
   const bookAccount = v1.finance.expensePaymentInputSchema.safeParse({
     sourceType: "BOOK_ACCOUNT",
@@ -140,6 +170,65 @@ const validExpense = {
   ],
   allocations: [{ type: "COMMON", amountMinor: 100_000 }],
 };
+
+test("expense documents reject client-controlled storage keys", () => {
+  const result = v1.finance.createExpenseInputSchema.safeParse({
+    ...validExpense,
+    documents: [
+      {
+        type: "RECEIPT",
+        storageKey: "private/arbitrary-object.jpg",
+      },
+    ],
+  });
+
+  assert.equal(result.success, false);
+  assert.deepEqual(result.error?.issues[0]?.path, ["documents", 0]);
+});
+
+test("bills store a series separately while receipts only accept a number", () => {
+  const bill = v1.finance.financialDocumentInputSchema.parse({
+    type: "INVOICE",
+    documentSeries: " VL ",
+    documentNumber: "639013079",
+  });
+
+  assert.equal(bill.documentSeries, "VL");
+  assert.equal(bill.documentNumber, "639013079");
+
+  const receipt = v1.finance.financialDocumentInputSchema.safeParse({
+    type: "RECEIPT",
+    documentSeries: "BF",
+    documentNumber: "169303",
+  });
+
+  assert.equal(receipt.success, false);
+  assert.deepEqual(receipt.error?.issues[0]?.path, ["documentSeries"]);
+});
+
+test("an expense accepts only one server-resolved receipt source", () => {
+  const result = v1.finance.createExpenseInputSchema.safeParse({
+    ...validExpense,
+    extractionDraftId: "extraction-draft-1",
+    receiptUploadToken: "signed-upload-token",
+  });
+
+  assert.equal(result.success, false);
+  assert.equal(
+    result.error?.issues.find((issue) =>
+      issue.path.includes("receiptUploadToken"),
+    )?.message,
+    v1.finance.RECEIPT_UPLOAD_SOURCE_MESSAGE,
+  );
+
+  assert.equal(
+    v1.finance.createExpenseInputSchema.safeParse({
+      ...validExpense,
+      receiptUploadToken: "signed-upload-token",
+    }).success,
+    true,
+  );
+});
 
 test("accepts a mixed-payment, mixed-allocation expense", () => {
   const result = v1.finance.createExpenseInputSchema.safeParse({
@@ -252,6 +341,20 @@ test("settlement preview requires a forward-running period", () => {
   );
 });
 
+test("supplier writes require a name and CIF and reject an empty update", () => {
+  assert.equal(
+    v1.finance.createSupplierInputSchema.safeParse({
+      name: "Rotakt SRL",
+      taxIdentifier: "RO6334441",
+    }).success,
+    true,
+  );
+  assert.equal(
+    v1.finance.updateSupplierInputSchema.safeParse({}).success,
+    false,
+  );
+});
+
 test("route helpers build the versioned finance paths", () => {
   assert.equal(
     v1.finance.ROUTES.expenses.preview,
@@ -264,5 +367,9 @@ test("route helpers build the versioned finance paths", () => {
   assert.equal(
     v1.finance.ROUTES.accounts.balance("acc_1"),
     "/v1/finance/accounts/acc_1/balance",
+  );
+  assert.equal(
+    v1.finance.ROUTES.suppliers.update("supplier/1"),
+    "/v1/finance/suppliers/supplier%2F1",
   );
 });

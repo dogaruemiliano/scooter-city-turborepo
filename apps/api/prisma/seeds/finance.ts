@@ -11,6 +11,8 @@
  *
  * Idempotent: every write is an upsert on a stable key.
  */
+import { v1 } from "@repo/api-shared";
+
 import {
   provisionAssociateAccounts,
   provisionBookAccounts,
@@ -202,9 +204,9 @@ export async function seedFinance(prisma: PrismaClient): Promise<void> {
         email: associate.email,
         firstName: associate.firstName,
         lastName: associate.lastName,
-        roles: ["ADMIN"],
+        roles: [v1.auth.AUTH_ROLES.ADMIN],
       },
-      update: { roles: ["ADMIN"], deletedAt: null },
+      update: { roles: [v1.auth.AUTH_ROLES.ADMIN], deletedAt: null },
     });
   }
 

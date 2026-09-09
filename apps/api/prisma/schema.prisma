@@ -138,9 +138,10 @@ model User {
   auditEvents                AuditEvent[]
   mediaAssets                MediaAsset[]
   draftUploads               DraftUpload[]
+  expenseExtractionDrafts    ExpenseExtractionDraft[] @relation("ExpenseExtractionDraftOwner")
   person                     Person?
-  scooterIssuesReported      ScooterIssue[]      @relation("ScooterIssueReportedBy")
-  maintenanceRecordsRecorded MaintenanceRecord[] @relation("MaintenanceRecordRecordedBy")
+  scooterIssuesReported      ScooterIssue[]           @relation("ScooterIssueReportedBy")
+  maintenanceRecordsRecorded MaintenanceRecord[]      @relation("MaintenanceRecordRecordedBy")
 
   // Finance module. A User acting inside a finance book is an "associate";
   // there is deliberately no separate Associate table (see
@@ -197,22 +198,27 @@ model MediaAsset {
 /// unclaimed rows identify S3 objects that can be cleaned up as abandoned
 /// drafts.
 model DraftUpload {
-  id             String    @id @default(cuid())
-  userId         String?
-  user           User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
-  provider       String
-  bucket         String
-  storageKey     String    @unique
-  contentType    String
-  byteSize       Int
-  checksumSha256 String
-  purpose        String
-  expiresAt      DateTime
-  claimedAt      DateTime?
-  createdAt      DateTime  @default(now())
+  id                     String                  @id @default(cuid())
+  userId                 String?
+  user                   User?                   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  provider               String
+  bucket                 String
+  storageKey             String                  @unique
+  contentType            String
+  byteSize               Int
+  checksumSha256         String
+  purpose                String
+  expiresAt              DateTime
+  claimedAt              DateTime?
+  /// Set while abandoned-upload cleanup owns the object. Domain attachment
+  /// claims require this to be null; stale cleanup claims may be retried.
+  cleanupStartedAt       DateTime?
+  createdAt              DateTime                @default(now())
+  expenseExtractionDraft ExpenseExtractionDraft?
 
   @@index([userId, purpose, claimedAt, expiresAt])
   @@index([claimedAt, expiresAt])
+  @@index([claimedAt, cleanupStartedAt, expiresAt])
   @@index([purpose, expiresAt])
 }
 
@@ -521,6 +527,13 @@ enum FinanceBookType {
   ASSOCIATE_POOL
 }
 
+enum ExpenseExtractionDraftStatus {
+  ANALYZING
+  READY
+  FAILED
+  CONFIRMED
+}
+
 enum FinancialOperationKind {
   EXPENSE
   INCOME
@@ -654,18 +667,54 @@ enum SettlementTransferStatus {
 
 /// One of the two financial books. Exactly one row per `FinanceBookType`.
 model FinanceBook {
-  id                 String               @id @default(cuid())
+  id                 String                @id @default(cuid())
   name               String
-  type               FinanceBookType      @unique
-  functionalCurrency String               @default("RON")
+  type               FinanceBookType       @unique
+  functionalCurrency String                @default("RON")
   members            FinanceBookMember[]
   accounts           LedgerAccount[]
   operations         FinancialOperation[]
   expenseCategories  ExpenseCategory[]
   costObjects        CostObject[]
   settlementRuns     SettlementRun[]
-  createdAt          DateTime             @default(now())
-  updatedAt          DateTime             @updatedAt
+  legalIdentity      FinanceLegalIdentity?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+}
+
+/// Legal identity printed on supplier receipts and invoices for the company
+/// book. Normalized fields are persisted so receipt matching is deterministic
+/// and does not depend on locale-specific database collation.
+model FinanceLegalIdentity {
+  id                      String      @id @default(cuid())
+  bookId                  String      @unique
+  legalName               String
+  normalizedLegalName     String
+  taxIdentifier           String
+  normalizedTaxIdentifier String      @unique
+  nameAliases             String[]    @default([])
+  countryCode             String      @default("RO")
+  book                    FinanceBook @relation(fields: [bookId], references: [id], onDelete: Restrict)
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+}
+
+/// A supplier that can be selected while confirming an expense receipt.
+/// Normalized fields make name and tax-identifier uniqueness deterministic
+/// regardless of casing, punctuation, or Romanian diacritics.
+model Supplier {
+  id                      String    @id @default(cuid())
+  name                    String
+  normalizedName          String    @unique
+  taxIdentifier           String
+  normalizedTaxIdentifier String    @unique
+  isVatPayer              Boolean   @default(false)
+  isActive                Boolean   @default(true)
+  expenses                Expense[]
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  @@index([isActive, name])
 }
 
 /// An associate's ownership share of one book, valid over a time range.
@@ -725,39 +774,65 @@ model LedgerAccount {
 /// The business operation. Answers "what happened". The kind-specific detail
 /// lives in exactly one of the optional detail relations below.
 model FinancialOperation {
-  id                    String                   @id @default(cuid())
-  bookId                String
-  kind                  FinancialOperationKind
-  status                FinancialOperationStatus @default(DRAFT)
-  occurredAt            DateTime
-  description           String?
+  id                     String                   @id @default(cuid())
+  bookId                 String
+  kind                   FinancialOperationKind
+  status                 FinancialOperationStatus @default(DRAFT)
+  occurredAt             DateTime
+  description            String?
   /// Identifies the client command/request, not the database record.
-  idempotencyKey        String
-  createdById           String
-  postedAt              DateTime?
+  idempotencyKey         String
+  createdById            String
+  postedAt               DateTime?
   /// Present only on a REVERSAL operation.
-  reversalOfOperationId String?                  @unique
-  book                  FinanceBook              @relation(fields: [bookId], references: [id], onDelete: Restrict)
-  createdBy             User                     @relation("FinancialOperationCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
-  reversalOf            FinancialOperation?      @relation("FinancialOperationReversal", fields: [reversalOfOperationId], references: [id], onDelete: Restrict)
-  reversedBy            FinancialOperation?      @relation("FinancialOperationReversal")
-  expense               Expense?
-  income                Income?
-  transfer              MoneyTransfer?
-  associateFunding      AssociateFunding?
-  reimbursement         Reimbursement?
-  personalUse           PersonalUse?
-  allocations           EconomicAllocation[]
-  documents             FinancialDocument[]
-  journalEntry          JournalEntry?
-  settlementRuns        SettlementOperation[]
-  createdAt             DateTime                 @default(now())
-  updatedAt             DateTime                 @updatedAt
+  reversalOfOperationId  String?                  @unique
+  book                   FinanceBook              @relation(fields: [bookId], references: [id], onDelete: Restrict)
+  createdBy              User                     @relation("FinancialOperationCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  reversalOf             FinancialOperation?      @relation("FinancialOperationReversal", fields: [reversalOfOperationId], references: [id], onDelete: Restrict)
+  reversedBy             FinancialOperation?      @relation("FinancialOperationReversal")
+  expense                Expense?
+  income                 Income?
+  transfer               MoneyTransfer?
+  associateFunding       AssociateFunding?
+  reimbursement          Reimbursement?
+  personalUse            PersonalUse?
+  allocations            EconomicAllocation[]
+  documents              FinancialDocument[]
+  journalEntry           JournalEntry?
+  settlementRuns         SettlementOperation[]
+  expenseExtractionDraft ExpenseExtractionDraft?
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime                 @updatedAt
 
   @@unique([bookId, idempotencyKey])
   @@index([bookId, occurredAt])
   @@index([bookId, kind, status])
   @@index([status])
+}
+
+/// Resumable, owner-scoped interpretation of one expense receipt. Provider
+/// output is normalized and validated before it is stored in `result`; raw AWS
+/// response shapes never become an API or UI contract.
+model ExpenseExtractionDraft {
+  id                   String                       @id @default(cuid())
+  ownerUserId          String
+  sourceUploadId       String                       @unique
+  status               ExpenseExtractionDraftStatus @default(ANALYZING)
+  provider             String
+  providerRequestId    String?
+  parserVersion        String
+  result               Json?
+  failureCode          String?
+  failureMessage       String?
+  confirmedOperationId String?                      @unique
+  owner                User                         @relation("ExpenseExtractionDraftOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
+  sourceUpload         DraftUpload                  @relation(fields: [sourceUploadId], references: [id], onDelete: Restrict)
+  confirmedOperation   FinancialOperation?          @relation(fields: [confirmedOperationId], references: [id], onDelete: Restrict)
+  createdAt            DateTime                     @default(now())
+  updatedAt            DateTime                     @updatedAt
+
+  @@index([ownerUserId, status, updatedAt])
+  @@index([status, updatedAt])
 }
 
 /// Admin-managed expense taxonomy. `defaultTreatment` is a UI convenience;
@@ -819,15 +894,18 @@ model Expense {
   treatment    ExpenseTreatment
   categoryId   String
   costObjectId String?
+  supplierId   String?
   operation    FinancialOperation @relation(fields: [operationId], references: [id], onDelete: Restrict)
   category     ExpenseCategory    @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   costObject   CostObject?        @relation(fields: [costObjectId], references: [id], onDelete: Restrict)
+  supplier     Supplier?          @relation(fields: [supplierId], references: [id], onDelete: Restrict)
   payments     ExpensePayment[]
   createdAt    DateTime           @default(now())
   updatedAt    DateTime           @updatedAt
 
   @@index([categoryId])
   @@index([costObjectId])
+  @@index([supplierId])
   @@index([treatment])
 }
 
@@ -877,6 +955,7 @@ model FinancialDocument {
   id             String                @id @default(cuid())
   operationId    String
   type           FinancialDocumentType
+  documentSeries String?
   documentNumber String?
   issuedAt       DateTime?
   supplierName   String?

@@ -18,9 +18,15 @@ import type {
   EconomicAllocationCommand,
   ExpensePaymentCommand,
 } from "../domain/finance.types";
+import {
+  FinanceNotFoundError,
+  FinanceStateError,
+  FinanceValidationError,
+} from "../domain/finance.errors";
 import type { PostingLine } from "../domain/posting-plan";
-import type { Prisma } from "../../generated/prisma/client";
+import { Prisma } from "../../generated/prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
+import { provisionAssociateAccounts } from "./finance-book.provisioner";
 
 /** Relations every operation response needs. */
 const OPERATION_INCLUDE = {
@@ -30,6 +36,7 @@ const OPERATION_INCLUDE = {
     include: {
       category: true,
       costObject: true,
+      supplier: true,
       payments: {
         include: {
           sourceAccount: true,
@@ -68,6 +75,7 @@ const OPERATION_INCLUDE = {
     orderBy: { createdAt: "asc" },
   },
   documents: { orderBy: { createdAt: "asc" } },
+  expenseExtractionDraft: { select: { id: true } },
   journalEntry: {
     include: {
       postings: {
@@ -102,6 +110,26 @@ export type FinanceBookRecord = Prisma.FinanceBookGetPayload<{
   };
 }>;
 
+export type FinanceBookMemberRecord = FinanceBookRecord["members"][number];
+
+export interface CompanyAssociatesRecord {
+  members: FinanceBookMemberRecord[];
+  managingOwnerId: string;
+}
+
+export type ExpenseReceiptAttachment =
+  | {
+      source: "EXTRACTION_DRAFT";
+      extractionDraftId: string;
+      draftUploadId: string;
+      storageKey: string;
+    }
+  | {
+      source: "DIRECT_UPLOAD";
+      draftUploadId: string;
+      storageKey: string;
+    };
+
 export interface CreatePostedExpenseInput {
   bookId: string;
   occurredAt: Date;
@@ -112,9 +140,11 @@ export interface CreatePostedExpenseInput {
   treatment: v1.finance.ExpenseTreatment;
   categoryId: string;
   costObjectId: string | null;
+  supplierId: string | null;
   payments: readonly ExpensePaymentCommand[];
   allocations: readonly EconomicAllocationCommand[];
   documents: readonly v1.finance.FinancialDocumentInput[];
+  receiptAttachment: ExpenseReceiptAttachment | null;
   postings: readonly PostingLine[];
 }
 
@@ -195,6 +225,296 @@ export class PrismaFinanceRepository {
       },
       orderBy: { type: "asc" },
     });
+  }
+
+  listSuppliers(query: {
+    normalizedNameSearch: string | null;
+    normalizedTaxIdentifierSearch: string | null;
+    includeInactive: boolean;
+  }) {
+    const searchFilters: Prisma.SupplierWhereInput[] = [];
+    if (query.normalizedNameSearch) {
+      searchFilters.push({
+        normalizedName: { contains: query.normalizedNameSearch },
+      });
+    }
+    if (query.normalizedTaxIdentifierSearch) {
+      searchFilters.push({
+        normalizedTaxIdentifier: {
+          contains: query.normalizedTaxIdentifierSearch,
+        },
+      });
+    }
+
+    return this.prisma.supplier.findMany({
+      where: {
+        ...(query.includeInactive ? {} : { isActive: true }),
+        ...(searchFilters.length > 0 ? { OR: searchFilters } : {}),
+      },
+      orderBy: [{ isActive: "desc" }, { name: "asc" }],
+    });
+  }
+
+  findSupplierById(supplierId: string) {
+    return this.prisma.supplier.findUnique({ where: { id: supplierId } });
+  }
+
+  findSupplierByNormalizedIdentity(input: {
+    normalizedName: string;
+    normalizedTaxIdentifier: string;
+  }) {
+    return this.prisma.supplier.findFirst({
+      where: {
+        normalizedName: input.normalizedName,
+        normalizedTaxIdentifier: input.normalizedTaxIdentifier,
+      },
+    });
+  }
+
+  createSupplier(input: {
+    name: string;
+    normalizedName: string;
+    taxIdentifier: string;
+    normalizedTaxIdentifier: string;
+    isVatPayer: boolean;
+  }) {
+    return this.prisma.supplier.create({ data: input });
+  }
+
+  updateSupplier(
+    supplierId: string,
+    input: {
+      name?: string;
+      normalizedName?: string;
+      taxIdentifier?: string;
+      normalizedTaxIdentifier?: string;
+      isVatPayer?: boolean;
+      isActive?: boolean;
+    },
+  ) {
+    return this.prisma.supplier.update({
+      where: { id: supplierId },
+      data: input,
+    });
+  }
+
+  async getCompanyAssociates(): Promise<CompanyAssociatesRecord> {
+    const book = await this.prisma.financeBook.findUnique({
+      where: { type: "COMPANY" },
+      include: {
+        members: {
+          include: {
+            associate: {
+              select: {
+                id: true,
+                email: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+          orderBy: [{ validFrom: "asc" }, { createdAt: "asc" }, { id: "asc" }],
+        },
+      },
+    });
+
+    const managingOwnerId = book?.members[0]?.associateId;
+    if (!book || !managingOwnerId) {
+      throw new FinanceNotFoundError(
+        "The company finance book has no founding owner.",
+      );
+    }
+
+    return {
+      managingOwnerId,
+      members: book.members.filter((member) => member.validUntil === null),
+    };
+  }
+
+  updateCompanyAssociates(
+    input: v1.finance.UpdateCompanyAssociatesInput,
+  ): Promise<CompanyAssociatesRecord> {
+    return this.prisma.$transaction(
+      async (tx) => {
+        const books = await tx.financeBook.findMany({
+          where: { type: { in: ["COMPANY", "ASSOCIATE_POOL"] } },
+          orderBy: { type: "asc" },
+        });
+        const companyBook = books.find((book) => book.type === "COMPANY");
+        if (!companyBook || books.length !== 2) {
+          throw new FinanceNotFoundError(
+            "The company finance books are not fully configured.",
+          );
+        }
+
+        const foundingMembership = await tx.financeBookMember.findFirst({
+          where: { bookId: companyBook.id },
+          orderBy: [{ validFrom: "asc" }, { createdAt: "asc" }, { id: "asc" }],
+        });
+        if (!foundingMembership) {
+          throw new FinanceNotFoundError(
+            "The company finance book has no founding owner.",
+          );
+        }
+        const requestedIds = input.associates
+          .map((associate) => associate.associateId)
+          .filter((id): id is string => id !== undefined);
+        if (new Set(requestedIds).size !== requestedIds.length) {
+          throw new FinanceValidationError(
+            "Each associate can appear only once.",
+          );
+        }
+        const requestedEmails = input.associates.map(({ email }) => email);
+        if (new Set(requestedEmails).size !== requestedEmails.length) {
+          throw new FinanceValidationError(
+            "Each associate email can appear only once.",
+          );
+        }
+
+        const resolvedAssociates: Array<{
+          id: string;
+          displayName: string;
+          shareBasisPoints: number;
+        }> = [];
+
+        for (const requested of input.associates) {
+          let user = requested.associateId
+            ? await tx.user.findUnique({
+                where: { id: requested.associateId },
+              })
+            : await tx.user.findUnique({ where: { email: requested.email } });
+
+          if (user && user.email !== requested.email) {
+            throw new FinanceValidationError(
+              "An associate email cannot be changed from this page.",
+            );
+          }
+          if (user?.deletedAt) {
+            throw new FinanceValidationError(
+              "A deactivated account cannot be added as an associate.",
+            );
+          }
+          if (!user) {
+            user = await tx.user.create({
+              data: {
+                email: requested.email,
+                firstName: requested.firstName || null,
+                lastName: requested.lastName || null,
+                roles: [v1.auth.AUTH_ROLES.ADMIN],
+              },
+            });
+          } else {
+            const firstName = requested.firstName || null;
+            const lastName = requested.lastName || null;
+            const needsAdminRole = !user.roles.includes(
+              v1.auth.AUTH_ROLES.ADMIN,
+            );
+            const identityChanged =
+              user.firstName !== firstName || user.lastName !== lastName;
+
+            if (needsAdminRole || identityChanged) {
+              user = await tx.user.update({
+                where: { id: user.id },
+                data: {
+                  firstName,
+                  lastName,
+                  ...(needsAdminRole
+                    ? { roles: [...user.roles, v1.auth.AUTH_ROLES.ADMIN] }
+                    : {}),
+                },
+              });
+            }
+          }
+
+          const displayName = [user.firstName, user.lastName]
+            .filter(Boolean)
+            .join(" ")
+            .trim();
+          resolvedAssociates.push({
+            id: user.id,
+            displayName: displayName || user.email,
+            shareBasisPoints: requested.shareBasisPoints,
+          });
+        }
+
+        if (
+          !resolvedAssociates.some(
+            ({ id }) => id === foundingMembership.associateId,
+          )
+        ) {
+          throw new FinanceValidationError(
+            "The founding owner cannot be removed from the company.",
+          );
+        }
+
+        const totalShare = resolvedAssociates.reduce(
+          (total, associate) => total + associate.shareBasisPoints,
+          0,
+        );
+        if (totalShare !== v1.finance.TOTAL_SHARE_BASIS_POINTS) {
+          throw new FinanceValidationError(
+            "Associate ownership shares must total 100%.",
+          );
+        }
+
+        const changedAt = new Date();
+        for (const book of books) {
+          const currentMemberships = await tx.financeBookMember.findMany({
+            where: { bookId: book.id, validUntil: null },
+          });
+          const nextIds = new Set(
+            resolvedAssociates.map((associate) => associate.id),
+          );
+          const removedIds = currentMemberships
+            .map(({ associateId }) => associateId)
+            .filter((associateId) => !nextIds.has(associateId));
+
+          await tx.financeBookMember.updateMany({
+            where: { bookId: book.id, validUntil: null },
+            data: { validUntil: changedAt },
+          });
+          await tx.financeBookMember.createMany({
+            data: resolvedAssociates.map((associate) => ({
+              bookId: book.id,
+              associateId: associate.id,
+              shareBasisPoints: associate.shareBasisPoints,
+              validFrom: changedAt,
+            })),
+          });
+
+          if (removedIds.length > 0) {
+            await tx.ledgerAccount.updateMany({
+              where: { bookId: book.id, associateId: { in: removedIds } },
+              data: { isActive: false, isDefault: false },
+            });
+          }
+          for (const associate of resolvedAssociates) {
+            await provisionAssociateAccounts(tx, book.id, book.type, associate);
+          }
+        }
+
+        const members = await tx.financeBookMember.findMany({
+          where: { bookId: companyBook.id, validUntil: null },
+          include: {
+            associate: {
+              select: {
+                id: true,
+                email: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+          orderBy: [{ validFrom: "asc" }, { createdAt: "asc" }, { id: "asc" }],
+        });
+
+        return {
+          members,
+          managingOwnerId: foundingMembership.associateId,
+        };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
   }
 
   findBookById(bookId: string): Promise<FinanceBookRecord | null> {
@@ -397,6 +717,7 @@ export class PrismaFinanceRepository {
           treatment: input.treatment,
           categoryId: input.categoryId,
           costObjectId: input.costObjectId,
+          supplierId: input.supplierId,
         },
         select: { id: true },
       });
@@ -430,11 +751,34 @@ export class PrismaFinanceRepository {
         })),
       });
 
-      if (input.documents.length > 0) {
+      const documents: Array<
+        v1.finance.FinancialDocumentInput & { storageKey?: string }
+      > = input.documents.map((document) => ({ ...document }));
+      if (input.receiptAttachment) {
+        const receiptIndex = documents.findIndex(
+          (document) =>
+            document.type === "RECEIPT" || document.type === "INVOICE",
+        );
+
+        if (receiptIndex >= 0) {
+          documents[receiptIndex] = {
+            ...documents[receiptIndex],
+            storageKey: input.receiptAttachment.storageKey,
+          };
+        } else {
+          documents.push({
+            type: "RECEIPT",
+            storageKey: input.receiptAttachment.storageKey,
+          });
+        }
+      }
+
+      if (documents.length > 0) {
         await tx.financialDocument.createMany({
-          data: input.documents.map((document) => ({
+          data: documents.map((document) => ({
             operationId: operation.id,
             type: document.type,
+            documentSeries: document.documentSeries ?? null,
             documentNumber: document.documentNumber ?? null,
             issuedAt: document.issuedAt ? new Date(document.issuedAt) : null,
             supplierName: document.supplierName ?? null,
@@ -443,6 +787,52 @@ export class PrismaFinanceRepository {
             notes: document.notes ?? null,
           })),
         });
+      }
+
+      if (input.receiptAttachment) {
+        const extractionDraft =
+          input.receiptAttachment.source === "EXTRACTION_DRAFT"
+            ? await tx.expenseExtractionDraft.updateMany({
+                where: {
+                  id: input.receiptAttachment.extractionDraftId,
+                  ownerUserId: input.createdById,
+                  sourceUploadId: input.receiptAttachment.draftUploadId,
+                  status: "READY",
+                  confirmedOperationId: null,
+                },
+                data: {
+                  status: "CONFIRMED",
+                  confirmedOperationId: operation.id,
+                },
+              })
+            : null;
+        const upload = await tx.draftUpload.updateMany({
+          where: {
+            id: input.receiptAttachment.draftUploadId,
+            userId: input.createdById,
+            purpose: "finance-expense-document",
+            storageKey: input.receiptAttachment.storageKey,
+            claimedAt: null,
+            cleanupStartedAt: null,
+            ...(input.receiptAttachment.source === "DIRECT_UPLOAD"
+              ? { expiresAt: { gt: postedAt } }
+              : {}),
+          },
+          data: { claimedAt: postedAt },
+        });
+
+        if (
+          (extractionDraft && extractionDraft.count !== 1) ||
+          upload.count !== 1
+        ) {
+          throw new FinanceStateError(
+            "That receipt was claimed by another request. Reload and try again.",
+            {
+              receiptSource: input.receiptAttachment.source,
+              draftUploadId: input.receiptAttachment.draftUploadId,
+            },
+          );
+        }
       }
 
       await this.writeJournalEntry(tx, operation.id, input.postings, postedAt);
@@ -497,7 +887,11 @@ export class PrismaFinanceRepository {
         });
 
         const claimed = await tx.draftUpload.updateMany({
-          where: { id: input.proof.draftUploadId, claimedAt: null },
+          where: {
+            id: input.proof.draftUploadId,
+            claimedAt: null,
+            cleanupStartedAt: null,
+          },
           data: { claimedAt: postedAt },
         });
         if (claimed.count !== 1) {

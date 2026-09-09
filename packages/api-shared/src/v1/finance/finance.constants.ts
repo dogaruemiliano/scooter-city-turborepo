@@ -246,6 +246,24 @@ export const SETTLEMENT_TRANSFER_STATUSES = [
 export type SettlementTransferStatus =
   (typeof SETTLEMENT_TRANSFER_STATUSES)[number];
 
+export const EXPENSE_EXTRACTION_DRAFT_STATUSES = [
+  "ANALYZING",
+  "READY",
+  "FAILED",
+  "CONFIRMED",
+] as const;
+
+export type ExpenseExtractionDraftStatus =
+  (typeof EXPENSE_EXTRACTION_DRAFT_STATUSES)[number];
+
+export const COMPANY_MATCH_STATUSES = [
+  "MATCHED",
+  "MISMATCHED",
+  "UNKNOWN",
+] as const;
+
+export type CompanyMatchStatus = (typeof COMPANY_MATCH_STATUSES)[number];
+
 /**
  * Header carrying the client command identifier for every financial write.
  * Retrying with the same key returns the original operation instead of
@@ -261,6 +279,14 @@ export const MINOR_UNITS_PER_MAJOR = 100;
 
 export const ROUTES = {
   books: "/v1/finance/books",
+  companyIdentity: "/v1/finance/company-identity",
+  companyAssociates: "/v1/finance/company-associates",
+  suppliers: {
+    list: "/v1/finance/suppliers",
+    create: "/v1/finance/suppliers",
+    update: (supplierId: string): string =>
+      `/v1/finance/suppliers/${encodeURIComponent(supplierId)}`,
+  },
   accounts: {
     list: "/v1/finance/accounts",
     /** Accounts with balances summed from their journal postings. */
@@ -279,6 +305,10 @@ export const ROUTES = {
   expenses: {
     preview: "/v1/finance/expenses/preview",
     create: "/v1/finance/expenses",
+    draftUpload: "/v1/finance/expenses/receipt-draft-upload-url",
+    analyze: "/v1/finance/expenses/extractions",
+    extraction: (draftId: string): string =>
+      `/v1/finance/expenses/extractions/${encodeURIComponent(draftId)}`,
   },
   funding: {
     preview: "/v1/finance/funding/preview",

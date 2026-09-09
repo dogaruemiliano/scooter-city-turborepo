@@ -23,8 +23,14 @@ import { CreateFundingProofUploadUseCase } from "./application/funding/create-fu
 import { PreviewAssociateFundingUseCase } from "./application/funding/preview-associate-funding.use-case";
 
 import { CreateExpenseUseCase } from "./application/expenses/create-expense.use-case";
+import { CreateExpenseReceiptUploadUseCase } from "./application/expenses/create-expense-receipt-upload.use-case";
+import { AnalyzeExpenseReceiptUseCase } from "./application/expenses/analyze-expense-receipt.use-case";
 import { PreviewExpenseUseCase } from "./application/expenses/preview-expense.use-case";
 import { FinanceQueriesService } from "./application/finance-queries.service";
+import { SuppliersService } from "./application/suppliers.service";
+import { CompanyIdentityService } from "./application/company-identity.service";
+import { CompanyAssociatesService } from "./application/company-associates.service";
+import { ExpenseExtractionDraftService } from "./application/expenses/expense-extraction-draft.service";
 import { ReverseOperationUseCase } from "./application/reverse-operation.use-case";
 import { PreviewSettlementUseCase } from "./application/settlements/preview-settlement.use-case";
 import { LEDGER_ACCOUNT_RESOLVER } from "./domain/finance.tokens";
@@ -37,6 +43,7 @@ import { SettlementTransferMatcher } from "./domain/settlement/settlement-transf
 import { FinanceController } from "./http/finance.controller";
 import { LedgerAccountResolver } from "./infrastructure/ledger-account.resolver";
 import { PrismaFinanceRepository } from "./infrastructure/prisma-finance.repository";
+import { PrismaExpenseExtractionRepository } from "./infrastructure/prisma-expense-extraction.repository";
 
 @Module({
   imports: [ImageStorageModule],
@@ -52,11 +59,18 @@ import { PrismaFinanceRepository } from "./infrastructure/prisma-finance.reposit
 
     // Infrastructure
     PrismaFinanceRepository,
+    PrismaExpenseExtractionRepository,
     LedgerAccountResolver,
     { provide: LEDGER_ACCOUNT_RESOLVER, useExisting: LedgerAccountResolver },
 
     // Application
     FinanceQueriesService,
+    SuppliersService,
+    CompanyIdentityService,
+    CompanyAssociatesService,
+    ExpenseExtractionDraftService,
+    CreateExpenseReceiptUploadUseCase,
+    AnalyzeExpenseReceiptUseCase,
     PreviewExpenseUseCase,
     CreateExpenseUseCase,
     PreviewAssociateFundingUseCase,

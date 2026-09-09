@@ -38,6 +38,16 @@ export class FinanceNotFoundError extends FinanceError {
   readonly code = "FINANCE_NOT_FOUND";
 }
 
+/** Only the founding company-book owner may change associate ownership. */
+export class FinanceForbiddenError extends FinanceError {
+  readonly code = "FINANCE_FORBIDDEN";
+}
+
+/** A unique finance resource, such as a supplier name or CIF, already exists. */
+export class FinanceConflictError extends FinanceError {
+  readonly code = "FINANCE_CONFLICT";
+}
+
 /**
  * The books are set up wrong — a required ledger account is missing, or the
  * selector matched more than one. This is an operator problem, not a caller

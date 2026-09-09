@@ -102,6 +102,8 @@ export function fingerprintExpenseInput(
     input.treatment,
     input.categoryId,
     input.costObjectId ?? "",
+    input.supplierId ?? "",
+    input.extractionDraftId ?? "",
     payments.join("|"),
     allocations.join("|"),
   ].join("//");
@@ -139,6 +141,8 @@ export function fingerprintStoredExpense(row: OperationRecord): string {
     row.expense.treatment,
     row.expense.categoryId,
     row.expense.costObjectId ?? "",
+    row.expense.supplierId ?? "",
+    row.expenseExtractionDraft?.id ?? "",
     payments.join("|"),
     allocations.join("|"),
   ].join("//");

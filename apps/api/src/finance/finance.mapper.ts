@@ -13,6 +13,7 @@ import type { EconomicAllocationCommand } from "./domain/finance.types";
 import { summarizePostings, type PostingLine } from "./domain/posting-plan";
 import type {
   FinanceBookRecord,
+  FinanceBookMemberRecord,
   LedgerAccountRecord,
   OperationRecord,
 } from "./infrastructure/prisma-finance.repository";
@@ -20,6 +21,7 @@ import type {
   CostObject as CostObjectRow,
   ExpenseCategory as ExpenseCategoryRow,
   LedgerAccount as LedgerAccountRow,
+  Supplier as SupplierRow,
 } from "../generated/prisma/client";
 
 interface AssociateRow {
@@ -49,14 +51,20 @@ export function toFinanceBook(row: FinanceBookRecord): v1.finance.FinanceBook {
     name: row.name,
     type: row.type,
     functionalCurrency: row.functionalCurrency,
-    members: row.members.map((member) => ({
-      id: member.id,
-      associateId: member.associateId,
-      associate: member.associate ? toFinanceAssociate(member.associate) : null,
-      shareBasisPoints: member.shareBasisPoints,
-      validFrom: member.validFrom.toISOString(),
-      validUntil: member.validUntil?.toISOString() ?? null,
-    })),
+    members: row.members.map(toFinanceBookMember),
+  };
+}
+
+export function toFinanceBookMember(
+  member: FinanceBookMemberRecord,
+): v1.finance.FinanceBookMember {
+  return {
+    id: member.id,
+    associateId: member.associateId,
+    associate: member.associate ? toFinanceAssociate(member.associate) : null,
+    shareBasisPoints: member.shareBasisPoints,
+    validFrom: member.validFrom.toISOString(),
+    validUntil: member.validUntil?.toISOString() ?? null,
   };
 }
 
@@ -154,6 +162,18 @@ export function toCostObject(row: CostObjectRow): v1.finance.CostObject {
   };
 }
 
+export function toSupplier(row: SupplierRow): v1.finance.Supplier {
+  return {
+    id: row.id,
+    name: row.name,
+    taxIdentifier: row.taxIdentifier,
+    isVatPayer: row.isVatPayer,
+    isActive: row.isActive,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
 /** Persisted postings, in the shape the domain works with. */
 export function toDomainPostingLines(row: OperationRecord): PostingLine[] {
   return (row.journalEntry?.postings ?? []).map((posting) => ({
@@ -213,6 +233,10 @@ export function toFinancialOperation(
           costObject: row.expense.costObject
             ? toCostObject(row.expense.costObject)
             : null,
+          supplierId: row.expense.supplierId,
+          supplier: row.expense.supplier
+            ? toSupplier(row.expense.supplier)
+            : null,
           payments: row.expense.payments.map((payment) => ({
             id: payment.id,
             sourceType: payment.sourceType,
@@ -256,6 +280,7 @@ export function toFinancialOperation(
     documents: row.documents.map((document) => ({
       id: document.id,
       type: document.type,
+      documentSeries: document.documentSeries,
       documentNumber: document.documentNumber,
       issuedAt: document.issuedAt?.toISOString() ?? null,
       supplierName: document.supplierName,

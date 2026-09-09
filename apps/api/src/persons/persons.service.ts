@@ -793,7 +793,7 @@ export class PersonsService {
       throw new BadRequestException("Draft image upload was not found");
     }
 
-    if (draft.claimedAt) {
+    if (draft.claimedAt || draft.cleanupStartedAt !== null) {
       throw new BadRequestException("Draft image upload was already used");
     }
 
@@ -1547,6 +1547,7 @@ export class PersonsService {
       where: {
         id: draftUploadId,
         claimedAt: null,
+        cleanupStartedAt: null,
       },
       data: { claimedAt: new Date() },
     });

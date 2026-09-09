@@ -19,7 +19,7 @@
  *
  *   | Email                          | Purpose                       | Notes                               |
  *   |--------------------------------|-------------------------------|-------------------------------------|
- *   | admin@email.com                | Local admin access            | ADMIN role                          |
+ *   | admin@email.com                | Local super-admin access      | ADMIN + SUPER_ADMIN roles           |
  *   | test-email-otp@example.com     | Email-OTP flow                | no OAuth links                      |
  *   | test-sms@example.com           | SMS-OTP flow                  | phone +40700000001                  |
  *   | test-google@example.com        | Google OAuth                  | linked AuthAccount row              |
@@ -49,6 +49,7 @@
 import "dotenv/config";
 
 import { PrismaPg } from "@prisma/adapter-pg";
+import { v1 } from "@repo/api-shared";
 
 import { PrismaClient } from "../src/generated/prisma/client";
 import { seedFinance } from "./seeds/finance";
@@ -466,10 +467,10 @@ async function main(): Promise<void> {
       id: FIXED_IDS.admin,
       email: "admin@email.com",
       firstName: "Admin",
-      roles: ["ADMIN"],
+      roles: [v1.auth.AUTH_ROLES.ADMIN, v1.auth.AUTH_ROLES.SUPER_ADMIN],
     },
     update: {
-      roles: ["ADMIN"],
+      roles: [v1.auth.AUTH_ROLES.ADMIN, v1.auth.AUTH_ROLES.SUPER_ADMIN],
       deletedAt: null,
     },
   });

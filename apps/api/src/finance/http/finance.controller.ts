@@ -5,8 +5,8 @@
  * decision is made in this file — every posting rule lives in a domain policy
  * where it can be tested without an HTTP request.
  *
- * All finance routes are ADMIN-only. There is no per-associate view yet;
- * anyone who can see the books can see all of them.
+ * Finance routes are ADMIN-only by default. Company identity and associate
+ * management are further restricted to SUPER_ADMIN users.
  */
 import {
   Body,
@@ -15,7 +15,9 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  Patch,
   Post,
+  Put,
   Query,
   UseInterceptors,
 } from "@nestjs/common";
@@ -33,6 +35,12 @@ import type { AuthPrincipal } from "../../auth/auth.types";
 import { CurrentUser } from "../../auth/decorators/current-user.decorator";
 import { RequireRoles } from "../../common/decorators/roles.decorator";
 import { CreateExpenseUseCase } from "../application/expenses/create-expense.use-case";
+import { CreateExpenseReceiptUploadUseCase } from "../application/expenses/create-expense-receipt-upload.use-case";
+import { AnalyzeExpenseReceiptUseCase } from "../application/expenses/analyze-expense-receipt.use-case";
+import { ExpenseExtractionDraftService } from "../application/expenses/expense-extraction-draft.service";
+import { CompanyIdentityService } from "../application/company-identity.service";
+import { CompanyAssociatesService } from "../application/company-associates.service";
+import { SuppliersService } from "../application/suppliers.service";
 import { CreateAssociateFundingUseCase } from "../application/funding/create-associate-funding.use-case";
 import { CreateFundingProofUploadUseCase } from "../application/funding/create-funding-proof-upload.use-case";
 import { PreviewAssociateFundingUseCase } from "../application/funding/preview-associate-funding.use-case";
@@ -42,11 +50,21 @@ import { ReverseOperationUseCase } from "../application/reverse-operation.use-ca
 import { PreviewSettlementUseCase } from "../application/settlements/preview-settlement.use-case";
 import {
   CostObjectList,
+  CompanyAssociates,
+  AnalyzeExpenseReceiptInput,
   CreateAssociateFundingInput,
+  CreateExpenseReceiptDraftUploadInput,
   CreateFundingProofDraftUploadInput,
   CreateExpenseInput,
+  CreateSupplierInput,
   ExpenseCategoryList,
   FinanceBookList,
+  FinanceLegalIdentity,
+  FinanceLegalIdentityResponse,
+  UpsertFinanceLegalIdentityInput,
+  UpdateCompanyAssociatesInput,
+  ExpenseExtractionDraft,
+  ExpenseReceiptDraftUpload,
   FundingProofDraftUpload,
   FinancialOperation,
   FinancialOperationList,
@@ -58,12 +76,16 @@ import {
   ListExpenseCategoriesQuery,
   ListFinancialOperationsQuery,
   ListLedgerAccountsQuery,
+  ListSuppliersQuery,
   PostingPlan,
   PreviewExpenseInput,
   PreviewAssociateFundingInput,
   PreviewSettlementInput,
   ReverseOperationInput,
   SettlementPreview,
+  Supplier,
+  SupplierList,
+  UpdateSupplierInput,
 } from "./dto/finance.dto";
 import { FinanceErrorInterceptor } from "./finance-error.interceptor";
 import { IdempotencyKey } from "./idempotency-key.decorator";
@@ -78,12 +100,18 @@ const IDEMPOTENCY_HEADER_DOC = {
 @ApiTags("finance")
 @ApiCookieAuth(v1.auth.ACCESS_TOKEN_COOKIE)
 @ApiBearerAuth("bearer")
-@RequireRoles("ADMIN")
+@RequireRoles(v1.auth.AUTH_ROLES.ADMIN)
 @UseInterceptors(FinanceErrorInterceptor)
 @Controller({ path: "finance", version: "1" })
 export class FinanceController {
   constructor(
     private readonly queries: FinanceQueriesService,
+    private readonly companyIdentity: CompanyIdentityService,
+    private readonly companyAssociates: CompanyAssociatesService,
+    private readonly suppliers: SuppliersService,
+    private readonly expenseExtractionDrafts: ExpenseExtractionDraftService,
+    private readonly createExpenseReceiptUpload: CreateExpenseReceiptUploadUseCase,
+    private readonly analyzeExpenseReceipt: AnalyzeExpenseReceiptUseCase,
     private readonly previewExpense: PreviewExpenseUseCase,
     private readonly createExpense: CreateExpenseUseCase,
     private readonly previewAssociateFunding: PreviewAssociateFundingUseCase,
@@ -105,6 +133,91 @@ export class FinanceController {
   @ZodResponse({ type: FinanceBookList })
   listBooks(): Promise<v1.finance.FinanceBookList> {
     return this.queries.listBooks();
+  }
+
+  @Get("company-identity")
+  @RequireRoles(v1.auth.AUTH_ROLES.SUPER_ADMIN)
+  @ApiOperation({
+    operationId: "FinanceController_getCompanyIdentity_v1",
+    summary: "Get the legal identity used to match company receipts",
+  })
+  @ZodResponse({ type: FinanceLegalIdentityResponse })
+  getCompanyIdentity(): Promise<v1.finance.FinanceLegalIdentityResponse> {
+    return this.companyIdentity.get();
+  }
+
+  @Put("company-identity")
+  @RequireRoles(v1.auth.AUTH_ROLES.SUPER_ADMIN)
+  @ApiOperation({
+    operationId: "FinanceController_upsertCompanyIdentity_v1",
+    summary: "Configure the legal identity used to match company receipts",
+  })
+  @ZodResponse({ type: FinanceLegalIdentity })
+  upsertCompanyIdentity(
+    @Body() input: UpsertFinanceLegalIdentityInput,
+  ): Promise<v1.finance.FinanceLegalIdentity> {
+    return this.companyIdentity.upsert(input);
+  }
+
+  @Get("company-associates")
+  @RequireRoles(v1.auth.AUTH_ROLES.SUPER_ADMIN)
+  @ApiOperation({
+    operationId: "FinanceController_getCompanyAssociates_v1",
+    summary: "List active company associates and ownership shares",
+  })
+  @ZodResponse({ type: CompanyAssociates })
+  getCompanyAssociates(): Promise<v1.finance.CompanyAssociates> {
+    return this.companyAssociates.get();
+  }
+
+  @Put("company-associates")
+  @RequireRoles(v1.auth.AUTH_ROLES.SUPER_ADMIN)
+  @ApiOperation({
+    operationId: "FinanceController_updateCompanyAssociates_v1",
+    summary: "Replace active company associates and ownership shares",
+  })
+  @ZodResponse({ type: CompanyAssociates })
+  updateCompanyAssociates(
+    @Body() input: UpdateCompanyAssociatesInput,
+  ): Promise<v1.finance.CompanyAssociates> {
+    return this.companyAssociates.update(input);
+  }
+
+  @Get("suppliers")
+  @ApiOperation({
+    operationId: "FinanceController_listSuppliers_v1",
+    summary: "List expense suppliers",
+  })
+  @ZodResponse({ type: SupplierList })
+  listSuppliers(
+    @Query() query: ListSuppliersQuery,
+  ): Promise<v1.finance.SupplierList> {
+    return this.suppliers.list(query);
+  }
+
+  @Post("suppliers")
+  @ApiOperation({
+    operationId: "FinanceController_createSupplier_v1",
+    summary: "Create an expense supplier",
+  })
+  @ZodResponse({ status: HttpStatus.CREATED, type: Supplier })
+  createSupplier(
+    @Body() input: CreateSupplierInput,
+  ): Promise<v1.finance.Supplier> {
+    return this.suppliers.create(input);
+  }
+
+  @Patch("suppliers/:supplierId")
+  @ApiOperation({
+    operationId: "FinanceController_updateSupplier_v1",
+    summary: "Update an expense supplier",
+  })
+  @ZodResponse({ type: Supplier })
+  updateSupplier(
+    @Param("supplierId") supplierId: string,
+    @Body() input: UpdateSupplierInput,
+  ): Promise<v1.finance.Supplier> {
+    return this.suppliers.update(supplierId, input);
   }
 
   @Get("accounts")
@@ -233,6 +346,45 @@ export class FinanceController {
   // ---------------------------------------------------------------------
   // Expenses
   // ---------------------------------------------------------------------
+
+  @Post("expenses/receipt-draft-upload-url")
+  @ApiOperation({
+    operationId: "FinanceController_createExpenseReceiptDraftUpload_v1",
+    summary: "Create a signed upload URL for a receipt image",
+  })
+  @ZodResponse({ type: ExpenseReceiptDraftUpload })
+  createExpenseReceiptDraftUpload(
+    @Body() input: CreateExpenseReceiptDraftUploadInput,
+    @CurrentUser() user: AuthPrincipal,
+  ): Promise<v1.finance.ExpenseReceiptDraftUpload> {
+    return this.createExpenseReceiptUpload.execute(input, user.id);
+  }
+
+  @Post("expenses/extractions")
+  @ApiOperation({
+    operationId: "FinanceController_analyzeExpenseReceipt_v1",
+    summary: "Analyze an uploaded receipt and create an extraction draft",
+  })
+  @ZodResponse({ type: ExpenseExtractionDraft })
+  analyzeExpenseReceiptDraft(
+    @Body() input: AnalyzeExpenseReceiptInput,
+    @CurrentUser() user: AuthPrincipal,
+  ): Promise<v1.finance.ExpenseExtractionDraft> {
+    return this.analyzeExpenseReceipt.execute(input, user.id);
+  }
+
+  @Get("expenses/extractions/:draftId")
+  @ApiOperation({
+    operationId: "FinanceController_getExpenseExtractionDraft_v1",
+    summary: "Resume one receipt extraction draft",
+  })
+  @ZodResponse({ type: ExpenseExtractionDraft })
+  getExpenseExtractionDraft(
+    @Param("draftId") draftId: string,
+    @CurrentUser() user: AuthPrincipal,
+  ): Promise<v1.finance.ExpenseExtractionDraft> {
+    return this.expenseExtractionDrafts.get(draftId, user.id);
+  }
 
   @Post("expenses/preview")
   @HttpCode(HttpStatus.OK)

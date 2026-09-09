@@ -169,18 +169,20 @@ Next.js must not calculate authoritative:
 
 The frontend may format values and display backend previews, but all financial calculations must live in NestJS domain/application services.
 
-## 2.8 Do not infer the finance book from the document
+## 2.8 Document extraction may suggest, but never decide, the finance book
 
-The finance book must be selected explicitly.
+The finance book remains an explicit, user-editable value that is validated
+before posting. Receipt extraction may prefill it to reduce repetitive work:
 
-Do not use rules such as:
+- the configured company's buyer CUI/CIF or legal name matches: suggest the
+  company book;
+- company identity is configured but the buyer differs or is absent: suggest
+  the associate-pool book;
+- company identity is not configured: leave the book unset.
 
-```text
-has receipt = company
-does not have receipt = associate pool
-```
-
-A document is supporting metadata. It does not determine ownership of the transaction.
+These are review-screen defaults, not authoritative accounting decisions. A
+document is supporting metadata and the user confirms or changes the suggested
+book before the operation is recorded.
 
 ---
 

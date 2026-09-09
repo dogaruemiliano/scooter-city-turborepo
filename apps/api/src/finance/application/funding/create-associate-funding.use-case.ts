@@ -118,6 +118,7 @@ export class CreateAssociateFundingUseCase {
     if (
       !draft ||
       draft.claimedAt ||
+      draft.cleanupStartedAt !== null ||
       draft.expiresAt <= new Date() ||
       draft.userId !== userId ||
       draft.purpose !== FUNDING_PROOF_DRAFT_PURPOSE ||

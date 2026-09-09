@@ -41,6 +41,8 @@ describe("Finance HTTP surface (e2e)", () => {
 
   let bookId: string;
   let adminToken: string;
+  let superAdminToken: string;
+  let ownerToken: string;
   let emilianoId: string;
   let iustiId: string;
   let categoryId: string;
@@ -49,6 +51,7 @@ describe("Finance HTTP surface (e2e)", () => {
   const accounts = new Map<string, string>();
   const createdUserIds: string[] = [];
   const createdOperationIds: string[] = [];
+  const createdSupplierIds: string[] = [];
 
   const server = () => app.getHttpServer() as Server;
 
@@ -56,17 +59,25 @@ describe("Finance HTTP surface (e2e)", () => {
   const req = (): {
     get: (path: string) => RequestBuilder;
     post: (path: string) => RequestBuilder;
+    patch: (path: string) => RequestBuilder;
+    put: (path: string) => RequestBuilder;
   } => {
     const base = request(server());
     const tag = (b: RequestBuilder) => b.set("x-requested-with", "fetch");
     return {
       get: (p) => tag(base.get(p)),
       post: (p) => tag(base.post(p)),
+      patch: (p) => tag(base.patch(p)),
+      put: (p) => tag(base.put(p)),
     };
   };
 
   const asAdmin = (builder: RequestBuilder) =>
     builder.set("authorization", `Bearer ${adminToken}`);
+  const asSuperAdmin = (builder: RequestBuilder) =>
+    builder.set("authorization", `Bearer ${superAdminToken}`);
+  const asOwner = (builder: RequestBuilder) =>
+    builder.set("authorization", `Bearer ${ownerToken}`);
 
   /** A fresh idempotency key, since every financial write demands one. */
   const key = () => randomUUID();
@@ -113,6 +124,12 @@ describe("Finance HTTP surface (e2e)", () => {
     const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     const admin = await createUser(`fin-admin-${suffix}`, ["ADMIN"]);
     adminToken = (await coreAuth.issueSession({ user: admin })).accessToken;
+    const superAdmin = await createUser(`fin-super-admin-${suffix}`, [
+      v1.auth.AUTH_ROLES.ADMIN,
+      v1.auth.AUTH_ROLES.SUPER_ADMIN,
+    ]);
+    superAdminToken = (await coreAuth.issueSession({ user: superAdmin }))
+      .accessToken;
 
     const book = await prisma.financeBook.findUniqueOrThrow({
       where: { type: "COMPANY" },
@@ -133,6 +150,10 @@ describe("Finance HTTP surface (e2e)", () => {
     }
 
     [emilianoId, iustiId] = members.map((member) => member.associateId);
+    const owner = await prisma.user.findUniqueOrThrow({
+      where: { id: emilianoId },
+    });
+    ownerToken = (await coreAuth.issueSession({ user: owner })).accessToken;
 
     for (const row of await prisma.ledgerAccount.findMany({
       where: { bookId },
@@ -190,6 +211,12 @@ describe("Finance HTTP surface (e2e)", () => {
 
     if (prisma && createdUserIds.length > 0) {
       await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
+    }
+
+    if (prisma && createdSupplierIds.length > 0) {
+      await prisma.supplier.deleteMany({
+        where: { id: { in: createdSupplierIds } },
+      });
     }
 
     await app?.close();
@@ -1287,6 +1314,79 @@ describe("Finance HTTP surface (e2e)", () => {
     });
   });
 
+  describe("suppliers", () => {
+    it("creates, finds, updates, links, and uniquely identifies a supplier", async () => {
+      const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      const name = `E2E Rotakt ${suffix} SRL`;
+      const taxDigits = `9${Date.now().toString().slice(-8)}`;
+      const taxIdentifier = `RO${taxDigits}`;
+
+      const createdResponse = await asAdmin(
+        req().post(v1.finance.ROUTES.suppliers.create),
+      ).send({ name, taxIdentifier });
+
+      expect(createdResponse.status).toBe(201);
+      const supplier = v1.finance.supplierSchema.parse(createdResponse.body);
+      createdSupplierIds.push(supplier.id);
+      expect(supplier.isVatPayer).toBe(true);
+
+      const exactRetry = await asAdmin(
+        req().post(v1.finance.ROUTES.suppliers.create),
+      ).send({
+        name: name.replace(/ SRL$/, " S.R.L."),
+        taxIdentifier: `C.F. RO ${taxDigits}`,
+      });
+      expect(exactRetry.status).toBe(201);
+      expect(v1.finance.supplierSchema.parse(exactRetry.body).id).toBe(
+        supplier.id,
+      );
+
+      const listedResponse = await asAdmin(
+        req().get(
+          `${v1.finance.ROUTES.suppliers.list}?search=${encodeURIComponent(taxDigits)}`,
+        ),
+      );
+      expect(listedResponse.status).toBe(200);
+      expect(
+        v1.finance.supplierListSchema
+          .parse(listedResponse.body)
+          .items.some((candidate) => candidate.id === supplier.id),
+      ).toBe(true);
+
+      const duplicateName = await asAdmin(
+        req().post(v1.finance.ROUTES.suppliers.create),
+      ).send({
+        name: name.replace(/ SRL$/, " S.R.L."),
+        taxIdentifier: `RO8${Date.now().toString().slice(-8)}`,
+      });
+      expect(duplicateName.status).toBe(409);
+      expect(asErrorCode(duplicateName)).toBe("FINANCE_CONFLICT");
+
+      const duplicateCif = await asAdmin(
+        req().post(v1.finance.ROUTES.suppliers.create),
+      ).send({
+        name: `Different supplier ${suffix}`,
+        taxIdentifier: `ro ${taxDigits}`,
+      });
+      expect(duplicateCif.status).toBe(409);
+      expect(asErrorCode(duplicateCif)).toBe("FINANCE_CONFLICT");
+
+      const updatedResponse = await asAdmin(
+        req().patch(v1.finance.ROUTES.suppliers.update(supplier.id)),
+      ).send({ name: `${name} Updated` });
+      expect(updatedResponse.status).toBe(200);
+      expect(v1.finance.supplierSchema.parse(updatedResponse.body).name).toBe(
+        `${name} Updated`,
+      );
+
+      const createdExpense = await postExpense(
+        expenseInput({ supplierId: supplier.id }),
+      );
+      expect(createdExpense.status).toBe(201);
+      expect(asOperation(createdExpense).expense?.supplierId).toBe(supplier.id);
+    });
+  });
+
   describe("reads", () => {
     it("lists the books with their ownership shares", async () => {
       const res = await asAdmin(req().get(v1.finance.ROUTES.books));
@@ -1295,9 +1395,11 @@ describe("Finance HTTP surface (e2e)", () => {
       const book = asBookList(res).items.find(
         (candidate) => candidate.id === bookId,
       );
-      expect(book?.members).toHaveLength(2);
+      const activeMembers =
+        book?.members.filter((member) => member.validUntil === null) ?? [];
+      expect(activeMembers).toHaveLength(2);
       expect(
-        book?.members.reduce((sum, member) => sum + member.shareBasisPoints, 0),
+        activeMembers.reduce((sum, member) => sum + member.shareBasisPoints, 0),
       ).toBe(10_000);
     });
 
@@ -1334,6 +1436,94 @@ describe("Finance HTTP surface (e2e)", () => {
       expect(balance.postingCount).toBe(0);
     });
   });
+
+  describe("company associates", () => {
+    it("exposes company management only to super admins", async () => {
+      const adminResponse = await asAdmin(
+        req().get(v1.finance.ROUTES.companyAssociates),
+      );
+      const ownerResponse = await asOwner(
+        req().get(v1.finance.ROUTES.companyAssociates),
+      );
+      const superAdminResponse = await asSuperAdmin(
+        req().get(v1.finance.ROUTES.companyAssociates),
+      );
+      const identityAdminResponse = await asAdmin(
+        req().get(v1.finance.ROUTES.companyIdentity),
+      );
+      const identitySuperAdminResponse = await asSuperAdmin(
+        req().get(v1.finance.ROUTES.companyIdentity),
+      );
+
+      expect(adminResponse.status).toBe(403);
+      expect(ownerResponse.status).toBe(403);
+      expect(superAdminResponse.status).toBe(200);
+      expect(
+        v1.finance.companyAssociatesSchema.parse(superAdminResponse.body)
+          .canManage,
+      ).toBe(true);
+      expect(identityAdminResponse.status).toBe(403);
+      expect(identitySuperAdminResponse.status).toBe(200);
+    });
+
+    it("rejects company changes from users without the super-admin role", async () => {
+      const current = v1.finance.companyAssociatesSchema.parse(
+        (await asSuperAdmin(req().get(v1.finance.ROUTES.companyAssociates)))
+          .body,
+      );
+      const associateResponse = await asAdmin(
+        req().put(v1.finance.ROUTES.companyAssociates),
+      ).send(toAssociateUpdate(current.items));
+      const identityResponse = await asAdmin(
+        req().put(v1.finance.ROUTES.companyIdentity),
+      ).send({});
+
+      expect(associateResponse.status).toBe(403);
+      expect(identityResponse.status).toBe(403);
+    });
+
+    it("lets a super admin update associate details and shares", async () => {
+      const current = v1.finance.companyAssociatesSchema.parse(
+        (await asSuperAdmin(req().get(v1.finance.ROUTES.companyAssociates)))
+          .body,
+      );
+      const changed = toAssociateUpdate(current.items);
+      const originalFirstName = changed.associates[1].firstName;
+      changed.associates[0].shareBasisPoints = 6_000;
+      changed.associates[1].shareBasisPoints = 4_000;
+      changed.associates[1].firstName = "Updated associate";
+
+      const res = await asSuperAdmin(
+        req().put(v1.finance.ROUTES.companyAssociates),
+      ).send(changed);
+
+      expect(res.status).toBe(200);
+      const updated = v1.finance.companyAssociatesSchema.parse(res.body);
+      expect(
+        updated.items.map(({ shareBasisPoints }) => shareBasisPoints),
+      ).toEqual([6_000, 4_000]);
+      expect(
+        updated.items.find(
+          ({ associateId }) =>
+            associateId === changed.associates[1].associateId,
+        )?.associate?.firstName,
+      ).toBe("Updated associate");
+      expect(updated.canManage).toBe(true);
+
+      const restored = toAssociateUpdate(updated.items);
+      restored.associates[1].firstName = originalFirstName;
+      restored.associates.forEach((associate) => {
+        associate.shareBasisPoints = 5_000;
+      });
+      expect(
+        (
+          await asSuperAdmin(
+            req().put(v1.finance.ROUTES.companyAssociates),
+          ).send(restored)
+        ).status,
+      ).toBe(200);
+    });
+  });
 });
 
 /**
@@ -1359,6 +1549,20 @@ function asOperationList(
 
 function asBookList(res: request.Response): v1.finance.FinanceBookList {
   return v1.finance.financeBookListSchema.parse(res.body);
+}
+
+function toAssociateUpdate(
+  members: readonly v1.finance.FinanceBookMember[],
+): v1.finance.UpdateCompanyAssociatesInput {
+  return {
+    associates: members.map((member) => ({
+      associateId: member.associateId,
+      email: member.associate?.email ?? "missing@example.com",
+      firstName: member.associate?.firstName ?? null,
+      lastName: member.associate?.lastName ?? null,
+      shareBasisPoints: member.shareBasisPoints,
+    })),
+  };
 }
 
 function asSettlement(res: request.Response): v1.finance.SettlementPreview {

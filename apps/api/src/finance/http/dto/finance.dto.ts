@@ -5,6 +5,58 @@ export class FinanceBookList extends createZodDto(
   v1.finance.financeBookListSchema,
 ) {}
 
+export class Supplier extends createZodDto(v1.finance.supplierSchema) {}
+
+export class SupplierList extends createZodDto(v1.finance.supplierListSchema) {}
+
+export class ListSuppliersQuery extends createZodDto(
+  v1.finance.listSuppliersQuerySchema,
+) {}
+
+export class CreateSupplierInput extends createZodDto(
+  v1.finance.createSupplierInputSchema,
+) {}
+
+export class UpdateSupplierInput extends createZodDto(
+  v1.finance.updateSupplierInputSchema,
+) {}
+
+export class CompanyAssociates extends createZodDto(
+  v1.finance.companyAssociatesSchema,
+) {}
+
+export class UpdateCompanyAssociatesInput extends createZodDto(
+  v1.finance.updateCompanyAssociatesInputSchema,
+) {}
+
+export class FinanceLegalIdentity extends createZodDto(
+  v1.finance.financeLegalIdentitySchema,
+) {}
+
+export class FinanceLegalIdentityResponse extends createZodDto(
+  v1.finance.financeLegalIdentityResponseSchema,
+) {}
+
+export class UpsertFinanceLegalIdentityInput extends createZodDto(
+  v1.finance.upsertFinanceLegalIdentityInputSchema,
+) {}
+
+export class ExpenseExtractionDraft extends createZodDto(
+  v1.finance.expenseExtractionDraftSchema,
+) {}
+
+export class CreateExpenseReceiptDraftUploadInput extends createZodDto(
+  v1.finance.createExpenseReceiptDraftUploadInputSchema,
+) {}
+
+export class ExpenseReceiptDraftUpload extends createZodDto(
+  v1.finance.expenseReceiptDraftUploadSchema,
+) {}
+
+export class AnalyzeExpenseReceiptInput extends createZodDto(
+  v1.finance.analyzeExpenseReceiptInputSchema,
+) {}
+
 export class ListLedgerAccountsQuery extends createZodDto(
   v1.finance.listLedgerAccountsQuerySchema,
 ) {}

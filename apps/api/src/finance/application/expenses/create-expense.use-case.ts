@@ -15,8 +15,11 @@
 import { Injectable } from "@nestjs/common";
 import { v1 } from "@repo/api-shared";
 
+import { ImageStorageService } from "../../../image-storage/image-storage.service";
 import {
   FinanceNotFoundError,
+  FinanceStateError,
+  FinanceValidationError,
   IdempotencyConflictError,
 } from "../../domain/finance.errors";
 import { assertTreatmentAllowedForBook } from "../../domain/finance-invariants";
@@ -31,6 +34,10 @@ import {
   fingerprintStoredExpense,
   toExpenseCommand,
 } from "./expense-command";
+import {
+  EXPENSE_RECEIPT_DRAFT_PURPOSE,
+  expenseReceiptUploadScope,
+} from "./create-expense-receipt-upload.use-case";
 
 const UNIQUE_CONSTRAINT_VIOLATION = "P2002";
 
@@ -47,6 +54,7 @@ export class CreateExpenseUseCase {
     private readonly journal: JournalValidator,
     private readonly repository: PrismaFinanceRepository,
     private readonly prisma: PrismaService,
+    private readonly imageStorage: ImageStorageService,
   ) {}
 
   async execute({
@@ -58,6 +66,17 @@ export class CreateExpenseUseCase {
     if (replay) return replay;
 
     await this.assertReferencesExist(input);
+    const receiptAttachment = input.extractionDraftId
+      ? await this.prepareExtractionAttachment(
+          input.extractionDraftId,
+          createdById,
+        )
+      : input.receiptUploadToken
+        ? await this.prepareDirectAttachment(
+            input.receiptUploadToken,
+            createdById,
+          )
+        : null;
 
     const command = toExpenseCommand(input);
     const plan = await this.policy.build(command);
@@ -76,9 +95,11 @@ export class CreateExpenseUseCase {
         treatment: input.treatment,
         categoryId: input.categoryId,
         costObjectId: input.costObjectId ?? null,
+        supplierId: input.supplierId ?? null,
         payments: command.payments,
         allocations: command.allocations,
         documents: input.documents ?? [],
+        receiptAttachment,
         postings: plan.postings,
       });
     } catch (error) {
@@ -91,6 +112,117 @@ export class CreateExpenseUseCase {
     }
 
     return this.loadOperation(operationId);
+  }
+
+  private async prepareExtractionAttachment(
+    draftId: string,
+    ownerUserId: string,
+  ): Promise<{
+    source: "EXTRACTION_DRAFT";
+    extractionDraftId: string;
+    draftUploadId: string;
+    storageKey: string;
+  }> {
+    const draft = await this.prisma.expenseExtractionDraft.findFirst({
+      where: { id: draftId, ownerUserId },
+      select: {
+        id: true,
+        sourceUploadId: true,
+        status: true,
+        confirmedOperationId: true,
+        sourceUpload: {
+          select: {
+            storageKey: true,
+            purpose: true,
+            claimedAt: true,
+            cleanupStartedAt: true,
+          },
+        },
+      },
+    });
+
+    if (!draft) {
+      throw new FinanceNotFoundError(
+        "That receipt extraction draft does not exist.",
+        { draftId },
+      );
+    }
+
+    if (
+      draft.status !== "READY" ||
+      draft.confirmedOperationId ||
+      draft.sourceUpload.claimedAt ||
+      draft.sourceUpload.cleanupStartedAt !== null ||
+      draft.sourceUpload.purpose !== "finance-expense-document"
+    ) {
+      throw new FinanceStateError(
+        "That receipt has already been used or is not ready to confirm.",
+        { draftId },
+      );
+    }
+
+    return {
+      source: "EXTRACTION_DRAFT",
+      extractionDraftId: draft.id,
+      draftUploadId: draft.sourceUploadId,
+      storageKey: draft.sourceUpload.storageKey,
+    };
+  }
+
+  private async prepareDirectAttachment(
+    uploadToken: string,
+    ownerUserId: string,
+  ): Promise<{
+    source: "DIRECT_UPLOAD";
+    draftUploadId: string;
+    storageKey: string;
+  }> {
+    const stored = await this.imageStorage.completePresignedUpload(
+      uploadToken,
+      expenseReceiptUploadScope(ownerUserId),
+    );
+    const draft = await this.prisma.draftUpload.findUnique({
+      where: { storageKey: stored.storageKey },
+      select: {
+        id: true,
+        userId: true,
+        provider: true,
+        bucket: true,
+        storageKey: true,
+        contentType: true,
+        byteSize: true,
+        checksumSha256: true,
+        purpose: true,
+        expiresAt: true,
+        claimedAt: true,
+        cleanupStartedAt: true,
+      },
+    });
+
+    if (
+      !draft ||
+      draft.userId !== ownerUserId ||
+      draft.purpose !== EXPENSE_RECEIPT_DRAFT_PURPOSE ||
+      draft.provider !== stored.provider ||
+      draft.bucket !== stored.bucket ||
+      draft.storageKey !== stored.storageKey ||
+      draft.contentType !== stored.contentType ||
+      draft.byteSize !== stored.byteSize ||
+      draft.checksumSha256 !== stored.checksumSha256 ||
+      draft.claimedAt !== null ||
+      draft.cleanupStartedAt !== null ||
+      draft.expiresAt <= new Date()
+    ) {
+      throw new FinanceValidationError(
+        "The receipt upload is expired, already used, or does not match.",
+      );
+    }
+
+    return {
+      source: "DIRECT_UPLOAD",
+      draftUploadId: draft.id,
+      storageKey: draft.storageKey,
+    };
   }
 
   /** Returns the original operation when this key has already been used. */
@@ -134,7 +266,7 @@ export class CreateExpenseUseCase {
   private async assertReferencesExist(
     input: v1.finance.CreateExpenseInput,
   ): Promise<void> {
-    const [book, category, costObject] = await Promise.all([
+    const [book, category, costObject, supplier] = await Promise.all([
       this.repository.findBookById(input.bookId),
       this.prisma.expenseCategory.findUnique({
         where: { id: input.categoryId },
@@ -145,6 +277,9 @@ export class CreateExpenseUseCase {
             where: { id: input.costObjectId },
             select: { bookId: true, isActive: true, name: true },
           })
+        : Promise.resolve(null),
+      input.supplierId
+        ? this.repository.findSupplierById(input.supplierId)
         : Promise.resolve(null),
     ]);
 
@@ -182,6 +317,21 @@ export class CreateExpenseUseCase {
         throw new FinanceNotFoundError(
           `The cost object "${costObject.name}" is archived and cannot take new expenses.`,
           { costObjectId: input.costObjectId },
+        );
+      }
+    }
+
+    if (input.supplierId) {
+      if (!supplier) {
+        throw new FinanceNotFoundError("That supplier does not exist.", {
+          supplierId: input.supplierId,
+        });
+      }
+
+      if (!supplier.isActive) {
+        throw new FinanceNotFoundError(
+          `The supplier "${supplier.name}" is archived and cannot take new expenses.`,
+          { supplierId: input.supplierId },
         );
       }
     }

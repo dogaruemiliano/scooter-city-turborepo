@@ -24,7 +24,9 @@ import { Observable, throwError } from "rxjs";
 import { catchError } from "rxjs/operators";
 
 import {
+  FinanceConflictError,
   FinanceError,
+  FinanceForbiddenError,
   FinanceNotFoundError,
   FinanceStateError,
   FinanceValidationError,
@@ -39,7 +41,9 @@ import {
  * malformed bodies, which the zod pipe rejects before a use case runs.
  */
 function statusFor(error: FinanceError): number {
+  if (error instanceof FinanceForbiddenError) return HttpStatus.FORBIDDEN;
   if (error instanceof FinanceNotFoundError) return HttpStatus.NOT_FOUND;
+  if (error instanceof FinanceConflictError) return HttpStatus.CONFLICT;
   if (error instanceof IdempotencyConflictError) return HttpStatus.CONFLICT;
   if (error instanceof FinanceStateError) return HttpStatus.CONFLICT;
   if (error instanceof FinanceValidationError) {
