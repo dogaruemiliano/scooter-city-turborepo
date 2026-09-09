@@ -85,6 +85,7 @@ export function FormField({
       value={{ disabled, error, errorId, id, label, name, required }}
     >
       <div
+        data-field-name={name}
         data-disabled={disabled || undefined}
         className={cn("flex min-w-0 flex-col gap-2", className)}
       >

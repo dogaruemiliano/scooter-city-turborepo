@@ -7,6 +7,8 @@ import { radius } from "./tokens/radius";
 import { typography } from "./tokens/typography";
 import { shadow } from "./tokens/shadow";
 import { motion } from "./tokens/motion";
+import { magnification } from "./tokens/magnification";
+import { aspectRatio } from "./tokens/aspect-ratio";
 import { zIndex } from "./tokens/z-index";
 import { breakpoints } from "./tokens/breakpoints";
 
@@ -24,6 +26,8 @@ export const tokens = {
   typography,
   shadow,
   motion,
+  magnification,
+  aspectRatio,
   zIndex,
   breakpoints,
 } as const;

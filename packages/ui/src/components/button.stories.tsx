@@ -7,7 +7,7 @@ import {
   Trash2Icon,
 } from "lucide-react";
 
-import { Button } from "@repo/ui/components/button";
+import { Button, buttonVariants } from "@repo/ui/components/button";
 
 const meta = {
   title: "Shadcn/Button",
@@ -126,8 +126,8 @@ export const Disabled: Story = {
 
 export const AsLink: Story = {
   render: () => (
-    <Button nativeButton={false} render={<a href="#patient-profile" />}>
+    <a href="#patient-profile" className={buttonVariants()}>
       Open patient profile
-    </Button>
+    </a>
   ),
 };

@@ -253,7 +253,7 @@ importers:
 
   apps/mobile:
     dependencies:
-      '@expo-google-fonts/manrope':
+      '@expo-google-fonts/montserrat':
         specifier: ^0.4.2
         version: 0.4.2
       '@gorhom/bottom-sheet':
@@ -638,9 +638,9 @@ importers:
         specifier: ^1.4.0
         version: 1.4.0
     devDependencies:
-      '@fontsource-variable/manrope':
-        specifier: ^5.2.8
-        version: 5.2.8
+      '@fontsource-variable/montserrat':
+        specifier: ^5.3.0
+        version: 5.3.0
       '@repo/eslint-config':
         specifier: workspace:*
         version: link:../eslint-config
@@ -1786,11 +1786,11 @@ packages:
       '@noble/hashes':
         optional: true
 
-  '@expo-google-fonts/manrope@0.4.2':
-    resolution: {integrity: sha512-BZsKe8d9BJrVnIQIZcTS7/Kac0TbXnqs/+8EBSiQxrmK6GoCO6eTkmr50D1weIk/EoF20pTmAkpWICnovATr/g==}
-
   '@expo-google-fonts/material-symbols@0.4.38':
     resolution: {integrity: sha512-IJkBtN1o8u9BW5fvSii1MyHPQ7Q0HxbWcVBvOrOzgMLpVtZw7R2w94wBTVR7kZwv3w1JNTESMmLA5Sqn1+Z36A==}
+
+  '@expo-google-fonts/montserrat@0.4.2':
+    resolution: {integrity: sha512-Xyq7rKJhhZOE1Xk4wKSSVoUeOkFmQEMhtZ3pdFrgYckGZMs115Apmld1AI8Ju+yrl5GzDdfRCCqRr33dvEDYUA==}
 
   '@expo/cli@55.0.32':
     resolution: {integrity: sha512-fq+/yUYBVw5ZudT4igNyJ3WaF17R39iS7EZlrkfHkLI7Y1kmUlivabwKviLoAfepJOKjKODKpViti9EPfmG3SQ==}
@@ -1979,8 +1979,8 @@ packages:
   '@floating-ui/utils@0.2.11':
     resolution: {integrity: sha512-RiB/yIh78pcIxl6lLMG0CgBXAZ2Y0eVHqMPYugu+9U0AeT6YBeiJpf7lbdJNIugFP5SIjwNRgo4DhR1Qxi26Gg==}
 
-  '@fontsource-variable/manrope@5.2.8':
-    resolution: {integrity: sha512-nc9lOuCRz73UHnovDE2bwXUdghE2SEOc7Aii0qGe3CLyE03W1a7VnY5Z6euRiapiKbCkGS+eXbY3s/kvWeGeSw==}
+  '@fontsource-variable/montserrat@5.3.0':
+    resolution: {integrity: sha512-7PaZoxaxrWLAyrhO46v65An9LhUhfkTExWLhfbywYZCnZEgg/W1rEHnlNmZKjNZ3nJTVYyicqxlJt10z/26yTA==}
 
   '@formatjs/fast-memoize@3.1.6':
     resolution: {integrity: sha512-H5aexk1Le7T9TPmscacZ+1pR6CTa2n1wq+HDVGXhH8TzUlQQpeXzZs91dRtmFHrbeNbjPFPfQujUqm7MHgVoXQ==}
@@ -11459,9 +11459,9 @@ snapshots:
     optionalDependencies:
       '@noble/hashes': 1.8.0
 
-  '@expo-google-fonts/manrope@0.4.2': {}
-
   '@expo-google-fonts/material-symbols@0.4.38': {}
+
+  '@expo-google-fonts/montserrat@0.4.2': {}
 
   '@expo/cli@55.0.32(@expo/dom-webview@55.0.6)(@expo/metro-runtime@55.0.11)(expo-constants@55.0.16)(expo-font@55.0.8)(expo-router@55.0.16)(expo@55.0.26)(react-dom@19.2.0(react@19.2.0))(react-native@0.83.6(@babel/core@7.29.7)(@types/react@19.2.2)(react@19.2.0))(react@19.2.0)(typescript@5.9.2)':
     dependencies:
@@ -11838,7 +11838,7 @@ snapshots:
 
   '@floating-ui/utils@0.2.11': {}
 
-  '@fontsource-variable/manrope@5.2.8': {}
+  '@fontsource-variable/montserrat@5.3.0': {}
 
   '@formatjs/fast-memoize@3.1.6': {}
 

@@ -95,6 +95,7 @@ export type CalendarPickerProps = {
   onOpenChange?: (open: boolean) => void;
   onValueChange?: (value: string) => void;
   open?: boolean;
+  presentation?: "responsive" | "sheet" | "popover";
   today?: string;
   value?: string | null;
   weekStartsOn?: 0 | 1;
@@ -116,6 +117,7 @@ export function CalendarPicker({
   onOpenChange,
   onValueChange,
   open,
+  presentation = "responsive",
   renderTrigger,
   title,
   today,
@@ -124,6 +126,8 @@ export function CalendarPicker({
   weekStartsOn = DEFAULT_WEEK_STARTS_ON,
 }: CalendarPickerProps) {
   const isMobile = useIsMobile();
+  const usesSheet =
+    presentation === "sheet" || (presentation === "responsive" && isMobile);
   const [internalOpen, setInternalOpen] = React.useState(defaultOpen ?? false);
   const [internalValue, setInternalValue] = React.useState(defaultValue);
   const selectedValue = value === undefined ? internalValue : value;
@@ -202,7 +206,7 @@ export function CalendarPicker({
       onSelectDate={selectDate}
       onViewChange={setView}
       selectedDate={selectedDate}
-      surface={isMobile ? "sheet" : "popover"}
+      surface={usesSheet ? "sheet" : "popover"}
       title={title}
       todayDate={todayDate}
       view={view}
@@ -211,7 +215,7 @@ export function CalendarPicker({
     />
   );
 
-  if (isMobile) {
+  if (usesSheet) {
     return (
       <BottomSheet open={resolvedOpen} onOpenChange={setResolvedOpen}>
         <BottomSheetTrigger render={renderTrigger}>
@@ -496,7 +500,7 @@ function MonthGrid({
                   aria-label={formatFullDate(date, locale)}
                   aria-pressed={isSelected}
                   className={cn(
-                    "rounded-full text-base font-medium",
+                    "size-10 rounded-full text-base font-medium md:size-10",
                     !isSelected &&
                       "text-foreground hover:bg-secondary-hover active:bg-secondary-active",
                     !isCurrentMonth && "text-muted-foreground",

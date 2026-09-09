@@ -4,8 +4,8 @@
 export const typography = {
   fontFamily: {
     sans: {
-      web: "var(--font-manrope, 'Manrope Variable'), ui-sans-serif, system-ui, sans-serif",
-      native: "Manrope_400Regular",
+      web: "var(--font-montserrat, 'Montserrat Variable'), ui-sans-serif, system-ui, sans-serif",
+      native: "Montserrat_400Regular",
     },
     mono: {
       web: "var(--font-mono, ui-monospace), SFMono-Regular, Menlo, Consolas, monospace",
@@ -13,10 +13,10 @@ export const typography = {
     },
   },
   fontFamilyByWeight: {
-    regular: "Manrope_400Regular",
-    medium: "Manrope_500Medium",
-    semibold: "Manrope_600SemiBold",
-    bold: "Manrope_700Bold",
+    regular: "Montserrat_400Regular",
+    medium: "Montserrat_500Medium",
+    semibold: "Montserrat_600SemiBold",
+    bold: "Montserrat_700Bold",
   },
   fontSize: {
     xs: 12,

@@ -210,6 +210,7 @@ export function FormSelect({
           }}
         >
           <SelectTrigger
+            ref={field.ref}
             aria-describedby={errorId}
             aria-invalid={error ? true : undefined}
             aria-required={required || undefined}

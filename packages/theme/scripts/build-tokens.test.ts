@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { aspectRatio } from "../src/tokens/aspect-ratio.js";
 import { radius } from "../src/tokens/radius.js";
 import { motion } from "../src/tokens/motion.js";
 import { semanticColors } from "../src/tokens/semantic.js";
@@ -30,6 +31,7 @@ test("native output converts OKLCH and alpha to hexadecimal sRGB", () => {
   assert.doesNotMatch(native, /oklch\(/i);
   assert.match(native, /"scrim": "#00000066"/);
   assert.match(native, /"border": "#FFFFFF1A"/);
+  assert.match(native, /"magnification": \{\n {4}"loupe": 2\n {2}\}/);
   assert.doesNotMatch(native, /"minimal": \{/);
 });
 
@@ -69,4 +71,13 @@ test("CSS exposes motion durations through Tailwind's transition namespace", () 
       new RegExp(`--transition-duration-${cssName}: ${value}ms;`),
     );
   }
+});
+
+test("CSS exposes content aspect ratios through Tailwind's aspect namespace", () => {
+  const css = buildCss();
+
+  assert.match(
+    css,
+    new RegExp(`--aspect-receipt-portrait: ${aspectRatio.receiptPortrait};`),
+  );
 });

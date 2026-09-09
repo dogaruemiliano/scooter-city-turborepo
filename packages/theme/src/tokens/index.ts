@@ -19,6 +19,12 @@ export type { Shadow, ShadowToken, NativeShadow } from "./shadow";
 export { motion } from "./motion";
 export type { Motion } from "./motion";
 
+export { magnification } from "./magnification";
+export type { Magnification } from "./magnification";
+
+export { aspectRatio } from "./aspect-ratio";
+export type { AspectRatio } from "./aspect-ratio";
+
 export { zIndex } from "./z-index";
 export type { ZIndex } from "./z-index";
 
