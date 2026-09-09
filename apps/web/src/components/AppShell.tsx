@@ -10,6 +10,7 @@ import {
   ArrowLeftRightIcon,
   ArrowLeftIcon,
   BikeIcon,
+  Building2Icon,
   ChartPieIcon,
   HandCoinsIcon,
   LandmarkIcon,
@@ -21,6 +22,7 @@ import {
   WrenchIcon,
   type LucideIcon,
 } from "lucide-react";
+import { v1 } from "@repo/api-shared";
 import type { SupportedLocale } from "@repo/i18n";
 import {
   Avatar,
@@ -132,11 +134,31 @@ const NAVIGATION_GROUPS = [
       },
     ],
   },
+  {
+    labelKey: "companyGroup",
+    requiredRole: v1.auth.AUTH_ROLES.SUPER_ADMIN,
+    items: [
+      {
+        href: "/company/settings",
+        labelKey: "companySettings",
+        icon: Building2Icon,
+      },
+      {
+        href: "/company/associates",
+        labelKey: "companyAssociates",
+        icon: UsersRoundIcon,
+      },
+    ],
+  },
 ] as const;
 
 const SIDEBAR_ROOT_ROUTES: ReadonlySet<string> = new Set([
   DASHBOARD_NAVIGATION_ITEM.href,
   ...NAVIGATION_GROUPS.flatMap((group) => group.items.map((item) => item.href)),
+]);
+
+const IMMERSIVE_ROUTES: ReadonlySet<string> = new Set([
+  "/finance/expenses/new",
 ]);
 
 const ALL_NAVIGATION_HREFS: readonly string[] = [
@@ -150,10 +172,14 @@ const PAGE_TITLES: Record<string, string> = {
   "/finance": "finance",
   "/finance/expenses": "financeExpenses",
   "/finance/expenses/new": "newFinanceExpense",
+  "/finance/expenses/new/manual": "newFinanceExpenseManual",
   "/finance/funding/new": "newFinanceFunding",
   "/finance/operations": "financeOperations",
   "/finance/accounts": "financeAccounts",
+  "/finance/settings": "financeSettings",
   "/finance/settlement": "financeSettlement",
+  "/company/settings": "companySettings",
+  "/company/associates": "companyAssociates",
   "/persons": "persons",
   "/persons/new": "newPerson",
   "/scooters": "scooters",
@@ -181,7 +207,7 @@ export function AppShell({
   const pageTitle =
     pageTitleOverride ?? (pageTitleKey ? tPages(pageTitleKey) : "Scooter City");
 
-  if (isSignInPathname(pathname)) {
+  if (isSignInPathname(pathname) || IMMERSIVE_ROUTES.has(routePathname)) {
     return children;
   }
 
@@ -631,6 +657,10 @@ function AccountMenuLinkItem({
 }
 
 function getNestedFinancePageTitle(pathname: string): string | undefined {
+  if (pathname.startsWith("/finance/expenses/extractions/")) {
+    return "reviewFinanceExpense";
+  }
+
   if (pathname.startsWith("/finance/operations/")) {
     return "financeOperation";
   }

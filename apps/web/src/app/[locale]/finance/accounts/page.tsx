@@ -53,23 +53,15 @@ export default async function AccountsRoutePage({
     ),
   ]);
 
-  const t = messages[locale].finance.accounts;
   const currency =
     books.items.find((book) => book.type === "COMPANY")?.functionalCurrency ??
     "RON";
 
   return (
-    <div className="flex flex-col gap-6">
-      <header className="flex flex-col gap-1">
-        <h1 className="text-xl font-medium">{t.title}</h1>
-        <p className="text-sm text-muted-foreground">{t.description}</p>
-      </header>
-
-      <AccountBalanceTable
-        balances={balances.items}
-        currency={currency}
-        locale={locale}
-      />
-    </div>
+    <AccountBalanceTable
+      balances={balances.items}
+      currency={currency}
+      locale={locale}
+    />
   );
 }

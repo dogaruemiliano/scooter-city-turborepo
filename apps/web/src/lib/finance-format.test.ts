@@ -20,6 +20,16 @@ describe("formatMinorAmount", () => {
   it("uses the locale's own separators", () => {
     expect(formatMinorAmount(123_456, "RON", "ro")).toContain("1.234,56");
   });
+
+  it.each(["en", "ro"] as const)(
+    "uses the RON code instead of the localized lei symbol for %s",
+    (locale) => {
+      const formatted = formatMinorAmount(30_000, "RON", locale);
+
+      expect(formatted).toContain("RON");
+      expect(formatted.toLocaleLowerCase("ro-RO")).not.toContain("lei");
+    },
+  );
 });
 
 describe("formatSignedMinorAmount", () => {
@@ -32,6 +42,10 @@ describe("formatSignedMinorAmount", () => {
     const formatted = formatSignedMinorAmount(0, "RON", "en");
     expect(formatted.startsWith("+")).toBe(false);
     expect(formatted.startsWith("−")).toBe(false);
+  });
+
+  it("keeps the RON code on signed amounts", () => {
+    expect(formatSignedMinorAmount(-30_000, "RON", "ro")).toContain("RON");
   });
 });
 

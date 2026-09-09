@@ -56,8 +56,41 @@ export async function AccountBalanceTable({
             {t(`categories.${group.category}`)}
           </h2>
 
-          <Card className="overflow-x-auto">
-            <table className="w-full min-w-xl text-sm">
+          <Card className="gap-0 py-0 md:hidden">
+            <ul>
+              {group.rows.map((balance) => (
+                <li
+                  key={balance.accountId}
+                  className="border-b p-3 last:border-b-0"
+                >
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+                    <p className="min-w-0 break-words font-medium">
+                      {balance.name}
+                    </p>
+
+                    <p className="min-w-0 break-words text-right font-medium tabular-nums">
+                      {formatMinorAmount(
+                        balance.displayBalanceMinor,
+                        currency,
+                        locale,
+                      )}
+                    </p>
+
+                    <p className="min-w-0 break-words text-muted-foreground">
+                      {t(`roles.${balance.role}`)}
+                    </p>
+
+                    <p className="min-w-0 text-right tabular-nums text-muted-foreground">
+                      {t("postingCount", { count: balance.postingCount })}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </Card>
+
+          <Card className="hidden gap-0 overflow-hidden py-0 md:flex">
+            <table className="w-full text-sm">
               <thead>
                 <tr className="border-b text-left text-muted-foreground">
                   <th scope="col" className="p-3 font-normal">

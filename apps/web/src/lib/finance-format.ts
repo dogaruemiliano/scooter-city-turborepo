@@ -23,7 +23,7 @@ export function formatMinorAmount(
   return new Intl.NumberFormat(NUMBER_FORMAT_LOCALES[locale], {
     style: "currency",
     currency,
-    currencyDisplay: "narrowSymbol",
+    currencyDisplay: "code",
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(amountMinor / v1.finance.MINOR_UNITS_PER_MAJOR);
@@ -31,7 +31,7 @@ export function formatMinorAmount(
 
 /**
  * Formats an amount with an explicit sign, for impact figures where the
- * direction is the point: "−300,00 lei" of company cash.
+ * direction is the point: "−300,00 RON" of company cash.
  */
 export function formatSignedMinorAmount(
   amountMinor: number,

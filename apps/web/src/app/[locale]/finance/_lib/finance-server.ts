@@ -1,6 +1,6 @@
 import "server-only";
 
-import { ApiError } from "@repo/api-shared";
+import { ApiError, v1 } from "@repo/api-shared";
 import type { SupportedLocale } from "@repo/i18n";
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
@@ -10,7 +10,8 @@ import { getLocalizedSignInPath, localizePath } from "@/i18n/paths";
 import { webApi } from "@/lib/api";
 import { meFromApi } from "@/lib/auth-server";
 
-const ADMIN_ROLE = "ADMIN";
+const ADMIN_ROLE = v1.auth.AUTH_ROLES.ADMIN;
+const SUPER_ADMIN_ROLE = v1.auth.AUTH_ROLES.SUPER_ADMIN;
 
 /**
  * The finance module is admin-only. Anyone else gets a 404 rather than a 403,
@@ -21,13 +22,28 @@ export async function requireFinanceAdmin(
   locale: SupportedLocale,
   returnPath: string,
 ) {
+  return requireFinanceRole(locale, returnPath, ADMIN_ROLE);
+}
+
+export async function requireFinanceSuperAdmin(
+  locale: SupportedLocale,
+  returnPath: string,
+) {
+  return requireFinanceRole(locale, returnPath, SUPER_ADMIN_ROLE);
+}
+
+async function requireFinanceRole(
+  locale: SupportedLocale,
+  returnPath: string,
+  role: string,
+) {
   const user = await meFromApi();
 
   if (!user) {
     redirect(getLocalizedSignInPath(locale, localizePath(returnPath, locale)));
   }
 
-  if (!user.roles.includes(ADMIN_ROLE)) {
+  if (!user.roles.includes(role)) {
     notFound();
   }
 

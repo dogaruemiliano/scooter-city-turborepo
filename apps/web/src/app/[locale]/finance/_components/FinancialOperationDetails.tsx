@@ -320,9 +320,15 @@ export function FinancialOperationDetails({
               <li key={document.id} className="flex flex-col">
                 <span>
                   {tExpense(`documents.types.${document.type}`)}
-                  {document.documentNumber
-                    ? ` · ${document.documentNumber}`
-                    : ""}
+                  {document.type === "INVOICE" && document.documentSeries
+                    ? ` · ${document.documentSeries}${
+                        document.documentNumber
+                          ? ` ${document.documentNumber}`
+                          : ""
+                      }`
+                    : document.documentNumber
+                      ? ` · ${document.documentNumber}`
+                      : ""}
                 </span>
                 {document.supplierName ? (
                   <span className="text-xs text-muted-foreground">

@@ -14,11 +14,11 @@
  */
 import { ApiError, v1 } from "@repo/api-shared";
 import type { SupportedLocale } from "@repo/i18n";
-import { Button, Card, Separator } from "@repo/ui/components";
-import { PlusIcon, Trash2Icon } from "lucide-react";
+import { Button, Card, Input, Label, Separator } from "@repo/ui/components";
+import { ImageIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FormProvider, useFieldArray, useWatch } from "react-hook-form";
 
 import { FormField } from "@/components/form/FormField";
@@ -33,7 +33,12 @@ import { financeUserLabel, formatMinorAmount } from "@/lib/finance-format";
 import { useZodForm } from "@/lib/form/use-zod-form";
 import { FinancialImpactPreview } from "../../_components/FinancialImpactPreview";
 import { FINANCE_PATHS } from "../../_lib/links";
-import { createExpense, previewExpense } from "../_lib/expense-api";
+import {
+  createExpense,
+  createSupplier,
+  previewExpense,
+  uploadExpenseReceipt,
+} from "../_lib/expense-api";
 import {
   allocationDefaultsForCostObject,
   emptyAllocationLine,
@@ -44,11 +49,13 @@ import {
   sumLines,
   toCreateExpenseInput,
   todayDateOnly,
+  type ExpenseFormFocusField,
   type ExpenseFormValues,
 } from "../_lib/expense-form";
 
 /** How long the form waits after a keystroke before asking for a preview. */
 const PREVIEW_DEBOUNCE_MS = 400;
+const RECEIPT_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
 
 export interface ExpenseFormProps {
   book: v1.finance.FinanceBook;
@@ -58,6 +65,11 @@ export interface ExpenseFormProps {
   costObjects: readonly v1.finance.CostObject[];
   /** Already localized by the server component that renders this form. */
   expensesHref: string;
+  initialValues?: ExpenseFormValues;
+  /** READY scan whose private image will be claimed when the form is saved. */
+  extractionDraftId?: string;
+  /** First invalid scan field to reveal when continuing from confirmation. */
+  initialFocusField?: ExpenseFormFocusField;
 }
 
 export function ExpenseForm({
@@ -67,6 +79,9 @@ export function ExpenseForm({
   categories,
   costObjects,
   expensesHref,
+  initialValues,
+  extractionDraftId,
+  initialFocusField,
 }: ExpenseFormProps) {
   const t = useTranslations("finance.expense");
   const tCommon = useTranslations("finance.common");
@@ -79,6 +94,12 @@ export function ExpenseForm({
   const [previewError, setPreviewError] = useState<string>();
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [receiptFile, setReceiptFile] = useState<File>();
+  const [receiptPreview, setReceiptPreview] = useState<string>();
+  const [receiptUploadToken, setReceiptUploadToken] = useState<string>();
+  const [receiptUploading, setReceiptUploading] = useState(false);
+  const [receiptError, setReceiptError] = useState<string>();
+  const receiptInputRef = useRef<HTMLInputElement>(null);
 
   // One key for the life of this form. A retry after a timeout returns the
   // original operation instead of recording the expense a second time.
@@ -87,13 +108,37 @@ export function ExpenseForm({
   const form = useZodForm<ExpenseFormValues, ExpenseFormValues>(
     expenseFormSchema,
     {
-      defaultValues: expenseFormDefaults({
-        bookId: book.id,
-        today: todayDateOnly(),
-      }),
+      defaultValues:
+        initialValues ??
+        expenseFormDefaults({
+          bookId: book.id,
+          today: todayDateOnly(),
+        }),
       labelFor: (path) => labelForPath(path, t),
     },
   );
+
+  useEffect(() => {
+    if (!initialFocusField) return;
+
+    let cancelled = false;
+    const frame = requestAnimationFrame(() => {
+      void form.trigger(initialFocusField).then(() => {
+        if (cancelled) return;
+
+        const field = document.querySelector<HTMLElement>(
+          `[data-field-name="${initialFocusField}"]`,
+        );
+        field?.scrollIntoView({ block: "center" });
+        form.setFocus(initialFocusField, { shouldSelect: true });
+      });
+    });
+
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(frame);
+    };
+  }, [form, initialFocusField]);
 
   const payments = useFieldArray({ control: form.control, name: "payments" });
   const allocations = useFieldArray({
@@ -202,6 +247,13 @@ export function ExpenseForm({
     };
   }, [refreshPreview, values]);
 
+  useEffect(
+    () => () => {
+      if (receiptPreview) URL.revokeObjectURL(receiptPreview);
+    },
+    [receiptPreview],
+  );
+
   const paymentsTotalMinor = sumLines(values.payments ?? []);
   const allocationsTotalMinor = sumLines(values.allocations ?? []);
 
@@ -210,8 +262,60 @@ export function ExpenseForm({
     setSubmitError(null);
 
     try {
+      let valuesToSave = submitted;
+      const extractedDocument = submitted.documents[0];
+      if (
+        extractionDraftId &&
+        !submitted.supplierId &&
+        extractedDocument?.supplierName &&
+        extractedDocument.supplierTaxId
+      ) {
+        const supplier = await createSupplier({
+          name: extractedDocument.supplierName,
+          taxIdentifier: extractedDocument.supplierTaxId,
+        });
+        valuesToSave = {
+          ...submitted,
+          supplierId: supplier.id,
+          description: supplier.name,
+          documents: submitted.documents.map((document, index) =>
+            index === 0
+              ? {
+                  ...document,
+                  supplierName: supplier.name,
+                  supplierTaxId: supplier.taxIdentifier,
+                }
+              : document,
+          ),
+        };
+        form.reset(valuesToSave);
+      }
+
+      let uploadToken = receiptUploadToken;
+
+      if (!extractionDraftId && receiptFile && !uploadToken) {
+        setReceiptError(undefined);
+        setReceiptUploading(true);
+
+        try {
+          uploadToken = await uploadExpenseReceipt(receiptFile);
+          setReceiptUploadToken(uploadToken);
+        } catch {
+          setReceiptError(t("documents.imageUploadFailed"));
+          return;
+        } finally {
+          setReceiptUploading(false);
+        }
+      }
+
       const operation = await createExpense(
-        toCreateExpenseInput(submitted),
+        {
+          ...toCreateExpenseInput(valuesToSave),
+          ...(extractionDraftId ? { extractionDraftId } : {}),
+          ...(!extractionDraftId && uploadToken
+            ? { receiptUploadToken: uploadToken }
+            : {}),
+        },
         idempotencyKey,
       );
 
@@ -220,10 +324,37 @@ export function ExpenseForm({
       router.push(localizePath(FINANCE_PATHS.operation(operation.id), locale));
       router.refresh();
     } catch (error) {
+      // A presigned completion token is intentionally short-lived. Keep the
+      // local File, but obtain a fresh upload/token on the next submit so a
+      // validation or network failure cannot strand the receipt.
+      if (!extractionDraftId && receiptFile) {
+        setReceiptUploadToken(undefined);
+      }
       setSubmitError(messageForError(error, tErrors));
     } finally {
       setSubmitting(false);
     }
+  }
+
+  function selectReceipt(file: File | null) {
+    if (!file) return;
+
+    if (!(RECEIPT_IMAGE_TYPES as readonly string[]).includes(file.type)) {
+      setReceiptError(t("documents.imageUnsupportedType"));
+      return;
+    }
+
+    setReceiptFile(file);
+    setReceiptPreview(URL.createObjectURL(file));
+    setReceiptUploadToken(undefined);
+    setReceiptError(undefined);
+  }
+
+  function removeReceipt() {
+    setReceiptFile(undefined);
+    setReceiptPreview(undefined);
+    setReceiptUploadToken(undefined);
+    setReceiptError(undefined);
   }
 
   /** Prefills the benefit lines — and only those — from a cost object. */
@@ -265,8 +396,6 @@ export function ExpenseForm({
         className="flex flex-col gap-6 lg:flex-row lg:items-start"
       >
         <div className="flex min-w-0 flex-1 flex-col gap-6">
-          <FormSummary title={t("newTitle")} message={submitError} />
-
           <Card className="flex flex-col gap-4 p-4">
             <SectionHeading title={t("steps.details")} />
 
@@ -534,6 +663,23 @@ export function ExpenseForm({
               description={t("documents.description")}
             />
 
+            {extractionDraftId ? (
+              <div className="flex items-center gap-3 border-y border-border py-3">
+                <ImageIcon
+                  className="size-5 shrink-0 text-muted-foreground"
+                  aria-hidden="true"
+                />
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">
+                    {t("documents.receiptAttached")}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {t("documents.receiptAttachedHint")}
+                  </p>
+                </div>
+              </div>
+            ) : null}
+
             {documents.fields.map((field, index) => (
               <div key={field.id} className="flex flex-col gap-3">
                 {index > 0 ? <Separator /> : null}
@@ -551,8 +697,24 @@ export function ExpenseForm({
                           label: t(`documents.types.${type}`),
                         }),
                       )}
+                      onValueChange={(type) => {
+                        if (type === "INVOICE") return;
+                        form.setValue(`documents.${index}.documentSeries`, "", {
+                          shouldDirty: true,
+                          shouldValidate: true,
+                        });
+                      }}
                     />
                   </FormField>
+
+                  {values.documents?.[index]?.type === "INVOICE" ? (
+                    <FormField
+                      name={`documents.${index}.documentSeries`}
+                      label={t("documents.documentSeries")}
+                    >
+                      <FormInput autoComplete="off" />
+                    </FormField>
+                  ) : null}
 
                   <FormField
                     name={`documents.${index}.documentNumber`}
@@ -606,6 +768,99 @@ export function ExpenseForm({
               <PlusIcon aria-hidden="true" />
               {t("documents.addLine")}
             </Button>
+
+            {!extractionDraftId ? (
+              <div className="flex flex-col gap-3 pt-2">
+                <div className="flex flex-col gap-1">
+                  <h3 className="text-sm font-medium">
+                    {t("documents.imageTitle")}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {t("documents.imageDescription")}
+                  </p>
+                </div>
+
+                <Input
+                  ref={receiptInputRef}
+                  id="expense-receipt-image"
+                  type="file"
+                  accept={RECEIPT_IMAGE_TYPES.join(",")}
+                  className="sr-only"
+                  disabled={submitting || receiptUploading}
+                  onChange={(event) => {
+                    selectReceipt(event.target.files?.[0] ?? null);
+                    event.currentTarget.value = "";
+                  }}
+                />
+
+                {receiptPreview && receiptFile ? (
+                  <div className="flex min-h-20 flex-col gap-3 border-y border-border py-3 sm:flex-row sm:items-center">
+                    {/* eslint-disable-next-line @next/next/no-img-element -- local object URL preview. */}
+                    <img
+                      src={receiptPreview}
+                      alt={t("documents.imagePreviewAlt")}
+                      className="size-16 shrink-0 rounded-lg object-cover"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">
+                        {receiptFile.name}
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {receiptUploading
+                          ? t("documents.imageUploading")
+                          : receiptError
+                            ? t("documents.imageUploadErrorStatus")
+                            : t("documents.imageReady")}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={submitting || receiptUploading}
+                        onClick={() => receiptInputRef.current?.click()}
+                      >
+                        {t("documents.imageReplace")}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        disabled={submitting || receiptUploading}
+                        onClick={removeReceipt}
+                      >
+                        <Trash2Icon aria-hidden="true" />
+                        {t("documents.imageRemove")}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <Label
+                    htmlFor="expense-receipt-image"
+                    className="flex min-h-20 cursor-pointer items-center gap-4 border-y border-border py-3 transition-colors duration-fast ease-standard hover:bg-muted/50"
+                  >
+                    <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                      <ImageIcon className="size-5" aria-hidden="true" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-medium">
+                        {t("documents.imageAdd")}
+                      </span>
+                      <span className="mt-1 block text-xs font-normal text-muted-foreground">
+                        {t("documents.imageFormats")}
+                      </span>
+                    </span>
+                  </Label>
+                )}
+
+                {receiptError ? (
+                  <p role="alert" className="text-sm text-destructive">
+                    {receiptError}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
           </Card>
         </div>
 
@@ -620,8 +875,10 @@ export function ExpenseForm({
             onRetry={() => void refreshPreview()}
           />
 
+          <FormSummary title={t("newTitle")} message={submitError} />
+
           <div className="flex flex-wrap gap-2">
-            <Button type="submit" disabled={submitting}>
+            <Button type="submit" disabled={submitting || receiptUploading}>
               {submitting ? t("submitting") : t("submit")}
             </Button>
             <Button

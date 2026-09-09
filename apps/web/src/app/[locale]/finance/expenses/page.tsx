@@ -1,6 +1,6 @@
 import { v1 } from "@repo/api-shared";
 import { messages } from "@repo/i18n";
-import { Button } from "@repo/ui/components";
+import { buttonVariants } from "@repo/ui/components";
 import type { Metadata } from "next";
 
 import { Link } from "@/i18n/navigation";
@@ -73,9 +73,9 @@ export default async function ExpensesRoutePage({
           </p>
         </div>
 
-        <Button render={<Link href={FINANCE_PATHS.newExpense} />}>
+        <Link href={FINANCE_PATHS.newExpense} className={buttonVariants()}>
           {t.overview.newExpense}
-        </Button>
+        </Link>
       </header>
 
       <OperationList

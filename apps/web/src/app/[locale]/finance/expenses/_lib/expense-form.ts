@@ -18,6 +18,47 @@ const MAX_NOTES_LENGTH = 2_000;
 const MAX_SUPPLIER_LENGTH = 200;
 const MAX_CODE_LENGTH = 64;
 
+export const EXPENSE_FORM_FOCUS_FIELDS = [
+  "bookId",
+  "amount",
+  "occurredAt",
+  "treatment",
+  "categoryId",
+  "payments.0.sourceType",
+  "payments.0.sourceAccountId",
+  "payments.0.payerAssociateId",
+  "payments.0.paymentMethod",
+  "payments.0.amount",
+  "allocations.0.type",
+  "allocations.0.associateId",
+  "allocations.0.amount",
+] as const;
+
+export type ExpenseFormFocusField = (typeof EXPENSE_FORM_FOCUS_FIELDS)[number];
+
+const EXPENSE_FORM_FOCUS_FIELD_SET = new Set<string>(EXPENSE_FORM_FOCUS_FIELDS);
+
+export function isExpenseFormFocusField(
+  value: string | undefined,
+): value is ExpenseFormFocusField {
+  return Boolean(value && EXPENSE_FORM_FOCUS_FIELD_SET.has(value));
+}
+
+export function expenseFormFocusFieldForIssuePath(
+  path: readonly PropertyKey[],
+): ExpenseFormFocusField | undefined {
+  const [section, , nestedField] = path.map(String);
+  let candidate = path.map(String).join(".");
+
+  if (section === "payments") {
+    candidate = `payments.0.${nestedField ?? "amount"}`;
+  } else if (section === "allocations") {
+    candidate = `allocations.0.${nestedField ?? "amount"}`;
+  }
+
+  return isExpenseFormFocusField(candidate) ? candidate : undefined;
+}
+
 /** Issue codes the UI swaps for localized text. */
 export const PAYMENTS_TOTAL_ISSUE = "finance.paymentsTotal";
 export const ALLOCATIONS_TOTAL_ISSUE = "finance.allocationsTotal";
@@ -69,6 +110,7 @@ export const economicAllocationFieldSchema = z.object({
 
 export const financialDocumentFieldSchema = z.object({
   type: z.enum(v1.finance.FINANCIAL_DOCUMENT_TYPES),
+  documentSeries: optionalTextSchema(MAX_CODE_LENGTH),
   documentNumber: optionalTextSchema(MAX_CODE_LENGTH),
   issuedAt: z.string().trim(),
   supplierName: optionalTextSchema(MAX_SUPPLIER_LENGTH),
@@ -79,6 +121,7 @@ export const financialDocumentFieldSchema = z.object({
 export const expenseFormSchema = z
   .object({
     bookId: z.string().trim().min(1),
+    supplierId: z.string().trim(),
     occurredAt: z.string().trim().min(1),
     description: optionalTextSchema(MAX_DESCRIPTION_LENGTH),
     amount: amountFieldSchema,
@@ -200,6 +243,7 @@ export function emptyAllocationLine(
 export function emptyDocumentLine(): ExpenseFormValues["documents"][number] {
   return {
     type: "RECEIPT",
+    documentSeries: "",
     documentNumber: "",
     issuedAt: "",
     supplierName: "",
@@ -219,6 +263,7 @@ export function expenseFormDefaults({
 }: ExpenseFormDefaultsInput): ExpenseFormValues {
   return {
     bookId,
+    supplierId: "",
     occurredAt: today,
     description: "",
     amount: "",
@@ -228,6 +273,113 @@ export function expenseFormDefaults({
     payments: [emptyPaymentLine()],
     allocations: [emptyAllocationLine()],
     documents: [],
+  };
+}
+
+export function expenseFormDefaultsFromExtraction(input: {
+  extraction: v1.finance.NormalizedExpenseExtraction;
+  books: readonly v1.finance.FinanceBook[];
+  accounts: readonly v1.finance.LedgerAccount[];
+  categories: readonly v1.finance.ExpenseCategory[];
+  suppliers: readonly v1.finance.Supplier[];
+  currentUserId: string;
+  fallbackBook: v1.finance.FinanceBook;
+  today: string;
+}): ExpenseFormValues {
+  const { extraction } = input;
+  const book =
+    input.books.find(
+      (candidate) => candidate.type === extraction.suggestedBookType,
+    ) ?? input.fallbackBook;
+  const amount =
+    extraction.amountMinor.value === null
+      ? ""
+      : v1.finance.formatMinorToMajor(extraction.amountMinor.value);
+  const category = input.categories.find(
+    (candidate) =>
+      candidate.bookId === book.id &&
+      candidate.code === extraction.suggestedCategoryCode,
+  );
+  const supplier = findMatchingSupplier(
+    input.suppliers,
+    extraction.supplierName.value,
+    extraction.supplierTaxIdentifier.value,
+  );
+  const allowedTreatments =
+    v1.finance.EXPENSE_TREATMENTS_BY_BOOK_TYPE[book.type];
+  const treatment =
+    category?.defaultTreatment &&
+    allowedTreatments.includes(category.defaultTreatment)
+      ? category.defaultTreatment
+      : allowedTreatments[0];
+  const sourceAccount =
+    book.type === "COMPANY"
+      ? (input.accounts.find(
+          (account) =>
+            account.bookId === book.id &&
+            account.role === "BANK" &&
+            account.isDefault,
+        ) ??
+        input.accounts.find(
+          (account) =>
+            account.bookId === book.id &&
+            (
+              v1.finance.EXPENSE_PAYMENT_SOURCE_ROLES as readonly string[]
+            ).includes(account.role),
+        ))
+      : undefined;
+  const hasDocumentDetails = [
+    extraction.suggestedDocumentType === "INVOICE",
+    extraction.documentSeries.value,
+    extraction.documentNumber.value,
+    extraction.occurredAt.value,
+    extraction.supplierName.value,
+    extraction.supplierTaxIdentifier.value,
+  ].some(Boolean);
+
+  return {
+    ...expenseFormDefaults({ bookId: book.id, today: input.today }),
+    supplierId: supplier?.id ?? "",
+    occurredAt: extraction.occurredAt.value ?? input.today,
+    description: extraction.supplierName.value ?? "",
+    amount,
+    treatment: treatment ?? "OPERATING_EXPENSE",
+    categoryId: category?.id ?? "",
+    payments: [
+      emptyPaymentLine({
+        sourceType:
+          book.type === "ASSOCIATE_POOL"
+            ? "ASSOCIATE_PERSONAL_FUNDS"
+            : "BOOK_ACCOUNT",
+        sourceAccountId: sourceAccount?.id ?? "",
+        payerAssociateId:
+          book.type === "ASSOCIATE_POOL" ? input.currentUserId : "",
+        paymentMethod: extraction.suggestedPaymentMethod ?? "BANK_TRANSFER",
+        amount,
+      }),
+    ],
+    allocations: [
+      emptyAllocationLine({
+        type: extraction.suggestedAllocationType ?? "COMMON",
+        amount,
+      }),
+    ],
+    documents: hasDocumentDetails
+      ? [
+          {
+            ...emptyDocumentLine(),
+            type: extraction.suggestedDocumentType,
+            documentSeries:
+              extraction.suggestedDocumentType === "INVOICE"
+                ? (extraction.documentSeries.value ?? "")
+                : "",
+            documentNumber: extraction.documentNumber.value ?? "",
+            issuedAt: extraction.occurredAt.value ?? "",
+            supplierName: extraction.supplierName.value ?? "",
+            supplierTaxId: extraction.supplierTaxIdentifier.value ?? "",
+          },
+        ]
+      : [],
   };
 }
 
@@ -271,6 +423,7 @@ export function toCreateExpenseInput(
 ): v1.finance.CreateExpenseInput {
   return {
     bookId: values.bookId,
+    ...(values.supplierId ? { supplierId: values.supplierId } : {}),
     occurredAt: dateToIsoTimestamp(values.occurredAt),
     ...(values.description ? { description: values.description } : {}),
     amountMinor: v1.finance.parseMajorToMinor(values.amount),
@@ -308,6 +461,9 @@ export function toCreateExpenseInput(
       ? {
           documents: values.documents.map((document) => ({
             type: document.type,
+            ...(document.type === "INVOICE" && document.documentSeries
+              ? { documentSeries: document.documentSeries }
+              : {}),
             ...(document.documentNumber
               ? { documentNumber: document.documentNumber }
               : {}),
@@ -325,6 +481,60 @@ export function toCreateExpenseInput(
         }
       : {}),
   };
+}
+
+export function findMatchingSupplier(
+  suppliers: readonly v1.finance.Supplier[],
+  supplierName: string | null,
+  supplierTaxIdentifier: string | null,
+): v1.finance.Supplier | undefined {
+  const normalizedTaxIdentifier = supplierTaxIdentifier
+    ? normalizeSupplierTaxIdentifier(supplierTaxIdentifier)
+    : "";
+  if (normalizedTaxIdentifier) {
+    return suppliers.find(
+      (supplier) =>
+        supplier.isActive &&
+        normalizeSupplierTaxIdentifier(supplier.taxIdentifier) ===
+          normalizedTaxIdentifier,
+    );
+  }
+
+  const normalizedName = supplierName
+    ? normalizeSupplierName(supplierName)
+    : "";
+  if (!normalizedName) return undefined;
+  return suppliers.find(
+    (supplier) =>
+      supplier.isActive &&
+      normalizeSupplierName(supplier.name) === normalizedName,
+  );
+}
+
+function normalizeSupplierTaxIdentifier(value: string): string {
+  return value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .replace(/^(CODFISCAL|CUI|CIF|VAT|CF)/, "")
+    .replace(/^RO(?=\d)/, "");
+}
+
+function normalizeSupplierName(value: string): string {
+  const normalized = value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+
+  return normalized
+    .replace(/\bS R L\b/g, "SRL")
+    .replace(/\bS A\b/g, "SA")
+    .replace(/\bP F A\b/g, "PFA")
+    .replace(/\bI I\b/g, "II");
 }
 
 /** A calendar date becomes midnight UTC — the ledger only cares about the day. */

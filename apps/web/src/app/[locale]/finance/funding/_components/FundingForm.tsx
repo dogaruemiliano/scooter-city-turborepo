@@ -17,7 +17,7 @@ import {
 import { FileImageIcon, Trash2Icon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FormProvider, useWatch } from "react-hook-form";
 
 import { FormField } from "@/components/form/FormField";
@@ -114,6 +114,7 @@ export function FundingForm({
   const [proofName, setProofName] = useState<string>();
   const [proofPreview, setProofPreview] = useState<string>();
   const [proofUploading, setProofUploading] = useState(false);
+  const proofInputRef = useRef<HTMLInputElement>(null);
   const [proofError, setProofError] = useState<string>();
   const [idempotencyKey] = useState(() => crypto.randomUUID());
 
@@ -265,6 +266,7 @@ export function FundingForm({
               </div>
               <div className="relative overflow-hidden rounded-lg border border-border bg-background">
                 <Input
+                  ref={proofInputRef}
                   id="funding-proof"
                   type="file"
                   accept="image/jpeg,image/png,image/webp"
@@ -300,7 +302,8 @@ export function FundingForm({
                         type="button"
                         variant="outline"
                         size="sm"
-                        render={<Label htmlFor="funding-proof" />}
+                        disabled={proofUploading || submitting}
+                        onClick={() => proofInputRef.current?.click()}
                       >
                         {t("proof.replace")}
                       </Button>

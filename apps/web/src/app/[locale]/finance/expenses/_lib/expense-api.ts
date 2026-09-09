@@ -42,6 +42,83 @@ export function createExpense(
   );
 }
 
+export function createSupplier(
+  input: v1.finance.CreateSupplierInput,
+): Promise<v1.finance.Supplier> {
+  return webApi.fetch(
+    v1.finance.ROUTES.suppliers.create,
+    v1.finance.supplierSchema,
+    { method: "POST", json: input },
+  );
+}
+
+export function updateSupplier(
+  supplierId: string,
+  input: v1.finance.UpdateSupplierInput,
+): Promise<v1.finance.Supplier> {
+  return webApi.fetch(
+    v1.finance.ROUTES.suppliers.update(supplierId),
+    v1.finance.supplierSchema,
+    { method: "PATCH", json: input },
+  );
+}
+
+export async function analyzeExpenseReceipt(
+  file: File,
+): Promise<v1.finance.ExpenseExtractionDraft> {
+  const uploadToken = await uploadExpenseReceipt(file);
+
+  return webApi.fetch(
+    v1.finance.ROUTES.expenses.analyze,
+    v1.finance.expenseExtractionDraftSchema,
+    {
+      method: "POST",
+      json: { uploadToken },
+    },
+  );
+}
+
+/**
+ * Uploads private receipt evidence without starting Textract.
+ *
+ * The returned signed token, rather than the storage key, is sent when the
+ * expense is finally recorded. That keeps the browser from choosing which
+ * private object is attached to a financial operation.
+ */
+export async function uploadExpenseReceipt(file: File): Promise<string> {
+  const checksum = await crypto.subtle.digest(
+    "SHA-256",
+    await file.arrayBuffer(),
+  );
+  const checksumSha256 = Array.from(new Uint8Array(checksum), (byte) =>
+    byte.toString(16).padStart(2, "0"),
+  ).join("");
+
+  const signed = await webApi.fetch(
+    v1.finance.ROUTES.expenses.draftUpload,
+    v1.finance.expenseReceiptDraftUploadSchema,
+    {
+      method: "POST",
+      json: {
+        contentType: file.type,
+        byteSize: file.size,
+        checksumSha256,
+      },
+    },
+  );
+
+  const upload = await fetch(signed.uploadUrl, {
+    method: signed.method,
+    headers: signed.headers,
+    body: file,
+  });
+  if (!upload.ok) {
+    throw new Error(`Storage upload returned HTTP ${upload.status}`);
+  }
+
+  return signed.uploadToken;
+}
+
 export function reverseOperation(
   operationId: string,
   input: v1.finance.ReverseOperationInput,

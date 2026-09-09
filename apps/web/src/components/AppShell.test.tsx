@@ -362,13 +362,13 @@ describe("AppShell", () => {
     );
   });
 
-  it("renders the Romanian persons navigation and title for admins", () => {
+  it("renders company navigation for super admins", () => {
     mocks.pathname = "/persons";
 
     renderAppShell({
       id: "admin-1",
       email: "admin@example.com",
-      roles: ["ADMIN"],
+      roles: ["ADMIN", "SUPER_ADMIN"],
     });
 
     expect(screen.getByRole("link", { name: "Persoane" })).toHaveAttribute(
@@ -393,10 +393,35 @@ describe("AppShell", () => {
     expect(screen.getByText("Entități")).toBeInTheDocument();
     expect(screen.getAllByText("Scutere").length).toBeGreaterThan(0);
     expect(screen.getByText("Finanțe")).toBeInTheDocument();
+    expect(screen.getByText("Firmă")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Setări" })).toHaveAttribute(
+      "href",
+      "/company/settings",
+    );
+    expect(screen.getByRole("link", { name: "Asociați" })).toHaveAttribute(
+      "href",
+      "/company/associates",
+    );
+  });
+
+  it("hides company navigation from admins without the super-admin role", () => {
+    renderAppShell({
+      id: "admin-1",
+      email: "admin@example.com",
+      roles: ["ADMIN"],
+    });
+
+    expect(screen.queryByText("Firmă")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Setări" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Asociați" }),
+    ).not.toBeInTheDocument();
   });
 
   it("renders finance navigation and static finance page titles for admins", () => {
-    mocks.pathname = "/finance/expenses/new";
+    mocks.pathname = "/finance/accounts";
 
     renderAppShell({
       id: "admin-1",
@@ -416,11 +441,11 @@ describe("AppShell", () => {
       "/finance/settlement",
     );
     expect(
-      within(screen.getByRole("banner")).getByText("Înregistrează cheltuială"),
+      within(screen.getByRole("banner")).getByText("Conturi"),
     ).toBeInTheDocument();
   });
 
-  it("renders the compact expense page title in English and Romanian", () => {
+  it("renders the camera expense route without application chrome", () => {
     mocks.pathname = "/en/finance/expenses/new";
 
     const { unmount } = renderAppShell({
@@ -429,9 +454,11 @@ describe("AppShell", () => {
       roles: ["ADMIN"],
     });
 
+    expect(screen.getByText("Page content")).toBeInTheDocument();
+    expect(screen.queryByRole("banner")).not.toBeInTheDocument();
     expect(
-      within(screen.getByRole("banner")).getByText("Record expense"),
-    ).toBeInTheDocument();
+      screen.queryByRole("link", { name: "Overview" }),
+    ).not.toBeInTheDocument();
 
     unmount();
     mocks.pathname = "/finance/expenses/new";
@@ -442,9 +469,11 @@ describe("AppShell", () => {
       roles: ["ADMIN"],
     });
 
+    expect(screen.getByText("Page content")).toBeInTheDocument();
+    expect(screen.queryByRole("banner")).not.toBeInTheDocument();
     expect(
-      within(screen.getByRole("banner")).getByText("Înregistrează cheltuială"),
-    ).toBeInTheDocument();
+      screen.queryByRole("link", { name: "Prezentare generală" }),
+    ).not.toBeInTheDocument();
   });
 
   it("renders expense-list and accounts page titles", () => {
@@ -476,6 +505,20 @@ describe("AppShell", () => {
       "aria-current",
       "page",
     );
+  });
+
+  it("renders the finance settings title in the app header", () => {
+    mocks.pathname = "/en/finance/settings";
+
+    renderAppShell({
+      id: "admin-1",
+      email: "admin@example.com",
+      roles: ["ADMIN"],
+    });
+
+    expect(
+      within(screen.getByRole("banner")).getByText("Finance settings"),
+    ).toBeInTheDocument();
   });
 
   it("uses finance detail titles for nested routes", () => {

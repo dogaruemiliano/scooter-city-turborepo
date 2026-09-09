@@ -1,6 +1,6 @@
 import { v1 } from "@repo/api-shared";
 import { messages } from "@repo/i18n";
-import { Button, Card } from "@repo/ui/components";
+import { buttonVariants, Card } from "@repo/ui/components";
 import type { Metadata } from "next";
 
 import { Link } from "@/i18n/navigation";
@@ -96,21 +96,27 @@ export default async function FinanceRoutePage({
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <Button render={<Link href={FINANCE_PATHS.newExpense} />}>
+          <Link href={FINANCE_PATHS.newExpense} className={buttonVariants()}>
             {t.overview.newExpense}
-          </Button>
-          <Button
-            variant="outline"
-            render={<Link href={FINANCE_PATHS.newFunding} />}
+          </Link>
+          <Link
+            href={FINANCE_PATHS.newFunding}
+            className={buttonVariants({ variant: "outline" })}
           >
             {t.overview.addCompanyMoney}
-          </Button>
-          <Button
-            variant="outline"
-            render={<Link href={FINANCE_PATHS.settlement} />}
+          </Link>
+          <Link
+            href={FINANCE_PATHS.settlement}
+            className={buttonVariants({ variant: "outline" })}
           >
             {t.overview.viewSettlement}
-          </Button>
+          </Link>
+          <Link
+            href={FINANCE_PATHS.settings}
+            className={buttonVariants({ variant: "ghost" })}
+          >
+            {t.overview.settings}
+          </Link>
         </div>
       </header>
 
@@ -136,13 +142,12 @@ export default async function FinanceRoutePage({
       <section className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-base font-medium">{t.operations.title}</h2>
-          <Button
-            variant="ghost"
-            size="sm"
-            render={<Link href={FINANCE_PATHS.operations} />}
+          <Link
+            href={FINANCE_PATHS.operations}
+            className={buttonVariants({ variant: "ghost", size: "sm" })}
           >
             {t.overview.viewOperations}
-          </Button>
+          </Link>
         </div>
 
         <OperationList

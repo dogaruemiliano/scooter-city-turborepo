@@ -1,6 +1,6 @@
 import { v1 } from "@repo/api-shared";
 import { messages } from "@repo/i18n";
-import { Button } from "@repo/ui/components";
+import { buttonVariants } from "@repo/ui/components";
 import type { Metadata } from "next";
 
 import { resolveRouteLocale } from "@/i18n/paths";
@@ -69,9 +69,9 @@ export default async function OperationsRoutePage({
           <h1 className="text-xl font-medium">{t.title}</h1>
           <p className="text-sm text-muted-foreground">{t.description}</p>
         </div>
-        <Button render={<Link href={FINANCE_PATHS.newFunding} />}>
+        <Link href={FINANCE_PATHS.newFunding} className={buttonVariants()}>
           {messages[locale].finance.overview.addCompanyMoney}
-        </Button>
+        </Link>
       </header>
 
       <OperationList
