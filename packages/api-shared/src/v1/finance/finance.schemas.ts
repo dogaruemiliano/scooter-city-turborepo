@@ -1,1062 +1,1213 @@
+/**
+ * Financial-module request and response contracts.
+ *
+ * Design reference: docs/finance/financial-system-architecture.md
+ *
+ * Two rules shape everything here:
+ *
+ * 1. Money is an integer count of minor units (`amountMinor`). 300 lei is
+ *    `30000`. Floating point never touches a monetary value.
+ * 2. Who paid and who benefited are independent inputs. `payments` answers
+ *    the first, `allocations` the second; neither is inferred from the other.
+ */
 import { z } from "zod";
 
 import {
-  optionalSearchStringSchema,
+  normalizedEmailSchema,
+  nullableTrimmedStringSchema,
   queryBooleanSchema,
+  requiredTrimmedStringSchema,
 } from "../common/common.schemas";
 import {
-  BILLING_STATUSES,
-  COMPANY_ACTIVITY_PERIODS,
-  COMPANY_LEGAL_FORMS,
-  COMPANY_WALLET_TYPES,
-  CREATABLE_MONEY_TRANSACTION_TYPES,
-  FINANCIAL_CATEGORY_ICONS,
-  FINANCIAL_CATEGORY_KINDS,
-  FINANCIAL_COUNTERPARTY_KINDS,
-  MONEY_TRANSACTION_SCOPES,
-  MONEY_TRANSACTION_STATUSES,
-  MONEY_TRANSACTION_TYPES,
+  COST_OBJECT_OWNERSHIP_TYPES,
+  COST_OBJECT_TYPES,
+  ASSOCIATE_FUNDING_TYPES,
+  ECONOMIC_ALLOCATION_TYPES,
+  EXPENSE_PAYMENT_SOURCE_TYPES,
+  EXPENSE_TREATMENTS,
+  FINANCE_BOOK_TYPES,
+  FINANCIAL_DOCUMENT_TYPES,
+  FINANCIAL_OPERATION_KINDS,
+  FINANCIAL_OPERATION_STATUSES,
+  LEDGER_ACCOUNT_CATEGORIES,
+  LEDGER_ACCOUNT_ROLES,
   PAYMENT_METHODS,
-  WALLET_BALANCE_BUCKETS,
-  WALLET_TYPES,
+  SETTLEMENT_RUN_KINDS,
+  COMPANY_MATCH_STATUSES,
+  EXPENSE_EXTRACTION_DRAFT_STATUSES,
+  TOTAL_SHARE_BASIS_POINTS,
 } from "./finance.constants";
-import type { WalletType } from "./finance.constants";
 
-const MAX_NAME_LENGTH = 120;
-const MAX_DESCRIPTION_LENGTH = 2_000;
-const MAX_IDEMPOTENCY_KEY_LENGTH = 200;
-const MAX_REFERENCE_TYPE_LENGTH = 80;
-const MAX_REFERENCE_ID_LENGTH = 200;
+const MAX_DB_INT = 2_147_483_647;
 const MAX_PAGE_SIZE = 100;
-const MAX_CURSOR_LENGTH = 2_048;
-const MAX_BALANCE_CHANGES = 16;
-const MAX_REFERENCES = 20;
-const MAX_SUMMARY_RANGE_MS = 366 * 24 * 60 * 60 * 1_000;
-const MAX_COMPANY_TEXT_LENGTH = 255;
+const MAX_CODE_LENGTH = 64;
+const MAX_NAME_LENGTH = 160;
+const MAX_DESCRIPTION_LENGTH = 500;
+const MAX_NOTES_LENGTH = 2_000;
+const MAX_SUPPLIER_LENGTH = 200;
+const MAX_PAYMENT_LINES = 10;
+const MAX_ALLOCATION_LINES = 20;
+const MAX_DOCUMENT_LINES = 10;
 
-const optionalCompanyTextSchema = z.preprocess(
-  (value) => (typeof value === "string" && value.trim() === "" ? null : value),
-  z.string().trim().max(MAX_COMPANY_TEXT_LENGTH).nullable().optional(),
+const idSchema = z.string().trim().min(1);
+const isoTimestampSchema = z.iso.datetime({ offset: true });
+const pageSchema = z.coerce.number().int().min(1).default(1);
+const pageSizeSchema = z.coerce
+  .number()
+  .int()
+  .min(1)
+  .max(MAX_PAGE_SIZE)
+  .default(25);
+
+/**
+ * A positive integer count of minor currency units. Direction is carried by
+ * the operation kind and the posting sign — never by a negative amount.
+ */
+export const amountMinorSchema = z.number().int().min(1).max(MAX_DB_INT);
+
+/** Signed posting amount: positive debits, negative credits. */
+export const signedAmountMinorSchema = z
+  .number()
+  .int()
+  .min(-MAX_DB_INT)
+  .max(MAX_DB_INT);
+
+/** Any balance, which may legitimately be zero or negative. */
+export const balanceMinorSchema = z.number().int();
+
+export const shareBasisPointsSchema = z.number().int().min(1).max(10_000);
+
+export const financeBookTypeSchema = z.enum(FINANCE_BOOK_TYPES);
+export const financialOperationKindSchema = z.enum(FINANCIAL_OPERATION_KINDS);
+export const financialOperationStatusSchema = z.enum(
+  FINANCIAL_OPERATION_STATUSES,
 );
-
-const unsignedMoneyPattern = /^(?:0|[1-9]\d{0,16})(?:\.\d{1,2})?$/;
-const signedMoneyPattern = /^-?(?:0|[1-9]\d{0,16})(?:\.\d{1,2})?$/;
-const aggregateMoneyPattern = /^(?:0|[1-9]\d*)(?:\.\d{1,2})?$/;
-const signedAggregateMoneyPattern = /^-?(?:0|[1-9]\d*)(?:\.\d{1,2})?$/;
-
-export const currencySchema = z
-  .string()
-  .trim()
-  .toUpperCase()
-  .regex(/^[A-Z]{3}$/)
-  .default("RON");
-
-export const moneyAmountSchema = z.string().trim().regex(unsignedMoneyPattern, {
-  message: "Amount must be a non-negative decimal with at most 2 decimals.",
-});
-
-export const positiveMoneyAmountSchema = moneyAmountSchema.refine(
-  (value) => !/^0(?:\.0{1,2})?$/.test(value),
-  { message: "Amount must be greater than zero." },
+export const ledgerAccountCategorySchema = z.enum(LEDGER_ACCOUNT_CATEGORIES);
+export const ledgerAccountRoleSchema = z.enum(LEDGER_ACCOUNT_ROLES);
+export const expenseTreatmentSchema = z.enum(EXPENSE_TREATMENTS);
+export const expensePaymentSourceTypeSchema = z.enum(
+  EXPENSE_PAYMENT_SOURCE_TYPES,
 );
-
-export const aggregateMoneyAmountSchema = z
-  .string()
-  .trim()
-  .regex(aggregateMoneyPattern, {
-    message:
-      "Aggregate amount must be a non-negative decimal with at most 2 decimals.",
-  });
-
-export const positiveAggregateMoneyAmountSchema =
-  aggregateMoneyAmountSchema.refine(
-    (value) => !/^0(?:\.0{1,2})?$/.test(value),
-    { message: "Aggregate amount must be greater than zero." },
-  );
-
-export const signedAggregateMoneyAmountSchema = z
-  .string()
-  .trim()
-  .regex(signedAggregateMoneyPattern, {
-    message:
-      "Aggregate amount must be a decimal with at most 2 decimal places.",
-  });
-
-export const signedMoneyAmountSchema = z
-  .string()
-  .trim()
-  .regex(signedMoneyPattern, {
-    message: "Amount must be a decimal with at most 2 decimals.",
-  });
-
-export const signedNonZeroMoneyAmountSchema = signedMoneyAmountSchema.refine(
-  (value) => !/^-?0(?:\.0{1,2})?$/.test(value),
-  {
-    message: "Balance change must not be zero.",
-  },
-);
-
-export const walletTypeSchema = z.enum(WALLET_TYPES);
-export const companyWalletTypeSchema = z.enum(COMPANY_WALLET_TYPES);
-export const walletBalanceBucketSchema = z.enum(WALLET_BALANCE_BUCKETS);
-export const moneyTransactionTypeSchema = z.enum(MONEY_TRANSACTION_TYPES);
-export const creatableMoneyTransactionTypeSchema = z.enum(
-  CREATABLE_MONEY_TRANSACTION_TYPES,
-);
-export const moneyTransactionStatusSchema = z.enum(MONEY_TRANSACTION_STATUSES);
-export const moneyTransactionScopeSchema = z.enum(MONEY_TRANSACTION_SCOPES);
 export const paymentMethodSchema = z.enum(PAYMENT_METHODS);
-export const billingStatusSchema = z.enum(BILLING_STATUSES);
-export const financialCategoryKindSchema = z.enum(FINANCIAL_CATEGORY_KINDS);
-export const financialCategoryIconSchema = z.enum(FINANCIAL_CATEGORY_ICONS);
+export const economicAllocationTypeSchema = z.enum(ECONOMIC_ALLOCATION_TYPES);
+export const costObjectTypeSchema = z.enum(COST_OBJECT_TYPES);
+export const costObjectOwnershipTypeSchema = z.enum(
+  COST_OBJECT_OWNERSHIP_TYPES,
+);
+export const financialDocumentTypeSchema = z.enum(FINANCIAL_DOCUMENT_TYPES);
+export const associateFundingTypeSchema = z.enum(ASSOCIATE_FUNDING_TYPES);
+export const settlementRunKindSchema = z.enum(SETTLEMENT_RUN_KINDS);
 
-export const financeUserSummarySchema = z
+// ---------------------------------------------------------------------------
+// Reference resources
+// ---------------------------------------------------------------------------
+
+/** Minimal associate identity, so the UI can label amounts with names. */
+export const financeAssociateSchema = z
   .object({
     id: z.string(),
-    email: z.email(),
+    email: z.string(),
     firstName: z.string().nullable(),
     lastName: z.string().nullable(),
+    displayName: z.string(),
   })
-  .meta({ id: "FinanceUserSummary" });
+  .meta({ id: "FinanceAssociate" });
 
-export type FinanceUserSummary = z.infer<typeof financeUserSummarySchema>;
+export type FinanceAssociate = z.infer<typeof financeAssociateSchema>;
 
-export const financeCounterpartySummarySchema = z
+export const financeBookMemberSchema = z
   .object({
     id: z.string(),
-    kind: z.enum(FINANCIAL_COUNTERPARTY_KINDS),
-    label: z.string(),
+    associateId: z.string(),
+    associate: financeAssociateSchema.nullable(),
+    shareBasisPoints: z.number().int(),
+    validFrom: isoTimestampSchema,
+    validUntil: isoTimestampSchema.nullable(),
   })
-  .strict()
-  .meta({ id: "FinanceCounterpartySummary" });
+  .meta({ id: "FinanceBookMember" });
 
-export type FinanceCounterpartySummary = z.infer<
-  typeof financeCounterpartySummarySchema
->;
+export type FinanceBookMember = z.infer<typeof financeBookMemberSchema>;
 
-export const financeWalletSummarySchema = z
+export const financeBookSchema = z
   .object({
     id: z.string(),
-    type: walletTypeSchema,
-    ownerUserId: z.string().nullable(),
     name: z.string(),
-    owner: financeUserSummarySchema.nullable(),
+    type: financeBookTypeSchema,
+    functionalCurrency: z.string(),
+    members: z.array(financeBookMemberSchema),
   })
-  .meta({ id: "FinanceWalletSummary" });
+  .meta({ id: "FinanceBook" });
 
-export type FinanceWalletSummary = z.infer<typeof financeWalletSummarySchema>;
+export type FinanceBook = z.infer<typeof financeBookSchema>;
 
-export const financeCategorySummarySchema = z
+export const financeBookListSchema = z
+  .object({ items: z.array(financeBookSchema) })
+  .meta({ id: "FinanceBookList" });
+
+export type FinanceBookList = z.infer<typeof financeBookListSchema>;
+
+export const supplierSchema = z
   .object({
     id: z.string(),
-    code: z.string(),
     name: z.string(),
-    kind: financialCategoryKindSchema,
-    /** Optional so summaries selected without the column stay valid. */
-    icon: z.string().nullable().optional(),
-  })
-  .meta({ id: "FinanceCategorySummary" });
-
-export type FinanceCategorySummary = z.infer<
-  typeof financeCategorySummarySchema
->;
-
-export const walletOwnerSchema = financeUserSummarySchema
-  .clone()
-  .meta({ id: "FinanceWalletOwner" });
-
-export const walletBalanceSchema = z
-  .object({
-    bucket: walletBalanceBucketSchema,
-    currency: currencySchema,
-    balance: signedMoneyAmountSchema,
-    updatedAt: z.iso.datetime({ offset: true }),
-  })
-  .meta({ id: "WalletBalance" });
-
-export const walletSchema = z
-  .object({
-    id: z.string(),
-    type: walletTypeSchema,
-    ownerUserId: z.string().nullable(),
-    owner: walletOwnerSchema.nullable(),
-    cardHolderUserId: z.string().nullable(),
-    cardHolder: financeUserSummarySchema.nullable(),
-    name: z.string(),
+    taxIdentifier: z.string(),
+    isVatPayer: z.boolean(),
     isActive: z.boolean(),
-    balances: z.array(walletBalanceSchema),
-    createdAt: z.iso.datetime({ offset: true }),
-    updatedAt: z.iso.datetime({ offset: true }),
+    createdAt: isoTimestampSchema,
+    updatedAt: isoTimestampSchema,
   })
-  .meta({ id: "Wallet" });
+  .meta({ id: "Supplier" });
 
-export type Wallet = z.infer<typeof walletSchema>;
+export type Supplier = z.infer<typeof supplierSchema>;
 
-export const walletListSchema = z
+export const supplierListSchema = z
+  .object({ items: z.array(supplierSchema) })
+  .meta({ id: "SupplierList" });
+
+export type SupplierList = z.infer<typeof supplierListSchema>;
+
+export const listSuppliersQuerySchema = z
   .object({
-    items: z.array(walletSchema),
-    page: z.number().int().min(1),
-    pageSize: z.number().int().min(1).max(MAX_PAGE_SIZE),
-    total: z.number().int().min(0),
-  })
-  .meta({ id: "WalletList" });
-
-export type WalletList = z.infer<typeof walletListSchema>;
-
-export const walletOptionSchema = z
-  .object({
-    id: z.string(),
-    type: walletTypeSchema,
-    name: z.string(),
-    isActive: z.boolean(),
-    owner: financeUserSummarySchema.nullable(),
-    cardHolderUserId: z.string().nullable(),
-    cardHolder: financeUserSummarySchema.nullable(),
+    search: requiredTrimmedStringSchema(MAX_SUPPLIER_LENGTH).optional(),
+    includeInactive: queryBooleanSchema.default(false),
   })
   .strict()
-  .meta({ id: "WalletOption" });
+  .meta({ id: "ListSuppliersQuery" });
 
-export type WalletOption = z.infer<typeof walletOptionSchema>;
+export type ListSuppliersQuery = z.infer<typeof listSuppliersQuerySchema>;
 
-export const walletOptionListSchema = z
+export const createSupplierInputSchema = z
   .object({
-    items: z.array(walletOptionSchema),
-    nextCursor: z.string().nullable(),
+    name: requiredTrimmedStringSchema(MAX_SUPPLIER_LENGTH),
+    taxIdentifier: requiredTrimmedStringSchema(MAX_CODE_LENGTH),
   })
   .strict()
-  .meta({ id: "WalletOptionList" });
+  .meta({ id: "CreateSupplierInput" });
 
-export type WalletOptionList = z.infer<typeof walletOptionListSchema>;
+export type CreateSupplierInput = z.infer<typeof createSupplierInputSchema>;
 
-export const financialCounterpartyKindSchema = z.enum(
-  FINANCIAL_COUNTERPARTY_KINDS,
-);
-
-export const financialCounterpartySearchItemSchema = z
+export const updateSupplierInputSchema = z
   .object({
-    id: z.string().min(1),
-    kind: financialCounterpartyKindSchema,
-    label: z.string().min(1),
-    description: z.string(),
-    email: z.email().nullable(),
-    phoneMasked: z.string().nullable(),
-    identifierMasked: z.string().nullable(),
-  })
-  .strict()
-  .meta({ id: "FinancialCounterpartySearchItem" });
-
-export type FinancialCounterpartySearchItem = z.infer<
-  typeof financialCounterpartySearchItemSchema
->;
-
-export const financialCounterpartySearchResultSchema = z
-  .object({
-    items: z.array(financialCounterpartySearchItemSchema),
-    nextCursor: z.string().nullable(),
-  })
-  .strict()
-  .meta({ id: "FinancialCounterpartySearchResult" });
-
-export type FinancialCounterpartySearchResult = z.infer<
-  typeof financialCounterpartySearchResultSchema
->;
-
-export const companySchema = z
-  .object({
-    id: z.string(),
-    counterpartyId: z.string(),
-    businessLegalEntityId: z.string().nullable(),
-    legalName: z.string(),
-    legalForm: z.enum(COMPANY_LEGAL_FORMS),
-    tradingName: z.string().nullable(),
-    taxIdentifier: z.string().nullable(),
-    registrationNumber: z.string().nullable(),
-    email: z.email().nullable(),
-    phone: z.string().nullable(),
-    addressLine1: z.string().nullable(),
-    addressLine2: z.string().nullable(),
-    city: z.string().nullable(),
-    region: z.string().nullable(),
-    postalCode: z.string().nullable(),
-    countryCode: z.string().nullable(),
-    notes: z.string().nullable(),
-    isActive: z.boolean(),
-    createdAt: z.iso.datetime({ offset: true }),
-    updatedAt: z.iso.datetime({ offset: true }),
-  })
-  .strict()
-  .meta({ id: "Company" });
-
-export type Company = z.infer<typeof companySchema>;
-
-export const companyListSchema = z
-  .object({
-    items: z.array(companySchema),
-    page: z.number().int().min(1),
-    pageSize: z.number().int().min(1).max(MAX_PAGE_SIZE),
-    total: z.number().int().min(0),
-  })
-  .strict()
-  .meta({ id: "CompanyList" });
-
-export type CompanyList = z.infer<typeof companyListSchema>;
-
-const companyFieldsSchema = z.object({
-  legalName: z.string().trim().min(1).max(MAX_COMPANY_TEXT_LENGTH),
-  legalForm: z.enum(COMPANY_LEGAL_FORMS),
-  tradingName: optionalCompanyTextSchema,
-  taxIdentifier: optionalCompanyTextSchema,
-  registrationNumber: optionalCompanyTextSchema,
-  email: z.preprocess(
-    (value) =>
-      typeof value === "string" && value.trim() === "" ? null : value,
-    z.email().nullable().optional(),
-  ),
-  phone: optionalCompanyTextSchema,
-  addressLine1: optionalCompanyTextSchema,
-  addressLine2: optionalCompanyTextSchema,
-  city: optionalCompanyTextSchema,
-  region: optionalCompanyTextSchema,
-  postalCode: optionalCompanyTextSchema,
-  countryCode: z.preprocess(
-    (value) =>
-      typeof value === "string" && value.trim() === "" ? null : value,
-    z
-      .string()
-      .trim()
-      .toUpperCase()
-      .regex(/^[A-Z]{2}$/)
-      .nullable()
-      .optional(),
-  ),
-  notes: z.preprocess(
-    (value) =>
-      typeof value === "string" && value.trim() === "" ? null : value,
-    z.string().trim().max(MAX_DESCRIPTION_LENGTH).nullable().optional(),
-  ),
-});
-
-export const createCompanyInputSchema = companyFieldsSchema
-  .strict()
-  .meta({ id: "CreateCompanyInput" });
-export type CreateCompanyInput = z.infer<typeof createCompanyInputSchema>;
-
-export const updateCompanyInputSchema = companyFieldsSchema
-  .partial()
-  .extend({ isActive: z.boolean().optional() })
-  .strict()
-  .refine((value) => Object.keys(value).length > 0, {
-    message: "At least one field is required.",
-  })
-  .meta({ id: "UpdateCompanyInput" });
-export type UpdateCompanyInput = z.infer<typeof updateCompanyInputSchema>;
-
-export const listCompaniesQuerySchema = z
-  .object({
-    search: optionalSearchStringSchema(MAX_NAME_LENGTH),
-    isActive: queryBooleanSchema.optional(),
-    page: z.coerce.number().int().min(1).default(1),
-    pageSize: z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).default(25),
-  })
-  .strict()
-  .meta({ id: "ListCompaniesQuery" });
-export type ListCompaniesQuery = z.infer<typeof listCompaniesQuerySchema>;
-
-export const companyStatsQuerySchema = z
-  .object({
-    period: z.enum(COMPANY_ACTIVITY_PERIODS).default("MONTH"),
-  })
-  .strict()
-  .meta({ id: "CompanyStatsQuery" });
-export type CompanyStatsQuery = z.infer<typeof companyStatsQuerySchema>;
-
-export const companyStatsSchema = z
-  .object({
-    period: z.enum(COMPANY_ACTIVITY_PERIODS),
-    from: z.iso.datetime({ offset: true }).nullable(),
-    to: z.iso.datetime({ offset: true }),
-    transactionCount: z.number().int().min(0),
-    totals: z.array(
-      z.object({
-        currency: currencySchema,
-        income: aggregateMoneyAmountSchema,
-        expenses: aggregateMoneyAmountSchema,
-        net: signedAggregateMoneyAmountSchema,
-      }),
-    ),
-  })
-  .strict()
-  .meta({ id: "CompanyStats" });
-export type CompanyStats = z.infer<typeof companyStatsSchema>;
-
-export const searchFinancialCounterpartiesQuerySchema = z
-  .object({
-    search: z.preprocess(
-      (value) =>
-        typeof value === "string" ? value.replace(/\s+/g, " ").trim() : value,
-      z
-        .string()
-        .max(MAX_NAME_LENGTH)
-        .refine((search) => search.length === 0 || search.length >= 2)
-        .default(""),
-    ),
-    transactionType: z.enum(["INCOME", "EXPENSE"]).default("EXPENSE"),
-    kind: financialCounterpartyKindSchema.optional(),
-    cursor: z
-      .string()
-      .min(1)
-      .max(MAX_CURSOR_LENGTH)
-      .regex(/^[A-Za-z0-9_-]+$/)
-      .optional(),
-    pageSize: z.coerce.number().int().min(1).max(20).default(20),
-  })
-  .strict()
-  .meta({ id: "SearchFinancialCounterpartiesQuery" });
-
-export type SearchFinancialCounterpartiesQuery = z.infer<
-  typeof searchFinancialCounterpartiesQuerySchema
->;
-
-export interface WalletOptionCursorFilters {
-  search?: string;
-  type?: WalletType;
-  companyOnly?: boolean;
-  ownerRole?: "ADMIN";
-  ownerUserId?: string;
-  isActive?: boolean;
-}
-
-const walletOptionCursorFingerprintSchema = z
-  .string()
-  .regex(/^[A-Za-z0-9_-]{43}$/);
-
-export const walletOptionCursorPayloadSchema = z
-  .object({
-    version: z.literal(1),
-    id: z.string().min(1),
-    sortFingerprint: walletOptionCursorFingerprintSchema,
-    filterFingerprint: walletOptionCursorFingerprintSchema,
-  })
-  .strict();
-
-export type WalletOptionCursorPayload = z.infer<
-  typeof walletOptionCursorPayloadSchema
->;
-
-export const listWalletOptionsQuerySchema = z
-  .object({
-    search: z.preprocess(
-      (value) =>
-        typeof value === "string" ? value.replace(/\s+/g, " ") : value,
-      optionalSearchStringSchema(MAX_NAME_LENGTH),
-    ),
-    type: walletTypeSchema.optional(),
-    companyOnly: queryBooleanSchema.optional(),
-    ownerRole: z
-      .preprocess(
-        (value) => (typeof value === "string" ? value.trim() : value),
-        z.literal("ADMIN"),
-      )
-      .optional(),
-    ownerUserId: z.string().trim().min(1).optional(),
-    isActive: queryBooleanSchema.optional(),
-    cursor: z
-      .string()
-      .min(1)
-      .max(MAX_CURSOR_LENGTH)
-      .regex(/^[A-Za-z0-9_-]+$/)
-      .optional(),
-    pageSize: z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).default(25),
-  })
-  .strict()
-  .superRefine((query, ctx) => {
-    if (!query.companyOnly) return;
-
-    if (query.type === "USER") {
-      ctx.addIssue({
-        code: "custom",
-        path: ["type"],
-        message: "A company-only selector cannot use the USER wallet type.",
-      });
-    }
-    if (query.ownerRole !== undefined) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["ownerRole"],
-        message: "A company-only selector cannot filter by owner role.",
-      });
-    }
-    if (query.ownerUserId !== undefined) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["ownerUserId"],
-        message: "A company-only selector cannot filter by owner user ID.",
-      });
-    }
-  })
-  .meta({ id: "ListWalletOptionsQuery" });
-
-export type ListWalletOptionsQuery = z.infer<
-  typeof listWalletOptionsQuerySchema
->;
-
-export const listWalletsQuerySchema = z
-  .object({
-    page: z.coerce.number().int().min(1).default(1),
-    pageSize: z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).default(25),
-    type: walletTypeSchema.optional(),
-    search: z.preprocess(
-      (value) =>
-        typeof value === "string" ? value.replace(/\s+/g, " ") : value,
-      optionalSearchStringSchema(MAX_NAME_LENGTH),
-    ),
-    ownerUserId: z.string().trim().min(1).optional(),
-    ownerRole: z
-      .preprocess(
-        (value) => (typeof value === "string" ? value.trim() : value),
-        z.literal("ADMIN"),
-      )
-      .optional(),
-    ownerIsActive: queryBooleanSchema.optional(),
-    isActive: queryBooleanSchema.optional(),
-  })
-  .strict()
-  .meta({ id: "ListWalletsQuery" });
-
-export type ListWalletsQuery = z.infer<typeof listWalletsQuerySchema>;
-
-export const createCompanyWalletInputSchema = z
-  .object({
-    type: companyWalletTypeSchema,
-    name: z.string().trim().min(1).max(MAX_NAME_LENGTH),
-    cardHolderUserId: z.string().min(1).optional(),
-  })
-  .strict()
-  .meta({ id: "CreateCompanyWalletInput" });
-
-export type CreateCompanyWalletInput = z.infer<
-  typeof createCompanyWalletInputSchema
->;
-
-export const financialCategorySchema = z
-  .object({
-    id: z.string(),
-    code: z.string(),
-    name: z.string(),
-    kind: financialCategoryKindSchema,
-    /** Lucide icon name (e.g. "wrench"), resolved to a component on the client. */
-    icon: z.string().nullable(),
-    keywords: z.array(z.string().trim()).default([]),
-    parentCategoryId: z.string().nullable(),
-    isActive: z.boolean(),
-    createdAt: z.iso.datetime({ offset: true }),
-    updatedAt: z.iso.datetime({ offset: true }),
-  })
-  .meta({ id: "FinancialCategory" });
-
-export type FinancialCategory = z.infer<typeof financialCategorySchema>;
-
-export const financialCategoryListSchema = z
-  .object({
-    items: z.array(financialCategorySchema),
-  })
-  .meta({ id: "FinancialCategoryList" });
-
-export const createFinancialCategoryInputSchema = z
-  .object({
-    name: z.string().trim().min(1).max(MAX_NAME_LENGTH),
-    kind: financialCategoryKindSchema,
-    icon: financialCategoryIconSchema.nullable().optional(),
-    keywords: z.array(z.string().trim().min(1)).default([]),
-    parentCategoryId: z.string().nullable().optional(),
-  })
-  .strict()
-  .meta({ id: "CreateFinancialCategoryInput" });
-
-export type CreateFinancialCategoryInput = z.infer<
-  typeof createFinancialCategoryInputSchema
->;
-
-export const updateFinancialCategoryInputSchema = z
-  .object({
-    name: z.string().trim().min(1).max(MAX_NAME_LENGTH).optional(),
-    kind: financialCategoryKindSchema.optional(),
-    icon: financialCategoryIconSchema.nullable().optional(),
-    keywords: z.array(z.string().trim().min(1)).optional(),
-    parentCategoryId: z.string().nullable().optional(),
+    name: requiredTrimmedStringSchema(MAX_SUPPLIER_LENGTH).optional(),
+    taxIdentifier: requiredTrimmedStringSchema(MAX_CODE_LENGTH).optional(),
     isActive: z.boolean().optional(),
   })
   .strict()
-  .refine((value) => Object.keys(value).length > 0, {
-    message: "At least one field must be provided.",
+  .refine((input) => Object.keys(input).length > 0, {
+    message: "Provide at least one supplier field to update.",
   })
-  .meta({ id: "UpdateFinancialCategoryInput" });
+  .meta({ id: "UpdateSupplierInput" });
 
-export type UpdateFinancialCategoryInput = z.infer<
-  typeof updateFinancialCategoryInputSchema
+export type UpdateSupplierInput = z.infer<typeof updateSupplierInputSchema>;
+
+export const companyAssociatesSchema = z
+  .object({
+    items: z.array(financeBookMemberSchema),
+    managingOwnerId: z.string(),
+    canManage: z.boolean(),
+  })
+  .meta({ id: "CompanyAssociates" });
+
+export type CompanyAssociates = z.infer<typeof companyAssociatesSchema>;
+
+export const companyAssociateInputSchema = z
+  .object({
+    associateId: idSchema.optional(),
+    email: normalizedEmailSchema,
+    firstName: z.string().trim().max(100).nullable().default(null),
+    lastName: z.string().trim().max(100).nullable().default(null),
+    shareBasisPoints: shareBasisPointsSchema,
+  })
+  .strict()
+  .meta({ id: "CompanyAssociateInput" });
+
+export type CompanyAssociateInput = z.infer<typeof companyAssociateInputSchema>;
+
+export const updateCompanyAssociatesInputSchema = z
+  .object({
+    associates: z.array(companyAssociateInputSchema).min(1).max(20),
+  })
+  .strict()
+  .refine(
+    ({ associates }) =>
+      associates.reduce(
+        (total, associate) => total + associate.shareBasisPoints,
+        0,
+      ) === TOTAL_SHARE_BASIS_POINTS,
+    { message: "Associate ownership shares must total 100%." },
+  )
+  .meta({ id: "UpdateCompanyAssociatesInput" });
+
+export type UpdateCompanyAssociatesInput = z.infer<
+  typeof updateCompanyAssociatesInputSchema
 >;
 
-export const walletBalanceChangeInputSchema = z
-  .object({
-    walletId: z.string().min(1),
-    bucket: walletBalanceBucketSchema,
-    currency: currencySchema,
-    amountDelta: signedNonZeroMoneyAmountSchema,
-  })
-  .strict();
+// ---------------------------------------------------------------------------
+// Company identity and receipt extraction drafts
+// ---------------------------------------------------------------------------
 
-export type WalletBalanceChangeInput = z.infer<
-  typeof walletBalanceChangeInputSchema
+export const financeLegalIdentitySchema = z
+  .object({
+    id: z.string(),
+    bookId: z.string(),
+    legalName: z.string(),
+    taxIdentifier: z.string(),
+    nameAliases: z.array(z.string()),
+    countryCode: z.string(),
+    createdAt: isoTimestampSchema,
+    updatedAt: isoTimestampSchema,
+  })
+  .meta({ id: "FinanceLegalIdentity" });
+
+export type FinanceLegalIdentity = z.infer<typeof financeLegalIdentitySchema>;
+
+export const financeLegalIdentityResponseSchema = z
+  .object({ identity: financeLegalIdentitySchema.nullable() })
+  .meta({ id: "FinanceLegalIdentityResponse" });
+
+export type FinanceLegalIdentityResponse = z.infer<
+  typeof financeLegalIdentityResponseSchema
 >;
 
-export const moneyTransactionReferenceInputSchema = z
+export const upsertFinanceLegalIdentityInputSchema = z
   .object({
-    referenceType: z
-      .string()
-      .trim()
-      .min(1)
-      .max(MAX_REFERENCE_TYPE_LENGTH)
-      .toUpperCase(),
-    referenceId: z.string().trim().min(1).max(MAX_REFERENCE_ID_LENGTH),
-    isPrimary: z.boolean().default(false),
+    legalName: requiredTrimmedStringSchema(200),
+    taxIdentifier: requiredTrimmedStringSchema(64),
+    nameAliases: z.array(requiredTrimmedStringSchema(200)).max(20).default([]),
+    countryCode: z.string().trim().toUpperCase().length(2).default("RO"),
   })
-  .strict();
+  .strict()
+  .meta({ id: "UpsertFinanceLegalIdentityInput" });
 
-export const createMoneyTransactionInputSchema = z
+export type UpsertFinanceLegalIdentityInput = z.infer<
+  typeof upsertFinanceLegalIdentityInputSchema
+>;
+
+export const extractionEvidenceSchema = z
   .object({
-    type: creatableMoneyTransactionTypeSchema,
-    amount: positiveMoneyAmountSchema,
-    currency: currencySchema,
-    financialScope: moneyTransactionScopeSchema,
-    paymentMethod: paymentMethodSchema.nullable().optional(),
-    billingStatus: billingStatusSchema.default("NOT_APPLICABLE"),
-    categoryId: z.string().nullable().optional(),
-    counterpartyId: z.string().nullable().optional(),
-    counterpartyUserId: z.string().nullable().optional(),
-    recipientCounterpartyId: z.string().nullable().optional(),
-    recipientUserId: z.string().nullable().optional(),
-    debtorCounterpartyId: z.string().nullable().optional(),
-    debtorUserId: z.string().nullable().optional(),
-    creditorCounterpartyId: z.string().nullable().optional(),
-    creditorUserId: z.string().nullable().optional(),
-    occurredAt: z.iso.datetime({ offset: true }).optional(),
-    description: z
-      .string()
-      .trim()
+    text: z.string(),
+    confidence: z.number().min(0).max(100).nullable(),
+    pageNumber: z.number().int().min(1).nullable(),
+    source: z.enum(["SUMMARY_FIELD", "OCR_LINE", "LINE_ITEM", "RULE"]),
+  })
+  .meta({ id: "ExtractionEvidence" });
+
+export type ExtractionEvidence = z.infer<typeof extractionEvidenceSchema>;
+
+const extractedCandidate = <T extends z.ZodType>(valueSchema: T) =>
+  z.object({
+    value: valueSchema.nullable(),
+    confidence: z.number().min(0).max(100).nullable(),
+    evidence: z.array(extractionEvidenceSchema),
+  });
+
+export const companyMatchSchema = z
+  .object({
+    status: z.enum(COMPANY_MATCH_STATUSES),
+    matchedBy: z
+      .enum(["TAX_IDENTIFIER", "LEGAL_NAME", "NAME_ALIAS"])
+      .nullable(),
+    evidence: z.array(extractionEvidenceSchema),
+  })
+  .meta({ id: "CompanyMatch" });
+
+export const normalizedExpenseExtractionSchema = z
+  .object({
+    amountMinor: extractedCandidate(amountMinorSchema),
+    occurredAt: extractedCandidate(z.string()),
+    currency: extractedCandidate(z.string()),
+    supplierName: extractedCandidate(z.string()),
+    supplierTaxIdentifier: extractedCandidate(z.string()),
+    customerName: extractedCandidate(z.string()),
+    customerTaxIdentifier: extractedCandidate(z.string()),
+    documentSeries: extractedCandidate(z.string()).default({
+      value: null,
+      confidence: null,
+      evidence: [],
+    }),
+    documentNumber: extractedCandidate(z.string()),
+    companyMatch: companyMatchSchema,
+    suggestedBookType: financeBookTypeSchema.nullable(),
+    suggestedDocumentType: financialDocumentTypeSchema.default("RECEIPT"),
+    suggestedPaymentMethod: paymentMethodSchema.nullable(),
+    suggestedAllocationType: economicAllocationTypeSchema.nullable(),
+    suggestedCategoryCode: z.string().nullable(),
+    suggestionEvidence: z.object({
+      bookType: z.array(extractionEvidenceSchema),
+      documentType: z.array(extractionEvidenceSchema).default([]),
+      paymentMethod: z.array(extractionEvidenceSchema),
+      allocationType: z.array(extractionEvidenceSchema),
+      categoryCode: z.array(extractionEvidenceSchema),
+    }),
+    explanations: z.array(z.string()),
+  })
+  .meta({ id: "NormalizedExpenseExtraction" });
+
+export type NormalizedExpenseExtraction = z.infer<
+  typeof normalizedExpenseExtractionSchema
+>;
+
+export const expenseExtractionDraftSchema = z
+  .object({
+    id: z.string(),
+    sourceUploadId: z.string(),
+    status: z.enum(EXPENSE_EXTRACTION_DRAFT_STATUSES),
+    provider: z.string(),
+    providerRequestId: z.string().nullable(),
+    parserVersion: z.string(),
+    result: normalizedExpenseExtractionSchema.nullable(),
+    failureCode: z.string().nullable(),
+    failureMessage: z.string().nullable(),
+    confirmedOperationId: z.string().nullable(),
+    createdAt: isoTimestampSchema,
+    updatedAt: isoTimestampSchema,
+  })
+  .meta({ id: "ExpenseExtractionDraft" });
+
+export type ExpenseExtractionDraft = z.infer<
+  typeof expenseExtractionDraftSchema
+>;
+
+export const ledgerAccountSchema = z
+  .object({
+    id: z.string(),
+    bookId: z.string(),
+    code: z.string(),
+    name: z.string(),
+    category: ledgerAccountCategorySchema,
+    role: ledgerAccountRoleSchema,
+    associateId: z.string().nullable(),
+    associate: financeAssociateSchema.nullable(),
+    isDefault: z.boolean(),
+    isActive: z.boolean(),
+    isSystem: z.boolean(),
+  })
+  .meta({ id: "LedgerAccount" });
+
+export type LedgerAccount = z.infer<typeof ledgerAccountSchema>;
+
+export const ledgerAccountListSchema = z
+  .object({ items: z.array(ledgerAccountSchema) })
+  .meta({ id: "LedgerAccountList" });
+
+export type LedgerAccountList = z.infer<typeof ledgerAccountListSchema>;
+
+export const listLedgerAccountsQuerySchema = z
+  .object({
+    bookId: idSchema.optional(),
+    bookType: financeBookTypeSchema.optional(),
+    role: ledgerAccountRoleSchema.optional(),
+    category: ledgerAccountCategorySchema.optional(),
+    associateId: idSchema.optional(),
+    includeInactive: queryBooleanSchema.default(false),
+  })
+  .strict()
+  .meta({ id: "ListLedgerAccountsQuery" });
+
+export type ListLedgerAccountsQuery = z.infer<
+  typeof listLedgerAccountsQuerySchema
+>;
+
+/**
+ * A balance computed from journal postings — balances are never stored.
+ *
+ * `signedBalanceMinor` is the raw debit-positive sum. `displayBalanceMinor`
+ * negates it for LIABILITY / REVENUE / EQUITY accounts so the UI can render
+ * every balance as a plain positive-is-more number.
+ */
+export const ledgerAccountBalanceSchema = z
+  .object({
+    accountId: z.string(),
+    bookId: z.string(),
+    code: z.string(),
+    name: z.string(),
+    category: ledgerAccountCategorySchema,
+    role: ledgerAccountRoleSchema,
+    associateId: z.string().nullable(),
+    signedBalanceMinor: balanceMinorSchema,
+    displayBalanceMinor: balanceMinorSchema,
+    postingCount: z.number().int(),
+    asOf: isoTimestampSchema,
+  })
+  .meta({ id: "LedgerAccountBalance" });
+
+export type LedgerAccountBalance = z.infer<typeof ledgerAccountBalanceSchema>;
+
+export const ledgerAccountBalanceListSchema = z
+  .object({ items: z.array(ledgerAccountBalanceSchema) })
+  .meta({ id: "LedgerAccountBalanceList" });
+
+export type LedgerAccountBalanceList = z.infer<
+  typeof ledgerAccountBalanceListSchema
+>;
+
+export const expenseCategorySchema = z
+  .object({
+    id: z.string(),
+    bookId: z.string(),
+    code: z.string(),
+    name: z.string(),
+    defaultTreatment: expenseTreatmentSchema.nullable(),
+    isActive: z.boolean(),
+  })
+  .meta({ id: "ExpenseCategory" });
+
+export type ExpenseCategory = z.infer<typeof expenseCategorySchema>;
+
+export const expenseCategoryListSchema = z
+  .object({ items: z.array(expenseCategorySchema) })
+  .meta({ id: "ExpenseCategoryList" });
+
+export type ExpenseCategoryList = z.infer<typeof expenseCategoryListSchema>;
+
+export const listExpenseCategoriesQuerySchema = z
+  .object({
+    bookId: idSchema.optional(),
+    bookType: financeBookTypeSchema.optional(),
+    includeInactive: queryBooleanSchema.default(false),
+  })
+  .strict()
+  .meta({ id: "ListExpenseCategoriesQuery" });
+
+export type ListExpenseCategoriesQuery = z.infer<
+  typeof listExpenseCategoriesQuerySchema
+>;
+
+export const createExpenseCategoryInputSchema = z
+  .object({
+    bookId: idSchema,
+    code: requiredTrimmedStringSchema(MAX_CODE_LENGTH),
+    name: requiredTrimmedStringSchema(MAX_NAME_LENGTH),
+    defaultTreatment: expenseTreatmentSchema.optional(),
+  })
+  .strict()
+  .meta({ id: "CreateExpenseCategoryInput" });
+
+export type CreateExpenseCategoryInput = z.infer<
+  typeof createExpenseCategoryInputSchema
+>;
+
+export const costObjectSchema = z
+  .object({
+    id: z.string(),
+    bookId: z.string(),
+    code: z.string(),
+    name: z.string(),
+    type: costObjectTypeSchema,
+    ownershipType: costObjectOwnershipTypeSchema,
+    ownerAssociateId: z.string().nullable(),
+    externalEntityType: z.string().nullable(),
+    externalEntityId: z.string().nullable(),
+    /**
+     * Prefills the expense form only. The saved expense always carries its
+     * own explicit allocations.
+     */
+    defaultAllocationType: economicAllocationTypeSchema.nullable(),
+    defaultBeneficiaryAssociateId: z.string().nullable(),
+    isActive: z.boolean(),
+  })
+  .meta({ id: "CostObject" });
+
+export type CostObject = z.infer<typeof costObjectSchema>;
+
+export const costObjectListSchema = z
+  .object({ items: z.array(costObjectSchema) })
+  .meta({ id: "CostObjectList" });
+
+export type CostObjectList = z.infer<typeof costObjectListSchema>;
+
+export const listCostObjectsQuerySchema = z
+  .object({
+    bookId: idSchema.optional(),
+    bookType: financeBookTypeSchema.optional(),
+    type: costObjectTypeSchema.optional(),
+    includeInactive: queryBooleanSchema.default(false),
+  })
+  .strict()
+  .meta({ id: "ListCostObjectsQuery" });
+
+export type ListCostObjectsQuery = z.infer<typeof listCostObjectsQuerySchema>;
+
+const costObjectWritableFields = {
+  code: requiredTrimmedStringSchema(MAX_CODE_LENGTH),
+  name: requiredTrimmedStringSchema(MAX_NAME_LENGTH),
+  type: costObjectTypeSchema,
+  ownershipType: costObjectOwnershipTypeSchema,
+  ownerAssociateId: idSchema.nullable().optional(),
+  externalEntityType: nullableTrimmedStringSchema(MAX_CODE_LENGTH).optional(),
+  externalEntityId: idSchema.nullable().optional(),
+  defaultAllocationType: economicAllocationTypeSchema.nullable().optional(),
+  defaultBeneficiaryAssociateId: idSchema.nullable().optional(),
+};
+
+export const createCostObjectInputSchema = z
+  .object({ bookId: idSchema, ...costObjectWritableFields })
+  .strict()
+  .meta({ id: "CreateCostObjectInput" });
+
+export type CreateCostObjectInput = z.infer<typeof createCostObjectInputSchema>;
+
+export const updateCostObjectInputSchema = z
+  .object({
+    code: costObjectWritableFields.code.optional(),
+    name: costObjectWritableFields.name.optional(),
+    type: costObjectTypeSchema.optional(),
+    ownershipType: costObjectOwnershipTypeSchema.optional(),
+    ownerAssociateId: idSchema.nullable().optional(),
+    externalEntityType: nullableTrimmedStringSchema(MAX_CODE_LENGTH).optional(),
+    externalEntityId: idSchema.nullable().optional(),
+    defaultAllocationType: economicAllocationTypeSchema.nullable().optional(),
+    defaultBeneficiaryAssociateId: idSchema.nullable().optional(),
+    isActive: z.boolean().optional(),
+  })
+  .strict()
+  .meta({ id: "UpdateCostObjectInput" });
+
+export type UpdateCostObjectInput = z.infer<typeof updateCostObjectInputSchema>;
+
+// ---------------------------------------------------------------------------
+// Posting plan — the shared shape of "what this operation does to the books"
+// ---------------------------------------------------------------------------
+
+export const postingLineSchema = z
+  .object({
+    accountId: z.string(),
+    accountCode: z.string(),
+    accountName: z.string(),
+    accountRole: ledgerAccountRoleSchema,
+    accountCategory: ledgerAccountCategorySchema,
+    /** Set when the account belongs to one associate. */
+    associateId: z.string().nullable(),
+    /** Positive debits, negative credits. Lines always sum to zero. */
+    signedAmountMinor: signedAmountMinorSchema,
+    description: z.string(),
+  })
+  .meta({ id: "PostingLine" });
+
+export type PostingLine = z.infer<typeof postingLineSchema>;
+
+export const associateAmountSchema = z
+  .object({
+    associateId: z.string(),
+    amountMinor: z.number().int(),
+  })
+  .meta({ id: "AssociateAmount" });
+
+export type AssociateAmount = z.infer<typeof associateAmountSchema>;
+
+/**
+ * Plain-language consequences of an operation, derived from the same posting
+ * lines that get persisted. The UI renders this instead of debits and credits.
+ */
+export const postingImpactSummarySchema = z
+  .object({
+    /** How much the book's profit is reduced. */
+    companyExpenseMinor: z.number().int(),
+    /** How much was capitalized rather than expensed. */
+    companyAssetIncreaseMinor: z.number().int(),
+    /** Net movement of the book's own cash and bank accounts. */
+    companyCashImpactMinor: z.number().int(),
+    /** Permanent contributed capital added to the company. */
+    companyEquityIncreaseMinor: z.number().int(),
+    /** New debt the book owes each associate. */
+    associatePayables: z.array(associateAmountSchema),
+    /** New debt each associate owes the book. */
+    associateReceivables: z.array(associateAmountSchema),
+    /** Benefit attributed to a named associate; drives settlement. */
+    specificEconomicBenefits: z.array(associateAmountSchema),
+    /** Benefit shared by everyone; never drives settlement. */
+    commonEconomicBenefitMinor: z.number().int(),
+  })
+  .meta({ id: "PostingImpactSummary" });
+
+export type PostingImpactSummary = z.infer<typeof postingImpactSummarySchema>;
+
+export const postingPlanSchema = z
+  .object({
+    postings: z.array(postingLineSchema),
+    summary: postingImpactSummarySchema,
+  })
+  .meta({ id: "PostingPlan" });
+
+export type PostingPlan = z.infer<typeof postingPlanSchema>;
+
+// ---------------------------------------------------------------------------
+// Expense input
+// ---------------------------------------------------------------------------
+
+/**
+ * One source of money for an expense. A book account is the book's own money;
+ * associate personal funds create a payable to that associate for the full
+ * line amount, whoever ends up benefiting.
+ */
+export const expensePaymentInputSchema = z
+  .discriminatedUnion("sourceType", [
+    z
+      .object({
+        sourceType: z.literal("BOOK_ACCOUNT"),
+        sourceAccountId: idSchema,
+        paymentMethod: paymentMethodSchema,
+        amountMinor: amountMinorSchema,
+      })
+      .strict(),
+    z
+      .object({
+        sourceType: z.literal("ASSOCIATE_PERSONAL_FUNDS"),
+        payerAssociateId: idSchema,
+        paymentMethod: paymentMethodSchema,
+        amountMinor: amountMinorSchema,
+      })
+      .strict(),
+  ])
+  .meta({ id: "ExpensePaymentInput" });
+
+export type ExpensePaymentInput = z.infer<typeof expensePaymentInputSchema>;
+
+/**
+ * Who received the benefit. `COMMON` is shared by the whole book and never
+ * creates a settlement; `ASSOCIATE_SPECIFIC` names one beneficiary and does.
+ */
+export const economicAllocationInputSchema = z
+  .discriminatedUnion("type", [
+    z
+      .object({
+        type: z.literal("COMMON"),
+        amountMinor: amountMinorSchema,
+      })
+      .strict(),
+    z
+      .object({
+        type: z.literal("ASSOCIATE_SPECIFIC"),
+        associateId: idSchema,
+        amountMinor: amountMinorSchema,
+      })
+      .strict(),
+  ])
+  .meta({ id: "EconomicAllocationInput" });
+
+export type EconomicAllocationInput = z.infer<
+  typeof economicAllocationInputSchema
+>;
+
+export const financialDocumentInputSchema = z
+  .object({
+    type: financialDocumentTypeSchema,
+    documentSeries: nullableTrimmedStringSchema(MAX_CODE_LENGTH).optional(),
+    documentNumber: nullableTrimmedStringSchema(MAX_CODE_LENGTH).optional(),
+    issuedAt: isoTimestampSchema.optional(),
+    supplierName: nullableTrimmedStringSchema(MAX_SUPPLIER_LENGTH).optional(),
+    supplierTaxId: nullableTrimmedStringSchema(MAX_CODE_LENGTH).optional(),
+    notes: nullableTrimmedStringSchema(MAX_NOTES_LENGTH).optional(),
+  })
+  .strict()
+  .superRefine((document, ctx) => {
+    if (document.type !== "INVOICE" && document.documentSeries) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["documentSeries"],
+        message: "Document series is only supported for bills.",
+      });
+    }
+  })
+  .meta({ id: "FinancialDocumentInput" });
+
+export type FinancialDocumentInput = z.infer<
+  typeof financialDocumentInputSchema
+>;
+
+/**
+ * Issue messages raised by the expense cross-field checks. Clients match on
+ * them to swap in a localized message, so schema and UI cannot drift apart.
+ */
+export const PAYMENTS_TOTAL_MESSAGE =
+  "Payments must add up to the expense amount.";
+export const ALLOCATIONS_TOTAL_MESSAGE =
+  "Benefit allocations must add up to the expense amount.";
+export const DUPLICATE_ALLOCATION_MESSAGE =
+  "Each associate can only appear once in the benefit allocation.";
+export const RECEIPT_UPLOAD_SOURCE_MESSAGE =
+  "Choose either an extracted receipt or a direct receipt upload, not both.";
+
+const sumAmounts = (lines: ReadonlyArray<{ amountMinor: number }>): number =>
+  lines.reduce((total, line) => total + line.amountMinor, 0);
+
+export const createExpenseInputSchema = z
+  .object({
+    bookId: idSchema,
+    supplierId: idSchema.optional(),
+    /**
+     * A READY receipt extraction that should be claimed by this expense.
+     * The API resolves its private storage key server-side; clients never
+     * decide which uploaded object becomes the supporting document.
+     */
+    extractionDraftId: idSchema.optional(),
+    /**
+     * A receipt uploaded from the manual expense form. The signed token is
+     * resolved and validated by the API; its private storage key is never
+     * accepted from the client.
+     */
+    receiptUploadToken: idSchema.optional(),
+    occurredAt: isoTimestampSchema,
+    description: nullableTrimmedStringSchema(MAX_DESCRIPTION_LENGTH).optional(),
+    amountMinor: amountMinorSchema,
+    treatment: expenseTreatmentSchema,
+    categoryId: idSchema,
+    costObjectId: idSchema.optional(),
+    payments: z.array(expensePaymentInputSchema).min(1).max(MAX_PAYMENT_LINES),
+    allocations: z
+      .array(economicAllocationInputSchema)
       .min(1)
-      .max(MAX_DESCRIPTION_LENGTH)
-      .nullable()
+      .max(MAX_ALLOCATION_LINES),
+    documents: z
+      .array(financialDocumentInputSchema)
+      .max(MAX_DOCUMENT_LINES)
       .optional(),
-    idempotencyKey: z.string().trim().min(1).max(MAX_IDEMPOTENCY_KEY_LENGTH),
-    postImmediately: z.boolean().default(true),
-    balanceChanges: z
-      .array(walletBalanceChangeInputSchema)
-      .max(MAX_BALANCE_CHANGES)
-      .default([]),
-    references: z
-      .array(moneyTransactionReferenceInputSchema)
-      .max(MAX_REFERENCES)
-      .default([]),
   })
   .strict()
   .superRefine((input, ctx) => {
-    if (
-      input.type === "INCOME" &&
-      !input.counterpartyId &&
-      !input.counterpartyUserId
-    ) {
+    if (input.extractionDraftId && input.receiptUploadToken) {
       ctx.addIssue({
         code: "custom",
-        path: ["counterpartyId"],
-        message: "An income transaction requires a payer.",
+        path: ["receiptUploadToken"],
+        message: RECEIPT_UPLOAD_SOURCE_MESSAGE,
       });
     }
 
-    if (input.type === "EXPENSE" && !input.categoryId) {
+    if (sumAmounts(input.payments) !== input.amountMinor) {
       ctx.addIssue({
         code: "custom",
-        path: ["categoryId"],
-        message: "An expense requires a category.",
+        path: ["payments"],
+        message: PAYMENTS_TOTAL_MESSAGE,
       });
     }
 
-    if (
-      input.type === "EXPENSE" &&
-      !input.counterpartyId &&
-      !input.counterpartyUserId &&
-      !input.description
-    ) {
+    if (sumAmounts(input.allocations) !== input.amountMinor) {
       ctx.addIssue({
         code: "custom",
-        path: ["description"],
-        message: "An expense without a recipient requires a description.",
+        path: ["allocations"],
+        message: ALLOCATIONS_TOTAL_MESSAGE,
       });
     }
 
-    const primaryReferences = input.references.filter(
-      (reference) => reference.isPrimary,
-    );
-    if (primaryReferences.length > 1) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["references"],
-        message: "Only one primary reference is allowed.",
-      });
-    }
+    // One line per beneficiary keeps the settlement arithmetic auditable.
+    const seen = new Set<string>();
+    for (const [index, allocation] of input.allocations.entries()) {
+      const key =
+        allocation.type === "COMMON" ? "COMMON" : allocation.associateId;
 
-    const changeKeys = input.balanceChanges.map(
-      (change) => `${change.walletId}:${change.bucket}:${change.currency}`,
-    );
-    if (new Set(changeKeys).size !== changeKeys.length) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["balanceChanges"],
-        message:
-          "A transaction can change a wallet bucket and currency only once.",
-      });
+      if (seen.has(key)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["allocations", index],
+          message: DUPLICATE_ALLOCATION_MESSAGE,
+        });
+      }
+
+      seen.add(key);
     }
   })
-  .meta({ id: "CreateMoneyTransactionInput" });
+  .meta({ id: "CreateExpenseInput" });
 
-export type CreateMoneyTransactionInput = z.infer<
-  typeof createMoneyTransactionInputSchema
->;
+export type CreateExpenseInput = z.infer<typeof createExpenseInputSchema>;
 
-export const reverseMoneyTransactionInputSchema = z
+/**
+ * Preview takes exactly the same body as create. One schema, one posting
+ * policy — a preview can never disagree with what posting would do.
+ */
+export const previewExpenseInputSchema = createExpenseInputSchema;
+
+export type PreviewExpenseInput = CreateExpenseInput;
+
+// ---------------------------------------------------------------------------
+// Associate funding input
+// ---------------------------------------------------------------------------
+
+export const fundingProofContentTypeSchema = z.enum([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
+
+export const createFundingProofDraftUploadInputSchema = z
   .object({
-    idempotencyKey: z.string().trim().min(1).max(MAX_IDEMPOTENCY_KEY_LENGTH),
-    description: z
-      .string()
-      .trim()
-      .min(1)
-      .max(MAX_DESCRIPTION_LENGTH)
-      .nullable()
-      .optional(),
+    contentType: fundingProofContentTypeSchema,
+    byteSize: z.number().int().positive(),
+    checksumSha256: z.string().regex(/^[a-f0-9]{64}$/i),
   })
   .strict()
-  .meta({ id: "ReverseMoneyTransactionInput" });
+  .meta({ id: "CreateFundingProofDraftUploadInput" });
 
-export type ReverseMoneyTransactionInput = z.infer<
-  typeof reverseMoneyTransactionInputSchema
+export type CreateFundingProofDraftUploadInput = z.infer<
+  typeof createFundingProofDraftUploadInputSchema
 >;
 
-export const walletBalanceChangeSchema = z
+export const fundingProofDraftUploadSchema = z
   .object({
-    id: z.string(),
-    walletId: z.string(),
-    wallet: financeWalletSummarySchema,
-    bucket: walletBalanceBucketSchema,
-    currency: currencySchema,
-    amountDelta: z.string(),
-    createdAt: z.iso.datetime({ offset: true }),
+    uploadUrl: z.string().url(),
+    uploadToken: z.string().min(1),
+    method: z.literal("PUT"),
+    headers: z.record(z.string(), z.string()),
+    expiresAt: isoTimestampSchema,
+    maxBytes: z.number().int().positive(),
   })
-  .meta({ id: "WalletBalanceChange" });
+  .meta({ id: "FundingProofDraftUpload" });
 
-export const moneyTransactionReferenceSchema = z
+export type FundingProofDraftUpload = z.infer<
+  typeof fundingProofDraftUploadSchema
+>;
+
+export const createExpenseReceiptDraftUploadInputSchema =
+  createFundingProofDraftUploadInputSchema.meta({
+    id: "CreateExpenseReceiptDraftUploadInput",
+  });
+
+export type CreateExpenseReceiptDraftUploadInput = z.infer<
+  typeof createExpenseReceiptDraftUploadInputSchema
+>;
+
+export const expenseReceiptDraftUploadSchema =
+  fundingProofDraftUploadSchema.meta({ id: "ExpenseReceiptDraftUpload" });
+
+export type ExpenseReceiptDraftUpload = z.infer<
+  typeof expenseReceiptDraftUploadSchema
+>;
+
+export const analyzeExpenseReceiptInputSchema = z
+  .object({ uploadToken: z.string().min(1) })
+  .strict()
+  .meta({ id: "AnalyzeExpenseReceiptInput" });
+
+export type AnalyzeExpenseReceiptInput = z.infer<
+  typeof analyzeExpenseReceiptInputSchema
+>;
+
+export const createAssociateFundingInputSchema = z
   .object({
-    id: z.string(),
-    referenceType: z.string(),
-    referenceId: z.string(),
-    isPrimary: z.boolean(),
-    createdAt: z.iso.datetime({ offset: true }),
+    bookId: idSchema,
+    occurredAt: isoTimestampSchema,
+    amountMinor: amountMinorSchema,
+    type: associateFundingTypeSchema,
+    associateId: idSchema,
+    destinationAccountId: idSchema,
+    reference: nullableTrimmedStringSchema(MAX_NAME_LENGTH).optional(),
+    notes: nullableTrimmedStringSchema(MAX_NOTES_LENGTH).optional(),
+    proofUploadToken: z.string().min(1).optional(),
   })
-  .meta({ id: "MoneyTransactionReference" });
+  .strict()
+  .meta({ id: "CreateAssociateFundingInput" });
 
-export const moneyTransactionSchema = z
+export type CreateAssociateFundingInput = z.infer<
+  typeof createAssociateFundingInputSchema
+>;
+
+/** Preview excludes the proof because uploads never affect ledger postings. */
+export const previewAssociateFundingInputSchema =
+  createAssociateFundingInputSchema.omit({ proofUploadToken: true }).meta({
+    id: "PreviewAssociateFundingInput",
+  });
+
+export type PreviewAssociateFundingInput = z.infer<
+  typeof previewAssociateFundingInputSchema
+>;
+
+// ---------------------------------------------------------------------------
+// Operation resources
+// ---------------------------------------------------------------------------
+
+export const ledgerAccountRefSchema = z
   .object({
     id: z.string(),
-    type: moneyTransactionTypeSchema,
-    status: moneyTransactionStatusSchema,
-    amount: z.string(),
-    currency: currencySchema,
-    financialScope: moneyTransactionScopeSchema,
-    paymentMethod: paymentMethodSchema.nullable(),
-    billingStatus: billingStatusSchema,
-    categoryId: z.string().nullable(),
-    counterpartyId: z.string().nullable(),
-    counterpartyUserId: z.string().nullable(),
-    recipientCounterpartyId: z.string().nullable(),
-    recipientUserId: z.string().nullable(),
-    debtorCounterpartyId: z.string().nullable(),
-    debtorUserId: z.string().nullable(),
-    creditorCounterpartyId: z.string().nullable(),
-    creditorUserId: z.string().nullable(),
-    recordedByUserId: z.string().nullable(),
-    category: financeCategorySummarySchema.nullable(),
-    counterparty: financeUserSummarySchema.nullable(),
-    counterpartyEntity: financeCounterpartySummarySchema.nullable().optional(),
-    recipient: financeUserSummarySchema.nullable(),
-    recipientCounterparty: financeCounterpartySummarySchema
-      .nullable()
-      .optional(),
-    debtor: financeUserSummarySchema.nullable(),
-    debtorCounterparty: financeCounterpartySummarySchema.nullable().optional(),
-    creditor: financeUserSummarySchema.nullable(),
-    creditorCounterparty: financeCounterpartySummarySchema
-      .nullable()
-      .optional(),
-    recordedBy: financeUserSummarySchema.nullable(),
-    occurredAt: z.iso.datetime({ offset: true }),
+    code: z.string(),
+    name: z.string(),
+    category: ledgerAccountCategorySchema,
+    role: ledgerAccountRoleSchema,
+    associateId: z.string().nullable(),
+  })
+  .meta({ id: "LedgerAccountRef" });
+
+export type LedgerAccountRef = z.infer<typeof ledgerAccountRefSchema>;
+
+export const expensePaymentSchema = z
+  .object({
+    id: z.string(),
+    sourceType: expensePaymentSourceTypeSchema,
+    amountMinor: z.number().int(),
+    paymentMethod: paymentMethodSchema,
+    sourceAccountId: z.string().nullable(),
+    sourceAccount: ledgerAccountRefSchema.nullable(),
+    payerAssociateId: z.string().nullable(),
+    payerAssociate: financeAssociateSchema.nullable(),
+  })
+  .meta({ id: "ExpensePayment" });
+
+export type ExpensePayment = z.infer<typeof expensePaymentSchema>;
+
+export const economicAllocationSchema = z
+  .object({
+    id: z.string(),
+    type: economicAllocationTypeSchema,
+    amountMinor: z.number().int(),
+    associateId: z.string().nullable(),
+    associate: financeAssociateSchema.nullable(),
+  })
+  .meta({ id: "EconomicAllocation" });
+
+export type EconomicAllocation = z.infer<typeof economicAllocationSchema>;
+
+export const financialDocumentSchema = z
+  .object({
+    id: z.string(),
+    type: financialDocumentTypeSchema,
+    documentSeries: z.string().nullable(),
+    documentNumber: z.string().nullable(),
+    issuedAt: isoTimestampSchema.nullable(),
+    supplierName: z.string().nullable(),
+    supplierTaxId: z.string().nullable(),
+    storageKey: z.string().nullable(),
+    notes: z.string().nullable(),
+  })
+  .meta({ id: "FinancialDocument" });
+
+export type FinancialDocument = z.infer<typeof financialDocumentSchema>;
+
+export const expenseDetailSchema = z
+  .object({
+    id: z.string(),
+    amountMinor: z.number().int(),
+    treatment: expenseTreatmentSchema,
+    categoryId: z.string(),
+    category: expenseCategorySchema.nullable(),
+    costObjectId: z.string().nullable(),
+    costObject: costObjectSchema.nullable(),
+    supplierId: z.string().nullable(),
+    supplier: supplierSchema.nullable(),
+    payments: z.array(expensePaymentSchema),
+  })
+  .meta({ id: "ExpenseDetail" });
+
+export type ExpenseDetail = z.infer<typeof expenseDetailSchema>;
+
+export const associateFundingDetailSchema = z
+  .object({
+    id: z.string(),
+    type: associateFundingTypeSchema,
+    associateId: z.string(),
+    associate: financeAssociateSchema,
+    destinationAccountId: z.string(),
+    destinationAccount: ledgerAccountRefSchema,
+    amountMinor: z.number().int(),
+    reference: z.string().nullable(),
+    notes: z.string().nullable(),
+  })
+  .meta({ id: "AssociateFundingDetail" });
+
+export type AssociateFundingDetail = z.infer<
+  typeof associateFundingDetailSchema
+>;
+
+export const journalPostingSchema = z
+  .object({
+    id: z.string(),
+    lineNumber: z.number().int(),
+    accountId: z.string(),
+    account: ledgerAccountRefSchema,
+    signedAmountMinor: signedAmountMinorSchema,
+    description: z.string().nullable(),
+  })
+  .meta({ id: "JournalPosting" });
+
+export type JournalPosting = z.infer<typeof journalPostingSchema>;
+
+export const journalEntrySchema = z
+  .object({
+    id: z.string(),
+    postedAt: isoTimestampSchema,
+    postings: z.array(journalPostingSchema),
+  })
+  .meta({ id: "JournalEntry" });
+
+export type JournalEntry = z.infer<typeof journalEntrySchema>;
+
+export const financialOperationSchema = z
+  .object({
+    id: z.string(),
+    bookId: z.string(),
+    bookType: financeBookTypeSchema,
+    kind: financialOperationKindSchema,
+    status: financialOperationStatusSchema,
+    occurredAt: isoTimestampSchema,
     description: z.string().nullable(),
     idempotencyKey: z.string(),
-    originTransactionId: z.string().nullable(),
-    reversalOfTransactionId: z.string().nullable(),
-    reversalTransactionId: z.string().nullable(),
-    createdAt: z.iso.datetime({ offset: true }),
-    updatedAt: z.iso.datetime({ offset: true }),
-    balanceChanges: z.array(walletBalanceChangeSchema),
-    references: z.array(moneyTransactionReferenceSchema),
+    createdById: z.string(),
+    postedAt: isoTimestampSchema.nullable(),
+    /** Set on a REVERSAL: the operation it undoes. */
+    reversalOfOperationId: z.string().nullable(),
+    /** Set on a reversed operation: the REVERSAL that undid it. */
+    reversedByOperationId: z.string().nullable(),
+    expense: expenseDetailSchema.nullable(),
+    associateFunding: associateFundingDetailSchema.nullable(),
+    allocations: z.array(economicAllocationSchema),
+    documents: z.array(financialDocumentSchema),
+    journalEntry: journalEntrySchema.nullable(),
+    /** Recomputed from the persisted postings, not stored. */
+    summary: postingImpactSummarySchema,
+    createdAt: isoTimestampSchema,
+    updatedAt: isoTimestampSchema,
   })
-  .meta({ id: "MoneyTransaction" });
+  .meta({ id: "FinancialOperation" });
 
-export type MoneyTransaction = z.infer<typeof moneyTransactionSchema>;
+export type FinancialOperation = z.infer<typeof financialOperationSchema>;
 
-export const moneyTransactionListSchema = z
+export const financialOperationListItemSchema = z
   .object({
-    items: z.array(moneyTransactionSchema),
-    page: z.number().int().min(1),
-    pageSize: z.number().int().min(1).max(MAX_PAGE_SIZE),
-    total: z.number().int().min(0),
+    id: z.string(),
+    bookId: z.string(),
+    bookType: financeBookTypeSchema,
+    kind: financialOperationKindSchema,
+    status: financialOperationStatusSchema,
+    occurredAt: isoTimestampSchema,
+    description: z.string().nullable(),
+    /** Absolute size of the operation, for list display. */
+    amountMinor: z.number().int(),
+    treatment: expenseTreatmentSchema.nullable(),
+    categoryName: z.string().nullable(),
+    costObjectName: z.string().nullable(),
+    postedAt: isoTimestampSchema.nullable(),
+    createdAt: isoTimestampSchema,
   })
-  .meta({ id: "MoneyTransactionList" });
+  .meta({ id: "FinancialOperationListItem" });
 
-export type MoneyTransactionList = z.infer<typeof moneyTransactionListSchema>;
-
-export const listMoneyTransactionsQuerySchema = z
-  .object({
-    page: z.coerce.number().int().min(1).default(1),
-    pageSize: z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).default(25),
-    status: moneyTransactionStatusSchema.optional(),
-    type: moneyTransactionTypeSchema.optional(),
-    types: z
-      .preprocess(
-        (value) =>
-          typeof value === "string"
-            ? value
-                .split(",")
-                .map((item) => item.trim())
-                .filter(Boolean)
-            : value,
-        z.array(moneyTransactionTypeSchema).min(1),
-      )
-      .optional(),
-    financialScope: moneyTransactionScopeSchema.optional(),
-    paymentMethod: paymentMethodSchema.optional(),
-    billingStatus: billingStatusSchema.optional(),
-    walletId: z.string().optional(),
-    userId: z.string().optional(),
-    counterpartyId: z.string().optional(),
-    businessLegalEntityId: z.string().optional(),
-    recordedByUserId: z.string().optional(),
-    categoryId: z.string().optional(),
-    from: z.iso
-      .datetime({ offset: true })
-      .describe("Inclusive start instant for the half-open ledger period.")
-      .optional(),
-    to: z.iso
-      .datetime({ offset: true })
-      .describe("Exclusive end instant for the half-open ledger period.")
-      .optional(),
-  })
-  .strict()
-  .superRefine((query, ctx) => {
-    if (query.type !== undefined && query.types !== undefined) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["types"],
-        message: "Use either type or types, not both.",
-      });
-    }
-    if (
-      query.from !== undefined &&
-      query.to !== undefined &&
-      Date.parse(query.from) >= Date.parse(query.to)
-    ) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["to"],
-        message: "The end timestamp must be after the start timestamp.",
-      });
-    }
-  })
-  .meta({ id: "ListMoneyTransactionsQuery" });
-
-export type ListMoneyTransactionsQuery = z.infer<
-  typeof listMoneyTransactionsQuerySchema
+export type FinancialOperationListItem = z.infer<
+  typeof financialOperationListItemSchema
 >;
 
-export const financeSummaryQuerySchema = z
+export const financialOperationListSchema = z
   .object({
-    from: z.iso
-      .datetime({ offset: true })
-      .describe("Inclusive start instant for the half-open reporting period."),
-    to: z.iso
-      .datetime({ offset: true })
-      .describe("Exclusive end instant for the half-open reporting period."),
+    items: z.array(financialOperationListItemSchema),
+    page: z.number().int(),
+    pageSize: z.number().int(),
+    total: z.number().int(),
   })
-  .strict()
-  .superRefine((query, ctx) => {
-    const fromInstant = Date.parse(query.from);
-    const toInstant = Date.parse(query.to);
+  .meta({ id: "FinancialOperationList" });
 
-    if (fromInstant >= toInstant) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["to"],
-        message: "The end timestamp must be after the start timestamp.",
-      });
-      return;
-    }
-
-    if (toInstant - fromInstant > MAX_SUMMARY_RANGE_MS) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["to"],
-        message: "The reporting period must not exceed 366 days.",
-      });
-    }
-  })
-  .meta({ id: "FinanceSummaryQuery" });
-
-export type FinanceSummaryQuery = z.infer<typeof financeSummaryQuerySchema>;
-
-const summaryAmountSchema = z.object({
-  currency: currencySchema,
-  amount: aggregateMoneyAmountSchema,
-});
-
-const paymentMethodSummarySchema = summaryAmountSchema.extend({
-  paymentMethod: paymentMethodSchema.nullable(),
-});
-
-const categoryAmountSummarySchema = summaryAmountSchema.extend({
-  category: financeCategorySummarySchema.nullable(),
-});
-
-const billingStatusSummarySchema = summaryAmountSchema.extend({
-  billingStatus: billingStatusSchema,
-});
-
-const financialScopeSummarySchema = summaryAmountSchema.extend({
-  financialScope: moneyTransactionScopeSchema,
-});
-
-const financeSummaryPeriodSchema = z
-  .object({
-    from: z.iso.datetime({ offset: true }),
-    to: z.iso.datetime({ offset: true }),
-  })
-  .meta({ id: "FinanceSummaryPeriod" });
-
-const financeCurrencyTotalSchema = z
-  .object({
-    currency: currencySchema,
-    income: aggregateMoneyAmountSchema,
-    expenses: aggregateMoneyAmountSchema,
-  })
-  .meta({ id: "FinanceCurrencyTotal" });
-
-const financeCompanyMoneySchema = z
-  .object({
-    walletId: z.string(),
-    walletType: companyWalletTypeSchema,
-    walletName: z.string(),
-    currency: currencySchema,
-    amount: signedAggregateMoneyAmountSchema,
-  })
-  .meta({ id: "FinanceCompanyMoney" });
-
-const financeAdminMoneySchema = z
-  .object({
-    admin: financeUserSummarySchema,
-    currency: currencySchema,
-    businessFunds: signedAggregateMoneyAmountSchema,
-    personalFunds: signedAggregateMoneyAmountSchema,
-    customerGuaranteeFunds: signedAggregateMoneyAmountSchema,
-  })
-  .meta({ id: "FinanceAdminMoney" });
-
-export const financeBalanceSnapshotSchema = z
-  .object({
-    wallet: financeWalletSummarySchema,
-    bucket: walletBalanceBucketSchema,
-    currency: currencySchema,
-    balance: signedMoneyAmountSchema,
-    ownerIsActive: z.boolean().nullable(),
-    ownerIsAdmin: z.boolean().nullable(),
-  })
-  .meta({ id: "FinanceBalanceSnapshot" });
-
-export type FinanceBalanceSnapshot = z.infer<
-  typeof financeBalanceSnapshotSchema
+export type FinancialOperationList = z.infer<
+  typeof financialOperationListSchema
 >;
 
-const financeCurrentBalancesSchema = z
+export const listFinancialOperationsQuerySchema = z
   .object({
-    company: z.array(financeBalanceSnapshotSchema),
-    admins: z.array(financeBalanceSnapshotSchema),
+    page: pageSchema,
+    pageSize: pageSizeSchema,
+    bookId: idSchema.optional(),
+    bookType: financeBookTypeSchema.optional(),
+    kind: financialOperationKindSchema.optional(),
+    status: financialOperationStatusSchema.optional(),
+    treatment: expenseTreatmentSchema.optional(),
+    /** Inclusive lower bound on `occurredAt`. */
+    from: isoTimestampSchema.optional(),
+    /** Exclusive upper bound on `occurredAt`. */
+    to: isoTimestampSchema.optional(),
   })
-  .meta({ id: "FinanceCurrentBalances" });
+  .strict()
+  .meta({ id: "ListFinancialOperationsQuery" });
 
-export const financeSummarySchema = z
-  .object({
-    from: z.iso.datetime({ offset: true }),
-    to: z.iso.datetime({ offset: true }),
-    period: financeSummaryPeriodSchema,
-    generatedAt: z.iso.datetime({ offset: true }),
-    income: z.array(summaryAmountSchema),
-    expenses: z.array(summaryAmountSchema),
-    totals: z.array(financeCurrencyTotalSchema),
-    incomeByPaymentMethod: z.array(paymentMethodSummarySchema),
-    expensesByCategory: z.array(categoryAmountSummarySchema),
-    incomeByBillingStatus: z.array(billingStatusSummarySchema),
-    incomeByScope: z.array(financialScopeSummarySchema),
-    companyMoney: z.array(financeCompanyMoneySchema),
-    adminMoney: z.array(financeAdminMoneySchema),
-    currentBalances: financeCurrentBalancesSchema,
-  })
-  .meta({ id: "FinanceSummary" });
-
-export type FinanceSummary = z.infer<typeof financeSummarySchema>;
-
-export const outstandingPersonalClaimSchema = z
-  .object({
-    debtorUserId: z.string(),
-    creditorUserId: z.string(),
-    debtor: financeUserSummarySchema,
-    creditor: financeUserSummarySchema,
-    currency: currencySchema,
-    amount: positiveAggregateMoneyAmountSchema,
-  })
-  .meta({ id: "OutstandingPersonalClaim" });
-
-export type OutstandingPersonalClaim = z.infer<
-  typeof outstandingPersonalClaimSchema
+export type ListFinancialOperationsQuery = z.infer<
+  typeof listFinancialOperationsQuerySchema
 >;
 
-export const outstandingPersonalClaimListSchema = z
+export const reverseOperationInputSchema = z
   .object({
-    items: z.array(outstandingPersonalClaimSchema),
-  })
-  .meta({ id: "OutstandingPersonalClaimList" });
-
-export const ownerBalanceSchema = z
-  .object({
-    userId: z.string(),
-    user: financeUserSummarySchema,
-    currency: currencySchema,
-    amount: signedAggregateMoneyAmountSchema,
+    /** Defaults to now when omitted. */
+    occurredAt: isoTimestampSchema.optional(),
+    reason: nullableTrimmedStringSchema(MAX_DESCRIPTION_LENGTH).optional(),
   })
   .strict()
-  .meta({ id: "OwnerBalance" });
+  .meta({ id: "ReverseOperationInput" });
 
-export type OwnerBalance = z.infer<typeof ownerBalanceSchema>;
+export type ReverseOperationInput = z.infer<typeof reverseOperationInputSchema>;
 
-export const ownerBalanceListSchema = z
+// ---------------------------------------------------------------------------
+// Settlement
+// ---------------------------------------------------------------------------
+
+export const previewSettlementInputSchema = z
   .object({
-    items: z.array(ownerBalanceSchema),
+    bookId: idSchema,
+    kind: settlementRunKindSchema,
+    /** Inclusive. */
+    periodStart: isoTimestampSchema,
+    /** Exclusive. */
+    periodEnd: isoTimestampSchema,
   })
   .strict()
-  .meta({ id: "OwnerBalanceList" });
+  .refine((input) => input.periodStart < input.periodEnd, {
+    message: "The period must end after it starts.",
+    path: ["periodEnd"],
+  })
+  .meta({ id: "PreviewSettlementInput" });
 
-export type OwnerBalanceList = z.infer<typeof ownerBalanceListSchema>;
+export type PreviewSettlementInput = z.infer<
+  typeof previewSettlementInputSchema
+>;
+
+export const settlementShareSchema = z
+  .object({
+    associateId: z.string(),
+    associate: financeAssociateSchema.nullable(),
+    shareBasisPoints: z.number().int(),
+  })
+  .meta({ id: "SettlementShare" });
+
+export type SettlementShare = z.infer<typeof settlementShareSchema>;
+
+export const settlementLineSchema = z
+  .object({
+    associateId: z.string(),
+    associate: financeAssociateSchema.nullable(),
+    shareBasisPoints: z.number().int(),
+    /** Benefit actually received (or pool cash actually held). */
+    actualAmountMinor: z.number().int(),
+    /** Benefit the ownership share entitles them to. */
+    expectedAmountMinor: z.number().int(),
+    /** Positive = must receive. Negative = must pay. Always sums to zero. */
+    adjustmentMinor: z.number().int(),
+  })
+  .meta({ id: "SettlementLine" });
+
+export type SettlementLine = z.infer<typeof settlementLineSchema>;
+
+export const settlementTransferSchema = z
+  .object({
+    fromAssociateId: z.string(),
+    fromAssociate: financeAssociateSchema.nullable(),
+    toAssociateId: z.string(),
+    toAssociate: financeAssociateSchema.nullable(),
+    amountMinor: z.number().int(),
+  })
+  .meta({ id: "SettlementTransfer" });
+
+export type SettlementTransfer = z.infer<typeof settlementTransferSchema>;
+
+/**
+ * A calculated settlement. These transfers are private balancing payments
+ * between associates; they are deliberately NOT netted against whatever the
+ * company separately owes an associate for money they advanced.
+ */
+export const settlementPreviewSchema = z
+  .object({
+    bookId: z.string(),
+    kind: settlementRunKindSchema,
+    periodStart: isoTimestampSchema,
+    periodEnd: isoTimestampSchema,
+    /** Total specific benefit (or total pool cash) being shared out. */
+    totalAmountMinor: z.number().int(),
+    shares: z.array(settlementShareSchema),
+    lines: z.array(settlementLineSchema),
+    transfers: z.array(settlementTransferSchema),
+    /** Operations included in this calculation. */
+    operationIds: z.array(z.string()),
+    calculatedAt: isoTimestampSchema,
+  })
+  .meta({ id: "SettlementPreview" });
+
+export type SettlementPreview = z.infer<typeof settlementPreviewSchema>;

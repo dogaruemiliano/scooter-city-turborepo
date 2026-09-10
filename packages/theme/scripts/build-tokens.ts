@@ -7,7 +7,9 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { formatHex, formatHex8, parse, toGamut } from "culori";
 
+import { aspectRatio } from "../src/tokens/aspect-ratio.js";
 import { breakpoints } from "../src/tokens/breakpoints.js";
+import { magnification } from "../src/tokens/magnification.js";
 import { motion } from "../src/tokens/motion.js";
 import { primitives } from "../src/tokens/primitives.js";
 import { radius, radiusBase } from "../src/tokens/radius.js";
@@ -113,6 +115,10 @@ export function buildCss(): string {
     lines.push(`  --spacing-${kebab(key)}: ${pxToRem(value)};`);
   }
   lines.push("");
+  for (const [key, value] of Object.entries(aspectRatio)) {
+    lines.push(`  --aspect-${kebab(key)}: ${value};`);
+  }
+  lines.push("");
   for (const [key, value] of Object.entries(typography.fontSize)) {
     lines.push(`  --text-${kebab(key)}: ${pxToRem(value)};`);
   }
@@ -211,6 +217,8 @@ export function buildNative(): string {
       ]),
     ),
     motion,
+    magnification,
+    aspectRatio,
     zIndex,
     breakpoints,
   };

@@ -43,14 +43,18 @@ const buttonVariants = cva(
   },
 );
 
+type ButtonProps = Omit<ButtonPrimitive.Props, "nativeButton" | "render"> &
+  VariantProps<typeof buttonVariants>;
+
 const Button = ({
   className,
   variant = "default",
   size = "default",
   ...props
-}: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) => {
+}: ButtonProps) => {
   return (
     <ButtonPrimitive
+      nativeButton
       data-slot="button"
       className={cn(buttonVariants({ variant, size, className }))}
       {...props}
@@ -58,4 +62,4 @@ const Button = ({
   );
 };
 
-export { Button, buttonVariants };
+export { Button, buttonVariants, type ButtonProps };

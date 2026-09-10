@@ -140,6 +140,14 @@ export const envSchema = z
         "HMAC secret used to sign direct-upload completion tokens. Required when IMAGE_STORAGE_DRIVER=s3. Min 32 chars.",
       ),
 
+    /* Document extraction ------------------------------------------------ */
+    DOCUMENT_EXTRACTION_DRIVER: z
+      .enum(["disabled", "fake", "textract"])
+      .default("disabled")
+      .describe(
+        "Document extraction backend. Use disabled by default, fake for local/CI fixtures, or textract for AWS AnalyzeExpense.",
+      ),
+
     /* JWT ----------------------------------------------------------------- */
     JWT_PRIVATE_KEY: z
       .string()
@@ -381,6 +389,17 @@ export const envSchema = z
       "IMAGE_STORAGE_UPLOAD_TOKEN_SECRET",
       "IMAGE_STORAGE_DRIVER=s3",
     );
+    if (
+      v.NODE_ENV === "production" &&
+      v.DOCUMENT_EXTRACTION_DRIVER === "fake"
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["DOCUMENT_EXTRACTION_DRIVER"],
+        message:
+          "DOCUMENT_EXTRACTION_DRIVER=fake cannot be used in production.",
+      });
+    }
   });
 
 export type Env = z.infer<typeof envSchema>;

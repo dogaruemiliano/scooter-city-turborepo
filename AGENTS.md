@@ -28,6 +28,19 @@ Every visual or motion value — color, spacing, radius, typography, shadow, mot
 
 <!-- END:theme-tokens-rule -->
 
+<!-- BEGIN:bottom-sheet-surface-rule -->
+
+# Bottom sheets must be visually distinct from the page
+
+A bottom sheet must **never** use the page background color. The contrast between the page and the sheet is an important state cue that helps users immediately recognize that a temporary surface is open.
+
+- Use the semantic sheet/popover surface (`bg-popover` with `text-popover-foreground`) or a dedicated bottom-sheet surface token. Do not use `bg-background` for the sheet popup, body, header, footer, or any full-width child surface.
+- Nested sheet content must inherit the sheet surface or explicitly use the same sheet/popover token. Do not let a child container cover the sheet with the page background.
+- Keep the sheet surface consistent from the drag-handle area through the body and footer unless a smaller component has a meaningful, localized state color.
+- When changing a bottom sheet, add or update a test that prevents a full-sheet `bg-background` override from returning.
+
+<!-- END:bottom-sheet-surface-rule -->
+
 <!-- BEGIN:prisma-verify-rule -->
 
 # Prisma — verify the docs before writing any code

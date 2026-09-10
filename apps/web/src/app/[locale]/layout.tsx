@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist_Mono, Manrope } from "next/font/google";
+import { Geist_Mono, Montserrat } from "next/font/google";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { isSupportedLocale, supportedLocales } from "@repo/i18n";
@@ -17,8 +17,8 @@ import {
 } from "../../lib/theme-cookie";
 import "../globals.css";
 
-const manrope = Manrope({
-  variable: "--font-manrope",
+const montserrat = Montserrat({
+  variable: "--font-montserrat",
   subsets: ["latin"],
 });
 
@@ -72,9 +72,9 @@ export default async function RootLayout({
     <html
       lang={locale}
       data-theme={dataTheme}
-      className={`${manrope.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${montserrat.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="relative min-h-full">
+      <body suppressHydrationWarning className="relative min-h-full">
         <div className="isolate flex min-h-full flex-col">
           <NextIntlClientProvider>
             <TooltipProvider>

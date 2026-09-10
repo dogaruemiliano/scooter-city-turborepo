@@ -410,6 +410,8 @@ export class ImageStorageService {
         return `${this.prefix}/personal-documents/${year}/${fileName}`;
       case "expense-invoice":
         return `${this.prefix}/invoices/${year}-${month}/${fileName}`;
+      case "finance-document":
+        return `${this.prefix}/finance-documents/${year}-${month}/${fileName}`;
       case "scooter-sale-document":
         return `${this.prefix}/${year}/${month}/${day}/${fileName}`;
     }

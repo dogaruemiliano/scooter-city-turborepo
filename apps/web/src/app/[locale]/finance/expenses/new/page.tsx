@@ -1,58 +1,85 @@
-import { randomUUID } from "node:crypto";
-
+import { v1 } from "@repo/api-shared";
 import { messages } from "@repo/i18n";
 import type { Metadata } from "next";
 
-import { localizePath, resolveRouteLocale } from "@/i18n/paths";
+import { resolveRouteLocale } from "@/i18n/paths";
 import {
+  fetchFinance,
   financeCookieHeader,
-  handleFinanceApiErrors,
   requireFinanceAdmin,
-} from "../../_lib/server";
-import { ExpenseCreateFlow } from "../_components/ExpenseCreateFlow";
-import { expenseToday } from "../_lib/expense-date";
-import { loadExpenseFormBootstrap } from "../_lib/expense-server";
+} from "../../_lib/finance-server";
+import { FINANCE_PATHS } from "../../_lib/links";
+import { ExpenseReceiptCapture } from "../_components/ExpenseReceiptCapture";
 
-const EXPENSES_PATH = "/finance/expenses";
-const NEW_EXPENSE_PATH = "/finance/expenses/new";
-const BUSINESS_SETTINGS_PATH = "/finance/settings/business";
-const CATEGORIES_PATH = "/finance/categories";
-const ADVANCED_TRANSACTION_PATH = "/finance/transactions/new";
-
-interface NewExpensePageProps {
+interface NewExpenseRoutePageProps {
   params: Promise<{ locale: string }>;
 }
 
 export async function generateMetadata({
   params,
-}: NewExpensePageProps): Promise<Metadata> {
+}: NewExpenseRoutePageProps): Promise<Metadata> {
   const { locale: rawLocale } = await params;
   const locale = resolveRouteLocale(rawLocale);
-  return { title: messages[locale].finance.expenses.form.title };
+
+  return { title: messages[locale].appShell.pages.newFinanceExpense };
 }
 
-export default async function NewExpensePage({ params }: NewExpensePageProps) {
+export default async function NewExpenseRoutePage({
+  params,
+}: NewExpenseRoutePageProps) {
   const { locale: rawLocale } = await params;
   const locale = resolveRouteLocale(rawLocale);
-  const user = await requireFinanceAdmin(locale, NEW_EXPENSE_PATH);
+  const path = FINANCE_PATHS.newExpense;
+
+  const currentUser = await requireFinanceAdmin(locale, path);
   const cookieHeader = await financeCookieHeader();
-  const today = expenseToday();
-  const bootstrap = await handleFinanceApiErrors(locale, NEW_EXPENSE_PATH, () =>
-    loadExpenseFormBootstrap({
-      cookieHeader,
-      currentUserId: user.id,
-      today,
-    }),
-  );
+  const [books, accounts, categories, costObjects, suppliers] =
+    await Promise.all([
+      fetchFinance(
+        locale,
+        path,
+        v1.finance.ROUTES.books,
+        v1.finance.financeBookListSchema,
+        cookieHeader,
+      ),
+      fetchFinance(
+        locale,
+        path,
+        v1.finance.ROUTES.accounts.list,
+        v1.finance.ledgerAccountListSchema,
+        cookieHeader,
+      ),
+      fetchFinance(
+        locale,
+        path,
+        v1.finance.ROUTES.expenseCategories.list,
+        v1.finance.expenseCategoryListSchema,
+        cookieHeader,
+      ),
+      fetchFinance(
+        locale,
+        path,
+        v1.finance.ROUTES.costObjects.list,
+        v1.finance.costObjectListSchema,
+        cookieHeader,
+      ),
+      fetchFinance(
+        locale,
+        path,
+        v1.finance.ROUTES.suppliers.list,
+        v1.finance.supplierListSchema,
+        cookieHeader,
+      ),
+    ]);
 
   return (
-    <ExpenseCreateFlow
-      bootstrap={bootstrap}
-      idempotencyKey={`web:expense:create:${randomUUID()}`}
-      expensesHref={localizePath(EXPENSES_PATH, locale)}
-      categoriesHref={localizePath(CATEGORIES_PATH, locale)}
-      settingsHref={localizePath(BUSINESS_SETTINGS_PATH, locale)}
-      advancedTransactionHref={localizePath(ADVANCED_TRANSACTION_PATH, locale)}
+    <ExpenseReceiptCapture
+      books={books.items}
+      accounts={accounts.items}
+      categories={categories.items}
+      costObjects={costObjects.items}
+      suppliers={suppliers.items}
+      currentUserId={currentUser.id}
     />
   );
 }

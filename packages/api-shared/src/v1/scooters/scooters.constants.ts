@@ -35,8 +35,6 @@ export const SCOOTER_LIST_SORTS = [
   "brandDesc",
   "manufactureYearDesc",
   "manufactureYearAsc",
-  "purchasedOnDesc",
-  "purchasedOnAsc",
   "createdAtDesc",
   "createdAtAsc",
   "updatedAtDesc",

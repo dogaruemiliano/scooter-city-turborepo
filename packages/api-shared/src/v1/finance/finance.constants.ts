@@ -1,207 +1,331 @@
-export const WALLET_TYPES = [
-  "USER",
-  "COMPANY_CASH",
-  "COMPANY_BANK",
-  "PAYMENT_PROCESSOR",
-] as const;
+/**
+ * Financial-module shared constants and route helpers.
+ *
+ * Design reference: docs/finance/financial-system-architecture.md
+ *
+ * The enum tuples mirror the Prisma enums exactly. They are the single
+ * source of truth for both the zod schemas here and the UI's option lists,
+ * so a Prisma enum change surfaces as a type error rather than a runtime
+ * surprise.
+ */
 
-export type WalletType = (typeof WALLET_TYPES)[number];
+export const FINANCE_BOOK_TYPES = ["COMPANY", "ASSOCIATE_POOL"] as const;
 
-export const COMPANY_WALLET_TYPES = [
-  "COMPANY_CASH",
-  "COMPANY_BANK",
-  "PAYMENT_PROCESSOR",
-] as const satisfies readonly WalletType[];
+export type FinanceBookType = (typeof FINANCE_BOOK_TYPES)[number];
 
-export type CompanyWalletType = (typeof COMPANY_WALLET_TYPES)[number];
-
-export const WALLET_BALANCE_BUCKETS = [
-  "USER_SETTLEMENT",
-  "BUSINESS_FUNDS",
-  "ADMIN_PERSONAL_FUNDS",
-  "CUSTOMER_GUARANTEE_FUNDS",
-] as const;
-
-export type WalletBalanceBucket = (typeof WALLET_BALANCE_BUCKETS)[number];
-
-export const MONEY_TRANSACTION_TYPES = [
-  "INCOME",
+export const FINANCIAL_OPERATION_KINDS = [
   "EXPENSE",
+  "INCOME",
   "TRANSFER",
-  "USER_CHARGE",
-  "USER_PAYMENT",
-  "GUARANTEE_RECEIVED",
-  "GUARANTEE_REFUNDED",
+  "ASSOCIATE_FUNDING",
   "REIMBURSEMENT",
-  "PERSONAL_EXTRACTION",
-  "PERSONAL_FUNDS_SPLIT",
-  "PERSONAL_FUNDS_CLAIM",
-  "COMPANY_DISTRIBUTION",
-  "CAPITAL_CONTRIBUTION",
-  "REFUND",
-  "ADJUSTMENT",
+  "PERSONAL_USE",
   "REVERSAL",
 ] as const;
 
-export type MoneyTransactionType = (typeof MONEY_TRANSACTION_TYPES)[number];
+export type FinancialOperationKind = (typeof FINANCIAL_OPERATION_KINDS)[number];
 
-export const CREATABLE_MONEY_TRANSACTION_TYPES = [
-  "INCOME",
-  "EXPENSE",
-  "TRANSFER",
-  "USER_CHARGE",
-  "USER_PAYMENT",
-  "GUARANTEE_RECEIVED",
-  "GUARANTEE_REFUNDED",
-  "REIMBURSEMENT",
-  "PERSONAL_EXTRACTION",
-  "PERSONAL_FUNDS_SPLIT",
-  "COMPANY_DISTRIBUTION",
-  "CAPITAL_CONTRIBUTION",
-  "REFUND",
-  "ADJUSTMENT",
-] as const satisfies readonly MoneyTransactionType[];
-
-export type CreatableMoneyTransactionType =
-  (typeof CREATABLE_MONEY_TRANSACTION_TYPES)[number];
-
-export const MONEY_TRANSACTION_STATUSES = [
+export const FINANCIAL_OPERATION_STATUSES = [
   "DRAFT",
   "POSTED",
   "REVERSED",
 ] as const;
 
-export type MoneyTransactionStatus =
-  (typeof MONEY_TRANSACTION_STATUSES)[number];
+export type FinancialOperationStatus =
+  (typeof FINANCIAL_OPERATION_STATUSES)[number];
 
-export const MONEY_TRANSACTION_SCOPES = [
-  "COMPANY",
-  "ADMIN_PERSONAL",
-  "CUSTOMER_HELD",
+export const LEDGER_ACCOUNT_CATEGORIES = [
+  "ASSET",
+  "LIABILITY",
+  "EQUITY",
+  "REVENUE",
+  "EXPENSE",
 ] as const;
 
-export type MoneyTransactionScope = (typeof MONEY_TRANSACTION_SCOPES)[number];
+export type LedgerAccountCategory = (typeof LEDGER_ACCOUNT_CATEGORIES)[number];
+
+export const LEDGER_ACCOUNT_ROLES = [
+  "BANK",
+  "CASH_REGISTER",
+  "COMPANY_CASH_CUSTODY",
+  "ASSOCIATE_POOL_CASH_CUSTODY",
+  "PAYABLE_TO_ASSOCIATE",
+  "RECEIVABLE_FROM_ASSOCIATE",
+  "ASSOCIATE_LOAN_PAYABLE",
+  "CONTRIBUTED_CAPITAL",
+  "OPERATING_EXPENSE",
+  "NON_OPERATIONAL_COMPANY_EXPENSE",
+  "ASSOCIATE_POOL_EXPENSE",
+  "FIXED_ASSET",
+  "RENTAL_REVENUE",
+  "SCOOTER_SALE_REVENUE",
+  "ASSOCIATE_POOL_REVENUE",
+] as const;
+
+export type LedgerAccountRole = (typeof LEDGER_ACCOUNT_ROLES)[number];
+
+/**
+ * The accounting category each role must carry. Mirrored by the
+ * `LedgerAccount_role_category_valid` database constraint.
+ */
+export const LEDGER_ROLE_CATEGORY = {
+  BANK: "ASSET",
+  CASH_REGISTER: "ASSET",
+  COMPANY_CASH_CUSTODY: "ASSET",
+  ASSOCIATE_POOL_CASH_CUSTODY: "ASSET",
+  PAYABLE_TO_ASSOCIATE: "LIABILITY",
+  RECEIVABLE_FROM_ASSOCIATE: "ASSET",
+  ASSOCIATE_LOAN_PAYABLE: "LIABILITY",
+  CONTRIBUTED_CAPITAL: "EQUITY",
+  OPERATING_EXPENSE: "EXPENSE",
+  NON_OPERATIONAL_COMPANY_EXPENSE: "EXPENSE",
+  ASSOCIATE_POOL_EXPENSE: "EXPENSE",
+  FIXED_ASSET: "ASSET",
+  RENTAL_REVENUE: "REVENUE",
+  SCOOTER_SALE_REVENUE: "REVENUE",
+  ASSOCIATE_POOL_REVENUE: "REVENUE",
+} as const satisfies Record<LedgerAccountRole, LedgerAccountCategory>;
+
+/**
+ * Roles whose accounts belong to one associate. Company cash custody is an
+ * associate-scoped *company asset* — it is not the associate's own money.
+ */
+export const ASSOCIATE_SCOPED_LEDGER_ROLES = [
+  "COMPANY_CASH_CUSTODY",
+  "ASSOCIATE_POOL_CASH_CUSTODY",
+  "PAYABLE_TO_ASSOCIATE",
+  "RECEIVABLE_FROM_ASSOCIATE",
+  "ASSOCIATE_LOAN_PAYABLE",
+] as const satisfies readonly LedgerAccountRole[];
+
+/** Asset roles an expense may be paid from directly. */
+export const EXPENSE_PAYMENT_SOURCE_ROLES = [
+  "BANK",
+  "CASH_REGISTER",
+  "COMPANY_CASH_CUSTODY",
+  "ASSOCIATE_POOL_CASH_CUSTODY",
+] as const satisfies readonly LedgerAccountRole[];
+
+export const EXPENSE_TREATMENTS = [
+  "OPERATING_EXPENSE",
+  "NON_OPERATIONAL_COMPANY_EXPENSE",
+  "CAPITAL_ASSET",
+  "ASSOCIATE_POOL_EXPENSE",
+] as const;
+
+export type ExpenseTreatment = (typeof EXPENSE_TREATMENTS)[number];
+
+/** Expense treatments allowed in each conceptual finance book. */
+export const EXPENSE_TREATMENTS_BY_BOOK_TYPE: Record<
+  FinanceBookType,
+  readonly ExpenseTreatment[]
+> = {
+  COMPANY: [
+    "OPERATING_EXPENSE",
+    "NON_OPERATIONAL_COMPANY_EXPENSE",
+    "CAPITAL_ASSET",
+  ],
+  ASSOCIATE_POOL: ["ASSOCIATE_POOL_EXPENSE"],
+};
+
+/** The ledger role each treatment debits. */
+export const EXPENSE_TREATMENT_DEBIT_ROLE = {
+  OPERATING_EXPENSE: "OPERATING_EXPENSE",
+  NON_OPERATIONAL_COMPANY_EXPENSE: "NON_OPERATIONAL_COMPANY_EXPENSE",
+  CAPITAL_ASSET: "FIXED_ASSET",
+  ASSOCIATE_POOL_EXPENSE: "ASSOCIATE_POOL_EXPENSE",
+} as const satisfies Record<ExpenseTreatment, LedgerAccountRole>;
+
+/**
+ * Treatments that participate in company-benefit settlement. Capital assets
+ * are excluded in v1 — the money became an asset, not a consumed benefit.
+ */
+export const SETTLED_EXPENSE_TREATMENTS = [
+  "OPERATING_EXPENSE",
+  "NON_OPERATIONAL_COMPANY_EXPENSE",
+] as const satisfies readonly ExpenseTreatment[];
+
+export const EXPENSE_PAYMENT_SOURCE_TYPES = [
+  "BOOK_ACCOUNT",
+  "ASSOCIATE_PERSONAL_FUNDS",
+] as const;
+
+export type ExpensePaymentSourceType =
+  (typeof EXPENSE_PAYMENT_SOURCE_TYPES)[number];
 
 export const PAYMENT_METHODS = [
   "CASH",
-  "POS",
+  "CARD",
   "BANK_TRANSFER",
-  "ONLINE_PAYMENT",
+  "ONLINE",
+  "OTHER",
 ] as const;
 
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 
-export const BILLING_STATUSES = [
-  "BILLED",
-  "NOT_BILLED",
-  "NOT_APPLICABLE",
+export const ECONOMIC_ALLOCATION_TYPES = [
+  "COMMON",
+  "ASSOCIATE_SPECIFIC",
 ] as const;
 
-export type BillingStatus = (typeof BILLING_STATUSES)[number];
+export type EconomicAllocationType = (typeof ECONOMIC_ALLOCATION_TYPES)[number];
 
-export const FINANCIAL_CATEGORY_KINDS = ["INCOME", "EXPENSE"] as const;
+export const INCOME_TYPES = ["RENTAL", "SCOOTER_SALE"] as const;
 
-export type FinancialCategoryKind = (typeof FINANCIAL_CATEGORY_KINDS)[number];
+export type IncomeType = (typeof INCOME_TYPES)[number];
 
-/**
- * Curated Lucide icon names selectable for a financial category. Stored as a
- * plain string column, so this list can grow without a migration; keep it in
- * sync with the icon lookup map consumed on the client.
- */
-export const FINANCIAL_CATEGORY_ICONS = [
-  "wrench",
-  "truck",
-  "fuel",
-  "shield",
-  "receipt",
-  "wallet",
-  "bike",
-  "zap",
-  "tag",
-  "building-2",
-  "users",
-  "banknote",
-  "car",
-  "package",
-  "phone",
-  "wifi",
-  "home",
-  "heart",
-  "gift",
-  "megaphone",
-  "credit-card",
-  "piggy-bank",
-  "alert-triangle",
-  "scale",
-  "graduation-cap",
-  "file-text",
+export const ASSOCIATE_FUNDING_TYPES = [
+  "LOAN",
+  "CAPITAL_CONTRIBUTION",
 ] as const;
 
-export type FinancialCategoryIcon = (typeof FINANCIAL_CATEGORY_ICONS)[number];
+export type AssociateFundingType = (typeof ASSOCIATE_FUNDING_TYPES)[number];
 
-export const FINANCIAL_COUNTERPARTY_KINDS = ["PERSON", "COMPANY"] as const;
+export const REIMBURSEMENT_TYPES = [
+  "EXPENSE_ADVANCE_REPAYMENT",
+  "ASSOCIATE_LOAN_REPAYMENT",
+  "ASSOCIATE_RECEIVABLE_REPAYMENT",
+] as const;
 
-export type FinancialCounterpartyKind =
-  (typeof FINANCIAL_COUNTERPARTY_KINDS)[number];
+export type ReimbursementType = (typeof REIMBURSEMENT_TYPES)[number];
 
-export const COMPANY_LEGAL_FORMS = [
-  "SRL",
-  "SA",
-  "PFA",
-  "II",
-  "IF",
-  "ONG",
+export const COST_OBJECT_TYPES = [
+  "SCOOTER",
+  "VEHICLE",
+  "PROPERTY",
+  "OFFICE",
+  "FLEET",
+  "EQUIPMENT",
   "OTHER",
 ] as const;
 
-export type CompanyLegalForm = (typeof COMPANY_LEGAL_FORMS)[number];
+export type CostObjectType = (typeof COST_OBJECT_TYPES)[number];
 
-export const COMPANY_ACTIVITY_PERIODS = [
-  "DAY",
-  "WEEK",
-  "MONTH",
-  "YEAR",
-  "ALL",
+export const COST_OBJECT_OWNERSHIP_TYPES = [
+  "COMPANY",
+  "ASSOCIATE",
+  "SHARED",
+  "EXTERNAL",
 ] as const;
 
-export type CompanyActivityPeriod = (typeof COMPANY_ACTIVITY_PERIODS)[number];
+export type CostObjectOwnershipType =
+  (typeof COST_OBJECT_OWNERSHIP_TYPES)[number];
+
+export const FINANCIAL_DOCUMENT_TYPES = [
+  "RECEIPT",
+  "INVOICE",
+  "CONTRACT",
+  "OTHER",
+] as const;
+
+export type FinancialDocumentType = (typeof FINANCIAL_DOCUMENT_TYPES)[number];
+
+export const SETTLEMENT_RUN_KINDS = [
+  "COMPANY_SPECIFIC_BENEFIT",
+  "ASSOCIATE_POOL_CASH",
+] as const;
+
+export type SettlementRunKind = (typeof SETTLEMENT_RUN_KINDS)[number];
+
+export const SETTLEMENT_RUN_STATUSES = [
+  "DRAFT",
+  "CONFIRMED",
+  "PARTIALLY_SETTLED",
+  "SETTLED",
+  "CANCELLED",
+] as const;
+
+export type SettlementRunStatus = (typeof SETTLEMENT_RUN_STATUSES)[number];
+
+export const SETTLEMENT_TRANSFER_STATUSES = [
+  "PENDING",
+  "COMPLETED",
+  "CANCELLED",
+] as const;
+
+export type SettlementTransferStatus =
+  (typeof SETTLEMENT_TRANSFER_STATUSES)[number];
+
+export const EXPENSE_EXTRACTION_DRAFT_STATUSES = [
+  "ANALYZING",
+  "READY",
+  "FAILED",
+  "CONFIRMED",
+] as const;
+
+export type ExpenseExtractionDraftStatus =
+  (typeof EXPENSE_EXTRACTION_DRAFT_STATUSES)[number];
+
+export const COMPANY_MATCH_STATUSES = [
+  "MATCHED",
+  "MISMATCHED",
+  "UNKNOWN",
+] as const;
+
+export type CompanyMatchStatus = (typeof COMPANY_MATCH_STATUSES)[number];
+
+/**
+ * Header carrying the client command identifier for every financial write.
+ * Retrying with the same key returns the original operation instead of
+ * creating a second one.
+ */
+export const IDEMPOTENCY_KEY_HEADER = "Idempotency-Key";
+
+/** Ownership shares are basis points of a whole book. */
+export const TOTAL_SHARE_BASIS_POINTS = 10_000;
+
+/** Minor units per major unit for every currency this module handles. */
+export const MINOR_UNITS_PER_MAJOR = 100;
 
 export const ROUTES = {
-  summary: "/v1/finance/summary",
-  walletOptions: "/v1/finance/wallet-options",
-  wallets: {
-    list: "/v1/finance/wallets",
-    create: "/v1/finance/wallets",
-    get: (id: string): string => `/v1/finance/wallets/${id}`,
-    mine: "/v1/finance/me/wallet",
+  books: "/v1/finance/books",
+  companyIdentity: "/v1/finance/company-identity",
+  companyAssociates: "/v1/finance/company-associates",
+  suppliers: {
+    list: "/v1/finance/suppliers",
+    create: "/v1/finance/suppliers",
+    update: (supplierId: string): string =>
+      `/v1/finance/suppliers/${encodeURIComponent(supplierId)}`,
   },
-  categories: {
-    list: "/v1/finance/categories",
-    create: "/v1/finance/categories",
-    update: (id: string): string => `/v1/finance/categories/${id}`,
+  accounts: {
+    list: "/v1/finance/accounts",
+    /** Accounts with balances summed from their journal postings. */
+    balances: "/v1/finance/account-balances",
+    get: (accountId: string): string => `/v1/finance/accounts/${accountId}`,
+    balance: (accountId: string): string =>
+      `/v1/finance/accounts/${accountId}/balance`,
   },
-  counterparties: {
-    search: "/v1/finance/counterparties/search",
+  operations: {
+    list: "/v1/finance/operations",
+    get: (operationId: string): string =>
+      `/v1/finance/operations/${operationId}`,
+    reverse: (operationId: string): string =>
+      `/v1/finance/operations/${operationId}/reverse`,
   },
-  companies: {
-    list: "/v1/finance/companies",
-    create: "/v1/finance/companies",
-    get: (id: string): string => `/v1/finance/companies/${id}`,
-    update: (id: string): string => `/v1/finance/companies/${id}`,
-    delete: (id: string): string => `/v1/finance/companies/${id}`,
-    stats: (id: string): string => `/v1/finance/companies/${id}/stats`,
+  expenses: {
+    preview: "/v1/finance/expenses/preview",
+    create: "/v1/finance/expenses",
+    draftUpload: "/v1/finance/expenses/receipt-draft-upload-url",
+    analyze: "/v1/finance/expenses/extractions",
+    extraction: (draftId: string): string =>
+      `/v1/finance/expenses/extractions/${encodeURIComponent(draftId)}`,
   },
-  transactions: {
-    list: "/v1/finance/transactions",
-    create: "/v1/finance/transactions",
-    get: (id: string): string => `/v1/finance/transactions/${id}`,
-    post: (id: string): string => `/v1/finance/transactions/${id}/post`,
-    reverse: (id: string): string => `/v1/finance/transactions/${id}/reverse`,
+  funding: {
+    preview: "/v1/finance/funding/preview",
+    create: "/v1/finance/funding",
+    draftUpload: "/v1/finance/funding/proof-draft-upload-url",
   },
-  claims: {
-    outstanding: "/v1/finance/claims/outstanding",
+  expenseCategories: {
+    list: "/v1/finance/expense-categories",
+    create: "/v1/finance/expense-categories",
   },
-  owners: {
-    balances: "/v1/finance/owners/balances",
+  costObjects: {
+    list: "/v1/finance/cost-objects",
+    create: "/v1/finance/cost-objects",
+    update: (costObjectId: string): string =>
+      `/v1/finance/cost-objects/${costObjectId}`,
+  },
+  settlements: {
+    preview: "/v1/finance/settlements/preview",
   },
 } as const;

@@ -18,8 +18,9 @@ import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
 import { pinoConfig } from "./common/logger/pino.config";
 import { RequestIdMiddleware } from "./common/middleware/request-id.middleware";
 import { ConfigModule } from "./config/config.module";
-import { FinanceModule } from "./finance/finance.module";
 import { loadEnv } from "./config/env";
+import { DocumentExtractionModule } from "./document-extraction/document-extraction.module";
+import { FinanceModule } from "./finance/finance.module";
 import { HealthModule } from "./health/health.module";
 import { MailerModule } from "./mailer/mailer.module";
 import { MaintenanceModule } from "./maintenance/maintenance.module";
@@ -40,6 +41,7 @@ const env = loadEnv();
     ConfigModule,
     LoggerModule.forRoot(pinoConfig(process.env.NODE_ENV ?? "development")),
     PrismaModule,
+    DocumentExtractionModule,
     MailerModule,
     SmsModule.forRoot(env),
     AuditModule,
@@ -49,11 +51,11 @@ const env = loadEnv();
 
     // Public-surface modules.
     HealthModule,
+    FinanceModule,
     PersonsModule,
     MaintenanceModule,
     ScootersModule,
     ScooterBrandsModule,
-    FinanceModule,
     AuthModule.forRoot(buildAuthConfig(env)),
   ],
   providers: [

@@ -1,640 +1,595 @@
+import { v1 } from "@repo/api-shared";
 import { describe, expect, it } from "vitest";
 
 import {
-  availableExpensePaymentSources,
-  buildCompactExpensePayload,
-  changeExpenseAttributionTarget,
-  changeExpenseCompanyCuiAnswer,
-  changeExpensePaymentSource,
-  clearExpenseErrorsForAction,
-  createExpenseFormState,
-  expenseFundingTreatmentFor,
-  expenseFormReducer,
-  expenseReviewWarnings,
-  expenseVatSummary,
-  isExpensePaymentCombinationAllowed,
-  normalizeExpenseAmountInput,
-  resetExpenseFiscalAssertions,
-  validateExpenseDetails,
-  validateExpenseEvidence,
-  type ExpenseAttributionTarget,
-  type ExpenseEvidenceReference,
-  type ExpenseFormState,
-  type ExpenseFundingTreatment,
-  type ExpensePaymentSource,
+  allocationDefaultsForCostObject,
+  dateToIsoTimestamp,
+  emptyAllocationLine,
+  emptyPaymentLine,
+  expenseFormDefaults,
+  expenseFormDefaultsFromExtraction,
+  expenseFormFocusFieldForIssuePath,
+  expenseFormSchema,
+  findMatchingSupplier,
+  isExpenseFormFocusField,
+  safeMinor,
+  sumLines,
+  toCreateExpenseInput,
+  type ExpenseFormValues,
 } from "../_lib/expense-form";
 
-const fiscalEvidence: ExpenseEvidenceReference = {
-  fileName: "invoice.pdf",
-  contentType: "application/pdf",
-  byteSize: 1_024,
-  sha256: "a".repeat(64),
-};
+const BOOK_ID = "book-company";
+const EMILIANO = "user-emiliano";
+const IUSTI = "user-iusti";
 
-const posEvidence: ExpenseEvidenceReference = {
-  fileName: "pos.jpg",
-  contentType: "image/jpeg",
-  byteSize: 2_048,
-  sha256: "b".repeat(64),
-};
-
-function completeState(): ExpenseFormState {
+function values(overrides: Partial<ExpenseFormValues> = {}): ExpenseFormValues {
   return {
-    ...createExpenseFormState({
-      currentUserId: "user-payer",
-      defaultBusinessEntityId: "entity-1",
-      today: "2026-08-01",
-    }),
-    hasCompanyCui: "YES",
-    grossAmount: "1250",
-    categoryId: "category-1",
-    companyWalletId: "wallet-card",
-    payeeCounterpartyId: "counterparty-1",
-    documentType: "INVOICE",
-    documentNumber: "FCT 1234",
-    documentDate: "2026-08-01",
-    supplierCui: "ro12345678",
-    buyerCuiStatus: "MATCHED",
-    vatLines: [
-      {
-        id: "vat-1",
-        netAmount: "1050.42",
-        ratePercent: "19",
-        vatAmount: "199.58",
-      },
+    ...expenseFormDefaults({ bookId: BOOK_ID, today: "2026-08-14" }),
+    amount: "300",
+    categoryId: "category-fuel",
+    payments: [
+      emptyPaymentLine({ sourceAccountId: "account-bank", amount: "300" }),
     ],
+    allocations: [emptyAllocationLine({ amount: "300" })],
+    ...overrides,
   };
 }
 
-describe.each<
-  [
-    ExpensePaymentSource,
-    ExpenseAttributionTarget,
-    boolean,
-    ExpenseFundingTreatment,
-  ]
->([
-  ["COMPANY_CARD", "BUSINESS", true, "NON_REIMBURSABLE"],
-  ["COMPANY_CARD", "OWNER", true, "NON_REIMBURSABLE"],
-  ["COMPANY_CASH_DESK", "BUSINESS", true, "NON_REIMBURSABLE"],
-  ["COMPANY_CASH_DESK", "OWNER", true, "NON_REIMBURSABLE"],
-  ["PERSONAL_FUNDS", "BUSINESS", true, "REIMBURSABLE"],
-  ["PERSONAL_FUNDS", "OWNER", true, "NON_REIMBURSABLE"],
-])("expense funding matrix", (source, target, allowed, treatment) => {
-  it(`${source} + ${target}`, () => {
-    expect(isExpensePaymentCombinationAllowed(source, target)).toBe(allowed);
-    expect(expenseFundingTreatmentFor(source, target)).toBe(treatment);
-  });
-});
-
-describe("expense form transitions", () => {
-  it("defaults manual evidence classification to a fiscal receipt", () => {
-    expect(
-      createExpenseFormState({
-        currentUserId: "user-payer",
-        today: "2026-08-01",
-      }).documentType,
-    ).toBe("FISCAL_RECEIPT");
+describe("expenseFormSchema", () => {
+  it("accepts a complete, balanced expense", () => {
+    expect(expenseFormSchema.safeParse(values()).success).toBe(true);
   });
 
-  it("keeps owner attribution when central cash desk is selected", () => {
-    const state = {
-      ...completeState(),
-      attributionTarget: "OWNER" as const,
-      businessOwnerId: "owner-1",
-    };
-
-    expect(
-      changeExpensePaymentSource(state, "COMPANY_CASH_DESK"),
-    ).toMatchObject({
-      paymentSource: "COMPANY_CASH_DESK",
-      attributionTarget: "OWNER",
-      businessOwnerId: "owner-1",
-    });
-  });
-
-  it("keeps central cash desk when a specific owner is selected", () => {
-    const state = {
-      ...completeState(),
-      paymentSource: "COMPANY_CASH_DESK" as const,
-      companyWalletId: "wallet-cash",
-    };
-
-    expect(changeExpenseAttributionTarget(state, "OWNER")).toMatchObject({
-      paymentSource: "COMPANY_CASH_DESK",
-      attributionTarget: "OWNER",
-      companyWalletId: "wallet-cash",
-    });
-    expect(availableExpensePaymentSources("OWNER")).toEqual([
-      "COMPANY_CARD",
-      "COMPANY_CASH_DESK",
-      "PERSONAL_FUNDS",
-    ]);
-  });
-
-  it("forces personal funds and company attribution when the receipt has no CUI", () => {
-    expect(
-      changeExpenseCompanyCuiAnswer(completeState(), "NO", "user-payer"),
-    ).toMatchObject({
-      hasCompanyCui: "NO",
-      paymentSource: "PERSONAL_FUNDS",
-      companyWalletId: "",
-      fundedByUserId: "user-payer",
-      paidByUserId: "user-payer",
-      attributionTarget: "BUSINESS",
-      businessOwnerId: "",
-      buyerCuiStatus: "MISSING",
-    });
-  });
-
-  it("marks the buyer CUI as matched when Yes is selected", () => {
-    const personal = changeExpenseCompanyCuiAnswer(
-      completeState(),
-      "NO",
-      "user-payer",
+  it("rejects payments that do not add up to the amount", () => {
+    const result = expenseFormSchema.safeParse(
+      values({
+        payments: [
+          emptyPaymentLine({ sourceAccountId: "account-bank", amount: "200" }),
+        ],
+      }),
     );
 
+    expect(result.success).toBe(false);
     expect(
-      changeExpenseCompanyCuiAnswer(personal, "YES", "user-payer"),
-    ).toMatchObject({
-      hasCompanyCui: "YES",
-      paymentSource: "COMPANY_CARD",
-      fundedByUserId: "",
-      buyerCuiStatus: "MATCHED",
-    });
+      result.error?.issues.some((issue) => issue.path.join(".") === "payments"),
+    ).toBe(true);
   });
 
-  it("clears an incompatible wallet when the company payment source changes", () => {
-    const cardState = {
-      ...completeState(),
-      paymentSource: "COMPANY_CARD" as const,
-      companyWalletId: "wallet-card",
-    };
+  it("rejects benefit allocations that do not add up to the amount", () => {
+    const result = expenseFormSchema.safeParse(
+      values({ allocations: [emptyAllocationLine({ amount: "200" })] }),
+    );
 
+    expect(result.success).toBe(false);
     expect(
-      changeExpensePaymentSource(cardState, "COMPANY_CASH_DESK"),
-    ).toMatchObject({
-      paymentSource: "COMPANY_CASH_DESK",
-      companyWalletId: "",
-    });
-
-    expect(
-      changeExpensePaymentSource(
-        { ...cardState, paymentSource: "COMPANY_CASH_DESK" },
-        "COMPANY_CARD",
+      result.error?.issues.some(
+        (issue) => issue.path.join(".") === "allocations",
       ),
-    ).toMatchObject({
-      paymentSource: "COMPANY_CARD",
-      companyWalletId: "",
-    });
+    ).toBe(true);
   });
 
-  it("adds VAT lines without assuming a tax rate", () => {
-    const state = createExpenseFormState({
-      currentUserId: "user-payer",
-      today: "2026-08-01",
-    });
+  it("requires an account when the book paid", () => {
+    const result = expenseFormSchema.safeParse(
+      values({
+        payments: [emptyPaymentLine({ sourceAccountId: "", amount: "300" })],
+      }),
+    );
 
-    const next = expenseFormReducer(state, {
-      type: "ADD_VAT_LINE",
-      id: "vat-1",
-    });
-    expect(next.vatLines).toEqual([
-      { id: "vat-1", netAmount: "", ratePercent: "", vatAmount: "" },
+    expect(result.success).toBe(false);
+    expect(
+      result.error?.issues.some(
+        (issue) => issue.path.join(".") === "payments.0.sourceAccountId",
+      ),
+    ).toBe(true);
+  });
+
+  it("requires a payer when an associate used their own money", () => {
+    const result = expenseFormSchema.safeParse(
+      values({
+        payments: [
+          emptyPaymentLine({
+            sourceType: "ASSOCIATE_PERSONAL_FUNDS",
+            amount: "300",
+          }),
+        ],
+      }),
+    );
+
+    expect(result.success).toBe(false);
+    expect(
+      result.error?.issues.some(
+        (issue) => issue.path.join(".") === "payments.0.payerAssociateId",
+      ),
+    ).toBe(true);
+  });
+
+  it("requires a beneficiary on a specific allocation", () => {
+    const result = expenseFormSchema.safeParse(
+      values({
+        allocations: [
+          emptyAllocationLine({ type: "ASSOCIATE_SPECIFIC", amount: "300" }),
+        ],
+      }),
+    );
+
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects two allocation lines for the same associate", () => {
+    const result = expenseFormSchema.safeParse(
+      values({
+        allocations: [
+          emptyAllocationLine({
+            type: "ASSOCIATE_SPECIFIC",
+            associateId: IUSTI,
+            amount: "100",
+          }),
+          emptyAllocationLine({
+            type: "ASSOCIATE_SPECIFIC",
+            associateId: IUSTI,
+            amount: "200",
+          }),
+        ],
+      }),
+    );
+
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects an amount with more decimals than the currency has", () => {
+    expect(
+      expenseFormSchema.safeParse(values({ amount: "300.005" })).success,
+    ).toBe(false);
+  });
+
+  it("rejects a zero amount", () => {
+    const result = expenseFormSchema.safeParse(
+      values({
+        amount: "0",
+        payments: [
+          emptyPaymentLine({ sourceAccountId: "account-bank", amount: "0" }),
+        ],
+        allocations: [emptyAllocationLine({ amount: "0" })],
+      }),
+    );
+
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("expense form focus fields", () => {
+  it("accepts only the supported form paths", () => {
+    expect(isExpenseFormFocusField("categoryId")).toBe(true);
+    expect(isExpenseFormFocusField("documents.0.supplierName")).toBe(false);
+    expect(isExpenseFormFocusField(undefined)).toBe(false);
+  });
+
+  it("normalizes collection issues to the first editable amount", () => {
+    expect(expenseFormFocusFieldForIssuePath(["payments"])).toBe(
+      "payments.0.amount",
+    );
+    expect(
+      expenseFormFocusFieldForIssuePath(["allocations", 3, "amount"]),
+    ).toBe("allocations.0.amount");
+  });
+});
+
+describe("toCreateExpenseInput", () => {
+  it("converts major-unit text into minor units", () => {
+    const input = toCreateExpenseInput(values({ amount: "300.50" }));
+
+    expect(input.amountMinor).toBe(30_050);
+    expect(input.occurredAt).toBe("2026-08-14T00:00:00.000Z");
+  });
+
+  it("keeps payment and allocation lines independent", () => {
+    const input = toCreateExpenseInput(
+      values({
+        amount: "400",
+        payments: [
+          emptyPaymentLine({
+            sourceType: "ASSOCIATE_PERSONAL_FUNDS",
+            payerAssociateId: IUSTI,
+            paymentMethod: "CARD",
+            amount: "400",
+          }),
+        ],
+        allocations: [
+          emptyAllocationLine({
+            type: "ASSOCIATE_SPECIFIC",
+            associateId: EMILIANO,
+            amount: "400",
+          }),
+        ],
+      }),
+    );
+
+    // Iusti paid; Emiliano benefited. Neither field leaks into the other.
+    expect(input.payments).toEqual([
+      {
+        sourceType: "ASSOCIATE_PERSONAL_FUNDS",
+        payerAssociateId: IUSTI,
+        paymentMethod: "CARD",
+        amountMinor: 40_000,
+      },
+    ]);
+    expect(input.allocations).toEqual([
+      {
+        type: "ASSOCIATE_SPECIFIC",
+        associateId: EMILIANO,
+        amountMinor: 40_000,
+      },
     ]);
   });
 
-  it("resets document assertions and VAT lines when evidence context changes", () => {
-    expect(resetExpenseFiscalAssertions(completeState())).toMatchObject({
-      documentType: "FISCAL_RECEIPT",
-      documentNumber: "",
-      documentDate: "",
-      supplierCui: "",
-      documentBuyerCui: "",
-      buyerCuiStatus: "MATCHED",
-      vatLines: [],
-    });
+  it("omits the fields that do not apply to the chosen variant", () => {
+    const input = toCreateExpenseInput(values());
 
+    // The API's discriminated union rejects a book payment naming a payer.
+    expect(input.payments[0]).not.toHaveProperty("payerAssociateId");
+    expect(input.allocations[0]).not.toHaveProperty("associateId");
+    expect(input).not.toHaveProperty("costObjectId");
+    expect(input).not.toHaveProperty("supplierId");
+  });
+
+  it("sends the selected supplier link separately from document snapshots", () => {
     expect(
-      expenseFormReducer(completeState(), {
-        type: "SET_BUSINESS_ENTITY",
-        businessEntityId: "entity-2",
-        currency: "EUR",
+      toCreateExpenseInput(values({ supplierId: "supplier-1" })).supplierId,
+    ).toBe("supplier-1");
+  });
+
+  it("sends documents only when some were entered", () => {
+    expect(toCreateExpenseInput(values())).not.toHaveProperty("documents");
+
+    const withDocument = toCreateExpenseInput(
+      values({
+        documents: [
+          {
+            type: "RECEIPT",
+            documentSeries: "SHOULD-NOT-BE-SENT",
+            documentNumber: "",
+            issuedAt: "2026-08-14",
+            supplierName: "Fuel Station",
+            supplierTaxId: "",
+            notes: "",
+          },
+        ],
       }),
-    ).toMatchObject({
-      businessEntityId: "entity-2",
-      currency: "EUR",
-      companyWalletId: "",
-      businessOwnerId: "",
-      documentType: "FISCAL_RECEIPT",
-      documentNumber: "",
-      vatLines: [],
-    });
-  });
+    );
 
-  it("clears a field error as soon as the field is corrected", () => {
-    expect(
-      clearExpenseErrorsForAction(
-        { grossAmount: "Invalid", categoryId: "Required" },
-        { type: "SET_FIELD", field: "grossAmount", value: "100" },
-      ),
-    ).toEqual({ categoryId: "Required" });
-  });
-});
-
-describe("Romanian expense amount input", () => {
-  it.each([
-    ["1.000", "1000"],
-    ["1.000,50", "1000.50"],
-    ["1000,50", "1000.50"],
-    ["1000.50", "1000.50"],
-  ])("normalizes %s to %s", (input, expected) => {
-    expect(normalizeExpenseAmountInput(input, "ro")).toBe(expected);
-  });
-
-  it.each(["1.00.0", "12.34,5", "1,000.50"])(
-    "leaves malformed or ambiguous input %s untouched",
-    (input) => {
-      expect(normalizeExpenseAmountInput(input, "ro")).toBe(input);
-    },
-  );
-
-  it("does not reinterpret English input", () => {
-    expect(normalizeExpenseAmountInput("1.000", "en")).toBe("1.000");
-  });
-});
-
-describe("compact expense payload", () => {
-  it("maps v1 to one payment, one 100% attribution, and manual documents", () => {
-    const payload = buildCompactExpensePayload(completeState(), {
-      idempotencyKey: "web:create:expense-1",
-      fiscalEvidence,
-      posEvidence,
-      legalEntityTaxIdentifier: "ro87654321",
-    });
-
-    expect(payload).toMatchObject({
-      legalEntityId: "entity-1",
-      payeeId: "counterparty-1",
-      occurredOn: "2026-08-01",
-      grossAmount: "1250.00",
-      postImmediately: true,
-      payment: {
-        source: "COMPANY_CARD",
-        companyWalletId: "wallet-card",
-        paidByUserId: "user-payer",
-        amount: "1250.00",
-        paidOn: "2026-08-01",
+    expect(withDocument.documents).toEqual([
+      {
+        type: "RECEIPT",
+        issuedAt: "2026-08-14T00:00:00.000Z",
+        supplierName: "Fuel Station",
       },
-      attribution: { target: "BUSINESS" },
-      taxLines: [
+    ]);
+  });
+
+  it("sends a bill series separately from its number", () => {
+    const input = toCreateExpenseInput(
+      values({
+        documents: [
+          {
+            type: "INVOICE",
+            documentSeries: "VL",
+            documentNumber: "639013079",
+            issuedAt: "2026-08-19",
+            supplierName: "REGISTRUL AUTO ROMAN R.A.",
+            supplierTaxId: "RO1590236",
+            notes: "",
+          },
+        ],
+      }),
+    );
+
+    expect(input.documents?.[0]).toMatchObject({
+      type: "INVOICE",
+      documentSeries: "VL",
+      documentNumber: "639013079",
+    });
+  });
+});
+
+describe("findMatchingSupplier", () => {
+  const suppliers: v1.finance.Supplier[] = [
+    {
+      id: "supplier-rotakt",
+      name: "ROTAKT S.R.L.",
+      taxIdentifier: "RO6334441",
+      isVatPayer: true,
+      isActive: true,
+      createdAt: "2026-08-01T00:00:00.000Z",
+      updatedAt: "2026-08-01T00:00:00.000Z",
+    },
+    {
+      id: "supplier-archived",
+      name: "Archived SRL",
+      taxIdentifier: "RO100",
+      isVatPayer: true,
+      isActive: false,
+      createdAt: "2026-08-01T00:00:00.000Z",
+      updatedAt: "2026-08-01T00:00:00.000Z",
+    },
+  ];
+
+  it("matches a stored supplier by CIF before considering its displayed name", () => {
+    expect(
+      findMatchingSupplier(suppliers, "OCR name differs", "C.F. RO 6334441")
+        ?.id,
+    ).toBe("supplier-rotakt");
+  });
+
+  it("matches by normalized name only when the receipt has no CIF", () => {
+    expect(findMatchingSupplier(suppliers, "Rotakt srl", null)?.id).toBe(
+      "supplier-rotakt",
+    );
+  });
+
+  it("does not auto-select an archived supplier", () => {
+    expect(
+      findMatchingSupplier(suppliers, "Archived SRL", null),
+    ).toBeUndefined();
+  });
+});
+
+describe("allocationDefaultsForCostObject", () => {
+  const costObject = {
+    id: "cost-object-1",
+    bookId: BOOK_ID,
+    code: "VEHICLE_IUSTI_PERSONAL",
+    name: "Iusti Personal Car",
+    type: "VEHICLE" as const,
+    ownershipType: "ASSOCIATE" as const,
+    ownerAssociateId: IUSTI,
+    externalEntityType: null,
+    externalEntityId: null,
+    defaultAllocationType: "ASSOCIATE_SPECIFIC" as const,
+    defaultBeneficiaryAssociateId: IUSTI,
+    isActive: true,
+  };
+
+  it("prefills the beneficiary an associate-owned object implies", () => {
+    expect(allocationDefaultsForCostObject(costObject, "200")).toEqual([
+      { type: "ASSOCIATE_SPECIFIC", associateId: IUSTI, amount: "200" },
+    ]);
+  });
+
+  it("prefills a common benefit for a shared object", () => {
+    expect(
+      allocationDefaultsForCostObject(
         {
-          vatRate: "19",
-          netAmount: "1050.42",
-          vatAmount: "199.58",
-          grossAmount: "1250.00",
-          deductiblePercent: "0",
+          ...costObject,
+          ownershipType: "COMPANY",
+          defaultAllocationType: "COMMON",
+          defaultBeneficiaryAssociateId: null,
+        },
+        "200",
+      ),
+    ).toEqual([{ type: "COMMON", associateId: "", amount: "200" }]);
+  });
+
+  it("leaves the form alone when the object carries no default", () => {
+    expect(
+      allocationDefaultsForCostObject(
+        { ...costObject, defaultAllocationType: null },
+        "200",
+      ),
+    ).toBeUndefined();
+    expect(allocationDefaultsForCostObject(undefined, "200")).toBeUndefined();
+  });
+});
+
+describe("expenseFormDefaultsFromExtraction", () => {
+  it("prefills the company book, card payment, common allocation, and document", () => {
+    const companyBook: v1.finance.FinanceBook = {
+      id: BOOK_ID,
+      name: "Company",
+      type: "COMPANY",
+      functionalCurrency: "RON",
+      members: [],
+    };
+    const poolBook: v1.finance.FinanceBook = {
+      id: "book-pool",
+      name: "Pool",
+      type: "ASSOCIATE_POOL",
+      functionalCurrency: "RON",
+      members: [],
+    };
+    const extraction = v1.finance.normalizedExpenseExtractionSchema.parse({
+      amountMinor: candidate(12_345),
+      occurredAt: candidate("2026-08-22"),
+      currency: candidate("RON"),
+      supplierName: candidate("Example Parts SRL"),
+      supplierTaxIdentifier: candidate("RO87654321"),
+      customerName: candidate("Example Company SRL"),
+      customerTaxIdentifier: candidate("RO12345678"),
+      documentSeries: candidate("VL"),
+      documentNumber: candidate("R-42"),
+      companyMatch: {
+        status: "MATCHED",
+        matchedBy: "TAX_IDENTIFIER",
+        evidence: [],
+      },
+      suggestedBookType: "COMPANY",
+      suggestedDocumentType: "INVOICE",
+      suggestedPaymentMethod: "CARD",
+      suggestedAllocationType: "COMMON",
+      suggestedCategoryCode: "PARTS",
+      suggestionEvidence: {
+        bookType: [],
+        documentType: [],
+        paymentMethod: [],
+        allocationType: [],
+        categoryCode: [],
+      },
+      explanations: [],
+    });
+
+    const defaults = expenseFormDefaultsFromExtraction({
+      extraction,
+      books: [companyBook, poolBook],
+      accounts: [
+        {
+          id: "account-bank",
+          bookId: BOOK_ID,
+          code: "BANK",
+          name: "Company bank",
+          category: "ASSET",
+          role: "BANK",
+          associateId: null,
+          associate: null,
+          isDefault: true,
+          isActive: true,
+          isSystem: true,
         },
       ],
+      categories: [
+        {
+          id: "category-parts",
+          bookId: BOOK_ID,
+          code: "PARTS",
+          name: "Parts",
+          defaultTreatment: "OPERATING_EXPENSE",
+          isActive: true,
+        },
+      ],
+      suppliers: [
+        {
+          id: "supplier-parts",
+          name: "Example Parts SRL",
+          taxIdentifier: "87654321",
+          isVatPayer: false,
+          isActive: true,
+          createdAt: "2026-08-01T00:00:00.000Z",
+          updatedAt: "2026-08-01T00:00:00.000Z",
+        },
+      ],
+      currentUserId: "user-current",
+      fallbackBook: companyBook,
+      today: "2026-08-23",
+    });
+
+    expect(defaults).toMatchObject({
+      bookId: BOOK_ID,
+      supplierId: "supplier-parts",
+      occurredAt: "2026-08-22",
+      amount: "123.45",
+      categoryId: "category-parts",
+      payments: [
+        {
+          sourceAccountId: "account-bank",
+          paymentMethod: "CARD",
+          amount: "123.45",
+        },
+      ],
+      allocations: [{ type: "COMMON", amount: "123.45" }],
       documents: [
         {
           type: "INVOICE",
-          documentNumber: "FCT 1234",
-          supplierTaxIdentifier: "RO12345678",
-          buyerTaxIdentifier: "RO87654321",
-          buyerCuiStatus: "MATCHED",
-        },
-        {
-          type: "POS_RECEIPT",
-          buyerCuiStatus: "NOT_APPLICABLE",
+          documentSeries: "VL",
+          documentNumber: "R-42",
+          issuedAt: "2026-08-22",
+          supplierName: "Example Parts SRL",
+          supplierTaxId: "RO87654321",
         },
       ],
     });
   });
 
-  it("maps company cash + owner with its company wallet", () => {
-    const state = {
-      ...completeState(),
-      paymentSource: "COMPANY_CASH_DESK" as const,
-      companyWalletId: "wallet-cash",
-      attributionTarget: "OWNER" as const,
-      businessOwnerId: "business-owner-1",
+  it("prefills an unmatched receipt as a shared associate-pool expense paid by the current user", () => {
+    const companyBook: v1.finance.FinanceBook = {
+      id: BOOK_ID,
+      name: "Company",
+      type: "COMPANY",
+      functionalCurrency: "RON",
+      members: [],
     };
-
-    const payload = buildCompactExpensePayload(state, {
-      idempotencyKey: "web:create:expense-2",
-      fiscalEvidence,
-      posEvidence: null,
-      legalEntityTaxIdentifier: "RO87654321",
-    });
-
-    expect(payload?.payment).toEqual({
-      source: "COMPANY_CASH_DESK",
-      companyWalletId: "wallet-cash",
-      paidByUserId: "user-payer",
-      amount: "1250.00",
-      paidOn: "2026-08-01",
-    });
-    expect(payload?.attribution).toEqual({
-      target: "OWNER",
-      businessOwnerId: "business-owner-1",
-    });
-  });
-
-  it("rejects personal funds when the receipt is declared to have company CUI", () => {
-    const state = {
-      ...completeState(),
-      paymentSource: "PERSONAL_FUNDS" as const,
-      companyWalletId: "",
-      fundedByUserId: "user-funder",
+    const poolBook: v1.finance.FinanceBook = {
+      id: "book-pool",
+      name: "Associate pool",
+      type: "ASSOCIATE_POOL",
+      functionalCurrency: "RON",
+      members: [],
     };
-
-    expect(
-      buildCompactExpensePayload(state, {
-        idempotencyKey: "web:create:expense-invalid-cui-source",
-        fiscalEvidence,
-        posEvidence: null,
-        legalEntityTaxIdentifier: "RO87654321",
-      }),
-    ).toBeNull();
-  });
-
-  it("does not allow POS evidence to contribute a VAT line", () => {
-    const payload = buildCompactExpensePayload(completeState(), {
-      idempotencyKey: "web:create:expense-3",
-      fiscalEvidence,
-      posEvidence,
-      legalEntityTaxIdentifier: "RO87654321",
+    const extraction = v1.finance.normalizedExpenseExtractionSchema.parse({
+      amountMinor: candidate(2_500),
+      occurredAt: candidate("2026-08-19"),
+      currency: candidate("RON"),
+      supplierName: candidate("ROTAKT SRL"),
+      supplierTaxIdentifier: candidate("RO6334441"),
+      customerName: candidate(null),
+      customerTaxIdentifier: candidate(null),
+      documentNumber: candidate("706210"),
+      companyMatch: {
+        status: "UNKNOWN",
+        matchedBy: null,
+        evidence: [],
+      },
+      suggestedBookType: "ASSOCIATE_POOL",
+      suggestedPaymentMethod: "CASH",
+      suggestedAllocationType: "COMMON",
+      suggestedCategoryCode: "POOL_SHARED_COST",
+      suggestionEvidence: {
+        bookType: [],
+        paymentMethod: [],
+        allocationType: [],
+        categoryCode: [],
+      },
+      explanations: [],
     });
 
-    expect(
-      payload?.documents.filter((item) => item.type === "POS_RECEIPT"),
-    ).toHaveLength(1);
-    expect(payload?.taxLines).toHaveLength(1);
-  });
-
-  it("allows optional evidence to be marked unavailable", () => {
-    const state = {
-      ...completeState(),
-      hasCompanyCui: "NO" as const,
-      paymentSource: "PERSONAL_FUNDS" as const,
-      companyWalletId: "",
-      fundedByUserId: "user-payer",
-      attributionTarget: "BUSINESS" as const,
-      documentNumber: "",
-      documentDate: "",
-      supplierCui: "",
-      buyerCuiStatus: "NOT_REVIEWED" as const,
-    };
-    const payload = buildCompactExpensePayload(state, {
-      idempotencyKey: "web:create:expense-4",
-      fiscalEvidence: null,
-      posEvidence: null,
+    const defaults = expenseFormDefaultsFromExtraction({
+      extraction,
+      books: [companyBook, poolBook],
+      accounts: [],
+      categories: [
+        {
+          id: "category-pool-shared",
+          bookId: poolBook.id,
+          code: "POOL_SHARED_COST",
+          name: "Shared pool cost",
+          defaultTreatment: "ASSOCIATE_POOL_EXPENSE",
+          isActive: true,
+        },
+      ],
+      suppliers: [],
+      currentUserId: "user-current",
+      fallbackBook: companyBook,
+      today: "2026-08-23",
     });
 
-    expect(payload?.documents).toEqual([]);
-  });
-
-  it("allows a no-CUI expense without any document", () => {
-    const state = {
-      ...completeState(),
-      hasCompanyCui: "NO" as const,
-      paymentSource: "PERSONAL_FUNDS" as const,
-      companyWalletId: "",
-      fundedByUserId: "user-payer",
-      attributionTarget: "BUSINESS" as const,
-      documentNumber: "",
-      documentDate: "",
-      supplierCui: "",
-      buyerCuiStatus: "NOT_REVIEWED" as const,
-      vatLines: [],
-    };
-    const payload = buildCompactExpensePayload(state, {
-      idempotencyKey: "web:create:expense-pos-only",
-      fiscalEvidence: null,
-      posEvidence: null,
+    expect(defaults).toMatchObject({
+      bookId: poolBook.id,
+      occurredAt: "2026-08-19",
+      amount: "25.00",
+      treatment: "ASSOCIATE_POOL_EXPENSE",
+      categoryId: "category-pool-shared",
+      payments: [
+        {
+          sourceType: "ASSOCIATE_PERSONAL_FUNDS",
+          sourceAccountId: "",
+          payerAssociateId: "user-current",
+          paymentMethod: "CASH",
+          amount: "25.00",
+        },
+      ],
+      allocations: [{ type: "COMMON", amount: "25.00" }],
     });
-
-    expect(payload?.documents).toEqual([]);
-  });
-
-  it("marks an optional document as missing the buyer CUI for no-CUI expenses", () => {
-    const state = changeExpenseCompanyCuiAnswer(
-      completeState(),
-      "NO",
-      "user-payer",
-    );
-    const payload = buildCompactExpensePayload(state, {
-      idempotencyKey: "web:create:expense-no-cui-document",
-      fiscalEvidence,
-      posEvidence: null,
-      isVatRegistered: true,
-    });
-
-    expect(payload?.payment.source).toBe("PERSONAL_FUNDS");
-    expect(payload?.documents).toEqual([
-      expect.objectContaining({
-        type: "FISCAL_RECEIPT",
-        buyerCuiStatus: "MISSING",
-        reviewStatus: "CONFIRMED",
-      }),
-    ]);
-    expect(payload?.taxLines).toEqual([]);
-  });
-
-  it("does not build a matched-CUI expense without the company identifier", () => {
-    expect(
-      buildCompactExpensePayload(completeState(), {
-        idempotencyKey: "web:create:expense-missing-company-cui",
-        fiscalEvidence,
-        posEvidence,
-        legalEntityTaxIdentifier: null,
-      }),
-    ).toBeNull();
   });
 });
 
-describe("expense validation and review", () => {
-  it("requires the source-dependent fields", () => {
-    const errors = validateExpenseDetails(
-      {
-        ...completeState(),
-        paymentSource: "PERSONAL_FUNDS",
-        companyWalletId: "",
-        fundedByUserId: "",
-      },
-      "Required",
-      "Invalid amount",
-      "Invalid combination",
-    );
+function candidate<T>(value: T) {
+  return { value, confidence: 99, evidence: [] };
+}
 
-    expect(errors.fundedByUserId).toBe("Required");
-    expect(errors.companyWalletId).toBeUndefined();
+describe("money helpers", () => {
+  it("treats an unparseable line as zero rather than throwing", () => {
+    expect(safeMinor("nope")).toBeUndefined();
+    expect(sumLines([{ amount: "10" }, { amount: "nope" }])).toBe(1_000);
   });
 
-  it("requires an explicit answer about the company CUI", () => {
-    const errors = validateExpenseDetails(
-      { ...completeState(), hasCompanyCui: "" },
-      "Required",
-      "Invalid amount",
-      "Invalid combination",
-    );
-
-    expect(errors.hasCompanyCui).toBe("Required");
-  });
-
-  it("rejects personal funds in the Yes branch", () => {
-    const errors = validateExpenseDetails(
-      {
-        ...completeState(),
-        paymentSource: "PERSONAL_FUNDS",
-        companyWalletId: "",
-        fundedByUserId: "user-payer",
-      },
-      "Required",
-      "Invalid amount",
-      "Invalid combination",
-    );
-
-    expect(errors.paymentCombination).toBe("Invalid combination");
-  });
-
-  it("requires fiscal evidence and POS proof for company card payments", () => {
-    const errors = validateExpenseEvidence(
-      { ...completeState(), buyerCuiStatus: "NOT_REVIEWED" },
-      { fiscalEvidence: null, posEvidence: null },
-      "Required",
-      "Invalid VAT",
-    );
-
-    expect(errors.fiscalEvidence).toBe("Required");
-    expect(errors.posEvidence).toBe("Required");
-  });
-
-  it("requires only fiscal evidence for a company cash payment", () => {
-    const errors = validateExpenseEvidence(
-      {
-        ...completeState(),
-        paymentSource: "COMPANY_CASH_DESK",
-        companyWalletId: "wallet-cash",
-      },
-      { fiscalEvidence: null, posEvidence: null },
-      "Required",
-      "Invalid VAT",
-    );
-
-    expect(errors.fiscalEvidence).toBe("Required");
-    expect(errors.posEvidence).toBeUndefined();
-  });
-
-  it("keeps evidence optional when the receipt has no company CUI", () => {
-    const state = changeExpenseCompanyCuiAnswer(
-      completeState(),
-      "NO",
-      "user-payer",
-    );
-    const errors = validateExpenseEvidence(
-      state,
-      { fiscalEvidence: null, posEvidence: null },
-      "Required",
-      "Invalid VAT",
-    );
-
-    expect(errors.fiscalEvidence).toBeUndefined();
-    expect(errors.posEvidence).toBeUndefined();
-  });
-
-  it("does not force document number or date when a file is attached", () => {
-    const errors = validateExpenseEvidence(
-      {
-        ...completeState(),
-        documentNumber: "",
-        documentDate: "",
-      },
-      { fiscalEvidence, posEvidence },
-      "Required",
-      "Invalid VAT",
-    );
-
-    expect(errors.documentNumber).toBeUndefined();
-    expect(errors.documentDate).toBeUndefined();
-  });
-
-  it("validates VAT arithmetic and reconciliation before submission", () => {
-    const invalidFormula = validateExpenseEvidence(
-      {
-        ...completeState(),
-        vatLines: [
-          {
-            id: "vat-1",
-            netAmount: "100.00",
-            ratePercent: "19",
-            vatAmount: "18.99",
-          },
-        ],
-      },
-      { fiscalEvidence, posEvidence: null },
-      "Required",
-      "Invalid VAT",
-    );
-    expect(invalidFormula.vatLines).toBe("Invalid VAT");
-
-    const invalidTotal = validateExpenseEvidence(
-      {
-        ...completeState(),
-        vatLines: [
-          {
-            id: "vat-1",
-            netAmount: "100.00",
-            ratePercent: "19",
-            vatAmount: "19.00",
-          },
-        ],
-      },
-      { fiscalEvidence, posEvidence: null },
-      "Required",
-      "Invalid VAT",
-    );
-    expect(invalidTotal.vatLines).toBe("Invalid VAT");
-
-    const valid = validateExpenseEvidence(
-      completeState(),
-      { fiscalEvidence, posEvidence: null },
-      "Required",
-      "Invalid VAT",
-    );
-    expect(valid.vatLines).toBeUndefined();
-  });
-
-  it("keeps recoverable VAT at zero and recognizes the gross cost", () => {
-    expect(expenseVatSummary(completeState())).toEqual({
-      netAmount: "1050.42",
-      vatAmount: "199.58",
-      recoverableVatAmount: "0.00",
-      recognizedCostAmount: "1250.00",
-      documentTotal: "1250.00",
-    });
-  });
-
-  it("surfaces manual mismatch warnings", () => {
-    expect(
-      expenseReviewWarnings({
-        ...completeState(),
-        documentDate: "2026-07-31",
-        buyerCuiStatus: "MISMATCH",
-        vatLines: [
-          {
-            id: "vat-1",
-            netAmount: "1000",
-            ratePercent: "19",
-            vatAmount: "190",
-          },
-        ],
-      }),
-    ).toEqual([
-      "DOCUMENT_DATE_DIFFERS",
-      "BUYER_CUI_MISMATCH",
-      "VAT_TOTAL_DIFFERS",
-    ]);
+  it("turns a calendar date into midnight UTC", () => {
+    expect(dateToIsoTimestamp("2026-08-14")).toBe("2026-08-14T00:00:00.000Z");
   });
 });

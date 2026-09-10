@@ -1,38 +1,37 @@
 /**
- * HTTP-level coverage for the financial tracking module.
+ * End-to-end tests for the financial module against a real PostgreSQL.
  *
- * These tests exercise the posted transaction ledger and its rebuildable
- * wallet-balance cache against PostgreSQL. They intentionally cover the
- * business distinctions that are easiest to accidentally blur:
+ * Prisma is deliberately NOT mocked here. The things these tests exist to
+ * prove — transaction atomicity, the unique index behind idempotency, CHECK
+ * constraints, the immutability trigger, balances summed from postings — are
+ * all database behaviour. A mock would only assert that the mock works.
  *
- * - payment method versus money location;
- * - billed business cash held by an admin versus unbilled personal cash;
- * - refundable customer guarantees;
- * - automatic claims between active admins;
- * - idempotent posting and immutable reversal.
+ * Only one finance book may exist per type (`@@unique([type])`), so the suite
+ * shares the seeded COMPANY book rather than creating its own. Two habits
+ * keep that safe:
+ *
+ * - every balance assertion is a *delta* around the operation under test;
+ * - settlement tests use a far-future period unique to this run, so leftovers
+ *   from anywhere else cannot drift into the window.
+ *
+ * Cleanup removes exactly the operations this run created, and nothing else.
  */
 import { INestApplication, VersioningType } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import { v1 } from "@repo/api-shared";
 import cookieParser from "cookie-parser";
+import { randomUUID } from "node:crypto";
 import type { Server } from "node:http";
 import request from "supertest";
+import { z } from "zod";
 
+import { seedFinance } from "../prisma/seeds/finance";
 import { AppModule } from "../src/app.module";
 import { CoreAuthService } from "../src/auth/modules/core-auth/core-auth.service";
 import { PrismaService } from "../src/prisma/prisma.service";
 import { UsersService } from "../src/users/users.service";
 
-interface TestSession {
-  accessToken: string;
-  email: string;
-  userId: string;
-}
-
-interface AdminRoleSnapshot {
-  id: string;
-  roles: string[];
-}
+const DAY_MS = 86_400_000;
 
 describe("Finance HTTP surface (e2e)", () => {
   let app: INestApplication;
@@ -40,35 +39,19 @@ describe("Finance HTTP surface (e2e)", () => {
   let users: UsersService;
   let coreAuth: CoreAuthService;
 
-  let admin: TestSession;
-  let secondAdmin: TestSession;
-  let customer: TestSession;
-  let formerAdmin: TestSession;
-  let adminWallet: v1.finance.Wallet;
-  let secondAdminWallet: v1.finance.Wallet;
-  let customerWallet: v1.finance.Wallet;
-  let formerAdminWallet: v1.finance.Wallet;
-  let companyCashWallet: v1.finance.Wallet;
-  let companyBankWallet: v1.finance.Wallet;
-  let companyProcessorWallet: v1.finance.Wallet;
-  let rentalIncomeCategory: v1.finance.FinancialCategory;
-  let operatingExpenseCategory: v1.finance.FinancialCategory;
-  let expenseEvidenceEntity: v1.finance.BusinessLegalEntity;
-  let expenseEvidenceOwner: v1.finance.BusinessOwner;
-  let expenseEvidencePayee: v1.finance.Company;
-  let expenseEvidenceCategory: v1.finance.FinancialCategory;
-  let expenseEvidenceCashWalletId: string;
-  let expenseEvidenceCardWalletId: string;
+  let bookId: string;
+  let adminToken: string;
+  let superAdminToken: string;
+  let ownerToken: string;
+  let emilianoId: string;
+  let iustiId: string;
+  let categoryId: string;
+  let costObjectId: string;
 
-  const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  const suiteStartedAt = new Date().toISOString();
-  const expenseEvidenceTaxIdentifier = `RO${Date.now()}${Math.floor(
-    Math.random() * 1_000,
-  )}`;
+  const accounts = new Map<string, string>();
   const createdUserIds: string[] = [];
-  const createdWalletIds: string[] = [];
-  const createdCategoryIds: string[] = [];
-  let existingAdminRoleSnapshots: AdminRoleSnapshot[] = [];
+  const createdOperationIds: string[] = [];
+  const createdSupplierIds: string[] = [];
 
   const server = () => app.getHttpServer() as Server;
 
@@ -76,162 +59,55 @@ describe("Finance HTTP surface (e2e)", () => {
   const req = (): {
     get: (path: string) => RequestBuilder;
     post: (path: string) => RequestBuilder;
+    patch: (path: string) => RequestBuilder;
+    put: (path: string) => RequestBuilder;
   } => {
     const base = request(server());
-    const tag = (builder: RequestBuilder) =>
-      builder.set("x-requested-with", "fetch");
+    const tag = (b: RequestBuilder) => b.set("x-requested-with", "fetch");
     return {
-      get: (path) => tag(base.get(path)),
-      post: (path) => tag(base.post(path)),
+      get: (p) => tag(base.get(p)),
+      post: (p) => tag(base.post(p)),
+      patch: (p) => tag(base.patch(p)),
+      put: (p) => tag(base.put(p)),
     };
   };
 
-  const authenticate = (builder: RequestBuilder, session: TestSession) =>
-    builder.set("Cookie", [`access_token=${session.accessToken}`]);
+  const asAdmin = (builder: RequestBuilder) =>
+    builder.set("authorization", `Bearer ${adminToken}`);
+  const asSuperAdmin = (builder: RequestBuilder) =>
+    builder.set("authorization", `Bearer ${superAdminToken}`);
+  const asOwner = (builder: RequestBuilder) =>
+    builder.set("authorization", `Bearer ${ownerToken}`);
 
-  async function freshSession(
-    roles: string[],
-    profile: { firstName?: string; lastName?: string } = {},
-  ): Promise<TestSession> {
-    const user = await users.createOne({
-      email: `finance-${runId}-${createdUserIds.length}@example.com`,
-      roles,
-      ...profile,
-    });
-    createdUserIds.push(user.id);
-    const issued = await coreAuth.issueSession({ user });
+  /** A fresh idempotency key, since every financial write demands one. */
+  const key = () => randomUUID();
+
+  /**
+   * A period far enough out that no real data can fall inside it, and
+   * randomised per run so two runs never share a window.
+   */
+  let periodCursor =
+    Date.UTC(2200, 0, 1) + Math.floor(Math.random() * 5_000) * DAY_MS;
+
+  function nextPeriod(): {
+    periodStart: string;
+    periodEnd: string;
+    occurredAt: (hour: number) => string;
+  } {
+    const start = periodCursor;
+    periodCursor += DAY_MS;
+
     return {
-      accessToken: issued.accessToken,
-      email: user.email,
-      userId: user.id,
+      periodStart: new Date(start).toISOString(),
+      periodEnd: new Date(start + DAY_MS).toISOString(),
+      occurredAt: (hour) => new Date(start + hour * 3_600_000).toISOString(),
     };
-  }
-
-  async function getWallet(
-    walletId: string,
-    session = admin,
-  ): Promise<v1.finance.Wallet> {
-    const response = await authenticate(
-      req().get(v1.finance.ROUTES.wallets.get(walletId)),
-      session,
-    );
-    expect(response.status).toBe(200);
-    return response.body as v1.finance.Wallet;
-  }
-
-  function balance(
-    wallet: v1.finance.Wallet,
-    bucket: v1.finance.WalletBalanceBucket,
-  ): string {
-    return (
-      wallet.balances.find(
-        (item) => item.bucket === bucket && item.currency === "RON",
-      )?.balance ?? "0.00"
-    );
-  }
-
-  function claimsForSuiteAdmins(
-    body: unknown,
-  ): v1.finance.OutstandingPersonalClaim[] {
-    const suiteAdminIds = new Set([admin.userId, secondAdmin.userId]);
-    const { items } = body as {
-      items: v1.finance.OutstandingPersonalClaim[];
-    };
-
-    return items.filter(
-      (claim) =>
-        suiteAdminIds.has(claim.debtorUserId) &&
-        suiteAdminIds.has(claim.creditorUserId),
-    );
-  }
-
-  function expensePayload(input: {
-    key: string;
-    source: v1.finance.ExpensePaymentSource;
-    target?: v1.finance.ExpenseAttributionTarget;
-    documents?: v1.finance.ExpenseDocumentInput[];
-  }): v1.finance.CreateExpenseInput {
-    const target = input.target ?? "BUSINESS";
-    const isPersonal = input.source === "PERSONAL_FUNDS";
-    return {
-      legalEntityId: expenseEvidenceEntity.id,
-      payeeId: expenseEvidencePayee.counterpartyId,
-      categoryId: expenseEvidenceCategory.id,
-      occurredOn: "2040-01-15",
-      taxPointOn: "2040-01-15",
-      currency: "RON",
-      grossAmount: "25.00",
-      idempotencyKey: `expense-e2e:${runId}:${input.key}`,
-      postImmediately: false,
-      payment: {
-        source: input.source,
-        companyWalletId: isPersonal
-          ? null
-          : input.source === "COMPANY_CASH_DESK"
-            ? expenseEvidenceCashWalletId
-            : expenseEvidenceCardWalletId,
-        fundedByUserId: isPersonal ? admin.userId : null,
-        paidByUserId: admin.userId,
-        amount: "25.00",
-        paidOn: "2040-01-15",
-      },
-      attribution: {
-        target,
-        businessOwnerId: target === "OWNER" ? expenseEvidenceOwner.id : null,
-      },
-      taxLines: [],
-      references: [],
-      documents: input.documents ?? [],
-      scooterAllocations: [],
-    };
-  }
-
-  async function createExpenseDraft(input: {
-    key: string;
-    source: v1.finance.ExpensePaymentSource;
-    target?: v1.finance.ExpenseAttributionTarget;
-    documents?: v1.finance.ExpenseDocumentInput[];
-  }): Promise<v1.finance.Expense> {
-    const response = await authenticate(
-      req().post(v1.finance.EXPENSE_ROUTES.create).send(expensePayload(input)),
-      admin,
-    );
-    expect(response.status).toBe(201);
-    return response.body as v1.finance.Expense;
-  }
-
-  async function attachExpenseDocumentOriginal(
-    documentId: string,
-    key: string,
-  ): Promise<void> {
-    const asset = await prisma.mediaAsset.create({
-      data: {
-        provider: "e2e",
-        bucket: "expense-e2e",
-        storageKey: `expense-e2e/${runId}/${key}`,
-        contentType: "image/jpeg",
-        byteSize: 1,
-        checksumSha256: "a".repeat(64),
-        uploadedByUserId: admin.userId,
-      },
-      select: { id: true },
-    });
-    await prisma.expenseDocumentAsset.create({
-      data: {
-        documentId,
-        assetId: asset.id,
-        role: "ORIGINAL",
-        imageWidth: 1,
-        imageHeight: 1,
-      },
-    });
   }
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
-
     app = moduleRef.createNestApplication();
     app.enableVersioning({ type: VersioningType.URI, defaultVersion: "1" });
     app.use(cookieParser());
@@ -241,2750 +117,1466 @@ describe("Finance HTTP surface (e2e)", () => {
     users = app.get(UsersService);
     coreAuth = app.get(CoreAuthService);
 
-    // The API E2E command runs suites in-band. Isolate the active-admin set
-    // atomically so personal-income claim generation sees only this suite's
-    // two admins, while preserving every pre-existing user's exact roles.
-    existingAdminRoleSnapshots = await prisma.$transaction(async (tx) => {
-      const snapshots = await tx.user.findMany({
-        where: { roles: { has: "ADMIN" }, deletedAt: null },
-        select: { id: true, roles: true },
-        orderBy: { id: "asc" },
-      });
+    // Idempotent: creates the books, associates, chart of accounts, and
+    // reference data if they are not already there.
+    await seedFinance(prisma);
 
-      for (const snapshot of snapshots) {
-        await tx.user.update({
-          where: { id: snapshot.id },
-          data: {
-            roles: snapshot.roles.filter((role) => role !== "ADMIN"),
-          },
-        });
-      }
+    const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const admin = await createUser(`fin-admin-${suffix}`, ["ADMIN"]);
+    adminToken = (await coreAuth.issueSession({ user: admin })).accessToken;
+    const superAdmin = await createUser(`fin-super-admin-${suffix}`, [
+      v1.auth.AUTH_ROLES.ADMIN,
+      v1.auth.AUTH_ROLES.SUPER_ADMIN,
+    ]);
+    superAdminToken = (await coreAuth.issueSession({ user: superAdmin }))
+      .accessToken;
 
-      return snapshots;
+    const book = await prisma.financeBook.findUniqueOrThrow({
+      where: { type: "COMPANY" },
+      select: { id: true },
+    });
+    bookId = book.id;
+
+    const members = await prisma.financeBookMember.findMany({
+      where: { bookId, validUntil: null },
+      orderBy: { associateId: "asc" },
+      select: { associateId: true, shareBasisPoints: true },
     });
 
-    admin = await freshSession(["ADMIN"], {
-      firstName: "Ada",
-      lastName: "Lovelace",
-    });
-    secondAdmin = await freshSession(["ADMIN"], {
-      firstName: "Grace",
-      lastName: "Hopper",
-    });
-    customer = await freshSession(["USER"], {
-      firstName: "Customer",
-      lastName: "Example",
-    });
-
-    adminWallet = await getWalletForUser(admin);
-    secondAdminWallet = await getWalletForUser(secondAdmin);
-    customerWallet = await getWalletForUser(customer);
-    createdWalletIds.push(
-      adminWallet.id,
-      secondAdminWallet.id,
-      customerWallet.id,
-    );
-
-    const entityResponse = await authenticate(
-      req()
-        .post(v1.finance.EXPENSE_ROUTES.legalEntities.create)
-        .send({
-          company: {
-            legalName: `Expense Evidence Entity ${runId}`,
-            legalForm: "SRL",
-            taxIdentifier: expenseEvidenceTaxIdentifier,
-          },
-          defaultCurrency: "RON",
-          walletIds: [],
-          bankAccounts: [
-            {
-              name: "Expense evidence card account",
-              cardHolderUserId: admin.userId,
-            },
-          ],
-        }),
-      admin,
-    );
-    expect(entityResponse.status).toBe(201);
-    expenseEvidenceEntity =
-      entityResponse.body as v1.finance.BusinessLegalEntity;
-    const cashWallet = expenseEvidenceEntity.wallets.find(
-      (wallet) => wallet.type === "COMPANY_CASH",
-    );
-    const cardWallet = expenseEvidenceEntity.wallets.find(
-      (wallet) => wallet.type === "COMPANY_BANK",
-    );
-    if (!cashWallet || !cardWallet) {
+    if (members.length !== 2) {
       throw new Error(
-        "Expense evidence entity must expose cash and card wallets",
+        `Expected the COMPANY book to have two members; found ${members.length}.`,
       );
     }
-    expenseEvidenceCashWalletId = cashWallet.id;
-    expenseEvidenceCardWalletId = cardWallet.id;
-    createdWalletIds.push(...expenseEvidenceEntity.wallets.map(({ id }) => id));
 
-    const ownerResponse = await authenticate(
-      req()
-        .post(
-          v1.finance.EXPENSE_ROUTES.legalEntities.owners.create(
-            expenseEvidenceEntity.id,
-          ),
-        )
-        .send({ userId: admin.userId, effectiveFrom: "2000-01-01" }),
-      admin,
-    );
-    expect(ownerResponse.status).toBe(201);
-    expenseEvidenceOwner = ownerResponse.body as v1.finance.BusinessOwner;
+    [emilianoId, iustiId] = members.map((member) => member.associateId);
+    const owner = await prisma.user.findUniqueOrThrow({
+      where: { id: emilianoId },
+    });
+    ownerToken = (await coreAuth.issueSession({ user: owner })).accessToken;
 
-    const payeeResponse = await authenticate(
-      req()
-        .post(v1.finance.ROUTES.companies.create)
-        .send({
-          legalName: `Expense Evidence Vendor ${runId}`,
-          legalForm: "SRL",
-          taxIdentifier: `${expenseEvidenceTaxIdentifier}1`,
-        }),
-      admin,
-    );
-    expect(payeeResponse.status).toBe(201);
-    expenseEvidencePayee = payeeResponse.body as v1.finance.Company;
+    for (const row of await prisma.ledgerAccount.findMany({
+      where: { bookId },
+      select: { id: true, role: true, associateId: true },
+    })) {
+      accounts.set(accountKey(row.role, row.associateId), row.id);
+    }
 
-    const categoryResponse = await authenticate(
-      req()
-        .post(v1.finance.ROUTES.categories.create)
-        .send({ name: `Expense evidence ${runId}`, kind: "EXPENSE" }),
-      admin,
-    );
-    expect(categoryResponse.status).toBe(201);
-    expenseEvidenceCategory =
-      categoryResponse.body as v1.finance.FinancialCategory;
-    createdCategoryIds.push(expenseEvidenceCategory.id);
+    categoryId = (
+      await prisma.expenseCategory.findFirstOrThrow({
+        where: { bookId, code: "FUEL" },
+        select: { id: true },
+      })
+    ).id;
+
+    costObjectId = (
+      await prisma.costObject.findFirstOrThrow({
+        where: { bookId, code: "VEHICLE_SHARED_VAN" },
+        select: { id: true },
+      })
+    ).id;
   });
 
   afterAll(async () => {
-    let expenseCleanupError: unknown;
-    if (prisma) {
-      try {
-        await prisma.$transaction(async (tx) => {
-          // Expense history is deliberately append-only in production. This
-          // transaction-local PostgreSQL setting disables user triggers only on
-          // this E2E connection so the suite can remove its own isolated rows.
-          await tx.$executeRawUnsafe(
-            "SET LOCAL session_replication_role = 'replica'",
-          );
-          const expenses = await tx.expense.findMany({
-            where: {
-              idempotencyKey: { startsWith: `expense-e2e:${runId}:` },
-            },
-            select: { id: true },
-          });
-          const expenseIds = expenses.map(({ id }) => id);
-          if (expenseIds.length === 0) return;
+    if (prisma && createdOperationIds.length > 0) {
+      const ids = createdOperationIds;
 
-          const [postings, documents, pools, snapshots, claims] =
-            await Promise.all([
-              tx.expensePosting.findMany({
-                where: { expenseId: { in: expenseIds } },
-                select: { moneyTransactionId: true },
-              }),
-              tx.expenseDocument.findMany({
-                where: { expenseId: { in: expenseIds } },
-                select: { id: true },
-              }),
-              tx.expenseCostPool.findMany({
-                where: { expenseId: { in: expenseIds } },
-                select: { id: true },
-              }),
-              tx.expenseTaxSnapshot.findMany({
-                where: { expenseId: { in: expenseIds } },
-                select: { id: true },
-              }),
-              tx.expenseReimbursementClaim.findMany({
-                where: { expenseId: { in: expenseIds } },
-                select: { id: true },
-              }),
-            ]);
-          const transactionIds = postings.map(
-            ({ moneyTransactionId }) => moneyTransactionId,
-          );
-          const documentIds = documents.map(({ id }) => id);
-          const poolIds = pools.map(({ id }) => id);
-          const snapshotIds = snapshots.map(({ id }) => id);
-          const claimIds = claims.map(({ id }) => id);
-          const assetLinks =
-            documentIds.length === 0
-              ? []
-              : await tx.expenseDocumentAsset.findMany({
-                  where: { documentId: { in: documentIds } },
-                  select: { assetId: true },
-                });
-
-          await tx.expensePosting.deleteMany({
-            where: { expenseId: { in: expenseIds } },
-          });
-          if (transactionIds.length > 0) {
-            await tx.moneyTransactionReference.deleteMany({
-              where: { moneyTransactionId: { in: transactionIds } },
-            });
-            await tx.walletBalanceChange.deleteMany({
-              where: { moneyTransactionId: { in: transactionIds } },
-            });
-            await tx.moneyTransaction.deleteMany({
-              where: { id: { in: transactionIds } },
-            });
-          }
-          if (claimIds.length > 0) {
-            await tx.expenseReimbursementSettlement.deleteMany({
-              where: { claimId: { in: claimIds } },
-            });
-            await tx.expenseReimbursementClaim.deleteMany({
-              where: { id: { in: claimIds } },
-            });
-          }
-          if (documentIds.length > 0) {
-            await tx.expenseDocumentAsset.deleteMany({
-              where: { documentId: { in: documentIds } },
-            });
-            await tx.expenseDocument.deleteMany({
-              where: { id: { in: documentIds } },
-            });
-          }
-          if (snapshotIds.length > 0) {
-            await tx.expenseTaxLine.deleteMany({
-              where: { taxSnapshotId: { in: snapshotIds } },
-            });
-            await tx.expenseTaxSnapshot.deleteMany({
-              where: { id: { in: snapshotIds } },
-            });
-          }
-          await tx.expenseReference.deleteMany({
-            where: { expenseId: { in: expenseIds } },
-          });
-          if (poolIds.length > 0) {
-            await tx.expenseCostAttribution.deleteMany({
-              where: { costPoolId: { in: poolIds } },
-            });
-            await tx.expenseCostPool.deleteMany({
-              where: { id: { in: poolIds } },
-            });
-          }
-          await tx.expensePayment.deleteMany({
-            where: { expenseId: { in: expenseIds } },
-          });
-          await tx.expense.deleteMany({ where: { id: { in: expenseIds } } });
-          if (assetLinks.length > 0) {
-            await tx.mediaAsset.deleteMany({
-              where: { id: { in: assetLinks.map(({ assetId }) => assetId) } },
-            });
-          }
-        });
-
-        if (expenseEvidenceEntity) {
-          await prisma.$transaction(async (tx) => {
-            await tx.businessOwner.deleteMany({
-              where: { legalEntityId: expenseEvidenceEntity.id },
-            });
-            await tx.businessLegalEntityWallet.deleteMany({
-              where: { legalEntityId: expenseEvidenceEntity.id },
-            });
-            await tx.businessLegalEntity.delete({
-              where: { id: expenseEvidenceEntity.id },
-            });
-
-            const companyIds = [
-              expenseEvidenceEntity.companyId,
-              expenseEvidencePayee?.id,
-            ].filter((id): id is string => Boolean(id));
-            await tx.counterparty.deleteMany({
-              where: { companyId: { in: companyIds } },
-            });
-            await tx.company.deleteMany({ where: { id: { in: companyIds } } });
-          });
-        }
-      } catch (error) {
-        expenseCleanupError = error;
-      }
-    }
-
-    if (prisma && existingAdminRoleSnapshots.length > 0) {
-      await prisma.$transaction(
-        existingAdminRoleSnapshots.map((snapshot) =>
-          prisma.user.update({
-            where: { id: snapshot.id },
-            data: { roles: snapshot.roles },
-          }),
-        ),
-      );
-      existingAdminRoleSnapshots = [];
+      // Innermost first, and reversals before the operations they point at.
+      await prisma.journalPosting.deleteMany({
+        where: { journalEntry: { operationId: { in: ids } } },
+      });
+      await prisma.journalEntry.deleteMany({
+        where: { operationId: { in: ids } },
+      });
+      await prisma.expensePayment.deleteMany({
+        where: { expense: { operationId: { in: ids } } },
+      });
+      await prisma.expense.deleteMany({ where: { operationId: { in: ids } } });
+      await prisma.economicAllocation.deleteMany({
+        where: { operationId: { in: ids } },
+      });
+      await prisma.financialDocument.deleteMany({
+        where: { operationId: { in: ids } },
+      });
+      await prisma.associateFunding.deleteMany({
+        where: { operationId: { in: ids } },
+      });
+      await prisma.financialOperation.deleteMany({
+        where: { id: { in: ids }, kind: "REVERSAL" },
+      });
+      await prisma.financialOperation.deleteMany({
+        where: { id: { in: ids } },
+      });
     }
 
     if (prisma && createdUserIds.length > 0) {
-      const transactionRows = await prisma.moneyTransaction.findMany({
-        where: {
-          OR: [
-            { recordedByUserId: { in: createdUserIds } },
-            { counterpartyUserId: { in: createdUserIds } },
-            { recipientUserId: { in: createdUserIds } },
-            { debtorUserId: { in: createdUserIds } },
-            { creditorUserId: { in: createdUserIds } },
-            {
-              idempotencyKey: {
-                startsWith: `finance:${runId}:`,
-              },
-            },
-          ],
-        },
-        select: { id: true },
-      });
-      const transactionIds = transactionRows.map((row) => row.id);
-
-      if (transactionIds.length > 0) {
-        await prisma.moneyTransactionReference.deleteMany({
-          where: { moneyTransactionId: { in: transactionIds } },
-        });
-        await prisma.walletBalanceChange.deleteMany({
-          where: { moneyTransactionId: { in: transactionIds } },
-        });
-        await prisma.moneyTransaction.deleteMany({
-          where: {
-            id: { in: transactionIds },
-            OR: [
-              { originTransactionId: { not: null } },
-              { reversalOfTransactionId: { not: null } },
-            ],
-          },
-        });
-        await prisma.moneyTransaction.deleteMany({
-          where: { id: { in: transactionIds } },
-        });
-      }
-    }
-
-    if (prisma && createdCategoryIds.length > 0) {
-      await prisma.financialCategory.deleteMany({
-        where: { id: { in: createdCategoryIds } },
-      });
-    }
-    if (prisma && createdWalletIds.length > 0) {
-      await prisma.walletBalance.deleteMany({
-        where: { walletId: { in: createdWalletIds } },
-      });
-      await prisma.wallet.deleteMany({
-        where: { id: { in: createdWalletIds } },
-      });
-    }
-    if (prisma && createdUserIds.length > 0) {
-      await prisma.auditEvent.deleteMany({
-        where: { userId: { in: createdUserIds } },
-      });
       await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
     }
-    await app?.close();
-    if (expenseCleanupError instanceof Error) throw expenseCleanupError;
-    if (expenseCleanupError) {
-      throw new Error("Expense fixture cleanup failed");
+
+    if (prisma && createdSupplierIds.length > 0) {
+      await prisma.supplier.deleteMany({
+        where: { id: { in: createdSupplierIds } },
+      });
     }
+
+    await app?.close();
   });
 
-  async function getWalletForUser(
-    session: TestSession,
-  ): Promise<v1.finance.Wallet> {
-    const response = await authenticate(
-      req().get(v1.finance.ROUTES.wallets.mine),
-      session,
-    );
-    expect(response.status).toBe(200);
-    return response.body as v1.finance.Wallet;
+  function accountKey(
+    role: v1.finance.LedgerAccountRole,
+    associateId: string | null,
+  ): string {
+    return `${role}:${associateId ?? ""}`;
   }
 
-  it("creates exactly one wallet for every user and limits normal users to their own wallet", async () => {
-    expect(adminWallet.ownerUserId).toBe(admin.userId);
-    expect(secondAdminWallet.ownerUserId).toBe(secondAdmin.userId);
-    expect(customerWallet.ownerUserId).toBe(customer.userId);
-    expect(balance(customerWallet, "USER_SETTLEMENT")).toBe("0.00");
+  function accountId(
+    role: v1.finance.LedgerAccountRole,
+    associateId?: string,
+  ): string {
+    const id = accounts.get(accountKey(role, associateId ?? null));
+    if (!id) throw new Error(`No ${role} account provisioned for this book.`);
+    return id;
+  }
 
-    const forbidden = await authenticate(
-      req().get(v1.finance.ROUTES.wallets.list),
-      customer,
-    );
-    expect(forbidden.status).toBe(403);
-  });
-
-  it("allows admins to create company money locations and reporting categories", async () => {
-    const cashResponse = await authenticate(
-      req()
-        .post(v1.finance.ROUTES.wallets.create)
-        .send({ type: "COMPANY_CASH", name: `Cash desk ${runId}` }),
-      admin,
-    );
-    expect(cashResponse.status).toBe(201);
-    companyCashWallet = cashResponse.body as v1.finance.Wallet;
-    createdWalletIds.push(companyCashWallet.id);
-
-    const bankResponse = await authenticate(
-      req()
-        .post(v1.finance.ROUTES.wallets.create)
-        .send({ type: "COMPANY_BANK", name: `Bank account ${runId}` }),
-      admin,
-    );
-    expect(bankResponse.status).toBe(201);
-    companyBankWallet = bankResponse.body as v1.finance.Wallet;
-    createdWalletIds.push(companyBankWallet.id);
-
-    const processorResponse = await authenticate(
-      req()
-        .post(v1.finance.ROUTES.wallets.create)
-        .send({
-          type: "PAYMENT_PROCESSOR",
-          name: `Payment processor ${runId}`,
-        }),
-      admin,
-    );
-    expect(processorResponse.status).toBe(201);
-    companyProcessorWallet = processorResponse.body as v1.finance.Wallet;
-    createdWalletIds.push(companyProcessorWallet.id);
-
-    const incomeResponse = await authenticate(
-      req()
-        .post(v1.finance.ROUTES.categories.create)
-        .send({
-          name: `Rental income ${runId}`,
-          kind: "INCOME",
-        }),
-      admin,
-    );
-    expect(incomeResponse.status).toBe(201);
-    rentalIncomeCategory = incomeResponse.body as v1.finance.FinancialCategory;
-    createdCategoryIds.push(rentalIncomeCategory.id);
-
-    const expenseResponse = await authenticate(
-      req()
-        .post(v1.finance.ROUTES.categories.create)
-        .send({
-          name: `Operating expense ${runId}`,
-          kind: "EXPENSE",
-        }),
-      admin,
-    );
-    expect(expenseResponse.status).toBe(201);
-    operatingExpenseCategory =
-      expenseResponse.body as v1.finance.FinancialCategory;
-    createdCategoryIds.push(operatingExpenseCategory.id);
-  });
-
-  it("tracks billed business cash in the collecting admin wallet until it reaches the cash desk", async () => {
-    const idempotencyKey = `finance:${runId}:billed-rental`;
-    const draftResponse = await authenticate(
-      req()
-        .post(v1.finance.ROUTES.transactions.create)
-        .send({
-          type: "INCOME",
-          amount: "120.00",
-          currency: "RON",
-          financialScope: "COMPANY",
-          paymentMethod: "CASH",
-          billingStatus: "BILLED",
-          categoryId: rentalIncomeCategory.id,
-          counterpartyUserId: customer.userId,
-          idempotencyKey,
-          postImmediately: false,
-          balanceChanges: [
-            {
-              walletId: adminWallet.id,
-              bucket: "BUSINESS_FUNDS",
-              currency: "RON",
-              amountDelta: "120.00",
-            },
-          ],
-          references: [
-            {
-              referenceType: "RENTAL",
-              referenceId: `rental-${runId}`,
-              isPrimary: true,
-            },
-          ],
-        }),
-      admin,
-    );
-    expect(draftResponse.status).toBe(201);
-    const draft = draftResponse.body as v1.finance.MoneyTransaction;
-    expect(draft.status).toBe("DRAFT");
-    expect(draft.category).toMatchObject({
-      id: rentalIncomeCategory.id,
-      name: rentalIncomeCategory.name,
-      kind: "INCOME",
+  async function createUser(handle: string, roles: string[]) {
+    const user = await users.createOne({
+      email: `${handle}@example.com`,
+      roles,
     });
-    expect(draft.counterparty).toMatchObject({
-      id: customer.userId,
-      email: customer.email,
-      firstName: "Customer",
-      lastName: "Example",
-    });
-    expect(draft.recordedBy).toMatchObject({
-      id: admin.userId,
-      firstName: "Ada",
-      lastName: "Lovelace",
-    });
-    expect(draft.balanceChanges[0]?.wallet).toMatchObject({
-      id: adminWallet.id,
-      type: "USER",
-      ownerUserId: admin.userId,
-      owner: {
-        id: admin.userId,
-        firstName: "Ada",
-        lastName: "Lovelace",
-      },
-    });
-    expect(balance(await getWallet(adminWallet.id), "BUSINESS_FUNDS")).toBe(
-      "0.00",
-    );
+    createdUserIds.push(user.id);
+    return user;
+  }
 
-    const postedResponse = await authenticate(
-      req().post(v1.finance.ROUTES.transactions.post(draft.id)),
-      admin,
-    );
-    expect(postedResponse.status).toBe(201);
-    const posted = postedResponse.body as v1.finance.MoneyTransaction;
-    expect(posted.status).toBe("POSTED");
-    expect(posted).toMatchObject({
-      category: { id: rentalIncomeCategory.id },
-      counterparty: { id: customer.userId },
-      recordedBy: { id: admin.userId },
-      balanceChanges: [
+  /**
+   * A valid expense. The default payment and allocation follow `amountMinor`,
+   * so overriding only the amount still produces a balanced expense — a test
+   * that wants an unbalanced one has to say so explicitly.
+   */
+  function expenseInput(
+    overrides: Partial<v1.finance.CreateExpenseInput> = {},
+  ): v1.finance.CreateExpenseInput {
+    const amountMinor = overrides.amountMinor ?? 30_000;
+
+    return {
+      bookId,
+      occurredAt: "2026-08-14T10:00:00.000Z",
+      description: "Test expense",
+      treatment: "OPERATING_EXPENSE",
+      categoryId,
+      amountMinor,
+      payments: [
         {
-          wallet: { id: adminWallet.id, ownerUserId: admin.userId },
+          sourceType: "BOOK_ACCOUNT",
+          sourceAccountId: accountId("BANK"),
+          paymentMethod: "BANK_TRANSFER",
+          amountMinor,
         },
       ],
+      allocations: [{ type: "COMMON", amountMinor }],
+      ...overrides,
+    };
+  }
+
+  function fundingInput(
+    overrides: Partial<v1.finance.CreateAssociateFundingInput> = {},
+  ): v1.finance.CreateAssociateFundingInput {
+    return {
+      bookId,
+      occurredAt: "2026-08-17T10:00:00.000Z",
+      amountMinor: 50_000,
+      type: "LOAN",
+      associateId: emilianoId,
+      destinationAccountId: accountId("BANK"),
+      ...overrides,
+    };
+  }
+
+  /** Remembers what this run created, so cleanup touches nothing else. */
+  function track(res: request.Response): request.Response {
+    const parsed = createdOperationSchema.safeParse(res.body);
+    if (parsed.success) createdOperationIds.push(parsed.data.id);
+    return res;
+  }
+
+  async function postExpense(
+    input: v1.finance.CreateExpenseInput,
+    idempotencyKey = key(),
+  ): Promise<request.Response> {
+    return track(
+      await asAdmin(req().post(v1.finance.ROUTES.expenses.create))
+        .set(v1.finance.IDEMPOTENCY_KEY_HEADER, idempotencyKey)
+        .send(input),
+    );
+  }
+
+  async function postFunding(
+    input: v1.finance.CreateAssociateFundingInput,
+    idempotencyKey = key(),
+  ): Promise<request.Response> {
+    return track(
+      await asAdmin(req().post(v1.finance.ROUTES.funding.create))
+        .set(v1.finance.IDEMPOTENCY_KEY_HEADER, idempotencyKey)
+        .send(input),
+    );
+  }
+
+  async function reverse(
+    operationId: string,
+    body: v1.finance.ReverseOperationInput = {},
+    idempotencyKey = key(),
+  ): Promise<request.Response> {
+    return track(
+      await asAdmin(
+        req().post(v1.finance.ROUTES.operations.reverse(operationId)),
+      )
+        .set(v1.finance.IDEMPOTENCY_KEY_HEADER, idempotencyKey)
+        .send(body),
+    );
+  }
+
+  async function previewSettlement(period: {
+    periodStart: string;
+    periodEnd: string;
+  }): Promise<request.Response> {
+    return asAdmin(req().post(v1.finance.ROUTES.settlements.preview)).send({
+      bookId,
+      kind: "COMPANY_SPECIFIC_BENEFIT",
+      ...period,
     });
-    expect(balance(await getWallet(adminWallet.id), "BUSINESS_FUNDS")).toBe(
-      "120.00",
-    );
+  }
 
-    const duplicateResponse = await authenticate(
-      req()
-        .post(v1.finance.ROUTES.transactions.create)
-        .send({
-          type: "INCOME",
-          amount: "120.00",
-          currency: "RON",
-          financialScope: "COMPANY",
-          paymentMethod: "CASH",
-          billingStatus: "BILLED",
-          categoryId: rentalIncomeCategory.id,
-          counterpartyUserId: customer.userId,
-          idempotencyKey,
-          postImmediately: true,
-          balanceChanges: [
-            {
-              walletId: adminWallet.id,
-              bucket: "BUSINESS_FUNDS",
-              currency: "RON",
-              amountDelta: "120.00",
-            },
-          ],
-          references: [],
-        }),
-      admin,
-    );
-    expect(duplicateResponse.status).toBe(201);
-    expect((duplicateResponse.body as v1.finance.MoneyTransaction).id).toBe(
-      draft.id,
-    );
-    expect(balance(await getWallet(adminWallet.id), "BUSINESS_FUNDS")).toBe(
-      "120.00",
-    );
-
-    const detailResponse = await authenticate(
-      req().get(v1.finance.ROUTES.transactions.get(draft.id)),
-      admin,
-    );
-    expect(detailResponse.status).toBe(200);
-    const detail = detailResponse.body as v1.finance.MoneyTransaction;
-    expect(detail).toMatchObject({
-      id: draft.id,
-      category: {
-        id: rentalIncomeCategory.id,
-        name: rentalIncomeCategory.name,
-      },
-      counterparty: { id: customer.userId, firstName: "Customer" },
-      recordedBy: { id: admin.userId, firstName: "Ada" },
-      balanceChanges: [
-        {
-          walletId: adminWallet.id,
-          wallet: { id: adminWallet.id, ownerUserId: admin.userId },
-        },
-      ],
-    });
-
-    const listResponse = await authenticate(
+  async function balanceOf(
+    role: v1.finance.LedgerAccountRole,
+    associateId?: string,
+  ): Promise<v1.finance.LedgerAccountBalance> {
+    const res = await asAdmin(
       req().get(
-        `${v1.finance.ROUTES.transactions.list}?walletId=${adminWallet.id}&categoryId=${rentalIncomeCategory.id}&status=POSTED`,
+        v1.finance.ROUTES.accounts.balance(accountId(role, associateId)),
       ),
-      admin,
     );
-    expect(listResponse.status).toBe(200);
-    const listed = (
-      listResponse.body as v1.finance.MoneyTransactionList
-    ).items.find((item) => item.id === draft.id);
-    expect(listed).toEqual(detail);
+    expect(res.status).toBe(200);
+    return res.body as v1.finance.LedgerAccountBalance;
+  }
 
-    // Participant relations are independent on historical rows, while no
-    // single creation workflow legitimately uses every role at once.
-    const allParticipantRoles = await prisma.moneyTransaction.create({
-      data: {
-        type: "ADJUSTMENT",
-        status: "DRAFT",
-        amount: "1.00",
-        currency: "RON",
-        financialScope: "COMPANY",
-        paymentMethod: null,
-        billingStatus: "NOT_APPLICABLE",
-        counterpartyUserId: customer.userId,
-        recipientUserId: secondAdmin.userId,
-        debtorUserId: admin.userId,
-        creditorUserId: secondAdmin.userId,
-        recordedByUserId: admin.userId,
-        occurredAt: new Date(),
-        idempotencyKey: `finance:${runId}:all-participant-roles`,
-      },
-      select: { id: true },
-    });
+  // -----------------------------------------------------------------------
 
-    const allParticipantDetailResponse = await authenticate(
-      req().get(v1.finance.ROUTES.transactions.get(allParticipantRoles.id)),
-      admin,
-    );
-    expect(allParticipantDetailResponse.status).toBe(200);
-    const allParticipantDetail =
-      allParticipantDetailResponse.body as v1.finance.MoneyTransaction;
-    expect(allParticipantDetail).toMatchObject({
-      id: allParticipantRoles.id,
-      category: null,
-      counterparty: { id: customer.userId },
-      recipient: { id: secondAdmin.userId },
-      debtor: { id: admin.userId },
-      creditor: { id: secondAdmin.userId },
-      recordedBy: { id: admin.userId },
-      balanceChanges: [],
-    });
+  describe("authorization", () => {
+    it("refuses anonymous and non-admin callers", async () => {
+      const anonymous = await req().get(v1.finance.ROUTES.accounts.list);
+      expect(anonymous.status).toBe(401);
 
-    const allParticipantListResponse = await authenticate(
-      req().get(
-        `${v1.finance.ROUTES.transactions.list}?status=DRAFT&type=ADJUSTMENT&userId=${customer.userId}`,
-      ),
-      admin,
-    );
-    expect(allParticipantListResponse.status).toBe(200);
-    expect(
-      (
-        allParticipantListResponse.body as v1.finance.MoneyTransactionList
-      ).items.find((item) => item.id === allParticipantRoles.id),
-    ).toEqual(allParticipantDetail);
-
-    // Legacy/imported rows may also predate recorder attribution entirely.
-    const noOptionalParticipants = await prisma.moneyTransaction.create({
-      data: {
-        type: "ADJUSTMENT",
-        status: "DRAFT",
-        amount: "1.00",
-        currency: "RON",
-        financialScope: "COMPANY",
-        paymentMethod: null,
-        billingStatus: "NOT_APPLICABLE",
-        occurredAt: new Date(),
-        idempotencyKey: `finance:${runId}:no-optional-participants`,
-      },
-      select: { id: true },
-    });
-    const noOptionalDetailResponse = await authenticate(
-      req().get(v1.finance.ROUTES.transactions.get(noOptionalParticipants.id)),
-      admin,
-    );
-    expect(noOptionalDetailResponse.status).toBe(200);
-    expect(noOptionalDetailResponse.body).toMatchObject({
-      id: noOptionalParticipants.id,
-      category: null,
-      counterparty: null,
-      recipient: null,
-      debtor: null,
-      creditor: null,
-      recordedBy: null,
-      balanceChanges: [],
-    });
-
-    await prisma.user.update({
-      where: { id: customer.userId },
-      data: { deletedAt: new Date() },
-    });
-    try {
-      const deletedParticipantResponse = await authenticate(
-        req().get(v1.finance.ROUTES.transactions.get(draft.id)),
-        admin,
+      const viewer = await createUser(
+        `fin-viewer-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        [],
       );
-      expect(deletedParticipantResponse.status).toBe(200);
+      const viewerToken = (await coreAuth.issueSession({ user: viewer }))
+        .accessToken;
+
+      const forbidden = await req()
+        .get(v1.finance.ROUTES.accounts.list)
+        .set("authorization", `Bearer ${viewerToken}`);
+      expect(forbidden.status).toBe(403);
+    });
+  });
+
+  describe("idempotency", () => {
+    it("requires an idempotency key on every write", async () => {
+      const res = await asAdmin(
+        req().post(v1.finance.ROUTES.expenses.create),
+      ).send(expenseInput());
+
+      expect(res.status).toBe(400);
+      expect(asErrorCode(res)).toBe("IDEMPOTENCY_KEY_REQUIRED");
+    });
+
+    it("returns the original operation when a key is replayed", async () => {
+      const idempotencyKey = key();
+      const input = expenseInput({ description: "Replayed expense" });
+
+      const first = await postExpense(input, idempotencyKey);
+      const second = await postExpense(input, idempotencyKey);
+
+      expect(first.status).toBe(201);
+      expect(second.status).toBe(201);
+      expect(asOperation(second).id).toBe(asOperation(first).id);
       expect(
-        (deletedParticipantResponse.body as v1.finance.MoneyTransaction)
-          .counterparty,
-      ).toEqual({
-        id: customer.userId,
-        email: customer.email,
-        firstName: "Customer",
-        lastName: "Example",
-      });
-    } finally {
-      await prisma.user.update({
-        where: { id: customer.userId },
-        data: { deletedAt: null },
-      });
-    }
-
-    const transferResponse = await authenticate(
-      req()
-        .post(v1.finance.ROUTES.transactions.create)
-        .send({
-          type: "TRANSFER",
-          amount: "120.00",
-          currency: "RON",
-          financialScope: "COMPANY",
-          billingStatus: "NOT_APPLICABLE",
-          idempotencyKey: `finance:${runId}:cash-deposit`,
-          postImmediately: true,
-          balanceChanges: [
-            {
-              walletId: adminWallet.id,
-              bucket: "BUSINESS_FUNDS",
-              currency: "RON",
-              amountDelta: "-120.00",
-            },
-            {
-              walletId: companyCashWallet.id,
-              bucket: "BUSINESS_FUNDS",
-              currency: "RON",
-              amountDelta: "120.00",
-            },
-          ],
-          references: [],
+        await prisma.financialOperation.count({
+          where: { bookId, idempotencyKey },
         }),
-      admin,
-    );
-    expect(transferResponse.status).toBe(201);
-    expect(transferResponse.body).toMatchObject({
-      category: null,
-      counterparty: null,
-      recipient: null,
-      debtor: null,
-      creditor: null,
-      recordedBy: { id: admin.userId },
-    });
-    expect(balance(await getWallet(adminWallet.id), "BUSINESS_FUNDS")).toBe(
-      "0.00",
-    );
-    expect(
-      balance(await getWallet(companyCashWallet.id), "BUSINESS_FUNDS"),
-    ).toBe("120.00");
-  });
-
-  it("tracks business bank expenses and restores balances with a reversal transaction", async () => {
-    const incomeResponse = await authenticate(
-      req()
-        .post(v1.finance.ROUTES.transactions.create)
-        .send({
-          type: "INCOME",
-          amount: "500.00",
-          currency: "RON",
-          financialScope: "COMPANY",
-          paymentMethod: "BANK_TRANSFER",
-          billingStatus: "BILLED",
-          categoryId: rentalIncomeCategory.id,
-          counterpartyUserId: customer.userId,
-          idempotencyKey: `finance:${runId}:bank-income`,
-          postImmediately: true,
-          balanceChanges: [
-            {
-              walletId: companyBankWallet.id,
-              bucket: "BUSINESS_FUNDS",
-              currency: "RON",
-              amountDelta: "500.00",
-            },
-          ],
-          references: [],
-        }),
-      admin,
-    );
-    expect(incomeResponse.status).toBe(201);
-    const bankIncome = incomeResponse.body as v1.finance.MoneyTransaction;
-
-    const expenseResponse = await authenticate(
-      req()
-        .post(v1.finance.ROUTES.transactions.create)
-        .send({
-          type: "EXPENSE",
-          amount: "80.00",
-          currency: "RON",
-          financialScope: "COMPANY",
-          paymentMethod: "BANK_TRANSFER",
-          billingStatus: "BILLED",
-          categoryId: operatingExpenseCategory.id,
-          description: "Bank transfer expense without a named recipient",
-          idempotencyKey: `finance:${runId}:bank-expense`,
-          postImmediately: true,
-          balanceChanges: [
-            {
-              walletId: companyBankWallet.id,
-              bucket: "BUSINESS_FUNDS",
-              currency: "RON",
-              amountDelta: "-80.00",
-            },
-          ],
-          references: [
-            {
-              referenceType: "BUSINESS_EXPENSE",
-              referenceId: `accounting-${runId}`,
-              isPrimary: true,
-            },
-          ],
-        }),
-      admin,
-    );
-    expect(expenseResponse.status).toBe(201);
-    const expense = expenseResponse.body as v1.finance.MoneyTransaction;
-    expect(
-      balance(await getWallet(companyBankWallet.id), "BUSINESS_FUNDS"),
-    ).toBe("420.00");
-
-    const reverseResponse = await authenticate(
-      req()
-        .post(v1.finance.ROUTES.transactions.reverse(expense.id))
-        .send({
-          idempotencyKey: `finance:${runId}:reverse-bank-expense`,
-          description: "Expense entered twice",
-        }),
-      admin,
-    );
-    expect(reverseResponse.status).toBe(201);
-    const reversal = reverseResponse.body as v1.finance.MoneyTransaction;
-    expect(reversal.type).toBe("REVERSAL");
-    expect(reversal.reversalOfTransactionId).toBe(expense.id);
-    expect(reversal).toMatchObject({
-      recordedBy: { id: admin.userId },
-      balanceChanges: [
-        {
-          wallet: { id: companyBankWallet.id },
-        },
-      ],
-    });
-    expect(
-      balance(await getWallet(companyBankWallet.id), "BUSINESS_FUNDS"),
-    ).toBe("500.00");
-
-    const originalResponse = await authenticate(
-      req().get(v1.finance.ROUTES.transactions.get(expense.id)),
-      admin,
-    );
-    expect(originalResponse.status).toBe(200);
-    expect((originalResponse.body as v1.finance.MoneyTransaction).status).toBe(
-      "REVERSED",
-    );
-    expect(
-      (originalResponse.body as v1.finance.MoneyTransaction)
-        .reversalTransactionId,
-    ).toBe(reversal.id);
-
-    const customerTransactions = await authenticate(
-      req().get(
-        `${v1.finance.ROUTES.transactions.list}?userId=${customer.userId}`,
-      ),
-      admin,
-    );
-    expect(customerTransactions.status).toBe(200);
-    expect(
-      (customerTransactions.body as v1.finance.MoneyTransactionList).items.map(
-        (item) => item.id,
-      ),
-    ).toContain(bankIncome.id);
-
-    const recordedByAdmin = await authenticate(
-      req().get(
-        `${v1.finance.ROUTES.transactions.list}?recordedByUserId=${admin.userId}`,
-      ),
-      admin,
-    );
-    expect(recordedByAdmin.status).toBe(200);
-    expect(
-      (recordedByAdmin.body as v1.finance.MoneyTransactionList).items.map(
-        (item) => item.id,
-      ),
-    ).toContain(bankIncome.id);
-  });
-
-  it("tracks customer guarantees as held cash and an amount owed back to the customer", async () => {
-    const receivedResponse = await authenticate(
-      req()
-        .post(v1.finance.ROUTES.transactions.create)
-        .send({
-          type: "GUARANTEE_RECEIVED",
-          amount: "300.00",
-          currency: "RON",
-          financialScope: "CUSTOMER_HELD",
-          paymentMethod: "CASH",
-          billingStatus: "NOT_APPLICABLE",
-          counterpartyUserId: customer.userId,
-          idempotencyKey: `finance:${runId}:guarantee-received`,
-          postImmediately: true,
-          balanceChanges: [
-            {
-              walletId: companyCashWallet.id,
-              bucket: "CUSTOMER_GUARANTEE_FUNDS",
-              currency: "RON",
-              amountDelta: "300.00",
-            },
-            {
-              walletId: customerWallet.id,
-              bucket: "USER_SETTLEMENT",
-              currency: "RON",
-              amountDelta: "300.00",
-            },
-          ],
-          references: [
-            {
-              referenceType: "RENTAL",
-              referenceId: `guarantee-rental-${runId}`,
-              isPrimary: true,
-            },
-          ],
-        }),
-      admin,
-    );
-    expect(receivedResponse.status).toBe(201);
-    expect(
-      balance(
-        await getWallet(companyCashWallet.id),
-        "CUSTOMER_GUARANTEE_FUNDS",
-      ),
-    ).toBe("300.00");
-    expect(balance(await getWalletForUser(customer), "USER_SETTLEMENT")).toBe(
-      "300.00",
-    );
-
-    const refundedResponse = await authenticate(
-      req()
-        .post(v1.finance.ROUTES.transactions.create)
-        .send({
-          type: "GUARANTEE_REFUNDED",
-          amount: "300.00",
-          currency: "RON",
-          financialScope: "CUSTOMER_HELD",
-          paymentMethod: "CASH",
-          billingStatus: "NOT_APPLICABLE",
-          counterpartyUserId: customer.userId,
-          idempotencyKey: `finance:${runId}:guarantee-refunded`,
-          postImmediately: true,
-          balanceChanges: [
-            {
-              walletId: companyCashWallet.id,
-              bucket: "CUSTOMER_GUARANTEE_FUNDS",
-              currency: "RON",
-              amountDelta: "-300.00",
-            },
-            {
-              walletId: customerWallet.id,
-              bucket: "USER_SETTLEMENT",
-              currency: "RON",
-              amountDelta: "-300.00",
-            },
-          ],
-          references: [],
-        }),
-      admin,
-    );
-    expect(refundedResponse.status).toBe(201);
-    expect(
-      balance(
-        await getWallet(companyCashWallet.id),
-        "CUSTOMER_GUARANTEE_FUNDS",
-      ),
-    ).toBe("0.00");
-    expect(balance(await getWalletForUser(customer), "USER_SETTLEMENT")).toBe(
-      "0.00",
-    );
-  });
-
-  it("rejects generic transaction payloads that contradict their declared type", async () => {
-    const malformedTransactions = [
-      {
-        name: "expense without category",
-        input: {
-          type: "EXPENSE",
-          amount: "10.00",
-          currency: "RON",
-          financialScope: "COMPANY",
-          paymentMethod: "CASH",
-          billingStatus: "BILLED",
-          idempotencyKey: `finance:${runId}:invalid-categoryless-expense`,
-          postImmediately: true,
-          balanceChanges: [
-            {
-              walletId: companyCashWallet.id,
-              bucket: "BUSINESS_FUNDS",
-              currency: "RON",
-              amountDelta: "-10.00",
-            },
-          ],
-          references: [],
-        },
-      },
-      {
-        name: "positive expense",
-        input: {
-          type: "EXPENSE",
-          amount: "10.00",
-          currency: "RON",
-          financialScope: "COMPANY",
-          paymentMethod: "CASH",
-          billingStatus: "BILLED",
-          categoryId: operatingExpenseCategory.id,
-          idempotencyKey: `finance:${runId}:invalid-positive-expense`,
-          postImmediately: true,
-          balanceChanges: [
-            {
-              walletId: companyCashWallet.id,
-              bucket: "BUSINESS_FUNDS",
-              currency: "RON",
-              amountDelta: "10.00",
-            },
-          ],
-          references: [],
-        },
-      },
-      {
-        name: "guarantee recorded as business funds",
-        input: {
-          type: "GUARANTEE_RECEIVED",
-          amount: "10.00",
-          currency: "RON",
-          financialScope: "CUSTOMER_HELD",
-          paymentMethod: "CASH",
-          billingStatus: "NOT_APPLICABLE",
-          counterpartyUserId: customer.userId,
-          idempotencyKey: `finance:${runId}:invalid-guarantee-bucket`,
-          postImmediately: true,
-          balanceChanges: [
-            {
-              walletId: companyCashWallet.id,
-              bucket: "BUSINESS_FUNDS",
-              currency: "RON",
-              amountDelta: "10.00",
-            },
-            {
-              walletId: customerWallet.id,
-              bucket: "USER_SETTLEMENT",
-              currency: "RON",
-              amountDelta: "10.00",
-            },
-          ],
-          references: [],
-        },
-      },
-      {
-        name: "user charge reducing debt",
-        input: {
-          type: "USER_CHARGE",
-          amount: "10.00",
-          currency: "RON",
-          financialScope: "COMPANY",
-          billingStatus: "BILLED",
-          counterpartyUserId: customer.userId,
-          idempotencyKey: `finance:${runId}:invalid-user-charge-direction`,
-          postImmediately: true,
-          balanceChanges: [
-            {
-              walletId: customerWallet.id,
-              bucket: "USER_SETTLEMENT",
-              currency: "RON",
-              amountDelta: "10.00",
-            },
-          ],
-          references: [],
-        },
-      },
-      {
-        name: "user payment without collected business funds",
-        input: {
-          type: "USER_PAYMENT",
-          amount: "10.00",
-          currency: "RON",
-          financialScope: "COMPANY",
-          paymentMethod: "CASH",
-          billingStatus: "NOT_APPLICABLE",
-          counterpartyUserId: customer.userId,
-          idempotencyKey: `finance:${runId}:invalid-user-payment-shape`,
-          postImmediately: true,
-          balanceChanges: [
-            {
-              walletId: customerWallet.id,
-              bucket: "USER_SETTLEMENT",
-              currency: "RON",
-              amountDelta: "10.00",
-            },
-          ],
-          references: [],
-        },
-      },
-      {
-        name: "reimbursement without recipient personal funds",
-        input: {
-          type: "REIMBURSEMENT",
-          amount: "10.00",
-          currency: "RON",
-          financialScope: "COMPANY",
-          paymentMethod: "BANK_TRANSFER",
-          billingStatus: "NOT_APPLICABLE",
-          recipientUserId: admin.userId,
-          idempotencyKey: `finance:${runId}:invalid-reimbursement-shape`,
-          postImmediately: true,
-          balanceChanges: [
-            {
-              walletId: companyBankWallet.id,
-              bucket: "BUSINESS_FUNDS",
-              currency: "RON",
-              amountDelta: "-10.00",
-            },
-            {
-              walletId: companyCashWallet.id,
-              bucket: "BUSINESS_FUNDS",
-              currency: "RON",
-              amountDelta: "10.00",
-            },
-          ],
-          references: [],
-        },
-      },
-      {
-        name: "refund moving balances in the payment direction",
-        input: {
-          type: "REFUND",
-          amount: "10.00",
-          currency: "RON",
-          financialScope: "COMPANY",
-          paymentMethod: "CASH",
-          billingStatus: "NOT_APPLICABLE",
-          counterpartyUserId: customer.userId,
-          idempotencyKey: `finance:${runId}:invalid-refund-direction`,
-          postImmediately: true,
-          balanceChanges: [
-            {
-              walletId: companyCashWallet.id,
-              bucket: "BUSINESS_FUNDS",
-              currency: "RON",
-              amountDelta: "10.00",
-            },
-            {
-              walletId: customerWallet.id,
-              bucket: "USER_SETTLEMENT",
-              currency: "RON",
-              amountDelta: "10.00",
-            },
-          ],
-          references: [],
-        },
-      },
-    ] as const;
-
-    for (const malformed of malformedTransactions) {
-      const response = await authenticate(
-        req().post(v1.finance.ROUTES.transactions.create).send(malformed.input),
-        admin,
-      );
-      expect({ name: malformed.name, status: response.status }).toEqual({
-        name: malformed.name,
-        status: 400,
-      });
-    }
-  });
-
-  it("automatically creates and settles equal-share claims for unbilled personal cash", async () => {
-    const personalIncomeResponse = await authenticate(
-      req()
-        .post(v1.finance.ROUTES.transactions.create)
-        .send({
-          type: "INCOME",
-          amount: "1000.00",
-          currency: "RON",
-          financialScope: "ADMIN_PERSONAL",
-          paymentMethod: "CASH",
-          billingStatus: "NOT_BILLED",
-          counterpartyUserId: customer.userId,
-          idempotencyKey: `finance:${runId}:personal-income`,
-          postImmediately: true,
-          balanceChanges: [
-            {
-              walletId: adminWallet.id,
-              bucket: "ADMIN_PERSONAL_FUNDS",
-              currency: "RON",
-              amountDelta: "1000.00",
-            },
-          ],
-          references: [
-            {
-              referenceType: "RENTAL",
-              referenceId: `personal-rental-${runId}`,
-              isPrimary: true,
-            },
-          ],
-        }),
-      admin,
-    );
-    expect(personalIncomeResponse.status).toBe(201);
-    const personalIncome =
-      personalIncomeResponse.body as v1.finance.MoneyTransaction;
-    expect(
-      balance(await getWallet(adminWallet.id), "ADMIN_PERSONAL_FUNDS"),
-    ).toBe("1000.00");
-
-    const claimsResponse = await authenticate(
-      req().get(v1.finance.ROUTES.claims.outstanding),
-      admin,
-    );
-    expect(claimsResponse.status).toBe(200);
-    expect(claimsForSuiteAdmins(claimsResponse.body)).toEqual([
-      {
-        debtorUserId: admin.userId,
-        creditorUserId: secondAdmin.userId,
-        debtor: {
-          id: admin.userId,
-          email: admin.email,
-          firstName: "Ada",
-          lastName: "Lovelace",
-        },
-        creditor: {
-          id: secondAdmin.userId,
-          email: secondAdmin.email,
-          firstName: "Grace",
-          lastName: "Hopper",
-        },
-        currency: "RON",
-        amount: "500.00",
-      },
-    ]);
-
-    const expenseResponse = await authenticate(
-      req()
-        .post(v1.finance.ROUTES.transactions.create)
-        .send({
-          type: "EXPENSE",
-          amount: "300.00",
-          currency: "RON",
-          financialScope: "ADMIN_PERSONAL",
-          paymentMethod: "CASH",
-          billingStatus: "NOT_BILLED",
-          categoryId: operatingExpenseCategory.id,
-          description: "Cash expense without a named recipient",
-          idempotencyKey: `finance:${runId}:personal-expense`,
-          postImmediately: true,
-          balanceChanges: [
-            {
-              walletId: adminWallet.id,
-              bucket: "ADMIN_PERSONAL_FUNDS",
-              currency: "RON",
-              amountDelta: "-300.00",
-            },
-          ],
-          references: [],
-        }),
-      admin,
-    );
-    expect(expenseResponse.status).toBe(201);
-    expect(
-      balance(await getWallet(adminWallet.id), "ADMIN_PERSONAL_FUNDS"),
-    ).toBe("700.00");
-
-    const splitResponse = await authenticate(
-      req()
-        .post(v1.finance.ROUTES.transactions.create)
-        .send({
-          type: "PERSONAL_FUNDS_SPLIT",
-          amount: "500.00",
-          currency: "RON",
-          financialScope: "ADMIN_PERSONAL",
-          paymentMethod: "CASH",
-          billingStatus: "NOT_APPLICABLE",
-          debtorUserId: admin.userId,
-          creditorUserId: secondAdmin.userId,
-          idempotencyKey: `finance:${runId}:personal-split`,
-          postImmediately: true,
-          balanceChanges: [
-            {
-              walletId: adminWallet.id,
-              bucket: "ADMIN_PERSONAL_FUNDS",
-              currency: "RON",
-              amountDelta: "-500.00",
-            },
-            {
-              walletId: secondAdminWallet.id,
-              bucket: "ADMIN_PERSONAL_FUNDS",
-              currency: "RON",
-              amountDelta: "500.00",
-            },
-          ],
-          references: [],
-        }),
-      admin,
-    );
-    expect(splitResponse.status).toBe(201);
-    expect(
-      balance(await getWallet(adminWallet.id), "ADMIN_PERSONAL_FUNDS"),
-    ).toBe("200.00");
-    expect(
-      balance(await getWallet(secondAdminWallet.id), "ADMIN_PERSONAL_FUNDS"),
-    ).toBe("500.00");
-
-    const settledClaimsResponse = await authenticate(
-      req().get(v1.finance.ROUTES.claims.outstanding),
-      admin,
-    );
-    expect(settledClaimsResponse.status).toBe(200);
-    expect(claimsForSuiteAdmins(settledClaimsResponse.body)).toEqual([]);
-
-    const settledIncomeReversalResponse = await authenticate(
-      req()
-        .post(v1.finance.ROUTES.transactions.reverse(personalIncome.id))
-        .send({
-          idempotencyKey: `finance:${runId}:invalid-personal-income-reversal`,
-        }),
-      admin,
-    );
-    expect(settledIncomeReversalResponse.status).toBe(409);
-
-    const secondAdminIncomeResponse = await authenticate(
-      req()
-        .post(v1.finance.ROUTES.transactions.create)
-        .send({
-          type: "INCOME",
-          amount: "400.00",
-          currency: "RON",
-          financialScope: "ADMIN_PERSONAL",
-          paymentMethod: "CASH",
-          billingStatus: "NOT_BILLED",
-          counterpartyUserId: customer.userId,
-          idempotencyKey: `finance:${runId}:second-admin-personal-income`,
-          postImmediately: true,
-          balanceChanges: [
-            {
-              walletId: secondAdminWallet.id,
-              bucket: "ADMIN_PERSONAL_FUNDS",
-              currency: "RON",
-              amountDelta: "400.00",
-            },
-          ],
-          references: [],
-        }),
-      secondAdmin,
-    );
-    expect(secondAdminIncomeResponse.status).toBe(201);
-
-    const firstAdminIncomeResponse = await authenticate(
-      req()
-        .post(v1.finance.ROUTES.transactions.create)
-        .send({
-          type: "INCOME",
-          amount: "100.00",
-          currency: "RON",
-          financialScope: "ADMIN_PERSONAL",
-          paymentMethod: "CASH",
-          billingStatus: "NOT_BILLED",
-          counterpartyUserId: customer.userId,
-          idempotencyKey: `finance:${runId}:first-admin-personal-income`,
-          postImmediately: true,
-          balanceChanges: [
-            {
-              walletId: adminWallet.id,
-              bucket: "ADMIN_PERSONAL_FUNDS",
-              currency: "RON",
-              amountDelta: "100.00",
-            },
-          ],
-          references: [],
-        }),
-      admin,
-    );
-    expect(firstAdminIncomeResponse.status).toBe(201);
-
-    const netClaimsResponse = await authenticate(
-      req().get(v1.finance.ROUTES.claims.outstanding),
-      admin,
-    );
-    expect(netClaimsResponse.status).toBe(200);
-    expect(claimsForSuiteAdmins(netClaimsResponse.body)).toEqual([
-      {
-        debtorUserId: secondAdmin.userId,
-        creditorUserId: admin.userId,
-        debtor: {
-          id: secondAdmin.userId,
-          email: secondAdmin.email,
-          firstName: "Grace",
-          lastName: "Hopper",
-        },
-        creditor: {
-          id: admin.userId,
-          email: admin.email,
-          firstName: "Ada",
-          lastName: "Lovelace",
-        },
-        currency: "RON",
-        amount: "150.00",
-      },
-    ]);
-
-    const wrongDirectionResponse = await authenticate(
-      req()
-        .post(v1.finance.ROUTES.transactions.create)
-        .send({
-          type: "PERSONAL_FUNDS_SPLIT",
-          amount: "1.00",
-          currency: "RON",
-          financialScope: "ADMIN_PERSONAL",
-          paymentMethod: "CASH",
-          billingStatus: "NOT_APPLICABLE",
-          debtorUserId: admin.userId,
-          creditorUserId: secondAdmin.userId,
-          idempotencyKey: `finance:${runId}:wrong-direction-split`,
-          postImmediately: true,
-          balanceChanges: [
-            {
-              walletId: adminWallet.id,
-              bucket: "ADMIN_PERSONAL_FUNDS",
-              currency: "RON",
-              amountDelta: "-1.00",
-            },
-            {
-              walletId: secondAdminWallet.id,
-              bucket: "ADMIN_PERSONAL_FUNDS",
-              currency: "RON",
-              amountDelta: "1.00",
-            },
-          ],
-          references: [],
-        }),
-      admin,
-    );
-    expect(wrongDirectionResponse.status).toBe(409);
-
-    const reciprocalSplitResponse = await authenticate(
-      req()
-        .post(v1.finance.ROUTES.transactions.create)
-        .send({
-          type: "PERSONAL_FUNDS_SPLIT",
-          amount: "150.00",
-          currency: "RON",
-          financialScope: "ADMIN_PERSONAL",
-          paymentMethod: "CASH",
-          billingStatus: "NOT_APPLICABLE",
-          debtorUserId: secondAdmin.userId,
-          creditorUserId: admin.userId,
-          idempotencyKey: `finance:${runId}:reciprocal-split`,
-          postImmediately: true,
-          balanceChanges: [
-            {
-              walletId: secondAdminWallet.id,
-              bucket: "ADMIN_PERSONAL_FUNDS",
-              currency: "RON",
-              amountDelta: "-150.00",
-            },
-            {
-              walletId: adminWallet.id,
-              bucket: "ADMIN_PERSONAL_FUNDS",
-              currency: "RON",
-              amountDelta: "150.00",
-            },
-          ],
-          references: [],
-        }),
-      secondAdmin,
-    );
-    expect(reciprocalSplitResponse.status).toBe(201);
-
-    const finalClaimsResponse = await authenticate(
-      req().get(v1.finance.ROUTES.claims.outstanding),
-      admin,
-    );
-    expect(finalClaimsResponse.status).toBe(200);
-    expect(claimsForSuiteAdmins(finalClaimsResponse.body)).toEqual([]);
-  });
-
-  it("rejects malformed capital contribution and distribution-repayment shapes", async () => {
-    const contributor = await freshSession(["ADMIN"], {
-      firstName: "Rosalind",
-      lastName: "Franklin",
-    });
-    const contributorWallet = await getWalletForUser(contributor);
-    createdWalletIds.push(contributorWallet.id);
-
-    const malformedTransactions = [
-      {
-        name: "capital contribution missing the settlement credit",
-        input: {
-          type: "CAPITAL_CONTRIBUTION",
-          amount: "10.00",
-          currency: "RON",
-          financialScope: "COMPANY",
-          paymentMethod: "BANK_TRANSFER",
-          billingStatus: "NOT_APPLICABLE",
-          counterpartyUserId: contributor.userId,
-          idempotencyKey: `finance:${runId}:invalid-capital-contribution-shape`,
-          postImmediately: true,
-          balanceChanges: [
-            {
-              walletId: contributorWallet.id,
-              bucket: "ADMIN_PERSONAL_FUNDS",
-              currency: "RON",
-              amountDelta: "-10.00",
-            },
-            {
-              walletId: companyBankWallet.id,
-              bucket: "BUSINESS_FUNDS",
-              currency: "RON",
-              amountDelta: "10.00",
-            },
-          ],
-          references: [],
-        },
-      },
-      {
-        name: "company distribution repaying the wrong direction",
-        input: {
-          type: "COMPANY_DISTRIBUTION",
-          amount: "10.00",
-          currency: "RON",
-          financialScope: "COMPANY",
-          paymentMethod: "BANK_TRANSFER",
-          billingStatus: "NOT_APPLICABLE",
-          recipientUserId: contributor.userId,
-          idempotencyKey: `finance:${runId}:invalid-distribution-repayment-shape`,
-          postImmediately: true,
-          balanceChanges: [
-            {
-              walletId: companyBankWallet.id,
-              bucket: "BUSINESS_FUNDS",
-              currency: "RON",
-              amountDelta: "-10.00",
-            },
-            {
-              walletId: contributorWallet.id,
-              bucket: "USER_SETTLEMENT",
-              currency: "RON",
-              amountDelta: "10.00",
-            },
-          ],
-          references: [],
-        },
-      },
-      {
-        name: "company distribution with three balance changes",
-        input: {
-          type: "COMPANY_DISTRIBUTION",
-          amount: "10.00",
-          currency: "RON",
-          financialScope: "COMPANY",
-          paymentMethod: "BANK_TRANSFER",
-          billingStatus: "NOT_APPLICABLE",
-          recipientUserId: contributor.userId,
-          idempotencyKey: `finance:${runId}:invalid-distribution-three-changes`,
-          postImmediately: true,
-          balanceChanges: [
-            {
-              walletId: companyBankWallet.id,
-              bucket: "BUSINESS_FUNDS",
-              currency: "RON",
-              amountDelta: "-10.00",
-            },
-            {
-              walletId: contributorWallet.id,
-              bucket: "USER_SETTLEMENT",
-              currency: "RON",
-              amountDelta: "-5.00",
-            },
-            {
-              walletId: contributorWallet.id,
-              bucket: "ADMIN_PERSONAL_FUNDS",
-              currency: "RON",
-              amountDelta: "-5.00",
-            },
-          ],
-          references: [],
-        },
-      },
-    ] as const;
-
-    for (const malformed of malformedTransactions) {
-      const response = await authenticate(
-        req().post(v1.finance.ROUTES.transactions.create).send(malformed.input),
-        admin,
-      );
-      expect({ name: malformed.name, status: response.status }).toEqual({
-        name: malformed.name,
-        status: 400,
-      });
-    }
-  });
-
-  it("records a capital contribution as a debt owed back to the contributing owner, then lets a distribution repay it", async () => {
-    const contributor = await freshSession(["ADMIN"], {
-      firstName: "Marie",
-      lastName: "Curie",
-    });
-    const contributorWallet = await getWalletForUser(contributor);
-    createdWalletIds.push(contributorWallet.id);
-
-    const contributionResponse = await authenticate(
-      req()
-        .post(v1.finance.ROUTES.transactions.create)
-        .send({
-          type: "CAPITAL_CONTRIBUTION",
-          amount: "400.00",
-          currency: "RON",
-          financialScope: "COMPANY",
-          paymentMethod: "BANK_TRANSFER",
-          billingStatus: "NOT_APPLICABLE",
-          counterpartyUserId: contributor.userId,
-          idempotencyKey: `finance:${runId}:capital-contribution`,
-          postImmediately: true,
-          balanceChanges: [
-            {
-              walletId: contributorWallet.id,
-              bucket: "ADMIN_PERSONAL_FUNDS",
-              currency: "RON",
-              amountDelta: "-400.00",
-            },
-            {
-              walletId: companyBankWallet.id,
-              bucket: "BUSINESS_FUNDS",
-              currency: "RON",
-              amountDelta: "400.00",
-            },
-            {
-              walletId: contributorWallet.id,
-              bucket: "USER_SETTLEMENT",
-              currency: "RON",
-              amountDelta: "400.00",
-            },
-          ],
-          references: [],
-        }),
-      admin,
-    );
-    expect(contributionResponse.status).toBe(201);
-
-    const contributorAfterContribution = await getWallet(contributorWallet.id);
-    expect(balance(contributorAfterContribution, "ADMIN_PERSONAL_FUNDS")).toBe(
-      "-400.00",
-    );
-    expect(balance(contributorAfterContribution, "USER_SETTLEMENT")).toBe(
-      "400.00",
-    );
-
-    const beforeOwnershipResponse = await authenticate(
-      req().get(v1.finance.ROUTES.owners.balances),
-      admin,
-    );
-    expect(beforeOwnershipResponse.status).toBe(200);
-    const beforeOwnershipBody = beforeOwnershipResponse.body as {
-      items: v1.finance.OwnerBalance[];
-    };
-    expect(
-      beforeOwnershipBody.items.some(
-        (item) => item.userId === contributor.userId,
-      ),
-    ).toBe(false);
-
-    const ownerRegistrationResponse = await authenticate(
-      req()
-        .post(
-          v1.finance.EXPENSE_ROUTES.legalEntities.owners.create(
-            expenseEvidenceEntity.id,
-          ),
-        )
-        .send({ userId: contributor.userId, effectiveFrom: "2000-01-01" }),
-      admin,
-    );
-    expect(ownerRegistrationResponse.status).toBe(201);
-
-    const afterOwnershipResponse = await authenticate(
-      req().get(v1.finance.ROUTES.owners.balances),
-      admin,
-    );
-    expect(afterOwnershipResponse.status).toBe(200);
-    const afterOwnershipBody = afterOwnershipResponse.body as {
-      items: v1.finance.OwnerBalance[];
-    };
-    expect(afterOwnershipBody.items).toContainEqual({
-      userId: contributor.userId,
-      user: {
-        id: contributor.userId,
-        email: contributor.email,
-        firstName: "Marie",
-        lastName: "Curie",
-      },
-      currency: "RON",
-      amount: "400.00",
+      ).toBe(1);
     });
 
-    const repaymentDistributionResponse = await authenticate(
-      req()
-        .post(v1.finance.ROUTES.transactions.create)
-        .send({
-          type: "COMPANY_DISTRIBUTION",
-          amount: "150.00",
-          currency: "RON",
-          financialScope: "COMPANY",
-          paymentMethod: "BANK_TRANSFER",
-          billingStatus: "NOT_APPLICABLE",
-          recipientUserId: contributor.userId,
-          idempotencyKey: `finance:${runId}:distribution-repayment`,
-          postImmediately: true,
-          balanceChanges: [
-            {
-              walletId: companyBankWallet.id,
-              bucket: "BUSINESS_FUNDS",
-              currency: "RON",
-              amountDelta: "-150.00",
-            },
-            {
-              walletId: contributorWallet.id,
-              bucket: "USER_SETTLEMENT",
-              currency: "RON",
-              amountDelta: "-150.00",
-            },
-          ],
-          references: [],
-        }),
-      admin,
-    );
-    expect(repaymentDistributionResponse.status).toBe(201);
+    it("does not create a second operation when requests race", async () => {
+      const idempotencyKey = key();
+      const input = expenseInput({ description: "Raced expense" });
 
-    const contributorAfterRepayment = await getWallet(contributorWallet.id);
-    expect(balance(contributorAfterRepayment, "USER_SETTLEMENT")).toBe(
-      "250.00",
-    );
+      const results = await Promise.all([
+        postExpense(input, idempotencyKey),
+        postExpense(input, idempotencyKey),
+        postExpense(input, idempotencyKey),
+      ]);
 
-    const afterRepaymentBalancesResponse = await authenticate(
-      req().get(v1.finance.ROUTES.owners.balances),
-      admin,
-    );
-    const afterRepaymentBody = afterRepaymentBalancesResponse.body as {
-      items: v1.finance.OwnerBalance[];
-    };
-    expect(afterRepaymentBody.items).toContainEqual({
-      userId: contributor.userId,
-      user: {
-        id: contributor.userId,
-        email: contributor.email,
-        firstName: "Marie",
-        lastName: "Curie",
-      },
-      currency: "RON",
-      amount: "250.00",
-    });
-
-    const pureDistributionResponse = await authenticate(
-      req()
-        .post(v1.finance.ROUTES.transactions.create)
-        .send({
-          type: "COMPANY_DISTRIBUTION",
-          amount: "50.00",
-          currency: "RON",
-          financialScope: "COMPANY",
-          paymentMethod: "BANK_TRANSFER",
-          billingStatus: "NOT_APPLICABLE",
-          recipientUserId: contributor.userId,
-          idempotencyKey: `finance:${runId}:pure-distribution`,
-          postImmediately: true,
-          balanceChanges: [
-            {
-              walletId: companyBankWallet.id,
-              bucket: "BUSINESS_FUNDS",
-              currency: "RON",
-              amountDelta: "-50.00",
-            },
-          ],
-          references: [],
-        }),
-      admin,
-    );
-    expect(pureDistributionResponse.status).toBe(201);
-
-    const contributorAfterPureDistribution = await getWallet(
-      contributorWallet.id,
-    );
-    expect(balance(contributorAfterPureDistribution, "USER_SETTLEMENT")).toBe(
-      "250.00",
-    );
-  });
-
-  it("filters and paginates wallet selectors without returning every wallet", async () => {
-    const ownerSearch = await authenticate(
-      req().get(
-        `${v1.finance.ROUTES.wallets.list}?search=${encodeURIComponent(`finance-${runId}-0@example.com`)}&page=1&pageSize=1`,
-      ),
-      admin,
-    );
-    expect(ownerSearch.status).toBe(200);
-    expect(ownerSearch.body).toMatchObject({
-      page: 1,
-      pageSize: 1,
-      total: 1,
-      items: [{ id: adminWallet.id, ownerUserId: admin.userId }],
-    });
-
-    const fullNameSearch = await authenticate(
-      req().get(
-        `${v1.finance.ROUTES.wallets.list}?search=${encodeURIComponent("  Ada   Lovelace  ")}&ownerRole=ADMIN&ownerIsActive=true`,
-      ),
-      admin,
-    );
-    expect(fullNameSearch.status).toBe(200);
-    expect(fullNameSearch.body).toMatchObject({
-      total: 1,
-      items: [
-        {
-          id: adminWallet.id,
-          owner: {
-            id: admin.userId,
-            firstName: "Ada",
-            lastName: "Lovelace",
-          },
-        },
-      ],
-    });
-
-    const exactFilters = await authenticate(
-      req().get(
-        `${v1.finance.ROUTES.wallets.list}?type=USER&ownerUserId=${admin.userId}&isActive=true`,
-      ),
-      admin,
-    );
-    expect(exactFilters.status).toBe(200);
-    expect(exactFilters.body).toMatchObject({
-      page: 1,
-      pageSize: 25,
-      total: 1,
-      items: [{ id: adminWallet.id }],
-    });
-
-    const companyNameSearch = await authenticate(
-      req().get(
-        `${v1.finance.ROUTES.wallets.list}?search=${encodeURIComponent(`Cash desk ${runId}`)}`,
-      ),
-      admin,
-    );
-    expect(companyNameSearch.status).toBe(200);
-    expect(companyNameSearch.body).toMatchObject({
-      total: 1,
-      items: [{ id: companyCashWallet.id }],
-    });
-
-    const customerExcludedFromAdminOptions = await authenticate(
-      req().get(
-        `${v1.finance.ROUTES.wallets.list}?search=${encodeURIComponent("Customer Example")}&ownerRole=ADMIN`,
-      ),
-      admin,
-    );
-    expect(customerExcludedFromAdminOptions.status).toBe(200);
-    expect(customerExcludedFromAdminOptions.body).toMatchObject({
-      total: 0,
-      items: [],
-    });
-
-    const literalWildcardSearch = await authenticate(
-      req().get(
-        `${v1.finance.ROUTES.wallets.list}?search=${encodeURIComponent("%")}`,
-      ),
-      admin,
-    );
-    expect(literalWildcardSearch.status).toBe(200);
-    expect(literalWildcardSearch.body).toMatchObject({
-      total: 0,
-      items: [],
-    });
-
-    const unsupportedOwnerRole = await authenticate(
-      req().get(`${v1.finance.ROUTES.wallets.list}?ownerRole=USER`),
-      admin,
-    );
-    expect(unsupportedOwnerRole.status).toBe(400);
-
-    await prisma.user.update({
-      where: { id: secondAdmin.userId },
-      data: { deletedAt: new Date() },
-    });
-    try {
-      const inactiveOwnerExcluded = await authenticate(
-        req().get(
-          `${v1.finance.ROUTES.wallets.list}?search=${encodeURIComponent("Grace Hopper")}&ownerRole=ADMIN&ownerIsActive=true`,
-        ),
-        admin,
-      );
-      expect(inactiveOwnerExcluded.status).toBe(200);
-      expect(inactiveOwnerExcluded.body).toMatchObject({
-        total: 0,
-        items: [],
-      });
-
-      const inactiveAdminOption = await authenticate(
-        req().get(
-          `${v1.finance.ROUTES.walletOptions}?search=${encodeURIComponent("Grace Hopper")}&ownerRole=ADMIN`,
-        ),
-        admin,
-      );
-      expect(inactiveAdminOption.status).toBe(200);
-      expect(inactiveAdminOption.body).toEqual({
-        items: [],
-        nextCursor: null,
-      });
-
-      const inactiveUserOption = await authenticate(
-        req().get(
-          `${v1.finance.ROUTES.walletOptions}?type=USER&ownerUserId=${secondAdmin.userId}&isActive=true`,
-        ),
-        admin,
-      );
-      expect(inactiveUserOption.status).toBe(200);
-      expect(inactiveUserOption.body).toEqual({
-        items: [],
-        nextCursor: null,
-      });
-    } finally {
-      await prisma.user.update({
-        where: { id: secondAdmin.userId },
-        data: { deletedAt: null },
-      });
-    }
-
-    const oversizedPage = await authenticate(
-      req().get(`${v1.finance.ROUTES.wallets.list}?pageSize=101`),
-      admin,
-    );
-    expect(oversizedPage.status).toBe(400);
-  });
-
-  it("serves lightweight, filtered wallet options with stable cursors", async () => {
-    const duplicateName = `Selector duplicate ${runId}`;
-    const duplicateWallets = await Promise.all([
-      prisma.wallet.create({
-        data: {
-          type: "COMPANY_CASH",
-          name: duplicateName,
-        },
-        select: { id: true },
-      }),
-      prisma.wallet.create({
-        data: {
-          type: "COMPANY_CASH",
-          name: duplicateName,
-        },
-        select: { id: true },
-      }),
-      prisma.wallet.create({
-        data: {
-          type: "COMPANY_CASH",
-          name: duplicateName,
-          isActive: false,
-        },
-        select: { id: true },
-      }),
-    ]);
-    createdWalletIds.push(...duplicateWallets.map((wallet) => wallet.id));
-
-    const ownerSearch = await authenticate(
-      req().get(
-        `${v1.finance.ROUTES.walletOptions}?search=${encodeURIComponent("  aDa   LOVElaCE  ")}&type=USER&ownerRole=ADMIN&ownerUserId=${admin.userId}&isActive=true`,
-      ),
-      admin,
-    );
-    expect(ownerSearch.status).toBe(200);
-    const ownerSearchBody = ownerSearch.body as v1.finance.WalletOptionList;
-    expect(ownerSearchBody).toEqual({
-      items: [
-        {
-          id: adminWallet.id,
-          type: "USER",
-          name: "Personal wallet",
-          isActive: true,
-          cardHolderUserId: null,
-          cardHolder: null,
-          owner: {
-            id: admin.userId,
-            email: admin.email,
-            firstName: "Ada",
-            lastName: "Lovelace",
-          },
-        },
-      ],
-      nextCursor: null,
-    });
-    expect(Object.keys(ownerSearchBody.items[0]).sort()).toEqual(
-      [
-        "id",
-        "type",
-        "name",
-        "isActive",
-        "owner",
-        "cardHolderUserId",
-        "cardHolder",
-      ].sort(),
-    );
-    expect(ownerSearchBody.items[0]).not.toHaveProperty("balances");
-
-    const companyOnly = await authenticate(
-      req().get(
-        `${v1.finance.ROUTES.walletOptions}?search=${encodeURIComponent(runId)}&companyOnly=true&pageSize=100`,
-      ),
-      admin,
-    );
-    expect(companyOnly.status).toBe(200);
-    const companyOnlyBody = companyOnly.body as v1.finance.WalletOptionList;
-    expect(
-      companyOnlyBody.items.every(
-        (wallet) => wallet.type !== "USER" && wallet.owner === null,
-      ),
-    ).toBe(true);
-    expect(companyOnlyBody.items.map((wallet) => wallet.id)).toEqual(
-      expect.arrayContaining([
-        companyCashWallet.id,
-        companyBankWallet.id,
-        companyProcessorWallet.id,
-      ]),
-    );
-    expect(companyOnlyBody.items.map((wallet) => wallet.id)).not.toContain(
-      adminWallet.id,
-    );
-
-    const companyCashOnly = await authenticate(
-      req().get(
-        `${v1.finance.ROUTES.walletOptions}?search=${encodeURIComponent(runId)}&companyOnly=true&type=COMPANY_CASH&pageSize=100`,
-      ),
-      admin,
-    );
-    expect(companyCashOnly.status).toBe(200);
-    expect(
-      (companyCashOnly.body as v1.finance.WalletOptionList).items.every(
-        (wallet) => wallet.type === "COMPANY_CASH",
-      ),
-    ).toBe(true);
-
-    const inactiveOnly = await authenticate(
-      req().get(
-        `${v1.finance.ROUTES.walletOptions}?search=${encodeURIComponent(duplicateName)}&type=COMPANY_CASH&isActive=false`,
-      ),
-      admin,
-    );
-    expect(inactiveOnly.status).toBe(200);
-    expect(inactiveOnly.body).toEqual({
-      items: [
-        {
-          id: duplicateWallets[2]?.id,
-          type: "COMPANY_CASH",
-          name: duplicateName,
-          isActive: false,
-          owner: null,
-          cardHolderUserId: null,
-          cardHolder: null,
-        },
-      ],
-      nextCursor: null,
-    });
-
-    const seenWalletIds: string[] = [];
-    let cursor: string | null = null;
-    let firstCursor: string | null = null;
-    let firstWalletId: string | null = null;
-    for (let page = 0; page < duplicateWallets.length; page += 1) {
-      const cursorQuery = cursor ? `&cursor=${encodeURIComponent(cursor)}` : "";
-      const response = await authenticate(
-        req().get(
-          `${v1.finance.ROUTES.walletOptions}?search=${encodeURIComponent(duplicateName)}&type=COMPANY_CASH&isActive=true&pageSize=1${cursorQuery}`,
-        ),
-        admin,
-      );
-      expect(response.status).toBe(200);
-      const body = response.body as v1.finance.WalletOptionList;
-      expect(body.items).toHaveLength(1);
-      seenWalletIds.push(body.items[0].id);
-      if (page === 0) {
-        firstCursor = body.nextCursor;
-        firstWalletId = body.items[0].id;
+      for (const result of results) {
+        expect(result.status).toBe(201);
       }
-      cursor = body.nextCursor;
-      if (!cursor) break;
-    }
-    expect(seenWalletIds.sort()).toEqual(
-      duplicateWallets
-        .slice(0, 2)
-        .map((wallet) => wallet.id)
-        .sort(),
-    );
-    expect(new Set(seenWalletIds).size).toBe(seenWalletIds.length);
-    expect(cursor).toBeNull();
-
-    expect(firstCursor).not.toBeNull();
-    expect(firstWalletId).not.toBeNull();
-    if (!firstCursor || !firstWalletId) {
-      throw new Error("Expected the first wallet-option page to have a cursor");
-    }
-    expect(
-      Buffer.from(firstCursor, "base64url").toString("utf8"),
-    ).not.toContain(duplicateName);
-
-    const changedFilterCursor = await authenticate(
-      req().get(
-        `${v1.finance.ROUTES.walletOptions}?search=${encodeURIComponent(duplicateName)}&type=COMPANY_CASH&companyOnly=true&isActive=true&pageSize=1&cursor=${encodeURIComponent(firstCursor)}`,
-      ),
-      admin,
-    );
-    expect(changedFilterCursor.status).toBe(400);
-
-    await prisma.wallet.update({
-      where: { id: firstWalletId },
-      data: { name: `Changed ${runId}` },
+      expect(new Set(results.map((r) => asOperation(r).id)).size).toBe(1);
+      expect(
+        await prisma.financialOperation.count({
+          where: { bookId, idempotencyKey },
+        }),
+      ).toBe(1);
     });
-    try {
-      const staleCursor = await authenticate(
-        req().get(
-          `${v1.finance.ROUTES.walletOptions}?search=${encodeURIComponent(duplicateName)}&type=COMPANY_CASH&isActive=true&pageSize=1&cursor=${encodeURIComponent(firstCursor)}`,
-        ),
-        admin,
+
+    it("rejects a key reused for a materially different expense", async () => {
+      const idempotencyKey = key();
+
+      await postExpense(expenseInput(), idempotencyKey);
+      const conflicting = await postExpense(
+        expenseInput({
+          amountMinor: 50_000,
+          payments: [
+            {
+              sourceType: "BOOK_ACCOUNT",
+              sourceAccountId: accountId("BANK"),
+              paymentMethod: "BANK_TRANSFER",
+              amountMinor: 50_000,
+            },
+          ],
+          allocations: [{ type: "COMMON", amountMinor: 50_000 }],
+        }),
+        idempotencyKey,
       );
-      expect(staleCursor.status).toBe(400);
-    } finally {
-      await prisma.wallet.update({
-        where: { id: firstWalletId },
-        data: { name: duplicateName },
+
+      expect(conflicting.status).toBe(409);
+      expect(asErrorCode(conflicting)).toBe("FINANCE_IDEMPOTENCY_CONFLICT");
+    });
+  });
+
+  describe("preview and create agree", () => {
+    it("rejects an associate-pool treatment in the company book", async () => {
+      const input = expenseInput({ treatment: "ASSOCIATE_POOL_EXPENSE" });
+
+      const preview = await asAdmin(
+        req().post(v1.finance.ROUTES.expenses.preview),
+      ).send(input);
+      const created = await postExpense(input);
+
+      expect(preview.status).toBe(422);
+      expect(asErrorCode(preview)).toBe("FINANCE_VALIDATION_FAILED");
+      expect(created.status).toBe(422);
+      expect(asErrorCode(created)).toBe("FINANCE_VALIDATION_FAILED");
+    });
+
+    it("previews without writing anything", async () => {
+      const before = await prisma.financialOperation.count({
+        where: { bookId },
       });
-    }
 
-    const badCursor = await authenticate(
-      req().get(`${v1.finance.ROUTES.walletOptions}?cursor=not-a-cursor`),
-      admin,
-    );
-    expect(badCursor.status).toBe(400);
+      const res = await asAdmin(
+        req().post(v1.finance.ROUTES.expenses.preview),
+      ).send(expenseInput());
 
-    const oversizedPage = await authenticate(
-      req().get(`${v1.finance.ROUTES.walletOptions}?pageSize=101`),
-      admin,
-    );
-    expect(oversizedPage.status).toBe(400);
-
-    const forbidden = await authenticate(
-      req().get(v1.finance.ROUTES.walletOptions),
-      customer,
-    );
-    expect(forbidden.status).toBe(403);
-  });
-
-  it("keeps funds held by former admins visible in current balance snapshots", async () => {
-    formerAdmin = await freshSession(["ADMIN"], {
-      firstName: "Katherine",
-      lastName: "Johnson",
-    });
-    formerAdminWallet = await getWalletForUser(formerAdmin);
-    createdWalletIds.push(formerAdminWallet.id);
-
-    const transferResponse = await authenticate(
-      req()
-        .post(v1.finance.ROUTES.transactions.create)
-        .send({
-          type: "TRANSFER",
-          amount: "50.00",
-          currency: "RON",
-          financialScope: "COMPANY",
-          billingStatus: "NOT_APPLICABLE",
-          idempotencyKey: `finance:${runId}:former-admin-funds`,
-          postImmediately: true,
-          balanceChanges: [
-            {
-              walletId: companyBankWallet.id,
-              bucket: "BUSINESS_FUNDS",
-              currency: "RON",
-              amountDelta: "-50.00",
-            },
-            {
-              walletId: formerAdminWallet.id,
-              bucket: "BUSINESS_FUNDS",
-              currency: "RON",
-              amountDelta: "50.00",
-            },
-          ],
-          references: [],
-        }),
-      formerAdmin,
-    );
-    expect(transferResponse.status).toBe(201);
-
-    await prisma.user.update({
-      where: { id: formerAdmin.userId },
-      data: { roles: ["USER"] },
-    });
-  });
-
-  it("summarizes posted income and expenses in the requested range", async () => {
-    await prisma.financialCategory.update({
-      where: { id: operatingExpenseCategory.id },
-      data: { isActive: false },
-    });
-    const from = encodeURIComponent(suiteStartedAt);
-    const to = encodeURIComponent(new Date().toISOString());
-    const response = await authenticate(
-      req().get(`${v1.finance.ROUTES.summary}?from=${from}&to=${to}`),
-      admin,
-    );
-    expect(response.status).toBe(200);
-
-    const summary = response.body as v1.finance.FinanceSummary;
-    expect(summary.period).toEqual({
-      from: summary.from,
-      to: summary.to,
-    });
-    expect(summary.income).toEqual([{ currency: "RON", amount: "2120.00" }]);
-    expect(summary.expenses).toEqual([{ currency: "RON", amount: "300.00" }]);
-    expect(summary.totals).toEqual([
-      {
-        currency: "RON",
-        income: "2120.00",
-        expenses: "300.00",
-      },
-    ]);
-    expect(summary.incomeByPaymentMethod).toEqual([
-      {
-        paymentMethod: "BANK_TRANSFER",
-        currency: "RON",
-        amount: "500.00",
-      },
-      { paymentMethod: "CASH", currency: "RON", amount: "1620.00" },
-    ]);
-    expect(summary.expensesByCategory).toEqual([
-      {
-        category: {
-          id: operatingExpenseCategory.id,
-          code: operatingExpenseCategory.code,
-          name: operatingExpenseCategory.name,
-          kind: "EXPENSE",
-        },
-        currency: "RON",
-        amount: "300.00",
-      },
-    ]);
-    expect(summary.incomeByBillingStatus).toEqual([
-      { billingStatus: "BILLED", currency: "RON", amount: "620.00" },
-      { billingStatus: "NOT_BILLED", currency: "RON", amount: "1500.00" },
-    ]);
-    expect(summary.incomeByScope).toEqual([
-      {
-        financialScope: "ADMIN_PERSONAL",
-        currency: "RON",
-        amount: "1500.00",
-      },
-      {
-        financialScope: "COMPANY",
-        currency: "RON",
-        amount: "620.00",
-      },
-    ]);
-    expect(Number.isNaN(Date.parse(summary.generatedAt))).toBe(false);
-
-    const companyCash = summary.currentBalances.company.find(
-      (item) =>
-        item.wallet.id === companyCashWallet.id &&
-        item.bucket === "BUSINESS_FUNDS" &&
-        item.currency === "RON",
-    );
-    expect(companyCash).toMatchObject({
-      balance: "120.00",
-      ownerIsActive: null,
-      ownerIsAdmin: null,
-      wallet: {
-        id: companyCashWallet.id,
-        type: "COMPANY_CASH",
-        name: `Cash desk ${runId}`,
-        ownerUserId: null,
-        owner: null,
-      },
-    });
-    expect(summary.companyMoney).toContainEqual({
-      walletId: companyCashWallet.id,
-      walletType: "COMPANY_CASH",
-      walletName: `Cash desk ${runId}`,
-      currency: "RON",
-      amount: "120.00",
-    });
-
-    const adminPersonal = summary.currentBalances.admins.find(
-      (item) =>
-        item.wallet.id === adminWallet.id &&
-        item.bucket === "ADMIN_PERSONAL_FUNDS" &&
-        item.currency === "RON",
-    );
-    expect(adminPersonal).toMatchObject({
-      ownerIsActive: true,
-      ownerIsAdmin: true,
-      wallet: {
-        id: adminWallet.id,
-        ownerUserId: admin.userId,
-        owner: {
-          id: admin.userId,
-          firstName: "Ada",
-          lastName: "Lovelace",
-        },
-      },
-    });
-    expect(adminPersonal?.balance).toMatch(/^-?\d+\.\d{2}$/);
-    expect(summary.adminMoney).toContainEqual({
-      admin: {
-        id: admin.userId,
-        email: admin.email,
-        firstName: "Ada",
-        lastName: "Lovelace",
-      },
-      currency: "RON",
-      businessFunds: "0.00",
-      personalFunds: "450.00",
-      customerGuaranteeFunds: "0.00",
-    });
-
-    const processorBusiness = summary.currentBalances.company.find(
-      (item) =>
-        item.wallet.id === companyProcessorWallet.id &&
-        item.bucket === "BUSINESS_FUNDS" &&
-        item.currency === "RON",
-    );
-    expect(processorBusiness).toMatchObject({
-      balance: "0.00",
-      ownerIsActive: null,
-      ownerIsAdmin: null,
-    });
-
-    const secondAdminBusiness = summary.currentBalances.admins.find(
-      (item) =>
-        item.wallet.id === secondAdminWallet.id &&
-        item.bucket === "BUSINESS_FUNDS" &&
-        item.currency === "RON",
-    );
-    expect(secondAdminBusiness).toMatchObject({
-      balance: "0.00",
-      ownerIsActive: true,
-      ownerIsAdmin: true,
-    });
-
-    const formerAdminBusiness = summary.currentBalances.admins.find(
-      (item) =>
-        item.wallet.id === formerAdminWallet.id &&
-        item.bucket === "BUSINESS_FUNDS" &&
-        item.currency === "RON",
-    );
-    expect(formerAdminBusiness).toMatchObject({
-      balance: "50.00",
-      ownerIsActive: true,
-      ownerIsAdmin: false,
-    });
-  });
-
-  it("uses half-open timestamp ranges, separates currencies, and protects the summary route", async () => {
-    const unusualExpenseCategoryResponse = await authenticate(
-      req()
-        .post(v1.finance.ROUTES.categories.create)
-        .send({
-          name: `Other expenses ${runId}`,
-          kind: "EXPENSE",
-        }),
-      admin,
-    );
-    expect(unusualExpenseCategoryResponse.status).toBe(201);
-    const unusualExpenseCategory =
-      unusualExpenseCategoryResponse.body as v1.finance.FinancialCategory;
-    createdCategoryIds.push(unusualExpenseCategory.id);
-
-    async function recordIncome(input: {
-      key: string;
-      amount: string;
-      currency: string;
-      occurredAt: string;
-      postImmediately: boolean;
-    }): Promise<string> {
-      const response = await authenticate(
-        req()
-          .post(v1.finance.ROUTES.transactions.create)
-          .send({
-            type: "INCOME",
-            amount: input.amount,
-            currency: input.currency,
-            financialScope: "COMPANY",
-            paymentMethod: "CASH",
-            billingStatus: "BILLED",
-            categoryId: rentalIncomeCategory.id,
-            counterpartyUserId: customer.userId,
-            occurredAt: input.occurredAt,
-            idempotencyKey: `finance:${runId}:summary-boundary:${input.key}`,
-            postImmediately: input.postImmediately,
-            balanceChanges: [
-              {
-                walletId: companyCashWallet.id,
-                bucket: "BUSINESS_FUNDS",
-                currency: input.currency,
-                amountDelta: input.amount,
-              },
-            ],
-            references: [],
-          }),
-        admin,
+      expect(res.status).toBe(200);
+      expect(asPlan(res).postings).toHaveLength(2);
+      expect(await prisma.financialOperation.count({ where: { bookId } })).toBe(
+        before,
       );
-      expect(response.status).toBe(201);
-      return (response.body as v1.finance.MoneyTransaction).id;
-    }
+    });
 
-    const from = "2099-01-01T00:00:00.000+02:00";
-    const to = "2099-01-02T00:00:00.000+02:00";
-    const atFromId = await recordIncome({
-      key: "from",
-      amount: "10.00",
-      currency: "RON",
-      occurredAt: from,
-      postImmediately: true,
+    it("posts exactly what the preview promised", async () => {
+      const input = expenseInput({
+        amountMinor: 100_000,
+        payments: [
+          {
+            sourceType: "BOOK_ACCOUNT",
+            sourceAccountId: accountId("BANK"),
+            paymentMethod: "BANK_TRANSFER",
+            amountMinor: 50_000,
+          },
+          {
+            sourceType: "ASSOCIATE_PERSONAL_FUNDS",
+            payerAssociateId: emilianoId,
+            paymentMethod: "CARD",
+            amountMinor: 30_000,
+          },
+          {
+            sourceType: "ASSOCIATE_PERSONAL_FUNDS",
+            payerAssociateId: iustiId,
+            paymentMethod: "CASH",
+            amountMinor: 20_000,
+          },
+        ],
+        allocations: [{ type: "COMMON", amountMinor: 100_000 }],
+      });
+
+      const preview = await asAdmin(
+        req().post(v1.finance.ROUTES.expenses.preview),
+      ).send(input);
+      const created = await postExpense(input);
+
+      expect(created.status).toBe(201);
+
+      const plan = asPlan(preview);
+      const operation = asOperation(created);
+
+      expect(operation.summary).toEqual(plan.summary);
+      expect(
+        operation.journalEntry?.postings.map((posting) => ({
+          accountId: posting.accountId,
+          signedAmountMinor: posting.signedAmountMinor,
+        })),
+      ).toEqual(
+        plan.postings.map((posting) => ({
+          accountId: posting.accountId,
+          signedAmountMinor: posting.signedAmountMinor,
+        })),
+      );
     });
-    const insideId = await recordIncome({
-      key: "inside",
-      amount: "20.00",
-      currency: "EUR",
-      occurredAt: "2099-01-01T23:59:59.999+02:00",
-      postImmediately: true,
+  });
+
+  describe("Case A — company bank pays a common expense", () => {
+    it("records the expense, the postings, and the balances", async () => {
+      const bankBefore = (await balanceOf("BANK")).signedBalanceMinor;
+      const expenseBefore = (await balanceOf("OPERATING_EXPENSE"))
+        .signedBalanceMinor;
+
+      const res = await postExpense(
+        expenseInput({ description: "Case A", costObjectId }),
+      );
+      expect(res.status).toBe(201);
+
+      const operation = asOperation(res);
+
+      expect(operation.status).toBe("POSTED");
+      expect(operation.postedAt).not.toBeNull();
+      expect(operation.expense?.amountMinor).toBe(30_000);
+      expect(operation.expense?.payments).toHaveLength(1);
+      expect(operation.expense?.costObject?.id).toBe(costObjectId);
+      expect(operation.allocations).toHaveLength(1);
+      expect(operation.allocations[0].type).toBe("COMMON");
+      expect(operation.allocations[0].associateId).toBeNull();
+
+      const postings = operation.journalEntry?.postings ?? [];
+      expect(postings).toHaveLength(2);
+      expect(postings.reduce((sum, p) => sum + p.signedAmountMinor, 0)).toBe(0);
+
+      expect(operation.summary.companyExpenseMinor).toBe(30_000);
+      expect(operation.summary.companyCashImpactMinor).toBe(-30_000);
+      expect(operation.summary.associatePayables).toEqual([]);
+      expect(operation.summary.specificEconomicBenefits).toEqual([]);
+
+      expect((await balanceOf("BANK")).signedBalanceMinor).toBe(
+        bankBefore - 30_000,
+      );
+      expect((await balanceOf("OPERATING_EXPENSE")).signedBalanceMinor).toBe(
+        expenseBefore + 30_000,
+      );
     });
-    const atToId = await recordIncome({
-      key: "to",
-      amount: "30.00",
-      currency: "RON",
-      occurredAt: to,
-      postImmediately: true,
-    });
-    const draftId = await recordIncome({
-      key: "draft",
-      amount: "99.00",
-      currency: "RON",
-      occurredAt: "2099-01-01T12:00:00.000+02:00",
-      postImmediately: false,
-    });
-    await prisma.moneyTransaction.create({
-      data: {
-        type: "INCOME",
-        status: "POSTED",
-        amount: "7.00",
-        currency: "XTS",
-        financialScope: "COMPANY",
-        paymentMethod: null,
-        billingStatus: "BILLED",
-        recordedByUserId: admin.userId,
-        occurredAt: new Date("2099-01-01T10:00:00.000+02:00"),
-        idempotencyKey: `finance:${runId}:summary-null-payment-method`,
-      },
-    });
-    const unusualExpense = await authenticate(
-      req()
-        .post(v1.finance.ROUTES.transactions.create)
-        .send({
-          type: "EXPENSE",
-          amount: "5.00",
-          currency: "EUR",
-          financialScope: "COMPANY",
-          paymentMethod: "CASH",
-          billingStatus: "BILLED",
-          categoryId: unusualExpenseCategory.id,
-          description: "Cash expense without a named recipient",
-          occurredAt: "2099-01-01T11:00:00.000+02:00",
-          idempotencyKey: `finance:${runId}:summary-unusual-expense`,
-          postImmediately: true,
-          balanceChanges: [
+  });
+
+  describe("Case B — Iusti pays personal funds and Iusti benefits", () => {
+    it("owes Iusti the money and attributes the benefit to him", async () => {
+      const payableBefore = (await balanceOf("PAYABLE_TO_ASSOCIATE", iustiId))
+        .displayBalanceMinor;
+      const cashBefore = (await balanceOf("BANK")).signedBalanceMinor;
+
+      const res = await postExpense(
+        expenseInput({
+          description: "Case B",
+          amountMinor: 20_000,
+          treatment: "NON_OPERATIONAL_COMPANY_EXPENSE",
+          payments: [
             {
-              walletId: companyCashWallet.id,
-              bucket: "BUSINESS_FUNDS",
-              currency: "EUR",
-              amountDelta: "-5.00",
+              sourceType: "ASSOCIATE_PERSONAL_FUNDS",
+              payerAssociateId: iustiId,
+              paymentMethod: "CASH",
+              amountMinor: 20_000,
             },
           ],
-          references: [],
+          allocations: [
+            {
+              type: "ASSOCIATE_SPECIFIC",
+              associateId: iustiId,
+              amountMinor: 20_000,
+            },
+          ],
         }),
-      admin,
-    );
-    expect(unusualExpense.status).toBe(201);
+      );
 
-    const response = await authenticate(
-      req().get(
-        `${v1.finance.ROUTES.summary}?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
-      ),
-      admin,
-    );
-    expect(response.status).toBe(200);
-    expect((response.body as v1.finance.FinanceSummary).income).toEqual([
-      { currency: "EUR", amount: "20.00" },
-      { currency: "RON", amount: "10.00" },
-      { currency: "XTS", amount: "7.00" },
-    ]);
-    const boundarySummary = response.body as v1.finance.FinanceSummary;
-    expect(boundarySummary.expenses).toEqual([
-      { currency: "EUR", amount: "5.00" },
-    ]);
-    expect(boundarySummary.incomeByPaymentMethod).toContainEqual({
-      currency: "XTS",
-      paymentMethod: null,
-      amount: "7.00",
-    });
-    expect(boundarySummary.expensesByCategory).toEqual([
-      {
-        currency: "EUR",
-        category: {
-          id: unusualExpenseCategory.id,
-          code: unusualExpenseCategory.code,
-          name: unusualExpenseCategory.name,
-          kind: "EXPENSE",
-        },
-        amount: "5.00",
-      },
-    ]);
-    expect(boundarySummary.totals).toEqual([
-      { currency: "EUR", income: "20.00", expenses: "5.00" },
-      { currency: "RON", income: "10.00", expenses: "0.00" },
-      { currency: "XTS", income: "7.00", expenses: "0.00" },
-    ]);
+      expect(res.status).toBe(201);
+      const operation = asOperation(res);
 
-    const ledgerResponse = await authenticate(
-      req().get(
-        `${v1.finance.ROUTES.transactions.list}?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&status=POSTED&type=INCOME&paymentMethod=CASH`,
-      ),
-      admin,
-    );
-    expect(ledgerResponse.status).toBe(200);
-    const ledgerIds = (
-      ledgerResponse.body as v1.finance.MoneyTransactionList
-    ).items.map((item) => item.id);
-    expect(ledgerIds).toEqual([insideId, atFromId]);
-    expect(ledgerIds).not.toContain(atToId);
-    expect(ledgerIds).not.toContain(draftId);
+      expect(operation.summary.companyCashImpactMinor).toBe(0);
+      expect(operation.summary.associatePayables).toEqual([
+        { associateId: iustiId, amountMinor: 20_000 },
+      ]);
+      expect(operation.summary.specificEconomicBenefits).toEqual([
+        { associateId: iustiId, amountMinor: 20_000 },
+      ]);
 
-    const zeroLength = await authenticate(
-      req().get(
-        `${v1.finance.ROUTES.summary}?from=${encodeURIComponent(from)}&to=${encodeURIComponent(from)}`,
-      ),
-      admin,
-    );
-    expect(zeroLength.status).toBe(400);
+      // No company money moved — only a debt was created.
+      expect((await balanceOf("BANK")).signedBalanceMinor).toBe(cashBefore);
 
-    const invalidTimestamp = await authenticate(
-      req().get(
-        `${v1.finance.ROUTES.summary}?from=not-a-timestamp&to=${encodeURIComponent(to)}`,
-      ),
-      admin,
-    );
-    expect(invalidTimestamp.status).toBe(400);
-
-    const excessiveRange = await authenticate(
-      req().get(
-        `${v1.finance.ROUTES.summary}?from=${encodeURIComponent("2024-01-01T00:00:00.000Z")}&to=${encodeURIComponent("2026-01-01T00:00:00.000Z")}`,
-      ),
-      admin,
-    );
-    expect(excessiveRange.status).toBe(400);
-
-    const forbidden = await authenticate(
-      req().get(
-        `${v1.finance.ROUTES.summary}?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
-      ),
-      customer,
-    );
-    expect(forbidden.status).toBe(403);
-  });
-
-  it("keeps incomplete company-funded expenses editable as drafts", async () => {
-    const draft = await createExpenseDraft({
-      key: "incomplete-company-card-draft",
-      source: "COMPANY_CARD",
-    });
-
-    expect(draft).toMatchObject({
-      status: "DRAFT",
-      payment: {
-        source: "COMPANY_CARD",
-        companyWalletId: expenseEvidenceCardWalletId,
-      },
-      documents: [],
+      const payable = await balanceOf("PAYABLE_TO_ASSOCIATE", iustiId);
+      expect(payable.displayBalanceMinor).toBe(payableBefore + 20_000);
+      expect(payable.signedBalanceMinor).toBe(-payable.displayBalanceMinor);
     });
   });
 
-  it("posts a cash expense attributed to an owner when matched fiscal evidence has a live original", async () => {
-    const draft = await createExpenseDraft({
-      key: "cash-owner-with-original",
-      source: "COMPANY_CASH_DESK",
-      target: "OWNER",
-      documents: [
-        {
-          type: "FISCAL_RECEIPT",
-          documentNumber: `CASH-${runId}`,
-          issuedOn: "2040-01-15",
-          buyerTaxIdentifier: expenseEvidenceTaxIdentifier,
-          buyerCuiStatus: "MATCHED",
-          reviewStatus: "CONFIRMED",
-        },
-      ],
-    });
-    const fiscalDocument = draft.documents[0];
-    if (!fiscalDocument) throw new Error("Expected a fiscal document");
-    await attachExpenseDocumentOriginal(
-      fiscalDocument.id,
-      "cash-owner-fiscal-original",
-    );
+  describe("Case C — Iusti pays personal funds and Emiliano benefits", () => {
+    it("keeps the reimbursement whole and the settlement separate", async () => {
+      const iustiBefore = (await balanceOf("PAYABLE_TO_ASSOCIATE", iustiId))
+        .displayBalanceMinor;
+      const emilianoBefore = (
+        await balanceOf("PAYABLE_TO_ASSOCIATE", emilianoId)
+      ).displayBalanceMinor;
 
-    const response = await authenticate(
-      req()
-        .post(v1.finance.EXPENSE_ROUTES.post(draft.id))
-        .send({
-          idempotencyKey: `expense-e2e:${runId}:cash-owner-post`,
+      const res = await postExpense(
+        expenseInput({
+          description: "Case C",
+          amountMinor: 40_000,
+          treatment: "NON_OPERATIONAL_COMPANY_EXPENSE",
+          payments: [
+            {
+              sourceType: "ASSOCIATE_PERSONAL_FUNDS",
+              payerAssociateId: iustiId,
+              paymentMethod: "CARD",
+              amountMinor: 40_000,
+            },
+          ],
+          allocations: [
+            {
+              type: "ASSOCIATE_SPECIFIC",
+              associateId: emilianoId,
+              amountMinor: 40_000,
+            },
+          ],
         }),
-      admin,
-    );
+      );
 
-    expect(response.status).toBe(201);
-    expect(response.body).toMatchObject({
-      id: draft.id,
-      status: "POSTED",
-      payment: { source: "COMPANY_CASH_DESK" },
-      costPool: {
-        attribution: {
-          target: "OWNER",
-          businessOwnerId: expenseEvidenceOwner.id,
-        },
-      },
-      postings: [{ role: "EXPENSE_PAYMENT" }],
+      expect(res.status).toBe(201);
+      const operation = asOperation(res);
+
+      // The full 40,000 is owed to Iusti — not 20,000. What Emiliano owes
+      // Iusti privately is a separate obligation, settled separately.
+      expect(operation.summary.associatePayables).toEqual([
+        { associateId: iustiId, amountMinor: 40_000 },
+      ]);
+      expect(operation.summary.specificEconomicBenefits).toEqual([
+        { associateId: emilianoId, amountMinor: 40_000 },
+      ]);
+
+      expect(
+        (await balanceOf("PAYABLE_TO_ASSOCIATE", iustiId)).displayBalanceMinor,
+      ).toBe(iustiBefore + 40_000);
+      // The beneficiary is owed nothing — he did not pay.
+      expect(
+        (await balanceOf("PAYABLE_TO_ASSOCIATE", emilianoId))
+          .displayBalanceMinor,
+      ).toBe(emilianoBefore);
     });
   });
 
-  it("rejects a company-card post when its POS receipt has no live original", async () => {
-    const draft = await createExpenseDraft({
-      key: "card-missing-pos-original",
-      source: "COMPANY_CARD",
-      documents: [
-        {
-          type: "INVOICE",
-          documentNumber: `CARD-${runId}`,
-          issuedOn: "2040-01-15",
-          buyerTaxIdentifier: expenseEvidenceTaxIdentifier,
-          buyerCuiStatus: "MATCHED",
-          reviewStatus: "CONFIRMED",
-        },
-        {
-          type: "POS_RECEIPT",
-          documentNumber: `POS-${runId}`,
-          issuedOn: "2040-01-15",
-          buyerCuiStatus: "NOT_APPLICABLE",
-          reviewStatus: "CONFIRMED",
-        },
-      ],
-    });
-    const fiscalDocument = draft.documents.find(
-      (document) => document.type === "INVOICE",
-    );
-    if (!fiscalDocument) throw new Error("Expected an invoice");
-    await attachExpenseDocumentOriginal(
-      fiscalDocument.id,
-      "card-fiscal-original",
-    );
+  describe("Case D — Iusti pays a common expense", () => {
+    it("owes Iusti the full amount with no specific benefit", async () => {
+      const payableBefore = (await balanceOf("PAYABLE_TO_ASSOCIATE", iustiId))
+        .displayBalanceMinor;
 
-    const response = await authenticate(
-      req()
-        .post(v1.finance.EXPENSE_ROUTES.post(draft.id))
-        .send({ idempotencyKey: `expense-e2e:${runId}:card-post` }),
-      admin,
-    );
-
-    expect(response.status).toBe(400);
-    const errorBody = response.body as {
-      error: { code: string; message: string };
-    };
-    expect(errorBody.error.code).toBe("BAD_REQUEST");
-    expect(errorBody.error.message).toContain("POS receipt");
-    expect(
-      await prisma.expense.findUnique({
-        where: { id: draft.id },
-        select: { status: true },
-      }),
-    ).toEqual({ status: "DRAFT" });
-  });
-
-  it("posts a personal-funds expense without receipt evidence", async () => {
-    const draft = await createExpenseDraft({
-      key: "personal-no-evidence",
-      source: "PERSONAL_FUNDS",
-    });
-
-    const response = await authenticate(
-      req()
-        .post(v1.finance.EXPENSE_ROUTES.post(draft.id))
-        .send({ idempotencyKey: `expense-e2e:${runId}:personal-post` }),
-      admin,
-    );
-
-    expect(response.status).toBe(201);
-    expect(response.body).toMatchObject({
-      status: "POSTED",
-      payment: {
-        source: "PERSONAL_FUNDS",
-        fundedByUserId: admin.userId,
-        fundingTreatment: "REIMBURSABLE",
-      },
-      documents: [],
-      reimbursementClaim: {
-        claimantUserId: admin.userId,
-        status: "OPEN",
-        originalAmount: "25.00",
-      },
-    });
-  });
-
-  it("rejects matched company-buyer evidence on a personal-funds expense", async () => {
-    const draft = await createExpenseDraft({
-      key: "personal-matched-buyer",
-      source: "PERSONAL_FUNDS",
-      documents: [
-        {
-          type: "FISCAL_RECEIPT",
-          documentNumber: `PERSONAL-${runId}`,
-          issuedOn: "2040-01-15",
-          buyerTaxIdentifier: expenseEvidenceTaxIdentifier,
-          buyerCuiStatus: "MATCHED",
-          reviewStatus: "CONFIRMED",
-        },
-      ],
-    });
-    const fiscalDocument = draft.documents[0];
-    if (!fiscalDocument) throw new Error("Expected a fiscal document");
-    await attachExpenseDocumentOriginal(
-      fiscalDocument.id,
-      "personal-fiscal-original",
-    );
-
-    const response = await authenticate(
-      req()
-        .post(v1.finance.EXPENSE_ROUTES.post(draft.id))
-        .send({
-          idempotencyKey: `expense-e2e:${runId}:personal-matched-post`,
+      const res = await postExpense(
+        expenseInput({
+          description: "Case D",
+          payments: [
+            {
+              sourceType: "ASSOCIATE_PERSONAL_FUNDS",
+              payerAssociateId: iustiId,
+              paymentMethod: "CASH",
+              amountMinor: 30_000,
+            },
+          ],
         }),
-      admin,
-    );
+      );
 
-    expect(response.status).toBe(400);
-    const errorBody = response.body as {
-      error: { code: string; message: string };
-    };
-    expect(errorBody.error.code).toBe("BAD_REQUEST");
-    expect(errorBody.error.message).toContain("matched company-buyer evidence");
-    expect(
-      await prisma.expense.findUnique({
-        where: { id: draft.id },
-        select: { status: true },
-      }),
-    ).toEqual({ status: "DRAFT" });
+      expect(res.status).toBe(201);
+      expect(asOperation(res).summary.specificEconomicBenefits).toEqual([]);
+      expect(asOperation(res).summary.commonEconomicBenefitMinor).toBe(30_000);
+      expect(
+        (await balanceOf("PAYABLE_TO_ASSOCIATE", iustiId)).displayBalanceMinor,
+      ).toBe(payableBefore + 30_000);
+    });
+  });
+
+  describe("Case E — company pays an Emiliano-specific expense", () => {
+    it("creates a specific benefit without owing anyone", async () => {
+      const payableBefore = (
+        await balanceOf("PAYABLE_TO_ASSOCIATE", emilianoId)
+      ).displayBalanceMinor;
+      const bankBefore = (await balanceOf("BANK")).signedBalanceMinor;
+
+      const res = await postExpense(
+        expenseInput({
+          description: "Case E",
+          amountMinor: 40_000,
+          payments: [
+            {
+              sourceType: "BOOK_ACCOUNT",
+              sourceAccountId: accountId("BANK"),
+              paymentMethod: "CARD",
+              amountMinor: 40_000,
+            },
+          ],
+          allocations: [
+            {
+              type: "ASSOCIATE_SPECIFIC",
+              associateId: emilianoId,
+              amountMinor: 40_000,
+            },
+          ],
+        }),
+      );
+
+      expect(res.status).toBe(201);
+      expect(asOperation(res).summary.associatePayables).toEqual([]);
+      expect(asOperation(res).summary.companyCashImpactMinor).toBe(-40_000);
+      expect((await balanceOf("BANK")).signedBalanceMinor).toBe(
+        bankBefore - 40_000,
+      );
+      expect(
+        (await balanceOf("PAYABLE_TO_ASSOCIATE", emilianoId))
+          .displayBalanceMinor,
+      ).toBe(payableBefore);
+    });
+  });
+
+  describe("capital assets", () => {
+    it("capitalizes rather than expensing, and stays out of profit", async () => {
+      const assetBefore = (await balanceOf("FIXED_ASSET")).signedBalanceMinor;
+
+      const res = await postExpense(
+        expenseInput({
+          description: "Van purchase",
+          treatment: "CAPITAL_ASSET",
+        }),
+      );
+
+      expect(res.status).toBe(201);
+      expect(asOperation(res).summary.companyAssetIncreaseMinor).toBe(30_000);
+      expect(asOperation(res).summary.companyExpenseMinor).toBe(0);
+      expect((await balanceOf("FIXED_ASSET")).signedBalanceMinor).toBe(
+        assetBefore + 30_000,
+      );
+    });
+  });
+
+  describe("cash held by an associate is company money", () => {
+    it("spends it as company cash and creates no debt", async () => {
+      const custodyBefore = (
+        await balanceOf("COMPANY_CASH_CUSTODY", emilianoId)
+      ).signedBalanceMinor;
+      const payableBefore = (
+        await balanceOf("PAYABLE_TO_ASSOCIATE", emilianoId)
+      ).displayBalanceMinor;
+
+      const res = await postExpense(
+        expenseInput({
+          description: "Paid from company cash Emiliano holds",
+          payments: [
+            {
+              sourceType: "BOOK_ACCOUNT",
+              sourceAccountId: accountId("COMPANY_CASH_CUSTODY", emilianoId),
+              paymentMethod: "CASH",
+              amountMinor: 30_000,
+            },
+          ],
+        }),
+      );
+
+      expect(res.status).toBe(201);
+      expect(asOperation(res).summary.companyCashImpactMinor).toBe(-30_000);
+      expect(asOperation(res).summary.associatePayables).toEqual([]);
+      expect(
+        (await balanceOf("COMPANY_CASH_CUSTODY", emilianoId))
+          .signedBalanceMinor,
+      ).toBe(custodyBefore - 30_000);
+      expect(
+        (await balanceOf("PAYABLE_TO_ASSOCIATE", emilianoId))
+          .displayBalanceMinor,
+      ).toBe(payableBefore);
+    });
+  });
+
+  describe("associate funding", () => {
+    it("records a loan as company cash and a debt to the provider", async () => {
+      const bankBefore = await balanceOf("BANK");
+      const loanBefore = await balanceOf("ASSOCIATE_LOAN_PAYABLE", emilianoId);
+      const input = fundingInput({ reference: "BANK-REF-100" });
+
+      const preview = await asAdmin(
+        req().post(v1.finance.ROUTES.funding.preview),
+      ).send(input);
+      const created = await postFunding(input);
+
+      expect(preview.status).toBe(200);
+      expect(created.status).toBe(201);
+      const operation = asOperation(created);
+      expect(operation.kind).toBe("ASSOCIATE_FUNDING");
+      expect(operation.associateFunding).toMatchObject({
+        type: "LOAN",
+        associateId: emilianoId,
+        amountMinor: 50_000,
+        reference: "BANK-REF-100",
+      });
+      expect(operation.summary).toEqual(
+        v1.finance.postingPlanSchema.parse(preview.body).summary,
+      );
+
+      const bankAfter = await balanceOf("BANK");
+      const loanAfter = await balanceOf("ASSOCIATE_LOAN_PAYABLE", emilianoId);
+      expect(bankAfter.signedBalanceMinor - bankBefore.signedBalanceMinor).toBe(
+        50_000,
+      );
+      expect(
+        loanAfter.displayBalanceMinor - loanBefore.displayBalanceMinor,
+      ).toBe(50_000);
+    });
+
+    it("records a capital contribution as equity with no repayment debt", async () => {
+      const equityBefore = await balanceOf("CONTRIBUTED_CAPITAL");
+      const loanBefore = await balanceOf("ASSOCIATE_LOAN_PAYABLE", emilianoId);
+      const created = await postFunding(
+        fundingInput({
+          amountMinor: 75_000,
+          type: "CAPITAL_CONTRIBUTION",
+          notes: "Permanent owner contribution",
+        }),
+      );
+
+      expect(created.status).toBe(201);
+      const operation = asOperation(created);
+      expect(operation.summary.companyEquityIncreaseMinor).toBe(75_000);
+      expect(operation.summary.associatePayables).toEqual([]);
+
+      const equityAfter = await balanceOf("CONTRIBUTED_CAPITAL");
+      const loanAfter = await balanceOf("ASSOCIATE_LOAN_PAYABLE", emilianoId);
+      expect(
+        equityAfter.displayBalanceMinor - equityBefore.displayBalanceMinor,
+      ).toBe(75_000);
+      expect(loanAfter.displayBalanceMinor).toBe(
+        loanBefore.displayBalanceMinor,
+      );
+    });
+  });
+
+  describe("validation", () => {
+    it("rejects payments that do not add up", async () => {
+      const res = await postExpense(
+        expenseInput({
+          amountMinor: 30_000,
+          payments: [
+            {
+              sourceType: "BOOK_ACCOUNT",
+              sourceAccountId: accountId("BANK"),
+              paymentMethod: "CARD",
+              amountMinor: 20_000,
+            },
+          ],
+        }),
+      );
+
+      expect(res.status).toBe(400);
+    });
+
+    it("rejects a category from another book", async () => {
+      const foreignCategory = await prisma.expenseCategory.findFirst({
+        where: { book: { type: "ASSOCIATE_POOL" } },
+        select: { id: true },
+      });
+
+      const res = await postExpense(
+        expenseInput({ categoryId: foreignCategory?.id ?? "missing" }),
+      );
+
+      expect(res.status).toBe(404);
+      expect(asErrorCode(res)).toBe("FINANCE_NOT_FOUND");
+    });
+
+    it("rejects paying an expense out of a revenue account", async () => {
+      const res = await postExpense(
+        expenseInput({
+          payments: [
+            {
+              sourceType: "BOOK_ACCOUNT",
+              sourceAccountId: accountId("RENTAL_REVENUE"),
+              paymentMethod: "OTHER",
+              amountMinor: 30_000,
+            },
+          ],
+        }),
+      );
+
+      expect(res.status).toBe(422);
+      expect(asErrorCode(res)).toBe("FINANCE_VALIDATION_FAILED");
+    });
+
+    it("rejects an unknown source account", async () => {
+      const res = await postExpense(
+        expenseInput({
+          payments: [
+            {
+              sourceType: "BOOK_ACCOUNT",
+              sourceAccountId: "does-not-exist",
+              paymentMethod: "CARD",
+              amountMinor: 30_000,
+            },
+          ],
+        }),
+      );
+
+      expect(res.status).toBe(404);
+    });
+  });
+
+  describe("atomicity", () => {
+    it("leaves nothing behind when an expense is rejected", async () => {
+      const before = await Promise.all([
+        prisma.financialOperation.count({ where: { bookId } }),
+        prisma.expense.count({ where: { operation: { bookId } } }),
+        prisma.journalEntry.count({ where: { operation: { bookId } } }),
+      ]);
+
+      const res = await postExpense(
+        expenseInput({
+          payments: [
+            {
+              sourceType: "BOOK_ACCOUNT",
+              sourceAccountId: accountId("RENTAL_REVENUE"),
+              paymentMethod: "OTHER",
+              amountMinor: 30_000,
+            },
+          ],
+        }),
+      );
+      expect(res.status).toBe(422);
+
+      const after = await Promise.all([
+        prisma.financialOperation.count({ where: { bookId } }),
+        prisma.expense.count({ where: { operation: { bookId } } }),
+        prisma.journalEntry.count({ where: { operation: { bookId } } }),
+      ]);
+
+      expect(after).toEqual(before);
+    });
+
+    it("never leaves an operation stuck in DRAFT", async () => {
+      await postExpense(expenseInput());
+
+      expect(
+        await prisma.financialOperation.count({
+          where: { bookId, status: "DRAFT" },
+        }),
+      ).toBe(0);
+    });
+  });
+
+  describe("immutability", () => {
+    it("refuses to rewrite a posted journal posting", async () => {
+      const res = await postExpense(expenseInput({ description: "Immutable" }));
+      const postingId = asOperation(res).journalEntry!.postings[0].id;
+
+      await expect(
+        prisma.journalPosting.update({
+          where: { id: postingId },
+          data: { signedAmountMinor: 1 },
+        }),
+      ).rejects.toThrow(/immutable/i);
+    });
+
+    it("refuses to rewrite a posted journal entry", async () => {
+      const res = await postExpense(expenseInput({ description: "Entry" }));
+      const entryId = asOperation(res).journalEntry!.id;
+
+      await expect(
+        prisma.journalEntry.update({
+          where: { id: entryId },
+          data: { postedAt: new Date() },
+        }),
+      ).rejects.toThrow(/immutable/i);
+    });
+  });
+
+  describe("database constraints", () => {
+    it("refuses a payment that names both an account and a payer", async () => {
+      const expense = await prisma.expense.findFirstOrThrow({
+        where: { operationId: { in: createdOperationIds } },
+        select: { id: true },
+      });
+
+      await expect(
+        prisma.expensePayment.create({
+          data: {
+            expenseId: expense.id,
+            sourceType: "BOOK_ACCOUNT",
+            amountMinor: 100,
+            paymentMethod: "CARD",
+            sourceAccountId: accountId("BANK"),
+            payerAssociateId: iustiId,
+          },
+        }),
+      ).rejects.toThrow(/ExpensePayment_valid_source/);
+    });
+
+    it("refuses a common allocation that names a beneficiary", async () => {
+      await expect(
+        prisma.economicAllocation.create({
+          data: {
+            operationId: createdOperationIds[0],
+            type: "COMMON",
+            amountMinor: 100,
+            associateId: iustiId,
+          },
+        }),
+      ).rejects.toThrow(/EconomicAllocation_valid_associate/);
+    });
+
+    it("refuses a non-positive amount", async () => {
+      await expect(
+        prisma.economicAllocation.create({
+          data: {
+            operationId: createdOperationIds[0],
+            type: "COMMON",
+            amountMinor: 0,
+          },
+        }),
+      ).rejects.toThrow(/amount_positive/);
+    });
+
+    it("refuses an account whose role and category disagree", async () => {
+      await expect(
+        prisma.ledgerAccount.create({
+          data: {
+            bookId,
+            code: `BROKEN_${Date.now()}`,
+            name: "Wrong category",
+            category: "REVENUE",
+            role: "BANK",
+          },
+        }),
+      ).rejects.toThrow(/LedgerAccount_role_category_valid/);
+    });
+
+    it("refuses an associate-scoped role with no associate", async () => {
+      await expect(
+        prisma.ledgerAccount.create({
+          data: {
+            bookId,
+            code: `ORPHAN_${Date.now()}`,
+            name: "Payable to nobody",
+            category: "LIABILITY",
+            role: "PAYABLE_TO_ASSOCIATE",
+          },
+        }),
+      ).rejects.toThrow(/LedgerAccount_associate_scope_valid/);
+    });
+
+    it("refuses an ownership share above one whole book", async () => {
+      await expect(
+        prisma.financeBookMember.create({
+          data: { bookId, associateId: iustiId, shareBasisPoints: 10_001 },
+        }),
+      ).rejects.toThrow(/share_range/);
+    });
+  });
+
+  describe("reversal", () => {
+    it("posts the exact inverse and marks the original reversed", async () => {
+      const created = await postExpense(
+        expenseInput({
+          description: "To be reversed",
+          amountMinor: 25_000,
+          payments: [
+            {
+              sourceType: "ASSOCIATE_PERSONAL_FUNDS",
+              payerAssociateId: iustiId,
+              paymentMethod: "CASH",
+              amountMinor: 25_000,
+            },
+          ],
+          allocations: [{ type: "COMMON", amountMinor: 25_000 }],
+        }),
+      );
+      const original = asOperation(created);
+      const payableAfterExpense = (
+        await balanceOf("PAYABLE_TO_ASSOCIATE", iustiId)
+      ).displayBalanceMinor;
+
+      const res = await reverse(original.id, { reason: "Entered twice" });
+      expect(res.status).toBe(201);
+
+      const reversal = asOperation(res);
+
+      expect(reversal.kind).toBe("REVERSAL");
+      expect(reversal.status).toBe("POSTED");
+      expect(reversal.reversalOfOperationId).toBe(original.id);
+      expect(reversal.description).toContain("Entered twice");
+
+      const originalPostings = original.journalEntry?.postings ?? [];
+      const reversalPostings = reversal.journalEntry?.postings ?? [];
+      expect(reversalPostings).toHaveLength(originalPostings.length);
+
+      for (const posting of originalPostings) {
+        const inverse = reversalPostings.find(
+          (candidate) => candidate.accountId === posting.accountId,
+        );
+        expect(inverse?.signedAmountMinor).toBe(-posting.signedAmountMinor);
+      }
+
+      // The debt is gone, and the original entry is left exactly as it was.
+      expect(
+        (await balanceOf("PAYABLE_TO_ASSOCIATE", iustiId)).displayBalanceMinor,
+      ).toBe(payableAfterExpense - 25_000);
+
+      const reloaded = await asAdmin(
+        req().get(v1.finance.ROUTES.operations.get(original.id)),
+      );
+      const afterReversal = asOperation(reloaded);
+      expect(afterReversal.status).toBe("REVERSED");
+      expect(afterReversal.reversedByOperationId).toBe(reversal.id);
+      expect(afterReversal.journalEntry?.postings).toHaveLength(
+        originalPostings.length,
+      );
+      expect(afterReversal.expense?.amountMinor).toBe(25_000);
+    });
+
+    it("refuses to reverse the same operation twice", async () => {
+      const created = await postExpense(
+        expenseInput({ description: "Reversed once" }),
+      );
+
+      const createdId = asOperation(created).id;
+      expect((await reverse(createdId)).status).toBe(201);
+
+      const second = await reverse(createdId);
+      expect(second.status).toBe(409);
+      expect(asErrorCode(second)).toBe("FINANCE_INVALID_STATE");
+    });
+
+    it("replays a reversal key instead of reversing twice", async () => {
+      const created = await postExpense(
+        expenseInput({ description: "Replayed reversal" }),
+      );
+      const idempotencyKey = key();
+
+      const createdId = asOperation(created).id;
+      const first = await reverse(createdId, {}, idempotencyKey);
+      const second = await reverse(createdId, {}, idempotencyKey);
+
+      expect(second.status).toBe(201);
+      expect(asOperation(second).id).toBe(asOperation(first).id);
+    });
+
+    it("returns 404 for an operation that does not exist", async () => {
+      const res = await reverse("no-such-operation");
+      expect(res.status).toBe(404);
+    });
+  });
+
+  describe("settlement preview", () => {
+    it("balances specific benefits between the associates", async () => {
+      const period = nextPeriod();
+
+      await postExpense(
+        expenseInput({
+          description: "Settlement — Emiliano benefits",
+          occurredAt: period.occurredAt(1),
+          amountMinor: 40_000,
+          allocations: [
+            {
+              type: "ASSOCIATE_SPECIFIC",
+              associateId: emilianoId,
+              amountMinor: 40_000,
+            },
+          ],
+        }),
+      );
+
+      // Common benefit is already borne in proportion to ownership, so it
+      // must not move the numbers.
+      await postExpense(
+        expenseInput({
+          description: "Settlement — common",
+          occurredAt: period.occurredAt(2),
+        }),
+      );
+
+      // Capital assets are excluded from settlement in v1.
+      await postExpense(
+        expenseInput({
+          description: "Settlement — capitalized",
+          occurredAt: period.occurredAt(3),
+          treatment: "CAPITAL_ASSET",
+          allocations: [
+            {
+              type: "ASSOCIATE_SPECIFIC",
+              associateId: emilianoId,
+              amountMinor: 30_000,
+            },
+          ],
+        }),
+      );
+
+      const res = await previewSettlement(period);
+      expect(res.status).toBe(200);
+
+      const preview = asSettlement(res);
+      expect(preview.totalAmountMinor).toBe(40_000);
+
+      expect(
+        preview.lines.find((line) => line.associateId === emilianoId),
+      ).toMatchObject({
+        actualAmountMinor: 40_000,
+        expectedAmountMinor: 20_000,
+        adjustmentMinor: -20_000,
+      });
+      expect(
+        preview.lines.find((line) => line.associateId === iustiId),
+      ).toMatchObject({
+        actualAmountMinor: 0,
+        expectedAmountMinor: 20_000,
+        adjustmentMinor: 20_000,
+      });
+
+      expect(preview.transfers).toHaveLength(1);
+      expect(preview.transfers[0]).toMatchObject({
+        fromAssociateId: emilianoId,
+        toAssociateId: iustiId,
+        amountMinor: 20_000,
+      });
+      // The transfer carries names, so the UI can render it without a lookup.
+      expect(preview.transfers[0].fromAssociate?.id).toBe(emilianoId);
+      expect(preview.transfers[0].toAssociate?.id).toBe(iustiId);
+
+      expect(
+        preview.lines.reduce((sum, line) => sum + line.adjustmentMinor, 0),
+      ).toBe(0);
+    });
+
+    it("drops a reversed expense out of the settlement", async () => {
+      const period = nextPeriod();
+
+      const created = await postExpense(
+        expenseInput({
+          description: "Settlement — reversed",
+          occurredAt: period.occurredAt(1),
+          amountMinor: 60_000,
+          allocations: [
+            {
+              type: "ASSOCIATE_SPECIFIC",
+              associateId: iustiId,
+              amountMinor: 60_000,
+            },
+          ],
+        }),
+      );
+
+      expect(
+        asSettlement(await previewSettlement(period)).totalAmountMinor,
+      ).toBe(60_000);
+
+      await reverse(asOperation(created).id);
+
+      const after = asSettlement(await previewSettlement(period));
+      expect(after.totalAmountMinor).toBe(0);
+      expect(after.transfers).toEqual([]);
+    });
+
+    it("returns an empty settlement for a quiet period", async () => {
+      const res = await previewSettlement(nextPeriod());
+
+      expect(res.status).toBe(200);
+
+      const preview = asSettlement(res);
+      expect(preview.totalAmountMinor).toBe(0);
+      expect(preview.transfers).toEqual([]);
+      expect(preview.lines).toHaveLength(2);
+    });
+
+    it("refuses pool-cash settlement, which is not implemented yet", async () => {
+      const period = nextPeriod();
+      const res = await asAdmin(
+        req().post(v1.finance.ROUTES.settlements.preview),
+      ).send({
+        bookId,
+        kind: "ASSOCIATE_POOL_CASH",
+        periodStart: period.periodStart,
+        periodEnd: period.periodEnd,
+      });
+
+      expect(res.status).toBe(422);
+    });
+  });
+
+  describe("suppliers", () => {
+    it("creates, finds, updates, links, and uniquely identifies a supplier", async () => {
+      const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      const name = `E2E Rotakt ${suffix} SRL`;
+      const taxDigits = `9${Date.now().toString().slice(-8)}`;
+      const taxIdentifier = `RO${taxDigits}`;
+
+      const createdResponse = await asAdmin(
+        req().post(v1.finance.ROUTES.suppliers.create),
+      ).send({ name, taxIdentifier });
+
+      expect(createdResponse.status).toBe(201);
+      const supplier = v1.finance.supplierSchema.parse(createdResponse.body);
+      createdSupplierIds.push(supplier.id);
+      expect(supplier.isVatPayer).toBe(true);
+
+      const exactRetry = await asAdmin(
+        req().post(v1.finance.ROUTES.suppliers.create),
+      ).send({
+        name: name.replace(/ SRL$/, " S.R.L."),
+        taxIdentifier: `C.F. RO ${taxDigits}`,
+      });
+      expect(exactRetry.status).toBe(201);
+      expect(v1.finance.supplierSchema.parse(exactRetry.body).id).toBe(
+        supplier.id,
+      );
+
+      const listedResponse = await asAdmin(
+        req().get(
+          `${v1.finance.ROUTES.suppliers.list}?search=${encodeURIComponent(taxDigits)}`,
+        ),
+      );
+      expect(listedResponse.status).toBe(200);
+      expect(
+        v1.finance.supplierListSchema
+          .parse(listedResponse.body)
+          .items.some((candidate) => candidate.id === supplier.id),
+      ).toBe(true);
+
+      const duplicateName = await asAdmin(
+        req().post(v1.finance.ROUTES.suppliers.create),
+      ).send({
+        name: name.replace(/ SRL$/, " S.R.L."),
+        taxIdentifier: `RO8${Date.now().toString().slice(-8)}`,
+      });
+      expect(duplicateName.status).toBe(409);
+      expect(asErrorCode(duplicateName)).toBe("FINANCE_CONFLICT");
+
+      const duplicateCif = await asAdmin(
+        req().post(v1.finance.ROUTES.suppliers.create),
+      ).send({
+        name: `Different supplier ${suffix}`,
+        taxIdentifier: `ro ${taxDigits}`,
+      });
+      expect(duplicateCif.status).toBe(409);
+      expect(asErrorCode(duplicateCif)).toBe("FINANCE_CONFLICT");
+
+      const updatedResponse = await asAdmin(
+        req().patch(v1.finance.ROUTES.suppliers.update(supplier.id)),
+      ).send({ name: `${name} Updated` });
+      expect(updatedResponse.status).toBe(200);
+      expect(v1.finance.supplierSchema.parse(updatedResponse.body).name).toBe(
+        `${name} Updated`,
+      );
+
+      const createdExpense = await postExpense(
+        expenseInput({ supplierId: supplier.id }),
+      );
+      expect(createdExpense.status).toBe(201);
+      expect(asOperation(createdExpense).expense?.supplierId).toBe(supplier.id);
+    });
+  });
+
+  describe("reads", () => {
+    it("lists the books with their ownership shares", async () => {
+      const res = await asAdmin(req().get(v1.finance.ROUTES.books));
+
+      expect(res.status).toBe(200);
+      const book = asBookList(res).items.find(
+        (candidate) => candidate.id === bookId,
+      );
+      const activeMembers =
+        book?.members.filter((member) => member.validUntil === null) ?? [];
+      expect(activeMembers).toHaveLength(2);
+      expect(
+        activeMembers.reduce((sum, member) => sum + member.shareBasisPoints, 0),
+      ).toBe(10_000);
+    });
+
+    it("filters operations by book and kind", async () => {
+      const res = await asAdmin(
+        req().get(
+          `${v1.finance.ROUTES.operations.list}?bookId=${bookId}&kind=EXPENSE&pageSize=100`,
+        ),
+      );
+
+      expect(res.status).toBe(200);
+
+      const list = asOperationList(res);
+      expect(list.items.length).toBeGreaterThan(0);
+      expect(
+        list.items.every(
+          (item) => item.kind === "EXPENSE" && item.bookId === bookId,
+        ),
+      ).toBe(true);
+    });
+
+    it("returns 404 for an operation that does not exist", async () => {
+      const res = await asAdmin(
+        req().get(v1.finance.ROUTES.operations.get("no-such-operation")),
+      );
+
+      expect(res.status).toBe(404);
+    });
+
+    it("reports a zero balance for an account with no postings", async () => {
+      const balance = await balanceOf("SCOOTER_SALE_REVENUE");
+
+      expect(balance.signedBalanceMinor).toBe(0);
+      expect(balance.postingCount).toBe(0);
+    });
+  });
+
+  describe("company associates", () => {
+    it("exposes company management only to super admins", async () => {
+      const adminResponse = await asAdmin(
+        req().get(v1.finance.ROUTES.companyAssociates),
+      );
+      const ownerResponse = await asOwner(
+        req().get(v1.finance.ROUTES.companyAssociates),
+      );
+      const superAdminResponse = await asSuperAdmin(
+        req().get(v1.finance.ROUTES.companyAssociates),
+      );
+      const identityAdminResponse = await asAdmin(
+        req().get(v1.finance.ROUTES.companyIdentity),
+      );
+      const identitySuperAdminResponse = await asSuperAdmin(
+        req().get(v1.finance.ROUTES.companyIdentity),
+      );
+
+      expect(adminResponse.status).toBe(403);
+      expect(ownerResponse.status).toBe(403);
+      expect(superAdminResponse.status).toBe(200);
+      expect(
+        v1.finance.companyAssociatesSchema.parse(superAdminResponse.body)
+          .canManage,
+      ).toBe(true);
+      expect(identityAdminResponse.status).toBe(403);
+      expect(identitySuperAdminResponse.status).toBe(200);
+    });
+
+    it("rejects company changes from users without the super-admin role", async () => {
+      const current = v1.finance.companyAssociatesSchema.parse(
+        (await asSuperAdmin(req().get(v1.finance.ROUTES.companyAssociates)))
+          .body,
+      );
+      const associateResponse = await asAdmin(
+        req().put(v1.finance.ROUTES.companyAssociates),
+      ).send(toAssociateUpdate(current.items));
+      const identityResponse = await asAdmin(
+        req().put(v1.finance.ROUTES.companyIdentity),
+      ).send({});
+
+      expect(associateResponse.status).toBe(403);
+      expect(identityResponse.status).toBe(403);
+    });
+
+    it("lets a super admin update associate details and shares", async () => {
+      const current = v1.finance.companyAssociatesSchema.parse(
+        (await asSuperAdmin(req().get(v1.finance.ROUTES.companyAssociates)))
+          .body,
+      );
+      const changed = toAssociateUpdate(current.items);
+      const originalFirstName = changed.associates[1].firstName;
+      changed.associates[0].shareBasisPoints = 6_000;
+      changed.associates[1].shareBasisPoints = 4_000;
+      changed.associates[1].firstName = "Updated associate";
+
+      const res = await asSuperAdmin(
+        req().put(v1.finance.ROUTES.companyAssociates),
+      ).send(changed);
+
+      expect(res.status).toBe(200);
+      const updated = v1.finance.companyAssociatesSchema.parse(res.body);
+      expect(
+        updated.items.map(({ shareBasisPoints }) => shareBasisPoints),
+      ).toEqual([6_000, 4_000]);
+      expect(
+        updated.items.find(
+          ({ associateId }) =>
+            associateId === changed.associates[1].associateId,
+        )?.associate?.firstName,
+      ).toBe("Updated associate");
+      expect(updated.canManage).toBe(true);
+
+      const restored = toAssociateUpdate(updated.items);
+      restored.associates[1].firstName = originalFirstName;
+      restored.associates.forEach((associate) => {
+        associate.shareBasisPoints = 5_000;
+      });
+      expect(
+        (
+          await asSuperAdmin(
+            req().put(v1.finance.ROUTES.companyAssociates),
+          ).send(restored)
+        ).status,
+      ).toBe(200);
+    });
   });
 });
+
+/**
+ * Reads a response body through its published schema.
+ *
+ * Two jobs at once: it gives the test typed access instead of `any`, and it
+ * fails loudly if the API ever returns a shape the shared contract does not
+ * describe — which is exactly the drift generated clients would hit.
+ */
+function asOperation(res: request.Response): v1.finance.FinancialOperation {
+  return v1.finance.financialOperationSchema.parse(res.body);
+}
+
+function asPlan(res: request.Response): v1.finance.PostingPlan {
+  return v1.finance.postingPlanSchema.parse(res.body);
+}
+
+function asOperationList(
+  res: request.Response,
+): v1.finance.FinancialOperationList {
+  return v1.finance.financialOperationListSchema.parse(res.body);
+}
+
+function asBookList(res: request.Response): v1.finance.FinanceBookList {
+  return v1.finance.financeBookListSchema.parse(res.body);
+}
+
+function toAssociateUpdate(
+  members: readonly v1.finance.FinanceBookMember[],
+): v1.finance.UpdateCompanyAssociatesInput {
+  return {
+    associates: members.map((member) => ({
+      associateId: member.associateId,
+      email: member.associate?.email ?? "missing@example.com",
+      firstName: member.associate?.firstName ?? null,
+      lastName: member.associate?.lastName ?? null,
+      shareBasisPoints: member.shareBasisPoints,
+    })),
+  };
+}
+
+function asSettlement(res: request.Response): v1.finance.SettlementPreview {
+  return v1.finance.settlementPreviewSchema.parse(res.body);
+}
+
+/** The API's normalized error envelope. */
+/** Just enough of a created operation to record it for cleanup. */
+const createdOperationSchema = z.object({ id: z.string().min(1) });
+
+const errorEnvelopeSchema = z.object({
+  error: z.object({ code: z.string(), message: z.string() }),
+});
+
+function asErrorCode(res: request.Response): string {
+  return errorEnvelopeSchema.parse(res.body).error.code;
+}

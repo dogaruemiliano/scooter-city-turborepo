@@ -1,196 +1,341 @@
+/**
+ * Database rows to API resources.
+ *
+ * The one thing worth noticing here: an operation's impact summary is
+ * recomputed from its persisted journal postings by the same function that
+ * builds the preview summary. It is never stored. So the numbers a user saw
+ * before confirming and the numbers they see afterwards come from one piece
+ * of code, and cannot drift apart.
+ */
 import { v1 } from "@repo/api-shared";
 
+import type { EconomicAllocationCommand } from "./domain/finance.types";
+import { summarizePostings, type PostingLine } from "./domain/posting-plan";
 import type {
-  Company,
-  Counterparty,
-  FinancialCategory,
-  MoneyTransaction,
-  MoneyTransactionReference,
-  Person,
-  User,
-  Wallet,
-  WalletBalance,
-  WalletBalanceChange,
+  FinanceBookRecord,
+  FinanceBookMemberRecord,
+  LedgerAccountRecord,
+  OperationRecord,
+} from "./infrastructure/prisma-finance.repository";
+import type {
+  CostObject as CostObjectRow,
+  ExpenseCategory as ExpenseCategoryRow,
+  LedgerAccount as LedgerAccountRow,
+  Supplier as SupplierRow,
 } from "../generated/prisma/client";
 
-export type WalletWithDetails = Wallet & {
-  owner: Pick<User, "id" | "email" | "firstName" | "lastName"> | null;
-  cardHolder: Pick<User, "id" | "email" | "firstName" | "lastName"> | null;
-  balances: WalletBalance[];
-};
-
-type UserSummary = Pick<User, "id" | "email" | "firstName" | "lastName">;
-type CategorySummary = Pick<FinancialCategory, "id" | "code" | "name" | "kind">;
-type WalletSummary = Pick<Wallet, "id" | "type" | "name" | "ownerUserId"> & {
-  owner: UserSummary | null;
-};
-
-type CounterpartySummary = Pick<Counterparty, "id" | "type"> & {
-  person: Pick<Person, "email" | "firstName" | "lastName"> | null;
-  company: Pick<Company, "legalForm" | "legalName"> | null;
-};
-
-export type MoneyTransactionWithDetails = MoneyTransaction & {
-  category: CategorySummary | null;
-  counterparty: UserSummary | null;
-  counterpartyEntity: CounterpartySummary | null;
-  recipient: UserSummary | null;
-  recipientCounterparty: CounterpartySummary | null;
-  debtor: UserSummary | null;
-  debtorCounterparty: CounterpartySummary | null;
-  creditor: UserSummary | null;
-  creditorCounterparty: CounterpartySummary | null;
-  recordedBy: UserSummary | null;
-  balanceChanges: Array<
-    WalletBalanceChange & {
-      wallet: WalletSummary;
-    }
-  >;
-  references: MoneyTransactionReference[];
-  reversals: Array<Pick<MoneyTransaction, "id">>;
-};
-
-function money(value: { toFixed(decimalPlaces: number): string }): string {
-  return value.toFixed(2);
+interface AssociateRow {
+  id: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
 }
 
-function toUserSummary(row: UserSummary | null) {
-  return row
-    ? {
-        id: row.id,
-        email: row.email,
-        firstName: row.firstName,
-        lastName: row.lastName,
-      }
-    : null;
-}
+export function toFinanceAssociate(
+  row: AssociateRow,
+): v1.finance.FinanceAssociate {
+  const name = [row.firstName, row.lastName].filter(Boolean).join(" ").trim();
 
-export function toCounterpartySummary(row: CounterpartySummary | null) {
-  if (!row) return null;
-  const personName = row.person
-    ? [row.person.firstName, row.person.lastName].filter(Boolean).join(" ")
-    : "";
   return {
     id: row.id,
-    kind: row.type,
-    label:
-      (row.company?.legalName ?? personName) || row.person?.email || row.id,
+    email: row.email,
+    firstName: row.firstName,
+    lastName: row.lastName,
+    displayName: name || row.email,
   };
 }
 
-export function toWallet(row: WalletWithDetails): v1.finance.Wallet {
+export function toFinanceBook(row: FinanceBookRecord): v1.finance.FinanceBook {
   return {
     id: row.id,
-    type: row.type,
-    ownerUserId: row.ownerUserId,
-    owner: row.owner
-      ? {
-          id: row.owner.id,
-          email: row.owner.email,
-          firstName: row.owner.firstName,
-          lastName: row.owner.lastName,
-        }
-      : null,
-    cardHolderUserId: row.cardHolderUserId,
-    cardHolder: toUserSummary(row.cardHolder),
     name: row.name,
-    isActive: row.isActive,
-    balances: row.balances.map((balance) => ({
-      bucket: balance.bucket,
-      currency: balance.currency,
-      balance: money(balance.balance),
-      updatedAt: balance.updatedAt.toISOString(),
-    })),
-    createdAt: row.createdAt.toISOString(),
-    updatedAt: row.updatedAt.toISOString(),
+    type: row.type,
+    functionalCurrency: row.functionalCurrency,
+    members: row.members.map(toFinanceBookMember),
   };
 }
 
-export function toMoneyTransaction(
-  row: MoneyTransactionWithDetails,
-): v1.finance.MoneyTransaction {
+export function toFinanceBookMember(
+  member: FinanceBookMemberRecord,
+): v1.finance.FinanceBookMember {
+  return {
+    id: member.id,
+    associateId: member.associateId,
+    associate: member.associate ? toFinanceAssociate(member.associate) : null,
+    shareBasisPoints: member.shareBasisPoints,
+    validFrom: member.validFrom.toISOString(),
+    validUntil: member.validUntil?.toISOString() ?? null,
+  };
+}
+
+export function toLedgerAccount(
+  row: LedgerAccountRecord,
+): v1.finance.LedgerAccount {
   return {
     id: row.id,
-    type: row.type,
-    status: row.status,
-    amount: money(row.amount),
-    currency: row.currency,
-    financialScope: row.financialScope,
-    paymentMethod: row.paymentMethod,
-    billingStatus: row.billingStatus,
-    categoryId: row.categoryId,
-    category: row.category
-      ? {
-          id: row.category.id,
-          code: row.category.code,
-          name: row.category.name,
-          kind: row.category.kind,
-        }
-      : null,
-    counterpartyUserId: row.counterpartyUserId,
-    counterpartyId: row.counterpartyId,
-    counterparty: toUserSummary(row.counterparty),
-    counterpartyEntity: toCounterpartySummary(row.counterpartyEntity),
-    recipientUserId: row.recipientUserId,
-    recipientCounterpartyId: row.recipientCounterpartyId,
-    recipient: toUserSummary(row.recipient),
-    recipientCounterparty: toCounterpartySummary(row.recipientCounterparty),
-    debtorUserId: row.debtorUserId,
-    debtorCounterpartyId: row.debtorCounterpartyId,
-    debtor: toUserSummary(row.debtor),
-    debtorCounterparty: toCounterpartySummary(row.debtorCounterparty),
-    creditorUserId: row.creditorUserId,
-    creditorCounterpartyId: row.creditorCounterpartyId,
-    creditor: toUserSummary(row.creditor),
-    creditorCounterparty: toCounterpartySummary(row.creditorCounterparty),
-    recordedByUserId: row.recordedByUserId,
-    recordedBy: toUserSummary(row.recordedBy),
-    occurredAt: row.occurredAt.toISOString(),
-    description: row.description,
-    idempotencyKey: row.idempotencyKey,
-    originTransactionId: row.originTransactionId,
-    reversalOfTransactionId: row.reversalOfTransactionId,
-    reversalTransactionId: row.reversals[0]?.id ?? null,
-    createdAt: row.createdAt.toISOString(),
-    updatedAt: row.updatedAt.toISOString(),
-    balanceChanges: row.balanceChanges.map((change) => ({
-      id: change.id,
-      walletId: change.walletId,
-      wallet: {
-        id: change.wallet.id,
-        type: change.wallet.type,
-        name: change.wallet.name,
-        ownerUserId: change.wallet.ownerUserId,
-        owner: toUserSummary(change.wallet.owner),
-      },
-      bucket: change.bucket,
-      currency: change.currency,
-      amountDelta: money(change.amountDelta),
-      createdAt: change.createdAt.toISOString(),
-    })),
-    references: row.references.map((reference) => ({
-      id: reference.id,
-      referenceType: reference.referenceType,
-      referenceId: reference.referenceId,
-      isPrimary: reference.isPrimary,
-      createdAt: reference.createdAt.toISOString(),
-    })),
+    bookId: row.bookId,
+    code: row.code,
+    name: row.name,
+    category: row.category,
+    role: row.role,
+    associateId: row.associateId,
+    associate: row.associate ? toFinanceAssociate(row.associate) : null,
+    isDefault: row.isDefault,
+    isActive: row.isActive,
+    isSystem: row.isSystem,
   };
 }
 
-export function toFinancialCategory(
-  row: FinancialCategory,
-): v1.finance.FinancialCategory {
+export function toLedgerAccountRef(
+  row: LedgerAccountRow,
+): v1.finance.LedgerAccountRef {
   return {
     id: row.id,
     code: row.code,
     name: row.name,
-    kind: row.kind,
-    icon: row.icon,
-    keywords: row.keywords,
-    parentCategoryId: row.parentCategoryId,
+    category: row.category,
+    role: row.role,
+    associateId: row.associateId,
+  };
+}
+
+/**
+ * Assets and expenses read naturally as their signed balance; liabilities,
+ * revenue, and equity are negative when they grow, so they are negated for
+ * display. "Company owes Iusti 200" should read as 200, not -200.
+ */
+export function toLedgerAccountBalance(
+  account: LedgerAccountRecord,
+  balance: { signedBalanceMinor: number; postingCount: number } | undefined,
+  asOf: Date,
+): v1.finance.LedgerAccountBalance {
+  const signedBalanceMinor = balance?.signedBalanceMinor ?? 0;
+  const negatesForDisplay =
+    account.category === "LIABILITY" ||
+    account.category === "REVENUE" ||
+    account.category === "EQUITY";
+
+  return {
+    accountId: account.id,
+    bookId: account.bookId,
+    code: account.code,
+    name: account.name,
+    category: account.category,
+    role: account.role,
+    associateId: account.associateId,
+    signedBalanceMinor,
+    displayBalanceMinor: negatesForDisplay
+      ? -signedBalanceMinor
+      : signedBalanceMinor,
+    postingCount: balance?.postingCount ?? 0,
+    asOf: asOf.toISOString(),
+  };
+}
+
+export function toExpenseCategory(
+  row: ExpenseCategoryRow,
+): v1.finance.ExpenseCategory {
+  return {
+    id: row.id,
+    bookId: row.bookId,
+    code: row.code,
+    name: row.name,
+    defaultTreatment: row.defaultTreatment,
+    isActive: row.isActive,
+  };
+}
+
+export function toCostObject(row: CostObjectRow): v1.finance.CostObject {
+  return {
+    id: row.id,
+    bookId: row.bookId,
+    code: row.code,
+    name: row.name,
+    type: row.type,
+    ownershipType: row.ownershipType,
+    ownerAssociateId: row.ownerAssociateId,
+    externalEntityType: row.externalEntityType,
+    externalEntityId: row.externalEntityId,
+    defaultAllocationType: row.defaultAllocationType,
+    defaultBeneficiaryAssociateId: row.defaultBeneficiaryAssociateId,
+    isActive: row.isActive,
+  };
+}
+
+export function toSupplier(row: SupplierRow): v1.finance.Supplier {
+  return {
+    id: row.id,
+    name: row.name,
+    taxIdentifier: row.taxIdentifier,
+    isVatPayer: row.isVatPayer,
     isActive: row.isActive,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+/** Persisted postings, in the shape the domain works with. */
+export function toDomainPostingLines(row: OperationRecord): PostingLine[] {
+  return (row.journalEntry?.postings ?? []).map((posting) => ({
+    accountId: posting.accountId,
+    accountCode: posting.account.code,
+    accountName: posting.account.name,
+    accountRole: posting.account.role,
+    accountCategory: posting.account.category,
+    associateId: posting.account.associateId,
+    signedAmountMinor: posting.signedAmountMinor,
+    description: posting.description ?? "",
+  }));
+}
+
+/** Persisted allocations, in the shape the domain works with. */
+export function toDomainAllocationCommands(
+  row: OperationRecord,
+): EconomicAllocationCommand[] {
+  return row.allocations.map(
+    (allocation): EconomicAllocationCommand =>
+      allocation.type === "ASSOCIATE_SPECIFIC" && allocation.associateId
+        ? {
+            type: "ASSOCIATE_SPECIFIC",
+            associateId: allocation.associateId,
+            amountMinor: allocation.amountMinor,
+          }
+        : { type: "COMMON", amountMinor: allocation.amountMinor },
+  );
+}
+
+export function toFinancialOperation(
+  row: OperationRecord,
+): v1.finance.FinancialOperation {
+  return {
+    id: row.id,
+    bookId: row.bookId,
+    bookType: row.book.type,
+    kind: row.kind,
+    status: row.status,
+    occurredAt: row.occurredAt.toISOString(),
+    description: row.description,
+    idempotencyKey: row.idempotencyKey,
+    createdById: row.createdById,
+    postedAt: row.postedAt?.toISOString() ?? null,
+    reversalOfOperationId: row.reversalOfOperationId,
+    reversedByOperationId: row.reversedBy?.id ?? null,
+    expense: row.expense
+      ? {
+          id: row.expense.id,
+          amountMinor: row.expense.amountMinor,
+          treatment: row.expense.treatment,
+          categoryId: row.expense.categoryId,
+          category: row.expense.category
+            ? toExpenseCategory(row.expense.category)
+            : null,
+          costObjectId: row.expense.costObjectId,
+          costObject: row.expense.costObject
+            ? toCostObject(row.expense.costObject)
+            : null,
+          supplierId: row.expense.supplierId,
+          supplier: row.expense.supplier
+            ? toSupplier(row.expense.supplier)
+            : null,
+          payments: row.expense.payments.map((payment) => ({
+            id: payment.id,
+            sourceType: payment.sourceType,
+            amountMinor: payment.amountMinor,
+            paymentMethod: payment.paymentMethod,
+            sourceAccountId: payment.sourceAccountId,
+            sourceAccount: payment.sourceAccount
+              ? toLedgerAccountRef(payment.sourceAccount)
+              : null,
+            payerAssociateId: payment.payerAssociateId,
+            payerAssociate: payment.payerAssociate
+              ? toFinanceAssociate(payment.payerAssociate)
+              : null,
+          })),
+        }
+      : null,
+    associateFunding: row.associateFunding
+      ? {
+          id: row.associateFunding.id,
+          type: row.associateFunding.type,
+          associateId: row.associateFunding.associateId,
+          associate: toFinanceAssociate(row.associateFunding.associate),
+          destinationAccountId: row.associateFunding.destinationAccountId,
+          destinationAccount: toLedgerAccountRef(
+            row.associateFunding.destinationAccount,
+          ),
+          amountMinor: row.associateFunding.amountMinor,
+          reference: row.associateFunding.reference,
+          notes: row.associateFunding.notes,
+        }
+      : null,
+    allocations: row.allocations.map((allocation) => ({
+      id: allocation.id,
+      type: allocation.type,
+      amountMinor: allocation.amountMinor,
+      associateId: allocation.associateId,
+      associate: allocation.associate
+        ? toFinanceAssociate(allocation.associate)
+        : null,
+    })),
+    documents: row.documents.map((document) => ({
+      id: document.id,
+      type: document.type,
+      documentSeries: document.documentSeries,
+      documentNumber: document.documentNumber,
+      issuedAt: document.issuedAt?.toISOString() ?? null,
+      supplierName: document.supplierName,
+      supplierTaxId: document.supplierTaxId,
+      storageKey: document.storageKey,
+      notes: document.notes,
+    })),
+    journalEntry: row.journalEntry
+      ? {
+          id: row.journalEntry.id,
+          postedAt: row.journalEntry.postedAt.toISOString(),
+          postings: row.journalEntry.postings.map((posting) => ({
+            id: posting.id,
+            lineNumber: posting.lineNumber,
+            accountId: posting.accountId,
+            account: toLedgerAccountRef(posting.account),
+            signedAmountMinor: posting.signedAmountMinor,
+            description: posting.description,
+          })),
+        }
+      : null,
+    summary: summarizePostings(
+      toDomainPostingLines(row),
+      toDomainAllocationCommands(row),
+    ),
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+export function toFinancialOperationListItem(
+  row: OperationRecord,
+): v1.finance.FinancialOperationListItem {
+  // Reversals carry no detail record; their size is the magnitude of one
+  // side of the entry, which equals the original operation's amount.
+  const reversalAmountMinor = (row.journalEntry?.postings ?? [])
+    .filter((posting) => posting.signedAmountMinor > 0)
+    .reduce((total, posting) => total + posting.signedAmountMinor, 0);
+
+  return {
+    id: row.id,
+    bookId: row.bookId,
+    bookType: row.book.type,
+    kind: row.kind,
+    status: row.status,
+    occurredAt: row.occurredAt.toISOString(),
+    description: row.description,
+    amountMinor:
+      row.expense?.amountMinor ??
+      row.associateFunding?.amountMinor ??
+      reversalAmountMinor,
+    treatment: row.expense?.treatment ?? null,
+    categoryName: row.expense?.category?.name ?? null,
+    costObjectName: row.expense?.costObject?.name ?? null,
+    postedAt: row.postedAt?.toISOString() ?? null,
+    createdAt: row.createdAt.toISOString(),
   };
 }

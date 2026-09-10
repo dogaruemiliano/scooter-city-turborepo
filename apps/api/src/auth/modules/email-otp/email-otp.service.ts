@@ -4,7 +4,6 @@ import type { SupportedLocale } from "@repo/i18n";
 
 import { AuditService } from "../../../audit/audit.service";
 import { AuditEventType } from "../../../audit/audit.types";
-import { userWalletCreateInput } from "../../../finance/user-wallet";
 import { CoreAuthService } from "../core-auth/core-auth.service";
 import type { IssueSessionResult } from "../core-auth/core-auth.types";
 import {
@@ -80,7 +79,6 @@ export class EmailOtpService {
             data: {
               email: challenge.target,
               emailVerified: now,
-              wallet: userWalletCreateInput(),
             },
           });
         } else if (emailVerifiedNow) {

@@ -34,6 +34,7 @@ import { VersioningType } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import type { NestExpressApplication } from "@nestjs/platform-express";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
+import { v1 } from "@repo/api-shared";
 import { localeHeaderName } from "@repo/i18n";
 
 import { AppModule } from "./app.module";
@@ -101,6 +102,7 @@ async function bootstrap(): Promise<void> {
       "X-Request-Id",
       "X-Requested-With",
       localeHeaderName,
+      v1.finance.IDEMPOTENCY_KEY_HEADER,
     ],
     exposedHeaders: ["X-Request-Id"],
   });

@@ -1,110 +1,171 @@
 import { v1 } from "@repo/api-shared";
 import { messages } from "@repo/i18n";
+import { buttonVariants, Card } from "@repo/ui/components";
 import type { Metadata } from "next";
 
+import { Link } from "@/i18n/navigation";
 import { resolveRouteLocale } from "@/i18n/paths";
-import { webApi } from "@/lib/api";
-import { FinanceOverview } from "./_components/FinanceOverview";
-import { resolveFinancePeriod } from "./_lib/period";
+import { formatMinorAmount } from "@/lib/finance-format";
+import { OperationList } from "./_components/OperationList";
 import {
+  fetchFinance,
   financeCookieHeader,
-  handleFinanceApiErrors,
   requireFinanceAdmin,
-} from "./_lib/server";
+} from "./_lib/finance-server";
+import { FINANCE_PATHS } from "./_lib/links";
 
-const FINANCE_PATH = "/finance";
-const RECENT_TRANSACTION_COUNT = 8;
+const RECENT_OPERATION_COUNT = 8;
 
-interface FinancePageProps {
+interface FinanceRoutePageProps {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 export async function generateMetadata({
   params,
-}: Pick<FinancePageProps, "params">): Promise<Metadata> {
+}: FinanceRoutePageProps): Promise<Metadata> {
   const { locale: rawLocale } = await params;
   const locale = resolveRouteLocale(rawLocale);
 
-  return { title: messages[locale].finance.overview.title };
+  return { title: messages[locale].appShell.pages.finance };
 }
 
-export default async function FinancePage({
+export default async function FinanceRoutePage({
   params,
-  searchParams,
-}: FinancePageProps) {
+}: FinanceRoutePageProps) {
   const { locale: rawLocale } = await params;
   const locale = resolveRouteLocale(rawLocale);
-  const period = resolveFinancePeriod(await searchParams);
-  await requireFinanceAdmin(locale, FINANCE_PATH);
+  const path = FINANCE_PATHS.overview;
+
+  await requireFinanceAdmin(locale, path);
   const cookieHeader = await financeCookieHeader();
 
-  const [summary, recentTransactions, claims] = await Promise.all([
-    handleFinanceApiErrors(locale, FINANCE_PATH, () =>
-      webApi.fetch(
-        financeSummaryPath(period.query),
-        v1.finance.financeSummarySchema,
-        {
-          headers: { cookie: cookieHeader },
-          cache: "no-store",
-        },
-      ),
+  const [books, balances, operations] = await Promise.all([
+    fetchFinance(
+      locale,
+      path,
+      v1.finance.ROUTES.books,
+      v1.finance.financeBookListSchema,
+      cookieHeader,
     ),
-    handleFinanceApiErrors(locale, FINANCE_PATH, () =>
-      webApi.fetch(
-        recentTransactionsPath(period.query),
-        v1.finance.moneyTransactionListSchema,
-        {
-          headers: { cookie: cookieHeader },
-          cache: "no-store",
-        },
-      ),
+    fetchFinance(
+      locale,
+      path,
+      `${v1.finance.ROUTES.accounts.balances}?${new URLSearchParams({
+        bookType: "COMPANY",
+      })}`,
+      v1.finance.ledgerAccountBalanceListSchema,
+      cookieHeader,
     ),
-    handleFinanceApiErrors(locale, FINANCE_PATH, () =>
-      webApi.fetch(
-        v1.finance.ROUTES.claims.outstanding,
-        v1.finance.outstandingPersonalClaimListSchema,
-        {
-          headers: { cookie: cookieHeader },
-          cache: "no-store",
-        },
-      ),
+    fetchFinance(
+      locale,
+      path,
+      `${v1.finance.ROUTES.operations.list}?${new URLSearchParams({
+        bookType: "COMPANY",
+        pageSize: String(RECENT_OPERATION_COUNT),
+      })}`,
+      v1.finance.financialOperationListSchema,
+      cookieHeader,
     ),
   ]);
 
+  const t = messages[locale].finance;
+  const companyBook = books.items.find((book) => book.type === "COMPANY");
+  const currency = companyBook?.functionalCurrency ?? "RON";
+
+  const totalOf = (roles: readonly v1.finance.LedgerAccountRole[]) =>
+    balances.items
+      .filter((balance) => roles.includes(balance.role))
+      .reduce((sum, balance) => sum + balance.displayBalanceMinor, 0);
+
+  const cashMinor = totalOf(["BANK", "CASH_REGISTER", "COMPANY_CASH_CUSTODY"]);
+  const owedMinor = totalOf(["PAYABLE_TO_ASSOCIATE", "ASSOCIATE_LOAN_PAYABLE"]);
+  const owingMinor = totalOf(["RECEIVABLE_FROM_ASSOCIATE"]);
+  const expenseMinor = totalOf([
+    "OPERATING_EXPENSE",
+    "NON_OPERATIONAL_COMPANY_EXPENSE",
+  ]);
+
   return (
-    <FinanceOverview
-      locale={locale}
-      period={period}
-      summary={summary}
-      recentTransactions={recentTransactions}
-      claims={claims}
-    />
+    <div className="flex flex-col gap-6">
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-xl font-medium">{t.overview.title}</h1>
+          <p className="text-sm text-muted-foreground">
+            {t.overview.description}
+          </p>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <Link href={FINANCE_PATHS.newExpense} className={buttonVariants()}>
+            {t.overview.newExpense}
+          </Link>
+          <Link
+            href={FINANCE_PATHS.newFunding}
+            className={buttonVariants({ variant: "outline" })}
+          >
+            {t.overview.addCompanyMoney}
+          </Link>
+          <Link
+            href={FINANCE_PATHS.settlement}
+            className={buttonVariants({ variant: "outline" })}
+          >
+            {t.overview.viewSettlement}
+          </Link>
+          <Link
+            href={FINANCE_PATHS.settings}
+            className={buttonVariants({ variant: "ghost" })}
+          >
+            {t.overview.settings}
+          </Link>
+        </div>
+      </header>
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <SummaryTile
+          label={t.overview.sections.cash}
+          value={formatMinorAmount(cashMinor, currency, locale)}
+        />
+        <SummaryTile
+          label={t.overview.sections.owed}
+          value={formatMinorAmount(owedMinor, currency, locale)}
+        />
+        <SummaryTile
+          label={t.overview.sections.owing}
+          value={formatMinorAmount(owingMinor, currency, locale)}
+        />
+        <SummaryTile
+          label={t.overview.sections.results}
+          value={formatMinorAmount(expenseMinor, currency, locale)}
+        />
+      </div>
+
+      <section className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-base font-medium">{t.operations.title}</h2>
+          <Link
+            href={FINANCE_PATHS.operations}
+            className={buttonVariants({ variant: "ghost", size: "sm" })}
+          >
+            {t.overview.viewOperations}
+          </Link>
+        </div>
+
+        <OperationList
+          items={operations.items}
+          currency={currency}
+          locale={locale}
+          emptyLabel={t.overview.empty}
+        />
+      </section>
+    </div>
   );
 }
 
-function financeSummaryPath(query: v1.finance.FinanceSummaryQuery): string {
-  const params = new URLSearchParams({
-    from: query.from,
-    to: query.to,
-  });
-  return `${v1.finance.ROUTES.summary}?${params}`;
-}
-
-function recentTransactionsPath(
-  period: v1.finance.FinanceSummaryQuery,
-): string {
-  const query = v1.finance.listMoneyTransactionsQuerySchema.parse({
-    page: 1,
-    pageSize: RECENT_TRANSACTION_COUNT,
-    from: period.from,
-    to: period.to,
-  });
-  const params = new URLSearchParams({
-    page: String(query.page),
-    pageSize: String(query.pageSize),
-    from: query.from!,
-    to: query.to!,
-  });
-  return `${v1.finance.ROUTES.transactions.list}?${params}`;
+function SummaryTile({ label, value }: { label: string; value: string }) {
+  return (
+    <Card className="flex flex-col gap-1 p-4">
+      <p className="text-sm text-muted-foreground">{label}</p>
+      <p className="text-xl font-medium tabular-nums">{value}</p>
+    </Card>
+  );
 }

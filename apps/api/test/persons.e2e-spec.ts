@@ -202,17 +202,6 @@ describe("Persons HTTP surface (e2e)", () => {
           { phone: { in: createdPersonPhones } },
         ],
       };
-      const personIds = (
-        await prisma.person.findMany({
-          where: personWhere,
-          select: { id: true },
-        })
-      ).map(({ id }) => id);
-      if (personIds.length > 0) {
-        await prisma.counterparty.deleteMany({
-          where: { personId: { in: personIds } },
-        });
-      }
       await prisma.person.deleteMany({ where: personWhere });
     }
     if (prisma && createdUserIds.length > 0) {

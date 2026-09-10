@@ -1,166 +1,89 @@
 import { v1 } from "@repo/api-shared";
 import { messages } from "@repo/i18n";
-import {
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@repo/ui/components";
-import { PlusIcon } from "lucide-react";
+import { buttonVariants } from "@repo/ui/components";
 import type { Metadata } from "next";
-import Link from "next/link";
-import { getTranslations } from "next-intl/server";
 
-import { FinanceEmptyState } from "../_components/FinanceEmptyState";
-import { FinanceStatusBadge } from "../_components/FinanceStatusBadge";
+import { Link } from "@/i18n/navigation";
+import { resolveRouteLocale } from "@/i18n/paths";
+import { OperationList } from "../_components/OperationList";
 import {
+  fetchFinance,
   financeCookieHeader,
-  handleFinanceApiErrors,
   requireFinanceAdmin,
-} from "../_lib/server";
-import { localizePath, resolveRouteLocale } from "@/i18n/paths";
-import { webApi } from "@/lib/api";
-import { formatMoney } from "@/lib/finance-format";
+} from "../_lib/finance-server";
+import { FINANCE_PATHS } from "../_lib/links";
 
-const EXPENSES_PATH = "/finance/expenses";
-const NEW_EXPENSE_PATH = "/finance/expenses/new";
+const PAGE_SIZE = 25;
 
-interface ExpensesPageProps {
+interface ExpensesRoutePageProps {
   params: Promise<{ locale: string }>;
 }
 
 export async function generateMetadata({
   params,
-}: ExpensesPageProps): Promise<Metadata> {
+}: ExpensesRoutePageProps): Promise<Metadata> {
   const { locale: rawLocale } = await params;
   const locale = resolveRouteLocale(rawLocale);
-  return { title: messages[locale].finance.expenses.list.title };
+
+  return { title: messages[locale].appShell.pages.financeExpenses };
 }
 
-export default async function ExpensesPage({ params }: ExpensesPageProps) {
+export default async function ExpensesRoutePage({
+  params,
+}: ExpensesRoutePageProps) {
   const { locale: rawLocale } = await params;
   const locale = resolveRouteLocale(rawLocale);
-  await requireFinanceAdmin(locale, EXPENSES_PATH);
+  const path = FINANCE_PATHS.expenses;
+
+  await requireFinanceAdmin(locale, path);
   const cookieHeader = await financeCookieHeader();
-  const expenses = await handleFinanceApiErrors(locale, EXPENSES_PATH, () =>
-    webApi.fetch(
-      `${v1.finance.EXPENSE_ROUTES.list}?page=1&pageSize=25`,
-      v1.finance.expenseListSchema,
-      { headers: { cookie: cookieHeader }, cache: "no-store" },
+
+  const [books, operations] = await Promise.all([
+    fetchFinance(
+      locale,
+      path,
+      v1.finance.ROUTES.books,
+      v1.finance.financeBookListSchema,
+      cookieHeader,
     ),
-  );
-  const t = await getTranslations({ locale, namespace: "finance.expenses" });
+    fetchFinance(
+      locale,
+      path,
+      `${v1.finance.ROUTES.operations.list}?${new URLSearchParams({
+        kind: "EXPENSE",
+        pageSize: String(PAGE_SIZE),
+      })}`,
+      v1.finance.financialOperationListSchema,
+      cookieHeader,
+    ),
+  ]);
+
+  const t = messages[locale].finance;
+  const currency =
+    books.items.find((book) => book.type === "COMPANY")?.functionalCurrency ??
+    "RON";
 
   return (
-    <main className="mx-auto flex w-full max-w-screen-xl flex-1 flex-col gap-8 px-4 py-6 sm:px-6 lg:px-8">
-      <div className="flex justify-end">
-        <Button
-          nativeButton={false}
-          render={<Link href={localizePath(NEW_EXPENSE_PATH, locale)} />}
-        >
-          <PlusIcon data-icon="inline-start" />
-          {t("list.new")}
-        </Button>
-      </div>
+    <div className="flex flex-col gap-6">
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-xl font-medium">{t.expense.listTitle}</h1>
+          <p className="text-sm text-muted-foreground">
+            {t.expense.listDescription}
+          </p>
+        </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("list.recent")}</CardTitle>
-        </CardHeader>
-        <CardContent className="px-0 sm:px-(--card-spacing)">
-          {expenses.items.length === 0 ? (
-            <FinanceEmptyState>{t("list.empty")}</FinanceEmptyState>
-          ) : (
-            <>
-              <div className="divide-y divide-border sm:hidden">
-                {expenses.items.map((expense) => (
-                  <article
-                    key={expense.id}
-                    className="grid gap-3 px-(--card-spacing) py-4 first:pt-0 last:pb-0"
-                  >
-                    <div className="flex min-w-0 items-start justify-between gap-4">
-                      <div className="min-w-0">
-                        <p className="truncate font-medium">
-                          {expense.payee?.label ?? t("list.unknownPayee")}
-                        </p>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                          {expense.occurredOn}
-                        </p>
-                      </div>
-                      <p className="shrink-0 font-mono font-semibold tabular-nums">
-                        {formatMoney(
-                          expense.grossAmount,
-                          expense.currency,
-                          locale,
-                        )}
-                      </p>
-                    </div>
+        <Link href={FINANCE_PATHS.newExpense} className={buttonVariants()}>
+          {t.overview.newExpense}
+        </Link>
+      </header>
 
-                    <div className="flex min-w-0 items-center justify-between gap-4">
-                      <p className="truncate text-sm text-muted-foreground">
-                        {expense.category?.name ?? t("list.unknownCategory")}
-                      </p>
-                      <FinanceStatusBadge
-                        status={expense.status}
-                        label={t(`statuses.${expense.status}`)}
-                      />
-                    </div>
-                  </article>
-                ))}
-              </div>
-
-              <div className="hidden sm:block">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>{t("list.columns.date")}</TableHead>
-                      <TableHead>{t("list.columns.payee")}</TableHead>
-                      <TableHead>{t("list.columns.category")}</TableHead>
-                      <TableHead>{t("list.columns.status")}</TableHead>
-                      <TableHead className="text-right">
-                        {t("list.columns.amount")}
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {expenses.items.map((expense) => (
-                      <TableRow key={expense.id}>
-                        <TableCell>{expense.occurredOn}</TableCell>
-                        <TableCell>
-                          {expense.payee?.label ?? t("list.unknownPayee")}
-                        </TableCell>
-                        <TableCell>
-                          {expense.category?.name ?? t("list.unknownCategory")}
-                        </TableCell>
-                        <TableCell>
-                          <FinanceStatusBadge
-                            status={expense.status}
-                            label={t(`statuses.${expense.status}`)}
-                          />
-                        </TableCell>
-                        <TableCell className="text-right font-mono tabular-nums">
-                          {formatMoney(
-                            expense.grossAmount,
-                            expense.currency,
-                            locale,
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
-    </main>
+      <OperationList
+        items={operations.items}
+        currency={currency}
+        locale={locale}
+        emptyLabel={t.operations.empty}
+      />
+    </div>
   );
 }

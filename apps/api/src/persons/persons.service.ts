@@ -25,10 +25,6 @@ import type {
   User,
 } from "../generated/prisma/client";
 import { Prisma as PrismaRuntime } from "../generated/prisma/client";
-import {
-  ensureUserWallet,
-  userWalletCreateInput,
-} from "../finance/user-wallet";
 import { PrismaService } from "../prisma/prisma.service";
 import type {
   PersonDocumentPhotoWithAsset,
@@ -87,7 +83,6 @@ export class PersonsService {
           data: {
             ...this.toCreateData(input),
             user: { connect: { id: user.id } },
-            counterparty: { create: { type: "PERSON" } },
           },
           include: this.personInclude(),
         });
@@ -798,7 +793,7 @@ export class PersonsService {
       throw new BadRequestException("Draft image upload was not found");
     }
 
-    if (draft.claimedAt) {
+    if (draft.claimedAt || draft.cleanupStartedAt !== null) {
       throw new BadRequestException("Draft image upload was already used");
     }
 
@@ -894,7 +889,7 @@ export class PersonsService {
         );
       }
 
-      const user = await tx.user.update({
+      return tx.user.update({
         where: { id: existingUser.id },
         data: {
           phone: existingUser.phone ?? input.phone,
@@ -902,8 +897,6 @@ export class PersonsService {
           lastName: input.lastName,
         },
       });
-      await ensureUserWallet(tx, user.id);
-      return user;
     }
 
     return tx.user.create({
@@ -912,7 +905,6 @@ export class PersonsService {
         phone: input.phone,
         firstName: input.firstName,
         lastName: input.lastName,
-        wallet: userWalletCreateInput(),
       },
     });
   }
@@ -1555,6 +1547,7 @@ export class PersonsService {
       where: {
         id: draftUploadId,
         claimedAt: null,
+        cleanupStartedAt: null,
       },
       data: { claimedAt: new Date() },
     });

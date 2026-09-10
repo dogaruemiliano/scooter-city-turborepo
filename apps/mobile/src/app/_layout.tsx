@@ -1,11 +1,11 @@
 import { useEffect } from "react";
 import {
-  Manrope_400Regular,
-  Manrope_500Medium,
-  Manrope_600SemiBold,
-  Manrope_700Bold,
+  Montserrat_400Regular,
+  Montserrat_500Medium,
+  Montserrat_600SemiBold,
+  Montserrat_700Bold,
   useFonts,
-} from "@expo-google-fonts/manrope";
+} from "@expo-google-fonts/montserrat";
 import {
   DarkTheme,
   DefaultTheme,
@@ -23,10 +23,10 @@ void SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
-    Manrope_400Regular,
-    Manrope_500Medium,
-    Manrope_600SemiBold,
-    Manrope_700Bold,
+    Montserrat_400Regular,
+    Montserrat_500Medium,
+    Montserrat_600SemiBold,
+    Montserrat_700Bold,
   });
   const { scheme, colors } = useTheme();
   const isDark = scheme === "dark";

@@ -23,7 +23,6 @@ import { Injectable } from "@nestjs/common";
 // `Prisma` namespace lives in `client` (the runtime file). The pure-type
 // barrel at `models` doesn't re-export the namespace.
 import type { Prisma, User } from "../generated/prisma/client";
-import { userWalletCreateInput } from "../finance/user-wallet";
 import { PrismaService } from "../prisma/prisma.service";
 
 @Injectable()
@@ -56,12 +55,7 @@ export class UsersService {
   }
 
   createOne(data: Prisma.UserCreateInput): Promise<User> {
-    return this.prisma.user.create({
-      data: {
-        ...data,
-        wallet: data.wallet ?? userWalletCreateInput(),
-      },
-    });
+    return this.prisma.user.create({ data });
   }
 
   updateProfile(

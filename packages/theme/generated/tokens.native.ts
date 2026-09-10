@@ -174,14 +174,14 @@ export const tokens = {
   },
   typography: {
     fontFamily: {
-      sans: "Manrope_400Regular",
+      sans: "Montserrat_400Regular",
       mono: "Menlo",
     },
     fontFamilyByWeight: {
-      regular: "Manrope_400Regular",
-      medium: "Manrope_500Medium",
-      semibold: "Manrope_600SemiBold",
-      bold: "Manrope_700Bold",
+      regular: "Montserrat_400Regular",
+      medium: "Montserrat_500Medium",
+      semibold: "Montserrat_600SemiBold",
+      bold: "Montserrat_700Bold",
     },
     fontSize: {
       xs: 12,
@@ -279,6 +279,12 @@ export const tokens = {
       accelerate: "cubic-bezier(0.4, 0, 1, 1)",
       linear: "linear",
     },
+  },
+  magnification: {
+    loupe: 2,
+  },
+  aspectRatio: {
+    receiptPortrait: 0.3333333333333333,
   },
   zIndex: {
     base: 0,

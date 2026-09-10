@@ -4,13 +4,23 @@ import {
   CountrySheetSelect,
   Input,
   PhoneNumberInput,
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Textarea,
 } from "@repo/ui/components";
+import { cn } from "@repo/ui/lib/utils";
 import type { ComponentProps } from "react";
 import { Controller, useFormContext } from "react-hook-form";
 
 import { DatePartsField } from "@/components/DateField";
 import { useFormFieldControl } from "./FormField";
+
+/** Stands in for "nothing selected" where the select cannot use `""`. */
+const EMPTY_SELECT_VALUE = "__none__";
 
 /**
  * Controls bound to the enclosing `FormField`. Native inputs use `register`
@@ -140,6 +150,91 @@ export function FormCountrySelect(
           required={required}
           value={field.value ?? ""}
         />
+      )}
+    />
+  );
+}
+
+export interface FormSelectOption {
+  value: string;
+  label: string;
+}
+
+export interface FormSelectProps {
+  options: readonly FormSelectOption[];
+  placeholder?: string;
+  /** Adds a "no selection" choice for optional fields. */
+  emptyOption?: { label: string };
+  className?: string;
+  /** Runs after the form value is set — for dependent-field prefilling. */
+  onValueChange?: (value: string) => void;
+}
+
+/**
+ * A `Select` bound to the enclosing `FormField`.
+ *
+ * The empty choice carries a sentinel rather than `""`, because the
+ * underlying select treats an empty value as "nothing selected" and would
+ * refuse to render the option at all. The sentinel is translated back to `""`
+ * before it reaches the form, so consumers only ever see an empty string.
+ */
+export function FormSelect({
+  options,
+  placeholder,
+  emptyOption,
+  className,
+  onValueChange,
+}: FormSelectProps) {
+  const { control } = useFormContext();
+  const { controlProps, disabled, error, errorId, id, name, required } =
+    useFormFieldControl();
+
+  return (
+    <Controller
+      control={control}
+      name={name}
+      render={({ field }) => (
+        <Select
+          value={
+            field.value
+              ? String(field.value)
+              : emptyOption
+                ? EMPTY_SELECT_VALUE
+                : null
+          }
+          onValueChange={(value) => {
+            const next = value === EMPTY_SELECT_VALUE ? "" : String(value);
+            field.onChange(next);
+            field.onBlur();
+            onValueChange?.(next);
+          }}
+        >
+          <SelectTrigger
+            ref={field.ref}
+            aria-describedby={errorId}
+            aria-invalid={error ? true : undefined}
+            aria-required={required || undefined}
+            className={cn("w-full", className)}
+            disabled={disabled || controlProps.disabled}
+            id={id}
+          >
+            <SelectValue placeholder={placeholder} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              {emptyOption ? (
+                <SelectItem value={EMPTY_SELECT_VALUE}>
+                  {emptyOption.label}
+                </SelectItem>
+              ) : null}
+              {options.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
       )}
     />
   );

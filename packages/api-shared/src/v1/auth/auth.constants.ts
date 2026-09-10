@@ -32,6 +32,13 @@ import type { AuthMethodId } from "./auth.schemas";
 export const ACCESS_TOKEN_COOKIE = "access_token";
 export const REFRESH_TOKEN_COOKIE = "refresh_token";
 
+export const AUTH_ROLES = {
+  ADMIN: "ADMIN",
+  SUPER_ADMIN: "SUPER_ADMIN",
+} as const;
+
+export type AuthRole = (typeof AUTH_ROLES)[keyof typeof AUTH_ROLES];
+
 export type AuthCookieName =
   | typeof ACCESS_TOKEN_COOKIE
   | typeof REFRESH_TOKEN_COOKIE;

@@ -111,40 +111,47 @@ function BottomSheetHandle({
 function BottomSheetContent({
   className,
   children,
+  fullScreen = false,
   ...props
-}: BottomSheetPrimitive.Popup.Props) {
+}: BottomSheetPrimitive.Popup.Props & { fullScreen?: boolean }) {
   const { hasSnapPoints, modal, showHandle } = useBottomSheet();
 
   return (
-    <BottomSheetPortal>
-      {modal === true ? (
-        <BottomSheetOverlay data-snap-points={hasSnapPoints ? "" : undefined} />
-      ) : null}
-      <BottomSheetPrimitive.Viewport
-        data-slot="bottom-sheet-viewport"
-        data-modal={modal}
-        className="pointer-events-none fixed inset-0 z-modal select-none data-[modal=true]:pointer-events-auto"
-      >
-        <BottomSheetPrimitive.Popup
-          data-slot="bottom-sheet-popup"
-          data-swipe-axis="y"
-          data-snap-points={hasSnapPoints ? "" : undefined}
-          className={cn(
-            "group/bottom-sheet pointer-events-auto fixed inset-x-0 bottom-0 z-modal flex h-(--drawer-content-height) max-h-(--bottom-sheet-max-height) min-h-0 w-full origin-bottom transform-[translate3d(0,var(--bottom-sheet-translate-y,0px),0)] flex-col rounded-t-2xl border-t border-border bg-popover text-sm text-popover-foreground shadow-lg transition-[transform,height,opacity] duration-normal ease-decelerate will-change-transform outline-none select-none [interpolate-size:allow-keywords] [--bottom-sheet-closed-transform:translate3d(0,calc(100%+var(--spacing-px)),0)] [--bottom-sheet-max-height:calc(100dvh-var(--spacing-12))] [--bottom-sheet-stack-offset:0] [--bottom-sheet-translate-y:calc(var(--drawer-snap-point-offset,0px)+var(--drawer-swipe-movement-y,0px)-var(--bottom-sheet-stack-offset))] [--drawer-content-height:var(--bottom-sheet-height,auto)] after:pointer-events-none after:absolute after:inset-0 after:z-raised after:rounded-[inherit] after:bg-scrim after:opacity-0 after:transition-opacity after:duration-normal after:ease-standard data-ending-style:transform-(--bottom-sheet-closed-transform) data-ending-style:opacity-[0.9999] data-nested-drawer-open:overflow-hidden data-nested-drawer-open:after:opacity-100 data-nested-drawer-open:[--bottom-sheet-stack-offset:var(--spacing-3)] data-snap-points:[--drawer-content-height:100dvh] data-starting-style:transform-(--bottom-sheet-closed-transform) data-swiping:duration-0 lg:inset-x-auto lg:top-1/2 lg:bottom-auto lg:left-1/2 lg:h-auto lg:max-h-[calc(100dvh-var(--spacing-24))] lg:w-96 lg:max-w-[calc(100vw-var(--spacing-12))] lg:origin-center lg:transform-[translate3d(-50%,calc(-50%+var(--bottom-sheet-translate-y,0px)),0)] lg:rounded-2xl lg:border lg:[--bottom-sheet-closed-transform:translate3d(-50%,-50%,0)] lg:[--bottom-sheet-max-height:calc(100dvh-var(--spacing-24))] lg:[--bottom-sheet-translate-y:var(--drawer-swipe-movement-y,0px)] lg:[--drawer-content-height:auto] lg:data-ending-style:opacity-0 lg:data-nested-drawer-open:[--bottom-sheet-stack-offset:0] lg:data-snap-points:[--drawer-content-height:auto] lg:data-starting-style:opacity-0",
-            className,
-          )}
-          {...props}
+    <BottomSheetPrimitive.VirtualKeyboardProvider>
+      <BottomSheetPortal>
+        {modal === true ? (
+          <BottomSheetOverlay
+            data-snap-points={hasSnapPoints ? "" : undefined}
+          />
+        ) : null}
+        <BottomSheetPrimitive.Viewport
+          data-slot="bottom-sheet-viewport"
+          data-modal={modal}
+          className="pointer-events-none fixed inset-0 z-modal select-none data-[modal=true]:pointer-events-auto"
         >
-          {showHandle ? <BottomSheetHandle /> : null}
-          <BottomSheetPrimitive.Content
-            data-slot="bottom-sheet-content"
-            className="flex min-h-0 flex-1 flex-col overflow-hidden overscroll-contain rounded-[inherit] select-text group-data-swiping/bottom-sheet:select-none"
+          <BottomSheetPrimitive.Popup
+            data-slot="bottom-sheet-popup"
+            data-swipe-axis="y"
+            data-snap-points={hasSnapPoints ? "" : undefined}
+            className={cn(
+              "group/bottom-sheet pointer-events-auto fixed inset-x-0 bottom-0 z-modal flex h-(--drawer-content-height) max-h-(--bottom-sheet-max-height) min-h-0 w-full origin-bottom transform-[translate3d(0,var(--bottom-sheet-translate-y,0px),0)] flex-col rounded-t-2xl border-t border-border bg-popover text-sm text-popover-foreground shadow-lg transition-[transform,height,opacity] duration-normal ease-decelerate will-change-transform outline-none select-none [interpolate-size:allow-keywords] [--bottom-sheet-closed-transform:translate3d(0,calc(100%+var(--spacing-px)),0)] [--bottom-sheet-max-height:calc(100dvh-var(--spacing-12))] [--bottom-sheet-stack-offset:0] [--bottom-sheet-translate-y:calc(var(--drawer-snap-point-offset,0px)+var(--drawer-swipe-movement-y,0px)-var(--bottom-sheet-stack-offset))] [--drawer-content-height:var(--bottom-sheet-height,auto)] after:pointer-events-none after:absolute after:inset-0 after:z-raised after:rounded-[inherit] after:bg-scrim after:opacity-0 after:transition-opacity after:duration-normal after:ease-standard data-ending-style:transform-(--bottom-sheet-closed-transform) data-ending-style:opacity-[0.9999] data-nested-drawer-open:overflow-hidden data-nested-drawer-open:after:opacity-100 data-nested-drawer-open:[--bottom-sheet-stack-offset:var(--spacing-3)] data-snap-points:[--drawer-content-height:100dvh] data-starting-style:transform-(--bottom-sheet-closed-transform) data-swiping:duration-0 lg:inset-x-auto lg:top-1/2 lg:bottom-auto lg:left-1/2 lg:h-auto lg:max-h-[calc(100dvh-var(--spacing-24))] lg:w-96 lg:max-w-[calc(100vw-var(--spacing-12))] lg:origin-center lg:transform-[translate3d(-50%,calc(-50%+var(--bottom-sheet-translate-y,0px)),0)] lg:rounded-2xl lg:border lg:[--bottom-sheet-closed-transform:translate3d(-50%,-50%,0)] lg:[--bottom-sheet-max-height:calc(100dvh-var(--spacing-24))] lg:[--bottom-sheet-translate-y:var(--drawer-swipe-movement-y,0px)] lg:[--drawer-content-height:auto] lg:data-ending-style:opacity-0 lg:data-nested-drawer-open:[--bottom-sheet-stack-offset:0] lg:data-snap-points:[--drawer-content-height:auto] lg:data-starting-style:opacity-0",
+              fullScreen &&
+                "inset-0 h-dvh max-h-dvh rounded-none border-0 [--bottom-sheet-closed-transform:translate3d(0,100%,0)] [--bottom-sheet-max-height:100dvh] [--drawer-content-height:100dvh] lg:inset-0 lg:h-dvh lg:max-h-dvh lg:w-full lg:max-w-none lg:origin-bottom lg:transform-[translate3d(0,var(--bottom-sheet-translate-y,0px),0)] lg:rounded-none lg:border-0 lg:[--bottom-sheet-closed-transform:translate3d(0,100%,0)] lg:[--bottom-sheet-max-height:100dvh] lg:[--bottom-sheet-translate-y:var(--drawer-swipe-movement-y,0px)] lg:[--drawer-content-height:100dvh] lg:data-ending-style:opacity-[0.9999] lg:data-starting-style:opacity-[0.9999]",
+              className,
+            )}
+            {...props}
           >
-            {children}
-          </BottomSheetPrimitive.Content>
-        </BottomSheetPrimitive.Popup>
-      </BottomSheetPrimitive.Viewport>
-    </BottomSheetPortal>
+            {showHandle ? <BottomSheetHandle /> : null}
+            <BottomSheetPrimitive.Content
+              data-slot="bottom-sheet-content"
+              className="flex min-h-0 flex-1 flex-col overflow-hidden overscroll-contain rounded-[inherit] select-text group-data-swiping/bottom-sheet:select-none"
+            >
+              {children}
+            </BottomSheetPrimitive.Content>
+          </BottomSheetPrimitive.Popup>
+        </BottomSheetPrimitive.Viewport>
+      </BottomSheetPortal>
+    </BottomSheetPrimitive.VirtualKeyboardProvider>
   );
 }
 

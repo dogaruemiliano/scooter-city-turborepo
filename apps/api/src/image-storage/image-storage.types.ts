@@ -22,6 +22,7 @@ export type SupportedDocumentContentType =
 export const DOCUMENT_STORAGE_CATEGORIES = [
   "personal-document",
   "expense-invoice",
+  "finance-document",
   "scooter-sale-document",
 ] as const;
 

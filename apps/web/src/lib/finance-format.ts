@@ -1,4 +1,12 @@
-import type { v1 } from "@repo/api-shared";
+/**
+ * Display formatting for the finance UI.
+ *
+ * The API speaks in minor units — `30000` is 300.00 RON — and these are the
+ * only functions that turn one into the other for display. Parsing in the
+ * other direction lives in `@repo/api-shared` (`parseMajorToMinor`), so a
+ * form and a table can never disagree about what "300,50" means.
+ */
+import { v1 } from "@repo/api-shared";
 import type { SupportedLocale } from "@repo/i18n";
 
 const NUMBER_FORMAT_LOCALES = {
@@ -6,63 +14,54 @@ const NUMBER_FORMAT_LOCALES = {
   ro: "ro-RO",
 } as const satisfies Record<SupportedLocale, string>;
 
-const MONEY_PATTERN = /^(-?)(0|[1-9]\d*)(?:\.(\d{1,2}))?$/;
-
-export function formatMoney(
-  amount: string,
+/** Formats an integer minor-unit amount as localized currency. */
+export function formatMinorAmount(
+  amountMinor: number,
   currency: string,
   locale: SupportedLocale,
 ): string {
-  const match = MONEY_PATTERN.exec(amount);
-
-  if (!match) {
-    return `${amount} ${currency}`;
-  }
-
-  const isNegative = match[1] === "-";
-  const integer = BigInt(match[2]);
-  const fraction = (match[3] ?? "").padEnd(2, "0");
-  const formatter = new Intl.NumberFormat(NUMBER_FORMAT_LOCALES[locale], {
+  return new Intl.NumberFormat(NUMBER_FORMAT_LOCALES[locale], {
     style: "currency",
     currency,
-    currencyDisplay: "narrowSymbol",
+    currencyDisplay: "code",
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  });
-  const formattedInteger =
-    isNegative && integer !== BigInt(0) ? -integer : integer;
-  const parts = formatter
-    .formatToParts(formattedInteger)
-    .map((part) =>
-      part.type === "fraction" ? { ...part, value: fraction } : part,
-    );
-
-  if (isNegative && integer === BigInt(0)) {
-    const negativeParts = formatter.formatToParts(BigInt(-1));
-    const minusIndex = negativeParts.findIndex(
-      (part) => part.type === "minusSign",
-    );
-    const minusSign =
-      negativeParts.find((part) => part.type === "minusSign")?.value ?? "-";
-    const insertionIndex = Math.max(0, Math.min(minusIndex, parts.length));
-    parts.splice(insertionIndex, 0, {
-      type: "minusSign",
-      value: minusSign,
-    });
-  }
-
-  return parts.map((part) => part.value).join("");
+  }).format(amountMinor / v1.finance.MINOR_UNITS_PER_MAJOR);
 }
 
-export function formatTransactionAmount(
-  amount: string,
+/**
+ * Formats an amount with an explicit sign, for impact figures where the
+ * direction is the point: "−300,00 RON" of company cash.
+ */
+export function formatSignedMinorAmount(
+  amountMinor: number,
   currency: string,
   locale: SupportedLocale,
-  type: v1.finance.MoneyTransactionType,
 ): string {
-  const signedAmount =
-    type === "EXPENSE" ? `-${amount.replace(/^-/, "")}` : amount;
-  return formatMoney(signedAmount, currency, locale);
+  const formatted = formatMinorAmount(Math.abs(amountMinor), currency, locale);
+
+  if (amountMinor === 0) return formatted;
+  return amountMinor > 0 ? `+${formatted}` : `−${formatted}`;
+}
+
+/** Formats basis points as a percentage: `5000` → "50%". */
+export function formatBasisPoints(
+  basisPoints: number,
+  locale: SupportedLocale,
+): string {
+  return new Intl.NumberFormat(NUMBER_FORMAT_LOCALES[locale], {
+    style: "percent",
+    maximumFractionDigits: 2,
+  }).format(basisPoints / v1.finance.TOTAL_SHARE_BASIS_POINTS);
+}
+
+export function formatFinanceDate(
+  value: string,
+  locale: SupportedLocale,
+): string {
+  return new Intl.DateTimeFormat(NUMBER_FORMAT_LOCALES[locale], {
+    dateStyle: "medium",
+  }).format(new Date(value));
 }
 
 export function formatFinanceDateTime(
@@ -75,6 +74,7 @@ export function formatFinanceDateTime(
   }).format(new Date(value));
 }
 
+/** Falls back to the email when an associate has no name on record. */
 export function financeUserLabel(user: {
   email: string;
   firstName: string | null;
