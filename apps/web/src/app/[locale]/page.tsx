@@ -1,8 +1,17 @@
 import type { Metadata } from "next";
 import { messages } from "@repo/i18n";
-import { ChartNoAxesCombinedIcon, LoaderCircleIcon } from "lucide-react";
+import { buttonVariants, Card } from "@repo/ui/components";
+import { ArrowRightIcon, PlusIcon } from "lucide-react";
+import { Suspense } from "react";
 
-import { resolveRouteLocale } from "../../i18n/paths";
+import { Link } from "@/i18n/navigation";
+import { resolveRouteLocale } from "@/i18n/paths";
+import {
+  DashboardOverview,
+  DashboardOverviewSkeleton,
+} from "./_components/DashboardOverview";
+import { loadDashboard } from "./_lib/dashboard-server";
+import { FINANCE_PATHS } from "./finance/_lib/links";
 
 interface DashboardPageProps {
   params: Promise<{ locale: string }>;
@@ -22,35 +31,85 @@ export async function generateMetadata({
 export default async function DashboardPage({ params }: DashboardPageProps) {
   const { locale: rawLocale } = await params;
   const locale = resolveRouteLocale(rawLocale);
+  const { user, overview } = await loadDashboard(locale);
+  const t = messages[locale].dashboard;
+
+  if (!overview) {
+    return (
+      <div className="flex min-w-0 flex-col gap-8 p-4 md:p-8">
+        <header className="flex flex-col gap-2">
+          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+            {t.account.title}
+          </h1>
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            {t.account.description}
+          </p>
+        </header>
+
+        <Card className="max-w-(--breakpoint-sm) gap-5 p-6 shadow-none">
+          <h2 className="text-base font-semibold">{t.account.heading}</h2>
+          <div className="flex flex-col gap-1">
+            <p className="text-sm text-muted-foreground">
+              {t.account.signedInAs}
+            </p>
+            <p className="break-all text-base">{user.email}</p>
+          </div>
+          <Link
+            href="/account/settings"
+            className={buttonVariants({ className: "self-start" })}
+          >
+            {t.account.settings}
+            <ArrowRightIcon aria-hidden="true" data-icon="inline-end" />
+          </Link>
+        </Card>
+      </div>
+    );
+  }
 
   return (
-    <main className="flex flex-1 items-center justify-center px-6 py-12">
-      <div className="flex max-w-lg flex-col items-center gap-6 text-center">
-        <div className="relative flex size-24 items-center justify-center text-primary">
-          <LoaderCircleIcon
-            aria-hidden="true"
-            className="absolute inset-0 size-full animate-spin stroke-1 duration-slower ease-linear motion-reduce:animate-none"
-          />
-          <span className="flex size-14 items-center justify-center rounded-2xl bg-primary/10">
-            <ChartNoAxesCombinedIcon aria-hidden="true" className="size-7" />
-          </span>
-        </div>
-
-        <div className="flex flex-col items-center gap-2">
-          <h1 className="text-balance text-2xl font-semibold tracking-tight">
-            {messages[locale].dashboard.title}
+    <div className="flex min-w-0 flex-col gap-8 p-4 md:p-8">
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex flex-col gap-2">
+          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+            {t.title}
           </h1>
-          <p className="max-w-md text-pretty text-sm leading-relaxed text-muted-foreground">
-            {messages[locale].dashboard.description}
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            {t.description}
           </p>
         </div>
+        <Link href={FINANCE_PATHS.newExpense} className={buttonVariants()}>
+          <PlusIcon aria-hidden="true" data-icon="inline-start" />
+          {t.newExpense}
+        </Link>
+      </header>
 
-        <div className="flex items-end gap-1.5" aria-hidden="true">
-          <span className="h-2 w-2 animate-pulse rounded-full bg-primary/40 duration-slower motion-reduce:animate-none" />
-          <span className="h-2 w-2 animate-pulse rounded-full bg-primary/70 duration-slow motion-reduce:animate-none" />
-          <span className="h-2 w-2 animate-pulse rounded-full bg-primary duration-normal motion-reduce:animate-none" />
-        </div>
-      </div>
-    </main>
+      <nav
+        aria-label={t.shortcuts}
+        className="flex flex-wrap items-center gap-2"
+      >
+        <Link
+          href={FINANCE_PATHS.newFunding}
+          className={buttonVariants({ variant: "outline", size: "sm" })}
+        >
+          {t.links.funding}
+        </Link>
+        <Link
+          href="/scooters"
+          className={buttonVariants({ variant: "outline", size: "sm" })}
+        >
+          {t.links.scooters}
+        </Link>
+        <Link
+          href="/persons"
+          className={buttonVariants({ variant: "outline", size: "sm" })}
+        >
+          {t.links.people}
+        </Link>
+      </nav>
+
+      <Suspense fallback={<DashboardOverviewSkeleton locale={locale} />}>
+        <DashboardOverview data={overview} locale={locale} />
+      </Suspense>
+    </div>
   );
 }

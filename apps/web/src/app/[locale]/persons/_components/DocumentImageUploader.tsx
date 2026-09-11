@@ -129,7 +129,7 @@ export function DocumentImageUploader({
         </span>
       </Label>
       {errorMessage && onRetry && retryLabel ? (
-        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-lg bg-scrim">
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-lg bg-media-scrim">
           <span role="alert" className="sr-only">
             {errorMessage}
           </span>
@@ -146,7 +146,7 @@ export function DocumentImageUploader({
           </Button>
           <span
             aria-hidden="true"
-            className="text-sm font-medium text-primary-foreground"
+            className="text-sm font-medium text-scrim-foreground"
           >
             {retryLabel}
           </span>

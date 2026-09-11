@@ -43,7 +43,7 @@ export default function RootLayout() {
     ...(isDark ? DarkTheme : DefaultTheme),
     dark: isDark,
     colors: {
-      primary: colors.primary,
+      primary: colors.link,
       background: colors.background,
       card: colors.card,
       text: colors.foreground,

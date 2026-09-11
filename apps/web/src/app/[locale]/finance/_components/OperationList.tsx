@@ -1,6 +1,17 @@
 import type { v1 } from "@repo/api-shared";
 import type { SupportedLocale } from "@repo/i18n";
-import { Badge, Card } from "@repo/ui/components";
+import {
+  Badge,
+  Card,
+  CardContent,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@repo/ui/components";
+import { cn } from "@repo/ui/lib/utils";
 import { getTranslations } from "next-intl/server";
 
 import { Link } from "@/i18n/navigation";
@@ -29,8 +40,10 @@ export async function OperationList({
 
   if (items.length === 0) {
     return (
-      <Card className="p-6">
-        <p className="text-sm text-muted-foreground">{emptyLabel}</p>
+      <Card>
+        <CardContent className="flex min-h-36 items-center justify-center text-center">
+          <p className="text-sm text-muted-foreground">{emptyLabel}</p>
+        </CardContent>
       </Card>
     );
   }
@@ -43,25 +56,11 @@ export async function OperationList({
             <li key={item.id} className="border-b last:border-b-0">
               <Link
                 href={FINANCE_PATHS.operation(item.id)}
-                className="block min-h-16 p-4 outline-none transition-colors duration-fast ease-standard hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                className="block min-h-16 p-5 outline-none transition-colors duration-fast ease-standard hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
               >
-                <div className="flex min-w-0 items-start justify-between gap-3">
-                  <p className="min-w-0 break-words font-medium">
-                    {item.description ?? t(`kinds.${item.kind}`)}
-                  </p>
-                  <p
-                    className={`shrink-0 whitespace-nowrap text-right font-medium tabular-nums ${
-                      item.status === "REVERSED" ? "line-through" : ""
-                    }`}
-                  >
-                    {formatMinorAmount(item.amountMinor, currency, locale)}
-                  </p>
-                </div>
-
-                <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-xs text-muted-foreground">
                     {formatFinanceDate(item.occurredAt, locale)}
-                    {` · ${t(`kinds.${item.kind}`)}`}
                   </p>
                   <Badge
                     variant={item.status === "POSTED" ? "outline" : "secondary"}
@@ -70,77 +69,101 @@ export async function OperationList({
                   </Badge>
                 </div>
 
-                {item.categoryName || item.costObjectName ? (
-                  <p className="mt-2 break-words text-xs text-muted-foreground">
-                    {[item.categoryName, item.costObjectName]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </p>
-                ) : null}
+                <p className="mt-3 font-medium wrap-anywhere">
+                  {item.description ?? t(`kinds.${item.kind}`)}
+                </p>
+                <p className="mt-1 text-xs leading-relaxed wrap-anywhere text-muted-foreground">
+                  {[
+                    t(`kinds.${item.kind}`),
+                    item.categoryName,
+                    item.costObjectName,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </p>
+                <p
+                  className={cn(
+                    "mt-3 text-base font-semibold wrap-anywhere tabular-nums",
+                    item.status === "REVERSED" &&
+                      "text-muted-foreground line-through",
+                  )}
+                >
+                  {formatMinorAmount(item.amountMinor, currency, locale)}
+                </p>
               </Link>
             </li>
           ))}
         </ul>
       </Card>
 
-      <Card className="hidden overflow-x-auto py-0 md:flex">
-        <table className="w-full min-w-2xl text-sm">
-          <thead>
-            <tr className="border-b text-left text-muted-foreground">
-              <th scope="col" className="p-3 font-normal">
+      <Card className="hidden py-0 md:flex">
+        <Table className="min-w-(--breakpoint-sm)">
+          <TableHeader>
+            <TableRow>
+              <TableHead scope="col" className="px-5 py-3">
                 {t("columns.date")}
-              </th>
-              <th scope="col" className="p-3 font-normal">
+              </TableHead>
+              <TableHead scope="col" className="px-5 py-3">
                 {t("columns.description")}
-              </th>
-              <th scope="col" className="p-3 font-normal">
+              </TableHead>
+              <TableHead scope="col" className="px-5 py-3">
                 {t("columns.category")}
-              </th>
-              <th scope="col" className="p-3 text-right font-normal">
+              </TableHead>
+              <TableHead scope="col" className="px-5 py-3 text-right">
                 {t("columns.amount")}
-              </th>
-              <th scope="col" className="p-3 font-normal">
+              </TableHead>
+              <TableHead scope="col" className="px-5 py-3">
                 {t("columns.status")}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {items.map((item) => (
-              <tr key={item.id} className="border-b last:border-b-0">
-                <td className="p-3 whitespace-nowrap">
-                  {formatFinanceDate(item.occurredAt, locale)}
-                </td>
-                <td className="p-3">
+              <TableRow key={item.id}>
+                <TableCell className="px-5 py-4">
+                  <span className="text-muted-foreground">
+                    {formatFinanceDate(item.occurredAt, locale)}
+                  </span>
+                </TableCell>
+                <TableCell className="px-5 py-4 whitespace-normal">
                   <Link
                     href={FINANCE_PATHS.operation(item.id)}
-                    className="font-medium underline-offset-4 hover:underline"
+                    className="rounded-sm font-medium wrap-anywhere underline-offset-4 outline-none hover:text-link hover:underline focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     {item.description ?? t(`kinds.${item.kind}`)}
                   </Link>
-                  <span className="block text-xs text-muted-foreground">
+                  <span className="mt-1 block text-xs leading-relaxed wrap-anywhere text-muted-foreground">
                     {t(`kinds.${item.kind}`)}
                     {item.costObjectName ? ` · ${item.costObjectName}` : ""}
                   </span>
-                </td>
-                <td className="p-3">{item.categoryName ?? "—"}</td>
-                <td
-                  className={`p-3 text-right tabular-nums ${
-                    item.status === "REVERSED" ? "line-through" : ""
-                  }`}
-                >
-                  {formatMinorAmount(item.amountMinor, currency, locale)}
-                </td>
-                <td className="p-3">
+                </TableCell>
+                <TableCell className="px-5 py-4 whitespace-normal">
+                  <span className="wrap-anywhere text-muted-foreground">
+                    {item.categoryName ?? "—"}
+                  </span>
+                </TableCell>
+                <TableCell className="px-5 py-4 text-right">
+                  <span
+                    className={cn(
+                      "font-semibold tabular-nums",
+                      item.status === "REVERSED" &&
+                        "text-muted-foreground line-through",
+                    )}
+                  >
+                    {formatMinorAmount(item.amountMinor, currency, locale)}
+                  </span>
+                </TableCell>
+                <TableCell className="px-5 py-4">
                   <Badge
                     variant={item.status === "POSTED" ? "outline" : "secondary"}
                   >
                     {t(`statuses.${item.status}`)}
                   </Badge>
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </Card>
     </>
   );

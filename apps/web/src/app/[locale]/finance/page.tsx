@@ -1,6 +1,8 @@
 import { v1 } from "@repo/api-shared";
 import { messages } from "@repo/i18n";
-import { buttonVariants, Card } from "@repo/ui/components";
+import { buttonVariants, Card, CardContent } from "@repo/ui/components";
+import { cn } from "@repo/ui/lib/utils";
+import { ArrowRight, Plus, Settings } from "lucide-react";
 import type { Metadata } from "next";
 
 import { Link } from "@/i18n/navigation";
@@ -52,6 +54,8 @@ export default async function FinanceRoutePage({
       path,
       `${v1.finance.ROUTES.accounts.balances}?${new URLSearchParams({
         bookType: "COMPANY",
+        // Inactive custody accounts can still hold company funds.
+        includeInactive: "true",
       })}`,
       v1.finance.ledgerAccountBalanceListSchema,
       cookieHeader,
@@ -86,19 +90,28 @@ export default async function FinanceRoutePage({
   ]);
 
   return (
-    <div className="flex flex-col gap-6">
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-xl font-medium">{t.overview.title}</h1>
-          <p className="text-sm text-muted-foreground">
+    <div className="flex min-w-0 flex-col gap-8">
+      <header className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 flex-col gap-2">
+          <h1 className="text-3xl font-semibold tracking-tight text-balance">
+            {t.overview.title}
+          </h1>
+          <p className="text-sm leading-relaxed text-muted-foreground">
             {t.overview.description}
           </p>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          <Link href={FINANCE_PATHS.newExpense} className={buttonVariants()}>
-            {t.overview.newExpense}
-          </Link>
+        <Link
+          href={FINANCE_PATHS.newExpense}
+          className={cn(buttonVariants(), "shrink-0 self-start")}
+        >
+          <Plus aria-hidden="true" data-icon="inline-start" />
+          {t.overview.newExpense}
+        </Link>
+      </header>
+
+      <section className="flex min-w-0 flex-col gap-4">
+        <div className="flex flex-wrap items-center gap-2">
           <Link
             href={FINANCE_PATHS.newFunding}
             className={buttonVariants({ variant: "outline" })}
@@ -107,46 +120,52 @@ export default async function FinanceRoutePage({
           </Link>
           <Link
             href={FINANCE_PATHS.settlement}
-            className={buttonVariants({ variant: "outline" })}
+            className={buttonVariants({ variant: "ghost" })}
           >
             {t.overview.viewSettlement}
           </Link>
           <Link
             href={FINANCE_PATHS.settings}
-            className={buttonVariants({ variant: "ghost" })}
+            className={cn(buttonVariants({ variant: "ghost" }), "sm:ml-auto")}
           >
+            <Settings aria-hidden="true" data-icon="inline-start" />
             {t.overview.settings}
           </Link>
         </div>
-      </header>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <SummaryTile
-          label={t.overview.sections.cash}
-          value={formatMinorAmount(cashMinor, currency, locale)}
-        />
-        <SummaryTile
-          label={t.overview.sections.owed}
-          value={formatMinorAmount(owedMinor, currency, locale)}
-        />
-        <SummaryTile
-          label={t.overview.sections.owing}
-          value={formatMinorAmount(owingMinor, currency, locale)}
-        />
-        <SummaryTile
-          label={t.overview.sections.results}
-          value={formatMinorAmount(expenseMinor, currency, locale)}
-        />
-      </div>
+        <Card className="py-0">
+          <CardContent className="p-0">
+            <dl className="grid sm:grid-cols-2 xl:grid-cols-4">
+              <SummaryBalance
+                label={t.overview.sections.cash}
+                value={formatMinorAmount(cashMinor, currency, locale)}
+              />
+              <SummaryBalance
+                label={t.overview.sections.owed}
+                value={formatMinorAmount(owedMinor, currency, locale)}
+              />
+              <SummaryBalance
+                label={t.overview.sections.owing}
+                value={formatMinorAmount(owingMinor, currency, locale)}
+              />
+              <SummaryBalance
+                label={t.overview.sections.results}
+                value={formatMinorAmount(expenseMinor, currency, locale)}
+              />
+            </dl>
+          </CardContent>
+        </Card>
+      </section>
 
-      <section className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-base font-medium">{t.operations.title}</h2>
+      <section className="flex min-w-0 flex-col gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold">{t.operations.title}</h2>
           <Link
             href={FINANCE_PATHS.operations}
             className={buttonVariants({ variant: "ghost", size: "sm" })}
           >
             {t.overview.viewOperations}
+            <ArrowRight aria-hidden="true" data-icon="inline-end" />
           </Link>
         </div>
 
@@ -161,11 +180,13 @@ export default async function FinanceRoutePage({
   );
 }
 
-function SummaryTile({ label, value }: { label: string; value: string }) {
+function SummaryBalance({ label, value }: { label: string; value: string }) {
   return (
-    <Card className="flex flex-col gap-1 p-4">
-      <p className="text-sm text-muted-foreground">{label}</p>
-      <p className="text-xl font-medium tabular-nums">{value}</p>
-    </Card>
+    <div className="flex min-w-0 flex-col justify-between gap-4 border-b p-5 last:border-b-0 sm:p-6 sm:odd:border-r sm:[&:nth-last-child(-n+2)]:border-b-0 xl:border-b-0 xl:not-last:border-r">
+      <dt className="text-sm leading-relaxed text-muted-foreground">{label}</dt>
+      <dd className="text-2xl leading-tight font-semibold tracking-tight wrap-anywhere tabular-nums">
+        {value}
+      </dd>
+    </div>
   );
 }

@@ -396,7 +396,7 @@ function CalendarHeader({
         aria-label={labels.chooseMonthAndYear}
         className={cn(
           "justify-self-center text-lg font-semibold",
-          selectorOpen && "text-primary hover:text-primary",
+          selectorOpen && "text-link hover:text-link-hover",
         )}
         onClick={() => onModeChange(selectorOpen ? "calendar" : "month-year")}
         type="button"
@@ -504,7 +504,7 @@ function MonthGrid({
                     !isSelected &&
                       "text-foreground hover:bg-secondary-hover active:bg-secondary-active",
                     !isCurrentMonth && "text-muted-foreground",
-                    isToday && !isSelected && "border-primary text-primary",
+                    isToday && !isSelected && "border-ring text-link",
                     isSelected && "bg-primary text-primary-foreground",
                   )}
                   disabled={isDisabled}

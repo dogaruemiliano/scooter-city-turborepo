@@ -323,9 +323,14 @@ describe("Sidebar hover expansion", () => {
 
     expect(trigger).toHaveAttribute("aria-expanded", "true");
     expect(trigger).toHaveTextContent("Close navigation");
-    expect(screen.getByRole("dialog", { name: "Sidebar" })).toHaveAttribute(
-      "data-mobile",
-      "true",
+    const sheet = screen.getByRole("dialog", { name: "Sidebar" });
+    expect(sheet).toHaveAttribute("data-mobile", "true");
+    expect(sheet).toHaveClass("bg-popover", "text-popover-foreground");
+    expect(sheet).not.toHaveClass("bg-background", "bg-sidebar");
+    expect(sheet.querySelector(".bg-background")).toBeNull();
+    expect(sheet.style.getPropertyValue("--sidebar")).toBe("var(--popover)");
+    expect(sheet.style.getPropertyValue("--sidebar-foreground")).toBe(
+      "var(--popover-foreground)",
     );
   });
 });

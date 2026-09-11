@@ -282,7 +282,7 @@ export function DocumentPhotoDraftCard({
           </span>
         </BottomSheetTrigger>
         {upload?.status === "failed" ? (
-          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-lg bg-scrim">
+          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-lg bg-media-scrim">
             <span role="alert" className="sr-only">
               {upload.message}
             </span>
@@ -299,7 +299,7 @@ export function DocumentPhotoDraftCard({
             </Button>
             <span
               aria-hidden="true"
-              className="text-sm font-medium text-primary-foreground"
+              className="text-sm font-medium text-scrim-foreground"
             >
               {t("documentForm.retryUpload")}
             </span>

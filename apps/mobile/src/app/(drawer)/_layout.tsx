@@ -12,7 +12,8 @@ export default function DrawerLayout() {
         headerStyle: { backgroundColor: theme.colors.background },
         headerTintColor: theme.colors.foreground,
         drawerStyle: { backgroundColor: theme.colors.card },
-        drawerActiveTintColor: theme.colors.primary,
+        drawerActiveTintColor: theme.colors.link,
+        drawerActiveBackgroundColor: theme.colors.accent,
         drawerInactiveTintColor: theme.colors.mutedForeground,
       }}
     >

@@ -195,14 +195,10 @@ describe("PersonEditForm", () => {
     },
   );
 
-  it("stops the date-of-birth calendar at today", async () => {
+  it("stops the date-of-birth calendar at the current UTC day", async () => {
     const browser = userEvent.setup();
-    const today = new Date();
-    const todayIso = [
-      today.getFullYear(),
-      String(today.getMonth() + 1).padStart(2, "0"),
-      String(today.getDate()).padStart(2, "0"),
-    ].join("-");
+    // Date-only validation follows the API's UTC day, even after local midnight.
+    const todayIso = v1.common.dateOnlyToday();
 
     // Opens the calendar on the current month, so no wheel navigation is
     // needed to reach the boundary.
@@ -216,11 +212,7 @@ describe("PersonEditForm", () => {
       month: "long",
       timeZone: "UTC",
       year: "numeric",
-    }).format(
-      new Date(
-        Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()),
-      ),
-    );
+    }).format(new Date(`${todayIso}T00:00:00.000Z`));
 
     expect(
       within(dialog).getByRole("button", { name: todayLabel }),

@@ -177,7 +177,7 @@ export function ExpenseSupplierPicker({
                         </span>
                         {selected ? (
                           <CheckIcon
-                            className="size-5 shrink-0 text-primary"
+                            className="size-5 shrink-0 text-link"
                             aria-hidden="true"
                           />
                         ) : null}

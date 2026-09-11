@@ -15,6 +15,7 @@ import {
   HandCoinsIcon,
   LandmarkIcon,
   LayoutDashboardIcon,
+  MoreHorizontalIcon,
   ReceiptTextIcon,
   Settings2Icon,
   TagIcon,
@@ -255,10 +256,10 @@ function AppShellContent({
         pathname={pathname}
         initialThemePreference={initialThemePreference}
       />
-      <SidebarInset>
-        <header className="sticky top-0 z-sticky flex h-12 shrink-0 items-center gap-2 border-b border-border bg-background px-4">
+      <SidebarInset className="min-w-0">
+        <header className="sticky top-0 z-sticky flex h-16 shrink-0 items-center gap-3 border-b border-border bg-card px-4 md:px-8">
           <HeaderNavigationButton pathname={pathname} />
-          <span className="min-w-0 flex-1 truncate text-sm font-medium">
+          <span className="min-w-0 flex-1 truncate text-sm font-semibold">
             {pageTitle}
           </span>
           <div
@@ -266,7 +267,7 @@ function AppShellContent({
             className="ml-auto flex shrink-0 md:hidden"
           />
         </header>
-        <div className="flex flex-1 flex-col">{children}</div>
+        <div className="flex min-w-0 flex-1 flex-col">{children}</div>
       </SidebarInset>
     </PageHeaderActionsContext.Provider>
   );
@@ -313,7 +314,7 @@ function AppSidebar({
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader>
+      <SidebarHeader className="border-b border-sidebar-border">
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
@@ -439,7 +440,7 @@ function AppSidebar({
         ))}
       </SidebarContent>
 
-      <SidebarFooter>
+      <SidebarFooter className="border-t border-sidebar-border">
         <AccountMenu
           key={user?.id ?? "signed-out"}
           locale={locale}
@@ -544,16 +545,14 @@ function AccountMenu({
               </Avatar>
               <span className="flex min-w-0 flex-1 flex-col">
                 <span className="truncate font-medium">{displayName}</span>
-                <span className="truncate text-xs text-muted-foreground">
+                <span className="truncate text-xs text-sidebar-muted-foreground">
                   {email}
                 </span>
               </span>
-              <span
-                className="ml-auto text-muted-foreground"
+              <MoreHorizontalIcon
+                className="ml-auto text-sidebar-muted-foreground"
                 aria-hidden="true"
-              >
-                ...
-              </span>
+              />
             </DropdownMenuTrigger>
 
             <DropdownMenuContent
