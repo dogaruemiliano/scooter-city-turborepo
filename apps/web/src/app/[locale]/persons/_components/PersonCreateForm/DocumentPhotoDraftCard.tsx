@@ -52,6 +52,7 @@ export function DocumentPhotoDraftCard({
   upload,
   disabled,
   onSetDocumentPhoto,
+  acceptsPdf = false,
 }: {
   inputId: string;
   documentKey: string;
@@ -60,6 +61,7 @@ export function DocumentPhotoDraftCard({
   upload: PersonDocumentPhotoDraftUpload | undefined;
   disabled: boolean;
   onSetDocumentPhoto: SetPersonDocumentPhoto;
+  acceptsPdf?: boolean;
 }) {
   const t = useTranslations("persons");
   const [open, setOpen] = useState(false);
@@ -77,8 +79,12 @@ export function DocumentPhotoDraftCard({
   const hasPhoto = Boolean(upload && previewUrl);
   const hasUploadedPhoto = upload?.status === "uploaded";
   const triggerLabel = hasPhoto
-    ? t("documentForm.changePhoto", { slot: slotLabel })
-    : t("documentForm.addPhoto", { slot: slotLabel });
+    ? t(acceptsPdf ? "documentForm.changeFile" : "documentForm.changePhoto", {
+        slot: slotLabel,
+      })
+    : t(acceptsPdf ? "documentForm.addFile" : "documentForm.addPhoto", {
+        slot: slotLabel,
+      });
   const photoAlt = t("detail.documents.photoAlt", { slot: slotLabel });
 
   const stopCamera = useCallback(() => {
@@ -252,7 +258,18 @@ export function DocumentPhotoDraftCard({
             />
           }
         >
-          {hasPhoto && previewUrl ? (
+          {hasPhoto && upload?.file.type === "application/pdf" ? (
+            <span className="flex h-full w-full flex-col items-center justify-center gap-2 p-3 text-center">
+              <FileTextIcon
+                aria-hidden="true"
+                className="size-7 text-muted-foreground"
+              />
+              <span className="max-w-full truncate text-sm font-medium">
+                {upload.file.name}
+              </span>
+              <span className="text-xs text-muted-foreground">PDF</span>
+            </span>
+          ) : hasPhoto && previewUrl ? (
             // eslint-disable-next-line @next/next/no-img-element -- draft previews use temporary object URLs.
             <img
               src={previewUrl}
@@ -269,7 +286,9 @@ export function DocumentPhotoDraftCard({
                 {triggerLabel}
               </span>
               <span className="text-xs text-muted-foreground">
-                {t("detail.documents.photoFileTypesShort")}
+                {acceptsPdf
+                  ? t("documentForm.fileTypesShort")
+                  : t("detail.documents.photoFileTypesShort")}
               </span>
             </span>
           )}
@@ -310,7 +329,9 @@ export function DocumentPhotoDraftCard({
       <BottomSheetContent className="lg:w-xl">
         <BottomSheetHeader>
           <BottomSheetTitle>
-            {t("documentForm.photoSheetTitle", { slot: slotLabel })}
+            {acceptsPdf
+              ? t("documentForm.fileSheetTitle", { slot: slotLabel })
+              : t("documentForm.photoSheetTitle", { slot: slotLabel })}
           </BottomSheetTitle>
         </BottomSheetHeader>
 
@@ -319,7 +340,25 @@ export function DocumentPhotoDraftCard({
             data-base-ui-swipe-ignore
             className="relative h-64 overflow-hidden rounded-lg bg-muted sm:h-72"
           >
-            {candidateUrl ? (
+            {candidateUrl && candidate?.type === "application/pdf" ? (
+              <div className="flex h-full flex-col items-center justify-center gap-3 p-4 text-center">
+                <FileTextIcon
+                  aria-hidden="true"
+                  className="size-10 text-muted-foreground"
+                />
+                <p className="max-w-full truncate text-sm font-medium">
+                  {candidate.name}
+                </p>
+                <a
+                  href={candidateUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-sm text-primary underline"
+                >
+                  {t("documentForm.openFile")}
+                </a>
+              </div>
+            ) : candidateUrl ? (
               // eslint-disable-next-line @next/next/no-img-element -- staged previews use temporary object URLs.
               <img
                 src={candidateUrl}
@@ -397,7 +436,11 @@ export function DocumentPhotoDraftCard({
             ref={filesInputRef}
             id={`${inputId}-files`}
             type="file"
-            accept={DOCUMENT_PHOTO_ACCEPT}
+            accept={
+              acceptsPdf
+                ? `${DOCUMENT_PHOTO_ACCEPT},application/pdf`
+                : DOCUMENT_PHOTO_ACCEPT
+            }
             aria-label={t("documentForm.chooseFromFiles")}
             className="hidden"
             disabled={disabled}
@@ -447,7 +490,11 @@ export function DocumentPhotoDraftCard({
                 onClick={usePhoto}
               >
                 <CheckIcon data-icon="inline-start" />
-                {t("documentForm.usePhoto")}
+                {t(
+                  candidate?.type === "application/pdf"
+                    ? "documentForm.useFile"
+                    : "documentForm.usePhoto",
+                )}
               </Button>
               <Button
                 type="button"

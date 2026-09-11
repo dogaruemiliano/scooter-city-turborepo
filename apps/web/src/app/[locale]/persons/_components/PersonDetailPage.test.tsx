@@ -142,6 +142,113 @@ beforeEach(() => {
 });
 
 describe("PersonDetailPage", () => {
+  it("shows passport and supplementary documents together", () => {
+    renderDetail({
+      ...readyPerson,
+      documents: [
+        { ...identityDocument, type: "passport" },
+        { ...identityDocument, id: "visa", type: "visa" },
+        { ...identityDocument, id: "permit", type: "residencePermit" },
+        { ...identityDocument, id: "proof", type: "proofOfAddress" },
+        driverLicenseDocument,
+      ],
+    });
+    for (const type of [
+      "passport",
+      "visa",
+      "residencePermit",
+      "proofOfAddress",
+      "driverLicense",
+    ] as const) {
+      expect(
+        screen.getByRole("button", {
+          name: `View ${messages.en.persons.documentTypes[type]}`,
+        }),
+      ).toBeInTheDocument();
+    }
+  });
+
+  it("opens an address-proof PDF without rendering it as an image", async () => {
+    const browser = userEvent.setup();
+    const proof = {
+      ...identityDocument,
+      id: "proof",
+      type: "proofOfAddress" as const,
+      expiresOn: null,
+    };
+    const proofPhoto = {
+      ...identityFrontPhoto,
+      personDocumentId: proof.id,
+      contentType: "application/pdf",
+      contentUrl: "/v1/persons/person-1/documents/proof/photos/front/content",
+    };
+    renderDetail(
+      { ...readyPerson, documents: [identityDocument, proof] },
+      "en",
+      { [proof.id]: [proofPhoto] },
+    );
+    await browser.click(
+      screen.getByRole("button", { name: "View Proof of address" }),
+    );
+    const dialog = await screen.findByRole("dialog");
+    expect(
+      within(dialog).getByRole("link", { name: "View PDF" }),
+    ).toHaveAttribute("href", `https://api.test${proofPhoto.contentUrl}`);
+    expect(within(dialog).queryByRole("img")).not.toBeInTheDocument();
+    expect(dialog.querySelector('input[type="file"]')).toHaveAttribute(
+      "accept",
+      "image/jpeg,image/png,image/webp,application/pdf",
+    );
+    expect(dialog).not.toHaveClass("bg-background");
+  });
+
+  it("keeps licence categories editable and submits their reviewed values", async () => {
+    const browser = userEvent.setup();
+    const licence = {
+      ...driverLicenseDocument,
+      licenseCategories: [
+        {
+          category: "AM" as const,
+          issuedOn: "2024-01-15",
+          expiresOn: "2030-01-31",
+          restrictions: null,
+        },
+      ],
+    };
+    mocks.apiFetch.mockResolvedValue(licence);
+    renderDetail({ ...readyPerson, documents: [identityDocument, licence] });
+    await browser.click(
+      screen.getByRole("button", { name: "View Driver license" }),
+    );
+    const detail = await screen.findByRole("dialog");
+    expect(within(detail).getByText("AM")).toBeInTheDocument();
+    expect(detail).not.toHaveClass("bg-background");
+    await browser.click(
+      within(detail).getByRole("button", { name: "Edit document" }),
+    );
+    const editor = await screen.findByRole("dialog", { name: "Edit document" });
+    expect(editor).not.toHaveClass("bg-background");
+    await browser.selectOptions(
+      within(editor).getByLabelText(messages.en.persons.license.category),
+      "A1",
+    );
+    await browser.click(within(editor).getByRole("button", { name: "Save" }));
+    await waitFor(() =>
+      expect(mocks.apiFetch).toHaveBeenCalledWith(
+        v1.persons.ROUTES.documents.update(readyPerson.id, licence.id),
+        v1.persons.personDocumentSchema,
+        expect.objectContaining({
+          method: "PATCH",
+          json: expect.objectContaining({
+            licenseCategories: [
+              { ...licence.licenseCategories[0], category: "A1" },
+            ],
+          }),
+        }),
+      ),
+    );
+  });
+
   it("renders compact document cards and opens the complete details", async () => {
     const browser = userEvent.setup();
 
@@ -318,8 +425,8 @@ describe("PersonDetailPage", () => {
       screen.queryByRole("button", { name: "Edit person" }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "Add document" }),
-    ).not.toBeInTheDocument();
+      screen.getByRole("button", { name: "Add document" }),
+    ).toBeInTheDocument();
 
     await browser.click(screen.getByRole("button", { name: "More actions" }));
     const menu = await screen.findByRole("menu");
@@ -847,13 +954,14 @@ describe("PersonDetailPage", () => {
 function renderDetail(
   person: v1.persons.Person = readyPerson,
   locale: SupportedLocale = "en",
+  photos: Record<string, v1.persons.PersonDocumentPhoto[]> = documentPhotos,
 ) {
   return render(
     <NextIntlClientProvider locale={locale} messages={messages[locale]}>
       <PersonDetailPage
         person={person}
         auditEvents={auditEvents}
-        documentPhotos={documentPhotos}
+        documentPhotos={photos}
         personsHref={locale === "en" ? "/en/persons" : "/persons"}
       />
     </NextIntlClientProvider>,

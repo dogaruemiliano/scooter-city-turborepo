@@ -13,6 +13,11 @@ export interface Feedback {
 }
 
 export type PersonCitizenship = "romanian" | "foreign";
+export type NationalIdFormat = "classic" | "electronic";
+export type DocumentWorkflow =
+  | "romanianClassic"
+  | "romanianElectronic"
+  | "foreign";
 
 export type PersonFormFieldKey =
   | "email"
@@ -40,6 +45,8 @@ export type PersonDocumentFormFieldKey =
   | "hasExpiryDate"
   | "expiresOn"
   | "status"
+  | "licenseCategories"
+  | "photos"
   | "notes";
 
 export type FormErrorKey =
@@ -73,6 +80,10 @@ export type PersonDocumentPhotoDraftUploads = Partial<
 
 export interface CreatePersonFormState {
   citizenship: PersonCitizenship;
+  nationalIdFormat: NationalIdFormat;
+  documentDrafts: Partial<
+    Record<DocumentWorkflow, CreatePersonDocumentFormState[]>
+  >;
   email: string;
   phone: string;
   phoneCountry: CountryCode;
@@ -94,8 +105,10 @@ export interface CreatePersonFormState {
 export interface CreatePersonDocumentFormState {
   key: string;
   required: boolean;
-  slot: "identity" | "driverLicense";
+  slot: "identity" | "driverLicense" | "supporting";
   type: v1.persons.PersonDocumentType;
+  nationalIdFormat: NationalIdFormat | null;
+  licenseCategories: v1.persons.PersonDriverLicenseCategoryEntry[];
   series: string;
   number: string;
   cnp: string;

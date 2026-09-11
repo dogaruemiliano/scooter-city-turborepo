@@ -22,7 +22,7 @@ import { useTranslations } from "next-intl";
 import { useState } from "react";
 
 import { DocumentExpiryField } from "../DocumentExpiryField";
-import { FOREIGN_IDENTITY_DOCUMENT_TYPES } from "./constants";
+import { LicenseCategoriesFields } from "../LicenseCategoriesFields";
 import { documentFieldErrorKey, fieldErrorId, invalidAria } from "./errors";
 import { FormField } from "./FormField";
 import type {
@@ -39,7 +39,6 @@ export function DocumentDraftSheet({
   documentId,
   fieldErrors,
   locale,
-  canChangeIdentityType,
   showUnder18Warning,
   disabled,
   onSave,
@@ -50,7 +49,6 @@ export function DocumentDraftSheet({
   documentId: string;
   fieldErrors: FormErrors;
   locale: string;
-  canChangeIdentityType: boolean;
   showUnder18Warning: boolean;
   disabled: boolean;
   onSave: () => void;
@@ -61,7 +59,6 @@ export function DocumentDraftSheet({
     null,
   );
   const isNationalId = document.type === "nationalId";
-  const typeError = fieldErrors[documentFieldErrorKey(document.key, "type")];
   const seriesError =
     fieldErrors[documentFieldErrorKey(document.key, "series")];
   const numberError =
@@ -110,47 +107,6 @@ export function DocumentDraftSheet({
       </BottomSheetHeader>
       <BottomSheetBody>
         <div className="grid min-w-0 gap-4 sm:grid-cols-2">
-          {canChangeIdentityType ? (
-            <FormField
-              id={`${documentId}-type`}
-              label={t("fields.documentType")}
-              required={document.required}
-              error={typeError}
-            >
-              <Select
-                value={document.type}
-                onValueChange={(value) => {
-                  if (value) {
-                    onSetDocumentValue(
-                      document.key,
-                      "type",
-                      value as v1.persons.PersonDocumentType,
-                    );
-                  }
-                }}
-              >
-                <SelectTrigger
-                  id={`${documentId}-type`}
-                  aria-describedby={fieldErrorId(
-                    `${documentId}-type`,
-                    typeError,
-                  )}
-                  aria-invalid={invalidAria(typeError)}
-                  className="w-full"
-                >
-                  <SelectValue placeholder={t("placeholders.documentType")} />
-                </SelectTrigger>
-                <SelectContent>
-                  {FOREIGN_IDENTITY_DOCUMENT_TYPES.map((type) => (
-                    <SelectItem key={type} value={type}>
-                      {t(`documentTypes.${type}`)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </FormField>
-          ) : null}
-
           {isNationalId ? (
             <div className="grid min-w-0 grid-cols-3 gap-3 sm:col-span-2">
               <FormField
@@ -361,6 +317,28 @@ export function DocumentDraftSheet({
               />
             </FormField>
           </DocumentExpiryField>
+          {document.type === "driverLicense" ? (
+            <div className="grid gap-3 sm:col-span-2">
+              <LicenseCategoriesFields
+                value={document.licenseCategories}
+                onChange={(value) =>
+                  onSetDocumentValue(document.key, "licenseCategories", value)
+                }
+                disabled={disabled}
+              />
+              {fieldErrors[
+                documentFieldErrorKey(document.key, "licenseCategories")
+              ] ? (
+                <p role="alert" className="text-sm text-destructive">
+                  {
+                    fieldErrors[
+                      documentFieldErrorKey(document.key, "licenseCategories")
+                    ]
+                  }
+                </p>
+              ) : null}
+            </div>
+          ) : null}
           <FormField
             id={`${documentId}-status`}
             label={t("fields.documentStatus")}

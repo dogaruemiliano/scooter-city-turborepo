@@ -38,6 +38,8 @@ export interface PersonFormState {
 }
 
 export interface DocumentFormState {
+  nationalIdFormat: "classic" | "electronic" | null;
+  licenseCategories: v1.persons.PersonDriverLicenseCategoryEntry[];
   type: v1.persons.PersonDocumentType;
   series: string;
   number: string;

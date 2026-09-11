@@ -96,6 +96,25 @@ export class ImageStorageService {
     const contentType = this.requireSupportedImageContentType(
       input.contentType,
     );
+    return { ...(await this.storeObject(input, contentType)), contentType };
+  }
+
+  async storeDocument(input: StoreImageInput): Promise<StoredDocument> {
+    const contentType = this.requireSupportedDocumentContentType(
+      input.contentType,
+    );
+    return {
+      ...(await this.storeObject(input, contentType)),
+      imageWidth: null,
+      imageHeight: null,
+      pageCount: null,
+    };
+  }
+
+  private async storeObject(
+    input: StoreImageInput,
+    contentType: SupportedDocumentContentType,
+  ): Promise<Omit<StoredDocument, "imageWidth" | "imageHeight" | "pageCount">> {
     this.assertValidByteSize(input.byteSize);
 
     const storageKey = this.generateStorageKey(contentType, input.category);
@@ -171,6 +190,19 @@ export class ImageStorageService {
     );
     const storageKey = this.generateStorageKey(contentType, input.category);
     const expiresAt = this.createExpiresAt();
+    const completionTtl = input.completionTokenTtlSeconds;
+    if (
+      completionTtl !== undefined &&
+      (!Number.isInteger(completionTtl) ||
+        completionTtl <= 0 ||
+        completionTtl > 86_400)
+    ) {
+      throw new BadRequestException("Invalid upload completion token lifetime");
+    }
+    const uploadTokenExpiresAt =
+      completionTtl === undefined
+        ? expiresAt
+        : new Date(Date.now() + completionTtl * 1000);
     const requestHeaders: Record<string, string> = {
       "Content-Type": contentType,
       "x-amz-checksum-sha256": checksumSha256Base64,
@@ -202,7 +234,7 @@ export class ImageStorageService {
       imageHeight: input.imageHeight ?? null,
       pageCount: input.pageCount ?? null,
       scope: input.scope,
-      exp: Math.floor(expiresAt.getTime() / 1000),
+      exp: Math.floor(uploadTokenExpiresAt.getTime() / 1000),
     });
 
     let uploadUrl: string;
@@ -239,6 +271,7 @@ export class ImageStorageService {
       method: "PUT",
       headers: this.browserUploadHeadersForSignedUrl(uploadUrl, requestHeaders),
       expiresAt,
+      uploadTokenExpiresAt,
       maxBytes: this.env.IMAGE_STORAGE_MAX_BYTES,
     };
   }

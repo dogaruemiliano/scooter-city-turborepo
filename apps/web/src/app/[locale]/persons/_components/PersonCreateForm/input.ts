@@ -2,7 +2,7 @@ import { v1 } from "@repo/api-shared";
 import { buildDateOnly } from "@repo/ui/lib/date-parts";
 
 import { documentFieldErrorKey } from "./errors";
-import { isBlankDocumentDraft } from "./form-state";
+import { documentWorkflow, isBlankDocumentDraft } from "./form-state";
 import type {
   CreatePersonDocumentFormState,
   CreatePersonFormState,
@@ -20,6 +20,7 @@ export function createPersonInput(
   ) => string,
 ): { input?: Record<string, unknown>; error?: FieldValidationError } {
   const input: Record<string, unknown> = {
+    documentWorkflow: documentWorkflow(form),
     email: form.email,
     phone: normalizePhoneForSubmit(form),
     firstName: form.firstName,
@@ -122,6 +123,10 @@ function createDocumentInput(document: CreatePersonDocumentFormState): {
     };
   }
 
+  if (document.type === "nationalId")
+    input.nationalIdFormat = document.nationalIdFormat;
+  if (document.type === "driverLicense")
+    input.licenseCategories = document.licenseCategories;
   addOptional(input, "series", document.series);
   addOptional(input, "number", document.number);
   if (document.required && document.type === "nationalId") {

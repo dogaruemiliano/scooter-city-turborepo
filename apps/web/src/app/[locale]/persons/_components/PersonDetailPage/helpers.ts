@@ -111,15 +111,23 @@ export function documentFormState(
 ): DocumentFormState {
   return {
     type: document?.type ?? initialType,
+    nationalIdFormat: document?.nationalIdFormat ?? null,
+    licenseCategories: (document?.licenseCategories ?? []).map((entry) => ({
+      ...entry,
+    })),
     series: document?.series ?? "",
     number: document?.number ?? "",
     cnp: document?.cnp ?? "",
     issuingCountryCode: document?.issuingCountryCode ?? "",
     issuedBy: document?.issuedBy ?? "",
     issuedOn: document?.issuedOn ?? "",
-    hasExpiryDate: document ? document.expiresOn !== null : true,
+    hasExpiryDate: document
+      ? document.expiresOn !== null
+      : initialType !== "proofOfAddress",
     expiresOn: document?.expiresOn ?? "",
-    status: document?.status ?? "verified",
+    status:
+      document?.status ??
+      (initialType === "driverLicense" ? "unverified" : "verified"),
     notes: document?.notes ?? "",
   };
 }
@@ -129,6 +137,15 @@ export function documentFormInput(
 ): v1.persons.UpdatePersonDocumentInput {
   return {
     type: form.type,
+    ...(form.nationalIdFormat !== null
+      ? {
+          nationalIdFormat:
+            form.type === "nationalId" ? form.nationalIdFormat : null,
+        }
+      : {}),
+    ...(form.type === "driverLicense"
+      ? { licenseCategories: form.licenseCategories }
+      : {}),
     series: blankToNull(form.series),
     number: blankToNull(form.number),
     cnp: blankToNull(form.cnp),
@@ -159,6 +176,9 @@ export function documentFormHasChanges(
   const input = parsed.data;
   return (
     input.type !== document.type ||
+    (input.nationalIdFormat ?? null) !== (document.nationalIdFormat ?? null) ||
+    JSON.stringify(input.licenseCategories ?? []) !==
+      JSON.stringify(document.licenseCategories ?? []) ||
     input.series !== document.series ||
     input.number !== document.number ||
     input.cnp !== document.cnp ||

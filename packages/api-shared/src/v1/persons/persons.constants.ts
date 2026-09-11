@@ -6,7 +6,9 @@ export const PERSON_DOCUMENT_TYPES = [
   "passport",
   "nationalId",
   "driverLicense",
+  "visa",
   "residencePermit",
+  "proofOfAddress",
   "other",
 ] as const;
 
@@ -14,10 +16,44 @@ export type PersonDocumentType = (typeof PERSON_DOCUMENT_TYPES)[number];
 
 export const PERSON_DRIVER_LICENSE_DOCUMENT_TYPE = "driverLicense" as const;
 
+export const PERSON_NATIONAL_ID_FORMATS = ["classic", "electronic"] as const;
+export type PersonNationalIdFormat =
+  (typeof PERSON_NATIONAL_ID_FORMATS)[number];
+
+export const PERSON_DOCUMENT_WORKFLOWS = [
+  "romanianClassic",
+  "romanianElectronic",
+  "foreign",
+] as const;
+export type PersonDocumentWorkflow = (typeof PERSON_DOCUMENT_WORKFLOWS)[number];
+
+export const PERSON_DRIVER_LICENSE_CATEGORIES = [
+  "AM",
+  "A1",
+  "A2",
+  "A",
+  "B1",
+  "B",
+  "BE",
+  "C1",
+  "C1E",
+  "C",
+  "CE",
+  "D1",
+  "D1E",
+  "D",
+  "DE",
+  "Tr",
+  "Tr1",
+  "Tb",
+  "Tv",
+] as const;
+export type PersonDriverLicenseCategory =
+  (typeof PERSON_DRIVER_LICENSE_CATEGORIES)[number];
+
 export const PERSON_IDENTITY_DOCUMENT_TYPES = [
   "passport",
   "nationalId",
-  "residencePermit",
   "other",
 ] as const satisfies readonly PersonDocumentType[];
 

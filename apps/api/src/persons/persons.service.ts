@@ -14,7 +14,7 @@ import { toDateOnlyDate, toDateOnlyString } from "../common/dates/date-only";
 import type { RequestMetadata } from "../common/http/request-metadata";
 import type {
   PresignedImageUpload,
-  StoredImage,
+  StoredDocument,
 } from "../image-storage/image-storage.types";
 import { ImageStorageService } from "../image-storage/image-storage.service";
 import type {
@@ -44,6 +44,17 @@ const PERSON_AUDIT_EVENT_LIMIT = 50;
 const PERSON_EMAIL_CONFLICT_CODE = "PERSON_EMAIL_CONFLICT";
 const PERSON_PHONE_CONFLICT_CODE = "PERSON_PHONE_CONFLICT";
 const DRAFT_DOCUMENT_PHOTO_PURPOSE = "person-document-photo";
+const DRAFT_DOCUMENT_COMPLETION_TTL_SECONDS = 86_400;
+
+type StoredPersonDocument = Pick<
+  StoredDocument,
+  | "provider"
+  | "bucket"
+  | "storageKey"
+  | "contentType"
+  | "byteSize"
+  | "checksumSha256"
+>;
 
 type PersonAuditContext = RequestMetadata & {
   actor: AuthPrincipal;
@@ -55,7 +66,7 @@ interface PreparedDraftDocumentPhoto {
   documentType: v1.persons.PersonDocumentType;
   slot: v1.persons.PersonDocumentPhotoSlot;
   draftUploadId: string;
-  storedImage: StoredImage;
+  storedImage: StoredPersonDocument;
 }
 
 @Injectable()
@@ -383,6 +394,26 @@ export class PersonsService {
           throw new NotFoundException("Person document not found");
         }
 
+        const resolvedType = input.type ?? existing.type;
+        const metadata = v1.persons.createPersonDocumentInputSchema.safeParse({
+          type: resolvedType,
+          nationalIdFormat:
+            input.nationalIdFormat !== undefined
+              ? input.nationalIdFormat
+              : resolvedType === "nationalId"
+                ? existing.nationalIdFormat
+                : null,
+          licenseCategories:
+            input.licenseCategories !== undefined
+              ? input.licenseCategories
+              : resolvedType === "driverLicense"
+                ? existing.licenseCategories
+                : [],
+        });
+        if (!metadata.success) {
+          throw new BadRequestException(metadata.error.issues);
+        }
+
         if (!documentInputHasChanges(existing, input)) {
           return existing;
         }
@@ -529,12 +560,17 @@ export class PersonsService {
     const normalizedSlot = this.requireDocumentPhotoSlot(slot);
     await this.ensureActiveDocument(personId, documentId);
     this.assertBufferedUpload(file);
+    await this.assertDocumentUploadContentType(
+      personId,
+      documentId,
+      file.mimetype,
+    );
 
-    let stored: StoredImage | null = null;
+    let stored: StoredPersonDocument | null = null;
     let replacedStorageKeys: string[] = [];
 
     try {
-      stored = await this.imageStorage.storeImage({
+      stored = await this.imageStorage.storeDocument({
         buffer: file.buffer,
         contentType: file.mimetype,
         byteSize: file.size,
@@ -572,8 +608,13 @@ export class PersonsService {
   ): Promise<v1.persons.PersonDocumentPhotoUploadUrl> {
     const normalizedSlot = this.requireDocumentPhotoSlot(slot);
     await this.ensureActiveDocument(personId, documentId);
+    await this.assertDocumentUploadContentType(
+      personId,
+      documentId,
+      input.contentType,
+    );
 
-    const upload = await this.imageStorage.createPresignedUpload({
+    const upload = await this.imageStorage.createPresignedDocumentUpload({
       ...input,
       category: "personal-document",
       scope: this.documentPhotoUploadScope(
@@ -601,10 +642,11 @@ export class PersonsService {
     this.logger.debug(logContext, "Creating document-photo draft upload URL");
 
     try {
-      const upload = await this.imageStorage.createPresignedUpload({
+      const upload = await this.imageStorage.createPresignedDocumentUpload({
         ...input,
         category: "personal-document",
         scope: this.draftDocumentPhotoUploadScope(uploadedByUserId),
+        completionTokenTtlSeconds: DRAFT_DOCUMENT_COMPLETION_TTL_SECONDS,
       });
 
       const draftUpload = await this.prisma.draftUpload.create({
@@ -617,7 +659,7 @@ export class PersonsService {
           byteSize: input.byteSize,
           checksumSha256: input.checksumSha256.trim().toLowerCase(),
           purpose: DRAFT_DOCUMENT_PHOTO_PURPOSE,
-          expiresAt: upload.expiresAt,
+          expiresAt: upload.uploadTokenExpiresAt ?? upload.expiresAt,
         },
       });
 
@@ -651,9 +693,9 @@ export class PersonsService {
     const normalizedSlot = this.requireDocumentPhotoSlot(slot);
     await this.ensureActiveDocument(personId, documentId);
 
-    let stored: StoredImage | null = null;
+    let stored: StoredPersonDocument | null = null;
     try {
-      stored = await this.imageStorage.completePresignedUpload(
+      stored = await this.imageStorage.completePresignedDocumentUpload(
         input.uploadToken,
         this.documentPhotoUploadScope(
           personId,
@@ -661,6 +703,11 @@ export class PersonsService {
           normalizedSlot,
           uploadedByUserId,
         ),
+      );
+      await this.assertDocumentUploadContentType(
+        personId,
+        documentId,
+        stored.contentType,
       );
       const result = await this.replaceDocumentPhotoWithStoredImage(
         documentId,
@@ -753,10 +800,19 @@ export class PersonsService {
           continue;
         }
 
-        const storedImage = await this.imageStorage.completePresignedUpload(
-          uploadToken,
-          this.draftDocumentPhotoUploadScope(uploadedByUserId),
-        );
+        const storedImage =
+          await this.imageStorage.completePresignedDocumentUpload(
+            uploadToken,
+            this.draftDocumentPhotoUploadScope(uploadedByUserId),
+          );
+        if (
+          storedImage.contentType === "application/pdf" &&
+          document.type !== "proofOfAddress"
+        ) {
+          throw new BadRequestException(
+            "PDF uploads are only supported for proof of address",
+          );
+        }
 
         if (seenStorageKeys.has(storedImage.storageKey)) {
           throw new BadRequestException("Draft image upload was used twice");
@@ -785,7 +841,7 @@ export class PersonsService {
 
   private async assertUsableDraftUpload(
     draft: DraftUpload | null,
-    storedImage: StoredImage,
+    storedImage: StoredPersonDocument,
     uploadedByUserId: string,
   ): Promise<DraftUpload> {
     if (!draft) {
@@ -933,6 +989,14 @@ export class PersonsService {
   ): Prisma.PersonDocumentCreateWithoutPersonInput {
     return {
       type: input.type,
+      nationalIdFormat:
+        input.type && input.type !== "nationalId"
+          ? null
+          : input.nationalIdFormat,
+      licenseCategories:
+        input.type && input.type !== "driverLicense"
+          ? []
+          : input.licenseCategories,
       series: input.series,
       number: input.number,
       cnp: input.cnp,
@@ -950,6 +1014,14 @@ export class PersonsService {
   ): Prisma.PersonDocumentUpdateInput {
     return {
       type: input.type,
+      nationalIdFormat:
+        input.type && input.type !== "nationalId"
+          ? null
+          : input.nationalIdFormat,
+      licenseCategories:
+        input.type && input.type !== "driverLicense"
+          ? []
+          : input.licenseCategories,
       series: input.series,
       number: input.number,
       cnp: input.cnp,
@@ -1051,6 +1123,16 @@ export class PersonsService {
   ): v1.persons.PersonAuditFieldChange[] {
     return compactChanges([
       createValueChange("document.type", existing.type, updated.type),
+      createValueChange(
+        "document.nationalIdFormat",
+        existing.nationalIdFormat,
+        updated.nationalIdFormat,
+      ),
+      createValueChange(
+        "document.licenseCategories",
+        serializeLicenseCategories(existing.licenseCategories),
+        serializeLicenseCategories(updated.licenseCategories),
+      ),
       createValueChange("document.series", existing.series, updated.series),
       createSensitiveValueChange(
         "document.number",
@@ -1515,11 +1597,26 @@ export class PersonsService {
     }
   }
 
+  private async assertDocumentUploadContentType(
+    personId: string,
+    documentId: string,
+    contentType: string,
+  ): Promise<void> {
+    if (contentType !== "application/pdf") return;
+    const document = await this.findActiveDocument(personId, documentId);
+    if (!document) throw new NotFoundException("Person document not found");
+    if (document.type !== "proofOfAddress") {
+      throw new BadRequestException(
+        "PDF uploads are only supported for proof of address",
+      );
+    }
+  }
+
   private async createDocumentPhotoFromDraft(
     tx: Prisma.TransactionClient,
     documentId: string,
     slot: v1.persons.PersonDocumentPhotoSlot,
-    storedImage: StoredImage,
+    storedImage: StoredPersonDocument,
     draftUploadId: string,
     uploadedByUserId: string,
   ): Promise<void> {
@@ -1560,7 +1657,7 @@ export class PersonsService {
   private async replaceDocumentPhotoWithStoredImage(
     documentId: string,
     slot: v1.persons.PersonDocumentPhotoSlot,
-    storedImage: StoredImage,
+    storedImage: StoredPersonDocument,
     uploadedByUserId: string,
   ): Promise<{
     photo: PersonDocumentPhotoWithAsset;
@@ -1662,6 +1759,7 @@ export class PersonsService {
       method: upload.method,
       headers: upload.headers,
       expiresAt: upload.expiresAt.toISOString(),
+      uploadTokenExpiresAt: upload.uploadTokenExpiresAt?.toISOString(),
       maxBytes: upload.maxBytes,
     };
   }
@@ -1782,6 +1880,15 @@ function personAuditValues(person: PersonWithDocuments): AuditValue[] {
 function documentAuditValues(document: PersonDocument): AuditValue[] {
   return [
     { field: "document.type", value: document.type },
+    { field: "document.nationalIdFormat", value: document.nationalIdFormat },
+    {
+      field: "document.licenseCategories",
+      value:
+        document.licenseCategories &&
+        serializeLicenseCategories(document.licenseCategories) !== "[]"
+          ? serializeLicenseCategories(document.licenseCategories)
+          : null,
+    },
     { field: "document.series", value: document.series },
     {
       field: "document.number",
@@ -1803,12 +1910,22 @@ function documentAuditValues(document: PersonDocument): AuditValue[] {
   ];
 }
 
+function serializeLicenseCategories(value: unknown): string {
+  return JSON.stringify(
+    v1.persons.personDriverLicenseCategoriesSchema.parse(value),
+  );
+}
+
 function documentInputHasChanges(
   existing: PersonDocument,
   input: v1.persons.UpdatePersonDocumentInput,
 ): boolean {
   return (
     definedValueChanged(input.type, existing.type) ||
+    definedValueChanged(input.nationalIdFormat, existing.nationalIdFormat) ||
+    (input.licenseCategories !== undefined &&
+      serializeLicenseCategories(input.licenseCategories) !==
+        serializeLicenseCategories(existing.licenseCategories)) ||
     definedValueChanged(input.series, existing.series) ||
     definedValueChanged(input.number, existing.number) ||
     definedValueChanged(input.cnp, existing.cnp) ||

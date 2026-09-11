@@ -121,10 +121,6 @@ export function DocumentsSection({
             documentId={`${formId}-document-${activeDocument.key}`}
             fieldErrors={fieldErrors}
             locale={locale}
-            canChangeIdentityType={
-              form.citizenship === "foreign" &&
-              activeDocument.slot === "identity"
-            }
             showUnder18Warning={showUnder18Warning}
             disabled={disabled}
             onSave={saveDocument}
@@ -144,5 +140,8 @@ function cloneDocument(
     issuedOn: { ...document.issuedOn },
     expiresOn: { ...document.expiresOn },
     photos: { ...document.photos },
+    licenseCategories: document.licenseCategories.map((category) => ({
+      ...category,
+    })),
   };
 }

@@ -83,5 +83,7 @@ export const PERSON_DOCUMENT_FORM_FIELD_KEYS =
     "hasExpiryDate",
     "expiresOn",
     "status",
+    "licenseCategories",
+    "photos",
     "notes",
   ]);

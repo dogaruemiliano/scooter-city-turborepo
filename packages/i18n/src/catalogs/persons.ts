@@ -68,6 +68,7 @@ export const personsCatalog = {
         invalidCnp: "Enter a valid CNP.",
         futureDate: "{field} cannot be in the future.",
         maxLength: "{field} must be {max} characters or fewer.",
+        requiredDocumentPhotos: "Add the required files for {document}.",
         duplicateDocumentTypes: "Document types must be unique.",
         documentSlotLimit:
           "Only one identity document and one driver license are allowed.",
@@ -120,6 +121,7 @@ export const personsCatalog = {
         photoSources: "Camera, gallery, files",
         photoFileTypes: "JPEG, PNG, or WebP",
         photoFileTypesShort: "JPEG • PNG • WebP",
+        openFile: "Open file",
         photoMetadata: "{contentType}, {byteSize} bytes",
         deleteConfirmation: "Are you sure?",
       },
@@ -174,6 +176,28 @@ export const personsCatalog = {
       romanian: "Romanian citizen",
       foreign: "Foreign citizen",
     },
+    nationalIdFormat: {
+      label: "National ID version",
+      classic: "Old national ID",
+      electronic: "Electronic ID (CEI)",
+      classicHelp: "Add one photo of the old national ID.",
+      electronicHelp:
+        "Add both sides of the electronic ID and proof of address.",
+    },
+    license: {
+      title: "Driving licence categories",
+      addCategory: "Add category",
+      removeCategory: "Remove category",
+      category: "Category",
+      issuedOn: "Category issued on",
+      expiresOn: "Category expires on",
+      restrictions: "Restrictions",
+      reviewHelp:
+        "Check the licence and its categories before marking this document as verified. A photo alone does not confirm rental eligibility.",
+      uploadHelp:
+        "Optional. Add both sides to review categories and validity. Without a confirmed valid licence, only scooters requiring no licence are available.",
+      empty: "No categories recorded.",
+    },
     documentForm: {
       empty: "No documents added.",
       allTypesAdded: "Identity document and driver license have been added.",
@@ -200,6 +224,14 @@ export const personsCatalog = {
       removePhoto: "Remove {slot} photo",
       captureFailed:
         "The photo could not be captured. Try again or choose an image.",
+      addFile: "Add {slot} file",
+      changeFile: "Change {slot} file",
+      fileSheetTitle: "{slot} file",
+      useFile: "Use file",
+      openFile: "Open file",
+      fileTypesShort: "JPEG • PNG • WebP • PDF",
+      proofOfAddressHelp:
+        "Photo or PDF of the certificate confirming domicile or residence.",
       required: "Required",
       optional: "Optional",
       photoHelp: "Optional. You can add them later.",
@@ -291,6 +323,8 @@ export const personsCatalog = {
       none: "None",
       passport: "Passport",
       nationalId: "National ID",
+      visa: "Visa",
+      proofOfAddress: "Proof of address",
       driverLicense: "Driver license",
       residencePermit: "Residence permit",
       other: "Other",
@@ -403,6 +437,8 @@ export const personsCatalog = {
         invalidCnp: "Introdu un CNP valid.",
         futureDate: "{field} nu poate fi în viitor.",
         maxLength: "{field} trebuie să aibă cel mult {max} caractere.",
+        requiredDocumentPhotos:
+          "Adaugă fișierele obligatorii pentru {document}.",
         duplicateDocumentTypes: "Tipurile de documente trebuie să fie unice.",
         documentSlotLimit:
           "Este permis un singur document de identitate și un singur permis de conducere.",
@@ -457,6 +493,7 @@ export const personsCatalog = {
         photoSources: "Cameră, galerie, fișiere",
         photoFileTypes: "JPEG, PNG sau WebP",
         photoFileTypesShort: "JPEG • PNG • WebP",
+        openFile: "Deschide fișierul",
         photoMetadata: "{contentType}, {byteSize} bytes",
         deleteConfirmation: "Ești sigur?",
       },
@@ -511,6 +548,28 @@ export const personsCatalog = {
       romanian: "Cetățean român",
       foreign: "Cetățean străin",
     },
+    nationalIdFormat: {
+      label: "Versiunea cărții de identitate",
+      classic: "Carte de identitate veche",
+      electronic: "Carte electronică (CEI)",
+      classicHelp: "Adaugă o fotografie a cărții de identitate vechi.",
+      electronicHelp:
+        "Adaugă ambele fețe ale cărții electronice și dovada de domiciliu / reședință.",
+    },
+    license: {
+      title: "Categorii permis de conducere",
+      addCategory: "Adaugă categorie",
+      removeCategory: "Elimină categoria",
+      category: "Categorie",
+      issuedOn: "Categoria emisă la",
+      expiresOn: "Categoria expiră la",
+      restrictions: "Restricții",
+      reviewHelp:
+        "Verifică permisul și categoriile înainte de a marca documentul drept verificat. Fotografia singură nu confirmă eligibilitatea pentru închiriere.",
+      uploadHelp:
+        "Opțional. Adaugă ambele fețe pentru verificarea categoriilor și valabilității. Fără un permis valabil confirmat, sunt disponibile doar scuterele care nu necesită permis.",
+      empty: "Nu există categorii înregistrate.",
+    },
     documentForm: {
       empty: "Nu a fost adăugat niciun document.",
       allTypesAdded:
@@ -538,6 +597,14 @@ export const personsCatalog = {
       removePhoto: "Elimină poza: {slot}",
       captureFailed:
         "Fotografia nu a putut fi realizată. Încearcă din nou sau alege o imagine.",
+      addFile: "Adaugă fișier: {slot}",
+      changeFile: "Schimbă fișierul: {slot}",
+      fileSheetTitle: "Fișier: {slot}",
+      useFile: "Folosește fișierul",
+      openFile: "Deschide fișierul",
+      fileTypesShort: "JPEG • PNG • WebP • PDF",
+      proofOfAddressHelp:
+        "Fotografie sau PDF al certificatului de atestare a domiciliului / reședinței.",
       required: "Obligatoriu",
       optional: "Opțional",
       photoHelp: "Opțional. Le poți adăuga mai târziu.",
@@ -630,6 +697,8 @@ export const personsCatalog = {
       none: "Niciunul",
       passport: "Pașaport",
       nationalId: "Carte de identitate",
+      visa: "Viză",
+      proofOfAddress: "Dovadă de domiciliu / reședință",
       driverLicense: "Permis de conducere",
       residencePermit: "Permis de ședere",
       other: "Altul",

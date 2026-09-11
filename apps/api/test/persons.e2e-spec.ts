@@ -1019,6 +1019,281 @@ describe("Persons HTTP surface (e2e)", () => {
     expect(s3Objects.size).toBe(1);
   });
 
+  async function uploadPersonDraft(
+    session: IssuedSession,
+    contentType: "image/png" | "application/pdf" = "image/png",
+  ) {
+    const buffer = Buffer.from(
+      contentType === "application/pdf" ? "%PDF-proof" : "document-image",
+    );
+    const response = await req()
+      .post(v1.persons.ROUTES.documents.photos.createDraftUploadUrl)
+      .set("Cookie", [`access_token=${session.accessToken}`])
+      .send({
+        contentType,
+        ...(contentType === "application/pdf"
+          ? { documentType: "proofOfAddress" }
+          : {}),
+        byteSize: buffer.length,
+        checksumSha256: createHash("sha256").update(buffer).digest("hex"),
+      });
+    expect(response.status).toBe(201);
+    const upload = v1.persons.personDocumentPhotoUploadUrlSchema.parse(
+      response.body,
+    );
+    const storageKey = presignedPutKeys.at(-1);
+    if (!storageKey) throw new Error("Missing draft storage key");
+    s3Objects.set(storageKey, { body: buffer, contentType });
+    return { ...upload, storageKey };
+  }
+
+  it("saves foreign supplementary documents and reviewed licence categories with an audit trail", async () => {
+    const admin = await freshSession(["ADMIN"]);
+    const upload = await uploadPersonDraft(admin);
+    const categories = [
+      {
+        category: "AM" as const,
+        issuedOn: "2022-01-01",
+        expiresOn: "2032-01-01",
+        restrictions: "01",
+      },
+    ];
+    const response = await req()
+      .post(v1.persons.ROUTES.create)
+      .set("Cookie", [`access_token=${admin.accessToken}`])
+      .send(
+        personInput({
+          documentWorkflow: "foreign",
+          documents: [
+            {
+              type: "passport",
+              status: "verified",
+              photos: { front: upload.uploadToken },
+            },
+            { type: "visa", status: "verified", number: "V123" },
+            { type: "residencePermit", status: "verified", number: "R123" },
+            {
+              type: "driverLicense",
+              status: "verified",
+              licenseCategories: categories,
+            },
+          ],
+        }),
+      );
+    expect(response.status).toBe(201);
+    const person = v1.persons.personSchema.parse(response.body);
+    expect(person.documents.map((document) => document.type).sort()).toEqual([
+      "driverLicense",
+      "passport",
+      "residencePermit",
+      "visa",
+    ]);
+    const licence = person.documents.find(
+      (document) => document.type === "driverLicense",
+    );
+    const passport = person.documents.find(
+      (document) => document.type === "passport",
+    );
+    if (!licence || !passport)
+      throw new Error("Expected passport and driving licence");
+    expect(licence.licenseCategories).toEqual(categories);
+
+    const update = await req()
+      .patch(v1.persons.ROUTES.documents.update(person.id, licence.id))
+      .set("Cookie", [`access_token=${admin.accessToken}`])
+      .send({
+        licenseCategories: [
+          { category: "A1", issuedOn: "2023-01-01", expiresOn: "2033-01-01" },
+        ],
+      });
+    expect(update.status).toBe(200);
+    expect(
+      v1.persons.personDocumentSchema.parse(update.body).licenseCategories?.[0]
+        ?.category,
+    ).toBe("A1");
+    const invalidMetadata = await req()
+      .patch(v1.persons.ROUTES.documents.update(person.id, passport.id))
+      .set("Cookie", [`access_token=${admin.accessToken}`])
+      .send({ licenseCategories: categories });
+    expect(invalidMetadata.status).toBe(400);
+    const duplicateVisa = await req()
+      .post(v1.persons.ROUTES.documents.create(person.id))
+      .set("Cookie", [`access_token=${admin.accessToken}`])
+      .send({ type: "visa" });
+    expect(duplicateVisa.status).toBe(409);
+    const audit = await listAuditEvents(person.id, admin.accessToken);
+    expect(
+      audit.find((event) => event.type === "PERSON_DOCUMENT_UPDATED")?.changes,
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          field: "document.licenseCategories",
+          oldValue: JSON.stringify(categories),
+        }),
+      ]),
+    );
+  });
+
+  it("requires electronic ID front, back and proof and accepts private proof PDFs including replacements", async () => {
+    const admin = await freshSession(["ADMIN"]);
+    const front = await uploadPersonDraft(admin);
+    const back = await uploadPersonDraft(admin);
+    const proof = await uploadPersonDraft(admin, "application/pdf");
+    const nationalId: v1.persons.CreatePersonNestedDocumentInput = {
+      type: "nationalId",
+      nationalIdFormat: "electronic",
+      issuingCountryCode: "RO",
+      status: "verified",
+      photos: { front: front.uploadToken, back: back.uploadToken },
+    };
+    const missing = await req()
+      .post(v1.persons.ROUTES.create)
+      .set("Cookie", [`access_token=${admin.accessToken}`])
+      .send(
+        personInput({
+          documentWorkflow: "romanianElectronic",
+          documents: [nationalId],
+        }),
+      );
+    expect(missing.status).toBe(400);
+    const wrongPdf = await req()
+      .post(v1.persons.ROUTES.create)
+      .set("Cookie", [`access_token=${admin.accessToken}`])
+      .send(
+        personInput({
+          documents: [
+            {
+              type: "nationalId",
+              status: "verified",
+              photos: { front: proof.uploadToken },
+            },
+          ],
+        }),
+      );
+    expect(wrongPdf.status).toBe(400);
+    const response = await req()
+      .post(v1.persons.ROUTES.create)
+      .set("Cookie", [`access_token=${admin.accessToken}`])
+      .send(
+        personInput({
+          documentWorkflow: "romanianElectronic",
+          documents: [
+            nationalId,
+            {
+              type: "proofOfAddress",
+              status: "verified",
+              photos: { front: proof.uploadToken },
+            },
+          ],
+        }),
+      );
+    expect(response.status).toBe(201);
+    const person = v1.persons.personSchema.parse(response.body);
+    const id = person.documents.find(
+      (document) => document.type === "nationalId",
+    );
+    const address = person.documents.find(
+      (document) => document.type === "proofOfAddress",
+    );
+    if (!id || !address)
+      throw new Error("Expected electronic ID and proof of address");
+    expect(id.nationalIdFormat).toBe("electronic");
+    const contentPath = v1.persons.ROUTES.documents.photos.content(
+      person.id,
+      address.id,
+      "front",
+    );
+    const content = await req()
+      .get(contentPath)
+      .set("Cookie", [`access_token=${admin.accessToken}`]);
+    expect(content.status).toBe(200);
+    expect(content.headers["content-type"]).toContain("application/pdf");
+    expect((await req().get(contentPath)).status).toBe(401);
+    const replace = await req()
+      .put(
+        v1.persons.ROUTES.documents.photos.upsert(
+          person.id,
+          address.id,
+          "front",
+        ),
+      )
+      .set("Cookie", [`access_token=${admin.accessToken}`])
+      .attach("file", Buffer.from("%PDF-replacement"), {
+        filename: "proof.pdf",
+        contentType: "application/pdf",
+      });
+    expect(replace.status).toBe(200);
+    expect(
+      v1.persons.personDocumentPhotoSchema.parse(replace.body).contentType,
+    ).toBe("application/pdf");
+    const wrongType = await req()
+      .put(v1.persons.ROUTES.documents.photos.upsert(person.id, id.id, "front"))
+      .set("Cookie", [`access_token=${admin.accessToken}`])
+      .attach("file", Buffer.from("%PDF-wrong"), {
+        filename: "id.pdf",
+        contentType: "application/pdf",
+      });
+    expect(wrongType.status).toBe(400);
+  });
+
+  it("retains uploaded drafts for review while enforcing owner, expiry and single-use claims", async () => {
+    const admin = await freshSession(["ADMIN"]);
+    const anotherAdmin = await freshSession(["ADMIN"]);
+    const upload = await uploadPersonDraft(admin);
+    expect(
+      Date.parse(upload.uploadTokenExpiresAt ?? "") -
+        Date.parse(upload.expiresAt),
+    ).toBeGreaterThan(80_000_000);
+    const draft = await prisma.draftUpload.findUniqueOrThrow({
+      where: { storageKey: upload.storageKey },
+    });
+    expect(draft.expiresAt.toISOString()).toBe(upload.uploadTokenExpiresAt);
+    const documents: v1.persons.CreatePersonNestedDocumentInput[] = [
+      {
+        type: "passport",
+        status: "verified",
+        photos: { front: upload.uploadToken },
+      },
+    ];
+    const wrongOwner = await req()
+      .post(v1.persons.ROUTES.create)
+      .set("Cookie", [`access_token=${anotherAdmin.accessToken}`])
+      .send(personInput({ documents }));
+    expect(wrongOwner.status).toBe(400);
+    const create = await req()
+      .post(v1.persons.ROUTES.create)
+      .set("Cookie", [`access_token=${admin.accessToken}`])
+      .send(personInput({ documents }));
+    expect(create.status).toBe(201);
+    const reused = await req()
+      .post(v1.persons.ROUTES.create)
+      .set("Cookie", [`access_token=${admin.accessToken}`])
+      .send(personInput({ documents }));
+    expect(reused.status).toBe(400);
+    expect(s3Objects.has(upload.storageKey)).toBe(true);
+
+    const expired = await uploadPersonDraft(admin);
+    await prisma.draftUpload.update({
+      where: { storageKey: expired.storageKey },
+      data: { expiresAt: new Date(0) },
+    });
+    const expiredCreate = await req()
+      .post(v1.persons.ROUTES.create)
+      .set("Cookie", [`access_token=${admin.accessToken}`])
+      .send(
+        personInput({
+          documents: [
+            {
+              type: "passport",
+              status: "verified",
+              photos: { front: expired.uploadToken },
+            },
+          ],
+        }),
+      );
+    expect(expiredCreate.status).toBe(400);
+  });
+
   it("returns 409 for duplicate email or phone", async () => {
     const session = await freshSession(["ADMIN"]);
     const input = personInput();

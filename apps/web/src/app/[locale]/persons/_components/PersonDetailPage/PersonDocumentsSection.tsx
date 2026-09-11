@@ -5,6 +5,7 @@ import { FileTextIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { inlineIconClassName } from "./constants";
+import { DocumentFormDialog } from "./DocumentFormDialog";
 import { DocumentDetailCard } from "./DocumentDetailCard";
 import { EmptyDocumentDetailCard } from "./EmptyDocumentDetailCard";
 import type { DocumentPhotosByDocumentId } from "./types";
@@ -49,6 +50,20 @@ export function PersonDocumentsSection({
   const driverLicenseDocument = documents.find(
     (document) =>
       document.type === v1.persons.PERSON_DRIVER_LICENSE_DOCUMENT_TYPE,
+  );
+
+  const supplementaryTypes = [
+    "visa",
+    "residencePermit",
+    "proofOfAddress",
+  ] as const;
+  const availableSupplementaryTypes = supplementaryTypes.filter(
+    (type) => !documents.some((document) => document.type === type),
+  );
+  const supplementaryDocuments = documents.filter(
+    (document) =>
+      !v1.persons.isPersonIdentityDocumentType(document.type) &&
+      document.type !== "driverLicense",
   );
 
   return (
@@ -104,7 +119,37 @@ export function PersonDocumentsSection({
             onCreate={onCreateDocument}
           />
         )}
+        {supplementaryDocuments.map((document) => (
+          <DocumentDetailCard
+            key={document.id}
+            document={document}
+            photos={photosByDocumentId[document.id] ?? []}
+            locale={locale}
+            busyAction={busyAction}
+            onUpdate={(input) => onUpdateDocument(document.id, input)}
+            onDelete={() => onDeleteDocument(document.id)}
+            onUploadPhoto={(slot, file) =>
+              onUploadDocumentPhoto(document.id, slot, file)
+            }
+            onDeletePhoto={(slot) => onDeleteDocumentPhoto(document.id, slot)}
+          />
+        ))}
       </div>
+      {availableSupplementaryTypes.length > 0 ? (
+        <div>
+          <DocumentFormDialog
+            title={t("detail.dialogs.addDocumentTitle")}
+            triggerLabel={t("actions.addDocument")}
+            initialType={availableSupplementaryTypes[0]}
+            allowedTypes={availableSupplementaryTypes}
+            busy={busyAction !== null}
+            triggerDisabled={busyAction !== null}
+            onSubmit={(input) =>
+              onCreateDocument(input as v1.persons.CreatePersonDocumentInput)
+            }
+          />
+        </div>
+      ) : null}
     </section>
   );
 }

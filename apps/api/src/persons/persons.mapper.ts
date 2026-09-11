@@ -45,6 +45,11 @@ export function toPersonDocument(
     id: row.id,
     personId: row.personId,
     type: row.type as v1.persons.PersonDocument["type"],
+    nationalIdFormat:
+      row.nationalIdFormat as v1.persons.PersonNationalIdFormat | null,
+    licenseCategories: v1.persons.personDriverLicenseCategoriesSchema.parse(
+      row.licenseCategories,
+    ),
     series: row.series,
     number: row.number,
     cnp: row.cnp,

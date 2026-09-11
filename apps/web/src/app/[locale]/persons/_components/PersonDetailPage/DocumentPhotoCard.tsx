@@ -2,7 +2,7 @@
 
 import { v1 } from "@repo/api-shared";
 import { Button } from "@repo/ui/components";
-import { Trash2Icon } from "lucide-react";
+import { FileTextIcon, Trash2Icon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 
@@ -11,6 +11,7 @@ import { documentPhotoAccept } from "./constants";
 
 export function DocumentPhotoCard({
   inputId,
+  allowPdf = false,
   slot,
   slotLabel,
   photo,
@@ -21,6 +22,7 @@ export function DocumentPhotoCard({
   onDeletePhoto,
 }: {
   inputId: string;
+  allowPdf?: boolean;
   slot: v1.persons.PersonDocumentPhotoSlot;
   slotLabel: string;
   photo: v1.persons.PersonDocumentPhoto | undefined;
@@ -60,10 +62,22 @@ export function DocumentPhotoCard({
     <div className="relative min-w-0">
       <DocumentImageUploader
         inputId={inputId}
-        accept={documentPhotoAccept}
+        accept={
+          allowPdf
+            ? `${documentPhotoAccept},application/pdf`
+            : documentPhotoAccept
+        }
         uploadLabel={uploadLabel}
         slotLabel={slotLabel}
         imageUrl={imageUrl}
+        preview={
+          photo?.contentType === "application/pdf" ? (
+            <span className="flex h-full w-full flex-col items-center justify-center gap-2 text-muted-foreground">
+              <FileTextIcon aria-hidden="true" className="size-7" />
+              <span className="text-sm">PDF</span>
+            </span>
+          ) : undefined
+        }
         alt={photoAlt}
         disabled={disabled || deleteConfirmationOpen}
         missingLabel={t("detail.documents.missingPhoto")}
@@ -101,6 +115,16 @@ export function DocumentPhotoCard({
         }
       />
 
+      {photo?.contentType === "application/pdf" && imageUrl ? (
+        <a
+          href={imageUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-2 inline-block text-sm text-primary underline"
+        >
+          {t("actions.view")} PDF
+        </a>
+      ) : null}
       {photo && deleteConfirmationOpen ? (
         <div
           role="alertdialog"

@@ -213,7 +213,7 @@ test("person document photo schemas expose slot metadata and content routes", ()
       byteSize: 1234,
       checksumSha256,
     }).success,
-    false,
+    true,
   );
   assert.equal(
     v1.persons.createPersonDocumentPhotoUploadUrlInputSchema.safeParse({
@@ -455,6 +455,198 @@ test("listPersonsQuerySchema validates search filters", () => {
   assert.equal(
     v1.persons.listPersonsQuerySchema.safeParse({
       sort: "firstNameAsc",
+    }).success,
+    false,
+  );
+});
+
+test("document workflows require the relevant photos while preserving legacy inputs", () => {
+  const base = {
+    email: "rider@example.com",
+    phone: "+40712345678",
+    firstName: "Ada",
+    lastName: "Lovelace",
+  };
+  assert.equal(
+    v1.persons.createPersonInputSchema.safeParse(base).success,
+    true,
+  );
+  const classic = {
+    type: "nationalId",
+    nationalIdFormat: "classic",
+    photos: { front: "front-token" },
+  };
+  const electronic = {
+    ...classic,
+    nationalIdFormat: "electronic",
+    photos: { front: "front-token", back: "back-token" },
+  };
+  const proof = { type: "proofOfAddress", photos: { front: "proof-token" } };
+  assert.equal(
+    v1.persons.createPersonInputSchema.safeParse({
+      ...base,
+      documentWorkflow: "romanianClassic",
+      documents: [classic],
+    }).success,
+    true,
+  );
+  assert.equal(
+    v1.persons.createPersonInputSchema.safeParse({
+      ...base,
+      documentWorkflow: "romanianElectronic",
+      documents: [electronic, proof],
+    }).success,
+    true,
+  );
+  assert.equal(
+    v1.persons.createPersonInputSchema.safeParse({
+      ...base,
+      documentWorkflow: "foreign",
+      documents: [
+        { type: "passport", photos: { front: "passport-token" } },
+        { type: "visa" },
+        { type: "residencePermit" },
+        { type: "driverLicense" },
+      ],
+    }).success,
+    true,
+  );
+  for (const documents of [
+    [classic],
+    [electronic],
+    [{ ...electronic, photos: { front: "token" } }, proof],
+  ]) {
+    assert.equal(
+      v1.persons.createPersonInputSchema.safeParse({
+        ...base,
+        documentWorkflow: "romanianElectronic",
+        documents,
+      }).success,
+      false,
+    );
+  }
+  assert.equal(
+    v1.persons.createPersonInputSchema.safeParse({
+      ...base,
+      documentWorkflow: "foreign",
+      documents: [{ type: "passport" }],
+    }).success,
+    false,
+  );
+  assert.equal(
+    v1.persons.createPersonInputSchema.safeParse({
+      ...base,
+      documentWorkflow: "foreign",
+      documents: [classic],
+    }).success,
+    false,
+  );
+  assert.equal(
+    v1.persons.createPersonInputSchema.safeParse({
+      ...base,
+      documents: [
+        { type: "passport" },
+        { type: "residencePermit" },
+        { type: "visa" },
+      ],
+    }).success,
+    true,
+  );
+  assert.equal(
+    v1.persons.createPersonInputSchema.safeParse({
+      ...base,
+      documents: [{ type: "visa" }, { type: "visa" }],
+    }).success,
+    false,
+  );
+});
+
+test("licence metadata validates categories, dates, duplicates and document type", () => {
+  const category = {
+    category: "AM",
+    issuedOn: "2020-01-01",
+    expiresOn: "2030-01-01",
+    restrictions: "  01  ",
+  };
+  const parsed = v1.persons.createPersonDocumentInputSchema.parse({
+    type: "driverLicense",
+    licenseCategories: [category],
+  });
+  assert.equal(parsed.licenseCategories?.[0]?.restrictions, "01");
+  for (const licenseCategories of [
+    [{ ...category, category: "UNKNOWN" }],
+    [{ ...category, expiresOn: "2019-01-01" }],
+    [{ ...category, issuedOn: "2024-02-31" }],
+    [category, category],
+  ]) {
+    assert.equal(
+      v1.persons.createPersonDocumentInputSchema.safeParse({
+        type: "driverLicense",
+        licenseCategories,
+      }).success,
+      false,
+    );
+  }
+  assert.equal(
+    v1.persons.createPersonDocumentInputSchema.safeParse({
+      type: "passport",
+      licenseCategories: [category],
+    }).success,
+    false,
+  );
+  assert.equal(
+    v1.persons.createPersonDocumentInputSchema.safeParse({
+      type: "passport",
+      nationalIdFormat: "classic",
+    }).success,
+    false,
+  );
+  assert.equal(
+    v1.persons.createPersonDocumentInputSchema.safeParse({
+      type: "driverLicense",
+      licenseCategories: [{ category: "B", issuedOn: null, expiresOn: null }],
+    }).success,
+    true,
+  );
+  assert.equal(
+    v1.persons.updatePersonDocumentInputSchema.safeParse({
+      licenseCategories: [category],
+    }).success,
+    true,
+  );
+});
+
+test("draft PDFs require proof-of-address metadata and preserve checksum validation", () => {
+  const input = {
+    contentType: "application/pdf",
+    byteSize: 100,
+    checksumSha256: "a".repeat(64),
+  };
+  assert.equal(
+    v1.persons.createPersonDocumentPhotoDraftUploadUrlInputSchema.safeParse(
+      input,
+    ).success,
+    false,
+  );
+  assert.equal(
+    v1.persons.createPersonDocumentPhotoDraftUploadUrlInputSchema.safeParse({
+      ...input,
+      documentType: "passport",
+    }).success,
+    false,
+  );
+  assert.equal(
+    v1.persons.createPersonDocumentPhotoDraftUploadUrlInputSchema.safeParse({
+      ...input,
+      documentType: "proofOfAddress",
+    }).success,
+    true,
+  );
+  assert.equal(
+    v1.persons.createPersonDocumentPhotoDraftUploadUrlInputSchema.safeParse({
+      ...input,
+      documentType: "proofOfAddress",
+      checksumSha256: "bad",
     }).success,
     false,
   );

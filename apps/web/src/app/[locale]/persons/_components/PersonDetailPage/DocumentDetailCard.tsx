@@ -163,6 +163,8 @@ export function DocumentDetailCard({
         <BottomSheetBody>
           <DocumentPhotosPanel
             documentId={document.id}
+            documentType={document.type}
+            nationalIdFormat={document.nationalIdFormat}
             photos={photos}
             busyAction={busyAction}
             onUploadPhoto={onUploadPhoto}
@@ -218,6 +220,50 @@ export function DocumentDetailCard({
               className="sm:col-span-2"
             />
           </dl>
+          {isDriverLicense ? (
+            <section className="grid gap-3" aria-label={t("license.title")}>
+              <h3 className="text-sm font-medium">{t("license.title")}</h3>
+              <p className="text-sm text-muted-foreground">
+                {t("license.reviewHelp")}
+              </p>
+              {(document.licenseCategories ?? []).length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  {t("license.empty")}
+                </p>
+              ) : null}
+              {(document.licenseCategories ?? []).map((entry) => (
+                <dl
+                  key={entry.category}
+                  className="grid gap-3 border-t border-border pt-3 sm:grid-cols-2"
+                >
+                  <DetailField
+                    label={t("license.category")}
+                    value={entry.category}
+                  />
+                  <DetailField
+                    label={t("license.issuedOn")}
+                    value={formatOptionalDate(
+                      entry.issuedOn,
+                      locale,
+                      emptyValue,
+                    )}
+                  />
+                  <DetailField
+                    label={t("license.expiresOn")}
+                    value={formatOptionalDate(
+                      entry.expiresOn,
+                      locale,
+                      emptyValue,
+                    )}
+                  />
+                  <DetailField
+                    label={t("license.restrictions")}
+                    value={entry.restrictions ?? emptyValue}
+                  />
+                </dl>
+              ))}
+            </section>
+          ) : null}
         </BottomSheetBody>
         <BottomSheetFooter className="sm:flex-row-reverse sm:justify-start">
           <DocumentFormDialog

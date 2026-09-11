@@ -22,6 +22,8 @@ const documentTypeIcons = {
   driverLicense: CarFrontIcon,
   residencePermit: IdCardIcon,
   other: FileTextIcon,
+  visa: FileTextIcon,
+  proofOfAddress: FileTextIcon,
 } as const satisfies Record<v1.persons.PersonDocumentType, LucideIcon>;
 
 export function DocumentDraftCard({

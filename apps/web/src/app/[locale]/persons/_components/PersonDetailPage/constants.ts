@@ -32,5 +32,7 @@ export const documentTypeIcons = {
   nationalId: IdCardIcon,
   driverLicense: CarFrontIcon,
   residencePermit: IdCardIcon,
+  visa: FileTextIcon,
+  proofOfAddress: FileTextIcon,
   other: FileTextIcon,
 } as const satisfies Record<v1.persons.PersonDocumentType, LucideIcon>;

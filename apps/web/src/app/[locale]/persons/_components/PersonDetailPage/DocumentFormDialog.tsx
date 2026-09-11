@@ -22,6 +22,7 @@ import { Trash2Icon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useId, useState, type FormEvent, type ReactNode } from "react";
 
+import { LicenseCategoriesFields } from "../LicenseCategoriesFields";
 import { DocumentExpiryField } from "../DocumentExpiryField";
 import {
   documentFormHasChanges,
@@ -298,6 +299,13 @@ export function DocumentFormDialog({
                   onChange={(value) => setValue("expiresOn", value)}
                 />
               </DocumentExpiryField>
+              {isDriverLicense ? (
+                <LicenseCategoriesFields
+                  value={form.licenseCategories}
+                  onChange={(value) => setValue("licenseCategories", value)}
+                  disabled={busy || deleteBusy}
+                />
+              ) : null}
               <TextareaField
                 label={t("fields.notes")}
                 value={form.notes}

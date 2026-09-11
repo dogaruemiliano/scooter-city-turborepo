@@ -5,7 +5,6 @@ import type {
   CountryCode,
   PhoneNumberInputChangeDetails,
 } from "@repo/ui/components";
-import { emptyDateParts } from "@repo/ui/lib/date-parts";
 import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { useId, useState, type FormEvent } from "react";
@@ -29,11 +28,13 @@ import {
 import { FormActions } from "./FormActions";
 import {
   createEmptyCreateForm,
-  createInitialDocuments,
+  switchDocumentWorkflow,
+  updateDocumentDrafts,
   isUnder18Person,
 } from "./form-state";
 import { createPersonInput } from "./input";
 import { NotesField } from "./NotesField";
+import { NationalIdFormatSelect } from "./NationalIdFormatSelect";
 import type {
   CreatePersonDocumentFormState,
   CreatePersonFormState,
@@ -42,6 +43,7 @@ import type {
   FormErrors,
   FormValidationIssue,
   PersonCitizenship,
+  NationalIdFormat,
   PersonCreateFormProps,
   PersonDocumentFormFieldKey,
 } from "./types";
@@ -174,6 +176,15 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
     issue: FormValidationIssue,
     field: FormErrorKey | null,
   ): string {
+    if (isDocumentFieldErrorKey(field, "photos")) {
+      const documentKey = documentFieldFromErrorKey(field)?.documentKey;
+      const document = form.documents.find((item) => item.key === documentKey);
+      return t("feedback.validation.requiredDocumentPhotos", {
+        document: document
+          ? t(`documentTypes.${document.type}`)
+          : t("sections.documentPhotos"),
+      });
+    }
     if (field === "documents") {
       return issue.message === "Document types must be unique."
         ? t("feedback.validation.duplicateDocumentTypes")
@@ -253,6 +264,10 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
           return t("fields.documentExpiresOn");
         case "status":
           return t("fields.documentStatus");
+        case "licenseCategories":
+          return t("license.title");
+        case "photos":
+          return t("sections.documentPhotos");
         case "notes":
           return t("fields.notes");
       }
@@ -303,11 +318,19 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
           citizenship={form.citizenship}
           onChange={changeCitizenship}
         />
+        {form.citizenship === "romanian" ? (
+          <NationalIdFormatSelect
+            value={form.nationalIdFormat}
+            disabled={creating}
+            onChange={changeNationalIdFormat}
+          />
+        ) : null}
         <DocumentPhotosSection
           formId={formId}
           form={form}
           disabled={creating}
           onSetDocumentPhoto={setDocumentPhoto}
+          fieldErrors={fieldErrors}
         />
         <ContactSection
           formId={formId}
@@ -384,19 +407,13 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
   }
 
   function changeCitizenship(citizenship: PersonCitizenship) {
-    setForm((current) =>
-      current.citizenship === citizenship
-        ? current
-        : {
-            ...current,
-            citizenship,
-            dateOfBirth:
-              citizenship === "romanian"
-                ? emptyDateParts()
-                : current.dateOfBirth,
-            documents: createInitialDocuments(citizenship),
-          },
-    );
+    setForm((current) => switchDocumentWorkflow(current, citizenship));
+    setFieldErrors({});
+    setFeedback(null);
+  }
+
+  function changeNationalIdFormat(format: NationalIdFormat) {
+    setForm((current) => switchDocumentWorkflow(current, "romanian", format));
     setFieldErrors({});
     setFeedback(null);
   }
@@ -431,6 +448,7 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
     slot: v1.persons.PersonDocumentPhotoSlot,
     file: File | null,
   ) {
+    clearFieldError(documentFieldErrorKey(documentKey, "photos"));
     if (file) {
       const uploadId = createDraftUploadId();
       setForm((current) => ({
@@ -502,6 +520,9 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
         {
           method: "POST",
           json: {
+            ...(file.type === "application/pdf"
+              ? { documentType: "proofOfAddress" }
+              : {}),
             contentType: file.type,
             byteSize: file.size,
             checksumSha256,
@@ -587,25 +608,19 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
     uploadId: string,
     nextUpload: CreatePersonDocumentFormState["photos"][v1.persons.PersonDocumentPhotoSlot],
   ) {
-    setForm((current) => ({
-      ...current,
-      documents: current.documents.map((document) => {
+    setForm((current) =>
+      updateDocumentDrafts(current, (document) => {
         if (
           document.key !== documentKey ||
           document.photos[slot]?.id !== uploadId
-        ) {
+        )
           return document;
-        }
-
         return {
           ...document,
-          photos: {
-            ...document.photos,
-            [slot]: nextUpload,
-          },
+          photos: { ...document.photos, [slot]: nextUpload },
         };
       }),
-    }));
+    );
   }
 
   function clearFieldError(field: FormErrorKey) {
