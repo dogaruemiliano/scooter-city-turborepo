@@ -23,22 +23,15 @@ import { useState } from "react";
 
 import { DocumentExpiryField } from "../DocumentExpiryField";
 import { FOREIGN_IDENTITY_DOCUMENT_TYPES } from "./constants";
-import { DocumentPhotoDraftCard } from "./DocumentPhotoDraftCard";
 import { documentFieldErrorKey, fieldErrorId, invalidAria } from "./errors";
 import { FormField } from "./FormField";
 import type {
   CreatePersonDocumentFormState,
   FormErrors,
-  SetPersonDocumentPhoto,
   SetPersonDocumentValue,
 } from "./types";
 import { Under18Warning } from "./Under18Warning";
 import { DatePartsInput } from "@/components/DateField";
-
-const documentPhotoSlots = [
-  "front",
-  "back",
-] as const satisfies readonly v1.persons.PersonDocumentPhotoSlot[];
 
 export function DocumentDraftSheet({
   title,
@@ -51,7 +44,6 @@ export function DocumentDraftSheet({
   disabled,
   onSave,
   onSetDocumentValue,
-  onSetDocumentPhoto,
 }: {
   title: string;
   document: CreatePersonDocumentFormState;
@@ -63,7 +55,6 @@ export function DocumentDraftSheet({
   disabled: boolean;
   onSave: () => void;
   onSetDocumentValue: SetPersonDocumentValue;
-  onSetDocumentPhoto: SetPersonDocumentPhoto;
 }) {
   const t = useTranslations("persons");
   const [localExpiresOnError, setLocalExpiresOnError] = useState<string | null>(
@@ -424,33 +415,6 @@ export function DocumentDraftSheet({
               }
             />
           </FormField>
-
-          <div className="grid gap-3 sm:col-span-2">
-            <div className="grid gap-1">
-              <p className="text-xs text-muted-foreground">
-                {t("documentForm.photoHelp")}
-              </p>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {documentPhotoSlots.map((slot) => {
-                const photoInputId = `${documentId}-${slot}-photo`;
-                const slotLabel = t(`documentPhotoSlots.${slot}`);
-
-                return (
-                  <DocumentPhotoDraftCard
-                    key={slot}
-                    inputId={photoInputId}
-                    documentKey={document.key}
-                    slot={slot}
-                    slotLabel={slotLabel}
-                    upload={document.photos[slot]}
-                    disabled={disabled}
-                    onSetDocumentPhoto={onSetDocumentPhoto}
-                  />
-                );
-              })}
-            </div>
-          </div>
         </div>
       </BottomSheetBody>
       <BottomSheetFooter className="sm:flex-row-reverse sm:justify-start">

@@ -1,6 +1,7 @@
 import { ApiError, v1 } from "@repo/api-shared";
 import { messages, type SupportedLocale } from "@repo/i18n";
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -124,6 +125,37 @@ describe("PersonCreateForm", () => {
     expect(screen.queryByLabelText("Issued on")).not.toBeInTheDocument();
   });
 
+  it("places accessible document photo inputs before personal details", () => {
+    renderCreateForm();
+
+    const photos = screen.getByRole("region", { name: "Document photos" });
+    const nationalId = within(photos).getByRole("group", {
+      name: "National ID",
+    });
+    const drivingLicence = within(photos).getByRole("group", {
+      name: "Driver license Optional",
+    });
+
+    for (const document of [nationalId, drivingLicence]) {
+      expect(
+        within(document).getByRole("button", { name: "Add Front photo" }),
+      ).toBeInTheDocument();
+      expect(
+        within(document).getByRole("button", { name: "Add Back photo" }),
+      ).toBeInTheDocument();
+    }
+    expect(
+      screen
+        .getByRole("button", { name: "Romanian citizen" })
+        .compareDocumentPosition(photos) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      photos.compareDocumentPosition(screen.getByLabelText("First name")) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
   it("renders Romanian create page copy and localized document sheet", async () => {
     const browser = userEvent.setup();
 
@@ -242,6 +274,15 @@ describe("PersonCreateForm", () => {
     const addDialog = await screen.findByRole("dialog", {
       name: "Add document",
     });
+    expect(addDialog).toHaveClass("bg-popover", "text-popover-foreground");
+    for (const surface of addDialog.querySelectorAll(
+      '[data-slot="bottom-sheet-header"], [data-slot="bottom-sheet-body"], [data-slot="bottom-sheet-footer"], [data-slot="bottom-sheet-body"] > div',
+    )) {
+      expect(surface).not.toHaveClass("bg-background");
+    }
+    expect(
+      within(addDialog).queryByRole("button", { name: "Add Front photo" }),
+    ).not.toBeInTheDocument();
     const saveButton = within(addDialog).getByRole("button", { name: "Save" });
     const expirySwitch = within(addDialog).getByRole("switch", {
       name: "Document has expiry date?",
@@ -410,7 +451,7 @@ describe("PersonCreateForm", () => {
     expect(mocks.refresh).toHaveBeenCalledOnce();
   }, 10_000);
 
-  it("uploads selected document photos as drafts and submits their tokens", async () => {
+  it("preserves an upload completed during cancelled detail edits and submits its draft token", async () => {
     const draftUpload: v1.persons.PersonDocumentPhotoUploadUrl = {
       uploadUrl: "https://s3.test/upload/front",
       uploadToken: "draft-front-token",
@@ -425,29 +466,47 @@ describe("PersonCreateForm", () => {
     mocks.apiFetch
       .mockResolvedValueOnce(draftUpload)
       .mockResolvedValueOnce(createdPerson);
-    mocks.s3Fetch.mockResolvedValueOnce(new Response(null, { status: 200 }));
+    let completeStorageUpload!: (response: Response) => void;
+    mocks.s3Fetch.mockReturnValueOnce(
+      new Promise<Response>((resolve) => {
+        completeStorageUpload = resolve;
+      }),
+    );
     const browser = userEvent.setup();
     const file = new File(["photo"], "front.png", { type: "image/png" });
 
     renderCreateForm();
     await fillFullCreateForm(browser);
-    const documentDialog = await openNationalIdSheet(browser);
-    await chooseDocumentPhotoFromFiles(browser, documentDialog, file);
+    const documentPhotos = getNationalIdPhotos();
+    await chooseDocumentPhotoFromFiles(browser, documentPhotos, file);
     await waitFor(() => expect(mocks.s3Fetch).toHaveBeenCalledOnce());
+    const documentDialog = await openNationalIdSheet(browser);
+    changeDialogField(documentDialog, "Number", "999999");
+    await act(async () => {
+      completeStorageUpload(new Response(null, { status: 200 }));
+    });
+    await waitFor(() =>
+      expect(
+        within(documentDialog).getByRole("button", { name: "Save" }),
+      ).toBeEnabled(),
+    );
+    await browser.click(
+      within(documentDialog).getByRole("button", { name: "Cancel" }),
+    );
+    await waitFor(() => expect(documentDialog).not.toBeInTheDocument());
     expect(
-      within(documentDialog).getByRole("img", {
+      within(documentPhotos).getByRole("img", {
         name: "Front document photo",
       }),
     ).toBeInTheDocument();
     expect(
-      within(documentDialog).getByRole("button", {
+      within(documentPhotos).getByRole("button", {
         name: "Change Front photo",
       }),
     ).toBeInTheDocument();
     expect(
-      within(documentDialog).getByRole("button", { name: "Add Back photo" }),
+      within(documentPhotos).getByRole("button", { name: "Add Back photo" }),
     ).toBeInTheDocument();
-    await saveDocumentSheet(browser, documentDialog);
     await waitFor(() =>
       expect(
         screen.getByRole("button", { name: "Create person" }),
@@ -484,6 +543,7 @@ describe("PersonCreateForm", () => {
           documents: [
             expect.objectContaining({
               type: "nationalId",
+              number: "123456",
               photos: { front: "draft-front-token" },
             }),
           ],
@@ -516,8 +576,7 @@ describe("PersonCreateForm", () => {
 
     renderCreateForm();
     await fillFullCreateForm(browser);
-    const documentDialog = await openNationalIdSheet(browser);
-    await chooseDocumentPhotoFromFiles(browser, documentDialog, file);
+    await chooseDocumentPhotoFromFiles(browser, getNationalIdPhotos(), file);
 
     expect(await screen.findByText("Photos not uploaded")).toBeInTheDocument();
     expect(
@@ -525,9 +584,7 @@ describe("PersonCreateForm", () => {
         "The selected document photo was not uploaded. Try selecting it again.",
       ),
     ).not.toHaveLength(0);
-    expect(
-      within(documentDialog).getByRole("button", { name: "Save" }),
-    ).toBeDisabled();
+    await browser.click(screen.getByRole("button", { name: "Create person" }));
 
     expect(mocks.apiFetch).toHaveBeenCalledTimes(1);
     expect(consoleError).toHaveBeenCalledWith(
@@ -559,8 +616,7 @@ describe("PersonCreateForm", () => {
     const file = new File(["photo"], "front.png", { type: "image/png" });
 
     renderCreateForm();
-    const documentDialog = await openNationalIdSheet(browser);
-    await chooseDocumentPhotoFromFiles(browser, documentDialog, file);
+    await chooseDocumentPhotoFromFiles(browser, getNationalIdPhotos(), file);
 
     await waitFor(() =>
       expect(consoleError).toHaveBeenCalledWith(
@@ -582,7 +638,7 @@ describe("PersonCreateForm", () => {
     consoleError.mockRestore();
   });
 
-  it("nests the photo chooser, keeps fallback sources available, and cancels only the child sheet", async () => {
+  it("opens the photo chooser directly, keeps fallback sources available, and cancels back to the form", async () => {
     const browser = userEvent.setup();
     Object.defineProperty(navigator, "mediaDevices", {
       configurable: true,
@@ -590,12 +646,12 @@ describe("PersonCreateForm", () => {
     });
 
     renderCreateForm();
-    const documentDialog = await openNationalIdSheet(browser);
+    const documentPhotos = getNationalIdPhotos();
     expect(
-      within(documentDialog).getByRole("button", { name: "Add Back photo" }),
+      within(documentPhotos).getByRole("button", { name: "Add Back photo" }),
     ).toBeInTheDocument();
     await browser.click(
-      within(documentDialog).getByRole("button", {
+      within(documentPhotos).getByRole("button", {
         name: "Add Front photo",
       }),
     );
@@ -603,9 +659,7 @@ describe("PersonCreateForm", () => {
       name: "Front photo",
     });
 
-    await waitFor(() =>
-      expect(documentDialog).toHaveAttribute("data-nested-drawer-open"),
-    );
+    expect(screen.getAllByRole("dialog")).toHaveLength(1);
     expect(
       await within(photoDialog).findByText("Camera unavailable"),
     ).toBeInTheDocument();
@@ -635,9 +689,10 @@ describe("PersonCreateForm", () => {
     );
     await waitFor(() => expect(photoDialog).not.toBeInTheDocument());
 
-    expect(documentDialog).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("First name")).toBeInTheDocument();
     expect(
-      within(documentDialog).getByRole("button", {
+      within(documentPhotos).getByRole("button", {
         name: "Add Front photo",
       }),
     ).toBeInTheDocument();
@@ -977,11 +1032,11 @@ async function openNationalIdSheet(
 
 async function chooseDocumentPhotoFromFiles(
   browser: ReturnType<typeof userEvent.setup>,
-  documentDialog: HTMLElement,
+  documentPhotos: HTMLElement,
   file: File,
 ) {
   await browser.click(
-    within(documentDialog).getByRole("button", { name: "Add Front photo" }),
+    within(documentPhotos).getByRole("button", { name: "Add Front photo" }),
   );
   const photoDialog = await screen.findByRole("dialog", {
     name: "Front photo",
@@ -998,6 +1053,12 @@ async function chooseDocumentPhotoFromFiles(
     within(photoDialog).getByRole("button", { name: "Use photo" }),
   );
   await waitFor(() => expect(photoDialog).not.toBeInTheDocument());
+}
+
+function getNationalIdPhotos() {
+  return within(
+    screen.getByRole("region", { name: "Document photos" }),
+  ).getByRole("group", { name: "National ID" });
 }
 
 async function saveDocumentSheet(

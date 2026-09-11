@@ -16,7 +16,6 @@ import type {
   CreatePersonFormState,
   FormErrors,
   SetPersonDocument,
-  SetPersonDocumentPhoto,
   SetPersonDocumentValue,
 } from "./types";
 
@@ -29,7 +28,6 @@ export function DocumentsSection({
   disabled,
   onSetDocument,
   onSetDocumentValue,
-  onSetDocumentPhoto,
 }: {
   formId: string;
   form: CreatePersonFormState;
@@ -39,7 +37,6 @@ export function DocumentsSection({
   disabled: boolean;
   onSetDocument: SetPersonDocument;
   onSetDocumentValue: SetPersonDocumentValue;
-  onSetDocumentPhoto: SetPersonDocumentPhoto;
 }) {
   const t = useTranslations("persons");
   const [open, setOpen] = useState(false);
@@ -132,7 +129,6 @@ export function DocumentsSection({
             disabled={disabled}
             onSave={saveDocument}
             onSetDocumentValue={onSetDocumentValue}
-            onSetDocumentPhoto={onSetDocumentPhoto}
           />
         ) : null}
       </BottomSheetContent>

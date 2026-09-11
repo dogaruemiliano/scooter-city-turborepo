@@ -167,6 +167,7 @@ export const personsCatalog = {
       contact: "Contact",
       address: "Address",
       document: "Documents",
+      documentPhotos: "Document photos",
     },
     citizenship: {
       label: "Citizenship",
@@ -202,6 +203,8 @@ export const personsCatalog = {
       required: "Required",
       optional: "Optional",
       photoHelp: "Optional. You can add them later.",
+      photosFirstHelp:
+        "Add document photos, then complete and check the details below.",
       selectedPhoto: "Selected: {fileName}",
       uploadingPhoto: "Uploading: {fileName}",
       uploadedPhoto: "Uploaded: {fileName}",
@@ -501,6 +504,7 @@ export const personsCatalog = {
       contact: "Contact",
       address: "Adresă",
       document: "Documente",
+      documentPhotos: "Fotografii documente",
     },
     citizenship: {
       label: "Cetățenie",
@@ -537,6 +541,8 @@ export const personsCatalog = {
       required: "Obligatoriu",
       optional: "Opțional",
       photoHelp: "Opțional. Le poți adăuga mai târziu.",
+      photosFirstHelp:
+        "Adaugă fotografiile documentelor, apoi completează și verifică datele de mai jos.",
       selectedPhoto: "Selectat: {fileName}",
       uploadingPhoto: "Se încarcă: {fileName}",
       uploadedPhoto: "Încărcat: {fileName}",

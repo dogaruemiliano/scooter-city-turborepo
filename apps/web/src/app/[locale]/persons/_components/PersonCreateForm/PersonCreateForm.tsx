@@ -16,6 +16,7 @@ import { CitizenshipToggle } from "./CitizenshipToggle";
 import { ContactSection } from "./ContactSection";
 import { CreateFormFeedback } from "./CreateFormFeedback";
 import { DocumentsSection } from "./DocumentsSection";
+import { DocumentPhotosSection } from "./DocumentPhotosSection";
 import {
   documentFieldErrorKey,
   documentFieldFromErrorKey,
@@ -302,6 +303,12 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
           citizenship={form.citizenship}
           onChange={changeCitizenship}
         />
+        <DocumentPhotosSection
+          formId={formId}
+          form={form}
+          disabled={creating}
+          onSetDocumentPhoto={setDocumentPhoto}
+        />
         <ContactSection
           formId={formId}
           form={form}
@@ -327,7 +334,6 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
           showUnder18Warning={showUnder18Warning}
           disabled={creating}
           onSetDocumentValue={setDocumentValue}
-          onSetDocumentPhoto={setDocumentPhoto}
           onSetDocument={setDocument}
         />
         <NotesField
@@ -413,7 +419,9 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
     setForm((current) => ({
       ...current,
       documents: current.documents.map((currentDocument) =>
-        currentDocument.key === document.key ? document : currentDocument,
+        currentDocument.key === document.key
+          ? { ...document, photos: currentDocument.photos }
+          : currentDocument,
       ),
     }));
   }
