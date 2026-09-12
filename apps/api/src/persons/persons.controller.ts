@@ -28,6 +28,7 @@ import {
   ApiTags,
 } from "@nestjs/swagger";
 import { FileInterceptor } from "@nestjs/platform-express";
+import { Throttle } from "@nestjs/throttler";
 import { v1 } from "@repo/api-shared";
 import type { Request, Response } from "express";
 import { memoryStorage } from "multer";
@@ -60,6 +61,9 @@ import {
   toPersonDocumentPhoto,
 } from "./persons.mapper";
 import { PersonsService } from "./persons.service";
+import { PersonDocumentAnalysisService } from "./person-document-analysis.service";
+import { AnalyzePersonDocumentInput } from "./dto/analyze-person-document.input";
+import { PersonDocumentExtraction } from "./dto/person-document-extraction";
 
 @ApiTags("persons")
 @ApiCookieAuth(v1.auth.ACCESS_TOKEN_COOKIE)
@@ -67,7 +71,26 @@ import { PersonsService } from "./persons.service";
 @RequireRoles("ADMIN")
 @Controller({ path: "persons", version: "1" })
 export class PersonsController {
-  constructor(private readonly persons: PersonsService) {}
+  constructor(
+    private readonly persons: PersonsService,
+    private readonly documentAnalysis: PersonDocumentAnalysisService,
+  ) {}
+
+  @Post("document-extraction")
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @ApiOperation({
+    operationId: "PersonsController_analyzeDocument_v1",
+    summary:
+      "Extract suggested fields from owned person-document drafts for operator review",
+  })
+  @ZodResponse({ type: PersonDocumentExtraction })
+  async analyzeDocument(
+    @Body() input: AnalyzePersonDocumentInput,
+    @CurrentUser() user: AuthPrincipal,
+  ): Promise<v1.persons.PersonDocumentExtraction> {
+    return this.documentAnalysis.analyze(input, user.id);
+  }
 
   @Post()
   @ApiOperation({

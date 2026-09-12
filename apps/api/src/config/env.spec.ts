@@ -76,4 +76,49 @@ describe("environment schema", () => {
       ),
     ).toThrow("DOCUMENT_EXTRACTION_DRIVER");
   });
+
+  it("keeps person extraction disabled by default and independent from Textract", () => {
+    const source = validEnv({ DOCUMENT_EXTRACTION_DRIVER: "textract" });
+    delete source.PERSON_DOCUMENT_EXTRACTION_DRIVER;
+    expect(loadEnv(source).PERSON_DOCUMENT_EXTRACTION_DRIVER).toBe("disabled");
+  });
+
+  it("requires a nonempty server-side key for OpenAI extraction", () => {
+    expect(() =>
+      loadEnv(
+        validEnv({
+          PERSON_DOCUMENT_EXTRACTION_DRIVER: "openai",
+          PERSON_DOCUMENT_EXTRACTION_OPENAI_API_KEY: " ",
+        }),
+      ),
+    ).toThrow("PERSON_DOCUMENT_EXTRACTION_OPENAI_API_KEY");
+    expect(
+      loadEnv(
+        validEnv({
+          PERSON_DOCUMENT_EXTRACTION_DRIVER: "openai",
+          PERSON_DOCUMENT_EXTRACTION_OPENAI_API_KEY: "test-key",
+        }),
+      ).PERSON_DOCUMENT_EXTRACTION_MODEL,
+    ).toBe("gpt-4.1-mini-2025-04-14");
+  });
+
+  it("forbids fake person extraction in production", () => {
+    expect(() =>
+      loadEnv(
+        validEnv({
+          NODE_ENV: "production",
+          PERSON_DOCUMENT_EXTRACTION_DRIVER: "fake",
+        }),
+      ),
+    ).toThrow("PERSON_DOCUMENT_EXTRACTION_DRIVER");
+  });
+
+  it.each(["0", "45001"])(
+    "rejects invalid person-extraction timeout %s",
+    (timeout) => {
+      expect(() =>
+        loadEnv(validEnv({ PERSON_DOCUMENT_EXTRACTION_TIMEOUT_MS: timeout })),
+      ).toThrow("PERSON_DOCUMENT_EXTRACTION_TIMEOUT_MS");
+    },
+  );
 });

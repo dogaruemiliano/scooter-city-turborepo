@@ -129,6 +129,7 @@ export const ROUTES = {
     list: (personId: string): string => `/v1/persons/${personId}/audit-events`,
   },
   documents: {
+    extract: "/v1/persons/document-extraction",
     list: (personId: string): string => `/v1/persons/${personId}/documents`,
     create: (personId: string): string => `/v1/persons/${personId}/documents`,
     get: (personId: string, documentId: string): string =>

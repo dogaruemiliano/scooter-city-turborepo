@@ -800,11 +800,8 @@ export class PersonsService {
           continue;
         }
 
-        const storedImage =
-          await this.imageStorage.completePresignedDocumentUpload(
-            uploadToken,
-            this.draftDocumentPhotoUploadScope(uploadedByUserId),
-          );
+        const { draftUploadId, storedDocument: storedImage } =
+          await this.resolveUsableDocumentDraft(uploadToken, uploadedByUserId);
         if (
           storedImage.contentType === "application/pdf" &&
           document.type !== "proofOfAddress"
@@ -819,24 +816,35 @@ export class PersonsService {
         }
         seenStorageKeys.add(storedImage.storageKey);
 
-        const draft = await this.assertUsableDraftUpload(
-          await this.prisma.draftUpload.findUnique({
-            where: { storageKey: storedImage.storageKey },
-          }),
-          storedImage,
-          uploadedByUserId,
-        );
-
         prepared.push({
           documentType: document.type,
           slot,
-          draftUploadId: draft.id,
+          draftUploadId,
           storedImage,
         });
       }
     }
 
     return prepared;
+  }
+
+  async resolveUsableDocumentDraft(
+    uploadToken: string,
+    uploadedByUserId: string,
+  ): Promise<{ draftUploadId: string; storedDocument: StoredDocument }> {
+    const storedDocument =
+      await this.imageStorage.completePresignedDocumentUpload(
+        uploadToken,
+        this.draftDocumentPhotoUploadScope(uploadedByUserId),
+      );
+    const draft = await this.assertUsableDraftUpload(
+      await this.prisma.draftUpload.findUnique({
+        where: { storageKey: storedDocument.storageKey },
+      }),
+      storedDocument,
+      uploadedByUserId,
+    );
+    return { draftUploadId: draft.id, storedDocument };
   }
 
   private async assertUsableDraftUpload(

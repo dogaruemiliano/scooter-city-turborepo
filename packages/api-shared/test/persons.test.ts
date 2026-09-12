@@ -651,3 +651,95 @@ test("draft PDFs require proof-of-address metadata and preserve checksum validat
     false,
   );
 });
+
+test("person document extraction accepts only owned draft-token inputs and known suggestion fields", () => {
+  assert.equal(
+    v1.persons.ROUTES.documents.extract,
+    "/v1/persons/document-extraction",
+  );
+  assert.equal(
+    v1.persons.analyzePersonDocumentInputSchema.safeParse({
+      documentType: "nationalId",
+      nationalIdFormat: "electronic",
+      photos: { back: "draft-token" },
+    }).success,
+    true,
+  );
+  for (const input of [
+    { documentType: "passport", photos: {} },
+    { documentType: "passport", photos: { front: " " } },
+    {
+      documentType: "passport",
+      photos: { front: "token" },
+      url: "https://example.test/private.png",
+    },
+    {
+      documentType: "passport",
+      nationalIdFormat: "classic",
+      photos: { front: "token" },
+    },
+  ])
+    assert.equal(
+      v1.persons.analyzePersonDocumentInputSchema.safeParse(input).success,
+      false,
+    );
+
+  const content = {
+    documentType: "nationalId",
+    detectedDocumentType: "nationalId",
+    sourceUploadIds: ["draft-1"],
+    reviewRequired: true,
+    suggestions: [
+      {
+        target: "person",
+        field: "firstName",
+        value: "Ștefan",
+        sourceSlot: "front",
+        needsReview: false,
+      },
+    ],
+    licenseCategories: [],
+    warnings: [],
+  };
+  assert.equal(
+    v1.persons.personDocumentExtractionSchema.safeParse(content).success,
+    true,
+  );
+  assert.equal(
+    v1.persons.personDocumentExtractionSchema.safeParse({
+      ...content,
+      reviewRequired: false,
+    }).success,
+    false,
+  );
+  assert.equal(
+    v1.persons.personDocumentExtractionSchema.safeParse({
+      ...content,
+      suggestions: [
+        {
+          target: "document",
+          field: "status",
+          value: "verified",
+          sourceSlot: "front",
+          needsReview: false,
+        },
+      ],
+    }).success,
+    false,
+  );
+  assert.equal(
+    v1.persons.personDocumentExtractionSchema.safeParse({
+      ...content,
+      suggestions: [
+        {
+          target: "person",
+          field: "number",
+          value: "123",
+          sourceSlot: "front",
+          needsReview: false,
+        },
+      ],
+    }).success,
+    false,
+  );
+});

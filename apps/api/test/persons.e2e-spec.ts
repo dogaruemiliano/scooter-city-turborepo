@@ -24,6 +24,7 @@ import {
 } from "../src/image-storage/image-storage.constants";
 import type { S3PresignOptions } from "../src/image-storage/image-storage.module";
 import { PrismaService } from "../src/prisma/prisma.service";
+import { PersonDocumentExtractionService } from "../src/person-document-extraction/person-document-extraction.service";
 import { UsersService } from "../src/users/users.service";
 
 interface IssuedSession {
@@ -52,6 +53,23 @@ describe("Persons HTTP surface (e2e)", () => {
   // database that still holds an earlier run's rows collides on the unique
   // phone and fails the very first create with a 409.
   let phoneSeq = 10_000_000 + Math.floor(Math.random() * 89_000_000);
+
+  const fakePersonExtraction = {
+    analyze: jest.fn().mockResolvedValue({
+      detectedDocumentType: "nationalId",
+      suggestions: [
+        {
+          target: "person",
+          field: "firstName",
+          value: "Ștefan",
+          sourceSlot: "front",
+          needsReview: false,
+        },
+      ],
+      licenseCategories: [],
+      warnings: [],
+    }),
+  };
 
   const fakeS3 = {
     send: jest.fn((command: unknown) => {
@@ -176,6 +194,8 @@ describe("Persons HTTP surface (e2e)", () => {
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule],
     })
+      .overrideProvider(PersonDocumentExtractionService)
+      .useValue(fakePersonExtraction)
       .overrideProvider(S3_CLIENT)
       .useValue(fakeS3)
       .overrideProvider(S3_PRESIGNER)
@@ -1292,6 +1312,168 @@ describe("Persons HTTP surface (e2e)", () => {
         }),
       );
     expect(expiredCreate.status).toBe(400);
+  });
+
+  it("extracts only authenticated admin-owned drafts with CSRF protection and never changes saved records", async () => {
+    fakePersonExtraction.analyze.mockClear();
+    const admin = await freshSession(["ADMIN"]);
+    const otherAdmin = await freshSession(["ADMIN"]);
+    const user = await freshSession(["USER"]);
+    const upload = await uploadPersonDraft(admin);
+    const input = {
+      documentType: "nationalId",
+      nationalIdFormat: "classic",
+      photos: { front: upload.uploadToken },
+    };
+    expect(
+      (await req().post(v1.persons.ROUTES.documents.extract).send(input))
+        .status,
+    ).toBe(401);
+    expect(
+      (
+        await req()
+          .post(v1.persons.ROUTES.documents.extract)
+          .set("Cookie", [`access_token=${user.accessToken}`])
+          .send(input)
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await request(server())
+          .post(v1.persons.ROUTES.documents.extract)
+          .set("Cookie", [`access_token=${admin.accessToken}`])
+          .send(input)
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await req()
+          .post(v1.persons.ROUTES.documents.extract)
+          .set("Cookie", [`access_token=${otherAdmin.accessToken}`])
+          .send(input)
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await req()
+          .post(v1.persons.ROUTES.documents.extract)
+          .set("Cookie", [`access_token=${admin.accessToken}`])
+          .send({ ...input, photos: {} })
+      ).status,
+    ).toBe(400);
+    expect(fakePersonExtraction.analyze).not.toHaveBeenCalled();
+
+    const analyzed = await req()
+      .post(v1.persons.ROUTES.documents.extract)
+      .set("Cookie", [`access_token=${admin.accessToken}`])
+      .send(input);
+    expect(analyzed.status).toBe(200);
+    const result = v1.persons.personDocumentExtractionSchema.parse(
+      analyzed.body,
+    );
+    const draft = await prisma.draftUpload.findUniqueOrThrow({
+      where: { storageKey: upload.storageKey },
+    });
+    expect(result).toMatchObject({
+      documentType: "nationalId",
+      sourceUploadIds: [draft.id],
+      reviewRequired: true,
+      suggestions: [
+        {
+          target: "person",
+          field: "firstName",
+          value: "Ștefan",
+          sourceSlot: "front",
+          needsReview: false,
+        },
+      ],
+    });
+    expect(draft.claimedAt).toBeNull();
+    expect(fakePersonExtraction.analyze).toHaveBeenCalledTimes(1);
+    const create = await req()
+      .post(v1.persons.ROUTES.create)
+      .set("Cookie", [`access_token=${admin.accessToken}`])
+      .send(
+        personInput({
+          documents: [
+            {
+              type: "nationalId",
+              status: "verified",
+              photos: { front: upload.uploadToken },
+            },
+          ],
+        }),
+      );
+    expect(create.status).toBe(201);
+    expect(v1.persons.personSchema.parse(create.body).firstName).toBe("Ada");
+    const replay = await req()
+      .post(v1.persons.ROUTES.documents.extract)
+      .set("Cookie", [`access_token=${admin.accessToken}`])
+      .send(input);
+    expect(replay.status).toBe(400);
+    expect(fakePersonExtraction.analyze).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects extraction for MIME, actual checksum, expired, and cleanup-owned draft mismatches before the provider", async () => {
+    fakePersonExtraction.analyze.mockClear();
+    const admin = await freshSession(["ADMIN"]);
+    const pdf = await uploadPersonDraft(admin, "application/pdf");
+    const wrongType = await req()
+      .post(v1.persons.ROUTES.documents.extract)
+      .set("Cookie", [`access_token=${admin.accessToken}`])
+      .send({ documentType: "passport", photos: { front: pdf.uploadToken } });
+    expect(wrongType.status).toBe(400);
+    const corrupt = await uploadPersonDraft(admin);
+    const object = s3Objects.get(corrupt.storageKey);
+    if (!object) throw new Error("Expected stored draft object");
+    s3Objects.set(corrupt.storageKey, {
+      ...object,
+      body: Buffer.alloc(object.body.length),
+    });
+    expect(
+      (
+        await req()
+          .post(v1.persons.ROUTES.documents.extract)
+          .set("Cookie", [`access_token=${admin.accessToken}`])
+          .send({
+            documentType: "passport",
+            photos: { front: corrupt.uploadToken },
+          })
+      ).status,
+    ).toBe(400);
+    const expired = await uploadPersonDraft(admin);
+    await prisma.draftUpload.update({
+      where: { storageKey: expired.storageKey },
+      data: { expiresAt: new Date(0) },
+    });
+    expect(
+      (
+        await req()
+          .post(v1.persons.ROUTES.documents.extract)
+          .set("Cookie", [`access_token=${admin.accessToken}`])
+          .send({
+            documentType: "passport",
+            photos: { front: expired.uploadToken },
+          })
+      ).status,
+    ).toBe(400);
+    const cleanup = await uploadPersonDraft(admin);
+    await prisma.draftUpload.update({
+      where: { storageKey: cleanup.storageKey },
+      data: { cleanupStartedAt: new Date() },
+    });
+    expect(
+      (
+        await req()
+          .post(v1.persons.ROUTES.documents.extract)
+          .set("Cookie", [`access_token=${admin.accessToken}`])
+          .send({
+            documentType: "passport",
+            photos: { front: cleanup.uploadToken },
+          })
+      ).status,
+    ).toBe(400);
+    expect(fakePersonExtraction.analyze).not.toHaveBeenCalled();
   });
 
   it("returns 409 for duplicate email or phone", async () => {
