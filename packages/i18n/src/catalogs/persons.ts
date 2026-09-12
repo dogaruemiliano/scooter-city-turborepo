@@ -178,6 +178,7 @@ export const personsCatalog = {
     },
     extraction: {
       title: "Document reading",
+      fieldPending: "Reading {field} from document…",
       from: "From {source}",
       checkValue: "Check this value",
       sourceChanged: "The source photo changed. Check the new reading.",
@@ -619,6 +620,7 @@ export const personsCatalog = {
     },
     extraction: {
       title: "Citirea documentelor",
+      fieldPending: "Se citește {field} din document…",
       from: "Din {source}",
       checkValue: "Verifică această valoare",
       sourceChanged: "Fotografia sursă s-a schimbat. Verifică noua citire.",

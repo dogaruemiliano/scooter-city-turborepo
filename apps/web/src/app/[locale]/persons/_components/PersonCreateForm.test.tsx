@@ -869,7 +869,17 @@ describe("document extraction review", () => {
       await browser.click(
         screen.getByRole("button", { name: "Review details" }),
       );
+      expect(
+        screen.getByRole("status", {
+          name: "Reading First name from document…",
+        }),
+      ).toBeInTheDocument();
       changeField("First name", "Operator");
+      expect(
+        screen.queryByRole("status", {
+          name: "Reading First name from document…",
+        }),
+      ).not.toBeInTheDocument();
       showReviewStep("Document details");
       await browser.click(
         screen.getByRole("button", { name: /^(Add|Edit) Passport$/ }),
@@ -878,8 +888,23 @@ describe("document extraction review", () => {
         name: /^(Add|Edit) document$/,
       });
       expect(within(dialog).queryByLabelText("Series")).not.toBeInTheDocument();
+      expect(
+        within(dialog).getByRole("status", {
+          name: "Reading ID number from document…",
+        }),
+      ).toBeInTheDocument();
       changeDialogField(dialog, "ID number", "LOCAL");
+      expect(
+        within(dialog).queryByRole("status", {
+          name: "Reading ID number from document…",
+        }),
+      ).not.toBeInTheDocument();
       await act(async () => resolve(extractedPassport()));
+      expect(
+        within(dialog).queryByRole("status", {
+          name: /^Reading .* from document/,
+        }),
+      ).not.toBeInTheDocument();
       expect(within(dialog).getByLabelText("ID number")).toHaveValue("LOCAL");
       expect(within(dialog).getByLabelText("Issued by")).toHaveValue(
         "Passport office",

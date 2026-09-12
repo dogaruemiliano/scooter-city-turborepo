@@ -2,6 +2,7 @@ import { Label } from "@repo/ui/components";
 import type { ReactNode } from "react";
 import type { ExtractionFieldKey } from "./extraction-state";
 import { FieldExtractionHint } from "./FieldExtractionHint";
+import { FieldExtractionLoading } from "./FieldExtractionLoading";
 
 export function FormField({
   id,
@@ -44,6 +45,9 @@ export function FormField({
           <span aria-hidden="true" className="text-current">
             *
           </span>
+        ) : null}
+        {extractionKey && !disabled ? (
+          <FieldExtractionLoading fieldKey={extractionKey} label={label} />
         ) : null}
       </div>
       {children}

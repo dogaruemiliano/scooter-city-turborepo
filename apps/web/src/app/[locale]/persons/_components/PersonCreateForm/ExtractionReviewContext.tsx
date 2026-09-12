@@ -5,6 +5,7 @@ import type { ExtractionFieldKey, ExtractionState } from "./extraction-state";
 
 export interface ExtractionReviewContextValue {
   state: ExtractionState;
+  pendingDocumentKeys: ReadonlySet<string>;
   onApplySuggestion: (key: ExtractionFieldKey, suggestionId: string) => void;
 }
 

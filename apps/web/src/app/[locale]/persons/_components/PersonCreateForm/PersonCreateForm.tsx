@@ -362,6 +362,7 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
     <ExtractionReviewContext.Provider
       value={{
         state: extractionState,
+        pendingDocumentKeys: extraction.pendingDocumentKeys,
         onApplySuggestion: (key, id) =>
           setExtractionState((current) =>
             applyExtractionSuggestion(current, key, id),

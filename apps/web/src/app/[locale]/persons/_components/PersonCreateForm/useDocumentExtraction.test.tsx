@@ -91,6 +91,7 @@ describe("automatic document reading", () => {
       }),
     );
     expect(result.current.pending).toBe(false);
+    expect(result.current.pendingDocumentKeys.size).toBe(0);
   });
 
   it("marks reading pending and preserves edits and intentional clears during the request", async () => {
@@ -98,6 +99,9 @@ describe("automatic document reading", () => {
     api.fetch.mockReturnValue(request.promise);
     const { result } = setup();
     expect(result.current.pending).toBe(true);
+    expect([...result.current.pendingDocumentKeys]).toEqual([
+      "foreign-passport",
+    ]);
     act(() =>
       result.current.setState((state) =>
         markExtractionFieldEdited(
@@ -223,8 +227,12 @@ describe("automatic document reading", () => {
     act(() => result.current.continueManually());
     expect(result.current.pending).toBe(false);
     expect(result.current.jobs["foreign-passport"]?.status).toBe("manual");
+    expect(result.current.pendingDocumentKeys.size).toBe(0);
     act(() => result.current.retry("foreign-passport"));
     expect(result.current.pending).toBe(true);
+    expect([...result.current.pendingDocumentKeys]).toEqual([
+      "foreign-passport",
+    ]);
     await act(async () => latest.resolve(resultFor("Retry")));
     await act(async () => old.resolve(resultFor("Ignored")));
     expect(result.current.state.form.firstName).toBe("Retry");
@@ -237,6 +245,7 @@ describe("automatic document reading", () => {
     const { result } = setup();
     await waitFor(() => expect(result.current.pending).toBe(false));
     expect(result.current.jobs["foreign-passport"]?.status).toBe("disabled");
+    expect(result.current.pendingDocumentKeys.size).toBe(0);
     act(() =>
       result.current.setState((state) => ({
         ...state,
@@ -244,5 +253,22 @@ describe("automatic document reading", () => {
       })),
     );
     expect(api.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops field loading on an error and resumes only on explicit retry", async () => {
+    api.fetch.mockRejectedValueOnce(new Error("Unavailable"));
+    const { result } = setup();
+    await waitFor(() =>
+      expect(result.current.jobs["foreign-passport"]?.status).toBe("error"),
+    );
+    expect(result.current.pendingDocumentKeys.size).toBe(0);
+    const retry = deferred();
+    api.fetch.mockReturnValueOnce(retry.promise);
+    act(() => result.current.retry("foreign-passport"));
+    expect([...result.current.pendingDocumentKeys]).toEqual([
+      "foreign-passport",
+    ]);
+    await act(async () => retry.resolve(resultFor("Ana")));
+    expect(result.current.pendingDocumentKeys.size).toBe(0);
   });
 });

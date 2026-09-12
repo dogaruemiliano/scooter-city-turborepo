@@ -196,17 +196,20 @@ export function useDocumentExtraction(
     setJobs(nextJobs);
   }
 
-  const pending = state.form.documents.some((document) => {
-    const signature = documentExtractionSignature(document);
-    return (
-      signature &&
-      (jobs[document.key]?.signature !== signature ||
-        jobs[document.key]?.status === "pending")
-    );
-  });
+  const pendingDocumentKeys = new Set(
+    state.form.documents.flatMap((document) => {
+      const signature = documentExtractionSignature(document);
+      return signature &&
+        (jobs[document.key]?.signature !== signature ||
+          jobs[document.key]?.status === "pending")
+        ? [document.key]
+        : [];
+    }),
+  );
   return {
     jobs,
-    pending,
+    pending: pendingDocumentKeys.size > 0,
+    pendingDocumentKeys,
     retry: cancelDocument,
     cancelDocument,
     continueManually,
