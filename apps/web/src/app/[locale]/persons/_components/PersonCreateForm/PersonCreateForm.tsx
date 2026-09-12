@@ -10,6 +10,16 @@ import { useLocale, useTranslations } from "next-intl";
 import { useId, useState, type FormEvent } from "react";
 
 import { webApi } from "@/lib/api";
+import {
+  createExtractionState,
+  markExtractionFieldEdited,
+  invalidateDocumentExtraction,
+  applyExtractionSuggestion,
+  type ExtractionFieldKey,
+} from "./extraction-state";
+import { ExtractionReviewContext } from "./ExtractionReviewContext";
+import { useDocumentExtraction } from "./useDocumentExtraction";
+import { DocumentExtractionFeedback } from "./DocumentExtractionFeedback";
 import { AddressSection } from "./AddressSection";
 import { CitizenshipChoice } from "./CitizenshipChoice";
 import { WizardProgress, type PersonWizardStep } from "./WizardProgress";
@@ -59,9 +69,19 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
   const [step, setStep] = useState<PersonWizardStep>("citizenship");
   const [chosenNationalIdFormat, setChosenNationalIdFormat] =
     useState<NationalIdFormat | null>(null);
-  const [form, setForm] = useState<CreatePersonFormState>(() =>
-    createEmptyCreateForm("romanian"),
+  const [extractionState, setExtractionState] = useState(() =>
+    createExtractionState(createEmptyCreateForm("romanian")),
   );
+  const form = extractionState.form;
+  const extraction = useDocumentExtraction(extractionState, setExtractionState);
+  function setForm(
+    update: (current: CreatePersonFormState) => CreatePersonFormState,
+  ) {
+    setExtractionState((current) => ({
+      ...current,
+      form: update(current.form),
+    }));
+  }
   const [fieldErrors, setFieldErrors] = useState<FormErrors>({});
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const showUnder18Warning = isUnder18Person(form);
@@ -69,7 +89,7 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
 
   async function createPerson(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (step !== "review" || creating) return;
+    if (step !== "review" || creating || extraction.pending) return;
     setFeedback(null);
     setFieldErrors({});
 
@@ -317,90 +337,110 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-screen-lg flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
-      <form
-        className="grid gap-6"
-        noValidate
-        onSubmit={(event) => void createPerson(event)}
-      >
-        <WizardProgress step={step} />
-        {step === "citizenship" ? (
-          <CitizenshipChoice onChange={changeCitizenship} />
-        ) : null}
-        {step === "nationalId" ? (
-          <NationalIdFormatSelect
-            value={chosenNationalIdFormat}
-            disabled={creating}
-            onChange={changeNationalIdFormat}
-          />
-        ) : null}
-        {step === "documents" ? (
-          <DocumentPhotosSection
-            formId={formId}
-            form={form}
-            disabled={creating}
-            onSetDocumentPhoto={setDocumentPhoto}
-            fieldErrors={fieldErrors}
-          />
-        ) : null}
-        {step === "review" ? (
-          <>
-            <div className="grid gap-2">
-              <h2 className="text-xl font-semibold">
-                {t("wizard.reviewTitle")}
-              </h2>
-              <p className="text-sm text-muted-foreground">
-                {t("wizard.reviewHelp")}
-              </p>
-            </div>
-            <ContactSection
-              formId={formId}
-              form={form}
-              fieldErrors={fieldErrors}
-              locale={locale}
-              showUnder18Warning={showUnder18Warning}
-              onSetFormValue={setFormValue}
-              onChangePhone={changePhone}
-            />
-            <AddressSection
-              formId={formId}
-              form={form}
-              fieldErrors={fieldErrors}
-              locale={locale}
-              onSetFormValue={setFormValue}
-              onChangeCountry={changeCountry}
-            />
-            <DocumentsSection
-              formId={formId}
-              form={form}
-              fieldErrors={fieldErrors}
-              locale={locale}
-              showUnder18Warning={showUnder18Warning}
+    <ExtractionReviewContext.Provider
+      value={{
+        state: extractionState,
+        onApplySuggestion: (key, id) =>
+          setExtractionState((current) =>
+            applyExtractionSuggestion(current, key, id),
+          ),
+      }}
+    >
+      <div className="mx-auto flex w-full max-w-screen-lg flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
+        <form
+          className="grid gap-6"
+          noValidate
+          onSubmit={(event) => void createPerson(event)}
+        >
+          <WizardProgress step={step} />
+          {step === "citizenship" ? (
+            <CitizenshipChoice onChange={changeCitizenship} />
+          ) : null}
+          {step === "nationalId" ? (
+            <NationalIdFormatSelect
+              value={chosenNationalIdFormat}
               disabled={creating}
-              onSetDocumentValue={setDocumentValue}
-              onSetDocument={setDocument}
+              onChange={changeNationalIdFormat}
             />
-            <NotesField
+          ) : null}
+          {step === "documents" ? (
+            <DocumentPhotosSection
               formId={formId}
-              value={form.notes}
-              error={fieldErrors.notes}
-              onChange={(value) => setFormValue("notes", value)}
+              form={form}
+              disabled={creating}
+              onSetDocumentPhoto={setDocumentPhoto}
+              fieldErrors={fieldErrors}
             />
-          </>
-        ) : null}
+          ) : null}
+          {step === "documents" || step === "review" ? (
+            <DocumentExtractionFeedback
+              form={form}
+              jobs={extraction.jobs}
+              pending={extraction.pending}
+              disabled={creating}
+              onRetry={extraction.retry}
+              onManual={extraction.continueManually}
+            />
+          ) : null}
+          {step === "review" ? (
+            <>
+              <div className="grid gap-2">
+                <h2 className="text-xl font-semibold">
+                  {t("wizard.reviewTitle")}
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  {t("wizard.reviewHelp")}
+                </p>
+              </div>
+              <ContactSection
+                formId={formId}
+                form={form}
+                fieldErrors={fieldErrors}
+                locale={locale}
+                showUnder18Warning={showUnder18Warning}
+                onSetFormValue={setFormValue}
+                onChangePhone={changePhone}
+              />
+              <AddressSection
+                formId={formId}
+                form={form}
+                fieldErrors={fieldErrors}
+                locale={locale}
+                onSetFormValue={setFormValue}
+                onChangeCountry={changeCountry}
+              />
+              <DocumentsSection
+                formId={formId}
+                form={form}
+                fieldErrors={fieldErrors}
+                locale={locale}
+                showUnder18Warning={showUnder18Warning}
+                disabled={creating}
+                onSetDocument={setDocument}
+              />
+              <NotesField
+                formId={formId}
+                value={form.notes}
+                error={fieldErrors.notes}
+                onChange={(value) => setFormValue("notes", value)}
+              />
+            </>
+          ) : null}
 
-        {feedback ? <CreateFormFeedback feedback={feedback} /> : null}
+          {feedback ? <CreateFormFeedback feedback={feedback} /> : null}
 
-        <FormActions
-          creating={creating}
-          uploadingPhotos={uploadingPhotos}
-          personsHref={personsHref}
-          step={step}
-          onBack={goBack}
-          onNext={reviewDetails}
-        />
-      </form>
-    </div>
+          <FormActions
+            creating={creating}
+            uploadingPhotos={uploadingPhotos}
+            extracting={extraction.pending}
+            personsHref={personsHref}
+            step={step}
+            onBack={goBack}
+            onNext={reviewDetails}
+          />
+        </form>
+      </div>
+    </ExtractionReviewContext.Provider>
   );
 
   function goBack() {
@@ -453,7 +493,12 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
     key: Key,
     value: CreatePersonFormState[Key],
   ) {
-    setForm((current) => ({ ...current, [key]: value }));
+    setExtractionState((current) =>
+      markExtractionFieldEdited(
+        { ...current, form: { ...current.form, [key]: value } },
+        `person.${key}` as ExtractionFieldKey,
+      ),
+    );
     clearFieldErrorForPersonKey(key);
   }
 
@@ -469,53 +514,82 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
   }
 
   function changeCountry(value: CountryCode) {
-    setForm((current) => ({
-      ...current,
-      countryCode: value,
-      region: "",
-    }));
+    setExtractionState((current) =>
+      markExtractionFieldEdited(
+        markExtractionFieldEdited(
+          {
+            ...current,
+            form: { ...current.form, countryCode: value, region: "" },
+          },
+          "person.countryCode",
+        ),
+        "person.region",
+      ),
+    );
     clearFieldError("countryCode");
     clearFieldError("region");
   }
 
   function changeCitizenship(citizenship: PersonCitizenship) {
-    setForm((current) => switchDocumentWorkflow(current, citizenship));
+    changeWorkflow(citizenship, form.nationalIdFormat);
     setStep(citizenship === "romanian" ? "nationalId" : "documents");
     setFieldErrors({});
     setFeedback(null);
   }
 
   function changeNationalIdFormat(format: NationalIdFormat) {
-    setForm((current) => switchDocumentWorkflow(current, "romanian", format));
+    changeWorkflow("romanian", format);
     setChosenNationalIdFormat(format);
     setStep("documents");
     setFieldErrors({});
     setFeedback(null);
   }
 
-  function setDocumentValue<Key extends PersonDocumentFormFieldKey>(
-    documentKey: string,
-    key: Key,
-    value: CreatePersonDocumentFormState[Key],
+  function changeWorkflow(
+    citizenship: PersonCitizenship,
+    format: NationalIdFormat,
   ) {
-    setForm((current) => ({
-      ...current,
-      documents: current.documents.map((document) =>
-        document.key === documentKey ? { ...document, [key]: value } : document,
-      ),
-    }));
-    clearFieldError(documentFieldErrorKey(documentKey, key));
+    if (form.citizenship === citizenship && form.nationalIdFormat === format)
+      return;
+    for (const document of form.documents)
+      extraction.cancelDocument(document.key);
+    setExtractionState((current) => {
+      let next = current;
+      for (const document of current.form.documents)
+        next = invalidateDocumentExtraction(next, document.key);
+      return {
+        ...next,
+        form: switchDocumentWorkflow(next.form, citizenship, format),
+      };
+    });
   }
 
-  function setDocument(document: CreatePersonDocumentFormState) {
-    setForm((current) => ({
-      ...current,
-      documents: current.documents.map((currentDocument) =>
-        currentDocument.key === document.key
-          ? { ...document, photos: currentDocument.photos }
-          : currentDocument,
-      ),
-    }));
+  function setDocument(
+    document: CreatePersonDocumentFormState,
+    editedFields: readonly PersonDocumentFormFieldKey[] = [],
+  ) {
+    setExtractionState((current) => {
+      const patch = Object.fromEntries(
+        editedFields.map((key) => [key, document[key]]),
+      );
+      let next = {
+        ...current,
+        form: {
+          ...current.form,
+          documents: current.form.documents.map((item) =>
+            item.key === document.key ? { ...item, ...patch } : item,
+          ),
+        },
+      };
+      for (const key of editedFields)
+        next = markExtractionFieldEdited(
+          next,
+          `document.${document.key}.${key}`,
+        );
+      return next;
+    });
+    for (const key of editedFields)
+      clearFieldError(documentFieldErrorKey(document.key, key));
   }
 
   function setDocumentPhoto(
@@ -524,6 +598,10 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
     file: File | null,
   ) {
     clearFieldError(documentFieldErrorKey(documentKey, "photos"));
+    extraction.cancelDocument(documentKey);
+    setExtractionState((current) =>
+      invalidateDocumentExtraction(current, documentKey),
+    );
     if (file) {
       const uploadId = createDraftUploadId();
       setForm((current) => ({

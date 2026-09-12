@@ -48,6 +48,7 @@ export function ContactSection({
     <FormSection title={t("sections.contact")}>
       <FormField
         id={`${formId}-first-name`}
+        extractionKey="person.firstName"
         label={t("fields.firstName")}
         required
         error={firstNameError}
@@ -69,6 +70,7 @@ export function ContactSection({
       </FormField>
       <FormField
         id={`${formId}-last-name`}
+        extractionKey="person.lastName"
         label={t("fields.lastName")}
         required
         error={lastNameError}
@@ -123,6 +125,7 @@ export function ContactSection({
         <>
           <FormField
             id={`${formId}-date-of-birth-day`}
+            extractionKey="person.dateOfBirth"
             label={t("fields.dateOfBirth")}
             error={dateOfBirthError}
           >

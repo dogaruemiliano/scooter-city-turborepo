@@ -1,5 +1,7 @@
 import { Label } from "@repo/ui/components";
 import type { ReactNode } from "react";
+import type { ExtractionFieldKey } from "./extraction-state";
+import { FieldExtractionHint } from "./FieldExtractionHint";
 
 export function FormField({
   id,
@@ -9,6 +11,7 @@ export function FormField({
   error,
   className,
   children,
+  extractionKey,
 }: {
   id: string;
   label: string;
@@ -17,6 +20,7 @@ export function FormField({
   error?: string;
   className?: string;
   children: ReactNode;
+  extractionKey?: ExtractionFieldKey;
 }) {
   return (
     <div
@@ -43,6 +47,7 @@ export function FormField({
         ) : null}
       </div>
       {children}
+      {extractionKey ? <FieldExtractionHint fieldKey={extractionKey} /> : null}
       {error ? (
         <p id={`${id}-error`} role="alert" className="text-sm text-destructive">
           {error}

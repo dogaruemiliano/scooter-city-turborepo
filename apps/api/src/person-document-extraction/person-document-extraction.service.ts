@@ -98,15 +98,15 @@ export class PersonDocumentExtractionService {
         warnings.add("invalidValue");
         continue;
       }
-      if (
-        suggestions.some(
-          (existing) =>
-            existing.target === suggestion.target &&
-            existing.field === suggestion.field &&
-            existing.value === normalized.data &&
-            existing.sourceSlot === suggestion.sourceSlot,
-        )
-      ) {
+      const duplicate = suggestions.find(
+        (existing) =>
+          existing.target === suggestion.target &&
+          existing.field === suggestion.field &&
+          existing.value === normalized.data &&
+          existing.sourceSlot === suggestion.sourceSlot,
+      );
+      if (duplicate) {
+        duplicate.needsReview ||= suggestion.needsReview;
         continue;
       }
       suggestions.push({ ...suggestion, value: normalized.data });

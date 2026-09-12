@@ -43,6 +43,7 @@ export function AddressSection({
     <FormSection title={t("sections.address")}>
       <FormField
         id={`${formId}-country`}
+        extractionKey="person.countryCode"
         label={t("fields.country")}
         required
         error={countryCodeError}
@@ -66,6 +67,7 @@ export function AddressSection({
       {form.countryCode === "RO" ? (
         <FormField
           id={`${formId}-county`}
+          extractionKey="person.region"
           label={t("fields.county")}
           error={fieldErrors.region}
         >
@@ -84,6 +86,10 @@ export function AddressSection({
             }}
           >
             <option value="">{t("placeholders.county")}</option>
+            {form.region &&
+            !ROMANIAN_COUNTIES.some((county) => county === form.region) ? (
+              <option value={form.region}>{form.region}</option>
+            ) : null}
             {ROMANIAN_COUNTIES.map((county) => (
               <option key={county} value={county}>
                 {county}
@@ -94,6 +100,7 @@ export function AddressSection({
       ) : (
         <FormField
           id={`${formId}-region`}
+          extractionKey="person.region"
           label={t("fields.region")}
           error={fieldErrors.region}
         >
@@ -113,6 +120,7 @@ export function AddressSection({
       )}
       <FormField
         id={`${formId}-address-line-1`}
+        extractionKey="person.addressLine1"
         label={t("fields.addressLine1")}
         error={addressLine1Error}
       >
@@ -133,6 +141,7 @@ export function AddressSection({
       </FormField>
       <FormField
         id={`${formId}-address-line-2`}
+        extractionKey="person.addressLine2"
         label={t("fields.addressLine2")}
         error={addressLine2Error}
       >
@@ -153,6 +162,7 @@ export function AddressSection({
       </FormField>
       <FormField
         id={`${formId}-city`}
+        extractionKey="person.city"
         label={t("fields.city")}
         error={cityError}
       >
@@ -168,6 +178,7 @@ export function AddressSection({
       </FormField>
       <FormField
         id={`${formId}-postal-code`}
+        extractionKey="person.postalCode"
         label={t("fields.postalCode")}
         error={postalCodeError}
       >

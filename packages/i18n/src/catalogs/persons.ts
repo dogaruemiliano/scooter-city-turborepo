@@ -176,6 +176,41 @@ export const personsCatalog = {
       romanian: "Romanian citizen",
       foreign: "Foreign citizen",
     },
+    extraction: {
+      title: "Document reading",
+      from: "From {source}",
+      checkValue: "Check this value",
+      sourceChanged: "The source photo changed. Check the new reading.",
+      conflictingValues:
+        "The documents show different values. Choose the correct one.",
+      apply: "Use suggestion",
+      applyLabel: "Use {value} from {source}",
+      retry: "Read document again",
+      continueManually: "Continue manually",
+      status: {
+        pending:
+          "Reading document… You can review and edit the form while this finishes.",
+        success:
+          "Details are ready to review. Check them against the document before saving.",
+        error:
+          "We couldn't read this document. Try again or enter its details manually.",
+        disabled:
+          "Automatic reading is unavailable. Enter the details manually.",
+        manual: "Enter and check the details manually.",
+      },
+      warnings: {
+        unclearText:
+          "Some text was unclear. Check the highlighted suggestions.",
+        ambiguousDate:
+          "A date could not be read reliably. Enter it from the document.",
+        typeMismatch:
+          "This photo appears to be a different document type. Check the upload.",
+        conflictingSources:
+          "Some readings conflict. Check the document before filling those fields.",
+        invalidValue: "Some values could not be validated and were left out.",
+        noData: "No usable details were found. Enter the details manually.",
+      },
+    },
     wizard: {
       progress: "Add person progress",
       steps: {
@@ -564,6 +599,42 @@ export const personsCatalog = {
       label: "Cetățenie",
       romanian: "Cetățean român",
       foreign: "Cetățean străin",
+    },
+    extraction: {
+      title: "Citirea documentelor",
+      from: "Din {source}",
+      checkValue: "Verifică această valoare",
+      sourceChanged: "Fotografia sursă s-a schimbat. Verifică noua citire.",
+      conflictingValues:
+        "Documentele indică valori diferite. Alege valoarea corectă.",
+      apply: "Folosește sugestia",
+      applyLabel: "Folosește {value} din {source}",
+      retry: "Citește documentul din nou",
+      continueManually: "Continuă manual",
+      status: {
+        pending:
+          "Se citește documentul… Poți verifica și edita formularul între timp.",
+        success:
+          "Datele sunt pregătite pentru verificare. Compară-le cu documentul înainte de salvare.",
+        error:
+          "Documentul nu a putut fi citit. Încearcă din nou sau completează datele manual.",
+        disabled:
+          "Citirea automată nu este disponibilă. Completează datele manual.",
+        manual: "Completează și verifică datele manual.",
+      },
+      warnings: {
+        unclearText:
+          "O parte din text nu este clară. Verifică sugestiile marcate.",
+        ambiguousDate:
+          "O dată nu a putut fi citită sigur. Completeaz-o din document.",
+        typeMismatch:
+          "Fotografia pare să conțină alt tip de document. Verifică fișierul încărcat.",
+        conflictingSources:
+          "Unele citiri sunt contradictorii. Verifică documentul înainte de completare.",
+        invalidValue: "Unele valori nu au putut fi validate și au fost omise.",
+        noData:
+          "Nu au fost găsite date utilizabile. Completează datele manual.",
+      },
     },
     wizard: {
       progress: "Pași pentru adăugarea persoanei",

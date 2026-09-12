@@ -112,7 +112,7 @@ export interface CreatePersonDocumentFormState {
   series: string;
   number: string;
   cnp: string;
-  issuingCountryCode: CountryCode;
+  issuingCountryCode: CountryCode | "";
   issuedBy: string;
   issuedOn: DateParts;
   hasExpiryDate: boolean;
@@ -154,6 +154,7 @@ export type SetPersonDocumentValue = <Key extends PersonDocumentFormFieldKey>(
 
 export type SetPersonDocument = (
   document: CreatePersonDocumentFormState,
+  editedFields?: readonly PersonDocumentFormFieldKey[],
 ) => void;
 
 export type SetPersonDocumentPhoto = (

@@ -129,6 +129,27 @@ describe("person-document extraction normalization", () => {
     expect(result.warnings).toEqual(["conflictingSources"]);
   });
 
+  it.each([
+    [false, true],
+    [true, false],
+  ])(
+    "preserves review flags when deduplicating identical readings (%s, %s)",
+    async (firstNeedsReview, secondNeedsReview) => {
+      const reading = suggestion("person", "firstName", "Ana");
+      const { service } = setup({
+        suggestions: [
+          { ...reading, needsReview: firstNeedsReview },
+          { ...reading, needsReview: secondNeedsReview },
+        ],
+      });
+
+      const result = await service.analyze(input);
+
+      expect(result.suggestions).toEqual([{ ...reading, needsReview: true }]);
+      expect(result.warnings).toEqual([]);
+    },
+  );
+
   it.each(["passport", null])(
     "returns no suggestions when actual type is %s",
     async (detectedDocumentType) => {

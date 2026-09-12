@@ -1,6 +1,7 @@
 import { ApiError, v1 } from "@repo/api-shared";
 import { messages, type SupportedLocale } from "@repo/i18n";
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -16,6 +17,7 @@ import { PersonCreateForm } from "./PersonCreateForm";
 const mocks = vi.hoisted(() => ({
   apiFetch: vi.fn(),
   createPerson: vi.fn(),
+  extractDocument: vi.fn(),
   s3Fetch: vi.fn(),
   push: vi.fn(),
   refresh: vi.fn(),
@@ -76,6 +78,10 @@ beforeEach(() => {
   mocks.apiFetch.mockReset();
   mocks.createPerson.mockReset();
   mocks.createPerson.mockResolvedValue(createdPerson);
+  mocks.extractDocument.mockReset();
+  mocks.extractDocument.mockRejectedValue(
+    new ApiError(503, "Disabled", "DOCUMENT_EXTRACTION_DISABLED"),
+  );
   mocks.apiFetch.mockImplementation((route, ...args) =>
     route === v1.persons.ROUTES.documents.photos.createDraftUploadUrl
       ? Promise.resolve({
@@ -86,7 +92,9 @@ beforeEach(() => {
           expiresAt: "2026-06-25T10:05:00.000Z",
           maxBytes: 64,
         })
-      : mocks.createPerson(route, ...args),
+      : route === v1.persons.ROUTES.documents.extract
+        ? mocks.extractDocument(route, ...args)
+        : mocks.createPerson(route, ...args),
   );
   mocks.s3Fetch.mockReset();
   mocks.s3Fetch.mockResolvedValue(new Response(null, { status: 200 }));
@@ -695,6 +703,147 @@ describe("PersonCreateForm wizard", () => {
     },
   );
 });
+
+describe("document extraction review", () => {
+  it("prefills editable fields with visible sources and uncertainty", async () => {
+    mocks.extractDocument.mockResolvedValue(extractedPassport());
+    const browser = userEvent.setup();
+    renderCreateForm();
+    await enterDocuments(browser, "foreign");
+    await uploadPhoto(browser, "Passport");
+    await browser.click(screen.getByRole("button", { name: "Review details" }));
+    expect(screen.getByLabelText("First name")).toHaveValue("Ana");
+    expect(screen.getByLabelText("Last name")).toHaveValue("Popescu");
+    expect(
+      screen.getByText(/From Passport · Front · Check this value/),
+    ).toBeInTheDocument();
+    changeField("First name", "");
+    const useSuggestion = screen.getByRole("button", {
+      name: "Use Ana from Passport",
+    });
+    await browser.click(useSuggestion);
+    expect(screen.getByLabelText("First name")).toHaveValue("Ana");
+  });
+
+  it.each(["Save", "Cancel"])(
+    "%s in a document editor preserves extraction arriving during local edits",
+    async (action) => {
+      let resolve!: (value: v1.persons.PersonDocumentExtraction) => void;
+      mocks.extractDocument.mockReturnValue(
+        new Promise((done) => {
+          resolve = done;
+        }),
+      );
+      const browser = userEvent.setup();
+      renderCreateForm();
+      await enterDocuments(browser, "foreign");
+      await uploadPhoto(browser, "Passport");
+      await browser.click(
+        screen.getByRole("button", { name: "Review details" }),
+      );
+      changeField("First name", "Operator");
+      await browser.click(
+        screen.getByRole("button", { name: /^(Add|Edit) Passport$/ }),
+      );
+      const dialog = await screen.findByRole("dialog", {
+        name: /^(Add|Edit) document$/,
+      });
+      changeDialogField(dialog, "Document number", "LOCAL");
+      await act(async () => resolve(extractedPassport()));
+      expect(within(dialog).getByLabelText("Document number")).toHaveValue(
+        "LOCAL",
+      );
+      expect(within(dialog).getByLabelText("Issued by")).toHaveValue(
+        "Passport office",
+      );
+      await browser.click(within(dialog).getByRole("button", { name: action }));
+      await waitFor(() => expect(dialog).not.toBeInTheDocument());
+      expect(screen.getByLabelText("First name")).toHaveValue("Operator");
+      expect(screen.getByLabelText("Last name")).toHaveValue("Popescu");
+      await browser.click(
+        screen.getByRole("button", { name: "Edit Passport" }),
+      );
+      const reopened = await screen.findByRole("dialog", {
+        name: "Edit document",
+      });
+      expect(within(reopened).getByLabelText("Document number")).toHaveValue(
+        action === "Save" ? "LOCAL" : "EXTRACTED",
+      );
+      expect(within(reopened).getByLabelText("Issued by")).toHaveValue(
+        "Passport office",
+      );
+    },
+  );
+
+  it("blocks creation while reading and allows explicit manual completion", async () => {
+    let resolve!: (value: v1.persons.PersonDocumentExtraction) => void;
+    mocks.extractDocument.mockReturnValue(
+      new Promise((done) => {
+        resolve = done;
+      }),
+    );
+    const browser = userEvent.setup();
+    renderCreateForm();
+    await enterDocuments(browser, "foreign");
+    await uploadPhoto(browser, "Passport");
+    await browser.click(screen.getByRole("button", { name: "Review details" }));
+    fillRequiredFields();
+    expect(
+      screen.getByRole("button", { name: "Create person" }),
+    ).toBeDisabled();
+    await browser.click(
+      screen.getByRole("button", { name: "Continue manually" }),
+    );
+    await act(async () => resolve(extractedPassport()));
+    expect(screen.getByLabelText("First name")).toHaveValue("Grace");
+    await browser.click(screen.getByRole("button", { name: "Create person" }));
+    await waitFor(() =>
+      expect(mocks.push).toHaveBeenCalledWith("/en/persons/person-2"),
+    );
+    expect(mocks.createPerson).toHaveBeenCalledTimes(1);
+  });
+});
+
+function extractedPassport(): v1.persons.PersonDocumentExtraction {
+  return {
+    documentType: "passport",
+    detectedDocumentType: "passport",
+    sourceUploadIds: ["source"],
+    reviewRequired: true,
+    suggestions: [
+      {
+        target: "person",
+        field: "firstName",
+        value: "Ana",
+        sourceSlot: "front",
+        needsReview: true,
+      },
+      {
+        target: "person",
+        field: "lastName",
+        value: "Popescu",
+        sourceSlot: "front",
+        needsReview: false,
+      },
+      {
+        target: "document",
+        field: "number",
+        value: "EXTRACTED",
+        sourceSlot: "front",
+        needsReview: false,
+      },
+      {
+        target: "document",
+        field: "issuedBy",
+        value: "Passport office",
+        sourceSlot: "front",
+        needsReview: false,
+      },
+    ],
+    licenseCategories: [],
+    warnings: [],
+  };
+}
 
 function renderCreateForm(locale: SupportedLocale = "en") {
   return render(

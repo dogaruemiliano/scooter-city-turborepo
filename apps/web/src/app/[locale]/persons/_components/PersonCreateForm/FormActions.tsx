@@ -9,6 +9,7 @@ import type { PersonWizardStep } from "./WizardProgress";
 export function FormActions({
   creating,
   uploadingPhotos,
+  extracting,
   personsHref,
   step,
   onBack,
@@ -16,6 +17,7 @@ export function FormActions({
 }: {
   creating: boolean;
   uploadingPhotos: boolean;
+  extracting: boolean;
   personsHref: string;
   step: PersonWizardStep;
   onBack: () => void;
@@ -70,7 +72,7 @@ export function FormActions({
         <Button
           type="submit"
           className="w-full sm:w-auto"
-          disabled={creating || uploadingPhotos}
+          disabled={creating || uploadingPhotos || extracting}
         >
           <UserPlusIcon data-icon="inline-start" />
           {creating ? t("actions.creating") : t("actions.create")}

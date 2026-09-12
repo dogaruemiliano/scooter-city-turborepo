@@ -5,6 +5,34 @@ those private draft uploads and returns suggestions for operator review. Analysi
 does not create a person, save document fields, verify a document, or grant rental
 eligibility. The operator remains responsible for checking each document.
 
+## Add-person screens
+
+1. Choose **Romanian citizen** or **Foreign citizen**.
+2. Romanian citizens choose old national ID or electronic ID (CEI), then upload
+   the required documents. Old IDs require one photo; CEI requires both sides
+   and separate proof of address. Foreign citizens go directly to passport
+   upload, with optional visa and residence permit. A driving licence is optional
+   in every path.
+3. Review and edit the extracted personal and document details, then save. Email
+   and phone still need manual entry. Saving opens the new person's detail page.
+
+Going back preserves uploads and manual edits. Extraction runs against uploaded
+drafts before the person is created. Every suggested value remains editable;
+document verification status is never changed by extraction.
+
+Automatic suggestions fill empty, untouched fields. Operator edits, including
+intentional clears, are preserved. Competing readings require an explicit choice;
+the first response does not win. Replacing or removing a photo clears untouched
+values from that source, while manual corrections remain. Request identities and
+abort signals prevent late responses from older photos or workflows being applied.
+
+The review form shows source documents and uncertain values. Document editors keep
+local changes until Save; Cancel does not roll back extraction that arrived while
+the editor was open. Save is blocked while a reading is pending, with an explicit
+Continue manually option that ignores pending results. Failed or unavailable
+extraction leaves manual entry available. Unreadable foreign document issuers stay
+blank rather than defaulting to Romania.
+
 ## Configuration
 
 Person extraction has its own configuration; expense extraction continues using

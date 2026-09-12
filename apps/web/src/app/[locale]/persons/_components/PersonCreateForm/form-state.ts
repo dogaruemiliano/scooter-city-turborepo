@@ -174,7 +174,8 @@ export function createDocumentDraft(
     series: "",
     number: "",
     cnp: "",
-    issuingCountryCode: "RO",
+    issuingCountryCode:
+      type === "nationalId" || type === "proofOfAddress" ? "RO" : "",
     issuedBy: "",
     issuedOn: emptyDateParts(),
     hasExpiryDate: type !== "proofOfAddress",
