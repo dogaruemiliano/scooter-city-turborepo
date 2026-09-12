@@ -28,7 +28,7 @@ export function NationalIdFormatSelect({
             aria-pressed={value === format}
             disabled={disabled}
             onClick={() => onChange(format)}
-            className="h-auto min-h-32 whitespace-normal p-4 md:h-auto"
+            className={`h-auto min-h-32 whitespace-normal p-4 md:h-auto ${value === format ? "" : "bg-card text-card-foreground"}`}
           >
             {t(`nationalIdFormat.${format}`)}
           </Button>

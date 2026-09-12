@@ -25,7 +25,7 @@ export function CitizenshipChoice({
         <Button
           type="button"
           variant="outline"
-          className="h-auto min-h-48 flex-col gap-4 rounded-xl p-6 whitespace-normal md:h-auto"
+          className="h-auto min-h-48 flex-col gap-4 rounded-xl bg-card p-6 text-card-foreground whitespace-normal md:h-auto"
           onClick={() => onChange("romanian")}
         >
           {/* A local vector flag stays sharp without image optimization. */}
@@ -42,7 +42,7 @@ export function CitizenshipChoice({
         <Button
           type="button"
           variant="outline"
-          className="h-auto min-h-48 flex-col gap-4 rounded-xl p-6 whitespace-normal md:h-auto"
+          className="h-auto min-h-48 flex-col gap-4 rounded-xl bg-card p-6 text-card-foreground whitespace-normal md:h-auto"
           onClick={() => onChange("foreign")}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
