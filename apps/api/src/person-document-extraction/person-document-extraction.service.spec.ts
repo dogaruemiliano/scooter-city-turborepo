@@ -203,11 +203,11 @@ describe("person-document extraction normalization", () => {
     expect(result.suggestions.map((item) => [item.field, item.value])).toEqual([
       ["firstName", "Ștefan"],
       ["lastName", "Popescu"],
-      ["dateOfBirth", "1990-02-28"],
       ["cnp", "1900228123450"],
       ["number", "001234"],
       ["series", "AB"],
       ["issuingCountryCode", "RO"],
+      ["dateOfBirth", "1990-02-28"],
     ]);
     expect(result.warnings).toEqual([]);
     expect(result).not.toHaveProperty("status");
@@ -401,18 +401,51 @@ describe("person-document extraction normalization", () => {
     expect(result.warnings).toEqual(["invalidValue"]);
   });
 
-  it("omits a conflicting CNP and birth date rather than choosing an identity", async () => {
+  it.each([undefined, "1990-03-01", "1990-02-28"])(
+    "derives birth date from validated CNP regardless of OCR date %s",
+    async (ocrDate) => {
+      const { service } = setup({
+        suggestions: [
+          suggestion("document", "cnp", "1900228123450"),
+          ...(ocrDate ? [suggestion("person", "dateOfBirth", ocrDate)] : []),
+        ],
+      });
+      const result = await service.analyze(input);
+      expect(result.suggestions).toEqual([
+        suggestion("person", "cnp", "1900228123450"),
+        suggestion("person", "dateOfBirth", "1990-02-28"),
+      ]);
+      expect(result.warnings).toEqual([]);
+    },
+  );
+
+  it("preserves the CNP source and review flag on its derived birth date", async () => {
     const { service } = setup({
       suggestions: [
-        suggestion("document", "cnp", "1900228123450"),
-        suggestion("person", "dateOfBirth", "1990-03-01"),
+        {
+          ...suggestion("person", "cnp", "1900228123450", "back"),
+          needsReview: true,
+        },
       ],
     });
     const result = await service.analyze(input);
-    expect(result.suggestions).toEqual([]);
-    expect(result.warnings).toEqual(
-      expect.arrayContaining(["conflictingSources", "noData"]),
-    );
+    expect(result.suggestions).toContainEqual({
+      ...suggestion("person", "dateOfBirth", "1990-02-28", "back"),
+      needsReview: true,
+    });
+  });
+
+  it("keeps the printed birth date when no valid CNP is available", async () => {
+    const { service } = setup({
+      suggestions: [
+        suggestion("person", "cnp", "1234567890123"),
+        suggestion("person", "dateOfBirth", "1990-02-28"),
+      ],
+    });
+    const result = await service.analyze(input);
+    expect(result.suggestions).toEqual([
+      suggestion("person", "dateOfBirth", "1990-02-28"),
+    ]);
   });
 
   it("omits inconsistent document issue and expiry dates", async () => {

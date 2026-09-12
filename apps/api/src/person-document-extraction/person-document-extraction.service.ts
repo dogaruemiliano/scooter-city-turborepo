@@ -148,24 +148,25 @@ export class PersonDocumentExtractionService {
       suggestions.push({ ...suggestion, value: normalized.data });
     }
 
-    const birthDates = suggestions.filter(
-      (item) => item.target === "person" && item.field === "dateOfBirth",
-    );
     const cnps = suggestions.filter(
       (item) => item.target === "person" && item.field === "cnp",
     );
-    if (
-      cnps.some((cnp) =>
-        birthDates.some(
-          (birthDate) =>
-            v1.persons.getDateOfBirthFromCnp(cnp.value) !== birthDate.value,
-        ),
-      )
-    ) {
-      warnings.add("conflictingSources");
+    if (cnps.length > 0) {
+      // A validated CNP is authoritative for birth date; discard OCR dates.
       suggestions = suggestions.filter(
-        (item) => item.field !== "cnp" && item.field !== "dateOfBirth",
+        (item) => item.target !== "person" || item.field !== "dateOfBirth",
       );
+      for (const cnp of cnps) {
+        const dateOfBirth = v1.persons.getDateOfBirthFromCnp(cnp.value);
+        if (dateOfBirth) {
+          suggestions.push({
+            ...cnp,
+            target: "person",
+            field: "dateOfBirth",
+            value: dateOfBirth,
+          });
+        }
+      }
     }
 
     const issuedOn = suggestions.filter(

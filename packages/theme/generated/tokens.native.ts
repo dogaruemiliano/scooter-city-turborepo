@@ -278,6 +278,7 @@ export const tokens = {
       slow: 400,
       slower: 600,
       countdownTick: 1000,
+      orientationHint: 2400,
     },
     easing: {
       standard: "cubic-bezier(0.4, 0, 0.2, 1)",
@@ -291,6 +292,7 @@ export const tokens = {
   },
   aspectRatio: {
     documentLandscape: 1.586,
+    identityCardPortrait: 0.6305170239596469,
     receiptPortrait: 0.3333333333333333,
   },
   zIndex: {

@@ -4,6 +4,7 @@
  */
 export const aspectRatio = {
   documentLandscape: 1.586,
+  identityCardPortrait: 1 / 1.586,
   receiptPortrait: 1 / 3,
 } as const;
 

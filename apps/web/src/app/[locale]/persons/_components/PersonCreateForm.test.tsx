@@ -28,6 +28,11 @@ const mocks = vi.hoisted(() => ({
   refresh: vi.fn(),
 }));
 
+vi.mock("@repo/ui/lib/crop-image", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@repo/ui/lib/crop-image")>()),
+  cropImage: vi.fn(async (file: File) => file),
+}));
+
 vi.mock("@/lib/api", () => ({
   webApi: {
     fetch: mocks.apiFetch,
@@ -601,9 +606,10 @@ describe("PersonCreateForm wizard", () => {
       new File(["%PDF-proof"], "residence.pdf", { type: "application/pdf" }),
     );
     expect(within(dialog).getByText(/residence.pdf/)).toBeInTheDocument();
-    expect(
-      within(dialog).getByRole("link", { name: /Open file/ }),
-    ).toHaveAttribute("href", expect.stringMatching(/^blob:/));
+    expect(within(dialog).getByTitle("residence.pdf")).toHaveAttribute(
+      "src",
+      expect.stringMatching(/^blob:/),
+    );
     expect(within(dialog).queryByRole("img")).not.toBeInTheDocument();
     await browser.click(
       within(dialog).getByRole("button", { name: "Use file" }),
@@ -787,7 +793,7 @@ describe("PersonCreateForm wizard", () => {
       "image/jpeg,image/png,image/webp,application/pdf",
     );
     await browser.click(
-      within(chooser).getByRole("button", { name: "Cancel" }),
+      within(chooser).getByRole("button", { name: "Close camera" }),
     );
     await waitFor(() => expect(chooser).not.toBeInTheDocument());
     expect(mocks.apiFetch).not.toHaveBeenCalled();

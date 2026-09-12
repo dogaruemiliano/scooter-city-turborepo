@@ -46,6 +46,33 @@ function requestBody(request?: RequestInit): Record<string, unknown> {
 }
 
 describe("OpenAI person-document extraction", () => {
+  it.each(["development", "production", "test", undefined])(
+    "logs raw extraction output only in development (NODE_ENV=%s)",
+    async (nodeEnv) => {
+      const env = jest.replaceProperty(process, "env", {
+        ...process.env,
+        NODE_ENV: nodeEnv,
+      });
+      const log = jest.spyOn(console, "log").mockImplementation(() => {});
+      try {
+        const { provider } = setup();
+        await expect(provider.analyze(input)).resolves.toEqual(output);
+        if (nodeEnv === "development") {
+          expect(log).toHaveBeenCalledTimes(1);
+          expect(log).toHaveBeenCalledWith(
+            "[person-document-extraction] raw model output",
+            JSON.stringify(output),
+          );
+        } else {
+          expect(log).not.toHaveBeenCalled();
+        }
+      } finally {
+        log.mockRestore();
+        env.restore();
+      }
+    },
+  );
+
   it("sends labelled image bytes with strict structured output, bounded tokens and storage disabled", async () => {
     const { provider, fetcher } = setup();
 

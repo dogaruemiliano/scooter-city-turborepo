@@ -391,6 +391,7 @@
   --spacing-2-5: 0.625rem;
 
   --aspect-document-landscape: 1.586;
+  --aspect-identity-card-portrait: 0.6305170239596469;
   --aspect-receipt-portrait: 0.3333333333333333;
 
   --text-xs: 0.75rem;
@@ -432,6 +433,8 @@
   --transition-duration-slower: 600ms;
   --duration-countdown-tick: 1000ms;
   --transition-duration-countdown-tick: 1000ms;
+  --duration-orientation-hint: 2400ms;
+  --transition-duration-orientation-hint: 2400ms;
   --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
   --ease-decelerate: cubic-bezier(0, 0, 0.2, 1);
   --ease-accelerate: cubic-bezier(0.4, 0, 1, 1);
