@@ -352,6 +352,7 @@ export function DocumentPhotoDraftCard({
           saveFailed: t("documentForm.cropFailed"),
           resetCrop: t("documentForm.resetCrop"),
           cropCorner: (corner) => t("documentForm.cropCorner", { corner }),
+          cropEdge: (edge) => t(`documentForm.cropEdges.${edge}`),
           identityCardHint: t("documentForm.identityCardHint"),
           identityCardDescription: t("documentForm.identityCardDescription"),
           identityCardLandscapeDescription: t(

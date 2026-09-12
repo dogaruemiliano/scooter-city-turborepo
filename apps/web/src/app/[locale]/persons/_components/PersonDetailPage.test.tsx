@@ -229,6 +229,9 @@ describe("PersonDetailPage", () => {
     );
     const editor = await screen.findByRole("dialog", { name: "Edit document" });
     expect(editor).not.toHaveClass("bg-background");
+    await browser.click(
+      within(editor).getByRole("button", { name: "Edit AM" }),
+    );
     await browser.selectOptions(
       within(editor).getByLabelText(messages.en.persons.license.category),
       "A1",

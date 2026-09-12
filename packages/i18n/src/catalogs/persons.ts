@@ -79,6 +79,17 @@ export const personsCatalog = {
       title: "Edit person",
       description: "Update contact, address and notes for this person.",
     },
+    draft: {
+      title: "Continue adding {name}?",
+      unnamed: "this person",
+      description:
+        "Your details, documents, and current step have been saved in this browser.",
+      startNew: "Start a new person",
+      continue: "Continue draft",
+      loading: "Loading saved draft",
+      saveFailed:
+        "The draft is kept for this session, but could not be saved for after a page refresh.",
+    },
     createPage: {
       title: "Add person",
       description: "Create a standalone rental person record.",
@@ -242,13 +253,28 @@ export const personsCatalog = {
       electronicHelp:
         "Add both sides of the electronic ID and proof of address.",
     },
+    licenseName: {
+      title: "The names on the documents differ",
+      formatting:
+        "Only spaces or hyphens differ. The identity document's spelling is kept. Compare both versions before confirming.",
+      different:
+        "The driving licence shows a different name. The name from the identity document is kept. Check that both documents belong to the same person.",
+      identity: "Identity document",
+      license: "Driving licence",
+      confirm:
+        "I checked both names and confirm that the documents belong to the same person.",
+      required: "Confirm the name difference before adding this person.",
+    },
     license: {
       title: "Driving licence categories",
       addCategory: "Add category",
-      removeCategory: "Remove category",
+      removeCategory: "Remove {category}",
+      editCategory: "Edit {category}",
+      doneEditing: "Done editing {category}",
+      missingDate: "Not provided",
       category: "Category",
-      issuedOn: "Category issued on",
-      expiresOn: "Category expires on",
+      issuedOn: "Issued on",
+      expiresOn: "Expires on",
       restrictions: "Restrictions",
       reviewHelp:
         "Check the licence and its categories before marking this document as verified. A photo alone does not confirm rental eligibility.",
@@ -298,7 +324,14 @@ export const personsCatalog = {
       cropPhoto: "Crop photo",
       saveCrop: "Save crop",
       cropHelp: "Drag the corners to fit the document, or use the arrow keys.",
+      seriesAndNumber: "Series and number",
       cropCorner: "Resize {corner} corner",
+      cropEdges: {
+        north: "Move the top crop edge",
+        south: "Move the bottom crop edge",
+        west: "Move the left crop edge",
+        east: "Move the right crop edge",
+      },
       cropFailed: "The image could not be cropped. Try another image.",
       dropFile: "Drop a document here",
       uploadRequirementsLabel: "Document upload requirements",
@@ -553,6 +586,17 @@ export const personsCatalog = {
       description:
         "Actualizează datele de contact, adresa și notițele acestei persoane.",
     },
+    draft: {
+      title: "Continui adăugarea pentru {name}?",
+      unnamed: "această persoană",
+      description:
+        "Datele, documentele și pasul curent au fost salvate în acest browser.",
+      startNew: "Persoană nouă",
+      continue: "Continuă",
+      loading: "Se încarcă draftul salvat",
+      saveFailed:
+        "Draftul este păstrat pentru această sesiune, dar nu a putut fi salvat pentru după reîncărcarea paginii.",
+    },
     createPage: {
       title: "Adaugă persoană",
       description:
@@ -718,13 +762,28 @@ export const personsCatalog = {
       electronicHelp:
         "Adaugă ambele fețe ale cărții electronice și dovada de domiciliu / reședință.",
     },
+    licenseName: {
+      title: "Numele diferă între documente",
+      formatting:
+        "Diferența este doar de spații sau cratime. Păstrăm scrierea din actul de identitate. Compară ambele variante înainte de confirmare.",
+      different:
+        "Pe permis apare un nume diferit. Păstrăm numele din actul de identitate. Verifică dacă ambele documente aparțin aceleiași persoane.",
+      identity: "Act de identitate",
+      license: "Permis de conducere",
+      confirm:
+        "Am verificat numele și confirm că documentele aparțin aceleiași persoane.",
+      required: "Confirmă diferența de nume înainte de a adăuga persoana.",
+    },
     license: {
       title: "Categorii permis de conducere",
       addCategory: "Adaugă categorie",
-      removeCategory: "Elimină categoria",
+      removeCategory: "Elimină {category}",
+      editCategory: "Editează {category}",
+      doneEditing: "Încheie editarea pentru {category}",
+      missingDate: "Lipsă",
       category: "Categorie",
-      issuedOn: "Categoria emisă la",
-      expiresOn: "Categoria expiră la",
+      issuedOn: "Obținut la",
+      expiresOn: "Expiră la",
       restrictions: "Restricții",
       reviewHelp:
         "Verifică permisul și categoriile înainte de a marca documentul drept verificat. Fotografia singură nu confirmă eligibilitatea pentru închiriere.",
@@ -776,7 +835,14 @@ export const personsCatalog = {
       saveCrop: "Salvează decupajul",
       cropHelp:
         "Trage colțurile pentru a încadra documentul sau folosește tastele săgeți.",
+      seriesAndNumber: "Serie și număr",
       cropCorner: "Redimensionează colțul {corner}",
+      cropEdges: {
+        north: "Mută marginea de sus",
+        south: "Mută marginea de jos",
+        west: "Mută marginea din stânga",
+        east: "Mută marginea din dreapta",
+      },
       cropFailed: "Imaginea nu a putut fi decupată. Încearcă altă imagine.",
       dropFile: "Trage un document aici",
       uploadRequirementsLabel: "Cerințe pentru documente",

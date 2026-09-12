@@ -8,6 +8,40 @@ import {
 import { createPersonInput } from "./input";
 
 describe("person document workflows", () => {
+  it("shares the uploaded ID, its edits and both photo sides across format changes", () => {
+    let form = createEmptyCreateForm("romanian");
+    const front = {
+      id: "front",
+      status: "uploaded" as const,
+      file: new File(["front"], "front.png"),
+      uploadToken: "token",
+    };
+    const identity = {
+      ...form.documents[0]!,
+      number: "123456",
+      issuedBy: "Issuer",
+      photos: { front },
+    };
+    form.documents[0] = identity;
+    form = switchDocumentWorkflow(form, "romanian", "electronic");
+    expect(form.documents[0]).toMatchObject({
+      key: identity.key,
+      number: "123456",
+      issuedBy: "Issuer",
+      nationalIdFormat: "electronic",
+    });
+    expect(form.documents[0]!.photos.front).toBe(front);
+    expect(
+      form.documents.some((document) => document.type === "proofOfAddress"),
+    ).toBe(true);
+    const back = { ...front, id: "back", file: new File(["back"], "back.png") };
+    form.documents[0]!.photos.back = back;
+    form = switchDocumentWorkflow(form, "romanian", "classic");
+    form = switchDocumentWorkflow(form, "romanian", "electronic");
+    expect(form.documents[0]!.photos).toEqual({ front, back });
+    expect(form.documents[0]!.key).toBe(identity.key);
+  });
+
   it("restores edited documents and uploads completed while their workflow was hidden", () => {
     let form = createEmptyCreateForm("romanian");
     const file = new File(["id"], "id.png", { type: "image/png" });

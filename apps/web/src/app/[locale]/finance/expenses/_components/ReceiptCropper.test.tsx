@@ -39,6 +39,55 @@ afterEach(() => {
 });
 
 describe("ReceiptCropper", () => {
+  it.each([
+    { edge: "north", expected: { x: 0.1, y: 0.3, width: 0.6, height: 0.4 } },
+    { edge: "south", expected: { x: 0.1, y: 0.2, width: 0.6, height: 0.6 } },
+    { edge: "west", expected: { x: 0.2, y: 0.2, width: 0.5, height: 0.5 } },
+    { edge: "east", expected: { x: 0.1, y: 0.2, width: 0.7, height: 0.5 } },
+  ])(
+    "drags the $edge edge independently of the other boundaries",
+    ({ edge, expected }) => {
+      const { frame, onCropChange } = renderMeasuredCropper();
+      const handle = screen.getByRole("button", {
+        name: `Resize ${edge} edge`,
+      });
+      const width = Number.parseFloat(frame.style.width);
+      const height = Number.parseFloat(frame.style.height);
+      fireEvent.pointerDown(handle, {
+        pointerId: 1,
+        clientX: 100,
+        clientY: 100,
+      });
+      fireEvent.pointerMove(handle, {
+        pointerId: 1,
+        clientX: 100 + width / 10,
+        clientY: 100 + height / 10,
+      });
+      const next = onCropChange.mock.lastCall![0];
+      for (const key of ["x", "y", "width", "height"] as const) {
+        expect(next[key]).toBeCloseTo(expected[key]);
+      }
+      expect(Number.parseFloat(frame.style.width)).toBe(width);
+      fireEvent.pointerUp(handle, { pointerId: 1 });
+      expect(cropLoupe()).toBeNull();
+    },
+  );
+
+  it("resizes an edge with the keyboard and enforces the minimum crop size", () => {
+    const { onCropChange } = renderMeasuredCropper();
+    const handle = screen.getByRole("button", { name: "Resize west edge" });
+    for (let index = 0; index < 100; index++)
+      fireEvent.keyDown(handle, { key: "ArrowRight" });
+    fireEvent.keyUp(handle, { key: "ArrowRight" });
+    const crop = onCropChange.mock.lastCall![0];
+    expect(crop.width).toBeCloseTo(0.15);
+    expect(crop.x + crop.width).toBeCloseTo(
+      INITIAL_CROP.x + INITIAL_CROP.width,
+    );
+    expect(crop.y).toBe(INITIAL_CROP.y);
+    expect(crop.height).toBeCloseTo(INITIAL_CROP.height);
+  });
+
   it("previews both perspective axes with every original corner inside the expanded canvas", () => {
     const { frame, setPerspective } = renderCropper();
     const encode = vi.spyOn(HTMLCanvasElement.prototype, "toBlob");

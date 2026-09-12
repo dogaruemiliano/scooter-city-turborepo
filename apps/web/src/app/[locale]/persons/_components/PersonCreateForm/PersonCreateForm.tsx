@@ -7,7 +7,26 @@ import type {
 } from "@repo/ui/components";
 import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
-import { useId, useState, useRef, useEffect, type FormEvent } from "react";
+import {
+  useId,
+  useState,
+  useRef,
+  useEffect,
+  useMemo,
+  type FormEvent,
+} from "react";
+import { Button, Spinner } from "@repo/ui/components";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@repo/ui/components/dialog";
+import { usePersonDraft } from "./usePersonDraft";
+import { licenseNameDifferences } from "./license-name-comparison";
+import { LicenseNameConfirmation } from "./LicenseNameConfirmation";
+import type { PersonDraft } from "./person-draft-store";
 
 import { webApi } from "@/lib/api";
 import { PageHeaderNavigation } from "@/components/PageHeaderNavigation";
@@ -71,7 +90,10 @@ import type {
   PersonDocumentFormFieldKey,
 } from "./types";
 
-export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
+export function PersonCreateForm({
+  personsHref,
+  draftOwnerId,
+}: PersonCreateFormProps) {
   const t = useTranslations("persons");
   const locale = useLocale();
   const router = useRouter();
@@ -88,6 +110,21 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
     createExtractionState(createEmptyCreateForm("romanian")),
   );
   const form = extractionState.form;
+  const nameDifferences = licenseNameDifferences(extractionState);
+  const nameConfirmationKey = JSON.stringify(nameDifferences);
+  const [confirmedNames, setConfirmedNames] = useState<string | null>(null);
+  const nameConfirmationRequired =
+    nameDifferences.length > 0 && confirmedNames !== nameConfirmationKey;
+  const draftSnapshot = useMemo<PersonDraft>(
+    () => ({
+      version: 1,
+      extraction: extractionState,
+      navigation: navigation.snapshot,
+      nationalIdFormat: chosenNationalIdFormat,
+    }),
+    [extractionState, navigation.snapshot, chosenNationalIdFormat],
+  );
+  const draft = usePersonDraft(draftOwnerId, draftSnapshot);
   const extraction = useDocumentExtraction(extractionState, setExtractionState);
   function setForm(
     update: (current: CreatePersonFormState) => CreatePersonFormState,
@@ -114,6 +151,14 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
       return;
     }
     if (extraction.pending) return;
+    if (nameConfirmationRequired) {
+      setFeedback({
+        kind: "error",
+        title: t("licenseName.title"),
+        messages: [t("licenseName.required")],
+      });
+      return;
+    }
     setFeedback(null);
     setFieldErrors({});
 
@@ -199,6 +244,7 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
         },
       );
 
+      draft.complete();
       setFeedback({
         kind: "success",
         title: t("feedback.createSuccessTitle"),
@@ -376,7 +422,42 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
           ),
       }}
     >
-      <div className="mx-auto flex w-full max-w-screen-lg flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
+      {draft.pending ? (
+        <Dialog open>
+          <DialogContent showCloseButton={false}>
+            <DialogTitle>
+              {t("draft.title", {
+                name:
+                  [
+                    draft.pending.extraction.form.firstName,
+                    draft.pending.extraction.form.lastName,
+                  ]
+                    .filter(Boolean)
+                    .join(" ") || t("draft.unnamed"),
+              })}
+            </DialogTitle>
+            <DialogDescription>{t("draft.description")}</DialogDescription>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={draft.discard}>
+                {t("draft.startNew")}
+              </Button>
+              <Button type="button" onClick={resumeDraft}>
+                {t("draft.continue")}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      ) : null}
+      <div
+        inert={!draft.ready || Boolean(draft.pending)}
+        className="mx-auto flex w-full max-w-screen-lg flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10"
+      >
+        {!draft.ready ? <Spinner aria-label={t("draft.loading")} /> : null}
+        {draft.saveFailed ? (
+          <p role="status" className="text-sm text-destructive">
+            {t("draft.saveFailed")}
+          </p>
+        ) : null}
         <PageHeaderNavigation
           onBack={canGoBack ? goBack : undefined}
           backDisabled={creating}
@@ -506,6 +587,16 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
           ) : null}
           {step === "review" ? (
             <>
+              {nameDifferences.length > 0 ? (
+                <LicenseNameConfirmation
+                  differences={nameDifferences}
+                  checked={!nameConfirmationRequired}
+                  disabled={creating || extraction.pending}
+                  onCheckedChange={(checked) =>
+                    setConfirmedNames(checked ? nameConfirmationKey : null)
+                  }
+                />
+              ) : null}
               <DocumentsSection
                 formId={formId}
                 form={form}
@@ -530,18 +621,63 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
             creating={creating}
             uploadingPhotos={uploadingPhotos}
             extracting={extraction.pending}
-            personsHref={personsHref}
+            confirmationRequired={nameConfirmationRequired}
             step={step}
             canGoBack={canGoBack}
-            forwardStepLabel={forwardStepLabel}
             onBack={goBack}
-            onForward={goForward}
             onNext={nextStep}
           />
         </form>
       </div>
     </ExtractionReviewContext.Provider>
   );
+
+  function resumeDraft() {
+    const saved = draft.pending;
+    if (!saved) return;
+    // Refresh upload tokens, including interrupted uploads, from the saved Files.
+    const uploads = new Map<
+      string,
+      {
+        documentKey: string;
+        slot: v1.persons.PersonDocumentPhotoSlot;
+        photo: NonNullable<
+          CreatePersonDocumentFormState["photos"][v1.persons.PersonDocumentPhotoSlot]
+        >;
+      }
+    >();
+    const restoredForm = updateDocumentDrafts(
+      saved.extraction.form,
+      (document) => {
+        const photos = { ...document.photos };
+        for (const slot of v1.persons.PERSON_DOCUMENT_PHOTO_SLOTS) {
+          const photo = photos[slot];
+          if (!photo) continue;
+          uploads.set(photo.id, { documentKey: document.key, slot, photo });
+          photos[slot] = {
+            id: photo.id,
+            status: "uploading",
+            file: photo.file,
+            originalFile: photo.originalFile,
+          };
+        }
+        return { ...document, photos };
+      },
+    );
+    setExtractionState({ ...saved.extraction, form: restoredForm });
+    setChosenNationalIdFormat(saved.nationalIdFormat);
+    navigation.restore(saved.navigation);
+    draft.resume();
+    for (const { documentKey, slot, photo } of uploads.values()) {
+      void uploadDocumentPhotoDraft(
+        documentKey,
+        slot,
+        photo.file,
+        photo.id,
+        photo.originalFile,
+      );
+    }
+  }
 
   function selectProgressStep(next: PersonProgressStep) {
     if (creating) return;
@@ -738,6 +874,12 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
   ) {
     if (form.citizenship === citizenship && form.nationalIdFormat === format)
       return;
+    if (form.citizenship === "romanian" && citizenship === "romanian") {
+      setForm((current) =>
+        switchDocumentWorkflow(current, citizenship, format),
+      );
+      return;
+    }
     for (const document of form.documents)
       extraction.cancelDocument(document.key);
     setExtractionState((current) => {

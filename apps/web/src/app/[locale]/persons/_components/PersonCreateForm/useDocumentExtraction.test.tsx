@@ -7,6 +7,7 @@ import {
   createExtractionState,
   invalidateDocumentExtraction,
   markExtractionFieldEdited,
+  reconcileDocumentExtraction,
   type ExtractionState,
 } from "./extraction-state";
 import { useDocumentExtraction } from "./useDocumentExtraction";
@@ -65,6 +66,162 @@ beforeEach(() => {
 });
 
 describe("automatic document reading", () => {
+  it("reuses format-specific extraction signatures from older saved drafts", () => {
+    let state = createExtractionState(createEmptyCreateForm("romanian"));
+    state.form.documents[0]!.photos = initial().form.documents[0]!.photos;
+    state = reconcileDocumentExtraction(state, {
+      documentKey: state.form.documents[0]!.key,
+      sourceSignature: JSON.stringify([
+        "nationalId",
+        "classic",
+        [["front", "front-1"]],
+      ]),
+      result: {
+        ...resultFor("Ana"),
+        documentType: "nationalId",
+        detectedDocumentType: "nationalId",
+      },
+    });
+    state = {
+      ...state,
+      form: switchDocumentWorkflow(state.form, "romanian", "electronic"),
+    };
+    const { result } = setup(state);
+    expect(result.current.state.form.firstName).toBe("Ana");
+    expect(result.current.pending).toBe(false);
+    expect(api.fetch).not.toHaveBeenCalled();
+  });
+
+  it("does not repeat or abort ID extraction when only the selected format changes", async () => {
+    const state = createExtractionState(createEmptyCreateForm("romanian"));
+    state.form.documents[0]!.photos = initial().form.documents[0]!.photos;
+    const request = deferred();
+    api.fetch.mockReturnValue(request.promise);
+    const { result } = setup(state);
+    act(() =>
+      result.current.setState((current) => ({
+        ...current,
+        form: switchDocumentWorkflow(current.form, "romanian", "electronic"),
+      })),
+    );
+    expect(api.fetch).toHaveBeenCalledOnce();
+    expect(api.fetch.mock.calls[0]![2].signal.aborted).toBe(false);
+    await act(async () =>
+      request.resolve({
+        ...resultFor("Ana-Maria"),
+        documentType: "nationalId",
+        detectedDocumentType: "nationalId",
+      }),
+    );
+    expect(result.current.state.form.firstName).toBe("Ana-Maria");
+    act(() =>
+      result.current.setState((current) => ({
+        ...current,
+        form: switchDocumentWorkflow(current.form, "romanian", "classic"),
+      })),
+    );
+    expect(result.current.state.form.firstName).toBe("Ana-Maria");
+    expect(result.current.pending).toBe(false);
+    expect(api.fetch).toHaveBeenCalledOnce();
+  });
+
+  it("reuses saved extraction after remount and token renewal, preserving manual edits", async () => {
+    api.fetch.mockResolvedValue(resultFor("Ana"));
+    const first = setup();
+    await waitFor(() => expect(first.result.current.pending).toBe(false));
+    act(() =>
+      first.result.current.setState((state) =>
+        markExtractionFieldEdited(
+          { ...state, form: { ...state.form, firstName: "Ana-Maria" } },
+          "person.firstName",
+        ),
+      ),
+    );
+    const saved = first.result.current.state;
+    first.unmount();
+    api.fetch.mockClear();
+    const document = saved.form.documents[0]!;
+    const photo = document.photos.front!;
+    const restored = setup({
+      ...saved,
+      form: {
+        ...saved.form,
+        documents: saved.form.documents.map((entry) =>
+          entry.key === document.key
+            ? {
+                ...entry,
+                photos: {
+                  front: {
+                    id: photo.id,
+                    file: photo.file,
+                    status: "uploading",
+                  },
+                },
+              }
+            : entry,
+        ),
+      },
+    });
+    expect(api.fetch).not.toHaveBeenCalled();
+    act(() =>
+      restored.result.current.setState({
+        ...saved,
+        form: {
+          ...saved.form,
+          documents: saved.form.documents.map((entry) =>
+            entry.key === document.key
+              ? {
+                  ...entry,
+                  photos: {
+                    front: {
+                      ...photo,
+                      status: "uploaded",
+                      uploadToken: "renewed-token",
+                    },
+                  },
+                }
+              : entry,
+          ),
+        },
+      }),
+    );
+    expect(restored.result.current.pending).toBe(false);
+    expect(restored.result.current.jobs[document.key]?.status).toBe("success");
+    expect(restored.result.current.state.form.firstName).toBe("Ana-Maria");
+    expect(api.fetch).not.toHaveBeenCalled();
+    act(() => restored.result.current.retry(document.key));
+    await waitFor(() => expect(api.fetch).toHaveBeenCalledOnce());
+  });
+
+  it("extracts changed photos after resuming instead of reusing stale readings", async () => {
+    api.fetch.mockResolvedValue(resultFor("Ana"));
+    const first = setup();
+    await waitFor(() => expect(first.result.current.pending).toBe(false));
+    const saved = first.result.current.state;
+    first.unmount();
+    api.fetch.mockClear();
+    api.fetch.mockResolvedValue(resultFor("Maria"));
+    const document = saved.form.documents[0]!;
+    const restored = setup({
+      ...saved,
+      form: {
+        ...saved.form,
+        documents: saved.form.documents.map((entry) =>
+          entry.key === document.key
+            ? {
+                ...entry,
+                photos: { front: { ...entry.photos.front!, id: "new-photo" } },
+              }
+            : entry,
+        ),
+      },
+    });
+    await waitFor(() =>
+      expect(restored.result.current.state.form.firstName).toBe("Maria"),
+    );
+    expect(api.fetch).toHaveBeenCalledOnce();
+  });
+
   it("waits for upload completion and sends only current draft tokens", async () => {
     const state = initial();
     const photo = state.form.documents[0]!.photos.front!;

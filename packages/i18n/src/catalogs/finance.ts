@@ -201,6 +201,12 @@ export const financeCatalog = {
         unsupportedType: "Choose a JPG, PNG or WebP image.",
         cropTitle: "Crop receipt",
         cropPreview: "Receipt ready to crop",
+        cropEdges: {
+          north: "Move the top crop edge",
+          south: "Move the bottom crop edge",
+          west: "Move the left crop edge",
+          east: "Move the right crop edge",
+        },
         cropCorners: {
           "north-west": "Move the top-left crop corner",
           "north-east": "Move the top-right crop corner",
@@ -803,6 +809,12 @@ export const financeCatalog = {
         unsupportedType: "Alege o imagine JPG, PNG sau WebP.",
         cropTitle: "Decupează bonul",
         cropPreview: "Bon pregătit pentru decupare",
+        cropEdges: {
+          north: "Mută marginea de sus",
+          south: "Mută marginea de jos",
+          west: "Mută marginea din stânga",
+          east: "Mută marginea din dreapta",
+        },
         cropCorners: {
           "north-west": "Mută colțul din stânga sus",
           "north-east": "Mută colțul din dreapta sus",

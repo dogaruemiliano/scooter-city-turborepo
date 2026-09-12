@@ -22,6 +22,7 @@ import {
   rotateImage,
   DEFAULT_IMAGE_CROP,
   type CropCorner,
+  type CropEdge,
   type CropRect,
 } from "@repo/ui/lib/crop-image";
 import { cn } from "@repo/ui/lib/utils";
@@ -40,6 +41,7 @@ export interface ImageEditorLabels {
   adjustRotationY: string;
   imageAlt: string;
   cropCorner: (corner: CropCorner) => string;
+  cropEdge: (edge: CropEdge) => string;
   showEntirePhoto: string;
   save: string;
   saving: string;
@@ -62,6 +64,7 @@ const DEFAULT_LABELS: ImageEditorLabels = {
   adjustRotationY: "Adjust horizontal perspective",
   imageAlt: "Selected photo",
   cropCorner: (corner) => `Resize ${corner} corner`,
+  cropEdge: (edge) => `Resize ${edge} edge`,
   showEntirePhoto: "Show entire photo",
   save: "Done",
   saving: "Saving…",
@@ -168,6 +171,9 @@ export function ImageEditor({
     }
   }
 
+  const [zoomOutContainer, setZoomOutContainer] =
+    useState<HTMLDivElement | null>(null);
+
   async function save() {
     if (busyRef.current) return;
     busyRef.current = true;
@@ -269,7 +275,9 @@ export function ImageEditor({
               fixedFrame
               imageAlt={labels.imageAlt}
               cornerLabel={labels.cropCorner}
-              showZoomOut={false}
+              edgeLabel={labels.cropEdge}
+              zoomOutLabel={labels.showEntirePhoto}
+              zoomOutContainer={zoomOutContainer}
               viewResetKey={viewResetKey}
               fullViewport
               viewportInsets={insets}
@@ -333,7 +341,12 @@ export function ImageEditor({
               {error}
             </p>
           ) : null}
-          <footer className="flex justify-end px-6 pt-2 pb-[calc(env(safe-area-inset-bottom)+var(--spacing-6))]">
+          <footer className="flex items-center justify-between gap-4 px-6 pt-2 pb-[calc(env(safe-area-inset-bottom)+var(--spacing-6))]">
+            <div
+              ref={setZoomOutContainer}
+              inert={busy}
+              className="size-12 shrink-0"
+            />
             <Button type="button" disabled={busy} onClick={() => void save()}>
               {busy && !rotating ? (
                 <>

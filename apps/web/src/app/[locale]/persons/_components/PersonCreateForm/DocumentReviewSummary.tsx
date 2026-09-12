@@ -25,9 +25,11 @@ export function documentHasSeries(document: CreatePersonDocumentFormState) {
 export function DocumentReviewSummary({
   document,
   locale,
+  compact = false,
 }: {
   document: CreatePersonDocumentFormState;
   locale: string;
+  compact?: boolean;
 }) {
   const t = useTranslations("persons");
   const missing = t("documentForm.missingValue");
@@ -42,37 +44,68 @@ export function DocumentReviewSummary({
       timeZone: "UTC",
     }).format(new Date(`${parsed.value}T00:00:00Z`));
   }
-  const values = [
-    ...(documentHasSeries(document)
+  const expiry = document.hasExpiryDate
+    ? buildDateOnly(document.expiresOn)
+    : null;
+  const now = new Date();
+  const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  const daysRemaining = expiry?.value
+    ? (Date.parse(`${expiry.value}T00:00:00Z`) - today) / 86_400_000
+    : null;
+  const expiryColor =
+    daysRemaining === null
+      ? undefined
+      : daysRemaining < 7
+        ? "text-destructive"
+        : daysRemaining <= 30
+          ? "text-warning"
+          : undefined;
+  const hasSeries = documentHasSeries(document);
+  const values: { label: string; value: string; color?: string }[] = [
+    ...(compact && hasSeries
       ? [
           {
-            label: t("fields.documentSeries"),
-            value: document.series.trim() || missing,
+            label: t("documentForm.seriesAndNumber"),
+            value: `${document.series.trim() || missing} ${document.number.trim() || missing}`,
+          },
+        ]
+      : [
+          ...(hasSeries
+            ? [
+                {
+                  label: t("fields.documentSeries"),
+                  value: document.series.trim() || missing,
+                },
+              ]
+            : []),
+          {
+            label: t(`fields.${documentNumberLabel(document)}`),
+            value: document.number.trim() || missing,
+          },
+        ]),
+    ...(!compact
+      ? [
+          {
+            label: t("fields.documentIssuedOn"),
+            value: dateLabel(document.issuedOn),
           },
         ]
       : []),
-    {
-      label: t(`fields.${documentNumberLabel(document)}`),
-      value: document.number.trim() || missing,
-    },
-    {
-      label: t("fields.documentIssuedOn"),
-      value: dateLabel(document.issuedOn),
-    },
     {
       label: t("fields.documentExpiresOn"),
       value: document.hasExpiryDate
         ? dateLabel(document.expiresOn)
         : t("documentForm.noExpiryDate"),
+      color: expiryColor,
     },
   ];
   return (
     <dl className="grid grid-cols-2 gap-x-4 gap-y-3 border-t border-border p-4">
-      {values.map(({ label, value }) => (
+      {values.map(({ label, value, color }) => (
         <div key={label} className="min-w-0">
           <dt className="text-xs text-muted-foreground">{label}</dt>
           <dd
-            className={`mt-1 break-words text-base ${value === missing ? "text-muted-foreground" : "font-medium text-foreground"}`}
+            className={`mt-1 break-words text-base ${value === missing ? "text-muted-foreground" : `font-medium ${color ?? "text-foreground"}`}`}
           >
             {value}
           </dd>

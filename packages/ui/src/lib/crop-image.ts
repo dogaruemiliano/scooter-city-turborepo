@@ -265,9 +265,12 @@ export type CropCorner =
   | "south-west"
   | "south-east";
 
+export type CropEdge = "north" | "south" | "west" | "east";
+export type CropHandle = CropCorner | CropEdge;
+
 export function resizeCropRect(
   initial: CropRect,
-  corner: CropCorner,
+  corner: CropHandle,
   deltaX: number,
   deltaY: number,
 ): CropRect {

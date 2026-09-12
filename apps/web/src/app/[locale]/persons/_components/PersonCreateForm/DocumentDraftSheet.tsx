@@ -10,11 +10,6 @@ import {
   Button,
   CountrySheetSelect,
   Input,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
   Textarea,
 } from "@repo/ui/components";
 import { buildDateOnly } from "@repo/ui/lib/date-parts";
@@ -75,8 +70,6 @@ export function DocumentDraftSheet({
   const expiresOnError =
     localExpiresOnError ??
     fieldErrors[documentFieldErrorKey(document.key, "expiresOn")];
-  const statusError =
-    fieldErrors[documentFieldErrorKey(document.key, "status")];
   const notesError = fieldErrors[documentFieldErrorKey(document.key, "notes")];
   const photoUploadPending = hasPhotoWithStatus(document, "uploading");
   const photoUploadFailed = hasPhotoWithStatus(document, "failed");
@@ -182,76 +175,63 @@ export function DocumentDraftSheet({
             </FormField>
           )}
 
-          <FormField
-            id={`${documentId}-issued-by`}
-            extractionKey={`document.${document.key}.issuedBy`}
-            label={t("fields.documentIssuedBy")}
-            error={issuedByError}
-          >
-            <Input
+          <div className="grid min-w-0 gap-4 sm:col-span-2 sm:grid-cols-2">
+            <FormField
               id={`${documentId}-issued-by`}
-              aria-describedby={fieldErrorId(
-                `${documentId}-issued-by`,
-                issuedByError,
-              )}
-              aria-invalid={invalidAria(issuedByError)}
-              name="documentIssuedBy"
-              value={document.issuedBy}
-              onChange={(event) =>
-                onSetDocumentValue(document.key, "issuedBy", event.target.value)
-              }
-            />
-          </FormField>
-          <FormField
-            id={`${documentId}-issued-on-day`}
-            extractionKey={`document.${document.key}.issuedOn`}
-            label={t("fields.documentIssuedOn")}
-            error={issuedOnError}
-          >
-            <DatePartsInput
-              baseId={`${documentId}-issued-on`}
-              aria-describedby={fieldErrorId(
-                `${documentId}-issued-on-day`,
-                issuedOnError,
-              )}
-              invalid={Boolean(issuedOnError)}
-              label={t("fields.documentIssuedOn")}
-              locale={locale}
-              value={document.issuedOn}
-              onChange={(value) =>
-                onSetDocumentValue(document.key, "issuedOn", value)
-              }
-            />
-          </FormField>
-          <FormField
-            id={`${documentId}-country`}
-            extractionKey={`document.${document.key}.issuingCountryCode`}
-            label={t("fields.documentIssuingCountryCode")}
-            error={issuingCountryCodeError}
-          >
-            <CountrySheetSelect
+              extractionKey={`document.${document.key}.issuedBy`}
+              label={t("fields.documentIssuedBy")}
+              error={issuedByError}
+            >
+              <Input
+                id={`${documentId}-issued-by`}
+                aria-describedby={fieldErrorId(
+                  `${documentId}-issued-by`,
+                  issuedByError,
+                )}
+                aria-invalid={invalidAria(issuedByError)}
+                name="documentIssuedBy"
+                value={document.issuedBy}
+                onChange={(event) =>
+                  onSetDocumentValue(
+                    document.key,
+                    "issuedBy",
+                    event.target.value,
+                  )
+                }
+              />
+            </FormField>
+            <FormField
               id={`${documentId}-country`}
+              extractionKey={`document.${document.key}.issuingCountryCode`}
               label={t("fields.documentIssuingCountryCode")}
-              labelledById={`${documentId}-country-label`}
-              describedById={fieldErrorId(
-                `${documentId}-country`,
-                issuingCountryCodeError,
-              )}
-              invalid={Boolean(issuingCountryCodeError)}
-              locale={locale}
-              value={document.issuingCountryCode}
-              placeholder={t("placeholders.country")}
-              onValueChange={(value) =>
-                onSetDocumentValue(document.key, "issuingCountryCode", value)
-              }
-              searchPlaceholder={t("countryPicker.search")}
-              clearSearchLabel={t("countryPicker.clearSearch")}
-              emptyMessage={t("countryPicker.empty")}
-              closeLabel={t("actions.close")}
-            />
-          </FormField>
+              error={issuingCountryCodeError}
+            >
+              <CountrySheetSelect
+                id={`${documentId}-country`}
+                label={t("fields.documentIssuingCountryCode")}
+                labelledById={`${documentId}-country-label`}
+                describedById={fieldErrorId(
+                  `${documentId}-country`,
+                  issuingCountryCodeError,
+                )}
+                invalid={Boolean(issuingCountryCodeError)}
+                locale={locale}
+                value={document.issuingCountryCode}
+                placeholder={t("placeholders.country")}
+                onValueChange={(value) =>
+                  onSetDocumentValue(document.key, "issuingCountryCode", value)
+                }
+                searchPlaceholder={t("countryPicker.search")}
+                clearSearchLabel={t("countryPicker.clearSearch")}
+                emptyMessage={t("countryPicker.empty")}
+                closeLabel={t("actions.close")}
+              />
+            </FormField>
+          </div>
 
           <DocumentExpiryField
+            className="sm:col-span-2"
+            switchClassName="justify-end *:data-[slot=field-label]:flex-initial *:data-[slot=field-label]:text-right"
             switchId={`${documentId}-has-expiry-date`}
             switchLabel={t("fields.documentHasExpiryDate")}
             checked={document.hasExpiryDate}
@@ -261,30 +241,53 @@ export function DocumentDraftSheet({
               if (!checked) setLocalExpiresOnError(null);
             }}
           >
-            <FormField
-              id={`${documentId}-expires-on-day`}
-              extractionKey={`document.${document.key}.expiresOn`}
-              label={t("fields.documentExpiresOn")}
-              disabled={disabled || !document.hasExpiryDate}
-              error={document.hasExpiryDate ? expiresOnError : undefined}
-            >
-              <DatePartsInput
-                baseId={`${documentId}-expires-on`}
-                aria-describedby={fieldErrorId(
-                  `${documentId}-expires-on-day`,
-                  expiresOnError,
-                )}
-                disabled={disabled || !document.hasExpiryDate}
-                invalid={document.hasExpiryDate && Boolean(expiresOnError)}
+            <div className="grid min-w-0 gap-4 sm:grid-cols-2">
+              <FormField
+                id={`${documentId}-issued-on-day`}
+                extractionKey={`document.${document.key}.issuedOn`}
+                label={t("fields.documentIssuedOn")}
+                error={issuedOnError}
+              >
+                <DatePartsInput
+                  baseId={`${documentId}-issued-on`}
+                  aria-describedby={fieldErrorId(
+                    `${documentId}-issued-on-day`,
+                    issuedOnError,
+                  )}
+                  invalid={Boolean(issuedOnError)}
+                  label={t("fields.documentIssuedOn")}
+                  locale={locale}
+                  value={document.issuedOn}
+                  onChange={(value) =>
+                    onSetDocumentValue(document.key, "issuedOn", value)
+                  }
+                />
+              </FormField>
+              <FormField
+                id={`${documentId}-expires-on-day`}
+                extractionKey={`document.${document.key}.expiresOn`}
                 label={t("fields.documentExpiresOn")}
-                locale={locale}
-                value={document.expiresOn}
-                onChange={(value) => {
-                  setLocalExpiresOnError(null);
-                  onSetDocumentValue(document.key, "expiresOn", value);
-                }}
-              />
-            </FormField>
+                disabled={disabled || !document.hasExpiryDate}
+                error={document.hasExpiryDate ? expiresOnError : undefined}
+              >
+                <DatePartsInput
+                  baseId={`${documentId}-expires-on`}
+                  aria-describedby={fieldErrorId(
+                    `${documentId}-expires-on-day`,
+                    expiresOnError,
+                  )}
+                  disabled={disabled || !document.hasExpiryDate}
+                  invalid={document.hasExpiryDate && Boolean(expiresOnError)}
+                  label={t("fields.documentExpiresOn")}
+                  locale={locale}
+                  value={document.expiresOn}
+                  onChange={(value) => {
+                    setLocalExpiresOnError(null);
+                    onSetDocumentValue(document.key, "expiresOn", value);
+                  }}
+                />
+              </FormField>
+            </div>
           </DocumentExpiryField>
           {document.type === "driverLicense" ? (
             <div className="grid gap-3 sm:col-span-2">
@@ -312,43 +315,7 @@ export function DocumentDraftSheet({
             </div>
           ) : null}
           <FormField
-            id={`${documentId}-status`}
-            label={t("fields.documentStatus")}
-            error={statusError}
-          >
-            <Select
-              value={document.status}
-              onValueChange={(value) => {
-                if (value) {
-                  onSetDocumentValue(
-                    document.key,
-                    "status",
-                    value as v1.persons.PersonDocumentStatus,
-                  );
-                }
-              }}
-            >
-              <SelectTrigger
-                id={`${documentId}-status`}
-                aria-describedby={fieldErrorId(
-                  `${documentId}-status`,
-                  statusError,
-                )}
-                aria-invalid={invalidAria(statusError)}
-                className="w-full"
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {v1.persons.PERSON_DOCUMENT_STATUSES.map((status) => (
-                  <SelectItem key={status} value={status}>
-                    {t(`documentStatuses.${status}`)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </FormField>
-          <FormField
+            className="sm:col-span-2"
             id={`${documentId}-notes`}
             label={t("fields.notes")}
             error={notesError}

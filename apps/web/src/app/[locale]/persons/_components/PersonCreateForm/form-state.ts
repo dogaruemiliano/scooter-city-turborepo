@@ -115,15 +115,29 @@ export function switchDocumentWorkflow(
   const licence = current.documents.find(
     (document) => document.type === "driverLicense",
   );
+  const identity =
+    current.citizenship === "romanian" && citizenship === "romanian"
+      ? current.documents.find((document) => document.type === "nationalId")
+      : undefined;
   return {
     ...next,
     documentDrafts: drafts,
     documents: (
       drafts[documentWorkflow(next)] ??
       createInitialDocuments(citizenship, nationalIdFormat)
-    ).map((document) =>
-      document.type === "driverLicense" && licence ? licence : document,
-    ),
+    ).map((document) => {
+      if (document.type === "driverLicense" && licence) return licence;
+      if (document.type === "nationalId" && identity?.photos.front) {
+        // Changing the requested format does not replace the physical document.
+        // Retain its stable key so uploads, extraction provenance and edits survive.
+        return {
+          ...identity,
+          nationalIdFormat,
+          photos: { ...document.photos, ...identity.photos },
+        };
+      }
+      return document;
+    }),
   };
 }
 

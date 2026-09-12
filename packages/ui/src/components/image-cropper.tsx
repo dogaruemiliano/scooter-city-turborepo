@@ -4,11 +4,14 @@ import { magnification, spacing } from "@repo/theme";
 import { ZoomOutIcon } from "lucide-react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import {
   getProjectedImageGeometry,
   resizeCropRect,
   type CropCorner,
+  type CropEdge,
+  type CropHandle,
   type CropRect,
 } from "../lib/crop-image";
 import { cn } from "../lib/utils";
@@ -24,6 +27,7 @@ export interface ImageCropperProps {
   onCropChange: (crop: CropRect) => void;
   imageAlt: string;
   cornerLabel: (corner: CropCorner) => string;
+  edgeLabel?: (edge: CropEdge) => string;
   compact?: boolean;
   className?: string;
   imageClassName?: string;
@@ -36,6 +40,8 @@ export interface ImageCropperProps {
   fixedFrame?: boolean;
   zoomOutLabel?: string;
   showZoomOut?: boolean;
+  /** Optional external control slot, keeping the button outside the crop area. */
+  zoomOutContainer?: HTMLElement | null;
   /** Restores the initial preview on an explicit reset, including an unchanged crop. */
   viewResetKey?: number;
   /** Draw the image and mask across the full editor, behind floating controls. */
@@ -50,7 +56,7 @@ export interface ImageCropperProps {
 
 interface DragState {
   pointerId: number;
-  corner: CropCorner;
+  corner: CropHandle;
   clientX: number;
   clientY: number;
   crop: CropRect;
@@ -61,7 +67,7 @@ interface DragState {
 }
 
 interface CropLoupeState {
-  corner: CropCorner;
+  corner: CropHandle;
   frameWidth: number;
   frameHeight: number;
   viewport?: CropPreviewLayout;
@@ -80,11 +86,15 @@ interface ProjectedPreviewGeometry {
 
 const FULL_IMAGE: CropRect = { x: 0, y: 0, width: 1, height: 1 };
 
-const CORNERS: readonly CropCorner[] = [
+const HANDLES: readonly CropHandle[] = [
   "north-west",
   "north-east",
   "south-west",
   "south-east",
+  "north",
+  "south",
+  "west",
+  "east",
 ];
 
 export function ImageCropper({
@@ -93,6 +103,7 @@ export function ImageCropper({
   onCropChange,
   imageAlt,
   cornerLabel,
+  edgeLabel = (edge) => `Resize ${edge} edge`,
   compact = false,
   className,
   imageClassName,
@@ -102,6 +113,7 @@ export function ImageCropper({
   fixedFrame = false,
   zoomOutLabel = "Show entire photo",
   showZoomOut = true,
+  zoomOutContainer,
   viewResetKey = 0,
   fullViewport = false,
   viewportInsets,
@@ -223,7 +235,7 @@ export function ImageCropper({
   }
 
   function beginResize(
-    corner: CropCorner,
+    corner: CropHandle,
     event: ReactPointerEvent<HTMLButtonElement>,
   ) {
     event.preventDefault();
@@ -396,11 +408,15 @@ export function ImageCropper({
               </div>
             ) : null}
 
-            {CORNERS.map((corner) => (
+            {HANDLES.map((corner) => (
               <button
                 key={corner}
                 type="button"
-                aria-label={cornerLabel(corner)}
+                aria-label={
+                  corner.includes("-")
+                    ? cornerLabel(corner as CropCorner)
+                    : edgeLabel(corner as CropEdge)
+                }
                 className={`group absolute flex size-12 touch-none items-center justify-center rounded-full outline-none ${cornerPosition(
                   corner,
                 )}`}
@@ -450,7 +466,14 @@ export function ImageCropper({
               >
                 <span
                   aria-hidden="true"
-                  className="size-6 rounded-full border-2 border-foreground bg-background text-foreground shadow-sm group-focus-visible:ring-2 group-focus-visible:ring-foreground"
+                  className={cn(
+                    "rounded-full border-2 border-foreground bg-background text-foreground shadow-sm group-focus-visible:ring-2 group-focus-visible:ring-foreground",
+                    corner.includes("-")
+                      ? "size-6"
+                      : corner === "north" || corner === "south"
+                        ? "h-1.5 w-8"
+                        : "h-8 w-1.5",
+                  )}
                 />
               </button>
             ))}
@@ -465,27 +488,37 @@ export function ImageCropper({
             ) : null}
           </div>
         </div>
-        {showZoomOut && zoomed && !frozen ? (
-          <button
-            type="button"
-            aria-label={zoomOutLabel}
-            className="absolute z-raised flex size-12 items-center justify-center rounded-full border border-border bg-background text-foreground outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-foreground"
-            style={zoomOutPosition}
-            onClick={() => {
-              setFocusedView(undefined);
-              setFullImageView({ sourceUrl, viewResetKey });
-              setAnimatedView({
-                sourceUrl,
-                viewResetKey,
-                tiltDegrees,
-                rotationX,
-                rotationY,
-              });
-            }}
-          >
-            <ZoomOutIcon className="size-5" aria-hidden="true" />
-          </button>
-        ) : null}
+        {showZoomOut && zoomed && !frozen && zoomOutContainer !== null
+          ? (() => {
+              const button = (
+                <button
+                  type="button"
+                  aria-label={zoomOutLabel}
+                  className={cn(
+                    "flex size-12 items-center justify-center rounded-full border border-border bg-background text-foreground outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-foreground",
+                    !zoomOutContainer && "absolute z-raised",
+                  )}
+                  style={zoomOutContainer ? undefined : zoomOutPosition}
+                  onClick={() => {
+                    setFocusedView(undefined);
+                    setFullImageView({ sourceUrl, viewResetKey });
+                    setAnimatedView({
+                      sourceUrl,
+                      viewResetKey,
+                      tiltDegrees,
+                      rotationX,
+                      rotationY,
+                    });
+                  }}
+                >
+                  <ZoomOutIcon className="size-5" aria-hidden="true" />
+                </button>
+              );
+              return zoomOutContainer
+                ? createPortal(button, zoomOutContainer)
+                : button;
+            })()
+          : null}
       </div>
     </div>
   );
@@ -743,23 +776,27 @@ function percentRect(crop: CropRect) {
   };
 }
 
-function cornerStyle(crop: CropRect, corner: CropCorner) {
+function cornerStyle(crop: CropRect, corner: CropHandle) {
+  const point = cropCornerPoint(crop, corner);
+  return { left: `${point.x * 100}%`, top: `${point.y * 100}%` };
+}
+
+function cropCornerPoint(crop: CropRect, corner: CropHandle) {
   return {
-    left: `${(corner.endsWith("west") ? crop.x : crop.x + crop.width) * 100}%`,
-    top: `${
-      (corner.startsWith("north") ? crop.y : crop.y + crop.height) * 100
-    }%`,
+    x: corner.endsWith("west")
+      ? crop.x
+      : corner.endsWith("east")
+        ? crop.x + crop.width
+        : crop.x + crop.width / 2,
+    y: corner.startsWith("north")
+      ? crop.y
+      : corner.startsWith("south")
+        ? crop.y + crop.height
+        : crop.y + crop.height / 2,
   };
 }
 
-function cropCornerPoint(crop: CropRect, corner: CropCorner) {
-  return {
-    x: corner.endsWith("west") ? crop.x : crop.x + crop.width,
-    y: corner.startsWith("north") ? crop.y : crop.y + crop.height,
-  };
-}
-
-function cornerPosition(corner: CropCorner): string {
+function cornerPosition(corner: CropHandle): string {
   if (corner === "north-west") return "-translate-x-1/2 -translate-y-1/2";
   if (corner === "north-east") return "-translate-x-1/2 -translate-y-1/2";
   if (corner === "south-west") return "-translate-x-1/2 -translate-y-1/2";

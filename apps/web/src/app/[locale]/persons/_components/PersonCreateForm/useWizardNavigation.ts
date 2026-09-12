@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import type { PersonWizardStep } from "./WizardProgress";
 
-type NavigationState = {
+export type NavigationState = {
   history: PersonWizardStep[];
   cursor: number;
 };
@@ -53,7 +53,14 @@ export function useWizardNavigation() {
     );
   }, []);
 
+  const restore = useCallback(
+    (snapshot: NavigationState) => setState(snapshot),
+    [],
+  );
+
   return {
+    snapshot: state,
+    restore,
     step: state.history[state.cursor]!,
     canGoBack: state.cursor > 0,
     forwardStep: state.history[state.cursor + 1],

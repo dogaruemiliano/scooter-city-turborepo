@@ -3,6 +3,10 @@ import { describe, expect, it } from "vitest";
 
 import { createEmptyCreateForm, switchDocumentWorkflow } from "./form-state";
 import {
+  equivalentPersonNames,
+  licenseNameDifferences,
+} from "./license-name-comparison";
+import {
   applyExtractionSuggestion,
   createExtractionState,
   invalidateDocumentExtraction,
@@ -64,6 +68,59 @@ const category = (
 });
 
 describe("person document extraction reconciliation", () => {
+  it.each(["EMILIANO CONSTANTIN", "EMILIAN CONSTANTIN"])(
+    "keeps the ID name when the licence reads %s, regardless of arrival order",
+    (licenseName) => {
+      for (const licenceFirst of [false, true]) {
+        let state = initial();
+        const licenseKey = state.form.documents.find(
+          (document) => document.type === "driverLicense",
+        )!.key;
+        const identity = (current: ExtractionState) =>
+          read(current, [
+            person("firstName", "EMILIANO-CONSTANTIN"),
+            person("lastName", "DOGARU"),
+          ]);
+        const license = (current: ExtractionState) =>
+          read(
+            current,
+            [person("firstName", licenseName), person("lastName", "DOGARU")],
+            { key: licenseKey },
+          );
+        state = licenceFirst
+          ? identity(license(state))
+          : license(identity(state));
+        expect(state.form.firstName).toBe("EMILIANO-CONSTANTIN");
+        expect(state.form.lastName).toBe("DOGARU");
+        expect(state.fields["person.firstName"]!.suggestions).toHaveLength(1);
+        expect(licenseNameDifferences(state)).toMatchObject([
+          {
+            field: "firstName",
+            identityName: "EMILIANO-CONSTANTIN",
+            licenseName,
+            formattingOnly: licenseName === "EMILIANO CONSTANTIN",
+          },
+        ]);
+        state = invalidateDocumentExtraction(state, licenseKey);
+        expect(state.form.firstName).toBe("EMILIANO-CONSTANTIN");
+        expect(licenseNameDifferences(state)).toEqual([]);
+      }
+    },
+  );
+
+  it.each([
+    ["Ana-Maria", " ANA   MARIA ", true],
+    ["Ana‑Maria", "ana maria", true],
+    ["Ana Maria", "Anamaria", false],
+    ["Ștefan", "Stefan", false],
+    ["Ana Maria", "Maria Ana", false],
+  ])(
+    "compares %s and %s without hiding substantive changes",
+    (left, right, equivalent) => {
+      expect(equivalentPersonNames(left, right)).toBe(equivalent);
+    },
+  );
+
   it("fills empty fields, converts dates and records source and uncertainty", () => {
     const state = read(initial(), [
       person("firstName", "Ștefan", true),

@@ -316,6 +316,13 @@ function collectCandidates(state: ExtractionState) {
       needsReview,
     });
     for (const suggestion of reading.result.suggestions) {
+      // A licence name is comparison evidence, never a replacement for the ID name.
+      if (
+        document.type === "driverLicense" &&
+        suggestion.target === "person" &&
+        (suggestion.field === "firstName" || suggestion.field === "lastName")
+      )
+        continue;
       const key: ExtractionFieldKey =
         suggestion.field === "cnp"
           ? "person.cnp"

@@ -496,9 +496,11 @@ describe("shared ImageCapture", () => {
       '[data-slot="receipt-crop-frame"]',
     )!;
     const initialWidth = Number.parseFloat(frame.style.width);
-    expect(
-      screen.queryByRole("button", { name: "Show entire photo" }),
-    ).toBeNull();
+    const zoomOut = screen.getByRole("button", { name: "Show entire photo" });
+    expect(zoomOut.closest("footer")).toBe(
+      screen.getByRole("button", { name: "Use photo" }).closest("footer"),
+    );
+    expect(zoomOut).not.toHaveClass("absolute");
     let corner = screen.getByRole("button", {
       name: "Resize north-west corner",
     });
@@ -512,14 +514,20 @@ describe("shared ImageCapture", () => {
     fireEvent.keyUp(corner, { key: "ArrowRight" });
     await userEvent.click(screen.getByRole("button", { name: "Reset" }));
     expect(
-      screen.queryByRole("button", { name: "Show entire photo" }),
-    ).toBeNull();
+      screen.getByRole("button", { name: "Show entire photo" }),
+    ).toBeVisible();
     expect(Number.parseFloat(frame.style.width)).toBe(initialWidth);
     corner = screen.getByRole("button", { name: "Resize north-west corner" });
     expect(corner.style.left).toBe("4%");
 
     fireEvent.keyDown(corner, { key: "ArrowRight" });
     fireEvent.keyUp(corner, { key: "ArrowRight" });
+    const zoomedWidth = Number.parseFloat(frame.style.width);
+    await userEvent.click(
+      screen.getByRole("button", { name: "Show entire photo" }),
+    );
+    expect(Number.parseFloat(frame.style.width)).toBeLessThan(zoomedWidth);
+    expect(corner.style.left).toBe("5%");
     expect(onCapture).not.toHaveBeenCalled();
     expect(createImageBitmapMock).not.toHaveBeenCalled();
     await userEvent.click(screen.getByRole("button", { name: "Use photo" }));
@@ -675,10 +683,10 @@ describe("shared ImageCapture", () => {
 
   it("offers files on desktop and gallery plus files on mobile", async () => {
     const { unmount } = render(<CaptureHarness onCapture={vi.fn()} />);
-    await userEvent.click(
-      screen.getByRole("button", { name: "Choose from gallery or files" }),
-    );
+    const openPicker = vi.spyOn(screen.getByLabelText("Files"), "click");
     expect(screen.getByRole("button", { name: "Files" })).toBeEnabled();
+    await userEvent.click(screen.getByRole("button", { name: "Files" }));
+    expect(openPicker).toHaveBeenCalledOnce();
     expect(
       screen.queryByRole("button", { name: "Gallery" }),
     ).not.toBeInTheDocument();
@@ -899,9 +907,7 @@ describe("shared ImageCapture", () => {
     });
     expect(screen.getByRole("button", { name: "Take photo" })).toBeDisabled();
     expect(screen.getByRole("status")).toHaveTextContent("Camera unavailable");
-    expect(
-      screen.getByRole("button", { name: "Choose from gallery or files" }),
-    ).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Files" })).toBeEnabled();
   });
 });
 

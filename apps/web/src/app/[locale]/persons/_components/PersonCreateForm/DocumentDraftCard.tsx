@@ -31,6 +31,7 @@ export function DocumentDraftCard({
   document,
   documentId,
   locale,
+  citizenship,
   disabled,
   fieldErrors,
   onOpen,
@@ -38,6 +39,7 @@ export function DocumentDraftCard({
   document: CreatePersonDocumentFormState;
   documentId: string;
   locale: string;
+  citizenship: "romanian" | "foreign";
   disabled: boolean;
   fieldErrors: FormErrors;
   onOpen: () => void;
@@ -106,7 +108,11 @@ export function DocumentDraftCard({
         </span>
       </BottomSheetTrigger>
       {document.required || !isBlank ? (
-        <DocumentReviewSummary document={document} locale={locale} />
+        <DocumentReviewSummary
+          document={document}
+          locale={locale}
+          compact={citizenship === "romanian"}
+        />
       ) : null}
       {error ? (
         <p

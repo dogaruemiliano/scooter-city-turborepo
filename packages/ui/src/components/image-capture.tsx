@@ -35,7 +35,7 @@ import {
   captureCameraFrame,
   useCaptureCamera,
 } from "@repo/ui/hooks/use-capture-camera";
-import type { CropCorner } from "@repo/ui/lib/crop-image";
+import type { CropCorner, CropEdge } from "@repo/ui/lib/crop-image";
 
 export interface ImageCaptureLabels {
   title: string;
@@ -76,6 +76,7 @@ export interface ImageCaptureLabels {
   saveFailed: string;
   resetCrop: string;
   cropCorner: (corner: CropCorner) => string;
+  cropEdge: (edge: CropEdge) => string;
 }
 
 const DEFAULT_LABELS: ImageCaptureLabels = {
@@ -120,6 +121,7 @@ const DEFAULT_LABELS: ImageCaptureLabels = {
   saveFailed: "Could not use the photo. Please try again.",
   resetCrop: "Reset crop",
   cropCorner: (corner) => `Resize ${corner} corner`,
+  cropEdge: (edge) => `Resize ${edge} edge`,
 };
 
 export interface ImageCaptureProps {
@@ -301,6 +303,7 @@ function ImageCaptureSession({
           adjustRotationY: labels.adjustRotationY,
           imageAlt: labels.previewAlt,
           cropCorner: labels.cropCorner,
+          cropEdge: labels.cropEdge,
           showEntirePhoto: labels.showEntirePhoto,
           save: labels.usePhoto,
           saving: labels.processing,
@@ -543,7 +546,18 @@ function ImageCaptureSession({
               ) : null}
               <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-6">
                 <div className="flex justify-center">
-                  {allowGallery ? (
+                  {allowGallery && !isMobile ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      disabled={busy}
+                      onClick={() => filesRef.current?.click()}
+                      className="rounded-full bg-mist-950/60 text-mist-50 hover:bg-mist-950/80 hover:text-mist-50"
+                    >
+                      <FileIcon data-icon="inline-start" />
+                      {labels.files}
+                    </Button>
+                  ) : allowGallery ? (
                     <Popover open={importOpen} onOpenChange={setImportOpen}>
                       <PopoverTrigger
                         render={

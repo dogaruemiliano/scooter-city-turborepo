@@ -15,6 +15,13 @@ import { TooltipProvider } from "@repo/ui/components/tooltip";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PersonCreateForm } from "./PersonCreateForm";
+import { createEmptyCreateForm } from "./PersonCreateForm/form-state";
+import { createExtractionState } from "./PersonCreateForm/extraction-state";
+import {
+  readPersonDraft,
+  writePersonDraft,
+  type PersonDraft,
+} from "./PersonCreateForm/person-draft-store";
 import { AppShell } from "@/components/AppShell";
 import { SessionProvider } from "@/components/auth/SessionProvider";
 
@@ -133,6 +140,229 @@ beforeEach(() => {
 });
 
 describe("PersonCreateForm wizard", () => {
+  it("keeps the ID front and extracted data when changing from classic to electronic", async () => {
+    mocks.extractDocument.mockResolvedValue({
+      documentType: "nationalId",
+      detectedDocumentType: "nationalId",
+      sourceUploadIds: ["front"],
+      reviewRequired: true,
+      suggestions: [
+        {
+          target: "person",
+          field: "firstName",
+          value: "Ana-Maria",
+          sourceSlot: "front",
+          needsReview: false,
+        },
+        {
+          target: "document",
+          field: "number",
+          value: "123456",
+          sourceSlot: "front",
+          needsReview: false,
+        },
+      ],
+      licenseCategories: [],
+      warnings: [],
+    });
+    const browser = userEvent.setup();
+    await renderReviewForm(browser);
+    await waitFor(() =>
+      expect(screen.getByLabelText("First name")).toHaveValue("Ana-Maria"),
+    );
+    changeField("First name", "Ana-Maria Elena");
+    showReviewStep("Identification documents");
+    await browser.click(
+      screen.getByRole("button", { name: "Electronic ID (CEI)" }),
+    );
+    expect(
+      within(getPhotoGroup("National ID")).getByRole("img", {
+        name: "Front document photo",
+      }),
+    ).toBeVisible();
+    expect(
+      within(getPhotoGroup("National ID")).getByRole("button", {
+        name: "Add Back photo",
+      }),
+    ).toBeVisible();
+    expect(getPhotoGroup("Proof of address")).toBeVisible();
+    expect(mocks.extractDocument).toHaveBeenCalledOnce();
+    expect(mocks.s3Fetch).toHaveBeenCalledOnce();
+    await browser.click(
+      screen.getByRole("button", { name: "Old national ID" }),
+    );
+    await browser.click(screen.getByRole("button", { name: "Review details" }));
+    expect(screen.getByLabelText("First name")).toHaveValue("Ana-Maria Elena");
+    expect(screen.getByText(/123456/)).toBeVisible();
+    expect(mocks.extractDocument).toHaveBeenCalledOnce();
+  });
+
+  it.each(["EMILIANO CONSTANTIN", "EMILIAN CONSTANTIN"])(
+    "keeps the ID name and requires final confirmation when the licence reads %s",
+    async (licenseName) => {
+      mocks.extractDocument.mockImplementation((_route, _schema, options) => {
+        const type = options.json.documentType;
+        return Promise.resolve({
+          documentType: type,
+          detectedDocumentType: type,
+          sourceUploadIds: ["upload"],
+          reviewRequired: true,
+          suggestions: [
+            {
+              target: "person",
+              field: "firstName",
+              value:
+                type === "driverLicense" ? licenseName : "EMILIANO-CONSTANTIN",
+              sourceSlot: "front",
+              needsReview: false,
+            },
+            {
+              target: "person",
+              field: "lastName",
+              value: "DOGARU",
+              sourceSlot: "front",
+              needsReview: false,
+            },
+          ],
+          licenseCategories: [],
+          warnings: [],
+        });
+      });
+      const browser = userEvent.setup();
+      await renderReviewForm(browser);
+      await waitFor(() =>
+        expect(screen.getByLabelText("First name")).toHaveValue(
+          "EMILIANO-CONSTANTIN",
+        ),
+      );
+      changeField("CNP", "1900228123450");
+      showReviewStep("Driving license");
+      await uploadPhoto(browser, "Driver license Optional", "Front");
+      await uploadPhoto(browser, "Driver license Optional", "Back");
+      await waitFor(() =>
+        expect(mocks.extractDocument).toHaveBeenCalledTimes(2),
+      );
+      showReviewStep("Personal details");
+      expect(screen.getByLabelText("First name")).toHaveValue(
+        "EMILIANO-CONSTANTIN",
+      );
+      expect(screen.getByLabelText("Last name")).toHaveValue("DOGARU");
+      showReviewStep("Document details");
+      const confirmation = await screen.findByRole("region", {
+        name: "The names on the documents differ",
+      });
+      expect(
+        within(confirmation).getByText("EMILIANO-CONSTANTIN"),
+      ).toBeVisible();
+      expect(within(confirmation).getByText(licenseName)).toBeVisible();
+      const submit = screen.getByRole("button", {
+        name: messages.en.persons.actions.create,
+      });
+      expect(submit).toBeDisabled();
+      fireEvent.submit(submit.closest("form")!);
+      expect(mocks.createPerson).not.toHaveBeenCalled();
+      const checkbox = within(confirmation).getByRole("checkbox");
+      await browser.click(checkbox);
+      expect(submit).toBeEnabled();
+      showReviewStep("Personal details");
+      changeField("First name", "EMILIANO");
+      showReviewStep("Document details");
+      expect(screen.getByRole("checkbox")).not.toBeChecked();
+      expect(
+        screen.getByRole("button", {
+          name: messages.en.persons.actions.create,
+        }),
+      ).toBeDisabled();
+    },
+  );
+
+  it("keeps desktop actions in one row without a cancel action", async () => {
+    const browser = userEvent.setup();
+    renderCreateForm();
+    await enterDocuments(browser);
+    const next = screen.getByRole("button", { name: "Review details" });
+    expect(next.parentElement).toHaveClass("md:flex-row", "md:items-center");
+    expect(
+      within(next.parentElement!).getByRole("button", {
+        name: "Back",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Cancel" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Cancel" })).toBeNull();
+  });
+
+  it("prompts by name on return and restores edits, documents, and navigation", async () => {
+    const owner = "draft-resume-test";
+    const state = createEmptyCreateForm("romanian");
+    state.firstName = "Grace";
+    state.lastName = "Hopper";
+    const photo = new File(["photo"], "id.jpg", { type: "image/jpeg" });
+    state.documents[0]!.photos.front = {
+      id: "interrupted",
+      status: "uploading",
+      file: photo,
+      originalFile: photo,
+    };
+    const saved: PersonDraft = {
+      version: 1,
+      extraction: createExtractionState(state),
+      navigation: {
+        history: ["citizenship", "documents", "personal"],
+        cursor: 2,
+      },
+      nationalIdFormat: "classic",
+    };
+    await writePersonDraft(owner, saved).catch(() => {});
+    const browser = userEvent.setup();
+    const first = renderCreateForm("en", false, owner);
+    const prompt = await screen.findByRole("dialog", {
+      name: "Continue adding Grace Hopper?",
+    });
+    expect(mocks.apiFetch).not.toHaveBeenCalled();
+    await browser.click(
+      within(prompt).getByRole("button", { name: "Continue draft" }),
+    );
+    expect(screen.getByLabelText("First name")).toHaveValue("Grace");
+    await waitFor(() => expect(mocks.s3Fetch).toHaveBeenCalled());
+    expect(mocks.s3Fetch.mock.calls[0]![1].body).toBe(photo);
+    changeField("First name", "Ada");
+    first.unmount();
+    const second = renderCreateForm("en", false, owner);
+    const nextPrompt = await screen.findByRole("dialog", {
+      name: "Continue adding Ada Hopper?",
+    });
+    await browser.click(
+      within(nextPrompt).getByRole("button", { name: "Continue draft" }),
+    );
+    expect(screen.getByLabelText("First name")).toHaveValue("Ada");
+    expect(screen.getByRole("button", { name: "Back" })).toBeEnabled();
+    second.unmount();
+  });
+
+  it("discards a draft when starting a new person and isolates it by account", async () => {
+    const owner = "draft-discard-test";
+    const state = createEmptyCreateForm("romanian");
+    state.firstName = "Grace";
+    const saved: PersonDraft = {
+      version: 1,
+      extraction: createExtractionState(state),
+      navigation: { history: ["citizenship", "documents"], cursor: 1 },
+      nationalIdFormat: "classic",
+    };
+    await writePersonDraft(owner, saved).catch(() => {});
+    expect(await readPersonDraft("different-account")).toBeNull();
+    const browser = userEvent.setup();
+    renderCreateForm("en", false, owner);
+    await browser.click(
+      await screen.findByRole("button", { name: "Start a new person" }),
+    );
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Romanian citizen" }),
+    ).toBeEnabled();
+    expect(await readPersonDraft(owner)).toBeNull();
+  });
+
   it("uses mobile header history and only shows forward after going back", async () => {
     const browser = userEvent.setup();
     Object.defineProperty(window, "innerWidth", {
@@ -196,7 +426,7 @@ describe("PersonCreateForm wizard", () => {
     ).toBeNull();
   });
 
-  it("offers desktop return controls inside the form while the header keeps sidebar navigation", async () => {
+  it("keeps desktop back navigation without redundant return buttons", async () => {
     const browser = userEvent.setup();
     renderCreateForm("en", true);
     const header = within(screen.getByRole("banner"));
@@ -206,11 +436,8 @@ describe("PersonCreateForm wizard", () => {
     expect(
       header.queryByRole("button", { name: /Back|Go forward/ }),
     ).toBeNull();
-    await browser.click(
-      screen.getByRole("button", {
-        name: "Return to Identification documents",
-      }),
-    );
+    expect(screen.queryByRole("button", { name: /Return to/ })).toBeNull();
+    await enterDocuments(browser);
     expect(
       screen.getByRole("region", { name: "Document photos" }),
     ).toBeVisible();
@@ -496,7 +723,7 @@ describe("PersonCreateForm wizard", () => {
 
   it("submits reviewed data and opens the newly created person's detail page", async () => {
     const browser = userEvent.setup();
-    await renderReviewForm(browser);
+    await renderReviewForm(browser, "draft-completed-test");
     fillRequiredFields("0749096855");
     showReviewStep("Address");
     await selectAddressOption(browser, "County", "București");
@@ -524,12 +751,12 @@ describe("PersonCreateForm wizard", () => {
     const summary = within(
       screen.getByRole("article", { name: "National ID" }),
     );
-    expect(summary.getByText("RX")).toBeVisible();
-    expect(summary.getByText("123456")).toBeVisible();
-    expect(summary.getByText("Jan 15, 2024")).toBeVisible();
+    expect(summary.getByText("RX 123456")).toBeVisible();
+    expect(summary.queryByText("Jan 15, 2024")).toBeNull();
     expect(summary.getByText("Jan 31, 2030")).toBeVisible();
     await submitPerson(browser);
     await waitFor(() => expect(mocks.createPerson).toHaveBeenCalledOnce());
+    expect(await readPersonDraft("draft-completed-test")).toBeNull();
     expect(mocks.createPerson).toHaveBeenCalledWith(
       v1.persons.ROUTES.create,
       v1.persons.personSchema,
@@ -676,6 +903,17 @@ describe("PersonCreateForm wizard", () => {
     await renderReviewForm(browser);
     let dialog = await openNationalIdSheet(browser);
     expect(dialog).toHaveClass("bg-popover", "text-popover-foreground");
+    const issuerRow =
+      within(dialog).getByLabelText("Issued by").parentElement!.parentElement!;
+    expect(issuerRow).toHaveClass("sm:col-span-2", "sm:grid-cols-2");
+    expect(within(issuerRow).getByText("Issuing country")).toBeInTheDocument();
+    expect(issuerRow).not.toHaveClass("bg-background");
+    const expiryRow = within(dialog).getByRole("switch", {
+      name: "Document has expiry date?",
+    }).parentElement!;
+    expect(expiryRow).toHaveClass("w-full", "justify-end");
+    expect(expiryRow.parentElement).toHaveClass("sm:col-span-2");
+    expect(expiryRow.parentElement).not.toHaveClass("bg-background");
     for (const surface of dialog.querySelectorAll(
       '[data-slot="bottom-sheet-header"], [data-slot="bottom-sheet-body"], [data-slot="bottom-sheet-footer"], [data-slot="bottom-sheet-body"] > div',
     ))
@@ -731,8 +969,8 @@ describe("PersonCreateForm wizard", () => {
     );
     const dialog = await screen.findByRole("dialog", { name: "Edit document" });
     expect(
-      within(dialog).getByRole("combobox", { name: "Document status" }),
-    ).toHaveTextContent("Unverified");
+      within(dialog).queryByRole("combobox", { name: "Document status" }),
+    ).toBeNull();
     await browser.click(
       within(dialog).getByRole("button", { name: "Add category" }),
     );
@@ -740,7 +978,7 @@ describe("PersonCreateForm wizard", () => {
       within(dialog).getByLabelText("Category"),
       "A1",
     );
-    fillDialogDateParts(dialog, "Category expires on (A1)", {
+    fillDialogDateParts(dialog, "Expires on (A1)", {
       day: "31",
       month: "12",
       year: "2030",
@@ -761,7 +999,7 @@ describe("PersonCreateForm wizard", () => {
             expect.objectContaining({ type: "nationalId" }),
             expect.objectContaining({
               type: "driverLicense",
-              status: "unverified",
+              status: "verified",
               licenseCategories: [
                 expect.objectContaining({
                   category: "A1",
@@ -864,7 +1102,7 @@ describe("PersonCreateForm wizard", () => {
       new File(["photo"], "id.png", { type: "image/png" }),
     );
     await browser.click(
-      within(chooser).getByRole("button", { name: "Folosește fotografia" }),
+      screen.getByRole("button", { name: "Folosește fotografia" }),
     );
     await waitFor(() => expect(chooser).not.toBeInTheDocument());
     await browser.click(
@@ -1214,10 +1452,15 @@ function extractedPassport(): v1.persons.PersonDocumentExtraction {
   };
 }
 
-function renderCreateForm(locale: SupportedLocale = "en", withShell = false) {
+function renderCreateForm(
+  locale: SupportedLocale = "en",
+  withShell = false,
+  draftOwnerId?: string,
+) {
   const form = (
     <PersonCreateForm
       personsHref={locale === "en" ? "/en/persons" : "/persons"}
+      draftOwnerId={draftOwnerId}
     />
   );
   return render(
@@ -1259,8 +1502,11 @@ async function enterDocuments(
     );
 }
 
-async function renderReviewForm(browser: ReturnType<typeof userEvent.setup>) {
-  renderCreateForm();
+async function renderReviewForm(
+  browser: ReturnType<typeof userEvent.setup>,
+  draftOwnerId?: string,
+) {
+  renderCreateForm("en", false, draftOwnerId);
   await enterDocuments(browser);
   await uploadPhoto(browser, "National ID");
   await browser.click(screen.getByRole("button", { name: "Review details" }));
@@ -1287,13 +1533,14 @@ async function uploadPhoto(
     within(dialog).getByLabelText("Choose from files"),
     new File(["photo"], `${slot}.png`, { type: "image/png" }),
   );
+  const editor = screen.getByRole("dialog");
   expect(
-    within(dialog).getByRole("img", { name: `${slot} document photo` }),
+    within(editor).getByRole("img", { name: `${slot} document photo` }),
   ).toBeInTheDocument();
   await browser.click(
-    within(dialog).getByRole("button", { name: "Use photo" }),
+    within(editor).getByRole("button", { name: "Use photo" }),
   );
-  await waitFor(() => expect(dialog).not.toBeInTheDocument());
+  await waitFor(() => expect(editor).not.toBeInTheDocument());
   await waitFor(() =>
     expect(
       screen.getByRole("button", { name: /^(Review details|Continue)$/ }),

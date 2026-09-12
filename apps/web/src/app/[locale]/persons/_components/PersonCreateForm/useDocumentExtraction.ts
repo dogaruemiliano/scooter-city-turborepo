@@ -47,9 +47,27 @@ export function documentExtractionSignature(
   if (!uploaded.length) return null;
   return JSON.stringify([
     document.type,
-    document.nationalIdFormat,
+    document.type === "nationalId" ? null : document.nationalIdFormat,
     uploaded.map(({ slot, photo }) => [slot, photo!.id]),
   ]);
+}
+
+/** Older drafts included the requested ID format, even for identical photo sources. */
+function sameExtractionSources(saved: string, current: string) {
+  if (saved === current) return true;
+  try {
+    const previous: unknown = JSON.parse(saved);
+    const next: unknown = JSON.parse(current);
+    return (
+      Array.isArray(previous) &&
+      Array.isArray(next) &&
+      previous[0] === "nationalId" &&
+      next[0] === "nationalId" &&
+      JSON.stringify(previous[2]) === JSON.stringify(next[2])
+    );
+  } catch {
+    return false;
+  }
 }
 
 export function useDocumentExtraction(
@@ -61,6 +79,7 @@ export function useDocumentExtraction(
     new Map<string, { signature: string; controller: AbortController }>(),
   );
   const completed = useRef(new Map<string, string>());
+  const forceReading = useRef(new Set<string>());
 
   useEffect(() => {
     const active = new Map(
@@ -83,6 +102,24 @@ export function useDocumentExtraction(
         completed.current.get(document.key) === signature
       )
         continue;
+      const saved = state.readings[document.key];
+      if (
+        saved &&
+        sameExtractionSources(saved.sourceSignature, signature) &&
+        !forceReading.current.has(document.key)
+      ) {
+        completed.current.set(document.key, signature);
+        setJobs((current) => ({
+          ...current,
+          [document.key]: {
+            signature,
+            status: "success",
+            warnings: saved.result.warnings,
+          },
+        }));
+        continue;
+      }
+      forceReading.current.delete(document.key);
       const controller = new AbortController();
       const request = { signature, controller };
       requests.current.set(document.key, request);
@@ -165,7 +202,7 @@ export function useDocumentExtraction(
       }
       void extract();
     }
-  }, [state.form.documents, setState, jobs]);
+  }, [state.form.documents, state.readings, setState, jobs]);
 
   useEffect(
     () => () => {
@@ -218,7 +255,10 @@ export function useDocumentExtraction(
     jobs,
     pending: pendingDocumentKeys.size > 0,
     pendingDocumentKeys,
-    retry: cancelDocument,
+    retry: (key: string) => {
+      forceReading.current.add(key);
+      cancelDocument(key);
+    },
     cancelDocument,
     continueManually,
   };

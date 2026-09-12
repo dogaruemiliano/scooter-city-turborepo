@@ -259,6 +259,7 @@ export function ExpenseReceiptCapture({
           resetEdits: t("resetEdits"),
           showEntirePhoto: t("showEntirePhoto"),
           cropCorner: (corner) => t(`cropCorners.${corner}`),
+          cropEdge: (edge) => t(`cropEdges.${edge}`),
         }}
         cameraActions={
           <Button

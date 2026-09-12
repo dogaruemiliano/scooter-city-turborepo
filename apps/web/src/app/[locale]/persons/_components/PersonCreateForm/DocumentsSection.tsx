@@ -87,10 +87,9 @@ export function DocumentsSection({
 
   function saveDocument() {
     if (activeDocument)
-      onSetDocument(
-        activeDocument,
-        Object.keys(patch) as PersonDocumentFormFieldKey[],
-      );
+      onSetDocument({ ...activeDocument, status: "verified" }, [
+        ...new Set([...Object.keys(patch), "status"]),
+      ] as PersonDocumentFormFieldKey[]);
     setOpen(false);
   }
 
@@ -117,6 +116,7 @@ export function DocumentsSection({
             <DocumentDraftCard
               key={document.key}
               document={document}
+              citizenship={form.citizenship}
               documentId={documentId}
               locale={locale}
               disabled={disabled}
