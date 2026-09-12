@@ -3,6 +3,7 @@ import { v1 } from "@repo/api-shared";
 
 import { DocumentExtractionError } from "../document-extraction/document-extraction.errors";
 import { personDocumentModelOutputSchema } from "./person-document-extraction.schema";
+import { capitalizeExtractedName } from "./person-name";
 import {
   PERSON_DOCUMENT_EXTRACTION_MAX_SOURCE_BYTES,
   PERSON_DOCUMENT_EXTRACTION_PROVIDER,
@@ -77,7 +78,12 @@ export class PersonDocumentExtractionService {
         suggestion.target === "person"
           ? v1.persons.createPersonInputSchema.shape[suggestion.field]
           : v1.persons.createPersonDocumentInputSchema.shape[suggestion.field];
-      const normalized = fieldSchema.safeParse(suggestion.value.trim());
+      const normalized = fieldSchema.safeParse(
+        suggestion.target === "person" &&
+          (suggestion.field === "firstName" || suggestion.field === "lastName")
+          ? capitalizeExtractedName(suggestion.value)
+          : suggestion.value.trim(),
+      );
       if (!normalized.success || typeof normalized.data !== "string") {
         warnings.add("invalidValue");
         continue;
