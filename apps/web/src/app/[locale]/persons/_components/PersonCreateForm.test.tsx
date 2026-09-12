@@ -337,6 +337,13 @@ describe("PersonCreateForm wizard", () => {
       year: "2030",
     });
     await saveDocumentSheet(browser, dialog);
+    const summary = within(
+      screen.getByRole("article", { name: "National ID" }),
+    );
+    expect(summary.getByText("RX")).toBeVisible();
+    expect(summary.getByText("123456")).toBeVisible();
+    expect(summary.getByText("Jan 15, 2024")).toBeVisible();
+    expect(summary.getByText("Jan 31, 2030")).toBeVisible();
     await submitPerson(browser);
     await waitFor(() => expect(mocks.createPerson).toHaveBeenCalledOnce());
     expect(mocks.createPerson).toHaveBeenCalledWith(
@@ -430,6 +437,19 @@ describe("PersonCreateForm wizard", () => {
     expect(await screen.findByLabelText("First name")).toBeInTheDocument();
     fillRequiredFields();
     await saveNationalIdDocument(browser);
+    const idSummary = within(
+      screen.getByRole("article", { name: "National ID" }),
+    );
+    expect(idSummary.getByText("ID number")).toBeVisible();
+    expect(idSummary.queryByText("Series")).not.toBeInTheDocument();
+    const idEditor = await openNationalIdSheet(browser);
+    expect(within(idEditor).getByLabelText("ID number")).toBeVisible();
+    expect(within(idEditor).queryByLabelText("Series")).not.toBeInTheDocument();
+    await browser.click(
+      within(idEditor).getByRole("button", { name: "Cancel" }),
+    );
+    await waitFor(() => expect(idEditor).not.toBeInTheDocument());
+
     await submitPerson(browser);
     await waitFor(() => expect(mocks.createPerson).toHaveBeenCalledOnce());
     expect(mocks.apiFetch).toHaveBeenCalledWith(
@@ -853,11 +873,10 @@ describe("document extraction review", () => {
       const dialog = await screen.findByRole("dialog", {
         name: /^(Add|Edit) document$/,
       });
-      changeDialogField(dialog, "Document number", "LOCAL");
+      expect(within(dialog).queryByLabelText("Series")).not.toBeInTheDocument();
+      changeDialogField(dialog, "ID number", "LOCAL");
       await act(async () => resolve(extractedPassport()));
-      expect(within(dialog).getByLabelText("Document number")).toHaveValue(
-        "LOCAL",
-      );
+      expect(within(dialog).getByLabelText("ID number")).toHaveValue("LOCAL");
       expect(within(dialog).getByLabelText("Issued by")).toHaveValue(
         "Passport office",
       );
@@ -873,7 +892,7 @@ describe("document extraction review", () => {
       const reopened = await screen.findByRole("dialog", {
         name: "Edit document",
       });
-      expect(within(reopened).getByLabelText("Document number")).toHaveValue(
+      expect(within(reopened).getByLabelText("ID number")).toHaveValue(
         action === "Save" ? "LOCAL" : "EXTRACTED",
       );
       expect(within(reopened).getByLabelText("Issued by")).toHaveValue(

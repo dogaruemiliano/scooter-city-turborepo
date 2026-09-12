@@ -118,6 +118,7 @@ export function DocumentsSection({
               key={document.key}
               document={document}
               documentId={documentId}
+              locale={locale}
               disabled={disabled}
               fieldErrors={fieldErrors}
               onOpen={() => openDocument(document)}

@@ -13,6 +13,7 @@ import { useTranslations } from "next-intl";
 
 import { PERSON_DOCUMENT_FORM_FIELD_KEYS } from "./constants";
 import { documentFieldErrorKey, invalidAria } from "./errors";
+import { DocumentReviewSummary } from "./DocumentReviewSummary";
 import { isBlankDocumentDraft } from "./form-state";
 import type { CreatePersonDocumentFormState, FormErrors } from "./types";
 
@@ -29,12 +30,14 @@ const documentTypeIcons = {
 export function DocumentDraftCard({
   document,
   documentId,
+  locale,
   disabled,
   fieldErrors,
   onOpen,
 }: {
   document: CreatePersonDocumentFormState;
   documentId: string;
+  locale: string;
   disabled: boolean;
   fieldErrors: FormErrors;
   onOpen: () => void;
@@ -50,13 +53,16 @@ export function DocumentDraftCard({
   const DocumentIcon = documentTypeIcons[document.type];
 
   return (
-    <div className="grid min-w-0 gap-2">
+    <article
+      aria-label={typeLabel}
+      className="min-w-0 overflow-hidden rounded-xl border border-border bg-card text-card-foreground"
+    >
       <BottomSheetTrigger
         render={
           <Button
             type="button"
-            variant="outline"
-            className="h-auto w-full items-center justify-between rounded-xl p-4 text-left whitespace-normal shadow-sm md:h-auto"
+            variant="ghost"
+            className="h-auto w-full items-center justify-between rounded-none p-4 text-left whitespace-normal md:h-auto"
             aria-label={actionLabel}
             aria-describedby={error ? errorId : undefined}
             aria-invalid={invalidAria(error)}
@@ -99,12 +105,19 @@ export function DocumentDraftCard({
           <ChevronRightIcon aria-hidden="true" />
         </span>
       </BottomSheetTrigger>
+      {document.required || !isBlank ? (
+        <DocumentReviewSummary document={document} locale={locale} />
+      ) : null}
       {error ? (
-        <p id={errorId} role="alert" className="text-sm text-destructive">
+        <p
+          id={errorId}
+          role="alert"
+          className="px-4 pb-4 text-sm text-destructive"
+        >
           {error}
         </p>
       ) : null}
-    </div>
+    </article>
   );
 }
 

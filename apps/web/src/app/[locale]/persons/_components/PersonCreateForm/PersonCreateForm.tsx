@@ -32,6 +32,7 @@ import {
 import { PersonalSection } from "./PersonalSection";
 import { ContactSection } from "./ContactSection";
 import { CreateFormFeedback } from "./CreateFormFeedback";
+import { documentNumberLabel } from "./DocumentReviewSummary";
 import { DocumentsSection } from "./DocumentsSection";
 import { DocumentPhotosSection } from "./DocumentPhotosSection";
 import {
@@ -294,8 +295,8 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
           const document = form.documents.find(
             (item) => item.key === documentField.documentKey,
           );
-          return document?.type === "nationalId"
-            ? t("fields.nationalIdNumber")
+          return document
+            ? t(`fields.${documentNumberLabel(document)}`)
             : t("fields.documentNumber");
         }
         case "cnp":

@@ -21,6 +21,10 @@ import { buildDateOnly } from "@repo/ui/lib/date-parts";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 
+import {
+  documentHasSeries,
+  documentNumberLabel,
+} from "./DocumentReviewSummary";
 import { DocumentExpiryField } from "../DocumentExpiryField";
 import { LicenseCategoriesFields } from "../LicenseCategoriesFields";
 import { documentFieldErrorKey, fieldErrorId, invalidAria } from "./errors";
@@ -57,7 +61,7 @@ export function DocumentDraftSheet({
   const [localExpiresOnError, setLocalExpiresOnError] = useState<string | null>(
     null,
   );
-  const isNationalId = document.type === "nationalId";
+
   const seriesError =
     fieldErrors[documentFieldErrorKey(document.key, "series")];
   const numberError =
@@ -101,7 +105,7 @@ export function DocumentDraftSheet({
       </BottomSheetHeader>
       <BottomSheetBody>
         <div className="grid min-w-0 gap-4 sm:grid-cols-2">
-          {isNationalId || document.series ? (
+          {documentHasSeries(document) ? (
             <div className="grid min-w-0 grid-cols-3 gap-3 sm:col-span-2">
               <FormField
                 id={`${documentId}-series`}
@@ -132,11 +136,7 @@ export function DocumentDraftSheet({
               <FormField
                 id={`${documentId}-number`}
                 extractionKey={`document.${document.key}.number`}
-                label={t(
-                  isNationalId
-                    ? "fields.nationalIdNumber"
-                    : "fields.documentNumber",
-                )}
+                label={t(`fields.${documentNumberLabel(document)}`)}
                 className="col-span-2"
                 error={numberError}
               >
@@ -163,7 +163,7 @@ export function DocumentDraftSheet({
             <FormField
               id={`${documentId}-number`}
               extractionKey={`document.${document.key}.number`}
-              label={t("fields.documentNumber")}
+              label={t(`fields.${documentNumberLabel(document)}`)}
               error={numberError}
             >
               <Input
