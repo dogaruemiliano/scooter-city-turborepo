@@ -57,7 +57,7 @@ export function FormActions({
           {t("wizard.back")}
         </Button>
       ) : null}
-      {step === "documents" ? (
+      {["documents", "personal", "contact", "address"].includes(step) ? (
         <Button
           type="button"
           disabled={creating || uploadingPhotos}
@@ -65,7 +65,9 @@ export function FormActions({
         >
           {uploadingPhotos
             ? t("actions.uploadingDocumentPhoto")
-            : t("wizard.continueToReview")}
+            : step === "documents"
+              ? t("wizard.continueToReview")
+              : t("wizard.next")}
         </Button>
       ) : null}
       {step === "review" ? (

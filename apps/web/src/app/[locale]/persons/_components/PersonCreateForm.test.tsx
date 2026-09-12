@@ -109,6 +109,53 @@ beforeEach(() => {
 });
 
 describe("PersonCreateForm wizard", () => {
+  it("separates personal, contact, address and document review with step validation", async () => {
+    const browser = userEvent.setup();
+    await renderReviewForm(browser);
+    expect(screen.getByLabelText("First name")).toBeVisible();
+    expect(screen.getByLabelText("Last name")).toBeVisible();
+    expect(screen.getByLabelText("CNP")).toBeVisible();
+    expect(screen.queryByLabelText("Email")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("County")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Create person" }),
+    ).not.toBeInTheDocument();
+
+    await browser.click(screen.getByRole("button", { name: "Continue" }));
+    expect(screen.getByLabelText("First name")).toHaveAttribute(
+      "aria-invalid",
+      "true",
+    );
+    changeField("First name", "Grace");
+    changeField("Last name", "Hopper");
+    changeField("CNP", "1900228123450");
+    await browser.click(screen.getByRole("button", { name: "Continue" }));
+    expect(screen.getByLabelText("Email")).toBeVisible();
+    expect(screen.queryByLabelText("First name")).not.toBeInTheDocument();
+    await browser.click(screen.getByRole("button", { name: "Continue" }));
+    expect(screen.getByLabelText("Email")).toHaveAttribute(
+      "aria-invalid",
+      "true",
+    );
+    changeField("Email", "rider@example.com");
+    changeField("Phone", "749096855");
+    await browser.click(screen.getByRole("button", { name: "Back" }));
+    expect(screen.getByLabelText("CNP")).toHaveValue("1900228123450");
+    await browser.click(screen.getByRole("button", { name: "Continue" }));
+    expect(screen.getByLabelText("Phone")).toHaveValue("749096855");
+    await browser.click(screen.getByRole("button", { name: "Continue" }));
+    expect(screen.getByLabelText("County")).toBeVisible();
+    expect(screen.getByLabelText("City / locality")).toBeVisible();
+    expect(screen.queryByLabelText("Email")).not.toBeInTheDocument();
+    await browser.click(screen.getByRole("button", { name: "Continue" }));
+    expect(
+      screen.getByRole("button", { name: /^(Add|Edit) National ID$/ }),
+    ).toBeVisible();
+    expect(screen.getByRole("button", { name: "Create person" })).toBeVisible();
+    expect(screen.queryByLabelText("CNP")).not.toBeInTheDocument();
+    expect(mocks.createPerson).not.toHaveBeenCalled();
+  });
+
   it("starts with citizenship cards before any uploads or personal fields", () => {
     renderCreateForm();
     expect(
@@ -186,7 +233,7 @@ describe("PersonCreateForm wizard", () => {
     await uploadPhoto(browser, "Passport");
     await browser.click(screen.getByRole("button", { name: "Review details" }));
     fillRequiredFields();
-    await browser.click(screen.getByRole("button", { name: "Create person" }));
+    await submitPerson(browser);
     await waitFor(() => expect(mocks.createPerson).toHaveBeenCalledOnce());
     expect(mocks.createPerson).toHaveBeenCalledWith(
       v1.persons.ROUTES.create,
@@ -225,12 +272,14 @@ describe("PersonCreateForm wizard", () => {
     expect(
       screen.queryByRole("region", { name: "Document photos" }),
     ).not.toBeInTheDocument();
-    await browser.click(screen.getByRole("button", { name: "Create person" }));
+    await submitPerson(browser);
     expect(await screen.findByText("Person not created")).toBeInTheDocument();
+    showReviewStep("Personal details");
     expect(screen.getByLabelText("First name")).toHaveAttribute(
       "aria-invalid",
       "true",
     );
+    showReviewStep("Contact details");
     expect(screen.getByLabelText("Email")).toHaveAccessibleDescription(
       "Email is required.",
     );
@@ -242,6 +291,7 @@ describe("PersonCreateForm wizard", () => {
     await renderReviewForm(browser);
     fillRequiredFields();
     await saveNationalIdDocument(browser);
+    showReviewStep("Personal details");
     await browser.click(screen.getByRole("button", { name: "Back" }));
     expect(
       within(getPhotoGroup("National ID")).getByRole("button", {
@@ -249,11 +299,12 @@ describe("PersonCreateForm wizard", () => {
       }),
     ).toBeInTheDocument();
     await browser.click(screen.getByRole("button", { name: "Review details" }));
+    showReviewStep("Contact details");
     expect(screen.getByLabelText("Phone")).toHaveValue("749096855");
+    showReviewStep("Personal details");
     expect(screen.getByLabelText("First name")).toHaveValue("Grace");
     const dialog = await openNationalIdSheet(browser);
     expect(within(dialog).queryByLabelText("CNP")).toBeNull();
-    expect(screen.getByLabelText("CNP")).toHaveValue("1900228123450");
     await browser.click(within(dialog).getByRole("button", { name: "Cancel" }));
     await waitFor(() => expect(dialog).not.toBeInTheDocument());
     expect(mocks.s3Fetch).toHaveBeenCalledOnce();
@@ -263,16 +314,17 @@ describe("PersonCreateForm wizard", () => {
     const browser = userEvent.setup();
     await renderReviewForm(browser);
     fillRequiredFields("0749096855");
+    showReviewStep("Address");
     await browser.selectOptions(screen.getByLabelText("County"), "București");
     changeField("Address line 1", "1 Rental Street");
     changeField("Address line 2", "Apt 4");
     changeField("City / locality", "Bucharest");
     changeField("Postal code", "010101");
     changeField("Notes", "Frequent rider");
+    changeField("CNP", "1900228123450");
     const dialog = await openNationalIdSheet(browser);
     changeDialogField(dialog, "Series", "rx");
     changeDialogField(dialog, "Number", "123456");
-    changeField("CNP", "1900228123450");
     changeDialogField(dialog, "Issued by", "SPCLEP Bucuresti");
     fillDialogDateParts(dialog, "Issued on", {
       day: "15",
@@ -285,7 +337,7 @@ describe("PersonCreateForm wizard", () => {
       year: "2030",
     });
     await saveDocumentSheet(browser, dialog);
-    await browser.click(screen.getByRole("button", { name: "Create person" }));
+    await submitPerson(browser);
     await waitFor(() => expect(mocks.createPerson).toHaveBeenCalledOnce());
     expect(mocks.createPerson).toHaveBeenCalledWith(
       v1.persons.ROUTES.create,
@@ -378,7 +430,7 @@ describe("PersonCreateForm wizard", () => {
     expect(await screen.findByLabelText("First name")).toBeInTheDocument();
     fillRequiredFields();
     await saveNationalIdDocument(browser);
-    await browser.click(screen.getByRole("button", { name: "Create person" }));
+    await submitPerson(browser);
     await waitFor(() => expect(mocks.createPerson).toHaveBeenCalledOnce());
     expect(mocks.apiFetch).toHaveBeenCalledWith(
       v1.persons.ROUTES.documents.photos.createDraftUploadUrl,
@@ -465,7 +517,7 @@ describe("PersonCreateForm wizard", () => {
       within(dialog).getByRole("switch", { name: "Document has expiry date?" }),
     );
     await saveDocumentSheet(browser, dialog);
-    await browser.click(screen.getByRole("button", { name: "Create person" }));
+    await submitPerson(browser);
     await waitFor(() => expect(mocks.createPerson).toHaveBeenCalledOnce());
     expect(mocks.createPerson).toHaveBeenCalledWith(
       v1.persons.ROUTES.create,
@@ -590,6 +642,7 @@ describe("PersonCreateForm wizard", () => {
     changeField("Nume", "Ionescu");
     changeField("Email", "ana@example.com");
     changeField("Telefon", "123");
+    showReviewStep("Date documente");
     await browser.click(
       screen.getByRole("button", { name: "Creează persoana" }),
     );
@@ -610,8 +663,9 @@ describe("PersonCreateForm wizard", () => {
     await renderReviewForm(browser);
     fillRequiredFields();
     await saveNationalIdDocument(browser);
-    await browser.click(screen.getByRole("button", { name: "Create person" }));
+    await submitPerson(browser);
     expect(await screen.findByText("Service unavailable.")).toBeInTheDocument();
+    showReviewStep("Contact details");
     expect(screen.getByLabelText("Phone")).not.toHaveAttribute("aria-invalid");
     expect(screen.getByLabelText("Email")).not.toHaveAttribute("aria-invalid");
     expect(mocks.push).not.toHaveBeenCalled();
@@ -625,7 +679,7 @@ describe("PersonCreateForm wizard", () => {
     await browser.click(screen.getByRole("button", { name: "Review details" }));
     fillRequiredFields();
     changeField("Date of birth", "28");
-    await browser.click(screen.getByRole("button", { name: "Create person" }));
+    await submitPerson(browser);
     expect(await screen.findAllByText("Complete Date of birth.")).toHaveLength(
       2,
     );
@@ -639,7 +693,7 @@ describe("PersonCreateForm wizard", () => {
     changeField("Date of birth", "31");
     changeField("Date of birth MM", "02");
     changeField("Date of birth YYYY", "1990");
-    await browser.click(screen.getByRole("button", { name: "Create person" }));
+    await submitPerson(browser);
     expect(
       await screen.findAllByText("Enter a valid Date of birth."),
     ).toHaveLength(2);
@@ -690,9 +744,7 @@ describe("PersonCreateForm wizard", () => {
       await renderReviewForm(browser);
       fillRequiredFields();
       await saveNationalIdDocument(browser);
-      await browser.click(
-        screen.getByRole("button", { name: "Create person" }),
-      );
+      await submitPerson(browser);
       expect(
         await screen.findAllByText(`${field} already exists.`),
       ).toHaveLength(2);
@@ -740,12 +792,14 @@ describe("document extraction review", () => {
     const browser = userEvent.setup();
     await renderReviewForm(browser);
     expect(screen.getByLabelText("CNP")).toHaveValue("1900228123450");
+    showReviewStep("Address");
     expect(screen.getByLabelText("County")).toHaveValue("Vâlcea");
     expect(screen.getByLabelText("City / locality")).toHaveValue(
       "Râmnicu Vâlcea",
     );
     changeField("City / locality", "Drăgășani");
     expect(screen.getByLabelText("City / locality")).toHaveValue("Drăgășani");
+    showReviewStep("Document details");
     await browser.click(
       screen.getByRole("button", { name: /^(Add|Edit) National ID$/ }),
     );
@@ -792,6 +846,7 @@ describe("document extraction review", () => {
         screen.getByRole("button", { name: "Review details" }),
       );
       changeField("First name", "Operator");
+      showReviewStep("Document details");
       await browser.click(
         screen.getByRole("button", { name: /^(Add|Edit) Passport$/ }),
       );
@@ -808,8 +863,10 @@ describe("document extraction review", () => {
       );
       await browser.click(within(dialog).getByRole("button", { name: action }));
       await waitFor(() => expect(dialog).not.toBeInTheDocument());
+      showReviewStep("Personal details");
       expect(screen.getByLabelText("First name")).toHaveValue("Operator");
       expect(screen.getByLabelText("Last name")).toHaveValue("Popescu");
+      showReviewStep("Document details");
       await browser.click(
         screen.getByRole("button", { name: "Edit Passport" }),
       );
@@ -838,6 +895,7 @@ describe("document extraction review", () => {
     await uploadPhoto(browser, "Passport");
     await browser.click(screen.getByRole("button", { name: "Review details" }));
     fillRequiredFields();
+    showReviewStep("Document details");
     expect(
       screen.getByRole("button", { name: "Create person" }),
     ).toBeDisabled();
@@ -845,8 +903,9 @@ describe("document extraction review", () => {
       screen.getByRole("button", { name: "Continue manually" }),
     );
     await act(async () => resolve(extractedPassport()));
+    showReviewStep("Personal details");
     expect(screen.getByLabelText("First name")).toHaveValue("Grace");
-    await browser.click(screen.getByRole("button", { name: "Create person" }));
+    await submitPerson(browser);
     await waitFor(() =>
       expect(mocks.push).toHaveBeenCalledWith("/en/persons/person-2"),
     );
@@ -975,6 +1034,7 @@ function fillRequiredFields(phone = "749096855") {
 async function openNationalIdSheet(
   browser: ReturnType<typeof userEvent.setup>,
 ) {
+  showReviewStep("Document details");
   await browser.click(
     screen.getByRole("button", { name: /^(Add|Edit) National ID$/ }),
   );
@@ -1017,5 +1077,41 @@ function fillDialogDateParts(
 }
 
 function changeField(label: string, value: string) {
+  showField(label);
   fireEvent.change(screen.getByLabelText(label), { target: { value } });
+}
+
+function showReviewStep(name: string) {
+  const progress = screen.getByRole("list", {
+    name: /Add person progress|Pași pentru adăugarea persoanei/,
+  });
+  fireEvent.click(within(progress).getByRole("button", { name }));
+}
+
+function showField(label: string) {
+  if (screen.queryByLabelText(label)) return;
+  const ro = Boolean(
+    screen.queryByRole("list", { name: "Pași pentru adăugarea persoanei" }),
+  );
+  const step = /^(First name|Last name|CNP|Date of birth|Prenume|Nume)/.test(
+    label,
+  )
+    ? ro
+      ? "Date personale"
+      : "Personal details"
+    : /^(Email|Phone|Telefon)/.test(label)
+      ? ro
+        ? "Date de contact"
+        : "Contact details"
+      : label === "Notes"
+        ? "Document details"
+        : ro
+          ? "Adresă"
+          : "Address";
+  showReviewStep(step);
+}
+
+async function submitPerson(browser: ReturnType<typeof userEvent.setup>) {
+  showReviewStep("Document details");
+  await browser.click(screen.getByRole("button", { name: "Create person" }));
 }

@@ -7,7 +7,7 @@ import type {
 } from "@repo/ui/components";
 import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
-import { useId, useState, type FormEvent } from "react";
+import { useId, useState, useRef, useEffect, type FormEvent } from "react";
 
 import { webApi } from "@/lib/api";
 import {
@@ -22,7 +22,14 @@ import { useDocumentExtraction } from "./useDocumentExtraction";
 import { DocumentExtractionFeedback } from "./DocumentExtractionFeedback";
 import { AddressSection } from "./AddressSection";
 import { CitizenshipChoice } from "./CitizenshipChoice";
-import { WizardProgress, type PersonWizardStep } from "./WizardProgress";
+import {
+  WizardProgress,
+  REVIEW_STEPS,
+  isReviewStep,
+  type PersonReviewStep,
+  type PersonWizardStep,
+} from "./WizardProgress";
+import { PersonalSection } from "./PersonalSection";
 import { ContactSection } from "./ContactSection";
 import { CreateFormFeedback } from "./CreateFormFeedback";
 import { DocumentsSection } from "./DocumentsSection";
@@ -86,10 +93,19 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const showUnder18Warning = isUnder18Person(form);
   const uploadingPhotos = hasDocumentPhotoStatus(form, "uploading");
+  const stepHeading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    stepHeading.current?.focus();
+  }, [step]);
 
   async function createPerson(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (step !== "review" || creating || extraction.pending) return;
+    if (creating) return;
+    if (step !== "review") {
+      nextStep();
+      return;
+    }
+    if (extraction.pending) return;
     setFeedback(null);
     setFieldErrors({});
 
@@ -125,6 +141,7 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
         : t("feedback.date.invalid", { field: fieldLabel });
     });
     if (inputCandidate.error) {
+      setStep(stepForField(inputCandidate.error.field));
       setFieldErrors({
         [inputCandidate.error.field]: inputCandidate.error.message,
       });
@@ -146,6 +163,7 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
         formatValidationIssue,
       );
       setFieldErrors(nextFieldErrors);
+      setStep(stepForField(Object.keys(nextFieldErrors)[0] as FormErrorKey));
       setFeedback({
         kind: "error",
         title: t("feedback.createErrorTitle"),
@@ -184,6 +202,7 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
       const personConflict = personCreateConflict(error);
       if (personConflict) {
         setFieldErrors({ [personConflict.field]: personConflict.message });
+        setStep(stepForField(personConflict.field));
       }
       const message = personConflict
         ? personConflict.message
@@ -354,7 +373,11 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
           noValidate
           onSubmit={(event) => void createPerson(event)}
         >
-          <WizardProgress step={step} />
+          <WizardProgress
+            step={step}
+            disabled={creating}
+            onSelect={selectReviewStep}
+          />
           {step === "citizenship" ? (
             <CitizenshipChoice onChange={changeCitizenship} />
           ) : null}
@@ -374,7 +397,7 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
               fieldErrors={fieldErrors}
             />
           ) : null}
-          {step === "documents" || step === "review" ? (
+          {step === "documents" || isReviewStep(step) ? (
             <DocumentExtractionFeedback
               form={form}
               jobs={extraction.jobs}
@@ -384,33 +407,52 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
               onManual={extraction.continueManually}
             />
           ) : null}
+          {isReviewStep(step) ? (
+            <div className="grid gap-2">
+              <h2
+                ref={stepHeading}
+                tabIndex={-1}
+                className="text-xl font-semibold outline-none"
+              >
+                {t(`wizard.steps.${step}`)}
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                {t("wizard.reviewHelp")}
+              </p>
+            </div>
+          ) : null}
+          {step === "personal" ? (
+            <PersonalSection
+              formId={formId}
+              form={form}
+              fieldErrors={fieldErrors}
+              locale={locale}
+              showUnder18Warning={showUnder18Warning}
+              onSetFormValue={setFormValue}
+            />
+          ) : null}
+          {step === "contact" ? (
+            <ContactSection
+              formId={formId}
+              form={form}
+              fieldErrors={fieldErrors}
+              locale={locale}
+              onSetFormValue={setFormValue}
+              onChangePhone={changePhone}
+            />
+          ) : null}
+          {step === "address" ? (
+            <AddressSection
+              formId={formId}
+              form={form}
+              fieldErrors={fieldErrors}
+              locale={locale}
+              onSetFormValue={setFormValue}
+              onChangeCountry={changeCountry}
+            />
+          ) : null}
           {step === "review" ? (
             <>
-              <div className="grid gap-2">
-                <h2 className="text-xl font-semibold">
-                  {t("wizard.reviewTitle")}
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  {t("wizard.reviewHelp")}
-                </p>
-              </div>
-              <ContactSection
-                formId={formId}
-                form={form}
-                fieldErrors={fieldErrors}
-                locale={locale}
-                showUnder18Warning={showUnder18Warning}
-                onSetFormValue={setFormValue}
-                onChangePhone={changePhone}
-              />
-              <AddressSection
-                formId={formId}
-                form={form}
-                fieldErrors={fieldErrors}
-                locale={locale}
-                onSetFormValue={setFormValue}
-                onChangeCountry={changeCountry}
-              />
               <DocumentsSection
                 formId={formId}
                 form={form}
@@ -438,22 +480,87 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
             personsHref={personsHref}
             step={step}
             onBack={goBack}
-            onNext={reviewDetails}
+            onNext={nextStep}
           />
         </form>
       </div>
     </ExtractionReviewContext.Provider>
   );
 
+  function selectReviewStep(next: PersonReviewStep) {
+    setFeedback(null);
+    setStep(next);
+  }
+
   function goBack() {
     setFeedback(null);
+    const index = isReviewStep(step) ? REVIEW_STEPS.indexOf(step) : -1;
     setStep(
-      step === "review"
-        ? "documents"
-        : step === "documents" && form.citizenship === "romanian"
-          ? "nationalId"
-          : "citizenship",
+      index > 0
+        ? REVIEW_STEPS[index - 1]!
+        : step === "personal"
+          ? "documents"
+          : step === "documents" && form.citizenship === "romanian"
+            ? "nationalId"
+            : "citizenship",
     );
+  }
+
+  function nextStep() {
+    if (step === "documents") {
+      reviewDetails();
+      return;
+    }
+    if (!isReviewStep(step) || step === "review" || creating) return;
+    // Validate only the visible group; later steps are validated on their turn.
+    const fields =
+      step === "personal"
+        ? (["firstName", "lastName", "cnp", "dateOfBirth"] as const)
+        : step === "contact"
+          ? (["email", "phone"] as const)
+          : ([
+              "addressLine1",
+              "addressLine2",
+              "city",
+              "region",
+              "postalCode",
+              "countryCode",
+            ] as const);
+    const candidate = createPersonInput(
+      { ...form, documents: [] },
+      (field, error) =>
+        t(`feedback.date.${error}`, {
+          field: fieldLabel(field === "dateOfBirth" ? field : null),
+        }),
+    );
+    const errors: FormErrors = {};
+    if (candidate.error && stepForField(candidate.error.field) === step) {
+      errors[candidate.error.field] = candidate.error.message;
+    }
+    // A partial birth date must not prevent validation of contact/address.
+    const values = candidate.input ?? { ...form };
+    for (const field of fields) {
+      if (field === "dateOfBirth" && candidate.error) continue;
+      const result = v1.persons.createPersonInputSchema.shape[field].safeParse(
+        values[field],
+      );
+      if (!result.success)
+        errors[field] = formatValidationIssue(result.error.issues[0]!, field);
+    }
+    setFieldErrors((current) => {
+      const next = { ...current };
+      for (const field of fields) delete next[field];
+      return { ...next, ...errors };
+    });
+    if (Object.keys(errors).length) {
+      setFeedback({
+        kind: "error",
+        title: t("feedback.createErrorTitle"),
+        messages: Object.values(errors) as string[],
+      });
+      return;
+    }
+    selectReviewStep(REVIEW_STEPS[REVIEW_STEPS.indexOf(step) + 1]!);
   }
 
   function reviewDetails() {
@@ -488,7 +595,7 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
       return;
     }
     setFeedback(null);
-    setStep("review");
+    setStep("personal");
   }
 
   function setFormValue<Key extends keyof CreatePersonFormState>(
@@ -898,4 +1005,22 @@ function storageUploadResponseDiagnostics(
     storageRequestId: response.headers.get("x-amz-request-id"),
     storageExtendedRequestId: response.headers.get("x-amz-id-2"),
   };
+}
+
+function stepForField(field: FormErrorKey): PersonReviewStep {
+  if (["firstName", "lastName", "cnp", "dateOfBirth"].includes(field))
+    return "personal";
+  if (["email", "phone"].includes(field)) return "contact";
+  if (
+    [
+      "addressLine1",
+      "addressLine2",
+      "city",
+      "region",
+      "postalCode",
+      "countryCode",
+    ].includes(field)
+  )
+    return "address";
+  return "review";
 }

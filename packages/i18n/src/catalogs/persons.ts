@@ -215,8 +215,11 @@ export const personsCatalog = {
       progress: "Add person progress",
       steps: {
         citizenship: "Citizenship",
-        documents: "Documents",
-        review: "Review",
+        documents: "Photos",
+        personal: "Personal details",
+        contact: "Contact details",
+        address: "Address",
+        review: "Document details",
       },
       chooseCitizenship: "Who are you adding?",
       citizenshipHelp: "Choose their citizenship to see the documents needed.",
@@ -227,6 +230,7 @@ export const personsCatalog = {
       documentsMissing: "Complete the document uploads",
       back: "Back",
       continueToReview: "Review details",
+      next: "Continue",
     },
     nationalIdFormat: {
       label: "National ID version",
@@ -640,8 +644,11 @@ export const personsCatalog = {
       progress: "Pași pentru adăugarea persoanei",
       steps: {
         citizenship: "Cetățenie",
-        documents: "Documente",
-        review: "Verificare",
+        documents: "Fotografii",
+        personal: "Date personale",
+        contact: "Date de contact",
+        address: "Adresă",
+        review: "Date documente",
       },
       chooseCitizenship: "Pe cine adaugi?",
       citizenshipHelp: "Alege cetățenia pentru a vedea documentele necesare.",
@@ -653,6 +660,7 @@ export const personsCatalog = {
       documentsMissing: "Completează încărcarea documentelor",
       back: "Înapoi",
       continueToReview: "Verifică datele",
+      next: "Continuă",
     },
     nationalIdFormat: {
       label: "Versiunea cărții de identitate",
