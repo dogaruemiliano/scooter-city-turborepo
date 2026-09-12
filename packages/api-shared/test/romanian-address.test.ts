@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   normalizeRomanianCounty,
+  getRomanianLocalities,
+  matchRomanianLocality,
+  splitRomanianAddressLines,
   parseRomanianAddress,
   ROMANIAN_COUNTY_NAMES,
 } from "../src/v1/persons/romanian-address";
@@ -42,8 +45,6 @@ test("extracts towns, communes and villages without street or building data", ()
     "Orasul ",
     "Com.",
     "Comuna ",
-    "Sat ",
-    "Satul ",
     "Loc.",
     "Localitatea ",
   ]) {
@@ -63,14 +64,14 @@ test("extracts towns, communes and villages without street or building data", ()
     ),
     {
       region: "Cluj",
-      city: "Luna de Sus",
+      city: "Florești",
     },
   );
   assert.deepEqual(
     parseRomanianAddress("Sat. Luna de Sus Com. Florești Jud.CJ"),
     {
       region: "Cluj",
-      city: "Luna de Sus",
+      city: "Florești",
     },
   );
 });
@@ -106,4 +107,49 @@ test("does not guess localities from county or street names, or expand unknown c
   assert.equal(parseRomanianAddress("Jud.XX").region, undefined);
   assert.equal(normalizeRomanianCounty("Unknown County"), "Unknown County");
   assert.equal(parseRomanianAddress("Str. Munteniei Nr.12").city, undefined);
+});
+
+test("uses the dataset to mix cities and communes with county-specific matching", () => {
+  const names = getRomanianLocalities("VL").map((item) => item.name);
+  assert.ok(names.includes("Râmnicu Vâlcea"));
+  assert.ok(names.includes("Budești"));
+  assert.ok(!names.includes("Cluj-Napoca"));
+  assert.equal(
+    matchRomanianLocality("Vâlcea", "mun.RAMNICU VALCEA"),
+    "Râmnicu Vâlcea",
+  );
+  assert.equal(matchRomanianLocality("VL", "Com. budesti"), "Budești");
+  assert.equal(matchRomanianLocality("CJ", "Râmnicu Vâlcea"), undefined);
+  assert.equal(matchRomanianLocality("", "Budești"), undefined);
+  assert.equal(parseRomanianAddress("Jud.CJ Sat.Luna de Sus").city, undefined);
+});
+
+test("keeps only street and number on line 1 and moves premises and village to line 2", () => {
+  assert.deepEqual(
+    splitRomanianAddressLines(
+      "Jud.VL Mun.Râmnicu Vâlcea Str.Exemplu Nr.12 Bl.A Sc.B Et.2 Ap.5",
+    ),
+    {
+      addressLine1: "Str. Exemplu, Nr. 12",
+      addressLine2: "Bl. A, Sc. B, Et. 2, Ap. 5",
+    },
+  );
+  assert.deepEqual(
+    splitRomanianAddressLines(
+      "Jud.CJ Com.Florești Sat.Luna de Sus Str.Principală Nr.10",
+    ),
+    {
+      addressLine1: "Str. Principală, Nr. 10",
+      addressLine2: "Sat. Luna de Sus",
+    },
+  );
+  assert.deepEqual(splitRomanianAddressLines("Jud.VL Mun.Râmnicu Vâlcea"), {});
+  assert.deepEqual(splitRomanianAddressLines("Calea lui Traian Nr.12 Bl.A"), {
+    addressLine1: "Calea lui Traian, Nr. 12",
+    addressLine2: "Bl. A",
+  });
+  assert.deepEqual(splitRomanianAddressLines("Str. Exemplu 12, apartment 4"), {
+    addressLine1: "Str. Exemplu 12",
+    addressLine2: "apartment 4",
+  });
 });

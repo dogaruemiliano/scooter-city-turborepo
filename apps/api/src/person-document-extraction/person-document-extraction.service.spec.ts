@@ -87,12 +87,7 @@ describe("person-document extraction normalization", () => {
     expect(result.suggestions).toEqual([
       suggestion("person", "region", "Vâlcea", "back"),
       suggestion("person", "city", "Râmnicu Vâlcea", "back"),
-      suggestion(
-        "person",
-        "addressLine1",
-        "Jud.VL Mun.RÂMNICU VÂLCEA Str.Exemplu Nr.12",
-        "back",
-      ),
+      suggestion("person", "addressLine1", "Str. Exemplu, Nr. 12", "back"),
     ]);
   });
 
@@ -116,10 +111,15 @@ describe("person-document extraction normalization", () => {
 
   it("keeps a plain city whose name also matches a county", async () => {
     const { service } = setup({
-      suggestions: [suggestion("person", "city", "IAȘI")],
+      suggestions: [
+        suggestion("person", "region", "IS"),
+        suggestion("person", "city", "IAȘI"),
+      ],
     });
     const result = await service.analyze(input);
-    expect(result.suggestions).toEqual([suggestion("person", "city", "Iași")]);
+    expect(result.suggestions).toContainEqual(
+      suggestion("person", "city", "Iași"),
+    );
   });
 
   it("also parses Romanian residence proofs for foreign citizens", async () => {
@@ -142,7 +142,7 @@ describe("person-document extraction normalization", () => {
     );
     expect(
       result.suggestions.find((item) => item.field === "city")?.value,
-    ).toMatch(/^Luna [Dd]e Sus$/u);
+    ).toBe("Florești");
   });
 
   it("retains conflict warnings when expanded address suggestions reach the response limit", async () => {
@@ -181,6 +181,64 @@ describe("person-document extraction normalization", () => {
     expect(result.suggestions).toContainEqual(
       suggestion("person", "city", "Alba"),
     );
+  });
+
+  it("selects the printed commune and separates street and premises from administrative labels", async () => {
+    const { service } = setup({
+      suggestions: [
+        suggestion("person", "region", "CJ"),
+        suggestion("person", "city", "Luna de Sus"),
+        suggestion(
+          "person",
+          "addressLine1",
+          "Jud.CJ Com.Florești Sat.Luna de Sus Str.Principală Nr.10 Bl.A Ap.4",
+        ),
+      ],
+    });
+    const result = await service.analyze(input);
+    expect(result.suggestions).toEqual(
+      expect.arrayContaining([
+        suggestion("person", "region", "Cluj"),
+        suggestion("person", "city", "Florești"),
+        suggestion("person", "addressLine1", "Str. Principală, Nr. 10"),
+        suggestion("person", "addressLine2", "Sat. Luna de Sus, Bl. A, Ap. 4"),
+      ]),
+    );
+    expect(
+      result.suggestions.filter((item) => item.field === "city"),
+    ).toHaveLength(1);
+    expect(
+      result.suggestions
+        .filter((item) => item.field.startsWith("addressLine"))
+        .every((item) => !item.value.includes("Jud.")),
+    ).toBe(true);
+  });
+
+  it("matches separate unaccented locality suggestions within their county", async () => {
+    const { service } = setup({
+      suggestions: [
+        suggestion("person", "city", "RAMNICU VALCEA"),
+        suggestion("person", "region", "VL"),
+      ],
+    });
+    const result = await service.analyze(input);
+    expect(result.suggestions).toContainEqual(
+      suggestion("person", "city", "Râmnicu Vâlcea"),
+    );
+  });
+
+  it("leaves unknown localities for review instead of guessing from another county", async () => {
+    const { service } = setup({
+      suggestions: [
+        suggestion("person", "region", "CJ"),
+        suggestion("person", "city", "Râmnicu Vâlcea"),
+      ],
+    });
+    const result = await service.analyze(input);
+    expect(result.suggestions).toContainEqual({
+      ...suggestion("person", "city", "Râmnicu Vâlcea"),
+      needsReview: true,
+    });
   });
 
   it("keeps good fields while omitting invalid CNP, date, future issue date and unknown country", async () => {
