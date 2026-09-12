@@ -1,5 +1,6 @@
 "use client";
 
+import { v1 } from "@repo/api-shared";
 import { Button } from "@repo/ui/components";
 import { useTranslations } from "next-intl";
 import { useExtractionReview } from "./ExtractionReviewContext";
@@ -81,6 +82,14 @@ export function FieldExtractionHint({
               variant="text"
               className="h-auto justify-self-start px-0 py-1"
               aria-label={t("extraction.applyLabel", { value, source })}
+              disabled={
+                fieldKey === "person.city" &&
+                context.state.form.countryCode === "RO" &&
+                !v1.persons.matchRomanianLocality(
+                  context.state.form.region,
+                  value,
+                )
+              }
               onClick={() => context.onApplySuggestion(fieldKey, suggestion.id)}
             >
               {t("extraction.apply")}

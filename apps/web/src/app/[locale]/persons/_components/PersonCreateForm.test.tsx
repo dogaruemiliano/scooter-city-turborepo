@@ -145,7 +145,7 @@ describe("PersonCreateForm wizard", () => {
     expect(screen.getByLabelText("Phone")).toHaveValue("749096855");
     await browser.click(screen.getByRole("button", { name: "Continue" }));
     expect(screen.getByLabelText("County")).toBeVisible();
-    expect(screen.getByLabelText("City / locality")).toBeVisible();
+    expect(screen.getByLabelText("Locality")).toBeVisible();
     expect(screen.queryByLabelText("Email")).not.toBeInTheDocument();
     await browser.click(screen.getByRole("button", { name: "Continue" }));
     expect(
@@ -318,7 +318,7 @@ describe("PersonCreateForm wizard", () => {
     await browser.selectOptions(screen.getByLabelText("County"), "București");
     changeField("Address line 1", "1 Rental Street");
     changeField("Address line 2", "Apt 4");
-    changeField("City / locality", "Bucharest");
+    changeField("Locality", "București");
     changeField("Postal code", "010101");
     changeField("Notes", "Frequent rider");
     changeField("CNP", "1900228123450");
@@ -361,7 +361,7 @@ describe("PersonCreateForm wizard", () => {
           dateOfBirth: "1990-02-28",
           addressLine1: "1 Rental Street",
           addressLine2: "Apt 4",
-          city: "Bucharest",
+          city: "București",
           region: "București",
           postalCode: "010101",
           countryCode: "RO",
@@ -814,11 +814,9 @@ describe("document extraction review", () => {
     expect(screen.getByLabelText("CNP")).toHaveValue("1900228123450");
     showReviewStep("Address");
     expect(screen.getByLabelText("County")).toHaveValue("Vâlcea");
-    expect(screen.getByLabelText("City / locality")).toHaveValue(
-      "Râmnicu Vâlcea",
-    );
-    changeField("City / locality", "Drăgășani");
-    expect(screen.getByLabelText("City / locality")).toHaveValue("Drăgășani");
+    expect(screen.getByLabelText("Locality")).toHaveValue("Râmnicu Vâlcea");
+    changeField("Locality", "Drăgășani");
+    expect(screen.getByLabelText("Locality")).toHaveValue("Drăgășani");
     showReviewStep("Document details");
     await browser.click(
       screen.getByRole("button", { name: /^(Add|Edit) National ID$/ }),

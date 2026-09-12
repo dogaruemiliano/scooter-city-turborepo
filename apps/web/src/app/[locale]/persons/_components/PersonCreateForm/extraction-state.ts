@@ -123,6 +123,15 @@ export function applyExtractionSuggestion(
   );
   if (!suggestion) return state;
   let value = suggestion.value;
+  if (
+    key === "person.city" &&
+    state.form.countryCode === "RO" &&
+    typeof value === "string"
+  ) {
+    const matched = v1.persons.matchRomanianLocality(state.form.region, value);
+    if (!matched) return state;
+    value = matched;
+  }
   const previous = readExtractionFieldValue(state.form, key);
   if (Array.isArray(value) && Array.isArray(previous)) {
     const suggestedCategories = new Set(value.map((row) => row.category));
@@ -135,6 +144,15 @@ export function applyExtractionSuggestion(
     { ...state, form: writeField(state.form, key, value) },
     key,
   );
+  if (
+    (key === "person.countryCode" || key === "person.region") &&
+    !equalValues(previous, value)
+  ) {
+    next = markExtractionFieldEdited(
+      { ...next, form: { ...next.form, city: "" } },
+      "person.city",
+    );
+  }
   if (key === "person.countryCode" && !equalValues(previous, value)) {
     // Match the normal country picker: a region belonging to the old country
     // must not survive an explicit country change under a different control.
@@ -187,11 +205,31 @@ function reconcile(state: ExtractionState): ExtractionState {
     ...Object.keys(candidates),
   ] as ExtractionFieldKey[]);
   // Address country determines whether the county needs Romanian normalization.
-  const orderedKeys = [...keys].sort((left, right) =>
-    left === "person.countryCode" ? -1 : right === "person.countryCode" ? 1 : 0,
+  const addressOrder = (key: ExtractionFieldKey) =>
+    key === "person.countryCode" ? 0 : key === "person.region" ? 1 : 2;
+  const orderedKeys = [...keys].sort(
+    (left, right) => addressOrder(left) - addressOrder(right),
   );
   for (const key of orderedKeys) {
-    const suggestions = groupSuggestions(candidates[key] ?? []);
+    const suggestions = groupSuggestions(
+      (candidates[key] ?? []).map((candidate) => {
+        if (
+          key !== "person.city" ||
+          form.countryCode !== "RO" ||
+          typeof candidate.value !== "string"
+        )
+          return candidate;
+        const matched = v1.persons.matchRomanianLocality(
+          form.region,
+          candidate.value,
+        );
+        return {
+          ...candidate,
+          value: matched ?? candidate.value,
+          needsReview: candidate.needsReview || !matched,
+        };
+      }),
+    );
     const before = readExtractionFieldValue(form, key);
     const candidate = suggestions.length === 1 ? suggestions[0] : undefined;
     const expiryManuallyDisabled =
@@ -205,8 +243,15 @@ function reconcile(state: ExtractionState): ExtractionState {
       form.countryCode === "RO" &&
       candidate &&
       !ROMANIAN_COUNTIES.some((county) => county === candidate.value);
+    const unknownRomanianLocality =
+      key === "person.city" &&
+      form.countryCode === "RO" &&
+      candidate &&
+      (typeof candidate.value !== "string" ||
+        !v1.persons.matchRomanianLocality(form.region, candidate.value));
     if (
       candidate &&
+      !unknownRomanianLocality &&
       !touched[key] &&
       !expiryManuallyDisabled &&
       !unknownRomanianCounty &&

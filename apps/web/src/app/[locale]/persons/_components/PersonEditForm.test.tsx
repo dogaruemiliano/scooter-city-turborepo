@@ -155,7 +155,7 @@ describe("PersonEditForm", () => {
     renderEditForm();
 
     // Editing one field must not flag the others.
-    await browser.type(screen.getByLabelText("City / locality"), "Cluj");
+    await browser.type(screen.getByLabelText("Locality"), "Cluj");
     await browser.tab();
 
     expect(screen.getByLabelText("First name")).not.toHaveAttribute(

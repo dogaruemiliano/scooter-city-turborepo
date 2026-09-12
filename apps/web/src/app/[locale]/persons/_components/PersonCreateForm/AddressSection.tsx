@@ -1,5 +1,6 @@
 "use client";
 
+import { v1 } from "@repo/api-shared";
 import {
   CountrySheetSelect,
   Input,
@@ -38,6 +39,7 @@ export function AddressSection({
   const addressLine2Error = fieldErrors.addressLine2;
   const cityError = fieldErrors.city;
   const postalCodeError = fieldErrors.postalCode;
+  const localities = v1.persons.getRomanianLocalities(form.region);
 
   return (
     <FormSection title={t("sections.address")}>
@@ -83,6 +85,7 @@ export function AddressSection({
             value={form.region}
             onChange={(event) => {
               onSetFormValue("region", event.target.value);
+              onSetFormValue("city", "");
             }}
           >
             <option value="">{t("placeholders.county")}</option>
@@ -118,6 +121,55 @@ export function AddressSection({
           />
         </FormField>
       )}
+      <FormField
+        id={`${formId}-city`}
+        extractionKey="person.city"
+        label={t("fields.city")}
+        error={cityError}
+      >
+        {form.countryCode === "RO" ? (
+          <select
+            id={`${formId}-city`}
+            name="city"
+            autoComplete="address-level2"
+            aria-describedby={fieldErrorId(`${formId}-city`, cityError)}
+            aria-invalid={invalidAria(cityError)}
+            disabled={!localities.length}
+            className="h-12 w-full rounded-lg border border-input bg-background px-3 py-2 text-base transition-colors duration-fast ease-standard outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:bg-disabled disabled:text-disabled-foreground aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive md:h-11 md:text-sm"
+            value={form.city}
+            onChange={(event) => onSetFormValue("city", event.target.value)}
+          >
+            <option value="">
+              {t(
+                form.region
+                  ? "placeholders.locality"
+                  : "placeholders.localityCountyFirst",
+              )}
+            </option>
+            {form.city &&
+            !localities.some((locality) => locality.name === form.city) ? (
+              <option value={form.city} disabled>
+                {form.city}
+              </option>
+            ) : null}
+            {localities.map((locality) => (
+              <option key={locality.sirutaCode} value={locality.name}>
+                {locality.name}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <Input
+            id={`${formId}-city`}
+            aria-describedby={fieldErrorId(`${formId}-city`, cityError)}
+            aria-invalid={invalidAria(cityError)}
+            name="city"
+            autoComplete="address-level2"
+            value={form.city}
+            onChange={(event) => onSetFormValue("city", event.target.value)}
+          />
+        )}
+      </FormField>
       <FormField
         id={`${formId}-address-line-1`}
         extractionKey="person.addressLine1"
@@ -158,22 +210,6 @@ export function AddressSection({
           onChange={(event) =>
             onSetFormValue("addressLine2", event.target.value)
           }
-        />
-      </FormField>
-      <FormField
-        id={`${formId}-city`}
-        extractionKey="person.city"
-        label={t("fields.city")}
-        error={cityError}
-      >
-        <Input
-          id={`${formId}-city`}
-          aria-describedby={fieldErrorId(`${formId}-city`, cityError)}
-          aria-invalid={invalidAria(cityError)}
-          name="city"
-          autoComplete="address-level2"
-          value={form.city}
-          onChange={(event) => onSetFormValue("city", event.target.value)}
         />
       </FormField>
       <FormField

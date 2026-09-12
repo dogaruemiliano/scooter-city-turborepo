@@ -105,6 +105,26 @@ describe("person document extraction reconciliation", () => {
     );
   });
 
+  it("matches locality after the county and does not autofill unlisted villages", () => {
+    let state = read(initial(), [
+      person("city", "RAMNICU VALCEA"),
+      person("region", "VL"),
+      person("countryCode", "RO"),
+    ]);
+    expect(state.form.city).toBe("Râmnicu Vâlcea");
+    state = read(
+      state,
+      [person("city", "Unlisted village"), person("region", "VL")],
+      { signature: "new-photo" },
+    );
+    expect(state.form.city).toBe("");
+    const suggestion = state.fields["person.city"]!.suggestions[0]!;
+    expect(suggestion.needsReview).toBe(true);
+    expect(
+      applyExtractionSuggestion(state, "person.city", suggestion.id).form.city,
+    ).toBe("");
+  });
+
   it("preserves both manually typed values and intentional clears", () => {
     let state = initial();
     state.form.firstName = "Operator's value";

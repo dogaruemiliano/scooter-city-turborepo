@@ -629,15 +629,19 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
         markExtractionFieldEdited(
           {
             ...current,
-            form: { ...current.form, countryCode: value, region: "" },
+            form: { ...current.form, countryCode: value, region: "", city: "" },
           },
           "person.countryCode",
         ),
         "person.region",
       ),
     );
+    setExtractionState((current) =>
+      markExtractionFieldEdited(current, "person.city"),
+    );
     clearFieldError("countryCode");
     clearFieldError("region");
+    clearFieldError("city");
   }
 
   function changeCitizenship(citizenship: PersonCitizenship) {
