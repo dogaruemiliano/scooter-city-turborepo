@@ -11,7 +11,8 @@ import { useId, useState, type FormEvent } from "react";
 
 import { webApi } from "@/lib/api";
 import { AddressSection } from "./AddressSection";
-import { CitizenshipToggle } from "./CitizenshipToggle";
+import { CitizenshipChoice } from "./CitizenshipChoice";
+import { WizardProgress, type PersonWizardStep } from "./WizardProgress";
 import { ContactSection } from "./ContactSection";
 import { CreateFormFeedback } from "./CreateFormFeedback";
 import { DocumentsSection } from "./DocumentsSection";
@@ -31,6 +32,7 @@ import {
   switchDocumentWorkflow,
   updateDocumentDrafts,
   isUnder18Person,
+  documentPhotoSlots,
 } from "./form-state";
 import { createPersonInput } from "./input";
 import { NotesField } from "./NotesField";
@@ -54,6 +56,9 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
   const router = useRouter();
   const formId = useId();
   const [creating, setCreating] = useState(false);
+  const [step, setStep] = useState<PersonWizardStep>("citizenship");
+  const [chosenNationalIdFormat, setChosenNationalIdFormat] =
+    useState<NationalIdFormat | null>(null);
   const [form, setForm] = useState<CreatePersonFormState>(() =>
     createEmptyCreateForm("romanian"),
   );
@@ -64,6 +69,7 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
 
   async function createPerson(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (step !== "review" || creating) return;
     setFeedback(null);
     setFieldErrors({});
 
@@ -138,18 +144,21 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
 
     setCreating(true);
     try {
-      await webApi.fetch(v1.persons.ROUTES.create, v1.persons.personSchema, {
-        method: "POST",
-        json: input.data,
-      });
+      const person = await webApi.fetch(
+        v1.persons.ROUTES.create,
+        v1.persons.personSchema,
+        {
+          method: "POST",
+          json: input.data,
+        },
+      );
 
       setFeedback({
         kind: "success",
         title: t("feedback.createSuccessTitle"),
         messages: [t("feedback.createSuccessMessage")],
       });
-      setForm(createEmptyCreateForm("romanian"));
-      router.push(personsHref);
+      router.push(`${personsHref}/${encodeURIComponent(person.id)}`);
       router.refresh();
     } catch (error) {
       const personConflict = personCreateConflict(error);
@@ -314,57 +323,71 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
         noValidate
         onSubmit={(event) => void createPerson(event)}
       >
-        <CitizenshipToggle
-          citizenship={form.citizenship}
-          onChange={changeCitizenship}
-        />
-        {form.citizenship === "romanian" ? (
+        <WizardProgress step={step} />
+        {step === "citizenship" ? (
+          <CitizenshipChoice onChange={changeCitizenship} />
+        ) : null}
+        {step === "nationalId" ? (
           <NationalIdFormatSelect
-            value={form.nationalIdFormat}
+            value={chosenNationalIdFormat}
             disabled={creating}
             onChange={changeNationalIdFormat}
           />
         ) : null}
-        <DocumentPhotosSection
-          formId={formId}
-          form={form}
-          disabled={creating}
-          onSetDocumentPhoto={setDocumentPhoto}
-          fieldErrors={fieldErrors}
-        />
-        <ContactSection
-          formId={formId}
-          form={form}
-          fieldErrors={fieldErrors}
-          locale={locale}
-          showUnder18Warning={showUnder18Warning}
-          onSetFormValue={setFormValue}
-          onChangePhone={changePhone}
-        />
-        <AddressSection
-          formId={formId}
-          form={form}
-          fieldErrors={fieldErrors}
-          locale={locale}
-          onSetFormValue={setFormValue}
-          onChangeCountry={changeCountry}
-        />
-        <DocumentsSection
-          formId={formId}
-          form={form}
-          fieldErrors={fieldErrors}
-          locale={locale}
-          showUnder18Warning={showUnder18Warning}
-          disabled={creating}
-          onSetDocumentValue={setDocumentValue}
-          onSetDocument={setDocument}
-        />
-        <NotesField
-          formId={formId}
-          value={form.notes}
-          error={fieldErrors.notes}
-          onChange={(value) => setFormValue("notes", value)}
-        />
+        {step === "documents" ? (
+          <DocumentPhotosSection
+            formId={formId}
+            form={form}
+            disabled={creating}
+            onSetDocumentPhoto={setDocumentPhoto}
+            fieldErrors={fieldErrors}
+          />
+        ) : null}
+        {step === "review" ? (
+          <>
+            <div className="grid gap-2">
+              <h2 className="text-xl font-semibold">
+                {t("wizard.reviewTitle")}
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                {t("wizard.reviewHelp")}
+              </p>
+            </div>
+            <ContactSection
+              formId={formId}
+              form={form}
+              fieldErrors={fieldErrors}
+              locale={locale}
+              showUnder18Warning={showUnder18Warning}
+              onSetFormValue={setFormValue}
+              onChangePhone={changePhone}
+            />
+            <AddressSection
+              formId={formId}
+              form={form}
+              fieldErrors={fieldErrors}
+              locale={locale}
+              onSetFormValue={setFormValue}
+              onChangeCountry={changeCountry}
+            />
+            <DocumentsSection
+              formId={formId}
+              form={form}
+              fieldErrors={fieldErrors}
+              locale={locale}
+              showUnder18Warning={showUnder18Warning}
+              disabled={creating}
+              onSetDocumentValue={setDocumentValue}
+              onSetDocument={setDocument}
+            />
+            <NotesField
+              formId={formId}
+              value={form.notes}
+              error={fieldErrors.notes}
+              onChange={(value) => setFormValue("notes", value)}
+            />
+          </>
+        ) : null}
 
         {feedback ? <CreateFormFeedback feedback={feedback} /> : null}
 
@@ -372,10 +395,59 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
           creating={creating}
           uploadingPhotos={uploadingPhotos}
           personsHref={personsHref}
+          step={step}
+          onBack={goBack}
+          onNext={reviewDetails}
         />
       </form>
     </div>
   );
+
+  function goBack() {
+    setFeedback(null);
+    setStep(
+      step === "review"
+        ? "documents"
+        : step === "documents" && form.citizenship === "romanian"
+          ? "nationalId"
+          : "citizenship",
+    );
+  }
+
+  function reviewDetails() {
+    if (uploadingPhotos) return;
+    const nextErrors: FormErrors = {};
+    for (const document of form.documents) {
+      const failed = Object.values(document.photos).find(
+        (photo) => photo?.status === "failed",
+      );
+      if (failed?.status === "failed") {
+        nextErrors[documentFieldErrorKey(document.key, "photos")] =
+          failed.message;
+      } else if (
+        document.required &&
+        documentPhotoSlots(document).some(
+          (slot) => document.photos[slot]?.status !== "uploaded",
+        )
+      ) {
+        nextErrors[documentFieldErrorKey(document.key, "photos")] = t(
+          "feedback.validation.requiredDocumentPhotos",
+          { document: t(`documentTypes.${document.type}`) },
+        );
+      }
+    }
+    setFieldErrors(nextErrors);
+    if (Object.keys(nextErrors).length) {
+      setFeedback({
+        kind: "error",
+        title: t("wizard.documentsMissing"),
+        messages: Object.values(nextErrors) as string[],
+      });
+      return;
+    }
+    setFeedback(null);
+    setStep("review");
+  }
 
   function setFormValue<Key extends keyof CreatePersonFormState>(
     key: Key,
@@ -408,12 +480,15 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
 
   function changeCitizenship(citizenship: PersonCitizenship) {
     setForm((current) => switchDocumentWorkflow(current, citizenship));
+    setStep(citizenship === "romanian" ? "nationalId" : "documents");
     setFieldErrors({});
     setFeedback(null);
   }
 
   function changeNationalIdFormat(format: NationalIdFormat) {
     setForm((current) => switchDocumentWorkflow(current, "romanian", format));
+    setChosenNationalIdFormat(format);
+    setStep("documents");
     setFieldErrors({});
     setFeedback(null);
   }

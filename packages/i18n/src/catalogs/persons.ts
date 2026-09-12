@@ -176,6 +176,23 @@ export const personsCatalog = {
       romanian: "Romanian citizen",
       foreign: "Foreign citizen",
     },
+    wizard: {
+      progress: "Add person progress",
+      steps: {
+        citizenship: "Citizenship",
+        documents: "Documents",
+        review: "Review",
+      },
+      chooseCitizenship: "Who are you adding?",
+      citizenshipHelp: "Choose their citizenship to see the documents needed.",
+      idVersionHelp: "Choose the ID version, then add the document photos.",
+      reviewTitle: "Check the person's details",
+      reviewHelp:
+        "Complete the fields and check them against the documents before saving.",
+      documentsMissing: "Complete the document uploads",
+      back: "Back",
+      continueToReview: "Review details",
+    },
     nationalIdFormat: {
       label: "National ID version",
       classic: "Old national ID",
@@ -547,6 +564,24 @@ export const personsCatalog = {
       label: "Cetățenie",
       romanian: "Cetățean român",
       foreign: "Cetățean străin",
+    },
+    wizard: {
+      progress: "Pași pentru adăugarea persoanei",
+      steps: {
+        citizenship: "Cetățenie",
+        documents: "Documente",
+        review: "Verificare",
+      },
+      chooseCitizenship: "Pe cine adaugi?",
+      citizenshipHelp: "Alege cetățenia pentru a vedea documentele necesare.",
+      idVersionHelp:
+        "Alege versiunea cărții de identitate, apoi adaugă fotografiile documentelor.",
+      reviewTitle: "Verifică datele persoanei",
+      reviewHelp:
+        "Completează câmpurile și verifică datele din documente înainte de salvare.",
+      documentsMissing: "Completează încărcarea documentelor",
+      back: "Înapoi",
+      continueToReview: "Verifică datele",
     },
     nationalIdFormat: {
       label: "Versiunea cărții de identitate",

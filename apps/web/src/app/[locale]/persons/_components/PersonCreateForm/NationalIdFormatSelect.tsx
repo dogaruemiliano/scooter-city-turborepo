@@ -9,7 +9,7 @@ export function NationalIdFormatSelect({
   disabled,
   onChange,
 }: {
-  value: NationalIdFormat;
+  value: NationalIdFormat | null;
   disabled: boolean;
   onChange: (value: NationalIdFormat) => void;
 }) {
@@ -20,7 +20,7 @@ export function NationalIdFormatSelect({
         {t("nationalIdFormat.label")}
       </legend>
       <div className="grid grid-cols-2 gap-3">
-        {(["classic", "electronic"] as const).map((format) => (
+        {(["electronic", "classic"] as const).map((format) => (
           <Button
             key={format}
             type="button"
@@ -28,14 +28,14 @@ export function NationalIdFormatSelect({
             aria-pressed={value === format}
             disabled={disabled}
             onClick={() => onChange(format)}
-            className="h-auto whitespace-normal py-3"
+            className="h-auto min-h-32 whitespace-normal p-4 md:h-auto"
           >
             {t(`nationalIdFormat.${format}`)}
           </Button>
         ))}
       </div>
       <p className="text-sm text-muted-foreground">
-        {t(`nationalIdFormat.${value}Help`)}
+        {t("wizard.idVersionHelp")}
       </p>
     </fieldset>
   );

@@ -108,6 +108,7 @@ export function ContactSection({
           id={`${formId}-phone`}
           name="phone"
           defaultCountry={form.phoneCountry}
+          value={form.phone}
           locale={locale}
           placeholder={t("placeholders.phone")}
           required

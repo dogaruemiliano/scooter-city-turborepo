@@ -4,15 +4,22 @@ import { Button, buttonVariants } from "@repo/ui/components";
 import { UserPlusIcon } from "lucide-react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
+import type { PersonWizardStep } from "./WizardProgress";
 
 export function FormActions({
   creating,
   uploadingPhotos,
   personsHref,
+  step,
+  onBack,
+  onNext,
 }: {
   creating: boolean;
   uploadingPhotos: boolean;
   personsHref: string;
+  step: PersonWizardStep;
+  onBack: () => void;
+  onNext: () => void;
 }) {
   const t = useTranslations("persons");
 
@@ -38,18 +45,37 @@ export function FormActions({
           {t("actions.cancel")}
         </Link>
       )}
-      <Button
-        type="submit"
-        className="w-full sm:w-auto"
-        disabled={creating || uploadingPhotos}
-      >
-        <UserPlusIcon data-icon="inline-start" />
-        {creating
-          ? t("actions.creating")
-          : uploadingPhotos
+      {step !== "citizenship" ? (
+        <Button
+          type="button"
+          variant="outline"
+          disabled={creating}
+          onClick={onBack}
+        >
+          {t("wizard.back")}
+        </Button>
+      ) : null}
+      {step === "documents" ? (
+        <Button
+          type="button"
+          disabled={creating || uploadingPhotos}
+          onClick={onNext}
+        >
+          {uploadingPhotos
             ? t("actions.uploadingDocumentPhoto")
-            : t("actions.create")}
-      </Button>
+            : t("wizard.continueToReview")}
+        </Button>
+      ) : null}
+      {step === "review" ? (
+        <Button
+          type="submit"
+          className="w-full sm:w-auto"
+          disabled={creating || uploadingPhotos}
+        >
+          <UserPlusIcon data-icon="inline-start" />
+          {creating ? t("actions.creating") : t("actions.create")}
+        </Button>
+      ) : null}
     </div>
   );
 }
