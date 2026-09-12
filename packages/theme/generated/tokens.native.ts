@@ -290,6 +290,7 @@ export const tokens = {
     loupe: 2,
   },
   aspectRatio: {
+    documentLandscape: 1.586,
     receiptPortrait: 0.3333333333333333,
   },
   zIndex: {

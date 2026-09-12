@@ -38,7 +38,7 @@ export function ContactSection({
   const emailError = fieldErrors.email;
 
   return (
-    <FormSection title={t("sections.contact")}>
+    <FormSection aria-label={t("sections.contact")}>
       <FormField
         id={`${formId}-email`}
         label={t("fields.email")}

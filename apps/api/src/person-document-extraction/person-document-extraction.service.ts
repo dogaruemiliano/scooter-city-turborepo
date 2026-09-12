@@ -206,7 +206,7 @@ export class PersonDocumentExtractionService {
       if (
         input.documentType !== "driverLicense" ||
         !normalized.success ||
-        (!normalized.data.issuedOn && !normalized.data.expiresOn) ||
+        !normalized.data.issuedOn ||
         (normalized.data.issuedOn &&
           v1.common.isFutureDateOnly(normalized.data.issuedOn))
       ) {
@@ -318,14 +318,12 @@ function validateSources(input: AnalyzePersonDocumentInput): void {
       (source) =>
         !["image/jpeg", "image/png", "image/webp", "application/pdf"].includes(
           source.contentType,
-        ) ||
-        (source.contentType === "application/pdf" &&
-          input.documentType !== "proofOfAddress"),
+        ),
     )
   ) {
     throw new DocumentExtractionError(
       "DOCUMENT_EXTRACTION_UNSUPPORTED_DOCUMENT",
-      "Use a JPEG, PNG or WebP image, or a PDF for proof of address.",
+      "Use a JPEG, PNG or WebP image, or a PDF document.",
       false,
     );
   }

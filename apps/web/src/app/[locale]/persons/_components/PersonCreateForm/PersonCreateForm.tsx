@@ -10,6 +10,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { useId, useState, useRef, useEffect, type FormEvent } from "react";
 
 import { webApi } from "@/lib/api";
+import { PageHeaderNavigation } from "@/components/PageHeaderNavigation";
 import {
   createExtractionState,
   markExtractionFieldEdited,
@@ -26,7 +27,7 @@ import {
   WizardProgress,
   REVIEW_STEPS,
   isReviewStep,
-  type PersonReviewStep,
+  type PersonProgressStep,
   type PersonWizardStep,
 } from "./WizardProgress";
 import { PersonalSection } from "./PersonalSection";
@@ -50,11 +51,13 @@ import {
   switchDocumentWorkflow,
   updateDocumentDrafts,
   isUnder18Person,
+  isBlankDocumentDraft,
   documentPhotoSlots,
 } from "./form-state";
 import { createPersonInput } from "./input";
 import { NotesField } from "./NotesField";
 import { NationalIdFormatSelect } from "./NationalIdFormatSelect";
+import { useWizardNavigation } from "./useWizardNavigation";
 import type {
   CreatePersonDocumentFormState,
   CreatePersonFormState,
@@ -74,7 +77,11 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
   const router = useRouter();
   const formId = useId();
   const [creating, setCreating] = useState(false);
-  const [step, setStep] = useState<PersonWizardStep>("citizenship");
+  const navigation = useWizardNavigation();
+  const { step, navigate: setStep, canGoBack, forwardStep } = navigation;
+  const forwardStepLabel = forwardStep
+    ? t(`wizard.steps.${forwardStep}`)
+    : undefined;
   const [chosenNationalIdFormat, setChosenNationalIdFormat] =
     useState<NationalIdFormat | null>(null);
   const [extractionState, setExtractionState] = useState(() =>
@@ -94,9 +101,9 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const showUnder18Warning = isUnder18Person(form);
   const uploadingPhotos = hasDocumentPhotoStatus(form, "uploading");
-  const stepHeading = useRef<HTMLHeadingElement>(null);
+  const stepSummary = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
-    stepHeading.current?.focus();
+    stepSummary.current?.focus();
   }, [step]);
 
   async function createPerson(event: FormEvent<HTMLFormElement>) {
@@ -370,30 +377,53 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
       }}
     >
       <div className="mx-auto flex w-full max-w-screen-lg flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
+        <PageHeaderNavigation
+          onBack={canGoBack ? goBack : undefined}
+          backDisabled={creating}
+          forwardAction={
+            forwardStepLabel
+              ? {
+                  onClick: goForward,
+                  label: t("wizard.forwardTo", { step: forwardStepLabel }),
+                  disabled: creating,
+                }
+              : undefined
+          }
+        />
         <form
-          className="grid gap-6"
+          className="flex flex-1 flex-col gap-6"
           noValidate
           onSubmit={(event) => void createPerson(event)}
         >
           <WizardProgress
             step={step}
+            summaryRef={stepSummary}
             disabled={creating}
-            onSelect={selectReviewStep}
+            onSelect={selectProgressStep}
           />
           {step === "citizenship" ? (
             <CitizenshipChoice onChange={changeCitizenship} />
           ) : null}
-          {step === "nationalId" ? (
+          {step === "documents" && form.citizenship === "romanian" ? (
             <NationalIdFormatSelect
               value={chosenNationalIdFormat}
               disabled={creating}
               onChange={changeNationalIdFormat}
             />
           ) : null}
-          {step === "documents" ? (
+          {(step === "documents" &&
+            (form.citizenship === "foreign" || chosenNationalIdFormat)) ||
+          step === "license" ? (
             <DocumentPhotosSection
               formId={formId}
-              form={form}
+              form={{
+                ...form,
+                documents: form.documents.filter((document) =>
+                  step === "license"
+                    ? document.type === "driverLicense"
+                    : document.type !== "driverLicense",
+                ),
+              }}
               disabled={creating}
               onSetDocumentPhoto={setDocumentPhoto}
               fieldErrors={fieldErrors}
@@ -401,27 +431,30 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
           ) : null}
           {step === "documents" || isReviewStep(step) ? (
             <DocumentExtractionFeedback
-              form={form}
+              form={{
+                ...form,
+                documents: form.documents.filter((document) =>
+                  step === "documents"
+                    ? document.type !== "driverLicense"
+                    : step === "license"
+                      ? document.type === "driverLicense"
+                      : true,
+                ),
+              }}
               jobs={extraction.jobs}
-              pending={extraction.pending}
+              pending={form.documents.some(
+                (document) =>
+                  extraction.pendingDocumentKeys.has(document.key) &&
+                  (step === "documents"
+                    ? document.type !== "driverLicense"
+                    : step === "license"
+                      ? document.type === "driverLicense"
+                      : true),
+              )}
               disabled={creating}
               onRetry={extraction.retry}
               onManual={extraction.continueManually}
             />
-          ) : null}
-          {isReviewStep(step) ? (
-            <div className="grid gap-2">
-              <h2
-                ref={stepHeading}
-                tabIndex={-1}
-                className="text-xl font-semibold outline-none"
-              >
-                {t(`wizard.steps.${step}`)}
-              </h2>
-              <p className="text-sm text-muted-foreground">
-                {t("wizard.reviewHelp")}
-              </p>
-            </div>
           ) : null}
           {step === "personal" ? (
             <PersonalSection
@@ -431,6 +464,24 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
               locale={locale}
               showUnder18Warning={showUnder18Warning}
               onSetFormValue={setFormValue}
+            />
+          ) : null}
+          {step === "personal" || step === "license" ? (
+            <DocumentsSection
+              formId={formId}
+              form={{
+                ...form,
+                documents: form.documents.filter((document) =>
+                  step === "license"
+                    ? document.type === "driverLicense"
+                    : document.type !== "driverLicense",
+                ),
+              }}
+              fieldErrors={fieldErrors}
+              locale={locale}
+              showUnder18Warning={showUnder18Warning}
+              disabled={creating}
+              onSetDocument={setDocument}
             />
           ) : null}
           {step === "contact" ? (
@@ -481,7 +532,10 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
             extracting={extraction.pending}
             personsHref={personsHref}
             step={step}
+            canGoBack={canGoBack}
+            forwardStepLabel={forwardStepLabel}
             onBack={goBack}
+            onForward={goForward}
             onNext={nextStep}
           />
         </form>
@@ -489,31 +543,35 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
     </ExtractionReviewContext.Provider>
   );
 
-  function selectReviewStep(next: PersonReviewStep) {
+  function selectProgressStep(next: PersonProgressStep) {
+    if (creating) return;
+    if (step === "personal" && next === "license") {
+      nextStep();
+      return;
+    }
     setFeedback(null);
-    setStep(next);
+    navigation.select(next);
   }
 
   function goBack() {
+    if (creating) return;
     setFeedback(null);
-    const index = isReviewStep(step) ? REVIEW_STEPS.indexOf(step) : -1;
-    setStep(
-      index > 0
-        ? REVIEW_STEPS[index - 1]!
-        : step === "personal"
-          ? "documents"
-          : step === "documents" && form.citizenship === "romanian"
-            ? "nationalId"
-            : "citizenship",
-    );
+    navigation.back();
+  }
+
+  function goForward() {
+    if (creating) return;
+    setFeedback(null);
+    navigation.forward();
   }
 
   function nextStep() {
-    if (step === "documents") {
+    if (step === "documents" || step === "license") {
       reviewDetails();
       return;
     }
     if (!isReviewStep(step) || step === "review" || creating) return;
+    if (step === "personal" && extraction.pending) return;
     // Validate only the visible group; later steps are validated on their turn.
     const fields =
       step === "personal"
@@ -542,6 +600,8 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
     // A partial birth date must not prevent validation of contact/address.
     const values = candidate.input ?? { ...form };
     for (const field of fields) {
+      if (field === "cnp" && form.citizenship === "foreign" && !form.cnp.trim())
+        continue;
       if (field === "dateOfBirth" && candidate.error) continue;
       const result = v1.persons.createPersonInputSchema.shape[field].safeParse(
         values[field],
@@ -562,13 +622,24 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
       });
       return;
     }
-    selectReviewStep(REVIEW_STEPS[REVIEW_STEPS.indexOf(step) + 1]!);
+    setFeedback(null);
+    setStep(REVIEW_STEPS[REVIEW_STEPS.indexOf(step) + 1]!);
   }
 
   function reviewDetails() {
     if (uploadingPhotos) return;
     const nextErrors: FormErrors = {};
-    for (const document of form.documents) {
+    if (
+      step === "documents" &&
+      form.citizenship === "romanian" &&
+      !chosenNationalIdFormat
+    )
+      return;
+    for (const document of form.documents.filter((document) =>
+      step === "license"
+        ? document.type === "driverLicense"
+        : document.type !== "driverLicense",
+    )) {
       const failed = Object.values(document.photos).find(
         (photo) => photo?.status === "failed",
       );
@@ -576,7 +647,9 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
         nextErrors[documentFieldErrorKey(document.key, "photos")] =
           failed.message;
       } else if (
-        document.required &&
+        (document.required ||
+          (document.type === "driverLicense" &&
+            !isBlankDocumentDraft(document))) &&
         documentPhotoSlots(document).some(
           (slot) => document.photos[slot]?.status !== "uploaded",
         )
@@ -597,7 +670,7 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
       return;
     }
     setFeedback(null);
-    setStep("personal");
+    setStep(step === "license" ? "contact" : "personal");
   }
 
   function setFormValue<Key extends keyof CreatePersonFormState>(
@@ -647,7 +720,7 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
 
   function changeCitizenship(citizenship: PersonCitizenship) {
     changeWorkflow(citizenship, form.nationalIdFormat);
-    setStep(citizenship === "romanian" ? "nationalId" : "documents");
+    setStep("documents");
     setFieldErrors({});
     setFeedback(null);
   }
@@ -655,7 +728,6 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
   function changeNationalIdFormat(format: NationalIdFormat) {
     changeWorkflow("romanian", format);
     setChosenNationalIdFormat(format);
-    setStep("documents");
     setFieldErrors({});
     setFeedback(null);
   }
@@ -711,6 +783,7 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
     documentKey: string,
     slot: v1.persons.PersonDocumentPhotoSlot,
     file: File | null,
+    originalFile?: File,
   ) {
     clearFieldError(documentFieldErrorKey(documentKey, "photos"));
     extraction.cancelDocument(documentKey);
@@ -731,6 +804,7 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
                     id: uploadId,
                     status: "uploading",
                     file,
+                    originalFile,
                   },
                 },
               }
@@ -738,7 +812,13 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
         ),
       }));
       setFeedback(null);
-      void uploadDocumentPhotoDraft(documentKey, slot, file, uploadId);
+      void uploadDocumentPhotoDraft(
+        documentKey,
+        slot,
+        file,
+        uploadId,
+        originalFile,
+      );
       return;
     }
 
@@ -764,6 +844,7 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
     slot: v1.persons.PersonDocumentPhotoSlot,
     file: File,
     uploadId: string,
+    originalFile?: File,
   ): Promise<void> {
     let stage: DocumentPhotoUploadStage = "checksum";
     let storageResponse: StorageUploadResponseDiagnostics | null = null;
@@ -788,9 +869,9 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
         {
           method: "POST",
           json: {
-            ...(file.type === "application/pdf"
-              ? { documentType: "proofOfAddress" }
-              : {}),
+            documentType: form.documents.find(
+              (document) => document.key === documentKey,
+            )?.type,
             contentType: file.type,
             byteSize: file.size,
             checksumSha256,
@@ -830,6 +911,7 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
         id: uploadId,
         status: "uploaded",
         file,
+        originalFile,
         uploadToken: upload.uploadToken,
       });
     } catch (error) {
@@ -860,6 +942,7 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
         id: uploadId,
         status: "failed",
         file,
+        originalFile,
         message,
       });
       setFeedback({
@@ -1013,7 +1096,10 @@ function storageUploadResponseDiagnostics(
   };
 }
 
-function stepForField(field: FormErrorKey): PersonReviewStep {
+function stepForField(field: FormErrorKey): PersonWizardStep {
+  if (field.startsWith("document.driver-license.")) return "license";
+  if (field.startsWith("document.") && field.endsWith(".photos"))
+    return "documents";
   if (["firstName", "lastName", "cnp", "dateOfBirth"].includes(field))
     return "personal";
   if (["email", "phone"].includes(field)) return "contact";

@@ -35,6 +35,14 @@ export function documentExtractionSignature(
     )
   )
     return null;
+  if (
+    document.type === "driverLicense" &&
+    ["front", "back"].some(
+      (slot) =>
+        document.photos[slot as "front" | "back"]?.status !== "uploaded",
+    )
+  )
+    return null;
   const uploaded = photos.filter(({ photo }) => photo?.status === "uploaded");
   if (!uploaded.length) return null;
   return JSON.stringify([

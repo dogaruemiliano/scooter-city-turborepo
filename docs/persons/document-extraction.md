@@ -8,13 +8,23 @@ eligibility. The operator remains responsible for checking each document.
 ## Add-person screens
 
 1. Choose **Romanian citizen** or **Foreign citizen**.
-2. Romanian citizens choose old national ID or electronic ID (CEI), then upload
-   the required documents. Old IDs require one photo; CEI requires both sides
-   and separate proof of address. Foreign citizens go directly to passport
-   upload, with optional visa and residence permit. A driving licence is optional
-   in every path.
-3. Review and edit the extracted personal and document details, then save. Email
-   and phone still need manual entry. Saving opens the new person's detail page.
+2. **Identification documents** keeps the old/electronic ID selector and uploads
+   on one screen. Old IDs require the front; CEI requires both sides and separate
+   proof of address. Foreign citizens upload a passport, with optional visa and
+   residence permit. Every slot accepts JPEG, PNG, WebP or PDF (up to 10 MiB).
+3. Review and edit the extracted personal and identification document details.
+4. Optionally add a **driving license**. A supplied license requires front and back;
+   automatic extraction waits for both sides. Review the license and category dates.
+5. Enter contact details.
+6. Check the address.
+7. Review document details and save. Saving opens the new person's detail page.
+
+Upload cards span the mobile width and preserve the document aspect ratio in
+previews. Opening a file shows a full-screen preview, with crop and delete actions
+for images. Cropping preserves the original in the current draft for later
+re-cropping. Mobile offers camera, gallery and files; desktop offers files and
+both support drag-and-drop. Camera access starts only on Take photo and stops on
+capture, close or unmount. PDF previews offer an Open file fallback and no crop.
 
 Going back preserves uploads and manual edits. Extraction runs against uploaded
 drafts before the person is created. Every suggested value remains editable;
@@ -64,7 +74,7 @@ storage objects before invoking this service.
 
 The OpenAI driver sends the document bytes to the fixed Responses API endpoint.
 JPEG, PNG and WebP use inline base64 `input_image` content with high detail.
-Proof-of-address PDFs use inline `input_file` content; there is no persistent Files
+PDFs for all document types use inline `input_file` content; there is no persistent Files
 API upload. The request sets `store: false`, uses strict JSON output, limits output
 to 4,000 tokens, and has a timeout capped at 45 seconds without automatic retries.
 Provider response bodies are limited to 128 KiB before JSON parsing. Source files
@@ -99,8 +109,9 @@ passport number. Electronic ID addresses are not invented; the separate proof of
 address supplies the address. The prompt treats any instructions printed inside
 documents as data rather than commands.
 
-Licence extraction suggests only supported categories with visible date evidence,
-not the full printed template of category icons. Invalid or contradictory rows
+Licence extraction includes a category only when its acquisition date is legible.
+An expiry date alone, empty row or category icon does not grant a category. It
+extracts category expiry dates separately from the document expiry date. Invalid or contradictory rows
 are omitted. Every suggested category is marked for review; no category equivalence
 or rental permission is inferred. Extraction does not set `status: verified`.
 

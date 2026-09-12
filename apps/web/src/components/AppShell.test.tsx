@@ -8,11 +8,12 @@ import {
 import { messages, type SupportedLocale } from "@repo/i18n";
 import { TooltipProvider } from "@repo/ui/components/tooltip";
 import { NextIntlClientProvider } from "next-intl";
-import type { AnchorHTMLAttributes, ReactNode } from "react";
+import { useState, type AnchorHTMLAttributes, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AppShell } from "./AppShell";
 import { PageHeaderActions } from "./PageHeaderActions";
+import { PageHeaderNavigation } from "./PageHeaderNavigation";
 import { PageTitleOverride } from "./PageTitleOverride";
 import { SessionProvider } from "./auth/SessionProvider";
 import type { SessionIdentity } from "../lib/auth-types";
@@ -323,6 +324,191 @@ describe("AppShell", () => {
     ).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Înapoi" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("uses the latest page callbacks for mobile header navigation", async () => {
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: 390,
+    });
+    mocks.pathname = "/persons/new";
+    const onBack = vi.fn();
+    const onForward = vi.fn();
+
+    function Page() {
+      const [value, setValue] = useState("initial");
+      return (
+        <>
+          <PageHeaderNavigation
+            onBack={() => onBack(value)}
+            forwardAction={{
+              onClick: () => onForward(value),
+              label: "Return to review",
+            }}
+          />
+          <button type="button" onClick={() => setValue("updated")}>
+            Update form
+          </button>
+        </>
+      );
+    }
+
+    renderAppShell(undefined, <Page />);
+
+    const header = within(screen.getByRole("banner"));
+    await header.findByRole("button", { name: "Return to review" });
+    fireEvent.click(screen.getByRole("button", { name: "Update form" }));
+    fireEvent.click(header.getByRole("button", { name: "Înapoi" }));
+    fireEvent.click(header.getByRole("button", { name: "Return to review" }));
+
+    expect(onBack).toHaveBeenCalledWith("updated");
+    expect(onForward).toHaveBeenCalledWith("updated");
+    expect(mocks.back).not.toHaveBeenCalled();
+    expect(header.getByRole("button", { name: "Return to review" })).toBe(
+      screen.getByRole("banner").lastElementChild?.firstElementChild,
+    );
+  });
+
+  it("only shows the mobile forward action while the page provides one", async () => {
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: 390,
+    });
+    mocks.pathname = "/persons/new";
+
+    function Page() {
+      const [isRevisiting, setIsRevisiting] = useState(false);
+      return (
+        <PageHeaderNavigation
+          onBack={() => setIsRevisiting(true)}
+          forwardAction={
+            isRevisiting
+              ? {
+                  onClick: () => setIsRevisiting(false),
+                  label: "Return to review",
+                }
+              : undefined
+          }
+        />
+      );
+    }
+
+    renderAppShell(undefined, <Page />);
+    const header = within(screen.getByRole("banner"));
+    const back = await header.findByRole("button", { name: "Înapoi" });
+    expect(
+      header.queryByRole("button", { name: "Return to review" }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(back);
+    fireEvent.click(
+      await header.findByRole("button", { name: "Return to review" }),
+    );
+
+    expect(
+      header.queryByRole("button", { name: "Return to review" }),
+    ).not.toBeInTheDocument();
+    expect(mocks.back).not.toHaveBeenCalled();
+  });
+
+  it.each([true, false])(
+    "disables mobile page navigation while busy (custom back: %s)",
+    async (customBack) => {
+      Object.defineProperty(window, "innerWidth", {
+        configurable: true,
+        value: 390,
+      });
+      mocks.pathname = "/persons/new";
+      const onBack = vi.fn();
+      const onForward = vi.fn();
+
+      renderAppShell(
+        undefined,
+        <PageHeaderNavigation
+          onBack={customBack ? onBack : undefined}
+          backDisabled
+          forwardAction={{
+            onClick: onForward,
+            label: "Return to review",
+            disabled: true,
+          }}
+        />,
+      );
+
+      const header = within(screen.getByRole("banner"));
+      const back = await header.findByRole("button", { name: "Înapoi" });
+      const forward = header.getByRole("button", { name: "Return to review" });
+      expect(back).toBeDisabled();
+      expect(forward).toBeDisabled();
+      fireEvent.click(back);
+      fireEvent.click(forward);
+
+      expect(onBack).not.toHaveBeenCalled();
+      expect(onForward).not.toHaveBeenCalled();
+      expect(mocks.back).not.toHaveBeenCalled();
+    },
+  );
+
+  it("restores route navigation when page controls unmount", async () => {
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: 390,
+    });
+    mocks.pathname = "/persons/new";
+    const onBack = vi.fn();
+
+    function Page() {
+      const [mounted, setMounted] = useState(true);
+      return (
+        <>
+          {mounted ? (
+            <PageHeaderNavigation
+              onBack={onBack}
+              forwardAction={{ onClick: vi.fn(), label: "Return to review" }}
+            />
+          ) : null}
+          <button type="button" onClick={() => setMounted(false)}>
+            Close form
+          </button>
+        </>
+      );
+    }
+
+    renderAppShell(undefined, <Page />);
+    const header = within(screen.getByRole("banner"));
+    await header.findByRole("button", { name: "Return to review" });
+    fireEvent.click(screen.getByRole("button", { name: "Close form" }));
+    fireEvent.click(header.getByRole("button", { name: "Înapoi" }));
+
+    expect(
+      header.queryByRole("button", { name: "Return to review" }),
+    ).not.toBeInTheDocument();
+    expect(onBack).not.toHaveBeenCalled();
+    expect(mocks.back).toHaveBeenCalledOnce();
+  });
+
+  it("keeps page navigation arrows out of the desktop header and content", () => {
+    mocks.pathname = "/persons/new";
+
+    renderAppShell(
+      undefined,
+      <PageHeaderNavigation
+        onBack={vi.fn()}
+        forwardAction={{ onClick: vi.fn(), label: "Return to review" }}
+      />,
+    );
+
+    expect(
+      within(screen.getByRole("banner")).getByRole("button", {
+        name: "Collapse sidebar",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Înapoi" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Return to review" }),
     ).not.toBeInTheDocument();
   });
 

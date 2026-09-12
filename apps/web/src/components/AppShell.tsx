@@ -9,6 +9,7 @@ import { createPortal } from "react-dom";
 import {
   ArrowLeftRightIcon,
   ArrowLeftIcon,
+  ArrowRightIcon,
   BikeIcon,
   Building2Icon,
   ChartPieIcon,
@@ -68,6 +69,10 @@ import {
   type PageHeaderActionsContextValue,
 } from "./PageHeaderActions";
 import { PageTitleOverrideContext } from "./PageTitleOverride";
+import {
+  PageHeaderNavigationContext,
+  type PageHeaderNavigationOptions,
+} from "./PageHeaderNavigation";
 import {
   applyThemePreference,
   isThemePreference,
@@ -248,32 +253,75 @@ function AppShellContent({
     () => ({ isMobile, target: pageHeaderActionsTarget }),
     [isMobile, pageHeaderActionsTarget],
   );
+  const [headerNavigation, setHeaderNavigation] = useState<
+    (PageHeaderNavigationOptions & { pathname: string }) | null
+  >(null);
+  const registerHeaderNavigation = useCallback(
+    (options: PageHeaderNavigationOptions) => {
+      const registration = { ...options, pathname };
+      setHeaderNavigation(registration);
+
+      return () => {
+        setHeaderNavigation((current) =>
+          current === registration ? null : current,
+        );
+      };
+    },
+    [pathname],
+  );
+  const navigation =
+    headerNavigation?.pathname === pathname ? headerNavigation : undefined;
+  const forwardAction = isMobile ? navigation?.forwardAction : undefined;
 
   return (
-    <PageHeaderActionsContext.Provider value={pageHeaderActionsContext}>
-      <AppSidebar
-        locale={locale}
-        pathname={pathname}
-        initialThemePreference={initialThemePreference}
-      />
-      <SidebarInset className="min-w-0">
-        <header className="sticky top-0 z-sticky flex h-16 shrink-0 items-center gap-3 border-b border-border bg-card px-4 md:px-8">
-          <HeaderNavigationButton pathname={pathname} />
-          <span className="min-w-0 flex-1 truncate text-sm font-semibold">
-            {pageTitle}
-          </span>
-          <div
-            ref={setPageHeaderActionsTarget}
-            className="ml-auto flex shrink-0 md:hidden"
-          />
-        </header>
-        <div className="flex min-w-0 flex-1 flex-col">{children}</div>
-      </SidebarInset>
-    </PageHeaderActionsContext.Provider>
+    <PageHeaderNavigationContext.Provider value={registerHeaderNavigation}>
+      <PageHeaderActionsContext.Provider value={pageHeaderActionsContext}>
+        <AppSidebar
+          locale={locale}
+          pathname={pathname}
+          initialThemePreference={initialThemePreference}
+        />
+        <SidebarInset className="min-w-0">
+          <header className="sticky top-0 z-sticky flex h-16 shrink-0 items-center gap-3 border-b border-border bg-card px-4 md:px-8">
+            <HeaderNavigationButton
+              pathname={pathname}
+              navigation={navigation}
+            />
+            <span className="min-w-0 flex-1 truncate text-sm font-semibold">
+              {pageTitle}
+            </span>
+            <div
+              ref={setPageHeaderActionsTarget}
+              className="ml-auto flex shrink-0 gap-2 md:hidden"
+            >
+              {forwardAction ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={forwardAction.label}
+                  disabled={forwardAction.disabled}
+                  onClick={forwardAction.onClick}
+                >
+                  <ArrowRightIcon aria-hidden="true" />
+                </Button>
+              ) : null}
+            </div>
+          </header>
+          <div className="flex min-w-0 flex-1 flex-col">{children}</div>
+        </SidebarInset>
+      </PageHeaderActionsContext.Provider>
+    </PageHeaderNavigationContext.Provider>
   );
 }
 
-function HeaderNavigationButton({ pathname }: { pathname: string }) {
+function HeaderNavigationButton({
+  pathname,
+  navigation,
+}: {
+  pathname: string;
+  navigation?: PageHeaderNavigationOptions;
+}) {
   const t = useTranslations("appShell.actions");
   const router = useRouter();
   const { isMobile } = useSidebar();
@@ -288,7 +336,8 @@ function HeaderNavigationButton({ pathname }: { pathname: string }) {
       variant="ghost"
       size="icon-sm"
       aria-label={t("back")}
-      onClick={() => router.back()}
+      disabled={navigation?.backDisabled}
+      onClick={navigation?.onBack ?? (() => router.back())}
     >
       <ArrowLeftIcon aria-hidden="true" />
     </Button>

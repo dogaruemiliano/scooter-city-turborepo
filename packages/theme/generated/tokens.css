@@ -390,6 +390,7 @@
   --spacing-1-5: 0.375rem;
   --spacing-2-5: 0.625rem;
 
+  --aspect-document-landscape: 1.586;
   --aspect-receipt-portrait: 0.3333333333333333;
 
   --text-xs: 0.75rem;

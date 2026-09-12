@@ -50,14 +50,6 @@ export class PersonDocumentAnalysisService {
         throw new BadRequestException(
           "The same upload cannot be used in multiple slots",
         );
-      if (
-        storedDocument.contentType === "application/pdf" &&
-        input.documentType !== "proofOfAddress"
-      ) {
-        throw new BadRequestException(
-          "PDF uploads are only supported for proof of address",
-        );
-      }
       totalBytes += storedDocument.byteSize;
       if (
         storedDocument.byteSize >

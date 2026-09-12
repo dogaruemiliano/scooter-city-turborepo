@@ -213,15 +213,6 @@ export const createPersonDocumentPhotoDraftUploadUrlInputSchema = z
     checksumSha256: z.string().regex(SHA_256_HEX_PATTERN),
   })
   .strict()
-  .refine(
-    (input) =>
-      input.contentType !== "application/pdf" ||
-      input.documentType === "proofOfAddress",
-    {
-      message: "PDF uploads are only supported for proof of address.",
-      path: ["contentType"],
-    },
-  )
   .meta({ id: "CreatePersonDocumentPhotoDraftUploadUrlInput" });
 
 export type CreatePersonDocumentPhotoDraftUploadUrlInput = z.infer<
@@ -553,6 +544,10 @@ function validateDocumentWorkflow(
   };
 
   requirePhoto(foreign ? "passport" : "nationalId", "front");
+  if (documents.some((document) => document.type === "driverLicense")) {
+    requirePhoto("driverLicense", "front");
+    requirePhoto("driverLicense", "back");
+  }
   if (electronic) {
     requirePhoto("nationalId", "back");
     requirePhoto("proofOfAddress", "front");

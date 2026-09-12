@@ -1,5 +1,12 @@
 import { messages } from "@repo/i18n";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -86,161 +93,255 @@ afterEach(() => {
 });
 
 describe("DocumentPhotoDraftCard", () => {
-  it("requests the camera lazily and commits a captured JPEG only after confirmation", async () => {
-    const onSetDocumentPhoto = vi.fn<SetPersonDocumentPhoto>();
+  it("opens existing images at full size without requesting the camera and allows deletion", async () => {
+    const onSet = vi.fn<SetPersonDocumentPhoto>();
     const browser = userEvent.setup();
-
-    renderCard(onSetDocumentPhoto);
-
-    expect(getUserMedia).not.toHaveBeenCalled();
-    await browser.click(
-      screen.getByRole("button", { name: "Add Front photo" }),
-    );
-
-    const sheet = await screen.findByRole("dialog", { name: "Front photo" });
-    await waitFor(() => {
-      expect(getUserMedia).toHaveBeenCalledOnce();
-      expect(getUserMedia).toHaveBeenCalledWith({
-        audio: false,
-        video: { facingMode: { ideal: "environment" } },
-      });
-    });
-    expect(within(sheet).getByLabelText("Front camera preview")).toHaveProperty(
-      "srcObject",
-      stream,
-    );
-
-    expect(
-      within(sheet).getByLabelText("Choose from gallery", {
-        selector: "input",
-      }),
-    ).toHaveAttribute("accept", "image/*");
-    expect(
-      within(sheet).getByLabelText("Choose from files", {
-        selector: "input",
-      }),
-    ).toHaveAttribute("accept", "image/jpeg,image/png,image/webp");
-
-    const takePhoto = within(sheet).getByRole("button", {
-      name: "Take photo",
-    });
-    await waitFor(() => expect(takePhoto).toBeEnabled());
-    await browser.click(takePhoto);
-
-    const usePhoto = await within(sheet).findByRole("button", {
-      name: "Use photo",
-    });
-    expect(drawImage).toHaveBeenCalledOnce();
-    expect(onSetDocumentPhoto).not.toHaveBeenCalled();
-    expect(
-      within(sheet).getByRole("img", { name: "Front document photo" }),
-    ).toHaveAttribute("src", "blob:document-photo");
-
-    await browser.click(usePhoto);
-
-    expect(onSetDocumentPhoto).toHaveBeenCalledOnce();
-    const [documentKey, slot, file] = onSetDocumentPhoto.mock.calls[0]!;
-    expect(documentKey).toBe("identity-document");
-    expect(slot).toBe("front");
-    expect(file).toBeInstanceOf(File);
-    expect(file).toMatchObject({ type: "image/jpeg" });
-    expect((file as File).name).toMatch(/^document-front-\d+\.jpg$/);
-    await waitForSheetToClose();
-  });
-
-  it("stops a live camera and does not commit when cancelled", async () => {
-    const onSetDocumentPhoto = vi.fn<SetPersonDocumentPhoto>();
-    const browser = userEvent.setup();
-
-    renderCard(onSetDocumentPhoto);
-    await browser.click(
-      screen.getByRole("button", { name: "Add Front photo" }),
-    );
-
-    const sheet = await screen.findByRole("dialog", { name: "Front photo" });
-    await waitFor(() =>
-      expect(
-        within(sheet).getByRole("button", { name: "Take photo" }),
-      ).toBeEnabled(),
-    );
-    expect(stopTrack).not.toHaveBeenCalled();
-
-    await browser.click(within(sheet).getByRole("button", { name: "Cancel" }));
-
-    expect(stopTrack).toHaveBeenCalledOnce();
-    expect(onSetDocumentPhoto).not.toHaveBeenCalled();
-    await waitForSheetToClose();
-  });
-
-  it("stops a live camera on unmount without committing", async () => {
-    const onSetDocumentPhoto = vi.fn<SetPersonDocumentPhoto>();
-    const browser = userEvent.setup();
-    const view = renderCard(onSetDocumentPhoto);
-
-    await browser.click(
-      screen.getByRole("button", { name: "Add Front photo" }),
-    );
-    const sheet = await screen.findByRole("dialog", { name: "Front photo" });
-    await waitFor(() =>
-      expect(
-        within(sheet).getByRole("button", { name: "Take photo" }),
-      ).toBeEnabled(),
-    );
-
-    view.unmount();
-
-    expect(stopTrack).toHaveBeenCalledOnce();
-    expect(onSetDocumentPhoto).not.toHaveBeenCalled();
-  });
-
-  it("shows a centered retry action after an upload failure", async () => {
-    const file = new File(["front-image"], "front.png", {
-      type: "image/png",
-    });
-    const upload: PersonDocumentPhotoDraftUpload = {
-      id: "failed-upload",
-      status: "failed",
-      file,
-      message: "The upload failed.",
-    };
-    const onSetDocumentPhoto = vi.fn<SetPersonDocumentPhoto>();
-    const browser = userEvent.setup();
-
-    renderCard(onSetDocumentPhoto, upload);
-
-    expect(screen.getByRole("alert")).toHaveTextContent("The upload failed.");
-    expect(
-      screen.queryByRole("button", { name: "Remove Front photo" }),
-    ).not.toBeInTheDocument();
-
-    await browser.click(screen.getByRole("button", { name: "Try again" }));
-
-    expect(onSetDocumentPhoto).toHaveBeenCalledWith(
-      "identity-document",
-      "front",
-      file,
-    );
-  });
-
-  it("offers removal only after a photo was uploaded", async () => {
-    const upload: PersonDocumentPhotoDraftUpload = {
-      id: "uploaded-photo",
+    renderCard(onSet, {
+      id: "uploaded",
       status: "uploaded",
-      file: new File(["front-image"], "front.png", { type: "image/png" }),
-      uploadToken: "upload-token",
-    };
-    const onSetDocumentPhoto = vi.fn<SetPersonDocumentPhoto>();
-    const browser = userEvent.setup();
-
-    renderCard(onSetDocumentPhoto, upload);
+      file: new File(["image"], "id.png", { type: "image/png" }),
+      uploadToken: "token",
+    });
     await browser.click(
       screen.getByRole("button", { name: "Change Front photo" }),
     );
-
-    const sheet = await screen.findByRole("dialog", { name: "Front photo" });
+    const dialog = await screen.findByRole("dialog", { name: "Front photo" });
+    expect(within(dialog).getByRole("img")).toHaveClass("object-contain");
+    expect(getUserMedia).not.toHaveBeenCalled();
     expect(
-      within(sheet).getByRole("button", { name: "Remove Front photo" }),
-    ).toBeInTheDocument();
+      within(dialog).getByRole("button", { name: "Crop photo" }),
+    ).toBeEnabled();
+    await browser.click(
+      within(dialog).getByRole("button", { name: "Remove Front photo" }),
+    );
+    expect(onSet).toHaveBeenCalledWith("identity-document", "front", null);
+    expect(
+      within(dialog).getByRole("button", { name: "Choose from files" }),
+    ).toBeEnabled();
+  });
+
+  it("offers only files on desktop and commits a selected image after confirmation", async () => {
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: 1280,
+    });
+    const onSet = vi.fn<SetPersonDocumentPhoto>();
+    const browser = userEvent.setup();
+    renderCard(onSet);
+    expect(
+      screen.getByRole("button", { name: "Add Front photo" }),
+    ).toHaveTextContent(/^Front$/);
+    await browser.click(
+      screen.getByRole("button", { name: "Add Front photo" }),
+    );
+    const dialog = await screen.findByRole("dialog", { name: "Front photo" });
+    expect(
+      within(dialog).queryByRole("button", { name: "Take photo" }),
+    ).toBeNull();
+    expect(
+      within(dialog).queryByRole("button", { name: "Choose from gallery" }),
+    ).toBeNull();
+    const file = new File(["image"], "front.png", { type: "image/png" });
+    await browser.upload(
+      within(dialog).getByLabelText("Choose from files"),
+      file,
+    );
+    expect(onSet).not.toHaveBeenCalled();
+    await browser.click(
+      within(dialog).getByRole("button", { name: "Use photo" }),
+    );
+    expect(onSet).toHaveBeenCalledWith(
+      "identity-document",
+      "front",
+      file,
+      undefined,
+    );
+    expect(getUserMedia).not.toHaveBeenCalled();
+  });
+
+  it("starts a full-screen camera only after choosing Take photo and releases it on cancel", async () => {
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: 375,
+    });
+    const onSet = vi.fn<SetPersonDocumentPhoto>();
+    const browser = userEvent.setup();
+    renderCard(onSet);
+    await browser.click(
+      screen.getByRole("button", { name: "Add Front photo" }),
+    );
+    const dialog = await screen.findByRole("dialog", { name: "Front photo" });
+    expect(getUserMedia).not.toHaveBeenCalled();
+    expect(
+      within(dialog).getByRole("button", { name: "Choose from gallery" }),
+    ).toBeEnabled();
+    await browser.click(
+      within(dialog).getByRole("button", { name: "Take photo" }),
+    );
+    await waitFor(() => expect(getUserMedia).toHaveBeenCalledOnce());
+    expect(dialog).toHaveClass("h-dvh", "inset-0");
+    await waitFor(() =>
+      expect(
+        within(dialog).getByLabelText("Front camera preview"),
+      ).toHaveProperty("srcObject", stream),
+    );
+    await browser.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    expect(stopTrack).toHaveBeenCalledOnce();
+    expect(onSet).not.toHaveBeenCalled();
+  });
+
+  it("captures into the crop editor without uploading until saved", async () => {
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: 375,
+    });
+    const onSet = vi.fn<SetPersonDocumentPhoto>();
+    const browser = userEvent.setup();
+    renderCard(onSet);
+    await browser.click(
+      screen.getByRole("button", { name: "Add Front photo" }),
+    );
+    await browser.click(screen.getByRole("button", { name: "Take photo" }));
+    const capture = await screen.findByRole("button", {
+      name: "Capture photo",
+    });
+    await waitFor(() => expect(capture).toBeEnabled());
+    await browser.click(capture);
+    expect(
+      await screen.findByRole("dialog", { name: "Crop photo" }),
+    ).toBeVisible();
+    expect(screen.getByRole("button", { name: "Save crop" })).toBeEnabled();
+    expect(onSet).not.toHaveBeenCalled();
+    expect(stopTrack).toHaveBeenCalledOnce();
+  });
+
+  it("re-crops from the original file and uploads the new crop", async () => {
+    const original = new File(["original"], "original.png", {
+      type: "image/png",
+    });
+    const previous = new File(["cropped"], "cropped.jpg", {
+      type: "image/jpeg",
+    });
+    const onSet = vi.fn<SetPersonDocumentPhoto>();
+    const browser = userEvent.setup();
+    vi.stubGlobal(
+      "createImageBitmap",
+      vi.fn().mockResolvedValue({ width: 800, height: 600, close: vi.fn() }),
+    );
+    renderCard(onSet, {
+      id: "uploaded",
+      status: "uploaded",
+      file: previous,
+      originalFile: original,
+      uploadToken: "token",
+    });
+    await browser.click(
+      screen.getByRole("button", { name: "Change Front photo" }),
+    );
+    await browser.click(screen.getByRole("button", { name: "Crop photo" }));
+    const corner = screen.getByRole("button", {
+      name: "Resize north-west corner",
+    });
+    corner.focus();
+    await browser.keyboard("{ArrowRight}{ArrowDown}");
+    await browser.click(screen.getByRole("button", { name: "Save crop" }));
+    await waitFor(() => expect(onSet).toHaveBeenCalledOnce());
+    expect(createImageBitmap).toHaveBeenCalledWith(
+      original,
+      expect.any(Object),
+    );
+    expect(onSet).toHaveBeenCalledWith(
+      "identity-document",
+      "front",
+      expect.objectContaining({ type: "image/jpeg" }),
+      original,
+    );
+    expect(drawImage.mock.calls[0]?.slice(1, 3)).toEqual([8, 6]);
+    vi.unstubAllGlobals();
+  });
+
+  it("accepts dropped PDFs in identity slots and previews them without cropping", async () => {
+    const onSet = vi.fn<SetPersonDocumentPhoto>();
+    const browser = userEvent.setup();
+    renderCard(onSet);
+    const file = new File(["%PDF-document"], "passport.pdf", {
+      type: "application/pdf",
+    });
+    fireEvent.drop(screen.getByRole("button", { name: "Add Front photo" }), {
+      dataTransfer: { files: [file] },
+    });
+    const dialog = await screen.findByRole("dialog", { name: "Front photo" });
+    expect(
+      within(dialog).getByRole("link", { name: /Open file/ }),
+    ).toHaveAttribute("href", "blob:document-photo");
+    expect(
+      within(dialog).queryByRole("button", { name: "Crop photo" }),
+    ).toBeNull();
+    await browser.click(
+      within(dialog).getByRole("button", { name: "Use file" }),
+    );
+    expect(onSet).toHaveBeenCalledWith(
+      "identity-document",
+      "front",
+      file,
+      undefined,
+    );
+  });
+
+  it("rejects unsupported and oversized dropped files", async () => {
+    const onSet = vi.fn<SetPersonDocumentPhoto>();
+    renderCard(onSet);
+    fireEvent.drop(screen.getByRole("button", { name: "Add Front photo" }), {
+      dataTransfer: {
+        files: [new File(["bad"], "bad.svg", { type: "image/svg+xml" })],
+      },
+    });
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Choose a JPEG, PNG, WebP or PDF",
+    );
+    expect(screen.queryByRole("button", { name: "Use file" })).toBeNull();
+    const file = new File(["image"], "large.png", { type: "image/png" });
+    Object.defineProperty(file, "size", { value: 10 * 1024 * 1024 + 1 });
+    fireEvent.drop(screen.getByRole("dialog"), {
+      dataTransfer: { files: [file] },
+    });
+    expect(screen.getByRole("alert")).toBeVisible();
+    expect(onSet).not.toHaveBeenCalled();
+  });
+
+  it("stops late camera streams after the dialog closes", async () => {
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: 375,
+    });
+    let resolveCamera!: (value: MediaStream) => void;
+    getUserMedia.mockReturnValue(
+      new Promise<MediaStream>((resolve) => {
+        resolveCamera = resolve;
+      }),
+    );
+    const browser = userEvent.setup();
+    renderCard(vi.fn());
+    await browser.click(
+      screen.getByRole("button", { name: "Add Front photo" }),
+    );
+    await browser.click(screen.getByRole("button", { name: "Take photo" }));
+    await browser.click(screen.getByRole("button", { name: "Cancel" }));
+    await act(async () => resolveCamera(stream));
+    expect(stopTrack).toHaveBeenCalledOnce();
+  });
+
+  it("keeps all full-screen document surfaces on the popover surface", async () => {
+    const browser = userEvent.setup();
+    renderCard(vi.fn());
+    await browser.click(
+      screen.getByRole("button", { name: "Add Front photo" }),
+    );
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveClass("bg-popover", "text-popover-foreground");
+    expect(
+      dialog.querySelector(".bg-background:not(button):not(input)"),
+    ).toBeNull();
   });
 });
 
@@ -260,17 +361,6 @@ function renderCard(
         onSetDocumentPhoto={onSetDocumentPhoto}
       />
     </NextIntlClientProvider>,
-  );
-}
-
-async function waitForSheetToClose() {
-  await waitFor(
-    () => {
-      expect(
-        screen.queryByRole("dialog", { name: "Front photo" }),
-      ).not.toBeInTheDocument();
-    },
-    { timeout: 2_000 },
   );
 }
 

@@ -61,17 +61,20 @@ export type PersonDocumentPhotoDraftUpload =
       id: string;
       status: "uploading";
       file: File;
+      originalFile?: File;
     }
   | {
       id: string;
       status: "uploaded";
       file: File;
+      originalFile?: File;
       uploadToken: string;
     }
   | {
       id: string;
       status: "failed";
       file: File;
+      originalFile?: File;
       message: string;
     };
 
@@ -163,4 +166,5 @@ export type SetPersonDocumentPhoto = (
   documentKey: string,
   slot: v1.persons.PersonDocumentPhotoSlot,
   file: File | null,
+  originalFile?: File,
 ) => void;

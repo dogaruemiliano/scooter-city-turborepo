@@ -49,14 +49,10 @@ export function FieldExtractionHint({
         </p>
       ) : null}
       {review.outdated ? (
-        <p className="text-warning-foreground">
-          {t("extraction.sourceChanged")}
-        </p>
+        <p className="text-foreground">{t("extraction.sourceChanged")}</p>
       ) : null}
       {review.suggestions.length > 1 ? (
-        <p className="text-warning-foreground">
-          {t("extraction.conflictingValues")}
-        </p>
+        <p className="text-foreground">{t("extraction.conflictingValues")}</p>
       ) : null}
       {alternatives.map((suggestion) => {
         const source = [

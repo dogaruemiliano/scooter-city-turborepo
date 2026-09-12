@@ -1179,6 +1179,8 @@ describe("Persons HTTP surface (e2e)", () => {
   it("saves foreign supplementary documents and reviewed licence categories with an audit trail", async () => {
     const admin = await freshSession(["ADMIN"]);
     const upload = await uploadPersonDraft(admin);
+    const licenseFront = await uploadPersonDraft(admin);
+    const licenseBack = await uploadPersonDraft(admin);
     const categories = [
       {
         category: "AM" as const,
@@ -1205,6 +1207,10 @@ describe("Persons HTTP surface (e2e)", () => {
               type: "driverLicense",
               status: "verified",
               licenseCategories: categories,
+              photos: {
+                front: licenseFront.uploadToken,
+                back: licenseBack.uploadToken,
+              },
             },
           ],
         }),
@@ -1355,14 +1361,17 @@ describe("Persons HTTP surface (e2e)", () => {
     expect(
       v1.persons.personDocumentPhotoSchema.parse(replace.body).contentType,
     ).toBe("application/pdf");
-    const wrongType = await req()
+    const idPdf = await req()
       .put(v1.persons.ROUTES.documents.photos.upsert(person.id, id.id, "front"))
       .set("Cookie", [`access_token=${admin.accessToken}`])
       .attach("file", Buffer.from("%PDF-wrong"), {
         filename: "id.pdf",
         contentType: "application/pdf",
       });
-    expect(wrongType.status).toBe(400);
+    expect(idPdf.status).toBe(200);
+    expect(
+      v1.persons.personDocumentPhotoSchema.parse(idPdf.body).contentType,
+    ).toBe("application/pdf");
   });
 
   it("retains uploaded drafts for review while enforcing owner, expiry and single-use claims", async () => {
@@ -1527,6 +1536,8 @@ describe("Persons HTTP surface (e2e)", () => {
     fakePersonExtraction.analyze.mockClear();
     const admin = await freshSession(["ADMIN"]);
     const pdf = await uploadPersonDraft(admin, "application/pdf");
+    const pdfObject = s3Objects.get(pdf.storageKey)!;
+    s3Objects.set(pdf.storageKey, { ...pdfObject, contentType: "image/png" });
     const wrongType = await req()
       .post(v1.persons.ROUTES.documents.extract)
       .set("Cookie", [`access_token=${admin.accessToken}`])

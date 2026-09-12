@@ -137,18 +137,20 @@ describe("PersonDocumentAnalysisService", () => {
     expect(duplicate.extraction.analyze).not.toHaveBeenCalled();
   });
 
-  it("checks the actual source checksum and restricts PDFs before external processing", async () => {
+  it("checks the actual source checksum and accepts identity PDFs", async () => {
     const checksum = createFixture({ checksum: "0".repeat(64) });
     await expect(checksum.service.analyze(input, "owner")).rejects.toThrow(
       "checksum",
     );
     expect(checksum.extraction.analyze).not.toHaveBeenCalled();
     const pdf = createFixture({ contentType: "application/pdf" });
-    await expect(pdf.service.analyze(input, "owner")).rejects.toThrow(
-      "proof of address",
+    await pdf.service.analyze(input, "owner");
+    expect(pdf.storage.readDocument).toHaveBeenCalledTimes(1);
+    expect(pdf.extraction.analyze).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sources: [expect.objectContaining({ contentType: "application/pdf" })],
+      }),
     );
-    expect(pdf.storage.readDocument).not.toHaveBeenCalled();
-    expect(pdf.extraction.analyze).not.toHaveBeenCalled();
   });
 
   it("bounds declared, streamed, and total document bytes before provider calls", async () => {

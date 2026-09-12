@@ -573,11 +573,6 @@ export class PersonsService {
     const normalizedSlot = this.requireDocumentPhotoSlot(slot);
     await this.ensureActiveDocument(personId, documentId);
     this.assertBufferedUpload(file);
-    await this.assertDocumentUploadContentType(
-      personId,
-      documentId,
-      file.mimetype,
-    );
 
     let stored: StoredPersonDocument | null = null;
     let replacedStorageKeys: string[] = [];
@@ -621,11 +616,6 @@ export class PersonsService {
   ): Promise<v1.persons.PersonDocumentPhotoUploadUrl> {
     const normalizedSlot = this.requireDocumentPhotoSlot(slot);
     await this.ensureActiveDocument(personId, documentId);
-    await this.assertDocumentUploadContentType(
-      personId,
-      documentId,
-      input.contentType,
-    );
 
     const upload = await this.imageStorage.createPresignedDocumentUpload({
       ...input,
@@ -716,11 +706,6 @@ export class PersonsService {
           normalizedSlot,
           uploadedByUserId,
         ),
-      );
-      await this.assertDocumentUploadContentType(
-        personId,
-        documentId,
-        stored.contentType,
       );
       const result = await this.replaceDocumentPhotoWithStoredImage(
         documentId,
@@ -815,14 +800,6 @@ export class PersonsService {
 
         const { draftUploadId, storedDocument: storedImage } =
           await this.resolveUsableDocumentDraft(uploadToken, uploadedByUserId);
-        if (
-          storedImage.contentType === "application/pdf" &&
-          document.type !== "proofOfAddress"
-        ) {
-          throw new BadRequestException(
-            "PDF uploads are only supported for proof of address",
-          );
-        }
 
         if (seenStorageKeys.has(storedImage.storageKey)) {
           throw new BadRequestException("Draft image upload was used twice");
@@ -1664,21 +1641,6 @@ export class PersonsService {
   private assertBufferedUpload(file: Express.Multer.File): void {
     if (!file.buffer || file.buffer.length === 0) {
       throw new BadRequestException("Image file is required");
-    }
-  }
-
-  private async assertDocumentUploadContentType(
-    personId: string,
-    documentId: string,
-    contentType: string,
-  ): Promise<void> {
-    if (contentType !== "application/pdf") return;
-    const document = await this.findActiveDocument(personId, documentId);
-    if (!document) throw new NotFoundException("Person document not found");
-    if (document.type !== "proofOfAddress") {
-      throw new BadRequestException(
-        "PDF uploads are only supported for proof of address",
-      );
     }
   }
 

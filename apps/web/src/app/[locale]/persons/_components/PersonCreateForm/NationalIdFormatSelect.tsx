@@ -16,9 +16,7 @@ export function NationalIdFormatSelect({
   const t = useTranslations("persons");
   return (
     <fieldset className="grid gap-3">
-      <legend className="mb-3 text-sm font-medium">
-        {t("nationalIdFormat.label")}
-      </legend>
+      <legend className="sr-only">{t("nationalIdFormat.label")}</legend>
       <div className="grid grid-cols-2 gap-3">
         {(["electronic", "classic"] as const).map((format) => (
           <Button
@@ -28,15 +26,12 @@ export function NationalIdFormatSelect({
             aria-pressed={value === format}
             disabled={disabled}
             onClick={() => onChange(format)}
-            className={`h-auto min-h-32 whitespace-normal p-4 md:h-auto ${value === format ? "" : "bg-card text-card-foreground"}`}
+            className={`h-auto min-h-12 whitespace-normal px-3 py-2 md:h-auto ${value === format ? "" : "bg-card text-card-foreground"}`}
           >
             {t(`nationalIdFormat.${format}`)}
           </Button>
         ))}
       </div>
-      <p className="text-sm text-muted-foreground">
-        {t("wizard.idVersionHelp")}
-      </p>
     </fieldset>
   );
 }

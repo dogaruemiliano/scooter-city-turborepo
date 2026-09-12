@@ -506,7 +506,10 @@ test("document workflows require the relevant photos while preserving legacy inp
         { type: "passport", photos: { front: "passport-token" } },
         { type: "visa" },
         { type: "residencePermit" },
-        { type: "driverLicense" },
+        {
+          type: "driverLicense",
+          photos: { front: "license-front", back: "license-back" },
+        },
       ],
     }).success,
     true,
@@ -616,7 +619,7 @@ test("licence metadata validates categories, dates, duplicates and document type
   );
 });
 
-test("draft PDFs require proof-of-address metadata and preserve checksum validation", () => {
+test("draft PDFs support identity documents and preserve checksum validation", () => {
   const input = {
     contentType: "application/pdf",
     byteSize: 100,
@@ -626,14 +629,14 @@ test("draft PDFs require proof-of-address metadata and preserve checksum validat
     v1.persons.createPersonDocumentPhotoDraftUploadUrlInputSchema.safeParse(
       input,
     ).success,
-    false,
+    true,
   );
   assert.equal(
     v1.persons.createPersonDocumentPhotoDraftUploadUrlInputSchema.safeParse({
       ...input,
       documentType: "passport",
     }).success,
-    false,
+    true,
   );
   assert.equal(
     v1.persons.createPersonDocumentPhotoDraftUploadUrlInputSchema.safeParse({
@@ -741,5 +744,36 @@ test("person document extraction accepts only owned draft-token inputs and known
       ],
     }).success,
     false,
+  );
+});
+
+test("a supplied driving license needs front and back in the add-person workflow", () => {
+  const input = {
+    email: "person@example.com",
+    phone: "+40749096855",
+    firstName: "Test",
+    lastName: "Person",
+    documentWorkflow: "foreign",
+    documents: [
+      { type: "passport", photos: { front: "passport-token" } },
+      { type: "driverLicense", photos: { front: "license-front" } },
+    ],
+  };
+  assert.equal(
+    v1.persons.createPersonInputSchema.safeParse(input).success,
+    false,
+  );
+  assert.equal(
+    v1.persons.createPersonInputSchema.safeParse({
+      ...input,
+      documents: [
+        input.documents[0],
+        {
+          type: "driverLicense",
+          photos: { front: "license-front", back: "license-back" },
+        },
+      ],
+    }).success,
+    true,
   );
 });

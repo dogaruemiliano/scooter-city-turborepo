@@ -214,17 +214,18 @@ export const personsCatalog = {
     },
     wizard: {
       progress: "Add person progress",
+      stepCount: "Step {current} of {total}",
+      forwardTo: "Go forward to {step}",
+      returnTo: "Return to {step}",
       steps: {
         citizenship: "Citizenship",
-        documents: "Photos",
+        documents: "Identification documents",
+        license: "Driving license",
         personal: "Personal details",
         contact: "Contact details",
         address: "Address",
         review: "Document details",
       },
-      chooseCitizenship: "Who are you adding?",
-      citizenshipHelp: "Choose their citizenship to see the documents needed.",
-      idVersionHelp: "Choose the ID version, then add the document photos.",
       reviewTitle: "Check the person's details",
       reviewHelp:
         "Complete the fields and check them against the documents before saving.",
@@ -252,7 +253,7 @@ export const personsCatalog = {
       reviewHelp:
         "Check the licence and its categories before marking this document as verified. A photo alone does not confirm rental eligibility.",
       uploadHelp:
-        "Optional. Add both sides to review categories and validity. Without a confirmed valid licence, only scooters requiring no licence are available.",
+        "Optional. Add the front and back to read each category’s acquisition and expiry dates. Categories without an acquisition date are excluded. Without a confirmed valid licence, only scooters requiring no licence are available.",
       empty: "No categories recorded.",
     },
     documentForm: {
@@ -272,6 +273,17 @@ export const personsCatalog = {
       cameraUnavailableDescription:
         "Allow camera access, or choose an image from your gallery or files.",
       takePhoto: "Take photo",
+      capturePhoto: "Capture photo",
+      cropPhoto: "Crop photo",
+      saveCrop: "Save crop",
+      cropHelp: "Drag the corners to fit the document, or use the arrow keys.",
+      cropCorner: "Resize {corner} corner",
+      cropFailed: "The image could not be cropped. Try another image.",
+      dropFile: "Drop a document here",
+      uploadRequirementsLabel: "Document upload requirements",
+      uploadRequirements:
+        "JPEG, PNG, WebP or PDF, up to 10 MB per file. Keep all edges visible and text readable.",
+      invalidFile: "Choose a JPEG, PNG, WebP or PDF file up to 10 MB.",
       retryCamera: "Try camera again",
       retryUpload: "Try again",
       retakePhoto: "Retake photo",
@@ -657,18 +669,18 @@ export const personsCatalog = {
     },
     wizard: {
       progress: "Pași pentru adăugarea persoanei",
+      stepCount: "Pasul {current} din {total}",
+      forwardTo: "Mergi înainte la {step}",
+      returnTo: "Revino la {step}",
       steps: {
         citizenship: "Cetățenie",
-        documents: "Fotografii",
+        documents: "Documente de identitate",
+        license: "Permis de conducere",
         personal: "Date personale",
         contact: "Date de contact",
         address: "Adresă",
         review: "Date documente",
       },
-      chooseCitizenship: "Pe cine adaugi?",
-      citizenshipHelp: "Alege cetățenia pentru a vedea documentele necesare.",
-      idVersionHelp:
-        "Alege versiunea cărții de identitate, apoi adaugă fotografiile documentelor.",
       reviewTitle: "Verifică datele persoanei",
       reviewHelp:
         "Completează câmpurile și verifică datele din documente înainte de salvare.",
@@ -696,7 +708,7 @@ export const personsCatalog = {
       reviewHelp:
         "Verifică permisul și categoriile înainte de a marca documentul drept verificat. Fotografia singură nu confirmă eligibilitatea pentru închiriere.",
       uploadHelp:
-        "Opțional. Adaugă ambele fețe pentru verificarea categoriilor și valabilității. Fără un permis valabil confirmat, sunt disponibile doar scuterele care nu necesită permis.",
+        "Opțional. Adaugă fața și verso pentru a citi data obținerii și expirării fiecărei categorii. Categoriile fără data obținerii sunt excluse. Fără un permis valabil confirmat, sunt disponibile doar scuterele care nu necesită permis.",
       empty: "Nu există categorii înregistrate.",
     },
     documentForm: {
@@ -717,6 +729,18 @@ export const personsCatalog = {
       cameraUnavailableDescription:
         "Permite accesul la cameră sau alege o imagine din galerie ori din fișiere.",
       takePhoto: "Fotografiază",
+      capturePhoto: "Realizează fotografia",
+      cropPhoto: "Decupează fotografia",
+      saveCrop: "Salvează decupajul",
+      cropHelp:
+        "Trage colțurile pentru a încadra documentul sau folosește tastele săgeți.",
+      cropCorner: "Redimensionează colțul {corner}",
+      cropFailed: "Imaginea nu a putut fi decupată. Încearcă altă imagine.",
+      dropFile: "Trage un document aici",
+      uploadRequirementsLabel: "Cerințe pentru documente",
+      uploadRequirements:
+        "JPEG, PNG, WebP sau PDF, maximum 10 MB per fișier. Păstrează toate marginile vizibile și textul lizibil.",
+      invalidFile: "Alege un fișier JPEG, PNG, WebP sau PDF de maximum 10 MB.",
       retryCamera: "Încearcă din nou camera",
       retryUpload: "Încearcă din nou",
       retakePhoto: "Refă fotografia",

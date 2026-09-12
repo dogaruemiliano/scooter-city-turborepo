@@ -513,6 +513,7 @@ describe("person-document extraction normalization", () => {
       licenseCategories: [
         category("AM", "2010-02-01", "2030-02-01"),
         category("A", null, null),
+        category("A1", null, "2030-02-01"),
         category("UNKNOWN", "2010-02-01", "2030-02-01"),
         category("B", "2010-02-31", "2030-02-01"),
         category("C", "2030-02-01", "2020-02-01"),
@@ -554,6 +555,23 @@ describe("person-document extraction normalization", () => {
     });
   });
 
+  it.each([
+    "nationalId",
+    "passport",
+    "visa",
+    "residencePermit",
+    "driverLicense",
+    "proofOfAddress",
+  ] as const)("accepts PDF sources for %s", async (documentType) => {
+    const { service, provider } = setup({ detectedDocumentType: documentType });
+    await service.analyze({
+      ...input,
+      documentType,
+      sources: [{ ...input.sources[0], contentType: "application/pdf" }],
+    });
+    expect(provider.analyze).toHaveBeenCalled();
+  });
+
   it("rejects empty, duplicate, unsupported or oversized sources before invoking the provider", async () => {
     const { service, provider } = setup();
     await expect(
@@ -576,7 +594,7 @@ describe("person-document extraction normalization", () => {
     await expect(
       service.analyze({
         ...input,
-        sources: [{ ...input.sources[0], contentType: "application/pdf" }],
+        sources: [{ ...input.sources[0], contentType: "image/gif" }],
       }),
     ).rejects.toMatchObject({
       code: "DOCUMENT_EXTRACTION_UNSUPPORTED_DOCUMENT",

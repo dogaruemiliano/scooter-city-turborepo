@@ -55,7 +55,7 @@ export function AddressSection({
   );
 
   return (
-    <FormSection title={t("sections.address")}>
+    <FormSection aria-label={t("sections.address")}>
       <FormField
         id={`${formId}-country`}
         extractionKey="person.countryCode"
