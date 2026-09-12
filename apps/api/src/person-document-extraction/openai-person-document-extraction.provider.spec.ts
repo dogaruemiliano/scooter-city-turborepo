@@ -55,6 +55,15 @@ describe("OpenAI person-document extraction", () => {
     const [url, request] = fetcher.mock.calls[0];
     expect(url).toBe("https://api.openai.com/v1/responses");
     const body = requestBody(request);
+    expect(body.instructions).toContain(
+      "Extract ONLY the SECOND address block",
+    );
+    expect(body.instructions).toContain(
+      "Loc naștere / Lieu de naissance / Place of birth",
+    );
+    expect(body.instructions).toContain(
+      "Every person suggestion must include addressEvidence",
+    );
     expect(body).toMatchObject({
       model: "gpt-4.1-mini-2025-04-14",
       store: false,

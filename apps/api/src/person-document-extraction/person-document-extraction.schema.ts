@@ -20,6 +20,19 @@ export const personDocumentModelOutputSchema = z
               target: z.literal("person"),
               field: z.enum(v1.persons.PERSON_EXTRACTION_PERSON_FIELDS),
               value: z.string().max(200),
+              addressEvidence: z
+                .object({
+                  section: z.enum([
+                    "domicile",
+                    "residence",
+                    "birthplace",
+                    "issuer",
+                    "unknown",
+                  ]),
+                  label: z.string().max(200),
+                })
+                .strict()
+                .nullable(),
               ...sourceShape,
             })
             .strict(),

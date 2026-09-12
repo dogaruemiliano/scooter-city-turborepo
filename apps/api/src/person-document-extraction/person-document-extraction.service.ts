@@ -73,9 +73,27 @@ export class PersonDocumentExtractionService {
       };
     }
 
+    // Check the printed section before resolving counties/localities: a birth
+    // county must never become context for a domicile locality.
+    const residentialSuggestions =
+      raw.suggestions.flatMap<v1.persons.PersonDocumentExtractionSuggestion>(
+        (suggestion) => {
+          if (suggestion.target !== "person") return [suggestion];
+          const { addressEvidence, ...publicSuggestion } = suggestion;
+          if (
+            ADDRESS_FIELDS.has(suggestion.field) &&
+            !hasResidentialEvidence(addressEvidence, input)
+          ) {
+            warnings.add("invalidValue");
+            return [];
+          }
+          return [publicSuggestion];
+        },
+      );
+
     let suggestions: v1.persons.PersonDocumentExtractionSuggestion[] = [];
     for (const rawSuggestion of normalizePersonAddressSuggestions(
-      raw.suggestions,
+      residentialSuggestions,
       input.documentType,
     )) {
       const suggestion =
@@ -233,6 +251,40 @@ export class PersonDocumentExtractionService {
       warnings: [...warnings],
     });
   }
+}
+
+const ADDRESS_FIELDS = new Set([
+  "countryCode",
+  "region",
+  "city",
+  "addressLine1",
+  "addressLine2",
+  "postalCode",
+]);
+
+function hasResidentialEvidence(
+  evidence: { section: string; label: string } | null,
+  input: AnalyzePersonDocumentInput,
+): boolean {
+  if (
+    !evidence ||
+    !["domicile", "residence"].includes(evidence.section) ||
+    (input.documentType === "nationalId" &&
+      input.nationalIdFormat === "electronic")
+  )
+    return false;
+
+  const label = evidence.label
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+  if (/naster|naissance|birth|emitent|eliberat|issuing|issuer/.test(label))
+    return false;
+  // Old Romanian IDs print two places. Only the second, explicitly labelled
+  // Domiciliu (not Loc naștere), establishes the person's address.
+  return input.documentType === "nationalId"
+    ? /\b(domiciliu\w*|resedinta)\b/.test(label)
+    : /\b(domicil\w*|residen\w*|resedinta|address|adresse)\b/.test(label);
 }
 
 function validateSources(input: AnalyzePersonDocumentInput): void {

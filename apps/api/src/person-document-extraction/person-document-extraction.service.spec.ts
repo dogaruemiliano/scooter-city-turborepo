@@ -30,20 +30,162 @@ function category(
   };
 }
 
-function setup(overrides: Record<string, unknown> = {}) {
+function setup(
+  overrides: Record<string, unknown> & {
+    suggestions?: Array<
+      ReturnType<typeof suggestion> & { addressEvidence?: unknown }
+    >;
+  } = {},
+) {
   const provider = {
     analyze: jest.fn().mockResolvedValue({
       detectedDocumentType: "nationalId",
-      suggestions: [],
       licenseCategories: [],
       warnings: [],
       ...overrides,
+      suggestions: (overrides.suggestions ?? []).map((item) =>
+        item.target === "person"
+          ? {
+              addressEvidence: [
+                "countryCode",
+                "region",
+                "city",
+                "addressLine1",
+                "addressLine2",
+                "postalCode",
+              ].includes(item.field)
+                ? { section: "domicile", label: "Domiciliu" }
+                : null,
+              ...item,
+            }
+          : item,
+      ),
     }),
   };
   return { provider, service: new PersonDocumentExtractionService(provider) };
 }
 
 describe("person-document extraction normalization", () => {
+  it("uses the second Domiciliu address on a classic ID without mixing in the birthplace county", async () => {
+    const { service } = setup({
+      suggestions: [
+        {
+          ...suggestion("person", "region", "Jud.VL Mun.Râmnicu Vâlcea"),
+          addressEvidence: {
+            section: "birthplace",
+            label: "Loc naștere / Place of birth",
+          },
+        },
+        {
+          ...suggestion("person", "city", "Râmnicu Vâlcea"),
+          addressEvidence: { section: "birthplace", label: "Loc naștere" },
+        },
+        {
+          ...suggestion(
+            "person",
+            "addressLine1",
+            "Jud.CJ Com.Florești Str.Exemplu Nr.12 Bl.A Ap.4",
+          ),
+          addressEvidence: {
+            section: "domicile",
+            label: "Domiciliu / Adresse / Address",
+          },
+        },
+        suggestion("person", "firstName", "ANA"),
+        suggestion("document", "number", "123456"),
+      ],
+    });
+
+    const result = await service.analyze({
+      ...input,
+      nationalIdFormat: "classic",
+    });
+    expect(result.suggestions).toEqual([
+      suggestion("person", "addressLine1", "Str. Exemplu, Nr. 12"),
+      suggestion("person", "addressLine2", "Bl. A, Ap. 4"),
+      suggestion("person", "region", "Cluj"),
+      suggestion("person", "city", "Florești"),
+      suggestion("person", "firstName", "Ana"),
+      suggestion("document", "number", "123456"),
+    ]);
+    expect(result.warnings).toEqual(["invalidValue"]);
+  });
+
+  it.each([
+    null,
+    { section: "birthplace", label: "Loc naștere" },
+    { section: "domicile", label: "Locul nașterii" },
+    { section: "domicile", label: "Lieu de naissance" },
+    { section: "domicile", label: "Place of birth" },
+    { section: "issuer", label: "Emitent" },
+    { section: "domicile", label: "Issuing authority address" },
+    { section: "unknown", label: "Domiciliu" },
+    { section: "domicile", label: "" },
+  ])(
+    "omits all address fields without residential evidence (%j), while preserving identity",
+    async (addressEvidence) => {
+      const fields = {
+        countryCode: "RO",
+        region: "VL",
+        city: "Râmnicu Vâlcea",
+        addressLine1: "Str. Exemplu Nr.12",
+        addressLine2: "Ap. 4",
+        postalCode: "240001",
+      };
+      const { service } = setup({
+        suggestions: [
+          ...Object.entries(fields).map(([field, value]) => ({
+            ...suggestion("person", field, value),
+            addressEvidence,
+          })),
+          suggestion("person", "lastName", "POPESCU"),
+        ],
+      });
+      const result = await service.analyze(input);
+      expect(result.suggestions).toEqual([
+        suggestion("person", "lastName", "Popescu"),
+      ]);
+      expect(result.warnings).toEqual(["invalidValue"]);
+    },
+  );
+
+  it("does not extract an address from electronic IDs but accepts the separate residence proof", async () => {
+    const suggestions = [
+      {
+        ...suggestion(
+          "person",
+          "addressLine1",
+          "Jud.CJ Com.Florești Str.Exemplu Nr.12",
+        ),
+        addressEvidence: { section: "residence", label: "Reședință" },
+      },
+    ];
+    const { service } = setup({ suggestions });
+    expect(
+      await service.analyze({ ...input, nationalIdFormat: "electronic" }),
+    ).toMatchObject({
+      suggestions: [],
+      warnings: ["invalidValue", "noData"],
+    });
+
+    const proof = setup({
+      detectedDocumentType: "proofOfAddress",
+      suggestions,
+    });
+    expect(
+      (
+        await proof.service.analyze({
+          ...input,
+          documentType: "proofOfAddress",
+        })
+      ).suggestions,
+    ).toEqual([
+      suggestion("person", "addressLine1", "Str. Exemplu, Nr. 12"),
+      suggestion("person", "region", "Cluj"),
+      suggestion("person", "city", "Florești"),
+    ]);
+  });
+
   it("preserves Romanian spelling, separates CNP and document number, and normalizes country codes", async () => {
     const { service } = setup({
       suggestions: [
@@ -351,7 +493,12 @@ describe("person-document extraction normalization", () => {
     });
     provider.analyze.mockResolvedValue({
       detectedDocumentType: "nationalId",
-      suggestions: [suggestion("person", "firstName", "Ana", "other")],
+      suggestions: [
+        {
+          ...suggestion("person", "firstName", "Ana", "other"),
+          addressEvidence: null,
+        },
+      ],
       licenseCategories: [],
       warnings: [],
     });
