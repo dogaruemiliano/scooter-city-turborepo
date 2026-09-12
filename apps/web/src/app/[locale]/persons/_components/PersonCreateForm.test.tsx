@@ -315,10 +315,10 @@ describe("PersonCreateForm wizard", () => {
     await renderReviewForm(browser);
     fillRequiredFields("0749096855");
     showReviewStep("Address");
-    await browser.selectOptions(screen.getByLabelText("County"), "București");
+    await selectAddressOption(browser, "County", "București");
     changeField("Address line 1", "1 Rental Street");
     changeField("Address line 2", "Apt 4");
-    changeField("Locality", "București");
+    await selectAddressOption(browser, "Locality", "București");
     changeField("Postal code", "010101");
     changeField("Notes", "Frequent rider");
     changeField("CNP", "1900228123450");
@@ -813,10 +813,16 @@ describe("document extraction review", () => {
     await renderReviewForm(browser);
     expect(screen.getByLabelText("CNP")).toHaveValue("1900228123450");
     showReviewStep("Address");
-    expect(screen.getByLabelText("County")).toHaveValue("Vâlcea");
-    expect(screen.getByLabelText("Locality")).toHaveValue("Râmnicu Vâlcea");
-    changeField("Locality", "Drăgășani");
-    expect(screen.getByLabelText("Locality")).toHaveValue("Drăgășani");
+    expect(
+      screen.getByRole("button", { name: /^County(?: |$)/ }),
+    ).toHaveTextContent("Vâlcea");
+    expect(
+      screen.getByRole("button", { name: /^Locality(?: |$)/ }),
+    ).toHaveTextContent("Râmnicu Vâlcea");
+    await selectAddressOption(browser, "Locality", "Drăgășani");
+    expect(
+      screen.getByRole("button", { name: /^Locality(?: |$)/ }),
+    ).toHaveTextContent("Drăgășani");
     showReviewStep("Document details");
     await browser.click(
       screen.getByRole("button", { name: /^(Add|Edit) National ID$/ }),
@@ -1091,6 +1097,19 @@ function fillDialogDateParts(
   changeDialogField(dialog, label, value.day);
   changeDialogField(dialog, `${label} MM`, value.month);
   changeDialogField(dialog, `${label} YYYY`, value.year);
+}
+
+async function selectAddressOption(
+  browser: ReturnType<typeof userEvent.setup>,
+  label: string,
+  value: string,
+) {
+  await browser.click(
+    screen.getByRole("button", { name: new RegExp(`^${label}(?: |$)`) }),
+  );
+  const dialog = await screen.findByRole("dialog", { name: label });
+  await browser.click(within(dialog).getByRole("button", { name: value }));
+  await waitFor(() => expect(dialog).not.toBeInTheDocument());
 }
 
 function changeField(label: string, value: string) {

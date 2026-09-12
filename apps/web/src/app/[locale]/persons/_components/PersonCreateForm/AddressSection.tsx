@@ -3,13 +3,14 @@
 import { v1 } from "@repo/api-shared";
 import {
   CountrySheetSelect,
+  SheetSelect,
   Input,
   type CountryCode,
   FormSection,
 } from "@repo/ui/components";
+import { useMemo } from "react";
 import { useTranslations } from "next-intl";
 
-import { ROMANIAN_COUNTIES } from "./constants";
 import { fieldErrorId, invalidAria } from "./errors";
 import { FormField } from "./FormField";
 import type {
@@ -17,6 +18,11 @@ import type {
   FormErrors,
   SetPersonFormValue,
 } from "./types";
+
+const COUNTY_OPTIONS = v1.persons.ROMANIAN_COUNTIES.map((county) => ({
+  value: county,
+  label: county,
+}));
 
 export function AddressSection({
   formId,
@@ -39,7 +45,14 @@ export function AddressSection({
   const addressLine2Error = fieldErrors.addressLine2;
   const cityError = fieldErrors.city;
   const postalCodeError = fieldErrors.postalCode;
-  const localities = v1.persons.getRomanianLocalities(form.region);
+  const localities = useMemo(
+    () =>
+      v1.persons.getRomanianLocalities(form.region).map((locality) => ({
+        value: locality.name,
+        label: locality.name,
+      })),
+    [form.region],
+  );
 
   return (
     <FormSection title={t("sections.address")}>
@@ -73,32 +86,30 @@ export function AddressSection({
           label={t("fields.county")}
           error={fieldErrors.region}
         >
-          <select
+          <SheetSelect
             id={`${formId}-county`}
-            aria-describedby={fieldErrorId(
-              `${formId}-county`,
-              fieldErrors.region,
-            )}
-            aria-invalid={invalidAria(fieldErrors.region)}
-            name="region"
-            className="h-12 w-full rounded-lg border border-input bg-background px-3 py-2 text-base transition-colors duration-fast ease-standard outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:bg-disabled disabled:text-disabled-foreground aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive md:h-11 md:text-sm"
+            label={t("fields.county")}
+            labelledById={`${formId}-county-label`}
+            describedById={fieldErrorId(`${formId}-county`, fieldErrors.region)}
+            invalid={Boolean(fieldErrors.region)}
+            options={COUNTY_OPTIONS}
             value={form.region}
-            onChange={(event) => {
-              onSetFormValue("region", event.target.value);
+            placeholder={t("placeholders.county")}
+            onValueChange={(value) => {
+              if (value === form.region) return;
+              onSetFormValue("region", value);
               onSetFormValue("city", "");
             }}
-          >
-            <option value="">{t("placeholders.county")}</option>
-            {form.region &&
-            !ROMANIAN_COUNTIES.some((county) => county === form.region) ? (
-              <option value={form.region}>{form.region}</option>
-            ) : null}
-            {ROMANIAN_COUNTIES.map((county) => (
-              <option key={county} value={county}>
-                {county}
-              </option>
-            ))}
-          </select>
+            onClear={() => {
+              onSetFormValue("region", "");
+              onSetFormValue("city", "");
+            }}
+            clearOptionLabel={t("placeholders.county")}
+            searchPlaceholder={t("countyPicker.search")}
+            clearSearchLabel={t("countryPicker.clearSearch")}
+            emptyMessage={t("countyPicker.empty")}
+            closeLabel={t("actions.close")}
+          />
         </FormField>
       ) : (
         <FormField
@@ -128,36 +139,28 @@ export function AddressSection({
         error={cityError}
       >
         {form.countryCode === "RO" ? (
-          <select
+          <SheetSelect
             id={`${formId}-city`}
-            name="city"
-            autoComplete="address-level2"
-            aria-describedby={fieldErrorId(`${formId}-city`, cityError)}
-            aria-invalid={invalidAria(cityError)}
+            label={t("fields.city")}
+            labelledById={`${formId}-city-label`}
+            describedById={fieldErrorId(`${formId}-city`, cityError)}
+            invalid={Boolean(cityError)}
             disabled={!localities.length}
-            className="h-12 w-full rounded-lg border border-input bg-background px-3 py-2 text-base transition-colors duration-fast ease-standard outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:bg-disabled disabled:text-disabled-foreground aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive md:h-11 md:text-sm"
+            options={localities}
             value={form.city}
-            onChange={(event) => onSetFormValue("city", event.target.value)}
-          >
-            <option value="">
-              {t(
-                form.region
-                  ? "placeholders.locality"
-                  : "placeholders.localityCountyFirst",
-              )}
-            </option>
-            {form.city &&
-            !localities.some((locality) => locality.name === form.city) ? (
-              <option value={form.city} disabled>
-                {form.city}
-              </option>
-            ) : null}
-            {localities.map((locality) => (
-              <option key={locality.sirutaCode} value={locality.name}>
-                {locality.name}
-              </option>
-            ))}
-          </select>
+            placeholder={t(
+              form.region
+                ? "placeholders.locality"
+                : "placeholders.localityCountyFirst",
+            )}
+            onValueChange={(value) => onSetFormValue("city", value)}
+            onClear={() => onSetFormValue("city", "")}
+            clearOptionLabel={t("placeholders.locality")}
+            searchPlaceholder={t("localityPicker.search")}
+            clearSearchLabel={t("countryPicker.clearSearch")}
+            emptyMessage={t("localityPicker.empty")}
+            closeLabel={t("actions.close")}
+          />
         ) : (
           <Input
             id={`${formId}-city`}

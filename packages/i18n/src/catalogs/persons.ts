@@ -343,6 +343,14 @@ export const personsCatalog = {
       phone: "Phone number",
       search: "Search name, email, or phone",
     },
+    countyPicker: {
+      search: "Search counties",
+      empty: "No counties found",
+    },
+    localityPicker: {
+      search: "Search localities",
+      empty: "No localities found",
+    },
     countryPicker: {
       search: "Search countries",
       clearSearch: "Clear search",
@@ -778,6 +786,14 @@ export const personsCatalog = {
       documentType: "Selectează tipul documentului",
       phone: "Număr de telefon",
       search: "Caută nume, email sau telefon",
+    },
+    countyPicker: {
+      search: "Caută județe",
+      empty: "Niciun județ găsit",
+    },
+    localityPicker: {
+      search: "Caută localități",
+      empty: "Nicio localitate găsită",
     },
     countryPicker: {
       search: "Caută țări",
