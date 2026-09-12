@@ -258,7 +258,17 @@ export class PersonsService {
 
         const updated = await tx.person.update({
           where: { id },
-          data: this.toUpdateData(input),
+          data: this.toUpdateData({
+            ...input,
+            ...(input.cnp !== undefined || input.dateOfBirth !== undefined
+              ? {
+                  dateOfBirth: this.resolvePersonBirthDate(
+                    input.cnp === undefined ? existing.cnp : input.cnp,
+                    input.dateOfBirth,
+                  ),
+                }
+              : {}),
+          }),
           include: this.personInclude(),
         });
         await tx.user.update({
@@ -325,6 +335,7 @@ export class PersonsService {
   ): Promise<PersonDocument> {
     try {
       return await this.prisma.$transaction(async (tx) => {
+        await this.validateDocumentCnp(personId, input.cnp, tx);
         await this.ensureActivePerson(personId, tx);
         await this.ensureDocumentTypeAvailable(
           personId,
@@ -385,6 +396,7 @@ export class PersonsService {
   ): Promise<PersonDocument> {
     try {
       return await this.prisma.$transaction(async (tx) => {
+        await this.validateDocumentCnp(personId, input.cnp, tx);
         const existing = await this.findActiveDocumentWithClient(
           tx,
           personId,
@@ -455,6 +467,7 @@ export class PersonsService {
   ): Promise<PersonDocument> {
     try {
       return await this.prisma.$transaction(async (tx) => {
+        await this.validateDocumentCnp(personId, input.cnp, tx);
         const existing = await this.findActiveDocumentWithClient(
           tx,
           personId,
@@ -885,12 +898,25 @@ export class PersonsService {
   private toCreateData(
     input: v1.persons.CreatePersonInput,
   ): Prisma.PersonCreateWithoutUserInput {
+    const cnps = new Set(
+      [
+        input.cnp,
+        ...(input.documents ?? []).map((document) => document.cnp),
+      ].filter((value): value is string => Boolean(value)),
+    );
+    if (cnps.size > 1)
+      throw new BadRequestException(
+        "Documents must have the same CNP as the person",
+      );
+    const cnp = input.cnp !== undefined ? input.cnp : [...cnps][0];
+    const dateOfBirth = this.resolvePersonBirthDate(cnp, input.dateOfBirth);
     return {
       email: input.email,
       phone: input.phone,
       firstName: input.firstName,
       lastName: input.lastName,
-      dateOfBirth: toDateOnlyDate(input.dateOfBirth),
+      cnp,
+      dateOfBirth: toDateOnlyDate(dateOfBirth),
       addressLine1: input.addressLine1,
       addressLine2: input.addressLine2,
       city: input.city,
@@ -981,7 +1007,10 @@ export class PersonsService {
       phone: input.phone,
       firstName: input.firstName,
       lastName: input.lastName,
-      dateOfBirth: toDateOnlyDate(input.dateOfBirth),
+      cnp: input.cnp,
+      dateOfBirth: toDateOnlyDate(
+        this.resolvePersonBirthDate(input.cnp, input.dateOfBirth),
+      ),
       addressLine1: input.addressLine1,
       addressLine2: input.addressLine2,
       city: input.city,
@@ -990,6 +1019,35 @@ export class PersonsService {
       countryCode: input.countryCode,
       notes: input.notes,
     };
+  }
+
+  private resolvePersonBirthDate(
+    cnp: string | null | undefined,
+    dateOfBirth: string | null | undefined,
+  ) {
+    const fromCnp = v1.persons.getDateOfBirthFromCnp(cnp);
+    if (fromCnp && dateOfBirth && fromCnp !== dateOfBirth)
+      throw new BadRequestException(
+        "Date of birth does not match the person's CNP",
+      );
+    return fromCnp ?? dateOfBirth;
+  }
+
+  private async validateDocumentCnp(
+    personId: string,
+    cnp: string | null | undefined,
+    tx: Prisma.TransactionClient,
+  ) {
+    if (!cnp) return;
+    const person = await tx.person.findFirst({
+      where: { id: personId, deletedAt: null },
+      select: { cnp: true },
+    });
+    if (!person) throw new NotFoundException("Person not found");
+    if (person.cnp !== cnp)
+      throw new BadRequestException(
+        "CNP belongs to the person. Update the person's details instead of the document.",
+      );
   }
 
   private toDocumentCreateData(
@@ -1109,10 +1167,13 @@ export class PersonsService {
     existing: PersonWithDocuments,
     updated: PersonWithDocuments,
   ): v1.persons.PersonAuditFieldChange[] {
-    return diffAuditValues(
-      personAuditValues(existing),
-      personAuditValues(updated),
-    );
+    return compactChanges([
+      ...diffAuditValues(
+        personAuditValues(existing).filter((item) => item.field !== "cnp"),
+        personAuditValues(updated).filter((item) => item.field !== "cnp"),
+      ),
+      createSensitiveValueChange("cnp", existing.cnp, updated.cnp),
+    ]);
   }
 
   private documentCreateChanges(
@@ -1298,6 +1359,7 @@ export class PersonsService {
       coalesce(p."addressLine2", '') || ' ' ||
       coalesce(p.city, '') || ' ' ||
       coalesce(p.region, '') || ' ' ||
+      coalesce(p.cnp, '') || ' ' ||
       coalesce(p."postalCode", '') || ' ' ||
       coalesce(p."countryCode", '') || ' ' ||
       coalesce(p.notes, '')
@@ -1845,6 +1907,13 @@ export class PersonsService {
       if (isMediaAssetStorageKeyConflict(error)) {
         throw new BadRequestException("Image upload token was already used");
       }
+      if (isUniqueTarget(error, "cnp")) {
+        throw new ConflictException({
+          code: "PERSON_CNP_CONFLICT",
+          message: "CNP already exists",
+          details: { field: "cnp" },
+        });
+      }
       if (isPersonEmailConflict(error)) {
         throw new ConflictException({
           code: PERSON_EMAIL_CONFLICT_CODE,
@@ -1871,6 +1940,7 @@ function personAuditValues(person: PersonWithDocuments): AuditValue[] {
     { field: "phone", value: person.phone },
     { field: "firstName", value: person.firstName },
     { field: "lastName", value: person.lastName },
+    { field: "cnp", value: maskSensitiveAuditValue(person.cnp) },
     {
       field: "dateOfBirth",
       value: toDateOnlyString(person.dateOfBirth),

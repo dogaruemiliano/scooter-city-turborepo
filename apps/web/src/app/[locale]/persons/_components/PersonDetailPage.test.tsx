@@ -67,6 +67,7 @@ const readyPerson: v1.persons.Person = {
   id: "person-1",
   email: "ada@example.com",
   phone: "+40712345678",
+  cnp: "1900228123450",
   firstName: "Ada",
   lastName: "Lovelace",
   dateOfBirth: "1990-02-28",
@@ -363,9 +364,7 @@ describe("PersonDetailPage", () => {
     );
     expect(within(documentSheet).getByText("RR")).toBeInTheDocument();
     expect(within(documentSheet).getByText("****3456")).toBeInTheDocument();
-    expect(
-      within(documentSheet).getByText("*********3450"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("*********3450")).toBeInTheDocument();
     expect(screen.queryByText("123456")).not.toBeInTheDocument();
     expect(screen.queryByText("1900228123450")).not.toBeInTheDocument();
     expect(

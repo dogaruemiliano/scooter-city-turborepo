@@ -17,6 +17,7 @@ import type {
   SetPersonFormValue,
 } from "./types";
 import { DatePartsInput } from "@/components/DateField";
+import { dateDigits } from "@repo/ui/lib/date-parts";
 
 export function ContactSection({
   formId,
@@ -87,6 +88,29 @@ export function ContactSection({
           onChange={(event) => onSetFormValue("lastName", event.target.value)}
         />
       </FormField>
+      <FormField
+        id={`${formId}-cnp`}
+        extractionKey="person.cnp"
+        label={t("fields.documentCnp")}
+        required={form.citizenship === "romanian"}
+        error={fieldErrors.cnp}
+      >
+        <Input
+          id={`${formId}-cnp`}
+          name="cnp"
+          inputMode="numeric"
+          maxLength={13}
+          value={form.cnp}
+          aria-invalid={invalidAria(fieldErrors.cnp)}
+          aria-describedby={fieldErrorId(`${formId}-cnp`, fieldErrors.cnp)}
+          onChange={(event) =>
+            onSetFormValue("cnp", dateDigits(event.target.value, 13))
+          }
+        />
+      </FormField>
+      {form.citizenship === "romanian" && showUnder18Warning ? (
+        <Under18Warning message={t("feedback.under18Warning")} />
+      ) : null}
       <FormField
         id={`${formId}-email`}
         label={t("fields.email")}

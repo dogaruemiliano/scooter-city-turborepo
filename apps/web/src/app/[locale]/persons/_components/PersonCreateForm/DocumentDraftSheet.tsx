@@ -17,7 +17,7 @@ import {
   SelectValue,
   Textarea,
 } from "@repo/ui/components";
-import { buildDateOnly, dateDigits } from "@repo/ui/lib/date-parts";
+import { buildDateOnly } from "@repo/ui/lib/date-parts";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 
@@ -31,7 +31,6 @@ import type {
   FormErrors,
   SetPersonDocumentValue,
 } from "./types";
-import { Under18Warning } from "./Under18Warning";
 import { DatePartsInput } from "@/components/DateField";
 
 export function DocumentDraftSheet({
@@ -40,7 +39,6 @@ export function DocumentDraftSheet({
   documentId,
   fieldErrors,
   locale,
-  showUnder18Warning,
   disabled,
   onSave,
   onSetDocumentValue,
@@ -64,7 +62,6 @@ export function DocumentDraftSheet({
     fieldErrors[documentFieldErrorKey(document.key, "series")];
   const numberError =
     fieldErrors[documentFieldErrorKey(document.key, "number")];
-  const cnpError = fieldErrors[documentFieldErrorKey(document.key, "cnp")];
   const issuingCountryCodeError =
     fieldErrors[documentFieldErrorKey(document.key, "issuingCountryCode")];
   const issuedByError =
@@ -185,37 +182,6 @@ export function DocumentDraftSheet({
             </FormField>
           )}
 
-          {isNationalId || document.cnp ? (
-            <>
-              <FormField
-                id={`${documentId}-cnp`}
-                extractionKey={`document.${document.key}.cnp`}
-                label={t("fields.documentCnp")}
-                required={document.required}
-                error={cnpError}
-              >
-                <Input
-                  id={`${documentId}-cnp`}
-                  aria-describedby={fieldErrorId(`${documentId}-cnp`, cnpError)}
-                  aria-invalid={invalidAria(cnpError)}
-                  name="documentCnp"
-                  inputMode="numeric"
-                  maxLength={13}
-                  value={document.cnp}
-                  onChange={(event) =>
-                    onSetDocumentValue(
-                      document.key,
-                      "cnp",
-                      dateDigits(event.target.value, 13),
-                    )
-                  }
-                />
-              </FormField>
-              {showUnder18Warning ? (
-                <Under18Warning message={t("feedback.under18Warning")} />
-              ) : null}
-            </>
-          ) : null}
           <FormField
             id={`${documentId}-issued-by`}
             extractionKey={`document.${document.key}.issuedBy`}

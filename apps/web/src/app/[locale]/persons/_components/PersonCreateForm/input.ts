@@ -25,6 +25,9 @@ export function createPersonInput(
     phone: normalizePhoneForSubmit(form),
     firstName: form.firstName,
     lastName: form.lastName,
+    ...(form.cnp.trim() || form.citizenship === "romanian"
+      ? { cnp: form.cnp }
+      : {}),
   };
 
   if (form.citizenship === "foreign") {
@@ -40,10 +43,7 @@ export function createPersonInput(
 
     addOptional(input, "dateOfBirth", dateOfBirth.value);
   } else {
-    const nationalId = form.documents.find(
-      (document) => document.type === "nationalId",
-    );
-    const dateOfBirth = v1.persons.getDateOfBirthFromCnp(nationalId?.cnp);
+    const dateOfBirth = v1.persons.getDateOfBirthFromCnp(form.cnp);
 
     addOptional(input, "dateOfBirth", dateOfBirth ?? undefined);
   }
@@ -129,11 +129,6 @@ function createDocumentInput(document: CreatePersonDocumentFormState): {
     input.licenseCategories = document.licenseCategories;
   addOptional(input, "series", document.series);
   addOptional(input, "number", document.number);
-  if (document.required && document.type === "nationalId") {
-    input.cnp = document.cnp;
-  } else {
-    addOptional(input, "cnp", document.cnp);
-  }
   addOptional(input, "issuingCountryCode", document.issuingCountryCode);
   addOptional(input, "issuedBy", document.issuedBy);
   addOptional(input, "issuedOn", issuedOn.value);

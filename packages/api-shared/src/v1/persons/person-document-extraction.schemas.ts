@@ -10,6 +10,7 @@ import {
 export const PERSON_EXTRACTION_PERSON_FIELDS = [
   "firstName",
   "lastName",
+  "cnp",
   "dateOfBirth",
   "addressLine1",
   "addressLine2",

@@ -73,7 +73,15 @@ export class PersonDocumentExtractionService {
     }
 
     let suggestions: v1.persons.PersonDocumentExtractionSuggestion[] = [];
-    for (const suggestion of raw.suggestions) {
+    for (const rawSuggestion of raw.suggestions) {
+      const suggestion =
+        rawSuggestion.field === "cnp"
+          ? {
+              ...rawSuggestion,
+              target: "person" as const,
+              field: "cnp" as const,
+            }
+          : rawSuggestion;
       const fieldSchema =
         suggestion.target === "person"
           ? v1.persons.createPersonInputSchema.shape[suggestion.field]
@@ -122,7 +130,7 @@ export class PersonDocumentExtractionService {
       (item) => item.target === "person" && item.field === "dateOfBirth",
     );
     const cnps = suggestions.filter(
-      (item) => item.target === "document" && item.field === "cnp",
+      (item) => item.target === "person" && item.field === "cnp",
     );
     if (
       cnps.some((cnp) =>

@@ -23,6 +23,7 @@ export function toPerson(row: PersonWithDocuments): v1.persons.Person {
     phone: row.phone,
     firstName: row.firstName,
     lastName: row.lastName,
+    cnp: row.cnp,
     dateOfBirth: toDateOnlyString(row.dateOfBirth),
     addressLine1: row.addressLine1,
     addressLine2: row.addressLine2,

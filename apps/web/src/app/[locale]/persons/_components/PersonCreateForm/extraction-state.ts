@@ -272,9 +272,11 @@ function collectCandidates(state: ExtractionState) {
     });
     for (const suggestion of reading.result.suggestions) {
       const key: ExtractionFieldKey =
-        suggestion.target === "person"
-          ? `person.${suggestion.field}`
-          : `document.${document.key}.${suggestion.field}`;
+        suggestion.field === "cnp"
+          ? "person.cnp"
+          : suggestion.target === "person"
+            ? `person.${suggestion.field}`
+            : `document.${document.key}.${suggestion.field}`;
       const value =
         key === "person.region"
           ? normalizeRomanianCounty(suggestion.value)

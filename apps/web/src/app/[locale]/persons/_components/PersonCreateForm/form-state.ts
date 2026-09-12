@@ -26,6 +26,7 @@ export function createEmptyCreateForm(
     phoneNationalNumber: "",
     firstName: "",
     lastName: "",
+    cnp: "",
     dateOfBirth: emptyDateParts(),
     addressLine1: "",
     addressLine2: "",
@@ -210,12 +211,7 @@ export function hasSelectedDocumentPhoto(
 
 export function isUnder18Person(form: CreatePersonFormState): boolean {
   const dateOfBirth =
-    form.citizenship === "romanian"
-      ? v1.persons.getDateOfBirthFromCnp(
-          form.documents.find((document) => document.type === "nationalId")
-            ?.cnp,
-        )
-      : buildDateOnly(form.dateOfBirth).value;
-
+    v1.persons.getDateOfBirthFromCnp(form.cnp) ??
+    buildDateOnly(form.dateOfBirth).value;
   return v1.persons.isUnder18FromDateOfBirth(dateOfBirth);
 }

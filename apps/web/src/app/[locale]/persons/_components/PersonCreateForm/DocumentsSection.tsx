@@ -1,7 +1,5 @@
 "use client";
 
-import { v1 } from "@repo/api-shared";
-
 import {
   BottomSheet,
   BottomSheetContent,
@@ -184,13 +182,7 @@ export function DocumentsSection({
               documentId={`${formId}-document-${activeDocument.key}`}
               fieldErrors={fieldErrors}
               locale={locale}
-              showUnder18Warning={
-                activeDocument.type === "nationalId"
-                  ? v1.persons.isUnder18FromDateOfBirth(
-                      v1.persons.getDateOfBirthFromCnp(activeDocument.cnp),
-                    )
-                  : showUnder18Warning
-              }
+              showUnder18Warning={showUnder18Warning}
               disabled={disabled}
               onSave={saveDocument}
               onSetDocumentValue={(_documentKey, key, value) =>

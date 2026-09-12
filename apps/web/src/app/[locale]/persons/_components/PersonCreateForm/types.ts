@@ -24,6 +24,7 @@ export type PersonFormFieldKey =
   | "phone"
   | "firstName"
   | "lastName"
+  | "cnp"
   | "dateOfBirth"
   | "addressLine1"
   | "addressLine2"
@@ -91,6 +92,7 @@ export interface CreatePersonFormState {
   phoneNationalNumber: string;
   firstName: string;
   lastName: string;
+  cnp: string;
   dateOfBirth: DateParts;
   addressLine1: string;
   addressLine2: string;

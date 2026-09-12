@@ -232,7 +232,7 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
         : t("feedback.validation.invalidPhone");
     }
 
-    if (isDocumentFieldErrorKey(field, "cnp")) {
+    if (field === "cnp" || isDocumentFieldErrorKey(field, "cnp")) {
       return t("feedback.validation.invalidCnp");
     }
 
@@ -309,6 +309,8 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
         return t("fields.phone");
       case "firstName":
         return t("fields.firstName");
+      case "cnp":
+        return t("fields.documentCnp");
       case "lastName":
         return t("fields.lastName");
       case "dateOfBirth":
@@ -795,15 +797,16 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
   }
 }
 
-function personCreateConflict(
-  error: unknown,
-): { field: Extract<FormErrorKey, "email" | "phone">; message: string } | null {
+function personCreateConflict(error: unknown): {
+  field: Extract<FormErrorKey, "email" | "phone" | "cnp">;
+  message: string;
+} | null {
   if (!(error instanceof ApiError) || error.status !== 409) {
     return null;
   }
 
   const field = conflictField(error.details);
-  if (field !== "email" && field !== "phone") {
+  if (field !== "email" && field !== "phone" && field !== "cnp") {
     return null;
   }
 

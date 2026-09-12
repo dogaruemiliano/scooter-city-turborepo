@@ -14,6 +14,9 @@ import cookieParser from "cookie-parser";
 import { createHash } from "node:crypto";
 import type { Server } from "node:http";
 import { Readable } from "node:stream";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { Client } from "pg";
 import request from "supertest";
 
 import { AppModule } from "../src/app.module";
@@ -275,7 +278,7 @@ describe("Persons HTTP surface (e2e)", () => {
           type: "nationalId",
           series: "RX",
           number: "123456",
-          cnp: "1900228123450",
+          cnp: overrides.cnp ?? undefined,
           issuingCountryCode: "RO",
           issuedBy: "SPCLEP Bucuresti",
           issuedOn: "2024-01-15",
@@ -310,6 +313,50 @@ describe("Persons HTTP surface (e2e)", () => {
     }
   }
 
+  it("backfills only unambiguous legacy CNPs without deleting document history", async () => {
+    const client = new Client({ connectionString: process.env.DATABASE_URL });
+    await client.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query(
+        'CREATE TEMP TABLE "Person" (id text PRIMARY KEY) ON COMMIT DROP',
+      );
+      await client.query(
+        'CREATE TEMP TABLE "PersonDocument" ("personId" text, cnp text) ON COMMIT DROP',
+      );
+      await client.query(`INSERT INTO "Person" VALUES ('one'), ('conflict'), ('duplicate'), ('empty');
+        INSERT INTO "PersonDocument" VALUES
+        ('one', '1900228123450'), ('one', ' 1900228123450 '),
+        ('conflict', '1900228123469'), ('conflict', '1900228123477'),
+        ('duplicate', '1900228123469'), ('empty', NULL)`);
+      await client.query(
+        readFileSync(
+          join(
+            __dirname,
+            "../prisma/migrations/20260912140000_person_cnp/migration.sql",
+          ),
+          "utf8",
+        ),
+      );
+      const result = await client.query(
+        'SELECT id, cnp FROM "Person" ORDER BY id',
+      );
+      expect(result.rows).toEqual([
+        { id: "conflict", cnp: null },
+        { id: "duplicate", cnp: null },
+        { id: "empty", cnp: null },
+        { id: "one", cnp: "1900228123450" },
+      ]);
+      const documents = await client.query<{ count: number }>(
+        'SELECT count(*)::int AS count FROM "PersonDocument"',
+      );
+      expect(documents.rows[0].count).toBe(6);
+    } finally {
+      await client.query("ROLLBACK");
+      await client.end();
+    }
+  });
+
   it("requires authentication", async () => {
     const res = await req().get(v1.persons.ROUTES.list);
     expect(res.status).toBe(401);
@@ -325,9 +372,70 @@ describe("Persons HTTP surface (e2e)", () => {
     expect(res.status).toBe(403);
   });
 
+  it("keeps a unique person CNP when an ID is replaced", async () => {
+    const session = await freshSession(["ADMIN"]);
+    const cookie = [`access_token=${session.accessToken}`];
+    const cnp = "1900228123469";
+    const create = await req()
+      .post(v1.persons.ROUTES.create)
+      .set("Cookie", cookie)
+      .send(personInput({ cnp, dateOfBirth: undefined }));
+    expect(create.status).toBe(201);
+    const person = v1.persons.personSchema.parse(create.body);
+    expect(person.cnp).toBe(cnp);
+    expect(person.dateOfBirth).toBe("1990-02-28");
+
+    const duplicate = await req()
+      .post(v1.persons.ROUTES.create)
+      .set("Cookie", cookie)
+      .send(personInput({ cnp }));
+    expect(duplicate.status).toBe(409);
+
+    const wrongBirthDate = await req()
+      .patch(v1.persons.ROUTES.update(person.id))
+      .set("Cookie", cookie)
+      .send({ dateOfBirth: "1991-02-28" });
+    expect(wrongBirthDate.status).toBe(400);
+
+    const replacement = await req()
+      .post(
+        v1.persons.ROUTES.documents.replace(person.id, person.documents[0].id),
+      )
+      .set("Cookie", cookie)
+      .send({
+        type: "nationalId",
+        series: "RX",
+        number: "999999",
+        issuingCountryCode: "RO",
+        expiresOn: "2035-01-31",
+      });
+    expect(replacement.status).toBe(201);
+    const replacementDocument = v1.persons.personDocumentSchema.parse(
+      replacement.body,
+    );
+    expect(replacementDocument.cnp).toBeNull();
+    const after = await req()
+      .get(v1.persons.ROUTES.get(person.id))
+      .set("Cookie", cookie);
+    expect(v1.persons.personSchema.parse(after.body).cnp).toBe(cnp);
+
+    const incorrectDocumentCnp = await req()
+      .patch(
+        v1.persons.ROUTES.documents.update(person.id, replacementDocument.id),
+      )
+      .set("Cookie", cookie)
+      .send({ cnp: "1900228123450" });
+    expect(incorrectDocumentCnp.status).toBe(400);
+    expectAuditPayloadToOmit(
+      await listAuditEvents(person.id, session.accessToken),
+      [cnp],
+    );
+  });
+
   it("lets admins create, list, get, update, and soft-delete persons", async () => {
     const session = await freshSession(["ADMIN"]);
     const input = personInput({
+      cnp: "1900228123450",
       firstName: "  Grace ",
       lastName: " Hopper ",
     });
@@ -341,6 +449,7 @@ describe("Persons HTTP surface (e2e)", () => {
     expect(createRes.status).toBe(201);
     expect(created.email).toBe(input.email);
     expect(created.phone).toBe(input.phone);
+    expect(created.cnp).toBe("1900228123450");
     expect(created.firstName).toBe("Grace");
     expect(created.lastName).toBe("Hopper");
     expect(created.documents).toHaveLength(1);
@@ -993,7 +1102,7 @@ describe("Persons HTTP surface (e2e)", () => {
           type: "nationalId",
           series: "DR",
           number: "777777",
-          cnp: "1900228123450",
+
           issuingCountryCode: "RO",
           issuedBy: "SPCLEP Bucuresti",
           issuedOn: "2024-01-15",

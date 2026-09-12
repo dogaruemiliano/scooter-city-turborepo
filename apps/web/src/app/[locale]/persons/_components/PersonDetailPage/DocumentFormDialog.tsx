@@ -257,13 +257,7 @@ export function DocumentFormDialog({
                 value={form.number}
                 onChange={(value) => setValue("number", value)}
               />
-              {!isDriverLicense ? (
-                <TextInputField
-                  label={t("fields.documentCnp")}
-                  value={form.cnp}
-                  onChange={(value) => setValue("cnp", value)}
-                />
-              ) : null}
+
               <TextInputField
                 label={t("fields.documentIssuingCountryCode")}
                 value={form.issuingCountryCode}

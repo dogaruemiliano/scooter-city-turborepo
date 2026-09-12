@@ -55,6 +55,7 @@ model Person {
   phone        String           @unique
   firstName    String
   lastName     String
+  cnp          String?          @unique
   dateOfBirth  DateTime?        @db.Date
   addressLine1 String?
   addressLine2 String?

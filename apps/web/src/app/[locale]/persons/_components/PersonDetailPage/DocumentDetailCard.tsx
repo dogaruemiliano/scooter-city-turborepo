@@ -182,12 +182,7 @@ export function DocumentDetailCard({
               label={t("fields.documentNumber")}
               value={maskSensitiveValue(document.number, emptyValue)}
             />
-            {!isDriverLicense ? (
-              <DetailField
-                label={t("fields.documentCnp")}
-                value={maskSensitiveValue(document.cnp, emptyValue)}
-              />
-            ) : null}
+
             <DetailField
               label={t("fields.documentIssuingCountryCode")}
               value={formatCountryName(

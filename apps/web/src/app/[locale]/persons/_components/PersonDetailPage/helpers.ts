@@ -148,7 +148,6 @@ export function documentFormInput(
       : {}),
     series: blankToNull(form.series),
     number: blankToNull(form.number),
-    cnp: blankToNull(form.cnp),
     issuingCountryCode: blankToNull(form.issuingCountryCode),
     issuedBy: blankToNull(form.issuedBy),
     issuedOn: blankToNull(form.issuedOn),
@@ -181,7 +180,6 @@ export function documentFormHasChanges(
       JSON.stringify(document.licenseCategories ?? []) ||
     input.series !== document.series ||
     input.number !== document.number ||
-    input.cnp !== document.cnp ||
     input.issuingCountryCode !== document.issuingCountryCode ||
     input.issuedBy !== document.issuedBy ||
     input.issuedOn !== document.issuedOn ||
@@ -309,6 +307,7 @@ function auditFieldLabel(field: string, t: PersonsTranslations): string {
       return t("fields.documentSeries");
     case "document.number":
       return t("fields.documentNumber");
+    case "cnp":
     case "document.cnp":
       return t("fields.documentCnp");
     case "document.issuingCountryCode":

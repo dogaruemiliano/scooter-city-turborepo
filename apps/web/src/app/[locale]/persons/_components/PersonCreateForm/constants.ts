@@ -60,6 +60,7 @@ export const PERSON_FORM_FIELD_KEYS = new Set<PersonFormFieldKey>([
   "phone",
   "firstName",
   "lastName",
+  "cnp",
   "dateOfBirth",
   "addressLine1",
   "addressLine2",

@@ -252,7 +252,8 @@ describe("PersonCreateForm wizard", () => {
     expect(screen.getByLabelText("Phone")).toHaveValue("749096855");
     expect(screen.getByLabelText("First name")).toHaveValue("Grace");
     const dialog = await openNationalIdSheet(browser);
-    expect(within(dialog).getByLabelText("CNP")).toHaveValue("1900228123450");
+    expect(within(dialog).queryByLabelText("CNP")).toBeNull();
+    expect(screen.getByLabelText("CNP")).toHaveValue("1900228123450");
     await browser.click(within(dialog).getByRole("button", { name: "Cancel" }));
     await waitFor(() => expect(dialog).not.toBeInTheDocument());
     expect(mocks.s3Fetch).toHaveBeenCalledOnce();
@@ -271,7 +272,7 @@ describe("PersonCreateForm wizard", () => {
     const dialog = await openNationalIdSheet(browser);
     changeDialogField(dialog, "Series", "rx");
     changeDialogField(dialog, "Number", "123456");
-    changeDialogField(dialog, "CNP", "1900228123450");
+    changeField("CNP", "1900228123450");
     changeDialogField(dialog, "Issued by", "SPCLEP Bucuresti");
     fillDialogDateParts(dialog, "Issued on", {
       day: "15",
@@ -293,6 +294,7 @@ describe("PersonCreateForm wizard", () => {
         method: "POST",
         json: {
           documentWorkflow: "romanianClassic",
+          cnp: "1900228123450",
           email: "rider@example.com",
           phone: "+40749096855",
           firstName: "Grace",
@@ -311,7 +313,6 @@ describe("PersonCreateForm wizard", () => {
               nationalIdFormat: "classic",
               series: "RX",
               number: "123456",
-              cnp: "1900228123450",
               issuingCountryCode: "RO",
               issuedBy: "SPCLEP Bucuresti",
               issuedOn: "2024-01-15",
@@ -648,10 +649,9 @@ describe("PersonCreateForm wizard", () => {
   it("shows the Romanian under-18 warning from the entered CNP", async () => {
     const browser = userEvent.setup();
     await renderReviewForm(browser);
-    const dialog = await openNationalIdSheet(browser);
-    changeDialogField(dialog, "CNP", "5100626123456");
+    changeField("CNP", "5100626123456");
     expect(
-      await within(dialog).findByText(
+      await screen.findByText(
         "This person is under 18 years old. Review eligibility before continuing.",
       ),
     ).toBeInTheDocument();
@@ -934,8 +934,8 @@ async function openNationalIdSheet(
 async function saveNationalIdDocument(
   browser: ReturnType<typeof userEvent.setup>,
 ) {
+  changeField("CNP", "1900228123450");
   const dialog = await openNationalIdSheet(browser);
-  changeDialogField(dialog, "CNP", "1900228123450");
   await browser.click(
     within(dialog).getByRole("switch", { name: "Document has expiry date?" }),
   );
