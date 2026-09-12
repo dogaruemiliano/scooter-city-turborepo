@@ -1,7 +1,6 @@
 "use client";
 
 import { Button } from "@repo/ui/components";
-import { Globe2Icon } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import type { PersonCitizenship } from "./types";
@@ -46,9 +45,11 @@ export function CitizenshipChoice({
           className="h-auto min-h-48 flex-col gap-4 rounded-xl p-6 whitespace-normal md:h-auto"
           onClick={() => onChange("foreign")}
         >
-          <Globe2Icon
-            aria-hidden="true"
-            className="size-10! text-muted-foreground"
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/icons/international.svg"
+            alt=""
+            className="size-10 object-contain"
           />
           <span className="text-base font-semibold">
             {t("citizenship.foreign")}
