@@ -266,7 +266,7 @@ describe("PersonCreateForm wizard", () => {
     await browser.selectOptions(screen.getByLabelText("County"), "București");
     changeField("Address line 1", "1 Rental Street");
     changeField("Address line 2", "Apt 4");
-    changeField("City", "Bucharest");
+    changeField("City / locality", "Bucharest");
     changeField("Postal code", "010101");
     changeField("Notes", "Frequent rider");
     const dialog = await openNationalIdSheet(browser);
@@ -705,6 +705,56 @@ describe("PersonCreateForm wizard", () => {
 });
 
 describe("document extraction review", () => {
+  it("fills county, locality and person CNP from the national ID and keeps them editable", async () => {
+    mocks.extractDocument.mockResolvedValue({
+      documentType: "nationalId",
+      detectedDocumentType: "nationalId",
+      sourceUploadIds: ["source"],
+      reviewRequired: true,
+      licenseCategories: [],
+      warnings: [],
+      suggestions: [
+        {
+          target: "person",
+          field: "cnp",
+          value: "1900228123450",
+          sourceSlot: "front",
+          needsReview: false,
+        },
+        {
+          target: "person",
+          field: "region",
+          value: "Vâlcea",
+          sourceSlot: "front",
+          needsReview: false,
+        },
+        {
+          target: "person",
+          field: "city",
+          value: "Râmnicu Vâlcea",
+          sourceSlot: "front",
+          needsReview: false,
+        },
+      ],
+    });
+    const browser = userEvent.setup();
+    await renderReviewForm(browser);
+    expect(screen.getByLabelText("CNP")).toHaveValue("1900228123450");
+    expect(screen.getByLabelText("County")).toHaveValue("Vâlcea");
+    expect(screen.getByLabelText("City / locality")).toHaveValue(
+      "Râmnicu Vâlcea",
+    );
+    changeField("City / locality", "Drăgășani");
+    expect(screen.getByLabelText("City / locality")).toHaveValue("Drăgășani");
+    await browser.click(
+      screen.getByRole("button", { name: /^(Add|Edit) National ID$/ }),
+    );
+    const dialog = await screen.findByRole("dialog", {
+      name: /^(Add|Edit) document$/,
+    });
+    expect(within(dialog).queryByLabelText("CNP")).not.toBeInTheDocument();
+  });
+
   it("prefills editable fields with visible sources and uncertainty", async () => {
     mocks.extractDocument.mockResolvedValue(extractedPassport());
     const browser = userEvent.setup();

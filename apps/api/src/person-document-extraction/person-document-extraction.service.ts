@@ -3,6 +3,7 @@ import { v1 } from "@repo/api-shared";
 
 import { DocumentExtractionError } from "../document-extraction/document-extraction.errors";
 import { personDocumentModelOutputSchema } from "./person-document-extraction.schema";
+import { normalizePersonAddressSuggestions } from "./person-address";
 import { capitalizeExtractedName } from "./person-name";
 import {
   PERSON_DOCUMENT_EXTRACTION_MAX_SOURCE_BYTES,
@@ -73,7 +74,10 @@ export class PersonDocumentExtractionService {
     }
 
     let suggestions: v1.persons.PersonDocumentExtractionSuggestion[] = [];
-    for (const rawSuggestion of raw.suggestions) {
+    for (const rawSuggestion of normalizePersonAddressSuggestions(
+      raw.suggestions,
+      input.documentType,
+    )) {
       const suggestion =
         rawSuggestion.field === "cnp"
           ? {
@@ -214,6 +218,13 @@ export class PersonDocumentExtractionService {
     );
     if (!suggestions.length && !consistentCategories.length)
       warnings.add("noData");
+
+    // Apply the response limit after conflict detection so truncation cannot
+    // turn an ambiguous value into a confident autofill.
+    if (suggestions.length > 64) {
+      warnings.add("invalidValue");
+      suggestions = suggestions.slice(0, 64);
+    }
 
     return v1.persons.personDocumentExtractionContentSchema.parse({
       detectedDocumentType: raw.detectedDocumentType,

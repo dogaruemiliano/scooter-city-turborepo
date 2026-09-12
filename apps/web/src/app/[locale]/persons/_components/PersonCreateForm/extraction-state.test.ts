@@ -84,6 +84,27 @@ describe("person document extraction reconciliation", () => {
     ]);
   });
 
+  it("fills Romanian county codes and locality independently without overwriting manual locality edits", () => {
+    let state = read(initial(), [
+      person("countryCode", "RO"),
+      person("region", "VL"),
+      person("city", "Râmnicu Vâlcea"),
+    ]);
+    expect(state.form.region).toBe("Vâlcea");
+    expect(state.form.city).toBe("Râmnicu Vâlcea");
+    state.form.city = "Drăgășani";
+    state = markExtractionFieldEdited(state, "person.city");
+    state = read(
+      state,
+      [person("region", "VL"), person("city", "Râmnicu Vâlcea")],
+      { signature: "photo-v2" },
+    );
+    expect(state.form.city).toBe("Drăgășani");
+    expect(state.fields["person.city"]?.suggestions[0]?.value).toBe(
+      "Râmnicu Vâlcea",
+    );
+  });
+
   it("preserves both manually typed values and intentional clears", () => {
     let state = initial();
     state.form.firstName = "Operator's value";

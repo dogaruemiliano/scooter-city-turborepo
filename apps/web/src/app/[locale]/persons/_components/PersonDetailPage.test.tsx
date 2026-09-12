@@ -279,7 +279,8 @@ describe("PersonDetailPage", () => {
         ?.parentElement,
     );
     expect(
-      screen.getByText("City", { selector: "dt" }).parentElement?.parentElement,
+      screen.getByText("City / locality", { selector: "dt" }).parentElement
+        ?.parentElement,
     ).toBe(
       screen.getByText("Postal code", { selector: "dt" }).parentElement
         ?.parentElement,

@@ -71,6 +71,118 @@ describe("person-document extraction normalization", () => {
     expect(result).not.toHaveProperty("status");
   });
 
+  it("splits printed county and locality labels with source attribution", async () => {
+    const { service } = setup({
+      suggestions: [
+        suggestion("person", "region", "Jud.VL Mun.RÂMNICU VÂLCEA", "back"),
+        suggestion(
+          "person",
+          "addressLine1",
+          "Jud.VL Mun.RÂMNICU VÂLCEA Str.Exemplu Nr.12",
+          "back",
+        ),
+      ],
+    });
+    const result = await service.analyze(input);
+    expect(result.suggestions).toEqual([
+      suggestion("person", "region", "Vâlcea", "back"),
+      suggestion("person", "city", "Râmnicu Vâlcea", "back"),
+      suggestion(
+        "person",
+        "addressLine1",
+        "Jud.VL Mun.RÂMNICU VÂLCEA Str.Exemplu Nr.12",
+        "back",
+      ),
+    ]);
+  });
+
+  it("preserves conflicting locality sources for manual review", async () => {
+    const { service } = setup({
+      suggestions: [
+        suggestion("person", "addressLine1", "Jud.VL Mun.Râmnicu Vâlcea"),
+        suggestion("person", "city", "Drăgășani", "back"),
+      ],
+    });
+    const result = await service.analyze(input);
+    expect(result.warnings).toContain("conflictingSources");
+    expect(result.suggestions.filter((item) => item.field === "city")).toEqual([
+      { ...suggestion("person", "city", "Râmnicu Vâlcea"), needsReview: true },
+      {
+        ...suggestion("person", "city", "Drăgășani", "back"),
+        needsReview: true,
+      },
+    ]);
+  });
+
+  it("keeps a plain city whose name also matches a county", async () => {
+    const { service } = setup({
+      suggestions: [suggestion("person", "city", "IAȘI")],
+    });
+    const result = await service.analyze(input);
+    expect(result.suggestions).toEqual([suggestion("person", "city", "Iași")]);
+  });
+
+  it("also parses Romanian residence proofs for foreign citizens", async () => {
+    const { service } = setup({
+      detectedDocumentType: "proofOfAddress",
+      suggestions: [
+        suggestion(
+          "person",
+          "addressLine1",
+          "Jud.CJ Com.Florești Sat.Luna de Sus Str.Principală",
+        ),
+      ],
+    });
+    const result = await service.analyze({
+      ...input,
+      documentType: "proofOfAddress",
+    });
+    expect(result.suggestions).toContainEqual(
+      suggestion("person", "region", "Cluj"),
+    );
+    expect(
+      result.suggestions.find((item) => item.field === "city")?.value,
+    ).toMatch(/^Luna [Dd]e Sus$/u);
+  });
+
+  it("retains conflict warnings when expanded address suggestions reach the response limit", async () => {
+    const { service } = setup({
+      suggestions: [
+        ...Array.from({ length: 63 }, (_, index) =>
+          suggestion("person", "firstName", `Name${index}`),
+        ),
+        suggestion("person", "addressLine1", "Jud.VL Mun.Râmnicu Vâlcea"),
+      ],
+    });
+    const result = await service.analyze(input);
+    expect(result.suggestions).toHaveLength(64);
+    expect(result.warnings).toEqual(
+      expect.arrayContaining(["invalidValue", "conflictingSources"]),
+    );
+    expect(
+      result.suggestions
+        .filter((item) => item.field === "firstName")
+        .every((item) => item.needsReview),
+    ).toBe(true);
+  });
+
+  it("does not reinterpret foreign addresses as Romanian counties", async () => {
+    const { service } = setup({
+      suggestions: [
+        suggestion("person", "countryCode", "IT"),
+        suggestion("person", "region", "AB"),
+        suggestion("person", "city", "Alba"),
+      ],
+    });
+    const result = await service.analyze(input);
+    expect(result.suggestions).toContainEqual(
+      suggestion("person", "region", "AB"),
+    );
+    expect(result.suggestions).toContainEqual(
+      suggestion("person", "city", "Alba"),
+    );
+  });
+
   it("keeps good fields while omitting invalid CNP, date, future issue date and unknown country", async () => {
     const { service } = setup({
       suggestions: [

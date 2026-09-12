@@ -422,17 +422,4 @@ function updateDocument(
   };
 }
 
-export function normalizeRomanianCounty(value: string): string {
-  const normalized = (text: string) =>
-    text
-      .normalize("NFD")
-      .replace(/\p{Diacritic}/gu, "")
-      .toLowerCase()
-      .replace(/^(judetul|jud\.?|municipiul)\s+/u, "")
-      .replace(/[\s-]/gu, "");
-  return (
-    ROMANIAN_COUNTIES.find(
-      (county) => normalized(county) === normalized(value),
-    ) ?? value
-  );
-}
+export const normalizeRomanianCounty = v1.persons.normalizeRomanianCounty;
