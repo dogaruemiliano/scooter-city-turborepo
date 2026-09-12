@@ -31,6 +31,7 @@ const person: v1.persons.Person = {
   id: "person-1",
   email: "ada@example.com",
   phone: "+40712345678",
+  cnp: "1900228123450",
   firstName: "Ada",
   lastName: "Lovelace",
   dateOfBirth: "1990-02-28",
@@ -57,6 +58,7 @@ describe("PersonEditForm", () => {
   it("prefills contact fields including the split phone input", () => {
     renderEditForm();
 
+    expect(screen.getByLabelText("CNP")).toHaveValue("1900228123450");
     expect(screen.getByLabelText("First name")).toHaveValue("Ada");
     expect(screen.getByLabelText("Phone country")).toHaveValue("RO");
     expect(screen.getByLabelText("Phone")).toHaveValue("712345678");
@@ -92,6 +94,26 @@ describe("PersonEditForm", () => {
     );
     expect(mocks.push).toHaveBeenCalledWith("/en/persons/person-1");
     expect(mocks.refresh).toHaveBeenCalledOnce();
+  });
+
+  it("validates and saves a corrected person CNP without changing documents", async () => {
+    const browser = userEvent.setup();
+    mocks.apiFetch.mockResolvedValueOnce(person);
+    renderEditForm();
+    const cnp = screen.getByLabelText("CNP");
+    await browser.clear(cnp);
+    await browser.type(cnp, "123");
+    await browser.click(screen.getByRole("button", { name: "Save" }));
+    expect(mocks.apiFetch).not.toHaveBeenCalled();
+    expect(cnp).toHaveAttribute("aria-invalid", "true");
+
+    await browser.clear(cnp);
+    await browser.type(cnp, "1900228123469");
+    await browser.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(mocks.apiFetch).toHaveBeenCalledOnce());
+    const payload = mocks.apiFetch.mock.calls[0]?.[2].json;
+    expect(payload.cnp).toBe("1900228123469");
+    expect(payload).not.toHaveProperty("documents");
   });
 
   it("validates a field when it loses focus, not before", async () => {

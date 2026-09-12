@@ -90,6 +90,7 @@ export function formatDateTime(value: string, locale: string): string {
 
 export function personFormState(person: v1.persons.Person): PersonFormState {
   return {
+    cnp: person.cnp ?? "",
     email: person.email,
     phone: person.phone,
     firstName: person.firstName,

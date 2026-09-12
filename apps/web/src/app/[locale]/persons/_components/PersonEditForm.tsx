@@ -90,6 +90,9 @@ export function PersonEditForm({ person, personHref }: PersonEditFormProps) {
             <FormField name="lastName" label={t("fields.lastName")} required>
               <FormInput />
             </FormField>
+            <FormField name="cnp" label={t("fields.documentCnp")}>
+              <FormInput inputMode="numeric" maxLength={13} />
+            </FormField>
             <FormField name="email" label={t("fields.email")} required>
               <FormInput type="email" />
             </FormField>

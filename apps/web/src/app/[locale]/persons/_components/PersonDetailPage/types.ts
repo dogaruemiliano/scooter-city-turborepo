@@ -23,6 +23,7 @@ export type DocumentPhotosByDocumentId = Record<
 >;
 
 export interface PersonFormState {
+  cnp: string;
   email: string;
   phone: string;
   firstName: string;
