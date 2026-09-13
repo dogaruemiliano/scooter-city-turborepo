@@ -46,7 +46,18 @@ function exampleFor(value: unknown): string {
 function lineFor(key: string, field: FieldSchema, required: boolean): string[] {
   const out: string[] = [];
   if (field.description) {
-    out.push(...field.description.split("\n").map((s) => `# ${s.trim()}`));
+    for (const paragraph of field.description.split("\n")) {
+      const words = paragraph.trim().split(/\s+/);
+      let line = "#";
+      for (const word of words) {
+        if (line.length + word.length + 1 > 80) {
+          out.push(line);
+          line = "#";
+        }
+        line += ` ${word}`;
+      }
+      out.push(line);
+    }
   }
   out.push(
     `# Required: ${required && field.default === undefined ? "yes" : "no"}`,
@@ -82,8 +93,46 @@ function generate(): string {
     "",
   ];
 
-  for (const [key, field] of Object.entries(json.properties)) {
-    blocks.push(...lineFor(key, field, requiredSet.has(key)), "");
+  blocks.push(
+    "# Grouped by feature; switches sit beside their settings and credentials.",
+    "# Values below are schema defaults. Blank values have no schema default.",
+    "# Optional providers may require credentials when enabled; see descriptions.",
+    "",
+  );
+  const sections: Array<[string, RegExp]> = [
+    [
+      "Application and HTTP",
+      /^(NODE_ENV|PORT|APP_BASE_URL|API_BASE_URL|HEALTH_MAX_HEAP_MB|COOKIE_DOMAIN|CORS_ORIGINS)$/,
+    ],
+    ["Database", /^DATABASE_/],
+    ["Image and document storage", /^IMAGE_STORAGE_/],
+    ["AWS credentials", /^AWS_/],
+    ["Receipt extraction", /^DOCUMENT_EXTRACTION_/],
+    ["Person document extraction", /^PERSON_DOCUMENT_EXTRACTION_/],
+    [
+      "Sessions and signing keys",
+      /^(JWT_|REFRESH_TOKEN_|ROTATION_|AUTH_CLEANUP_)/,
+    ],
+    ["Email OTP", /^(AUTH_EMAIL_OTP_|OTP_)/],
+    ["Google sign-in", /^(AUTH_GOOGLE_|GOOGLE_)/],
+    ["Apple sign-in", /^(AUTH_APPLE_|APPLE_)/],
+    ["Email delivery", /^(MAILER_|SMTP_)/],
+    ["SMS delivery", /^(SMS_|SMSO_)/],
+    ["Request limits", /^THROTTLE_/],
+    ["Other settings", /./],
+  ];
+  const remaining = new Map(Object.entries(json.properties));
+  for (const [title, pattern] of sections) {
+    const entries = [...remaining].filter(([key]) => pattern.test(key));
+    if (!entries.length) continue;
+    blocks.push(
+      `# --- ${title} ${"-".repeat(Math.max(0, 68 - title.length))}`,
+      "",
+    );
+    for (const [key, field] of entries) {
+      blocks.push(...lineFor(key, field, requiredSet.has(key)), "");
+      remaining.delete(key);
+    }
   }
 
   return blocks.join("\n");
