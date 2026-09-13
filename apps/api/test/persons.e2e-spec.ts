@@ -671,13 +671,13 @@ describe("Persons HTTP surface (e2e)", () => {
       .set("Cookie", [`access_token=${session.accessToken}`])
       .send({
         phone: newPhone,
-        addressLine1: "  1 Test Street ",
+        addressLine1: "  2 Test Street ",
       });
     const updated = v1.persons.personSchema.parse(updateRes.body);
 
     expect(updateRes.status).toBe(200);
     expect(updated.phone).toBe(newPhone);
-    expect(updated.addressLine1).toBe("1 Test Street");
+    expect(updated.addressLine1).toBe("2 Test Street");
 
     auditEvents = await listAuditEvents(created.id, session.accessToken);
     expect(
@@ -687,7 +687,8 @@ describe("Persons HTTP surface (e2e)", () => {
         expect.objectContaining({ field: "phone", newValue: newPhone }),
         expect.objectContaining({
           field: "addressLine1",
-          newValue: "1 Test Street",
+          oldValue: "1 Test Street",
+          newValue: "2 Test Street",
         }),
       ]),
     );
