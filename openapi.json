@@ -184,6 +184,264 @@
         "tags": ["finance"]
       }
     },
+    "/v1/finance/company-identity": {
+      "get": {
+        "operationId": "FinanceController_getCompanyIdentity_v1",
+        "parameters": [],
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FinanceLegalIdentityResponse_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Get the legal identity used to match company receipts",
+        "tags": ["finance"]
+      },
+      "put": {
+        "operationId": "FinanceController_upsertCompanyIdentity_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertFinanceLegalIdentityInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FinanceLegalIdentity_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Configure the legal identity used to match company receipts",
+        "tags": ["finance"]
+      }
+    },
+    "/v1/finance/company-associates": {
+      "get": {
+        "operationId": "FinanceController_getCompanyAssociates_v1",
+        "parameters": [],
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompanyAssociates_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "List active company associates and ownership shares",
+        "tags": ["finance"]
+      },
+      "put": {
+        "operationId": "FinanceController_updateCompanyAssociates_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCompanyAssociatesInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompanyAssociates_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Replace active company associates and ownership shares",
+        "tags": ["finance"]
+      }
+    },
+    "/v1/finance/suppliers": {
+      "get": {
+        "operationId": "FinanceController_listSuppliers_v1",
+        "parameters": [
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "name": "includeInactive",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupplierList_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "List expense suppliers",
+        "tags": ["finance"]
+      },
+      "post": {
+        "operationId": "FinanceController_createSupplier_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSupplierInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Supplier_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Create an expense supplier",
+        "tags": ["finance"]
+      }
+    },
+    "/v1/finance/suppliers/{supplierId}": {
+      "patch": {
+        "operationId": "FinanceController_updateSupplier_v1",
+        "parameters": [
+          {
+            "name": "supplierId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSupplierInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Supplier_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Update an expense supplier",
+        "tags": ["finance"]
+      }
+    },
     "/v1/finance/accounts": {
       "get": {
         "operationId": "FinanceController_listAccounts_v1",
@@ -220,6 +478,7 @@
                 "PAYABLE_TO_ASSOCIATE",
                 "RECEIVABLE_FROM_ASSOCIATE",
                 "ASSOCIATE_LOAN_PAYABLE",
+                "CONTRIBUTED_CAPITAL",
                 "OPERATING_EXPENSE",
                 "NON_OPERATIONAL_COMPANY_EXPENSE",
                 "ASSOCIATE_POOL_EXPENSE",
@@ -317,6 +576,7 @@
                 "PAYABLE_TO_ASSOCIATE",
                 "RECEIVABLE_FROM_ASSOCIATE",
                 "ASSOCIATE_LOAN_PAYABLE",
+                "CONTRIBUTED_CAPITAL",
                 "OPERATING_EXPENSE",
                 "NON_OPERATIONAL_COMPANY_EXPENSE",
                 "ASSOCIATE_POOL_EXPENSE",
@@ -802,6 +1062,119 @@
         "tags": ["finance"]
       }
     },
+    "/v1/finance/expenses/receipt-draft-upload-url": {
+      "post": {
+        "operationId": "FinanceController_createExpenseReceiptDraftUpload_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateExpenseReceiptDraftUploadInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpenseReceiptDraftUpload_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Create a signed upload URL for a receipt image",
+        "tags": ["finance"]
+      }
+    },
+    "/v1/finance/expenses/extractions": {
+      "post": {
+        "operationId": "FinanceController_analyzeExpenseReceipt_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnalyzeExpenseReceiptInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpenseExtractionDraft_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Analyze an uploaded receipt and create an extraction draft",
+        "tags": ["finance"]
+      }
+    },
+    "/v1/finance/expenses/extractions/{draftId}": {
+      "get": {
+        "operationId": "FinanceController_getExpenseExtractionDraft_v1",
+        "parameters": [
+          {
+            "name": "draftId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpenseExtractionDraft_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Resume one receipt extraction draft",
+        "tags": ["finance"]
+      }
+    },
     "/v1/finance/expenses/preview": {
       "post": {
         "description": "Runs the same posting policy the create endpoint runs, then stops. Nothing is written.",
@@ -889,6 +1262,130 @@
         "tags": ["finance"]
       }
     },
+    "/v1/finance/funding/preview": {
+      "post": {
+        "operationId": "FinanceController_previewAssociateFunding_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewAssociateFundingInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostingPlan_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Preview an associate loan or capital contribution",
+        "tags": ["finance"]
+      }
+    },
+    "/v1/finance/funding/proof-draft-upload-url": {
+      "post": {
+        "operationId": "FinanceController_createFundingProofDraftUpload_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateFundingProofDraftUploadInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FundingProofDraftUpload_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Create a signed upload URL for funding proof",
+        "tags": ["finance"]
+      }
+    },
+    "/v1/finance/funding": {
+      "post": {
+        "operationId": "FinanceController_createAssociateFunding_v1",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Unique client-generated value (a UUID) identifying this command. Retrying with the same key returns the original operation instead of creating a second one.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAssociateFundingInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FinancialOperation_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Record money provided to the company by an associate",
+        "tags": ["finance"]
+      }
+    },
     "/v1/finance/settlements/preview": {
       "post": {
         "description": "Private balancing payments between associates. These are deliberately not netted against what the company separately owes an associate for money they advanced.",
@@ -926,6 +1423,44 @@
         ],
         "summary": "Calculate the company specific-benefit settlement for a period",
         "tags": ["finance"]
+      }
+    },
+    "/v1/persons/document-extraction": {
+      "post": {
+        "operationId": "PersonsController_analyzeDocument_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnalyzePersonDocumentInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonDocumentExtraction_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Extract suggested fields from owned person-document drafts for operator review",
+        "tags": ["persons"]
       }
     },
     "/v1/persons": {
@@ -1019,7 +1554,9 @@
                 "passport",
                 "nationalId",
                 "driverLicense",
+                "visa",
                 "residencePermit",
+                "proofOfAddress",
                 "other"
               ]
             }
@@ -3645,6 +4182,255 @@
         "required": ["items"],
         "additionalProperties": false
       },
+      "FinanceLegalIdentity_Output": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "bookId": {
+            "type": "string"
+          },
+          "legalName": {
+            "type": "string"
+          },
+          "taxIdentifier": {
+            "type": "string"
+          },
+          "nameAliases": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "countryCode": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          }
+        },
+        "required": [
+          "id",
+          "bookId",
+          "legalName",
+          "taxIdentifier",
+          "nameAliases",
+          "countryCode",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "FinanceLegalIdentityResponse_Output": {
+        "type": "object",
+        "properties": {
+          "identity": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FinanceLegalIdentity_Output"
+              }
+            ],
+            "nullable": true
+          }
+        },
+        "required": ["identity"],
+        "additionalProperties": false
+      },
+      "UpsertFinanceLegalIdentityInput": {
+        "type": "object",
+        "properties": {
+          "legalName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "taxIdentifier": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "nameAliases": {
+            "default": [],
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          "countryCode": {
+            "default": "RO",
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2
+          }
+        },
+        "required": ["legalName", "taxIdentifier"],
+        "additionalProperties": false
+      },
+      "CompanyAssociates_Output": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FinanceBookMember_Output"
+            }
+          },
+          "managingOwnerId": {
+            "type": "string"
+          },
+          "canManage": {
+            "type": "boolean"
+          }
+        },
+        "required": ["items", "managingOwnerId", "canManage"],
+        "additionalProperties": false
+      },
+      "UpdateCompanyAssociatesInputCompanyAssociateInput": {
+        "type": "object",
+        "properties": {
+          "associateId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "email": {
+            "type": "string"
+          },
+          "firstName": {
+            "type": "string",
+            "maxLength": 100,
+            "default": null,
+            "nullable": true
+          },
+          "lastName": {
+            "type": "string",
+            "maxLength": 100,
+            "default": null,
+            "nullable": true
+          },
+          "shareBasisPoints": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000
+          }
+        },
+        "required": ["email", "shareBasisPoints"],
+        "additionalProperties": false
+      },
+      "UpdateCompanyAssociatesInput": {
+        "type": "object",
+        "properties": {
+          "associates": {
+            "minItems": 1,
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UpdateCompanyAssociatesInputCompanyAssociateInput"
+            }
+          }
+        },
+        "required": ["associates"],
+        "additionalProperties": false
+      },
+      "Supplier_Output": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "taxIdentifier": {
+            "type": "string"
+          },
+          "isVatPayer": {
+            "type": "boolean"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "taxIdentifier",
+          "isVatPayer",
+          "isActive",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "SupplierList_Output": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Supplier_Output"
+            }
+          }
+        },
+        "required": ["items"],
+        "additionalProperties": false
+      },
+      "CreateSupplierInput": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "taxIdentifier": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          }
+        },
+        "required": ["name", "taxIdentifier"],
+        "additionalProperties": false
+      },
+      "UpdateSupplierInput": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "taxIdentifier": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "isActive": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
       "LedgerAccount_Output": {
         "type": "object",
         "properties": {
@@ -3674,6 +4460,7 @@
               "PAYABLE_TO_ASSOCIATE",
               "RECEIVABLE_FROM_ASSOCIATE",
               "ASSOCIATE_LOAN_PAYABLE",
+              "CONTRIBUTED_CAPITAL",
               "OPERATING_EXPENSE",
               "NON_OPERATIONAL_COMPANY_EXPENSE",
               "ASSOCIATE_POOL_EXPENSE",
@@ -3762,6 +4549,7 @@
               "PAYABLE_TO_ASSOCIATE",
               "RECEIVABLE_FROM_ASSOCIATE",
               "ASSOCIATE_LOAN_PAYABLE",
+              "CONTRIBUTED_CAPITAL",
               "OPERATING_EXPENSE",
               "NON_OPERATIONAL_COMPANY_EXPENSE",
               "ASSOCIATE_POOL_EXPENSE",
@@ -4124,6 +4912,18 @@
             ],
             "nullable": true
           },
+          "supplierId": {
+            "type": "string",
+            "nullable": true
+          },
+          "supplier": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Supplier_Output"
+              }
+            ],
+            "nullable": true
+          },
           "payments": {
             "type": "array",
             "items": {
@@ -4139,6 +4939,8 @@
           "category",
           "costObjectId",
           "costObject",
+          "supplierId",
+          "supplier",
           "payments"
         ],
         "additionalProperties": false
@@ -4225,6 +5027,7 @@
               "PAYABLE_TO_ASSOCIATE",
               "RECEIVABLE_FROM_ASSOCIATE",
               "ASSOCIATE_LOAN_PAYABLE",
+              "CONTRIBUTED_CAPITAL",
               "OPERATING_EXPENSE",
               "NON_OPERATIONAL_COMPANY_EXPENSE",
               "ASSOCIATE_POOL_EXPENSE",
@@ -4240,6 +5043,55 @@
           }
         },
         "required": ["id", "code", "name", "category", "role", "associateId"],
+        "additionalProperties": false
+      },
+      "AssociateFundingDetail_Output": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["LOAN", "CAPITAL_CONTRIBUTION"]
+          },
+          "associateId": {
+            "type": "string"
+          },
+          "associate": {
+            "$ref": "#/components/schemas/FinanceAssociate_Output"
+          },
+          "destinationAccountId": {
+            "type": "string"
+          },
+          "destinationAccount": {
+            "$ref": "#/components/schemas/LedgerAccountRef_Output"
+          },
+          "amountMinor": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "reference": {
+            "type": "string",
+            "nullable": true
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "associateId",
+          "associate",
+          "destinationAccountId",
+          "destinationAccount",
+          "amountMinor",
+          "reference",
+          "notes"
+        ],
         "additionalProperties": false
       },
       "EconomicAllocation_Output": {
@@ -4283,6 +5135,10 @@
             "type": "string",
             "enum": ["RECEIPT", "INVOICE", "CONTRACT", "OTHER"]
           },
+          "documentSeries": {
+            "type": "string",
+            "nullable": true
+          },
           "documentNumber": {
             "type": "string",
             "nullable": true
@@ -4313,6 +5169,7 @@
         "required": [
           "id",
           "type",
+          "documentSeries",
           "documentNumber",
           "issuedAt",
           "supplierName",
@@ -4398,6 +5255,11 @@
             "minimum": -9007199254740991,
             "maximum": 9007199254740991
           },
+          "companyEquityIncreaseMinor": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
           "associatePayables": {
             "type": "array",
             "items": {
@@ -4426,6 +5288,7 @@
           "companyExpenseMinor",
           "companyAssetIncreaseMinor",
           "companyCashImpactMinor",
+          "companyEquityIncreaseMinor",
           "associatePayables",
           "associateReceivables",
           "specificEconomicBenefits",
@@ -4514,6 +5377,14 @@
             ],
             "nullable": true
           },
+          "associateFunding": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AssociateFundingDetail_Output"
+              }
+            ],
+            "nullable": true
+          },
           "allocations": {
             "type": "array",
             "items": {
@@ -4562,6 +5433,7 @@
           "reversalOfOperationId",
           "reversedByOperationId",
           "expense",
+          "associateFunding",
           "allocations",
           "documents",
           "journalEntry",
@@ -4586,6 +5458,521 @@
             "nullable": true
           }
         },
+        "additionalProperties": false
+      },
+      "CreateExpenseReceiptDraftUploadInputCreateFundingProofDraftUploadInput": {
+        "type": "object",
+        "properties": {
+          "contentType": {
+            "type": "string",
+            "enum": ["image/jpeg", "image/png", "image/webp"]
+          },
+          "byteSize": {
+            "type": "integer",
+            "exclusiveMinimum": true,
+            "maximum": 9007199254740991,
+            "minimum": 0
+          },
+          "checksumSha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": ["contentType", "byteSize", "checksumSha256"],
+        "additionalProperties": false
+      },
+      "CreateExpenseReceiptDraftUploadInput": {
+        "$ref": "#/components/schemas/CreateExpenseReceiptDraftUploadInputCreateFundingProofDraftUploadInput"
+      },
+      "FundingProofDraftUpload_Output": {
+        "type": "object",
+        "properties": {
+          "uploadUrl": {
+            "type": "string",
+            "format": "uri"
+          },
+          "uploadToken": {
+            "type": "string",
+            "minLength": 1
+          },
+          "method": {
+            "type": "string",
+            "enum": ["PUT"]
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "maxBytes": {
+            "type": "integer",
+            "exclusiveMinimum": true,
+            "maximum": 9007199254740991,
+            "minimum": 0
+          }
+        },
+        "required": [
+          "uploadUrl",
+          "uploadToken",
+          "method",
+          "headers",
+          "expiresAt",
+          "maxBytes"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseReceiptDraftUpload_Output": {
+        "$ref": "#/components/schemas/FundingProofDraftUpload_Output"
+      },
+      "AnalyzeExpenseReceiptInput": {
+        "type": "object",
+        "properties": {
+          "uploadToken": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": ["uploadToken"],
+        "additionalProperties": false
+      },
+      "NormalizedExpenseExtraction_Output": {
+        "type": "object",
+        "properties": {
+          "amountMinor": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 2147483647,
+                "nullable": true
+              },
+              "confidence": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100,
+                "nullable": true
+              },
+              "evidence": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ExtractionEvidence_Output"
+                }
+              }
+            },
+            "required": ["value", "confidence", "evidence"],
+            "additionalProperties": false
+          },
+          "occurredAt": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "type": "string",
+                "nullable": true
+              },
+              "confidence": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100,
+                "nullable": true
+              },
+              "evidence": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ExtractionEvidence_Output"
+                }
+              }
+            },
+            "required": ["value", "confidence", "evidence"],
+            "additionalProperties": false
+          },
+          "currency": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "type": "string",
+                "nullable": true
+              },
+              "confidence": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100,
+                "nullable": true
+              },
+              "evidence": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ExtractionEvidence_Output"
+                }
+              }
+            },
+            "required": ["value", "confidence", "evidence"],
+            "additionalProperties": false
+          },
+          "supplierName": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "type": "string",
+                "nullable": true
+              },
+              "confidence": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100,
+                "nullable": true
+              },
+              "evidence": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ExtractionEvidence_Output"
+                }
+              }
+            },
+            "required": ["value", "confidence", "evidence"],
+            "additionalProperties": false
+          },
+          "supplierTaxIdentifier": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "type": "string",
+                "nullable": true
+              },
+              "confidence": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100,
+                "nullable": true
+              },
+              "evidence": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ExtractionEvidence_Output"
+                }
+              }
+            },
+            "required": ["value", "confidence", "evidence"],
+            "additionalProperties": false
+          },
+          "customerName": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "type": "string",
+                "nullable": true
+              },
+              "confidence": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100,
+                "nullable": true
+              },
+              "evidence": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ExtractionEvidence_Output"
+                }
+              }
+            },
+            "required": ["value", "confidence", "evidence"],
+            "additionalProperties": false
+          },
+          "customerTaxIdentifier": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "type": "string",
+                "nullable": true
+              },
+              "confidence": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100,
+                "nullable": true
+              },
+              "evidence": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ExtractionEvidence_Output"
+                }
+              }
+            },
+            "required": ["value", "confidence", "evidence"],
+            "additionalProperties": false
+          },
+          "documentSeries": {
+            "default": {
+              "value": null,
+              "confidence": null,
+              "evidence": []
+            },
+            "type": "object",
+            "properties": {
+              "value": {
+                "type": "string",
+                "nullable": true
+              },
+              "confidence": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100,
+                "nullable": true
+              },
+              "evidence": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ExtractionEvidence_Output"
+                }
+              }
+            },
+            "required": ["value", "confidence", "evidence"],
+            "additionalProperties": false
+          },
+          "documentNumber": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "type": "string",
+                "nullable": true
+              },
+              "confidence": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100,
+                "nullable": true
+              },
+              "evidence": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ExtractionEvidence_Output"
+                }
+              }
+            },
+            "required": ["value", "confidence", "evidence"],
+            "additionalProperties": false
+          },
+          "companyMatch": {
+            "$ref": "#/components/schemas/CompanyMatch_Output"
+          },
+          "suggestedBookType": {
+            "type": "string",
+            "enum": ["COMPANY", "ASSOCIATE_POOL", null],
+            "nullable": true
+          },
+          "suggestedDocumentType": {
+            "default": "RECEIPT",
+            "type": "string",
+            "enum": ["RECEIPT", "INVOICE", "CONTRACT", "OTHER"]
+          },
+          "suggestedPaymentMethod": {
+            "type": "string",
+            "enum": ["CASH", "CARD", "BANK_TRANSFER", "ONLINE", "OTHER", null],
+            "nullable": true
+          },
+          "suggestedAllocationType": {
+            "type": "string",
+            "enum": ["COMMON", "ASSOCIATE_SPECIFIC", null],
+            "nullable": true
+          },
+          "suggestedCategoryCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "suggestionEvidence": {
+            "type": "object",
+            "properties": {
+              "bookType": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ExtractionEvidence_Output"
+                }
+              },
+              "documentType": {
+                "default": [],
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ExtractionEvidence_Output"
+                }
+              },
+              "paymentMethod": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ExtractionEvidence_Output"
+                }
+              },
+              "allocationType": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ExtractionEvidence_Output"
+                }
+              },
+              "categoryCode": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ExtractionEvidence_Output"
+                }
+              }
+            },
+            "required": [
+              "bookType",
+              "documentType",
+              "paymentMethod",
+              "allocationType",
+              "categoryCode"
+            ],
+            "additionalProperties": false
+          },
+          "explanations": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "amountMinor",
+          "occurredAt",
+          "currency",
+          "supplierName",
+          "supplierTaxIdentifier",
+          "customerName",
+          "customerTaxIdentifier",
+          "documentSeries",
+          "documentNumber",
+          "companyMatch",
+          "suggestedBookType",
+          "suggestedDocumentType",
+          "suggestedPaymentMethod",
+          "suggestedAllocationType",
+          "suggestedCategoryCode",
+          "suggestionEvidence",
+          "explanations"
+        ],
+        "additionalProperties": false
+      },
+      "ExtractionEvidence_Output": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100,
+            "nullable": true
+          },
+          "pageNumber": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "nullable": true
+          },
+          "source": {
+            "type": "string",
+            "enum": ["SUMMARY_FIELD", "OCR_LINE", "LINE_ITEM", "RULE"]
+          }
+        },
+        "required": ["text", "confidence", "pageNumber", "source"],
+        "additionalProperties": false
+      },
+      "CompanyMatch_Output": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["MATCHED", "MISMATCHED", "UNKNOWN"]
+          },
+          "matchedBy": {
+            "type": "string",
+            "enum": ["TAX_IDENTIFIER", "LEGAL_NAME", "NAME_ALIAS", null],
+            "nullable": true
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExtractionEvidence_Output"
+            }
+          }
+        },
+        "required": ["status", "matchedBy", "evidence"],
+        "additionalProperties": false
+      },
+      "ExpenseExtractionDraft_Output": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "sourceUploadId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["ANALYZING", "READY", "FAILED", "CONFIRMED"]
+          },
+          "provider": {
+            "type": "string"
+          },
+          "providerRequestId": {
+            "type": "string",
+            "nullable": true
+          },
+          "parserVersion": {
+            "type": "string"
+          },
+          "result": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/NormalizedExpenseExtraction_Output"
+              }
+            ],
+            "nullable": true
+          },
+          "failureCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "failureMessage": {
+            "type": "string",
+            "nullable": true
+          },
+          "confirmedOperationId": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          }
+        },
+        "required": [
+          "id",
+          "sourceUploadId",
+          "status",
+          "provider",
+          "providerRequestId",
+          "parserVersion",
+          "result",
+          "failureCode",
+          "failureMessage",
+          "confirmedOperationId",
+          "createdAt",
+          "updatedAt"
+        ],
         "additionalProperties": false
       },
       "PreviewExpenseInputExpensePaymentInput": {
@@ -4697,6 +6084,12 @@
             "type": "string",
             "enum": ["RECEIPT", "INVOICE", "CONTRACT", "OTHER"]
           },
+          "documentSeries": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "nullable": true
+          },
           "documentNumber": {
             "type": "string",
             "minLength": 1,
@@ -4720,12 +6113,6 @@
             "maxLength": 64,
             "nullable": true
           },
-          "storageKey": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 512,
-            "nullable": true
-          },
           "notes": {
             "type": "string",
             "minLength": 1,
@@ -4740,6 +6127,18 @@
         "type": "object",
         "properties": {
           "bookId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "supplierId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "extractionDraftId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "receiptUploadToken": {
             "type": "string",
             "minLength": 1
           },
@@ -4833,6 +6232,7 @@
               "PAYABLE_TO_ASSOCIATE",
               "RECEIVABLE_FROM_ASSOCIATE",
               "ASSOCIATE_LOAN_PAYABLE",
+              "CONTRIBUTED_CAPITAL",
               "OPERATING_EXPENSE",
               "NON_OPERATIONAL_COMPANY_EXPENSE",
               "ASSOCIATE_POOL_EXPENSE",
@@ -4996,6 +6396,12 @@
             "type": "string",
             "enum": ["RECEIPT", "INVOICE", "CONTRACT", "OTHER"]
           },
+          "documentSeries": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "nullable": true
+          },
           "documentNumber": {
             "type": "string",
             "minLength": 1,
@@ -5019,12 +6425,6 @@
             "maxLength": 64,
             "nullable": true
           },
-          "storageKey": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 512,
-            "nullable": true
-          },
           "notes": {
             "type": "string",
             "minLength": 1,
@@ -5039,6 +6439,18 @@
         "type": "object",
         "properties": {
           "bookId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "supplierId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "extractionDraftId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "receiptUploadToken": {
             "type": "string",
             "minLength": 1
           },
@@ -5107,6 +6519,135 @@
           "categoryId",
           "payments",
           "allocations"
+        ],
+        "additionalProperties": false
+      },
+      "PreviewAssociateFundingInput": {
+        "type": "object",
+        "properties": {
+          "bookId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "amountMinor": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "type": {
+            "type": "string",
+            "enum": ["LOAN", "CAPITAL_CONTRIBUTION"]
+          },
+          "associateId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "destinationAccountId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "reference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160,
+            "nullable": true
+          },
+          "notes": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "nullable": true
+          }
+        },
+        "required": [
+          "bookId",
+          "occurredAt",
+          "amountMinor",
+          "type",
+          "associateId",
+          "destinationAccountId"
+        ],
+        "additionalProperties": false
+      },
+      "CreateFundingProofDraftUploadInput": {
+        "type": "object",
+        "properties": {
+          "contentType": {
+            "type": "string",
+            "enum": ["image/jpeg", "image/png", "image/webp"]
+          },
+          "byteSize": {
+            "type": "integer",
+            "exclusiveMinimum": true,
+            "maximum": 9007199254740991,
+            "minimum": 0
+          },
+          "checksumSha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": ["contentType", "byteSize", "checksumSha256"],
+        "additionalProperties": false
+      },
+      "CreateAssociateFundingInput": {
+        "type": "object",
+        "properties": {
+          "bookId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "amountMinor": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "type": {
+            "type": "string",
+            "enum": ["LOAN", "CAPITAL_CONTRIBUTION"]
+          },
+          "associateId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "destinationAccountId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "reference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160,
+            "nullable": true
+          },
+          "notes": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "nullable": true
+          },
+          "proofUploadToken": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "bookId",
+          "occurredAt",
+          "amountMinor",
+          "type",
+          "associateId",
+          "destinationAccountId"
         ],
         "additionalProperties": false
       },
@@ -5312,72 +6853,276 @@
         ],
         "additionalProperties": false
       },
-      "CreatePersonInputCreatePersonNestedDocumentInput": {
+      "AnalyzePersonDocumentInput": {
         "type": "object",
         "properties": {
-          "type": {
+          "documentType": {
             "type": "string",
             "enum": [
               "passport",
               "nationalId",
               "driverLicense",
+              "visa",
               "residencePermit",
+              "proofOfAddress",
               "other"
             ]
           },
-          "series": {
+          "nationalIdFormat": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 200,
-            "nullable": true
-          },
-          "number": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 200,
-            "nullable": true
-          },
-          "cnp": {
-            "type": "string",
-            "nullable": true
-          },
-          "issuingCountryCode": {
-            "type": "string",
-            "nullable": true
-          },
-          "issuedBy": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 200,
-            "nullable": true
-          },
-          "issuedOn": {
-            "type": "string",
-            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
-            "nullable": true
-          },
-          "expiresOn": {
-            "type": "string",
-            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
-            "nullable": true
-          },
-          "status": {
-            "default": "verified",
-            "type": "string",
-            "enum": ["unverified", "verified", "rejected", "expired"]
-          },
-          "notes": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 2000,
-            "nullable": true
+            "enum": ["classic", "electronic"]
           },
           "photos": {
-            "$ref": "#/components/schemas/CreatePersonInputCreatePersonDocumentPhotoDraftTokens"
+            "type": "object",
+            "properties": {
+              "front": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 10000
+              },
+              "back": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 10000
+              },
+              "other": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 10000
+              }
+            },
+            "additionalProperties": false
           }
         },
-        "required": ["type"],
+        "required": ["documentType", "photos"],
         "additionalProperties": false
+      },
+      "PersonDocumentExtraction_Output": {
+        "type": "object",
+        "properties": {
+          "detectedDocumentType": {
+            "type": "string",
+            "enum": [
+              "passport",
+              "nationalId",
+              "driverLicense",
+              "visa",
+              "residencePermit",
+              "proofOfAddress",
+              "other",
+              null
+            ],
+            "nullable": true
+          },
+          "suggestions": {
+            "type": "array",
+            "maxItems": 64,
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "target": {
+                      "type": "string",
+                      "enum": ["person"]
+                    },
+                    "field": {
+                      "type": "string",
+                      "enum": [
+                        "firstName",
+                        "lastName",
+                        "cnp",
+                        "dateOfBirth",
+                        "addressLine1",
+                        "addressLine2",
+                        "city",
+                        "region",
+                        "countryCode"
+                      ]
+                    },
+                    "value": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    "sourceSlot": {
+                      "type": "string",
+                      "enum": ["front", "back", "other"]
+                    },
+                    "needsReview": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "target",
+                    "field",
+                    "value",
+                    "sourceSlot",
+                    "needsReview"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "target": {
+                      "type": "string",
+                      "enum": ["document"]
+                    },
+                    "field": {
+                      "type": "string",
+                      "enum": [
+                        "series",
+                        "number",
+                        "cnp",
+                        "issuingCountryCode",
+                        "expiresOn"
+                      ]
+                    },
+                    "value": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    "sourceSlot": {
+                      "type": "string",
+                      "enum": ["front", "back", "other"]
+                    },
+                    "needsReview": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "target",
+                    "field",
+                    "value",
+                    "sourceSlot",
+                    "needsReview"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            }
+          },
+          "licenseCategories": {
+            "type": "array",
+            "maxItems": 24,
+            "items": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "object",
+                  "properties": {
+                    "category": {
+                      "type": "string",
+                      "enum": [
+                        "AM",
+                        "A1",
+                        "A2",
+                        "A",
+                        "B1",
+                        "B",
+                        "BE",
+                        "C1",
+                        "C1E",
+                        "C",
+                        "CE",
+                        "D1",
+                        "D1E",
+                        "D",
+                        "DE",
+                        "Tr",
+                        "Tr1",
+                        "Tb",
+                        "Tv"
+                      ]
+                    },
+                    "issuedOn": {
+                      "type": "string",
+                      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                      "nullable": true
+                    },
+                    "expiresOn": {
+                      "type": "string",
+                      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                      "nullable": true
+                    },
+                    "restrictions": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200,
+                      "nullable": true
+                    }
+                  },
+                  "required": ["category", "issuedOn", "expiresOn"],
+                  "additionalProperties": false
+                },
+                "sourceSlot": {
+                  "type": "string",
+                  "enum": ["front", "back", "other"]
+                },
+                "needsReview": {
+                  "type": "boolean"
+                }
+              },
+              "required": ["value", "sourceSlot", "needsReview"],
+              "additionalProperties": false
+            }
+          },
+          "warnings": {
+            "type": "array",
+            "maxItems": 20,
+            "items": {
+              "type": "string",
+              "enum": [
+                "unclearText",
+                "ambiguousDate",
+                "typeMismatch",
+                "conflictingSources",
+                "invalidValue",
+                "noData"
+              ]
+            }
+          },
+          "documentType": {
+            "type": "string",
+            "enum": [
+              "passport",
+              "nationalId",
+              "driverLicense",
+              "visa",
+              "residencePermit",
+              "proofOfAddress",
+              "other"
+            ]
+          },
+          "sourceUploadIds": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 3,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "reviewRequired": {
+            "type": "boolean",
+            "enum": [true]
+          }
+        },
+        "required": [
+          "detectedDocumentType",
+          "suggestions",
+          "licenseCategories",
+          "warnings",
+          "documentType",
+          "sourceUploadIds",
+          "reviewRequired"
+        ],
+        "additionalProperties": false
+      },
+      "CreatePersonInputCreatePersonNestedDocumentInput": {
+        "$ref": "#/components/schemas/CreatePersonInputCreatePersonDocumentInput"
       },
       "CreatePersonInputCreatePersonDocumentPhotoDraftTokens": {
         "type": "object",
@@ -5397,9 +7142,127 @@
         },
         "additionalProperties": false
       },
+      "CreatePersonInputCreatePersonDocumentInput": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "passport",
+              "nationalId",
+              "driverLicense",
+              "visa",
+              "residencePermit",
+              "proofOfAddress",
+              "other"
+            ]
+          },
+          "photos": {
+            "$ref": "#/components/schemas/CreatePersonInputCreatePersonDocumentPhotoDraftTokens"
+          },
+          "nationalIdFormat": {
+            "type": "string",
+            "enum": ["classic", "electronic", null],
+            "nullable": true
+          },
+          "licenseCategories": {
+            "maxItems": 19,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "category": {
+                  "type": "string",
+                  "enum": [
+                    "AM",
+                    "A1",
+                    "A2",
+                    "A",
+                    "B1",
+                    "B",
+                    "BE",
+                    "C1",
+                    "C1E",
+                    "C",
+                    "CE",
+                    "D1",
+                    "D1E",
+                    "D",
+                    "DE",
+                    "Tr",
+                    "Tr1",
+                    "Tb",
+                    "Tv"
+                  ]
+                },
+                "issuedOn": {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "nullable": true
+                },
+                "expiresOn": {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "nullable": true
+                },
+                "restrictions": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200,
+                  "nullable": true
+                }
+              },
+              "required": ["category", "issuedOn", "expiresOn"],
+              "additionalProperties": false
+            }
+          },
+          "series": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "nullable": true
+          },
+          "number": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "nullable": true
+          },
+          "cnp": {
+            "type": "string",
+            "nullable": true
+          },
+          "issuingCountryCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "expiresOn": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "nullable": true
+          },
+          "status": {
+            "default": "verified",
+            "type": "string",
+            "enum": ["unverified", "verified", "rejected", "expired"]
+          },
+          "notes": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "nullable": true
+          }
+        },
+        "required": ["type"],
+        "additionalProperties": false
+      },
       "CreatePersonInput": {
         "type": "object",
         "properties": {
+          "documentWorkflow": {
+            "type": "string",
+            "enum": ["romanianClassic", "romanianElectronic", "foreign"]
+          },
           "email": {
             "type": "string"
           },
@@ -5416,6 +7279,10 @@
             "minLength": 1,
             "maxLength": 100
           },
+          "cnp": {
+            "type": "string",
+            "nullable": true
+          },
           "dateOfBirth": {
             "type": "string",
             "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
@@ -5424,8 +7291,7 @@
           "addressLine1": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 200,
-            "nullable": true
+            "maxLength": 200
           },
           "addressLine2": {
             "type": "string",
@@ -5436,20 +7302,12 @@
           "city": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 200,
-            "nullable": true
+            "maxLength": 200
           },
           "region": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 200,
-            "nullable": true
-          },
-          "postalCode": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 200,
-            "nullable": true
+            "maxLength": 200
           },
           "countryCode": {
             "type": "string",
@@ -5468,7 +7326,15 @@
             "nullable": true
           }
         },
-        "required": ["email", "phone", "firstName", "lastName"],
+        "required": [
+          "email",
+          "phone",
+          "firstName",
+          "lastName",
+          "addressLine1",
+          "city",
+          "region"
+        ],
         "additionalProperties": false
       },
       "PersonDocument_Output": {
@@ -5486,9 +7352,67 @@
               "passport",
               "nationalId",
               "driverLicense",
+              "visa",
               "residencePermit",
+              "proofOfAddress",
               "other"
             ]
+          },
+          "nationalIdFormat": {
+            "type": "string",
+            "enum": ["classic", "electronic", null],
+            "nullable": true
+          },
+          "licenseCategories": {
+            "type": "array",
+            "maxItems": 19,
+            "items": {
+              "type": "object",
+              "properties": {
+                "category": {
+                  "type": "string",
+                  "enum": [
+                    "AM",
+                    "A1",
+                    "A2",
+                    "A",
+                    "B1",
+                    "B",
+                    "BE",
+                    "C1",
+                    "C1E",
+                    "C",
+                    "CE",
+                    "D1",
+                    "D1E",
+                    "D",
+                    "DE",
+                    "Tr",
+                    "Tr1",
+                    "Tb",
+                    "Tv"
+                  ]
+                },
+                "issuedOn": {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "nullable": true
+                },
+                "expiresOn": {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "nullable": true
+                },
+                "restrictions": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200,
+                  "nullable": true
+                }
+              },
+              "required": ["category", "issuedOn", "expiresOn"],
+              "additionalProperties": false
+            }
           },
           "series": {
             "type": "string",
@@ -5503,14 +7427,6 @@
             "nullable": true
           },
           "issuingCountryCode": {
-            "type": "string",
-            "nullable": true
-          },
-          "issuedBy": {
-            "type": "string",
-            "nullable": true
-          },
-          "issuedOn": {
             "type": "string",
             "nullable": true
           },
@@ -5547,8 +7463,6 @@
           "number",
           "cnp",
           "issuingCountryCode",
-          "issuedBy",
-          "issuedOn",
           "expiresOn",
           "status",
           "notes",
@@ -5576,6 +7490,10 @@
           "lastName": {
             "type": "string"
           },
+          "cnp": {
+            "type": "string",
+            "nullable": true
+          },
           "dateOfBirth": {
             "type": "string",
             "nullable": true
@@ -5593,10 +7511,6 @@
             "nullable": true
           },
           "region": {
-            "type": "string",
-            "nullable": true
-          },
-          "postalCode": {
             "type": "string",
             "nullable": true
           },
@@ -5638,7 +7552,6 @@
           "addressLine2",
           "city",
           "region",
-          "postalCode",
           "countryCode",
           "documents",
           "notes",
@@ -5774,7 +7687,9 @@
               "passport",
               "nationalId",
               "driverLicense",
+              "visa",
               "residencePermit",
+              "proofOfAddress",
               "other"
             ]
           },
@@ -5829,6 +7744,24 @@
           "$ref": "#/components/schemas/PersonDocument_Output"
         }
       },
+      "CreatePersonDocumentInputCreatePersonDocumentPhotoDraftTokens": {
+        "type": "object",
+        "properties": {
+          "front": {
+            "type": "string",
+            "minLength": 1
+          },
+          "back": {
+            "type": "string",
+            "minLength": 1
+          },
+          "other": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "additionalProperties": false
+      },
       "CreatePersonDocumentInput": {
         "type": "object",
         "properties": {
@@ -5838,9 +7771,70 @@
               "passport",
               "nationalId",
               "driverLicense",
+              "visa",
               "residencePermit",
+              "proofOfAddress",
               "other"
             ]
+          },
+          "photos": {
+            "$ref": "#/components/schemas/CreatePersonDocumentInputCreatePersonDocumentPhotoDraftTokens"
+          },
+          "nationalIdFormat": {
+            "type": "string",
+            "enum": ["classic", "electronic", null],
+            "nullable": true
+          },
+          "licenseCategories": {
+            "maxItems": 19,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "category": {
+                  "type": "string",
+                  "enum": [
+                    "AM",
+                    "A1",
+                    "A2",
+                    "A",
+                    "B1",
+                    "B",
+                    "BE",
+                    "C1",
+                    "C1E",
+                    "C",
+                    "CE",
+                    "D1",
+                    "D1E",
+                    "D",
+                    "DE",
+                    "Tr",
+                    "Tr1",
+                    "Tb",
+                    "Tv"
+                  ]
+                },
+                "issuedOn": {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "nullable": true
+                },
+                "expiresOn": {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "nullable": true
+                },
+                "restrictions": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200,
+                  "nullable": true
+                }
+              },
+              "required": ["category", "issuedOn", "expiresOn"],
+              "additionalProperties": false
+            }
           },
           "series": {
             "type": "string",
@@ -5860,17 +7854,6 @@
           },
           "issuingCountryCode": {
             "type": "string",
-            "nullable": true
-          },
-          "issuedBy": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 200,
-            "nullable": true
-          },
-          "issuedOn": {
-            "type": "string",
-            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
             "nullable": true
           },
           "expiresOn": {
@@ -5902,9 +7885,67 @@
               "passport",
               "nationalId",
               "driverLicense",
+              "visa",
               "residencePermit",
+              "proofOfAddress",
               "other"
             ]
+          },
+          "nationalIdFormat": {
+            "type": "string",
+            "enum": ["classic", "electronic", null],
+            "nullable": true
+          },
+          "licenseCategories": {
+            "maxItems": 19,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "category": {
+                  "type": "string",
+                  "enum": [
+                    "AM",
+                    "A1",
+                    "A2",
+                    "A",
+                    "B1",
+                    "B",
+                    "BE",
+                    "C1",
+                    "C1E",
+                    "C",
+                    "CE",
+                    "D1",
+                    "D1E",
+                    "D",
+                    "DE",
+                    "Tr",
+                    "Tr1",
+                    "Tb",
+                    "Tv"
+                  ]
+                },
+                "issuedOn": {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "nullable": true
+                },
+                "expiresOn": {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "nullable": true
+                },
+                "restrictions": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200,
+                  "nullable": true
+                }
+              },
+              "required": ["category", "issuedOn", "expiresOn"],
+              "additionalProperties": false
+            }
           },
           "series": {
             "type": "string",
@@ -5924,17 +7965,6 @@
           },
           "issuingCountryCode": {
             "type": "string",
-            "nullable": true
-          },
-          "issuedBy": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 200,
-            "nullable": true
-          },
-          "issuedOn": {
-            "type": "string",
-            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
             "nullable": true
           },
           "expiresOn": {
@@ -6019,7 +8049,7 @@
         "properties": {
           "contentType": {
             "type": "string",
-            "enum": ["image/jpeg", "image/png", "image/webp"]
+            "enum": ["image/jpeg", "image/png", "image/webp", "application/pdf"]
           },
           "byteSize": {
             "type": "integer",
@@ -6060,6 +8090,10 @@
             "type": "string",
             "description": "ISO timestamp when the signed URL expires."
           },
+          "uploadTokenExpiresAt": {
+            "type": "string",
+            "description": "ISO timestamp until which an uploaded document can be attached to the form."
+          },
           "maxBytes": {
             "type": "integer",
             "exclusiveMinimum": true,
@@ -6080,9 +8114,21 @@
       "CreatePersonDocumentPhotoDraftUploadUrlInput": {
         "type": "object",
         "properties": {
+          "documentType": {
+            "type": "string",
+            "enum": [
+              "passport",
+              "nationalId",
+              "driverLicense",
+              "visa",
+              "residencePermit",
+              "proofOfAddress",
+              "other"
+            ]
+          },
           "contentType": {
             "type": "string",
-            "enum": ["image/jpeg", "image/png", "image/webp"]
+            "enum": ["image/jpeg", "image/png", "image/webp", "application/pdf"]
           },
           "byteSize": {
             "type": "integer",
@@ -6128,6 +8174,10 @@
             "minLength": 1,
             "maxLength": 100
           },
+          "cnp": {
+            "type": "string",
+            "nullable": true
+          },
           "dateOfBirth": {
             "type": "string",
             "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
@@ -6136,8 +8186,7 @@
           "addressLine1": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 200,
-            "nullable": true
+            "maxLength": 200
           },
           "addressLine2": {
             "type": "string",
@@ -6148,20 +8197,12 @@
           "city": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 200,
-            "nullable": true
+            "maxLength": 200
           },
           "region": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 200,
-            "nullable": true
-          },
-          "postalCode": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 200,
-            "nullable": true
+            "maxLength": 200
           },
           "countryCode": {
             "type": "string",
