@@ -13,18 +13,23 @@ export interface Feedback {
 }
 
 export type PersonCitizenship = "romanian" | "foreign";
+export type NationalIdFormat = "classic" | "electronic";
+export type DocumentWorkflow =
+  | "romanianClassic"
+  | "romanianElectronic"
+  | "foreign";
 
 export type PersonFormFieldKey =
   | "email"
   | "phone"
   | "firstName"
   | "lastName"
+  | "cnp"
   | "dateOfBirth"
   | "addressLine1"
   | "addressLine2"
   | "city"
   | "region"
-  | "postalCode"
   | "countryCode"
   | "documents"
   | "notes";
@@ -35,11 +40,11 @@ export type PersonDocumentFormFieldKey =
   | "number"
   | "cnp"
   | "issuingCountryCode"
-  | "issuedBy"
-  | "issuedOn"
   | "hasExpiryDate"
   | "expiresOn"
   | "status"
+  | "licenseCategories"
+  | "photos"
   | "notes";
 
 export type FormErrorKey =
@@ -53,17 +58,20 @@ export type PersonDocumentPhotoDraftUpload =
       id: string;
       status: "uploading";
       file: File;
+      originalFile?: File;
     }
   | {
       id: string;
       status: "uploaded";
       file: File;
+      originalFile?: File;
       uploadToken: string;
     }
   | {
       id: string;
       status: "failed";
       file: File;
+      originalFile?: File;
       message: string;
     };
 
@@ -73,6 +81,10 @@ export type PersonDocumentPhotoDraftUploads = Partial<
 
 export interface CreatePersonFormState {
   citizenship: PersonCitizenship;
+  nationalIdFormat: NationalIdFormat;
+  documentDrafts: Partial<
+    Record<DocumentWorkflow, CreatePersonDocumentFormState[]>
+  >;
   email: string;
   phone: string;
   phoneCountry: CountryCode;
@@ -80,12 +92,12 @@ export interface CreatePersonFormState {
   phoneNationalNumber: string;
   firstName: string;
   lastName: string;
+  cnp: string;
   dateOfBirth: DateParts;
   addressLine1: string;
   addressLine2: string;
   city: string;
   region: string;
-  postalCode: string;
   countryCode: CountryCode;
   documents: CreatePersonDocumentFormState[];
   notes: string;
@@ -94,14 +106,14 @@ export interface CreatePersonFormState {
 export interface CreatePersonDocumentFormState {
   key: string;
   required: boolean;
-  slot: "identity" | "driverLicense";
+  slot: "identity" | "driverLicense" | "supporting";
   type: v1.persons.PersonDocumentType;
+  nationalIdFormat: NationalIdFormat | null;
+  licenseCategories: v1.persons.PersonDriverLicenseCategoryEntry[];
   series: string;
   number: string;
   cnp: string;
-  issuingCountryCode: CountryCode;
-  issuedBy: string;
-  issuedOn: DateParts;
+  issuingCountryCode: CountryCode | "";
   hasExpiryDate: boolean;
   expiresOn: DateParts;
   status: v1.persons.PersonDocumentStatus;
@@ -123,10 +135,7 @@ export interface FormValidationIssue {
   format?: string;
 }
 
-export type DateField =
-  | "dateOfBirth"
-  | "documentIssuedOn"
-  | "documentExpiresOn";
+export type DateField = "dateOfBirth" | "documentExpiresOn";
 
 export type SetPersonFormValue = <Key extends keyof CreatePersonFormState>(
   key: Key,
@@ -141,10 +150,12 @@ export type SetPersonDocumentValue = <Key extends PersonDocumentFormFieldKey>(
 
 export type SetPersonDocument = (
   document: CreatePersonDocumentFormState,
+  editedFields?: readonly PersonDocumentFormFieldKey[],
 ) => void;
 
 export type SetPersonDocumentPhoto = (
   documentKey: string,
   slot: v1.persons.PersonDocumentPhotoSlot,
   file: File | null,
+  originalFile?: File,
 ) => void;

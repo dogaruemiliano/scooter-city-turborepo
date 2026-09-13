@@ -90,6 +90,9 @@ export function PersonEditForm({ person, personHref }: PersonEditFormProps) {
             <FormField name="lastName" label={t("fields.lastName")} required>
               <FormInput />
             </FormField>
+            <FormField name="cnp" label={t("fields.documentCnp")}>
+              <FormInput inputMode="numeric" maxLength={13} />
+            </FormField>
             <FormField name="email" label={t("fields.email")} required>
               <FormInput type="email" />
             </FormField>
@@ -123,17 +126,15 @@ export function PersonEditForm({ person, personHref }: PersonEditFormProps) {
                 closeLabel={t("actions.close")}
               />
             </FormField>
-            <FormField name="region" label={t("fields.region")}>
+            <FormField name="region" required label={t("fields.region")}>
               <FormInput />
             </FormField>
-            <FormField name="city" label={t("fields.city")}>
-              <FormInput />
-            </FormField>
-            <FormField name="postalCode" label={t("fields.postalCode")}>
+            <FormField name="city" required label={t("fields.city")}>
               <FormInput />
             </FormField>
             <FormField
               name="addressLine1"
+              required
               label={t("fields.addressLine1")}
               className="sm:col-span-2"
             >

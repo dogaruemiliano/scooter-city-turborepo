@@ -52,7 +52,6 @@ const person: v1.persons.Person = {
   addressLine2: null,
   city: "Bucharest",
   region: null,
-  postalCode: "010101",
   countryCode: "RO",
   documents: [
     {
@@ -63,8 +62,6 @@ const person: v1.persons.Person = {
       number: "123456",
       cnp: "1900228123450",
       issuingCountryCode: "RO",
-      issuedBy: null,
-      issuedOn: null,
       expiresOn: "2030-01-31",
       status: "verified",
       notes: null,
@@ -80,8 +77,6 @@ const person: v1.persons.Person = {
       number: "654321",
       cnp: null,
       issuingCountryCode: "RO",
-      issuedBy: null,
-      issuedOn: null,
       expiresOn: "2030-01-31",
       status: "verified",
       notes: null,

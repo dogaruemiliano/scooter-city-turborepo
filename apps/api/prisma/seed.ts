@@ -116,8 +116,6 @@ type PersonDocumentSeed = {
   number: string | null;
   cnp: string | null;
   issuingCountryCode: string | null;
-  issuedBy: string | null;
-  issuedOn: Date | null;
   expiresOn: Date | null;
   status: PersonDocumentStatus;
   notes: string | null;
@@ -144,7 +142,6 @@ type PersonSeed = {
   addressLine2: string | null;
   city: string | null;
   region: string | null;
-  postalCode: string | null;
   countryCode: string | null;
   notes: string | null;
   deletedAt: Date | null;
@@ -186,7 +183,6 @@ const CURATED_PERSON_SEEDS: PersonSeed[] = [
     addressLine2: null,
     city: "Bucuresti",
     region: "B",
-    postalCode: "010013",
     countryCode: "RO",
     notes: "Seed person with verified national ID and active driver license.",
     deletedAt: null,
@@ -198,8 +194,6 @@ const CURATED_PERSON_SEEDS: PersonSeed[] = [
         number: "100001",
         cnp: "2920412123454",
         issuingCountryCode: "RO",
-        issuedBy: "SPCLEP Sector 1",
-        issuedOn: dateOnly("2022-03-01"),
         expiresOn: dateOnly("2032-03-01"),
         status: "verified",
         notes: "Primary verified Romanian ID.",
@@ -212,8 +206,6 @@ const CURATED_PERSON_SEEDS: PersonSeed[] = [
         number: "B100001",
         cnp: null,
         issuingCountryCode: "RO",
-        issuedBy: "DRPCIV Bucuresti",
-        issuedOn: dateOnly("2021-06-15"),
         expiresOn: dateOnly("2031-06-15"),
         status: "unverified",
         notes: "Pending back-office verification.",
@@ -232,7 +224,6 @@ const CURATED_PERSON_SEEDS: PersonSeed[] = [
     addressLine2: "Ap. 8",
     city: "Bucuresti",
     region: "B",
-    postalCode: "010094",
     countryCode: "RO",
     notes: "Seed person with an expired passport and rejected driver license.",
     deletedAt: null,
@@ -244,8 +235,6 @@ const CURATED_PERSON_SEEDS: PersonSeed[] = [
         number: "900001",
         cnp: null,
         issuingCountryCode: "RO",
-        issuedBy: "Directia Generala de Pasapoarte",
-        issuedOn: dateOnly("2014-02-10"),
         expiresOn: dateOnly("2024-02-10"),
         status: "expired",
         notes: "Expired passport retained for search and renewal flows.",
@@ -258,8 +247,6 @@ const CURATED_PERSON_SEEDS: PersonSeed[] = [
         number: "B200001",
         cnp: null,
         issuingCountryCode: "RO",
-        issuedBy: "DRPCIV Bucuresti",
-        issuedOn: dateOnly("2024-02-10"),
         expiresOn: dateOnly("2034-02-10"),
         status: "rejected",
         notes: "Rejected driver license sample for admin UI states.",
@@ -278,7 +265,6 @@ const CURATED_PERSON_SEEDS: PersonSeed[] = [
     addressLine2: null,
     city: "Cluj-Napoca",
     region: "CJ",
-    postalCode: "400114",
     countryCode: "RO",
     notes: "Seed person without uploaded documents.",
     deletedAt: null,
@@ -295,7 +281,6 @@ const CURATED_PERSON_SEEDS: PersonSeed[] = [
     addressLine2: null,
     city: "Timisoara",
     region: "TM",
-    postalCode: "300222",
     countryCode: "RO",
     notes: "Soft-deleted seed person for includeDeleted flows.",
     deletedAt: new Date("2026-01-15T10:00:00.000Z"),
@@ -307,8 +292,6 @@ const CURATED_PERSON_SEEDS: PersonSeed[] = [
         number: "300001",
         cnp: "1780722123455",
         issuingCountryCode: "RO",
-        issuedBy: "SPCLEP Timisoara",
-        issuedOn: dateOnly("2019-05-10"),
         expiresOn: dateOnly("2029-05-10"),
         status: "verified",
         notes: "Document attached to soft-deleted seed person.",
@@ -352,37 +335,31 @@ const GENERATED_LOCATIONS = [
   {
     city: "Bucuresti",
     region: "B",
-    postalCode: "010101",
     street: "Strada Plantelor",
   },
   {
     city: "Cluj-Napoca",
     region: "CJ",
-    postalCode: "400101",
     street: "Strada Horea",
   },
   {
     city: "Timisoara",
     region: "TM",
-    postalCode: "300101",
     street: "Strada Alba Iulia",
   },
   {
     city: "Iasi",
     region: "IS",
-    postalCode: "700101",
     street: "Bulevardul Independentei",
   },
   {
     city: "Brasov",
     region: "BV",
-    postalCode: "500101",
     street: "Strada Lunga",
   },
   {
     city: "Constanta",
     region: "CT",
-    postalCode: "900101",
     street: "Bulevardul Tomis",
   },
 ] as const;
@@ -750,7 +727,6 @@ function personData(seed: PersonSeed) {
     addressLine2: seed.addressLine2,
     city: seed.city,
     region: seed.region,
-    postalCode: seed.postalCode,
     countryCode: seed.countryCode,
     notes: seed.notes,
     deletedAt: seed.deletedAt,
@@ -764,8 +740,6 @@ function personDocumentData(seed: PersonDocumentSeed) {
     number: seed.number,
     cnp: seed.cnp,
     issuingCountryCode: seed.issuingCountryCode,
-    issuedBy: seed.issuedBy,
-    issuedOn: seed.issuedOn,
     expiresOn: seed.expiresOn,
     status: seed.status,
     notes: seed.notes,
@@ -805,7 +779,6 @@ function personSeedAuditChanges(seed: PersonSeed) {
     createSeedChange("addressLine2", seed.addressLine2),
     createSeedChange("city", seed.city),
     createSeedChange("region", seed.region),
-    createSeedChange("postalCode", seed.postalCode),
     createSeedChange("countryCode", seed.countryCode),
     createSeedChange("notes", seed.notes),
   ]);
@@ -818,8 +791,6 @@ function documentSeedAuditChanges(seed: PersonDocumentSeed) {
     createSeedChange("document.number", maskSensitiveSeedValue(seed.number)),
     createSeedChange("document.cnp", maskSensitiveSeedValue(seed.cnp)),
     createSeedChange("document.issuingCountryCode", seed.issuingCountryCode),
-    createSeedChange("document.issuedBy", seed.issuedBy),
-    createSeedChange("document.issuedOn", dateOnlyString(seed.issuedOn)),
     createSeedChange("document.expiresOn", dateOnlyString(seed.expiresOn)),
     createSeedChange("document.status", seed.status),
     createSeedChange("document.notes", seed.notes),
@@ -891,7 +862,6 @@ function buildGeneratedPersonSeeds(count: number): PersonSeed[] {
           : null,
       city: location.city,
       region: location.region,
-      postalCode: location.postalCode,
       countryCode: "RO",
       notes: generatedPersonNotes(ordinal),
       deletedAt:
@@ -969,10 +939,6 @@ function buildGeneratedPersonDocuments({
           number: generatedDocumentNumber(300_000, ordinal),
           cnp: null,
           issuingCountryCode: "RO",
-          issuedBy: "Directia Generala de Pasapoarte",
-          issuedOn: dateOnly(
-            `${2020 + (ordinal % 5)}-${pad2(((ordinal + 4) % 12) + 1)}-20`,
-          ),
           expiresOn: dateOnly(
             `${2030 + (ordinal % 5)}-${pad2(((ordinal + 4) % 12) + 1)}-20`,
           ),
@@ -992,10 +958,6 @@ function buildGeneratedPersonDocuments({
             birthDay,
           }),
           issuingCountryCode: "RO",
-          issuedBy: generatedIssuedBy(ordinal),
-          issuedOn: dateOnly(
-            `${2018 + (ordinal % 7)}-${pad2((ordinal % 12) + 1)}-15`,
-          ),
           expiresOn: dateOnly(
             `${2028 + (ordinal % 7)}-${pad2((ordinal % 12) + 1)}-15`,
           ),
@@ -1013,10 +975,6 @@ function buildGeneratedPersonDocuments({
       number: `B${generatedDocumentNumber(200_000, ordinal)}`,
       cnp: null,
       issuingCountryCode: "RO",
-      issuedBy: "DRPCIV",
-      issuedOn: dateOnly(
-        `${2017 + (ordinal % 8)}-${pad2(((ordinal + 2) % 12) + 1)}-10`,
-      ),
       expiresOn: dateOnly(
         `${2027 + (ordinal % 8)}-${pad2(((ordinal + 2) % 12) + 1)}-10`,
       ),
@@ -1107,11 +1065,6 @@ function generatedDocumentStatus(ordinal: number): PersonDocumentStatus {
   if (ordinal % 13 === 0) return "expired";
   if (ordinal % 5 === 0) return "unverified";
   return "verified";
-}
-
-function generatedIssuedBy(ordinal: number): string {
-  const sector = (ordinal % 6) + 1;
-  return `SPCLEP Sector ${sector}`;
 }
 
 function generatedSeries(prefix: string, ordinal: number): string {

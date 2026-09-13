@@ -5,17 +5,40 @@ import type {
   CountryCode,
   PhoneNumberInputChangeDetails,
 } from "@repo/ui/components";
-import { emptyDateParts } from "@repo/ui/lib/date-parts";
 import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
-import { useId, useState, type FormEvent } from "react";
+import { useId, useState, useRef, useEffect, type FormEvent } from "react";
+import { usePersonLeaveGuard } from "./usePersonLeaveGuard";
+import { licenseNameDifferences } from "./license-name-comparison";
+import { LicenseNameConfirmation } from "./LicenseNameConfirmation";
 
 import { webApi } from "@/lib/api";
+import { PageHeaderNavigation } from "@/components/PageHeaderNavigation";
+import {
+  createExtractionState,
+  markExtractionFieldEdited,
+  invalidateDocumentExtraction,
+  applyExtractionSuggestion,
+  type ExtractionFieldKey,
+} from "./extraction-state";
+import { ExtractionReviewContext } from "./ExtractionReviewContext";
+import { useDocumentExtraction } from "./useDocumentExtraction";
+import { fieldHasPendingExtraction } from "./field-extraction-pending";
 import { AddressSection } from "./AddressSection";
-import { CitizenshipToggle } from "./CitizenshipToggle";
+import { CitizenshipChoice } from "./CitizenshipChoice";
+import {
+  WizardProgress,
+  REVIEW_STEPS,
+  isReviewStep,
+  type PersonProgressStep,
+  type PersonWizardStep,
+} from "./WizardProgress";
+import { PersonalSection } from "./PersonalSection";
 import { ContactSection } from "./ContactSection";
 import { CreateFormFeedback } from "./CreateFormFeedback";
+import { documentNumberLabel } from "./DocumentReviewSummary";
 import { DocumentsSection } from "./DocumentsSection";
+import { DocumentPhotosSection } from "./DocumentPhotosSection";
 import {
   documentFieldErrorKey,
   documentFieldFromErrorKey,
@@ -28,11 +51,16 @@ import {
 import { FormActions } from "./FormActions";
 import {
   createEmptyCreateForm,
-  createInitialDocuments,
+  switchDocumentWorkflow,
+  updateDocumentDrafts,
   isUnder18Person,
+  isBlankDocumentDraft,
+  documentPhotoSlots,
 } from "./form-state";
 import { createPersonInput } from "./input";
 import { NotesField } from "./NotesField";
+import { NationalIdFormatSelect } from "./NationalIdFormatSelect";
+import { useWizardNavigation } from "./useWizardNavigation";
 import type {
   CreatePersonDocumentFormState,
   CreatePersonFormState,
@@ -41,6 +69,7 @@ import type {
   FormErrors,
   FormValidationIssue,
   PersonCitizenship,
+  NationalIdFormat,
   PersonCreateFormProps,
   PersonDocumentFormFieldKey,
 } from "./types";
@@ -51,16 +80,60 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
   const router = useRouter();
   const formId = useId();
   const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState<CreatePersonFormState>(() =>
-    createEmptyCreateForm("romanian"),
+  const navigation = useWizardNavigation();
+  const { step, navigate: setStep, canGoBack, forwardStep } = navigation;
+  const forwardStepLabel = forwardStep
+    ? t(`wizard.steps.${forwardStep}`)
+    : undefined;
+  const [chosenNationalIdFormat, setChosenNationalIdFormat] =
+    useState<NationalIdFormat | null>(null);
+  const [extractionState, setExtractionState] = useState(() =>
+    createExtractionState(createEmptyCreateForm("romanian")),
   );
+  const form = extractionState.form;
+  const nameDifferences = licenseNameDifferences(extractionState);
+  const nameConfirmationKey = JSON.stringify(nameDifferences);
+  const [confirmedNames, setConfirmedNames] = useState<string | null>(null);
+  const nameConfirmationRequired =
+    nameDifferences.length > 0 && confirmedNames !== nameConfirmationKey;
+  const leaveGuard = usePersonLeaveGuard(
+    navigation.hasProgress,
+    t("leaveForm.confirm"),
+  );
+  const extraction = useDocumentExtraction(extractionState, setExtractionState);
+  function setForm(
+    update: (current: CreatePersonFormState) => CreatePersonFormState,
+  ) {
+    setExtractionState((current) => ({
+      ...current,
+      form: update(current.form),
+    }));
+  }
   const [fieldErrors, setFieldErrors] = useState<FormErrors>({});
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const showUnder18Warning = isUnder18Person(form);
   const uploadingPhotos = hasDocumentPhotoStatus(form, "uploading");
+  const stepSummary = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    stepSummary.current?.focus();
+  }, [step]);
 
   async function createPerson(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (creating) return;
+    if (step !== "review") {
+      nextStep();
+      return;
+    }
+    if (extraction.pending) return;
+    if (nameConfirmationRequired) {
+      setFeedback({
+        kind: "error",
+        title: t("licenseName.title"),
+        messages: [t("licenseName.required")],
+      });
+      return;
+    }
     setFeedback(null);
     setFieldErrors({});
 
@@ -87,15 +160,14 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
       const fieldLabel =
         field === "dateOfBirth"
           ? t("fields.dateOfBirth")
-          : field === "documentIssuedOn"
-            ? t("fields.documentIssuedOn")
-            : t("fields.documentExpiresOn");
+          : t("fields.documentExpiresOn");
 
       return error === "incomplete"
         ? t("feedback.date.incomplete", { field: fieldLabel })
         : t("feedback.date.invalid", { field: fieldLabel });
     });
     if (inputCandidate.error) {
+      setStep(stepForField(inputCandidate.error.field));
       setFieldErrors({
         [inputCandidate.error.field]: inputCandidate.error.message,
       });
@@ -117,6 +189,7 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
         formatValidationIssue,
       );
       setFieldErrors(nextFieldErrors);
+      setStep(stepForField(Object.keys(nextFieldErrors)[0] as FormErrorKey));
       setFeedback({
         kind: "error",
         title: t("feedback.createErrorTitle"),
@@ -135,23 +208,28 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
 
     setCreating(true);
     try {
-      await webApi.fetch(v1.persons.ROUTES.create, v1.persons.personSchema, {
-        method: "POST",
-        json: input.data,
-      });
+      const person = await webApi.fetch(
+        v1.persons.ROUTES.create,
+        v1.persons.personSchema,
+        {
+          method: "POST",
+          json: input.data,
+        },
+      );
 
+      leaveGuard.complete();
       setFeedback({
         kind: "success",
         title: t("feedback.createSuccessTitle"),
         messages: [t("feedback.createSuccessMessage")],
       });
-      setForm(createEmptyCreateForm("romanian"));
-      router.push(personsHref);
+      router.push(`${personsHref}/${encodeURIComponent(person.id)}`);
       router.refresh();
     } catch (error) {
       const personConflict = personCreateConflict(error);
       if (personConflict) {
         setFieldErrors({ [personConflict.field]: personConflict.message });
+        setStep(stepForField(personConflict.field));
       }
       const message = personConflict
         ? personConflict.message
@@ -173,6 +251,15 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
     issue: FormValidationIssue,
     field: FormErrorKey | null,
   ): string {
+    if (isDocumentFieldErrorKey(field, "photos")) {
+      const documentKey = documentFieldFromErrorKey(field)?.documentKey;
+      const document = form.documents.find((item) => item.key === documentKey);
+      return t("feedback.validation.requiredDocumentPhotos", {
+        document: document
+          ? t(`documentTypes.${document.type}`)
+          : t("sections.documentPhotos"),
+      });
+    }
     if (field === "documents") {
       return issue.message === "Document types must be unique."
         ? t("feedback.validation.duplicateDocumentTypes")
@@ -191,7 +278,7 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
         : t("feedback.validation.invalidPhone");
     }
 
-    if (isDocumentFieldErrorKey(field, "cnp")) {
+    if (field === "cnp" || isDocumentFieldErrorKey(field, "cnp")) {
       return t("feedback.validation.invalidCnp");
     }
 
@@ -234,24 +321,24 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
           const document = form.documents.find(
             (item) => item.key === documentField.documentKey,
           );
-          return document?.type === "nationalId"
-            ? t("fields.nationalIdNumber")
+          return document
+            ? t(`fields.${documentNumberLabel(document)}`)
             : t("fields.documentNumber");
         }
         case "cnp":
           return t("fields.documentCnp");
         case "issuingCountryCode":
           return t("fields.documentIssuingCountryCode");
-        case "issuedBy":
-          return t("fields.documentIssuedBy");
-        case "issuedOn":
-          return t("fields.documentIssuedOn");
         case "hasExpiryDate":
           return t("fields.documentHasExpiryDate");
         case "expiresOn":
           return t("fields.documentExpiresOn");
         case "status":
           return t("fields.documentStatus");
+        case "licenseCategories":
+          return t("license.title");
+        case "photos":
+          return t("sections.documentPhotos");
         case "notes":
           return t("fields.notes");
       }
@@ -264,6 +351,8 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
         return t("fields.phone");
       case "firstName":
         return t("fields.firstName");
+      case "cnp":
+        return t("fields.documentCnp");
       case "lastName":
         return t("fields.lastName");
       case "dateOfBirth":
@@ -278,8 +367,6 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
         return form.countryCode === "RO"
           ? t("fields.county")
           : t("fields.region");
-      case "postalCode":
-        return t("fields.postalCode");
       case "countryCode":
         return t("fields.country");
       case "documents":
@@ -292,67 +379,324 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-screen-lg flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
-      <form
-        className="grid gap-6"
-        noValidate
-        onSubmit={(event) => void createPerson(event)}
-      >
-        <CitizenshipToggle
-          citizenship={form.citizenship}
-          onChange={changeCitizenship}
+    <ExtractionReviewContext.Provider
+      value={{
+        state: extractionState,
+        pendingDocumentKeys: extraction.pendingDocumentKeys,
+        onApplySuggestion: (key, id) =>
+          setExtractionState((current) =>
+            applyExtractionSuggestion(current, key, id),
+          ),
+      }}
+    >
+      <div className="mx-auto flex w-full max-w-screen-lg flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
+        <PageHeaderNavigation
+          onBack={canGoBack ? goBack : undefined}
+          backDisabled={creating}
+          forwardAction={
+            forwardStepLabel
+              ? {
+                  onClick: goForward,
+                  label: t("wizard.forwardTo", { step: forwardStepLabel }),
+                  disabled: creating,
+                }
+              : undefined
+          }
         />
-        <ContactSection
-          formId={formId}
-          form={form}
-          fieldErrors={fieldErrors}
-          locale={locale}
-          showUnder18Warning={showUnder18Warning}
-          onSetFormValue={setFormValue}
-          onChangePhone={changePhone}
-        />
-        <AddressSection
-          formId={formId}
-          form={form}
-          fieldErrors={fieldErrors}
-          locale={locale}
-          onSetFormValue={setFormValue}
-          onChangeCountry={changeCountry}
-        />
-        <DocumentsSection
-          formId={formId}
-          form={form}
-          fieldErrors={fieldErrors}
-          locale={locale}
-          showUnder18Warning={showUnder18Warning}
-          disabled={creating}
-          onSetDocumentValue={setDocumentValue}
-          onSetDocumentPhoto={setDocumentPhoto}
-          onSetDocument={setDocument}
-        />
-        <NotesField
-          formId={formId}
-          value={form.notes}
-          error={fieldErrors.notes}
-          onChange={(value) => setFormValue("notes", value)}
-        />
+        <form
+          className="flex flex-1 flex-col gap-6"
+          noValidate
+          onSubmit={(event) => void createPerson(event)}
+        >
+          <WizardProgress
+            step={step}
+            summaryRef={stepSummary}
+            disabled={creating}
+            onSelect={selectProgressStep}
+          />
+          {step === "citizenship" ? (
+            <CitizenshipChoice onChange={changeCitizenship} />
+          ) : null}
+          {step === "documents" && form.citizenship === "romanian" ? (
+            <NationalIdFormatSelect
+              value={chosenNationalIdFormat}
+              disabled={creating}
+              onChange={changeNationalIdFormat}
+            />
+          ) : null}
+          {(step === "documents" &&
+            (form.citizenship === "foreign" || chosenNationalIdFormat)) ||
+          step === "license" ? (
+            <DocumentPhotosSection
+              formId={formId}
+              form={{
+                ...form,
+                documents: form.documents.filter((document) =>
+                  step === "license"
+                    ? document.type === "driverLicense"
+                    : document.type !== "driverLicense",
+                ),
+              }}
+              disabled={creating}
+              onSetDocumentPhoto={setDocumentPhoto}
+              jobs={extraction.jobs}
+              onRetry={extraction.retry}
+              fieldErrors={fieldErrors}
+            />
+          ) : null}
+          {step === "personal" ? (
+            <PersonalSection
+              formId={formId}
+              form={form}
+              fieldErrors={fieldErrors}
+              locale={locale}
+              showUnder18Warning={showUnder18Warning}
+              onSetFormValue={setFormValue}
+            />
+          ) : null}
+          {step === "personal" || step === "license" ? (
+            <DocumentsSection
+              formId={formId}
+              form={{
+                ...form,
+                documents: form.documents.filter((document) =>
+                  step === "license"
+                    ? document.type === "driverLicense"
+                    : document.type !== "driverLicense",
+                ),
+              }}
+              fieldErrors={fieldErrors}
+              locale={locale}
+              showUnder18Warning={showUnder18Warning}
+              disabled={creating}
+              onSetDocument={setDocument}
+            />
+          ) : null}
+          {step === "contact" ? (
+            <ContactSection
+              formId={formId}
+              form={form}
+              fieldErrors={fieldErrors}
+              locale={locale}
+              onSetFormValue={setFormValue}
+              onChangePhone={changePhone}
+            />
+          ) : null}
+          {step === "address" ? (
+            <AddressSection
+              formId={formId}
+              form={form}
+              fieldErrors={fieldErrors}
+              locale={locale}
+              onSetFormValue={setFormValue}
+              onChangeCountry={changeCountry}
+            />
+          ) : null}
+          {step === "review" ? (
+            <>
+              {nameDifferences.length > 0 ? (
+                <LicenseNameConfirmation
+                  differences={nameDifferences}
+                  checked={!nameConfirmationRequired}
+                  disabled={creating || extraction.pending}
+                  onCheckedChange={(checked) =>
+                    setConfirmedNames(checked ? nameConfirmationKey : null)
+                  }
+                />
+              ) : null}
+              <DocumentsSection
+                formId={formId}
+                form={form}
+                fieldErrors={fieldErrors}
+                locale={locale}
+                showUnder18Warning={showUnder18Warning}
+                disabled={creating}
+                onSetDocument={setDocument}
+              />
+              <NotesField
+                formId={formId}
+                value={form.notes}
+                error={fieldErrors.notes}
+                onChange={(value) => setFormValue("notes", value)}
+              />
+            </>
+          ) : null}
 
-        {feedback ? <CreateFormFeedback feedback={feedback} /> : null}
+          {feedback ? <CreateFormFeedback feedback={feedback} /> : null}
 
-        <FormActions
-          creating={creating}
-          uploadingPhotos={uploadingPhotos}
-          personsHref={personsHref}
-        />
-      </form>
-    </div>
+          <FormActions
+            creating={creating}
+            uploadingPhotos={uploadingPhotos}
+            extracting={extraction.pending}
+            confirmationRequired={nameConfirmationRequired}
+            step={step}
+            canGoBack={canGoBack}
+            onBack={goBack}
+            onNext={() => nextStep()}
+          />
+        </form>
+      </div>
+    </ExtractionReviewContext.Provider>
   );
+
+  function selectProgressStep(next: PersonProgressStep) {
+    if (creating) return;
+    if (step === "license" && ["contact", "review"].includes(next)) {
+      reviewDetails(next);
+      return;
+    }
+    if (step === "personal" && next === "license") {
+      nextStep(next);
+      return;
+    }
+    setFeedback(null);
+    navigation.select(next);
+  }
+
+  function goBack() {
+    if (creating) return;
+    setFeedback(null);
+    navigation.back();
+  }
+
+  function goForward() {
+    if (creating) return;
+    if (step === "documents" || step === "license") {
+      reviewDetails(navigation.forwardStep);
+      return;
+    }
+    setFeedback(null);
+    navigation.forward();
+  }
+
+  function nextStep(destination?: PersonProgressStep) {
+    if (step === "documents" || step === "license") {
+      reviewDetails();
+      return;
+    }
+    if (!isReviewStep(step) || step === "review" || creating) return;
+    // Validate only the visible group; later steps are validated on their turn.
+    const fields =
+      step === "personal"
+        ? (["firstName", "lastName", "cnp", "dateOfBirth"] as const)
+        : step === "contact"
+          ? (["email", "phone"] as const)
+          : ([
+              "addressLine1",
+              "addressLine2",
+              "city",
+              "region",
+              "countryCode",
+            ] as const);
+    const candidate = createPersonInput(
+      { ...form, documents: [] },
+      (field, error) =>
+        t(`feedback.date.${error}`, {
+          field: fieldLabel(field === "dateOfBirth" ? field : null),
+        }),
+    );
+    const errors: FormErrors = {};
+    const awaitingField = (field: string) =>
+      fieldHasPendingExtraction(
+        extractionState,
+        extraction.pendingDocumentKeys,
+        `person.${field}` as ExtractionFieldKey,
+      );
+    if (
+      candidate.error &&
+      stepForField(candidate.error.field) === step &&
+      !awaitingField(candidate.error.field)
+    ) {
+      errors[candidate.error.field] = candidate.error.message;
+    }
+    // A partial birth date must not prevent validation of contact/address.
+    const values = candidate.input ?? { ...form };
+    for (const field of fields) {
+      // Reading can finish on a later step; final submission validates every field.
+      if (awaitingField(field)) continue;
+      if (field === "cnp" && form.citizenship === "foreign" && !form.cnp.trim())
+        continue;
+      if (field === "dateOfBirth" && candidate.error) continue;
+      const result = v1.persons.createPersonInputSchema.shape[field].safeParse(
+        values[field],
+      );
+      if (!result.success)
+        errors[field] = formatValidationIssue(result.error.issues[0]!, field);
+    }
+    setFieldErrors((current) => {
+      const next = { ...current };
+      for (const field of fields) delete next[field];
+      return { ...next, ...errors };
+    });
+    if (Object.keys(errors).length) {
+      setFeedback({
+        kind: "error",
+        title: t("feedback.createErrorTitle"),
+        messages: Object.values(errors) as string[],
+      });
+      return;
+    }
+    setFeedback(null);
+    setStep(destination ?? REVIEW_STEPS[REVIEW_STEPS.indexOf(step) + 1]!);
+  }
+
+  function reviewDetails(next?: PersonProgressStep) {
+    if (uploadingPhotos) return;
+    const nextErrors: FormErrors = {};
+    if (
+      step === "documents" &&
+      form.citizenship === "romanian" &&
+      !chosenNationalIdFormat
+    )
+      return;
+    for (const document of form.documents.filter((document) =>
+      step === "license"
+        ? document.type === "driverLicense"
+        : document.type !== "driverLicense",
+    )) {
+      const failed = Object.values(document.photos).find(
+        (photo) => photo?.status === "failed",
+      );
+      if (failed?.status === "failed") {
+        nextErrors[documentFieldErrorKey(document.key, "photos")] =
+          failed.message;
+      } else if (
+        (document.required ||
+          (document.type === "driverLicense" &&
+            !isBlankDocumentDraft(document))) &&
+        documentPhotoSlots(document).some(
+          (slot) => document.photos[slot]?.status !== "uploaded",
+        )
+      ) {
+        nextErrors[documentFieldErrorKey(document.key, "photos")] = t(
+          "feedback.validation.requiredDocumentPhotos",
+          { document: t(`documentTypes.${document.type}`) },
+        );
+      }
+    }
+    setFieldErrors(nextErrors);
+    if (Object.keys(nextErrors).length) {
+      setFeedback({
+        kind: "error",
+        title: t("wizard.documentsMissing"),
+        messages: Object.values(nextErrors) as string[],
+      });
+      return;
+    }
+    setFeedback(null);
+    setStep(next ?? (step === "license" ? "contact" : "personal"));
+  }
 
   function setFormValue<Key extends keyof CreatePersonFormState>(
     key: Key,
     value: CreatePersonFormState[Key],
   ) {
-    setForm((current) => ({ ...current, [key]: value }));
+    setExtractionState((current) =>
+      markExtractionFieldEdited(
+        { ...current, form: { ...current.form, [key]: value } },
+        `person.${key}` as ExtractionFieldKey,
+      ),
+    );
     clearFieldErrorForPersonKey(key);
   }
 
@@ -368,61 +712,104 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
   }
 
   function changeCountry(value: CountryCode) {
-    setForm((current) => ({
-      ...current,
-      countryCode: value,
-      region: "",
-    }));
+    setExtractionState((current) =>
+      markExtractionFieldEdited(
+        markExtractionFieldEdited(
+          {
+            ...current,
+            form: { ...current.form, countryCode: value, region: "", city: "" },
+          },
+          "person.countryCode",
+        ),
+        "person.region",
+      ),
+    );
+    setExtractionState((current) =>
+      markExtractionFieldEdited(current, "person.city"),
+    );
     clearFieldError("countryCode");
     clearFieldError("region");
+    clearFieldError("city");
   }
 
   function changeCitizenship(citizenship: PersonCitizenship) {
-    setForm((current) =>
-      current.citizenship === citizenship
-        ? current
-        : {
-            ...current,
-            citizenship,
-            dateOfBirth:
-              citizenship === "romanian"
-                ? emptyDateParts()
-                : current.dateOfBirth,
-            documents: createInitialDocuments(citizenship),
-          },
-    );
+    changeWorkflow(citizenship, form.nationalIdFormat);
+    setStep("documents");
     setFieldErrors({});
     setFeedback(null);
   }
 
-  function setDocumentValue<Key extends PersonDocumentFormFieldKey>(
-    documentKey: string,
-    key: Key,
-    value: CreatePersonDocumentFormState[Key],
-  ) {
-    setForm((current) => ({
-      ...current,
-      documents: current.documents.map((document) =>
-        document.key === documentKey ? { ...document, [key]: value } : document,
-      ),
-    }));
-    clearFieldError(documentFieldErrorKey(documentKey, key));
+  function changeNationalIdFormat(format: NationalIdFormat) {
+    changeWorkflow("romanian", format);
+    setChosenNationalIdFormat(format);
+    setFieldErrors({});
+    setFeedback(null);
   }
 
-  function setDocument(document: CreatePersonDocumentFormState) {
-    setForm((current) => ({
-      ...current,
-      documents: current.documents.map((currentDocument) =>
-        currentDocument.key === document.key ? document : currentDocument,
-      ),
-    }));
+  function changeWorkflow(
+    citizenship: PersonCitizenship,
+    format: NationalIdFormat,
+  ) {
+    if (form.citizenship === citizenship && form.nationalIdFormat === format)
+      return;
+    if (form.citizenship === "romanian" && citizenship === "romanian") {
+      setForm((current) =>
+        switchDocumentWorkflow(current, citizenship, format),
+      );
+      return;
+    }
+    for (const document of form.documents)
+      extraction.cancelDocument(document.key);
+    setExtractionState((current) => {
+      let next = current;
+      for (const document of current.form.documents)
+        next = invalidateDocumentExtraction(next, document.key);
+      return {
+        ...next,
+        form: switchDocumentWorkflow(next.form, citizenship, format),
+      };
+    });
+  }
+
+  function setDocument(
+    document: CreatePersonDocumentFormState,
+    editedFields: readonly PersonDocumentFormFieldKey[] = [],
+  ) {
+    setExtractionState((current) => {
+      const patch = Object.fromEntries(
+        editedFields.map((key) => [key, document[key]]),
+      );
+      let next = {
+        ...current,
+        form: {
+          ...current.form,
+          documents: current.form.documents.map((item) =>
+            item.key === document.key ? { ...item, ...patch } : item,
+          ),
+        },
+      };
+      for (const key of editedFields)
+        next = markExtractionFieldEdited(
+          next,
+          `document.${document.key}.${key}`,
+        );
+      return next;
+    });
+    for (const key of editedFields)
+      clearFieldError(documentFieldErrorKey(document.key, key));
   }
 
   function setDocumentPhoto(
     documentKey: string,
     slot: v1.persons.PersonDocumentPhotoSlot,
     file: File | null,
+    originalFile?: File,
   ) {
+    clearFieldError(documentFieldErrorKey(documentKey, "photos"));
+    extraction.cancelDocument(documentKey);
+    setExtractionState((current) =>
+      invalidateDocumentExtraction(current, documentKey),
+    );
     if (file) {
       const uploadId = createDraftUploadId();
       setForm((current) => ({
@@ -437,6 +824,7 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
                     id: uploadId,
                     status: "uploading",
                     file,
+                    originalFile,
                   },
                 },
               }
@@ -444,7 +832,13 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
         ),
       }));
       setFeedback(null);
-      void uploadDocumentPhotoDraft(documentKey, slot, file, uploadId);
+      void uploadDocumentPhotoDraft(
+        documentKey,
+        slot,
+        file,
+        uploadId,
+        originalFile,
+      );
       return;
     }
 
@@ -470,6 +864,7 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
     slot: v1.persons.PersonDocumentPhotoSlot,
     file: File,
     uploadId: string,
+    originalFile?: File,
   ): Promise<void> {
     let stage: DocumentPhotoUploadStage = "checksum";
     let storageResponse: StorageUploadResponseDiagnostics | null = null;
@@ -494,6 +889,9 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
         {
           method: "POST",
           json: {
+            documentType: form.documents.find(
+              (document) => document.key === documentKey,
+            )?.type,
             contentType: file.type,
             byteSize: file.size,
             checksumSha256,
@@ -533,6 +931,7 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
         id: uploadId,
         status: "uploaded",
         file,
+        originalFile,
         uploadToken: upload.uploadToken,
       });
     } catch (error) {
@@ -563,6 +962,7 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
         id: uploadId,
         status: "failed",
         file,
+        originalFile,
         message,
       });
       setFeedback({
@@ -579,25 +979,19 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
     uploadId: string,
     nextUpload: CreatePersonDocumentFormState["photos"][v1.persons.PersonDocumentPhotoSlot],
   ) {
-    setForm((current) => ({
-      ...current,
-      documents: current.documents.map((document) => {
+    setForm((current) =>
+      updateDocumentDrafts(current, (document) => {
         if (
           document.key !== documentKey ||
           document.photos[slot]?.id !== uploadId
-        ) {
+        )
           return document;
-        }
-
         return {
           ...document,
-          photos: {
-            ...document.photos,
-            [slot]: nextUpload,
-          },
+          photos: { ...document.photos, [slot]: nextUpload },
         };
       }),
-    }));
+    );
   }
 
   function clearFieldError(field: FormErrorKey) {
@@ -619,15 +1013,16 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
   }
 }
 
-function personCreateConflict(
-  error: unknown,
-): { field: Extract<FormErrorKey, "email" | "phone">; message: string } | null {
+function personCreateConflict(error: unknown): {
+  field: Extract<FormErrorKey, "email" | "phone" | "cnp">;
+  message: string;
+} | null {
   if (!(error instanceof ApiError) || error.status !== 409) {
     return null;
   }
 
   const field = conflictField(error.details);
-  if (field !== "email" && field !== "phone") {
+  if (field !== "email" && field !== "phone" && field !== "cnp") {
     return null;
   }
 
@@ -719,4 +1114,20 @@ function storageUploadResponseDiagnostics(
     storageRequestId: response.headers.get("x-amz-request-id"),
     storageExtendedRequestId: response.headers.get("x-amz-id-2"),
   };
+}
+
+function stepForField(field: FormErrorKey): PersonWizardStep {
+  if (field.startsWith("document.driver-license.")) return "license";
+  if (field.startsWith("document.") && field.endsWith(".photos"))
+    return "documents";
+  if (["firstName", "lastName", "cnp", "dateOfBirth"].includes(field))
+    return "personal";
+  if (["email", "phone"].includes(field)) return "contact";
+  if (
+    ["addressLine1", "addressLine2", "city", "region", "countryCode"].includes(
+      field,
+    )
+  )
+    return "address";
+  return "review";
 }

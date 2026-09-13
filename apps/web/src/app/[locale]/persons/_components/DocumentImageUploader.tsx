@@ -15,6 +15,7 @@ type DocumentImageUploaderProps = {
   errorMessage?: string | null;
   formatsLabel?: string;
   imageUrl?: string | null;
+  preview?: ReactNode;
   inputId: string;
   missingLabel: string;
   onFileSelected: (file: File | null) => void;
@@ -33,6 +34,7 @@ export function DocumentImageUploader({
   errorMessage,
   formatsLabel,
   imageUrl,
+  preview,
   inputId,
   missingLabel,
   onFileSelected,
@@ -95,7 +97,9 @@ export function DocumentImageUploader({
           disabled && "pointer-events-none cursor-not-allowed opacity-60",
         )}
       >
-        {hasImage && imageUrl ? (
+        {hasImage && preview ? (
+          preview
+        ) : hasImage && imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- previews use object URLs or protected API image URLs.
           <img
             src={imageUrl}
@@ -129,7 +133,7 @@ export function DocumentImageUploader({
         </span>
       </Label>
       {errorMessage && onRetry && retryLabel ? (
-        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-lg bg-scrim">
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-lg bg-media-scrim">
           <span role="alert" className="sr-only">
             {errorMessage}
           </span>
@@ -146,7 +150,7 @@ export function DocumentImageUploader({
           </Button>
           <span
             aria-hidden="true"
-            className="text-sm font-medium text-primary-foreground"
+            className="text-sm font-medium text-scrim-foreground"
           >
             {retryLabel}
           </span>

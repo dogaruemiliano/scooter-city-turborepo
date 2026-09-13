@@ -6,18 +6,26 @@ import {
   FormSection,
 } from "@repo/ui/components";
 import { useTranslations } from "next-intl";
-import { useRef, useState } from "react";
+import { Fragment, useState } from "react";
+import {
+  ExtractionReviewContext,
+  useExtractionReview,
+} from "./ExtractionReviewContext";
+import {
+  applyExtractionSuggestion,
+  markExtractionFieldEdited,
+} from "./extraction-state";
 
 import { DocumentDraftCard } from "./DocumentDraftCard";
 import { DocumentDraftSheet } from "./DocumentDraftSheet";
+import { DocumentDraftFields } from "./DocumentDraftFields";
 import { isBlankDocumentDraft } from "./form-state";
 import type {
   CreatePersonDocumentFormState,
   CreatePersonFormState,
   FormErrors,
   SetPersonDocument,
-  SetPersonDocumentPhoto,
-  SetPersonDocumentValue,
+  PersonDocumentFormFieldKey,
 } from "./types";
 
 export function DocumentsSection({
@@ -28,8 +36,6 @@ export function DocumentsSection({
   showUnder18Warning,
   disabled,
   onSetDocument,
-  onSetDocumentValue,
-  onSetDocumentPhoto,
 }: {
   formId: string;
   form: CreatePersonFormState;
@@ -38,8 +44,6 @@ export function DocumentsSection({
   showUnder18Warning: boolean;
   disabled: boolean;
   onSetDocument: SetPersonDocument;
-  onSetDocumentValue: SetPersonDocumentValue;
-  onSetDocumentPhoto: SetPersonDocumentPhoto;
 }) {
   const t = useTranslations("persons");
   const [open, setOpen] = useState(false);
@@ -47,34 +51,53 @@ export function DocumentsSection({
     null,
   );
   const [sheetMode, setSheetMode] = useState<"add" | "edit">("add");
-  const documentSnapshot = useRef<CreatePersonDocumentFormState | null>(null);
-  const restoreSnapshotOnClose = useRef(true);
-  const activeDocument = form.documents.find(
+  const [patch, setPatch] = useState<Partial<CreatePersonDocumentFormState>>(
+    {},
+  );
+  const extraction = useExtractionReview();
+  const baseDocument = form.documents.find(
     (document) => document.key === activeDocumentKey,
   );
+  const activeDocument = baseDocument
+    ? { ...baseDocument, ...patch }
+    : undefined;
+  let localState = extraction?.state;
+  if (localState && activeDocument) {
+    localState = {
+      ...localState,
+      form: {
+        ...form,
+        documents: form.documents.map((document) =>
+          document.key === activeDocument.key ? activeDocument : document,
+        ),
+      },
+    };
+    for (const key of Object.keys(patch) as PersonDocumentFormFieldKey[])
+      localState = markExtractionFieldEdited(
+        localState,
+        `document.${activeDocument.key}.${key}`,
+      );
+  }
 
   function openDocument(document: CreatePersonDocumentFormState) {
-    documentSnapshot.current = cloneDocument(document);
-    restoreSnapshotOnClose.current = true;
+    setPatch({});
     setSheetMode(isBlankDocumentDraft(document) ? "add" : "edit");
     setActiveDocumentKey(document.key);
     setOpen(true);
   }
 
   function saveDocument() {
-    restoreSnapshotOnClose.current = false;
+    if (activeDocument)
+      onSetDocument({ ...activeDocument, status: "verified" }, [
+        ...new Set([...Object.keys(patch), "status"]),
+      ] as PersonDocumentFormFieldKey[]);
     setOpen(false);
   }
 
   function finishOpenChange(nextOpen: boolean) {
     if (nextOpen) return;
 
-    if (restoreSnapshotOnClose.current && documentSnapshot.current) {
-      onSetDocument(documentSnapshot.current);
-    }
-
-    documentSnapshot.current = null;
-    restoreSnapshotOnClose.current = true;
+    setPatch({});
     setActiveDocumentKey(null);
   }
 
@@ -87,20 +110,43 @@ export function DocumentsSection({
       onOpenChangeComplete={finishOpenChange}
     >
       <FormSection title={t("sections.document")}>
-        {form.documents.map((document) => {
-          const documentId = `${formId}-document-${document.key}`;
+        {form.documents
+          .filter(
+            (document) =>
+              document.required ||
+              document.type === "driverLicense" ||
+              !isBlankDocumentDraft(document),
+          )
+          .map((document) => {
+            const documentId = `${formId}-document-${document.key}`;
 
-          return (
-            <DocumentDraftCard
-              key={document.key}
-              document={document}
-              documentId={documentId}
-              disabled={disabled}
-              fieldErrors={fieldErrors}
-              onOpen={() => openDocument(document)}
-            />
-          );
-        })}
+            return (
+              <Fragment key={document.key}>
+                <DocumentDraftCard
+                  key={document.key}
+                  document={document}
+                  documentId={documentId}
+                  locale={locale}
+                  disabled={disabled}
+                  fieldErrors={fieldErrors}
+                  onOpen={() => openDocument(document)}
+                />
+                <div className="empty:hidden sm:col-span-2">
+                  <DocumentDraftFields
+                    document={document}
+                    documentId={`${documentId}-inline`}
+                    fieldErrors={fieldErrors}
+                    locale={locale}
+                    disabled={disabled}
+                    reviewOnly
+                    onSetDocumentValue={(_key, field, value) =>
+                      onSetDocument({ ...document, [field]: value }, [field])
+                    }
+                  />
+                </div>
+              </Fragment>
+            );
+          })}
         {fieldErrors.documents ? (
           <p
             id={`${formId}-documents-error`}
@@ -112,41 +158,63 @@ export function DocumentsSection({
         ) : null}
       </FormSection>
 
-      <BottomSheetContent className="lg:w-xl">
+      <BottomSheetContent className="lg:w-document-editor lg:max-w-document-editor">
         {activeDocument ? (
-          <DocumentDraftSheet
-            title={
-              sheetMode === "add"
-                ? t("detail.dialogs.addDocumentTitle")
-                : t("detail.dialogs.editDocumentTitle")
+          <ExtractionReviewContext.Provider
+            value={
+              extraction && localState
+                ? {
+                    ...extraction,
+                    state: localState,
+                    onApplySuggestion: (key, suggestionId) => {
+                      if (!localState) return;
+                      const next = applyExtractionSuggestion(
+                        localState,
+                        key,
+                        suggestionId,
+                      );
+                      const updated = next.form.documents.find(
+                        (document) => document.key === activeDocument.key,
+                      )!;
+                      const changes = Object.fromEntries(
+                        (
+                          Object.keys(
+                            activeDocument,
+                          ) as (keyof CreatePersonDocumentFormState)[]
+                        )
+                          .filter(
+                            (field) =>
+                              JSON.stringify(activeDocument[field]) !==
+                              JSON.stringify(updated[field]),
+                          )
+                          .map((field) => [field, updated[field]]),
+                      );
+                      setPatch((current) => ({ ...current, ...changes }));
+                    },
+                  }
+                : null
             }
-            document={activeDocument}
-            documentId={`${formId}-document-${activeDocument.key}`}
-            fieldErrors={fieldErrors}
-            locale={locale}
-            canChangeIdentityType={
-              form.citizenship === "foreign" &&
-              activeDocument.slot === "identity"
-            }
-            showUnder18Warning={showUnder18Warning}
-            disabled={disabled}
-            onSave={saveDocument}
-            onSetDocumentValue={onSetDocumentValue}
-            onSetDocumentPhoto={onSetDocumentPhoto}
-          />
+          >
+            <DocumentDraftSheet
+              title={
+                sheetMode === "add"
+                  ? t("detail.dialogs.addDocumentTitle")
+                  : t("detail.dialogs.editDocumentTitle")
+              }
+              document={activeDocument}
+              documentId={`${formId}-document-${activeDocument.key}`}
+              fieldErrors={fieldErrors}
+              locale={locale}
+              showUnder18Warning={showUnder18Warning}
+              disabled={disabled}
+              onSave={saveDocument}
+              onSetDocumentValue={(_documentKey, key, value) =>
+                setPatch((current) => ({ ...current, [key]: value }))
+              }
+            />
+          </ExtractionReviewContext.Provider>
         ) : null}
       </BottomSheetContent>
     </BottomSheet>
   );
-}
-
-function cloneDocument(
-  document: CreatePersonDocumentFormState,
-): CreatePersonDocumentFormState {
-  return {
-    ...document,
-    issuedOn: { ...document.issuedOn },
-    expiresOn: { ...document.expiresOn },
-    photos: { ...document.photos },
-  };
 }

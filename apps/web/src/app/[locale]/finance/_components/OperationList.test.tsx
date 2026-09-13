@@ -1,5 +1,5 @@
 import type { v1 } from "@repo/api-shared";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import type { ComponentProps } from "react";
 import { describe, expect, it, vi } from "vitest";
 
@@ -10,6 +10,7 @@ vi.mock("next-intl/server", () => ({
     ({
       "kinds.EXPENSE": "Expense",
       "statuses.POSTED": "Posted",
+      "statuses.REVERSED": "Reversed",
       "columns.date": "Date",
       "columns.description": "Description",
       "columns.category": "Category",
@@ -67,7 +68,50 @@ describe("OperationList", () => {
     expect(mobileLink).toHaveTextContent("Posted");
 
     const desktopTable = screen.getByRole("table");
-    expect(desktopTable.parentElement).toHaveClass("hidden", "md:flex");
+    expect(desktopTable.closest('[data-slot="card"]')).toHaveClass(
+      "hidden",
+      "md:flex",
+    );
     expect(screen.getAllByText("Battery replacement")).toHaveLength(2);
+  });
+
+  it("keeps reversed operations visible and distinguishes their amounts in both layouts", async () => {
+    render(
+      await OperationList({
+        items: [
+          item,
+          {
+            ...item,
+            id: "expense-corrected",
+            description: "Corrected expense",
+            status: "REVERSED",
+          },
+        ],
+        currency: "RON",
+        locale: "en",
+        emptyLabel: "No expenses",
+      }),
+    );
+
+    const mobileList = screen.getByRole("list");
+    const reversedLink = within(mobileList).getByRole("link", {
+      name: /Corrected expense/,
+    });
+    expect(reversedLink).toHaveAttribute(
+      "href",
+      "/finance/operations/expense-corrected",
+    );
+    expect(within(reversedLink).getByText("Reversed")).toBeInTheDocument();
+    expect(reversedLink.querySelector(".line-through")).toHaveTextContent(
+      "RON",
+    );
+
+    const desktopRows = within(screen.getByRole("table")).getAllByRole("row");
+    expect(desktopRows).toHaveLength(3);
+    expect(within(desktopRows[2]!).getByText("Reversed")).toBeInTheDocument();
+    expect(desktopRows[2]!.querySelector(".line-through")).toHaveTextContent(
+      "RON",
+    );
+    expect(desktopRows[1]!.querySelector(".line-through")).toBeNull();
   });
 });

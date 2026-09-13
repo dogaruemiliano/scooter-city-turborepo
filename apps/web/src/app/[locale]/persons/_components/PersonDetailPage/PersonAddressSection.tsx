@@ -33,16 +33,7 @@ export function PersonAddressSection({
           value={person.region ?? emptyValue}
         />
       </div>
-      <div className="grid grid-cols-2 gap-4 sm:col-span-2">
-        <DetailField
-          label={t("fields.city")}
-          value={person.city ?? emptyValue}
-        />
-        <DetailField
-          label={t("fields.postalCode")}
-          value={person.postalCode ?? emptyValue}
-        />
-      </div>
+      <DetailField label={t("fields.city")} value={person.city ?? emptyValue} />
       <DetailField
         label={t("fields.addressLine1")}
         value={person.addressLine1 ?? emptyValue}

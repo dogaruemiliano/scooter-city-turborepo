@@ -42,6 +42,8 @@ export interface PresignImageUploadInput {
   checksumSha256: string;
   scope: string;
   category: DocumentStorageCategory;
+  /** Internal completion-token lifetime; does not extend the signed PUT URL. */
+  completionTokenTtlSeconds?: number;
 }
 
 export interface PresignDocumentUploadInput extends PresignImageUploadInput {
@@ -86,6 +88,7 @@ export interface PresignedImageUpload {
   method: "PUT";
   headers: Record<string, string>;
   expiresAt: Date;
+  uploadTokenExpiresAt?: Date;
   maxBytes: number;
 }
 

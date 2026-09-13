@@ -10,6 +10,7 @@ export function DocumentExpiryField({
   checked,
   switchDisabled = false,
   className,
+  switchClassName,
   children,
   onCheckedChange,
 }: {
@@ -18,13 +19,14 @@ export function DocumentExpiryField({
   checked: boolean;
   switchDisabled?: boolean;
   className?: string;
+  switchClassName?: string;
   children: ReactNode;
   onCheckedChange: (checked: boolean) => void;
 }) {
   return (
     <div className={cn("grid min-w-0 gap-3", className)}>
       {children}
-      <Field orientation="horizontal">
+      <Field orientation="horizontal" className={switchClassName}>
         <FieldLabel htmlFor={switchId}>{switchLabel}</FieldLabel>
         <Switch
           id={switchId}

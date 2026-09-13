@@ -14,6 +14,9 @@ import cookieParser from "cookie-parser";
 import { createHash } from "node:crypto";
 import type { Server } from "node:http";
 import { Readable } from "node:stream";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { Client } from "pg";
 import request from "supertest";
 
 import { AppModule } from "../src/app.module";
@@ -24,6 +27,7 @@ import {
 } from "../src/image-storage/image-storage.constants";
 import type { S3PresignOptions } from "../src/image-storage/image-storage.module";
 import { PrismaService } from "../src/prisma/prisma.service";
+import { PersonDocumentExtractionService } from "../src/person-document-extraction/person-document-extraction.service";
 import { UsersService } from "../src/users/users.service";
 
 interface IssuedSession {
@@ -52,6 +56,23 @@ describe("Persons HTTP surface (e2e)", () => {
   // database that still holds an earlier run's rows collides on the unique
   // phone and fails the very first create with a 409.
   let phoneSeq = 10_000_000 + Math.floor(Math.random() * 89_000_000);
+
+  const fakePersonExtraction = {
+    analyze: jest.fn().mockResolvedValue({
+      detectedDocumentType: "nationalId",
+      suggestions: [
+        {
+          target: "person",
+          field: "firstName",
+          value: "Ștefan",
+          sourceSlot: "front",
+          needsReview: false,
+        },
+      ],
+      licenseCategories: [],
+      warnings: [],
+    }),
+  };
 
   const fakeS3 = {
     send: jest.fn((command: unknown) => {
@@ -176,6 +197,8 @@ describe("Persons HTTP surface (e2e)", () => {
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule],
     })
+      .overrideProvider(PersonDocumentExtractionService)
+      .useValue(fakePersonExtraction)
       .overrideProvider(S3_CLIENT)
       .useValue(fakeS3)
       .overrideProvider(S3_PRESIGNER)
@@ -247,6 +270,9 @@ describe("Persons HTTP surface (e2e)", () => {
     return {
       email,
       phone,
+      addressLine1: "1 Test Street",
+      city: "București",
+      region: "București",
       firstName: "Ada",
       lastName: "Lovelace",
       dateOfBirth: "1990-02-28",
@@ -255,10 +281,8 @@ describe("Persons HTTP surface (e2e)", () => {
           type: "nationalId",
           series: "RX",
           number: "123456",
-          cnp: "1900228123450",
+          cnp: overrides.cnp ?? undefined,
           issuingCountryCode: "RO",
-          issuedBy: "SPCLEP Bucuresti",
-          issuedOn: "2024-01-15",
           expiresOn: "2030-01-31",
           status: "unverified",
         },
@@ -290,6 +314,50 @@ describe("Persons HTTP surface (e2e)", () => {
     }
   }
 
+  it("backfills only unambiguous legacy CNPs without deleting document history", async () => {
+    const client = new Client({ connectionString: process.env.DATABASE_URL });
+    await client.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query(
+        'CREATE TEMP TABLE "Person" (id text PRIMARY KEY) ON COMMIT DROP',
+      );
+      await client.query(
+        'CREATE TEMP TABLE "PersonDocument" ("personId" text, cnp text) ON COMMIT DROP',
+      );
+      await client.query(`INSERT INTO "Person" VALUES ('one'), ('conflict'), ('duplicate'), ('empty');
+        INSERT INTO "PersonDocument" VALUES
+        ('one', '1900228123450'), ('one', ' 1900228123450 '),
+        ('conflict', '1900228123469'), ('conflict', '1900228123477'),
+        ('duplicate', '1900228123469'), ('empty', NULL)`);
+      await client.query(
+        readFileSync(
+          join(
+            __dirname,
+            "../prisma/migrations/20260912140000_person_cnp/migration.sql",
+          ),
+          "utf8",
+        ),
+      );
+      const result = await client.query(
+        'SELECT id, cnp FROM "Person" ORDER BY id',
+      );
+      expect(result.rows).toEqual([
+        { id: "conflict", cnp: null },
+        { id: "duplicate", cnp: null },
+        { id: "empty", cnp: null },
+        { id: "one", cnp: "1900228123450" },
+      ]);
+      const documents = await client.query<{ count: number }>(
+        'SELECT count(*)::int AS count FROM "PersonDocument"',
+      );
+      expect(documents.rows[0].count).toBe(6);
+    } finally {
+      await client.query("ROLLBACK");
+      await client.end();
+    }
+  });
+
   it("requires authentication", async () => {
     const res = await req().get(v1.persons.ROUTES.list);
     expect(res.status).toBe(401);
@@ -305,9 +373,70 @@ describe("Persons HTTP surface (e2e)", () => {
     expect(res.status).toBe(403);
   });
 
+  it("keeps a unique person CNP when an ID is replaced", async () => {
+    const session = await freshSession(["ADMIN"]);
+    const cookie = [`access_token=${session.accessToken}`];
+    const cnp = "1900228123469";
+    const create = await req()
+      .post(v1.persons.ROUTES.create)
+      .set("Cookie", cookie)
+      .send(personInput({ cnp, dateOfBirth: undefined }));
+    expect(create.status).toBe(201);
+    const person = v1.persons.personSchema.parse(create.body);
+    expect(person.cnp).toBe(cnp);
+    expect(person.dateOfBirth).toBe("1990-02-28");
+
+    const duplicate = await req()
+      .post(v1.persons.ROUTES.create)
+      .set("Cookie", cookie)
+      .send(personInput({ cnp }));
+    expect(duplicate.status).toBe(409);
+
+    const wrongBirthDate = await req()
+      .patch(v1.persons.ROUTES.update(person.id))
+      .set("Cookie", cookie)
+      .send({ dateOfBirth: "1991-02-28" });
+    expect(wrongBirthDate.status).toBe(400);
+
+    const replacement = await req()
+      .post(
+        v1.persons.ROUTES.documents.replace(person.id, person.documents[0].id),
+      )
+      .set("Cookie", cookie)
+      .send({
+        type: "nationalId",
+        series: "RX",
+        number: "999999",
+        issuingCountryCode: "RO",
+        expiresOn: "2035-01-31",
+      });
+    expect(replacement.status).toBe(201);
+    const replacementDocument = v1.persons.personDocumentSchema.parse(
+      replacement.body,
+    );
+    expect(replacementDocument.cnp).toBeNull();
+    const after = await req()
+      .get(v1.persons.ROUTES.get(person.id))
+      .set("Cookie", cookie);
+    expect(v1.persons.personSchema.parse(after.body).cnp).toBe(cnp);
+
+    const incorrectDocumentCnp = await req()
+      .patch(
+        v1.persons.ROUTES.documents.update(person.id, replacementDocument.id),
+      )
+      .set("Cookie", cookie)
+      .send({ cnp: "1900228123450" });
+    expect(incorrectDocumentCnp.status).toBe(400);
+    expectAuditPayloadToOmit(
+      await listAuditEvents(person.id, session.accessToken),
+      [cnp],
+    );
+  });
+
   it("lets admins create, list, get, update, and soft-delete persons", async () => {
     const session = await freshSession(["ADMIN"]);
     const input = personInput({
+      cnp: "1900228123450",
       firstName: "  Grace ",
       lastName: " Hopper ",
     });
@@ -321,6 +450,7 @@ describe("Persons HTTP surface (e2e)", () => {
     expect(createRes.status).toBe(201);
     expect(created.email).toBe(input.email);
     expect(created.phone).toBe(input.phone);
+    expect(created.cnp).toBe("1900228123450");
     expect(created.firstName).toBe("Grace");
     expect(created.lastName).toBe("Hopper");
     expect(created.documents).toHaveLength(1);
@@ -329,8 +459,6 @@ describe("Persons HTTP surface (e2e)", () => {
     expect(created.documents[0]?.number).toBe("123456");
     expect(created.documents[0]?.cnp).toBe("1900228123450");
     expect(created.documents[0]?.issuingCountryCode).toBe("RO");
-    expect(created.documents[0]?.issuedBy).toBe("SPCLEP Bucuresti");
-    expect(created.documents[0]?.issuedOn).toBe("2024-01-15");
     expect(created.documents[0]?.status).toBe("unverified");
     expect(created.deletedAt).toBeNull();
 
@@ -383,12 +511,23 @@ describe("Persons HTTP surface (e2e)", () => {
       });
     expect(duplicateIdentityDocumentRes.status).toBe(409);
 
+    const driverLicensePhotos = await uploadLicencePhotos(session);
+    const incompleteLicenceRes = await req()
+      .post(v1.persons.ROUTES.documents.create(created.id))
+      .set("Cookie", [`access_token=${session.accessToken}`])
+      .send({
+        type: "driverLicense",
+        photos: { front: driverLicensePhotos.front },
+      });
+    expect(incompleteLicenceRes.status).toBe(400);
+
     const driverLicenseRes = await req()
       .post(v1.persons.ROUTES.documents.create(created.id))
       .set("Cookie", [`access_token=${session.accessToken}`])
       .send({
         type: "driverLicense",
         number: "B7654321",
+        photos: driverLicensePhotos,
         issuingCountryCode: "RO",
         expiresOn: "2032-05-20",
       });
@@ -399,6 +538,18 @@ describe("Persons HTTP surface (e2e)", () => {
     expect(driverLicenseRes.status).toBe(201);
     expect(driverLicense.personId).toBe(created.id);
     expect(driverLicense.type).toBe("driverLicense");
+    const licencePhotosRes = await req()
+      .get(
+        v1.persons.ROUTES.documents.photos.list(created.id, driverLicense.id),
+      )
+      .set("Cookie", [`access_token=${session.accessToken}`]);
+    expect(licencePhotosRes.status).toBe(200);
+    expect(
+      v1.persons.personDocumentPhotoListSchema
+        .parse(licencePhotosRes.body)
+        .map((photo) => photo.slot)
+        .sort(),
+    ).toEqual(["back", "front"]);
 
     const documentsRes = await req()
       .get(v1.persons.ROUTES.documents.list(created.id))
@@ -443,8 +594,6 @@ describe("Persons HTTP surface (e2e)", () => {
         number: updatedDocument.number,
         cnp: updatedDocument.cnp,
         issuingCountryCode: updatedDocument.issuingCountryCode,
-        issuedBy: updatedDocument.issuedBy,
-        issuedOn: updatedDocument.issuedOn,
         expiresOn: updatedDocument.expiresOn,
         status: updatedDocument.status,
         notes: updatedDocument.notes,
@@ -498,7 +647,7 @@ describe("Persons HTTP surface (e2e)", () => {
     ).toBe(true);
 
     const fuzzyDocumentSearchRes = await req()
-      .get(`${v1.persons.ROUTES.list}?search=Bucuretsi&page=1&pageSize=10`)
+      .get(`${v1.persons.ROUTES.list}?search=B7654320&page=1&pageSize=10`)
       .set("Cookie", [`access_token=${session.accessToken}`]);
     const fuzzyDocumentSearch = v1.persons.personListSchema.parse(
       fuzzyDocumentSearchRes.body,
@@ -522,13 +671,13 @@ describe("Persons HTTP surface (e2e)", () => {
       .set("Cookie", [`access_token=${session.accessToken}`])
       .send({
         phone: newPhone,
-        addressLine1: "  1 Test Street ",
+        addressLine1: "  2 Test Street ",
       });
     const updated = v1.persons.personSchema.parse(updateRes.body);
 
     expect(updateRes.status).toBe(200);
     expect(updated.phone).toBe(newPhone);
-    expect(updated.addressLine1).toBe("1 Test Street");
+    expect(updated.addressLine1).toBe("2 Test Street");
 
     auditEvents = await listAuditEvents(created.id, session.accessToken);
     expect(
@@ -538,7 +687,8 @@ describe("Persons HTTP surface (e2e)", () => {
         expect.objectContaining({ field: "phone", newValue: newPhone }),
         expect.objectContaining({
           field: "addressLine1",
-          newValue: "1 Test Street",
+          oldValue: "1 Test Street",
+          newValue: "2 Test Street",
         }),
       ]),
     );
@@ -559,6 +709,7 @@ describe("Persons HTTP surface (e2e)", () => {
       .send({
         type: "driverLicense",
         number: "B7654322",
+        photos: await uploadLicencePhotos(session),
         issuingCountryCode: "RO",
       });
     expect(recreatedDriverLicenseRes.status).toBe(201);
@@ -577,6 +728,7 @@ describe("Persons HTTP surface (e2e)", () => {
       .send({
         type: "driverLicense",
         number: "B7654323",
+        photos: await uploadLicencePhotos(session),
         issuingCountryCode: "RO",
         expiresOn: "2033-05-20",
         status: "verified",
@@ -973,10 +1125,8 @@ describe("Persons HTTP surface (e2e)", () => {
           type: "nationalId",
           series: "DR",
           number: "777777",
-          cnp: "1900228123450",
+
           issuingCountryCode: "RO",
-          issuedBy: "SPCLEP Bucuresti",
-          issuedOn: "2024-01-15",
           expiresOn: "2030-01-31",
           status: "verified",
           photos: { front: uploadUrl.uploadToken },
@@ -1017,6 +1167,473 @@ describe("Persons HTTP surface (e2e)", () => {
     });
     expect(draft?.claimedAt).toBeInstanceOf(Date);
     expect(s3Objects.size).toBe(1);
+  });
+
+  async function uploadPersonDraft(
+    session: IssuedSession,
+    contentType: "image/png" | "application/pdf" = "image/png",
+  ) {
+    const buffer = Buffer.from(
+      contentType === "application/pdf" ? "%PDF-proof" : "document-image",
+    );
+    const response = await req()
+      .post(v1.persons.ROUTES.documents.photos.createDraftUploadUrl)
+      .set("Cookie", [`access_token=${session.accessToken}`])
+      .send({
+        contentType,
+        ...(contentType === "application/pdf"
+          ? { documentType: "proofOfAddress" }
+          : {}),
+        byteSize: buffer.length,
+        checksumSha256: createHash("sha256").update(buffer).digest("hex"),
+      });
+    expect(response.status).toBe(201);
+    const upload = v1.persons.personDocumentPhotoUploadUrlSchema.parse(
+      response.body,
+    );
+    const storageKey = presignedPutKeys.at(-1);
+    if (!storageKey) throw new Error("Missing draft storage key");
+    s3Objects.set(storageKey, { body: buffer, contentType });
+    return { ...upload, storageKey };
+  }
+
+  async function uploadLicencePhotos(session: IssuedSession) {
+    const front = await uploadPersonDraft(session);
+    const back = await uploadPersonDraft(session);
+    return { front: front.uploadToken, back: back.uploadToken };
+  }
+
+  it("saves foreign supplementary documents and reviewed licence categories with an audit trail", async () => {
+    const admin = await freshSession(["ADMIN"]);
+    const upload = await uploadPersonDraft(admin);
+    const licenseFront = await uploadPersonDraft(admin);
+    const licenseBack = await uploadPersonDraft(admin);
+    const categories = [
+      {
+        category: "AM" as const,
+        issuedOn: "2022-01-01",
+        expiresOn: "2032-01-01",
+        restrictions: "01",
+      },
+    ];
+    const response = await req()
+      .post(v1.persons.ROUTES.create)
+      .set("Cookie", [`access_token=${admin.accessToken}`])
+      .send(
+        personInput({
+          documentWorkflow: "foreign",
+          documents: [
+            {
+              type: "passport",
+              status: "verified",
+              photos: { front: upload.uploadToken },
+            },
+            { type: "visa", status: "verified", number: "V123" },
+            { type: "residencePermit", status: "verified", number: "R123" },
+            {
+              type: "driverLicense",
+              status: "verified",
+              licenseCategories: categories,
+              photos: {
+                front: licenseFront.uploadToken,
+                back: licenseBack.uploadToken,
+              },
+            },
+          ],
+        }),
+      );
+    expect(response.status).toBe(201);
+    const person = v1.persons.personSchema.parse(response.body);
+    expect(person.documents.map((document) => document.type).sort()).toEqual([
+      "driverLicense",
+      "passport",
+      "residencePermit",
+      "visa",
+    ]);
+    const licence = person.documents.find(
+      (document) => document.type === "driverLicense",
+    );
+    const passport = person.documents.find(
+      (document) => document.type === "passport",
+    );
+    if (!licence || !passport)
+      throw new Error("Expected passport and driving licence");
+    expect(licence.licenseCategories).toEqual(categories);
+
+    const update = await req()
+      .patch(v1.persons.ROUTES.documents.update(person.id, licence.id))
+      .set("Cookie", [`access_token=${admin.accessToken}`])
+      .send({
+        licenseCategories: [
+          { category: "A1", issuedOn: "2023-01-01", expiresOn: "2033-01-01" },
+        ],
+      });
+    expect(update.status).toBe(200);
+    expect(
+      v1.persons.personDocumentSchema.parse(update.body).licenseCategories?.[0]
+        ?.category,
+    ).toBe("A1");
+    const invalidMetadata = await req()
+      .patch(v1.persons.ROUTES.documents.update(person.id, passport.id))
+      .set("Cookie", [`access_token=${admin.accessToken}`])
+      .send({ licenseCategories: categories });
+    expect(invalidMetadata.status).toBe(400);
+    const duplicateVisa = await req()
+      .post(v1.persons.ROUTES.documents.create(person.id))
+      .set("Cookie", [`access_token=${admin.accessToken}`])
+      .send({ type: "visa" });
+    expect(duplicateVisa.status).toBe(409);
+    const audit = await listAuditEvents(person.id, admin.accessToken);
+    expect(
+      audit.find((event) => event.type === "PERSON_DOCUMENT_UPDATED")?.changes,
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          field: "document.licenseCategories",
+          oldValue: JSON.stringify(categories),
+        }),
+      ]),
+    );
+  });
+
+  it("requires electronic ID front and proof, rejects the reverse, and accepts private proof PDFs including replacements", async () => {
+    const admin = await freshSession(["ADMIN"]);
+    const front = await uploadPersonDraft(admin);
+    const back = await uploadPersonDraft(admin);
+    const proof = await uploadPersonDraft(admin, "application/pdf");
+    const nationalId: v1.persons.CreatePersonNestedDocumentInput = {
+      type: "nationalId",
+      nationalIdFormat: "electronic",
+      issuingCountryCode: "RO",
+      status: "verified",
+      photos: { front: front.uploadToken },
+    };
+    const missing = await req()
+      .post(v1.persons.ROUTES.create)
+      .set("Cookie", [`access_token=${admin.accessToken}`])
+      .send(
+        personInput({
+          documentWorkflow: "romanianElectronic",
+          documents: [nationalId],
+        }),
+      );
+    expect(missing.status).toBe(400);
+    const reverseIncluded = await req()
+      .post(v1.persons.ROUTES.create)
+      .set("Cookie", [`access_token=${admin.accessToken}`])
+      .send(
+        personInput({
+          documentWorkflow: "romanianElectronic",
+          documents: [
+            {
+              ...nationalId,
+              photos: { front: front.uploadToken, back: back.uploadToken },
+            },
+            {
+              type: "proofOfAddress",
+              status: "verified",
+              photos: { front: proof.uploadToken },
+            },
+          ],
+        }),
+      );
+    expect(reverseIncluded.status).toBe(400);
+    const response = await req()
+      .post(v1.persons.ROUTES.create)
+      .set("Cookie", [`access_token=${admin.accessToken}`])
+      .send(
+        personInput({
+          documentWorkflow: "romanianElectronic",
+          documents: [
+            nationalId,
+            {
+              type: "proofOfAddress",
+              status: "verified",
+              photos: { front: proof.uploadToken },
+            },
+          ],
+        }),
+      );
+    expect(response.status).toBe(201);
+    const person = v1.persons.personSchema.parse(response.body);
+    const id = person.documents.find(
+      (document) => document.type === "nationalId",
+    );
+    const address = person.documents.find(
+      (document) => document.type === "proofOfAddress",
+    );
+    if (!id || !address)
+      throw new Error("Expected electronic ID and proof of address");
+    expect(id.nationalIdFormat).toBe("electronic");
+    const reverseUpload = await req()
+      .put(v1.persons.ROUTES.documents.photos.upsert(person.id, id.id, "back"))
+      .set("Cookie", [`access_token=${admin.accessToken}`])
+      .attach("file", Buffer.from("retired-reverse"), {
+        filename: "back.jpg",
+        contentType: "image/jpeg",
+      });
+    expect(reverseUpload.status).toBe(400);
+    const contentPath = v1.persons.ROUTES.documents.photos.content(
+      person.id,
+      address.id,
+      "front",
+    );
+    const content = await req()
+      .get(contentPath)
+      .set("Cookie", [`access_token=${admin.accessToken}`]);
+    expect(content.status).toBe(200);
+    expect(content.headers["content-type"]).toContain("application/pdf");
+    expect((await req().get(contentPath)).status).toBe(401);
+    const replace = await req()
+      .put(
+        v1.persons.ROUTES.documents.photos.upsert(
+          person.id,
+          address.id,
+          "front",
+        ),
+      )
+      .set("Cookie", [`access_token=${admin.accessToken}`])
+      .attach("file", Buffer.from("%PDF-replacement"), {
+        filename: "proof.pdf",
+        contentType: "application/pdf",
+      });
+    expect(replace.status).toBe(200);
+    expect(
+      v1.persons.personDocumentPhotoSchema.parse(replace.body).contentType,
+    ).toBe("application/pdf");
+    const idPdf = await req()
+      .put(v1.persons.ROUTES.documents.photos.upsert(person.id, id.id, "front"))
+      .set("Cookie", [`access_token=${admin.accessToken}`])
+      .attach("file", Buffer.from("%PDF-wrong"), {
+        filename: "id.pdf",
+        contentType: "application/pdf",
+      });
+    expect(idPdf.status).toBe(200);
+    expect(
+      v1.persons.personDocumentPhotoSchema.parse(idPdf.body).contentType,
+    ).toBe("application/pdf");
+  });
+
+  it("retains uploaded drafts for review while enforcing owner, expiry and single-use claims", async () => {
+    const admin = await freshSession(["ADMIN"]);
+    const anotherAdmin = await freshSession(["ADMIN"]);
+    const upload = await uploadPersonDraft(admin);
+    expect(
+      Date.parse(upload.uploadTokenExpiresAt ?? "") -
+        Date.parse(upload.expiresAt),
+    ).toBeGreaterThan(80_000_000);
+    const draft = await prisma.draftUpload.findUniqueOrThrow({
+      where: { storageKey: upload.storageKey },
+    });
+    expect(draft.expiresAt.toISOString()).toBe(upload.uploadTokenExpiresAt);
+    const documents: v1.persons.CreatePersonNestedDocumentInput[] = [
+      {
+        type: "passport",
+        status: "verified",
+        photos: { front: upload.uploadToken },
+      },
+    ];
+    const wrongOwner = await req()
+      .post(v1.persons.ROUTES.create)
+      .set("Cookie", [`access_token=${anotherAdmin.accessToken}`])
+      .send(personInput({ documents }));
+    expect(wrongOwner.status).toBe(400);
+    const create = await req()
+      .post(v1.persons.ROUTES.create)
+      .set("Cookie", [`access_token=${admin.accessToken}`])
+      .send(personInput({ documents }));
+    expect(create.status).toBe(201);
+    const reused = await req()
+      .post(v1.persons.ROUTES.create)
+      .set("Cookie", [`access_token=${admin.accessToken}`])
+      .send(personInput({ documents }));
+    expect(reused.status).toBe(400);
+    expect(s3Objects.has(upload.storageKey)).toBe(true);
+
+    const expired = await uploadPersonDraft(admin);
+    await prisma.draftUpload.update({
+      where: { storageKey: expired.storageKey },
+      data: { expiresAt: new Date(0) },
+    });
+    const expiredCreate = await req()
+      .post(v1.persons.ROUTES.create)
+      .set("Cookie", [`access_token=${admin.accessToken}`])
+      .send(
+        personInput({
+          documents: [
+            {
+              type: "passport",
+              status: "verified",
+              photos: { front: expired.uploadToken },
+            },
+          ],
+        }),
+      );
+    expect(expiredCreate.status).toBe(400);
+  });
+
+  it("extracts only authenticated admin-owned drafts with CSRF protection and never changes saved records", async () => {
+    fakePersonExtraction.analyze.mockClear();
+    const admin = await freshSession(["ADMIN"]);
+    const otherAdmin = await freshSession(["ADMIN"]);
+    const user = await freshSession(["USER"]);
+    const upload = await uploadPersonDraft(admin);
+    const input = {
+      documentType: "nationalId",
+      nationalIdFormat: "classic",
+      photos: { front: upload.uploadToken },
+    };
+    expect(
+      (await req().post(v1.persons.ROUTES.documents.extract).send(input))
+        .status,
+    ).toBe(401);
+    expect(
+      (
+        await req()
+          .post(v1.persons.ROUTES.documents.extract)
+          .set("Cookie", [`access_token=${user.accessToken}`])
+          .send(input)
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await request(server())
+          .post(v1.persons.ROUTES.documents.extract)
+          .set("Cookie", [`access_token=${admin.accessToken}`])
+          .send(input)
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await req()
+          .post(v1.persons.ROUTES.documents.extract)
+          .set("Cookie", [`access_token=${otherAdmin.accessToken}`])
+          .send(input)
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await req()
+          .post(v1.persons.ROUTES.documents.extract)
+          .set("Cookie", [`access_token=${admin.accessToken}`])
+          .send({ ...input, photos: {} })
+      ).status,
+    ).toBe(400);
+    expect(fakePersonExtraction.analyze).not.toHaveBeenCalled();
+
+    const analyzed = await req()
+      .post(v1.persons.ROUTES.documents.extract)
+      .set("Cookie", [`access_token=${admin.accessToken}`])
+      .send(input);
+    expect(analyzed.status).toBe(200);
+    const result = v1.persons.personDocumentExtractionSchema.parse(
+      analyzed.body,
+    );
+    const draft = await prisma.draftUpload.findUniqueOrThrow({
+      where: { storageKey: upload.storageKey },
+    });
+    expect(result).toMatchObject({
+      documentType: "nationalId",
+      sourceUploadIds: [draft.id],
+      reviewRequired: true,
+      suggestions: [
+        {
+          target: "person",
+          field: "firstName",
+          value: "Ștefan",
+          sourceSlot: "front",
+          needsReview: false,
+        },
+      ],
+    });
+    expect(draft.claimedAt).toBeNull();
+    expect(fakePersonExtraction.analyze).toHaveBeenCalledTimes(1);
+    const create = await req()
+      .post(v1.persons.ROUTES.create)
+      .set("Cookie", [`access_token=${admin.accessToken}`])
+      .send(
+        personInput({
+          documents: [
+            {
+              type: "nationalId",
+              status: "verified",
+              photos: { front: upload.uploadToken },
+            },
+          ],
+        }),
+      );
+    expect(create.status).toBe(201);
+    expect(v1.persons.personSchema.parse(create.body).firstName).toBe("Ada");
+    const replay = await req()
+      .post(v1.persons.ROUTES.documents.extract)
+      .set("Cookie", [`access_token=${admin.accessToken}`])
+      .send(input);
+    expect(replay.status).toBe(400);
+    expect(fakePersonExtraction.analyze).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects extraction for MIME, actual checksum, expired, and cleanup-owned draft mismatches before the provider", async () => {
+    fakePersonExtraction.analyze.mockClear();
+    const admin = await freshSession(["ADMIN"]);
+    const pdf = await uploadPersonDraft(admin, "application/pdf");
+    const pdfObject = s3Objects.get(pdf.storageKey)!;
+    s3Objects.set(pdf.storageKey, { ...pdfObject, contentType: "image/png" });
+    const wrongType = await req()
+      .post(v1.persons.ROUTES.documents.extract)
+      .set("Cookie", [`access_token=${admin.accessToken}`])
+      .send({ documentType: "passport", photos: { front: pdf.uploadToken } });
+    expect(wrongType.status).toBe(400);
+    const corrupt = await uploadPersonDraft(admin);
+    const object = s3Objects.get(corrupt.storageKey);
+    if (!object) throw new Error("Expected stored draft object");
+    s3Objects.set(corrupt.storageKey, {
+      ...object,
+      body: Buffer.alloc(object.body.length),
+    });
+    expect(
+      (
+        await req()
+          .post(v1.persons.ROUTES.documents.extract)
+          .set("Cookie", [`access_token=${admin.accessToken}`])
+          .send({
+            documentType: "passport",
+            photos: { front: corrupt.uploadToken },
+          })
+      ).status,
+    ).toBe(400);
+    const expired = await uploadPersonDraft(admin);
+    await prisma.draftUpload.update({
+      where: { storageKey: expired.storageKey },
+      data: { expiresAt: new Date(0) },
+    });
+    expect(
+      (
+        await req()
+          .post(v1.persons.ROUTES.documents.extract)
+          .set("Cookie", [`access_token=${admin.accessToken}`])
+          .send({
+            documentType: "passport",
+            photos: { front: expired.uploadToken },
+          })
+      ).status,
+    ).toBe(400);
+    const cleanup = await uploadPersonDraft(admin);
+    await prisma.draftUpload.update({
+      where: { storageKey: cleanup.storageKey },
+      data: { cleanupStartedAt: new Date() },
+    });
+    expect(
+      (
+        await req()
+          .post(v1.persons.ROUTES.documents.extract)
+          .set("Cookie", [`access_token=${admin.accessToken}`])
+          .send({
+            documentType: "passport",
+            photos: { front: cleanup.uploadToken },
+          })
+      ).status,
+    ).toBe(400);
+    expect(fakePersonExtraction.analyze).not.toHaveBeenCalled();
   });
 
   it("returns 409 for duplicate email or phone", async () => {
@@ -1224,6 +1841,7 @@ describe("Persons HTTP surface (e2e)", () => {
       .send({
         type: "driverLicense",
         number: "FILTER-SAME-LICENSE",
+        photos: await uploadLicencePhotos(session),
         status: "rejected",
       });
     expect(sameDocumentLicenseRes.status).toBe(201);

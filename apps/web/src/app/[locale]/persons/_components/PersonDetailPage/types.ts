@@ -23,6 +23,7 @@ export type DocumentPhotosByDocumentId = Record<
 >;
 
 export interface PersonFormState {
+  cnp: string;
   email: string;
   phone: string;
   firstName: string;
@@ -32,19 +33,18 @@ export interface PersonFormState {
   addressLine2: string;
   city: string;
   region: string;
-  postalCode: string;
   countryCode: string;
   notes: string;
 }
 
 export interface DocumentFormState {
+  nationalIdFormat: "classic" | "electronic" | null;
+  licenseCategories: v1.persons.PersonDriverLicenseCategoryEntry[];
   type: v1.persons.PersonDocumentType;
   series: string;
   number: string;
   cnp: string;
   issuingCountryCode: string;
-  issuedBy: string;
-  issuedOn: string;
   hasExpiryDate: boolean;
   expiresOn: string;
   status: v1.persons.PersonDocumentStatus;

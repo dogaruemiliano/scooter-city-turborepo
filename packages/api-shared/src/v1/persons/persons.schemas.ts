@@ -23,6 +23,9 @@ import {
   isPersonIdentityDocumentType,
   PERSON_DOCUMENT_EXPIRIES,
   PERSON_DRIVER_LICENSE_DOCUMENT_TYPE,
+  PERSON_DRIVER_LICENSE_CATEGORIES,
+  PERSON_NATIONAL_ID_FORMATS,
+  PERSON_DOCUMENT_WORKFLOWS,
   PERSON_DOCUMENT_PHOTO_SLOTS,
   PERSON_DOCUMENT_STATUSES,
   PERSON_DOCUMENT_TYPES,
@@ -34,7 +37,12 @@ const MAX_NAME_LENGTH = 100;
 const MAX_TEXT_LENGTH = 200;
 const MAX_NOTES_LENGTH = 2_000;
 const MAX_PAGE_SIZE = 100;
-const IMAGE_CONTENT_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
+const DOCUMENT_CONTENT_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "application/pdf",
+] as const;
 const SHA_256_HEX_PATTERN = /^[a-f0-9]{64}$/i;
 
 const personNameSchema = requiredTrimmedStringSchema(MAX_NAME_LENGTH);
@@ -53,7 +61,43 @@ export const personDocumentStatusSchema = z.enum(PERSON_DOCUMENT_STATUSES);
 export const personDocumentPhotoSlotSchema = z.enum(
   PERSON_DOCUMENT_PHOTO_SLOTS,
 );
-export const personDocumentPhotoContentTypeSchema = z.enum(IMAGE_CONTENT_TYPES);
+export const personDocumentPhotoContentTypeSchema = z.enum(
+  DOCUMENT_CONTENT_TYPES,
+);
+export const personNationalIdFormatSchema = z.enum(PERSON_NATIONAL_ID_FORMATS);
+export const personDocumentWorkflowSchema = z.enum(PERSON_DOCUMENT_WORKFLOWS);
+export const personDriverLicenseCategorySchema = z.enum(
+  PERSON_DRIVER_LICENSE_CATEGORIES,
+);
+export const personDriverLicenseCategoryEntrySchema = z
+  .object({
+    category: personDriverLicenseCategorySchema,
+    issuedOn: dateOnlySchema.nullable(),
+    expiresOn: dateOnlySchema.nullable(),
+    restrictions: nullableTrimmedTextSchema.optional(),
+  })
+  .strict()
+  .refine(
+    (entry) =>
+      !entry.issuedOn || !entry.expiresOn || entry.expiresOn >= entry.issuedOn,
+    {
+      message: "Category expiry cannot be before its issue date.",
+      path: ["expiresOn"],
+    },
+  );
+export type PersonDriverLicenseCategoryEntry = z.infer<
+  typeof personDriverLicenseCategoryEntrySchema
+>;
+export const personDriverLicenseCategoriesSchema = z
+  .array(personDriverLicenseCategoryEntrySchema)
+  .max(PERSON_DRIVER_LICENSE_CATEGORIES.length)
+  .refine(
+    (entries) =>
+      new Set(entries.map((entry) => entry.category)).size === entries.length,
+    {
+      message: "Driving licence categories must be unique.",
+    },
+  );
 export const personAuditEventTypeSchema = z.enum(PERSON_AUDIT_EVENT_TYPES);
 export const personRecordStatusSchema = z.enum(PERSON_RECORD_STATUSES);
 export const personDocumentExpirySchema = z.enum(PERSON_DOCUMENT_EXPIRIES);
@@ -64,12 +108,12 @@ export const personDocumentSchema = z
     id: z.string(),
     personId: z.string(),
     type: personDocumentTypeSchema,
+    nationalIdFormat: personNationalIdFormatSchema.nullable().optional(),
+    licenseCategories: personDriverLicenseCategoriesSchema.optional(),
     series: z.string().nullable(),
     number: z.string().nullable(),
     cnp: z.string().nullable(),
     issuingCountryCode: z.string().nullable(),
-    issuedBy: z.string().nullable(),
-    issuedOn: z.string().nullable(),
     expiresOn: z.string().nullable(),
     status: personDocumentStatusSchema,
     notes: z.string().nullable(),
@@ -134,6 +178,12 @@ export const personDocumentPhotoUploadUrlSchema = z
     expiresAt: z
       .string()
       .describe("ISO timestamp when the signed URL expires."),
+    uploadTokenExpiresAt: z
+      .string()
+      .optional()
+      .describe(
+        "ISO timestamp until which an uploaded document can be attached to the form.",
+      ),
     maxBytes: z.number().int().positive(),
   })
   .meta({ id: "PersonDocumentPhotoUploadUrl" });
@@ -155,6 +205,7 @@ export type CompletePersonDocumentPhotoUploadInput = z.infer<
 
 export const createPersonDocumentPhotoDraftUploadUrlInputSchema = z
   .object({
+    documentType: personDocumentTypeSchema.optional(),
     contentType: personDocumentPhotoContentTypeSchema,
     byteSize: z.number().int().positive(),
     checksumSha256: z.string().regex(SHA_256_HEX_PATTERN),
@@ -253,12 +304,12 @@ export const personSchema = z
     phone: z.string(),
     firstName: z.string(),
     lastName: z.string(),
+    cnp: z.string().nullable().optional(),
     dateOfBirth: z.string().nullable(),
     addressLine1: z.string().nullable(),
     addressLine2: z.string().nullable(),
     city: z.string().nullable(),
     region: z.string().nullable(),
-    postalCode: z.string().nullable(),
     countryCode: z.string().nullable(),
     documents: z.array(personDocumentSchema),
     notes: z.string().nullable(),
@@ -273,29 +324,30 @@ export type Person = z.infer<typeof personSchema>;
 export const createPersonDocumentInputSchema = z
   .object({
     type: personDocumentTypeSchema,
+    photos: createPersonDocumentPhotoDraftTokensSchema.optional(),
+    nationalIdFormat: personNationalIdFormatSchema.nullable().optional(),
+    licenseCategories: personDriverLicenseCategoriesSchema.optional(),
     series: nullableTrimmedTextSchema.optional(),
     number: nullableTrimmedTextSchema.optional(),
     cnp: cnpSchema.nullable().optional(),
     issuingCountryCode: countryCodeSchema.nullable().optional(),
-    issuedBy: nullableTrimmedTextSchema.optional(),
-    issuedOn: dateOnlySchema.nullable().optional(),
     expiresOn: dateOnlySchema.nullable().optional(),
     status: personDocumentStatusSchema.default("verified"),
     notes: notesSchema.optional(),
   })
   .strict()
+  .superRefine(validateDocumentMetadata)
+  .superRefine(validateDocumentPhotos)
   .meta({ id: "CreatePersonDocumentInput" });
 
 export type CreatePersonDocumentInput = z.infer<
   typeof createPersonDocumentInputSchema
 >;
 
-const createPersonNestedDocumentInputSchema = createPersonDocumentInputSchema
-  .extend({
-    photos: createPersonDocumentPhotoDraftTokensSchema.optional(),
-  })
-  .strict()
-  .meta({ id: "CreatePersonNestedDocumentInput" });
+const createPersonNestedDocumentInputSchema =
+  createPersonDocumentInputSchema.meta({
+    id: "CreatePersonNestedDocumentInput",
+  });
 
 export type CreatePersonNestedDocumentInput = z.infer<
   typeof createPersonNestedDocumentInputSchema
@@ -304,17 +356,18 @@ export type CreatePersonNestedDocumentInput = z.infer<
 export const updatePersonDocumentInputSchema = z
   .object({
     type: personDocumentTypeSchema.optional(),
+    nationalIdFormat: personNationalIdFormatSchema.nullable().optional(),
+    licenseCategories: personDriverLicenseCategoriesSchema.optional(),
     series: nullableTrimmedTextSchema.optional(),
     number: nullableTrimmedTextSchema.optional(),
     cnp: cnpSchema.nullable().optional(),
     issuingCountryCode: countryCodeSchema.nullable().optional(),
-    issuedBy: nullableTrimmedTextSchema.optional(),
-    issuedOn: dateOnlySchema.nullable().optional(),
     expiresOn: dateOnlySchema.nullable().optional(),
     status: personDocumentStatusSchema.optional(),
     notes: notesSchema.optional(),
   })
   .strict()
+  .superRefine(validateDocumentMetadata)
   .meta({ id: "UpdatePersonDocumentInput" });
 
 export type UpdatePersonDocumentInput = z.infer<
@@ -323,16 +376,17 @@ export type UpdatePersonDocumentInput = z.infer<
 
 export const createPersonInputSchema = z
   .object({
+    documentWorkflow: personDocumentWorkflowSchema.optional(),
     email: normalizedEmailSchema,
     phone: normalizedPhoneSchema,
     firstName: personNameSchema,
     lastName: personNameSchema,
+    cnp: cnpSchema.nullable().optional(),
     dateOfBirth: pastDateOnlySchema.nullable().optional(),
-    addressLine1: nullableTrimmedTextSchema.optional(),
+    addressLine1: z.string().trim().min(1).max(MAX_TEXT_LENGTH),
     addressLine2: nullableTrimmedTextSchema.optional(),
-    city: nullableTrimmedTextSchema.optional(),
-    region: nullableTrimmedTextSchema.optional(),
-    postalCode: nullableTrimmedTextSchema.optional(),
+    city: z.string().trim().min(1).max(MAX_TEXT_LENGTH),
+    region: z.string().trim().min(1).max(MAX_TEXT_LENGTH),
     countryCode: countryCodeSchema.nullable().optional(),
     documents: z
       .array(createPersonNestedDocumentInputSchema)
@@ -341,12 +395,13 @@ export const createPersonInputSchema = z
       })
       .refine(hasAllowedDocumentSlots, {
         message:
-          "Only one identity document and one driver license are allowed.",
+          "Only one primary identity document and one driver license are allowed.",
       })
       .optional(),
     notes: notesSchema.optional(),
   })
   .strict()
+  .superRefine(validateDocumentWorkflow)
   .meta({ id: "CreatePersonInput" });
 
 export type CreatePersonInput = z.infer<typeof createPersonInputSchema>;
@@ -357,12 +412,12 @@ export const updatePersonInputSchema = z
     phone: normalizedPhoneSchema.optional(),
     firstName: personNameSchema.optional(),
     lastName: personNameSchema.optional(),
+    cnp: cnpSchema.nullable().optional(),
     dateOfBirth: pastDateOnlySchema.nullable().optional(),
-    addressLine1: nullableTrimmedTextSchema.optional(),
+    addressLine1: z.string().trim().min(1).max(MAX_TEXT_LENGTH).optional(),
     addressLine2: nullableTrimmedTextSchema.optional(),
-    city: nullableTrimmedTextSchema.optional(),
-    region: nullableTrimmedTextSchema.optional(),
-    postalCode: nullableTrimmedTextSchema.optional(),
+    city: z.string().trim().min(1).max(MAX_TEXT_LENGTH).optional(),
+    region: z.string().trim().min(1).max(MAX_TEXT_LENGTH).optional(),
     countryCode: countryCodeSchema.nullable().optional(),
     notes: notesSchema.optional(),
   })
@@ -402,6 +457,158 @@ export const personListSchema = z
   .meta({ id: "PersonList" });
 
 export type PersonList = z.infer<typeof personListSchema>;
+
+function validateDocumentPhotos(
+  document: {
+    type: z.infer<typeof personDocumentTypeSchema>;
+    photos?: { front?: string; back?: string; other?: string };
+  },
+  context: z.RefinementCtx,
+): void {
+  if (document.type === "driverLicense") {
+    for (const slot of ["front", "back"] as const) {
+      if (!document.photos?.[slot])
+        context.addIssue({
+          code: "custom",
+          path: ["photos", slot],
+          message: `driverLicense ${slot} upload is required.`,
+        });
+    }
+  }
+  if (
+    document.type === "nationalId" &&
+    (document.photos?.back || document.photos?.other)
+  ) {
+    context.addIssue({
+      code: "custom",
+      path: ["photos"],
+      message: "Only the front of the national ID is collected.",
+    });
+  }
+}
+
+function validateDocumentMetadata(
+  document: {
+    type?: z.infer<typeof personDocumentTypeSchema>;
+    nationalIdFormat?: z.infer<typeof personNationalIdFormatSchema> | null;
+    licenseCategories?: PersonDriverLicenseCategoryEntry[];
+    series?: string | null;
+    number?: string | null;
+    expiresOn?: string | null;
+  },
+  context: z.RefinementCtx,
+): void {
+  // Updates without a type need the stored type; the service validates the
+  // merged record before persisting it.
+  if (document.type === undefined) return;
+  if (document.type === "proofOfAddress") {
+    for (const field of ["series", "number", "expiresOn"] as const) {
+      if (document[field])
+        context.addIssue({
+          code: "custom",
+          path: [field],
+          message: "Proof of address has no document number or expiry date.",
+        });
+    }
+  }
+  if (document.nationalIdFormat != null && document.type !== "nationalId") {
+    context.addIssue({
+      code: "custom",
+      path: ["nationalIdFormat"],
+      message: "National ID format is only valid for national IDs.",
+    });
+  }
+  if (document.licenseCategories?.length && document.type !== "driverLicense") {
+    context.addIssue({
+      code: "custom",
+      path: ["licenseCategories"],
+      message: "Categories are only valid for driving licences.",
+    });
+  }
+}
+
+function validateDocumentWorkflow(
+  input: {
+    documentWorkflow?: z.infer<typeof personDocumentWorkflowSchema>;
+    documents?: CreatePersonNestedDocumentInput[];
+  },
+  context: z.RefinementCtx,
+): void {
+  if (!input.documentWorkflow) return;
+  const documents = input.documents ?? [];
+  const foreign = input.documentWorkflow === "foreign";
+  const electronic = input.documentWorkflow === "romanianElectronic";
+  const allowedTypes = foreign
+    ? ["passport", "visa", "residencePermit", "driverLicense"]
+    : [
+        "nationalId",
+        "driverLicense",
+        ...(electronic ? ["proofOfAddress"] : []),
+      ];
+
+  for (const [index, document] of documents.entries()) {
+    if (!allowedTypes.includes(document.type)) {
+      context.addIssue({
+        code: "custom",
+        path: ["documents", index, "type"],
+        message: "Document is not part of the selected document workflow.",
+      });
+    }
+  }
+
+  const requirePhoto = (
+    type: z.infer<typeof personDocumentTypeSchema>,
+    slot: "front" | "back",
+  ) => {
+    const index = documents.findIndex((document) => document.type === type);
+    if (index < 0) {
+      context.addIssue({
+        code: "custom",
+        path: ["documents"],
+        message: `${type} is required for the selected document workflow.`,
+      });
+    } else if (!documents[index]?.photos?.[slot]) {
+      context.addIssue({
+        code: "custom",
+        path: ["documents", index, "photos", slot],
+        message: `${type} ${slot} upload is required.`,
+      });
+    }
+  };
+
+  requirePhoto(foreign ? "passport" : "nationalId", "front");
+  if (documents.some((document) => document.type === "driverLicense")) {
+    requirePhoto("driverLicense", "front");
+    requirePhoto("driverLicense", "back");
+  }
+  if (electronic) {
+    requirePhoto("proofOfAddress", "front");
+  }
+  if (!foreign) {
+    const index = documents.findIndex(
+      (document) => document.type === "nationalId",
+    );
+    const document = documents[index];
+    if (
+      document &&
+      document.nationalIdFormat !== (electronic ? "electronic" : "classic")
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["documents", index, "nationalIdFormat"],
+        message:
+          "National ID format must match the selected document workflow.",
+      });
+    }
+    if (document?.issuingCountryCode && document.issuingCountryCode !== "RO") {
+      context.addIssue({
+        code: "custom",
+        path: ["documents", index, "issuingCountryCode"],
+        message: "Romanian national IDs must be issued by Romania.",
+      });
+    }
+  }
+}
 
 function hasUniqueDocumentTypes(
   documents: Array<{ type: z.infer<typeof personDocumentTypeSchema> }>,

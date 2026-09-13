@@ -55,12 +55,12 @@ model Person {
   phone        String           @unique
   firstName    String
   lastName     String
+  cnp          String?          @unique
   dateOfBirth  DateTime?        @db.Date
   addressLine1 String?
   addressLine2 String?
   city         String?
   region       String?
-  postalCode   String?
   countryCode  String?
   notes        String?
   createdAt    DateTime         @default(now())
@@ -83,12 +83,12 @@ model PersonDocument {
   personId           String
   person             Person                @relation(fields: [personId], references: [id], onDelete: Cascade)
   type               String
+  nationalIdFormat   String?
+  licenseCategories  Json                  @default("[]")
   series             String?
   number             String?
   cnp                String?
   issuingCountryCode String?
-  issuedBy           String?
-  issuedOn           DateTime?             @db.Date
   expiresOn          DateTime?             @db.Date
   status             String                @default("unverified")
   notes              String?
@@ -98,7 +98,7 @@ model PersonDocument {
   photos             PersonDocumentPhoto[]
 
   @@unique([personId, type], map: "person_document_active_type_unique", where: { deletedAt: null })
-  @@unique([personId], map: "person_document_active_identity_unique", where: raw("\"deletedAt\" IS NULL AND \"type\" IN ('passport', 'nationalId', 'residencePermit', 'other')"))
+  @@unique([personId], map: "person_document_active_identity_unique", where: raw("\"deletedAt\" IS NULL AND \"type\" IN ('passport', 'nationalId', 'other')"))
   @@index([personId, deletedAt])
   @@index([personId, type, status, issuingCountryCode, expiresOn], map: "PersonDocument_active_filters_idx", where: { deletedAt: null })
   @@index([type])

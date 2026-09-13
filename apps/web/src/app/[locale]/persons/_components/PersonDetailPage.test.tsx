@@ -43,8 +43,6 @@ const identityDocument: v1.persons.PersonDocument = {
   number: "123456",
   cnp: "1900228123450",
   issuingCountryCode: "RO",
-  issuedBy: "SPCLEP Bucuresti",
-  issuedOn: "2024-01-15",
   expiresOn: "2030-01-31",
   status: "verified",
   notes: "Identity checked at pickup.",
@@ -67,6 +65,7 @@ const readyPerson: v1.persons.Person = {
   id: "person-1",
   email: "ada@example.com",
   phone: "+40712345678",
+  cnp: "1900228123450",
   firstName: "Ada",
   lastName: "Lovelace",
   dateOfBirth: "1990-02-28",
@@ -74,7 +73,6 @@ const readyPerson: v1.persons.Person = {
   addressLine2: null,
   city: "Bucharest",
   region: "București",
-  postalCode: "010101",
   countryCode: "RO",
   documents: [identityDocument, driverLicenseDocument],
   notes: "Frequent renter",
@@ -142,6 +140,116 @@ beforeEach(() => {
 });
 
 describe("PersonDetailPage", () => {
+  it("shows passport and supplementary documents together", () => {
+    renderDetail({
+      ...readyPerson,
+      documents: [
+        { ...identityDocument, type: "passport" },
+        { ...identityDocument, id: "visa", type: "visa" },
+        { ...identityDocument, id: "permit", type: "residencePermit" },
+        { ...identityDocument, id: "proof", type: "proofOfAddress" },
+        driverLicenseDocument,
+      ],
+    });
+    for (const type of [
+      "passport",
+      "visa",
+      "residencePermit",
+      "proofOfAddress",
+      "driverLicense",
+    ] as const) {
+      expect(
+        screen.getByRole("button", {
+          name: `View ${messages.en.persons.documentTypes[type]}`,
+        }),
+      ).toBeInTheDocument();
+    }
+  });
+
+  it("opens an address-proof PDF without rendering it as an image", async () => {
+    const browser = userEvent.setup();
+    const proof = {
+      ...identityDocument,
+      id: "proof",
+      type: "proofOfAddress" as const,
+      expiresOn: null,
+    };
+    const proofPhoto = {
+      ...identityFrontPhoto,
+      personDocumentId: proof.id,
+      contentType: "application/pdf",
+      contentUrl: "/v1/persons/person-1/documents/proof/photos/front/content",
+    };
+    renderDetail(
+      { ...readyPerson, documents: [identityDocument, proof] },
+      "en",
+      { [proof.id]: [proofPhoto] },
+    );
+    await browser.click(
+      screen.getByRole("button", { name: "View Proof of address" }),
+    );
+    const dialog = await screen.findByRole("dialog");
+    expect(
+      within(dialog).getByRole("link", { name: "View PDF" }),
+    ).toHaveAttribute("href", `https://api.test${proofPhoto.contentUrl}`);
+    expect(within(dialog).queryByRole("img")).not.toBeInTheDocument();
+    expect(dialog.querySelector('input[type="file"]')).toHaveAttribute(
+      "accept",
+      "image/jpeg,image/png,image/webp,application/pdf",
+    );
+    expect(dialog).not.toHaveClass("bg-background");
+  });
+
+  it("keeps licence categories editable and submits their reviewed values", async () => {
+    const browser = userEvent.setup();
+    const licence = {
+      ...driverLicenseDocument,
+      licenseCategories: [
+        {
+          category: "AM" as const,
+          issuedOn: "2024-01-15",
+          expiresOn: "2030-01-31",
+          restrictions: null,
+        },
+      ],
+    };
+    mocks.apiFetch.mockResolvedValue(licence);
+    renderDetail({ ...readyPerson, documents: [identityDocument, licence] });
+    await browser.click(
+      screen.getByRole("button", { name: "View Driver license" }),
+    );
+    const detail = await screen.findByRole("dialog");
+    expect(within(detail).getByText("AM")).toBeInTheDocument();
+    expect(detail).not.toHaveClass("bg-background");
+    await browser.click(
+      within(detail).getByRole("button", { name: "Edit document" }),
+    );
+    const editor = await screen.findByRole("dialog", { name: "Edit document" });
+    expect(editor).not.toHaveClass("bg-background");
+    await browser.click(
+      within(editor).getByRole("button", { name: "Edit AM" }),
+    );
+    await browser.selectOptions(
+      within(editor).getByLabelText(messages.en.persons.license.category),
+      "A1",
+    );
+    await browser.click(within(editor).getByRole("button", { name: "Save" }));
+    await waitFor(() =>
+      expect(mocks.apiFetch).toHaveBeenCalledWith(
+        v1.persons.ROUTES.documents.update(readyPerson.id, licence.id),
+        v1.persons.personDocumentSchema,
+        expect.objectContaining({
+          method: "PATCH",
+          json: expect.objectContaining({
+            licenseCategories: [
+              { ...licence.licenseCategories[0], category: "A1" },
+            ],
+          }),
+        }),
+      ),
+    );
+  });
+
   it("renders compact document cards and opens the complete details", async () => {
     const browser = userEvent.setup();
 
@@ -170,28 +278,18 @@ describe("PersonDetailPage", () => {
       screen.getByText("Region", { selector: "dt" }).parentElement
         ?.parentElement,
     );
-    expect(
-      screen.getByText("City", { selector: "dt" }).parentElement?.parentElement,
-    ).toBe(
-      screen.getByText("Postal code", { selector: "dt" }).parentElement
-        ?.parentElement,
-    );
+    expect(screen.getByText("Locality", { selector: "dt" })).toBeVisible();
+    expect(screen.queryByText("Postal code")).not.toBeInTheDocument();
     const identityCardTrigger = screen.getByRole("button", {
       name: "View National ID",
     });
-    const identityCard =
-      identityCardTrigger.querySelector('[data-slot="card"]');
-    expect(identityCard).not.toBeNull();
-    expect(
-      within(identityCard as HTMLElement)
-        .getByText("National ID")
-        .closest('[data-slot="card-title"]'),
-    ).toHaveTextContent(/National ID\s*Verified/);
-    expect(
-      within(identityCard as HTMLElement).getByLabelText(
-        "Expires on Jan 31, 2030",
-      ),
-    ).toHaveTextContent(/Exp\.\s*Jan 31, 2030/);
+    expect(within(identityCardTrigger).getByText("National ID")).toBeVisible();
+    expect(within(identityCardTrigger).queryByText("Verified")).toBeNull();
+    expect(within(identityCardTrigger).getByText("RR 123456")).toBeVisible();
+    expect(identityCardTrigger.querySelector("time")).toHaveAttribute(
+      "dateTime",
+      "2030-01-31",
+    );
     expect(screen.getByText("Driver license")).toBeInTheDocument();
     expect(
       screen.getAllByRole("button", {
@@ -256,9 +354,7 @@ describe("PersonDetailPage", () => {
     );
     expect(within(documentSheet).getByText("RR")).toBeInTheDocument();
     expect(within(documentSheet).getByText("****3456")).toBeInTheDocument();
-    expect(
-      within(documentSheet).getByText("*********3450"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("*********3450")).toBeInTheDocument();
     expect(screen.queryByText("123456")).not.toBeInTheDocument();
     expect(screen.queryByText("1900228123450")).not.toBeInTheDocument();
     expect(
@@ -318,8 +414,8 @@ describe("PersonDetailPage", () => {
       screen.queryByRole("button", { name: "Edit person" }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "Add document" }),
-    ).not.toBeInTheDocument();
+      screen.getByRole("button", { name: "Add document" }),
+    ).toBeInTheDocument();
 
     await browser.click(screen.getByRole("button", { name: "More actions" }));
     const menu = await screen.findByRole("menu");
@@ -615,12 +711,12 @@ describe("PersonDetailPage", () => {
     const backPhoto: v1.persons.PersonDocumentPhoto = {
       ...identityFrontPhoto,
       id: "photo-2",
-      slot: "back",
+      slot: "front",
       contentType: "image/png",
       contentUrl: v1.persons.ROUTES.documents.photos.content(
         readyPerson.id,
         identityDocument.id,
-        "back",
+        "front",
       ),
     };
     mocks.apiFetch
@@ -633,7 +729,7 @@ describe("PersonDetailPage", () => {
       screen.getByRole("button", { name: "View National ID" }),
     );
     await browser.upload(
-      screen.getByLabelText("Back photo upload"),
+      screen.getByLabelText("Front photo upload"),
       new File(["back-image"], "back.png", { type: "image/png" }),
     );
 
@@ -642,7 +738,7 @@ describe("PersonDetailPage", () => {
         v1.persons.ROUTES.documents.photos.upsert(
           readyPerson.id,
           identityDocument.id,
-          "back",
+          "front",
         ),
         v1.persons.personDocumentPhotoSchema,
         expect.objectContaining({
@@ -652,7 +748,7 @@ describe("PersonDetailPage", () => {
       ),
     );
     expect(
-      screen.getByRole("img", { name: "Back document photo" }),
+      screen.getByRole("img", { name: "Front document photo" }),
     ).toHaveAttribute("src", `https://api.test${backPhoto.contentUrl}`);
 
     await browser.click(
@@ -697,12 +793,12 @@ describe("PersonDetailPage", () => {
     const backPhoto: v1.persons.PersonDocumentPhoto = {
       ...identityFrontPhoto,
       id: "photo-retried",
-      slot: "back",
+      slot: "front",
       contentType: "image/png",
       contentUrl: v1.persons.ROUTES.documents.photos.content(
         readyPerson.id,
         identityDocument.id,
-        "back",
+        "front",
       ),
     };
     mocks.apiFetch
@@ -720,7 +816,7 @@ describe("PersonDetailPage", () => {
       screen.getAllByRole("button", { name: "Delete photo" }),
     ).toHaveLength(1);
 
-    await browser.upload(screen.getByLabelText("Back photo upload"), file);
+    await browser.upload(screen.getByLabelText("Front photo upload"), file);
 
     const retry = await screen.findByRole("button", { name: "Try again" });
     expect(screen.getByRole("alert")).toHaveTextContent(
@@ -734,14 +830,14 @@ describe("PersonDetailPage", () => {
 
     await waitFor(() => expect(mocks.apiFetch).toHaveBeenCalledTimes(2));
     expect(
-      screen.getByRole("img", { name: "Back document photo" }),
+      screen.getByRole("img", { name: "Front document photo" }),
     ).toHaveAttribute("src", `https://api.test${backPhoto.contentUrl}`);
     expect(
       screen.queryByRole("button", { name: "Try again" }),
     ).not.toBeInTheDocument();
     expect(
       screen.getAllByRole("button", { name: "Delete photo" }),
-    ).toHaveLength(2);
+    ).toHaveLength(1);
   });
 
   it("renders deleted and empty document states", () => {
@@ -847,13 +943,14 @@ describe("PersonDetailPage", () => {
 function renderDetail(
   person: v1.persons.Person = readyPerson,
   locale: SupportedLocale = "en",
+  photos: Record<string, v1.persons.PersonDocumentPhoto[]> = documentPhotos,
 ) {
   return render(
     <NextIntlClientProvider locale={locale} messages={messages[locale]}>
       <PersonDetailPage
         person={person}
         auditEvents={auditEvents}
-        documentPhotos={documentPhotos}
+        documentPhotos={photos}
         personsHref={locale === "en" ? "/en/persons" : "/persons"}
       />
     </NextIntlClientProvider>,

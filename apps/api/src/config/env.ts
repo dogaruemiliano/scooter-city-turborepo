@@ -147,6 +147,40 @@ export const envSchema = z
       .describe(
         "Document extraction backend. Use disabled by default, fake for local/CI fixtures, or textract for AWS AnalyzeExpense.",
       ),
+    PERSON_DOCUMENT_EXTRACTION_DRIVER: z
+      .enum(["disabled", "openai", "fake"])
+      .default("disabled")
+      .describe(
+        "Person-document extraction backend, independent of expense extraction. OpenAI sends uploaded identity documents to the Responses API. Fake is for local/CI fixtures only.",
+      ),
+    PERSON_DOCUMENT_EXTRACTION_OPENAI_API_KEY: z
+      .preprocess(
+        (value) =>
+          typeof value === "string" && value.trim().length === 0
+            ? undefined
+            : value,
+        z.string().trim().min(1).optional(),
+      )
+      .describe(
+        "Secret OpenAI API key required when PERSON_DOCUMENT_EXTRACTION_DRIVER=openai. Server-only; never expose in the web app.",
+      ),
+    PERSON_DOCUMENT_EXTRACTION_MODEL: z
+      .string()
+      .trim()
+      .min(1)
+      .default("gpt-4.1-mini-2025-04-14")
+      .describe(
+        "Pinned vision model for person-document extraction. Must support Responses image/PDF inputs and strict structured outputs.",
+      ),
+    PERSON_DOCUMENT_EXTRACTION_TIMEOUT_MS: z.coerce
+      .number()
+      .int()
+      .positive()
+      .max(45_000)
+      .default(45_000)
+      .describe(
+        "Person-document extraction request timeout in milliseconds, capped at 45000. Requests are not automatically retried.",
+      ),
 
     /* JWT ----------------------------------------------------------------- */
     JWT_PRIVATE_KEY: z
@@ -398,6 +432,22 @@ export const envSchema = z
         path: ["DOCUMENT_EXTRACTION_DRIVER"],
         message:
           "DOCUMENT_EXTRACTION_DRIVER=fake cannot be used in production.",
+      });
+    }
+    requireIf(
+      v.PERSON_DOCUMENT_EXTRACTION_DRIVER === "openai",
+      "PERSON_DOCUMENT_EXTRACTION_OPENAI_API_KEY",
+      "PERSON_DOCUMENT_EXTRACTION_DRIVER=openai",
+    );
+    if (
+      v.NODE_ENV === "production" &&
+      v.PERSON_DOCUMENT_EXTRACTION_DRIVER === "fake"
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["PERSON_DOCUMENT_EXTRACTION_DRIVER"],
+        message:
+          "PERSON_DOCUMENT_EXTRACTION_DRIVER=fake cannot be used in production.",
       });
     }
   });

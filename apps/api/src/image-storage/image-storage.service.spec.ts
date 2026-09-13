@@ -360,6 +360,72 @@ describe("ImageStorageService", () => {
     });
   });
 
+  it("keeps draft completion valid after the PUT URL expires, within its bounded lifetime and owner scope", async () => {
+    const now = Date.now();
+    const clock = jest.spyOn(Date, "now").mockReturnValue(now);
+    const send = jest.fn((command: unknown) => {
+      if (command instanceof HeadObjectCommand)
+        return { ContentType: "image/png", ContentLength: 6 };
+      return {};
+    }) as SendMock;
+    const { service, presign } = createService(send);
+    const scope = "person-document-photo-draft:user-1";
+    try {
+      const upload = await service.createPresignedDocumentUpload({
+        contentType: "image/png",
+        byteSize: 6,
+        checksumSha256: createHash("sha256").update("stored").digest("hex"),
+        category: "personal-document",
+        scope,
+        completionTokenTtlSeconds: 86_400,
+      });
+      expect(presign.mock.calls[0]?.[1]).toBe(300);
+      expect(upload.uploadTokenExpiresAt?.getTime()).toBe(now + 86_400_000);
+      clock.mockReturnValue(now + 600_000);
+      await expect(
+        service.completePresignedDocumentUpload(upload.uploadToken, scope),
+      ).resolves.toMatchObject({ contentType: "image/png", byteSize: 6 });
+      await expect(
+        service.completePresignedDocumentUpload(
+          upload.uploadToken,
+          "person-document-photo-draft:another-user",
+        ),
+      ).rejects.toThrow("scope mismatch");
+      clock.mockReturnValue(now + 86_401_000);
+      await expect(
+        service.completePresignedDocumentUpload(upload.uploadToken, scope),
+      ).rejects.toThrow("expired");
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
+  it("stores multipart PDFs privately with a computed checksum", async () => {
+    const { service, send } = createService();
+    const buffer = Buffer.from("%PDF-test");
+    const stored = await service.storeDocument({
+      buffer,
+      byteSize: buffer.length,
+      contentType: "application/pdf",
+      category: "personal-document",
+    });
+    expect(stored).toMatchObject({
+      contentType: "application/pdf",
+      checksumSha256: createHash("sha256").update(buffer).digest("hex"),
+    });
+    expect(stored.storageKey).toMatch(/personal-documents\/\d{4}\/.+\.pdf$/);
+    const command = send.mock.calls[0]?.[0] as PutObjectCommand;
+    expect(command.input.ACL).toBeUndefined();
+    await expect(
+      service.storeImage({
+        buffer,
+        byteSize: buffer.length,
+        contentType: "application/pdf",
+        category: "personal-document",
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
   it("rejects unsupported content types, oversized files, and unsafe keys", async () => {
     const { service } = createService();
 

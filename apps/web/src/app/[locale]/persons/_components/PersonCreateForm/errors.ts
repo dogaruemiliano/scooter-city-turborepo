@@ -1,3 +1,4 @@
+import { isBlankDocumentDraft } from "./form-state";
 import {
   PERSON_DOCUMENT_FORM_FIELD_KEYS,
   PERSON_FORM_FIELD_KEYS,
@@ -40,7 +41,9 @@ export function formErrorKeyFromPath(
 
   if (field === "documents") {
     if (typeof index === "number") {
-      const document = form.documents[index];
+      const document = form.documents.filter(
+        (item) => item.required || !isBlankDocumentDraft(item),
+      )[index];
 
       if (!document) {
         return "documents";

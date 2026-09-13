@@ -90,6 +90,7 @@ export function formatDateTime(value: string, locale: string): string {
 
 export function personFormState(person: v1.persons.Person): PersonFormState {
   return {
+    cnp: person.cnp ?? "",
     email: person.email,
     phone: person.phone,
     firstName: person.firstName,
@@ -99,7 +100,6 @@ export function personFormState(person: v1.persons.Person): PersonFormState {
     addressLine2: person.addressLine2 ?? "",
     city: person.city ?? "",
     region: person.region ?? "",
-    postalCode: person.postalCode ?? "",
     countryCode: person.countryCode ?? "",
     notes: person.notes ?? "",
   };
@@ -111,15 +111,21 @@ export function documentFormState(
 ): DocumentFormState {
   return {
     type: document?.type ?? initialType,
+    nationalIdFormat: document?.nationalIdFormat ?? null,
+    licenseCategories: (document?.licenseCategories ?? []).map((entry) => ({
+      ...entry,
+    })),
     series: document?.series ?? "",
     number: document?.number ?? "",
     cnp: document?.cnp ?? "",
     issuingCountryCode: document?.issuingCountryCode ?? "",
-    issuedBy: document?.issuedBy ?? "",
-    issuedOn: document?.issuedOn ?? "",
-    hasExpiryDate: document ? document.expiresOn !== null : true,
+    hasExpiryDate: document
+      ? document.expiresOn !== null
+      : initialType !== "proofOfAddress",
     expiresOn: document?.expiresOn ?? "",
-    status: document?.status ?? "verified",
+    status:
+      document?.status ??
+      (initialType === "driverLicense" ? "unverified" : "verified"),
     notes: document?.notes ?? "",
   };
 }
@@ -129,13 +135,22 @@ export function documentFormInput(
 ): v1.persons.UpdatePersonDocumentInput {
   return {
     type: form.type,
-    series: blankToNull(form.series),
-    number: blankToNull(form.number),
-    cnp: blankToNull(form.cnp),
+    ...(form.nationalIdFormat !== null
+      ? {
+          nationalIdFormat:
+            form.type === "nationalId" ? form.nationalIdFormat : null,
+        }
+      : {}),
+    ...(form.type === "driverLicense"
+      ? { licenseCategories: form.licenseCategories }
+      : {}),
+    series: form.type === "proofOfAddress" ? null : blankToNull(form.series),
+    number: form.type === "proofOfAddress" ? null : blankToNull(form.number),
     issuingCountryCode: blankToNull(form.issuingCountryCode),
-    issuedBy: blankToNull(form.issuedBy),
-    issuedOn: blankToNull(form.issuedOn),
-    expiresOn: form.hasExpiryDate ? blankToNull(form.expiresOn) : null,
+    expiresOn:
+      form.type !== "proofOfAddress" && form.hasExpiryDate
+        ? blankToNull(form.expiresOn)
+        : null,
     status: form.status,
     notes: blankToNull(form.notes),
   };
@@ -159,12 +174,12 @@ export function documentFormHasChanges(
   const input = parsed.data;
   return (
     input.type !== document.type ||
+    (input.nationalIdFormat ?? null) !== (document.nationalIdFormat ?? null) ||
+    JSON.stringify(input.licenseCategories ?? []) !==
+      JSON.stringify(document.licenseCategories ?? []) ||
     input.series !== document.series ||
     input.number !== document.number ||
-    input.cnp !== document.cnp ||
     input.issuingCountryCode !== document.issuingCountryCode ||
-    input.issuedBy !== document.issuedBy ||
-    input.issuedOn !== document.issuedOn ||
     input.expiresOn !== document.expiresOn ||
     input.status !== document.status ||
     input.notes !== document.notes
@@ -276,8 +291,6 @@ function auditFieldLabel(field: string, t: PersonsTranslations): string {
       return t("fields.city");
     case "region":
       return t("fields.region");
-    case "postalCode":
-      return t("fields.postalCode");
     case "countryCode":
       return t("fields.countryCode");
     case "notes":
@@ -289,14 +302,11 @@ function auditFieldLabel(field: string, t: PersonsTranslations): string {
       return t("fields.documentSeries");
     case "document.number":
       return t("fields.documentNumber");
+    case "cnp":
     case "document.cnp":
       return t("fields.documentCnp");
     case "document.issuingCountryCode":
       return t("fields.documentIssuingCountryCode");
-    case "document.issuedBy":
-      return t("fields.documentIssuedBy");
-    case "document.issuedOn":
-      return t("fields.documentIssuedOn");
     case "document.expiresOn":
       return t("fields.documentExpiresOn");
     case "document.status":

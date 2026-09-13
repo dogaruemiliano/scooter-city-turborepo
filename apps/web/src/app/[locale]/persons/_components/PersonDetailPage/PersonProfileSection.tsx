@@ -7,7 +7,11 @@ import { useTranslations } from "next-intl";
 import { inlineIconClassName } from "./constants";
 import { DetailField } from "./DetailField";
 import { DetailSection } from "./DetailSection";
-import { formatDateTime, formatOptionalDate } from "./helpers";
+import {
+  formatDateTime,
+  formatOptionalDate,
+  maskSensitiveValue,
+} from "./helpers";
 
 export function PersonProfileSection({
   person,
@@ -27,6 +31,10 @@ export function PersonProfileSection({
     >
       <DetailField label={t("fields.firstName")} value={person.firstName} />
       <DetailField label={t("fields.lastName")} value={person.lastName} />
+      <DetailField
+        label={t("fields.documentCnp")}
+        value={maskSensitiveValue(person.cnp ?? null, t("detail.emptyValue"))}
+      />
       <DetailField
         label={t("fields.dateOfBirth")}
         value={formatOptionalDate(

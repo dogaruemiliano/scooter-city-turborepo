@@ -10,6 +10,7 @@ export const motion = {
     slow: 400,
     slower: 600,
     countdownTick: 1000,
+    orientationHint: 2400,
   },
   easing: {
     standard: "cubic-bezier(0.4, 0, 0.2, 1)",

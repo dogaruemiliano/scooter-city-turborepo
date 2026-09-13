@@ -8,12 +8,18 @@ test("createPersonInputSchema trims and normalizes required contact fields", () 
     v1.persons.createPersonInputSchema.parse({
       email: "  RIDER@EXAMPLE.COM ",
       phone: " +40712345678 ",
+      addressLine1: "1 Test Street",
+      city: "București",
+      region: "București",
       firstName: "  Ada ",
       lastName: " Lovelace ",
     }),
     {
       email: "rider@example.com",
       phone: "+40712345678",
+      addressLine1: "1 Test Street",
+      city: "București",
+      region: "București",
       firstName: "Ada",
       lastName: "Lovelace",
     },
@@ -24,6 +30,9 @@ test("createPersonInputSchema requires a valid E.164 phone", () => {
   assert.equal(
     v1.persons.createPersonInputSchema.safeParse({
       email: "rider@example.com",
+      addressLine1: "1 Test Street",
+      city: "București",
+      region: "București",
       firstName: "Ada",
       lastName: "Lovelace",
     }).success,
@@ -33,6 +42,9 @@ test("createPersonInputSchema requires a valid E.164 phone", () => {
     v1.persons.createPersonInputSchema.safeParse({
       email: "rider@example.com",
       phone: "0712345678",
+      addressLine1: "1 Test Street",
+      city: "București",
+      region: "București",
       firstName: "Ada",
       lastName: "Lovelace",
     }).success,
@@ -44,6 +56,9 @@ test("person schemas validate document values and date-only strings", () => {
   const parsed = v1.persons.createPersonInputSchema.parse({
     email: "rider@example.com",
     phone: "+40712345678",
+    addressLine1: "1 Test Street",
+    city: "București",
+    region: "București",
     firstName: "Ada",
     lastName: "Lovelace",
     dateOfBirth: "1990-02-28",
@@ -54,14 +69,13 @@ test("person schemas validate document values and date-only strings", () => {
         number: " 123456 ",
         cnp: "1900228123450",
         issuingCountryCode: " ro ",
-        issuedBy: " SPCLEP Bucuresti ",
-        issuedOn: "2024-01-15",
         expiresOn: "2030-01-31",
         status: "verified",
       },
       {
         type: "driverLicense",
         number: " B123456 ",
+        photos: { front: "front-token", back: "back-token" },
       },
     ],
   });
@@ -70,8 +84,7 @@ test("person schemas validate document values and date-only strings", () => {
   assert.equal(parsed.documents?.[0]?.number, "123456");
   assert.equal(parsed.documents?.[0]?.cnp, "1900228123450");
   assert.equal(parsed.documents?.[0]?.issuingCountryCode, "RO");
-  assert.equal(parsed.documents?.[0]?.issuedBy, "SPCLEP Bucuresti");
-  assert.equal(parsed.documents?.[0]?.issuedOn, "2024-01-15");
+  assert.equal("issuedOn" in parsed.documents![0]!, false);
   assert.equal(parsed.documents?.[0]?.status, "verified");
   assert.equal(parsed.documents?.[1]?.number, "B123456");
   assert.equal(parsed.documents?.[1]?.status, "verified");
@@ -79,6 +92,9 @@ test("person schemas validate document values and date-only strings", () => {
     v1.persons.createPersonInputSchema.safeParse({
       email: "rider@example.com",
       phone: "+40712345678",
+      addressLine1: "1 Test Street",
+      city: "București",
+      region: "București",
       firstName: "Ada",
       lastName: "Lovelace",
       documents: [{ type: "nationalId" }, { type: "nationalId" }],
@@ -89,6 +105,9 @@ test("person schemas validate document values and date-only strings", () => {
     v1.persons.createPersonInputSchema.safeParse({
       email: "rider@example.com",
       phone: "+40712345678",
+      addressLine1: "1 Test Street",
+      city: "București",
+      region: "București",
       firstName: "Ada",
       lastName: "Lovelace",
       documents: [{ type: "nationalId" }, { type: "passport" }],
@@ -99,6 +118,9 @@ test("person schemas validate document values and date-only strings", () => {
     v1.persons.createPersonInputSchema.safeParse({
       email: "rider@example.com",
       phone: "+40712345678",
+      addressLine1: "1 Test Street",
+      city: "București",
+      region: "București",
       firstName: "Ada",
       lastName: "Lovelace",
       dateOfBirth: "1990-02-31",
@@ -122,7 +144,7 @@ test("person schemas validate document values and date-only strings", () => {
   assert.equal(
     v1.persons.createPersonDocumentInputSchema.safeParse({
       type: "nationalId",
-      issuedOn: "2024-02-31",
+      expiresOn: "2024-02-31",
     }).success,
     false,
   );
@@ -213,7 +235,7 @@ test("person document photo schemas expose slot metadata and content routes", ()
       byteSize: 1234,
       checksumSha256,
     }).success,
-    false,
+    true,
   );
   assert.equal(
     v1.persons.createPersonDocumentPhotoUploadUrlInputSchema.safeParse({
@@ -456,6 +478,444 @@ test("listPersonsQuerySchema validates search filters", () => {
     v1.persons.listPersonsQuerySchema.safeParse({
       sort: "firstNameAsc",
     }).success,
+    false,
+  );
+});
+
+test("document workflows require the relevant photos while preserving legacy inputs", () => {
+  const base = {
+    email: "rider@example.com",
+    phone: "+40712345678",
+    addressLine1: "1 Test Street",
+    city: "București",
+    region: "București",
+    firstName: "Ada",
+    lastName: "Lovelace",
+  };
+  assert.equal(
+    v1.persons.createPersonInputSchema.safeParse(base).success,
+    true,
+  );
+  const classic = {
+    type: "nationalId",
+    nationalIdFormat: "classic",
+    photos: { front: "front-token" },
+  };
+  const electronic = {
+    ...classic,
+    nationalIdFormat: "electronic",
+    photos: { front: "front-token" },
+  };
+  const proof = { type: "proofOfAddress", photos: { front: "proof-token" } };
+  assert.equal(
+    v1.persons.createPersonInputSchema.safeParse({
+      ...base,
+      documentWorkflow: "romanianClassic",
+      documents: [classic],
+    }).success,
+    true,
+  );
+  assert.equal(
+    v1.persons.createPersonInputSchema.safeParse({
+      ...base,
+      documentWorkflow: "romanianElectronic",
+      documents: [electronic, proof],
+    }).success,
+    true,
+  );
+  assert.equal(
+    v1.persons.createPersonInputSchema.safeParse({
+      ...base,
+      documentWorkflow: "foreign",
+      documents: [
+        { type: "passport", photos: { front: "passport-token" } },
+        { type: "visa" },
+        { type: "residencePermit" },
+        {
+          type: "driverLicense",
+          photos: { front: "license-front", back: "license-back" },
+        },
+      ],
+    }).success,
+    true,
+  );
+  for (const documents of [
+    [classic],
+    [electronic],
+    [{ ...electronic, photos: { front: "token", back: "back" } }, proof],
+  ]) {
+    assert.equal(
+      v1.persons.createPersonInputSchema.safeParse({
+        ...base,
+        documentWorkflow: "romanianElectronic",
+        documents,
+      }).success,
+      false,
+    );
+  }
+  assert.equal(
+    v1.persons.createPersonInputSchema.safeParse({
+      ...base,
+      documentWorkflow: "foreign",
+      documents: [{ type: "passport" }],
+    }).success,
+    false,
+  );
+  assert.equal(
+    v1.persons.createPersonInputSchema.safeParse({
+      ...base,
+      documentWorkflow: "foreign",
+      documents: [classic],
+    }).success,
+    false,
+  );
+  assert.equal(
+    v1.persons.createPersonInputSchema.safeParse({
+      ...base,
+      documents: [
+        { type: "passport" },
+        { type: "residencePermit" },
+        { type: "visa" },
+      ],
+    }).success,
+    true,
+  );
+  assert.equal(
+    v1.persons.createPersonInputSchema.safeParse({
+      ...base,
+      documents: [{ type: "visa" }, { type: "visa" }],
+    }).success,
+    false,
+  );
+});
+
+test("licence metadata validates categories, dates, duplicates and document type", () => {
+  const category = {
+    category: "AM",
+    issuedOn: "2020-01-01",
+    expiresOn: "2030-01-01",
+    restrictions: "  01  ",
+  };
+  const parsed = v1.persons.createPersonDocumentInputSchema.parse({
+    type: "driverLicense",
+    photos: { front: "front-token", back: "back-token" },
+    licenseCategories: [category],
+  });
+  assert.equal(parsed.licenseCategories?.[0]?.restrictions, "01");
+  for (const licenseCategories of [
+    [{ ...category, category: "UNKNOWN" }],
+    [{ ...category, expiresOn: "2019-01-01" }],
+    [{ ...category, issuedOn: "2024-02-31" }],
+    [category, category],
+  ]) {
+    assert.equal(
+      v1.persons.createPersonDocumentInputSchema.safeParse({
+        type: "driverLicense",
+        photos: { front: "front-token", back: "back-token" },
+        licenseCategories,
+      }).success,
+      false,
+    );
+  }
+  assert.equal(
+    v1.persons.createPersonDocumentInputSchema.safeParse({
+      type: "passport",
+      licenseCategories: [category],
+    }).success,
+    false,
+  );
+  assert.equal(
+    v1.persons.createPersonDocumentInputSchema.safeParse({
+      type: "passport",
+      nationalIdFormat: "classic",
+    }).success,
+    false,
+  );
+  assert.equal(
+    v1.persons.createPersonDocumentInputSchema.safeParse({
+      type: "driverLicense",
+      photos: { front: "front-token", back: "back-token" },
+      licenseCategories: [{ category: "B", issuedOn: null, expiresOn: null }],
+    }).success,
+    true,
+  );
+  assert.equal(
+    v1.persons.updatePersonDocumentInputSchema.safeParse({
+      licenseCategories: [category],
+    }).success,
+    true,
+  );
+});
+
+test("draft PDFs support identity documents and preserve checksum validation", () => {
+  const input = {
+    contentType: "application/pdf",
+    byteSize: 100,
+    checksumSha256: "a".repeat(64),
+  };
+  assert.equal(
+    v1.persons.createPersonDocumentPhotoDraftUploadUrlInputSchema.safeParse(
+      input,
+    ).success,
+    true,
+  );
+  assert.equal(
+    v1.persons.createPersonDocumentPhotoDraftUploadUrlInputSchema.safeParse({
+      ...input,
+      documentType: "passport",
+    }).success,
+    true,
+  );
+  assert.equal(
+    v1.persons.createPersonDocumentPhotoDraftUploadUrlInputSchema.safeParse({
+      ...input,
+      documentType: "proofOfAddress",
+    }).success,
+    true,
+  );
+  assert.equal(
+    v1.persons.createPersonDocumentPhotoDraftUploadUrlInputSchema.safeParse({
+      ...input,
+      documentType: "proofOfAddress",
+      checksumSha256: "bad",
+    }).success,
+    false,
+  );
+});
+
+test("person document extraction accepts only owned draft-token inputs and known suggestion fields", () => {
+  assert.equal(
+    v1.persons.ROUTES.documents.extract,
+    "/v1/persons/document-extraction",
+  );
+  assert.equal(
+    v1.persons.analyzePersonDocumentInputSchema.safeParse({
+      documentType: "nationalId",
+      nationalIdFormat: "electronic",
+      photos: { front: "draft-token" },
+    }).success,
+    true,
+  );
+  for (const input of [
+    { documentType: "passport", photos: {} },
+    { documentType: "passport", photos: { front: " " } },
+    {
+      documentType: "passport",
+      photos: { front: "token" },
+      url: "https://example.test/private.png",
+    },
+    {
+      documentType: "passport",
+      nationalIdFormat: "classic",
+      photos: { front: "token" },
+    },
+  ])
+    assert.equal(
+      v1.persons.analyzePersonDocumentInputSchema.safeParse(input).success,
+      false,
+    );
+
+  const content = {
+    documentType: "nationalId",
+    detectedDocumentType: "nationalId",
+    sourceUploadIds: ["draft-1"],
+    reviewRequired: true,
+    suggestions: [
+      {
+        target: "person",
+        field: "firstName",
+        value: "Ștefan",
+        sourceSlot: "front",
+        needsReview: false,
+      },
+    ],
+    licenseCategories: [],
+    warnings: [],
+  };
+  assert.equal(
+    v1.persons.personDocumentExtractionSchema.safeParse(content).success,
+    true,
+  );
+  assert.equal(
+    v1.persons.personDocumentExtractionSchema.safeParse({
+      ...content,
+      reviewRequired: false,
+    }).success,
+    false,
+  );
+  assert.equal(
+    v1.persons.personDocumentExtractionSchema.safeParse({
+      ...content,
+      suggestions: [
+        {
+          target: "document",
+          field: "status",
+          value: "verified",
+          sourceSlot: "front",
+          needsReview: false,
+        },
+      ],
+    }).success,
+    false,
+  );
+  assert.equal(
+    v1.persons.personDocumentExtractionSchema.safeParse({
+      ...content,
+      suggestions: [
+        {
+          target: "person",
+          field: "number",
+          value: "123",
+          sourceSlot: "front",
+          needsReview: false,
+        },
+      ],
+    }).success,
+    false,
+  );
+});
+
+test("a supplied driving license needs front and back in the add-person workflow", () => {
+  const input = {
+    email: "person@example.com",
+    phone: "+40749096855",
+    addressLine1: "1 Test Street",
+    city: "București",
+    region: "București",
+    firstName: "Test",
+    lastName: "Person",
+    documentWorkflow: "foreign",
+    documents: [
+      { type: "passport", photos: { front: "passport-token" } },
+      { type: "driverLicense", photos: { front: "license-front" } },
+    ],
+  };
+  assert.equal(
+    v1.persons.createPersonInputSchema.safeParse(input).success,
+    false,
+  );
+  assert.equal(
+    v1.persons.createPersonInputSchema.safeParse({
+      ...input,
+      documents: [
+        input.documents[0],
+        {
+          type: "driverLicense",
+          photos: { front: "license-front", back: "license-back" },
+        },
+      ],
+    }).success,
+    true,
+  );
+});
+
+test("document creation and extraction reject retired metadata and incomplete licences", () => {
+  for (const photos of [
+    undefined,
+    { front: "front-token" },
+    { back: "back-token" },
+  ]) {
+    assert.equal(
+      v1.persons.createPersonDocumentInputSchema.safeParse({
+        type: "driverLicense",
+        photos,
+      }).success,
+      false,
+    );
+    assert.equal(
+      v1.persons.analyzePersonDocumentInputSchema.safeParse({
+        documentType: "driverLicense",
+        photos,
+      }).success,
+      false,
+    );
+  }
+  assert.equal(
+    v1.persons.createPersonDocumentInputSchema.safeParse({
+      type: "driverLicense",
+      photos: { front: "front-token", back: "back-token" },
+    }).success,
+    true,
+  );
+  for (const field of ["issuedBy", "issuedOn", "issuedAt"]) {
+    assert.equal(
+      v1.persons.createPersonDocumentInputSchema.safeParse({
+        type: "nationalId",
+        [field]: "retired",
+      }).success,
+      false,
+    );
+    assert.equal(
+      v1.persons.updatePersonDocumentInputSchema.safeParse({
+        [field]: "retired",
+      }).success,
+      false,
+    );
+  }
+  assert.equal(
+    v1.persons.analyzePersonDocumentInputSchema.safeParse({
+      documentType: "nationalId",
+      nationalIdFormat: "electronic",
+      photos: { front: "front-token", back: "back-token" },
+    }).success,
+    false,
+  );
+  for (const field of ["number", "series", "expiresOn"])
+    assert.equal(
+      v1.persons.createPersonDocumentInputSchema.safeParse({
+        type: "proofOfAddress",
+        [field]: field === "expiresOn" ? "2030-01-01" : "123",
+      }).success,
+      false,
+    );
+});
+
+test("person addresses require county, locality and street and reject retired postal codes", () => {
+  const valid = {
+    email: "rider@example.com",
+    phone: "+40712345678",
+    firstName: "Ada",
+    lastName: "Lovelace",
+    addressLine1: "1 Test Street",
+    city: "București",
+    region: "București",
+  };
+  assert.equal(
+    v1.persons.createPersonInputSchema.safeParse(valid).success,
+    true,
+  );
+  for (const field of ["addressLine1", "city", "region"]) {
+    for (const value of [undefined, null, "", "  "]) {
+      assert.equal(
+        v1.persons.createPersonInputSchema.safeParse({
+          ...valid,
+          [field]: value,
+        }).success,
+        false,
+      );
+      if (value !== undefined)
+        assert.equal(
+          v1.persons.updatePersonInputSchema.safeParse({ [field]: value })
+            .success,
+          false,
+        );
+    }
+  }
+  assert.equal(
+    v1.persons.updatePersonInputSchema.safeParse({ notes: "Contact updated" })
+      .success,
+    true,
+  );
+  assert.equal(
+    v1.persons.createPersonInputSchema.safeParse({
+      ...valid,
+      postalCode: "010101",
+    }).success,
+    false,
+  );
+  assert.equal(
+    v1.persons.updatePersonInputSchema.safeParse({ postalCode: "010101" })
+      .success,
     false,
   );
 });

@@ -32,3 +32,8 @@ export const spacing = {
 } as const;
 
 export type Spacing = typeof spacing;
+
+/** Viewport-relative sizing for web document editors. */
+export const viewportSizing = {
+  documentEditor: "80vw",
+} as const;

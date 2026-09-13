@@ -1,5 +1,12 @@
 import { Label } from "@repo/ui/components";
-import type { ReactNode } from "react";
+import { cloneElement, isValidElement, type ReactNode } from "react";
+import {
+  extractionFieldNeedsReview,
+  type ExtractionFieldKey,
+} from "./extraction-state";
+import { useExtractionReview } from "./ExtractionReviewContext";
+import { FieldExtractionHint } from "./FieldExtractionHint";
+import { FieldExtractionLoading } from "./FieldExtractionLoading";
 
 export function FormField({
   id,
@@ -9,6 +16,7 @@ export function FormField({
   error,
   className,
   children,
+  extractionKey,
 }: {
   id: string;
   label: string;
@@ -17,11 +25,39 @@ export function FormField({
   error?: string;
   className?: string;
   children: ReactNode;
+  extractionKey?: ExtractionFieldKey;
 }) {
+  const extraction = useExtractionReview();
+  const needsReview = Boolean(
+    !disabled &&
+    extractionKey &&
+    extraction &&
+    extractionFieldNeedsReview(extraction.state, extractionKey),
+  );
+  const control =
+    needsReview && isValidElement<Record<string, unknown>>(children)
+      ? cloneElement(children, {
+          ["describedById" in children.props
+            ? "describedById"
+            : "aria-describedby"]: [
+            children.props.describedById ?? children.props["aria-describedby"],
+            `${id}-extraction-hint`,
+          ]
+            .filter(Boolean)
+            .join(" "),
+        })
+      : children;
   return (
     <div
+      data-extraction-review={needsReview || undefined}
       data-disabled={disabled || undefined}
-      className={["flex min-w-0 flex-col gap-2", className]
+      className={[
+        "flex min-w-0 flex-col gap-2",
+        needsReview
+          ? "[&_input]:border-warning [&_input]:bg-warning-subtle [&_button[aria-haspopup]]:border-warning [&_button[aria-haspopup]]:bg-warning-subtle"
+          : undefined,
+        className,
+      ]
         .filter(Boolean)
         .join(" ")}
     >
@@ -41,8 +77,17 @@ export function FormField({
             *
           </span>
         ) : null}
+        {extractionKey && !disabled ? (
+          <FieldExtractionLoading fieldKey={extractionKey} label={label} />
+        ) : null}
       </div>
-      {children}
+      {control}
+      {extractionKey && !disabled ? (
+        <FieldExtractionHint
+          id={`${id}-extraction-hint`}
+          fieldKey={extractionKey}
+        />
+      ) : null}
       {error ? (
         <p id={`${id}-error`} role="alert" className="text-sm text-destructive">
           {error}

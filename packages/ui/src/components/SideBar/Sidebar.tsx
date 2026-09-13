@@ -97,10 +97,17 @@ export function Sidebar({
           data-sidebar="sidebar"
           data-slot="sidebar"
           data-mobile="true"
-          className="w-(--sidebar-width) bg-sidebar p-0 text-sidebar-foreground"
+          className="w-(--sidebar-width) bg-popover p-0 text-popover-foreground"
           style={
             {
               "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
+              "--sidebar": "var(--popover)",
+              "--sidebar-foreground": "var(--popover-foreground)",
+              "--sidebar-muted-foreground": "var(--muted-foreground)",
+              "--sidebar-accent": "var(--accent)",
+              "--sidebar-accent-foreground": "var(--accent-foreground)",
+              "--sidebar-border": "var(--border)",
+              "--sidebar-ring": "var(--ring)",
             } as React.CSSProperties
           }
           side={side}
