@@ -389,6 +389,7 @@
   --spacing-0-5: 0.125rem;
   --spacing-1-5: 0.375rem;
   --spacing-2-5: 0.625rem;
+  --container-document-editor: 80vw;
 
   --aspect-document-landscape: 1.586;
   --aspect-identity-card-portrait: 0.6305170239596469;

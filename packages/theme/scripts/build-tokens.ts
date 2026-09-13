@@ -15,7 +15,7 @@ import { primitives } from "../src/tokens/primitives.js";
 import { radius, radiusBase } from "../src/tokens/radius.js";
 import { semanticColors } from "../src/tokens/semantic.js";
 import { shadow } from "../src/tokens/shadow.js";
-import { spacing } from "../src/tokens/spacing.js";
+import { spacing, viewportSizing } from "../src/tokens/spacing.js";
 import { typography } from "../src/tokens/typography.js";
 import { zIndex } from "../src/tokens/z-index.js";
 
@@ -113,6 +113,9 @@ export function buildCss(): string {
   lines.push("");
   for (const [key, value] of Object.entries(spacing)) {
     lines.push(`  --spacing-${kebab(key)}: ${pxToRem(value)};`);
+  }
+  for (const [key, value] of Object.entries(viewportSizing)) {
+    lines.push(`  --container-${kebab(key)}: ${value};`);
   }
   lines.push("");
   for (const [key, value] of Object.entries(aspectRatio)) {
