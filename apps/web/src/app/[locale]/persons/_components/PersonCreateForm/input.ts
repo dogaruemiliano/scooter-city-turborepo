@@ -2,7 +2,11 @@ import { v1 } from "@repo/api-shared";
 import { buildDateOnly } from "@repo/ui/lib/date-parts";
 
 import { documentFieldErrorKey } from "./errors";
-import { documentWorkflow, isBlankDocumentDraft } from "./form-state";
+import {
+  documentPhotoSlots,
+  documentWorkflow,
+  isBlankDocumentDraft,
+} from "./form-state";
 import type {
   CreatePersonDocumentFormState,
   CreatePersonFormState,
@@ -52,8 +56,11 @@ export function createPersonInput(
   addOptional(input, "addressLine2", form.addressLine2);
   addOptional(input, "city", form.city);
   addOptional(input, "region", form.region);
-  addOptional(input, "postalCode", form.postalCode);
-  addOptional(input, "countryCode", form.countryCode);
+  addOptional(
+    input,
+    "countryCode",
+    form.citizenship === "romanian" ? "RO" : form.countryCode,
+  );
   const documents: Record<string, unknown>[] = [];
 
   for (const document of form.documents) {
@@ -89,8 +96,8 @@ export function createPersonInput(
 function createDocumentInput(document: CreatePersonDocumentFormState): {
   input: Record<string, unknown>;
   error?: {
-    field: Extract<PersonDocumentFormFieldKey, "issuedOn" | "expiresOn">;
-    dateField: Extract<DateField, "documentIssuedOn" | "documentExpiresOn">;
+    field: Extract<PersonDocumentFormFieldKey, "expiresOn">;
+    dateField: Extract<DateField, "documentExpiresOn">;
     kind: "incomplete" | "invalid";
   };
 } {
@@ -98,19 +105,7 @@ function createDocumentInput(document: CreatePersonDocumentFormState): {
     type: document.type,
     status: document.status,
   };
-  const issuedOn = buildDateOnly(document.issuedOn);
   const expiresOn = buildDateOnly(document.expiresOn);
-
-  if (issuedOn.error) {
-    return {
-      input,
-      error: {
-        field: "issuedOn",
-        dateField: "documentIssuedOn",
-        kind: issuedOn.error,
-      },
-    };
-  }
 
   if (document.hasExpiryDate && expiresOn.error) {
     return {
@@ -127,14 +122,20 @@ function createDocumentInput(document: CreatePersonDocumentFormState): {
     input.nationalIdFormat = document.nationalIdFormat;
   if (document.type === "driverLicense")
     input.licenseCategories = document.licenseCategories;
-  addOptional(input, "series", document.series);
-  addOptional(input, "number", document.number);
+  if (document.type !== "proofOfAddress") {
+    addOptional(input, "series", document.series);
+    addOptional(input, "number", document.number);
+  }
   addOptional(input, "issuingCountryCode", document.issuingCountryCode);
-  addOptional(input, "issuedBy", document.issuedBy);
-  addOptional(input, "issuedOn", issuedOn.value);
-  input.expiresOn = document.hasExpiryDate ? expiresOn.value : null;
+  input.expiresOn =
+    document.type !== "proofOfAddress" && document.hasExpiryDate
+      ? expiresOn.value
+      : null;
   addOptional(input, "notes", document.notes);
-  const photoTokens = documentPhotoUploadTokens(document.photos);
+  const photoTokens = documentPhotoUploadTokens(
+    document.photos,
+    documentPhotoSlots(document),
+  );
   if (Object.keys(photoTokens).length > 0) {
     input.photos = photoTokens;
   }
@@ -144,11 +145,12 @@ function createDocumentInput(document: CreatePersonDocumentFormState): {
 
 function documentPhotoUploadTokens(
   photos: PersonDocumentPhotoDraftUploads,
+  slots: readonly v1.persons.PersonDocumentPhotoSlot[],
 ): Partial<Record<v1.persons.PersonDocumentPhotoSlot, string>> {
   const tokens: Partial<Record<v1.persons.PersonDocumentPhotoSlot, string>> =
     {};
 
-  for (const slot of v1.persons.PERSON_DOCUMENT_PHOTO_SLOTS) {
+  for (const slot of slots) {
     const photo = photos[slot];
     if (photo?.status === "uploaded") {
       tokens[slot] = photo.uploadToken;

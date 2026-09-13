@@ -43,8 +43,6 @@ const identityDocument: v1.persons.PersonDocument = {
   number: "123456",
   cnp: "1900228123450",
   issuingCountryCode: "RO",
-  issuedBy: "SPCLEP Bucuresti",
-  issuedOn: "2024-01-15",
   expiresOn: "2030-01-31",
   status: "verified",
   notes: "Identity checked at pickup.",
@@ -75,7 +73,6 @@ const readyPerson: v1.persons.Person = {
   addressLine2: null,
   city: "Bucharest",
   region: "București",
-  postalCode: "010101",
   countryCode: "RO",
   documents: [identityDocument, driverLicenseDocument],
   notes: "Frequent renter",
@@ -281,29 +278,18 @@ describe("PersonDetailPage", () => {
       screen.getByText("Region", { selector: "dt" }).parentElement
         ?.parentElement,
     );
-    expect(
-      screen.getByText("Locality", { selector: "dt" }).parentElement
-        ?.parentElement,
-    ).toBe(
-      screen.getByText("Postal code", { selector: "dt" }).parentElement
-        ?.parentElement,
-    );
+    expect(screen.getByText("Locality", { selector: "dt" })).toBeVisible();
+    expect(screen.queryByText("Postal code")).not.toBeInTheDocument();
     const identityCardTrigger = screen.getByRole("button", {
       name: "View National ID",
     });
-    const identityCard =
-      identityCardTrigger.querySelector('[data-slot="card"]');
-    expect(identityCard).not.toBeNull();
-    expect(
-      within(identityCard as HTMLElement)
-        .getByText("National ID")
-        .closest('[data-slot="card-title"]'),
-    ).toHaveTextContent(/National ID\s*Verified/);
-    expect(
-      within(identityCard as HTMLElement).getByLabelText(
-        "Expires on Jan 31, 2030",
-      ),
-    ).toHaveTextContent(/Exp\.\s*Jan 31, 2030/);
+    expect(within(identityCardTrigger).getByText("National ID")).toBeVisible();
+    expect(within(identityCardTrigger).queryByText("Verified")).toBeNull();
+    expect(within(identityCardTrigger).getByText("RR 123456")).toBeVisible();
+    expect(identityCardTrigger.querySelector("time")).toHaveAttribute(
+      "dateTime",
+      "2030-01-31",
+    );
     expect(screen.getByText("Driver license")).toBeInTheDocument();
     expect(
       screen.getAllByRole("button", {
@@ -725,12 +711,12 @@ describe("PersonDetailPage", () => {
     const backPhoto: v1.persons.PersonDocumentPhoto = {
       ...identityFrontPhoto,
       id: "photo-2",
-      slot: "back",
+      slot: "front",
       contentType: "image/png",
       contentUrl: v1.persons.ROUTES.documents.photos.content(
         readyPerson.id,
         identityDocument.id,
-        "back",
+        "front",
       ),
     };
     mocks.apiFetch
@@ -743,7 +729,7 @@ describe("PersonDetailPage", () => {
       screen.getByRole("button", { name: "View National ID" }),
     );
     await browser.upload(
-      screen.getByLabelText("Back photo upload"),
+      screen.getByLabelText("Front photo upload"),
       new File(["back-image"], "back.png", { type: "image/png" }),
     );
 
@@ -752,7 +738,7 @@ describe("PersonDetailPage", () => {
         v1.persons.ROUTES.documents.photos.upsert(
           readyPerson.id,
           identityDocument.id,
-          "back",
+          "front",
         ),
         v1.persons.personDocumentPhotoSchema,
         expect.objectContaining({
@@ -762,7 +748,7 @@ describe("PersonDetailPage", () => {
       ),
     );
     expect(
-      screen.getByRole("img", { name: "Back document photo" }),
+      screen.getByRole("img", { name: "Front document photo" }),
     ).toHaveAttribute("src", `https://api.test${backPhoto.contentUrl}`);
 
     await browser.click(
@@ -807,12 +793,12 @@ describe("PersonDetailPage", () => {
     const backPhoto: v1.persons.PersonDocumentPhoto = {
       ...identityFrontPhoto,
       id: "photo-retried",
-      slot: "back",
+      slot: "front",
       contentType: "image/png",
       contentUrl: v1.persons.ROUTES.documents.photos.content(
         readyPerson.id,
         identityDocument.id,
-        "back",
+        "front",
       ),
     };
     mocks.apiFetch
@@ -830,7 +816,7 @@ describe("PersonDetailPage", () => {
       screen.getAllByRole("button", { name: "Delete photo" }),
     ).toHaveLength(1);
 
-    await browser.upload(screen.getByLabelText("Back photo upload"), file);
+    await browser.upload(screen.getByLabelText("Front photo upload"), file);
 
     const retry = await screen.findByRole("button", { name: "Try again" });
     expect(screen.getByRole("alert")).toHaveTextContent(
@@ -844,14 +830,14 @@ describe("PersonDetailPage", () => {
 
     await waitFor(() => expect(mocks.apiFetch).toHaveBeenCalledTimes(2));
     expect(
-      screen.getByRole("img", { name: "Back document photo" }),
+      screen.getByRole("img", { name: "Front document photo" }),
     ).toHaveAttribute("src", `https://api.test${backPhoto.contentUrl}`);
     expect(
       screen.queryByRole("button", { name: "Try again" }),
     ).not.toBeInTheDocument();
     expect(
       screen.getAllByRole("button", { name: "Delete photo" }),
-    ).toHaveLength(2);
+    ).toHaveLength(1);
   });
 
   it("renders deleted and empty document states", () => {

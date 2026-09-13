@@ -33,7 +33,6 @@ export interface PersonFormState {
   addressLine2: string;
   city: string;
   region: string;
-  postalCode: string;
   countryCode: string;
   notes: string;
 }
@@ -46,8 +45,6 @@ export interface DocumentFormState {
   number: string;
   cnp: string;
   issuingCountryCode: string;
-  issuedBy: string;
-  issuedOn: string;
   hasExpiryDate: boolean;
   expiresOn: string;
   status: v1.persons.PersonDocumentStatus;

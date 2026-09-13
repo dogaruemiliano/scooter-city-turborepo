@@ -14,9 +14,9 @@ const stepLabels = [
   "Citizenship",
   "Identification documents",
   "Personal details",
+  "Address",
   "Driving license",
   "Contact details",
-  "Address",
   "Document details",
 ];
 
@@ -29,9 +29,9 @@ describe("WizardProgress", () => {
     { step: "citizenship", current: 1, available: [] },
     { step: "documents", current: 2, available: ["Citizenship"] },
     { step: "personal", current: 3, available: stepLabels },
-    { step: "license", current: 4, available: stepLabels },
-    { step: "contact", current: 5, available: stepLabels },
-    { step: "address", current: 6, available: stepLabels },
+    { step: "license", current: 5, available: stepLabels },
+    { step: "contact", current: 6, available: stepLabels },
+    { step: "address", current: 4, available: stepLabels },
     { step: "review", current: 7, available: stepLabels },
   ])(
     "shows the current stage and available navigation for $step",
@@ -78,9 +78,9 @@ describe("WizardProgress", () => {
       "citizenship",
       "documents",
       "personal",
+      "address",
       "license",
       "contact",
-      "address",
       "review",
     ];
 

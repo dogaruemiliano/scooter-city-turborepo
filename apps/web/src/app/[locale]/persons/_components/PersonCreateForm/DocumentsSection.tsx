@@ -6,7 +6,7 @@ import {
   FormSection,
 } from "@repo/ui/components";
 import { useTranslations } from "next-intl";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import {
   ExtractionReviewContext,
   useExtractionReview,
@@ -18,6 +18,7 @@ import {
 
 import { DocumentDraftCard } from "./DocumentDraftCard";
 import { DocumentDraftSheet } from "./DocumentDraftSheet";
+import { DocumentDraftFields } from "./DocumentDraftFields";
 import { isBlankDocumentDraft } from "./form-state";
 import type {
   CreatePersonDocumentFormState,
@@ -109,22 +110,43 @@ export function DocumentsSection({
       onOpenChangeComplete={finishOpenChange}
     >
       <FormSection title={t("sections.document")}>
-        {form.documents.map((document) => {
-          const documentId = `${formId}-document-${document.key}`;
+        {form.documents
+          .filter(
+            (document) =>
+              document.required ||
+              document.type === "driverLicense" ||
+              !isBlankDocumentDraft(document),
+          )
+          .map((document) => {
+            const documentId = `${formId}-document-${document.key}`;
 
-          return (
-            <DocumentDraftCard
-              key={document.key}
-              document={document}
-              citizenship={form.citizenship}
-              documentId={documentId}
-              locale={locale}
-              disabled={disabled}
-              fieldErrors={fieldErrors}
-              onOpen={() => openDocument(document)}
-            />
-          );
-        })}
+            return (
+              <Fragment key={document.key}>
+                <DocumentDraftCard
+                  key={document.key}
+                  document={document}
+                  documentId={documentId}
+                  locale={locale}
+                  disabled={disabled}
+                  fieldErrors={fieldErrors}
+                  onOpen={() => openDocument(document)}
+                />
+                <div className="empty:hidden sm:col-span-2">
+                  <DocumentDraftFields
+                    document={document}
+                    documentId={`${documentId}-inline`}
+                    fieldErrors={fieldErrors}
+                    locale={locale}
+                    disabled={disabled}
+                    reviewOnly
+                    onSetDocumentValue={(_key, field, value) =>
+                      onSetDocument({ ...document, [field]: value }, [field])
+                    }
+                  />
+                </div>
+              </Fragment>
+            );
+          })}
         {fieldErrors.documents ? (
           <p
             id={`${formId}-documents-error`}
@@ -136,7 +158,7 @@ export function DocumentsSection({
         ) : null}
       </FormSection>
 
-      <BottomSheetContent className="lg:w-xl">
+      <BottomSheetContent className="lg:w-document-editor lg:max-w-document-editor">
         {activeDocument ? (
           <ExtractionReviewContext.Provider
             value={

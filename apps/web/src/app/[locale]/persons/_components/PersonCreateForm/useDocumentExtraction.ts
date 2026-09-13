@@ -17,14 +17,18 @@ import type { CreatePersonDocumentFormState } from "./types";
 
 export interface DocumentExtractionJob {
   signature: string;
-  status: "pending" | "success" | "error" | "disabled" | "manual";
+  status: "pending" | "success" | "error" | "disabled";
   warnings?: v1.persons.PersonDocumentExtraction["warnings"];
 }
 
 export function documentExtractionSignature(
   document: CreatePersonDocumentFormState,
 ): string | null {
-  const photos = v1.persons.PERSON_DOCUMENT_PHOTO_SLOTS.map((slot) => ({
+  const photos = (
+    document.type === "nationalId"
+      ? (["front"] as const)
+      : v1.persons.PERSON_DOCUMENT_PHOTO_SLOTS
+  ).map((slot) => ({
     slot,
     photo: document.photos[slot],
   }));
@@ -52,22 +56,13 @@ export function documentExtractionSignature(
   ]);
 }
 
-/** Older drafts included the requested ID format, even for identical photo sources. */
-function sameExtractionSources(saved: string, current: string) {
-  if (saved === current) return true;
-  try {
-    const previous: unknown = JSON.parse(saved);
-    const next: unknown = JSON.parse(current);
-    return (
-      Array.isArray(previous) &&
-      Array.isArray(next) &&
-      previous[0] === "nationalId" &&
-      next[0] === "nationalId" &&
-      JSON.stringify(previous[2]) === JSON.stringify(next[2])
-    );
-  } catch {
-    return false;
-  }
+function extractionWarnings(
+  result: v1.persons.PersonDocumentExtraction,
+  documentType: CreatePersonDocumentFormState["type"],
+) {
+  return result.detectedDocumentType === documentType
+    ? result.warnings.filter((warning) => warning !== "typeMismatch")
+    : result.warnings;
 }
 
 export function useDocumentExtraction(
@@ -105,7 +100,7 @@ export function useDocumentExtraction(
       const saved = state.readings[document.key];
       if (
         saved &&
-        sameExtractionSources(saved.sourceSignature, signature) &&
+        saved.sourceSignature === signature &&
         !forceReading.current.has(document.key)
       ) {
         completed.current.set(document.key, signature);
@@ -114,7 +109,7 @@ export function useDocumentExtraction(
           [document.key]: {
             signature,
             status: "success",
-            warnings: saved.result.warnings,
+            warnings: extractionWarnings(saved.result, document.type),
           },
         }));
         continue;
@@ -133,7 +128,10 @@ export function useDocumentExtraction(
         }));
         try {
           const photos = Object.fromEntries(
-            v1.persons.PERSON_DOCUMENT_PHOTO_SLOTS.flatMap((slot) => {
+            (document.type === "nationalId"
+              ? (["front"] as const)
+              : v1.persons.PERSON_DOCUMENT_PHOTO_SLOTS
+            ).flatMap((slot) => {
               const photo = document.photos[slot];
               return photo?.status === "uploaded"
                 ? [[slot, photo.uploadToken]]
@@ -178,7 +176,7 @@ export function useDocumentExtraction(
             [document.key]: {
               signature: signature!,
               status: "success",
-              warnings: result.warnings,
+              warnings: extractionWarnings(result, document.type),
             },
           }));
         } catch (error) {
@@ -224,23 +222,6 @@ export function useDocumentExtraction(
     });
   }
 
-  function continueManually() {
-    const nextJobs: Record<string, DocumentExtractionJob> = {};
-    for (const document of state.form.documents) {
-      const signature = documentExtractionSignature(document);
-      if (!signature) continue;
-      requests.current.get(document.key)?.controller.abort();
-      requests.current.delete(document.key);
-      completed.current.set(document.key, signature);
-      const existing = jobs[document.key];
-      nextJobs[document.key] =
-        existing?.signature === signature && existing.status !== "pending"
-          ? existing
-          : { signature, status: "manual" };
-    }
-    setJobs(nextJobs);
-  }
-
   const pendingDocumentKeys = new Set(
     state.form.documents.flatMap((document) => {
       const signature = documentExtractionSignature(document);
@@ -260,6 +241,5 @@ export function useDocumentExtraction(
       cancelDocument(key);
     },
     cancelDocument,
-    continueManually,
   };
 }

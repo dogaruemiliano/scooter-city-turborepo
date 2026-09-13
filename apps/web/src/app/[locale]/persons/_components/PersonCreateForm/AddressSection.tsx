@@ -44,7 +44,6 @@ export function AddressSection({
   const addressLine1Error = fieldErrors.addressLine1;
   const addressLine2Error = fieldErrors.addressLine2;
   const cityError = fieldErrors.city;
-  const postalCodeError = fieldErrors.postalCode;
   const localities = useMemo(
     () =>
       v1.persons.getRomanianLocalities(form.region).map((locality) => ({
@@ -56,37 +55,41 @@ export function AddressSection({
 
   return (
     <FormSection aria-label={t("sections.address")}>
-      <FormField
-        id={`${formId}-country`}
-        extractionKey="person.countryCode"
-        label={t("fields.country")}
-        required
-        error={countryCodeError}
-      >
-        <CountrySheetSelect
+      {form.citizenship !== "romanian" && (
+        <FormField
           id={`${formId}-country`}
+          extractionKey="person.countryCode"
           label={t("fields.country")}
-          labelledById={`${formId}-country-label`}
-          describedById={fieldErrorId(`${formId}-country`, countryCodeError)}
-          invalid={Boolean(countryCodeError)}
-          locale={locale}
           required
-          value={form.countryCode}
-          onValueChange={onChangeCountry}
-          searchPlaceholder={t("countryPicker.search")}
-          clearSearchLabel={t("countryPicker.clearSearch")}
-          emptyMessage={t("countryPicker.empty")}
-          closeLabel={t("actions.close")}
-        />
-      </FormField>
+          error={countryCodeError}
+        >
+          <CountrySheetSelect
+            id={`${formId}-country`}
+            label={t("fields.country")}
+            labelledById={`${formId}-country-label`}
+            describedById={fieldErrorId(`${formId}-country`, countryCodeError)}
+            invalid={Boolean(countryCodeError)}
+            locale={locale}
+            required
+            value={form.countryCode}
+            onValueChange={onChangeCountry}
+            searchPlaceholder={t("countryPicker.search")}
+            clearSearchLabel={t("countryPicker.clearSearch")}
+            emptyMessage={t("countryPicker.empty")}
+            closeLabel={t("actions.close")}
+          />
+        </FormField>
+      )}
       {form.countryCode === "RO" ? (
         <FormField
           id={`${formId}-county`}
           extractionKey="person.region"
+          required
           label={t("fields.county")}
           error={fieldErrors.region}
         >
           <SheetSelect
+            required
             id={`${formId}-county`}
             label={t("fields.county")}
             labelledById={`${formId}-county-label`}
@@ -115,6 +118,7 @@ export function AddressSection({
         <FormField
           id={`${formId}-region`}
           extractionKey="person.region"
+          required
           label={t("fields.region")}
           error={fieldErrors.region}
         >
@@ -126,6 +130,7 @@ export function AddressSection({
             )}
             aria-invalid={invalidAria(fieldErrors.region)}
             name="region"
+            required
             autoComplete="address-level1"
             value={form.region}
             onChange={(event) => onSetFormValue("region", event.target.value)}
@@ -135,11 +140,13 @@ export function AddressSection({
       <FormField
         id={`${formId}-city`}
         extractionKey="person.city"
+        required
         label={t("fields.city")}
         error={cityError}
       >
         {form.countryCode === "RO" ? (
           <SheetSelect
+            required
             id={`${formId}-city`}
             label={t("fields.city")}
             labelledById={`${formId}-city-label`}
@@ -167,6 +174,7 @@ export function AddressSection({
             aria-describedby={fieldErrorId(`${formId}-city`, cityError)}
             aria-invalid={invalidAria(cityError)}
             name="city"
+            required
             autoComplete="address-level2"
             value={form.city}
             onChange={(event) => onSetFormValue("city", event.target.value)}
@@ -176,6 +184,7 @@ export function AddressSection({
       <FormField
         id={`${formId}-address-line-1`}
         extractionKey="person.addressLine1"
+        required
         label={t("fields.addressLine1")}
         error={addressLine1Error}
       >
@@ -187,6 +196,7 @@ export function AddressSection({
           )}
           aria-invalid={invalidAria(addressLine1Error)}
           name="addressLine1"
+          required
           autoComplete="address-line1"
           value={form.addressLine1}
           onChange={(event) =>
@@ -213,25 +223,6 @@ export function AddressSection({
           onChange={(event) =>
             onSetFormValue("addressLine2", event.target.value)
           }
-        />
-      </FormField>
-      <FormField
-        id={`${formId}-postal-code`}
-        extractionKey="person.postalCode"
-        label={t("fields.postalCode")}
-        error={postalCodeError}
-      >
-        <Input
-          id={`${formId}-postal-code`}
-          aria-describedby={fieldErrorId(
-            `${formId}-postal-code`,
-            postalCodeError,
-          )}
-          aria-invalid={invalidAria(postalCodeError)}
-          name="postalCode"
-          autoComplete="postal-code"
-          value={form.postalCode}
-          onChange={(event) => onSetFormValue("postalCode", event.target.value)}
         />
       </FormField>
     </FormSection>

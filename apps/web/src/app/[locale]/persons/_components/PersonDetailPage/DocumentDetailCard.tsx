@@ -12,11 +12,6 @@ import {
   BottomSheetTitle,
   BottomSheetTrigger,
   Button,
-  Card,
-  CardAction,
-  CardContent,
-  CardHeader,
-  CardTitle,
 } from "@repo/ui/components";
 import { cn } from "@repo/ui/lib/utils";
 import { CalendarDaysIcon, ChevronRightIcon, PencilIcon } from "lucide-react";
@@ -29,6 +24,7 @@ import {
   inlineIconClassName,
 } from "./constants";
 import { DetailField } from "./DetailField";
+import { DocumentSummary } from "../DocumentSummary";
 import { DocumentFormDialog } from "./DocumentFormDialog";
 import { DocumentPhotosPanel } from "./DocumentPhotosPanel";
 import {
@@ -88,59 +84,32 @@ export function DocumentDetailCard({
           />
         }
       >
-        <Card
-          size="sm"
-          className="pointer-events-none relative transition-colors group-hover/document-card:bg-muted group-focus-visible/document-card:bg-muted/60 group-active/document-card:bg-muted/60"
-        >
-          <CardHeader className="pr-10">
-            <CardTitle className="flex min-w-0 items-center gap-2">
-              <TypeIcon aria-hidden="true" className={inlineIconClassName} />
-              <span className="min-w-0 truncate">{typeLabel}</span>
-              <Badge
-                variant="outline"
-                className={cn(
-                  "w-fit shrink-0",
-                  documentStatusClasses[document.status],
-                )}
-              >
-                <StatusIcon aria-hidden="true" data-icon="inline-start" />
-                {statusLabel}
-              </Badge>
-            </CardTitle>
-            <CardAction className="absolute right-(--card-spacing) top-1/2 -translate-y-1/2 self-center">
-              <ChevronRightIcon
-                aria-hidden="true"
-                className="size-4 shrink-0 text-muted-foreground"
-              />
-            </CardAction>
-          </CardHeader>
-          <CardContent className="pr-10">
-            <span
-              className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground"
-              aria-label={
-                document.expiresOn
-                  ? t("documentForm.expirySummary", { date: expiresOn })
-                  : expiresOn
-              }
-            >
-              <CalendarDaysIcon
-                aria-hidden="true"
-                className={inlineIconClassName}
-              />
-              {document.expiresOn ? (
-                <span aria-hidden="true" className="font-medium">
-                  {t("documentForm.expiresShort")}
-                </span>
-              ) : null}
-              <span aria-hidden="true" className="truncate">
-                {expiresOn}
-              </span>
-            </span>
-          </CardContent>
-        </Card>
+        <span className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card p-4 group-hover/document-card:bg-muted group-focus-visible/document-card:bg-muted">
+          <DocumentSummary
+            type={document.type}
+            number={[
+              (document.type === "nationalId" &&
+                document.nationalIdFormat === "electronic") ||
+              document.type === "passport"
+                ? ""
+                : document.series,
+              document.number,
+            ]
+              .filter(Boolean)
+              .join(" ")}
+            expiresOn={document.expiresOn}
+            hasExpiryDate={Boolean(document.expiresOn)}
+            uploaded={photos.some((photo) => photo.slot === "front")}
+            locale={locale}
+          />
+          <ChevronRightIcon
+            aria-hidden="true"
+            className="size-4 shrink-0 text-muted-foreground"
+          />
+        </span>
       </BottomSheetTrigger>
 
-      <BottomSheetContent className="lg:w-xl">
+      <BottomSheetContent className="lg:w-document-editor lg:max-w-document-editor">
         <BottomSheetHeader>
           <BottomSheetTitle
             aria-label={`${typeLabel}, ${statusLabel}`}
@@ -172,43 +141,39 @@ export function DocumentDetailCard({
           />
 
           <dl className="grid gap-3 sm:grid-cols-2">
-            {!isDriverLicense ? (
-              <DetailField
-                label={t("fields.documentSeries")}
-                value={document.series ?? emptyValue}
-              />
-            ) : null}
-            <DetailField
-              label={t("fields.documentNumber")}
-              value={maskSensitiveValue(document.number, emptyValue)}
-            />
-
-            <DetailField
-              label={t("fields.documentIssuingCountryCode")}
-              value={formatCountryName(
-                document.issuingCountryCode,
-                locale,
-                emptyValue,
-              )}
-            />
-            <DetailField
-              label={t("fields.documentIssuedBy")}
-              value={document.issuedBy ?? emptyValue}
-            />
-            <DetailField
-              label={t("fields.documentIssuedOn")}
-              value={formatOptionalDate(document.issuedOn, locale, emptyValue)}
-            />
-            <DetailField
-              label={t("fields.documentExpiresOn")}
-              value={expiresOn}
-              icon={
-                <CalendarDaysIcon
-                  aria-hidden="true"
-                  className={inlineIconClassName}
+            {document.type !== "proofOfAddress" ? (
+              <>
+                {!isDriverLicense ? (
+                  <DetailField
+                    label={t("fields.documentSeries")}
+                    value={document.series ?? emptyValue}
+                  />
+                ) : null}
+                <DetailField
+                  label={t("fields.documentNumber")}
+                  value={maskSensitiveValue(document.number, emptyValue)}
                 />
-              }
-            />
+
+                <DetailField
+                  label={t("fields.documentIssuingCountryCode")}
+                  value={formatCountryName(
+                    document.issuingCountryCode,
+                    locale,
+                    emptyValue,
+                  )}
+                />
+                <DetailField
+                  label={t("fields.documentExpiresOn")}
+                  value={expiresOn}
+                  icon={
+                    <CalendarDaysIcon
+                      aria-hidden="true"
+                      className={inlineIconClassName}
+                    />
+                  }
+                />
+              </>
+            ) : null}
             <DetailField
               label={t("fields.notes")}
               value={document.notes ?? emptyValue}

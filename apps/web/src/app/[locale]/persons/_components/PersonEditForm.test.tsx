@@ -39,7 +39,6 @@ const person: v1.persons.Person = {
   addressLine2: null,
   city: "Bucharest",
   region: "București",
-  postalCode: "010101",
   countryCode: "RO",
   documents: [],
   notes: "Frequent renter",

@@ -12,6 +12,7 @@ import { NextIntlClientProvider } from "next-intl";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DocumentPhotoDraftCard } from "./DocumentPhotoDraftCard";
+import type { DocumentExtractionJob } from "./useDocumentExtraction";
 import type {
   PersonDocumentPhotoDraftUpload,
   SetPersonDocumentPhoto,
@@ -108,6 +109,105 @@ afterEach(() => {
 });
 
 describe("DocumentPhotoDraftCard", () => {
+  it("shows parsing on the preview and still opens the photo", async () => {
+    const browser = userEvent.setup();
+    renderCard(
+      vi.fn(),
+      {
+        id: "uploaded",
+        status: "uploaded",
+        file: new File(["image"], "id.png", { type: "image/png" }),
+        uploadToken: "token",
+      },
+      "identity-document",
+      { signature: "current", status: "pending" },
+    );
+    const status = screen.getByRole("status");
+    expect(status).toHaveTextContent("Reading document…");
+    expect(status.closest('[data-slot="document-preview"]')).not.toBeNull();
+    expect(status).toHaveClass("bg-media-scrim", "text-scrim-foreground");
+    expect(status.parentElement).toHaveClass(
+      "right-2",
+      "bottom-2",
+      "justify-end",
+    );
+    await browser.click(
+      screen.getByRole("button", { name: "Change Front photo" }),
+    );
+    expect(
+      await screen.findByRole("dialog", { name: "Front photo" }),
+    ).toBeVisible();
+  });
+
+  it.each(["image/png", "application/pdf"])(
+    "shows warnings over %s previews and retries without opening the photo",
+    async (type) => {
+      const retry = vi.fn();
+      const browser = userEvent.setup();
+      renderCard(
+        vi.fn(),
+        {
+          id: "uploaded",
+          status: "uploaded",
+          file: new File(
+            ["document"],
+            type === "image/png" ? "id.png" : "proof.pdf",
+            { type },
+          ),
+          uploadToken: "token",
+        },
+        "identity-document",
+        {
+          signature: "current",
+          status: "success",
+          warnings: ["unclearText", "invalidValue", "unclearText"],
+        },
+        retry,
+      );
+      const status = screen.getByRole("status");
+      expect(status.closest('[data-slot="document-preview"]')).not.toBeNull();
+      expect(status).toHaveClass("bg-media-scrim");
+      expect(
+        within(status).getAllByText(
+          "Some text was unclear. Check the highlighted suggestions.",
+        ),
+      ).toHaveLength(1);
+      expect(status).toHaveTextContent(
+        "Some values could not be validated and were left out.",
+      );
+      await browser.click(
+        within(status).getByRole("button", { name: "Read document again" }),
+      );
+      expect(retry).toHaveBeenCalledOnce();
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    },
+  );
+
+  it("shows extraction errors over the preview with an independent retry", async () => {
+    const retry = vi.fn();
+    renderCard(
+      vi.fn(),
+      {
+        id: "uploaded",
+        status: "uploaded",
+        file: new File(["image"], "id.png", { type: "image/png" }),
+        uploadToken: "token",
+      },
+      "identity-document",
+      { signature: "current", status: "error" },
+      retry,
+    );
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent("We couldn't read this document.");
+    expect(alert.closest('[data-slot="document-preview"]')).not.toBeNull();
+    await userEvent
+      .setup()
+      .click(
+        within(alert).getByRole("button", { name: "Read document again" }),
+      );
+    expect(retry).toHaveBeenCalledOnce();
+  });
+
   it("opens uploaded images without the camera and allows deletion", async () => {
     const onSet = vi.fn<SetPersonDocumentPhoto>();
     const browser = userEvent.setup();
@@ -155,11 +255,6 @@ describe("DocumentPhotoDraftCard", () => {
     const dialog = await screen.findByRole("dialog", { name: "Front photo" });
     await waitFor(() => expect(getUserMedia).toHaveBeenCalledOnce());
     expect(dialog).toHaveClass("h-dvh", "w-full", "max-w-none");
-    await browser.click(
-      within(dialog).getByRole("button", {
-        name: "Choose from gallery or files",
-      }),
-    );
     expect(
       screen.getByRole("button", { name: "Choose from files" }),
     ).toBeEnabled();
@@ -432,6 +527,8 @@ function renderCard(
   onSetDocumentPhoto: SetPersonDocumentPhoto,
   upload?: PersonDocumentPhotoDraftUpload,
   documentKey = "identity-document",
+  extractionJob?: DocumentExtractionJob,
+  onRetryExtraction?: () => void,
 ) {
   return render(
     <NextIntlClientProvider locale="en" messages={messages.en}>
@@ -443,6 +540,8 @@ function renderCard(
         upload={upload}
         disabled={false}
         onSetDocumentPhoto={onSetDocumentPhoto}
+        extractionJob={extractionJob}
+        onRetryExtraction={onRetryExtraction}
       />
     </NextIntlClientProvider>,
   );

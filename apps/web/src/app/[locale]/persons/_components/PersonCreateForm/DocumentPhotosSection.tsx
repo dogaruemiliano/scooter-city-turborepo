@@ -15,6 +15,10 @@ import { useTranslations } from "next-intl";
 import { DocumentPhotoDraftCard } from "./DocumentPhotoDraftCard";
 import { documentPhotoSlots } from "./form-state";
 import { documentFieldErrorKey } from "./errors";
+import {
+  documentExtractionSignature,
+  type DocumentExtractionJob,
+} from "./useDocumentExtraction";
 import type {
   CreatePersonFormState,
   SetPersonDocumentPhoto,
@@ -27,12 +31,16 @@ export function DocumentPhotosSection({
   disabled,
   onSetDocumentPhoto,
   fieldErrors,
+  jobs,
+  onRetry,
 }: {
   formId: string;
   form: CreatePersonFormState;
   disabled: boolean;
   onSetDocumentPhoto: SetPersonDocumentPhoto;
   fieldErrors: FormErrors;
+  jobs: Record<string, DocumentExtractionJob>;
+  onRetry: (key: string) => void;
 }) {
   const t = useTranslations("persons");
 
@@ -101,21 +109,18 @@ export function DocumentPhotosSection({
                 }
                 acceptsPdf
                 upload={document.photos[slot]}
+                extractionJob={
+                  jobs[document.key]?.signature ===
+                  documentExtractionSignature(document)
+                    ? jobs[document.key]
+                    : undefined
+                }
+                onRetryExtraction={() => onRetry(document.key)}
                 disabled={disabled}
                 onSetDocumentPhoto={onSetDocumentPhoto}
               />
             ))}
           </div>
-          {document.type === "proofOfAddress" ? (
-            <p className="text-sm text-muted-foreground">
-              {t("documentForm.proofOfAddressHelp")}
-            </p>
-          ) : null}
-          {document.type === "driverLicense" ? (
-            <p className="text-sm text-muted-foreground">
-              {t("license.uploadHelp")}
-            </p>
-          ) : null}
           {fieldErrors[documentFieldErrorKey(document.key, "photos")] ? (
             <p
               id={`${formId}-${document.key}-photos-error`}

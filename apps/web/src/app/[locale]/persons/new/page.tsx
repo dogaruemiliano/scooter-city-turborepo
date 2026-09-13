@@ -46,10 +46,5 @@ export default async function NewPersonRoutePage({
     notFound();
   }
 
-  return (
-    <PersonCreateForm
-      personsHref={localizePath(PERSONS_PATH, locale)}
-      draftOwnerId={user.id}
-    />
-  );
+  return <PersonCreateForm personsHref={localizePath(PERSONS_PATH, locale)} />;
 }

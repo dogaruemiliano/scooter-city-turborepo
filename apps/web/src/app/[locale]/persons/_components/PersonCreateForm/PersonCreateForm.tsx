@@ -7,26 +7,10 @@ import type {
 } from "@repo/ui/components";
 import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
-import {
-  useId,
-  useState,
-  useRef,
-  useEffect,
-  useMemo,
-  type FormEvent,
-} from "react";
-import { Button, Spinner } from "@repo/ui/components";
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@repo/ui/components/dialog";
-import { usePersonDraft } from "./usePersonDraft";
+import { useId, useState, useRef, useEffect, type FormEvent } from "react";
+import { usePersonLeaveGuard } from "./usePersonLeaveGuard";
 import { licenseNameDifferences } from "./license-name-comparison";
 import { LicenseNameConfirmation } from "./LicenseNameConfirmation";
-import type { PersonDraft } from "./person-draft-store";
 
 import { webApi } from "@/lib/api";
 import { PageHeaderNavigation } from "@/components/PageHeaderNavigation";
@@ -39,7 +23,7 @@ import {
 } from "./extraction-state";
 import { ExtractionReviewContext } from "./ExtractionReviewContext";
 import { useDocumentExtraction } from "./useDocumentExtraction";
-import { DocumentExtractionFeedback } from "./DocumentExtractionFeedback";
+import { fieldHasPendingExtraction } from "./field-extraction-pending";
 import { AddressSection } from "./AddressSection";
 import { CitizenshipChoice } from "./CitizenshipChoice";
 import {
@@ -90,10 +74,7 @@ import type {
   PersonDocumentFormFieldKey,
 } from "./types";
 
-export function PersonCreateForm({
-  personsHref,
-  draftOwnerId,
-}: PersonCreateFormProps) {
+export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
   const t = useTranslations("persons");
   const locale = useLocale();
   const router = useRouter();
@@ -115,16 +96,10 @@ export function PersonCreateForm({
   const [confirmedNames, setConfirmedNames] = useState<string | null>(null);
   const nameConfirmationRequired =
     nameDifferences.length > 0 && confirmedNames !== nameConfirmationKey;
-  const draftSnapshot = useMemo<PersonDraft>(
-    () => ({
-      version: 1,
-      extraction: extractionState,
-      navigation: navigation.snapshot,
-      nationalIdFormat: chosenNationalIdFormat,
-    }),
-    [extractionState, navigation.snapshot, chosenNationalIdFormat],
+  const leaveGuard = usePersonLeaveGuard(
+    navigation.hasProgress,
+    t("leaveForm.confirm"),
   );
-  const draft = usePersonDraft(draftOwnerId, draftSnapshot);
   const extraction = useDocumentExtraction(extractionState, setExtractionState);
   function setForm(
     update: (current: CreatePersonFormState) => CreatePersonFormState,
@@ -185,9 +160,7 @@ export function PersonCreateForm({
       const fieldLabel =
         field === "dateOfBirth"
           ? t("fields.dateOfBirth")
-          : field === "documentIssuedOn"
-            ? t("fields.documentIssuedOn")
-            : t("fields.documentExpiresOn");
+          : t("fields.documentExpiresOn");
 
       return error === "incomplete"
         ? t("feedback.date.incomplete", { field: fieldLabel })
@@ -244,7 +217,7 @@ export function PersonCreateForm({
         },
       );
 
-      draft.complete();
+      leaveGuard.complete();
       setFeedback({
         kind: "success",
         title: t("feedback.createSuccessTitle"),
@@ -356,10 +329,6 @@ export function PersonCreateForm({
           return t("fields.documentCnp");
         case "issuingCountryCode":
           return t("fields.documentIssuingCountryCode");
-        case "issuedBy":
-          return t("fields.documentIssuedBy");
-        case "issuedOn":
-          return t("fields.documentIssuedOn");
         case "hasExpiryDate":
           return t("fields.documentHasExpiryDate");
         case "expiresOn":
@@ -398,8 +367,6 @@ export function PersonCreateForm({
         return form.countryCode === "RO"
           ? t("fields.county")
           : t("fields.region");
-      case "postalCode":
-        return t("fields.postalCode");
       case "countryCode":
         return t("fields.country");
       case "documents":
@@ -422,42 +389,7 @@ export function PersonCreateForm({
           ),
       }}
     >
-      {draft.pending ? (
-        <Dialog open>
-          <DialogContent showCloseButton={false}>
-            <DialogTitle>
-              {t("draft.title", {
-                name:
-                  [
-                    draft.pending.extraction.form.firstName,
-                    draft.pending.extraction.form.lastName,
-                  ]
-                    .filter(Boolean)
-                    .join(" ") || t("draft.unnamed"),
-              })}
-            </DialogTitle>
-            <DialogDescription>{t("draft.description")}</DialogDescription>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={draft.discard}>
-                {t("draft.startNew")}
-              </Button>
-              <Button type="button" onClick={resumeDraft}>
-                {t("draft.continue")}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      ) : null}
-      <div
-        inert={!draft.ready || Boolean(draft.pending)}
-        className="mx-auto flex w-full max-w-screen-lg flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10"
-      >
-        {!draft.ready ? <Spinner aria-label={t("draft.loading")} /> : null}
-        {draft.saveFailed ? (
-          <p role="status" className="text-sm text-destructive">
-            {t("draft.saveFailed")}
-          </p>
-        ) : null}
+      <div className="mx-auto flex w-full max-w-screen-lg flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
         <PageHeaderNavigation
           onBack={canGoBack ? goBack : undefined}
           backDisabled={creating}
@@ -507,34 +439,9 @@ export function PersonCreateForm({
               }}
               disabled={creating}
               onSetDocumentPhoto={setDocumentPhoto}
-              fieldErrors={fieldErrors}
-            />
-          ) : null}
-          {step === "documents" || isReviewStep(step) ? (
-            <DocumentExtractionFeedback
-              form={{
-                ...form,
-                documents: form.documents.filter((document) =>
-                  step === "documents"
-                    ? document.type !== "driverLicense"
-                    : step === "license"
-                      ? document.type === "driverLicense"
-                      : true,
-                ),
-              }}
               jobs={extraction.jobs}
-              pending={form.documents.some(
-                (document) =>
-                  extraction.pendingDocumentKeys.has(document.key) &&
-                  (step === "documents"
-                    ? document.type !== "driverLicense"
-                    : step === "license"
-                      ? document.type === "driverLicense"
-                      : true),
-              )}
-              disabled={creating}
               onRetry={extraction.retry}
-              onManual={extraction.continueManually}
+              fieldErrors={fieldErrors}
             />
           ) : null}
           {step === "personal" ? (
@@ -625,64 +532,21 @@ export function PersonCreateForm({
             step={step}
             canGoBack={canGoBack}
             onBack={goBack}
-            onNext={nextStep}
+            onNext={() => nextStep()}
           />
         </form>
       </div>
     </ExtractionReviewContext.Provider>
   );
 
-  function resumeDraft() {
-    const saved = draft.pending;
-    if (!saved) return;
-    // Refresh upload tokens, including interrupted uploads, from the saved Files.
-    const uploads = new Map<
-      string,
-      {
-        documentKey: string;
-        slot: v1.persons.PersonDocumentPhotoSlot;
-        photo: NonNullable<
-          CreatePersonDocumentFormState["photos"][v1.persons.PersonDocumentPhotoSlot]
-        >;
-      }
-    >();
-    const restoredForm = updateDocumentDrafts(
-      saved.extraction.form,
-      (document) => {
-        const photos = { ...document.photos };
-        for (const slot of v1.persons.PERSON_DOCUMENT_PHOTO_SLOTS) {
-          const photo = photos[slot];
-          if (!photo) continue;
-          uploads.set(photo.id, { documentKey: document.key, slot, photo });
-          photos[slot] = {
-            id: photo.id,
-            status: "uploading",
-            file: photo.file,
-            originalFile: photo.originalFile,
-          };
-        }
-        return { ...document, photos };
-      },
-    );
-    setExtractionState({ ...saved.extraction, form: restoredForm });
-    setChosenNationalIdFormat(saved.nationalIdFormat);
-    navigation.restore(saved.navigation);
-    draft.resume();
-    for (const { documentKey, slot, photo } of uploads.values()) {
-      void uploadDocumentPhotoDraft(
-        documentKey,
-        slot,
-        photo.file,
-        photo.id,
-        photo.originalFile,
-      );
-    }
-  }
-
   function selectProgressStep(next: PersonProgressStep) {
     if (creating) return;
+    if (step === "license" && ["contact", "review"].includes(next)) {
+      reviewDetails(next);
+      return;
+    }
     if (step === "personal" && next === "license") {
-      nextStep();
+      nextStep(next);
       return;
     }
     setFeedback(null);
@@ -697,17 +561,20 @@ export function PersonCreateForm({
 
   function goForward() {
     if (creating) return;
+    if (step === "documents" || step === "license") {
+      reviewDetails(navigation.forwardStep);
+      return;
+    }
     setFeedback(null);
     navigation.forward();
   }
 
-  function nextStep() {
+  function nextStep(destination?: PersonProgressStep) {
     if (step === "documents" || step === "license") {
       reviewDetails();
       return;
     }
     if (!isReviewStep(step) || step === "review" || creating) return;
-    if (step === "personal" && extraction.pending) return;
     // Validate only the visible group; later steps are validated on their turn.
     const fields =
       step === "personal"
@@ -719,7 +586,6 @@ export function PersonCreateForm({
               "addressLine2",
               "city",
               "region",
-              "postalCode",
               "countryCode",
             ] as const);
     const candidate = createPersonInput(
@@ -730,12 +596,24 @@ export function PersonCreateForm({
         }),
     );
     const errors: FormErrors = {};
-    if (candidate.error && stepForField(candidate.error.field) === step) {
+    const awaitingField = (field: string) =>
+      fieldHasPendingExtraction(
+        extractionState,
+        extraction.pendingDocumentKeys,
+        `person.${field}` as ExtractionFieldKey,
+      );
+    if (
+      candidate.error &&
+      stepForField(candidate.error.field) === step &&
+      !awaitingField(candidate.error.field)
+    ) {
       errors[candidate.error.field] = candidate.error.message;
     }
     // A partial birth date must not prevent validation of contact/address.
     const values = candidate.input ?? { ...form };
     for (const field of fields) {
+      // Reading can finish on a later step; final submission validates every field.
+      if (awaitingField(field)) continue;
       if (field === "cnp" && form.citizenship === "foreign" && !form.cnp.trim())
         continue;
       if (field === "dateOfBirth" && candidate.error) continue;
@@ -759,10 +637,10 @@ export function PersonCreateForm({
       return;
     }
     setFeedback(null);
-    setStep(REVIEW_STEPS[REVIEW_STEPS.indexOf(step) + 1]!);
+    setStep(destination ?? REVIEW_STEPS[REVIEW_STEPS.indexOf(step) + 1]!);
   }
 
-  function reviewDetails() {
+  function reviewDetails(next?: PersonProgressStep) {
     if (uploadingPhotos) return;
     const nextErrors: FormErrors = {};
     if (
@@ -806,7 +684,7 @@ export function PersonCreateForm({
       return;
     }
     setFeedback(null);
-    setStep(step === "license" ? "contact" : "personal");
+    setStep(next ?? (step === "license" ? "contact" : "personal"));
   }
 
   function setFormValue<Key extends keyof CreatePersonFormState>(
@@ -1246,14 +1124,9 @@ function stepForField(field: FormErrorKey): PersonWizardStep {
     return "personal";
   if (["email", "phone"].includes(field)) return "contact";
   if (
-    [
-      "addressLine1",
-      "addressLine2",
-      "city",
-      "region",
-      "postalCode",
-      "countryCode",
-    ].includes(field)
+    ["addressLine1", "addressLine2", "city", "region", "countryCode"].includes(
+      field,
+    )
   )
     return "address";
   return "review";

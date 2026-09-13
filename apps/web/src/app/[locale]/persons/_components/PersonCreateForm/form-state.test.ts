@@ -8,7 +8,7 @@ import {
 import { createPersonInput } from "./input";
 
 describe("person document workflows", () => {
-  it("shares the uploaded ID, its edits and both photo sides across format changes", () => {
+  it("preserves the ID front and edits across format changes, discarding retired back images", () => {
     let form = createEmptyCreateForm("romanian");
     const front = {
       id: "front",
@@ -19,7 +19,7 @@ describe("person document workflows", () => {
     const identity = {
       ...form.documents[0]!,
       number: "123456",
-      issuedBy: "Issuer",
+      notes: "Note",
       photos: { front },
     };
     form.documents[0] = identity;
@@ -27,7 +27,7 @@ describe("person document workflows", () => {
     expect(form.documents[0]).toMatchObject({
       key: identity.key,
       number: "123456",
-      issuedBy: "Issuer",
+      notes: "Note",
       nationalIdFormat: "electronic",
     });
     expect(form.documents[0]!.photos.front).toBe(front);
@@ -38,7 +38,7 @@ describe("person document workflows", () => {
     form.documents[0]!.photos.back = back;
     form = switchDocumentWorkflow(form, "romanian", "classic");
     form = switchDocumentWorkflow(form, "romanian", "electronic");
-    expect(form.documents[0]!.photos).toEqual({ front, back });
+    expect(form.documents[0]!.photos).toEqual({ front });
     expect(form.documents[0]!.key).toBe(identity.key);
   });
 
@@ -103,4 +103,22 @@ describe("person document workflows", () => {
     form = switchDocumentWorkflow(form, "foreign");
     expect(form.documents[0]?.number).toBe("PASSPORT-123");
   });
+});
+
+it("sets Romania when changing citizenship and serializes it for older Romanian drafts", () => {
+  const foreign = {
+    ...createEmptyCreateForm("foreign"),
+    countryCode: "FR" as const,
+    region: "Paris",
+    city: "Paris",
+  };
+  const romanian = switchDocumentWorkflow(foreign, "romanian");
+  expect(romanian).toMatchObject({ countryCode: "RO", region: "", city: "" });
+  expect(
+    createPersonInput({ ...romanian, countryCode: "FR" }, () => "invalid").input
+      ?.countryCode,
+  ).toBe("RO");
+  expect(createPersonInput(foreign, () => "invalid").input?.countryCode).toBe(
+    "FR",
+  );
 });

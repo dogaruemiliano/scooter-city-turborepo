@@ -183,7 +183,7 @@ export function PersonDetailPage({
       <PersonNotesSection notes={person.notes} />
       <PersonDocumentsSection
         documents={person.documents}
-        photosByDocumentId={photosByDocumentId}
+        photosByDocumentId={{ ...documentPhotos, ...photosByDocumentId }}
         locale={locale}
         busyAction={busyAction}
         onCreateDocument={createDocument}

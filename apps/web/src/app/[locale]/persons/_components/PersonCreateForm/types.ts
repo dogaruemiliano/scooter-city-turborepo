@@ -4,7 +4,6 @@ import type { DateParts } from "@repo/ui/lib/date-parts";
 
 export interface PersonCreateFormProps {
   personsHref: string;
-  draftOwnerId?: string;
 }
 
 export interface Feedback {
@@ -31,7 +30,6 @@ export type PersonFormFieldKey =
   | "addressLine2"
   | "city"
   | "region"
-  | "postalCode"
   | "countryCode"
   | "documents"
   | "notes";
@@ -42,8 +40,6 @@ export type PersonDocumentFormFieldKey =
   | "number"
   | "cnp"
   | "issuingCountryCode"
-  | "issuedBy"
-  | "issuedOn"
   | "hasExpiryDate"
   | "expiresOn"
   | "status"
@@ -102,7 +98,6 @@ export interface CreatePersonFormState {
   addressLine2: string;
   city: string;
   region: string;
-  postalCode: string;
   countryCode: CountryCode;
   documents: CreatePersonDocumentFormState[];
   notes: string;
@@ -119,8 +114,6 @@ export interface CreatePersonDocumentFormState {
   number: string;
   cnp: string;
   issuingCountryCode: CountryCode | "";
-  issuedBy: string;
-  issuedOn: DateParts;
   hasExpiryDate: boolean;
   expiresOn: DateParts;
   status: v1.persons.PersonDocumentStatus;
@@ -142,10 +135,7 @@ export interface FormValidationIssue {
   format?: string;
 }
 
-export type DateField =
-  | "dateOfBirth"
-  | "documentIssuedOn"
-  | "documentExpiresOn";
+export type DateField = "dateOfBirth" | "documentExpiresOn";
 
 export type SetPersonFormValue = <Key extends keyof CreatePersonFormState>(
   key: Key,

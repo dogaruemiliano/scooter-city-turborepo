@@ -2,6 +2,7 @@ import { v1 } from "@repo/api-shared";
 import { buildDateOnly, dateOnlyToDateParts } from "@repo/ui/lib/date-parts";
 
 import { ROMANIAN_COUNTIES } from "./constants";
+import { hasKnownRomanianCountry } from "./form-state";
 import type {
   CreatePersonDocumentFormState,
   CreatePersonFormState,
@@ -35,6 +36,8 @@ export interface ExtractionFieldReview {
   provenance?: ExtractionProvenance[];
   outdated: boolean;
   suggestions: ExtractionSuggestion[];
+  missing?: boolean;
+  preferredDocumentKey?: string;
 }
 
 interface DocumentReading {
@@ -55,12 +58,20 @@ export interface ExtractionState {
   fields: Partial<Record<ExtractionFieldKey, ExtractionFieldReview>>;
   readings: Record<string, DocumentReading>;
   autofilled: Partial<Record<ExtractionFieldKey, AutofilledValue>>;
+  replacements?: Record<string, ExtractionFieldKey[]>;
 }
 
 export function createExtractionState(
   form: CreatePersonFormState,
 ): ExtractionState {
-  return { form, touched: {}, fields: {}, readings: {}, autofilled: {} };
+  return {
+    form:
+      form.citizenship === "romanian" ? { ...form, countryCode: "RO" } : form,
+    touched: {},
+    fields: {},
+    readings: {},
+    autofilled: {},
+  };
 }
 
 /** Call after applying an operator edit, including an intentional empty value. */
@@ -92,10 +103,43 @@ export function invalidateDocumentExtraction(
   state: ExtractionState,
   documentKey: string,
 ): ExtractionState {
-  if (!state.readings[documentKey]) return state;
+  const document = state.form.documents.find(
+    (item) => item.key === documentKey,
+  );
+  if (
+    !state.readings[documentKey] &&
+    !Object.values(document?.photos ?? {}).some(Boolean)
+  )
+    return state;
+  const replacedFields = state.readings[documentKey]
+    ? (Object.keys(
+        collectCandidates({
+          ...state,
+          readings: { [documentKey]: state.readings[documentKey]! },
+        }),
+      ) as ExtractionFieldKey[])
+    : document
+      ? expectedExtractionFields(document)
+      : [];
   const readings = { ...state.readings };
   delete readings[documentKey];
-  return reconcile({ ...state, readings });
+  const next = reconcile({
+    ...state,
+    readings,
+    replacements: {
+      ...state.replacements,
+      [documentKey]: [
+        ...new Set([
+          ...(state.replacements?.[documentKey] ?? []),
+          ...replacedFields,
+        ]),
+      ],
+    },
+  });
+  for (const key of replacedFields) {
+    next.fields[key] = { suggestions: [], ...next.fields[key], outdated: true };
+  }
+  return next;
 }
 
 /** The request owner must check its generation and source signature first. */
@@ -107,10 +151,62 @@ export function reconcileDocumentExtraction(
     (item) => item.key === reading.documentKey,
   );
   if (!document || document.type !== reading.result.documentType) return state;
-  return reconcile({
-    ...state,
+  let next = state;
+  const replacement = state.replacements?.[reading.documentKey];
+  if (replacement) {
+    // A replacement owns its newly read values, including prior manual corrections.
+    // Retain manual corrections when a value is unreadable, but mark them as stale.
+    const incoming = collectCandidates({
+      ...state,
+      readings: { [reading.documentKey]: reading },
+    });
+    const touched = { ...state.touched };
+    const autofilled = { ...state.autofilled };
+    const fields = { ...state.fields };
+    let form =
+      state.form.citizenship === "romanian"
+        ? { ...state.form, countryCode: "RO" as const }
+        : state.form;
+    for (const rawKey of Object.keys(incoming)) {
+      const key = rawKey as ExtractionFieldKey;
+      if (groupSuggestions(incoming[key] ?? []).length !== 1) continue;
+      delete touched[key];
+      delete autofilled[key];
+      if (key.endsWith(".expiresOn"))
+        delete touched[`document.${documentKeyFromField(key)}.hasExpiryDate`];
+      fields[key] = {
+        suggestions: [],
+        outdated: false,
+        ...fields[key],
+        preferredDocumentKey: reading.documentKey,
+      };
+      form = writeField(
+        form,
+        key,
+        key.endsWith(".licenseCategories") ? [] : "",
+      );
+    }
+    next = { ...state, form, touched, autofilled, fields };
+  }
+  next = reconcile({
+    ...next,
     readings: { ...state.readings, [reading.documentKey]: reading },
   });
+  if (replacement) {
+    for (const key of replacement) {
+      const supplied = next.fields[key]?.suggestions.some((suggestion) =>
+        suggestion.sources.some(
+          (source) => source.documentKey === reading.documentKey,
+        ),
+      );
+      if (!supplied)
+        next.fields[key] = { ...next.fields[key]!, outdated: true };
+    }
+    const replacements = { ...next.replacements };
+    delete replacements[reading.documentKey];
+    next = { ...next, replacements };
+  }
+  return next;
 }
 
 export function applyExtractionSuggestion(
@@ -175,7 +271,10 @@ export function applyExtractionSuggestion(
 }
 
 function reconcile(state: ExtractionState): ExtractionState {
-  let form = state.form;
+  let form =
+    state.form.citizenship === "romanian"
+      ? { ...state.form, countryCode: "RO" as const }
+      : state.form;
   const touched = { ...state.touched };
   // Restore only values we still own before recomputing all available sources.
   // This makes the final result independent of request completion order.
@@ -203,6 +302,12 @@ function reconcile(state: ExtractionState): ExtractionState {
   const keys = new Set([
     ...Object.keys(state.fields),
     ...Object.keys(candidates),
+    ...Object.values(state.readings).flatMap((reading) => {
+      const document = form.documents.find(
+        (item) => item.key === reading.documentKey,
+      );
+      return document ? expectedExtractionFields(document) : [];
+    }),
   ] as ExtractionFieldKey[]);
   // Address country determines whether the county needs Romanian normalization.
   const addressOrder = (key: ExtractionFieldKey) =>
@@ -211,6 +316,7 @@ function reconcile(state: ExtractionState): ExtractionState {
     (left, right) => addressOrder(left) - addressOrder(right),
   );
   for (const key of orderedKeys) {
+    if (hasKnownRomanianCountry(form, key)) continue;
     const suggestions = groupSuggestions(
       (candidates[key] ?? []).map((candidate) => {
         if (
@@ -231,7 +337,20 @@ function reconcile(state: ExtractionState): ExtractionState {
       }),
     );
     const before = readExtractionFieldValue(form, key);
-    const candidate = suggestions.length === 1 ? suggestions[0] : undefined;
+    const preferredDocumentKey = state.fields[key]?.preferredDocumentKey;
+    const preferred = preferredDocumentKey
+      ? suggestions.filter((suggestion) =>
+          suggestion.sources.some(
+            (source) => source.documentKey === preferredDocumentKey,
+          ),
+        )
+      : [];
+    const candidate =
+      preferred.length === 1
+        ? preferred[0]
+        : suggestions.length === 1
+          ? suggestions[0]
+          : undefined;
     const expiryManuallyDisabled =
       key.endsWith(".expiresOn") &&
       touched[`document.${documentKeyFromField(key)}.hasExpiryDate`] &&
@@ -278,8 +397,11 @@ function reconcile(state: ExtractionState): ExtractionState {
     const provenance = matching?.sources ?? oldProvenance;
     fields[key] = {
       suggestions,
+      ...(preferredDocumentKey ? { preferredDocumentKey } : {}),
+      missing: !candidate && isAvailableForAutofill(current, key),
       ...(provenance?.length ? { provenance } : {}),
       outdated: Boolean(
+        (state.fields[key]?.outdated && !matching) ||
         provenance?.some(
           (source) =>
             state.readings[source.documentKey]?.sourceSignature !==
@@ -291,6 +413,62 @@ function reconcile(state: ExtractionState): ExtractionState {
   return { ...state, form, touched, fields, autofilled };
 }
 
+/** Fields that the selected document is expected to supply, never absent optional documents. */
+function expectedExtractionFields(
+  document: CreatePersonDocumentFormState,
+): ExtractionFieldKey[] {
+  const address: ExtractionFieldKey[] = [
+    "person.addressLine1",
+    "person.region",
+    "person.city",
+    "person.countryCode",
+  ];
+  if (document.type === "proofOfAddress") return address;
+  const fields: ExtractionFieldKey[] = [
+    `document.${document.key}.number`,
+    `document.${document.key}.issuingCountryCode`,
+  ];
+  if (document.hasExpiryDate) fields.push(`document.${document.key}.expiresOn`);
+  if (document.type === "nationalId" || document.type === "passport") {
+    fields.push(
+      "person.firstName",
+      "person.lastName",
+      document.type === "nationalId" ? "person.cnp" : "person.dateOfBirth",
+    );
+  }
+  if (
+    document.type === "nationalId" &&
+    document.nationalIdFormat !== "electronic"
+  )
+    fields.push(`document.${document.key}.series`, ...address);
+  return fields;
+}
+
+export function extractionFieldNeedsReview(
+  state: ExtractionState,
+  key: ExtractionFieldKey,
+): boolean {
+  if (hasKnownRomanianCountry(state.form, key)) return false;
+  const review = state.fields[key];
+  if (!review) return false;
+  return (
+    review.outdated ||
+    (!state.touched[key] &&
+      Boolean(
+        review.missing ||
+        review.suggestions.length > 1 ||
+        review.suggestions.some(
+          (suggestion) =>
+            suggestion.needsReview ||
+            !equalValues(
+              suggestion.value,
+              readExtractionFieldValue(state.form, key),
+            ),
+        ),
+      ))
+  );
+}
+
 function collectCandidates(state: ExtractionState) {
   const candidates: Partial<
     Record<ExtractionFieldKey, ExtractionSuggestion[]>
@@ -299,11 +477,7 @@ function collectCandidates(state: ExtractionState) {
     const document = state.form.documents.find(
       (item) => item.key === reading.documentKey,
     );
-    if (
-      !document ||
-      reading.result.detectedDocumentType !== document.type ||
-      reading.result.warnings.includes("typeMismatch")
-    )
+    if (!document || reading.result.detectedDocumentType !== document.type)
       continue;
     const source = (
       slot: v1.persons.PersonDocumentPhotoSlot,
@@ -416,7 +590,7 @@ export function readExtractionFieldValue(
   const parts =
     field === "dateOfBirth" && "dateOfBirth" in target
       ? target.dateOfBirth
-      : (field === "issuedOn" || field === "expiresOn") && "issuedOn" in target
+      : field === "expiresOn" && "expiresOn" in target
         ? target[field]
         : null;
   if (parts) {
@@ -433,6 +607,8 @@ function writeField(
   key: ExtractionFieldKey,
   value: ExtractionValue,
 ): CreatePersonFormState {
+  if (key === "person.countryCode" && form.citizenship === "romanian")
+    return { ...form, countryCode: "RO" };
   const field = key.slice(key.lastIndexOf(".") + 1);
   if (key.startsWith("person.") && typeof value === "string") {
     if (
@@ -454,7 +630,7 @@ function writeField(
     !v1.persons.PERSON_EXTRACTION_DOCUMENT_FIELDS.some((item) => item === field)
   )
     return form;
-  const isDate = field === "issuedOn" || field === "expiresOn";
+  const isDate = field === "expiresOn";
   return updateDocument(form, documentKeyFromField(key), {
     [field]: isDate ? dateOnlyToDateParts(value) : value,
     ...(field === "expiresOn" && value ? { hasExpiryDate: true } : {}),

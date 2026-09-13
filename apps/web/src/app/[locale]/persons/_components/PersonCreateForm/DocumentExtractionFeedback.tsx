@@ -1,86 +1,80 @@
 "use client";
 
-import { Button } from "@repo/ui/components";
+import { Button, Spinner } from "@repo/ui/components";
+import { TriangleAlertIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
-import {
-  documentExtractionSignature,
-  type DocumentExtractionJob,
-} from "./useDocumentExtraction";
-import type { CreatePersonFormState } from "./types";
+import type { DocumentExtractionJob } from "./useDocumentExtraction";
 
+/** Sits over the photo, outside its preview button so retry remains independent. */
 export function DocumentExtractionFeedback({
-  form,
-  jobs,
-  pending,
+  id,
+  job,
+  error,
   disabled,
   onRetry,
-  onManual,
+  retryLabel,
 }: {
-  form: CreatePersonFormState;
-  jobs: Record<string, DocumentExtractionJob>;
-  pending: boolean;
+  id: string;
+  job?: DocumentExtractionJob;
+  error?: string | null;
   disabled: boolean;
-  onRetry: (key: string) => void;
-  onManual: () => void;
+  onRetry?: () => void;
+  retryLabel?: string;
 }) {
   const t = useTranslations("persons");
-  const documents = form.documents.filter((document) =>
-    documentExtractionSignature(document),
-  );
-  if (!documents.length) return null;
-  return (
-    <section
-      aria-label={t("extraction.title")}
-      className="grid gap-3 rounded-xl border border-border bg-card p-4 text-card-foreground"
-    >
-      <div className="grid gap-3" aria-live="polite">
-        {documents.map((document) => {
-          const job = jobs[document.key];
-          const status =
-            job?.signature === documentExtractionSignature(document)
-              ? job.status
-              : "pending";
-          return (
-            <div key={document.key} className="grid gap-1">
-              <p className="text-sm font-medium">
-                {t(`documentTypes.${document.type}`)}
-              </p>
-              <p className="text-sm text-muted-foreground">
-                {t(`extraction.status.${status}`)}
-              </p>
-              {status === "success"
-                ? job?.warnings?.map((warning) => (
-                    <p className="text-sm text-muted-foreground" key={warning}>
-                      {t(`extraction.warnings.${warning}`)}
-                    </p>
-                  ))
-                : null}
-              {status === "error" || status === "manual" ? (
-                <Button
-                  type="button"
-                  variant="text"
-                  className="justify-self-start"
-                  disabled={disabled}
-                  onClick={() => onRetry(document.key)}
-                >
-                  {t("extraction.retry")}
-                </Button>
-              ) : null}
-            </div>
-          );
-        })}
-      </div>
-      {pending ? (
-        <Button
-          type="button"
-          variant="outline"
-          className="justify-self-start"
-          disabled={disabled}
-          onClick={onManual}
+  if (!error && job?.status === "pending") {
+    return (
+      <div className="pointer-events-none absolute right-2 bottom-2 left-2 flex justify-end">
+        <span
+          id={id}
+          role="status"
+          className="flex min-w-0 items-center gap-2 rounded-md bg-media-scrim px-3 py-2 text-sm text-scrim-foreground"
         >
-          {t("extraction.continueManually")}
-        </Button>
-      ) : null}
-    </section>
+          <Spinner className="shrink-0" />
+          {t("extraction.readingDocument")}
+        </span>
+      </div>
+    );
+  }
+
+  const isError = Boolean(error) || job?.status === "error";
+  const warnings = [...new Set(job?.warnings ?? [])];
+  const messages = error
+    ? [error]
+    : job?.status === "error" || job?.status === "disabled"
+      ? [t(`extraction.status.${job.status}`)]
+      : job?.status === "success"
+        ? warnings.map((warning) => t(`extraction.warnings.${warning}`))
+        : [];
+  if (!messages.length) return null;
+
+  return (
+    <div className="pointer-events-none absolute inset-x-0 top-12 bottom-0 flex items-end p-2">
+      <div
+        id={id}
+        role={isError ? "alert" : "status"}
+        className="pointer-events-auto grid max-h-full w-full gap-2 overflow-y-auto rounded-md bg-media-scrim p-3 text-sm text-scrim-foreground"
+      >
+        <div className="flex items-start gap-2">
+          <TriangleAlertIcon aria-hidden="true" className="size-4 shrink-0" />
+          <div className="grid min-w-0 gap-2">
+            {messages.map((message) => (
+              <p key={message}>{message}</p>
+            ))}
+          </div>
+        </div>
+        {onRetry && job?.status !== "disabled" ? (
+          <Button
+            type="button"
+            variant="text"
+            className="justify-self-start text-scrim-foreground underline hover:text-scrim-foreground"
+            disabled={disabled}
+            onClick={onRetry}
+          >
+            {retryLabel ?? t("extraction.retry")}
+          </Button>
+        ) : null}
+      </div>
+    </div>
   );
 }

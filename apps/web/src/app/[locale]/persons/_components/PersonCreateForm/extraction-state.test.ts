@@ -2,12 +2,14 @@ import { v1 } from "@repo/api-shared";
 import { describe, expect, it } from "vitest";
 
 import { createEmptyCreateForm, switchDocumentWorkflow } from "./form-state";
+import { fieldHasPendingExtraction } from "./field-extraction-pending";
 import {
   equivalentPersonNames,
   licenseNameDifferences,
 } from "./license-name-comparison";
 import {
   applyExtractionSuggestion,
+  extractionFieldNeedsReview,
   createExtractionState,
   invalidateDocumentExtraction,
   markExtractionFieldEdited,
@@ -27,6 +29,7 @@ function read(
     signature?: string;
     categories?: v1.persons.PersonDocumentExtraction["licenseCategories"];
     detectedType?: v1.persons.PersonDocumentType;
+    warnings?: v1.persons.PersonDocumentExtraction["warnings"];
   } = {},
 ) {
   const document = state.form.documents.find(
@@ -42,7 +45,7 @@ function read(
       reviewRequired: true,
       suggestions,
       licenseCategories: options.categories ?? [],
-      warnings: [],
+      warnings: options.warnings ?? [],
     },
   });
 }
@@ -68,6 +71,73 @@ const category = (
 });
 
 describe("person document extraction reconciliation", () => {
+  it.each(["classic", "electronic"] as const)(
+    "keeps Romania as the %s ID issuer without OCR or review",
+    (format) => {
+      const form = switchDocumentWorkflow(
+        createEmptyCreateForm("romanian"),
+        "romanian",
+        format,
+      );
+      const document = form.documents[0]!;
+      const key = `document.${document.key}.issuingCountryCode` as const;
+      let state = createExtractionState(form);
+      expect(document.issuingCountryCode).toBe("RO");
+      expect(
+        fieldHasPendingExtraction(state, new Set([document.key]), key),
+      ).toBe(false);
+      state = read(state, [], { key: document.key });
+      expect(state.form.documents[0]!.issuingCountryCode).toBe("RO");
+      expect(extractionFieldNeedsReview(state, key)).toBe(false);
+      state.fields[key] = { suggestions: [], missing: true, outdated: true };
+      expect(extractionFieldNeedsReview(state, key)).toBe(false);
+      state = invalidateDocumentExtraction(state, document.key);
+      expect(state.form.documents[0]!.issuingCountryCode).toBe("RO");
+      expect(extractionFieldNeedsReview(state, key)).toBe(false);
+    },
+  );
+
+  it("still requests an unreadable passport or driving licence issuer", () => {
+    let state = initial();
+    for (const document of state.form.documents.filter(
+      (item) => item.type === "passport" || item.type === "driverLicense",
+    )) {
+      const key = `document.${document.key}.issuingCountryCode` as const;
+      expect(document.issuingCountryCode).toBe("");
+      expect(
+        fieldHasPendingExtraction(state, new Set([document.key]), key),
+      ).toBe(true);
+      state = read(state, [], { key: document.key });
+      expect(extractionFieldNeedsReview(state, key)).toBe(true);
+    }
+  });
+
+  it("applies matching document readings despite a contradictory mismatch warning", () => {
+    const state = read(initial(), [person("firstName", "Ana")], {
+      warnings: ["typeMismatch", "unclearText"],
+    });
+    expect(state.form.firstName).toBe("Ana");
+
+    const licenseKey = state.form.documents.find(
+      (document) => document.type === "driverLicense",
+    )!.key;
+    const withLicence = read(state, [person("firstName", "Anamaria")], {
+      key: licenseKey,
+      warnings: ["typeMismatch"],
+      categories: [
+        { value: category("B"), sourceSlot: "back", needsReview: true },
+      ],
+    });
+    expect(withLicence.form.firstName).toBe("Ana");
+    expect(
+      withLicence.form.documents.find((document) => document.key === licenseKey)
+        ?.licenseCategories,
+    ).toEqual([category("B")]);
+    expect(licenseNameDifferences(withLicence)).toMatchObject([
+      { identityName: "Ana", licenseName: "Anamaria" },
+    ]);
+  });
+
   it.each(["EMILIANO CONSTANTIN", "EMILIAN CONSTANTIN"])(
     "keeps the ID name when the licence reads %s, regardless of arrival order",
     (licenseName) => {
@@ -224,7 +294,7 @@ describe("person document extraction reconciliation", () => {
     expect(replacement.fields["person.firstName"]?.outdated).toBe(false);
   });
 
-  it("preserves operator edits when their old photo is replaced", () => {
+  it("uses the new reading when an edited document is replaced", () => {
     let state = read(initial(), [person("firstName", "Old photo")]);
     state = { ...state, form: { ...state.form, firstName: "Corrected" } };
     state = markExtractionFieldEdited(state, "person.firstName");
@@ -232,7 +302,41 @@ describe("person document extraction reconciliation", () => {
     state = read(state, [person("firstName", "New photo")], {
       signature: "photo-v2",
     });
+    expect(state.form.firstName).toBe("New photo");
+  });
+
+  it("marks an unreadable replacement value as stale until manually corrected", () => {
+    let state = read(initial(), [person("firstName", "Old photo")]);
+    state = markExtractionFieldEdited(
+      { ...state, form: { ...state.form, firstName: "Corrected" } },
+      "person.firstName",
+    );
+    state = invalidateDocumentExtraction(state, "foreign-passport");
+    state = read(state, [], { signature: "unreadable" });
     expect(state.form.firstName).toBe("Corrected");
+    expect(extractionFieldNeedsReview(state, "person.firstName")).toBe(true);
+    state = markExtractionFieldEdited(
+      { ...state, form: { ...state.form, firstName: "Checked again" } },
+      "person.firstName",
+    );
+    expect(extractionFieldNeedsReview(state, "person.firstName")).toBe(false);
+  });
+
+  it("keeps the replacement reading when another document contains conflicting details", () => {
+    let state = read(initial(), [person("firstName", "Old")]);
+    state = read(state, [person("firstName", "Other")], {
+      key: "foreign-visa",
+    });
+    state = invalidateDocumentExtraction(state, "foreign-passport");
+    state = read(state, [person("firstName", "Replacement")], {
+      signature: "new-photo",
+    });
+    expect(state.form.firstName).toBe("Replacement");
+    state = read(state, [person("lastName", "Surname")], {
+      key: "foreign-residence-permit",
+    });
+    expect(state.form.firstName).toBe("Replacement");
+    expect(extractionFieldNeedsReview(state, "person.firstName")).toBe(true);
   });
 
   it("never chooses the first competing reading from one document", () => {
@@ -470,4 +574,26 @@ describe("person document extraction reconciliation", () => {
     });
     expect(ignored).toBe(switched);
   });
+});
+
+it("keeps the Romanian address country fixed through extraction and photo replacement", () => {
+  let state = createExtractionState(createEmptyCreateForm("romanian"));
+  const key = state.form.documents[0]!.key;
+  expect(
+    fieldHasPendingExtraction(state, new Set([key]), "person.countryCode"),
+  ).toBe(false);
+  state = read(state, [person("countryCode", "FR", true)], { key });
+  expect(state.form.countryCode).toBe("RO");
+  expect(extractionFieldNeedsReview(state, "person.countryCode")).toBe(false);
+  state = read(state, [person("countryCode", "DE")], {
+    key,
+    signature: "photo-v2",
+  });
+  expect(state.form.countryCode).toBe("RO");
+  expect(extractionFieldNeedsReview(state, "person.countryCode")).toBe(false);
+});
+
+it("still extracts the address country in the foreign workflow", () => {
+  const state = read(initial(), [person("countryCode", "FR")]);
+  expect(state.form.countryCode).toBe("FR");
 });

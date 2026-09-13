@@ -126,17 +126,15 @@ export function PersonEditForm({ person, personHref }: PersonEditFormProps) {
                 closeLabel={t("actions.close")}
               />
             </FormField>
-            <FormField name="region" label={t("fields.region")}>
+            <FormField name="region" required label={t("fields.region")}>
               <FormInput />
             </FormField>
-            <FormField name="city" label={t("fields.city")}>
-              <FormInput />
-            </FormField>
-            <FormField name="postalCode" label={t("fields.postalCode")}>
+            <FormField name="city" required label={t("fields.city")}>
               <FormInput />
             </FormField>
             <FormField
               name="addressLine1"
+              required
               label={t("fields.addressLine1")}
               className="sm:col-span-2"
             >

@@ -7,7 +7,6 @@ import {
   createExtractionState,
   invalidateDocumentExtraction,
   markExtractionFieldEdited,
-  reconcileDocumentExtraction,
   type ExtractionState,
 } from "./extraction-state";
 import { useDocumentExtraction } from "./useDocumentExtraction";
@@ -44,6 +43,7 @@ function resultFor(name: string): v1.persons.PersonDocumentExtraction {
     warnings: [],
   };
 }
+
 function deferred() {
   let resolve!: (value: v1.persons.PersonDocumentExtraction) => void;
   const promise = new Promise<v1.persons.PersonDocumentExtraction>((done) => {
@@ -66,32 +66,6 @@ beforeEach(() => {
 });
 
 describe("automatic document reading", () => {
-  it("reuses format-specific extraction signatures from older saved drafts", () => {
-    let state = createExtractionState(createEmptyCreateForm("romanian"));
-    state.form.documents[0]!.photos = initial().form.documents[0]!.photos;
-    state = reconcileDocumentExtraction(state, {
-      documentKey: state.form.documents[0]!.key,
-      sourceSignature: JSON.stringify([
-        "nationalId",
-        "classic",
-        [["front", "front-1"]],
-      ]),
-      result: {
-        ...resultFor("Ana"),
-        documentType: "nationalId",
-        detectedDocumentType: "nationalId",
-      },
-    });
-    state = {
-      ...state,
-      form: switchDocumentWorkflow(state.form, "romanian", "electronic"),
-    };
-    const { result } = setup(state);
-    expect(result.current.state.form.firstName).toBe("Ana");
-    expect(result.current.pending).toBe(false);
-    expect(api.fetch).not.toHaveBeenCalled();
-  });
-
   it("does not repeat or abort ID extraction when only the selected format changes", async () => {
     const state = createExtractionState(createEmptyCreateForm("romanian"));
     state.form.documents[0]!.photos = initial().form.documents[0]!.photos;
@@ -374,18 +348,16 @@ describe("automatic document reading", () => {
     expect(result.current.pending).toBe(false);
   });
 
-  it("allows manual continuation and rejects a superseded same-photo retry result", async () => {
+  it("aborts a superseded same-photo retry and ignores its late result", async () => {
     const old = deferred();
     const latest = deferred();
     api.fetch
       .mockReturnValueOnce(old.promise)
       .mockReturnValueOnce(latest.promise);
     const { result } = setup();
-    act(() => result.current.continueManually());
-    expect(result.current.pending).toBe(false);
-    expect(result.current.jobs["foreign-passport"]?.status).toBe("manual");
-    expect(result.current.pendingDocumentKeys.size).toBe(0);
+    const originalSignal = api.fetch.mock.calls[0]![2].signal;
     act(() => result.current.retry("foreign-passport"));
+    expect(originalSignal.aborted).toBe(true);
     expect(result.current.pending).toBe(true);
     expect([...result.current.pendingDocumentKeys]).toEqual([
       "foreign-passport",
@@ -393,6 +365,39 @@ describe("automatic document reading", () => {
     await act(async () => latest.resolve(resultFor("Retry")));
     await act(async () => old.resolve(resultFor("Ignored")));
     expect(result.current.state.form.firstName).toBe("Retry");
+  });
+
+  it("omits a contradictory mismatch warning from new and restored matching readings", async () => {
+    api.fetch.mockResolvedValue({
+      ...resultFor("Ana"),
+      warnings: ["typeMismatch", "unclearText"],
+    });
+    const first = setup();
+    await waitFor(() => expect(first.result.current.pending).toBe(false));
+    expect(first.result.current.jobs["foreign-passport"]?.warnings).toEqual([
+      "unclearText",
+    ]);
+    const saved = first.result.current.state;
+    first.unmount();
+    api.fetch.mockClear();
+    const restored = setup(saved);
+    expect(restored.result.current.jobs["foreign-passport"]?.warnings).toEqual([
+      "unclearText",
+    ]);
+    expect(api.fetch).not.toHaveBeenCalled();
+  });
+
+  it("keeps a genuine mismatch warning visible", async () => {
+    api.fetch.mockResolvedValue({
+      ...resultFor("Ana"),
+      detectedDocumentType: "nationalId",
+      warnings: ["typeMismatch"],
+    });
+    const { result } = setup();
+    await waitFor(() => expect(result.current.pending).toBe(false));
+    expect(result.current.jobs["foreign-passport"]?.warnings).toEqual([
+      "typeMismatch",
+    ]);
   });
 
   it("makes disabled extraction nonblocking without automatic retries", async () => {

@@ -32,7 +32,6 @@ export function createEmptyCreateForm(
     addressLine2: "",
     city: "",
     region: "",
-    postalCode: "",
     countryCode: "RO",
     documents: createInitialDocuments(citizenship),
     notes: "",
@@ -47,6 +46,23 @@ export function documentWorkflow(
     : form.nationalIdFormat === "electronic"
       ? "romanianElectronic"
       : "romanianClassic";
+}
+
+/** Countries established by the selected Romanian workflow need no AI review. */
+export function hasKnownRomanianCountry(
+  form: CreatePersonFormState,
+  fieldKey: string,
+): boolean {
+  return (
+    form.citizenship === "romanian" &&
+    (fieldKey === "person.countryCode" ||
+      form.documents.some(
+        (document) =>
+          document.type === "nationalId" &&
+          document.issuingCountryCode === "RO" &&
+          fieldKey === `document.${document.key}.issuingCountryCode`,
+      ))
+  );
 }
 
 export function createInitialDocuments(
@@ -106,8 +122,18 @@ export function switchDocumentWorkflow(
   citizenship: PersonCitizenship,
   nationalIdFormat = current.nationalIdFormat,
 ): CreatePersonFormState {
-  const next = { ...current, citizenship, nationalIdFormat };
-  if (documentWorkflow(current) === documentWorkflow(next)) return current;
+  const next = {
+    ...current,
+    citizenship,
+    nationalIdFormat,
+    ...(citizenship === "romanian"
+      ? {
+          countryCode: "RO" as const,
+          ...(current.countryCode !== "RO" ? { region: "", city: "" } : {}),
+        }
+      : {}),
+  };
+  if (documentWorkflow(current) === documentWorkflow(next)) return next;
   const drafts = {
     ...current.documentDrafts,
     [documentWorkflow(current)]: current.documents,
@@ -133,7 +159,7 @@ export function switchDocumentWorkflow(
         return {
           ...identity,
           nationalIdFormat,
-          photos: { ...document.photos, ...identity.photos },
+          photos: { front: identity.photos.front },
         };
       }
       return document;
@@ -164,9 +190,7 @@ export function documentPhotoSlots(
   document: CreatePersonDocumentFormState,
 ): readonly v1.persons.PersonDocumentPhotoSlot[] {
   return document.type === "driverLicense" ||
-    document.type === "residencePermit" ||
-    (document.type === "nationalId" &&
-      document.nationalIdFormat === "electronic")
+    document.type === "residencePermit"
     ? ["front", "back"]
     : ["front"];
 }
@@ -191,8 +215,6 @@ export function createDocumentDraft(
     cnp: "",
     issuingCountryCode:
       type === "nationalId" || type === "proofOfAddress" ? "RO" : "",
-    issuedBy: "",
-    issuedOn: emptyDateParts(),
     hasExpiryDate: type !== "proofOfAddress",
     expiresOn: emptyDateParts(),
     status: type === "driverLicense" ? "unverified" : "verified",
@@ -208,9 +230,7 @@ export function isBlankDocumentDraft(document: CreatePersonDocumentFormState) {
     document.series.trim().length === 0 &&
     document.number.trim().length === 0 &&
     document.cnp.trim().length === 0 &&
-    document.issuedBy.trim().length === 0 &&
     document.notes.trim().length === 0 &&
-    !hasDateParts(document.issuedOn) &&
     !hasDateParts(document.expiresOn)
   );
 }

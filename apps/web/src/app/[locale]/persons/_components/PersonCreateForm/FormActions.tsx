@@ -44,9 +44,7 @@ export function FormActions({
       ) ? (
         <Button
           type="button"
-          disabled={
-            creating || uploadingPhotos || (step === "personal" && extracting)
-          }
+          disabled={creating || uploadingPhotos}
           onClick={onNext}
         >
           {uploadingPhotos

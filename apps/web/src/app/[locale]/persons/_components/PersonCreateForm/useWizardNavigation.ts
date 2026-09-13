@@ -53,14 +53,8 @@ export function useWizardNavigation() {
     );
   }, []);
 
-  const restore = useCallback(
-    (snapshot: NavigationState) => setState(snapshot),
-    [],
-  );
-
   return {
-    snapshot: state,
-    restore,
+    hasProgress: state.history.length > 1,
     step: state.history[state.cursor]!,
     canGoBack: state.cursor > 0,
     forwardStep: state.history[state.cursor + 1],

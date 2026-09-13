@@ -100,7 +100,6 @@ export function personFormState(person: v1.persons.Person): PersonFormState {
     addressLine2: person.addressLine2 ?? "",
     city: person.city ?? "",
     region: person.region ?? "",
-    postalCode: person.postalCode ?? "",
     countryCode: person.countryCode ?? "",
     notes: person.notes ?? "",
   };
@@ -120,8 +119,6 @@ export function documentFormState(
     number: document?.number ?? "",
     cnp: document?.cnp ?? "",
     issuingCountryCode: document?.issuingCountryCode ?? "",
-    issuedBy: document?.issuedBy ?? "",
-    issuedOn: document?.issuedOn ?? "",
     hasExpiryDate: document
       ? document.expiresOn !== null
       : initialType !== "proofOfAddress",
@@ -147,12 +144,13 @@ export function documentFormInput(
     ...(form.type === "driverLicense"
       ? { licenseCategories: form.licenseCategories }
       : {}),
-    series: blankToNull(form.series),
-    number: blankToNull(form.number),
+    series: form.type === "proofOfAddress" ? null : blankToNull(form.series),
+    number: form.type === "proofOfAddress" ? null : blankToNull(form.number),
     issuingCountryCode: blankToNull(form.issuingCountryCode),
-    issuedBy: blankToNull(form.issuedBy),
-    issuedOn: blankToNull(form.issuedOn),
-    expiresOn: form.hasExpiryDate ? blankToNull(form.expiresOn) : null,
+    expiresOn:
+      form.type !== "proofOfAddress" && form.hasExpiryDate
+        ? blankToNull(form.expiresOn)
+        : null,
     status: form.status,
     notes: blankToNull(form.notes),
   };
@@ -182,8 +180,6 @@ export function documentFormHasChanges(
     input.series !== document.series ||
     input.number !== document.number ||
     input.issuingCountryCode !== document.issuingCountryCode ||
-    input.issuedBy !== document.issuedBy ||
-    input.issuedOn !== document.issuedOn ||
     input.expiresOn !== document.expiresOn ||
     input.status !== document.status ||
     input.notes !== document.notes
@@ -295,8 +291,6 @@ function auditFieldLabel(field: string, t: PersonsTranslations): string {
       return t("fields.city");
     case "region":
       return t("fields.region");
-    case "postalCode":
-      return t("fields.postalCode");
     case "countryCode":
       return t("fields.countryCode");
     case "notes":
@@ -313,10 +307,6 @@ function auditFieldLabel(field: string, t: PersonsTranslations): string {
       return t("fields.documentCnp");
     case "document.issuingCountryCode":
       return t("fields.documentIssuingCountryCode");
-    case "document.issuedBy":
-      return t("fields.documentIssuedBy");
-    case "document.issuedOn":
-      return t("fields.documentIssuedOn");
     case "document.expiresOn":
       return t("fields.documentExpiresOn");
     case "document.status":

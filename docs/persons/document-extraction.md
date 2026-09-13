@@ -9,7 +9,7 @@ eligibility. The operator remains responsible for checking each document.
 
 1. Choose **Romanian citizen** or **Foreign citizen**.
 2. **Identification documents** keeps the old/electronic ID selector and uploads
-   on one screen. Old IDs require the front; CEI requires both sides and separate
+   on one screen. Old IDs and CEI require only the front; CEI also requires separate
    proof of address. Foreign citizens upload a passport, with optional visa and
    residence permit. Every slot accepts JPEG, PNG, WebP or PDF (up to 10 MiB).
 3. Review and edit the extracted personal and identification document details.
@@ -27,19 +27,32 @@ both support drag-and-drop. Camera access starts only on Take photo and stops on
 capture, close or unmount. PDF previews offer an Open file fallback and no crop.
 
 Going back preserves uploads and manual edits. Extraction runs against uploaded
-drafts before the person is created. Every suggested value remains editable;
+drafts before the person is created. Document-level `issuedOn` (the requested `issuedAt`) and `issuedBy` are no longer
+collected or stored. Licence category acquisition dates remain available.
+Every suggested value remains editable;
 document verification status is never changed by extraction.
 
-Automatic suggestions fill empty, untouched fields. Operator edits, including
-intentional clears, are preserved. Competing readings require an explicit choice;
-the first response does not win. Replacing or removing a photo clears untouched
-values from that source, while manual corrections remain. Request identities and
+Initial suggestions fill empty, untouched fields. Operator edits, including
+intentional clears, are preserved during the initial reading. Replacing a photo
+automatically applies the new reading, including over earlier manual corrections.
+Removing a photo clears untouched values from that source. Unreadable replacement
+values remain flagged for review; old manual values are never presented as current.
+Conflicting readings are highlighted for manual correction. Request identities and
 abort signals prevent late responses from older photos or workflows being applied.
 
-The review form shows source documents and uncertain values. Document editors keep
+The existing personal-details step is reused for verification. Compact document
+cards show the icon, type, identifier and expiry, with the existing 7/30-day color
+thresholds and readable expiry statuses. Proof of address shows only upload
+confirmation. Missing or uncertain fields appear inline in yellow. Parsing appears
+at the bottom right of each document preview; reading warnings and errors appear
+over the preview on a translucent surface, with an independent retry action.
+Document editors expand to 80vw on desktop. Document editors keep
 local changes until Save; Cancel does not roll back extraction that arrived while
-the editor was open. Save is blocked while a reading is pending, with an explicit
-Continue manually option that ignores pending results. Failed or unavailable
+the editor was open. Continue remains available while extraction runs; validation
+of untouched fields with active reading indicators is deferred until their results
+arrive. Manual corrections are still validated. Final Save waits for pending
+readings and validates the complete form. There is no separate manual-edit action.
+Failed or unavailable
 extraction leaves manual entry available. Unreadable foreign document issuers stay
 blank rather than defaulting to Romania.
 
@@ -93,14 +106,25 @@ the requesting operator; extraction itself does not persist them.
 
 The model's JSON is untrusted even when structured output is requested. The
 service accepts only allowed fields and known source slots. A detected document
-type mismatch suppresses all suggestions. Missing or unreadable fields stay
+type mismatch suppresses all suggestions. When the detected type matches the
+requested type, a contradictory model `typeMismatch` warning is discarded and
+valid values are applied. Other warnings do not suppress valid readings.
+Proof of address is a supporting-document purpose: CEI domicile/residence
+certificates, including HUB MAI PDFs, belong here even if the model labels them
+as a national ID because they mention CEI/CNP. A requested proof is normalized to
+`proofOfAddress` only when a nonempty residential location has explicit domicile
+or residence evidence; names, nationality and issuer/birthplace addresses do not
+qualify. Person/address values still pass the ordinary validators, and document
+numbers/expiry are discarded for proofs. The provider prompt explicitly reads
+these certificates as proof of address.
+Missing or unreadable fields stay
 blank. A source reference to an image absent from the request is rejected.
 
 Names retain their spelling and diacritics. The service reuses the shared person
 and document validators to trim fields, validate calendar dates and CNP checksums,
 and normalize country codes. Invalid values are omitted individually so readable
-fields still help the operator. It also rejects future birth/issue dates,
-inconsistent issue/expiry pairs and contradictory CNP/birth-date readings.
+fields still help the operator. It also rejects future birth dates and invalid licence-category acquisition dates,
+and derives birth dates deterministically from validated CNPs.
 Competing readings of the same field retain source attribution and are marked for
 review. Country names or ambiguous dates are not guessed by server-side code.
 
@@ -137,3 +161,22 @@ The documented snapshot supports image input, Responses and structured outputs.
 The implementation uses the documented `text.format` JSON-schema configuration;
 every property is required, with nullable values where applicable, and all model
 output objects disallow additional properties.
+
+## Database rollout
+
+Apply `20260912180000_simplify_person_documents` with the normal migration deployment
+before running the updated API. It removes document issuance columns, scrubs their
+audit changes, rebuilds the affected search index, clears proof-of-address identifiers
+and expiry dates, and detaches old CEI reverse photos. Their storage objects are queued
+under the `retired-cei-back` purpose for the existing hourly, retryable cleanup job.
+Person creation keeps progress only in memory while the form is open. There is no
+draft persistence or resume flow. The browser database used by earlier clients is
+deleted on entry. Leaving through a link or browser Back requires confirmation;
+refreshing or closing the tab uses the browser's native unsaved-changes prompt.
+Successful creation bypasses the prompt. Private temporary uploads remain necessary
+for extraction and are handled by the existing upload lifecycle.
+
+Both sides are required when adding a driving licence through the wizard or the
+existing person's document dialog. The API validates those uploads and claims them
+inside the same transaction that creates the document. Updating an existing driving
+licence also requires both active photo slots.

@@ -15,13 +15,6 @@ import { TooltipProvider } from "@repo/ui/components/tooltip";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PersonCreateForm } from "./PersonCreateForm";
-import { createEmptyCreateForm } from "./PersonCreateForm/form-state";
-import { createExtractionState } from "./PersonCreateForm/extraction-state";
-import {
-  readPersonDraft,
-  writePersonDraft,
-  type PersonDraft,
-} from "./PersonCreateForm/person-draft-store";
 import { AppShell } from "@/components/AppShell";
 import { SessionProvider } from "@/components/auth/SessionProvider";
 
@@ -73,7 +66,6 @@ const createdPerson: v1.persons.Person = {
   addressLine2: "Apt 4",
   city: "Bucharest",
   region: "București",
-  postalCode: "010101",
   countryCode: "RO",
   documents: [
     {
@@ -84,8 +76,6 @@ const createdPerson: v1.persons.Person = {
       number: "123456",
       cnp: "1900228123450",
       issuingCountryCode: "RO",
-      issuedBy: "SPCLEP Bucuresti",
-      issuedOn: "2024-01-15",
       expiresOn: "2030-01-31",
       status: "verified",
       notes: null,
@@ -181,10 +171,10 @@ describe("PersonCreateForm wizard", () => {
       }),
     ).toBeVisible();
     expect(
-      within(getPhotoGroup("National ID")).getByRole("button", {
+      within(getPhotoGroup("National ID")).queryByRole("button", {
         name: "Add Back photo",
       }),
-    ).toBeVisible();
+    ).not.toBeInTheDocument();
     expect(getPhotoGroup("Proof of address")).toBeVisible();
     expect(mocks.extractDocument).toHaveBeenCalledOnce();
     expect(mocks.s3Fetch).toHaveBeenCalledOnce();
@@ -291,76 +281,31 @@ describe("PersonCreateForm wizard", () => {
     expect(screen.queryByRole("button", { name: "Cancel" })).toBeNull();
   });
 
-  it("prompts by name on return and restores edits, documents, and navigation", async () => {
-    const owner = "draft-resume-test";
-    const state = createEmptyCreateForm("romanian");
-    state.firstName = "Grace";
-    state.lastName = "Hopper";
-    const photo = new File(["photo"], "id.jpg", { type: "image/jpeg" });
-    state.documents[0]!.photos.front = {
-      id: "interrupted",
-      status: "uploading",
-      file: photo,
-      originalFile: photo,
-    };
-    const saved: PersonDraft = {
-      version: 1,
-      extraction: createExtractionState(state),
-      navigation: {
-        history: ["citizenship", "documents", "personal"],
-        cursor: 2,
-      },
-      nationalIdFormat: "classic",
-    };
-    await writePersonDraft(owner, saved).catch(() => {});
+  it("starts fresh after leaving while keeping images when moving between form steps", async () => {
     const browser = userEvent.setup();
-    const first = renderCreateForm("en", false, owner);
-    const prompt = await screen.findByRole("dialog", {
-      name: "Continue adding Grace Hopper?",
-    });
-    expect(mocks.apiFetch).not.toHaveBeenCalled();
-    await browser.click(
-      within(prompt).getByRole("button", { name: "Continue draft" }),
-    );
-    expect(screen.getByLabelText("First name")).toHaveValue("Grace");
-    await waitFor(() => expect(mocks.s3Fetch).toHaveBeenCalled());
-    expect(mocks.s3Fetch.mock.calls[0]![1].body).toBe(photo);
-    changeField("First name", "Ada");
-    first.unmount();
-    const second = renderCreateForm("en", false, owner);
-    const nextPrompt = await screen.findByRole("dialog", {
-      name: "Continue adding Ada Hopper?",
-    });
-    await browser.click(
-      within(nextPrompt).getByRole("button", { name: "Continue draft" }),
-    );
-    expect(screen.getByLabelText("First name")).toHaveValue("Ada");
-    expect(screen.getByRole("button", { name: "Back" })).toBeEnabled();
-    second.unmount();
-  });
-
-  it("discards a draft when starting a new person and isolates it by account", async () => {
-    const owner = "draft-discard-test";
-    const state = createEmptyCreateForm("romanian");
-    state.firstName = "Grace";
-    const saved: PersonDraft = {
-      version: 1,
-      extraction: createExtractionState(state),
-      navigation: { history: ["citizenship", "documents"], cursor: 1 },
-      nationalIdFormat: "classic",
-    };
-    await writePersonDraft(owner, saved).catch(() => {});
-    expect(await readPersonDraft("different-account")).toBeNull();
-    const browser = userEvent.setup();
-    renderCreateForm("en", false, owner);
-    await browser.click(
-      await screen.findByRole("button", { name: "Start a new person" }),
-    );
-    expect(screen.queryByRole("dialog")).toBeNull();
+    const first = renderCreateForm();
+    await enterDocuments(browser);
+    await uploadPhoto(browser, "National ID");
+    await browser.click(screen.getByRole("button", { name: "Review details" }));
+    changeField("First name", "Grace");
+    showReviewStep("Identification documents");
     expect(
-      screen.getByRole("button", { name: "Romanian citizen" }),
-    ).toBeEnabled();
-    expect(await readPersonDraft(owner)).toBeNull();
+      within(getPhotoGroup("National ID")).getByRole("img", {
+        name: "Front document photo",
+      }),
+    ).toBeVisible();
+    first.unmount();
+    renderCreateForm();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await enterDocuments(browser);
+    expect(
+      within(getPhotoGroup("National ID")).queryByRole("img"),
+    ).not.toBeInTheDocument();
+    expect(
+      within(getPhotoGroup("National ID")).getByRole("button", {
+        name: "Add Front photo",
+      }),
+    ).toBeVisible();
   });
 
   it("uses mobile header history and only shows forward after going back", async () => {
@@ -494,6 +439,18 @@ describe("PersonCreateForm wizard", () => {
     changeField("Last name", "Hopper");
     changeField("CNP", "1900228123450");
     await browser.click(screen.getByRole("button", { name: "Continue" }));
+    expect(screen.queryByLabelText("Country")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("County")).toBeVisible();
+    expect(screen.getByLabelText("Locality")).toBeVisible();
+    await browser.click(screen.getByRole("button", { name: "Continue" }));
+    expect(screen.getByLabelText("Address line 1")).toHaveAttribute(
+      "aria-invalid",
+      "true",
+    );
+    expect(screen.queryByLabelText("Postal code")).not.toBeInTheDocument();
+    await fillRequiredAddress(browser);
+    expect(screen.queryByLabelText("Email")).not.toBeInTheDocument();
+    await browser.click(screen.getByRole("button", { name: "Continue" }));
     expect(
       screen.getByRole("heading", { name: "Driving license" }),
     ).toBeInTheDocument();
@@ -511,14 +468,12 @@ describe("PersonCreateForm wizard", () => {
     changeField("Phone", "749096855");
     await browser.click(screen.getByRole("button", { name: "Back" }));
     await browser.click(screen.getByRole("button", { name: "Back" }));
+    await browser.click(screen.getByRole("button", { name: "Back" }));
     expect(screen.getByLabelText("CNP")).toHaveValue("1900228123450");
     await browser.click(screen.getByRole("button", { name: "Continue" }));
     await browser.click(screen.getByRole("button", { name: "Continue" }));
-    expect(screen.getByLabelText("Phone")).toHaveValue("749096855");
     await browser.click(screen.getByRole("button", { name: "Continue" }));
-    expect(screen.getByLabelText("County")).toBeVisible();
-    expect(screen.getByLabelText("Locality")).toBeVisible();
-    expect(screen.queryByLabelText("Email")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Phone")).toHaveValue("749096855");
     await browser.click(screen.getByRole("button", { name: "Continue" }));
     expect(
       screen.getByRole("button", { name: /^(Add|Edit) National ID$/ }),
@@ -723,25 +678,18 @@ describe("PersonCreateForm wizard", () => {
 
   it("submits reviewed data and opens the newly created person's detail page", async () => {
     const browser = userEvent.setup();
-    await renderReviewForm(browser, "draft-completed-test");
+    await renderReviewForm(browser);
     fillRequiredFields("0749096855");
     showReviewStep("Address");
     await selectAddressOption(browser, "County", "București");
     changeField("Address line 1", "1 Rental Street");
     changeField("Address line 2", "Apt 4");
     await selectAddressOption(browser, "Locality", "București");
-    changeField("Postal code", "010101");
     changeField("Notes", "Frequent rider");
     changeField("CNP", "1900228123450");
     const dialog = await openNationalIdSheet(browser);
     changeDialogField(dialog, "Series", "rx");
     changeDialogField(dialog, "Number", "123456");
-    changeDialogField(dialog, "Issued by", "SPCLEP Bucuresti");
-    fillDialogDateParts(dialog, "Issued on", {
-      day: "15",
-      month: "01",
-      year: "2024",
-    });
     fillDialogDateParts(dialog, "Expires on", {
       day: "31",
       month: "01",
@@ -756,7 +704,6 @@ describe("PersonCreateForm wizard", () => {
     expect(summary.getByText("Jan 31, 2030")).toBeVisible();
     await submitPerson(browser);
     await waitFor(() => expect(mocks.createPerson).toHaveBeenCalledOnce());
-    expect(await readPersonDraft("draft-completed-test")).toBeNull();
     expect(mocks.createPerson).toHaveBeenCalledWith(
       v1.persons.ROUTES.create,
       v1.persons.personSchema,
@@ -774,7 +721,6 @@ describe("PersonCreateForm wizard", () => {
           addressLine2: "Apt 4",
           city: "București",
           region: "București",
-          postalCode: "010101",
           countryCode: "RO",
           notes: "Frequent rider",
           documents: [
@@ -784,8 +730,6 @@ describe("PersonCreateForm wizard", () => {
               series: "RX",
               number: "123456",
               issuingCountryCode: "RO",
-              issuedBy: "SPCLEP Bucuresti",
-              issuedOn: "2024-01-15",
               expiresOn: "2030-01-31",
               status: "verified",
               photos: { front: "draft-front-token" },
@@ -798,23 +742,27 @@ describe("PersonCreateForm wizard", () => {
     expect(mocks.refresh).toHaveBeenCalledOnce();
   });
 
-  it("requires electronic ID front, back and proof of address, with a real PDF file preview", async () => {
+  it("requires only electronic ID front and proof of address, with a real PDF file preview", async () => {
     const browser = userEvent.setup();
     renderCreateForm();
     await enterDocuments(browser, "romanian", "electronic");
     await uploadPhoto(browser, "National ID");
     await browser.click(screen.getByRole("button", { name: "Review details" }));
     expect(
-      within(getPhotoGroup("National ID")).getByText(
+      within(getPhotoGroup("National ID")).queryByText(
         "Add the required files for National ID.",
       ),
-    ).toBeInTheDocument();
+    ).toBeNull();
+    expect(
+      within(getPhotoGroup("National ID")).queryByRole("button", {
+        name: "Add Back photo",
+      }),
+    ).toBeNull();
     expect(
       within(getPhotoGroup("Proof of address")).getByText(
         "Add the required files for Proof of address.",
       ),
     ).toBeInTheDocument();
-    await uploadPhoto(browser, "National ID", "Back");
     await browser.click(
       within(getPhotoGroup("Proof of address")).getByRole("button", {
         name: "Add Proof of address photo",
@@ -852,7 +800,9 @@ describe("PersonCreateForm wizard", () => {
     const idSummary = within(
       screen.getByRole("article", { name: "National ID" }),
     );
-    expect(idSummary.getByText("ID number")).toBeVisible();
+    expect(idSummary.getByText("National ID")).toBeVisible();
+    expect(idSummary.getByText("Not provided")).toBeVisible();
+    expect(screen.getByText("Uploaded successfully")).toBeVisible();
     expect(idSummary.queryByText("Series")).not.toBeInTheDocument();
     const idEditor = await openNationalIdSheet(browser);
     expect(within(idEditor).getByLabelText("ID number")).toBeVisible();
@@ -886,7 +836,7 @@ describe("PersonCreateForm wizard", () => {
             expect.objectContaining({
               type: "nationalId",
               nationalIdFormat: "electronic",
-              photos: { front: "draft-front-token", back: "draft-front-token" },
+              photos: { front: "draft-front-token" },
             }),
             expect.objectContaining({
               type: "proofOfAddress",
@@ -903,8 +853,9 @@ describe("PersonCreateForm wizard", () => {
     await renderReviewForm(browser);
     let dialog = await openNationalIdSheet(browser);
     expect(dialog).toHaveClass("bg-popover", "text-popover-foreground");
-    const issuerRow =
-      within(dialog).getByLabelText("Issued by").parentElement!.parentElement!;
+    const issuerRow = within(dialog).getByRole("button", {
+      name: /Issuing country/,
+    }).parentElement!.parentElement!;
     expect(issuerRow).toHaveClass("sm:col-span-2", "sm:grid-cols-2");
     expect(within(issuerRow).getByText("Issuing country")).toBeInTheDocument();
     expect(issuerRow).not.toHaveClass("bg-background");
@@ -938,6 +889,9 @@ describe("PersonCreateForm wizard", () => {
     changeField("First name", "Grace");
     changeField("Last name", "Hopper");
     changeField("CNP", "1900228123450");
+    await browser.click(screen.getByRole("button", { name: "Continue" }));
+    expect(screen.getByRole("heading", { name: "Address" })).toBeVisible();
+    await fillRequiredAddress(browser);
     await browser.click(screen.getByRole("button", { name: "Continue" }));
     expect(
       screen.getByRole("heading", { name: "Driving license" }),
@@ -1283,7 +1237,7 @@ describe("document extraction review", () => {
     expect(within(dialog).queryByLabelText("CNP")).not.toBeInTheDocument();
   });
 
-  it("prefills editable fields with visible sources and uncertainty", async () => {
+  it("highlights uncertain fields inline without suggestion confirmation buttons", async () => {
     mocks.extractDocument.mockResolvedValue(extractedPassport());
     const browser = userEvent.setup();
     renderCreateForm();
@@ -1292,15 +1246,27 @@ describe("document extraction review", () => {
     await browser.click(screen.getByRole("button", { name: "Review details" }));
     expect(screen.getByLabelText("First name")).toHaveValue("Ana");
     expect(screen.getByLabelText("Last name")).toHaveValue("Popescu");
+    const firstName = screen.getByLabelText("First name");
+    expect(firstName.closest("[data-extraction-review]")).toHaveAttribute(
+      "data-extraction-review",
+      "true",
+    );
+    expect(screen.getByText("Check this value")).toBeVisible();
+
     expect(
-      screen.getByText(/From Passport · Front · Check this value/),
-    ).toBeInTheDocument();
-    changeField("First name", "");
-    const useSuggestion = screen.getByRole("button", {
-      name: "Use Ana from Passport",
-    });
-    await browser.click(useSuggestion);
-    expect(screen.getByLabelText("First name")).toHaveValue("Ana");
+      screen.getByLabelText("Expires on").closest("[data-extraction-review]"),
+    ).toHaveAttribute("data-extraction-review", "true");
+    await browser.type(screen.getByLabelText("Expires on"), "12");
+    expect(screen.getByLabelText("Expires on")).toHaveValue("12");
+    expect(
+      screen.queryByText(
+        "Details are ready to review. Check them against the document before saving.",
+      ),
+    ).toBeNull();
+    changeField("First name", "Corrected");
+    expect(screen.queryByRole("button", { name: /Use .* from/ })).toBeNull();
+    expect(firstName).toHaveValue("Corrected");
+    expect(firstName.closest("[data-extraction-review]")).toBeNull();
   });
 
   it.each(["Save", "Cancel"])(
@@ -1356,9 +1322,9 @@ describe("document extraction review", () => {
         }),
       ).not.toBeInTheDocument();
       expect(within(dialog).getByLabelText("ID number")).toHaveValue("LOCAL");
-      expect(within(dialog).getByLabelText("Issued by")).toHaveValue(
-        "Passport office",
-      );
+      expect(
+        within(dialog).getByRole("button", { name: /Issuing country/ }),
+      ).toHaveTextContent("United Kingdom");
       await browser.click(within(dialog).getByRole("button", { name: action }));
       await waitFor(() => expect(dialog).not.toBeInTheDocument());
       showReviewStep("Personal details");
@@ -1374,13 +1340,118 @@ describe("document extraction review", () => {
       expect(within(reopened).getByLabelText("ID number")).toHaveValue(
         action === "Save" ? "LOCAL" : "EXTRACTED",
       );
-      expect(within(reopened).getByLabelText("Issued by")).toHaveValue(
-        "Passport office",
-      );
+      expect(
+        within(reopened).getByRole("button", { name: /Issuing country/ }),
+      ).toHaveTextContent("United Kingdom");
     },
   );
 
-  it("blocks creation while reading and allows explicit manual completion", async () => {
+  it("continues through pending personal and address fields without cancelling their reading", async () => {
+    let resolve!: (value: v1.persons.PersonDocumentExtraction) => void;
+    mocks.extractDocument.mockReturnValue(
+      new Promise((done) => {
+        resolve = done;
+      }),
+    );
+    const browser = userEvent.setup();
+    renderCreateForm();
+    await enterDocuments(browser, "foreign");
+    await uploadPhoto(browser, "Passport");
+    expect(
+      screen.queryByRole("button", { name: "Continue manually" }),
+    ).not.toBeInTheDocument();
+    await browser.click(screen.getByRole("button", { name: "Review details" }));
+    expect(
+      screen.getByRole("status", { name: "Reading First name from document…" }),
+    ).toBeVisible();
+    expect(screen.getByRole("button", { name: "Continue" })).toBeEnabled();
+    await browser.click(screen.getByRole("button", { name: "Continue" }));
+    expect(screen.getByRole("heading", { name: "Address" })).toBeVisible();
+    expect(
+      screen.getByRole("status", { name: "Reading Locality from document…" }),
+    ).toBeVisible();
+    await browser.click(screen.getByRole("button", { name: "Continue" }));
+    expect(
+      screen.getByRole("heading", { name: "Driving license" }),
+    ).toBeVisible();
+    await browser.click(screen.getByRole("button", { name: "Continue" }));
+    expect(screen.getByLabelText("Email")).toBeVisible();
+    changeField("Email", "rider@example.com");
+    changeField("Phone", "749096855");
+    await browser.click(screen.getByRole("button", { name: "Continue" }));
+    expect(
+      screen.getByRole("button", { name: "Create person" }),
+    ).toBeDisabled();
+    expect(mocks.extractDocument.mock.calls[0]![2].signal.aborted).toBe(false);
+    expect(mocks.extractDocument).toHaveBeenCalledOnce();
+    await act(async () => resolve(extractedPassport()));
+    showReviewStep("Personal details");
+    expect(screen.getByLabelText("First name")).toHaveValue("Ana");
+    expect(screen.getByLabelText("Last name")).toHaveValue("Popescu");
+    expect(
+      screen.queryByRole("status", { name: /^Reading .* from document/ }),
+    ).toBeNull();
+  });
+
+  it("validates an intentionally cleared field while other fields are still being read", async () => {
+    let resolve!: (value: v1.persons.PersonDocumentExtraction) => void;
+    mocks.extractDocument.mockReturnValue(
+      new Promise((done) => {
+        resolve = done;
+      }),
+    );
+    const browser = userEvent.setup();
+    renderCreateForm();
+    await enterDocuments(browser, "foreign");
+    await uploadPhoto(browser, "Passport");
+    await browser.click(screen.getByRole("button", { name: "Review details" }));
+    changeField("First name", "Operator");
+    changeField("First name", "");
+    await browser.click(screen.getByRole("button", { name: "Continue" }));
+    expect(screen.getByLabelText("First name")).toHaveAttribute(
+      "aria-invalid",
+      "true",
+    );
+    expect(
+      screen.getByRole("status", { name: "Reading Last name from document…" }),
+    ).toBeVisible();
+    await act(async () => resolve(extractedPassport()));
+    expect(screen.getByLabelText("First name")).toHaveValue("");
+    expect(screen.getByLabelText("Last name")).toHaveValue("Popescu");
+  });
+
+  it("validates deferred required fields before saving when extraction returns no data", async () => {
+    let resolve!: (value: v1.persons.PersonDocumentExtraction) => void;
+    mocks.extractDocument.mockReturnValue(
+      new Promise((done) => {
+        resolve = done;
+      }),
+    );
+    const browser = userEvent.setup();
+    renderCreateForm();
+    await enterDocuments(browser, "foreign");
+    await uploadPhoto(browser, "Passport");
+    await browser.click(screen.getByRole("button", { name: "Review details" }));
+    await browser.click(screen.getByRole("button", { name: "Continue" }));
+    changeField("Email", "rider@example.com");
+    changeField("Phone", "749096855");
+    showReviewStep("Document details");
+    await act(async () =>
+      resolve({
+        ...extractedPassport(),
+        suggestions: [],
+        warnings: ["noData"],
+      }),
+    );
+    await browser.click(screen.getByRole("button", { name: "Create person" }));
+    expect(screen.getByLabelText("First name")).toHaveAttribute(
+      "aria-invalid",
+      "true",
+    );
+    expect(mocks.createPerson).not.toHaveBeenCalled();
+  });
+
+  it("blocks creation until reading completes and preserves manual edits", async () => {
     let resolve!: (value: v1.persons.PersonDocumentExtraction) => void;
     mocks.extractDocument.mockReturnValue(
       new Promise((done) => {
@@ -1397,9 +1468,13 @@ describe("document extraction review", () => {
     expect(
       screen.getByRole("button", { name: "Create person" }),
     ).toBeDisabled();
-    await browser.click(
-      screen.getByRole("button", { name: "Continue manually" }),
+    expect(
+      screen.queryByRole("button", { name: "Continue manually" }),
+    ).not.toBeInTheDocument();
+    fireEvent.submit(
+      screen.getByRole("button", { name: "Create person" }).closest("form")!,
     );
+    expect(mocks.createPerson).not.toHaveBeenCalled();
     await act(async () => resolve(extractedPassport()));
     showReviewStep("Personal details");
     expect(screen.getByLabelText("First name")).toHaveValue("Grace");
@@ -1441,8 +1516,8 @@ function extractedPassport(): v1.persons.PersonDocumentExtraction {
       },
       {
         target: "document",
-        field: "issuedBy",
-        value: "Passport office",
+        field: "issuingCountryCode",
+        value: "GB",
         sourceSlot: "front",
         needsReview: false,
       },
@@ -1452,15 +1527,10 @@ function extractedPassport(): v1.persons.PersonDocumentExtraction {
   };
 }
 
-function renderCreateForm(
-  locale: SupportedLocale = "en",
-  withShell = false,
-  draftOwnerId?: string,
-) {
+function renderCreateForm(locale: SupportedLocale = "en", withShell = false) {
   const form = (
     <PersonCreateForm
       personsHref={locale === "en" ? "/en/persons" : "/persons"}
-      draftOwnerId={draftOwnerId}
     />
   );
   return render(
@@ -1502,11 +1572,8 @@ async function enterDocuments(
     );
 }
 
-async function renderReviewForm(
-  browser: ReturnType<typeof userEvent.setup>,
-  draftOwnerId?: string,
-) {
-  renderCreateForm("en", false, draftOwnerId);
+async function renderReviewForm(browser: ReturnType<typeof userEvent.setup>) {
+  renderCreateForm("en", false);
   await enterDocuments(browser);
   await uploadPhoto(browser, "National ID");
   await browser.click(screen.getByRole("button", { name: "Review details" }));
@@ -1648,7 +1715,18 @@ function showField(label: string) {
   showReviewStep(step);
 }
 
+async function fillRequiredAddress(
+  browser: ReturnType<typeof userEvent.setup>,
+) {
+  showReviewStep("Address");
+  await selectAddressOption(browser, "County", "București");
+  await selectAddressOption(browser, "Locality", "București");
+  if (!(screen.getByLabelText("Address line 1") as HTMLInputElement).value)
+    changeField("Address line 1", "1 Test Street");
+}
+
 async function submitPerson(browser: ReturnType<typeof userEvent.setup>) {
+  await fillRequiredAddress(browser);
   showReviewStep("Document details");
   await browser.click(screen.getByRole("button", { name: "Create person" }));
 }

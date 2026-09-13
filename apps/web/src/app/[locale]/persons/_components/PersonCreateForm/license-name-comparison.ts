@@ -29,11 +29,7 @@ export function licenseNameDifferences(
   for (const document of state.form.documents) {
     if (document.type !== "driverLicense") continue;
     const reading = state.readings[document.key];
-    if (
-      !reading ||
-      reading.result.detectedDocumentType !== "driverLicense" ||
-      reading.result.warnings.includes("typeMismatch")
-    )
+    if (!reading || reading.result.detectedDocumentType !== "driverLicense")
       continue;
     for (const suggestion of reading.result.suggestions) {
       if (

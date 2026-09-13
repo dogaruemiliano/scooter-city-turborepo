@@ -79,16 +79,9 @@ export const personsCatalog = {
       title: "Edit person",
       description: "Update contact, address and notes for this person.",
     },
-    draft: {
-      title: "Continue adding {name}?",
-      unnamed: "this person",
-      description:
-        "Your details, documents, and current step have been saved in this browser.",
-      startNew: "Start a new person",
-      continue: "Continue draft",
-      loading: "Loading saved draft",
-      saveFailed:
-        "The draft is kept for this session, but could not be saved for after a page refresh.",
+    leaveForm: {
+      confirm:
+        "Leave this form? All entered details and uploaded documents will be lost.",
     },
     createPage: {
       title: "Add person",
@@ -197,8 +190,10 @@ export const personsCatalog = {
         "The documents show different values. Choose the correct one.",
       apply: "Use suggestion",
       applyLabel: "Use {value} from {source}",
+      reading: "Reading documents…",
+      readingDocument: "Reading document…",
+      missingField: "Could not read this field. Enter it manually.",
       retry: "Read document again",
-      continueManually: "Continue manually",
       status: {
         pending:
           "Reading document… You can review and edit the form while this finishes.",
@@ -251,7 +246,7 @@ export const personsCatalog = {
       electronic: "Electronic ID (CEI)",
       classicHelp: "Add one photo of the old national ID.",
       electronicHelp:
-        "Add both sides of the electronic ID and proof of address.",
+        "Add the front of the electronic ID and proof of address.",
     },
     licenseName: {
       title: "The names on the documents differ",
@@ -278,8 +273,6 @@ export const personsCatalog = {
       restrictions: "Restrictions",
       reviewHelp:
         "Check the licence and its categories before marking this document as verified. A photo alone does not confirm rental eligibility.",
-      uploadHelp:
-        "Optional. Add the front and back to read each category’s acquisition and expiry dates. Categories without an acquisition date are excluded. Without a confirmed valid licence, only scooters requiring no licence are available.",
       empty: "No categories recorded.",
     },
     documentForm: {
@@ -289,7 +282,7 @@ export const personsCatalog = {
       addDocument: "Add {document}",
       editDocument: "Edit {document}",
       notAdded: "Not added",
-      detailsAdded: "Details added",
+      uploadedSuccessfully: "Uploaded successfully",
       addPhoto: "Add {slot} photo",
       changePhoto: "Change {slot} photo",
       photoSheetTitle: "{slot} photo",
@@ -381,7 +374,6 @@ export const personsCatalog = {
       addressLine2: "Address line 2",
       city: "Locality",
       region: "Region",
-      postalCode: "Postal code",
       country: "Country",
       countryCode: "Country code",
       county: "County",
@@ -393,8 +385,6 @@ export const personsCatalog = {
       identityDocumentNumber: "ID number",
       documentCnp: "CNP",
       documentIssuingCountryCode: "Issuing country",
-      documentIssuedBy: "Issued by",
-      documentIssuedOn: "Issued on",
       documentHasExpiryDate: "Document has expiry date?",
       documentExpiresOn: "Expires on",
       documentStatus: "Document status",
@@ -586,16 +576,9 @@ export const personsCatalog = {
       description:
         "Actualizează datele de contact, adresa și notițele acestei persoane.",
     },
-    draft: {
-      title: "Continui adăugarea pentru {name}?",
-      unnamed: "această persoană",
-      description:
-        "Datele, documentele și pasul curent au fost salvate în acest browser.",
-      startNew: "Persoană nouă",
-      continue: "Continuă",
-      loading: "Se încarcă draftul salvat",
-      saveFailed:
-        "Draftul este păstrat pentru această sesiune, dar nu a putut fi salvat pentru după reîncărcarea paginii.",
+    leaveForm: {
+      confirm:
+        "Părăsești formularul? Toate datele completate și documentele încărcate se vor pierde.",
     },
     createPage: {
       title: "Adaugă persoană",
@@ -705,8 +688,10 @@ export const personsCatalog = {
         "Documentele indică valori diferite. Alege valoarea corectă.",
       apply: "Folosește sugestia",
       applyLabel: "Folosește {value} din {source}",
+      reading: "Se citesc documentele…",
+      readingDocument: "Se citește documentul…",
+      missingField: "Câmpul nu a putut fi citit. Completează-l manual.",
       retry: "Citește documentul din nou",
-      continueManually: "Continuă manual",
       status: {
         pending:
           "Se citește documentul… Poți verifica și edita formularul între timp.",
@@ -760,7 +745,7 @@ export const personsCatalog = {
       electronic: "Carte electronică (CEI)",
       classicHelp: "Adaugă o fotografie a cărții de identitate vechi.",
       electronicHelp:
-        "Adaugă ambele fețe ale cărții electronice și dovada de domiciliu / reședință.",
+        "Adaugă fața cărții electronice și dovada de domiciliu / reședință.",
     },
     licenseName: {
       title: "Numele diferă între documente",
@@ -787,8 +772,6 @@ export const personsCatalog = {
       restrictions: "Restricții",
       reviewHelp:
         "Verifică permisul și categoriile înainte de a marca documentul drept verificat. Fotografia singură nu confirmă eligibilitatea pentru închiriere.",
-      uploadHelp:
-        "Opțional. Adaugă fața și verso pentru a citi data obținerii și expirării fiecărei categorii. Categoriile fără data obținerii sunt excluse. Fără un permis valabil confirmat, sunt disponibile doar scuterele care nu necesită permis.",
       empty: "Nu există categorii înregistrate.",
     },
     documentForm: {
@@ -799,7 +782,7 @@ export const personsCatalog = {
       addDocument: "Adaugă {document}",
       editDocument: "Editează {document}",
       notAdded: "Lipsă",
-      detailsAdded: "Date adăugate",
+      uploadedSuccessfully: "Încărcat cu succes",
       addPhoto: "Adaugă poza: {slot}",
       changePhoto: "Schimbă poza: {slot}",
       photoSheetTitle: "Poză document: {slot}",
@@ -892,7 +875,6 @@ export const personsCatalog = {
       addressLine2: "Adresă linia 2",
       city: "Localitate",
       region: "Județ / regiune",
-      postalCode: "Cod poștal",
       country: "Țară",
       countryCode: "Cod țară",
       county: "Județ",
@@ -904,8 +886,6 @@ export const personsCatalog = {
       identityDocumentNumber: "Număr document de identitate",
       documentCnp: "CNP",
       documentIssuingCountryCode: "Țara emitentă",
-      documentIssuedBy: "Emis de",
-      documentIssuedOn: "Emis la",
       documentHasExpiryDate: "Documentul are data de expirare?",
       documentExpiresOn: "Expiră la",
       documentStatus: "Stare document",

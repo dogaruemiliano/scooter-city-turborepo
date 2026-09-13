@@ -17,7 +17,6 @@ const FIELD_LABEL_KEYS: Record<keyof PersonFormState, string> = {
   lastName: "lastName",
   notes: "notes",
   phone: "phone",
-  postalCode: "postalCode",
   region: "region",
 };
 
@@ -37,7 +36,6 @@ const personEditValuesSchema = z.object({
   lastName: z.string(),
   notes: z.string(),
   phone: z.string(),
-  postalCode: z.string(),
   region: z.string(),
 });
 
@@ -58,11 +56,10 @@ export const personEditFormSchema = personEditValuesSchema
       firstName: form.firstName,
       lastName: form.lastName,
       dateOfBirth: blankToNull(form.dateOfBirth),
-      addressLine1: blankToNull(form.addressLine1),
+      addressLine1: form.addressLine1,
       addressLine2: blankToNull(form.addressLine2),
-      city: blankToNull(form.city),
-      region: blankToNull(form.region),
-      postalCode: blankToNull(form.postalCode),
+      city: form.city,
+      region: form.region,
       countryCode: blankToNull(form.countryCode),
       notes: blankToNull(form.notes),
     }),

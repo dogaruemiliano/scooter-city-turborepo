@@ -16,12 +16,13 @@ import {
   CropIcon,
   FileTextIcon,
   ImagePlusIcon,
-  RotateCcwIcon,
   Trash2Icon,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useEffect, useState, type DragEvent } from "react";
 import { DOCUMENT_PHOTO_ACCEPT } from "./constants";
+import { DocumentExtractionFeedback } from "./DocumentExtractionFeedback";
+import type { DocumentExtractionJob } from "./useDocumentExtraction";
 import type {
   PersonDocumentPhotoDraftUpload,
   SetPersonDocumentPhoto,
@@ -44,6 +45,8 @@ export function DocumentPhotoDraftCard({
   disabled,
   onSetDocumentPhoto,
   acceptsPdf = true,
+  extractionJob,
+  onRetryExtraction,
 }: {
   inputId: string;
   documentKey: string;
@@ -53,6 +56,8 @@ export function DocumentPhotoDraftCard({
   disabled: boolean;
   onSetDocumentPhoto: SetPersonDocumentPhoto;
   acceptsPdf?: boolean;
+  extractionJob?: DocumentExtractionJob;
+  onRetryExtraction?: () => void;
 }) {
   const t = useTranslations("persons");
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -98,6 +103,7 @@ export function DocumentPhotoDraftCard({
   return (
     <>
       <div
+        data-slot="document-preview"
         className="relative min-w-0"
         onDragOver={(event) => {
           event.preventDefault();
@@ -167,39 +173,30 @@ export function DocumentPhotoDraftCard({
             </span>
           ) : null}
         </Button>
-        {upload?.status === "failed" ? (
-          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-lg bg-media-scrim">
-            <span role="alert" className="sr-only">
-              {upload.message}
-            </span>
-            <Button
-              type="button"
-              variant="destructive"
-              size="icon"
-              className="pointer-events-auto"
-              aria-label={t("documentForm.retryUpload")}
-              disabled={disabled}
-              onClick={() =>
-                onSetDocumentPhoto(
-                  documentKey,
-                  slot,
-                  upload.file,
-                  upload.originalFile,
-                )
-              }
-            >
-              <RotateCcwIcon aria-hidden="true" />
-            </Button>
-            <span className="text-sm text-scrim-foreground">
-              {t("documentForm.retryUpload")}
-            </span>
-          </div>
-        ) : null}
-        {error ? (
-          <p role="alert" className="mt-2 text-sm text-destructive">
-            {error}
-          </p>
-        ) : null}
+        <DocumentExtractionFeedback
+          id={`${inputId}-feedback`}
+          job={upload?.status === "uploaded" ? extractionJob : undefined}
+          error={error ?? (upload?.status === "failed" ? upload.message : null)}
+          disabled={disabled}
+          retryLabel={
+            upload?.status === "failed"
+              ? t("documentForm.retryUpload")
+              : undefined
+          }
+          onRetry={
+            error
+              ? undefined
+              : upload?.status === "failed"
+                ? () =>
+                    onSetDocumentPhoto(
+                      documentKey,
+                      slot,
+                      upload.file,
+                      upload.originalFile,
+                    )
+                : onRetryExtraction
+          }
+        />
       </div>
       <Dialog open={previewOpen && !capture} onOpenChange={setPreviewOpen}>
         <DialogContent

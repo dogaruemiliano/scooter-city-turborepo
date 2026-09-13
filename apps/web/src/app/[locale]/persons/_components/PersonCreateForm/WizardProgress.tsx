@@ -6,9 +6,9 @@ import type { Ref } from "react";
 
 export const REVIEW_STEPS = [
   "personal",
+  "address",
   "license",
   "contact",
-  "address",
   "review",
 ] as const;
 export type PersonReviewStep = (typeof REVIEW_STEPS)[number];
