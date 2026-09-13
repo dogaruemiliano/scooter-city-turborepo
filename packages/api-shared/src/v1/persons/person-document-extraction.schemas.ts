@@ -16,7 +16,6 @@ export const PERSON_EXTRACTION_PERSON_FIELDS = [
   "addressLine2",
   "city",
   "region",
-  "postalCode",
   "countryCode",
 ] as const;
 
@@ -25,8 +24,6 @@ export const PERSON_EXTRACTION_DOCUMENT_FIELDS = [
   "number",
   "cnp",
   "issuingCountryCode",
-  "issuedBy",
-  "issuedOn",
   "expiresOn",
 ] as const;
 
@@ -61,6 +58,28 @@ export const analyzePersonDocumentInputSchema = z
       }),
   })
   .strict()
+  .superRefine((input, context) => {
+    if (input.documentType === "driverLicense") {
+      for (const slot of ["front", "back"] as const) {
+        if (!input.photos[slot])
+          context.addIssue({
+            code: "custom",
+            path: ["photos", slot],
+            message: `Driving licence ${slot} is required.`,
+          });
+      }
+    }
+    if (
+      input.documentType === "nationalId" &&
+      (input.photos.back || input.photos.other)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["photos"],
+        message: "Only the front of the national ID is collected.",
+      });
+    }
+  })
   .refine(
     (input) =>
       input.nationalIdFormat === undefined ||

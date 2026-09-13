@@ -51,7 +51,23 @@ export class PersonDocumentExtractionService {
       );
     }
 
-    if (raw.detectedDocumentType !== input.documentType) {
+    // proofOfAddress describes the document's purpose. A domicile certificate
+    // may mention an identity card and be labelled nationalId by the model.
+    // Accept it for this purpose only when it contains the holder's explicitly
+    // labelled residential location; a country/name/issuer address is insufficient.
+    const detectedDocumentType =
+      input.documentType === "proofOfAddress" &&
+      raw.suggestions.some(
+        (item) =>
+          item.target === "person" &&
+          ["addressLine1", "city", "region"].includes(item.field) &&
+          item.value.trim().length > 0 &&
+          hasResidentialEvidence(item.addressEvidence, input),
+      )
+        ? "proofOfAddress"
+        : raw.detectedDocumentType;
+
+    if (detectedDocumentType !== input.documentType) {
       warnings.add(
         raw.detectedDocumentType === null ? "noData" : "typeMismatch",
       );
@@ -62,16 +78,9 @@ export class PersonDocumentExtractionService {
         warnings: [...warnings],
       };
     }
-    // A model-reported mismatch must also prevent autofill even if its type
-    // field contradicts its own warning (for example, mixed document photos).
-    if (warnings.has("typeMismatch")) {
-      return {
-        detectedDocumentType: raw.detectedDocumentType,
-        suggestions: [],
-        licenseCategories: [],
-        warnings: [...warnings],
-      };
-    }
+    // The detected type determines whether this is the requested document.
+    // A contradictory model warning must not discard otherwise valid readings.
+    warnings.delete("typeMismatch");
 
     // Check the printed section before resolving counties/localities: a birth
     // county must never become context for a domicile locality.
@@ -104,6 +113,11 @@ export class PersonDocumentExtractionService {
               field: "cnp" as const,
             }
           : rawSuggestion;
+      if (
+        input.documentType === "proofOfAddress" &&
+        suggestion.target === "document"
+      )
+        continue;
       const fieldSchema =
         suggestion.target === "person"
           ? v1.persons.createPersonInputSchema.shape[suggestion.field]
@@ -115,14 +129,6 @@ export class PersonDocumentExtractionService {
           : suggestion.value.trim(),
       );
       if (!normalized.success || typeof normalized.data !== "string") {
-        warnings.add("invalidValue");
-        continue;
-      }
-      if (
-        suggestion.target === "document" &&
-        suggestion.field === "issuedOn" &&
-        v1.common.isFutureDateOnly(normalized.data)
-      ) {
         warnings.add("invalidValue");
         continue;
       }
@@ -169,24 +175,6 @@ export class PersonDocumentExtractionService {
       }
     }
 
-    const issuedOn = suggestions.filter(
-      (item) => item.target === "document" && item.field === "issuedOn",
-    );
-    const expiresOn = suggestions.filter(
-      (item) => item.target === "document" && item.field === "expiresOn",
-    );
-    if (
-      issuedOn.some((issue) =>
-        expiresOn.some((expiry) => expiry.value < issue.value),
-      )
-    ) {
-      warnings.add("invalidValue");
-      suggestions = suggestions.filter(
-        (item) =>
-          item.target !== "document" ||
-          (item.field !== "issuedOn" && item.field !== "expiresOn"),
-      );
-    }
     suggestions = suggestions.map((item) => {
       const conflict = suggestions.some(
         (other) =>
@@ -246,7 +234,7 @@ export class PersonDocumentExtractionService {
     }
 
     return v1.persons.personDocumentExtractionContentSchema.parse({
-      detectedDocumentType: raw.detectedDocumentType,
+      detectedDocumentType,
       suggestions,
       licenseCategories: consistentCategories,
       warnings: [...warnings],
@@ -260,7 +248,6 @@ const ADDRESS_FIELDS = new Set([
   "city",
   "addressLine1",
   "addressLine2",
-  "postalCode",
 ]);
 
 function hasResidentialEvidence(

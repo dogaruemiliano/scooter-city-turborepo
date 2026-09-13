@@ -270,6 +270,9 @@ describe("Persons HTTP surface (e2e)", () => {
     return {
       email,
       phone,
+      addressLine1: "1 Test Street",
+      city: "București",
+      region: "București",
       firstName: "Ada",
       lastName: "Lovelace",
       dateOfBirth: "1990-02-28",
@@ -280,8 +283,6 @@ describe("Persons HTTP surface (e2e)", () => {
           number: "123456",
           cnp: overrides.cnp ?? undefined,
           issuingCountryCode: "RO",
-          issuedBy: "SPCLEP Bucuresti",
-          issuedOn: "2024-01-15",
           expiresOn: "2030-01-31",
           status: "unverified",
         },
@@ -458,8 +459,6 @@ describe("Persons HTTP surface (e2e)", () => {
     expect(created.documents[0]?.number).toBe("123456");
     expect(created.documents[0]?.cnp).toBe("1900228123450");
     expect(created.documents[0]?.issuingCountryCode).toBe("RO");
-    expect(created.documents[0]?.issuedBy).toBe("SPCLEP Bucuresti");
-    expect(created.documents[0]?.issuedOn).toBe("2024-01-15");
     expect(created.documents[0]?.status).toBe("unverified");
     expect(created.deletedAt).toBeNull();
 
@@ -512,12 +511,23 @@ describe("Persons HTTP surface (e2e)", () => {
       });
     expect(duplicateIdentityDocumentRes.status).toBe(409);
 
+    const driverLicensePhotos = await uploadLicencePhotos(session);
+    const incompleteLicenceRes = await req()
+      .post(v1.persons.ROUTES.documents.create(created.id))
+      .set("Cookie", [`access_token=${session.accessToken}`])
+      .send({
+        type: "driverLicense",
+        photos: { front: driverLicensePhotos.front },
+      });
+    expect(incompleteLicenceRes.status).toBe(400);
+
     const driverLicenseRes = await req()
       .post(v1.persons.ROUTES.documents.create(created.id))
       .set("Cookie", [`access_token=${session.accessToken}`])
       .send({
         type: "driverLicense",
         number: "B7654321",
+        photos: driverLicensePhotos,
         issuingCountryCode: "RO",
         expiresOn: "2032-05-20",
       });
@@ -528,6 +538,18 @@ describe("Persons HTTP surface (e2e)", () => {
     expect(driverLicenseRes.status).toBe(201);
     expect(driverLicense.personId).toBe(created.id);
     expect(driverLicense.type).toBe("driverLicense");
+    const licencePhotosRes = await req()
+      .get(
+        v1.persons.ROUTES.documents.photos.list(created.id, driverLicense.id),
+      )
+      .set("Cookie", [`access_token=${session.accessToken}`]);
+    expect(licencePhotosRes.status).toBe(200);
+    expect(
+      v1.persons.personDocumentPhotoListSchema
+        .parse(licencePhotosRes.body)
+        .map((photo) => photo.slot)
+        .sort(),
+    ).toEqual(["back", "front"]);
 
     const documentsRes = await req()
       .get(v1.persons.ROUTES.documents.list(created.id))
@@ -572,8 +594,6 @@ describe("Persons HTTP surface (e2e)", () => {
         number: updatedDocument.number,
         cnp: updatedDocument.cnp,
         issuingCountryCode: updatedDocument.issuingCountryCode,
-        issuedBy: updatedDocument.issuedBy,
-        issuedOn: updatedDocument.issuedOn,
         expiresOn: updatedDocument.expiresOn,
         status: updatedDocument.status,
         notes: updatedDocument.notes,
@@ -627,7 +647,7 @@ describe("Persons HTTP surface (e2e)", () => {
     ).toBe(true);
 
     const fuzzyDocumentSearchRes = await req()
-      .get(`${v1.persons.ROUTES.list}?search=Bucuretsi&page=1&pageSize=10`)
+      .get(`${v1.persons.ROUTES.list}?search=B7654320&page=1&pageSize=10`)
       .set("Cookie", [`access_token=${session.accessToken}`]);
     const fuzzyDocumentSearch = v1.persons.personListSchema.parse(
       fuzzyDocumentSearchRes.body,
@@ -688,6 +708,7 @@ describe("Persons HTTP surface (e2e)", () => {
       .send({
         type: "driverLicense",
         number: "B7654322",
+        photos: await uploadLicencePhotos(session),
         issuingCountryCode: "RO",
       });
     expect(recreatedDriverLicenseRes.status).toBe(201);
@@ -706,6 +727,7 @@ describe("Persons HTTP surface (e2e)", () => {
       .send({
         type: "driverLicense",
         number: "B7654323",
+        photos: await uploadLicencePhotos(session),
         issuingCountryCode: "RO",
         expiresOn: "2033-05-20",
         status: "verified",
@@ -1104,8 +1126,6 @@ describe("Persons HTTP surface (e2e)", () => {
           number: "777777",
 
           issuingCountryCode: "RO",
-          issuedBy: "SPCLEP Bucuresti",
-          issuedOn: "2024-01-15",
           expiresOn: "2030-01-31",
           status: "verified",
           photos: { front: uploadUrl.uploadToken },
@@ -1174,6 +1194,12 @@ describe("Persons HTTP surface (e2e)", () => {
     if (!storageKey) throw new Error("Missing draft storage key");
     s3Objects.set(storageKey, { body: buffer, contentType });
     return { ...upload, storageKey };
+  }
+
+  async function uploadLicencePhotos(session: IssuedSession) {
+    const front = await uploadPersonDraft(session);
+    const back = await uploadPersonDraft(session);
+    return { front: front.uploadToken, back: back.uploadToken };
   }
 
   it("saves foreign supplementary documents and reviewed licence categories with an audit trail", async () => {
@@ -1269,7 +1295,7 @@ describe("Persons HTTP surface (e2e)", () => {
     );
   });
 
-  it("requires electronic ID front, back and proof and accepts private proof PDFs including replacements", async () => {
+  it("requires electronic ID front and proof, rejects the reverse, and accepts private proof PDFs including replacements", async () => {
     const admin = await freshSession(["ADMIN"]);
     const front = await uploadPersonDraft(admin);
     const back = await uploadPersonDraft(admin);
@@ -1279,7 +1305,7 @@ describe("Persons HTTP surface (e2e)", () => {
       nationalIdFormat: "electronic",
       issuingCountryCode: "RO",
       status: "verified",
-      photos: { front: front.uploadToken, back: back.uploadToken },
+      photos: { front: front.uploadToken },
     };
     const missing = await req()
       .post(v1.persons.ROUTES.create)
@@ -1291,21 +1317,26 @@ describe("Persons HTTP surface (e2e)", () => {
         }),
       );
     expect(missing.status).toBe(400);
-    const wrongPdf = await req()
+    const reverseIncluded = await req()
       .post(v1.persons.ROUTES.create)
       .set("Cookie", [`access_token=${admin.accessToken}`])
       .send(
         personInput({
+          documentWorkflow: "romanianElectronic",
           documents: [
             {
-              type: "nationalId",
+              ...nationalId,
+              photos: { front: front.uploadToken, back: back.uploadToken },
+            },
+            {
+              type: "proofOfAddress",
               status: "verified",
               photos: { front: proof.uploadToken },
             },
           ],
         }),
       );
-    expect(wrongPdf.status).toBe(400);
+    expect(reverseIncluded.status).toBe(400);
     const response = await req()
       .post(v1.persons.ROUTES.create)
       .set("Cookie", [`access_token=${admin.accessToken}`])
@@ -1333,6 +1364,14 @@ describe("Persons HTTP surface (e2e)", () => {
     if (!id || !address)
       throw new Error("Expected electronic ID and proof of address");
     expect(id.nationalIdFormat).toBe("electronic");
+    const reverseUpload = await req()
+      .put(v1.persons.ROUTES.documents.photos.upsert(person.id, id.id, "back"))
+      .set("Cookie", [`access_token=${admin.accessToken}`])
+      .attach("file", Buffer.from("retired-reverse"), {
+        filename: "back.jpg",
+        contentType: "image/jpeg",
+      });
+    expect(reverseUpload.status).toBe(400);
     const contentPath = v1.persons.ROUTES.documents.photos.content(
       person.id,
       address.id,
@@ -1801,6 +1840,7 @@ describe("Persons HTTP surface (e2e)", () => {
       .send({
         type: "driverLicense",
         number: "FILTER-SAME-LICENSE",
+        photos: await uploadLicencePhotos(session),
         status: "rejected",
       });
     expect(sameDocumentLicenseRes.status).toBe(201);

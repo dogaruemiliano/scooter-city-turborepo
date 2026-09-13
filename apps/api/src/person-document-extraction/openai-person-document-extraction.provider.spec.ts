@@ -155,6 +155,15 @@ describe("OpenAI person-document extraction", () => {
     });
 
     const body = requestBody(fetcher.mock.calls[0][1]);
+    expect(body.instructions).toContain(
+      'Romanian "Certificat privind domiciliul/reședința înregistrat în Registrul Național de Evidență a Persoanelor"',
+    );
+    expect(body.instructions).toContain(
+      "return detectedDocumentType=proofOfAddress",
+    );
+    expect(body.instructions).toContain(
+      "this restriction does not apply to proofOfAddress requests",
+    );
     expect(body).toMatchObject({
       input: [
         {

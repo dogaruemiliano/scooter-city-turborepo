@@ -52,7 +52,6 @@ function setup(
                 "city",
                 "addressLine1",
                 "addressLine2",
-                "postalCode",
               ].includes(item.field)
                 ? { section: "domicile", label: "Domiciliu" }
                 : null,
@@ -66,6 +65,98 @@ function setup(
 }
 
 describe("person-document extraction normalization", () => {
+  it.each(["nationalId", "other", null])(
+    "reads a CEI domicile certificate PDF even when the model labels it %s",
+    async (detectedDocumentType) => {
+      const { service } = setup({
+        detectedDocumentType,
+        warnings: ["typeMismatch"],
+        suggestions: [
+          suggestion("person", "firstName", "ANA-MARIA"),
+          suggestion("person", "lastName", "EXEMPLU"),
+          suggestion("person", "cnp", "1900228123450"),
+          suggestion("person", "countryCode", "RO"),
+          suggestion("person", "region", "CJ"),
+          suggestion("person", "city", "Florești"),
+          suggestion("person", "addressLine1", "Str. Exemplu Nr.12"),
+          suggestion("document", "number", "CERTIFICATE-123"),
+          suggestion("document", "expiresOn", "2030-01-01"),
+        ],
+      });
+      const result = await service.analyze({
+        documentType: "proofOfAddress",
+        sources: [
+          {
+            slot: "front",
+            contentType: "application/pdf",
+            bytes: Buffer.from("%PDF-certificate-fixture"),
+          },
+        ],
+      });
+      expect(result.detectedDocumentType).toBe("proofOfAddress");
+      expect(result.warnings).not.toContain("typeMismatch");
+      expect(result.suggestions).toEqual(
+        expect.arrayContaining([
+          suggestion("person", "firstName", "Ana-Maria"),
+          suggestion("person", "lastName", "Exemplu"),
+          suggestion("person", "cnp", "1900228123450"),
+          suggestion("person", "dateOfBirth", "1990-02-28"),
+          suggestion("person", "countryCode", "RO"),
+          suggestion("person", "region", "Cluj"),
+          suggestion("person", "city", "Florești"),
+          suggestion("person", "addressLine1", "Str. Exemplu, Nr. 12"),
+        ]),
+      );
+      expect(result.suggestions.every((item) => item.target === "person")).toBe(
+        true,
+      );
+    },
+  );
+
+  it.each([
+    null,
+    { section: "birthplace", label: "Loc naștere" },
+    { section: "issuer", label: "Adresa emitentului" },
+    { section: "domicile", label: "Locul nașterii" },
+    { section: "domicile", label: "Sediul emitentului" },
+  ])(
+    "does not accept unrelated PDFs as address proof without residential evidence (%j)",
+    async (addressEvidence) => {
+      const { service } = setup({
+        detectedDocumentType: "nationalId",
+        warnings: ["typeMismatch"],
+        suggestions: [
+          suggestion("person", "firstName", "Ana"),
+          {
+            ...suggestion("person", "addressLine1", "Str. Exemplu Nr.12"),
+            addressEvidence,
+          },
+        ],
+      });
+      const result = await service.analyze({
+        ...input,
+        documentType: "proofOfAddress",
+      });
+      expect(result.suggestions).toEqual([]);
+      expect(result.warnings).toContain("typeMismatch");
+    },
+  );
+
+  it("does not accept a name and country alone as proof of residence", async () => {
+    const { service } = setup({
+      suggestions: [
+        suggestion("person", "firstName", "Ana"),
+        suggestion("person", "countryCode", "RO"),
+      ],
+    });
+    const result = await service.analyze({
+      ...input,
+      documentType: "proofOfAddress",
+    });
+    expect(result.suggestions).toEqual([]);
+    expect(result.warnings).toContain("typeMismatch");
+  });
+
   it("uses the second Domiciliu address on a classic ID without mixing in the birthplace county", async () => {
     const { service } = setup({
       suggestions: [
@@ -130,7 +221,6 @@ describe("person-document extraction normalization", () => {
         city: "Râmnicu Vâlcea",
         addressLine1: "Str. Exemplu Nr.12",
         addressLine2: "Ap. 4",
-        postalCode: "240001",
       };
       const { service } = setup({
         suggestions: [
@@ -383,13 +473,12 @@ describe("person-document extraction normalization", () => {
     });
   });
 
-  it("keeps good fields while omitting invalid CNP, date, future issue date and unknown country", async () => {
+  it("keeps good fields while omitting invalid CNP, date and unknown country", async () => {
     const { service } = setup({
       suggestions: [
         suggestion("person", "firstName", "Ana"),
         suggestion("document", "cnp", "1234567890123"),
         suggestion("document", "expiresOn", "2027-02-30"),
-        suggestion("document", "issuedOn", "2999-01-01"),
         suggestion("person", "dateOfBirth", "2999-01-01"),
         suggestion("person", "countryCode", "ZZ"),
       ],
@@ -448,19 +537,6 @@ describe("person-document extraction normalization", () => {
     ]);
   });
 
-  it("omits inconsistent document issue and expiry dates", async () => {
-    const { service } = setup({
-      suggestions: [
-        suggestion("document", "issuedOn", "2025-01-01"),
-        suggestion("document", "expiresOn", "2024-01-01"),
-      ],
-    });
-    expect(await service.analyze(input)).toMatchObject({
-      suggestions: [],
-      warnings: ["invalidValue", "noData"],
-    });
-  });
-
   it("preserves competing readings and flags both for review", async () => {
     const { service } = setup({
       suggestions: [
@@ -495,20 +571,95 @@ describe("person-document extraction normalization", () => {
     },
   );
 
-  it.each(["passport", null])(
-    "returns no suggestions when actual type is %s",
-    async (detectedDocumentType) => {
+  it.each([
+    ["passport", []],
+    ["passport", ["typeMismatch"]],
+    [null, []],
+    [null, ["typeMismatch"]],
+  ])(
+    "returns no suggestions when actual type is %s and model warnings are %j",
+    async (detectedDocumentType, warnings) => {
       const { service } = setup({
         detectedDocumentType,
         suggestions: [suggestion("person", "firstName", "Ana")],
+        warnings,
       });
-      expect(await service.analyze(input)).toMatchObject({
+      const result = await service.analyze(input);
+      expect(result).toMatchObject({
         suggestions: [],
         licenseCategories: [],
-        warnings: [detectedDocumentType ? "typeMismatch" : "noData"],
+      });
+      expect(result.warnings).toContain(
+        detectedDocumentType ? "typeMismatch" : "noData",
+      );
+    },
+  );
+
+  it.each(["classic", "electronic"] as const)(
+    "applies valid %s national ID readings despite a contradictory typeMismatch warning",
+    async (nationalIdFormat) => {
+      const { service } = setup({
+        suggestions: [
+          suggestion("person", "lastName", "EXEMPLU"),
+          suggestion("person", "firstName", "ANA-MARIA"),
+          suggestion("document", "number", "123456"),
+        ],
+        warnings: ["typeMismatch"],
+      });
+
+      expect(
+        await service.analyze({
+          ...input,
+          nationalIdFormat,
+          sources: [input.sources[0]],
+        }),
+      ).toMatchObject({
+        detectedDocumentType: "nationalId",
+        suggestions: [
+          suggestion("person", "lastName", "Exemplu"),
+          suggestion("person", "firstName", "Ana-Maria"),
+          suggestion("document", "number", "123456"),
+        ],
+        warnings: [],
       });
     },
   );
+
+  it("preserves other warnings, review flags and field validation when removing a contradictory typeMismatch", async () => {
+    const { service } = setup({
+      suggestions: [
+        {
+          ...suggestion("person", "firstName", "ANA"),
+          needsReview: true,
+        },
+        suggestion("person", "cnp", "invalid"),
+      ],
+      warnings: ["typeMismatch", "unclearText"],
+    });
+
+    expect(await service.analyze(input)).toMatchObject({
+      suggestions: [
+        { ...suggestion("person", "firstName", "Ana"), needsReview: true },
+      ],
+      warnings: ["unclearText", "invalidValue"],
+    });
+  });
+
+  it("preserves reviewed licence categories when the detected type matches despite a typeMismatch warning", async () => {
+    const licenceCategory = category("B", "2010-02-01", "2030-02-01");
+    const { service } = setup({
+      detectedDocumentType: "driverLicense",
+      licenseCategories: [licenceCategory],
+      warnings: ["typeMismatch"],
+    });
+
+    expect(
+      await service.analyze({ ...input, documentType: "driverLicense" }),
+    ).toMatchObject({
+      licenseCategories: [{ ...licenceCategory, needsReview: true }],
+      warnings: [],
+    });
+  });
 
   it("rejects unrecognized fields, verified status, and source slots absent from the input", async () => {
     const { service, provider } = setup({ status: "verified" });

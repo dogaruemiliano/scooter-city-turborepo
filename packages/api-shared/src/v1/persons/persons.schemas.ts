@@ -114,8 +114,6 @@ export const personDocumentSchema = z
     number: z.string().nullable(),
     cnp: z.string().nullable(),
     issuingCountryCode: z.string().nullable(),
-    issuedBy: z.string().nullable(),
-    issuedOn: z.string().nullable(),
     expiresOn: z.string().nullable(),
     status: personDocumentStatusSchema,
     notes: z.string().nullable(),
@@ -312,7 +310,6 @@ export const personSchema = z
     addressLine2: z.string().nullable(),
     city: z.string().nullable(),
     region: z.string().nullable(),
-    postalCode: z.string().nullable(),
     countryCode: z.string().nullable(),
     documents: z.array(personDocumentSchema),
     notes: z.string().nullable(),
@@ -327,32 +324,30 @@ export type Person = z.infer<typeof personSchema>;
 export const createPersonDocumentInputSchema = z
   .object({
     type: personDocumentTypeSchema,
+    photos: createPersonDocumentPhotoDraftTokensSchema.optional(),
     nationalIdFormat: personNationalIdFormatSchema.nullable().optional(),
     licenseCategories: personDriverLicenseCategoriesSchema.optional(),
     series: nullableTrimmedTextSchema.optional(),
     number: nullableTrimmedTextSchema.optional(),
     cnp: cnpSchema.nullable().optional(),
     issuingCountryCode: countryCodeSchema.nullable().optional(),
-    issuedBy: nullableTrimmedTextSchema.optional(),
-    issuedOn: dateOnlySchema.nullable().optional(),
     expiresOn: dateOnlySchema.nullable().optional(),
     status: personDocumentStatusSchema.default("verified"),
     notes: notesSchema.optional(),
   })
   .strict()
   .superRefine(validateDocumentMetadata)
+  .superRefine(validateDocumentPhotos)
   .meta({ id: "CreatePersonDocumentInput" });
 
 export type CreatePersonDocumentInput = z.infer<
   typeof createPersonDocumentInputSchema
 >;
 
-const createPersonNestedDocumentInputSchema = createPersonDocumentInputSchema
-  .safeExtend({
-    photos: createPersonDocumentPhotoDraftTokensSchema.optional(),
-  })
-  .strict()
-  .meta({ id: "CreatePersonNestedDocumentInput" });
+const createPersonNestedDocumentInputSchema =
+  createPersonDocumentInputSchema.meta({
+    id: "CreatePersonNestedDocumentInput",
+  });
 
 export type CreatePersonNestedDocumentInput = z.infer<
   typeof createPersonNestedDocumentInputSchema
@@ -367,8 +362,6 @@ export const updatePersonDocumentInputSchema = z
     number: nullableTrimmedTextSchema.optional(),
     cnp: cnpSchema.nullable().optional(),
     issuingCountryCode: countryCodeSchema.nullable().optional(),
-    issuedBy: nullableTrimmedTextSchema.optional(),
-    issuedOn: dateOnlySchema.nullable().optional(),
     expiresOn: dateOnlySchema.nullable().optional(),
     status: personDocumentStatusSchema.optional(),
     notes: notesSchema.optional(),
@@ -390,11 +383,10 @@ export const createPersonInputSchema = z
     lastName: personNameSchema,
     cnp: cnpSchema.nullable().optional(),
     dateOfBirth: pastDateOnlySchema.nullable().optional(),
-    addressLine1: nullableTrimmedTextSchema.optional(),
+    addressLine1: z.string().trim().min(1).max(MAX_TEXT_LENGTH),
     addressLine2: nullableTrimmedTextSchema.optional(),
-    city: nullableTrimmedTextSchema.optional(),
-    region: nullableTrimmedTextSchema.optional(),
-    postalCode: nullableTrimmedTextSchema.optional(),
+    city: z.string().trim().min(1).max(MAX_TEXT_LENGTH),
+    region: z.string().trim().min(1).max(MAX_TEXT_LENGTH),
     countryCode: countryCodeSchema.nullable().optional(),
     documents: z
       .array(createPersonNestedDocumentInputSchema)
@@ -422,11 +414,10 @@ export const updatePersonInputSchema = z
     lastName: personNameSchema.optional(),
     cnp: cnpSchema.nullable().optional(),
     dateOfBirth: pastDateOnlySchema.nullable().optional(),
-    addressLine1: nullableTrimmedTextSchema.optional(),
+    addressLine1: z.string().trim().min(1).max(MAX_TEXT_LENGTH).optional(),
     addressLine2: nullableTrimmedTextSchema.optional(),
-    city: nullableTrimmedTextSchema.optional(),
-    region: nullableTrimmedTextSchema.optional(),
-    postalCode: nullableTrimmedTextSchema.optional(),
+    city: z.string().trim().min(1).max(MAX_TEXT_LENGTH).optional(),
+    region: z.string().trim().min(1).max(MAX_TEXT_LENGTH).optional(),
     countryCode: countryCodeSchema.nullable().optional(),
     notes: notesSchema.optional(),
   })
@@ -467,17 +458,59 @@ export const personListSchema = z
 
 export type PersonList = z.infer<typeof personListSchema>;
 
+function validateDocumentPhotos(
+  document: {
+    type: z.infer<typeof personDocumentTypeSchema>;
+    photos?: { front?: string; back?: string; other?: string };
+  },
+  context: z.RefinementCtx,
+): void {
+  if (document.type === "driverLicense") {
+    for (const slot of ["front", "back"] as const) {
+      if (!document.photos?.[slot])
+        context.addIssue({
+          code: "custom",
+          path: ["photos", slot],
+          message: `driverLicense ${slot} upload is required.`,
+        });
+    }
+  }
+  if (
+    document.type === "nationalId" &&
+    (document.photos?.back || document.photos?.other)
+  ) {
+    context.addIssue({
+      code: "custom",
+      path: ["photos"],
+      message: "Only the front of the national ID is collected.",
+    });
+  }
+}
+
 function validateDocumentMetadata(
   document: {
     type?: z.infer<typeof personDocumentTypeSchema>;
     nationalIdFormat?: z.infer<typeof personNationalIdFormatSchema> | null;
     licenseCategories?: PersonDriverLicenseCategoryEntry[];
+    series?: string | null;
+    number?: string | null;
+    expiresOn?: string | null;
   },
   context: z.RefinementCtx,
 ): void {
   // Updates without a type need the stored type; the service validates the
   // merged record before persisting it.
   if (document.type === undefined) return;
+  if (document.type === "proofOfAddress") {
+    for (const field of ["series", "number", "expiresOn"] as const) {
+      if (document[field])
+        context.addIssue({
+          code: "custom",
+          path: [field],
+          message: "Proof of address has no document number or expiry date.",
+        });
+    }
+  }
   if (document.nationalIdFormat != null && document.type !== "nationalId") {
     context.addIssue({
       code: "custom",
@@ -549,7 +582,6 @@ function validateDocumentWorkflow(
     requirePhoto("driverLicense", "back");
   }
   if (electronic) {
-    requirePhoto("nationalId", "back");
     requirePhoto("proofOfAddress", "front");
   }
   if (!foreign) {

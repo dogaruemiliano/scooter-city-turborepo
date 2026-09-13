@@ -61,7 +61,6 @@ model Person {
   addressLine2 String?
   city         String?
   region       String?
-  postalCode   String?
   countryCode  String?
   notes        String?
   createdAt    DateTime         @default(now())
@@ -90,8 +89,6 @@ model PersonDocument {
   number             String?
   cnp                String?
   issuingCountryCode String?
-  issuedBy           String?
-  issuedOn           DateTime?             @db.Date
   expiresOn          DateTime?             @db.Date
   status             String                @default("unverified")
   notes              String?

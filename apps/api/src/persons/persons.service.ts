@@ -334,6 +334,10 @@ export class PersonsService {
     context: PersonAuditContext,
   ): Promise<PersonDocument> {
     try {
+      const preparedPhotos = await this.prepareDraftDocumentPhotos(
+        { documents: [input] },
+        context.actor.id,
+      );
       return await this.prisma.$transaction(async (tx) => {
         await this.validateDocumentCnp(personId, input.cnp, tx);
         await this.ensureActivePerson(personId, tx);
@@ -350,6 +354,17 @@ export class PersonsService {
             ...this.toDocumentCreateData(input),
           },
         });
+
+        for (const photo of preparedPhotos) {
+          await this.createDocumentPhotoFromDraft(
+            tx,
+            document.id,
+            photo.slot,
+            photo.storedImage,
+            photo.draftUploadId,
+            context.actor.id,
+          );
+        }
 
         await this.recordPersonAudit(tx, {
           type: AuditEventType.PERSON_DOCUMENT_CREATED,
@@ -407,8 +422,14 @@ export class PersonsService {
         }
 
         const resolvedType = input.type ?? existing.type;
-        const metadata = v1.persons.createPersonDocumentInputSchema.safeParse({
+        const metadata = v1.persons.updatePersonDocumentInputSchema.safeParse({
           type: resolvedType,
+          series: input.series !== undefined ? input.series : existing.series,
+          number: input.number !== undefined ? input.number : existing.number,
+          expiresOn:
+            input.expiresOn !== undefined
+              ? input.expiresOn
+              : toDateOnlyString(existing.expiresOn),
           nationalIdFormat:
             input.nationalIdFormat !== undefined
               ? input.nationalIdFormat
@@ -439,6 +460,27 @@ export class PersonsService {
           );
         }
 
+        if (resolvedType === "driverLicense") {
+          const photos = await tx.personDocumentPhoto.findMany({
+            where: {
+              personDocumentId: documentId,
+              deletedAt: null,
+              asset: { deletedAt: null },
+              slot: { in: ["front", "back"] },
+            },
+            select: { slot: true },
+          });
+          if (
+            !["front", "back"].every((slot) =>
+              photos.some((photo) => photo.slot === slot),
+            )
+          ) {
+            throw new BadRequestException(
+              "Driving licence front and back uploads are required",
+            );
+          }
+        }
+
         const updated = await tx.personDocument.update({
           where: { id: documentId },
           data: this.toDocumentUpdateData(input),
@@ -466,6 +508,10 @@ export class PersonsService {
     context: PersonAuditContext,
   ): Promise<PersonDocument> {
     try {
+      const preparedPhotos = await this.prepareDraftDocumentPhotos(
+        { documents: [input] },
+        context.actor.id,
+      );
       return await this.prisma.$transaction(async (tx) => {
         await this.validateDocumentCnp(personId, input.cnp, tx);
         const existing = await this.findActiveDocumentWithClient(
@@ -496,6 +542,17 @@ export class PersonsService {
             ...this.toDocumentCreateData(input),
           },
         });
+
+        for (const photo of preparedPhotos) {
+          await this.createDocumentPhotoFromDraft(
+            tx,
+            replacement.id,
+            photo.slot,
+            photo.storedImage,
+            photo.draftUploadId,
+            context.actor.id,
+          );
+        }
 
         await this.recordPersonAudit(tx, {
           type: AuditEventType.PERSON_DOCUMENT_REPLACED,
@@ -571,7 +628,12 @@ export class PersonsService {
     uploadedByUserId: string,
   ): Promise<PersonDocumentPhotoWithAsset> {
     const normalizedSlot = this.requireDocumentPhotoSlot(slot);
-    await this.ensureActiveDocument(personId, documentId);
+    const document = await this.ensureActiveDocument(personId, documentId);
+    if (document.type === "nationalId" && normalizedSlot !== "front") {
+      throw new BadRequestException(
+        "Only the front of the national ID is collected",
+      );
+    }
     this.assertBufferedUpload(file);
 
     let stored: StoredPersonDocument | null = null;
@@ -615,7 +677,12 @@ export class PersonsService {
     uploadedByUserId: string,
   ): Promise<v1.persons.PersonDocumentPhotoUploadUrl> {
     const normalizedSlot = this.requireDocumentPhotoSlot(slot);
-    await this.ensureActiveDocument(personId, documentId);
+    const document = await this.ensureActiveDocument(personId, documentId);
+    if (document.type === "nationalId" && normalizedSlot !== "front") {
+      throw new BadRequestException(
+        "Only the front of the national ID is collected",
+      );
+    }
 
     const upload = await this.imageStorage.createPresignedDocumentUpload({
       ...input,
@@ -694,7 +761,12 @@ export class PersonsService {
     uploadedByUserId: string,
   ): Promise<PersonDocumentPhotoWithAsset> {
     const normalizedSlot = this.requireDocumentPhotoSlot(slot);
-    await this.ensureActiveDocument(personId, documentId);
+    const document = await this.ensureActiveDocument(personId, documentId);
+    if (document.type === "nationalId" && normalizedSlot !== "front") {
+      throw new BadRequestException(
+        "Only the front of the national ID is collected",
+      );
+    }
 
     let stored: StoredPersonDocument | null = null;
     try {
@@ -785,7 +857,7 @@ export class PersonsService {
   }
 
   private async prepareDraftDocumentPhotos(
-    input: v1.persons.CreatePersonInput,
+    input: Pick<v1.persons.CreatePersonInput, "documents">,
     uploadedByUserId: string,
   ): Promise<PreparedDraftDocumentPhoto[]> {
     const prepared: PreparedDraftDocumentPhoto[] = [];
@@ -898,7 +970,6 @@ export class PersonsService {
       addressLine2: input.addressLine2,
       city: input.city,
       region: input.region,
-      postalCode: input.postalCode,
       countryCode: input.countryCode,
       documents:
         input.documents && input.documents.length > 0
@@ -992,7 +1063,6 @@ export class PersonsService {
       addressLine2: input.addressLine2,
       city: input.city,
       region: input.region,
-      postalCode: input.postalCode,
       countryCode: input.countryCode,
       notes: input.notes,
     };
@@ -1044,8 +1114,6 @@ export class PersonsService {
       number: input.number,
       cnp: input.cnp,
       issuingCountryCode: input.issuingCountryCode,
-      issuedBy: input.issuedBy,
-      issuedOn: toDateOnlyDate(input.issuedOn),
       expiresOn: toDateOnlyDate(input.expiresOn),
       status: input.status ?? "verified",
       notes: input.notes,
@@ -1069,8 +1137,6 @@ export class PersonsService {
       number: input.number,
       cnp: input.cnp,
       issuingCountryCode: input.issuingCountryCode,
-      issuedBy: input.issuedBy,
-      issuedOn: toDateOnlyDate(input.issuedOn),
       expiresOn: toDateOnlyDate(input.expiresOn),
       status: input.status,
       notes: input.notes,
@@ -1190,16 +1256,6 @@ export class PersonsService {
         "document.issuingCountryCode",
         existing.issuingCountryCode,
         updated.issuingCountryCode,
-      ),
-      createValueChange(
-        "document.issuedBy",
-        existing.issuedBy,
-        updated.issuedBy,
-      ),
-      createValueChange(
-        "document.issuedOn",
-        toDateOnlyString(existing.issuedOn),
-        toDateOnlyString(updated.issuedOn),
       ),
       createValueChange(
         "document.expiresOn",
@@ -1337,7 +1393,6 @@ export class PersonsService {
       coalesce(p.city, '') || ' ' ||
       coalesce(p.region, '') || ' ' ||
       coalesce(p.cnp, '') || ' ' ||
-      coalesce(p."postalCode", '') || ' ' ||
       coalesce(p."countryCode", '') || ' ' ||
       coalesce(p.notes, '')
     )`;
@@ -1347,7 +1402,6 @@ export class PersonsService {
       coalesce(d.number, '') || ' ' ||
       coalesce(d.cnp, '') || ' ' ||
       coalesce(d."issuingCountryCode", '') || ' ' ||
-      coalesce(d."issuedBy", '') || ' ' ||
       coalesce(d.status, '') || ' ' ||
       coalesce(d.notes, '')
     )`;
@@ -1614,8 +1668,8 @@ export class PersonsService {
     personId: string,
     documentId: string,
     db: PrismaClientLike = this.prisma,
-  ): Promise<void> {
-    const count = await db.personDocument.count({
+  ): Promise<PersonDocument> {
+    const document = await db.personDocument.findFirst({
       where: {
         id: documentId,
         personId,
@@ -1623,9 +1677,10 @@ export class PersonsService {
         person: { deletedAt: null },
       },
     });
-    if (count === 0) {
+    if (!document) {
       throw new NotFoundException("Person document not found");
     }
+    return document;
   }
 
   private requireDocumentPhotoSlot(
@@ -1911,7 +1966,6 @@ function personAuditValues(person: PersonWithDocuments): AuditValue[] {
     { field: "addressLine2", value: person.addressLine2 },
     { field: "city", value: person.city },
     { field: "region", value: person.region },
-    { field: "postalCode", value: person.postalCode },
     { field: "countryCode", value: person.countryCode },
     { field: "notes", value: person.notes },
   ];
@@ -1939,8 +1993,6 @@ function documentAuditValues(document: PersonDocument): AuditValue[] {
       field: "document.issuingCountryCode",
       value: document.issuingCountryCode,
     },
-    { field: "document.issuedBy", value: document.issuedBy },
-    { field: "document.issuedOn", value: toDateOnlyString(document.issuedOn) },
     {
       field: "document.expiresOn",
       value: toDateOnlyString(document.expiresOn),
@@ -1973,8 +2025,6 @@ function documentInputHasChanges(
       input.issuingCountryCode,
       existing.issuingCountryCode,
     ) ||
-    definedValueChanged(input.issuedBy, existing.issuedBy) ||
-    definedValueChanged(input.issuedOn, toDateOnlyString(existing.issuedOn)) ||
     definedValueChanged(
       input.expiresOn,
       toDateOnlyString(existing.expiresOn),

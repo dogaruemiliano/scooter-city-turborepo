@@ -8,12 +8,18 @@ test("createPersonInputSchema trims and normalizes required contact fields", () 
     v1.persons.createPersonInputSchema.parse({
       email: "  RIDER@EXAMPLE.COM ",
       phone: " +40712345678 ",
+      addressLine1: "1 Test Street",
+      city: "București",
+      region: "București",
       firstName: "  Ada ",
       lastName: " Lovelace ",
     }),
     {
       email: "rider@example.com",
       phone: "+40712345678",
+      addressLine1: "1 Test Street",
+      city: "București",
+      region: "București",
       firstName: "Ada",
       lastName: "Lovelace",
     },
@@ -24,6 +30,9 @@ test("createPersonInputSchema requires a valid E.164 phone", () => {
   assert.equal(
     v1.persons.createPersonInputSchema.safeParse({
       email: "rider@example.com",
+      addressLine1: "1 Test Street",
+      city: "București",
+      region: "București",
       firstName: "Ada",
       lastName: "Lovelace",
     }).success,
@@ -33,6 +42,9 @@ test("createPersonInputSchema requires a valid E.164 phone", () => {
     v1.persons.createPersonInputSchema.safeParse({
       email: "rider@example.com",
       phone: "0712345678",
+      addressLine1: "1 Test Street",
+      city: "București",
+      region: "București",
       firstName: "Ada",
       lastName: "Lovelace",
     }).success,
@@ -44,6 +56,9 @@ test("person schemas validate document values and date-only strings", () => {
   const parsed = v1.persons.createPersonInputSchema.parse({
     email: "rider@example.com",
     phone: "+40712345678",
+    addressLine1: "1 Test Street",
+    city: "București",
+    region: "București",
     firstName: "Ada",
     lastName: "Lovelace",
     dateOfBirth: "1990-02-28",
@@ -54,14 +69,13 @@ test("person schemas validate document values and date-only strings", () => {
         number: " 123456 ",
         cnp: "1900228123450",
         issuingCountryCode: " ro ",
-        issuedBy: " SPCLEP Bucuresti ",
-        issuedOn: "2024-01-15",
         expiresOn: "2030-01-31",
         status: "verified",
       },
       {
         type: "driverLicense",
         number: " B123456 ",
+        photos: { front: "front-token", back: "back-token" },
       },
     ],
   });
@@ -70,8 +84,7 @@ test("person schemas validate document values and date-only strings", () => {
   assert.equal(parsed.documents?.[0]?.number, "123456");
   assert.equal(parsed.documents?.[0]?.cnp, "1900228123450");
   assert.equal(parsed.documents?.[0]?.issuingCountryCode, "RO");
-  assert.equal(parsed.documents?.[0]?.issuedBy, "SPCLEP Bucuresti");
-  assert.equal(parsed.documents?.[0]?.issuedOn, "2024-01-15");
+  assert.equal("issuedOn" in parsed.documents![0]!, false);
   assert.equal(parsed.documents?.[0]?.status, "verified");
   assert.equal(parsed.documents?.[1]?.number, "B123456");
   assert.equal(parsed.documents?.[1]?.status, "verified");
@@ -79,6 +92,9 @@ test("person schemas validate document values and date-only strings", () => {
     v1.persons.createPersonInputSchema.safeParse({
       email: "rider@example.com",
       phone: "+40712345678",
+      addressLine1: "1 Test Street",
+      city: "București",
+      region: "București",
       firstName: "Ada",
       lastName: "Lovelace",
       documents: [{ type: "nationalId" }, { type: "nationalId" }],
@@ -89,6 +105,9 @@ test("person schemas validate document values and date-only strings", () => {
     v1.persons.createPersonInputSchema.safeParse({
       email: "rider@example.com",
       phone: "+40712345678",
+      addressLine1: "1 Test Street",
+      city: "București",
+      region: "București",
       firstName: "Ada",
       lastName: "Lovelace",
       documents: [{ type: "nationalId" }, { type: "passport" }],
@@ -99,6 +118,9 @@ test("person schemas validate document values and date-only strings", () => {
     v1.persons.createPersonInputSchema.safeParse({
       email: "rider@example.com",
       phone: "+40712345678",
+      addressLine1: "1 Test Street",
+      city: "București",
+      region: "București",
       firstName: "Ada",
       lastName: "Lovelace",
       dateOfBirth: "1990-02-31",
@@ -122,7 +144,7 @@ test("person schemas validate document values and date-only strings", () => {
   assert.equal(
     v1.persons.createPersonDocumentInputSchema.safeParse({
       type: "nationalId",
-      issuedOn: "2024-02-31",
+      expiresOn: "2024-02-31",
     }).success,
     false,
   );
@@ -464,6 +486,9 @@ test("document workflows require the relevant photos while preserving legacy inp
   const base = {
     email: "rider@example.com",
     phone: "+40712345678",
+    addressLine1: "1 Test Street",
+    city: "București",
+    region: "București",
     firstName: "Ada",
     lastName: "Lovelace",
   };
@@ -479,7 +504,7 @@ test("document workflows require the relevant photos while preserving legacy inp
   const electronic = {
     ...classic,
     nationalIdFormat: "electronic",
-    photos: { front: "front-token", back: "back-token" },
+    photos: { front: "front-token" },
   };
   const proof = { type: "proofOfAddress", photos: { front: "proof-token" } };
   assert.equal(
@@ -517,7 +542,7 @@ test("document workflows require the relevant photos while preserving legacy inp
   for (const documents of [
     [classic],
     [electronic],
-    [{ ...electronic, photos: { front: "token" } }, proof],
+    [{ ...electronic, photos: { front: "token", back: "back" } }, proof],
   ]) {
     assert.equal(
       v1.persons.createPersonInputSchema.safeParse({
@@ -573,6 +598,7 @@ test("licence metadata validates categories, dates, duplicates and document type
   };
   const parsed = v1.persons.createPersonDocumentInputSchema.parse({
     type: "driverLicense",
+    photos: { front: "front-token", back: "back-token" },
     licenseCategories: [category],
   });
   assert.equal(parsed.licenseCategories?.[0]?.restrictions, "01");
@@ -585,6 +611,7 @@ test("licence metadata validates categories, dates, duplicates and document type
     assert.equal(
       v1.persons.createPersonDocumentInputSchema.safeParse({
         type: "driverLicense",
+        photos: { front: "front-token", back: "back-token" },
         licenseCategories,
       }).success,
       false,
@@ -607,6 +634,7 @@ test("licence metadata validates categories, dates, duplicates and document type
   assert.equal(
     v1.persons.createPersonDocumentInputSchema.safeParse({
       type: "driverLicense",
+      photos: { front: "front-token", back: "back-token" },
       licenseCategories: [{ category: "B", issuedOn: null, expiresOn: null }],
     }).success,
     true,
@@ -664,7 +692,7 @@ test("person document extraction accepts only owned draft-token inputs and known
     v1.persons.analyzePersonDocumentInputSchema.safeParse({
       documentType: "nationalId",
       nationalIdFormat: "electronic",
-      photos: { back: "draft-token" },
+      photos: { front: "draft-token" },
     }).success,
     true,
   );
@@ -751,6 +779,9 @@ test("a supplied driving license needs front and back in the add-person workflow
   const input = {
     email: "person@example.com",
     phone: "+40749096855",
+    addressLine1: "1 Test Street",
+    city: "București",
+    region: "București",
     firstName: "Test",
     lastName: "Person",
     documentWorkflow: "foreign",
@@ -775,5 +806,116 @@ test("a supplied driving license needs front and back in the add-person workflow
       ],
     }).success,
     true,
+  );
+});
+
+test("document creation and extraction reject retired metadata and incomplete licences", () => {
+  for (const photos of [
+    undefined,
+    { front: "front-token" },
+    { back: "back-token" },
+  ]) {
+    assert.equal(
+      v1.persons.createPersonDocumentInputSchema.safeParse({
+        type: "driverLicense",
+        photos,
+      }).success,
+      false,
+    );
+    assert.equal(
+      v1.persons.analyzePersonDocumentInputSchema.safeParse({
+        documentType: "driverLicense",
+        photos,
+      }).success,
+      false,
+    );
+  }
+  assert.equal(
+    v1.persons.createPersonDocumentInputSchema.safeParse({
+      type: "driverLicense",
+      photos: { front: "front-token", back: "back-token" },
+    }).success,
+    true,
+  );
+  for (const field of ["issuedBy", "issuedOn", "issuedAt"]) {
+    assert.equal(
+      v1.persons.createPersonDocumentInputSchema.safeParse({
+        type: "nationalId",
+        [field]: "retired",
+      }).success,
+      false,
+    );
+    assert.equal(
+      v1.persons.updatePersonDocumentInputSchema.safeParse({
+        [field]: "retired",
+      }).success,
+      false,
+    );
+  }
+  assert.equal(
+    v1.persons.analyzePersonDocumentInputSchema.safeParse({
+      documentType: "nationalId",
+      nationalIdFormat: "electronic",
+      photos: { front: "front-token", back: "back-token" },
+    }).success,
+    false,
+  );
+  for (const field of ["number", "series", "expiresOn"])
+    assert.equal(
+      v1.persons.createPersonDocumentInputSchema.safeParse({
+        type: "proofOfAddress",
+        [field]: field === "expiresOn" ? "2030-01-01" : "123",
+      }).success,
+      false,
+    );
+});
+
+test("person addresses require county, locality and street and reject retired postal codes", () => {
+  const valid = {
+    email: "rider@example.com",
+    phone: "+40712345678",
+    firstName: "Ada",
+    lastName: "Lovelace",
+    addressLine1: "1 Test Street",
+    city: "București",
+    region: "București",
+  };
+  assert.equal(
+    v1.persons.createPersonInputSchema.safeParse(valid).success,
+    true,
+  );
+  for (const field of ["addressLine1", "city", "region"]) {
+    for (const value of [undefined, null, "", "  "]) {
+      assert.equal(
+        v1.persons.createPersonInputSchema.safeParse({
+          ...valid,
+          [field]: value,
+        }).success,
+        false,
+      );
+      if (value !== undefined)
+        assert.equal(
+          v1.persons.updatePersonInputSchema.safeParse({ [field]: value })
+            .success,
+          false,
+        );
+    }
+  }
+  assert.equal(
+    v1.persons.updatePersonInputSchema.safeParse({ notes: "Contact updated" })
+      .success,
+    true,
+  );
+  assert.equal(
+    v1.persons.createPersonInputSchema.safeParse({
+      ...valid,
+      postalCode: "010101",
+    }).success,
+    false,
+  );
+  assert.equal(
+    v1.persons.updatePersonInputSchema.safeParse({ postalCode: "010101" })
+      .success,
+    false,
   );
 });
