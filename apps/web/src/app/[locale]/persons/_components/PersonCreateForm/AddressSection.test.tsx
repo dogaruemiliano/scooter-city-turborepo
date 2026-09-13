@@ -16,11 +16,13 @@ import { createEmptyCreateForm } from "./form-state";
 
 function AddressForm({
   country = "RO",
+  citizenship = "romanian",
 }: {
   country?: CreatePersonFormState["countryCode"];
+  citizenship?: CreatePersonFormState["citizenship"];
 }) {
   const [form, setForm] = useState({
-    ...createEmptyCreateForm("romanian"),
+    ...createEmptyCreateForm(citizenship),
     countryCode: country,
   });
   return (
@@ -65,6 +67,14 @@ async function pick(
 }
 
 describe("Romanian locality selection", () => {
+  it("hides the country selector for Romanian citizens", () => {
+    render(<AddressForm />);
+    expect(
+      screen.queryByRole("button", { name: /^Țară(?: |$)/ }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Județ(?: |$)/ })).toBeVisible();
+  });
+
   it("searches counties and mixed cities/communes without diacritics, scoped to the selected county", async () => {
     const browser = userEvent.setup();
     render(<AddressForm />);
@@ -162,9 +172,9 @@ describe("Romanian locality selection", () => {
     ).toBeDisabled();
   });
 
-  it("preserves country search by alternate-language name and clears Romanian address selections", async () => {
+  it("preserves country search for foreign citizens and clears Romanian address selections", async () => {
     const browser = userEvent.setup();
-    render(<AddressForm />);
+    render(<AddressForm citizenship="foreign" />);
     await pick(browser, await openPicker(browser, "Județ"), "Cluj");
     await pick(browser, await openPicker(browser, "Localitate"), "Florești");
     const country = await openPicker(browser, "Țară");
@@ -177,7 +187,7 @@ describe("Romanian locality selection", () => {
   });
 
   it("keeps editable text fields for addresses outside Romania", () => {
-    render(<AddressForm country="IT" />);
+    render(<AddressForm citizenship="foreign" country="IT" />);
     const locality = screen.getByRole("textbox", { name: "Localitate" });
     fireEvent.change(locality, { target: { value: "Roma" } });
     expect(locality).toHaveValue("Roma");
