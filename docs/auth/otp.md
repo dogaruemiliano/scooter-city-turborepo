@@ -105,3 +105,22 @@ session.
 - Persistent delivery quotas survive API restarts and multi-instance deploys.
 - A relaxed global per-endpoint throttle protects the rest of the HTTP surface.
 - The cleanup job deletes challenges more than seven days past expiry.
+
+### Branded OTP emails
+
+`apps/api/src/mailer/templates/otp-email.ts` renders HTML and plain text together.
+English and Romanian copy lives in the API i18n catalog. Subjects include the
+code; resends keep the existing code and may still be grouped by Gmail. The
+expiry label states the configured lifetime (15 minutes by default) from the
+original request, rather than showing a countdown from email generation.
+Explicit `OTP_TTL` environment settings override the default.
+
+Email styles consume `@repo/theme/email`, a generated CommonJS token export
+with email-compatible sRGB colors and inline font fallbacks. Regenerate it
+with `pnpm --filter @repo/theme build` after changing theme tokens. API build,
+start, dev, and unit-test scripts run this step automatically.
+
+Before release, request an OTP through Hostico and check both languages in
+Gmail on desktop and mobile. Confirm the subject, selectable code, expiry,
+plain-text alternative, and resend threading. Use cPanel Track Delivery to
+investigate missing messages; SMTP submission does not confirm inbox delivery.

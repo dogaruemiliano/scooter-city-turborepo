@@ -1,7 +1,15 @@
 export const apiCatalog = {
   en: {
     auth: {
-      otpEmailSubject: "Your sign-in code",
+      otpEmailSubject: "{code} is your Scooter City sign-in code",
+      otpEmailHeading: "Your sign-in code",
+      otpEmailPreview: "Enter this code to access your Scooter City account.",
+      otpEmailIntro:
+        "Enter this code to sign in or create your Scooter City account.",
+      otpEmailExpiry:
+        "This code expires {minutes} minutes after your original request.",
+      otpEmailSafety:
+        "Never share this code with anyone. If you didn’t request it, you can ignore this email.",
       otpExpired: "The code has expired. Request a new one.",
       otpInvalid: "The code is invalid or expired.",
       otpSent: "Your code is {code}. It expires in {ttl} minutes.",
@@ -23,7 +31,16 @@ export const apiCatalog = {
   },
   ro: {
     auth: {
-      otpEmailSubject: "Codul tău de autentificare",
+      otpEmailSubject: "{code} este codul tău de autentificare Scooter City",
+      otpEmailHeading: "Codul tău de autentificare",
+      otpEmailPreview:
+        "Introdu acest cod pentru a accesa contul tău Scooter City.",
+      otpEmailIntro:
+        "Introdu acest cod pentru a te autentifica sau pentru a crea un cont Scooter City.",
+      otpEmailExpiry:
+        "Acest cod expiră la {minutes} minute după solicitarea inițială.",
+      otpEmailSafety:
+        "Nu divulga acest cod nimănui. Dacă nu ai solicitat codul, poți ignora acest email.",
       otpExpired: "Codul a expirat. Cere unul nou.",
       otpInvalid: "Codul este invalid sau a expirat.",
       otpSent: "Codul tău este {code}. Expiră în {ttl} minute.",

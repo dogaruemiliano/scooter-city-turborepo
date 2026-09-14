@@ -20,6 +20,10 @@
     "./tailwind": {
       "types": "./src/tailwind-preset.ts",
       "default": "./src/tailwind-preset.ts"
+    },
+    "./email": {
+      "types": "./generated/tokens.email.d.cts",
+      "default": "./generated/tokens.email.cjs"
     }
   },
   "scripts": {

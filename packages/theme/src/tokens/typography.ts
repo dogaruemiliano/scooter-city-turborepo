@@ -6,6 +6,7 @@ export const typography = {
     sans: {
       web: "var(--font-montserrat, 'Montserrat Variable'), ui-sans-serif, system-ui, sans-serif",
       native: "Montserrat_400Regular",
+      email: "Arial, Helvetica, sans-serif",
     },
     mono: {
       web: "var(--font-mono, ui-monospace), SFMono-Regular, Menlo, Consolas, monospace",

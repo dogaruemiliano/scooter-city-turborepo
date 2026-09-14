@@ -6,16 +6,13 @@ import {
   Logger,
   UnauthorizedException,
 } from "@nestjs/common";
-import {
-  fallbackLocale,
-  formatMessage,
-  type SupportedLocale,
-} from "@repo/i18n";
+import { fallbackLocale, type SupportedLocale } from "@repo/i18n";
 import ms from "ms";
 
 import { ENV } from "../../../config/config.module";
 import type { Env } from "../../../config/env";
 import { Prisma, type OtpChallenge } from "../../../generated/prisma/client";
+import { renderOtpEmail } from "../../../mailer/templates/otp-email";
 import { MailerService } from "../../../mailer/mailer.service";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { hashOtp, safeEqualHex } from "../../utils/hash";
@@ -412,10 +409,10 @@ export class OtpChallengeService {
 
     await this.mailer.send({
       to: challenge.target,
-      subject: formatMessage(locale, "api.auth.otpEmailSubject"),
-      text: formatMessage(locale, "api.auth.otpSent", {
+      ...renderOtpEmail({
         code,
-        ttl: this.otpTtlMinutes(),
+        locale,
+        validForMinutes: ms(this.env.OTP_TTL as ms.StringValue) / 60_000,
       }),
     });
   }
@@ -476,11 +473,6 @@ export class OtpChallengeService {
     locale: SupportedLocale | null | undefined,
   ): SupportedLocale {
     return locale ?? fallbackLocale;
-  }
-
-  private otpTtlMinutes(): number {
-    const ttlMs = ms(this.env.OTP_TTL as ms.StringValue);
-    return Math.max(1, Math.ceil(ttlMs / 60_000));
   }
 
   private resendDelayMs(sentCount: number): number {

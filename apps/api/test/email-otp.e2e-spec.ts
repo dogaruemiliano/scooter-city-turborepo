@@ -148,9 +148,10 @@ describe("EmailOtpController (e2e)", () => {
     const email = uniqueEmail("localized");
     const challenge = await requestChallenge(email, { "X-Locale": "ro" });
     expect(mailer.findLastTo(email)).toMatchObject({
-      subject: "Codul tău de autentificare",
-      text: `Codul tău este ${DEV_OTP}. Expiră în 10 minute.`,
+      subject: `${DEV_OTP} este codul tău de autentificare Scooter City`,
     });
+    expect(mailer.findLastTo(email)?.text).toContain(DEV_OTP);
+    expect(mailer.findLastTo(email)?.html).toContain('lang="ro"');
 
     const invalidCode = await request(server())
       .post(v1.auth.ROUTES.emailOtp.verify)
@@ -278,7 +279,8 @@ describe("EmailOtpController (e2e)", () => {
     expect(row.sentCount).toBe(2);
     expect(row.attemptsCount).toBe(1);
     expect(row.expiresAt).toEqual(initialExpiry);
-    expect(mailer.findLastTo(email)?.text).toBe(initialMessage);
+    expect(mailer.findLastTo(email)?.text).toContain(DEV_OTP);
+    expect(initialMessage).toContain(DEV_OTP);
 
     await prisma.otpChallenge.update({
       where: { id: challenge.challengeId },

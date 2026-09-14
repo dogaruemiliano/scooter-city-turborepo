@@ -93,6 +93,9 @@ importers:
       '@repo/i18n':
         specifier: workspace:^
         version: link:../../packages/i18n
+      '@repo/theme':
+        specifier: workspace:*
+        version: link:../../packages/theme
       bcrypt:
         specifier: ^5.1.1
         version: 5.1.1

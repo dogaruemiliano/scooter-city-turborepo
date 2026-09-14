@@ -14,6 +14,7 @@
   },
   "transformIgnorePatterns": ["/node_modules/(?!@repo/)"],
   "moduleNameMapper": {
+    "^@repo/theme/email$": "<rootDir>/../../../packages/theme/generated/tokens.email.cjs",
     "^@repo/api-shared/romania-administrative-areas\\.json$": "<rootDir>/../../../packages/api-shared/data/romania-administrative-areas.json",
     "^@repo/(.*)$": "<rootDir>/../../../packages/$1/src/index.ts",
     "^(\\.{1,2}/.*)\\.js$": "$1"
