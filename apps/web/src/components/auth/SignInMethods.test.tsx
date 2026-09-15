@@ -252,6 +252,7 @@ describe("SignInMethods", () => {
       v1.auth.emailOtpChallengeSchema,
       {
         method: "POST",
+        headers: { "X-Locale": "en" },
         json: { email: user.email },
       },
     );
@@ -289,6 +290,7 @@ describe("SignInMethods", () => {
       v1.auth.tokenPairSchema,
       {
         method: "POST",
+        headers: { "X-Locale": "en" },
         json: {
           challengeId: challenge.challengeId,
           code: "000000",
@@ -314,6 +316,7 @@ describe("SignInMethods", () => {
       v1.auth.oauthSignInResultSchema,
       {
         method: "POST",
+        headers: { "X-Locale": "en" },
         json: { idToken: "google-id-token-direct" },
       },
     );
@@ -351,6 +354,7 @@ describe("SignInMethods", () => {
       v1.auth.tokenPairSchema,
       {
         method: "POST",
+        headers: { "X-Locale": "en" },
         json: {
           challengeId: challenge.challengeId,
           code: "000000",
@@ -383,6 +387,7 @@ describe("SignInMethods", () => {
       v1.auth.otpChallengeMetadataSchema,
       {
         method: "POST",
+        headers: { "X-Locale": "en" },
         json: { challengeId: challenge.challengeId },
       },
     );
@@ -430,6 +435,7 @@ describe("SignInMethods", () => {
       v1.auth.emailOtpChallengeSchema,
       {
         method: "POST",
+        headers: { "X-Locale": "en" },
         json: { email: user.email },
       },
     );
@@ -466,6 +472,7 @@ describe("SignInMethods", () => {
       v1.auth.oauthSignInResultSchema,
       {
         method: "POST",
+        headers: { "X-Locale": "en" },
         json: { idToken: "google-id-token-renew" },
       },
     );
@@ -583,9 +590,233 @@ describe("SignInMethods", () => {
   });
 });
 
-function getOtpInput(): HTMLInputElement {
+describe.each(["ro", "en"] as const)(
+  "localized login failures in %s",
+  (locale) => {
+    const copy = messages[locale];
+    const serverError = () =>
+      new ApiError(500, "Internal server error", "INTERNAL_SERVER_ERROR");
+
+    async function requestEmailCode() {
+      fireEvent.change(screen.getByLabelText("Email"), {
+        target: { value: user.email },
+      });
+      await act(async () => {
+        fireEvent.click(
+          screen.getByRole("button", {
+            name: copy.auth.signIn.emailOtp.sendCode,
+          }),
+        );
+      });
+    }
+
+    it.each([
+      {
+        name: "server",
+        error: serverError(),
+        expected: copy.api.errors.internalServer,
+      },
+      {
+        name: "network",
+        error: new TypeError("Failed to fetch"),
+        expected: copy.api.errors.network,
+      },
+      {
+        name: "unknown",
+        error: new Error("SMTP credentials rejected"),
+        expected: copy.api.errors.internalServer,
+      },
+      {
+        name: "rate limit",
+        error: new ApiError(429, "Too many requests", undefined, {
+          retryAfterSec: 30,
+        }),
+        expected: copy.api.errors.rateLimited.replace("{ttl}", "30"),
+      },
+    ])(
+      "localizes $name errors when requesting email codes",
+      async ({ error, expected }) => {
+        mocks.apiFetch.mockRejectedValueOnce(error);
+        renderSignInMethods({ locale });
+        await requestEmailCode();
+        expect(screen.getByRole("alert")).toHaveTextContent(expected);
+        expect(mocks.apiFetch).toHaveBeenLastCalledWith(
+          v1.auth.ROUTES.emailOtp.request,
+          v1.auth.emailOtpChallengeSchema,
+          expect.objectContaining({ headers: { "X-Locale": locale } }),
+        );
+        expect(
+          screen.getByRole("button", {
+            name: copy.auth.signIn.emailOtp.sendCode,
+          }),
+        ).toBeEnabled();
+      },
+    );
+
+    it.each(["emailOtp", "google"] as const)(
+      "localizes server failures during %s OTP verification",
+      async (method) => {
+        mocks.apiFetch
+          .mockResolvedValueOnce(
+            createChallenge("00000000-0000-4000-8000-000000000021"),
+          )
+          .mockRejectedValueOnce(serverError());
+        renderSignInMethods({ locale, enabledMethods: [method] });
+        if (method === "google") await triggerGoogleCredential("google-token");
+        else await requestEmailCode();
+        fireEvent.change(getOtpInput(locale), { target: { value: "111111" } });
+        await act(async () => {
+          fireEvent.click(
+            screen.getByRole("button", { name: copy.auth.otp.verify }),
+          );
+        });
+        expect(screen.getByRole("alert")).toHaveTextContent(
+          copy.api.errors.internalServer,
+        );
+        expect(screen.getByRole("alert")).not.toHaveTextContent(
+          copy.auth.otp.errors.invalidOrExpired,
+        );
+        expect(mocks.apiFetch).toHaveBeenLastCalledWith(
+          method === "google"
+            ? v1.auth.ROUTES.oauthEmailVerification.verify
+            : v1.auth.ROUTES.emailOtp.verify,
+          v1.auth.tokenPairSchema,
+          expect.objectContaining({ headers: { "X-Locale": locale } }),
+        );
+      },
+    );
+
+    it("localizes server failures when resending a code", async () => {
+      mocks.apiFetch
+        .mockResolvedValueOnce(
+          createChallenge("00000000-0000-4000-8000-000000000022", {
+            resendAfterSec: 0,
+          }),
+        )
+        .mockRejectedValueOnce(serverError());
+      renderSignInMethods({ locale });
+      await requestEmailCode();
+      await act(async () => {
+        fireEvent.click(
+          screen.getByRole("button", { name: copy.auth.otp.resendCode }),
+        );
+      });
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        copy.api.errors.internalServer,
+      );
+      expect(mocks.apiFetch).toHaveBeenLastCalledWith(
+        v1.auth.ROUTES.otp.resend,
+        v1.auth.otpChallengeMetadataSchema,
+        expect.objectContaining({ headers: { "X-Locale": locale } }),
+      );
+    });
+
+    it.each(["emailOtp", "google"] as const)(
+      "localizes failures renewing an expired %s challenge",
+      async (method) => {
+        vi.useFakeTimers();
+        mocks.apiFetch
+          .mockResolvedValueOnce(
+            createChallenge("00000000-0000-4000-8000-000000000023", {
+              expiresInSec: 1,
+            }),
+          )
+          .mockRejectedValueOnce(serverError());
+        renderSignInMethods({ locale, enabledMethods: [method] });
+        if (method === "google") await triggerGoogleCredential("google-token");
+        else await requestEmailCode();
+        await act(async () => {
+          vi.advanceTimersByTime(1_000);
+        });
+        await act(async () => {
+          fireEvent.click(
+            screen.getByRole("button", {
+              name: copy.auth.otp.requestAnotherCode,
+            }),
+          );
+        });
+        expect(screen.getByRole("alert")).toHaveTextContent(
+          copy.api.errors.internalServer,
+        );
+        expect(mocks.apiFetch.mock.lastCall?.[2]).toEqual(
+          expect.objectContaining({ headers: { "X-Locale": locale } }),
+        );
+      },
+    );
+
+    it("localizes Google API failures", async () => {
+      mocks.apiFetch.mockRejectedValueOnce(serverError());
+      renderSignInMethods({ locale, enabledMethods: ["google"] });
+      await triggerGoogleCredential("google-token");
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        copy.api.errors.internalServer,
+      );
+      expect(mocks.apiFetch).toHaveBeenCalledWith(
+        v1.auth.ROUTES.google,
+        v1.auth.oauthSignInResultSchema,
+        expect.objectContaining({ headers: { "X-Locale": locale } }),
+      );
+    });
+
+    it("localizes invalid OTP errors from an English API response", async () => {
+      mocks.apiFetch
+        .mockResolvedValueOnce(
+          createChallenge("00000000-0000-4000-8000-000000000024"),
+        )
+        .mockRejectedValueOnce(
+          new ApiError(401, "Invalid or expired code", "UNAUTHORIZED"),
+        );
+      renderSignInMethods({ locale });
+      await requestEmailCode();
+      fireEvent.change(getOtpInput(locale), { target: { value: "111111" } });
+      await act(async () => {
+        fireEvent.click(
+          screen.getByRole("button", { name: copy.auth.otp.verify }),
+        );
+      });
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        copy.auth.otp.errors.invalidOrExpired,
+      );
+    });
+  },
+);
+
+it("updates a visible server error when the selected language changes", async () => {
+  mocks.apiFetch.mockRejectedValueOnce(
+    new ApiError(500, "Internal server error"),
+  );
+  const view = renderSignInMethods({ locale: "en" });
+  fireEvent.change(screen.getByLabelText("Email"), {
+    target: { value: user.email },
+  });
+  await act(async () => {
+    fireEvent.click(
+      screen.getByRole("button", { name: "Continue with email" }),
+    );
+  });
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    messages.en.api.errors.internalServer,
+  );
+  mocks.pathname = "/sign-in";
+  view.rerender(
+    <NextIntlClientProvider locale="ro" messages={messages.ro}>
+      <SessionProvider initialUser={null}>
+        <SignInMethods
+          enabledMethods={enabledAll}
+          googleClientId="google-client-id"
+        />
+      </SessionProvider>
+    </NextIntlClientProvider>,
+  );
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    messages.ro.api.errors.internalServer,
+  );
+  expect(mocks.apiFetch).toHaveBeenCalledOnce();
+});
+
+function getOtpInput(locale: SupportedLocale = "en"): HTMLInputElement {
   const input = screen
-    .getByRole("group", { name: "6-digit code" })
+    .getByRole("group", { name: messages[locale].auth.otp.codeLabel })
     .querySelector<HTMLInputElement>('[data-slot="otp-field-input"]');
 
   if (!input) {

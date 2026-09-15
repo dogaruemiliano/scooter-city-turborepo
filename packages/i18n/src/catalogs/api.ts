@@ -19,6 +19,9 @@ export const apiCatalog = {
       conflict: "The request conflicts with the current resource state.",
       forbidden: "This action is not allowed.",
       generic: "The request could not be completed.",
+      internalServer: "Something didn’t work. Try again later.",
+      network: "Could not connect. Check your connection and try again.",
+      rateLimitedWithoutDelay: "Too many requests. Try again later.",
       imageStorageBucketUnavailable: "Image storage bucket is not available.",
       imageStorageUnavailable: "Image storage is not available.",
       notFound: "The requested resource does not exist.",
@@ -50,6 +53,11 @@ export const apiCatalog = {
       conflict: "Cererea intră în conflict cu starea curentă a resursei.",
       forbidden: "Această acțiune nu este permisă.",
       generic: "Cererea nu a putut fi finalizată.",
+      internalServer: "Ceva nu a funcționat. Încearcă din nou mai târziu.",
+      network:
+        "Conexiunea nu a reușit. Verifică conexiunea și încearcă din nou.",
+      rateLimitedWithoutDelay:
+        "Prea multe cereri. Încearcă din nou mai târziu.",
       imageStorageBucketUnavailable:
         "Bucketul pentru imagini nu este disponibil.",
       imageStorageUnavailable: "Stocarea imaginilor nu este disponibilă.",

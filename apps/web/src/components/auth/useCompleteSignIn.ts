@@ -1,6 +1,7 @@
 "use client";
 
 import { v1 } from "@repo/api-shared";
+import { localeHeaderName } from "@repo/i18n";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback } from "react";
 
@@ -24,9 +25,10 @@ export function useCompleteSignIn(): () => Promise<void> {
     const user = await webApi.fetch(
       v1.auth.ROUTES.me,
       v1.auth.sessionUserSchema,
+      { headers: { [localeHeaderName]: locale } },
     );
     setUser(toSessionIdentity(user));
     router.replace(destination);
     router.refresh();
-  }, [destination, router, setUser]);
+  }, [destination, locale, router, setUser]);
 }

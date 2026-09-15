@@ -1,9 +1,10 @@
 "use client";
 
 import { ApiError, v1 } from "@repo/api-shared";
+import { localeHeaderName } from "@repo/i18n";
 import { Button } from "@repo/ui/components";
 import { ArrowLeftIcon } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useState } from "react";
 
 import { webApi } from "../../lib/api";
@@ -11,6 +12,7 @@ import { EmailOtpSignInForm } from "./EmailOtpSignInForm";
 import { GoogleSignInButton } from "./GoogleSignInButton";
 import { OtpChallengeForm } from "./OtpChallengeForm";
 import { useCompleteSignIn } from "./useCompleteSignIn";
+import { formatAuthError, type AuthErrorState } from "./auth-errors";
 
 type ActiveChallenge =
   | {
@@ -36,15 +38,18 @@ export function SignInMethods({
   const tSignIn = useTranslations("auth.signIn");
   const tOtp = useTranslations("auth.otp");
   const tGoogle = useTranslations("auth.google");
+  const locale = useLocale();
   const completeSignIn = useCompleteSignIn();
   const [activeChallenge, setActiveChallenge] =
     useState<ActiveChallenge | null>(null);
-  const [methodError, setMethodError] = useState<string | null>(null);
+  const [methodError, setMethodError] = useState<
+    AuthErrorState | "failed" | "expired" | null
+  >(null);
 
   const handleGoogleCredential = useCallback(
     async (idToken: string) => {
       setMethodError(null);
-      const result = await exchangeGoogleIdToken(idToken);
+      const result = await exchangeGoogleIdToken(idToken, locale);
 
       if (isChallenge(result)) {
         setActiveChallenge({
@@ -57,12 +62,19 @@ export function SignInMethods({
 
       await completeSignIn();
     },
-    [completeSignIn],
+    [completeSignIn, locale],
   );
 
-  const handleGoogleError = useCallback(() => {
-    setMethodError(tGoogle("failed"));
-  }, [tGoogle]);
+  const handleGoogleError = useCallback((error?: unknown) => {
+    setMethodError(
+      error === undefined
+        ? "failed"
+        : {
+            cause: error,
+            unauthorizedMessage: "auth.google.failed",
+          },
+    );
+  }, []);
 
   const handleCancelChallenge = useCallback(() => {
     setActiveChallenge(null);
@@ -115,6 +127,7 @@ export function SignInMethods({
                 v1.auth.emailOtpChallengeSchema,
                 {
                   method: "POST",
+                  headers: { [localeHeaderName]: locale },
                   json: { email: activeChallenge.email },
                 },
               );
@@ -125,6 +138,7 @@ export function SignInMethods({
             try {
               const result = await exchangeGoogleIdToken(
                 activeChallenge.idToken,
+                locale,
               );
               if (isChallenge(result)) {
                 setActiveChallenge({ ...activeChallenge, challenge: result });
@@ -134,7 +148,7 @@ export function SignInMethods({
             } catch (error) {
               if (error instanceof ApiError && error.status === 401) {
                 setActiveChallenge(null);
-                setMethodError(tGoogle("expired"));
+                setMethodError("expired");
                 return;
               }
               throw error;
@@ -190,7 +204,13 @@ export function SignInMethods({
 
         {methodError ? (
           <p role="alert" className="text-sm text-destructive">
-            {methodError}
+            {typeof methodError === "string"
+              ? tGoogle(methodError)
+              : formatAuthError(
+                  methodError.cause,
+                  locale,
+                  methodError.unauthorizedMessage,
+                )}
           </p>
         ) : null}
       </div>
@@ -200,9 +220,11 @@ export function SignInMethods({
 
 async function exchangeGoogleIdToken(
   idToken: string,
+  locale: string,
 ): Promise<v1.auth.OAuthSignInResult> {
   return webApi.fetch(v1.auth.ROUTES.google, v1.auth.oauthSignInResultSchema, {
     method: "POST",
+    headers: { [localeHeaderName]: locale },
     json: { idToken },
   });
 }

@@ -44,7 +44,7 @@ declare global {
 export interface GoogleSignInButtonProps {
   clientId: string;
   onCredential: (idToken: string) => Promise<void>;
-  onError: () => void;
+  onError: (error?: unknown) => void;
 }
 
 export function GoogleSignInButton({
@@ -65,8 +65,8 @@ export function GoogleSignInButton({
         setBusy(true);
         try {
           await onCredential(response.credential);
-        } catch {
-          onError();
+        } catch (error) {
+          onError(error);
         } finally {
           setBusy(false);
         }
@@ -87,7 +87,7 @@ export function GoogleSignInButton({
         src="https://accounts.google.com/gsi/client"
         strategy="afterInteractive"
         onReady={() => setScriptReady(true)}
-        onError={onError}
+        onError={() => onError()}
       />
       <div
         ref={buttonRef}

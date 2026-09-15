@@ -1,15 +1,16 @@
 "use client";
 
 import { v1 } from "@repo/api-shared";
+import { localeHeaderName } from "@repo/i18n";
 import { tokens } from "@repo/theme/runtime";
 import { Button } from "@repo/ui/components";
 import { OTPField } from "@repo/ui/components/otp-field";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useState, type FormEvent } from "react";
 
 import { webApi } from "../../lib/api";
 import { formatSecondsAsMinutesAndSeconds } from "../../utils/format-seconds";
-import { formatAuthError } from "./auth-errors";
+import { formatAuthError, type AuthErrorState } from "./auth-errors";
 
 const SECOND_MS = tokens.motion.duration.countdownTick;
 
@@ -33,9 +34,10 @@ export function OtpChallengeForm({
   onCancel,
 }: OtpChallengeFormProps) {
   const t = useTranslations("auth.otp");
+  const locale = useLocale();
   const tSharedActions = useTranslations("shared.actions");
   const [code, setCode] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<AuthErrorState | null>(null);
   const [busy, setBusy] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const [expiresAt, setExpiresAt] = useState(
@@ -65,16 +67,22 @@ export function OtpChallengeForm({
     setError(null);
     setBusy(true);
 
+    let verified = false;
     try {
       await webApi.fetch(verifyRoute, v1.auth.tokenPairSchema, {
         method: "POST",
+        headers: { [localeHeaderName]: locale },
         json: { challengeId: challenge.challengeId, code },
       });
+      verified = true;
       await onVerified();
     } catch (verificationError) {
-      setError(
-        formatAuthError(verificationError, t("errors.invalidOrExpired")),
-      );
+      setError({
+        cause: verificationError,
+        unauthorizedMessage: verified
+          ? "auth.errors.sessionExpired"
+          : "auth.otp.errors.invalidOrExpired",
+      });
     } finally {
       setBusy(false);
     }
@@ -92,6 +100,7 @@ export function OtpChallengeForm({
         v1.auth.otpChallengeMetadataSchema,
         {
           method: "POST",
+          headers: { [localeHeaderName]: locale },
           json: { challengeId: challenge.challengeId },
         },
       );
@@ -101,7 +110,10 @@ export function OtpChallengeForm({
       setResendAt(currentTime + nextChallenge.resendAfterSec * SECOND_MS);
       onChallengeChange(nextChallenge);
     } catch (resendError) {
-      setError(formatAuthError(resendError, t("errors.resendFailed")));
+      setError({
+        cause: resendError,
+        unauthorizedMessage: "auth.otp.errors.invalidOrExpired",
+      });
     } finally {
       setBusy(false);
     }
@@ -115,7 +127,7 @@ export function OtpChallengeForm({
       await onRequestAnother();
       setCode("");
     } catch (requestError) {
-      setError(formatAuthError(requestError, t("errors.requestAnotherFailed")));
+      setError({ cause: requestError });
     } finally {
       setBusy(false);
     }
@@ -166,7 +178,7 @@ export function OtpChallengeForm({
 
       {error ? (
         <p role="alert" className="text-center text-sm text-destructive">
-          {error}
+          {formatAuthError(error.cause, locale, error.unauthorizedMessage)}
         </p>
       ) : null}
 
