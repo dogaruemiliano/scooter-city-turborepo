@@ -29,6 +29,7 @@ export const OTP_PURPOSE_OAUTH_EMAIL_VERIFY = "OAUTH_EMAIL_VERIFY";
 
 const GENERIC_INVALID_MESSAGE = "Invalid or expired code";
 const MAX_TRANSACTION_ATTEMPTS = 3;
+const TRANSACTION_RETRY_DELAY_MS = 10;
 const FIRST_RESEND_DELAY_MS = 30_000;
 const SECOND_RESEND_DELAY_MS = 120_000;
 const LATER_RESEND_DELAY_MS = 300_000;
@@ -511,9 +512,13 @@ export class OtpChallengeService {
       } catch (error) {
         const retryable =
           error instanceof Prisma.PrismaClientKnownRequestError &&
-          (error.code === "P2034" || error.code === "P2002") &&
-          attempt < MAX_TRANSACTION_ATTEMPTS;
-        if (!retryable) throw error;
+          (error.code === "P2034" || error.code === "P2002");
+        if (!retryable || attempt === MAX_TRANSACTION_ATTEMPTS) throw error;
+
+        // Give the conflicting transaction time to finish before retrying.
+        await new Promise<void>((resolve) =>
+          setTimeout(resolve, TRANSACTION_RETRY_DELAY_MS * 2 ** (attempt - 1)),
+        );
       }
     }
 
