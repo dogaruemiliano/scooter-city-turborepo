@@ -37,4 +37,27 @@ describe("SpyMailerService", () => {
     message.text = "mutated-after-send";
     expect(spy.findLastTo("x@example.com")?.text).toBe("original");
   });
+
+  it("returns independent recipient snapshots that survive later sends and reset", async () => {
+    await spy.send({ to: "x@example.com", subject: "S", text: "original" });
+    const captured = spy.findLastTo("x@example.com");
+    if (!captured) throw new Error("Expected a captured email");
+
+    captured.text = "changed snapshot";
+    expect(spy.findLastTo("x@example.com")?.text).toBe("original");
+    const stored = spy.getOutbox()[0];
+    if (!stored) throw new Error("Expected a stored email");
+    stored.text = "changed outbox";
+    expect(captured.text).toBe("changed snapshot");
+
+    await spy.send({ to: "x@example.com", subject: "New", text: "new" });
+    await spy.send({ to: "y@example.com", subject: "Other", text: "other" });
+    expect(spy.findLastTo("x@example.com")?.text).toBe("new");
+    spy.reset();
+    expect(captured).toEqual({
+      to: "x@example.com",
+      subject: "S",
+      text: "changed snapshot",
+    });
+  });
 });

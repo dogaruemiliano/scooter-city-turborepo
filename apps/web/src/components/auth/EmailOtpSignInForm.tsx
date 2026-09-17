@@ -1,12 +1,13 @@
 "use client";
 
 import { v1 } from "@repo/api-shared";
+import { localeHeaderName } from "@repo/i18n";
 import { Button, Input, Label } from "@repo/ui/components";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useId, useRef, useState, type FormEvent } from "react";
 
 import { webApi } from "../../lib/api";
-import { formatAuthError } from "./auth-errors";
+import { formatAuthError, type AuthErrorState } from "./auth-errors";
 
 const DEVELOPMENT_EMAIL =
   process.env.NODE_ENV === "development" ? "admin@email.com" : "";
@@ -17,12 +18,13 @@ export interface EmailOtpSignInFormProps {
 
 export function EmailOtpSignInForm({ onChallenge }: EmailOtpSignInFormProps) {
   const t = useTranslations("auth.signIn.emailOtp");
+  const locale = useLocale();
   const emailInputId = useId();
   const emailErrorId = `${emailInputId}-error`;
   const emailInputRef = useRef<HTMLInputElement>(null);
   const [email, setEmail] = useState(DEVELOPMENT_EMAIL);
   const [emailError, setEmailError] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<AuthErrorState | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function requestCode(event: FormEvent) {
@@ -43,11 +45,15 @@ export function EmailOtpSignInForm({ onChallenge }: EmailOtpSignInFormProps) {
       const challenge = await webApi.fetch(
         v1.auth.ROUTES.emailOtp.request,
         v1.auth.emailOtpChallengeSchema,
-        { method: "POST", json: input.data },
+        {
+          method: "POST",
+          headers: { [localeHeaderName]: locale },
+          json: input.data,
+        },
       );
       onChallenge(challenge, input.data.email);
     } catch (requestError) {
-      setError(formatAuthError(requestError, t("sendCodeError")));
+      setError({ cause: requestError });
     } finally {
       setBusy(false);
     }
@@ -102,7 +108,7 @@ export function EmailOtpSignInForm({ onChallenge }: EmailOtpSignInFormProps) {
       </Button>
       {error ? (
         <p role="alert" className="text-sm text-destructive">
-          {error}
+          {formatAuthError(error.cause, locale)}
         </p>
       ) : null}
     </form>

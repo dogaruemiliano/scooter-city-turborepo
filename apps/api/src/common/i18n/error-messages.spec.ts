@@ -3,6 +3,29 @@ import { HttpStatus } from "@nestjs/common";
 import { localizeErrorMessage } from "./error-messages";
 
 describe("localizeErrorMessage", () => {
+  it.each(["ro", "en"] as const)(
+    "replaces unexpected server messages with friendly %s copy",
+    (locale) => {
+      for (const status of [500, 502, 503, 504]) {
+        for (const message of [
+          "Internal server error",
+          "SMTP password rejected",
+        ]) {
+          expect(
+            localizeErrorMessage(
+              { status, code: "INTERNAL_SERVER_ERROR", message },
+              locale,
+            ),
+          ).toBe(
+            locale === "ro"
+              ? "Ceva nu a funcționat. Încearcă din nou mai târziu."
+              : "Something didn’t work. Try again later.",
+          );
+        }
+      }
+    },
+  );
+
   it("localizes validation failures", () => {
     expect(
       localizeErrorMessage(

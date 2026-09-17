@@ -33,6 +33,9 @@ export const spacing = {
 
 export type Spacing = typeof spacing;
 
+/** Maximum width for transactional email content, in px. */
+export const emailSizing = { content: 560 } as const;
+
 /** Viewport-relative sizing for web document editors. */
 export const viewportSizing = {
   documentEditor: "80vw",

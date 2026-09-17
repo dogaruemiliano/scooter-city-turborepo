@@ -6,16 +6,13 @@ import {
   Logger,
   UnauthorizedException,
 } from "@nestjs/common";
-import {
-  fallbackLocale,
-  formatMessage,
-  type SupportedLocale,
-} from "@repo/i18n";
+import { fallbackLocale, type SupportedLocale } from "@repo/i18n";
 import ms from "ms";
 
 import { ENV } from "../../../config/config.module";
 import type { Env } from "../../../config/env";
 import { Prisma, type OtpChallenge } from "../../../generated/prisma/client";
+import { renderOtpEmail } from "../../../mailer/templates/otp-email";
 import { MailerService } from "../../../mailer/mailer.service";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { hashOtp, safeEqualHex } from "../../utils/hash";
@@ -32,6 +29,7 @@ export const OTP_PURPOSE_OAUTH_EMAIL_VERIFY = "OAUTH_EMAIL_VERIFY";
 
 const GENERIC_INVALID_MESSAGE = "Invalid or expired code";
 const MAX_TRANSACTION_ATTEMPTS = 3;
+const TRANSACTION_RETRY_DELAY_MS = 10;
 const FIRST_RESEND_DELAY_MS = 30_000;
 const SECOND_RESEND_DELAY_MS = 120_000;
 const LATER_RESEND_DELAY_MS = 300_000;
@@ -412,10 +410,10 @@ export class OtpChallengeService {
 
     await this.mailer.send({
       to: challenge.target,
-      subject: formatMessage(locale, "api.auth.otpEmailSubject"),
-      text: formatMessage(locale, "api.auth.otpSent", {
+      ...renderOtpEmail({
         code,
-        ttl: this.otpTtlMinutes(),
+        locale,
+        validForMinutes: ms(this.env.OTP_TTL as ms.StringValue) / 60_000,
       }),
     });
   }
@@ -478,11 +476,6 @@ export class OtpChallengeService {
     return locale ?? fallbackLocale;
   }
 
-  private otpTtlMinutes(): number {
-    const ttlMs = ms(this.env.OTP_TTL as ms.StringValue);
-    return Math.max(1, Math.ceil(ttlMs / 60_000));
-  }
-
   private resendDelayMs(sentCount: number): number {
     if (sentCount === 1) return FIRST_RESEND_DELAY_MS;
     if (sentCount === 2) return SECOND_RESEND_DELAY_MS;
@@ -519,9 +512,13 @@ export class OtpChallengeService {
       } catch (error) {
         const retryable =
           error instanceof Prisma.PrismaClientKnownRequestError &&
-          (error.code === "P2034" || error.code === "P2002") &&
-          attempt < MAX_TRANSACTION_ATTEMPTS;
-        if (!retryable) throw error;
+          (error.code === "P2034" || error.code === "P2002");
+        if (!retryable || attempt === MAX_TRANSACTION_ATTEMPTS) throw error;
+
+        // Give the conflicting transaction time to finish before retrying.
+        await new Promise<void>((resolve) =>
+          setTimeout(resolve, TRANSACTION_RETRY_DELAY_MS * 2 ** (attempt - 1)),
+        );
       }
     }
 

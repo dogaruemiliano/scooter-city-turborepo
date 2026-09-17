@@ -24,7 +24,7 @@ export class SpyMailerService extends MailerService {
   findLastTo(to: string): MailerMessage | undefined {
     for (let i = this.outbox.length - 1; i >= 0; i--) {
       const message = this.outbox[i];
-      if (message && message.to === to) return message;
+      if (message && message.to === to) return { ...message };
     }
     return undefined;
   }

@@ -108,6 +108,10 @@ function matchErrorMessage(
     return { key: "api.errors.conflict" };
   }
 
+  if (input.status >= 500) {
+    return { key: "api.errors.internalServer" };
+  }
+
   return null;
 }
 

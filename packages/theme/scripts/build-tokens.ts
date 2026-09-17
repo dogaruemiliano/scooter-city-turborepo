@@ -15,7 +15,7 @@ import { primitives } from "../src/tokens/primitives.js";
 import { radius, radiusBase } from "../src/tokens/radius.js";
 import { semanticColors } from "../src/tokens/semantic.js";
 import { shadow } from "../src/tokens/shadow.js";
-import { spacing, viewportSizing } from "../src/tokens/spacing.js";
+import { spacing, viewportSizing, emailSizing } from "../src/tokens/spacing.js";
 import { typography } from "../src/tokens/typography.js";
 import { zIndex } from "../src/tokens/z-index.js";
 
@@ -235,10 +235,32 @@ export type ColorScheme = "light" | "dark";
 `;
 }
 
+export function buildEmailTokens() {
+  return {
+    color: nativeColorObject(semanticColors.light),
+    spacing,
+    radius,
+    typography,
+    sizing: emailSizing,
+  };
+}
+
 async function main() {
   await mkdir(OUT_DIR, { recursive: true });
   await writeFile(resolve(OUT_DIR, "tokens.css"), buildCss(), "utf8");
   await writeFile(resolve(OUT_DIR, "tokens.native.ts"), buildNative(), "utf8");
+  const email = JSON.stringify(buildEmailTokens(), null, 2);
+  await writeFile(
+    resolve(OUT_DIR, "tokens.email.cjs"),
+    `${BANNER}\nexports.tokens = ${email};\n`,
+    "utf8",
+  );
+  await writeFile(
+    resolve(OUT_DIR, "tokens.email.d.cts"),
+    `${BANNER}\nexport declare const tokens: ${email};\n`,
+    "utf8",
+  );
+  console.log(`[theme] wrote ${OUT_DIR}/tokens.email.cjs`);
   console.log(`[theme] wrote ${OUT_DIR}/tokens.css`);
   console.log(`[theme] wrote ${OUT_DIR}/tokens.native.ts`);
 }

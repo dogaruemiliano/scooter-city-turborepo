@@ -1,7 +1,15 @@
 export const apiCatalog = {
   en: {
     auth: {
-      otpEmailSubject: "Your sign-in code",
+      otpEmailSubject: "{code} is your Scooter City sign-in code",
+      otpEmailHeading: "Your sign-in code",
+      otpEmailPreview: "Enter this code to access your Scooter City account.",
+      otpEmailIntro:
+        "Enter this code to sign in or create your Scooter City account.",
+      otpEmailExpiry:
+        "This code expires {minutes} minutes after your original request.",
+      otpEmailSafety:
+        "Never share this code with anyone. If you didn’t request it, you can ignore this email.",
       otpExpired: "The code has expired. Request a new one.",
       otpInvalid: "The code is invalid or expired.",
       otpSent: "Your code is {code}. It expires in {ttl} minutes.",
@@ -11,6 +19,9 @@ export const apiCatalog = {
       conflict: "The request conflicts with the current resource state.",
       forbidden: "This action is not allowed.",
       generic: "The request could not be completed.",
+      internalServer: "Something didn’t work. Try again later.",
+      network: "Could not connect. Check your connection and try again.",
+      rateLimitedWithoutDelay: "Too many requests. Try again later.",
       imageStorageBucketUnavailable: "Image storage bucket is not available.",
       imageStorageUnavailable: "Image storage is not available.",
       notFound: "The requested resource does not exist.",
@@ -23,7 +34,16 @@ export const apiCatalog = {
   },
   ro: {
     auth: {
-      otpEmailSubject: "Codul tău de autentificare",
+      otpEmailSubject: "{code} este codul tău de autentificare Scooter City",
+      otpEmailHeading: "Codul tău de autentificare",
+      otpEmailPreview:
+        "Introdu acest cod pentru a accesa contul tău Scooter City.",
+      otpEmailIntro:
+        "Introdu acest cod pentru a te autentifica sau pentru a crea un cont Scooter City.",
+      otpEmailExpiry:
+        "Acest cod expiră la {minutes} minute după solicitarea inițială.",
+      otpEmailSafety:
+        "Nu divulga acest cod nimănui. Dacă nu ai solicitat codul, poți ignora acest email.",
       otpExpired: "Codul a expirat. Cere unul nou.",
       otpInvalid: "Codul este invalid sau a expirat.",
       otpSent: "Codul tău este {code}. Expiră în {ttl} minute.",
@@ -33,6 +53,11 @@ export const apiCatalog = {
       conflict: "Cererea intră în conflict cu starea curentă a resursei.",
       forbidden: "Această acțiune nu este permisă.",
       generic: "Cererea nu a putut fi finalizată.",
+      internalServer: "Ceva nu a funcționat. Încearcă din nou mai târziu.",
+      network:
+        "Conexiunea nu a reușit. Verifică conexiunea și încearcă din nou.",
+      rateLimitedWithoutDelay:
+        "Prea multe cereri. Încearcă din nou mai târziu.",
       imageStorageBucketUnavailable:
         "Bucketul pentru imagini nu este disponibil.",
       imageStorageUnavailable: "Stocarea imaginilor nu este disponibilă.",

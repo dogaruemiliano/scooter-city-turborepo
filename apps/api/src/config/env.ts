@@ -280,8 +280,8 @@ export const envSchema = z
       .describe("SHA-256 HMAC pepper for OTP-code DB hashing. Min 32 chars."),
     OTP_TTL: z
       .string()
-      .default("10m")
-      .describe('OTP lifetime (ms-format, e.g. "10m").'),
+      .default("15m")
+      .describe('OTP lifetime (ms-format, e.g. "15m").'),
     OTP_MAX_ATTEMPTS: z.coerce
       .number()
       .int()

@@ -12,6 +12,8 @@
  * each scenario; audit rows referencing deleted users survive with
  * `userId = NULL` (SetNull cascade) and are pruned by type at the end.
  */
+// Keep expiry assertions independent of local .env files and CI defaults.
+process.env.OTP_TTL = "10m";
 process.env.THROTTLE_LOGIN_PER_IP_PER_MIN = "10000";
 process.env.THROTTLE_GLOBAL_PER_IP_PER_MIN = "10000";
 process.env.THROTTLE_OTP_REQUESTS_PER_IP_PER_MIN = "10000";
@@ -346,10 +348,12 @@ describe("GoogleAuthController (e2e)", () => {
     const existingResponse = await request(server())
       .post("/v1/auth/google")
       .send({ idToken: existingToken });
+    const existingMail = mailer.findLastTo(existingEmail);
     const unknownResponse = await request(server())
       .post("/v1/auth/google")
       .set("X-Locale", "ro")
       .send({ idToken: unknownToken });
+    const unknownMail = mailer.findLastTo(unknownEmail);
     const existingBody =
       existingResponse.body as v1.auth.OAuthEmailVerificationRequired;
     const unknownBody =
@@ -370,14 +374,24 @@ describe("GoogleAuthController (e2e)", () => {
     );
     expect(existingBody.challengeId).not.toBe(unknownBody.challengeId);
     createdChallengeIds.push(existingBody.challengeId, unknownBody.challengeId);
-    expect(mailer.findLastTo(existingEmail)).toMatchObject({
-      subject: "Your sign-in code",
-      text: "Your code is 000000. It expires in 10 minutes.",
+    expect(existingMail).toMatchObject({
+      to: existingEmail,
+      subject: "000000 is your Scooter City sign-in code",
+      text: expect.stringContaining(
+        "This code expires 10 minutes after your original request.",
+      ) as string,
+      html: expect.stringContaining('lang="en"') as string,
     });
-    expect(mailer.findLastTo(unknownEmail)).toMatchObject({
-      subject: "Codul tău de autentificare",
-      text: "Codul tău este 000000. Expiră în 10 minute.",
+    expect(existingMail?.text).toContain("000000");
+    expect(unknownMail).toMatchObject({
+      to: unknownEmail,
+      subject: "000000 este codul tău de autentificare Scooter City",
+      text: expect.stringContaining(
+        "Acest cod expiră la 10 minute după solicitarea inițială.",
+      ) as string,
+      html: expect.stringContaining('lang="ro"') as string,
     });
+    expect(unknownMail?.text).toContain("000000");
 
     const accounts = await prisma.authAccount.findMany({
       where: { userId: user.id, provider: "google" },
