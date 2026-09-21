@@ -28,15 +28,15 @@ export function DetailSectionCard({
   children: ReactNode;
 }) {
   return (
-    <section className="min-w-0">
-      <Card className="grid md:grid-cols-3 md:gap-6">
-        <CardHeader className="flex md:col-span-1">
+    <section className="h-full min-w-0">
+      <Card className="h-full">
+        <CardHeader>
           <CardTitle className="flex items-center gap-2">
             {icon}
             <h2>{title}</h2>
           </CardTitle>
         </CardHeader>
-        <CardContent className="min-w-0 md:col-span-2">{children}</CardContent>
+        <CardContent className="min-w-0">{children}</CardContent>
       </Card>
     </section>
   );
