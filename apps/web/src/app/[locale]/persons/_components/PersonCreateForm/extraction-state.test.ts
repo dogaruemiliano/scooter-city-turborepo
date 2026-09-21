@@ -299,6 +299,12 @@ describe("person document extraction reconciliation", () => {
     ["ANA-MARIA", "ANA MARIA"],
     ["ANA MARIA", "ANA-MARIA"],
     ["ANA‑MARIA", "ANA MARIA"],
+    ["ȘTEFAN", "STEFAN"],
+    ["ȚĂNASE", "TANASE"],
+    ["PÂRVU", "PARVU"],
+    ["ÎNTORSUREANU", "INTORSUREANU"],
+    ["ȘTEFAN-ȚĂNASE", "STEFAN TANASE"],
+    ["ȘTEFAN", "ŞTEFAN"],
   ])(
     "silently keeps national ID names %s when the licence reads %s",
     (identityName, licenseName) => {
@@ -333,7 +339,12 @@ describe("person document extraction reconciliation", () => {
     ["Ana-Maria", " ANA   MARIA ", true],
     ["Ana‑Maria", "ana maria", true],
     ["Ana Maria", "Anamaria", false],
-    ["Ștefan", "Stefan", false],
+    ["Ștefan", "Stefan", true],
+    ["S\u0326tefan", "Stefan", true],
+    ["Ștefan", "Ştefan", true],
+    ["Ștefan-Țănase", "stefan tanase", true],
+    ["Ștefan", "Ștefania", false],
+    ["Ștefan-Țănase", "Stefan Tanasa", false],
     ["Ana Maria", "Maria Ana", false],
   ])(
     "compares %s and %s without hiding substantive changes",

@@ -187,9 +187,15 @@ describe("PersonCreateForm wizard", () => {
     expect(mocks.extractDocument).toHaveBeenCalledOnce();
   });
 
-  it.each(["EMILIANO CONSTANTIN", "EMILIAN CONSTANTIN"])(
-    "keeps the ID name and only requires confirmation for substantive differences when the licence reads %s",
-    async (licenseName) => {
+  it.each([
+    ["EMILIANO-CONSTANTIN", "EMILIANO CONSTANTIN", false],
+    ["EMILIANO-CONSTANTIN", "EMILIAN CONSTANTIN", true],
+    ["ȘTEFAN", "STEFAN", false],
+    ["ȘTEFAN-ȚĂNASE", "STEFAN TANASE", false],
+    ["ȘTEFAN", "STEFANIA", true],
+  ] as const)(
+    "keeps ID name %s when the licence reads %s (confirmation: %s)",
+    async (identityName, licenseName, confirmationRequired) => {
       mocks.extractDocument.mockImplementation((_route, _schema, options) => {
         const type = options.json.documentType;
         return Promise.resolve({
@@ -201,8 +207,7 @@ describe("PersonCreateForm wizard", () => {
             {
               target: "person",
               field: "firstName",
-              value:
-                type === "driverLicense" ? licenseName : "EMILIANO-CONSTANTIN",
+              value: type === "driverLicense" ? licenseName : identityName,
               sourceSlot: "front",
               needsReview: false,
             },
@@ -221,9 +226,7 @@ describe("PersonCreateForm wizard", () => {
       const browser = userEvent.setup();
       await renderReviewForm(browser);
       await waitFor(() =>
-        expect(screen.getByLabelText("First name")).toHaveValue(
-          "EMILIANO-CONSTANTIN",
-        ),
+        expect(screen.getByLabelText("First name")).toHaveValue(identityName),
       );
       changeField("CNP", "1900228123450");
       showReviewStep("Driving license");
@@ -233,15 +236,13 @@ describe("PersonCreateForm wizard", () => {
         expect(mocks.extractDocument).toHaveBeenCalledTimes(2),
       );
       showReviewStep("Personal details");
-      expect(screen.getByLabelText("First name")).toHaveValue(
-        "EMILIANO-CONSTANTIN",
-      );
+      expect(screen.getByLabelText("First name")).toHaveValue(identityName);
       expect(screen.getByLabelText("Last name")).toHaveValue("DOGARU");
       showReviewStep("Document details");
       const submit = screen.getByRole("button", {
         name: messages.en.persons.actions.create,
       });
-      if (licenseName === "EMILIANO CONSTANTIN") {
+      if (!confirmationRequired) {
         expect(
           screen.queryByRole("region", {
             name: "The names on the documents differ",
@@ -253,9 +254,7 @@ describe("PersonCreateForm wizard", () => {
       const confirmation = await screen.findByRole("region", {
         name: "The names on the documents differ",
       });
-      expect(
-        within(confirmation).getByText("EMILIANO-CONSTANTIN"),
-      ).toBeVisible();
+      expect(within(confirmation).getByText(identityName)).toBeVisible();
       expect(within(confirmation).getByText(licenseName)).toBeVisible();
       expect(submit).toBeDisabled();
       fireEvent.submit(submit.closest("form")!);

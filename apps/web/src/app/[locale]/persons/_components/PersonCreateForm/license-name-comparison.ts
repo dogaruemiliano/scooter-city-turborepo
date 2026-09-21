@@ -17,8 +17,11 @@ function normalizeName(value: string) {
 }
 
 export function equivalentPersonNames(left: string, right: string) {
+  // Normalize only for comparison; keep the identity document's original spelling.
   const normalize = (value: string) =>
-    normalizeName(value.replace(/\p{Dash_Punctuation}/gu, " "));
+    normalizeName(value.replace(/\p{Dash_Punctuation}/gu, " "))
+      .normalize("NFD")
+      .replace(/\p{M}/gu, "");
   return normalize(left) === normalize(right);
 }
 
