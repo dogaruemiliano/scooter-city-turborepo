@@ -71,6 +71,44 @@ const category = (
 });
 
 describe("person document extraction reconciliation", () => {
+  it("applies both CEI identifier parts and flags a missing series for review", () => {
+    const form = switchDocumentWorkflow(
+      createEmptyCreateForm("romanian"),
+      "romanian",
+      "electronic",
+    );
+    const document = form.documents[0]!;
+    const seriesKey = `document.${document.key}.series` as const;
+    const initialState = createExtractionState(form);
+    const missing = read(initialState, [], { key: document.key });
+    expect(extractionFieldNeedsReview(missing, seriesKey)).toBe(true);
+    const state = read(
+      initialState,
+      [
+        {
+          target: "document",
+          field: "series",
+          value: "ZR",
+          sourceSlot: "front",
+          needsReview: false,
+        },
+        {
+          target: "document",
+          field: "number",
+          value: "0012345",
+          sourceSlot: "front",
+          needsReview: false,
+        },
+      ],
+      { key: document.key },
+    );
+    expect(state.form.documents[0]).toMatchObject({
+      series: "ZR",
+      number: "0012345",
+    });
+    expect(extractionFieldNeedsReview(state, seriesKey)).toBe(false);
+  });
+
   it.each(["classic", "electronic"] as const)(
     "keeps Romania as the %s ID issuer without OCR or review",
     (format) => {
@@ -97,7 +135,82 @@ describe("person document extraction reconciliation", () => {
     },
   );
 
-  it("still requests an unreadable passport or driving licence issuer", () => {
+  it.each(["classic", "electronic"] as const)(
+    "defaults an unreadable licence issuer to Romania in the %s Romanian workflow",
+    (format) => {
+      const form = switchDocumentWorkflow(
+        createEmptyCreateForm("romanian"),
+        "romanian",
+        format,
+      );
+      const key = "document.driver-license.issuingCountryCode";
+      let state = read(createExtractionState(form), [], {
+        key: "driver-license",
+      });
+      expect(state.form.documents.at(-1)?.issuingCountryCode).toBe("RO");
+      expect(extractionFieldNeedsReview(state, key)).toBe(false);
+      expect(state.fields[key]?.provenance).toBeUndefined();
+      expect(state.fields[key]?.suggestions).toEqual([]);
+
+      state = invalidateDocumentExtraction(state, "driver-license");
+      expect(state.form.documents.at(-1)?.issuingCountryCode).toBe("");
+      state = read(state, [], { key: "driver-license", signature: "photo-v2" });
+      expect(state.form.documents.at(-1)?.issuingCountryCode).toBe("RO");
+    },
+  );
+
+  it.each(["RO", "DE"])(
+    "uses the extracted licence issuer %s instead of the Romanian fallback",
+    (country) => {
+      let state = read(
+        createExtractionState(createEmptyCreateForm("romanian")),
+        [],
+        { key: "driver-license" },
+      );
+      state = read(
+        state,
+        [
+          {
+            target: "document",
+            field: "issuingCountryCode",
+            value: country,
+            sourceSlot: "front",
+            needsReview: false,
+          },
+        ],
+        { key: "driver-license", signature: "photo-v2" },
+      );
+      expect(state.form.documents.at(-1)?.issuingCountryCode).toBe(country);
+      expect(
+        state.fields["document.driver-license.issuingCountryCode"]?.provenance,
+      ).toMatchObject([{ sourceSlot: "front", sourceSignature: "photo-v2" }]);
+    },
+  );
+
+  it.each(["DE", ""] as const)(
+    "preserves the manually entered licence issuer '%s' when OCR misses it",
+    (country) => {
+      let state = createExtractionState(createEmptyCreateForm("romanian"));
+      state.form.documents.at(-1)!.issuingCountryCode = country;
+      state = markExtractionFieldEdited(
+        state,
+        "document.driver-license.issuingCountryCode",
+      );
+      state = read(state, [], { key: "driver-license" });
+      expect(state.form.documents.at(-1)?.issuingCountryCode).toBe(country);
+    },
+  );
+
+  it("does not default the issuer when the uploaded document is not a licence", () => {
+    const state = read(
+      createExtractionState(createEmptyCreateForm("romanian")),
+      [],
+      { key: "driver-license", detectedType: "passport" },
+    );
+    expect(state.form.documents.at(-1)?.issuingCountryCode).toBe("");
+  });
+
+  it("still requests an unreadable passport or driving licence issuer for foreign citizens", () => {
     let state = initial();
     for (const document of state.form.documents.filter(
       (item) => item.type === "passport" || item.type === "driverLicense",
@@ -163,14 +276,18 @@ describe("person document extraction reconciliation", () => {
         expect(state.form.firstName).toBe("EMILIANO-CONSTANTIN");
         expect(state.form.lastName).toBe("DOGARU");
         expect(state.fields["person.firstName"]!.suggestions).toHaveLength(1);
-        expect(licenseNameDifferences(state)).toMatchObject([
-          {
-            field: "firstName",
-            identityName: "EMILIANO-CONSTANTIN",
-            licenseName,
-            formattingOnly: licenseName === "EMILIANO CONSTANTIN",
-          },
-        ]);
+        expect(licenseNameDifferences(state)).toMatchObject(
+          licenseName === "EMILIANO CONSTANTIN"
+            ? []
+            : [
+                {
+                  field: "firstName",
+                  identityName: "EMILIANO-CONSTANTIN",
+                  licenseName,
+                  formattingOnly: false,
+                },
+              ],
+        );
         state = invalidateDocumentExtraction(state, licenseKey);
         expect(state.form.firstName).toBe("EMILIANO-CONSTANTIN");
         expect(licenseNameDifferences(state)).toEqual([]);
@@ -179,10 +296,55 @@ describe("person document extraction reconciliation", () => {
   );
 
   it.each([
+    ["ANA-MARIA", "ANA MARIA"],
+    ["ANA MARIA", "ANA-MARIA"],
+    ["ANA‑MARIA", "ANA MARIA"],
+    ["ȘTEFAN", "STEFAN"],
+    ["ȚĂNASE", "TANASE"],
+    ["PÂRVU", "PARVU"],
+    ["ÎNTORSUREANU", "INTORSUREANU"],
+    ["ȘTEFAN-ȚĂNASE", "STEFAN TANASE"],
+    ["ȘTEFAN", "ŞTEFAN"],
+  ])(
+    "silently keeps national ID names %s when the licence reads %s",
+    (identityName, licenseName) => {
+      for (const field of ["firstName", "lastName"] as const) {
+        for (const licenceFirst of [false, true]) {
+          let state = createExtractionState(createEmptyCreateForm("romanian"));
+          const identityKey = state.form.documents.find(
+            (document) => document.type === "nationalId",
+          )!.key;
+          const licenseKey = state.form.documents.find(
+            (document) => document.type === "driverLicense",
+          )!.key;
+          const identity = (current: ExtractionState) =>
+            read(current, [person(field, identityName)], { key: identityKey });
+          const license = (current: ExtractionState) =>
+            read(current, [person(field, licenseName)], { key: licenseKey });
+          state = licenceFirst
+            ? identity(license(state))
+            : license(identity(state));
+
+          expect(state.form[field]).toBe(identityName);
+          expect(licenseNameDifferences(state)).toEqual([]);
+          expect(extractionFieldNeedsReview(state, `person.${field}`)).toBe(
+            false,
+          );
+        }
+      }
+    },
+  );
+
+  it.each([
     ["Ana-Maria", " ANA   MARIA ", true],
     ["Ana‑Maria", "ana maria", true],
     ["Ana Maria", "Anamaria", false],
-    ["Ștefan", "Stefan", false],
+    ["Ștefan", "Stefan", true],
+    ["S\u0326tefan", "Stefan", true],
+    ["Ștefan", "Ştefan", true],
+    ["Ștefan-Țănase", "stefan tanase", true],
+    ["Ștefan", "Ștefania", false],
+    ["Ștefan-Țănase", "Stefan Tanasa", false],
     ["Ana Maria", "Maria Ana", false],
   ])(
     "compares %s and %s without hiding substantive changes",

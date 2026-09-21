@@ -49,13 +49,10 @@ import {
   type ScooterFormErrors,
   type ScooterFormState,
 } from "./scooter-form";
-import { ScooterMaintenanceSection } from "./ScooterMaintenanceSection";
 
 interface ScooterDetailPageProps {
   scooter: v1.scooters.Scooter;
   scootersHref: string;
-  maintenanceOverview: v1.maintenance.ScooterMaintenanceOverview;
-  maintenanceTypes: v1.maintenance.MaintenanceTypeList;
 }
 
 interface Feedback {
@@ -67,8 +64,6 @@ interface Feedback {
 export function ScooterDetailPage({
   scooter,
   scootersHref,
-  maintenanceOverview,
-  maintenanceTypes,
 }: ScooterDetailPageProps) {
   const t = useTranslations("scooters");
   const locale = useLocale();
@@ -247,6 +242,14 @@ export function ScooterDetailPage({
               : t("detail.emptyValue")
           }
         />
+        <DetailField
+          label={t("fields.currentMileageKm")}
+          value={
+            scooter.currentMileageKm == null
+              ? t("detail.emptyValue")
+              : new Intl.NumberFormat(locale).format(scooter.currentMileageKm)
+          }
+        />
       </DetailSection>
 
       <DetailSection title={t("sections.registration")}>
@@ -308,12 +311,6 @@ export function ScooterDetailPage({
           className="sm:col-span-2"
         />
       </DetailSection>
-
-      <ScooterMaintenanceSection
-        scooter={scooter}
-        overview={maintenanceOverview}
-        maintenanceTypes={maintenanceTypes}
-      />
 
       <ScooterRegistrationDialog
         key={`edit-scooter-registration-${registrationDialogKey}`}

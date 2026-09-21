@@ -65,6 +65,133 @@ function setup(
 }
 
 describe("person-document extraction normalization", () => {
+  it.each(["classic", "electronic"] as const)(
+    "preserves separate %s ID fields and leading zeros",
+    async (nationalIdFormat) => {
+      const number = nationalIdFormat === "classic" ? "001234" : "0012345";
+      const { service } = setup({
+        suggestions: [
+          suggestion("document", "series", " rx "),
+          suggestion("document", "number", ` ${number} `),
+        ],
+      });
+      const result = await service.analyze({ ...input, nationalIdFormat });
+      expect(result.suggestions).toEqual([
+        suggestion("document", "series", "RX"),
+        suggestion("document", "number", number),
+      ]);
+      expect(result.warnings).toEqual([]);
+    },
+  );
+
+  it.each([
+    ["classic", "RX001234", "RX", "001234"],
+    ["classic", "rx 001 234", "RX", "001234"],
+    ["electronic", "ZR0012345", "ZR", "0012345"],
+    ["electronic", " zr 001 2345 ", "ZR", "0012345"],
+  ] as const)(
+    "splits a combined %s identifier %s with source and uncertainty intact",
+    async (nationalIdFormat, value, series, number) => {
+      const { service } = setup({
+        suggestions: [
+          {
+            ...suggestion("document", "number", value, "back"),
+            needsReview: true,
+          },
+        ],
+      });
+      const result = await service.analyze({ ...input, nationalIdFormat });
+      expect(result.suggestions).toEqual([
+        {
+          ...suggestion("document", "series", series, "back"),
+          needsReview: true,
+        },
+        {
+          ...suggestion("document", "number", number, "back"),
+          needsReview: true,
+        },
+      ]);
+    },
+  );
+
+  it("deduplicates a CEI series already returned separately", async () => {
+    const { service } = setup({
+      suggestions: [
+        suggestion("document", "series", "ZR"),
+        suggestion("document", "number", "ZR0012345"),
+      ],
+    });
+    const result = await service.analyze({
+      ...input,
+      nationalIdFormat: "electronic",
+    });
+    expect(result.suggestions).toEqual([
+      suggestion("document", "series", "ZR"),
+      suggestion("document", "number", "0012345"),
+    ]);
+    expect(result.warnings).toEqual([]);
+  });
+
+  it("retains conflicting explicit and combined CEI series for review", async () => {
+    const { service } = setup({
+      suggestions: [
+        suggestion("document", "series", "RX"),
+        suggestion("document", "number", "ZR0012345", "back"),
+      ],
+    });
+    const result = await service.analyze({
+      ...input,
+      nationalIdFormat: "electronic",
+    });
+    expect(result.suggestions).toEqual([
+      { ...suggestion("document", "series", "RX"), needsReview: true },
+      { ...suggestion("document", "series", "ZR", "back"), needsReview: true },
+      suggestion("document", "number", "0012345", "back"),
+    ]);
+    expect(result.warnings).toEqual(["conflictingSources"]);
+  });
+
+  it("normalizes Romanian IDs with an issuer but no format hint", async () => {
+    const { service } = setup({
+      suggestions: [
+        suggestion("document", "issuingCountryCode", "ro"),
+        suggestion("document", "number", "ZR0012345"),
+      ],
+    });
+    expect((await service.analyze(input)).suggestions).toEqual([
+      suggestion("document", "issuingCountryCode", "RO"),
+      suggestion("document", "series", "ZR"),
+      suggestion("document", "number", "0012345"),
+    ]);
+  });
+
+  it.each([
+    "passport",
+    "driverLicense",
+    "residencePermit",
+    "visa",
+    "nationalId",
+  ] as const)("does not split an unrelated %s number", async (documentType) => {
+    const suggestions = [suggestion("document", "number", "AB0012345")];
+    const { service } = setup({
+      detectedDocumentType: documentType,
+      suggestions,
+    });
+    expect(
+      (await service.analyze({ ...input, documentType })).suggestions,
+    ).toEqual(suggestions);
+  });
+
+  it("does not invent a CEI series when only the numeric part is readable", async () => {
+    const { service } = setup({
+      suggestions: [suggestion("document", "number", "0012345")],
+    });
+    expect(
+      (await service.analyze({ ...input, nationalIdFormat: "electronic" }))
+        .suggestions,
+    ).toEqual([suggestion("document", "number", "0012345")]);
+  });
+
   it.each(["nationalId", "other", null])(
     "reads a CEI domicile certificate PDF even when the model labels it %s",
     async (detectedDocumentType) => {
@@ -352,6 +479,62 @@ describe("person-document extraction normalization", () => {
     expect(result.suggestions).toContainEqual(
       suggestion("person", "city", "Iași"),
     );
+  });
+
+  it.each([1, 2, 3, 4, 5, 6])(
+    "uses printed Bucharest Sector %i instead of a model's București locality",
+    async (sector) => {
+      const { service } = setup({
+        suggestions: [
+          suggestion("person", "region", "B", "back"),
+          suggestion("person", "city", "București", "back"),
+          suggestion(
+            "person",
+            "addressLine1",
+            `Mun.București Sectorul ${sector} Str.Exemplu Nr.12 Bl.A`,
+            "back",
+          ),
+        ],
+      });
+      const result = await service.analyze(input);
+      expect(result.suggestions).toEqual(
+        expect.arrayContaining([
+          suggestion("person", "region", "București", "back"),
+          suggestion("person", "city", `Sector ${sector}`, "back"),
+          suggestion("person", "addressLine1", "Str. Exemplu, Nr. 12", "back"),
+          suggestion("person", "addressLine2", "Bl. A", "back"),
+        ]),
+      );
+      expect(
+        result.suggestions.filter((item) => item.field === "city"),
+      ).toHaveLength(1);
+    },
+  );
+
+  it("normalizes a sector returned separately from the Bucharest county", async () => {
+    const { service } = setup({
+      suggestions: [
+        suggestion("person", "region", "Bucuresti"),
+        suggestion("person", "city", "Sectorul 6"),
+      ],
+    });
+    const result = await service.analyze(input);
+    expect(result.suggestions).toContainEqual(
+      suggestion("person", "city", "Sector 6"),
+    );
+  });
+
+  it("leaves a Bucharest locality without a printed sector for manual review", async () => {
+    const { service } = setup({
+      suggestions: [
+        suggestion("person", "region", "București"),
+        suggestion("person", "city", "București"),
+      ],
+    });
+    const result = await service.analyze(input);
+    expect(result.suggestions.filter((item) => item.field === "city")).toEqual([
+      { ...suggestion("person", "city", "București"), needsReview: true },
+    ]);
   });
 
   it("also parses Romanian residence proofs for foreign citizens", async () => {

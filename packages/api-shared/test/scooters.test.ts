@@ -23,6 +23,68 @@ test("scooter create schema accepts a valid scooter", () => {
   );
 });
 
+test("scooter mileage remains optional and constrained to nonnegative whole kilometres", () => {
+  for (const currentMileageKm of [0, 12_250, 2_147_483_647, null]) {
+    assert.equal(
+      v1.scooters.createScooterInputSchema.parse({
+        ...baseScooterInput(),
+        currentMileageKm,
+      }).currentMileageKm,
+      currentMileageKm,
+    );
+    assert.equal(
+      v1.scooters.updateScooterInputSchema.parse({ currentMileageKm })
+        .currentMileageKm,
+      currentMileageKm,
+    );
+  }
+  for (const currentMileageKm of [-1, 0.5, 2_147_483_648]) {
+    assert.equal(
+      v1.scooters.createScooterInputSchema.safeParse({
+        ...baseScooterInput(),
+        currentMileageKm,
+      }).success,
+      false,
+    );
+    assert.equal(
+      v1.scooters.updateScooterInputSchema.safeParse({ currentMileageKm })
+        .success,
+      false,
+    );
+  }
+});
+
+test("scooter list items use the basic scooter contract", () => {
+  const scooter = {
+    id: "scooter-1",
+    vin: "JYARN23E0RA123456",
+    brandId: "brand-1",
+    brand: "Yamaha",
+    brandCode: "YAM",
+    model: "NMAX",
+    color: "White",
+    manufactureYear: 2026,
+    powertrainType: "combustion",
+    engineType: null,
+    engineCc: 125,
+    powerKw: 9.5,
+    registrationType: "unregistered",
+    plateNumber: null,
+    registeredOn: null,
+    registrationExpiresOn: null,
+    requiredDriverLicenseType: "A1",
+    currentMileageKm: 12_250,
+    notes: null,
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+    deletedAt: null,
+  };
+  const parsed = v1.scooters.scooterListItemSchema.parse(scooter);
+  assert.deepEqual(parsed, v1.scooters.scooterSchema.parse(scooter));
+  assert.equal(parsed.currentMileageKm, 12_250);
+  assert.equal("attentionSummary" in parsed, false);
+});
+
 test("scooter create schema accepts registered scooters", () => {
   assert.equal(
     v1.scooters.createScooterInputSchema.parse({

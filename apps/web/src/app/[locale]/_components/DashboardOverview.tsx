@@ -117,66 +117,22 @@ export async function DashboardOverview({
                     {number.format(fleet.totalScooters)}
                   </p>
                 </div>
-                {fleet.totalScooters > 0 ? (
-                  <>
-                    <dl className="divide-y px-6">
-                      {[
-                        {
-                          label: t.fleet.openIssues,
-                          count: fleet.scootersWithOpenIssues,
-                        },
-                        {
-                          label: t.fleet.blockingIssues,
-                          count: fleet.scootersWithBlockingIssues,
-                        },
-                        {
-                          label: t.fleet.overdue,
-                          count: fleet.scootersWithOverdueMaintenance,
-                        },
-                      ].map(({ label, count }) => (
-                        <div
-                          key={label}
-                          className="flex items-baseline justify-between gap-4 py-3"
-                        >
-                          <dt className="text-sm">{label}</dt>
-                          <dd className="text-sm font-semibold tabular-nums">
-                            {number.format(count)}
-                          </dd>
-                        </div>
-                      ))}
-                    </dl>
-                    <div className="mt-auto px-6 pt-3 pb-6">
-                      <Link
-                        href="/service"
-                        className={buttonVariants({
-                          variant: "outline",
-                          size: "sm",
-                        })}
-                      >
-                        {t.fleet.service}
-                        <ArrowRightIcon
-                          aria-hidden="true"
-                          data-icon="inline-end"
-                        />
-                      </Link>
-                    </div>
-                  </>
-                ) : (
-                  <div className="flex flex-col items-start gap-4 p-6">
+                <div className="mt-auto flex flex-col items-start gap-4 p-6">
+                  {fleet.totalScooters === 0 ? (
                     <p className="text-sm leading-relaxed text-muted-foreground">
                       {t.fleet.empty}
                     </p>
-                    <Link
-                      href="/scooters/new"
-                      className={buttonVariants({
-                        variant: "outline",
-                        size: "sm",
-                      })}
-                    >
-                      {t.fleet.add}
-                    </Link>
-                  </div>
-                )}
+                  ) : null}
+                  <Link
+                    href="/scooters/new"
+                    className={buttonVariants({
+                      variant: "outline",
+                      size: "sm",
+                    })}
+                  >
+                    {t.fleet.add}
+                  </Link>
+                </div>
               </>
             ) : (
               <div className="flex flex-col items-start gap-4 px-6 pb-6">
@@ -184,10 +140,10 @@ export async function DashboardOverview({
                   {t.unavailable}
                 </p>
                 <Link
-                  href="/service"
+                  href="/scooters/new"
                   className={buttonVariants({ variant: "outline", size: "sm" })}
                 >
-                  {t.fleet.service}
+                  {t.fleet.add}
                 </Link>
               </div>
             )}

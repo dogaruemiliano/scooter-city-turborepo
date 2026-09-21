@@ -189,7 +189,10 @@ const result: County[] = countyRows
     const sectors = rows
       .filter((row) => row.JUD === countyId && Number(row.TIP) === 6)
       .map((row) => ({
-        name: normalizeUatName(row.DENLOC),
+        name: normalizeUatName(row.DENLOC).replace(
+          /^(?:București\s+)?Sectorul\s+([1-6])$/u,
+          'Sector $1',
+        ),
         sirutaCode: Number(row.SIRUTA),
       }))
       .sort((a, b) => a.name.localeCompare(b.name, 'ro'));

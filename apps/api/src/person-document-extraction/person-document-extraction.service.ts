@@ -5,6 +5,7 @@ import { DocumentExtractionError } from "../document-extraction/document-extract
 import { personDocumentModelOutputSchema } from "./person-document-extraction.schema";
 import { normalizePersonAddressSuggestions } from "./person-address";
 import { capitalizeExtractedName } from "./person-name";
+import { normalizePersonDocumentIdentifiers } from "./person-document-identifier";
 import {
   PERSON_DOCUMENT_EXTRACTION_MAX_SOURCE_BYTES,
   PERSON_DOCUMENT_EXTRACTION_PROVIDER,
@@ -102,7 +103,7 @@ export class PersonDocumentExtractionService {
 
     let suggestions: v1.persons.PersonDocumentExtractionSuggestion[] = [];
     for (const rawSuggestion of normalizePersonAddressSuggestions(
-      residentialSuggestions,
+      normalizePersonDocumentIdentifiers(residentialSuggestions, input),
       input.documentType,
     )) {
       const suggestion =

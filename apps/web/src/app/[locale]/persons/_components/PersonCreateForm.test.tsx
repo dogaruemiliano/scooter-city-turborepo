@@ -187,9 +187,15 @@ describe("PersonCreateForm wizard", () => {
     expect(mocks.extractDocument).toHaveBeenCalledOnce();
   });
 
-  it.each(["EMILIANO CONSTANTIN", "EMILIAN CONSTANTIN"])(
-    "keeps the ID name and requires final confirmation when the licence reads %s",
-    async (licenseName) => {
+  it.each([
+    ["EMILIANO-CONSTANTIN", "EMILIANO CONSTANTIN", false],
+    ["EMILIANO-CONSTANTIN", "EMILIAN CONSTANTIN", true],
+    ["ȘTEFAN", "STEFAN", false],
+    ["ȘTEFAN-ȚĂNASE", "STEFAN TANASE", false],
+    ["ȘTEFAN", "STEFANIA", true],
+  ] as const)(
+    "keeps ID name %s when the licence reads %s (confirmation: %s)",
+    async (identityName, licenseName, confirmationRequired) => {
       mocks.extractDocument.mockImplementation((_route, _schema, options) => {
         const type = options.json.documentType;
         return Promise.resolve({
@@ -201,8 +207,7 @@ describe("PersonCreateForm wizard", () => {
             {
               target: "person",
               field: "firstName",
-              value:
-                type === "driverLicense" ? licenseName : "EMILIANO-CONSTANTIN",
+              value: type === "driverLicense" ? licenseName : identityName,
               sourceSlot: "front",
               needsReview: false,
             },
@@ -221,9 +226,7 @@ describe("PersonCreateForm wizard", () => {
       const browser = userEvent.setup();
       await renderReviewForm(browser);
       await waitFor(() =>
-        expect(screen.getByLabelText("First name")).toHaveValue(
-          "EMILIANO-CONSTANTIN",
-        ),
+        expect(screen.getByLabelText("First name")).toHaveValue(identityName),
       );
       changeField("CNP", "1900228123450");
       showReviewStep("Driving license");
@@ -233,21 +236,26 @@ describe("PersonCreateForm wizard", () => {
         expect(mocks.extractDocument).toHaveBeenCalledTimes(2),
       );
       showReviewStep("Personal details");
-      expect(screen.getByLabelText("First name")).toHaveValue(
-        "EMILIANO-CONSTANTIN",
-      );
+      expect(screen.getByLabelText("First name")).toHaveValue(identityName);
       expect(screen.getByLabelText("Last name")).toHaveValue("DOGARU");
       showReviewStep("Document details");
-      const confirmation = await screen.findByRole("region", {
-        name: "The names on the documents differ",
-      });
-      expect(
-        within(confirmation).getByText("EMILIANO-CONSTANTIN"),
-      ).toBeVisible();
-      expect(within(confirmation).getByText(licenseName)).toBeVisible();
       const submit = screen.getByRole("button", {
         name: messages.en.persons.actions.create,
       });
+      if (!confirmationRequired) {
+        expect(
+          screen.queryByRole("region", {
+            name: "The names on the documents differ",
+          }),
+        ).not.toBeInTheDocument();
+        expect(submit).toBeEnabled();
+        return;
+      }
+      const confirmation = await screen.findByRole("region", {
+        name: "The names on the documents differ",
+      });
+      expect(within(confirmation).getByText(identityName)).toBeVisible();
+      expect(within(confirmation).getByText(licenseName)).toBeVisible();
       expect(submit).toBeDisabled();
       fireEvent.submit(submit.closest("form")!);
       expect(mocks.createPerson).not.toHaveBeenCalled();
@@ -473,7 +481,7 @@ describe("PersonCreateForm wizard", () => {
     await browser.click(screen.getByRole("button", { name: "Continue" }));
     await browser.click(screen.getByRole("button", { name: "Continue" }));
     await browser.click(screen.getByRole("button", { name: "Continue" }));
-    expect(screen.getByLabelText("Phone")).toHaveValue("749096855");
+    expect(screen.getByLabelText("Phone")).toHaveValue("749 096 855");
     await browser.click(screen.getByRole("button", { name: "Continue" }));
     expect(
       screen.getByRole("button", { name: /^(Add|Edit) National ID$/ }),
@@ -666,7 +674,7 @@ describe("PersonCreateForm wizard", () => {
     ).toBeInTheDocument();
     await browser.click(screen.getByRole("button", { name: "Review details" }));
     showReviewStep("Contact details");
-    expect(screen.getByLabelText("Phone")).toHaveValue("749096855");
+    expect(screen.getByLabelText("Phone")).toHaveValue("749 096 855");
     showReviewStep("Personal details");
     expect(screen.getByLabelText("First name")).toHaveValue("Grace");
     const dialog = await openNationalIdSheet(browser);
@@ -674,6 +682,32 @@ describe("PersonCreateForm wizard", () => {
     await browser.click(within(dialog).getByRole("button", { name: "Cancel" }));
     await waitFor(() => expect(dialog).not.toBeInTheDocument());
     expect(mocks.s3Fetch).toHaveBeenCalledOnce();
+  });
+
+  it("offers only the six sectors as localities for Bucharest", async () => {
+    const browser = userEvent.setup();
+    await renderReviewForm(browser);
+    showReviewStep("Address");
+    await selectAddressOption(browser, "County", "București");
+    await browser.click(
+      screen.getByRole("button", { name: /^Locality(?: |$)/ }),
+    );
+    const dialog = await screen.findByRole("dialog", { name: "Locality" });
+    for (let sector = 1; sector <= 6; sector++) {
+      expect(
+        within(dialog).getByRole("button", { name: `Sector ${sector}` }),
+      ).toBeVisible();
+    }
+    expect(
+      within(dialog).queryByRole("button", { name: "București" }),
+    ).toBeNull();
+    await browser.click(
+      within(dialog).getByRole("button", { name: "Sector 3" }),
+    );
+    await waitFor(() => expect(dialog).not.toBeInTheDocument());
+    expect(
+      screen.getByRole("button", { name: /^Locality(?: |$)/ }),
+    ).toHaveTextContent("Sector 3");
   });
 
   it("submits reviewed data and opens the newly created person's detail page", async () => {
@@ -684,7 +718,7 @@ describe("PersonCreateForm wizard", () => {
     await selectAddressOption(browser, "County", "București");
     changeField("Address line 1", "1 Rental Street");
     changeField("Address line 2", "Apt 4");
-    await selectAddressOption(browser, "Locality", "București");
+    await selectAddressOption(browser, "Locality", "Sector 3");
     changeField("Notes", "Frequent rider");
     changeField("CNP", "1900228123450");
     const dialog = await openNationalIdSheet(browser);
@@ -719,7 +753,7 @@ describe("PersonCreateForm wizard", () => {
           dateOfBirth: "1990-02-28",
           addressLine1: "1 Rental Street",
           addressLine2: "Apt 4",
-          city: "București",
+          city: "Sector 3",
           region: "București",
           countryCode: "RO",
           notes: "Frequent rider",
@@ -806,11 +840,11 @@ describe("PersonCreateForm wizard", () => {
     expect(idSummary.queryByText("Series")).not.toBeInTheDocument();
     const idEditor = await openNationalIdSheet(browser);
     expect(within(idEditor).getByLabelText("ID number")).toBeVisible();
-    expect(within(idEditor).queryByLabelText("Series")).not.toBeInTheDocument();
-    await browser.click(
-      within(idEditor).getByRole("button", { name: "Cancel" }),
-    );
-    await waitFor(() => expect(idEditor).not.toBeInTheDocument());
+    expect(within(idEditor).getByLabelText("Series")).toBeVisible();
+    changeDialogField(idEditor, "Series", "ZR");
+    changeDialogField(idEditor, "ID number", "0012345");
+    await saveDocumentSheet(browser, idEditor);
+    expect(idSummary.getByText("ZR 0012345")).toBeVisible();
 
     await submitPerson(browser);
     await waitFor(() => expect(mocks.createPerson).toHaveBeenCalledOnce());
@@ -836,6 +870,8 @@ describe("PersonCreateForm wizard", () => {
             expect.objectContaining({
               type: "nationalId",
               nationalIdFormat: "electronic",
+              series: "ZR",
+              number: "0012345",
               photos: { front: "draft-front-token" },
             }),
             expect.objectContaining({
@@ -1720,7 +1756,7 @@ async function fillRequiredAddress(
 ) {
   showReviewStep("Address");
   await selectAddressOption(browser, "County", "București");
-  await selectAddressOption(browser, "Locality", "București");
+  await selectAddressOption(browser, "Locality", "Sector 3");
   if (!(screen.getByLabelText("Address line 1") as HTMLInputElement).value)
     changeField("Address line 1", "1 Test Street");
 }

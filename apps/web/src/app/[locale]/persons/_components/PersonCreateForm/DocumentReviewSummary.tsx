@@ -18,7 +18,7 @@ export function documentNumberLabel(document: CreatePersonDocumentFormState) {
 
 export function documentHasSeries(document: CreatePersonDocumentFormState) {
   return document.type === "nationalId"
-    ? document.nationalIdFormat !== "electronic"
+    ? true
     : document.type !== "passport" && Boolean(document.series);
 }
 

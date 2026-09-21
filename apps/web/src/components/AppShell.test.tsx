@@ -568,10 +568,9 @@ describe("AppShell", () => {
       "href",
       "/scooters",
     );
-    expect(screen.getByRole("link", { name: "Service" })).toHaveAttribute(
-      "href",
-      "/service",
-    );
+    expect(
+      screen.queryByRole("link", { name: "Service" }),
+    ).not.toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: "Prezentare generală" }),
     ).toHaveAttribute("href", "/finance");
@@ -761,28 +760,6 @@ describe("AppShell", () => {
 
     expect(
       within(screen.getAllByRole("banner")[1]).getByText("Adaugă scuter"),
-    ).toBeInTheDocument();
-  });
-
-  it("renders Service in operations and marks its route active", () => {
-    mocks.pathname = "/service";
-
-    renderAppShell({
-      id: "admin-1",
-      email: "admin@example.com",
-      roles: ["ADMIN"],
-    });
-
-    expect(screen.getByRole("link", { name: "Service" })).toHaveAttribute(
-      "href",
-      "/service",
-    );
-    expect(screen.getByRole("link", { name: "Service" })).toHaveAttribute(
-      "aria-current",
-      "page",
-    );
-    expect(
-      within(screen.getByRole("banner")).getByText("Service"),
     ).toBeInTheDocument();
   });
 

@@ -67,7 +67,6 @@ const scooter: v1.scooters.ScooterListItem = {
   createdAt: "2026-06-25T10:00:00.000Z",
   updatedAt: "2026-06-25T10:00:00.000Z",
   deletedAt: null,
-  attentionSummary: healthyAttentionSummary(),
 };
 
 beforeEach(() => {
@@ -379,16 +378,5 @@ function scooterRecord(
   return {
     ...scooter,
     ...overrides,
-  };
-}
-
-function healthyAttentionSummary(): v1.maintenance.ScooterMaintenanceAttentionSummary {
-  return {
-    highestOpenIssueSeverity: null,
-    hasBlockingIssues: false,
-    hasOverdueMaintenance: false,
-    hasMaintenanceDueSoon: false,
-    maintenanceAttentionRequired: false,
-    recommendedOperationalStatus: "AVAILABLE",
   };
 }

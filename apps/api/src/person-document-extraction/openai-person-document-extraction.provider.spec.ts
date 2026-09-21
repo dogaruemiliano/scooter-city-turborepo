@@ -46,6 +46,22 @@ function requestBody(request?: RequestInit): Record<string, unknown> {
 }
 
 describe("OpenAI person-document extraction", () => {
+  it("instructs licence extraction to read the issuer from the EU flag", async () => {
+    const { provider, fetcher } = setup();
+    await provider.analyze({ ...input, documentType: "driverLicense" });
+
+    const body = requestBody(fetcher.mock.calls[0][1]);
+    expect(body.instructions).toContain(
+      "country code inside the EU flag in the top-left corner of the front",
+    );
+    expect(body.instructions).toContain(
+      'field issuingCountryCode, value "RO", sourceSlot front',
+    );
+    expect(body.instructions).toContain(
+      "Preserve a different visible issuing country",
+    );
+  });
+
   it.each(["development", "production", "test", undefined])(
     "logs raw extraction output only in development (NODE_ENV=%s)",
     async (nodeEnv) => {
@@ -82,6 +98,19 @@ describe("OpenAI person-document extraction", () => {
     const [url, request] = fetcher.mock.calls[0];
     expect(url).toBe("https://api.openai.com/v1/responses");
     const body = requestBody(request);
+    expect(body.instructions).toContain(
+      "SERIA RX, NR. 001234 means series RX and number 001234",
+    );
+    expect(body.instructions).toContain(
+      "ZR0012345 means series ZR and number 0012345",
+    );
+    expect(body.instructions).toContain("Preserve every leading zero");
+    expect(body.instructions).toContain(
+      'city must be exactly "Sector 1", "Sector 2", "Sector 3", "Sector 4", "Sector 5" or "Sector 6"',
+    );
+    expect(body.instructions).toContain(
+      "If the sector is missing or unreadable, omit city",
+    );
     expect(body.instructions).toContain(
       "Extract ONLY the SECOND address block",
     );

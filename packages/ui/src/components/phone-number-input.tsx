@@ -95,6 +95,18 @@ function PhoneNumberInput({
   );
   const countryCallingCode = getCountryCallingCode(parts.country);
   const phoneValue = formatPhoneValue(parts);
+  const inputRef = React.useRef<HTMLInputElement>(null);
+  const pendingCaret = React.useRef<number | null>(null);
+
+  React.useLayoutEffect(() => {
+    if (pendingCaret.current !== null) {
+      inputRef.current?.setSelectionRange(
+        pendingCaret.current,
+        pendingCaret.current,
+      );
+      pendingCaret.current = null;
+    }
+  });
 
   React.useEffect(() => {
     if (value === undefined) {
@@ -127,24 +139,49 @@ function PhoneNumberInput({
 
     commitParts({
       country: nextCountry,
-      nationalNumber: parts.nationalNumber,
+      nationalNumber: normalizeNationalNumber(parts.nationalNumber, nextCountry),
     });
   }
 
   function handleNationalNumberChange(
     event: React.ChangeEvent<HTMLInputElement>,
   ) {
-    const nextValue = event.currentTarget.value.trim();
+    const input = event.currentTarget;
+    const nextValue = input.value;
+    let digitPosition = digitsOnly(
+      nextValue.slice(0, input.selectionStart ?? nextValue.length),
+    ).length;
+    let nextDigits = digitsOnly(nextValue);
+    const inputType = (event.nativeEvent as InputEvent).inputType;
 
-    if (nextValue.startsWith("+")) {
-      commitParts(parsePhoneValue(nextValue, parts.country));
-      return;
+    // Deleting a display separator should delete the adjacent digit, too.
+    if (
+      nextDigits === parts.nationalNumber &&
+      nextValue.length < formatNationalNumber(parts.nationalNumber).length
+    ) {
+      if (inputType === "deleteContentBackward") {
+        digitPosition = Math.max(0, digitPosition - 1);
+        nextDigits =
+          nextDigits.slice(0, digitPosition) + nextDigits.slice(digitPosition + 1);
+      } else if (inputType === "deleteContentForward") {
+        nextDigits =
+          nextDigits.slice(0, digitPosition) + nextDigits.slice(digitPosition + 1);
+      }
     }
 
-    commitParts({
-      country: parts.country,
-      nationalNumber: digitsOnly(nextValue),
-    });
+    const nextParts = nextValue.trim().startsWith("+")
+      ? parsePhoneValue(nextValue, parts.country)
+      : {
+          country: parts.country,
+          nationalNumber: normalizeNationalNumber(nextDigits, parts.country),
+        };
+    const removedPrefixLength =
+      nextDigits.length - nextParts.nationalNumber.length;
+    const nationalDigitPosition = Math.max(0, digitPosition - removedPrefixLength);
+    pendingCaret.current = formatNationalNumber(
+      nextParts.nationalNumber.slice(0, nationalDigitPosition),
+    ).length;
+    commitParts(nextParts);
   }
 
   function handleNationalNumberBlur(event: React.FocusEvent<HTMLInputElement>) {
@@ -189,6 +226,7 @@ function PhoneNumberInput({
           />
         </div>
         <input
+          ref={inputRef}
           id={id}
           aria-describedby={describedBy || undefined}
           aria-invalid={isInvalid || undefined}
@@ -205,7 +243,7 @@ function PhoneNumberInput({
           placeholder={placeholder ?? numberInputLabel}
           required={required}
           type="tel"
-          value={parts.nationalNumber}
+          value={formatNationalNumber(parts.nationalNumber)}
           onBlur={handleNationalNumberBlur}
           onChange={handleNationalNumberChange}
           onFocus={handleNationalNumberFocus}
@@ -248,7 +286,7 @@ function parsePhoneValue(
 
   return {
     country: fallbackCountry,
-    nationalNumber: digitsOnly(trimmedValue),
+    nationalNumber: normalizeNationalNumber(trimmedValue, fallbackCountry),
   };
 }
 
@@ -262,6 +300,15 @@ function formatPhoneValue(parts: PhoneNumberParts) {
 
 function digitsOnly(value: string) {
   return value.replace(/\D/g, "");
+}
+
+function normalizeNationalNumber(value: string, country: CountryCode) {
+  const digits = digitsOnly(value);
+  return country === "RO" ? digits.replace(/^0/, "") : digits;
+}
+
+function formatNationalNumber(value: string) {
+  return value.replace(/(\d{3})(?=\d)/g, "$1 ");
 }
 
 function normalizeCountry(country: CountryCode | undefined) {

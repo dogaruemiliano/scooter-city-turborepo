@@ -30,18 +30,6 @@ datasource db {
   provider = "postgresql"
 }
 
-enum ScooterIssueSeverity {
-  LOW
-  MEDIUM
-  HIGH
-  CRITICAL
-}
-
-enum ScooterIssueStatus {
-  OPEN
-  FIXED
-}
-
 /// Admin-managed person record used by rental flows.
 ///
 /// `Person` remains separate from authentication details, but every person is
@@ -131,17 +119,15 @@ model User {
   /// preserving the User row and its business history.
   deletedAt     DateTime?
 
-  sessions                   Session[]
-  refreshTokens              RefreshToken[]
-  otpChallenges              OtpChallenge[]
-  authAccounts               AuthAccount[]
-  auditEvents                AuditEvent[]
-  mediaAssets                MediaAsset[]
-  draftUploads               DraftUpload[]
-  expenseExtractionDrafts    ExpenseExtractionDraft[] @relation("ExpenseExtractionDraftOwner")
-  person                     Person?
-  scooterIssuesReported      ScooterIssue[]           @relation("ScooterIssueReportedBy")
-  maintenanceRecordsRecorded MaintenanceRecord[]      @relation("MaintenanceRecordRecordedBy")
+  sessions                Session[]
+  refreshTokens           RefreshToken[]
+  otpChallenges           OtpChallenge[]
+  authAccounts            AuthAccount[]
+  auditEvents             AuditEvent[]
+  mediaAssets             MediaAsset[]
+  draftUploads            DraftUpload[]
+  expenseExtractionDrafts ExpenseExtractionDraft[] @relation("ExpenseExtractionDraftOwner")
+  person                  Person?
 
   // Finance module. A User acting inside a finance book is an "associate";
   // there is deliberately no separate Associate table (see
@@ -254,10 +240,10 @@ model ScooterBrand {
 
 /// Scooter inventory record with Romanian registration metadata.
 model Scooter {
-  id                        String              @id @default(cuid())
-  vin                       String              @unique
+  id                        String       @id @default(cuid())
+  vin                       String       @unique
   brandId                   String
-  brand                     ScooterBrand        @relation(fields: [brandId], references: [id], onDelete: Restrict)
+  brand                     ScooterBrand @relation(fields: [brandId], references: [id], onDelete: Restrict)
   model                     String
   color                     String?
   manufactureYear           Int
@@ -265,20 +251,18 @@ model Scooter {
   engineType                String?
   engineCc                  Int?
   powerKw                   Float?
-  registrationType          String              @default("unregistered")
+  registrationType          String       @default("unregistered")
   plateNumber               String?
   plateNumberNormalized     String?
-  registeredOn              DateTime?           @db.Date
-  registrationExpiresOn     DateTime?           @db.Date
-  requiredDriverLicenseType String              @default("none")
-  /// Enforced as non-negative by the maintenance migration CHECK constraint.
+  registeredOn              DateTime?    @db.Date
+  registrationExpiresOn     DateTime?    @db.Date
+  requiredDriverLicenseType String       @default("none")
+  /// Enforced as non-negative by a database CHECK constraint.
   currentMileageKm          Int?
   notes                     String?
-  createdAt                 DateTime            @default(now())
-  updatedAt                 DateTime            @updatedAt
+  createdAt                 DateTime     @default(now())
+  updatedAt                 DateTime     @updatedAt
   deletedAt                 DateTime?
-  issues                    ScooterIssue[]
-  maintenanceRecords        MaintenanceRecord[]
 
   @@unique([plateNumberNormalized], map: "Scooter_active_plateNumberNormalized_key", where: raw("\"deletedAt\" IS NULL AND \"plateNumberNormalized\" IS NOT NULL"))
   @@index([deletedAt])
@@ -286,75 +270,6 @@ model Scooter {
   @@index([registrationType, deletedAt])
   @@index([requiredDriverLicenseType, deletedAt])
   @@index([brandId, model])
-}
-
-/// A reported fleet issue. Resolution intentionally stays lightweight for the
-/// MVP: FIXED issues record their resolution time without a separate workflow.
-model ScooterIssue {
-  id               String               @id @default(cuid())
-  scooterId        String
-  scooter          Scooter              @relation(fields: [scooterId], references: [id], onDelete: Restrict)
-  title            String
-  description      String?
-  severity         ScooterIssueSeverity
-  status           ScooterIssueStatus   @default(OPEN)
-  reportedAt       DateTime             @default(now())
-  resolvedAt       DateTime?
-  reportedByUserId String?
-  reportedBy       User?                @relation("ScooterIssueReportedBy", fields: [reportedByUserId], references: [id], onDelete: SetNull)
-  createdAt        DateTime             @default(now())
-  updatedAt        DateTime             @updatedAt
-
-  @@index([scooterId, status, severity(sort: Desc), reportedAt(sort: Desc)])
-  @@index([status, reportedAt(sort: Desc)])
-  @@index([severity, reportedAt(sort: Desc)])
-  @@index([reportedAt(sort: Desc)])
-  @@index([reportedByUserId])
-}
-
-/// Admin-editable service definition. Seeded intervals are conservative
-/// examples only; the applicable manufacturer schedule remains authoritative.
-model MaintenanceType {
-  id             String              @id @default(cuid())
-  name           String
-  code           String              @unique
-  /// Positive when set; enforced by a database CHECK constraint.
-  intervalKm     Int?
-  /// Positive when set; enforced by a database CHECK constraint.
-  intervalMonths Int?
-  isActive       Boolean             @default(true)
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
-  records        MaintenanceRecord[]
-
-  @@index([isActive, name])
-}
-
-/// One completed service item for one scooter. A service visit that performs
-/// multiple items creates one record per MaintenanceType.
-model MaintenanceRecord {
-  id                String          @id @default(cuid())
-  scooterId         String
-  scooter           Scooter         @relation(fields: [scooterId], references: [id], onDelete: Restrict)
-  maintenanceTypeId String
-  maintenanceType   MaintenanceType @relation(fields: [maintenanceTypeId], references: [id], onDelete: Restrict)
-  performedAt       DateTime        @db.Date
-  /// Enforced as non-negative by the maintenance migration CHECK constraint.
-  performedKm       Int
-  notes             String?
-  /// Enforced as non-negative when set by a database CHECK constraint.
-  nextDueKm         Int?
-  nextDueAt         DateTime?       @db.Date
-  recordedByUserId  String?
-  recordedBy        User?           @relation("MaintenanceRecordRecordedBy", fields: [recordedByUserId], references: [id], onDelete: SetNull)
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
-
-  @@index([scooterId, maintenanceTypeId, performedAt(sort: Desc), createdAt(sort: Desc)])
-  @@index([scooterId, performedAt(sort: Desc), createdAt(sort: Desc)])
-  @@index([maintenanceTypeId, performedAt(sort: Desc)])
-  @@index([nextDueAt])
-  @@index([recordedByUserId])
 }
 
 /// First-class session record. One row per "logged-in device". Refresh-token

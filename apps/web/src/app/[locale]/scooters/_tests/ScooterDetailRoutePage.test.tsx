@@ -1,10 +1,11 @@
 import { v1 } from "@repo/api-shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { generateMetadata } from "../[id]/page";
+import ScooterRoutePage, { generateMetadata } from "../[id]/page";
 
 const mocks = vi.hoisted(() => ({
   apiFetch: vi.fn(),
+  meFromApi: vi.fn(),
   cookies: vi.fn(),
   notFound: vi.fn(),
   redirect: vi.fn(),
@@ -19,7 +20,7 @@ vi.mock("@/lib/api", () => ({
 }));
 
 vi.mock("@/lib/auth-server", () => ({
-  meFromApi: vi.fn(),
+  meFromApi: mocks.meFromApi,
 }));
 
 vi.mock("next/headers", () => ({
@@ -61,6 +62,7 @@ const scooter: v1.scooters.Scooter = {
 
 beforeEach(() => {
   mocks.apiFetch.mockReset();
+  mocks.meFromApi.mockReset();
   mocks.cookies.mockReset();
   mocks.notFound.mockReset();
   mocks.redirect.mockReset();
@@ -87,6 +89,24 @@ describe("ScooterRoutePage metadata", () => {
         headers: { cookie: "session=abc" },
         cache: "no-store",
       },
+    );
+  });
+});
+
+describe("ScooterRoutePage", () => {
+  it("loads scooter administration with a single scooter request", async () => {
+    mocks.meFromApi.mockResolvedValue({ id: "admin-1", roles: ["ADMIN"] });
+    mocks.apiFetch.mockResolvedValueOnce(scooter);
+
+    const page = await ScooterRoutePage({
+      params: Promise.resolve({ locale: "en", id: scooter.id }),
+    });
+
+    expect(page.props).toEqual({ scooter, scootersHref: "/en/scooters" });
+    expect(mocks.apiFetch).toHaveBeenCalledExactlyOnceWith(
+      v1.scooters.ROUTES.get(scooter.id),
+      v1.scooters.scooterSchema,
+      { headers: { cookie: "session=abc" }, cache: "no-store" },
     );
   });
 });
