@@ -21,7 +21,6 @@ import {
   Settings2Icon,
   TagIcon,
   UsersRoundIcon,
-  WrenchIcon,
   type LucideIcon,
 } from "lucide-react";
 import { v1 } from "@repo/api-shared";
@@ -104,7 +103,6 @@ const NAVIGATION_GROUPS = [
     requiredRole: "ADMIN",
     items: [
       { href: "/scooters", labelKey: "scooterList", icon: BikeIcon },
-      { href: "/service", labelKey: "service", icon: WrenchIcon },
       { href: "/scooters/brands", labelKey: "scooterBrands", icon: TagIcon },
     ],
   },
@@ -191,7 +189,6 @@ const PAGE_TITLES: Record<string, string> = {
   "/scooters": "scooters",
   "/scooters/new": "newScooter",
   "/scooters/brands": "scooterBrands",
-  "/service": "service",
 };
 
 export function AppShell({

@@ -9,7 +9,6 @@ import { mobilePlatformCatalog } from "./catalogs/mobile-platform";
 import { personsCatalog } from "./catalogs/persons";
 import { sharedCatalog } from "./catalogs/shared";
 import { scootersCatalog } from "./catalogs/scooters";
-import { serviceCatalog } from "./catalogs/service";
 import { themeCatalog } from "./catalogs/theme";
 
 export type MessageTree = {
@@ -29,7 +28,6 @@ export const messages = {
     language: languageCatalog.en,
     persons: personsCatalog.en,
     scooters: scootersCatalog.en,
-    service: serviceCatalog.en,
     api: apiCatalog.en,
     mobilePlatform: mobilePlatformCatalog.en,
   },
@@ -43,7 +41,6 @@ export const messages = {
     language: languageCatalog.ro,
     persons: personsCatalog.ro,
     scooters: scootersCatalog.ro,
-    service: serviceCatalog.ro,
     api: apiCatalog.ro,
     mobilePlatform: mobilePlatformCatalog.ro,
   },

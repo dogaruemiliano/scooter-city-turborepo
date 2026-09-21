@@ -16,7 +16,9 @@ export interface RomanianLocality {
 const localitiesByCounty = new Map(
   administrativeAreas.map((county) => [
     county.name,
-    [...county.cities, ...county.communes].sort((a, b) =>
+    (county.code === "B"
+      ? [...(county.sectors ?? [])]
+      : [...county.cities, ...county.communes]).sort((a, b) =>
       a.name.localeCompare(b.name, "ro"),
     ),
   ]),
@@ -32,11 +34,14 @@ export function matchRomanianLocality(
   county: string,
   value: string,
 ): string | undefined {
-  const name = normalized(value)
+  const name = normalized(value.trim())
     .replace(
       /^(?:municipiul|municipiu|mun|orasul|oras|or|comuna|com|localitatea|loc)(?:\.\s*|\s+)/u,
       "",
     )
+    .replace(/^(?:bucuresti|bucharest)[\s,]+(?=sect)/u, "")
+    .replace(/^sectorul\b/u, "sector")
+    .replace(/^sect\./u, "sector")
     .replace(/[\s.-]/gu, "");
   const matches = getRomanianLocalities(county).filter(
     (locality) => normalized(locality.name).replace(/[\s.-]/gu, "") === name,
@@ -55,6 +60,7 @@ function countyName(value: string): string | undefined {
   const name = normalized(value)
     .replace(/^(?:municipiul|mun\.)\s*/u, "")
     .replace(/[\s.-]/gu, "");
+  if (name === "bucharest") return "București";
   return Object.entries(ROMANIAN_COUNTY_NAMES).find(
     ([code, county]) =>
       normalized(code) === name ||
@@ -65,7 +71,7 @@ function countyName(value: string): string | undefined {
 // Require a label boundary: e.g. "Mun.Râmnicu Vâlcea", but not "Satu Mare".
 // Street/building markers end a locality, so they never become part of its name.
 const labels =
-  /(?<![\p{L}\d])(județul|judeţul|judetul|județ|judeţ|judet|jud|municipiul|municipiu|mun|orașul|oraşul|orasul|oraș|oraş|oras|or|comuna|com|satul|sat|localitatea|loc|bulevardul|b-dul|bdul|bd|șoseaua|şoseaua|soseaua|șos|sos|aleea|intrarea|intr|strada|str|numărul|numarul|nr|bloc|bl|scara|sc|apartament|apartment|apt|ap|etajul|etaj|et|corp|camera|cam|sectorul|sector)(?:\.\s*|:\s*|\s+)/giu;
+  /(?<![\p{L}\d])(județul|judeţul|judetul|județ|judeţ|judet|jud|municipiul|municipiu|mun|orașul|oraşul|orasul|oraș|oraş|oras|or|comuna|com|satul|sat|localitatea|loc|bulevardul|b-dul|bdul|bd|șoseaua|şoseaua|soseaua|șos|sos|aleea|intrarea|intr|strada|str|numărul|numarul|nr|bloc|bl|scara|sc|apartament|apartment|apt|ap|etajul|etaj|et|corp|camera|cam|sectorul|sector|sect)(?:\.\s*|:\s*|\s+|(?<=sector)(?=\d))/giu;
 
 export function parseRomanianAddress(
   value: string,
@@ -91,13 +97,19 @@ export function parseRomanianAddress(
       result.region = countyName(part);
       continue;
     }
-    // This dataset contains cities and communes, not villages. A printed
+    if (label.startsWith("sect")) {
+      candidates.push(`Sector ${part}`);
+      continue;
+    }
+    // Localities are cities, communes and Bucharest sectors, not villages. A printed
     // village stays in the full address and must not imply its parent commune.
     if (/^(?:mun|or|com|loc)/u.test(label) && /\p{L}/u.test(part))
       candidates.push(part);
   }
   result.region ??= countyName(
-    matches.length ? value.slice(0, matches[0]!.index).trim() : value,
+    matches.length
+      ? value.slice(0, matches[0]!.index).replace(/[,;/\s]+$/u, "")
+      : value,
   );
   if (
     !result.region &&
@@ -152,7 +164,7 @@ export function splitRomanianAddressLines(
     // A bare street name followed by nr./building metadata is also common.
     if (
       prefix &&
-      !/^(?:jud|mun|com|sat|or|loc|str|bd|bul|sos|intr|ale)/u.test(
+      !/^(?:jud|mun|com|sat|or|loc|str|bd|bul|sos|intr|ale|sect)/u.test(
         normalized(matches[0]![1]!),
       )
     ) {
@@ -164,7 +176,7 @@ export function splitRomanianAddressLines(
         value.slice(match.index + match[0].length, matches[index + 1]?.index),
       );
       if (!part) return;
-      if (/^(?:jud|mun|com|or|loc)/u.test(label)) return;
+      if (/^(?:jud|mun|com|or|loc|sect)/u.test(label)) return;
       const segment = `${match[1]}${match[0].includes(".") ? "." : ""} ${part}`;
       if (
         /^(?:str|bulevard|b-dul|bdul|bd|sosea|sos|alee|intra|intr|numar|nr)/u.test(

@@ -148,6 +148,37 @@ describe("Scooters HTTP surface (e2e)", () => {
     expect(nonAdminRes.status).toBe(403);
   });
 
+  it("does not expose retired service and repair endpoints", async () => {
+    const admin = await freshSession(["ADMIN"]);
+    const createRes = await req()
+      .post(v1.scooters.ROUTES.create)
+      .set("Cookie", [`access_token=${admin.accessToken}`])
+      .send(scooterInput());
+    expect(createRes.status).toBe(201);
+    const scooter = v1.scooters.scooterSchema.parse(createRes.body);
+
+    for (const path of [
+      "/v1/maintenance/types",
+      "/v1/maintenance/issues",
+      "/v1/maintenance/schedule",
+      "/v1/maintenance/dashboard",
+      `/v1/scooters/${scooter.id}/issues`,
+      `/v1/scooters/${scooter.id}/maintenance-records`,
+      `/v1/scooters/${scooter.id}/maintenance-overview`,
+    ]) {
+      const response = await req()
+        .get(path)
+        .set("Cookie", [`access_token=${admin.accessToken}`]);
+      expect({ path, status: response.status }).toEqual({ path, status: 404 });
+    }
+
+    const reportIssueRes = await req()
+      .post(`/v1/scooters/${scooter.id}/issues`)
+      .set("Cookie", [`access_token=${admin.accessToken}`])
+      .send({ title: "Retired endpoint", severity: "LOW" });
+    expect(reportIssueRes.status).toBe(404);
+  });
+
   it("lets admins create, read, update, and soft-delete scooters", async () => {
     const admin = await freshSession(["ADMIN"]);
     const input = scooterInput();
@@ -269,6 +300,9 @@ describe("Scooters HTTP surface (e2e)", () => {
       .get(`${v1.scooters.ROUTES.list}?search=yamah&page=1&pageSize=50`)
       .set("Cookie", [`access_token=${admin.accessToken}`]);
     expect(fuzzyRes.status).toBe(200);
+    for (const item of (fuzzyRes.body as { items: unknown[] }).items) {
+      expect(item).not.toHaveProperty("attentionSummary");
+    }
     const fuzzyList = v1.scooters.scooterListSchema.parse(fuzzyRes.body);
     expect(fuzzyList.items.map((scooter) => scooter.id)).toContain(yamaha.id);
     expect(fuzzyList.items.map((scooter) => scooter.id)).not.toContain(

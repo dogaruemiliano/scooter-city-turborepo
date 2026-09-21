@@ -34,13 +34,3 @@ export function toScooter(row: ScooterRowWithBrand): v1.scooters.Scooter {
     deletedAt: row.deletedAt?.toISOString() ?? null,
   };
 }
-
-export function toScooterListItem(
-  row: ScooterRowWithBrand,
-  attentionSummary: v1.maintenance.ScooterMaintenanceAttentionSummary,
-): v1.scooters.ScooterListItem {
-  return {
-    ...toScooter(row),
-    attentionSummary,
-  };
-}

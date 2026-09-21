@@ -23,7 +23,6 @@ import { DocumentExtractionModule } from "./document-extraction/document-extract
 import { FinanceModule } from "./finance/finance.module";
 import { HealthModule } from "./health/health.module";
 import { MailerModule } from "./mailer/mailer.module";
-import { MaintenanceModule } from "./maintenance/maintenance.module";
 import { PersonsModule } from "./persons/persons.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { ScooterBrandsModule } from "./scooter-brands/scooter-brands.module";
@@ -53,7 +52,6 @@ const env = loadEnv();
     HealthModule,
     FinanceModule,
     PersonsModule,
-    MaintenanceModule,
     ScootersModule,
     ScooterBrandsModule,
     AuthModule.forRoot(buildAuthConfig(env)),

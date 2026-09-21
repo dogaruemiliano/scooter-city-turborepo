@@ -389,6 +389,22 @@ function reconcile(state: ExtractionState): ExtractionState {
       };
       form = writeField(form, key, candidate.value);
     }
+    const document = key.endsWith(".issuingCountryCode")
+      ? form.documents.find((item) => item.key === documentKeyFromField(key))
+      : undefined;
+    // This is a workflow default, not an OCR fact: keep it out of provenance.
+    const defaultRomanianLicenceIssuer =
+      form.citizenship === "romanian" &&
+      document?.type === "driverLicense" &&
+      state.readings[document.key]?.result.detectedDocumentType ===
+        "driverLicense" &&
+      suggestions.length === 0 &&
+      !touched[key] &&
+      isAvailableForAutofill(before, key);
+    if (defaultRomanianLicenceIssuer) {
+      autofilled[key] = { value: "RO", previousValue: before ?? "" };
+      form = writeField(form, key, "RO");
+    }
     const current = readExtractionFieldValue(form, key);
     const matching = suggestions.find((item) =>
       equalValues(item.value, current),
@@ -398,7 +414,10 @@ function reconcile(state: ExtractionState): ExtractionState {
     fields[key] = {
       suggestions,
       ...(preferredDocumentKey ? { preferredDocumentKey } : {}),
-      missing: !candidate && isAvailableForAutofill(current, key),
+      missing:
+        !candidate &&
+        !defaultRomanianLicenceIssuer &&
+        isAvailableForAutofill(current, key),
       ...(provenance?.length ? { provenance } : {}),
       outdated: Boolean(
         (state.fields[key]?.outdated && !matching) ||
@@ -436,11 +455,10 @@ function expectedExtractionFields(
       document.type === "nationalId" ? "person.cnp" : "person.dateOfBirth",
     );
   }
-  if (
-    document.type === "nationalId" &&
-    document.nationalIdFormat !== "electronic"
-  )
-    fields.push(`document.${document.key}.series`, ...address);
+  if (document.type === "nationalId") {
+    fields.push(`document.${document.key}.series`);
+    if (document.nationalIdFormat !== "electronic") fields.push(...address);
+  }
   return fields;
 }
 

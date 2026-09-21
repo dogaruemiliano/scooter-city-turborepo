@@ -2859,27 +2859,27 @@
     "communes": [],
     "sectors": [
       {
-        "name": "București Sectorul 1",
+        "name": "Sector 1",
         "sirutaCode": 179141
       },
       {
-        "name": "București Sectorul 2",
+        "name": "Sector 2",
         "sirutaCode": 179150
       },
       {
-        "name": "București Sectorul 3",
+        "name": "Sector 3",
         "sirutaCode": 179169
       },
       {
-        "name": "București Sectorul 4",
+        "name": "Sector 4",
         "sirutaCode": 179178
       },
       {
-        "name": "București Sectorul 5",
+        "name": "Sector 5",
         "sirutaCode": 179187
       },
       {
-        "name": "București Sectorul 6",
+        "name": "Sector 6",
         "sirutaCode": 179196
       }
     ]

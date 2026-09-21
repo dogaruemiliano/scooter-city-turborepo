@@ -60,7 +60,7 @@ describe("PersonEditForm", () => {
     expect(screen.getByLabelText("CNP")).toHaveValue("1900228123450");
     expect(screen.getByLabelText("First name")).toHaveValue("Ada");
     expect(screen.getByLabelText("Phone country")).toHaveValue("RO");
-    expect(screen.getByLabelText("Phone")).toHaveValue("712345678");
+    expect(screen.getByLabelText("Phone")).toHaveValue("712 345 678");
     expect(screen.getByLabelText("Phone")).toHaveAttribute(
       "placeholder",
       "Phone number",

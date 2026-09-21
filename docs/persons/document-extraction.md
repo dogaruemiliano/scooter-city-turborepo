@@ -125,6 +125,11 @@ and document validators to trim fields, validate calendar dates and CNP checksum
 and normalize country codes. Invalid values are omitted individually so readable
 fields still help the operator. It also rejects future birth dates and invalid licence-category acquisition dates,
 and derives birth dates deterministically from validated CNPs.
+Romanian IDs always provide separate series and number suggestions. Classic IDs
+use the printed SERIA and NR. fields; CEI document numbers such as `ZR0012345`
+are split into series `ZR` and number `0012345`. Leading zeros are preserved.
+The normalization layer also splits combined readings and retains conflicts with
+separately extracted fields for review. Both fields are editable for either format.
 Competing readings of the same field retain source attribution and are marked for
 review. Country names or ambiguous dates are not guessed by server-side code.
 
@@ -132,6 +137,13 @@ The extraction prompt distinguishes a visa/permit's own number from a referenced
 passport number. Electronic ID addresses are not invented; the separate proof of
 address supplies the address. The prompt treats any instructions printed inside
 documents as data rather than commands.
+
+Licence extraction reads the issuing country from the country code inside the
+EU flag at the top left of the front (including `RO` for Romania), or a printed
+country name. In the Romanian-citizen wizard, a recognized driving licence with
+no readable issuer defaults to Romania. This editable workflow default has no OCR
+source attribution; a readable foreign issuer or a manual edit takes precedence.
+Foreign-citizen licences still require an issuer when none is readable.
 
 Licence extraction includes a category only when its acquisition date is legible.
 An expiry date alone, empty row or category icon does not grant a category. It

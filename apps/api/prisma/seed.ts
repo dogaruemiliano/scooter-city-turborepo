@@ -53,7 +53,6 @@ import { v1 } from "@repo/api-shared";
 
 import { PrismaClient } from "../src/generated/prisma/client";
 import { seedFinance } from "./seeds/finance";
-import { seedMaintenance } from "./seeds/maintenance";
 
 if (process.env.NODE_ENV === "production") {
   console.error(
@@ -538,7 +537,6 @@ async function main(): Promise<void> {
 
   await seedPersons();
   await seedScooters();
-  await seedMaintenance(prisma);
   await seedFinance(prisma);
 
   console.log(

@@ -26,7 +26,7 @@ export interface DashboardOverviewData {
     items: v1.finance.FinancialOperationListItem[];
     currency: string;
   } | null;
-  fleet: v1.maintenance.FleetMaintenanceDashboard | null;
+  fleet: { totalScooters: number } | null;
 }
 
 /** Gate before starting any administrative request, using the current DB role. */
@@ -74,8 +74,8 @@ async function loadOverview(
     fetchOverviewResource(
       locale,
       cookieHeader,
-      v1.maintenance.ROUTES.dashboard,
-      v1.maintenance.fleetMaintenanceDashboardSchema,
+      `${v1.scooters.ROUTES.list}?page=1&pageSize=1&includeDeleted=false`,
+      v1.scooters.scooterListSchema,
     ),
   ]);
 
@@ -110,7 +110,7 @@ async function loadOverview(
             currency: companyBook.functionalCurrency,
           }
         : null,
-    fleet,
+    fleet: fleet ? { totalScooters: fleet.total } : null,
   };
 }
 

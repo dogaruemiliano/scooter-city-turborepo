@@ -42,7 +42,7 @@ export function licenseNameDifferences(
       if (
         !identityName ||
         !licenseName ||
-        normalizeName(identityName) === normalizeName(licenseName)
+        equivalentPersonNames(identityName, licenseName)
       )
         continue;
       if (

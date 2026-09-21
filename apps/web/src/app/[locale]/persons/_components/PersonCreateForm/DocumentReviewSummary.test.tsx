@@ -35,7 +35,15 @@ describe("document review summary", () => {
     ])
       expect(screen.queryByText(label)).toBeNull();
   });
-  it.each(["nationalId", "passport"] as const)(
+  it("shows both parts of an electronic ID identifier", () => {
+    renderSummary({
+      nationalIdFormat: "electronic",
+      series: "ZR",
+      number: "0012345",
+    });
+    expect(screen.getByText("ZR 0012345")).toBeVisible();
+  });
+  it.each(["passport"] as const)(
     "shows only the number for %s without a series",
     (type) => {
       renderSummary({

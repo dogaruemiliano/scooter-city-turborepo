@@ -12,10 +12,6 @@ import {
   requiredTrimmedStringSchema,
 } from "../common/common.schemas";
 import {
-  mileageKmSchema,
-  scooterMaintenanceAttentionSummarySchema,
-} from "../maintenance/maintenance.schemas";
-import {
   SCOOTER_LIST_SORTS,
   SCOOTER_POWERTRAIN_TYPES,
   SCOOTER_REGISTRATION_TYPES,
@@ -32,6 +28,7 @@ const MAX_PAGE_SIZE = 100;
 const MIN_MANUFACTURE_YEAR = 1950;
 const MAX_MANUFACTURE_YEAR = new Date().getUTCFullYear() + 1;
 const MAX_ENGINE_CC = 2_000;
+const MAX_MILEAGE_KM = 2_147_483_647;
 const MAX_POWER_KW = 200;
 const MAX_PLATE_INPUT_LENGTH = 64;
 const REGISTERED_ON_FUTURE_MESSAGE =
@@ -122,6 +119,7 @@ export const scooterRequiredDriverLicenseTypeSchema = z.enum(
   SCOOTER_REQUIRED_DRIVER_LICENSE_TYPES,
 );
 export const scooterListSortSchema = z.enum(SCOOTER_LIST_SORTS);
+export const mileageKmSchema = z.number().int().min(0).max(MAX_MILEAGE_KM);
 
 export interface NormalizedScooterPlateNumber {
   displayValue: string;
@@ -298,11 +296,9 @@ export const listScootersQuerySchema = z
 
 export type ListScootersQuery = z.infer<typeof listScootersQuerySchema>;
 
-export const scooterListItemSchema = scooterSchema
-  .extend({
-    attentionSummary: scooterMaintenanceAttentionSummarySchema,
-  })
-  .meta({ id: "ScooterListItem" });
+export const scooterListItemSchema = scooterSchema.meta({
+  id: "ScooterListItem",
+});
 
 export type ScooterListItem = z.infer<typeof scooterListItemSchema>;
 

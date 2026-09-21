@@ -140,6 +140,21 @@ beforeEach(() => {
 });
 
 describe("PersonDetailPage", () => {
+  it("includes the series in a saved CEI summary", () => {
+    renderDetail({
+      ...readyPerson,
+      documents: [
+        {
+          ...identityDocument,
+          nationalIdFormat: "electronic",
+          series: "ZR",
+          number: "0012345",
+        },
+      ],
+    });
+    expect(screen.getByText("ZR 0012345")).toBeVisible();
+  });
+
   it("shows passport and supplementary documents together", () => {
     renderDetail({
       ...readyPerson,

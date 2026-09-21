@@ -28,14 +28,7 @@ const companyBook = {
   functionalCurrency: "EUR",
   members: [],
 };
-const fleet: v1.maintenance.FleetMaintenanceDashboard = {
-  totalScooters: 12,
-  scootersWithOpenIssues: 3,
-  scootersWithBlockingIssues: 1,
-  scootersWithOverdueMaintenance: 2,
-  scootersWithMaintenanceDueSoon: 4,
-  requiresAttention: [],
-};
+const fleet = { totalScooters: 12 };
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -53,7 +46,8 @@ beforeEach(() => {
       return { items: [account("bank", "BANK", 10_000)] };
     if (path.startsWith(v1.finance.ROUTES.operations.list))
       return { items: [] };
-    if (path === v1.maintenance.ROUTES.dashboard) return fleet;
+    if (path.startsWith(v1.scooters.ROUTES.list))
+      return { items: [], total: fleet.totalScooters, page: 1, pageSize: 1 };
     throw new Error(`Unexpected path: ${path}`);
   });
 });
@@ -94,8 +88,14 @@ describe("dashboard data", () => {
       v1.finance.ROUTES.books,
       `${v1.finance.ROUTES.accounts.balances}?bookType=COMPANY&includeInactive=true`,
       `${v1.finance.ROUTES.operations.list}?bookType=COMPANY&pageSize=4`,
-      v1.maintenance.ROUTES.dashboard,
+      `${v1.scooters.ROUTES.list}?page=1&pageSize=1&includeDeleted=false`,
     ]);
+    const inventoryPath = mocks.apiFetch.mock.calls[3]![0] as string;
+    expect(
+      v1.scooters.listScootersQuerySchema.parse(
+        Object.fromEntries(new URLSearchParams(inventoryPath.split("?")[1])),
+      ),
+    ).toMatchObject({ page: 1, pageSize: 1, includeDeleted: false });
     for (const call of mocks.apiFetch.mock.calls) {
       expect(call[2]).toEqual({
         headers: { cookie: "session=abc" },
@@ -176,7 +176,7 @@ describe("dashboard data", () => {
     expect(data?.cash?.accounts).toContainEqual(accounts[1]!.balance);
   });
 
-  it("keeps company summaries when maintenance is unavailable", async () => {
+  it("keeps company summaries when scooter inventory is unavailable", async () => {
     mocks.apiFetch
       .mockResolvedValueOnce({ items: [companyBook] })
       .mockResolvedValueOnce({ items: [] })

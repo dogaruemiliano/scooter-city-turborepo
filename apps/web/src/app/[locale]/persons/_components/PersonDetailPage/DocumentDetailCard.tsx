@@ -88,8 +88,6 @@ export function DocumentDetailCard({
           <DocumentSummary
             type={document.type}
             number={[
-              (document.type === "nationalId" &&
-                document.nationalIdFormat === "electronic") ||
               document.type === "passport"
                 ? ""
                 : document.series,
