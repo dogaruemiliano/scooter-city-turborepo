@@ -22,7 +22,7 @@ import type { PrismaClient } from "../../generated/prisma/client";
 
 type Client = Pick<
   PrismaClient,
-  "financeBook" | "ledgerAccount" | "financeBookMember"
+  "financeBook" | "ledgerAccount" | "financeBookMember" | "expenseCategory"
 >;
 
 interface AccountBlueprint {
@@ -225,4 +225,75 @@ async function upsertAccount(
       isSystem: true,
     },
   });
+}
+
+interface CategorySeed {
+  code: string;
+  name: string;
+  defaultTreatment: "OPERATING_EXPENSE" | "CAPITAL_ASSET" | null;
+}
+
+/**
+ * `defaultTreatment` only prefills the form. Fuel bought for an associate's
+ * own car is still recorded as a non-operational company expense by choosing
+ * that treatment explicitly — the category never decides it.
+ */
+const COMPANY_CATEGORIES: readonly CategorySeed[] = [
+  { code: "FUEL", name: "Fuel", defaultTreatment: "OPERATING_EXPENSE" },
+  { code: "REPAIRS", name: "Repairs", defaultTreatment: "OPERATING_EXPENSE" },
+  { code: "PARTS", name: "Parts", defaultTreatment: "OPERATING_EXPENSE" },
+  { code: "RENT", name: "Rent", defaultTreatment: "OPERATING_EXPENSE" },
+  {
+    code: "ACCOUNTING",
+    name: "Accounting",
+    defaultTreatment: "OPERATING_EXPENSE",
+  },
+  { code: "SOFTWARE", name: "Software", defaultTreatment: "OPERATING_EXPENSE" },
+  {
+    code: "INSURANCE",
+    name: "Insurance",
+    defaultTreatment: "OPERATING_EXPENSE",
+  },
+  {
+    code: "ADVERTISING",
+    name: "Advertising",
+    defaultTreatment: "OPERATING_EXPENSE",
+  },
+  {
+    code: "EQUIPMENT",
+    name: "Equipment purchase",
+    defaultTreatment: "CAPITAL_ASSET",
+  },
+  {
+    code: "VEHICLE_PURCHASE",
+    name: "Vehicle purchase",
+    defaultTreatment: "CAPITAL_ASSET",
+  },
+  { code: "OTHER", name: "Other", defaultTreatment: null },
+];
+
+const POOL_CATEGORIES: readonly CategorySeed[] = [
+  {
+    code: "POOL_SHARED_COST",
+    name: "Shared cost",
+    defaultTreatment: null,
+  },
+  { code: "POOL_OTHER", name: "Other", defaultTreatment: null },
+];
+
+/** Standard categories shared by initial setup and the development seed. */
+export async function provisionBookCategories(
+  client: Client,
+  bookId: string,
+  type: v1.finance.FinanceBookType,
+): Promise<void> {
+  for (const category of type === "COMPANY"
+    ? COMPANY_CATEGORIES
+    : POOL_CATEGORIES) {
+    await client.expenseCategory.upsert({
+      where: { bookId_code: { bookId, code: category.code } },
+      create: { bookId, ...category },
+      update: { name: category.name, isActive: true },
+    });
+  }
 }

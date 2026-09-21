@@ -29,6 +29,8 @@ import { PreviewExpenseUseCase } from "./application/expenses/preview-expense.us
 import { FinanceQueriesService } from "./application/finance-queries.service";
 import { SuppliersService } from "./application/suppliers.service";
 import { CompanyIdentityService } from "./application/company-identity.service";
+import { FinanceBooksService } from "./application/finance-books.service";
+import { PrismaFinanceBooksRepository } from "./infrastructure/prisma-finance-books.repository";
 import { CompanyAssociatesService } from "./application/company-associates.service";
 import { ExpenseExtractionDraftService } from "./application/expenses/expense-extraction-draft.service";
 import { ReverseOperationUseCase } from "./application/reverse-operation.use-case";
@@ -59,6 +61,7 @@ import { PrismaExpenseExtractionRepository } from "./infrastructure/prisma-expen
 
     // Infrastructure
     PrismaFinanceRepository,
+    PrismaFinanceBooksRepository,
     PrismaExpenseExtractionRepository,
     LedgerAccountResolver,
     { provide: LEDGER_ACCOUNT_RESOLVER, useExisting: LedgerAccountResolver },
@@ -67,6 +70,7 @@ import { PrismaExpenseExtractionRepository } from "./infrastructure/prisma-expen
     FinanceQueriesService,
     SuppliersService,
     CompanyIdentityService,
+    FinanceBooksService,
     CompanyAssociatesService,
     ExpenseExtractionDraftService,
     CreateExpenseReceiptUploadUseCase,

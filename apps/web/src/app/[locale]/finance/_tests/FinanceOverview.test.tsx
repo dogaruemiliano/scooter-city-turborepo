@@ -64,6 +64,7 @@ describe("Finance overview", () => {
               {
                 id: "company-book",
                 name: "Company",
+                names: { ro: "Company" },
                 type: "COMPANY",
                 functionalCurrency: "RON",
                 members: [],

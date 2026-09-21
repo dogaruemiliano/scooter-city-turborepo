@@ -444,7 +444,7 @@ export function ExpenseExtractionReview({
               value={values.bookId}
               options={books.map((candidate) => ({
                 value: candidate.id,
-                label: t(`bookLabels.${candidate.type}`),
+                label: v1.finance.financeBookName(candidate, locale),
                 description: t(`bookHints.${candidate.type}`),
               }))}
               onValueChange={selectBook}

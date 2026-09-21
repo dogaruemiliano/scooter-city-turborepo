@@ -136,6 +136,12 @@ const NAVIGATION_GROUPS = [
         labelKey: "financeSettlement",
         icon: HandCoinsIcon,
       },
+      {
+        href: "/finance/settings",
+        labelKey: "financeSettings",
+        icon: Settings2Icon,
+        requiredRole: v1.auth.AUTH_ROLES.SUPER_ADMIN,
+      },
     ],
   },
   {
@@ -356,7 +362,14 @@ function AppSidebar({
     (group) =>
       !("requiredRole" in group) ||
       user?.roles.includes(group.requiredRole) === true,
-  );
+  ).map((group) => ({
+    ...group,
+    items: group.items.filter(
+      (item) =>
+        !("requiredRole" in item) ||
+        user?.roles.includes(item.requiredRole) === true,
+    ),
+  }));
 
   return (
     <Sidebar collapsible="icon">

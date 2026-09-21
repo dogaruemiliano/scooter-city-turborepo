@@ -583,7 +583,9 @@ enum SettlementTransferStatus {
 /// One of the two financial books. Exactly one row per `FinanceBookType`.
 model FinanceBook {
   id                 String                @id @default(cuid())
+  /// Required Romanian display name and fallback for untranslated locales.
   name               String
+  nameTranslations   Json                  @default("{}")
   type               FinanceBookType       @unique
   functionalCurrency String                @default("RON")
   members            FinanceBookMember[]

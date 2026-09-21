@@ -404,7 +404,7 @@ export function ExpenseForm({
                 onValueChange={applyBookTreatment}
                 options={books.map((candidate) => ({
                   value: candidate.id,
-                  label: candidate.name,
+                  label: v1.finance.financeBookName(candidate, locale),
                 }))}
               />
             </FormField>

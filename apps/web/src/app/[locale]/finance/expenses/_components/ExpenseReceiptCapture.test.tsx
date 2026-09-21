@@ -77,6 +77,7 @@ vi.mock("@/i18n/navigation", () => ({
 const book: v1.finance.FinanceBook = {
   id: "company-book",
   name: "Company",
+  names: { ro: "Company" },
   type: "COMPANY",
   functionalCurrency: "RON",
   members: [],

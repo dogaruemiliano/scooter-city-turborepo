@@ -1,5 +1,12 @@
-import { v1 } from "@repo/api-shared";
 import { createZodDto } from "nestjs-zod";
+import { v1 } from "@repo/api-shared";
+export class FinanceBook extends createZodDto(v1.finance.financeBookSchema) {}
+export class CreateFinanceBookInput extends createZodDto(
+  v1.finance.createFinanceBookInputSchema,
+) {}
+export class UpdateFinanceBookInput extends createZodDto(
+  v1.finance.updateFinanceBookInputSchema,
+) {}
 
 export class FinanceBookList extends createZodDto(
   v1.finance.financeBookListSchema,

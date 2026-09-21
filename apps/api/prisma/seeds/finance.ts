@@ -16,6 +16,7 @@ import { v1 } from "@repo/api-shared";
 import {
   provisionAssociateAccounts,
   provisionBookAccounts,
+  provisionBookCategories,
 } from "../../src/finance/infrastructure/finance-book.provisioner";
 import type { PrismaClient } from "../../src/generated/prisma/client";
 
@@ -59,74 +60,23 @@ const ASSOCIATES: readonly AssociateSeed[] = [
 interface BookSeed {
   id: string;
   name: string;
+  englishName: string;
   type: "COMPANY" | "ASSOCIATE_POOL";
 }
 
 const BOOKS: readonly BookSeed[] = [
   {
     id: FIXED_IDS.companyBook,
-    name: "ScooterCity Company",
+    name: "Firma ScooterCity",
+    englishName: "ScooterCity Company",
     type: "COMPANY",
   },
   {
     id: FIXED_IDS.poolBook,
-    name: "ScooterCity Associate Pool",
+    name: "Asociații ScooterCity",
+    englishName: "ScooterCity Associate Pool",
     type: "ASSOCIATE_POOL",
   },
-];
-
-interface CategorySeed {
-  code: string;
-  name: string;
-  defaultTreatment: "OPERATING_EXPENSE" | "CAPITAL_ASSET" | null;
-}
-
-/**
- * `defaultTreatment` only prefills the form. Fuel bought for an associate's
- * own car is still recorded as a non-operational company expense by choosing
- * that treatment explicitly — the category never decides it.
- */
-const COMPANY_CATEGORIES: readonly CategorySeed[] = [
-  { code: "FUEL", name: "Fuel", defaultTreatment: "OPERATING_EXPENSE" },
-  { code: "REPAIRS", name: "Repairs", defaultTreatment: "OPERATING_EXPENSE" },
-  { code: "PARTS", name: "Parts", defaultTreatment: "OPERATING_EXPENSE" },
-  { code: "RENT", name: "Rent", defaultTreatment: "OPERATING_EXPENSE" },
-  {
-    code: "ACCOUNTING",
-    name: "Accounting",
-    defaultTreatment: "OPERATING_EXPENSE",
-  },
-  { code: "SOFTWARE", name: "Software", defaultTreatment: "OPERATING_EXPENSE" },
-  {
-    code: "INSURANCE",
-    name: "Insurance",
-    defaultTreatment: "OPERATING_EXPENSE",
-  },
-  {
-    code: "ADVERTISING",
-    name: "Advertising",
-    defaultTreatment: "OPERATING_EXPENSE",
-  },
-  {
-    code: "EQUIPMENT",
-    name: "Equipment purchase",
-    defaultTreatment: "CAPITAL_ASSET",
-  },
-  {
-    code: "VEHICLE_PURCHASE",
-    name: "Vehicle purchase",
-    defaultTreatment: "CAPITAL_ASSET",
-  },
-  { code: "OTHER", name: "Other", defaultTreatment: null },
-];
-
-const POOL_CATEGORIES: readonly CategorySeed[] = [
-  {
-    code: "POOL_SHARED_COST",
-    name: "Shared cost",
-    defaultTreatment: null,
-  },
-  { code: "POOL_OTHER", name: "Other", defaultTreatment: null },
 ];
 
 interface CostObjectSeed {
@@ -213,8 +163,13 @@ export async function seedFinance(prisma: PrismaClient): Promise<void> {
   for (const book of BOOKS) {
     await prisma.financeBook.upsert({
       where: { type: book.type },
-      create: { id: book.id, name: book.name, type: book.type },
-      update: { name: book.name },
+      create: {
+        id: book.id,
+        name: book.name,
+        nameTranslations: { en: book.englishName },
+        type: book.type,
+      },
+      update: {},
     });
 
     const stored = await prisma.financeBook.findUniqueOrThrow({
@@ -229,21 +184,7 @@ export async function seedFinance(prisma: PrismaClient): Promise<void> {
       await provisionAssociateAccounts(prisma, stored.id, book.type, associate);
     }
 
-    const categories =
-      book.type === "COMPANY" ? COMPANY_CATEGORIES : POOL_CATEGORIES;
-
-    for (const category of categories) {
-      await prisma.expenseCategory.upsert({
-        where: { bookId_code: { bookId: stored.id, code: category.code } },
-        create: {
-          bookId: stored.id,
-          code: category.code,
-          name: category.name,
-          defaultTreatment: category.defaultTreatment,
-        },
-        update: { name: category.name, isActive: true },
-      });
-    }
+    await provisionBookCategories(prisma, stored.id, book.type);
 
     if (book.type === "COMPANY") {
       for (const costObject of COMPANY_COST_OBJECTS) {
