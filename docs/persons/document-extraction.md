@@ -32,6 +32,12 @@ collected or stored. Licence category acquisition dates remain available.
 Every suggested value remains editable;
 document verification status is never changed by extraction.
 
+Completing the admin/owner create-person form confirms the operator has reviewed
+the attached documents. Its submission explicitly sets every document to
+`status: verified`, including driving licenses and drafts with an older
+`unverified` status. A future customer self-service flow must submit documents as
+`unverified` and must not reuse this admin submission policy.
+
 Initial suggestions fill empty, untouched fields. Operator edits, including
 intentional clears, are preserved during the initial reading. Replacing a photo
 automatically applies the new reading, including over earlier manual corrections.

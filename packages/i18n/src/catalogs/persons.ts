@@ -108,9 +108,9 @@ export const personsCatalog = {
         issues: {
           missingIdentity: "Missing identity document.",
           missingDriverLicense: "Missing driver license.",
-          hasRejected: "A document was rejected.",
-          hasExpired: "A document is expired.",
-          hasUnverified: "A document is waiting for verification.",
+          hasRejected: "{document}: rejected.",
+          hasExpired: "{document}: expired.",
+          hasUnverified: "{document}: awaiting verification.",
         },
       },
       documents: {
@@ -606,9 +606,9 @@ export const personsCatalog = {
         issues: {
           missingIdentity: "Lipsește documentul de identitate.",
           missingDriverLicense: "Lipsește permisul de conducere.",
-          hasRejected: "Un document a fost respins.",
-          hasExpired: "Un document este expirat.",
-          hasUnverified: "Un document așteaptă verificarea.",
+          hasRejected: "{document}: respins.",
+          hasExpired: "{document}: expirat.",
+          hasUnverified: "{document}: așteaptă verificarea.",
         },
       },
       documents: {

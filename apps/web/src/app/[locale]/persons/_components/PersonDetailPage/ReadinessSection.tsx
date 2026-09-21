@@ -16,10 +16,21 @@ export function ReadinessSection({ issues }: { issues: ReadinessIssue[] }) {
   return (
     <section aria-label={t("detail.readiness.title")} className="grid gap-2">
       {issues.map((issue) => (
-        <Alert key={issue} variant="warning">
+        <Alert
+          key={
+            "document" in issue
+              ? `${issue.kind}-${issue.document.id}`
+              : issue.kind
+          }
+          variant="warning"
+        >
           <CircleAlertIcon aria-hidden="true" />
           <AlertDescription>
-            {t(`detail.readiness.issues.${issue}`)}
+            {"document" in issue
+              ? t(`detail.readiness.issues.${issue.kind}`, {
+                  document: t(`documentTypes.${issue.document.type}`),
+                })
+              : t(`detail.readiness.issues.${issue.kind}`)}
           </AlertDescription>
         </Alert>
       ))}

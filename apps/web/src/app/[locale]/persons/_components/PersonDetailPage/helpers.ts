@@ -21,23 +21,23 @@ export function getRentalReadiness(person: v1.persons.Person): {
       v1.persons.isPersonIdentityDocumentType(document.type),
     )
   ) {
-    issues.push("missingIdentity");
+    issues.push({ kind: "missingIdentity" });
   }
 
   if (!documents.some((document) => document.type === "driverLicense")) {
-    issues.push("missingDriverLicense");
+    issues.push({ kind: "missingDriverLicense" });
   }
 
-  if (documents.some((document) => document.status === "rejected")) {
-    issues.push("hasRejected");
-  }
-
-  if (documents.some((document) => isPersonDocumentExpired(document))) {
-    issues.push("hasExpired");
-  }
-
-  if (documents.some((document) => document.status === "unverified")) {
-    issues.push("hasUnverified");
+  for (const document of documents) {
+    if (document.status === "rejected") {
+      issues.push({ kind: "hasRejected", document });
+    }
+    if (isPersonDocumentExpired(document)) {
+      issues.push({ kind: "hasExpired", document });
+    }
+    if (document.status === "unverified") {
+      issues.push({ kind: "hasUnverified", document });
+    }
   }
 
   return { issues };

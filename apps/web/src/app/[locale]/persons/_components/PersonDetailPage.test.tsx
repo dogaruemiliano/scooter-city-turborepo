@@ -888,7 +888,7 @@ describe("PersonDetailPage", () => {
         { ...identityDocument, expiresOn: "2020-01-01" },
         driverLicenseDocument,
       ],
-      expected: "A document is expired.",
+      expected: "National ID: expired.",
     },
     {
       name: "rejected document",
@@ -896,7 +896,7 @@ describe("PersonDetailPage", () => {
         { ...identityDocument, status: "rejected" as const },
         driverLicenseDocument,
       ],
-      expected: "A document was rejected.",
+      expected: "National ID: rejected.",
     },
     {
       name: "unverified document",
@@ -904,7 +904,7 @@ describe("PersonDetailPage", () => {
         { ...identityDocument, status: "unverified" as const },
         driverLicenseDocument,
       ],
-      expected: "A document is waiting for verification.",
+      expected: "National ID: awaiting verification.",
     },
   ])("renders readiness issue for $name", ({ documents, expected }) => {
     renderDetail({ ...readyPerson, documents });
@@ -917,6 +917,59 @@ describe("PersonDetailPage", () => {
     expect(
       screen.getByRole("region", { name: "Rental readiness" }),
     ).toContainElement(screen.getByRole("alert"));
+  });
+
+  it.each([
+    {
+      locale: "en" as const,
+      expected: [
+        "National ID: awaiting verification.",
+        "Driver license: awaiting verification.",
+      ],
+    },
+    {
+      locale: "ro" as const,
+      expected: [
+        "Carte de identitate: așteaptă verificarea.",
+        "Permis de conducere: așteaptă verificarea.",
+      ],
+    },
+  ])("names every unverified document in $locale", ({ locale, expected }) => {
+    renderDetail(
+      {
+        ...readyPerson,
+        documents: [identityDocument, driverLicenseDocument].map(
+          (document) => ({
+            ...document,
+            status: "unverified",
+          }),
+        ),
+      },
+      locale,
+    );
+
+    for (const message of expected) {
+      expect(screen.getByText(message)).toBeInTheDocument();
+    }
+    expect(screen.getAllByRole("alert")).toHaveLength(2);
+  });
+
+  it("ignores deleted documents when reporting verification issues", () => {
+    renderDetail({
+      ...readyPerson,
+      documents: [
+        ...readyPerson.documents,
+        {
+          ...identityDocument,
+          id: "deleted-passport",
+          type: "passport",
+          status: "unverified",
+          deletedAt: "2026-06-26T10:00:00.000Z",
+        },
+      ],
+    });
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("renders Romanian detail copy with diacritics", async () => {
