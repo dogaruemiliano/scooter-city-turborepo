@@ -11,11 +11,11 @@ export interface PersonDetailPageProps {
 export type PersonsTranslations = ReturnType<typeof useTranslations>;
 
 export type ReadinessIssue =
-  | "missingIdentity"
-  | "missingDriverLicense"
-  | "hasRejected"
-  | "hasExpired"
-  | "hasUnverified";
+  | { kind: "missingIdentity" | "missingDriverLicense" }
+  | {
+      kind: "hasRejected" | "hasExpired" | "hasUnverified";
+      document: Pick<v1.persons.PersonDocument, "id" | "type">;
+    };
 
 export type DocumentPhotosByDocumentId = Record<
   string,

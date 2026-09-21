@@ -177,10 +177,16 @@ export function PersonDetailPage({
       />
 
       <ReadinessSection issues={readiness.issues} />
-      <PersonProfileSection person={person} locale={locale} />
-      <PersonContactSection person={person} />
-      <PersonAddressSection person={person} />
-      <PersonNotesSection notes={person.notes} />
+      <div className="grid min-w-0 gap-6 lg:grid-cols-3">
+        <div className="min-w-0 lg:col-span-2">
+          <PersonProfileSection person={person} locale={locale} />
+        </div>
+        <PersonContactSection person={person} />
+        <div className="min-w-0 lg:col-span-2">
+          <PersonAddressSection person={person} />
+        </div>
+        <PersonNotesSection notes={person.notes} />
+      </div>
       <PersonDocumentsSection
         documents={person.documents}
         photosByDocumentId={{ ...documentPhotos, ...photosByDocumentId }}

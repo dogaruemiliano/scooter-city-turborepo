@@ -103,7 +103,8 @@ function createDocumentInput(document: CreatePersonDocumentFormState): {
 } {
   const input: Record<string, unknown> = {
     type: document.type,
-    status: document.status,
+    // Completing this admin form confirms review of every attached document.
+    status: "verified",
   };
   const expiresOn = buildDateOnly(document.expiresOn);
 

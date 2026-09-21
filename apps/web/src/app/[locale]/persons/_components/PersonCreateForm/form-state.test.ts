@@ -1,13 +1,37 @@
+import { v1 } from "@repo/api-shared";
 import { describe, expect, it } from "vitest";
 
 import {
   createEmptyCreateForm,
+  createDocumentDraft,
   switchDocumentWorkflow,
   updateDocumentDrafts,
 } from "./form-state";
 import { createPersonInput } from "./input";
 
 describe("person document workflows", () => {
+  it.each(v1.persons.PERSON_DOCUMENT_TYPES)(
+    "explicitly verifies %s when the admin completes person creation",
+    (type) => {
+      const form = createEmptyCreateForm("romanian");
+      form.documents = [
+        {
+          ...createDocumentDraft(type, {
+            key: "document",
+            required: true,
+            slot: "supporting",
+          }),
+          // Older drafts can still carry the previous unverified default.
+          status: "unverified",
+        },
+      ];
+
+      expect(createPersonInput(form, () => "invalid").input?.documents).toEqual(
+        [expect.objectContaining({ type, status: "verified" })],
+      );
+    },
+  );
+
   it("preserves the ID front and edits across format changes, discarding retired back images", () => {
     let form = createEmptyCreateForm("romanian");
     const front = {
