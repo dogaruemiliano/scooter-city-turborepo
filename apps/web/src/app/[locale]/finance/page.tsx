@@ -38,7 +38,7 @@ export default async function FinanceRoutePage({
   const locale = resolveRouteLocale(rawLocale);
   const path = FINANCE_PATHS.overview;
 
-  await requireFinanceAdmin(locale, path);
+  const user = await requireFinanceAdmin(locale, path);
   const cookieHeader = await financeCookieHeader();
 
   const [books, balances, operations] = await Promise.all([
@@ -124,13 +124,15 @@ export default async function FinanceRoutePage({
           >
             {t.overview.viewSettlement}
           </Link>
-          <Link
-            href={FINANCE_PATHS.settings}
-            className={cn(buttonVariants({ variant: "ghost" }), "sm:ml-auto")}
-          >
-            <Settings aria-hidden="true" data-icon="inline-start" />
-            {t.overview.settings}
-          </Link>
+          {user?.roles.includes(v1.auth.AUTH_ROLES.SUPER_ADMIN) ? (
+            <Link
+              href={FINANCE_PATHS.settings}
+              className={cn(buttonVariants({ variant: "ghost" }), "sm:ml-auto")}
+            >
+              <Settings aria-hidden="true" data-icon="inline-start" />
+              {t.overview.settings}
+            </Link>
+          ) : null}
         </div>
 
         <Card className="py-0">

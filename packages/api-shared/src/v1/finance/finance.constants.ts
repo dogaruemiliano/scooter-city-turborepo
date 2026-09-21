@@ -279,6 +279,8 @@ export const MINOR_UNITS_PER_MAJOR = 100;
 
 export const ROUTES = {
   books: "/v1/finance/books",
+  book: (bookId: string): string =>
+    `/v1/finance/books/${encodeURIComponent(bookId)}`,
   companyIdentity: "/v1/finance/company-identity",
   companyAssociates: "/v1/finance/company-associates",
   suppliers: {

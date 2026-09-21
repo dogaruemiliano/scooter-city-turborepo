@@ -579,6 +579,10 @@ describe("AppShell", () => {
     expect(screen.getAllByText("Scutere").length).toBeGreaterThan(0);
     expect(screen.getByText("Finanțe")).toBeInTheDocument();
     expect(screen.getByText("Firmă")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Configurare" })).toHaveAttribute(
+      "href",
+      "/finance/settings",
+    );
     expect(screen.getByRole("link", { name: "Setări" })).toHaveAttribute(
       "href",
       "/company/settings",
@@ -597,6 +601,9 @@ describe("AppShell", () => {
     });
 
     expect(screen.queryByText("Firmă")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Configurare" }),
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("link", { name: "Setări" }),
     ).not.toBeInTheDocument();

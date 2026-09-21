@@ -385,6 +385,7 @@ describe("expenseFormDefaultsFromExtraction", () => {
     const companyBook: v1.finance.FinanceBook = {
       id: BOOK_ID,
       name: "Company",
+      names: { ro: "Company" },
       type: "COMPANY",
       functionalCurrency: "RON",
       members: [],
@@ -392,6 +393,7 @@ describe("expenseFormDefaultsFromExtraction", () => {
     const poolBook: v1.finance.FinanceBook = {
       id: "book-pool",
       name: "Pool",
+      names: { ro: "Pool" },
       type: "ASSOCIATE_POOL",
       functionalCurrency: "RON",
       members: [],
@@ -501,6 +503,7 @@ describe("expenseFormDefaultsFromExtraction", () => {
     const companyBook: v1.finance.FinanceBook = {
       id: BOOK_ID,
       name: "Company",
+      names: { ro: "Company" },
       type: "COMPANY",
       functionalCurrency: "RON",
       members: [],
@@ -508,6 +511,7 @@ describe("expenseFormDefaultsFromExtraction", () => {
     const poolBook: v1.finance.FinanceBook = {
       id: "book-pool",
       name: "Associate pool",
+      names: { ro: "Associate pool" },
       type: "ASSOCIATE_POOL",
       functionalCurrency: "RON",
       members: [],

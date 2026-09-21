@@ -39,6 +39,7 @@ import { CreateExpenseReceiptUploadUseCase } from "../application/expenses/creat
 import { AnalyzeExpenseReceiptUseCase } from "../application/expenses/analyze-expense-receipt.use-case";
 import { ExpenseExtractionDraftService } from "../application/expenses/expense-extraction-draft.service";
 import { CompanyIdentityService } from "../application/company-identity.service";
+import { FinanceBooksService } from "../application/finance-books.service";
 import { CompanyAssociatesService } from "../application/company-associates.service";
 import { SuppliersService } from "../application/suppliers.service";
 import { CreateAssociateFundingUseCase } from "../application/funding/create-associate-funding.use-case";
@@ -59,6 +60,9 @@ import {
   CreateSupplierInput,
   ExpenseCategoryList,
   FinanceBookList,
+  FinanceBook,
+  CreateFinanceBookInput,
+  UpdateFinanceBookInput,
   FinanceLegalIdentity,
   FinanceLegalIdentityResponse,
   UpsertFinanceLegalIdentityInput,
@@ -106,6 +110,7 @@ const IDEMPOTENCY_HEADER_DOC = {
 export class FinanceController {
   constructor(
     private readonly queries: FinanceQueriesService,
+    private readonly books: FinanceBooksService,
     private readonly companyIdentity: CompanyIdentityService,
     private readonly companyAssociates: CompanyAssociatesService,
     private readonly suppliers: SuppliersService,
@@ -133,6 +138,34 @@ export class FinanceController {
   @ZodResponse({ type: FinanceBookList })
   listBooks(): Promise<v1.finance.FinanceBookList> {
     return this.queries.listBooks();
+  }
+
+  @Post("books")
+  @RequireRoles(v1.auth.AUTH_ROLES.SUPER_ADMIN)
+  @ApiOperation({
+    operationId: "FinanceController_createBook_v1",
+    summary: "Create and initialize a finance book",
+  })
+  @ZodResponse({ status: HttpStatus.CREATED, type: FinanceBook })
+  createBook(
+    @Body() input: CreateFinanceBookInput,
+    @CurrentUser() user: AuthPrincipal,
+  ): Promise<v1.finance.FinanceBook> {
+    return this.books.create(input, user.id);
+  }
+
+  @Put("books/:bookId")
+  @RequireRoles(v1.auth.AUTH_ROLES.SUPER_ADMIN)
+  @ApiOperation({
+    operationId: "FinanceController_updateBook_v1",
+    summary: "Update a finance book's localized names",
+  })
+  @ZodResponse({ type: FinanceBook })
+  updateBook(
+    @Param("bookId") bookId: string,
+    @Body() input: UpdateFinanceBookInput,
+  ): Promise<v1.finance.FinanceBook> {
+    return this.books.update(bookId, input);
   }
 
   @Get("company-identity")

@@ -8,6 +8,22 @@
  */
 export const financeCatalog = {
   en: {
+    configuration: {
+      title: "Finance configuration",
+      romanianName: "Name in Romanian",
+      englishName: "Name in English (optional)",
+      companySetup: "Initial owner: you (100%).",
+      companyFirst: "Create the company book first.",
+      manageAssociates: "Manage associates",
+      create: "Create book",
+      save: "Save names",
+      saving: "Saving…",
+      saved: "Book saved.",
+      saveFailed:
+        "The book could not be saved. Check your connection and try again.",
+      conflict:
+        "The finance configuration changed or this book already exists. Refresh the page and try again.",
+    },
     common: {
       all: "All",
       apply: "Apply",
@@ -613,6 +629,22 @@ export const financeCatalog = {
     },
   },
   ro: {
+    configuration: {
+      title: "Configurare financiară",
+      romanianName: "Denumire în română",
+      englishName: "Denumire în engleză (opțional)",
+      companySetup: "Asociat inițial: tu (100%).",
+      companyFirst: "Creează mai întâi registrul firmei.",
+      manageAssociates: "Gestionează asociații",
+      create: "Creează registru",
+      save: "Salvează denumirile",
+      saving: "Se salvează…",
+      saved: "Registrul a fost salvat.",
+      saveFailed:
+        "Registrul nu a putut fi salvat. Verifică conexiunea și încearcă din nou.",
+      conflict:
+        "Configurarea financiară s-a schimbat sau registrul există deja. Reîncarcă pagina și încearcă din nou.",
+    },
     common: {
       all: "Toate",
       apply: "Aplică",

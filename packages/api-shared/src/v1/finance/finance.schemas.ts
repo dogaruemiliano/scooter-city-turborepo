@@ -128,10 +128,34 @@ export const financeBookMemberSchema = z
 
 export type FinanceBookMember = z.infer<typeof financeBookMemberSchema>;
 
+export const financeBookNamesSchema = z.object({
+  ro: z.string().trim().min(1).max(200),
+  en: z.string().trim().max(200).optional(),
+});
+
+export const createFinanceBookInputSchema = z
+  .object({ type: financeBookTypeSchema, names: financeBookNamesSchema })
+  .strict()
+  .meta({ id: "CreateFinanceBookInput" });
+
+export type CreateFinanceBookInput = z.infer<
+  typeof createFinanceBookInputSchema
+>;
+
+export const updateFinanceBookInputSchema = z
+  .object({ names: financeBookNamesSchema })
+  .strict()
+  .meta({ id: "UpdateFinanceBookInput" });
+
+export type UpdateFinanceBookInput = z.infer<
+  typeof updateFinanceBookInputSchema
+>;
+
 export const financeBookSchema = z
   .object({
     id: z.string(),
     name: z.string(),
+    names: financeBookNamesSchema,
     type: financeBookTypeSchema,
     functionalCurrency: z.string(),
     members: z.array(financeBookMemberSchema),

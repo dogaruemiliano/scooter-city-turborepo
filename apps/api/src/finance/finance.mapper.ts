@@ -46,9 +46,20 @@ export function toFinanceAssociate(
 }
 
 export function toFinanceBook(row: FinanceBookRecord): v1.finance.FinanceBook {
+  const translations = row.nameTranslations;
+  const english =
+    translations &&
+    typeof translations === "object" &&
+    !Array.isArray(translations)
+      ? translations.en
+      : undefined;
   return {
     id: row.id,
     name: row.name,
+    names: {
+      ro: row.name,
+      ...(typeof english === "string" && english.trim() ? { en: english } : {}),
+    },
     type: row.type,
     functionalCurrency: row.functionalCurrency,
     members: row.members.map(toFinanceBookMember),

@@ -75,6 +75,7 @@ const member: v1.finance.FinanceBookMember = {
 const companyBook: v1.finance.FinanceBook = {
   id: "company-book",
   name: "Company",
+  names: { ro: "Company" },
   type: "COMPANY",
   functionalCurrency: "RON",
   members: [member],
@@ -83,6 +84,7 @@ const companyBook: v1.finance.FinanceBook = {
 const personalBook: v1.finance.FinanceBook = {
   id: "personal-book",
   name: "Personal funds",
+  names: { ro: "Personal funds" },
   type: "ASSOCIATE_POOL",
   functionalCurrency: "RON",
   members: [member],

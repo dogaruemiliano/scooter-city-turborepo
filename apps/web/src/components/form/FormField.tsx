@@ -102,7 +102,10 @@ export function FormField({
             {label}
           </Label>
           {required ? (
-            <span aria-hidden="true" className="text-current">
+            <span
+              aria-hidden="true"
+              className="text-sm leading-none text-current"
+            >
               *
             </span>
           ) : null}
