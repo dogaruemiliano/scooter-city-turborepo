@@ -120,10 +120,7 @@ export function ExpenseExtractionReview({
   const firstFieldNeedingAttention = fieldsNeedingAttention[0]?.field;
   const canSave = validation.success;
 
-  const associates =
-    book?.members.flatMap((member) =>
-      member.associate ? [member.associate] : [],
-    ) ?? [];
+  const associates = v1.finance.financeBookAssociates(book);
   const beneficiary =
     allocation?.type === "COMMON"
       ? tExpense("allocations.types.COMMON")
@@ -1064,19 +1061,13 @@ function paymentSourceOptions(
       label: account.name,
       description: tExpense("payments.sourceTypes.BOOK_ACCOUNT"),
     }));
-  const associateOptions = book.members.flatMap((member) =>
-    member.associate
-      ? [
-          {
-            value: `associate:${member.associate.id}`,
-            label: financeUserLabel(member.associate),
-            description: tExpense(
-              "payments.sourceTypes.ASSOCIATE_PERSONAL_FUNDS",
-            ),
-          },
-        ]
-      : [],
-  );
+  const associateOptions = v1.finance
+    .financeBookAssociates(book)
+    .map((associate) => ({
+      value: `associate:${associate.id}`,
+      label: financeUserLabel(associate),
+      description: tExpense("payments.sourceTypes.ASSOCIATE_PERSONAL_FUNDS"),
+    }));
   return [...accountOptions, ...associateOptions];
 }
 
@@ -1098,17 +1089,11 @@ function beneficiaryOptions(
       value: "common:",
       label: tExpense("allocations.types.COMMON"),
     },
-    ...(book?.members.flatMap((member) =>
-      member.associate
-        ? [
-            {
-              value: `associate:${member.associate.id}`,
-              label: financeUserLabel(member.associate),
-              description: tExpense("allocations.types.ASSOCIATE_SPECIFIC"),
-            },
-          ]
-        : [],
-    ) ?? []),
+    ...v1.finance.financeBookAssociates(book).map((associate) => ({
+      value: `associate:${associate.id}`,
+      label: financeUserLabel(associate),
+      description: tExpense("allocations.types.ASSOCIATE_SPECIFIC"),
+    })),
   ];
 }
 
