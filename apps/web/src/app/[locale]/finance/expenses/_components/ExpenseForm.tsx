@@ -14,7 +14,14 @@
  */
 import { ApiError, v1 } from "@repo/api-shared";
 import type { SupportedLocale } from "@repo/i18n";
-import { Button, Card, Input, Label, Separator } from "@repo/ui/components";
+import {
+  Button,
+  Card,
+  CardContent,
+  FormSection,
+  Input,
+  Label,
+} from "@repo/ui/components";
 import { ImageIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
@@ -181,11 +188,10 @@ export function ExpenseForm({
     [costObjects, values.bookId],
   );
 
-  const associates = useMemo(() => {
-    return activeBook.members.flatMap((member) =>
-      member.associate ? [member.associate] : [],
-    );
-  }, [activeBook]);
+  const associates = useMemo(
+    () => v1.finance.financeBookAssociates(activeBook),
+    [activeBook],
+  );
 
   const associateNames = useMemo(
     () =>
@@ -396,10 +402,13 @@ export function ExpenseForm({
         className="flex flex-col gap-6 lg:flex-row lg:items-start"
       >
         <div className="flex min-w-0 flex-1 flex-col gap-6">
-          <Card className="flex flex-col gap-4 p-4">
-            <SectionHeading title={t("steps.details")} />
-
-            <FormField name="bookId" label={t("fields.book")} required>
+          <FormSection title={t("steps.details")}>
+            <FormField
+              name="bookId"
+              label={t("fields.book")}
+              required
+              className="sm:col-span-2"
+            >
               <FormSelect
                 onValueChange={applyBookTreatment}
                 options={books.map((candidate) => ({
@@ -407,34 +416,37 @@ export function ExpenseForm({
                   label: v1.finance.financeBookName(candidate, locale),
                 }))}
               />
+              <p className="text-sm text-muted-foreground">{t("hints.book")}</p>
             </FormField>
-            <p className="text-sm text-muted-foreground">{t("hints.book")}</p>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <FormField name="amount" label={t("fields.amount")} required>
-                <FormInput inputMode="decimal" autoComplete="off" />
-              </FormField>
+            <FormField name="amount" label={t("fields.amount")} required>
+              <FormInput inputMode="decimal" autoComplete="off" />
+            </FormField>
 
-              <FormField
-                name="occurredAt"
-                label={t("fields.occurredAt")}
-                required
-              >
-                <FormInput type="date" />
-              </FormField>
-            </div>
+            <FormField
+              name="occurredAt"
+              label={t("fields.occurredAt")}
+              required
+            >
+              <FormInput type="date" />
+            </FormField>
 
-            <FormField name="treatment" label={t("fields.treatment")} required>
+            <FormField
+              name="treatment"
+              label={t("fields.treatment")}
+              required
+              className="sm:col-span-2"
+            >
               <FormSelect
                 options={availableTreatments.map((treatment) => ({
                   value: treatment,
                   label: t(`treatments.${treatment}`),
                 }))}
               />
+              <p className="text-sm text-muted-foreground">
+                {t(`treatmentHints.${values.treatment ?? "OPERATING_EXPENSE"}`)}
+              </p>
             </FormField>
-            <p className="text-sm text-muted-foreground">
-              {t(`treatmentHints.${values.treatment ?? "OPERATING_EXPENSE"}`)}
-            </p>
 
             <FormField name="categoryId" label={t("fields.category")} required>
               <FormSelect
@@ -455,109 +467,108 @@ export function ExpenseForm({
                   label: costObject.name,
                 }))}
               />
+              <p className="text-sm text-muted-foreground">
+                {t("hints.costObject")}
+              </p>
             </FormField>
-            <p className="text-sm text-muted-foreground">
-              {t("hints.costObject")}
-            </p>
 
-            <FormField name="description" label={t("fields.description")}>
+            <FormField
+              name="description"
+              label={t("fields.description")}
+              className="sm:col-span-2"
+            >
               <FormTextarea rows={2} />
             </FormField>
-          </Card>
+          </FormSection>
 
-          <Card className="flex flex-col gap-4 p-4">
-            <SectionHeading
-              title={t("payments.title")}
-              description={t("payments.description")}
-            />
-
+          <FormSection title={t("payments.title")}>
             {payments.fields.map((field, index) => (
-              <div key={field.id} className="flex flex-col gap-3">
-                {index > 0 ? <Separator /> : null}
-
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <FormField
-                    name={`payments.${index}.sourceType`}
-                    label={t("payments.sourceType")}
-                    required
-                  >
-                    <FormSelect
-                      options={v1.finance.EXPENSE_PAYMENT_SOURCE_TYPES.map(
-                        (sourceType) => ({
-                          value: sourceType,
-                          label: t(`payments.sourceTypes.${sourceType}`),
-                        }),
-                      )}
-                    />
-                  </FormField>
-
-                  {values.payments?.[index]?.sourceType ===
-                  "ASSOCIATE_PERSONAL_FUNDS" ? (
+              <Card key={field.id} className="min-w-0 sm:col-span-2">
+                <CardContent className="flex flex-col gap-4">
+                  <div className="grid gap-4 sm:grid-cols-2">
                     <FormField
-                      name={`payments.${index}.payerAssociateId`}
-                      label={t("payments.payer")}
+                      name={`payments.${index}.sourceType`}
+                      label={t("payments.sourceType")}
                       required
                     >
                       <FormSelect
-                        options={associates.map((associate) => ({
-                          value: associate.id,
-                          label: financeUserLabel(associate),
-                        }))}
+                        options={v1.finance.EXPENSE_PAYMENT_SOURCE_TYPES.map(
+                          (sourceType) => ({
+                            value: sourceType,
+                            label: t(`payments.sourceTypes.${sourceType}`),
+                          }),
+                        )}
                       />
                     </FormField>
-                  ) : (
+
+                    {values.payments?.[index]?.sourceType ===
+                    "ASSOCIATE_PERSONAL_FUNDS" ? (
+                      <FormField
+                        name={`payments.${index}.payerAssociateId`}
+                        label={t("payments.payer")}
+                        required
+                      >
+                        <FormSelect
+                          options={associates.map((associate) => ({
+                            value: associate.id,
+                            label: financeUserLabel(associate),
+                          }))}
+                        />
+                      </FormField>
+                    ) : (
+                      <FormField
+                        name={`payments.${index}.sourceAccountId`}
+                        label={t("payments.account")}
+                        required
+                      >
+                        <FormSelect
+                          options={paymentSourceAccounts.map((account) => ({
+                            value: account.id,
+                            label: account.name,
+                          }))}
+                        />
+                      </FormField>
+                    )}
+
                     <FormField
-                      name={`payments.${index}.sourceAccountId`}
-                      label={t("payments.account")}
+                      name={`payments.${index}.paymentMethod`}
+                      label={t("payments.method")}
                       required
                     >
                       <FormSelect
-                        options={paymentSourceAccounts.map((account) => ({
-                          value: account.id,
-                          label: account.name,
+                        options={v1.finance.PAYMENT_METHODS.map((method) => ({
+                          value: method,
+                          label: t(`payments.methods.${method}`),
                         }))}
                       />
                     </FormField>
-                  )}
 
-                  <FormField
-                    name={`payments.${index}.paymentMethod`}
-                    label={t("payments.method")}
-                    required
-                  >
-                    <FormSelect
-                      options={v1.finance.PAYMENT_METHODS.map((method) => ({
-                        value: method,
-                        label: t(`payments.methods.${method}`),
-                      }))}
-                    />
-                  </FormField>
+                    <FormField
+                      name={`payments.${index}.amount`}
+                      label={t("payments.amount")}
+                      required
+                    >
+                      <FormInput inputMode="decimal" autoComplete="off" />
+                    </FormField>
+                  </div>
 
-                  <FormField
-                    name={`payments.${index}.amount`}
-                    label={t("payments.amount")}
-                    required
-                  >
-                    <FormInput inputMode="decimal" autoComplete="off" />
-                  </FormField>
-                </div>
-
-                {payments.fields.length > 1 ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="self-start"
-                    onClick={() => payments.remove(index)}
-                  >
-                    <Trash2Icon aria-hidden="true" />
-                    {t("payments.removeLine")}
-                  </Button>
-                ) : null}
-              </div>
+                  {payments.fields.length > 1 ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="self-start"
+                      onClick={() => payments.remove(index)}
+                    >
+                      <Trash2Icon aria-hidden="true" />
+                      {t("payments.removeLine")}
+                    </Button>
+                  ) : null}
+                </CardContent>
+              </Card>
             ))}
 
-            <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2 sm:col-span-2">
               <Button
                 type="button"
                 variant="outline"
@@ -572,75 +583,70 @@ export function ExpenseForm({
                 {formatMinorAmount(paymentsTotalMinor, currency, locale)}
               </p>
             </div>
-          </Card>
+          </FormSection>
 
-          <Card className="flex flex-col gap-4 p-4">
-            <SectionHeading
-              title={t("allocations.title")}
-              description={t("allocations.description")}
-            />
-
+          <FormSection title={t("allocations.title")}>
             {allocations.fields.map((field, index) => (
-              <div key={field.id} className="flex flex-col gap-3">
-                {index > 0 ? <Separator /> : null}
-
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <FormField
-                    name={`allocations.${index}.type`}
-                    label={t("allocations.type")}
-                    required
-                  >
-                    <FormSelect
-                      options={v1.finance.ECONOMIC_ALLOCATION_TYPES.map(
-                        (type) => ({
-                          value: type,
-                          label: t(`allocations.types.${type}`),
-                        }),
-                      )}
-                    />
-                  </FormField>
-
-                  {values.allocations?.[index]?.type ===
-                  "ASSOCIATE_SPECIFIC" ? (
+              <Card key={field.id} className="min-w-0 sm:col-span-2">
+                <CardContent className="flex flex-col gap-4">
+                  <div className="grid gap-4 sm:grid-cols-2">
                     <FormField
-                      name={`allocations.${index}.associateId`}
-                      label={t("allocations.associate")}
+                      name={`allocations.${index}.type`}
+                      label={t("allocations.type")}
                       required
                     >
                       <FormSelect
-                        options={associates.map((associate) => ({
-                          value: associate.id,
-                          label: financeUserLabel(associate),
-                        }))}
+                        options={v1.finance.ECONOMIC_ALLOCATION_TYPES.map(
+                          (type) => ({
+                            value: type,
+                            label: t(`allocations.types.${type}`),
+                          }),
+                        )}
                       />
                     </FormField>
+
+                    {values.allocations?.[index]?.type ===
+                    "ASSOCIATE_SPECIFIC" ? (
+                      <FormField
+                        name={`allocations.${index}.associateId`}
+                        label={t("allocations.associate")}
+                        required
+                      >
+                        <FormSelect
+                          options={associates.map((associate) => ({
+                            value: associate.id,
+                            label: financeUserLabel(associate),
+                          }))}
+                        />
+                      </FormField>
+                    ) : null}
+
+                    <FormField
+                      name={`allocations.${index}.amount`}
+                      label={t("allocations.amount")}
+                      required
+                    >
+                      <FormInput inputMode="decimal" autoComplete="off" />
+                    </FormField>
+                  </div>
+
+                  {allocations.fields.length > 1 ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="self-start"
+                      onClick={() => allocations.remove(index)}
+                    >
+                      <Trash2Icon aria-hidden="true" />
+                      {t("allocations.removeLine")}
+                    </Button>
                   ) : null}
-
-                  <FormField
-                    name={`allocations.${index}.amount`}
-                    label={t("allocations.amount")}
-                    required
-                  >
-                    <FormInput inputMode="decimal" autoComplete="off" />
-                  </FormField>
-                </div>
-
-                {allocations.fields.length > 1 ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="self-start"
-                    onClick={() => allocations.remove(index)}
-                  >
-                    <Trash2Icon aria-hidden="true" />
-                    {t("allocations.removeLine")}
-                  </Button>
-                ) : null}
-              </div>
+                </CardContent>
+              </Card>
             ))}
 
-            <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2 sm:col-span-2">
               <Button
                 type="button"
                 variant="outline"
@@ -655,16 +661,11 @@ export function ExpenseForm({
                 {formatMinorAmount(allocationsTotalMinor, currency, locale)}
               </p>
             </div>
-          </Card>
+          </FormSection>
 
-          <Card className="flex flex-col gap-4 p-4">
-            <SectionHeading
-              title={t("documents.title")}
-              description={t("documents.description")}
-            />
-
+          <FormSection title={t("documents.title")}>
             {extractionDraftId ? (
-              <div className="flex items-center gap-3 border-y border-border py-3">
+              <div className="flex items-center gap-3 border-y border-border py-3 sm:col-span-2">
                 <ImageIcon
                   className="size-5 shrink-0 text-muted-foreground"
                   aria-hidden="true"
@@ -681,88 +682,92 @@ export function ExpenseForm({
             ) : null}
 
             {documents.fields.map((field, index) => (
-              <div key={field.id} className="flex flex-col gap-3">
-                {index > 0 ? <Separator /> : null}
-
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <FormField
-                    name={`documents.${index}.type`}
-                    label={t("documents.type")}
-                    required
-                  >
-                    <FormSelect
-                      options={v1.finance.FINANCIAL_DOCUMENT_TYPES.map(
-                        (type) => ({
-                          value: type,
-                          label: t(`documents.types.${type}`),
-                        }),
-                      )}
-                      onValueChange={(type) => {
-                        if (type === "INVOICE") return;
-                        form.setValue(`documents.${index}.documentSeries`, "", {
-                          shouldDirty: true,
-                          shouldValidate: true,
-                        });
-                      }}
-                    />
-                  </FormField>
-
-                  {values.documents?.[index]?.type === "INVOICE" ? (
+              <Card key={field.id} className="min-w-0 sm:col-span-2">
+                <CardContent className="flex flex-col gap-4">
+                  <div className="grid gap-4 sm:grid-cols-2">
                     <FormField
-                      name={`documents.${index}.documentSeries`}
-                      label={t("documents.documentSeries")}
+                      name={`documents.${index}.type`}
+                      label={t("documents.type")}
+                      required
+                    >
+                      <FormSelect
+                        options={v1.finance.FINANCIAL_DOCUMENT_TYPES.map(
+                          (type) => ({
+                            value: type,
+                            label: t(`documents.types.${type}`),
+                          }),
+                        )}
+                        onValueChange={(type) => {
+                          if (type === "INVOICE") return;
+                          form.setValue(
+                            `documents.${index}.documentSeries`,
+                            "",
+                            {
+                              shouldDirty: true,
+                              shouldValidate: true,
+                            },
+                          );
+                        }}
+                      />
+                    </FormField>
+
+                    {values.documents?.[index]?.type === "INVOICE" ? (
+                      <FormField
+                        name={`documents.${index}.documentSeries`}
+                        label={t("documents.documentSeries")}
+                      >
+                        <FormInput autoComplete="off" />
+                      </FormField>
+                    ) : null}
+
+                    <FormField
+                      name={`documents.${index}.documentNumber`}
+                      label={t("documents.documentNumber")}
                     >
                       <FormInput autoComplete="off" />
                     </FormField>
-                  ) : null}
 
-                  <FormField
-                    name={`documents.${index}.documentNumber`}
-                    label={t("documents.documentNumber")}
+                    <FormField
+                      name={`documents.${index}.issuedAt`}
+                      label={t("documents.issuedAt")}
+                    >
+                      <FormInput type="date" />
+                    </FormField>
+
+                    <FormField
+                      name={`documents.${index}.supplierName`}
+                      label={t("documents.supplierName")}
+                    >
+                      <FormInput autoComplete="off" />
+                    </FormField>
+
+                    <FormField
+                      name={`documents.${index}.supplierTaxId`}
+                      label={t("documents.supplierTaxId")}
+                    >
+                      <FormInput autoComplete="off" />
+                    </FormField>
+                  </div>
+
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="self-start"
+                    onClick={() => documents.remove(index)}
                   >
-                    <FormInput autoComplete="off" />
-                  </FormField>
-
-                  <FormField
-                    name={`documents.${index}.issuedAt`}
-                    label={t("documents.issuedAt")}
-                  >
-                    <FormInput type="date" />
-                  </FormField>
-
-                  <FormField
-                    name={`documents.${index}.supplierName`}
-                    label={t("documents.supplierName")}
-                  >
-                    <FormInput autoComplete="off" />
-                  </FormField>
-
-                  <FormField
-                    name={`documents.${index}.supplierTaxId`}
-                    label={t("documents.supplierTaxId")}
-                  >
-                    <FormInput autoComplete="off" />
-                  </FormField>
-                </div>
-
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="self-start"
-                  onClick={() => documents.remove(index)}
-                >
-                  <Trash2Icon aria-hidden="true" />
-                  {t("documents.removeLine")}
-                </Button>
-              </div>
+                    <Trash2Icon aria-hidden="true" />
+                    {t("documents.removeLine")}
+                  </Button>
+                </CardContent>
+              </Card>
             ))}
 
             <Button
               type="button"
               variant="outline"
               size="sm"
-              className="self-start"
+              className="justify-self-start sm:col-span-2"
               onClick={() => documents.append(emptyDocumentLine())}
             >
               <PlusIcon aria-hidden="true" />
@@ -770,7 +775,7 @@ export function ExpenseForm({
             </Button>
 
             {!extractionDraftId ? (
-              <div className="flex flex-col gap-3 pt-2">
+              <div className="flex min-w-0 flex-col gap-3 pt-2 sm:col-span-2">
                 <div className="flex flex-col gap-1">
                   <h3 className="text-sm font-medium">
                     {t("documents.imageTitle")}
@@ -861,7 +866,7 @@ export function ExpenseForm({
                 ) : null}
               </div>
             ) : null}
-          </Card>
+          </FormSection>
         </div>
 
         <aside className="flex w-full flex-col gap-4 lg:sticky lg:top-4 lg:w-96">
@@ -892,23 +897,6 @@ export function ExpenseForm({
         </aside>
       </form>
     </FormProvider>
-  );
-}
-
-function SectionHeading({
-  title,
-  description,
-}: {
-  title: string;
-  description?: string;
-}) {
-  return (
-    <div className="flex flex-col gap-1">
-      <h2 className="text-base font-medium">{title}</h2>
-      {description ? (
-        <p className="text-sm text-muted-foreground">{description}</p>
-      ) : null}
-    </div>
   );
 }
 

@@ -12,7 +12,7 @@
  */
 import type { v1 } from "@repo/api-shared";
 import type { SupportedLocale } from "@repo/i18n";
-import { Button, Card, Separator, Spinner } from "@repo/ui/components";
+import { Button, Separator, Spinner } from "@repo/ui/components";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 
@@ -47,9 +47,9 @@ export function FinancialImpactPreview({
     associateNames?.get(associateId) ?? associateId;
 
   return (
-    <Card className="flex flex-col gap-4 p-4">
+    <section className="flex min-w-0 flex-col gap-4">
       <div className="flex flex-col gap-1">
-        <h2 className="text-base font-medium">{t("title")}</h2>
+        <h2 className="text-base font-semibold">{t("title")}</h2>
         <p className="text-sm text-muted-foreground">{t("description")}</p>
       </div>
 
@@ -179,7 +179,7 @@ export function FinancialImpactPreview({
           </div>
         </>
       ) : null}
-    </Card>
+    </section>
   );
 }
 
