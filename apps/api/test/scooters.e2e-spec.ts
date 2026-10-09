@@ -127,12 +127,118 @@ describe("Scooters HTTP surface (e2e)", () => {
       color: "blue",
       manufactureYear: 2025,
       powertrainType: "combustion",
-      engineCc: 125,
+      engineDisplacementCc: 125,
       powerKw: 8.5,
       notes: "Factory papers received.",
       ...overrides,
     };
   }
+
+  it("creates incomplete scooters, fills technical data and clears it without losing unrelated fields", async () => {
+    const admin = await freshSession(["ADMIN"]);
+    const cookie = [`access_token=${admin.accessToken}`];
+    const created = await req()
+      .post(v1.scooters.ROUTES.create)
+      .set("Cookie", cookie)
+      .send({
+        vin: uniqueVin(),
+        brandId: yamahaBrand.id,
+        powertrainType: "combustion",
+      });
+    expect(created.status).toBe(201);
+    const createdScooter = v1.scooters.scooterSchema.parse(created.body);
+    expect(created.body).toMatchObject({
+      model: null,
+      manufactureYear: null,
+      engineDisplacementCc: null,
+      powerKw: null,
+    });
+    const details = {
+      variant: "test-value",
+      version: "test-value",
+      commercialName: "test-value",
+      vehicleCategory: "test-value",
+      nationalCategory: "test-value",
+      bodyType: "test-value",
+      typeApprovalNumber: "test-value",
+      nationalRegistryNumber: "test-value",
+      seatsCount: 12,
+      engineSerialNumber: "test-value",
+      ratedEngineRpm: 12,
+      fuelType: "test-value",
+      propulsionSystem: "test-value",
+      electricMotorPowerKw: 0.125,
+      powerToWeightRatioKwKg: 0.125,
+      maxSpeedKmh: 12,
+      emissionsStandard: "test-value",
+      curbWeightKg: 12,
+      actualWeightKg: 12,
+      maxTechnicallyPermissibleMassKg: 12,
+      maxTrainMassKg: 12,
+      maxAxle1MassKg: 12,
+      maxAxle2MassKg: 12,
+      axlesCount: 12,
+      lengthMm: 12,
+      widthMm: 12,
+      heightMm: 12,
+      wheelbaseMm: 12,
+      frontTyreSpecification: "test-value",
+      rearTyreSpecification: "test-value",
+      frontSuspension: "test-value",
+      rearSuspension: "test-value",
+      fuelTankCapacityLiters: 0.125,
+      registrationCertificateNumber: "test-value",
+    };
+    const filled = await req()
+      .patch(v1.scooters.ROUTES.update(createdScooter.id))
+      .set("Cookie", cookie)
+      .send({
+        ...details,
+        model: "NMAX",
+        manufactureYear: 2025,
+        engineDisplacementCc: 125,
+        powerKw: 9.5,
+      });
+    expect(filled.status).toBe(200);
+    expect(filled.body).toMatchObject({ ...details, powerKw: 9.5 });
+    expect(v1.scooters.scooterSchema.safeParse(filled.body).success).toBe(true);
+    const noted = await req()
+      .patch(v1.scooters.ROUTES.update(createdScooter.id))
+      .set("Cookie", cookie)
+      .send({ notes: "Pending registration" });
+    expect(noted.status).toBe(200);
+    expect(noted.body).toMatchObject(details);
+    const clearedFields = Object.fromEntries(
+      Object.keys(details).map((key) => [key, null]),
+    );
+    const cleared = await req()
+      .patch(v1.scooters.ROUTES.update(createdScooter.id))
+      .set("Cookie", cookie)
+      .send({
+        ...clearedFields,
+        model: null,
+        manufactureYear: null,
+        engineDisplacementCc: null,
+        powerKw: null,
+      });
+    expect(cleared.status).toBe(200);
+    expect(cleared.body).toMatchObject({
+      ...clearedFields,
+      model: null,
+      manufactureYear: null,
+      engineDisplacementCc: null,
+      powerKw: null,
+      notes: "Pending registration",
+    });
+    const stored = await prisma.scooter.findUniqueOrThrow({
+      where: { id: createdScooter.id },
+    });
+    expect(stored).toMatchObject({
+      ...clearedFields,
+      model: null,
+      manufactureYear: null,
+    });
+  });
 
   it("requires an admin user", async () => {
     const unauthenticatedRes = await req()
@@ -198,13 +304,13 @@ describe("Scooters HTTP surface (e2e)", () => {
         color: "blue",
         manufactureYear: 2025,
         powertrainType: "combustion",
-        engineCc: 125,
+        engineDisplacementCc: 125,
         powerKw: 8.5,
         registrationType: "unregistered",
-        plateNumber: null,
-        registeredOn: null,
-        registrationExpiresOn: null,
-        requiredDriverLicenseType: "none",
+        registrationNumber: null,
+        registrationDate: null,
+        temporaryRegistrationExpiresAt: null,
+        requiredLicenseCategory: "none",
         deletedAt: null,
       }),
     );
@@ -236,7 +342,7 @@ describe("Scooters HTTP surface (e2e)", () => {
     expect(electricRes.status).toBe(200);
     const electric = v1.scooters.scooterSchema.parse(electricRes.body);
     expect(electric.powertrainType).toBe("electric");
-    expect(electric.engineCc).toBeNull();
+    expect(electric.engineDisplacementCc).toBeNull();
 
     const deleteRes = await req()
       .delete(v1.scooters.ROUTES.delete(created.id))
@@ -290,7 +396,7 @@ describe("Scooters HTTP surface (e2e)", () => {
           brandId: hondaBrand.id,
           model: "PCX Electric",
           powertrainType: "electric",
-          engineCc: undefined,
+          engineDisplacementCc: undefined,
         }),
       );
     const yamaha = v1.scooters.scooterSchema.parse(yamahaRes.body);
@@ -330,9 +436,9 @@ describe("Scooters HTTP surface (e2e)", () => {
       .send(
         scooterInput({
           registrationType: "national",
-          plateNumber: "cj12abc",
-          registeredOn: "2026-07-14",
-          requiredDriverLicenseType: "A1",
+          registrationNumber: "cj12abc",
+          registrationDate: "2026-07-14",
+          requiredLicenseCategory: "A1",
         }),
       );
     expect(nationalRes.status).toBe(201);
@@ -340,10 +446,10 @@ describe("Scooters HTTP surface (e2e)", () => {
     expect(national).toEqual(
       expect.objectContaining({
         registrationType: "national",
-        plateNumber: "CJ 12 ABC",
-        registeredOn: "2026-07-14",
-        registrationExpiresOn: null,
-        requiredDriverLicenseType: "A1",
+        registrationNumber: "CJ 12 ABC",
+        registrationDate: "2026-07-14",
+        temporaryRegistrationExpiresAt: null,
+        requiredLicenseCategory: "A1",
       }),
     );
 
@@ -353,10 +459,10 @@ describe("Scooters HTTP surface (e2e)", () => {
       .send(
         scooterInput({
           registrationType: "temporary",
-          plateNumber: "B 012345",
-          registeredOn: "2026-07-14",
-          registrationExpiresOn: "2026-08-14",
-          requiredDriverLicenseType: "AM",
+          registrationNumber: "B 012345",
+          registrationDate: "2026-07-14",
+          temporaryRegistrationExpiresAt: "2026-08-14",
+          requiredLicenseCategory: "AM",
         }),
       );
     expect(temporaryRes.status).toBe(201);
@@ -364,9 +470,9 @@ describe("Scooters HTTP surface (e2e)", () => {
     expect(temporary).toEqual(
       expect.objectContaining({
         registrationType: "temporary",
-        plateNumber: "B 012345",
-        registrationExpiresOn: "2026-08-14",
-        requiredDriverLicenseType: "AM",
+        registrationNumber: "B 012345",
+        temporaryRegistrationExpiresAt: "2026-08-14",
+        requiredLicenseCategory: "AM",
       }),
     );
 
@@ -375,16 +481,16 @@ describe("Scooters HTTP surface (e2e)", () => {
       .set("Cookie", [`access_token=${admin.accessToken}`])
       .send({
         registrationType: "national",
-        plateNumber: "B 46 XYZ",
-        registeredOn: "2026-07-14",
-        requiredDriverLicenseType: "A1",
+        registrationNumber: "B 46 XYZ",
+        registrationDate: "2026-07-14",
+        requiredLicenseCategory: "A1",
       });
     expect(switchToNationalRes.status).toBe(200);
     expect(v1.scooters.scooterSchema.parse(switchToNationalRes.body)).toEqual(
       expect.objectContaining({
         registrationType: "national",
-        plateNumber: "B 46 XYZ",
-        registrationExpiresOn: null,
+        registrationNumber: "B 46 XYZ",
+        temporaryRegistrationExpiresAt: null,
       }),
     );
   });
@@ -403,18 +509,18 @@ describe("Scooters HTTP surface (e2e)", () => {
       .set("Cookie", [`access_token=${admin.accessToken}`])
       .send({
         registrationType: "national",
-        plateNumber: "B 45 XYZ",
-        registeredOn: "2026-07-14",
-        requiredDriverLicenseType: "A1",
+        registrationNumber: "B 45 XYZ",
+        registrationDate: "2026-07-14",
+        requiredLicenseCategory: "A1",
       });
     expect(registeredRes.status).toBe(200);
     const registered = v1.scooters.scooterSchema.parse(registeredRes.body);
     expect(registered).toEqual(
       expect.objectContaining({
         registrationType: "national",
-        plateNumber: "B 45 XYZ",
-        registeredOn: "2026-07-14",
-        requiredDriverLicenseType: "A1",
+        registrationNumber: "B 45 XYZ",
+        registrationDate: "2026-07-14",
+        requiredLicenseCategory: "A1",
       }),
     );
 
@@ -427,10 +533,10 @@ describe("Scooters HTTP surface (e2e)", () => {
     expect(cleared).toEqual(
       expect.objectContaining({
         registrationType: "unregistered",
-        plateNumber: null,
-        registeredOn: null,
-        registrationExpiresOn: null,
-        requiredDriverLicenseType: "none",
+        registrationNumber: null,
+        registrationDate: null,
+        temporaryRegistrationExpiresAt: null,
+        requiredLicenseCategory: "none",
       }),
     );
   });
@@ -444,9 +550,9 @@ describe("Scooters HTTP surface (e2e)", () => {
       .send(
         scooterInput({
           registrationType: "national",
-          plateNumber: "B 123 ABC",
-          registeredOn: "2026-07-14",
-          requiredDriverLicenseType: "A1",
+          registrationNumber: "B 123 ABC",
+          registrationDate: "2026-07-14",
+          requiredLicenseCategory: "A1",
         }),
       );
     expect(firstRes.status).toBe(201);
@@ -458,16 +564,16 @@ describe("Scooters HTTP surface (e2e)", () => {
       .send(
         scooterInput({
           registrationType: "national",
-          plateNumber: "B123ABC",
-          registeredOn: "2026-07-14",
-          requiredDriverLicenseType: "A1",
+          registrationNumber: "B123ABC",
+          registrationDate: "2026-07-14",
+          requiredLicenseCategory: "A1",
         }),
       );
     expect(duplicateRes.status).toBe(409);
     expect(duplicateRes.body).toMatchObject({
       error: {
         code: "SCOOTER_PLATE_CONFLICT",
-        details: { field: "plateNumber" },
+        details: { field: "registrationNumber" },
       },
     });
 
@@ -482,9 +588,9 @@ describe("Scooters HTTP surface (e2e)", () => {
       .send(
         scooterInput({
           registrationType: "national",
-          plateNumber: "B 123 ABC",
-          registeredOn: "2026-07-14",
-          requiredDriverLicenseType: "A1",
+          registrationNumber: "B 123 ABC",
+          registrationDate: "2026-07-14",
+          requiredLicenseCategory: "A1",
         }),
       );
     expect(reuseRes.status).toBe(201);
@@ -498,9 +604,9 @@ describe("Scooters HTTP surface (e2e)", () => {
       .send(
         scooterInput({
           registrationType: "national",
-          plateNumber: "CJ 34 DEF",
-          registeredOn: "2026-07-14",
-          requiredDriverLicenseType: "A1",
+          registrationNumber: "CJ 34 DEF",
+          registrationDate: "2026-07-14",
+          requiredLicenseCategory: "A1",
         }),
       );
     expect(createRes.status).toBe(201);
@@ -550,9 +656,13 @@ describe("Scooters HTTP surface (e2e)", () => {
       .send({
         ...scooterInput(),
         powertrainType: "combustion",
-        engineCc: undefined,
+        engineDisplacementCc: undefined,
       });
-    expect(missingEngineCcRes.status).toBe(400);
+    expect(missingEngineCcRes.status).toBe(201);
+    expect(
+      v1.scooters.scooterSchema.parse(missingEngineCcRes.body)
+        .engineDisplacementCc,
+    ).toBeNull();
 
     const electricEngineCcRes = await req()
       .post(v1.scooters.ROUTES.create)
@@ -560,7 +670,7 @@ describe("Scooters HTTP surface (e2e)", () => {
       .send({
         ...scooterInput(),
         powertrainType: "electric",
-        engineCc: 125,
+        engineDisplacementCc: 125,
       });
     expect(electricEngineCcRes.status).toBe(400);
 

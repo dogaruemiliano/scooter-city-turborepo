@@ -146,10 +146,10 @@ export function normalizeScooterPlateNumber(
 
 export function validatePlateForRegistrationType(
   registrationType: z.infer<typeof scooterRegistrationTypeSchema>,
-  plateNumber: string | null | undefined,
+  registrationNumber: string | null | undefined,
 ): ScooterPlateValidationResult | null {
   if (registrationType === "unregistered") {
-    return plateNumber == null || plateNumber.trim().length === 0
+    return registrationNumber == null || registrationNumber.trim().length === 0
       ? {
           registrationType,
           displayValue: "",
@@ -158,38 +158,88 @@ export function validatePlateForRegistrationType(
       : null;
   }
 
-  if (plateNumber == null || plateNumber.trim().length === 0) {
+  if (registrationNumber == null || registrationNumber.trim().length === 0) {
     return null;
   }
 
   switch (registrationType) {
     case "national":
-      return normalizeNationalPlate(plateNumber);
+      return normalizeNationalPlate(registrationNumber);
     case "temporary":
-      return normalizeTemporaryPlate(plateNumber);
+      return normalizeTemporaryPlate(registrationNumber);
     case "local":
-      return normalizeLocalPlate(plateNumber);
+      return normalizeLocalPlate(registrationNumber);
   }
 }
 
+const nullableTechnicalIntegerSchema = z
+  .number()
+  .int()
+  .nonnegative()
+  .max(2_147_483_647)
+  .nullable();
+
+// Technical details may be omitted on create and explicitly cleared on update.
+export const scooterTechnicalDetailsSchema = z.object({
+  variant: nullableTrimmedStringSchema(MAX_TEXT_LENGTH).optional(),
+  version: nullableTrimmedStringSchema(MAX_TEXT_LENGTH).optional(),
+  commercialName: nullableTrimmedStringSchema(MAX_TEXT_LENGTH).optional(),
+  vehicleCategory: nullableTrimmedStringSchema(MAX_TEXT_LENGTH).optional(),
+  nationalCategory: nullableTrimmedStringSchema(MAX_TEXT_LENGTH).optional(),
+  bodyType: nullableTrimmedStringSchema(MAX_TEXT_LENGTH).optional(),
+  typeApprovalNumber: nullableTrimmedStringSchema(MAX_TEXT_LENGTH).optional(),
+  nationalRegistryNumber:
+    nullableTrimmedStringSchema(MAX_TEXT_LENGTH).optional(),
+  seatsCount: nullableTechnicalIntegerSchema.optional(),
+  engineSerialNumber: nullableTrimmedStringSchema(MAX_TEXT_LENGTH).optional(),
+  ratedEngineRpm: nullableTechnicalIntegerSchema.optional(),
+  fuelType: nullableTrimmedStringSchema(MAX_TEXT_LENGTH).optional(),
+  propulsionSystem: nullableTrimmedStringSchema(MAX_TEXT_LENGTH).optional(),
+  electricMotorPowerKw: z.number().nonnegative().nullable().optional(),
+  powerToWeightRatioKwKg: z.number().nonnegative().nullable().optional(),
+  maxSpeedKmh: nullableTechnicalIntegerSchema.optional(),
+  emissionsStandard: nullableTrimmedStringSchema(MAX_TEXT_LENGTH).optional(),
+  curbWeightKg: nullableTechnicalIntegerSchema.optional(),
+  actualWeightKg: nullableTechnicalIntegerSchema.optional(),
+  maxTechnicallyPermissibleMassKg: nullableTechnicalIntegerSchema.optional(),
+  maxTrainMassKg: nullableTechnicalIntegerSchema.optional(),
+  maxAxle1MassKg: nullableTechnicalIntegerSchema.optional(),
+  maxAxle2MassKg: nullableTechnicalIntegerSchema.optional(),
+  axlesCount: nullableTechnicalIntegerSchema.optional(),
+  lengthMm: nullableTechnicalIntegerSchema.optional(),
+  widthMm: nullableTechnicalIntegerSchema.optional(),
+  heightMm: nullableTechnicalIntegerSchema.optional(),
+  wheelbaseMm: nullableTechnicalIntegerSchema.optional(),
+  frontTyreSpecification:
+    nullableTrimmedStringSchema(MAX_TEXT_LENGTH).optional(),
+  rearTyreSpecification:
+    nullableTrimmedStringSchema(MAX_TEXT_LENGTH).optional(),
+  frontSuspension: nullableTrimmedStringSchema(MAX_TEXT_LENGTH).optional(),
+  rearSuspension: nullableTrimmedStringSchema(MAX_TEXT_LENGTH).optional(),
+  fuelTankCapacityLiters: z.number().nonnegative().nullable().optional(),
+  registrationCertificateNumber:
+    nullableTrimmedStringSchema(MAX_TEXT_LENGTH).optional(),
+});
+
 export const scooterSchema = z
   .object({
+    ...scooterTechnicalDetailsSchema.shape,
     id: z.string(),
     vin: z.string(),
     brandId: z.string(),
     brand: z.string().describe("Display name of the scooter's brand."),
-    model: z.string(),
+    model: z.string().nullable(),
     color: z.string().nullable(),
-    manufactureYear: z.number().int(),
+    manufactureYear: z.number().int().nullable(),
     powertrainType: scooterPowertrainTypeSchema,
-    engineType: z.string().nullable(),
-    engineCc: z.number().int().positive().nullable(),
+    engineCode: z.string().nullable(),
+    engineDisplacementCc: z.number().int().positive().nullable(),
     powerKw: z.number().positive().nullable(),
     registrationType: scooterRegistrationTypeSchema,
-    plateNumber: z.string().nullable(),
-    registeredOn: z.string().nullable(),
-    registrationExpiresOn: z.string().nullable(),
-    requiredDriverLicenseType: scooterRequiredDriverLicenseTypeSchema,
+    registrationNumber: z.string().nullable(),
+    registrationDate: z.string().nullable(),
+    temporaryRegistrationExpiresAt: z.string().nullable(),
+    requiredLicenseCategory: scooterRequiredDriverLicenseTypeSchema,
     currentMileageKm: mileageKmSchema.nullable(),
     notes: z.string().nullable(),
     createdAt: z.string().describe("ISO timestamp of scooter creation."),
@@ -202,18 +252,21 @@ export type Scooter = z.infer<typeof scooterSchema>;
 
 export const createScooterInputSchema = z
   .object({
+    ...scooterTechnicalDetailsSchema.shape,
     vin: vinSchema,
     brandId: requiredTrimmedStringSchema(MAX_TEXT_LENGTH),
-    model: requiredTrimmedStringSchema(MAX_TEXT_LENGTH),
+    model: nullableTrimmedStringSchema(MAX_TEXT_LENGTH).optional(),
     color: nullableColorSchema.optional(),
     manufactureYear: z
       .number()
       .int()
       .min(MIN_MANUFACTURE_YEAR)
-      .max(MAX_MANUFACTURE_YEAR),
+      .max(MAX_MANUFACTURE_YEAR)
+      .nullable()
+      .optional(),
     powertrainType: scooterPowertrainTypeSchema,
-    engineType: nullableEngineTypeSchema.optional(),
-    engineCc: z
+    engineCode: nullableEngineTypeSchema.optional(),
+    engineDisplacementCc: z
       .number()
       .int()
       .positive()
@@ -222,11 +275,10 @@ export const createScooterInputSchema = z
       .optional(),
     powerKw: z.number().positive().max(MAX_POWER_KW).nullable().optional(),
     registrationType: scooterRegistrationTypeSchema.optional(),
-    plateNumber: plateNumberInputSchema.optional(),
-    registeredOn: registeredOnSchema.nullable().optional(),
-    registrationExpiresOn: dateOnlySchema.nullable().optional(),
-    requiredDriverLicenseType:
-      scooterRequiredDriverLicenseTypeSchema.optional(),
+    registrationNumber: plateNumberInputSchema.optional(),
+    registrationDate: registeredOnSchema.nullable().optional(),
+    temporaryRegistrationExpiresAt: dateOnlySchema.nullable().optional(),
+    requiredLicenseCategory: scooterRequiredDriverLicenseTypeSchema.optional(),
     currentMileageKm: mileageKmSchema.nullable().optional(),
     notes: notesSchema.optional(),
   })
@@ -241,19 +293,21 @@ export type CreateScooterInput = z.infer<typeof createScooterInputSchema>;
 
 export const updateScooterInputSchema = z
   .object({
+    ...scooterTechnicalDetailsSchema.shape,
     vin: vinSchema.optional(),
     brandId: requiredTrimmedStringSchema(MAX_TEXT_LENGTH).optional(),
-    model: requiredTrimmedStringSchema(MAX_TEXT_LENGTH).optional(),
+    model: nullableTrimmedStringSchema(MAX_TEXT_LENGTH).optional(),
     color: nullableColorSchema.optional(),
     manufactureYear: z
       .number()
       .int()
       .min(MIN_MANUFACTURE_YEAR)
       .max(MAX_MANUFACTURE_YEAR)
+      .nullable()
       .optional(),
     powertrainType: scooterPowertrainTypeSchema.optional(),
-    engineType: nullableEngineTypeSchema.optional(),
-    engineCc: z
+    engineCode: nullableEngineTypeSchema.optional(),
+    engineDisplacementCc: z
       .number()
       .int()
       .positive()
@@ -262,11 +316,10 @@ export const updateScooterInputSchema = z
       .optional(),
     powerKw: z.number().positive().max(MAX_POWER_KW).nullable().optional(),
     registrationType: scooterRegistrationTypeSchema.optional(),
-    plateNumber: plateNumberInputSchema.optional(),
-    registeredOn: registeredOnSchema.nullable().optional(),
-    registrationExpiresOn: dateOnlySchema.nullable().optional(),
-    requiredDriverLicenseType:
-      scooterRequiredDriverLicenseTypeSchema.optional(),
+    registrationNumber: plateNumberInputSchema.optional(),
+    registrationDate: registeredOnSchema.nullable().optional(),
+    temporaryRegistrationExpiresAt: dateOnlySchema.nullable().optional(),
+    requiredLicenseCategory: scooterRequiredDriverLicenseTypeSchema.optional(),
     currentMileageKm: mileageKmSchema.nullable().optional(),
     notes: notesSchema.optional(),
   })
@@ -286,8 +339,7 @@ export const listScootersQuerySchema = z
     search: optionalSearchStringSchema(MAX_SEARCH_LENGTH),
     powertrainType: scooterPowertrainTypeSchema.optional(),
     registrationType: scooterRegistrationTypeSchema.optional(),
-    requiredDriverLicenseType:
-      scooterRequiredDriverLicenseTypeSchema.optional(),
+    requiredLicenseCategory: scooterRequiredDriverLicenseTypeSchema.optional(),
     sort: scooterListSortSchema.optional(),
     includeDeleted: queryBooleanSchema.default(false),
   })
@@ -314,9 +366,9 @@ export const scooterListSchema = z
 export type ScooterList = z.infer<typeof scooterListSchema>;
 
 function normalizeNationalPlate(
-  plateNumber: string,
+  registrationNumber: string,
 ): ScooterPlateValidationResult | null {
-  const { compactValue } = normalizeScooterPlateNumber(plateNumber);
+  const { compactValue } = normalizeScooterPlateNumber(registrationNumber);
   if (compactValue.includes("Q")) return null;
 
   const bucharestMatch = /^B(\d{2,3})([A-Z]{3})$/.exec(compactValue);
@@ -350,9 +402,9 @@ function normalizeNationalPlate(
 }
 
 function normalizeTemporaryPlate(
-  plateNumber: string,
+  registrationNumber: string,
 ): ScooterPlateValidationResult | null {
-  const { compactValue } = normalizeScooterPlateNumber(plateNumber);
+  const { compactValue } = normalizeScooterPlateNumber(registrationNumber);
 
   const bucharestMatch = /^B(\d{3,6})$/.exec(compactValue);
   if (bucharestMatch) {
@@ -383,9 +435,9 @@ function normalizeTemporaryMatch(
 }
 
 function normalizeLocalPlate(
-  plateNumber: string,
+  registrationNumber: string,
 ): ScooterPlateValidationResult | null {
-  const displayValue = plateNumber
+  const displayValue = registrationNumber
     .trim()
     .toUpperCase()
     .replace(/\s+/g, " ")
@@ -416,23 +468,15 @@ function isValidPermanentLetterSuffix(value: string): boolean {
 function validateScooterPowertrainForCreate(
   input: {
     powertrainType?: z.infer<typeof scooterPowertrainTypeSchema>;
-    engineCc?: number | null;
+    engineDisplacementCc?: number | null;
   },
   ctx: z.RefinementCtx,
 ): void {
-  if (input.powertrainType === "combustion" && !input.engineCc) {
-    ctx.addIssue({
-      code: "custom",
-      message: "Engine cc is required for combustion scooters.",
-      path: ["engineCc"],
-    });
-  }
-
-  if (input.powertrainType === "electric" && input.engineCc) {
+  if (input.powertrainType === "electric" && input.engineDisplacementCc) {
     ctx.addIssue({
       code: "custom",
       message: "Engine cc is only allowed for combustion scooters.",
-      path: ["engineCc"],
+      path: ["engineDisplacementCc"],
     });
   }
 }
@@ -440,23 +484,15 @@ function validateScooterPowertrainForCreate(
 function validateScooterPowertrainForUpdate(
   input: {
     powertrainType?: z.infer<typeof scooterPowertrainTypeSchema>;
-    engineCc?: number | null;
+    engineDisplacementCc?: number | null;
   },
   ctx: z.RefinementCtx,
 ): void {
-  if (input.powertrainType === "electric" && input.engineCc) {
+  if (input.powertrainType === "electric" && input.engineDisplacementCc) {
     ctx.addIssue({
       code: "custom",
       message: "Engine cc is only allowed for combustion scooters.",
-      path: ["engineCc"],
-    });
-  }
-
-  if (input.powertrainType === "combustion" && input.engineCc === null) {
-    ctx.addIssue({
-      code: "custom",
-      message: "Engine cc is required for combustion scooters.",
-      path: ["engineCc"],
+      path: ["engineDisplacementCc"],
     });
   }
 }
@@ -464,10 +500,10 @@ function validateScooterPowertrainForUpdate(
 function validateScooterRegistrationForCreate(
   input: {
     registrationType?: z.infer<typeof scooterRegistrationTypeSchema>;
-    plateNumber?: string | null;
-    registeredOn?: string | null;
-    registrationExpiresOn?: string | null;
-    requiredDriverLicenseType?: z.infer<
+    registrationNumber?: string | null;
+    registrationDate?: string | null;
+    temporaryRegistrationExpiresAt?: string | null;
+    requiredLicenseCategory?: z.infer<
       typeof scooterRequiredDriverLicenseTypeSchema
     >;
   },
@@ -482,52 +518,61 @@ function validateScooterRegistrationForCreate(
     return;
   }
 
-  if (!input.plateNumber) {
+  if (!input.registrationNumber) {
     ctx.addIssue({
       code: "custom",
       message: "Plate number is required for registered scooters.",
-      path: ["plateNumber"],
+      path: ["registrationNumber"],
     });
   } else if (
-    !validatePlateForRegistrationType(registrationType, input.plateNumber)
+    !validatePlateForRegistrationType(
+      registrationType,
+      input.registrationNumber,
+    )
   ) {
     ctx.addIssue({
       code: "custom",
       message: INVALID_PLATE_MESSAGE,
-      path: ["plateNumber"],
+      path: ["registrationNumber"],
     });
   }
 
-  if (!input.registeredOn) {
+  if (!input.registrationDate) {
     ctx.addIssue({
       code: "custom",
       message: "Registration date is required for registered scooters.",
-      path: ["registeredOn"],
+      path: ["registrationDate"],
     });
   }
 
-  if (!input.requiredDriverLicenseType) {
+  if (!input.requiredLicenseCategory) {
     ctx.addIssue({
       code: "custom",
       message:
         "Required driver license type is required for registered scooters.",
-      path: ["requiredDriverLicenseType"],
+      path: ["requiredLicenseCategory"],
     });
   }
 
-  if (registrationType === "temporary" && !input.registrationExpiresOn) {
+  if (
+    registrationType === "temporary" &&
+    !input.temporaryRegistrationExpiresAt
+  ) {
     ctx.addIssue({
       code: "custom",
       message: "Registration expiry date is required for temporary plates.",
-      path: ["registrationExpiresOn"],
+      path: ["temporaryRegistrationExpiresAt"],
     });
   }
 
-  if (registrationType !== "temporary" && input.registrationExpiresOn) {
+  if (
+    registrationType !== "temporary" &&
+    input.temporaryRegistrationExpiresAt
+  ) {
     ctx.addIssue({
       code: "custom",
       message: REGISTRATION_EXPIRES_ON_TEMPORARY_ONLY_MESSAGE,
-      path: ["registrationExpiresOn"],
+      path: ["temporaryRegistrationExpiresAt"],
     });
   }
 }
@@ -535,9 +580,9 @@ function validateScooterRegistrationForCreate(
 function validateScooterRegistrationForUpdate(
   input: {
     registrationType?: z.infer<typeof scooterRegistrationTypeSchema>;
-    plateNumber?: string | null;
-    registeredOn?: string | null;
-    registrationExpiresOn?: string | null;
+    registrationNumber?: string | null;
+    registrationDate?: string | null;
+    temporaryRegistrationExpiresAt?: string | null;
   },
   ctx: z.RefinementCtx,
 ): void {
@@ -551,26 +596,26 @@ function validateScooterRegistrationForUpdate(
   if (
     input.registrationType &&
     input.registrationType !== "temporary" &&
-    input.registrationExpiresOn
+    input.temporaryRegistrationExpiresAt
   ) {
     ctx.addIssue({
       code: "custom",
       message: REGISTRATION_EXPIRES_ON_TEMPORARY_ONLY_MESSAGE,
-      path: ["registrationExpiresOn"],
+      path: ["temporaryRegistrationExpiresAt"],
     });
   }
 
-  if (input.registrationType && input.plateNumber) {
+  if (input.registrationType && input.registrationNumber) {
     if (
       !validatePlateForRegistrationType(
         input.registrationType,
-        input.plateNumber,
+        input.registrationNumber,
       )
     ) {
       ctx.addIssue({
         code: "custom",
         message: INVALID_PLATE_MESSAGE,
-        path: ["plateNumber"],
+        path: ["registrationNumber"],
       });
     }
   }
@@ -578,54 +623,54 @@ function validateScooterRegistrationForUpdate(
 
 function validateUnregisteredFields(
   input: {
-    plateNumber?: string | null;
-    registeredOn?: string | null;
-    registrationExpiresOn?: string | null;
+    registrationNumber?: string | null;
+    registrationDate?: string | null;
+    temporaryRegistrationExpiresAt?: string | null;
   },
   ctx: z.RefinementCtx,
 ): void {
-  if (input.plateNumber) {
+  if (input.registrationNumber) {
     ctx.addIssue({
       code: "custom",
       message: "Plate number is only allowed for registered scooters.",
-      path: ["plateNumber"],
+      path: ["registrationNumber"],
     });
   }
 
-  if (input.registeredOn) {
+  if (input.registrationDate) {
     ctx.addIssue({
       code: "custom",
       message: "Registration date is only allowed for registered scooters.",
-      path: ["registeredOn"],
+      path: ["registrationDate"],
     });
   }
 
-  if (input.registrationExpiresOn) {
+  if (input.temporaryRegistrationExpiresAt) {
     ctx.addIssue({
       code: "custom",
       message:
         "Registration expiry date is only allowed for registered scooters.",
-      path: ["registrationExpiresOn"],
+      path: ["temporaryRegistrationExpiresAt"],
     });
   }
 }
 
 function validateRegistrationDates(
   input: {
-    registeredOn?: string | null;
-    registrationExpiresOn?: string | null;
+    registrationDate?: string | null;
+    temporaryRegistrationExpiresAt?: string | null;
   },
   ctx: z.RefinementCtx,
 ): void {
   if (
-    input.registeredOn &&
-    input.registrationExpiresOn &&
-    input.registrationExpiresOn < input.registeredOn
+    input.registrationDate &&
+    input.temporaryRegistrationExpiresAt &&
+    input.temporaryRegistrationExpiresAt < input.registrationDate
   ) {
     ctx.addIssue({
       code: "custom",
       message: REGISTRATION_EXPIRES_ON_ORDER_MESSAGE,
-      path: ["registrationExpiresOn"],
+      path: ["temporaryRegistrationExpiresAt"],
     });
   }
 }

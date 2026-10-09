@@ -2563,7 +2563,7 @@
             }
           },
           {
-            "name": "requiredDriverLicenseType",
+            "name": "requiredLicenseCategory",
             "required": false,
             "in": "query",
             "schema": {
@@ -7523,6 +7523,207 @@
       "CreateScooterInput": {
         "type": "object",
         "properties": {
+          "variant": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "version": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "commercialName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "vehicleCategory": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "nationalCategory": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "bodyType": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "typeApprovalNumber": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "nationalRegistryNumber": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "seatsCount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "engineSerialNumber": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "ratedEngineRpm": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "fuelType": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "propulsionSystem": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "electricMotorPowerKw": {
+            "type": "number",
+            "minimum": 0,
+            "nullable": true
+          },
+          "powerToWeightRatioKwKg": {
+            "type": "number",
+            "minimum": 0,
+            "nullable": true
+          },
+          "maxSpeedKmh": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "emissionsStandard": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "curbWeightKg": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "actualWeightKg": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "maxTechnicallyPermissibleMassKg": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "maxTrainMassKg": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "maxAxle1MassKg": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "maxAxle2MassKg": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "axlesCount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "lengthMm": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "widthMm": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "heightMm": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "wheelbaseMm": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "frontTyreSpecification": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "rearTyreSpecification": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "frontSuspension": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "rearSuspension": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "fuelTankCapacityLiters": {
+            "type": "number",
+            "minimum": 0,
+            "nullable": true
+          },
+          "registrationCertificateNumber": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
           "vin": {
             "type": "string"
           },
@@ -7534,7 +7735,8 @@
           "model": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 120
+            "maxLength": 120,
+            "nullable": true
           },
           "color": {
             "type": "string",
@@ -7545,19 +7747,20 @@
           "manufactureYear": {
             "type": "integer",
             "minimum": 1950,
-            "maximum": 2027
+            "maximum": 2027,
+            "nullable": true
           },
           "powertrainType": {
             "type": "string",
             "enum": ["electric", "combustion"]
           },
-          "engineType": {
+          "engineCode": {
             "type": "string",
             "minLength": 1,
             "maxLength": 100,
             "nullable": true
           },
-          "engineCc": {
+          "engineDisplacementCc": {
             "type": "integer",
             "exclusiveMinimum": 0,
             "maximum": 2000,
@@ -7573,22 +7776,22 @@
             "type": "string",
             "enum": ["unregistered", "national", "local", "temporary"]
           },
-          "plateNumber": {
+          "registrationNumber": {
             "type": "string",
             "maxLength": 64,
             "nullable": true
           },
-          "registeredOn": {
+          "registrationDate": {
             "type": "string",
             "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
             "nullable": true
           },
-          "registrationExpiresOn": {
+          "temporaryRegistrationExpiresAt": {
             "type": "string",
             "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
             "nullable": true
           },
-          "requiredDriverLicenseType": {
+          "requiredLicenseCategory": {
             "type": "string",
             "enum": ["none", "AM", "A1", "A2", "A"]
           },
@@ -7605,18 +7808,213 @@
             "nullable": true
           }
         },
-        "required": [
-          "vin",
-          "brandId",
-          "model",
-          "manufactureYear",
-          "powertrainType"
-        ],
+        "required": ["vin", "brandId", "powertrainType"],
         "additionalProperties": false
       },
       "Scooter_Output": {
         "type": "object",
         "properties": {
+          "variant": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "version": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "commercialName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "vehicleCategory": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "nationalCategory": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "bodyType": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "typeApprovalNumber": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "nationalRegistryNumber": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "seatsCount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "engineSerialNumber": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "ratedEngineRpm": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "fuelType": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "propulsionSystem": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "electricMotorPowerKw": {
+            "type": "number",
+            "minimum": 0,
+            "nullable": true
+          },
+          "powerToWeightRatioKwKg": {
+            "type": "number",
+            "minimum": 0,
+            "nullable": true
+          },
+          "maxSpeedKmh": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "emissionsStandard": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "curbWeightKg": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "actualWeightKg": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "maxTechnicallyPermissibleMassKg": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "maxTrainMassKg": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "maxAxle1MassKg": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "maxAxle2MassKg": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "axlesCount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "lengthMm": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "widthMm": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "heightMm": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "wheelbaseMm": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "frontTyreSpecification": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "rearTyreSpecification": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "frontSuspension": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "rearSuspension": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "fuelTankCapacityLiters": {
+            "type": "number",
+            "minimum": 0,
+            "nullable": true
+          },
+          "registrationCertificateNumber": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
           "id": {
             "type": "string"
           },
@@ -7631,7 +8029,8 @@
             "description": "Display name of the scooter's brand."
           },
           "model": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "color": {
             "type": "string",
@@ -7640,17 +8039,18 @@
           "manufactureYear": {
             "type": "integer",
             "minimum": -9007199254740991,
-            "maximum": 9007199254740991
+            "maximum": 9007199254740991,
+            "nullable": true
           },
           "powertrainType": {
             "type": "string",
             "enum": ["electric", "combustion"]
           },
-          "engineType": {
+          "engineCode": {
             "type": "string",
             "nullable": true
           },
-          "engineCc": {
+          "engineDisplacementCc": {
             "type": "integer",
             "exclusiveMinimum": 0,
             "maximum": 9007199254740991,
@@ -7665,19 +8065,19 @@
             "type": "string",
             "enum": ["unregistered", "national", "local", "temporary"]
           },
-          "plateNumber": {
+          "registrationNumber": {
             "type": "string",
             "nullable": true
           },
-          "registeredOn": {
+          "registrationDate": {
             "type": "string",
             "nullable": true
           },
-          "registrationExpiresOn": {
+          "temporaryRegistrationExpiresAt": {
             "type": "string",
             "nullable": true
           },
-          "requiredDriverLicenseType": {
+          "requiredLicenseCategory": {
             "type": "string",
             "enum": ["none", "AM", "A1", "A2", "A"]
           },
@@ -7713,14 +8113,14 @@
           "color",
           "manufactureYear",
           "powertrainType",
-          "engineType",
-          "engineCc",
+          "engineCode",
+          "engineDisplacementCc",
           "powerKw",
           "registrationType",
-          "plateNumber",
-          "registeredOn",
-          "registrationExpiresOn",
-          "requiredDriverLicenseType",
+          "registrationNumber",
+          "registrationDate",
+          "temporaryRegistrationExpiresAt",
+          "requiredLicenseCategory",
           "currentMileageKm",
           "notes",
           "createdAt",
@@ -7763,6 +8163,207 @@
       "UpdateScooterInput": {
         "type": "object",
         "properties": {
+          "variant": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "version": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "commercialName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "vehicleCategory": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "nationalCategory": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "bodyType": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "typeApprovalNumber": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "nationalRegistryNumber": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "seatsCount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "engineSerialNumber": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "ratedEngineRpm": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "fuelType": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "propulsionSystem": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "electricMotorPowerKw": {
+            "type": "number",
+            "minimum": 0,
+            "nullable": true
+          },
+          "powerToWeightRatioKwKg": {
+            "type": "number",
+            "minimum": 0,
+            "nullable": true
+          },
+          "maxSpeedKmh": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "emissionsStandard": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "curbWeightKg": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "actualWeightKg": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "maxTechnicallyPermissibleMassKg": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "maxTrainMassKg": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "maxAxle1MassKg": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "maxAxle2MassKg": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "axlesCount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "lengthMm": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "widthMm": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "heightMm": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "wheelbaseMm": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "frontTyreSpecification": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "rearTyreSpecification": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "frontSuspension": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "rearSuspension": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "fuelTankCapacityLiters": {
+            "type": "number",
+            "minimum": 0,
+            "nullable": true
+          },
+          "registrationCertificateNumber": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
           "vin": {
             "type": "string"
           },
@@ -7774,7 +8375,8 @@
           "model": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 120
+            "maxLength": 120,
+            "nullable": true
           },
           "color": {
             "type": "string",
@@ -7785,19 +8387,20 @@
           "manufactureYear": {
             "type": "integer",
             "minimum": 1950,
-            "maximum": 2027
+            "maximum": 2027,
+            "nullable": true
           },
           "powertrainType": {
             "type": "string",
             "enum": ["electric", "combustion"]
           },
-          "engineType": {
+          "engineCode": {
             "type": "string",
             "minLength": 1,
             "maxLength": 100,
             "nullable": true
           },
-          "engineCc": {
+          "engineDisplacementCc": {
             "type": "integer",
             "exclusiveMinimum": 0,
             "maximum": 2000,
@@ -7813,22 +8416,22 @@
             "type": "string",
             "enum": ["unregistered", "national", "local", "temporary"]
           },
-          "plateNumber": {
+          "registrationNumber": {
             "type": "string",
             "maxLength": 64,
             "nullable": true
           },
-          "registeredOn": {
+          "registrationDate": {
             "type": "string",
             "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
             "nullable": true
           },
-          "registrationExpiresOn": {
+          "temporaryRegistrationExpiresAt": {
             "type": "string",
             "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
             "nullable": true
           },
-          "requiredDriverLicenseType": {
+          "requiredLicenseCategory": {
             "type": "string",
             "enum": ["none", "AM", "A1", "A2", "A"]
           },
