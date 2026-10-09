@@ -73,7 +73,7 @@ export function ScooterDetailPage({
   const [registrationOpen, setRegistrationOpen] = useState(false);
   const [registrationDialogKey, setRegistrationDialogKey] = useState(0);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const title = `${scooter.brand} ${scooter.model}`;
+  const title = [scooter.brand, scooter.model].filter(Boolean).join(" ");
   const scooterEditHref = `${scootersHref}/${encodeURIComponent(scooter.id)}/edit`;
   const registrationActionLabel =
     scooter.registrationType === "unregistered"
@@ -201,7 +201,10 @@ export function ScooterDetailPage({
       <DetailSection title={t("sections.identity")}>
         <DetailField label={t("fields.vin")} value={scooter.vin} />
         <DetailField label={t("fields.brand")} value={scooter.brand} />
-        <DetailField label={t("fields.model")} value={scooter.model} />
+        <DetailField
+          label={t("fields.model")}
+          value={scooter.model ?? t("detail.emptyValue")}
+        />
         <DetailField
           label={t("fields.color")}
           value={scooter.color ?? t("detail.emptyValue")}
@@ -216,21 +219,25 @@ export function ScooterDetailPage({
       <DetailSection title={t("sections.technical")}>
         <DetailField
           label={t("fields.manufactureYear")}
-          value={String(scooter.manufactureYear)}
+          value={
+            scooter.manufactureYear == null
+              ? t("detail.emptyValue")
+              : String(scooter.manufactureYear)
+          }
         />
         <DetailField
           label={t("fields.powertrainType")}
           value={t(`powertrainTypes.${scooter.powertrainType}`)}
         />
         <DetailField
-          label={t("fields.engineType")}
-          value={scooter.engineType ?? t("detail.emptyValue")}
+          label={t("fields.engineCode")}
+          value={scooter.engineCode ?? t("detail.emptyValue")}
         />
         <DetailField
-          label={t("fields.engineCc")}
+          label={t("fields.engineDisplacementCc")}
           value={
-            scooter.engineCc
-              ? t("list.ccValue", { cc: scooter.engineCc })
+            scooter.engineDisplacementCc
+              ? t("list.ccValue", { cc: scooter.engineDisplacementCc })
               : t("detail.emptyValue")
           }
         />
@@ -258,31 +265,31 @@ export function ScooterDetailPage({
           value={t(`registrationTypes.${scooter.registrationType}`)}
         />
         <DetailField
-          label={t("fields.plateNumber")}
-          value={scooter.plateNumber ?? t("detail.emptyValue")}
+          label={t("fields.registrationNumber")}
+          value={scooter.registrationNumber ?? t("detail.emptyValue")}
         />
         <DetailField
-          label={t("fields.registeredOn")}
+          label={t("fields.registrationDate")}
           value={
-            scooter.registeredOn
-              ? formatDate(scooter.registeredOn, locale)
+            scooter.registrationDate
+              ? formatDate(scooter.registrationDate, locale)
               : t("detail.emptyValue")
           }
         />
         {scooter.registrationType === "temporary" ? (
           <DetailField
-            label={t("fields.registrationExpiresOn")}
+            label={t("fields.temporaryRegistrationExpiresAt")}
             value={
-              scooter.registrationExpiresOn
-                ? formatDate(scooter.registrationExpiresOn, locale)
+              scooter.temporaryRegistrationExpiresAt
+                ? formatDate(scooter.temporaryRegistrationExpiresAt, locale)
                 : t("detail.emptyValue")
             }
           />
         ) : null}
         <DetailField
-          label={t("fields.requiredDriverLicenseType")}
+          label={t("fields.requiredLicenseCategory")}
           value={t(
-            `requiredDriverLicenseTypes.${scooter.requiredDriverLicenseType}`,
+            `requiredDriverLicenseTypes.${scooter.requiredLicenseCategory}`,
           )}
         />
       </DetailSection>
@@ -581,8 +588,8 @@ function PowertrainBadge({ scooter }: { scooter: v1.scooters.Scooter }) {
   return (
     <Badge variant="outline">
       <Icon aria-hidden="true" data-icon="inline-start" />
-      {scooter.powertrainType === "combustion" && scooter.engineCc
-        ? t("list.ccValue", { cc: scooter.engineCc })
+      {scooter.powertrainType === "combustion" && scooter.engineDisplacementCc
+        ? t("list.ccValue", { cc: scooter.engineDisplacementCc })
         : t(`powertrainTypes.${scooter.powertrainType}`)}
     </Badge>
   );

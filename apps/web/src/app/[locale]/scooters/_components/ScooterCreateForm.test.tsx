@@ -6,7 +6,6 @@ import { NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ScooterCreateForm } from "./ScooterCreateForm";
-import { DEFAULT_COMBUSTION_ENGINE_CC } from "./scooter-form";
 
 const mocks = vi.hoisted(() => ({
   apiFetch: vi.fn(),
@@ -47,14 +46,14 @@ const createdScooter: v1.scooters.Scooter = {
   color: "White",
   manufactureYear: 2026,
   powertrainType: "combustion",
-  engineType: null,
-  engineCc: 125,
+  engineCode: null,
+  engineDisplacementCc: 125,
   powerKw: 8.5,
   registrationType: "unregistered",
-  plateNumber: null,
-  registeredOn: null,
-  registrationExpiresOn: null,
-  requiredDriverLicenseType: "none",
+  registrationNumber: null,
+  registrationDate: null,
+  temporaryRegistrationExpiresAt: null,
+  requiredLicenseCategory: "none",
   currentMileageKm: null,
   notes: "Maker papers received",
   createdAt: "2026-06-25T10:00:00.000Z",
@@ -79,7 +78,7 @@ describe("ScooterCreateForm", () => {
 
     expect(screen.getByText("Identity")).toBeInTheDocument();
     expect(screen.getByText("Technical")).toBeInTheDocument();
-    expect(requiredLabel("Color")).toHaveTextContent(/Color\s*\*/);
+    expect(requiredLabel("Color")).not.toHaveTextContent(/Color\s*\*/);
     expect(screen.getByRole("button", { name: "Combustion" })).toHaveAttribute(
       "aria-pressed",
       "true",
@@ -89,9 +88,7 @@ describe("ScooterCreateForm", () => {
       "false",
     );
     expect(screen.getByText("Registration")).toBeInTheDocument();
-    expect(screen.getByLabelText("Engine cc")).toHaveValue(
-      Number(DEFAULT_COMBUSTION_ENGINE_CC),
-    );
+    expect(screen.getByLabelText("Engine cc")).toHaveValue(null);
     expect(screen.getByLabelText("Current mileage (km)")).toHaveValue(null);
   });
 
@@ -100,7 +97,7 @@ describe("ScooterCreateForm", () => {
 
     renderCreateForm();
     const engineCcInput = screen.getByLabelText("Engine cc");
-    expect(engineCcInput).toHaveValue(Number(DEFAULT_COMBUSTION_ENGINE_CC));
+    expect(engineCcInput).toHaveValue(null);
     await browser.clear(engineCcInput);
     await browser.type(engineCcInput, "125");
     await browser.click(screen.getByRole("button", { name: "Electric" }));
@@ -109,23 +106,54 @@ describe("ScooterCreateForm", () => {
 
     await browser.click(screen.getByRole("button", { name: "Combustion" }));
 
-    expect(screen.getByLabelText("Engine cc")).toHaveValue(
-      Number(DEFAULT_COMBUSTION_ENGINE_CC),
-    );
+    expect(screen.getByLabelText("Engine cc")).toHaveValue(null);
   });
 
-  it("shows frontend required validation while keeping default engine cc", async () => {
+  it("requires identity fields but permits unknown technical data", async () => {
     const browser = userEvent.setup();
 
     renderCreateForm();
     await browser.click(screen.getByRole("button", { name: "Create scooter" }));
 
     expect(await screen.findByText("Scooter not created")).toBeInTheDocument();
-    expect(screen.getAllByText("Color is required.")[0]).toBeInTheDocument();
+    expect(screen.getAllByText("Brand is required.")[0]).toBeInTheDocument();
+    expect(screen.queryByText("Color is required.")).not.toBeInTheDocument();
     expect(
       screen.queryByText("Engine cc is required for combustion scooters."),
     ).not.toBeInTheDocument();
     expect(mocks.apiFetch).not.toHaveBeenCalled();
+  });
+
+  it("creates a scooter with only VIN and brand while technical data is unknown", async () => {
+    mocks.apiFetch.mockResolvedValueOnce({
+      ...createdScooter,
+      model: null,
+      color: null,
+      manufactureYear: null,
+      engineDisplacementCc: null,
+    });
+    const browser = userEvent.setup();
+    renderCreateForm();
+    await browser.type(screen.getByLabelText("VIN"), "jyarn23e0ra123456");
+    await selectBrand(browser, "Yamaha");
+    await browser.click(screen.getByRole("button", { name: "Create scooter" }));
+    await waitFor(() =>
+      expect(mocks.apiFetch).toHaveBeenCalledWith(
+        v1.scooters.ROUTES.create,
+        v1.scooters.scooterSchema,
+        expect.objectContaining({
+          json: expect.objectContaining({
+            vin: "JYARN23E0RA123456",
+            brandId: "brand-1",
+            powertrainType: "combustion",
+            model: null,
+            color: null,
+            manufactureYear: null,
+            engineDisplacementCc: null,
+          }),
+        }),
+      ),
+    );
   });
 
   it("submits the normalized create payload", async () => {
@@ -149,15 +177,15 @@ describe("ScooterCreateForm", () => {
             color: "White",
             manufactureYear: 2026,
             powertrainType: "combustion",
-            engineType: null,
-            engineCc: 125,
+            engineCode: null,
+            engineDisplacementCc: 125,
             powerKw: 8.5,
             currentMileageKm: null,
             registrationType: "unregistered",
-            plateNumber: null,
-            registeredOn: null,
-            registrationExpiresOn: null,
-            requiredDriverLicenseType: "none",
+            registrationNumber: null,
+            registrationDate: null,
+            temporaryRegistrationExpiresAt: null,
+            requiredLicenseCategory: "none",
             notes: "Maker papers received",
           },
         },
@@ -215,9 +243,9 @@ describe("ScooterCreateForm", () => {
     mocks.apiFetch.mockResolvedValueOnce({
       ...createdScooter,
       registrationType: "national",
-      plateNumber: "CJ 12 ABC",
-      registeredOn: v1.common.dateOnlyToday(),
-      requiredDriverLicenseType: "A1",
+      registrationNumber: "CJ 12 ABC",
+      registrationDate: v1.common.dateOnlyToday(),
+      requiredLicenseCategory: "A1",
     });
     const browser = userEvent.setup();
 
@@ -240,10 +268,10 @@ describe("ScooterCreateForm", () => {
           method: "POST",
           json: expect.objectContaining({
             registrationType: "national",
-            plateNumber: "CJ 12 ABC",
-            registeredOn: v1.common.dateOnlyToday(),
-            registrationExpiresOn: null,
-            requiredDriverLicenseType: "A1",
+            registrationNumber: "CJ 12 ABC",
+            registrationDate: v1.common.dateOnlyToday(),
+            temporaryRegistrationExpiresAt: null,
+            requiredLicenseCategory: "A1",
           }),
         }),
       ),

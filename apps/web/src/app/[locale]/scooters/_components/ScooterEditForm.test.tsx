@@ -35,14 +35,14 @@ const scooter: v1.scooters.Scooter = {
   color: "White",
   manufactureYear: 2026,
   powertrainType: "combustion",
-  engineType: null,
-  engineCc: 125,
+  engineCode: null,
+  engineDisplacementCc: 125,
   powerKw: 8.5,
   registrationType: "unregistered",
-  plateNumber: null,
-  registeredOn: null,
-  registrationExpiresOn: null,
-  requiredDriverLicenseType: "none",
+  registrationNumber: null,
+  registrationDate: null,
+  temporaryRegistrationExpiresAt: null,
+  requiredLicenseCategory: "none",
   currentMileageKm: 1_200,
   notes: "Maker papers received",
   createdAt: "2026-06-25T10:00:00.000Z",
@@ -108,17 +108,17 @@ describe("ScooterEditForm", () => {
     expect(mocks.refresh).toHaveBeenCalledOnce();
   });
 
-  it("requires color before sending the PATCH", async () => {
+  it("allows clearing unknown color when sending the PATCH", async () => {
+    mocks.apiFetch.mockResolvedValueOnce({ ...scooter, color: null });
     const browser = userEvent.setup();
 
     renderEditForm();
     await browser.clear(screen.getByLabelText("Color"));
     await browser.click(screen.getByRole("button", { name: "Save" }));
 
-    expect(
-      (await screen.findAllByText("Color is required."))[0],
-    ).toBeInTheDocument();
-    expect(mocks.apiFetch).not.toHaveBeenCalled();
+    await waitFor(() => expect(mocks.apiFetch).toHaveBeenCalled());
+    const options = mocks.apiFetch.mock.calls[0]![2];
+    expect(options.json).toMatchObject({ color: null });
   });
 
   it("never sends registration fields, which have their own sheet", async () => {
@@ -135,10 +135,10 @@ describe("ScooterEditForm", () => {
       { json: Record<string, unknown> },
     ];
     expect(options.json).not.toHaveProperty("registrationType");
-    expect(options.json).not.toHaveProperty("plateNumber");
-    expect(options.json).not.toHaveProperty("registeredOn");
-    expect(options.json).not.toHaveProperty("registrationExpiresOn");
-    expect(options.json).not.toHaveProperty("requiredDriverLicenseType");
+    expect(options.json).not.toHaveProperty("registrationNumber");
+    expect(options.json).not.toHaveProperty("registrationDate");
+    expect(options.json).not.toHaveProperty("temporaryRegistrationExpiresAt");
+    expect(options.json).not.toHaveProperty("requiredLicenseCategory");
   });
 });
 

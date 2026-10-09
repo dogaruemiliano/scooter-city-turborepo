@@ -97,10 +97,10 @@ export function ScooterEditForm({
     // Registration is edited from its own sheet on the detail page.
     const generalInput = { ...input.data };
     delete generalInput.registrationType;
-    delete generalInput.plateNumber;
-    delete generalInput.registeredOn;
-    delete generalInput.registrationExpiresOn;
-    delete generalInput.requiredDriverLicenseType;
+    delete generalInput.registrationNumber;
+    delete generalInput.registrationDate;
+    delete generalInput.temporaryRegistrationExpiresAt;
+    delete generalInput.requiredLicenseCategory;
 
     setSaving(true);
     try {
@@ -133,7 +133,7 @@ export function ScooterEditForm({
     setForm((current) => ({ ...current, [key]: value }));
     clearFieldError(key);
     if (key === "powertrainType") {
-      clearFieldError("engineCc");
+      clearFieldError("engineDisplacementCc");
     }
   }
 

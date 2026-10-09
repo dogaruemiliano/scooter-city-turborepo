@@ -48,7 +48,7 @@ export function ScooterFormFields({
   function changePowertrain(powertrainType: v1.scooters.ScooterPowertrainType) {
     onSetValue("powertrainType", powertrainType);
     if (powertrainType === "electric") {
-      onSetValue("engineCc", "");
+      onSetValue("engineDisplacementCc", "");
     }
   }
 
@@ -79,7 +79,6 @@ export function ScooterFormFields({
         <TextField
           id={`${formId}-model`}
           label={t("fields.model")}
-          required
           value={form.model}
           error={errors.model}
           placeholder={t("placeholders.model")}
@@ -89,7 +88,6 @@ export function ScooterFormFields({
         <TextField
           id={`${formId}-color`}
           label={t("fields.color")}
-          required
           value={form.color}
           error={errors.color}
           placeholder={t("placeholders.color")}
@@ -102,7 +100,6 @@ export function ScooterFormFields({
         <TextField
           id={`${formId}-manufacture-year`}
           label={t("fields.manufactureYear")}
-          required
           type="number"
           inputMode="numeric"
           value={form.manufactureYear}
@@ -139,25 +136,24 @@ export function ScooterFormFields({
         </div>
         <TextField
           id={`${formId}-engine-type`}
-          label={t("fields.engineType")}
-          value={form.engineType}
-          error={errors.engineType}
-          placeholder={t("placeholders.engineType")}
+          label={t("fields.engineCode")}
+          value={form.engineCode}
+          error={errors.engineCode}
+          placeholder={t("placeholders.engineCode")}
           disabled={disabled}
-          onChange={(value) => onSetValue("engineType", value)}
+          onChange={(value) => onSetValue("engineCode", value)}
         />
         {form.powertrainType === "combustion" ? (
           <TextField
             id={`${formId}-engine-cc`}
-            label={t("fields.engineCc")}
-            required
+            label={t("fields.engineDisplacementCc")}
             type="number"
             inputMode="numeric"
-            value={form.engineCc}
-            error={errors.engineCc}
-            placeholder={t("placeholders.engineCc")}
+            value={form.engineDisplacementCc}
+            error={errors.engineDisplacementCc}
+            placeholder={t("placeholders.engineDisplacementCc")}
             disabled={disabled}
-            onChange={(value) => onSetValue("engineCc", value)}
+            onChange={(value) => onSetValue("engineDisplacementCc", value)}
           />
         ) : null}
         <TextField
@@ -228,12 +224,16 @@ export function ScooterRegistrationFormFields({
   ) {
     onSetValue("registrationType", registrationType);
     if (registrationType === "unregistered") {
-      onSetValue("plateNumber", "");
-      onSetValue("registeredOn", { day: "", month: "", year: "" });
-      onSetValue("requiredDriverLicenseType", "none");
+      onSetValue("registrationNumber", "");
+      onSetValue("registrationDate", { day: "", month: "", year: "" });
+      onSetValue("requiredLicenseCategory", "none");
     }
     if (registrationType !== "temporary") {
-      onSetValue("registrationExpiresOn", { day: "", month: "", year: "" });
+      onSetValue("temporaryRegistrationExpiresAt", {
+        day: "",
+        month: "",
+        year: "",
+      });
     }
   }
 
@@ -271,69 +271,73 @@ export function ScooterRegistrationFormFields({
         <>
           <TextField
             id={`${formId}-plate-number`}
-            label={t("fields.plateNumber")}
+            label={t("fields.registrationNumber")}
             required
-            value={form.plateNumber}
-            error={errors.plateNumber}
-            placeholder={t(`placeholders.plateNumber.${form.registrationType}`)}
+            value={form.registrationNumber}
+            error={errors.registrationNumber}
+            placeholder={t(
+              `placeholders.registrationNumber.${form.registrationType}`,
+            )}
             disabled={disabled}
-            onChange={(value) => onSetValue("plateNumber", value)}
+            onChange={(value) => onSetValue("registrationNumber", value)}
           />
           <Field
             id={`${formId}-registered-on-day`}
-            label={t("fields.registeredOn")}
+            label={t("fields.registrationDate")}
             required
-            error={errors.registeredOn}
+            error={errors.registrationDate}
           >
             <DatePartsInput
               baseId={`${formId}-registered-on`}
               aria-describedby={
-                errors.registeredOn
+                errors.registrationDate
                   ? `${formId}-registered-on-day-error`
                   : undefined
               }
               disabled={disabled}
-              invalid={Boolean(errors.registeredOn)}
-              label={t("fields.registeredOn")}
+              invalid={Boolean(errors.registrationDate)}
+              label={t("fields.registrationDate")}
               locale={locale}
-              value={form.registeredOn}
-              onChange={(value) => onSetValue("registeredOn", value)}
+              value={form.registrationDate}
+              onChange={(value) => onSetValue("registrationDate", value)}
             />
           </Field>
           {form.registrationType === "temporary" ? (
             <Field
               id={`${formId}-registration-expires-on-day`}
-              label={t("fields.registrationExpiresOn")}
+              label={t("fields.temporaryRegistrationExpiresAt")}
               required
-              error={errors.registrationExpiresOn}
+              error={errors.temporaryRegistrationExpiresAt}
             >
               <DatePartsInput
                 baseId={`${formId}-registration-expires-on`}
                 aria-describedby={
-                  errors.registrationExpiresOn
+                  errors.temporaryRegistrationExpiresAt
                     ? `${formId}-registration-expires-on-day-error`
                     : undefined
                 }
                 disabled={disabled}
-                invalid={Boolean(errors.registrationExpiresOn)}
-                label={t("fields.registrationExpiresOn")}
+                invalid={Boolean(errors.temporaryRegistrationExpiresAt)}
+                label={t("fields.temporaryRegistrationExpiresAt")}
                 locale={locale}
-                value={form.registrationExpiresOn}
-                onChange={(value) => onSetValue("registrationExpiresOn", value)}
+                value={form.temporaryRegistrationExpiresAt}
+                onChange={(value) =>
+                  onSetValue("temporaryRegistrationExpiresAt", value)
+                }
               />
             </Field>
           ) : null}
           <Field
             id={`${formId}-required-driver-license-type`}
-            label={t("fields.requiredDriverLicenseType")}
+            label={t("fields.requiredLicenseCategory")}
             required
-            error={errors.requiredDriverLicenseType}
+            error={errors.requiredLicenseCategory}
           >
             <Select
-              value={form.requiredDriverLicenseType}
+              value={form.requiredLicenseCategory}
               onValueChange={(value) =>
                 onSetValue(
-                  "requiredDriverLicenseType",
+                  "requiredLicenseCategory",
                   value as v1.scooters.ScooterRequiredDriverLicenseType,
                 )
               }

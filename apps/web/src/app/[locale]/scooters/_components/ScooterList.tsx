@@ -36,7 +36,7 @@ export function ScooterList({ items }: ScooterListProps) {
   return (
     <ul className="flex flex-col gap-3">
       {items.map((scooter) => {
-        const title = `${scooter.brand} ${scooter.model}`;
+        const title = [scooter.brand, scooter.model].filter(Boolean).join(" ");
         const canOpenDetail = !scooter.deletedAt;
         const detailHref = localizePath(
           `/scooters/${encodeURIComponent(scooter.id)}`,
@@ -89,13 +89,15 @@ export function ScooterList({ items }: ScooterListProps) {
                     <span className="md:col-span-1">
                       {scooter.manufactureYear}
                     </span>
-                    {scooter.plateNumber ? (
+                    {scooter.registrationNumber ? (
                       <span className="inline-flex min-w-0 items-center gap-1.5 md:col-span-2">
                         <IdCardIcon
                           aria-hidden="true"
                           className={inlineIconClassName}
                         />
-                        <span className="truncate">{scooter.plateNumber}</span>
+                        <span className="truncate">
+                          {scooter.registrationNumber}
+                        </span>
                       </span>
                     ) : null}
 
@@ -129,8 +131,8 @@ function PowertrainBadge({ scooter }: { scooter: v1.scooters.Scooter }) {
   return (
     <Badge variant="outline">
       <Icon aria-hidden="true" data-icon="inline-start" />
-      {scooter.powertrainType === "combustion" && scooter.engineCc
-        ? t("list.ccValue", { cc: scooter.engineCc })
+      {scooter.powertrainType === "combustion" && scooter.engineDisplacementCc
+        ? t("list.ccValue", { cc: scooter.engineDisplacementCc })
         : t(`powertrainTypes.${scooter.powertrainType}`)}
     </Badge>
   );

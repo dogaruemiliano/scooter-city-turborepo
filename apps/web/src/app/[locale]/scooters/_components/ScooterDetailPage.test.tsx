@@ -37,14 +37,14 @@ const scooter: v1.scooters.Scooter = {
   color: "White",
   manufactureYear: 2026,
   powertrainType: "combustion",
-  engineType: null,
-  engineCc: 125,
+  engineCode: null,
+  engineDisplacementCc: 125,
   powerKw: 8.5,
   registrationType: "unregistered",
-  plateNumber: null,
-  registeredOn: null,
-  registrationExpiresOn: null,
-  requiredDriverLicenseType: "none",
+  registrationNumber: null,
+  registrationDate: null,
+  temporaryRegistrationExpiresAt: null,
+  requiredLicenseCategory: "none",
   currentMileageKm: 1_200,
   notes: "Maker papers received",
   createdAt: "2026-06-25T10:00:00.000Z",
@@ -110,9 +110,9 @@ describe("ScooterDetailPage", () => {
     mocks.apiFetch.mockResolvedValueOnce({
       ...scooter,
       registrationType: "national",
-      plateNumber: "CJ 12 ABC",
-      registeredOn: "2026-01-16",
-      requiredDriverLicenseType: "A1",
+      registrationNumber: "CJ 12 ABC",
+      registrationDate: "2026-01-16",
+      requiredLicenseCategory: "A1",
     });
     const browser = userEvent.setup();
 
@@ -139,10 +139,10 @@ describe("ScooterDetailPage", () => {
           method: "PATCH",
           json: {
             registrationType: "national",
-            plateNumber: "CJ 12 ABC",
-            registeredOn: "2026-01-16",
-            registrationExpiresOn: null,
-            requiredDriverLicenseType: "A1",
+            registrationNumber: "CJ 12 ABC",
+            registrationDate: "2026-01-16",
+            temporaryRegistrationExpiresAt: null,
+            requiredLicenseCategory: "A1",
           },
         },
       ),
@@ -156,9 +156,9 @@ describe("ScooterDetailPage", () => {
     renderDetail("en", {
       ...scooter,
       registrationType: "national",
-      plateNumber: "CJ 12 ABC",
-      registeredOn: "2026-01-16",
-      requiredDriverLicenseType: "A1",
+      registrationNumber: "CJ 12 ABC",
+      registrationDate: "2026-01-16",
+      requiredLicenseCategory: "A1",
     });
 
     await browser.click(screen.getByRole("button", { name: "More actions" }));
