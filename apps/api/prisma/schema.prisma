@@ -239,37 +239,113 @@ model ScooterBrand {
   scooters  Scooter[]
 }
 
-/// Scooter inventory record with Romanian registration metadata.
-model Scooter {
-  id                        String       @id @default(cuid())
-  vin                       String       @unique
-  brandId                   String
-  brand                     ScooterBrand @relation(fields: [brandId], references: [id], onDelete: Restrict)
-  model                     String
-  color                     String?
-  manufactureYear           Int
-  powertrainType            String
-  engineType                String?
-  engineCc                  Int?
-  powerKw                   Float?
-  registrationType          String       @default("unregistered")
-  plateNumber               String?
-  plateNumberNormalized     String?
-  registeredOn              DateTime?    @db.Date
-  registrationExpiresOn     DateTime?    @db.Date
-  requiredDriverLicenseType String       @default("none")
-  /// Enforced as non-negative by a database CHECK constraint.
-  currentMileageKm          Int?
-  notes                     String?
-  createdAt                 DateTime     @default(now())
-  updatedAt                 DateTime     @updatedAt
-  deletedAt                 DateTime?
+enum PowertrainType {
+  electric
+  combustion
+}
 
-  @@unique([plateNumberNormalized], map: "Scooter_active_plateNumberNormalized_key", where: raw("\"deletedAt\" IS NULL AND \"plateNumberNormalized\" IS NOT NULL"))
+enum ScooterRegistrationType {
+  unregistered
+  national
+  local
+  temporary
+}
+
+enum DrivingLicenseCategory {
+  none
+  AM
+  A1
+  A2
+  A
+}
+
+/// Scooter inventory; technical details can be completed after acquisition.
+model Scooter {
+  id String @id @default(cuid())
+
+  // Identity
+  vin             String  @unique
+  brandId         String
+  model           String?
+  variant         String?
+  version         String?
+  commercialName  String?
+  manufactureYear Int?
+  color           String?
+
+  // Classification / homologation
+  vehicleCategory        String?
+  nationalCategory       String?
+  bodyType               String?
+  typeApprovalNumber     String?
+  nationalRegistryNumber String?
+  seatsCount             Int?
+
+  // Powertrain / engine
+  powertrainType         PowertrainType
+  engineCode             String?
+  engineSerialNumber     String?
+  engineDisplacementCc   Int?
+  powerKw                Decimal?
+  ratedEngineRpm         Int?
+  fuelType               String?
+  propulsionSystem       String?
+  electricMotorPowerKw   Decimal?
+  powerToWeightRatioKwKg Decimal?
+  maxSpeedKmh            Int?
+  emissionsStandard      String?
+
+  // Masses
+  curbWeightKg                    Int?
+  actualWeightKg                  Int?
+  maxTechnicallyPermissibleMassKg Int?
+  maxTrainMassKg                  Int?
+  maxAxle1MassKg                  Int?
+  maxAxle2MassKg                  Int?
+
+  // Dimensions / chassis
+  axlesCount  Int?
+  lengthMm    Int?
+  widthMm     Int?
+  heightMm    Int?
+  wheelbaseMm Int?
+
+  // Wheels / suspension
+  frontTyreSpecification String?
+  rearTyreSpecification  String?
+  frontSuspension        String?
+  rearSuspension         String?
+
+  // Other technical data
+  fuelTankCapacityLiters Decimal?
+
+  // Current operational data
+  /// Enforced as non-negative by a database CHECK constraint.
+  currentMileageKm Int?
+  notes            String?
+
+  // Registration — current state
+  registrationType               ScooterRegistrationType @default(unregistered)
+  registrationNumber             String?
+  registrationNumberNormalized   String?
+  registrationDate               DateTime?               @db.Date
+  registrationCertificateNumber  String?
+  temporaryRegistrationExpiresAt DateTime?               @db.Date
+  requiredLicenseCategory        DrivingLicenseCategory  @default(none)
+
+  // Relations (acquisition, documents, insurance, issues and maintenance deferred)
+  brand ScooterBrand @relation(fields: [brandId], references: [id], onDelete: Restrict)
+
+  // Metadata
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@unique([registrationNumberNormalized], map: "Scooter_active_registrationNumberNormalized_key", where: raw("\"deletedAt\" IS NULL AND \"registrationNumberNormalized\" IS NOT NULL"))
   @@index([deletedAt])
   @@index([powertrainType, deletedAt])
   @@index([registrationType, deletedAt])
-  @@index([requiredDriverLicenseType, deletedAt])
+  @@index([requiredLicenseCategory, deletedAt])
   @@index([brandId, model])
 }
 

@@ -158,14 +158,14 @@ type ScooterSeed = {
   color: string | null;
   manufactureYear: number;
   powertrainType: ScooterPowertrainType;
-  engineCc: number | null;
+  engineDisplacementCc: number | null;
   powerKw: number | null;
   registrationType: ScooterRegistrationType;
-  plateNumber: string | null;
-  plateNumberNormalized: string | null;
-  registeredOn: Date | null;
-  registrationExpiresOn: Date | null;
-  requiredDriverLicenseType: "none";
+  registrationNumber: string | null;
+  registrationNumberNormalized: string | null;
+  registrationDate: Date | null;
+  temporaryRegistrationExpiresAt: Date | null;
+  requiredLicenseCategory: "none";
   notes: string | null;
   deletedAt: Date | null;
 };
@@ -753,14 +753,14 @@ function scooterData(seed: ScooterSeed, brandId: string) {
     color: seed.color,
     manufactureYear: seed.manufactureYear,
     powertrainType: seed.powertrainType,
-    engineCc: seed.engineCc,
+    engineDisplacementCc: seed.engineDisplacementCc,
     powerKw: seed.powerKw,
     registrationType: seed.registrationType,
-    plateNumber: seed.plateNumber,
-    plateNumberNormalized: seed.plateNumberNormalized,
-    registeredOn: seed.registeredOn,
-    registrationExpiresOn: seed.registrationExpiresOn,
-    requiredDriverLicenseType: seed.requiredDriverLicenseType,
+    registrationNumber: seed.registrationNumber,
+    registrationNumberNormalized: seed.registrationNumberNormalized,
+    registrationDate: seed.registrationDate,
+    temporaryRegistrationExpiresAt: seed.temporaryRegistrationExpiresAt,
+    requiredLicenseCategory: seed.requiredLicenseCategory,
     notes: seed.notes,
     deletedAt: seed.deletedAt,
   };
@@ -894,14 +894,14 @@ function buildGeneratedScooterSeeds(count: number): ScooterSeed[] {
       color: GENERATED_SCOOTER_COLORS[index % GENERATED_SCOOTER_COLORS.length],
       manufactureYear: 2021 + (index % 6),
       powertrainType: isElectric ? "electric" : "combustion",
-      engineCc: isElectric ? null : is125Cc ? 125 : 50,
+      engineDisplacementCc: isElectric ? null : is125Cc ? 125 : 50,
       powerKw: isElectric ? 3.2 : is125Cc ? 8.5 : 2.8,
       registrationType: "unregistered",
-      plateNumber: null,
-      plateNumberNormalized: null,
-      registeredOn: null,
-      registrationExpiresOn: null,
-      requiredDriverLicenseType: "none",
+      registrationNumber: null,
+      registrationNumberNormalized: null,
+      registrationDate: null,
+      temporaryRegistrationExpiresAt: null,
+      requiredLicenseCategory: "none",
       notes: generatedScooterNotes({ is125Cc, isElectric, isDeleted }),
       deletedAt: isDeleted
         ? new Date(`2026-03-${pad2(ordinal - 195)}T10:00:00.000Z`)
