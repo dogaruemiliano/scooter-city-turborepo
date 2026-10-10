@@ -40,6 +40,9 @@ export interface SheetSelectProps {
   value: string | null | undefined;
   options: readonly SheetSelectOption[];
   onValueChange: (value: string) => void;
+  triggerRef?: React.Ref<HTMLButtonElement>;
+  /** Optional action inside the sheet; call `select` to select and close it. */
+  renderHeaderAction?: (select: (value: string) => void) => React.ReactNode;
   id?: string;
   /**
    * Id of an external `<label>`. A `<label for>` cannot bind to the button
@@ -72,6 +75,8 @@ function SheetSelect({
   value,
   options,
   onValueChange,
+  triggerRef,
+  renderHeaderAction,
   id,
   labelledById,
   describedById,
@@ -127,11 +132,12 @@ function SheetSelect({
       }}
     >
       <BottomSheetTrigger
+        id={id}
+        disabled={disabled}
+        ref={triggerRef}
         render={
           <button
             type="button"
-            id={id}
-            disabled={disabled}
             aria-label={labelledById ? undefined : label}
             aria-labelledby={
               labelledById && id ? `${labelledById} ${id}` : undefined
@@ -143,26 +149,29 @@ function SheetSelect({
               "flex h-12 w-full items-center justify-between gap-2 rounded-lg border border-input bg-background px-3 py-2 text-base text-left outline-none transition-colors duration-fast ease-standard focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:bg-disabled disabled:text-disabled-foreground aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive md:h-11 md:text-sm",
               className,
             )}
-          />
+          >
+            <span
+              className={cn(
+                "truncate",
+                selectedOption ? "text-foreground" : "text-muted-foreground",
+              )}
+            >
+              {selectedOption?.label ?? (value || placeholder)}
+            </span>
+            <ChevronDownIcon
+              aria-hidden="true"
+              className="size-4 shrink-0 text-muted-foreground"
+            />
+          </button>
         }
-      >
-        <span
-          className={cn(
-            "truncate",
-            selectedOption ? "text-foreground" : "text-muted-foreground",
-          )}
-        >
-          {selectedOption?.label ?? (value || placeholder)}
-        </span>
-        <ChevronDownIcon
-          aria-hidden="true"
-          className="size-4 shrink-0 text-muted-foreground"
-        />
-      </BottomSheetTrigger>
+      />
 
       <BottomSheetContent initialFocus={searchInputRef}>
         <BottomSheetHeader>
-          <BottomSheetTitle>{label}</BottomSheetTitle>
+          <div className="flex items-center justify-between gap-2">
+            <BottomSheetTitle>{label}</BottomSheetTitle>
+            {renderHeaderAction?.(select)}
+          </div>
         </BottomSheetHeader>
 
         <BottomSheetBody>

@@ -160,7 +160,10 @@ test("native output converts OKLCH and alpha to hexadecimal sRGB", () => {
   assert.match(native, /"sidebarMutedForeground": "#A8B5BF"/);
   assert.match(native, /"scrim": "#00000066"/);
   assert.match(native, /"border": "#FFFFFF1A"/);
-  assert.match(native, /"magnification": \{\n {4}"loupe": 2\n {2}\}/);
+  assert.match(
+    native,
+    /"magnification": \{\n {4}"loupe": 2,\n {4}"documentMax": 4,\n {4}"documentStep": 0\.5\n {2}\}/,
+  );
   assert.doesNotMatch(native, /"minimal": \{/);
 });
 

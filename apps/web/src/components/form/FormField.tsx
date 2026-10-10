@@ -57,6 +57,7 @@ export interface FormFieldProps {
    * focusable input is a sub-element — the date field's `-day` input.
    */
   labelSuffix?: string;
+  labelHint?: string;
 }
 
 /**
@@ -70,6 +71,7 @@ export function FormField({
   disabled = false,
   label,
   labelSuffix,
+  labelHint,
   name,
   required = false,
 }: FormFieldProps) {
@@ -101,6 +103,11 @@ export function FormField({
           >
             {label}
           </Label>
+          {labelHint ? (
+            <span aria-hidden="true" className="text-xs text-muted-foreground">
+              {labelHint}
+            </span>
+          ) : null}
           {required ? (
             <span
               aria-hidden="true"
