@@ -4,13 +4,18 @@ import { Button, FormSection } from "@repo/ui/components";
 import {
   DocumentInput,
   type DocumentInputLabels,
+  type DocumentInputItem,
 } from "@repo/ui/components/document-input";
 import { DocumentPreview } from "@repo/ui/components/document-preview";
 import { useObjectUrl } from "@repo/ui/hooks/use-object-url";
 import { FileTextIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useState } from "react";
+import { useContext, useState } from "react";
 import { webApi } from "@/lib/api";
+import {
+  ScooterDocumentAnalysisContext,
+  ScooterDocumentAnalysisStatus,
+} from "./ScooterDocumentAnalysisStatus";
 import type {
   DocumentDraft,
   ScooterDocumentsEditor,
@@ -19,11 +24,13 @@ import type {
 function useDocumentLabels(
   type: v1.scooters.ScooterDocumentType,
   fileName?: string,
+  compact = false,
 ): DocumentInputLabels {
   const t = useTranslations("scooters.documents");
   return {
-    label: t(type),
+    label: compact ? t(`compact.${type}`) : t(type),
     add: t("add", { document: t(type) }),
+    addAction: t("addAction"),
     preview: t("preview", { name: fileName ?? t(type) }),
     title: fileName ?? t(type),
     imageAlt: fileName ?? t(type),
@@ -44,112 +51,166 @@ function useDocumentLabels(
 }
 export function ScooterDocumentUpload({
   type,
+  insurancePolicyId,
+  title,
   documents,
   disabled,
+  onAdd,
+  compact = false,
 }: {
   type: v1.scooters.ScooterDocumentType;
+  insurancePolicyId?: string;
+  title?: string;
   documents: ScooterDocumentsEditor;
   disabled: boolean;
+  onAdd?: (files: File[]) => void;
+  compact?: boolean;
 }) {
   const t = useTranslations("scooters.documents");
-  const labels = useDocumentLabels(type);
-  const existing = documents.existing.filter((item) => item.type === type);
-  const drafts = documents.drafts.filter((item) => item.type === type);
-  function validate(file: File, replacement = false) {
+  const extractionT = useTranslations("scooters.extraction");
+  const analysis = useContext(ScooterDocumentAnalysisContext);
+  const matchesCategory = (item: {
+    type: v1.scooters.ScooterDocumentType;
+    insurancePolicyId?: string | null;
+  }) =>
+    item.type === type &&
+    (item.insurancePolicyId ?? undefined) === insurancePolicyId;
+  const existing = documents.existing.filter(matchesCategory);
+  const drafts = documents.drafts.filter(matchesCategory);
+  const removed = documents.removed.filter(matchesCategory);
+  const values: DocumentInputItem[] = [
+    ...existing.map((document) => ({
+      id: document.id,
+      src: webApi.url(document.contentUrl),
+      fileName: document.fileName,
+      contentType: document.contentType,
+      uploaded: true,
+      status:
+        analysis[document.id]?.status === "processing"
+          ? extractionT("processing")
+          : undefined,
+    })),
+    ...drafts.map((draft) => ({
+      id: draft.id,
+      file: draft.file,
+      fileName: draft.file.name,
+      contentType: draft.file.type,
+      uploaded: draft.status === "ready",
+      status:
+        draft.status === "uploading"
+          ? t("uploading")
+          : analysis[draft.id]?.status === "processing"
+            ? extractionT("processing")
+            : undefined,
+      uploadError: draft.status === "failed" ? t("failed") : undefined,
+      onRetry: () => documents.retry(draft),
+    })),
+  ];
+  const labels = useDocumentLabels(
+    type,
+    values[0]?.fileName,
+    compact && values.length > 0,
+  );
+  const maxFiles =
+    values.length +
+    Math.max(
+      0,
+      v1.scooters.SCOOTER_DOCUMENT_MAX_FILES -
+        documents.existing.length -
+        documents.drafts.length,
+    );
+  function validate(file: File) {
     if (
       !(
         v1.scooters.SCOOTER_DOCUMENT_CONTENT_TYPES as readonly string[]
-      ).includes(file.type) ||
-      !file.size ||
-      file.size > v1.scooters.SCOOTER_DOCUMENT_MAX_BYTES
+      ).includes(file.type)
     )
-      return t("invalidFile");
+      return t("unsupportedFormat");
+    if (file.size > v1.scooters.SCOOTER_DOCUMENT_MAX_BYTES)
+      return t("tooLarge");
+    if (!file.size) return t("emptyFile");
     if (
       !v1.scooters.scooterDocumentDraftSchema.shape.fileName.safeParse(
         file.name,
       ).success
     )
       return t("invalidName");
-    if (
-      !replacement &&
-      documents.existing.length + documents.drafts.length >=
-        v1.scooters.SCOOTER_DOCUMENT_MAX_FILES
-    )
-      return t("tooMany");
     return null;
   }
-  const hasFiles = existing.length + drafts.length > 0;
+  function remove(id: string) {
+    if (existing.some((document) => document.id === id))
+      documents.removeExisting(id);
+    else documents.removeDraft(id);
+  }
   return (
-    <FormSection title={t(type)}>
-      <div className="grid gap-3 sm:col-span-2">
-        <p className="text-sm text-muted-foreground">{t("hint")}</p>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {existing.map((document) => (
-            <ScooterFilePreview
-              key={document.id}
-              document={document}
-              disabled={disabled}
-              onRemove={() => documents.removeExisting(document.id)}
-              validate={(file) => validate(file, true)}
-              onReplace={(file) => {
-                documents.removeExisting(document.id);
-                documents.add(type, [file]);
-              }}
-            />
-          ))}
-          {drafts.map((draft) => (
-            <ScooterFilePreview
-              key={draft.id}
-              draft={draft}
-              disabled={disabled}
-              onRetry={() => documents.retry(draft)}
-              onRemove={() => documents.removeDraft(draft.id)}
-              validate={(file) => validate(file, true)}
-              onReplace={(file) => {
-                documents.removeDraft(draft.id);
-                documents.add(type, [file]);
-              }}
-            />
-          ))}
-          {!hasFiles ? (
-            <DocumentInput
-              labels={labels}
-              accept={v1.scooters.SCOOTER_DOCUMENT_CONTENT_TYPES.join(",")}
-              disabled={disabled}
-              validate={validate}
-              onConfirm={(file) => documents.add(type, [file])}
-            />
-          ) : null}
-        </div>
-        {!hasFiles &&
-          documents.removed
-            .filter((item) => item.type === type)
-            .map((item) => (
-              <div
-                key={item.id}
-                className="flex items-center gap-3 text-sm text-muted-foreground"
-              >
-                <span className="min-w-0 flex-1 break-all line-through">
-                  {item.fileName}
-                </span>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  disabled={disabled}
-                  onClick={() => documents.undoRemove(item.id)}
-                >
-                  {t("undo")}
-                </Button>
-              </div>
-            ))}
-        {!hasFiles && documents.removed.some((item) => item.type === type) ? (
-          <p className="text-sm text-muted-foreground">{t("removalHint")}</p>
-        ) : null}
+    <div
+      role="group"
+      aria-label={title ?? t(type)}
+      className="grid min-w-0 content-start gap-3"
+    >
+      <div
+        className={
+          compact
+            ? `min-w-0 [&_[data-slot=document-input]>div>button:first-child]:min-h-36 ${values.length ? "" : "[&_[data-slot=badge]]:hidden"}`
+            : "min-w-0"
+        }
+      >
+        <DocumentInput
+          multiple
+          values={values}
+          labels={{
+            ...labels,
+            addMore: t("addMore"),
+            previousDocument: t("previousDocument"),
+            nextDocument: t("nextDocument"),
+            documentCount: (count) => t("documentCount", { count }),
+            documentPosition: (index, total) =>
+              t("documentPosition", { index, total }),
+            tooManyFiles: () => t("tooMany"),
+          }}
+          accept={v1.scooters.SCOOTER_DOCUMENT_CONTENT_TYPES.join(",")}
+          disabled={disabled}
+          maxFiles={maxFiles}
+          validate={validate}
+          onConfirm={
+            onAdd ?? ((files) => documents.add(type, files, insurancePolicyId))
+          }
+          onRemove={remove}
+          onReplace={(id, file) => {
+            remove(id);
+            documents.add(type, [file], insurancePolicyId);
+          }}
+        />
       </div>
-    </FormSection>
+      {values.map((item) => (
+        <ScooterDocumentAnalysisStatus key={item.id} sourceId={item.id} />
+      ))}
+      {removed.map((item) => (
+        <div
+          key={item.id}
+          className="flex items-center gap-3 text-sm text-muted-foreground"
+        >
+          <span className="min-w-0 flex-1 break-all line-through">
+            {item.fileName}
+          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            disabled={disabled || maxFiles === values.length}
+            onClick={() => documents.undoRemove(item.id)}
+          >
+            {t("undo")}
+          </Button>
+        </div>
+      ))}
+      {removed.length ? (
+        <p className="text-sm text-muted-foreground">{t("removalHint")}</p>
+      ) : null}
+    </div>
   );
 }
-function ScooterFilePreview({
+
+export function ScooterFilePreview({
   document,
   draft,
   disabled,
@@ -157,6 +218,7 @@ function ScooterFilePreview({
   onRemove,
   onReplace,
   validate,
+  compact = false,
 }: {
   document?: v1.scooters.ScooterDocument;
   draft?: DocumentDraft;
@@ -165,17 +227,27 @@ function ScooterFilePreview({
   onRemove?: () => void;
   onReplace?: (file: File) => void;
   validate?: (file: File) => string | null;
+  compact?: boolean;
 }) {
   const t = useTranslations("scooters.documents");
   const [open, setOpen] = useState(false);
   const fileName = document?.fileName ?? draft!.file.name;
   const type = document?.type ?? draft!.type;
-  const labels = useDocumentLabels(type, fileName);
+  const labels = useDocumentLabels(type, fileName, compact);
   const localUrl = useObjectUrl(draft?.file ?? null);
   const url = document ? webApi.url(document.contentUrl) : localUrl;
   const contentType = document?.contentType ?? draft!.file.type;
+  const analysis = useContext(ScooterDocumentAnalysisContext)[
+    document?.id ?? draft!.id
+  ];
+  const extractionT = useTranslations("scooters.extraction");
   const uploaded = Boolean(document) || draft?.status === "ready";
-  const status = draft?.status === "uploading" ? t("uploading") : undefined;
+  const status =
+    draft?.status === "uploading"
+      ? t("uploading")
+      : analysis?.status === "processing"
+        ? extractionT("processing")
+        : undefined;
   return (
     <div className="grid min-w-0 content-start gap-2">
       {onReplace && validate ? (
@@ -209,8 +281,10 @@ function ScooterFilePreview({
           open={open}
           onOpenChange={setOpen}
           uploaded={uploaded}
+          status={status}
         />
       )}
+      <ScooterDocumentAnalysisStatus sourceId={document?.id ?? draft!.id} />
     </div>
   );
 }
@@ -240,7 +314,9 @@ export function ScooterDocumentList({
   const t = useTranslations("scooters.documents");
   return (
     <div className="grid gap-6">
-      {v1.scooters.SCOOTER_DOCUMENT_TYPES.map((type) => (
+      {v1.scooters.SCOOTER_DOCUMENT_TYPES.filter(
+        (type) => type !== "insurance",
+      ).map((type) => (
         <FormSection key={type} title={t(type)}>
           <ul className="grid gap-4 sm:col-span-2 sm:grid-cols-2 lg:grid-cols-3">
             {documents

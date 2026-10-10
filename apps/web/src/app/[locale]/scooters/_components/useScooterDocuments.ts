@@ -7,6 +7,7 @@ import { webApi } from "@/lib/api";
 export interface DocumentDraft {
   id: string;
   type: v1.scooters.ScooterDocumentType;
+  insurancePolicyId?: string;
   file: File;
   status: "uploading" | "ready" | "failed";
   uploadToken?: string;
@@ -16,6 +17,9 @@ export function useScooterDocuments(
   existing: v1.scooters.ScooterDocument[] = [],
 ) {
   const [drafts, setDrafts] = useState<DocumentDraft[]>([]);
+  const [extractions, setExtractions] = useState<
+    Record<string, v1.scooters.ScooterDocumentExtractedData | null>
+  >({});
   const [removedIds, setRemovedIds] = useState<string[]>([]);
   const uploading = useRef(new Set<string>());
 
@@ -74,10 +78,15 @@ export function useScooterDocuments(
     }
   }
 
-  function add(type: v1.scooters.ScooterDocumentType, files: File[]) {
+  function add(
+    type: v1.scooters.ScooterDocumentType,
+    files: File[],
+    insurancePolicyId?: string,
+  ) {
     const items: DocumentDraft[] = files.map((file) => ({
       id: crypto.randomUUID(),
       type,
+      insurancePolicyId,
       file,
       status: "uploading",
     }));
@@ -87,6 +96,8 @@ export function useScooterDocuments(
 
   return {
     drafts,
+    extractions,
+    setExtractions,
     removedIds,
     removed: existing.filter((item) => removedIds.includes(item.id)),
     existing: existing.filter((item) => !removedIds.includes(item.id)),
@@ -101,7 +112,13 @@ export function useScooterDocuments(
     undoRemove: (id: string) =>
       setRemovedIds((current) => current.filter((item) => item !== id)),
     blocked: drafts.some((item) => item.status !== "ready"),
-    changed: drafts.length > 0 || removedIds.length > 0,
+    changed:
+      drafts.length > 0 ||
+      removedIds.length > 0 ||
+      [
+        ...existing.filter((doc) => !removedIds.includes(doc.id)),
+        ...drafts,
+      ].some((doc) => doc.id in extractions),
     payload: {
       ...(drafts.length
         ? {
@@ -109,8 +126,28 @@ export function useScooterDocuments(
               .filter((item) => item.status === "ready")
               .map((item) => ({
                 type: item.type,
+                ...(item.insurancePolicyId
+                  ? { insurancePolicyId: item.insurancePolicyId }
+                  : {}),
                 fileName: item.file.name,
                 uploadToken: item.uploadToken!,
+                ...(extractions[item.id]
+                  ? { extractedData: extractions[item.id] }
+                  : {}),
+              })),
+          }
+        : {}),
+      ...(existing.some(
+        (doc) => doc.id in extractions && !removedIds.includes(doc.id),
+      )
+        ? {
+            documentExtractions: existing
+              .filter(
+                (doc) => doc.id in extractions && !removedIds.includes(doc.id),
+              )
+              .map((doc) => ({
+                documentId: doc.id,
+                extractedData: extractions[doc.id] ?? null,
               })),
           }
         : {}),

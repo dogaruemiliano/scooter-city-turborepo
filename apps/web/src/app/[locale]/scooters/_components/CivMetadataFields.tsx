@@ -2,8 +2,12 @@
 import { v1 } from "@repo/api-shared";
 import { FormSection } from "@repo/ui/components";
 import { useTranslations } from "next-intl";
-import { useFormContext, useWatch } from "react-hook-form";
-import { FormField } from "@/components/form/FormField";
+import { get, useFormContext, useWatch } from "react-hook-form";
+import { useContext, useState } from "react";
+import {
+  FormField,
+  FormFieldWarningsContext,
+} from "@/components/form/FormField";
 import {
   FormDateField,
   FormInput,
@@ -11,9 +15,52 @@ import {
 } from "@/components/form/controls";
 import type { ScooterEditorValues } from "./scooter-editor-schema";
 
-export function CivMetadataFields({ disabled }: { disabled: boolean }) {
+const metadataFields = [
+  "civNumber",
+  "civIssuedAt",
+  "civIssuingAuthority",
+] as const;
+
+export function CivMetadataFields({
+  disabled,
+  compact = false,
+}: {
+  disabled: boolean;
+  compact?: boolean;
+}) {
   const t = useTranslations("scooters");
-  const { control } = useFormContext<ScooterEditorValues>();
+  const {
+    control,
+    getValues,
+    formState: { errors },
+  } = useFormContext<ScooterEditorValues>();
+  const warnings = useContext(FormFieldWarningsContext);
+  const [initiallyVisible] = useState(
+    () =>
+      new Set<string>(
+        metadataFields.filter((field) => getValues(field) || warnings[field]),
+      ),
+  );
+  const hidden = compact
+    ? metadataFields.filter((field) => !initiallyVisible.has(field))
+    : [];
+  function renderField(field: (typeof metadataFields)[number]) {
+    return (
+      <FormField
+        key={field}
+        name={field}
+        label={t(`fields.${field}`)}
+        disabled={disabled}
+        labelSuffix={field === "civIssuedAt" ? "day" : undefined}
+      >
+        {field === "civIssuedAt" ? (
+          <FormDateField maxDate={v1.common.dateOnlyToday()} />
+        ) : (
+          <FormInput placeholder={t(`placeholders.${field}`)} />
+        )}
+      </FormField>
+    );
+  }
   const version = useWatch({ control, name: "civVersion" });
   return (
     <FormSection title={t("sections.civDocument")}>
@@ -29,32 +76,34 @@ export function CivMetadataFields({ disabled }: { disabled: boolean }) {
           }))}
         />
       </FormField>
-      <FormField
-        name="civNumber"
-        label={t("fields.civNumber")}
-        disabled={disabled}
-      >
-        <FormInput placeholder={t("placeholders.civNumber")} />
-      </FormField>
-      <FormField
-        name="civIssuedAt"
-        label={t("fields.civIssuedAt")}
-        disabled={disabled}
-      >
-        <FormDateField />
-      </FormField>
-      <FormField
-        name="civIssuingAuthority"
-        label={t("fields.civIssuingAuthority")}
-        disabled={disabled}
-      >
-        <FormInput placeholder={t("placeholders.civIssuingAuthority")} />
-      </FormField>
-      <p className="text-sm text-muted-foreground sm:col-span-2">
-        {t(
-          version === "unknown" ? "civ.unknownVersionHint" : "civ.versionHint",
-        )}
-      </p>
+      {metadataFields
+        .filter((field) => !hidden.includes(field))
+        .map(renderField)}
+      {hidden.length ? (
+        <details
+          className="sm:col-span-2"
+          open={
+            hidden.some((field) => warnings[field] || get(errors, field)) ||
+            undefined
+          }
+        >
+          <summary className="cursor-pointer py-3 text-sm font-medium">
+            {t("wizard.otherFields")}
+          </summary>
+          <div className="grid gap-4 pt-4 sm:grid-cols-2">
+            {hidden.map(renderField)}
+          </div>
+        </details>
+      ) : null}
+      {!compact ? (
+        <p className="text-sm text-muted-foreground sm:col-span-2">
+          {t(
+            version === "unknown"
+              ? "civ.unknownVersionHint"
+              : "civ.versionHint",
+          )}
+        </p>
+      ) : null}
     </FormSection>
   );
 }

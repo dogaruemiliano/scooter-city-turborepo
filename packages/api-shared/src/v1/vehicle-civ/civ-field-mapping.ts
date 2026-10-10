@@ -294,11 +294,6 @@ export const CIV_FIELD_MAPPING = {
     "2016": reference("W"),
     "1993": reference("17"),
   },
-  civMentions: {
-    "2024": reference(),
-    "2016": reference(),
-    "1993": reference(),
-  },
 } satisfies Record<
   string,
   Record<Exclude<CivVersion, "unknown">, CivFieldReference>

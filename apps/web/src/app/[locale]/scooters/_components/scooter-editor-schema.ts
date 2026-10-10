@@ -88,8 +88,17 @@ export const SCOOTER_EDITOR_SECTIONS = [
       "co2EmissionsGKm",
     ],
   },
-  { title: "civMentions", fields: ["civMentions"] },
-  { title: "operational", fields: ["currentMileageKm", "notes"] },
+  {
+    title: "operational",
+    fields: [
+      "hasGps",
+      "currentMileageKm",
+      "odometerWorking",
+      "speedometerWorking",
+      "actualMaxSpeedKmh",
+      "notes",
+    ],
+  },
 ] as const;
 
 export const REGISTRATION_FIELDS = [
@@ -116,7 +125,46 @@ export const CREATE_FIELDS = [
   ...REGISTRATION_FIELDS,
 ] as const;
 export type ScooterEditorField = (typeof CREATE_FIELDS)[number];
-export type ScooterEditorValues = Record<ScooterEditorField, string>;
+export type InsuranceEditorValues = Record<
+  (typeof v1.scooters.INSURANCE_FIELDS)[number] | "id",
+  string
+> & {
+  vinReviewConfirmed: boolean;
+  sourceFileNames?: string[];
+  rawFields?: v1.scooters.InsurancePolicyInput["rawFields"];
+};
+export type ScooterEditorValues = Record<ScooterEditorField, string> & {
+  insurancePolicies?: InsuranceEditorValues[];
+};
+
+export function insuranceEditorDefaults(
+  policy?: v1.scooters.InsurancePolicyInput,
+): InsuranceEditorValues {
+  return {
+    id: policy?.id ?? crypto.randomUUID(),
+    insuredName: policy?.insuredName ?? "",
+    validFrom: policy?.validFrom ?? "",
+    validUntil: policy?.validUntil ?? "",
+    premiumAmount:
+      policy?.premiumAmount == null ? "" : String(policy.premiumAmount),
+    currency: policy?.currency ?? "",
+    documentVin: policy?.documentVin ?? "",
+    vinReviewConfirmed: policy?.vinReviewConfirmed ?? false,
+    rawFields: policy?.rawFields,
+  };
+}
+const insuranceEditorSchema = z.object({
+  id: z.string(),
+  insuredName: z.string(),
+  validFrom: z.string(),
+  validUntil: z.string(),
+  premiumAmount: z.string(),
+  currency: z.string(),
+  documentVin: z.string(),
+  vinReviewConfirmed: z.boolean(),
+  sourceFileNames: z.array(z.string()).optional(),
+  rawFields: v1.scooters.insuranceRawFieldsSchema.optional(),
+});
 
 export const DECIMAL_FIELDS = new Set<string>([
   "stationaryNoiseDb",
@@ -126,6 +174,11 @@ export const DECIMAL_FIELDS = new Set<string>([
   "electricMotorPowerKw",
   "powerToWeightRatioKwKg",
   "fuelTankCapacityLiters",
+]);
+export const BOOLEAN_FIELDS = new Set<string>([
+  "hasGps",
+  "odometerWorking",
+  "speedometerWorking",
 ]);
 export const INTEGER_FIELDS = new Set<string>([
   "maxAxle3MassKg",
@@ -141,6 +194,7 @@ export const INTEGER_FIELDS = new Set<string>([
   "engineDisplacementCc",
   "ratedEngineRpm",
   "maxSpeedKmh",
+  "actualMaxSpeedKmh",
   "curbWeightKg",
   "actualWeightKg",
   "maxTechnicallyPermissibleMassKg",
@@ -160,16 +214,18 @@ export const isNumericField = (field: string) =>
 export function scooterEditorDefaults(
   scooter?: v1.scooters.Scooter,
 ): ScooterEditorValues {
-  const values = Object.fromEntries(
+  const values: ScooterEditorValues = Object.fromEntries(
     CREATE_FIELDS.map((field) => [
       field,
       scooter?.[field] == null ? "" : String(scooter[field]),
     ]),
-  ) as ScooterEditorValues;
+  ) as Record<ScooterEditorField, string>;
   values.civVersion = scooter?.civVersion ?? "unknown";
   values.powertrainType = scooter?.powertrainType ?? "";
-  values.registrationType = scooter?.registrationType ?? "unregistered";
-  values.requiredLicenseCategory = scooter?.requiredLicenseCategory ?? "none";
+  values.registrationType = scooter?.registrationType ?? "";
+  values.requiredLicenseCategory = scooter?.requiredLicenseCategory ?? "";
+  values.insurancePolicies =
+    scooter?.insurancePolicies?.map(insuranceEditorDefaults) ?? [];
   return values;
 }
 
@@ -178,43 +234,84 @@ function convertValues(values: Partial<ScooterEditorValues>) {
     values.powertrainType ?? "",
   );
   return Object.fromEntries(
-    Object.entries(values).map(([field, value = ""]) => [
-      field,
-      (inactive as readonly string[]).includes(field)
-        ? null
-        : field === "fuelType" && values.powertrainType === "electric"
-          ? "electric"
-          : field === "fuelTypeOther" && values.powertrainType === "electric"
+    Object.entries(values)
+      .filter(([field]) => field !== "insurancePolicies")
+      .map(([field, raw = ""]) => {
+        const value = raw as string;
+        return [
+          field,
+          (inactive as readonly string[]).includes(field)
             ? null
-            : field.endsWith("Other") &&
-                values[field.slice(0, -5) as ScooterEditorField] !== "other"
-              ? null
-              : isNumericField(field)
-                ? v1.vehicleCiv.parseCivNumber(value)
-                : [
-                      "civVersion",
-                      "vin",
-                      "brandId",
-                      "powertrainType",
-                      "registrationType",
-                    ].includes(field)
-                  ? value.trim()
-                  : field === "requiredLicenseCategory"
-                    ? value || undefined
-                    : value.trim() || null,
-    ]),
+            : field === "fuelType" && values.powertrainType === "electric"
+              ? "electric"
+              : field === "fuelTypeOther" &&
+                  values.powertrainType === "electric"
+                ? null
+                : field.endsWith("Other") &&
+                    values[field.slice(0, -5) as ScooterEditorField] !== "other"
+                  ? null
+                  : BOOLEAN_FIELDS.has(field)
+                    ? value === ""
+                      ? null
+                      : value === "true"
+                        ? true
+                        : value === "false"
+                          ? false
+                          : value
+                    : isNumericField(field)
+                      ? v1.vehicleCiv.parseCivNumber(value)
+                      : [
+                            "civVersion",
+                            "vin",
+                            "brandId",
+                            "powertrainType",
+                            "registrationType",
+                          ].includes(field)
+                        ? value.trim()
+                        : field === "requiredLicenseCategory"
+                          ? value || undefined
+                          : value.trim() || null,
+        ];
+      }),
   );
+}
+
+function convertForm(values: Partial<ScooterEditorValues>) {
+  return {
+    ...convertValues(values),
+    ...(values.insurancePolicies
+      ? {
+          insurancePolicies: values.insurancePolicies.map((policy) => ({
+            id: policy.id,
+            vinReviewConfirmed: policy.vinReviewConfirmed,
+            rawFields: policy.rawFields,
+            insuredName: policy.insuredName.trim() || null,
+            validFrom: policy.validFrom || null,
+            validUntil: policy.validUntil || null,
+            premiumAmount: v1.vehicleCiv.parseCivNumber(policy.premiumAmount),
+            currency: policy.currency.trim().toUpperCase() || null,
+            documentVin: policy.documentVin.trim().toUpperCase() || null,
+          })),
+        }
+      : {}),
+  };
 }
 
 const rawShape = Object.fromEntries(
   CREATE_FIELDS.map((field) => [field, z.string()]),
 ) as Record<ScooterEditorField, z.ZodString>;
-const rawCreateSchema = z.object(rawShape);
+const rawCreateSchema = z.object({
+  ...rawShape,
+  insurancePolicies: z.array(insuranceEditorSchema).optional(),
+});
 
 export const scooterCreateFormSchema = rawCreateSchema
+  .extend({
+    insurancePolicies: z.array(insuranceEditorSchema).max(1).optional(),
+  })
   .transform(
     (values) =>
-      convertValues(values) as unknown as z.input<
+      convertForm(values) as unknown as z.input<
         typeof v1.scooters.createScooterInputSchema
       >,
   )
@@ -238,7 +335,7 @@ export const scooterEditFormSchema = rawCreateSchema
   })
   .transform(
     (values) =>
-      convertValues(values) as unknown as z.input<
+      convertForm(values) as unknown as z.input<
         typeof v1.scooters.updateScooterInputSchema
       >,
   )

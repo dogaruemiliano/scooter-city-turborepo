@@ -1,3 +1,4 @@
+import { writeInsurancePolicies } from "./scooter-insurance";
 import { CivVocabularyService } from "./civ-vocabulary.service";
 import { civMetadataWrite } from "./civ-metadata";
 import { ScooterDocumentsService } from "./scooter-documents.service";
@@ -17,7 +18,8 @@ import { PrismaService } from "../prisma/prisma.service";
 const scooterInclude = {
   brand: true,
   civDocument: true,
-} as const;
+  insurancePolicies: { orderBy: [{ validUntil: "desc" }, { id: "asc" }] },
+} satisfies Prisma.ScooterInclude;
 
 type ScooterWithBrand = Scooter & {
   brand: { name: string };
@@ -69,9 +71,21 @@ export class ScootersService {
           data,
           include: scooterInclude,
         });
+        if (input.insurancePolicies?.length)
+          await writeInsurancePolicies(
+            tx,
+            scooter.id,
+            scooter.vin,
+            input.insurancePolicies,
+          );
         await this.documents.apply(tx, scooter.id, prepared, [], userId);
         await this.civVocabulary.remember(tx, input);
-        return scooter;
+        return input.insurancePolicies?.length
+          ? tx.scooter.findUniqueOrThrow({
+              where: { id: scooter.id },
+              include: scooterInclude,
+            })
+          : scooter;
       });
     } catch (error) {
       this.handleWriteError(error);
@@ -213,15 +227,28 @@ export class ScootersService {
           data: { ...data, updatedAt: new Date() },
           include: scooterInclude,
         });
+        if (input.insurancePolicies?.length || input.vin !== undefined)
+          await writeInsurancePolicies(
+            tx,
+            id,
+            scooter.vin,
+            input.insurancePolicies,
+          );
         await this.documents.apply(
           tx,
           id,
           prepared,
           input.removedDocumentIds,
           userId,
+          input.documentExtractions,
         );
         await this.civVocabulary.remember(tx, input);
-        return scooter;
+        return input.insurancePolicies?.length
+          ? tx.scooter.findUniqueOrThrow({
+              where: { id: scooter.id },
+              include: scooterInclude,
+            })
+          : scooter;
       });
     } catch (error) {
       this.handleWriteError(error);
@@ -260,7 +287,6 @@ export class ScootersService {
       co2EmissionsGKm: input.co2EmissionsGKm,
       vehicleClass: input.vehicleClass,
       driveType: input.driveType,
-      civMentions: input.civMentions,
       civDocument: civData ? { create: civData } : undefined,
       vin: input.vin,
       brand: { connect: { id: input.brandId } },
@@ -322,6 +348,10 @@ export class ScootersService {
         requiredLicenseCategory: input.requiredLicenseCategory ?? "none",
       }),
       currentMileageKm: input.currentMileageKm ?? null,
+      hasGps: input.hasGps,
+      odometerWorking: input.odometerWorking,
+      speedometerWorking: input.speedometerWorking,
+      actualMaxSpeedKmh: input.actualMaxSpeedKmh,
       notes: input.notes,
     };
   }
@@ -345,7 +375,6 @@ export class ScootersService {
       co2EmissionsGKm: input.co2EmissionsGKm,
       vehicleClass: input.vehicleClass,
       driveType: input.driveType,
-      civMentions: input.civMentions,
       civDocument: civData
         ? { upsert: { create: civData, update: civData } }
         : undefined,
@@ -406,6 +435,10 @@ export class ScootersService {
         this.toNextRegistrationState(existing, input),
       ),
       currentMileageKm: input.currentMileageKm,
+      hasGps: input.hasGps,
+      odometerWorking: input.odometerWorking,
+      speedometerWorking: input.speedometerWorking,
+      actualMaxSpeedKmh: input.actualMaxSpeedKmh,
       notes: input.notes,
     };
   }

@@ -1,4 +1,8 @@
 import {
+  insurancePoliciesInputSchema,
+  insurancePolicySchema,
+} from "./scooter-insurance.schemas";
+import {
   civMetadataSchema,
   civAdditionalSpecificationsSchema,
 } from "../vehicle-civ/vehicle-civ.schemas";
@@ -7,6 +11,7 @@ import {
   scooterDocumentListSchema,
   SCOOTER_DOCUMENT_MAX_FILES,
 } from "./scooter-documents.schemas";
+import { scooterDocumentExtractionUpdateSchema } from "./scooter-document-extraction.schemas";
 /**
  * Scooters-domain Zod schemas.
  */
@@ -255,6 +260,7 @@ export const scooterTechnicalDetailsSchema = z.object({
 export const scooterSchema = z
   .object({
     documents: scooterDocumentListSchema.optional(),
+    insurancePolicies: z.array(insurancePolicySchema).optional(),
     ...civMetadataSchema.shape,
     ...scooterTechnicalDetailsSchema.shape,
     id: z.string(),
@@ -274,6 +280,10 @@ export const scooterSchema = z
     temporaryRegistrationExpiresAt: z.string().nullable(),
     requiredLicenseCategory: scooterRequiredDriverLicenseTypeSchema,
     currentMileageKm: mileageKmSchema.nullable(),
+    hasGps: z.boolean().nullable(),
+    odometerWorking: z.boolean().nullable(),
+    speedometerWorking: z.boolean().nullable(),
+    actualMaxSpeedKmh: nullableTechnicalIntegerSchema,
     notes: z.string().nullable(),
     createdAt: z.string().describe("ISO timestamp of scooter creation."),
     updatedAt: z.string().describe("ISO timestamp of last scooter update."),
@@ -285,6 +295,7 @@ export type Scooter = z.infer<typeof scooterSchema>;
 
 export const createScooterInputSchema = z
   .object({
+    insurancePolicies: insurancePoliciesInputSchema.optional(),
     documentDrafts: scooterDocumentDraftsSchema.optional(),
     ...civMetadataSchema.shape,
     ...scooterTechnicalDetailsSchema.shape,
@@ -315,10 +326,15 @@ export const createScooterInputSchema = z
     temporaryRegistrationExpiresAt: dateOnlySchema.nullable().optional(),
     requiredLicenseCategory: scooterRequiredDriverLicenseTypeSchema.optional(),
     currentMileageKm: mileageKmSchema.nullable().optional(),
+    hasGps: z.boolean().nullable().optional(),
+    odometerWorking: z.boolean().nullable().optional(),
+    speedometerWorking: z.boolean().nullable().optional(),
+    actualMaxSpeedKmh: nullableTechnicalIntegerSchema.optional(),
     notes: notesSchema.optional(),
   })
   .strict()
   .superRefine((input, ctx) => {
+    validateInsuranceVins(input, ctx);
     validateScooterPowertrainForCreate(input, ctx);
     validateScooterCivOptions(input, ctx);
     validateScooterRegistrationForCreate(input, ctx);
@@ -329,7 +345,17 @@ export type CreateScooterInput = z.infer<typeof createScooterInputSchema>;
 
 export const updateScooterInputSchema = z
   .object({
+    insurancePolicies: insurancePoliciesInputSchema.optional(),
     documentDrafts: scooterDocumentDraftsSchema.optional(),
+    documentExtractions: z
+      .array(scooterDocumentExtractionUpdateSchema)
+      .max(SCOOTER_DOCUMENT_MAX_FILES)
+      .refine(
+        (items) =>
+          new Set(items.map((item) => item.documentId)).size === items.length,
+        "Duplicate document extraction IDs",
+      )
+      .optional(),
     removedDocumentIds: z
       .array(z.string().min(1))
       .max(SCOOTER_DOCUMENT_MAX_FILES)
@@ -363,10 +389,15 @@ export const updateScooterInputSchema = z
     temporaryRegistrationExpiresAt: dateOnlySchema.nullable().optional(),
     requiredLicenseCategory: scooterRequiredDriverLicenseTypeSchema.optional(),
     currentMileageKm: mileageKmSchema.nullable().optional(),
+    hasGps: z.boolean().nullable().optional(),
+    odometerWorking: z.boolean().nullable().optional(),
+    speedometerWorking: z.boolean().nullable().optional(),
+    actualMaxSpeedKmh: nullableTechnicalIntegerSchema.optional(),
     notes: notesSchema.optional(),
   })
   .strict()
   .superRefine((input, ctx) => {
+    validateInsuranceVins(input, ctx);
     validateScooterPowertrainForUpdate(input, ctx);
     validateScooterCivOptions(input, ctx, true);
     validateScooterRegistrationForUpdate(input, ctx);
@@ -741,4 +772,19 @@ function validateScooterCivOptions(
       });
     }
   }
+}
+
+function validateInsuranceVins(
+  input: { vin?: string; insurancePolicies?: { documentVin: string | null }[] },
+  ctx: z.RefinementCtx,
+) {
+  if (!input.vin) return;
+  input.insurancePolicies?.forEach((policy, index) => {
+    if (policy.documentVin && policy.documentVin !== input.vin)
+      ctx.addIssue({
+        code: "custom",
+        path: ["insurancePolicies", index, "documentVin"],
+        message: "insuranceVinMismatch",
+      });
+  });
 }

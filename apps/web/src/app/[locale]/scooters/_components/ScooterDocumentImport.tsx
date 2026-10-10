@@ -1,21 +1,34 @@
 "use client";
 
 import { v1 } from "@repo/api-shared";
-import { Button, Label, Textarea } from "@repo/ui/components";
-import { ClipboardPasteIcon, ImportIcon } from "lucide-react";
+import { Button, Checkbox, Label, Textarea } from "@repo/ui/components";
+import {
+  FileJsonIcon,
+  ImportIcon,
+  LoaderCircleIcon,
+  TriangleAlertIcon,
+  UploadIcon,
+} from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useId, useRef, useState } from "react";
-import { useFormContext, useWatch } from "react-hook-form";
+import { useEffect, useId, useRef, useState } from "react";
+import { useFormContext } from "react-hook-form";
 import {
   MAX_IMPORT_CHARACTERS,
   parseDocumentImport,
+  type DocumentImportResult,
 } from "./scooter-document-import";
+import type { DocumentSource } from "./scooter-document-sources";
+import { useScooterImportReview } from "./ScooterImportReview";
 import { ScooterImportInstructions } from "./ScooterImportInstructions";
 import { ScooterImportDialog } from "./ScooterImportDialog";
+import { ScooterVinReference } from "./ScooterVinReference";
 import type {
   ScooterEditorField,
   ScooterEditorValues,
 } from "./scooter-editor-schema";
+
+// UTF-8 may use up to four bytes per character; check decoded length as well.
+const MAX_IMPORT_BYTES = MAX_IMPORT_CHARACTERS * 4;
 
 export function ScooterDocumentImport({
   brands,
@@ -23,141 +36,211 @@ export function ScooterDocumentImport({
   disabled,
   onRawFields,
   rawFields,
+  insuranceFiles = [],
+  onImport,
+  sources = [],
+  onApplyImport,
+  secondary = false,
 }: {
   brands: v1.scooterBrands.ScooterBrand[];
   editing: boolean;
+  sources?: DocumentSource[];
+  onApplyImport?: (result: Extract<DocumentImportResult, { ok: true }>) => void;
+  onImport: (result: Extract<DocumentImportResult, { ok: true }>) => void;
   disabled: boolean;
+  insuranceFiles?: { fileName: string; insurancePolicyId?: string | null }[];
   rawFields: Record<string, string>;
   onRawFields: (fields: Record<string, string>) => void;
+  secondary?: boolean;
 }) {
   const t = useTranslations("scooters");
   const id = useId();
   const form = useFormContext<ScooterEditorValues>();
+  const [vinReviewed, setVinReviewed] = useState(false);
+  const [needsVinReview, setNeedsVinReview] = useState(false);
+  const [importedVin, setImportedVin] = useState<string>();
   const [open, setOpen] = useState(false);
   const [showEditor, setShowEditor] = useState(false);
-  const [readingClipboard, setReadingClipboard] = useState(false);
-  const clipboardRequest = useRef(0);
-  const pasteRef = useRef<HTMLButtonElement>(null);
+  const [readingFile, setReadingFile] = useState(false);
+  const [fileName, setFileName] = useState<string | null>(null);
+  const fileRequest = useRef(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const uploadRef = useRef<HTMLButtonElement>(null);
   const jsonRef = useRef<HTMLTextAreaElement>(null);
   const [json, setJson] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState<string | null>(null);
-  const [review, setReview] = useState<{
-    unresolved: string[];
-    conflicts: string[];
-    snapshot: ScooterEditorValues;
-  } | null>(null);
+  const {
+    count: reviewCount,
+    reviewFields,
+    reviewImport,
+  } = useScooterImportReview();
+  useEffect(
+    () => () => {
+      fileRequest.current += 1;
+    },
+    [],
+  );
+
   function changeOpen(nextOpen: boolean) {
-    clipboardRequest.current += 1;
-    setReadingClipboard(false);
+    fileRequest.current += 1;
+    setReadingFile(false);
     setOpen(nextOpen);
   }
 
-  async function pasteJson() {
-    const request = ++clipboardRequest.current;
-    setReadingClipboard(true);
+  function parseJson(text: string) {
+    return parseDocumentImport(
+      text,
+      brands,
+      form.getValues(),
+      editing,
+      rawFields,
+      insuranceFiles,
+      sources,
+    );
+  }
+
+  function showImportError(
+    result: Extract<DocumentImportResult, { ok: false }>,
+    text: string,
+  ) {
+    if (result.reason === "invalidSources" && result.sourceIssue) {
+      const { kind, provided, uploaded } = result.sourceIssue;
+      const none = t("documentImport.sourceIssues.none");
+      setError(
+        t(`documentImport.sourceIssues.${kind}`, {
+          provided: provided.join(", ") || none,
+          uploaded: uploaded.join(", ") || none,
+        }),
+      );
+      return;
+    }
+    setError(
+      t(`documentImport.${result.reason}`, {
+        fields: result.fields.join(", "),
+        count: text.length,
+        limit: MAX_IMPORT_CHARACTERS,
+      }),
+    );
+  }
+
+  async function readJsonFile(file: File) {
+    const request = ++fileRequest.current;
+    setReadingFile(false);
+    setJson("");
+    setFileName(null);
+    setVinReviewed(false);
+    setNeedsVinReview(false);
     setError(null);
+    if (!/\.json$/i.test(file.name)) {
+      setError(t("documentImport.invalidFileType"));
+      return;
+    }
+    if (file.size > MAX_IMPORT_BYTES) {
+      setError(t("documentImport.fileTooLarge", { limit: MAX_IMPORT_BYTES }));
+      return;
+    }
+    setReadingFile(true);
     try {
-      const text = await navigator.clipboard.readText();
-      if (request !== clipboardRequest.current) return;
-      if (text.length > MAX_IMPORT_CHARACTERS) {
-        setError(t("documentImport.invalidJson"));
+      const text = await file.text();
+      if (request !== fileRequest.current) return;
+      const result = parseJson(text);
+      if (!result.ok) {
+        showImportError(result, text);
         return;
       }
       setJson(text);
-      setShowEditor(true);
-      if (!text.trim()) setError(t("documentImport.clipboardEmpty"));
+      setFileName(file.name);
+      setNeedsVinReview(Boolean(result.needsVinReview));
+      setImportedVin(result.values.vin);
     } catch {
-      if (request !== clipboardRequest.current) return;
-      setShowEditor(true);
-      setError(t("documentImport.pasteManuallyHint"));
+      if (request !== fileRequest.current) return;
+      setError(t("documentImport.fileReadError"));
     } finally {
-      if (request === clipboardRequest.current) setReadingClipboard(false);
+      if (request === fileRequest.current) setReadingFile(false);
     }
   }
 
   function apply() {
     setError(null);
-    setFeedback(null);
-    const result = parseDocumentImport(
-      json,
-      brands,
-      form.getValues(),
-      editing,
-      rawFields,
-    );
+    const result = parseJson(json);
     if (!result.ok) {
-      setError(
-        t(`documentImport.${result.reason}`, {
-          fields: result.fields.join(", "),
-        }),
-      );
+      showImportError(result, json);
       return;
     }
-    for (const [field, value] of Object.entries(result.values)) {
-      form.setValue(field as ScooterEditorField, value, {
-        shouldDirty: true,
-        shouldTouch: true,
-      });
+    if (result.needsVinReview && !vinReviewed) {
+      setNeedsVinReview(true);
+      setImportedVin(result.values.vin);
+      return;
     }
-    if (result.rawFields) onRawFields(result.rawFields);
-    setReview({
-      unresolved: result.unresolved,
-      conflicts: result.emptyConflicts,
-      snapshot: form.getValues(),
-    });
-    // Use the same resolver as manual input for cross-field validation and errors.
-    void form.trigger();
-    const count = Object.keys(result.values).length;
-    setFeedback(
-      [
-        count || result.rawFields ? t("documentImport.applied", { count }) : "",
-        result.rawFields ? t("documentImport.rawApplied") : "",
-        result.confirmedEmpty.length
-          ? t("documentImport.confirmedEmpty", {
-              fields: result.confirmedEmpty
-                .map((field) =>
-                  t(`fields.${field === "brandName" ? "brand" : field}`),
-                )
-                .join(", "),
-            })
-          : "",
-        result.unmatchedBrand
-          ? t("documentImport.unmatchedBrand", { brand: result.unmatchedBrand })
-          : "",
-      ]
-        .filter(Boolean)
-        .join(" "),
-    );
+    if (result.insurancePolicies)
+      result.insurancePolicies = result.insurancePolicies.map((policy) => ({
+        ...policy,
+        vinReviewConfirmed:
+          policy.vinReviewConfirmed || (vinReviewed && !policy.documentVin),
+      }));
+    onImport(result);
+    if (onApplyImport) onApplyImport(result);
+    else {
+      if (result.insurancePolicies)
+        form.setValue(
+          "insurancePolicies",
+          result.insurancePolicies.map((policy) => ({
+            ...policy,
+            vinReviewConfirmed:
+              policy.vinReviewConfirmed || (vinReviewed && !policy.documentVin),
+          })),
+          { shouldDirty: true, shouldTouch: true },
+        );
+      for (const [field, value] of Object.entries(result.values)) {
+        form.setValue(field as ScooterEditorField, value, {
+          shouldDirty: true,
+          shouldTouch: true,
+        });
+      }
+      if (result.rawFields) onRawFields(result.rawFields);
+    }
+    reviewImport(result, form.getValues());
+    // Keep normal form validation separate from non-blocking extraction warnings.
+    if (editing) void form.trigger();
     changeOpen(false);
   }
 
   return (
-    <div className="grid gap-4 border-y border-border py-8 sm:py-10">
+    <div
+      className={
+        secondary
+          ? "grid justify-items-start gap-3"
+          : "grid gap-4 border-y border-border py-8 sm:py-10"
+      }
+    >
       <ScooterImportDialog
         open={open}
         onOpenChange={changeOpen}
         title={t("documentImport.title")}
         description={t("documentImport.help")}
         closeLabel={t("actions.close")}
-        initialFocus={pasteRef}
+        initialFocus={uploadRef}
         trigger={
           <Button
             type="button"
-            size="lg"
+            size={secondary ? "default" : "lg"}
+            variant={secondary ? "text" : "default"}
             disabled={disabled}
-            aria-describedby={`${id}-entry-hint`}
-            className="w-full justify-self-center sm:w-auto sm:px-8"
+            className={
+              secondary
+                ? undefined
+                : "w-full justify-self-center sm:w-auto sm:px-8"
+            }
           >
             <ImportIcon aria-hidden="true" className="size-5" />
             {t("documentImport.open")}
           </Button>
         }
         footer={
-          showEditor && json.trim() ? (
+          json.trim() ? (
             <Button
               type="button"
-              disabled={disabled || readingClipboard}
+              disabled={disabled || readingFile || Boolean(error)}
               onClick={apply}
             >
               {t("documentImport.apply")}
@@ -165,37 +248,69 @@ export function ScooterDocumentImport({
           ) : null
         }
       >
-        <ScooterImportInstructions editing={editing} disabled={disabled} />
+        <ScooterImportInstructions
+          editing={editing}
+          disabled={disabled}
+          sources={sources}
+        />
         <div
           data-slot="import-entry-actions"
           className="grid grid-cols-2 gap-2"
         >
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json,application/json"
+            aria-label={t("documentImport.upload")}
+            className="hidden"
+            disabled={disabled}
+            onChange={(event) => {
+              const file = event.currentTarget.files?.[0];
+              event.currentTarget.value = "";
+              if (file) void readJsonFile(file);
+            }}
+          />
           <Button
-            ref={pasteRef}
+            ref={uploadRef}
             type="button"
-            variant={showEditor && json.trim() ? "outline" : "default"}
-            disabled={disabled || readingClipboard}
-            onClick={() => void pasteJson()}
+            variant={json.trim() ? "outline" : "default"}
+            disabled={disabled}
+            onClick={() => fileInputRef.current?.click()}
           >
-            <ClipboardPasteIcon aria-hidden="true" />
+            {readingFile ? (
+              <LoaderCircleIcon aria-hidden="true" className="animate-spin" />
+            ) : (
+              <UploadIcon aria-hidden="true" />
+            )}
             {t(
-              readingClipboard
-                ? "documentImport.pasting"
-                : "documentImport.paste",
+              readingFile
+                ? "documentImport.readingFile"
+                : "documentImport.upload",
             )}
           </Button>
           <Button
             type="button"
             variant="text"
-            disabled={disabled || readingClipboard}
+            disabled={disabled || readingFile}
             onClick={() => {
               setShowEditor(true);
               requestAnimationFrame(() => jsonRef.current?.focus());
             }}
           >
-            {t("documentImport.pasteManually")}
+            {t("documentImport.editJson")}
           </Button>
         </div>
+        {fileName ? (
+          <p
+            role="status"
+            className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground"
+          >
+            <FileJsonIcon aria-hidden="true" className="size-4 shrink-0" />
+            <span className="break-all">
+              {t("documentImport.fileReady", { fileName })}
+            </span>
+          </p>
+        ) : null}
         {showEditor ? (
           <div className="grid gap-2">
             <Label htmlFor={id}>{t("documentImport.jsonLabel")}</Label>
@@ -206,20 +321,58 @@ export function ScooterDocumentImport({
               rows={6}
               className="field-sizing-fixed"
               maxLength={MAX_IMPORT_CHARACTERS}
-              disabled={disabled || readingClipboard}
+              disabled={disabled || readingFile}
               spellCheck={false}
               autoCapitalize="none"
-              placeholder={'{"vin": "…", "powerKw": 2.4}'}
+              placeholder={'{"schemaVersion": 2, "documents": []}'}
               aria-invalid={Boolean(error)}
               aria-describedby={`${id}-hint${error ? ` ${id}-error` : ""}`}
+              onPaste={(event) => {
+                const input = event.currentTarget;
+                const count =
+                  input.value.length -
+                  (input.selectionEnd - input.selectionStart) +
+                  event.clipboardData.getData("text/plain").length;
+                // Native maxLength would silently truncate the pasted JSON.
+                // Keep the previous draft and explain the actual size instead.
+                if (count > MAX_IMPORT_CHARACTERS) {
+                  event.preventDefault();
+                  setError(
+                    t("documentImport.tooLarge", {
+                      count,
+                      limit: MAX_IMPORT_CHARACTERS,
+                    }),
+                  );
+                }
+              }}
               onChange={(event) => {
+                fileRequest.current += 1;
+                setReadingFile(false);
                 setJson(event.target.value);
+                setFileName(null);
+                setVinReviewed(false);
+                setNeedsVinReview(false);
                 setError(null);
               }}
             />
             <p id={`${id}-hint`} className="text-sm text-muted-foreground">
               {t("documentImport.mergeHint")}
             </p>
+          </div>
+        ) : null}
+        {needsVinReview ? (
+          <div className="grid gap-3">
+            <p role="alert" className="text-sm">
+              {t("documentImport.vinReview")}
+            </p>
+            <ScooterVinReference fallbackVin={importedVin} />
+            <label className="flex items-center gap-3 text-sm">
+              <Checkbox
+                checked={vinReviewed}
+                onCheckedChange={setVinReviewed}
+              />
+              {t("documentImport.confirmVinReview")}
+            </label>
           </div>
         ) : null}
         {error ? (
@@ -232,73 +385,21 @@ export function ScooterDocumentImport({
           </p>
         ) : null}
       </ScooterImportDialog>
-      <p
-        id={`${id}-entry-hint`}
-        className="max-w-md justify-self-center text-center text-sm text-muted-foreground"
-      >
-        {t("documentImport.entryHint")}
-      </p>
-      {review ? <ImportReviewWarnings review={review} /> : null}
-      {feedback ? (
-        <p role="status" className="text-sm text-muted-foreground">
-          {feedback}
-        </p>
+      {reviewCount > 0 ? (
+        <div role="status" className="grid gap-2 text-sm text-warning">
+          <p className="flex items-center gap-2">
+            <TriangleAlertIcon aria-hidden="true" className="size-4 shrink-0" />
+            {t("documentImport.reviewCount", { count: reviewCount })}
+          </p>
+          <ul className="list-disc space-y-1 pl-6">
+            {reviewFields.map((field, index) => (
+              <li key={`${index}:${field}`} className="break-words">
+                {field}
+              </li>
+            ))}
+          </ul>
+        </div>
       ) : null}
-    </div>
-  );
-}
-
-/** Warnings remain visible until the corresponding form value changes or the user acknowledges review. */
-function ImportReviewWarnings({
-  review,
-}: {
-  review: {
-    unresolved: string[];
-    conflicts: string[];
-    snapshot: ScooterEditorValues;
-  };
-}) {
-  const t = useTranslations("scooters");
-  const { control } = useFormContext<ScooterEditorValues>();
-  const values = useWatch({ control });
-  const [acknowledged, setAcknowledged] = useState<typeof review | null>(null);
-  const unchanged = (key: string) => {
-    const field = key === "brandName" ? "brandId" : (key as ScooterEditorField);
-    return values[field] === review.snapshot[field];
-  };
-  const label = (key: string) =>
-    t(`fields.${key === "brandName" ? "brand" : key}`);
-  const unresolved = review.unresolved.filter(unchanged);
-  const conflicts = review.conflicts.filter(unchanged);
-  if (acknowledged === review || (!unresolved.length && !conflicts.length))
-    return null;
-  return (
-    <div className="grid gap-2">
-      <div role="alert" className="grid gap-2 text-sm">
-        {unresolved.length ? (
-          <p>
-            {t("documentImport.reviewUnresolved", {
-              fields: unresolved.map(label).join(", "),
-            })}
-          </p>
-        ) : null}
-        {conflicts.length ? (
-          <p>
-            {t("documentImport.reviewEmptyConflict", {
-              fields: conflicts.map(label).join(", "),
-            })}
-          </p>
-        ) : null}
-      </div>
-      <div>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => setAcknowledged(review)}
-        >
-          {t("documentImport.markReviewed")}
-        </Button>
-      </div>
     </div>
   );
 }

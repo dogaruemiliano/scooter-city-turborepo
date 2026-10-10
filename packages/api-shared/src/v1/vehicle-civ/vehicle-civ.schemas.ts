@@ -71,7 +71,6 @@ export const civAdditionalSpecificationsSchema = z.object({
   co2EmissionsGKm: decimal,
   vehicleClass: text,
   driveType: text,
-  civMentions: nullableTrimmedStringSchema(10000).optional(),
 });
 export const CIV_ADDITIONAL_FIELDS = Object.keys(
   civAdditionalSpecificationsSchema.shape,

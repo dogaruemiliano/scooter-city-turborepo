@@ -69,7 +69,6 @@ test("CIV data supports cars, buses, heavy axles, unpowered trailers and literal
     standingCapacity: 0,
     civVersion: "1993",
     civRawFields: { "10": "original grouped text", unmapped: "-" },
-    civMentions: "CIV-only notes",
   });
   assert.equal(value.powerKw, 350.125);
   assert.equal(value.civRawFields?.unmapped, "-");

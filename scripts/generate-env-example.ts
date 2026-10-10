@@ -109,6 +109,7 @@ function generate(): string {
     ["AWS credentials", /^AWS_/],
     ["Receipt extraction", /^DOCUMENT_EXTRACTION_/],
     ["Person document extraction", /^PERSON_DOCUMENT_EXTRACTION_/],
+    ["Scooter document extraction", /^SCOOTER_DOCUMENT_EXTRACTION_/],
     [
       "Sessions and signing keys",
       /^(JWT_|REFRESH_TOKEN_|ROTATION_|AUTH_CLEANUP_)/,

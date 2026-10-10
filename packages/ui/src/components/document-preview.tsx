@@ -33,6 +33,7 @@ export function DocumentPreview({
   uploaded,
   status,
   footer,
+  countLabel,
 }: {
   id?: string;
   src?: string | null;
@@ -52,10 +53,11 @@ export function DocumentPreview({
   onEmptyClick?: () => void;
   disabled?: boolean;
   dragging?: boolean;
-  emptyLabel?: string;
+  emptyLabel?: ReactNode;
   uploaded?: boolean;
   status?: string;
   footer?: ReactNode;
+  countLabel?: string;
   onDrop?: DragEventHandler<HTMLElement>;
 }) {
   const isPdf = contentType === "application/pdf";
@@ -104,6 +106,11 @@ export function DocumentPreview({
             {label}
           </Badge>
         </span>
+        {countLabel ? (
+          <span className="absolute bottom-2 left-2">
+            <Badge variant="secondary">{countLabel}</Badge>
+          </span>
+        ) : null}
         {status ? (
           <span
             role="status"

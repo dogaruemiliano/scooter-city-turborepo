@@ -41,6 +41,7 @@ export function DocumentViewer({
   disabled,
   error,
   footer,
+  navigation,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -63,6 +64,7 @@ export function DocumentViewer({
   disabled?: boolean;
   error?: string | null;
   footer?: ReactNode;
+  navigation?: ReactNode;
 }) {
   // A positioned Dialog supplies a full-screen sheet without swipe dismissal.
   return (
@@ -159,6 +161,7 @@ export function DocumentViewer({
           ) : null}
         </div>
         <div className="flex shrink-0 flex-col gap-1 bg-popover px-2 pt-1 pb-[max(var(--spacing-2),env(safe-area-inset-bottom))] text-popover-foreground">
+          {navigation}
           {error ? (
             <p role="alert" className="text-center text-sm text-destructive">
               {error}

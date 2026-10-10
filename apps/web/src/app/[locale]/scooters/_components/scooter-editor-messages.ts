@@ -14,6 +14,16 @@ export function scooterEditorMessage(
   path: string,
   t: ValidationTranslator,
 ): string | undefined {
+  if (path.startsWith("insurancePolicies")) {
+    if (issue.message === "insuranceVinMismatch")
+      return t("insurance.vinMismatch");
+    if (issue.message === "insuranceDateOrder") return t("insurance.dateOrder");
+    if (issue.message === "insuranceVinReview")
+      return t("insurance.vinReviewRequired");
+    if (path.endsWith("documentVin"))
+      return t("feedback.validation.invalidVin");
+    return undefined;
+  }
   const field = t(`fields.${path === "brandId" ? "brand" : path}`);
   if (issue.message === "Fuel does not match the selected powertrain.")
     return t("feedback.validation.incompatibleFuel");

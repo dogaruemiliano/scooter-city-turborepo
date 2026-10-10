@@ -2,6 +2,7 @@ import { CivVocabularyController } from "./civ-vocabulary.controller";
 import { CivVocabularyService } from "./civ-vocabulary.service";
 import { ScooterDocumentsService } from "./scooter-documents.service";
 import { ScooterDocumentsController } from "./scooter-documents.controller";
+import { ScooterDocumentAnalysisService } from "./scooter-document-analysis.service";
 import { Test } from "@nestjs/testing";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { cleanupOpenApiDoc } from "nestjs-zod";
@@ -21,6 +22,7 @@ describe("Scooter OpenAPI document", () => {
         { provide: CivVocabularyService, useValue: {} },
         { provide: ScootersService, useValue: {} },
         { provide: ScooterDocumentsService, useValue: {} },
+        { provide: ScooterDocumentAnalysisService, useValue: {} },
       ],
     }).compile();
     const app = module.createNestApplication();
@@ -32,7 +34,21 @@ describe("Scooter OpenAPI document", () => {
       expect(document.paths["/scooters"].post).toBeDefined();
       expect(document.paths["/vehicle-civ/vocabulary"].get).toBeDefined();
       expect(document.paths["/scooters/{id}"].patch).toBeDefined();
+      expect(
+        document.paths["/scooters/document-extraction"].post?.responses[200],
+      ).toBeDefined();
+      expect(
+        document.components?.schemas?.AnalyzeScooterDocumentInput,
+      ).toBeDefined();
       const schemas = Object.values(document.components?.schemas ?? {});
+      expect(
+        schemas.find(
+          (schema) =>
+            "properties" in schema &&
+            schema.properties?.extractedData &&
+            schema.properties?.reviewRequired,
+        ),
+      ).toBeDefined();
       const registrySchemas = schemas.flatMap((schema) =>
         "properties" in schema && schema.properties?.nationalRegistryNumber
           ? [schema.properties.nationalRegistryNumber]

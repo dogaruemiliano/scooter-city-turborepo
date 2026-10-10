@@ -5,6 +5,10 @@ import { useObjectUrl } from "../hooks/use-object-url";
 import { Button } from "./button";
 import { DocumentPreview } from "./document-preview";
 import { DocumentViewer } from "./document-viewer";
+import {
+  DocumentCollectionInput,
+  type DocumentCollectionInputProps,
+} from "./document-collection-input";
 import type { DocumentZoomLabels } from "./document-zoom";
 import type { PdfPreviewLabels } from "./pdf-preview";
 
@@ -18,6 +22,7 @@ export type DocumentInputLabels = DocumentZoomLabels &
   PdfPreviewLabels & {
     label: string;
     add: string;
+    addAction?: string;
     preview: string;
     title: string;
     imageAlt: string;
@@ -30,21 +35,25 @@ export type DocumentInputLabels = DocumentZoomLabels &
     retry: string;
   };
 
-/** Native picker → provisional preview → explicit confirmation. No upload on selection. */
-export function DocumentInput({
-  id,
-  value,
-  onConfirm,
-  onRemove,
-  uploadError,
-  onRetry,
-  validate,
-  accept,
-  disabled,
-  uploaded,
-  status,
-  labels,
-}: {
+export type DocumentInputItem = DocumentInputValue & {
+  id: string;
+  uploaded?: boolean;
+  status?: string;
+  uploadError?: string;
+  onRetry?: () => void;
+};
+
+export type DocumentCollectionLabels = DocumentInputLabels & {
+  addMore: string;
+  previousDocument: string;
+  nextDocument: string;
+  documentCount: (count: number) => string;
+  documentPosition: (index: number, total: number) => string;
+  tooManyFiles: (max: number) => string;
+};
+
+type SingleDocumentInputProps = {
+  multiple?: false;
   id?: string;
   value?: DocumentInputValue;
   onConfirm: (file: File) => void;
@@ -57,7 +66,35 @@ export function DocumentInput({
   uploaded?: boolean;
   status?: string;
   labels: DocumentInputLabels;
-}) {
+};
+
+export type DocumentInputProps =
+  | SingleDocumentInputProps
+  | DocumentCollectionInputProps;
+
+export function DocumentInput(props: DocumentInputProps) {
+  return props.multiple ? (
+    <DocumentCollectionInput {...props} />
+  ) : (
+    <SingleDocumentInput {...props} />
+  );
+}
+
+/** Native picker → provisional preview → explicit confirmation. No upload on selection. */
+function SingleDocumentInput({
+  id,
+  value,
+  onConfirm,
+  onRemove,
+  uploadError,
+  onRetry,
+  validate,
+  accept,
+  disabled,
+  uploaded,
+  status,
+  labels,
+}: SingleDocumentInputProps) {
   const input = useRef<HTMLInputElement>(null);
   const [pending, setPending] = useState<File | null>(null);
   const [open, setOpen] = useState(false);
@@ -121,7 +158,16 @@ export function DocumentInput({
           open={false}
           onOpenChange={setOpen}
           onEmptyClick={() => input.current?.click()}
-          emptyLabel={labels.add}
+          emptyLabel={
+            labels.addAction ? (
+              <>
+                <span className="block">{labels.addAction}</span>
+                <span className="block">{labels.label}</span>
+              </>
+            ) : (
+              labels.add
+            )
+          }
           disabled={disabled}
           uploaded={uploaded}
           status={status}

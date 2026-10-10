@@ -5,15 +5,36 @@ import { toDateOnlyString } from "../common/dates/date-only";
 import type {
   Scooter as ScooterRow,
   VehicleCivDocument,
+  ScooterInsurancePolicy,
 } from "../generated/prisma/client";
 
 type ScooterRowWithBrand = ScooterRow & {
   brand: { name: string };
   civDocument?: VehicleCivDocument | null;
+  insurancePolicies?: ScooterInsurancePolicy[];
 };
 
 export function toScooter(row: ScooterRowWithBrand): v1.scooters.Scooter {
   return {
+    ...(row.insurancePolicies
+      ? {
+          insurancePolicies: row.insurancePolicies.map((policy) => ({
+            id: policy.id,
+            insuredName: policy.insuredName,
+            validFrom: toDateOnlyString(policy.validFrom),
+            validUntil: toDateOnlyString(policy.validUntil),
+            premiumAmount: policy.premiumAmount?.toNumber() ?? null,
+            currency: policy.currency,
+            documentVin: policy.documentVin,
+            vinReviewConfirmed: policy.vinReviewConfirmed,
+            rawFields: v1.scooters.insuranceRawFieldsSchema.parse(
+              policy.rawFields ?? {},
+            ),
+            createdAt: policy.createdAt.toISOString(),
+            updatedAt: policy.updatedAt.toISOString(),
+          })),
+        }
+      : {}),
     ...(row.civDocument === undefined
       ? {}
       : civMetadataResponse(row.civDocument)),
@@ -27,7 +48,6 @@ export function toScooter(row: ScooterRowWithBrand): v1.scooters.Scooter {
     noiseMeasurementRpm: row.noiseMeasurementRpm ?? null,
     vehicleClass: row.vehicleClass ?? null,
     driveType: row.driveType ?? null,
-    civMentions: row.civMentions ?? null,
     stationaryNoiseDb: row.stationaryNoiseDb?.toNumber() ?? null,
     drivingNoiseDb: row.drivingNoiseDb?.toNumber() ?? null,
     co2EmissionsGKm: row.co2EmissionsGKm?.toNumber() ?? null,
@@ -91,6 +111,10 @@ export function toScooter(row: ScooterRowWithBrand): v1.scooters.Scooter {
     ),
     requiredLicenseCategory: row.requiredLicenseCategory,
     currentMileageKm: row.currentMileageKm,
+    hasGps: row.hasGps,
+    odometerWorking: row.odometerWorking,
+    speedometerWorking: row.speedometerWorking,
+    actualMaxSpeedKmh: row.actualMaxSpeedKmh,
     notes: row.notes,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),

@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/lib/api", () => ({
   webApi: {
+    url: (path: string) => path,
     fetch: mocks.apiFetch,
   },
 }));
@@ -50,6 +51,10 @@ const scooter: v1.scooters.Scooter = {
   temporaryRegistrationExpiresAt: null,
   requiredLicenseCategory: "none",
   currentMileageKm: 1_200,
+  hasGps: null,
+  odometerWorking: null,
+  speedometerWorking: null,
+  actualMaxSpeedKmh: null,
   notes: "Maker papers received",
   createdAt: "2026-06-25T10:00:00.000Z",
   updatedAt: "2026-06-25T11:00:00.000Z",
@@ -79,6 +84,155 @@ beforeEach(() => {
 });
 
 describe("ScooterEditForm", () => {
+  it("fills the existing insurance document's policy and saves the normalized premium", async () => {
+    const browser = userEvent.setup();
+    mocks.apiFetch.mockResolvedValue(scooter);
+    render(
+      <NextIntlClientProvider locale="en" messages={messages.en}>
+        <ScooterEditForm
+          scooter={{
+            ...scooter,
+            insurancePolicies: [
+              {
+                id: "policy-1",
+                insuredName: null,
+                validFrom: null,
+                validUntil: null,
+                premiumAmount: null,
+                currency: null,
+                documentVin: scooter.vin,
+                vinReviewConfirmed: false,
+                createdAt: scooter.createdAt,
+                updatedAt: scooter.updatedAt,
+              },
+            ],
+            documents: [
+              {
+                id: "insurance-file",
+                type: "insurance",
+                insurancePolicyId: "policy-1",
+                fileName: "insurance.pdf",
+                contentType: "application/pdf",
+                byteSize: 100,
+                createdAt: scooter.createdAt,
+                contentUrl: "/insurance.pdf",
+              },
+            ],
+          }}
+          brands={brands}
+          scooterHref="/scooters/s"
+        />
+      </NextIntlClientProvider>,
+    );
+    expect(screen.getByLabelText("Insured name")).toHaveValue("");
+    await browser.click(screen.getByRole("button", { name: "Import JSON" }));
+    await browser.click(screen.getByRole("button", { name: "Edit JSON" }));
+    fireEvent.change(screen.getByLabelText("Extracted data (JSON)"), {
+      target: {
+        value: JSON.stringify({
+          documentVins: [
+            {
+              fileName: "insurance.pdf",
+              documentType: "insurance",
+              vin: scooter.vin,
+            },
+          ],
+          insurancePolicies: [
+            {
+              insuredName: "Test Asigurat SRL",
+              validFrom: "2026-01-01",
+              validUntil: "2026-12-31",
+              premiumAmount: "250,50",
+              currency: "RON",
+              documentVin: scooter.vin,
+              sourceFileNames: ["insurance.pdf"],
+            },
+          ],
+        }),
+      },
+    });
+    await browser.click(screen.getByRole("button", { name: "Fill fields" }));
+    expect(screen.getAllByLabelText("Insured name")).toHaveLength(1);
+    expect(screen.getByLabelText("Insured name")).toHaveValue(
+      "Test Asigurat SRL",
+    );
+    expect(screen.getByLabelText("Total premium")).toHaveValue("250.5");
+    await browser.click(screen.getByRole("button", { name: /^Save$/ }));
+    await waitFor(() =>
+      expect(mocks.apiFetch).toHaveBeenCalledWith(
+        v1.scooters.ROUTES.update(scooter.id),
+        v1.scooters.scooterSchema,
+        expect.objectContaining({
+          json: expect.objectContaining({
+            insurancePolicies: [
+              expect.objectContaining({
+                id: "policy-1",
+                insuredName: "Test Asigurat SRL",
+                premiumAmount: 250.5,
+                currency: "RON",
+              }),
+            ],
+          }),
+        }),
+      ),
+    );
+  });
+
+  it("requires manual confirmation for unreadable VINs and never imports mismatched documents", async () => {
+    const browser = userEvent.setup();
+    render(
+      <NextIntlClientProvider locale="en" messages={messages.en}>
+        <ScooterEditForm
+          scooter={scooter}
+          brands={brands}
+          scooterHref="/scooters/s"
+        />
+      </NextIntlClientProvider>,
+    );
+    await browser.click(screen.getByRole("button", { name: "Import JSON" }));
+    await browser.click(screen.getByRole("button", { name: "Edit JSON" }));
+    const input = screen.getByLabelText("Extracted data (JSON)");
+    fireEvent.change(input, {
+      target: {
+        value: JSON.stringify({
+          color: "Red",
+          documentVins: [
+            {
+              fileName: "other.pdf",
+              documentType: "insurance",
+              vin: "LXYTCKP05P0000002",
+            },
+          ],
+        }),
+      },
+    });
+    await browser.click(screen.getByRole("button", { name: "Fill fields" }));
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Document VINs do not match",
+    );
+    expect(screen.getByLabelText("Color")).toHaveValue("White");
+    fireEvent.change(input, {
+      target: {
+        value: JSON.stringify({
+          color: "Red",
+          documentVins: [
+            { fileName: "civ.pdf", documentType: "civ", vin: null },
+          ],
+        }),
+      },
+    });
+    await browser.click(screen.getByRole("button", { name: "Fill fields" }));
+    expect(screen.getByLabelText("Color")).toHaveValue("White");
+    await browser.click(
+      screen.getByRole("checkbox", {
+        name: "I checked that all documents refer to this scooter",
+      }),
+    );
+    await browser.click(screen.getByRole("button", { name: "Fill fields" }));
+    expect(screen.getByLabelText("Color")).toHaveValue("Red");
+    expect(mocks.apiFetch).not.toHaveBeenCalled();
+  });
+
   it("imports an unsaved JSON patch, preserves omitted values and saves raw CIV values", async () => {
     const browser = userEvent.setup();
     mocks.apiFetch.mockResolvedValue(scooter);
@@ -92,7 +246,7 @@ describe("ScooterEditForm", () => {
       </NextIntlClientProvider>,
     );
     await browser.click(screen.getByRole("button", { name: "Import JSON" }));
-    await browser.click(screen.getByRole("button", { name: "Add manually" }));
+    await browser.click(screen.getByRole("button", { name: "Edit JSON" }));
     fireEvent.change(screen.getByLabelText("Extracted data (JSON)"), {
       target: {
         value: JSON.stringify({
@@ -106,7 +260,9 @@ describe("ScooterEditForm", () => {
     await browser.click(screen.getByRole("button", { name: "Fill fields" }));
     expect(mocks.apiFetch).not.toHaveBeenCalled();
     expect(screen.getByLabelText("Color")).toHaveValue("White");
-    expect(screen.getByRole("status")).toHaveTextContent("Updated 2 fields");
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "1 field could not be interpreted.",
+    );
     await browser.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() =>
       expect(mocks.apiFetch).toHaveBeenCalledWith(
@@ -123,52 +279,83 @@ describe("ScooterEditForm", () => {
     );
   });
 
-  it("flags unresolved fields and dash conflicts, then clears warnings after manual review", async () => {
+  it("lists unresolved fields and highlights them until their values change", async () => {
     const browser = userEvent.setup();
-    render(
+    const { container } = render(
       <NextIntlClientProvider locale="en" messages={messages.en}>
         <ScooterEditForm
-          scooter={scooter}
+          scooter={{ ...scooter, civVersion: "2024" }}
           brands={brands}
           scooterHref="/scooters/s"
         />
       </NextIntlClientProvider>,
     );
     await browser.click(screen.getByRole("button", { name: "Import JSON" }));
-    await browser.click(screen.getByRole("button", { name: "Add manually" }));
+    await browser.click(screen.getByRole("button", { name: "Edit JSON" }));
     fireEvent.change(screen.getByLabelText("Extracted data (JSON)"), {
       target: {
         value: JSON.stringify({
           color: "-",
           powerKw: null,
           maxTrainMassKg: "-",
+          civRawFields: { "P.2": null, "15": null, Mențiuni: "" },
         }),
       },
     });
     await browser.click(screen.getByRole("button", { name: "Fill fields" }));
-    expect(screen.getByRole("alert")).toHaveTextContent(
-      "AI could not resolve these fields: Power (kW)",
-    );
-    expect(screen.getByRole("alert")).toHaveTextContent(
-      "these fields already contain values: Color",
-    );
     expect(screen.getByRole("status")).toHaveTextContent(
-      "Confirmed empty in the document",
+      "2 fields could not be interpreted.",
+    );
+    expect(
+      within(screen.getByRole("status"))
+        .getAllByRole("listitem")
+        .map((item) => item.textContent),
+    ).toEqual(expect.arrayContaining(["Power (kW) (P.2)", "Color"]));
+    for (const name of ["powerKw", "color"]) {
+      expect(
+        container.querySelector(`[data-field-name="${name}"]`),
+      ).toHaveAttribute("data-warning", "true");
+    }
+    expect(
+      container.querySelector('[data-field-name="maxTrainMassKg"]'),
+    ).not.toHaveAttribute("data-warning");
+    expect(screen.getByLabelText("Power (kW)")).toHaveAccessibleDescription(
+      "Check these CIV rubrics against the document: P.2.",
     );
     expect(screen.getByLabelText("Color")).toHaveValue("White");
-    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+    expect(
+      screen.queryByText(/Confirmed empty in the document/),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "I have checked these fields" }),
+    ).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Power (kW)"), {
       target: { value: "9" },
     });
-    expect(screen.getByRole("alert")).not.toHaveTextContent("Power (kW)");
-    await browser.click(
-      screen.getByRole("button", { name: "I have checked these fields" }),
+    expect(
+      container.querySelector('[data-field-name="powerKw"]'),
+    ).not.toHaveAttribute("data-warning");
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "1 field could not be interpreted.",
     );
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-    // A fresh import must not inherit acknowledgement from the previous one.
+    expect(
+      within(screen.getByRole("status"))
+        .getAllByRole("listitem")
+        .map((item) => item.textContent),
+    ).toEqual(["Color"]);
+    fireEvent.change(screen.getByLabelText("Color"), {
+      target: { value: "Blue" },
+    });
+    expect(
+      container.querySelector('[data-field-name="civMentions"]'),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    // A fresh import flags the freshly unresolved fields again.
     await browser.click(screen.getByRole("button", { name: "Import JSON" }));
     await browser.click(screen.getByRole("button", { name: "Fill fields" }));
-    expect(screen.getByRole("alert")).toHaveTextContent("Power (kW)");
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "2 fields could not be interpreted.",
+    );
     expect(mocks.apiFetch).not.toHaveBeenCalled();
   });
   it("copies the extraction contract and handles clipboard denial with a selectable prompt", async () => {
@@ -177,7 +364,20 @@ describe("ScooterEditForm", () => {
     render(
       <NextIntlClientProvider locale="en" messages={messages.en}>
         <ScooterEditForm
-          scooter={scooter}
+          scooter={{
+            ...scooter,
+            documents: [
+              {
+                id: "civ-file",
+                type: "civ",
+                fileName: "CIV.pdf",
+                contentType: "application/pdf",
+                byteSize: 100,
+                createdAt: scooter.createdAt,
+                contentUrl: "/CIV.pdf",
+              },
+            ],
+          }}
           brands={brands}
           scooterHref="/scooters/s"
         />
@@ -187,9 +387,8 @@ describe("ScooterEditForm", () => {
     await browser.click(
       screen.getByRole("button", { name: "Copy extraction prompt" }),
     );
-    expect(copy).toHaveBeenCalledWith(
-      expect.stringContaining('"key": "powerKw"'),
-    );
+    expect(copy.mock.calls[0]?.[0]).toMatch(/"schemaVersion"\s*:\s*2/);
+    expect(copy.mock.calls[0]?.[0]).toMatch(/"sourceId"\s*:\s*"civ-file"/);
     expect(screen.getByRole("status")).toHaveTextContent("Prompt copied");
     copy.mockRejectedValueOnce(new Error("Denied"));
     await browser.click(
@@ -201,7 +400,7 @@ describe("ScooterEditForm", () => {
           "Copy this prompt manually",
         ) as HTMLTextAreaElement
       ).value,
-    ).toContain("civRawFields");
+    ).toMatch(/"sourceId"\s*:\s*"civ-file"/);
     copy.mockRestore();
   });
 
@@ -217,7 +416,7 @@ describe("ScooterEditForm", () => {
       </NextIntlClientProvider>,
     );
     await browser.click(screen.getByRole("button", { name: "Import JSON" }));
-    await browser.click(screen.getByRole("button", { name: "Add manually" }));
+    await browser.click(screen.getByRole("button", { name: "Edit JSON" }));
     fireEvent.change(screen.getByLabelText("Extracted data (JSON)"), {
       target: { value: '{"color":"Red","powerKw":"bad"}' },
     });
@@ -228,11 +427,11 @@ describe("ScooterEditForm", () => {
     expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
   });
 
-  it("opens a compact dialog and pastes clipboard JSON without applying it until confirmed", async () => {
+  it("opens a compact dialog and reads a JSON file without applying it until confirmed", async () => {
     const browser = userEvent.setup();
-    const read = vi
-      .spyOn(navigator.clipboard, "readText")
-      .mockResolvedValue('{"color":"Red"}');
+    const json = '{"color":"Red"}';
+    const file = new File([json], "scuter.json", { type: "application/json" });
+    Object.defineProperty(file, "text", { value: vi.fn(async () => json) });
     render(
       <NextIntlClientProvider locale="en" messages={messages.en}>
         <ScooterEditForm
@@ -250,11 +449,17 @@ describe("ScooterEditForm", () => {
     expect(
       screen.getByRole("dialog", { name: "Import from documents" }),
     ).toHaveAttribute("data-slot", "dialog-content");
-    await browser.click(screen.getByRole("button", { name: "Paste JSON" }));
-    expect(read).toHaveBeenCalledOnce();
-    expect(screen.getByLabelText("Extracted data (JSON)")).toHaveValue(
-      '{"color":"Red"}',
+    await browser.upload(
+      screen.getByLabelText("Upload JSON", { selector: "input" }),
+      file,
     );
+    expect(
+      await screen.findByText("File ready: scuter.json"),
+    ).toBeInTheDocument();
+    expect(file.text).toHaveBeenCalledOnce();
+    expect(
+      screen.queryByLabelText("Extracted data (JSON)"),
+    ).not.toBeInTheDocument();
     expect(screen.getByLabelText("Color")).toHaveValue("White");
     await browser.click(screen.getByRole("button", { name: "Fill fields" }));
     await waitFor(() =>
@@ -262,14 +467,10 @@ describe("ScooterEditForm", () => {
     );
     expect(screen.getByLabelText("Color")).toHaveValue("Red");
     expect(mocks.apiFetch).not.toHaveBeenCalled();
-    read.mockRestore();
   });
 
-  it("supports manual paste when clipboard permission is denied and preserves the draft on close", async () => {
+  it("supports optional JSON editing and preserves the draft on close", async () => {
     const browser = userEvent.setup();
-    const read = vi
-      .spyOn(navigator.clipboard, "readText")
-      .mockRejectedValue(new Error("Denied"));
     render(
       <NextIntlClientProvider locale="en" messages={messages.en}>
         <ScooterEditForm
@@ -280,10 +481,7 @@ describe("ScooterEditForm", () => {
       </NextIntlClientProvider>,
     );
     await browser.click(screen.getByRole("button", { name: "Import JSON" }));
-    await browser.click(screen.getByRole("button", { name: "Paste JSON" }));
-    expect(screen.getByRole("alert")).toHaveTextContent(
-      "Clipboard access is unavailable",
-    );
+    await browser.click(screen.getByRole("button", { name: "Edit JSON" }));
     fireEvent.change(screen.getByLabelText("Extracted data (JSON)"), {
       target: { value: '{"color":"Red"}' },
     });
@@ -294,7 +492,6 @@ describe("ScooterEditForm", () => {
     expect(screen.getByLabelText("Extracted data (JSON)")).toHaveValue(
       '{"color":"Red"}',
     );
-    read.mockRestore();
   });
 
   it("uses a distinct bottom-sheet surface on mobile", async () => {
@@ -330,7 +527,7 @@ describe("ScooterEditForm", () => {
         within(instructions).getByRole("button", {
           name: "Copy extraction prompt",
         }),
-      ).toBeEnabled();
+      ).toBeDisabled();
       expect(
         sheet.querySelector('[data-slot="bottom-sheet-header"]'),
       ).not.toContainElement(
@@ -343,7 +540,7 @@ describe("ScooterEditForm", () => {
           "div.bg-background, section.bg-background, header.bg-background, footer.bg-background",
         ),
       ).toBeNull();
-      expect(screen.getByRole("button", { name: "Paste JSON" })).toBeEnabled();
+      expect(screen.getByRole("button", { name: "Upload JSON" })).toBeEnabled();
       await browser.click(screen.getByRole("button", { name: "Close" }));
     } finally {
       Object.defineProperty(window, "innerWidth", {

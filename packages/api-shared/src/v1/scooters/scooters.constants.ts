@@ -50,6 +50,7 @@ export type ScooterListSort = (typeof SCOOTER_LIST_SORTS)[number];
 
 export const ROUTES = {
   documents: {
+    extract: "/v1/scooters/document-extraction",
     createDraftUpload: "/v1/scooters/document-draft-upload-url",
     list: (id: string): string => `/v1/scooters/${id}/documents`,
     content: (id: string, documentId: string): string =>

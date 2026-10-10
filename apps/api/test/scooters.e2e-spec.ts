@@ -1,5 +1,9 @@
 import { ImageStorageService } from "../src/image-storage/image-storage.service";
 import { Readable } from "node:stream";
+import { createHash } from "node:crypto";
+import { ScooterDocumentExtractionService } from "../src/scooter-document-extraction/scooter-document-extraction.service";
+import { ENV } from "../src/config/config.module";
+import type { Env } from "../src/config/env";
 /**
  * HTTP-level e2e tests for the admin-managed `/v1/scooters` endpoints.
  */
@@ -136,6 +140,327 @@ describe("Scooters HTTP surface (e2e)", () => {
     };
   }
 
+  it("preserves insurance history and prices, checks VIN changes and rejects foreign policies", async () => {
+    const admin = await freshSession(["ADMIN"]);
+    const cookie = [`access_token=${admin.accessToken}`];
+    const input = scooterInput();
+    const policy = {
+      id: crypto.randomUUID(),
+      insuredName: "Test Asigurat SRL",
+      validFrom: "2025-01-01",
+      validUntil: "2025-12-31",
+      premiumAmount: 250.55,
+      currency: "RON",
+      documentVin: input.vin,
+      vinReviewConfirmed: false,
+    };
+    const created = await req()
+      .post(v1.scooters.ROUTES.create)
+      .set("Cookie", cookie)
+      .send({ ...input, insurancePolicies: [policy] })
+      .expect(201);
+    const vehicle = v1.scooters.scooterSchema.parse(created.body);
+    expect(vehicle.insurancePolicies).toEqual([
+      expect.objectContaining(policy),
+    ]);
+    const path = v1.scooters.ROUTES.update(vehicle.id);
+    const renewal = {
+      ...policy,
+      id: crypto.randomUUID(),
+      validFrom: "2026-01-01",
+      validUntil: "2026-12-31",
+      premiumAmount: 312.4,
+    };
+    const renewed = await req()
+      .patch(path)
+      .set("Cookie", cookie)
+      .send({ insurancePolicies: [renewal] })
+      .expect(200);
+    expect(
+      v1.scooters.scooterSchema.parse(renewed.body).insurancePolicies,
+    ).toHaveLength(2);
+    await req()
+      .patch(path)
+      .set("Cookie", cookie)
+      .send({ notes: "Keep both policies" })
+      .expect(200);
+    await req()
+      .patch(path)
+      .set("Cookie", cookie)
+      .send({ vin: uniqueVin() })
+      .expect(400);
+    const other = scooterInput();
+    await req()
+      .post(v1.scooters.ROUTES.create)
+      .set("Cookie", cookie)
+      .send({
+        ...other,
+        insurancePolicies: [{ ...policy, documentVin: other.vin }],
+      })
+      .expect(400);
+    expect(
+      await prisma.scooter.findUnique({ where: { vin: other.vin } }),
+    ).toBeNull();
+    const detail = await req().get(path).set("Cookie", cookie).expect(200);
+    expect(
+      v1.scooters.scooterSchema.parse(detail.body).insurancePolicies,
+    ).toHaveLength(2);
+    expect(
+      v1.scooters.scooterSchema.parse(detail.body).insurancePolicies,
+    ).toContainEqual(
+      expect.objectContaining({ id: policy.id, premiumAmount: 250.55 }),
+    );
+  });
+
+  it("links an insurance PDF to its policy atomically and protects its private content", async () => {
+    const admin = await freshSession(["ADMIN"]);
+    const cookie = [`access_token=${admin.accessToken}`];
+    const storageKey = `test-insurance-${crypto.randomUUID()}/policy.pdf`;
+    const stored = {
+      provider: "s3" as const,
+      bucket: "test-private",
+      storageKey,
+      contentType: "application/pdf" as const,
+      byteSize: 9,
+      checksumSha256: "a".repeat(64),
+      imageWidth: null,
+      imageHeight: null,
+      pageCount: null,
+    };
+    await prisma.draftUpload.create({
+      data: {
+        userId: admin.userId,
+        provider: stored.provider,
+        bucket: stored.bucket,
+        storageKey,
+        contentType: stored.contentType,
+        byteSize: stored.byteSize,
+        checksumSha256: stored.checksumSha256,
+        purpose: "scooter-document:insurance",
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+    });
+    const complete = jest
+      .spyOn(app.get(ImageStorageService), "completePresignedDocumentUpload")
+      .mockResolvedValue(stored);
+    let scooterId: string | undefined;
+    try {
+      const input = scooterInput();
+      const id = crypto.randomUUID();
+      const policy = {
+        id,
+        insuredName: "Test Insured",
+        validFrom: null,
+        validUntil: null,
+        premiumAmount: null,
+        currency: null,
+        documentVin: input.vin,
+        vinReviewConfirmed: false,
+      };
+      const draft = {
+        type: "insurance",
+        insurancePolicyId: id,
+        fileName: "policy.pdf",
+        uploadToken: "token",
+      };
+      await req()
+        .post(v1.scooters.ROUTES.create)
+        .set("Cookie", cookie)
+        .send({ ...input, documentDrafts: [draft] })
+        .expect(400);
+      expect(
+        await prisma.draftUpload.findUnique({ where: { storageKey } }),
+      ).toMatchObject({ claimedAt: null });
+      const created = await req()
+        .post(v1.scooters.ROUTES.create)
+        .set("Cookie", cookie)
+        .send({
+          ...input,
+          insurancePolicies: [policy],
+          documentDrafts: [draft],
+        })
+        .expect(201);
+      scooterId = v1.scooters.scooterSchema.parse(created.body).id;
+      const detail = await req()
+        .get(v1.scooters.ROUTES.get(scooterId))
+        .set("Cookie", cookie)
+        .expect(200);
+      expect(v1.scooters.scooterSchema.parse(detail.body).documents).toEqual([
+        expect.objectContaining({ type: "insurance", insurancePolicyId: id }),
+      ]);
+      await req()
+        .get(
+          v1.scooters.scooterSchema.parse(detail.body).documents![0].contentUrl,
+        )
+        .expect(401);
+      expect(complete).toHaveBeenCalledWith(
+        "token",
+        `scooter-document:insurance:${admin.userId}`,
+      );
+    } finally {
+      complete.mockRestore();
+      if (scooterId)
+        await prisma.scooterDocument.deleteMany({ where: { scooterId } });
+      await prisma.mediaAsset.deleteMany({ where: { storageKey } });
+      await prisma.draftUpload.deleteMany({ where: { storageKey } });
+    }
+  });
+
+  it("keeps per-file import evidence separate from CIV and preserves optional operational values", async () => {
+    const admin = await freshSession(["ADMIN"]);
+    const cookie = [`access_token=${admin.accessToken}`];
+    const input = scooterInput({
+      hasGps: false,
+      odometerWorking: null,
+      speedometerWorking: true,
+      actualMaxSpeedKmh: 0,
+    });
+    const storageKey = `test-import-${crypto.randomUUID()}/import.pdf`;
+    const stored = {
+      provider: "s3" as const,
+      bucket: "test-private",
+      storageKey,
+      contentType: "application/pdf" as const,
+      byteSize: 9,
+      checksumSha256: "a".repeat(64),
+      imageWidth: null,
+      imageHeight: null,
+      pageCount: null,
+    };
+    await prisma.draftUpload.create({
+      data: {
+        userId: admin.userId,
+        provider: stored.provider,
+        bucket: stored.bucket,
+        storageKey,
+        contentType: stored.contentType,
+        byteSize: stored.byteSize,
+        checksumSha256: stored.checksumSha256,
+        purpose: "scooter-document:import_document",
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+    });
+    const complete = jest
+      .spyOn(app.get(ImageStorageService), "completePresignedDocumentUpload")
+      .mockResolvedValue(stored);
+    let scooterId: string | undefined;
+    try {
+      const extractedData = {
+        vin: input.vin,
+        fields: { brandName: "KYMCO", powerKw: 2.68 },
+        rawFields: { power: "2,68", missing: "-", unreadable: null },
+      };
+      const created = await req()
+        .post(v1.scooters.ROUTES.create)
+        .set("Cookie", cookie)
+        .send({
+          ...input,
+          documentDrafts: [
+            {
+              type: "import_document",
+              fileName: "import.pdf",
+              uploadToken: "token",
+              extractedData,
+            },
+          ],
+        })
+        .expect(201);
+      const scooter = v1.scooters.scooterSchema.parse(created.body);
+      scooterId = scooter.id;
+      expect(scooter).toMatchObject({
+        hasGps: false,
+        odometerWorking: null,
+        speedometerWorking: true,
+        actualMaxSpeedKmh: 0,
+      });
+      expect(scooter.civRawFields).toBeNull();
+      const path = v1.scooters.ROUTES.get(scooterId);
+      const detail = await req().get(path).set("Cookie", cookie).expect(200);
+      const document = v1.scooters.scooterSchema.parse(detail.body)
+        .documents![0];
+      expect(document).toMatchObject({
+        type: "import_document",
+        extractedData,
+      });
+      const other = await req()
+        .post(v1.scooters.ROUTES.create)
+        .set("Cookie", cookie)
+        .send(scooterInput())
+        .expect(201);
+      const otherId = v1.scooters.scooterSchema.parse(other.body).id;
+      await req()
+        .patch(v1.scooters.ROUTES.update(otherId))
+        .set("Cookie", cookie)
+        .send({
+          hasGps: true,
+          documentExtractions: [
+            { documentId: document.id, extractedData: null },
+          ],
+        })
+        .expect(400);
+      expect(
+        (await prisma.scooter.findUniqueOrThrow({ where: { id: otherId } }))
+          .hasGps,
+      ).toBeNull();
+      const edited = await req()
+        .patch(path)
+        .set("Cookie", cookie)
+        .send({
+          hasGps: null,
+          odometerWorking: false,
+          actualMaxSpeedKmh: 31,
+          documentExtractions: [
+            {
+              documentId: document.id,
+              extractedData: {
+                ...extractedData,
+                fields: { ...extractedData.fields, model: "V7" },
+              },
+            },
+          ],
+        })
+        .expect(200);
+      expect(v1.scooters.scooterSchema.parse(edited.body)).toMatchObject({
+        hasGps: null,
+        odometerWorking: false,
+        speedometerWorking: true,
+        actualMaxSpeedKmh: 31,
+      });
+      const updated = await req().get(path).set("Cookie", cookie).expect(200);
+      expect(
+        v1.scooters.scooterSchema.parse(updated.body).documents![0]
+          .extractedData?.fields.model,
+      ).toBe("V7");
+      await req()
+        .patch(path)
+        .set("Cookie", cookie)
+        .send({ actualMaxSpeedKmh: -1 })
+        .expect(400);
+      await req()
+        .patch(path)
+        .set("Cookie", cookie)
+        .send({
+          documentExtractions: [
+            { documentId: document.id, extractedData: null },
+          ],
+        })
+        .expect(200);
+      expect(
+        (
+          await prisma.scooterDocument.findUniqueOrThrow({
+            where: { id: document.id },
+          })
+        ).extractedData,
+      ).toBeNull();
+    } finally {
+      complete.mockRestore();
+      if (scooterId)
+        await prisma.scooterDocument.deleteMany({ where: { scooterId } });
+      await prisma.mediaAsset.deleteMany({ where: { storageKey } });
+      await prisma.draftUpload.deleteMany({ where: { storageKey } });
+    }
+  });
+
   it("round-trips general vehicle CIV data and preserves original fields on partial updates", async () => {
     const admin = await freshSession(["ADMIN"]);
     const cookie = [`access_token=${admin.accessToken}`];
@@ -166,7 +491,6 @@ describe("Scooters HTTP surface (e2e)", () => {
           civIssuedAt: "2024-06-10",
           civIssuingAuthority: "RAR București",
           civRawFields: rawFields,
-          civMentions: "Official CIV mentions",
           notes: "Operational note",
         }),
       )
@@ -198,7 +522,6 @@ describe("Scooters HTTP surface (e2e)", () => {
       civVersion: "2016",
       civIssuedAt: "2024-06-10",
       civRawFields: rawFields,
-      civMentions: "Official CIV mentions",
       stationaryNoiseDb: 82.125,
     });
     await req().get(v1.vehicleCiv.CIV_ROUTES.vocabulary).expect(401);
@@ -280,7 +603,7 @@ describe("Scooters HTTP surface (e2e)", () => {
       });
     try {
       for (const invalid of [
-        { type: "insurance" },
+        { type: "unknown" },
         { contentType: "image/svg+xml" },
         { byteSize: 0 },
         { byteSize: 10_485_761 },
@@ -310,6 +633,160 @@ describe("Scooters HTTP surface (e2e)", () => {
     } finally {
       sign.mockRestore();
       await prisma.draftUpload.deleteMany({ where: { storageKey } });
+    }
+  });
+
+  it("extracts only authorized usable drafts without claiming uploads or saving records", async () => {
+    const route = v1.scooters.ROUTES.documents.extract;
+    const admin = await freshSession(["ADMIN"]);
+    const member = await freshSession(["USER"]);
+    const cookie = [`access_token=${admin.accessToken}`];
+    const input: v1.scooters.AnalyzeScooterDocumentInput = {
+      sourceId: "browser-source-id",
+      source: { kind: "draft", type: "civ", uploadToken: "test-token" },
+    };
+    await req().post(route).send(input).expect(401);
+    await req()
+      .post(route)
+      .set("Cookie", [`access_token=${member.accessToken}`])
+      .send(input)
+      .expect(403);
+    await request(server())
+      .post(route)
+      .set("Cookie", cookie)
+      .send(input)
+      .expect(403);
+    const bytes = Buffer.from("ffd8ffe00000", "hex");
+    const stored = {
+      provider: "s3" as const,
+      bucket: app.get<Env>(ENV).IMAGE_STORAGE_S3_BUCKET!,
+      storageKey: `test-scooter-extraction-${Date.now()}/civ.jpg`,
+      contentType: "image/jpeg" as const,
+      byteSize: bytes.length,
+      checksumSha256: createHash("sha256").update(bytes).digest("hex"),
+      imageWidth: null,
+      imageHeight: null,
+      pageCount: null,
+    };
+    const baseline = {
+      userId: admin.userId,
+      purpose: "scooter-document:civ",
+      expiresAt: new Date(Date.now() + 60_000),
+      claimedAt: null,
+      cleanupStartedAt: null,
+      checksumSha256: stored.checksumSha256,
+    };
+    const {
+      imageWidth: _width,
+      imageHeight: _height,
+      pageCount: _pages,
+      ...metadata
+    } = stored;
+    void _width;
+    void _height;
+    void _pages;
+    const draft = await prisma.draftUpload.create({
+      data: { ...metadata, ...baseline },
+    });
+    const storage = app.get(ImageStorageService);
+    const verify = jest
+      .spyOn(storage, "verifyDocumentUploadToken")
+      .mockReturnValue(stored);
+    const read = jest.spyOn(storage, "readDocument").mockImplementation(() =>
+      Promise.resolve({
+        body: Readable.from([bytes]),
+        contentType: stored.contentType,
+        contentLength: bytes.length,
+      }),
+    );
+    const extractedData = {
+      vin: "L5YAUCZB9H1148984",
+      fields: { powerKw: 1.8 },
+      rawFields: { "P.2": "1,8" },
+    };
+    const analyze = jest
+      .spyOn(app.get(ScooterDocumentExtractionService), "analyze")
+      .mockResolvedValue({ extractedData, issues: [] });
+    try {
+      const scooterCount = await prisma.scooter.count();
+      const assetCount = await prisma.mediaAsset.count();
+      const response = await req()
+        .post(route)
+        .set("Cookie", cookie)
+        .send(input)
+        .expect(200);
+      expect(
+        v1.scooters.scooterDocumentAnalysisSchema.parse(response.body),
+      ).toEqual({
+        sourceId: input.sourceId,
+        documentType: "civ",
+        extractedData,
+        issues: [],
+        reviewRequired: true,
+      });
+      expect(verify).toHaveBeenCalledWith(
+        "test-token",
+        `scooter-document:civ:${admin.userId}`,
+      );
+      expect(
+        (
+          await prisma.draftUpload.findUniqueOrThrow({
+            where: { id: draft.id },
+          })
+        ).claimedAt,
+      ).toBeNull();
+      expect(await prisma.scooter.count()).toBe(scooterCount);
+      expect(await prisma.mediaAsset.count()).toBe(assetCount);
+      analyze.mockClear();
+      read.mockClear();
+      for (const invalid of [
+        { expiresAt: new Date(Date.now() - 60_000) },
+        { claimedAt: new Date() },
+        { cleanupStartedAt: new Date() },
+        { userId: member.userId },
+        { purpose: "scooter-document:insurance" },
+        { checksumSha256: "0".repeat(64) },
+      ]) {
+        await prisma.draftUpload.update({
+          where: { id: draft.id },
+          data: { ...baseline, ...invalid },
+        });
+        const rejected = await req()
+          .post(route)
+          .set("Cookie", cookie)
+          .send(input)
+          .expect(400);
+        expect(rejected.body).toMatchObject({
+          error: { code: "DOCUMENT_EXTRACTION_INVALID_SOURCE" },
+        });
+      }
+      expect(read).not.toHaveBeenCalled();
+      expect(analyze).not.toHaveBeenCalled();
+      await req()
+        .post(route)
+        .set("Cookie", cookie)
+        .send({
+          sourceId: "missing",
+          source: {
+            kind: "saved",
+            scooterId: "unrelated",
+            documentId: "missing",
+          },
+        })
+        .expect(400);
+      await req()
+        .post(route)
+        .set("Cookie", cookie)
+        .send({
+          ...input,
+          source: { ...input.source, url: "https://untrusted.example/file" },
+        })
+        .expect(400);
+    } finally {
+      verify.mockRestore();
+      read.mockRestore();
+      analyze.mockRestore();
+      await prisma.draftUpload.delete({ where: { id: draft.id } });
     }
   });
 

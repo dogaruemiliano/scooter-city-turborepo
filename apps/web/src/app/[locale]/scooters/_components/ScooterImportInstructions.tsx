@@ -6,13 +6,16 @@ import { ArrowDownIcon, CheckIcon, CopyIcon } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { documentExtractionPrompt } from "./scooter-document-import";
+import type { DocumentSource } from "./scooter-document-sources";
 
 export function ScooterImportInstructions({
   editing,
   disabled,
+  sources = [],
 }: {
   editing: boolean;
   disabled: boolean;
+  sources?: DocumentSource[];
 }) {
   const t = useTranslations("scooters");
   const id = useId();
@@ -30,9 +33,12 @@ export function ScooterImportInstructions({
   );
 
   async function copyPrompt() {
+    if (disabled || sources.length === 0) return;
     const current = ++request.current;
-    const prompt = documentExtractionPrompt(editing, (field) =>
-      t(`fields.${field}`),
+    const prompt = documentExtractionPrompt(
+      editing,
+      (field) => t(`fields.${field}`),
+      sources,
     );
     try {
       await navigator.clipboard.writeText(prompt);
@@ -66,7 +72,7 @@ export function ScooterImportInstructions({
               size="icon"
               variant={copied ? "success" : "secondary"}
               className="size-16 rounded-full motion-reduce:transition-none md:size-16"
-              disabled={disabled}
+              disabled={disabled || sources.length === 0}
               aria-label={t("documentImport.copyPrompt")}
               title={t("documentImport.copyPrompt")}
               onClick={() => void copyPrompt()}
@@ -83,13 +89,15 @@ export function ScooterImportInstructions({
               className={`min-h-5 text-center text-sm ${copied ? "text-success" : "text-muted-foreground"}`}
             >
               {t(
-                copied
-                  ? "documentImport.copiedShort"
-                  : "documentImport.copyPrompt",
+                sources.length === 0
+                  ? "documentImport.addDocumentsToCopy"
+                  : copied
+                    ? "documentImport.copiedShort"
+                    : "documentImport.copyPrompt",
               )}
             </p>
           </div>
-          {manualPrompt ? (
+          {manualPrompt && sources.length > 0 ? (
             <div className="mt-3 grid gap-2">
               <Label htmlFor={id}>{t("documentImport.copyManually")}</Label>
               <Textarea
@@ -106,8 +114,10 @@ export function ScooterImportInstructions({
         <li>
           <p>{t("documentImport.steps.extract")}</p>
           <ul className="mt-2 list-disc space-y-1 pl-5">
+            <li>{t("documentImport.steps.documents.import")}</li>
             <li>{t("documentImport.steps.documents.civ")}</li>
             <li>{t("documentImport.steps.documents.registration")}</li>
+            <li>{t("documentImport.steps.documents.insurance")}</li>
           </ul>
           <p className="mt-2">{t("documentImport.steps.allPages")}</p>
         </li>

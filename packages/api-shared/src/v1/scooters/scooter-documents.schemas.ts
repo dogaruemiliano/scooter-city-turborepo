@@ -1,8 +1,11 @@
 import { z } from "zod";
+import { scooterDocumentExtractedDataSchema } from "./scooter-document-extraction.schemas";
 
 export const SCOOTER_DOCUMENT_TYPES = [
+  "import_document",
   "civ",
   "registration_certificate",
+  "insurance",
 ] as const;
 export const SCOOTER_DOCUMENT_CONTENT_TYPES = [
   "application/pdf",
@@ -24,6 +27,8 @@ const fileNameSchema = z
   .regex(/^[^\x00-\x1f\x7f/\\]+$/);
 export const scooterDocumentDraftSchema = z
   .object({
+    insurancePolicyId: z.string().min(1).max(120).optional(),
+    extractedData: scooterDocumentExtractedDataSchema.nullable().optional(),
     type: scooterDocumentTypeSchema,
     fileName: fileNameSchema,
     uploadToken: z.string().min(1).max(8192),
@@ -58,6 +63,8 @@ export const scooterDocumentUploadSchema = z
 export const scooterDocumentSchema = z
   .object({
     id: z.string(),
+    insurancePolicyId: z.string().nullable().optional(),
+    extractedData: scooterDocumentExtractedDataSchema.nullable().optional(),
     type: scooterDocumentTypeSchema,
     fileName: z.string(),
     contentType: z.enum(SCOOTER_DOCUMENT_CONTENT_TYPES),

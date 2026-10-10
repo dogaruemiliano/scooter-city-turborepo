@@ -8,7 +8,7 @@ const upload = {
   checksumSha256: "a".repeat(64),
 };
 
-test("scooter uploads accept only the two document types and supported files", () => {
+test("scooter uploads accept only the supported document types and supported files", () => {
   for (const type of v1.scooters.SCOOTER_DOCUMENT_TYPES) {
     for (const contentType of v1.scooters.SCOOTER_DOCUMENT_CONTENT_TYPES) {
       assert.ok(
@@ -21,7 +21,7 @@ test("scooter uploads accept only the two document types and supported files", (
     }
   }
   for (const invalid of [
-    { type: "insurance" },
+    { type: "unknown" },
     { contentType: "image/svg+xml" },
     { byteSize: 0 },
     { byteSize: v1.scooters.SCOOTER_DOCUMENT_MAX_BYTES + 1 },

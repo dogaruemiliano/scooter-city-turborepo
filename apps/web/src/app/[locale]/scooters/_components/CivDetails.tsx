@@ -2,6 +2,7 @@
 import { v1 } from "@repo/api-shared";
 import { Card, CardContent, CardHeader, CardTitle } from "@repo/ui/components";
 import { useLocale, useTranslations } from "next-intl";
+import { isRetiredCivRawLabel } from "./scooter-document-sources";
 
 // These values already appear in the page's identity/technical sections.
 const alreadyDisplayed = new Set([
@@ -26,7 +27,10 @@ export function CivDetails({ scooter }: { scooter: v1.scooters.Scooter }) {
     scooter.civIssuedAt ||
     scooter.civIssuingAuthority ||
     version !== "unknown";
-  if (!fields.length && !hasMetadata && !scooter.civRawFields) return null;
+  const originalFields = Object.entries(scooter.civRawFields ?? {}).filter(
+    ([code]) => !isRetiredCivRawLabel(code),
+  );
+  if (!fields.length && !hasMetadata && !originalFields.length) return null;
   const format = (field: v1.vehicleCiv.CivField) => {
     const value = scooter[field];
     if ((v1.scooters.SCOOTER_CIV_FIELDS as readonly string[]).includes(field)) {
@@ -66,10 +70,7 @@ export function CivDetails({ scooter }: { scooter: v1.scooters.Scooter }) {
               ) : null,
           )}
           {fields.map((field) => (
-            <div
-              key={field}
-              className={field === "civMentions" ? "sm:col-span-2" : undefined}
-            >
+            <div key={field}>
               <dt className="text-sm text-muted-foreground">
                 {t(`fields.${field}`)}{" "}
                 {v1.vehicleCiv.civFieldHint(version, field)}
@@ -80,13 +81,13 @@ export function CivDetails({ scooter }: { scooter: v1.scooters.Scooter }) {
             </div>
           ))}
         </dl>
-        {scooter.civRawFields && Object.keys(scooter.civRawFields).length ? (
+        {originalFields.length ? (
           <details>
             <summary className="cursor-pointer text-sm font-medium">
               {t("civ.originalValues")}
             </summary>
             <dl className="mt-4 grid gap-3">
-              {Object.entries(scooter.civRawFields).map(([code, value]) => (
+              {originalFields.map(([code, value]) => (
                 <div key={code}>
                   <dt className="text-sm text-muted-foreground">{code}</dt>
                   <dd className="whitespace-pre-wrap break-words">{value}</dd>

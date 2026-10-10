@@ -14,6 +14,8 @@ const validValues = () => ({
   vin: "jyarn23e0ra123456",
   brandId: "brand-1",
   powertrainType: "combustion",
+  registrationType: "unregistered",
+  requiredLicenseCategory: "none",
 });
 
 describe("scooter editor conversion", () => {
@@ -30,9 +32,12 @@ describe("scooter editor conversion", () => {
       Object.keys(v1.scooters.createScooterInputSchema.shape)
         .filter(
           (field) =>
-            !["propulsionSystem", "documentDrafts", "civRawFields"].includes(
-              field,
-            ),
+            ![
+              "propulsionSystem",
+              "documentDrafts",
+              "civRawFields",
+              "insurancePolicies",
+            ].includes(field),
         )
         .sort(),
     );
@@ -45,14 +50,12 @@ describe("scooter editor conversion", () => {
       standingCapacity: "0",
       stationaryNoiseDb: "82,125",
       civVersion: "2024",
-      civMentions: "Original mentions",
     });
     expect(input).toMatchObject({
       maxAxle3MassKg: null,
       standingCapacity: 0,
       stationaryNoiseDb: 82.125,
       civVersion: "2024",
-      civMentions: "Original mentions",
     });
   });
 
@@ -73,6 +76,66 @@ describe("scooter editor conversion", () => {
       powerToWeightRatioKwKg: 0.012345,
       engineDisplacementCc: null,
       model: null,
+    });
+  });
+
+  it("keeps operational yes, no and unchecked distinct from documentary values", () => {
+    const input = scooterCreateFormSchema.parse({
+      ...validValues(),
+      hasGps: "false",
+      odometerWorking: "true",
+      speedometerWorking: "",
+      currentMileageKm: "0",
+      actualMaxSpeedKmh: "45",
+      maxSpeedKmh: "25",
+    });
+    expect(input).toMatchObject({
+      hasGps: false,
+      odometerWorking: true,
+      speedometerWorking: null,
+      currentMileageKm: 0,
+      actualMaxSpeedKmh: 45,
+      maxSpeedKmh: 25,
+    });
+    expect(
+      scooterCreateFormSchema.safeParse({ ...validValues(), hasGps: "yes" })
+        .success,
+    ).toBe(false);
+  });
+
+  it("does not assume registration or operational status for a new scooter", () => {
+    const defaults = scooterEditorDefaults();
+    expect(defaults.registrationType).toBe("");
+    expect(defaults.requiredLicenseCategory).toBe("");
+    expect(defaults.hasGps).toBe("");
+    expect(defaults.odometerWorking).toBe("");
+    expect(defaults.speedometerWorking).toBe("");
+    expect(
+      scooterCreateFormSchema.safeParse({
+        ...validValues(),
+        registrationType: "",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("edits operational checks without clearing technical speed or replacing no with unknown", () => {
+    const input = scooterEditFormSchema.parse({
+      ...validValues(),
+      hasGps: "false",
+      odometerWorking: "",
+      actualMaxSpeedKmh: "0",
+      maxSpeedKmh: "25",
+    });
+    expect(
+      scooterChangedFields(input, {
+        hasGps: true,
+        odometerWorking: true,
+        actualMaxSpeedKmh: true,
+      }),
+    ).toEqual({
+      hasGps: false,
+      odometerWorking: null,
+      actualMaxSpeedKmh: 0,
     });
   });
 

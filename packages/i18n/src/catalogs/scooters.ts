@@ -1,6 +1,128 @@
 export const scootersCatalog = {
   en: {
+    extraction: {
+      extractAndContinue: "Extract and continue",
+      extract: "Extract from documents",
+      manual: "Complete manually",
+      retry: "Retry failed documents",
+      processing: "Extracting…",
+      vinReview: {
+        title: "Check document VINs",
+        description:
+          "Open the document previews above and correct any misread characters. The original AI reading is kept with each correction.",
+        original: "AI reading: {vin}",
+        unreadable: "unreadable",
+        invalid: "Enter a VIN with 17 characters, without I, O or Q.",
+        mismatch:
+          "The VINs still differ. Check the originals before correcting them. If the documents belong to different scooters, replace the incorrect document.",
+        confirm: "I checked the corrected VINs against the original documents",
+        apply: "Apply verified corrections",
+        reviewed: "VIN corrected after manual review",
+      },
+      errors: {
+        disabled:
+          "AI extraction is not enabled. Complete the fields manually or import JSON.",
+        unsupported: "This document cannot be read. Use a clear PDF or image.",
+        tooLarge: "This document is too large to extract.",
+        tooManyPages: "Use a PDF with at most 10 pages.",
+        encrypted: "This PDF is password protected. Upload an unlocked copy.",
+        readFailed: "The uploaded document could not be read. Upload it again.",
+        invalidSource:
+          "This upload is no longer available. Upload the document again.",
+        timeout: "Extraction timed out. Retry this document.",
+        throttled: "Too many extraction requests. Try again shortly.",
+        unavailable:
+          "AI extraction is temporarily unavailable. Try again or complete manually.",
+        failed: "Extraction failed. Retry or complete the fields manually.",
+      },
+    },
+    wizard: {
+      progress: "{current} / {total} · {step}",
+      steps: {
+        documents: "Documents",
+        import_document: "Import documents",
+        civ: "CIV",
+        registration_certificate: "Registration certificate",
+        insurance: "Insurance",
+        operational: "Operational information",
+      },
+      back: "Back",
+      continue: "Continue",
+      continueWithoutDocuments: "Continue without documents",
+      noDocs: "You can add the documents later.",
+      otherFields: "Other fields",
+      missingIdentity: "Scooter identification",
+      verifyVin:
+        "VIN could not be verified automatically. Check that the documents belong to this scooter.",
+      confirmVin: "I checked {fileName}",
+    },
+    operational: {
+      unknown: "Not checked",
+      yes: "Yes",
+      no: "No",
+    },
+    insurance: {
+      title: "Insurance",
+      policy: "Insurance policy {number}",
+      add: "Add insurance",
+      removeDraft: "Remove new policy",
+      fields: {
+        insuredName: "Insured name",
+        validFrom: "Valid from",
+        validUntil: "Valid until",
+        premiumAmount: "Total premium",
+        currency: "Currency",
+        documentVin: "VIN on insurance",
+        vinReviewConfirmed: "I checked that the insurance covers this scooter",
+      },
+      placeholders: {
+        insuredName: "Full name or company name",
+        premiumAmount: "e.g. 250.50",
+        currency: "e.g. RON",
+        documentVin: "17 characters from the insurance document",
+      },
+      status: {
+        active: "Active",
+        upcoming: "Upcoming",
+        expired: "Expired",
+        review: "Needs review",
+      },
+      overlap:
+        "Insurance periods overlap. Check whether both policies should cover these dates.",
+      dateOrder: "The end date must be on or after the start date.",
+      vinReviewRequired:
+        "Check the vehicle on the insurance and confirm it manually.",
+      vinReviewHint:
+        "The document VIN is missing or unreadable. Check the original document before confirming.",
+      vinMismatch:
+        "The insurance VIN differs from this scooter’s VIN. Check the document.",
+      unresolved: "This field could not be read. Check the original document.",
+      reviewed: "I reviewed the unreadable fields",
+      unknownInsured: "Insured name unavailable",
+    },
+
     documentImport: {
+      invalidSources:
+        "The JSON could not be associated with the uploaded documents. Use the current prompt to generate and download a new JSON file.",
+      sourceIssues: {
+        fileNames:
+          "The filenames in the JSON do not match the uploads. In JSON: {provided}. Uploaded: {uploaded}.",
+        coverage:
+          "The JSON does not identify every uploaded document. In JSON: {provided}. Uploaded: {uploaded}.",
+        ambiguous:
+          "The JSON does not distinguish the document sources. Use the current prompt to generate and download a JSON file with separate data for each document.",
+        none: "none",
+      },
+      documentReview: "Check these fields in the document: {fields}.",
+      markDocumentReviewed: "I checked the document",
+      singleInsurance:
+        "You can add only one insurance policy when creating a scooter. Remove the current policy before importing another.",
+      vinMismatch: "Document VINs do not match. Check: {fields}.",
+      vinReview:
+        "Some document VINs could not be read. Verify the original documents before applying the import.",
+      confirmVinReview: "I checked that all documents refer to this scooter",
+      scooterVin: "Scooter VIN",
+      vinUnavailable: "Not available yet",
       title: "Import from documents",
       open: "Import JSON",
       entryHint:
@@ -12,27 +134,42 @@ export const scootersCatalog = {
       clipboardEmpty:
         "The clipboard is empty. Copy the AI response or paste it manually below.",
       copiedShort: "Prompt copied",
+      addDocumentsToCopy: "Add the documents to copy the prompt.",
       steps: {
         copy: "Copy the prompt below.",
         extract: "Send it to ChatGPT and attach:",
         documents: {
+          import: "Import papers (all pages)",
           civ: "Vehicle identity card (CIV)",
           registration: "Registration certificate",
+          insurance: "Insurance policy (all pages)",
         },
         allPages:
           "Attach every page of the documents you have, as PDFs or photos.",
-        return: "Copy the JSON from ChatGPT. Then paste it here.",
+        return:
+          "Download the JSON file generated by ChatGPT and upload it here.",
       },
-      help: "Copy the prompt and attach the PDFs or images in your AI tool. Then paste its JSON response here.",
+      help: "Copy the prompt and attach the documents in ChatGPT. Download the generated .json file and upload it here.",
       copyPrompt: "Copy extraction prompt",
       copied: "Prompt copied. Attach the documents in your AI tool.",
       copyManually: "Copy this prompt manually",
+      upload: "Upload JSON",
+      readingFile: "Reading file…",
+      editJson: "Edit JSON",
+      invalidFileType: "Choose a .json file.",
+      fileReadError: "The file could not be read. Select it again.",
+      fileTooLarge:
+        "The file is too large. Maximum size: {limit, number} bytes.",
+      fileReady: "File ready: {fileName}",
       paste: "Paste JSON",
       jsonLabel: "Extracted data (JSON)",
       mergeHint:
-        "Supplied values replace matching fields. A dash means confirmed empty in the document; null or an empty string means unresolved and needs review. These markers preserve existing values. Review the form, then save.",
+        "Imported values fill the form while preserving your manual corrections. A printed dash means confirmed empty; null or an empty string marks a field for review. Check the highlighted fields before saving.",
       apply: "Fill fields",
-      invalidJson: "Paste a valid JSON object (up to 250,000 characters).",
+      invalidJson:
+        "The content is not a valid JSON object. Ask ChatGPT to regenerate the .json file, then download and upload it again.",
+      tooLarge:
+        "The JSON has {count, number} characters. The limit is {limit, number}.",
       invalidFields:
         "Nothing was imported. Check these unsupported, invalid or conflicting fields: {fields}.",
       empty: "The JSON contains no values to import.",
@@ -40,8 +177,14 @@ export const scootersCatalog = {
       rawApplied: "Original CIV values will be saved with the form.",
       confirmedEmpty:
         "Confirmed empty in the document (printed dash): {fields}.",
+      reviewCount:
+        "{count, plural, one {# field could not be interpreted.} other {# fields could not be interpreted.}}",
+      fieldReview: "Check this value against the document.",
+      fieldReviewRaw: "Check these CIV rubrics against the document: {fields}.",
       reviewUnresolved:
         "Check manually: the AI could not resolve these fields: {fields}. Existing values were kept.",
+      reviewUnresolvedRaw:
+        "Check these CIV rubrics manually: {fields}. The AI returned no readable value; existing values were kept.",
       reviewEmptyConflict:
         "Check manually: the document shows a dash, but these fields already contain values: {fields}. Existing values were kept.",
       markReviewed: "I have checked these fields",
@@ -49,6 +192,19 @@ export const scootersCatalog = {
         "No unique brand matches “{brand}”. Select it or add it using the brand field.",
     },
     documents: {
+      title: "Documents",
+      compact: {
+        import_document: "Import",
+        civ: "CIV",
+        registration_certificate: "Registration",
+        insurance: "Insurance",
+      },
+      addAction: "Add",
+      unsupportedFormat:
+        "Unsupported format. Choose a PDF, JPG, PNG or WebP file.",
+      tooLarge: "The file is too large. Maximum size: 10 MB.",
+      emptyFile: "The file is empty. Choose another file.",
+      insurance: "Insurance policy",
       chooseFiles: "Add PDF or image",
       preview: "Preview {name}",
       closePreview: "Close preview",
@@ -62,8 +218,14 @@ export const scootersCatalog = {
       change: "Change document",
       previousPage: "Previous page",
       nextPage: "Next page",
+      addMore: "Add another document",
+      previousDocument: "Previous document",
+      nextDocument: "Next document",
+      documentCount: "{count, plural, one {# document} other {# documents}}",
+      documentPosition: "Document {index} of {total}",
 
       civ: "Vehicle identity card (CIV)",
+      import_document: "Import documents",
       registration_certificate: "Registration certificate",
       add: "Add {document}",
       hint: "Optional. PDF, JPG, PNG or WebP, up to 10 MB per file. Files are attached when you save.",
@@ -359,7 +521,6 @@ export const scootersCatalog = {
     sections: {
       civDocument: "CIV document details",
       noiseEmissions: "Noise and CO₂ emissions",
-      civMentions: "CIV mentions",
       civAdditional: "Additional CIV specifications",
 
       classification: "Classification and approval",
@@ -376,6 +537,10 @@ export const scootersCatalog = {
       notes: "Notes",
     },
     fields: {
+      hasGps: "GPS installed",
+      odometerWorking: "Odometer working",
+      speedometerWorking: "Speedometer working",
+      actualMaxSpeedKmh: "Actual maximum speed (km/h)",
       civVersion: "CIV document model",
       civIssuedAt: "CIV issue date",
       civIssuingAuthority: "Issuing RAR office",
@@ -392,7 +557,6 @@ export const scootersCatalog = {
       drivingNoiseDb: "Driving noise [dB(A)]",
       noiseMeasurementRpm: "Engine speed for noise measurement (rpm)",
       co2EmissionsGKm: "CO₂ emissions (g/km)",
-      civMentions: "CIV mentions",
 
       vehicleCategoryOther: "Approval category — other",
       nationalCategoryOther: "Use category — other",
@@ -455,6 +619,7 @@ export const scootersCatalog = {
       notes: "Notes",
     },
     placeholders: {
+      actualMaxSpeedKmh: "e.g. 45",
       civVersion: "Select the printed CIV model",
       civIssuedAt: "Select issue date",
       civIssuingAuthority: "E.g. București",
@@ -471,7 +636,6 @@ export const scootersCatalog = {
       drivingNoiseDb: "E.g. 74.5",
       noiseMeasurementRpm: "E.g. 3750",
       co2EmissionsGKm: "E.g. 120.5",
-      civMentions: "Copy the mentions exactly as printed",
 
       selectOption: "Select an option",
       search: "Search VIN, plate, brand, model, or color",
@@ -646,7 +810,138 @@ export const scootersCatalog = {
     },
   },
   ro: {
+    extraction: {
+      extractAndContinue: "Extrage și continuă",
+      extract: "Extrage din documente",
+      manual: "Completează manual",
+      retry: "Reîncearcă documentele nereușite",
+      processing: "Se extrage…",
+      vinReview: {
+        title: "Verifică VIN-urile documentelor",
+        description:
+          "Deschide previzualizările documentelor de mai sus și corectează caracterele citite greșit. Citirea inițială a AI-ului se păstrează la fiecare corecție.",
+        original: "Citire AI: {vin}",
+        unreadable: "ilizibil",
+        invalid: "Introdu un VIN de 17 caractere, fără I, O sau Q.",
+        mismatch:
+          "VIN-urile încă diferă. Verifică originalele înainte să le corectezi. Dacă documentele aparțin unor scutere diferite, înlocuiește documentul greșit.",
+        confirm: "Am verificat VIN-urile corectate în documentele originale",
+        apply: "Aplică corecțiile verificate",
+        reviewed: "VIN corectat după verificare manuală",
+      },
+      errors: {
+        disabled:
+          "Extragerea AI nu este activată. Completează manual sau importă JSON.",
+        unsupported:
+          "Documentul nu poate fi citit. Folosește un PDF sau o imagine clară.",
+        tooLarge: "Documentul este prea mare pentru extragere.",
+        tooManyPages: "Folosește un PDF cu cel mult 10 pagini.",
+        encrypted:
+          "PDF-ul este protejat cu parolă. Încarcă o copie fără parolă.",
+        readFailed:
+          "Documentul încărcat nu a putut fi citit. Încarcă-l din nou.",
+        invalidSource:
+          "Fișierul încărcat nu mai este disponibil. Încarcă documentul din nou.",
+        timeout: "Extragerea a durat prea mult. Reîncearcă acest document.",
+        throttled:
+          "Sunt prea multe cereri de extragere. Reîncearcă în câteva momente.",
+        unavailable:
+          "Extragerea AI nu este disponibilă momentan. Reîncearcă sau completează manual.",
+        failed:
+          "Extragerea a eșuat. Reîncearcă sau completează câmpurile manual.",
+      },
+    },
+    wizard: {
+      progress: "{current} / {total} · {step}",
+      steps: {
+        documents: "Documente",
+        import_document: "Documente de import",
+        civ: "CIV",
+        registration_certificate: "Certificat de înmatriculare",
+        insurance: "Asigurare",
+        operational: "Informații operaționale",
+      },
+      back: "Înapoi",
+      continue: "Continuă",
+      continueWithoutDocuments: "Continuă fără documente",
+      noDocs: "Poți adăuga documentele mai târziu.",
+      otherFields: "Alte câmpuri",
+      missingIdentity: "Identificarea scuterului",
+      verifyVin:
+        "VIN-ul nu a putut fi verificat automat. Verifică dacă documentele aparțin acestui scuter.",
+      confirmVin: "Am verificat {fileName}",
+    },
+    operational: {
+      unknown: "Neverificat",
+      yes: "Da",
+      no: "Nu",
+    },
+    insurance: {
+      title: "Asigurări",
+      policy: "Polița de asigurare {number}",
+      add: "Adaugă asigurare",
+      removeDraft: "Elimină polița nouă",
+      fields: {
+        insuredName: "Asigurat",
+        validFrom: "Valabilă de la",
+        validUntil: "Valabilă până la",
+        premiumAmount: "Prima totală de asigurare",
+        currency: "Monedă",
+        documentVin: "VIN de pe asigurare",
+        vinReviewConfirmed:
+          "Am verificat că asigurarea este pentru acest scuter",
+      },
+      placeholders: {
+        insuredName: "Numele complet sau denumirea firmei",
+        premiumAmount: "ex. 250,50",
+        currency: "ex. RON",
+        documentVin: "Cele 17 caractere de pe asigurare",
+      },
+      status: {
+        active: "Valabilă",
+        upcoming: "Urmează să intre în vigoare",
+        expired: "Expirată",
+        review: "De verificat",
+      },
+      overlap:
+        "Perioadele asigurărilor se suprapun. Verifică dacă ambele polițe trebuie să acopere aceste date.",
+      dateOrder:
+        "Data de sfârșit trebuie să fie în aceeași zi sau după data de început.",
+      vinReviewRequired:
+        "Verifică vehiculul de pe asigurare și confirmă manual.",
+      vinReviewHint:
+        "VIN-ul de pe document lipsește sau nu este lizibil. Verifică documentul original înainte de confirmare.",
+      vinMismatch:
+        "VIN-ul de pe asigurare diferă de VIN-ul scuterului. Verifică documentul.",
+      unresolved:
+        "Acest câmp nu a putut fi citit. Verifică documentul original.",
+      reviewed: "Am verificat câmpurile ilizibile",
+      unknownInsured: "Asigurat necunoscut",
+    },
+
     documentImport: {
+      invalidSources:
+        "JSON-ul nu a putut fi asociat documentelor încărcate. Folosește promptul actual pentru a genera și descărca un fișier JSON nou.",
+      sourceIssues: {
+        fileNames:
+          "Numele fișierelor din JSON nu corespund celor încărcate. În JSON: {provided}. Încărcate: {uploaded}.",
+        coverage:
+          "JSON-ul nu identifică toate documentele încărcate. În JSON: {provided}. Încărcate: {uploaded}.",
+        ambiguous:
+          "JSON-ul nu diferențiază sursele documentelor. Folosește promptul actual pentru a genera și descărca un fișier JSON cu date separate pentru fiecare document.",
+        none: "niciunul",
+      },
+      documentReview: "Verifică în document aceste câmpuri: {fields}.",
+      markDocumentReviewed: "Am verificat documentul",
+      singleInsurance:
+        "Poți adăuga o singură asigurare la crearea scuterului. Elimină polița curentă înainte de a importa alta.",
+      vinMismatch: "VIN-urile documentelor nu coincid. Verifică: {fields}.",
+      vinReview:
+        "Unele VIN-uri nu au putut fi citite. Verifică documentele originale înainte de import.",
+      confirmVinReview:
+        "Am verificat că toate documentele sunt pentru acest scuter",
+      scooterVin: "VIN-ul scuterului",
+      vinUnavailable: "Nu este disponibil încă",
       title: "Import din documente",
       open: "Importă JSON",
       entryHint:
@@ -658,29 +953,42 @@ export const scootersCatalog = {
       clipboardEmpty:
         "Clipboard-ul este gol. Copiază răspunsul AI sau lipește-l manual mai jos.",
       copiedShort: "Instrucțiuni copiate",
+      addDocumentsToCopy: "Adaugă documentele pentru a copia promptul.",
       steps: {
         copy: "Copiază promptul de mai jos.",
         extract: "Trimite-l lui ChatGPT și atașează:",
         documents: {
+          import: "Documentele de import (toate paginile)",
           civ: "Cartea de identitate a vehiculului (CIV)",
           registration: "Certificatul de înmatriculare / înregistrare",
+          insurance: "Polița de asigurare (toate paginile)",
         },
         allPages:
           "Atașează toate paginile documentelor pe care le ai, ca PDF-uri sau fotografii.",
-        return: "Copiază JSON-ul de la ChatGPT. Apoi lipește-l aici.",
+        return: "Descarcă fișierul JSON generat de ChatGPT și încarcă-l aici.",
       },
-      help: "Copiază instrucțiunile și atașează PDF-urile sau imaginile în instrumentul AI. Apoi lipește aici răspunsul JSON.",
+      help: "Copiază promptul și atașează documentele în ChatGPT. Descarcă fișierul .json generat și încarcă-l aici.",
       copyPrompt: "Copiază instrucțiunile pentru AI",
       copied:
         "Instrucțiunile au fost copiate. Atașează documentele în instrumentul AI.",
       copyManually: "Copiază manual aceste instrucțiuni",
+      upload: "Încarcă JSON",
+      readingFile: "Se citește fișierul…",
+      editJson: "Editează JSON",
+      invalidFileType: "Alege un fișier .json.",
+      fileReadError: "Fișierul nu a putut fi citit. Selectează-l din nou.",
+      fileTooLarge:
+        "Fișierul este prea mare. Dimensiunea maximă: {limit, number} octeți.",
+      fileReady: "Fișier pregătit: {fileName}",
       paste: "Lipește JSON",
       jsonLabel: "Date extrase (JSON)",
       mergeHint:
-        "Valorile furnizate înlocuiesc câmpurile corespunzătoare. O liniuță confirmă un câmp gol în document; null sau un șir gol indică un câmp neclar, de verificat. Acești marcatori păstrează valorile existente. Verifică formularul, apoi salvează.",
+        "Valorile importate completează formularul și păstrează corecturile făcute manual. O liniuță tipărită înseamnă gol confirmat; null sau un text gol marchează câmpul pentru verificare. Verifică valorile evidențiate înainte de salvare.",
       apply: "Completează câmpurile",
       invalidJson:
-        "Lipește un obiect JSON valid (maximum 250.000 de caractere).",
+        "Conținutul nu este un obiect JSON valid. Cere-i lui ChatGPT să regenereze fișierul .json, apoi descarcă-l și încarcă-l din nou.",
+      tooLarge:
+        "JSON-ul are {count, number} de caractere. Limita este de {limit, number}.",
       invalidFields:
         "Nu s-a importat nimic. Verifică aceste câmpuri neacceptate, invalide sau incompatibile: {fields}.",
       empty: "JSON-ul nu conține valori de importat.",
@@ -690,8 +998,14 @@ export const scootersCatalog = {
         "Valorile originale din CIV vor fi salvate împreună cu formularul.",
       confirmedEmpty:
         "Câmpuri confirmate goale în document (liniuță tipărită): {fields}.",
+      reviewCount:
+        "{count, plural, one {# câmp nu a putut fi interpretat.} few {# câmpuri nu au putut fi interpretate.} other {# de câmpuri nu au putut fi interpretate.}}",
+      fieldReview: "Verifică această valoare în document.",
+      fieldReviewRaw: "Verifică aceste rubrici în CIV: {fields}.",
       reviewUnresolved:
         "Verifică manual: AI-ul nu a putut interpreta aceste câmpuri: {fields}. Valorile existente au fost păstrate.",
+      reviewUnresolvedRaw:
+        "Verifică manual aceste rubrici din CIV: {fields}. AI-ul nu a returnat o valoare lizibilă; valorile existente au fost păstrate.",
       reviewEmptyConflict:
         "Verifică manual: documentul conține o liniuță, dar aceste câmpuri au deja valori: {fields}. Valorile existente au fost păstrate.",
       markReviewed: "Am verificat aceste câmpuri",
@@ -699,6 +1013,19 @@ export const scootersCatalog = {
         "Marca „{brand}” nu are o potrivire unică. Selecteaz-o sau adaug-o din câmpul Marcă.",
     },
     documents: {
+      title: "Documente",
+      compact: {
+        import_document: "Import",
+        civ: "CIV",
+        registration_certificate: "Certificat",
+        insurance: "Asigurare",
+      },
+      addAction: "Adaugă",
+      unsupportedFormat:
+        "Format neacceptat. Alege un fișier PDF, JPG, PNG sau WebP.",
+      tooLarge: "Fișierul este prea mare. Dimensiunea maximă este de 10 MB.",
+      emptyFile: "Fișierul este gol. Alege alt fișier.",
+      insurance: "Poliță de asigurare",
       chooseFiles: "Adaugă PDF sau imagine",
       preview: "Previzualizează {name}",
       closePreview: "Închide previzualizarea",
@@ -713,8 +1040,15 @@ export const scootersCatalog = {
       change: "Schimbă documentul",
       previousPage: "Pagina anterioară",
       nextPage: "Pagina următoare",
+      addMore: "Adaugă încă un document",
+      previousDocument: "Documentul anterior",
+      nextDocument: "Documentul următor",
+      documentCount:
+        "{count, plural, one {# document} few {# documente} other {# de documente}}",
+      documentPosition: "Documentul {index} din {total}",
 
       civ: "Cartea de identitate a vehiculului (CIV)",
+      import_document: "Documente de import",
       registration_certificate: "Certificat de înmatriculare",
       add: "Adaugă {document}",
       hint: "Opțional. PDF, JPG, PNG sau WebP, maximum 10 MB per fișier. Fișierele se atașează la salvare.",
@@ -1022,7 +1356,6 @@ export const scootersCatalog = {
     sections: {
       civDocument: "Datele documentului CIV",
       noiseEmissions: "Zgomot și emisii CO₂",
-      civMentions: "Mențiuni CIV",
       civAdditional: "Specificații suplimentare CIV",
 
       classification: "Clasificare și omologare",
@@ -1039,6 +1372,10 @@ export const scootersCatalog = {
       notes: "Notițe",
     },
     fields: {
+      hasGps: "Are GPS",
+      odometerWorking: "Funcționează odometrul",
+      speedometerWorking: "Funcționează vitezometrul",
+      actualMaxSpeedKmh: "Viteză maximă reală (km/h)",
       civVersion: "Model CIV",
       civIssuedAt: "Data eliberării CIV",
       civIssuingAuthority: "Reprezentanța RAR",
@@ -1058,7 +1395,6 @@ export const scootersCatalog = {
       drivingNoiseDb: "Nivel sonor în mers [dB(A)]",
       noiseMeasurementRpm: "Turație motor la măsurarea zgomotului (min⁻¹)",
       co2EmissionsGKm: "Emisii CO₂ (g/km)",
-      civMentions: "Mențiuni CIV",
 
       vehicleCategoryOther: "Categorie de omologare — altă valoare",
       nationalCategoryOther: "Categorie de folosință — altă valoare",
@@ -1120,6 +1456,7 @@ export const scootersCatalog = {
       notes: "Notițe",
     },
     placeholders: {
+      actualMaxSpeedKmh: "Ex. 45",
       civVersion: "Selectează modelul CIV tipărit",
       civIssuedAt: "Selectează data eliberării",
       civIssuingAuthority: "Ex.: București",
@@ -1136,7 +1473,6 @@ export const scootersCatalog = {
       drivingNoiseDb: "Ex.: 74,5",
       noiseMeasurementRpm: "Ex.: 3750",
       co2EmissionsGKm: "Ex.: 120,5",
-      civMentions: "Transcrie mențiunile exact cum apar în CIV",
 
       selectOption: "Selectează o opțiune",
       search: "Caută VIN, număr, marcă, model sau culoare",

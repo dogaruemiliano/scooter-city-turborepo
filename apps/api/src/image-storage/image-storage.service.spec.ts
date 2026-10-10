@@ -96,6 +96,58 @@ function createService(
 }
 
 describe("ImageStorageService", () => {
+  it("verifies document upload tokens without reading, deleting, or completing objects", async () => {
+    const { service, send } = createService();
+    const upload = await service.createPresignedDocumentUpload({
+      contentType: "application/pdf",
+      byteSize: 10,
+      checksumSha256: "a".repeat(64),
+      category: "scooter-document",
+      scope: "scooter-document:civ:admin",
+    });
+    send.mockClear();
+    expect(
+      service.verifyDocumentUploadToken(
+        upload.uploadToken,
+        "scooter-document:civ:admin",
+      ),
+    ).toMatchObject({
+      contentType: "application/pdf",
+      byteSize: 10,
+      checksumSha256: "a".repeat(64),
+      storageKey: upload.storageKey,
+    });
+    expect(() =>
+      service.verifyDocumentUploadToken(
+        upload.uploadToken,
+        "scooter-document:civ:other",
+      ),
+    ).toThrow(BadRequestException);
+    expect(() =>
+      service.verifyDocumentUploadToken(
+        `${upload.uploadToken}altered`,
+        "scooter-document:civ:admin",
+      ),
+    ).toThrow(BadRequestException);
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("passes document read cancellation to S3", async () => {
+    const { service, send } = createService(
+      jest.fn((command: unknown) => ({
+        command,
+        Body: Readable.from([]),
+        ContentType: "application/pdf",
+        ContentLength: 0,
+      })),
+    );
+    const signal = new AbortController().signal;
+    await service.readDocument("documents/test.pdf", signal);
+    expect(send).toHaveBeenCalledWith(expect.any(GetObjectCommand), {
+      abortSignal: signal,
+    });
+  });
+
   it("stores supported images with generated S3 keys and checksum metadata", async () => {
     const { service, send } = createService();
     const buffer = Buffer.from("image-bytes");

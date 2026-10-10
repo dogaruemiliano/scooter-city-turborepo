@@ -294,6 +294,30 @@ export class ImageStorageService {
     return this.completePresignedObjectUpload(uploadToken, scope);
   }
 
+  /** Verify signed metadata without claiming, deleting, or reading an upload. */
+  verifyDocumentUploadToken(
+    uploadToken: string,
+    scope: string,
+  ): StoredDocument {
+    const payload = this.verifyUploadToken(uploadToken, scope);
+    this.assertSafeStorageKey(payload.storageKey);
+    if (payload.bucket !== this.bucket)
+      throw new BadRequestException("Invalid document upload bucket");
+    return {
+      provider: payload.provider,
+      bucket: payload.bucket,
+      storageKey: payload.storageKey,
+      contentType: this.requireSupportedDocumentContentType(
+        payload.contentType,
+      ),
+      byteSize: payload.byteSize,
+      checksumSha256: payload.checksumSha256,
+      imageWidth: payload.imageWidth ?? null,
+      imageHeight: payload.imageHeight ?? null,
+      pageCount: payload.pageCount ?? null,
+    };
+  }
+
   private async completePresignedObjectUpload(
     uploadToken: string,
     scope: string,
@@ -340,7 +364,10 @@ export class ImageStorageService {
     };
   }
 
-  async readImage(storageKey: string): Promise<ReadStoredImageResult> {
+  async readImage(
+    storageKey: string,
+    signal?: AbortSignal,
+  ): Promise<ReadStoredImageResult> {
     this.assertSafeStorageKey(storageKey);
 
     try {
@@ -349,6 +376,7 @@ export class ImageStorageService {
           Bucket: this.bucket,
           Key: storageKey,
         }),
+        ...(signal ? [{ abortSignal: signal }] : []),
       );
 
       return {
@@ -367,8 +395,11 @@ export class ImageStorageService {
     }
   }
 
-  readDocument(storageKey: string): Promise<ReadStoredImageResult> {
-    return this.readImage(storageKey);
+  readDocument(
+    storageKey: string,
+    signal?: AbortSignal,
+  ): Promise<ReadStoredImageResult> {
+    return this.readImage(storageKey, signal);
   }
 
   deleteDocument(storageKey: string): Promise<void> {
