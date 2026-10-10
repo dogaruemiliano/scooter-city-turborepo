@@ -47,6 +47,8 @@ export function PersonContactSheet({ person }: { person: v1.persons.Person }) {
         <BottomSheetBody safeAreaBottom>
           <div className="grid grid-cols-3 gap-2">
             <BottomSheetClose
+              nativeButton={false}
+              role="link"
               aria-label={t("actions.callPerson", { name: fullName })}
               render={
                 <a
@@ -59,6 +61,8 @@ export function PersonContactSheet({ person }: { person: v1.persons.Person }) {
               <span className="text-xs font-medium">{t("actions.call")}</span>
             </BottomSheetClose>
             <BottomSheetClose
+              nativeButton={false}
+              role="link"
               aria-label={t("actions.whatsappPerson", { name: fullName })}
               render={
                 <a
@@ -79,6 +83,8 @@ export function PersonContactSheet({ person }: { person: v1.persons.Person }) {
               </span>
             </BottomSheetClose>
             <BottomSheetClose
+              nativeButton={false}
+              role="link"
               aria-label={t("actions.emailPerson", { name: fullName })}
               render={
                 <a
