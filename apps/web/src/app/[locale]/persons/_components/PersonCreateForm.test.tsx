@@ -797,15 +797,10 @@ describe("PersonCreateForm wizard", () => {
         "Add the required files for Proof of address.",
       ),
     ).toBeInTheDocument();
-    await browser.click(
-      within(getPhotoGroup("Proof of address")).getByRole("button", {
-        name: "Add Proof of address photo",
-      }),
+    const fileInput = within(getPhotoGroup("Proof of address")).getByLabelText(
+      "Add Proof of address photo",
+      { selector: "input" },
     );
-    const dialog = await screen.findByRole("dialog", {
-      name: "Proof of address photo",
-    });
-    const fileInput = within(dialog).getByLabelText("Choose from files");
     expect(fileInput).toHaveAttribute(
       "accept",
       "image/jpeg,image/png,image/webp,application/pdf",
@@ -814,15 +809,13 @@ describe("PersonCreateForm wizard", () => {
       fileInput,
       new File(["%PDF-proof"], "residence.pdf", { type: "application/pdf" }),
     );
-    expect(within(dialog).getByText(/residence.pdf/)).toBeInTheDocument();
-    expect(within(dialog).getByTitle("residence.pdf")).toHaveAttribute(
-      "src",
-      expect.stringMatching(/^blob:/),
-    );
-    expect(within(dialog).queryByRole("img")).not.toBeInTheDocument();
-    await browser.click(
-      within(dialog).getByRole("button", { name: "Use file" }),
-    );
+    const dialog = await screen.findByRole("dialog", {
+      name: "Proof of address photo",
+    });
+    expect(
+      dialog.querySelector('[data-slot="pdf-preview"]'),
+    ).toBeInTheDocument();
+    await browser.click(within(dialog).getByRole("button", { name: "Save" }));
     await waitFor(() => expect(dialog).not.toBeInTheDocument());
     expect(
       within(getPhotoGroup("Proof of address")).queryByRole("img"),
@@ -1010,18 +1003,15 @@ describe("PersonCreateForm wizard", () => {
     const browser = userEvent.setup();
     renderCreateForm();
     await enterDocuments(browser);
-    await browser.click(
-      within(getPhotoGroup("National ID")).getByRole("button", {
-        name: "Add Front photo",
+    await browser.upload(
+      within(getPhotoGroup("National ID")).getByLabelText("Add Front photo", {
+        selector: "input",
       }),
+      new File(["photo"], "front.png", { type: "image/png" }),
     );
     const chooser = await screen.findByRole("dialog", { name: "Front photo" });
-    expect(within(chooser).getByLabelText("Choose from files")).toHaveAttribute(
-      "accept",
-      "image/jpeg,image/png,image/webp,application/pdf",
-    );
     await browser.click(
-      within(chooser).getByRole("button", { name: "Close camera" }),
+      within(chooser).getByRole("button", { name: "Cancel" }),
     );
     await waitFor(() => expect(chooser).not.toBeInTheDocument());
     expect(mocks.apiFetch).not.toHaveBeenCalled();
@@ -1081,18 +1071,17 @@ describe("PersonCreateForm wizard", () => {
     const nationalId = within(photos).getByRole("group", {
       name: "Carte de identitate",
     });
-    await browser.click(
-      within(nationalId).getByRole("button", { name: "Adaugă poza: Față" }),
+    await browser.upload(
+      within(nationalId).getByLabelText("Adaugă poza: Față", {
+        selector: "input",
+      }),
+      new File(["photo"], "id.png", { type: "image/png" }),
     );
     const chooser = await screen.findByRole("dialog", {
       name: "Poză document: Față",
     });
-    await browser.upload(
-      within(chooser).getByLabelText("Alege din fișiere"),
-      new File(["photo"], "id.png", { type: "image/png" }),
-    );
     await browser.click(
-      screen.getByRole("button", { name: "Folosește fotografia" }),
+      within(chooser).getByRole("button", { name: "Salvează" }),
     );
     await waitFor(() => expect(chooser).not.toBeInTheDocument());
     await browser.click(
@@ -1626,23 +1615,17 @@ async function uploadPhoto(
   document: string,
   slot: "Front" | "Back" = "Front",
 ) {
-  await browser.click(
-    within(getPhotoGroup(document)).getByRole("button", {
-      name: `Add ${slot} photo`,
-    }),
-  );
-  const dialog = await screen.findByRole("dialog", { name: `${slot} photo` });
   await browser.upload(
-    within(dialog).getByLabelText("Choose from files"),
+    within(getPhotoGroup(document)).getByLabelText(`Add ${slot} photo`, {
+      selector: "input",
+    }),
     new File(["photo"], `${slot}.png`, { type: "image/png" }),
   );
-  const editor = screen.getByRole("dialog");
+  const editor = await screen.findByRole("dialog", { name: `${slot} photo` });
   expect(
     within(editor).getByRole("img", { name: `${slot} document photo` }),
   ).toBeInTheDocument();
-  await browser.click(
-    within(editor).getByRole("button", { name: "Use photo" }),
-  );
+  await browser.click(within(editor).getByRole("button", { name: "Save" }));
   await waitFor(() => expect(editor).not.toBeInTheDocument());
   await waitFor(() =>
     expect(
