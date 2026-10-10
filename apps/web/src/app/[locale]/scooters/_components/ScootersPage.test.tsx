@@ -207,7 +207,9 @@ describe("ScootersPage", () => {
 
     renderScooters();
     await browser.click(screen.getByRole("button", { name: "Filters" }));
-    await browser.click(screen.getByRole("combobox", { name: "Powertrain" }));
+    await browser.click(
+      screen.getByRole("combobox", { name: "Propulsion system" }),
+    );
     await browser.click(
       await screen.findByRole("option", { name: "Electric" }),
     );

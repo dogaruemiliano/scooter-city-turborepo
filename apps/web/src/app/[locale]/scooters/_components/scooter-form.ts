@@ -132,7 +132,7 @@ export function buildScooterInputCandidate(
     errors,
   );
   const engineDisplacementCc =
-    form.powertrainType === "combustion"
+    form.powertrainType !== "electric"
       ? optionalNumberField(
           form.engineDisplacementCc,
           "engineDisplacementCc",

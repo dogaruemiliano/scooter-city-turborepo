@@ -38,8 +38,10 @@ import { useId, useState, type FormEvent, type ReactNode } from "react";
 import { MoreActionsMenu } from "@/components/MoreActionsMenu";
 import { PageTitleOverride } from "@/components/PageTitleOverride";
 import { webApi } from "@/lib/api";
-import { FeedbackAlert, formErrorsFromIssues } from "./ScooterCreateForm";
-import { ScooterRegistrationFormFields } from "./ScooterFormFields";
+import { FeedbackAlert, formErrorsFromIssues } from "./scooter-feedback";
+import { CivDetails } from "./CivDetails";
+import { ScooterDocumentList } from "./ScooterDocumentUpload";
+import { ScooterRegistrationFormFields } from "./ScooterRegistrationFormFields";
 import {
   buildScooterRegistrationInputCandidate,
   fieldFromIssue,
@@ -319,6 +321,8 @@ export function ScooterDetailPage({
         />
       </DetailSection>
 
+      <CivDetails scooter={scooter} />
+      <ScooterDocumentList documents={scooter.documents ?? []} />
       <ScooterRegistrationDialog
         key={`edit-scooter-registration-${registrationDialogKey}`}
         scooter={scooter}
@@ -588,7 +592,7 @@ function PowertrainBadge({ scooter }: { scooter: v1.scooters.Scooter }) {
   return (
     <Badge variant="outline">
       <Icon aria-hidden="true" data-icon="inline-start" />
-      {scooter.powertrainType === "combustion" && scooter.engineDisplacementCc
+      {scooter.powertrainType !== "electric" && scooter.engineDisplacementCc
         ? t("list.ccValue", { cc: scooter.engineDisplacementCc })
         : t(`powertrainTypes.${scooter.powertrainType}`)}
     </Badge>

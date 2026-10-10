@@ -50,15 +50,23 @@ export default async function NewScooterRoutePage({
   }
 
   const cookieHeader = (await cookies()).toString();
-  const brands = await webApi.fetch(
-    v1.scooterBrands.ROUTES.list,
-    v1.scooterBrands.scooterBrandListSchema,
-    { headers: { cookie: cookieHeader }, cache: "no-store" },
-  );
+  const [brands, vocabulary] = await Promise.all([
+    webApi.fetch(
+      v1.scooterBrands.ROUTES.list,
+      v1.scooterBrands.scooterBrandListSchema,
+      { headers: { cookie: cookieHeader }, cache: "no-store" },
+    ),
+    webApi.fetch(
+      v1.vehicleCiv.CIV_ROUTES.vocabulary,
+      v1.vehicleCiv.civVocabularySchema,
+      { headers: { cookie: cookieHeader }, cache: "no-store" },
+    ),
+  ]);
 
   return (
     <ScooterCreateForm
       scootersHref={localizePath(SCOOTERS_PATH, locale)}
+      vocabulary={vocabulary}
       brands={brands.items}
     />
   );

@@ -131,7 +131,7 @@ function PowertrainBadge({ scooter }: { scooter: v1.scooters.Scooter }) {
   return (
     <Badge variant="outline">
       <Icon aria-hidden="true" data-icon="inline-start" />
-      {scooter.powertrainType === "combustion" && scooter.engineDisplacementCc
+      {scooter.powertrainType !== "electric" && scooter.engineDisplacementCc
         ? t("list.ccValue", { cc: scooter.engineDisplacementCc })
         : t(`powertrainTypes.${scooter.powertrainType}`)}
     </Badge>

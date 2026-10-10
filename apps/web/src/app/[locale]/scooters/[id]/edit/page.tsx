@@ -48,9 +48,16 @@ export default async function EditScooterRoutePage({
   }
 
   const cookieHeader = (await cookies()).toString();
-  const [scooter, brands] = await Promise.all([
+  const [scooter, brands, vocabulary] = await Promise.all([
     scooterFromApi(locale, id, editPath, cookieHeader),
     scooterBrandsFromApi(locale, editPath, cookieHeader),
+    webApi
+      .fetch(
+        v1.vehicleCiv.CIV_ROUTES.vocabulary,
+        v1.vehicleCiv.civVocabularySchema,
+        { headers: { cookie: cookieHeader }, cache: "no-store" },
+      )
+      .catch((error: unknown) => handleEditFetchError(error, locale, editPath)),
   ]);
 
   return (
@@ -60,6 +67,7 @@ export default async function EditScooterRoutePage({
         `${SCOOTERS_PATH}/${encodeURIComponent(id)}`,
         locale,
       )}
+      vocabulary={vocabulary}
       brands={brands.items}
     />
   );
