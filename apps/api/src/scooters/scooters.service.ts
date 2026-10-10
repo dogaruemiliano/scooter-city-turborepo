@@ -1,3 +1,6 @@
+import { CivVocabularyService } from "./civ-vocabulary.service";
+import { civMetadataWrite } from "./civ-metadata";
+import { ScooterDocumentsService } from "./scooter-documents.service";
 import {
   BadRequestException,
   ConflictException,
@@ -13,6 +16,7 @@ import { PrismaService } from "../prisma/prisma.service";
 
 const scooterInclude = {
   brand: true,
+  civDocument: true,
 } as const;
 
 type ScooterWithBrand = Scooter & {
@@ -40,23 +44,34 @@ interface RegistrationState {
 
 @Injectable()
 export class ScootersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly documents: ScooterDocumentsService,
+    private readonly civVocabulary: CivVocabularyService,
+  ) {}
 
   async create(
     input: v1.scooters.CreateScooterInput,
+    userId?: string,
   ): Promise<ScooterWithBrand> {
-    this.assertValidPowertrain(
-      input.powertrainType,
-      input.engineDisplacementCc,
-    );
+    this.assertValidPowertrain(input.powertrainType, input);
 
     try {
       const data = this.toCreateData(input);
       await this.assertActivePlateAvailable(data.registrationNumberNormalized);
 
-      return await this.prisma.scooter.create({
-        data,
-        include: scooterInclude,
+      const prepared = await this.documents.prepare(
+        input.documentDrafts,
+        userId,
+      );
+      return await this.prisma.$transaction(async (tx) => {
+        const scooter = await tx.scooter.create({
+          data,
+          include: scooterInclude,
+        });
+        await this.documents.apply(tx, scooter.id, prepared, [], userId);
+        await this.civVocabulary.remember(tx, input);
+        return scooter;
       });
     } catch (error) {
       this.handleWriteError(error);
@@ -78,7 +93,7 @@ export class ScootersService {
       this.prisma.scooter.count({ where }),
       this.prisma.scooter.findMany({
         where,
-        include: scooterInclude,
+        include: { brand: true },
         orderBy: this.toScooterOrderBy(query),
         skip: (query.page - 1) * query.pageSize,
         take: query.pageSize,
@@ -124,7 +139,7 @@ export class ScootersService {
     const order = new Map(ids.map((id, index) => [id, index]));
     const items = await this.prisma.scooter.findMany({
       where: { id: { in: ids } },
-      include: scooterInclude,
+      include: { brand: true },
     });
     items.sort((first, second) => order.get(first.id)! - order.get(second.id)!);
 
@@ -146,6 +161,7 @@ export class ScootersService {
   async update(
     id: string,
     input: v1.scooters.UpdateScooterInput,
+    userId?: string,
   ): Promise<ScooterWithBrand> {
     try {
       const existing = await this.prisma.scooter.findFirst({
@@ -157,20 +173,29 @@ export class ScootersService {
 
       const nextPowertrainType =
         input.powertrainType ?? existing.powertrainType;
-      const nextEngineCc =
-        nextPowertrainType === "electric"
-          ? null
-          : input.engineDisplacementCc !== undefined
-            ? input.engineDisplacementCc
-            : existing.engineDisplacementCc;
-      this.assertValidPowertrain(nextPowertrainType, nextEngineCc);
-
-      const data = this.toUpdateData(
-        input,
-        existing,
+      const changingPowertrain = nextPowertrainType !== existing.powertrainType;
+      this.assertValidPowertrain(
         nextPowertrainType,
-        nextEngineCc,
+        changingPowertrain ? { ...existing, ...input } : input,
       );
+      for (const field of v1.scooters.SCOOTER_CIV_FIELDS) {
+        const otherField = `${field}Other` as const;
+        if (input[field] === undefined && input[otherField] === undefined)
+          continue;
+        const next =
+          input[field] === undefined ? existing[field] : input[field];
+        const text =
+          input[otherField] === undefined
+            ? existing[otherField]
+            : input[otherField];
+        if ((next === "other" && !text) || (next !== "other" && text != null)) {
+          throw new BadRequestException({
+            message: "The CIV selection and custom value must match.",
+            details: { field: otherField },
+          });
+        }
+      }
+      const data = this.toUpdateData(input, existing);
       await this.assertActivePlateAvailable(
         typeof data.registrationNumberNormalized === "string"
           ? data.registrationNumberNormalized
@@ -178,10 +203,25 @@ export class ScootersService {
         id,
       );
 
-      return await this.prisma.scooter.update({
-        where: { id },
-        data,
-        include: scooterInclude,
+      const prepared = await this.documents.prepare(
+        input.documentDrafts,
+        userId,
+      );
+      return await this.prisma.$transaction(async (tx) => {
+        const scooter = await tx.scooter.update({
+          where: { id, deletedAt: null },
+          data: { ...data, updatedAt: new Date() },
+          include: scooterInclude,
+        });
+        await this.documents.apply(
+          tx,
+          id,
+          prepared,
+          input.removedDocumentIds,
+          userId,
+        );
+        await this.civVocabulary.remember(tx, input);
+        return scooter;
       });
     } catch (error) {
       this.handleWriteError(error);
@@ -205,21 +245,44 @@ export class ScootersService {
   private toCreateData(
     input: v1.scooters.CreateScooterInput,
   ): Prisma.ScooterCreateInput {
+    const civData = civMetadataWrite(input);
     return {
+      maxAxle3MassKg: input.maxAxle3MassKg,
+      maxAxle4MassKg: input.maxAxle4MassKg,
+      maxAxle5MassKg: input.maxAxle5MassKg,
+      brakedTrailerMassKg: input.brakedTrailerMassKg,
+      unbrakedTrailerMassKg: input.unbrakedTrailerMassKg,
+      couplingPointMassKg: input.couplingPointMassKg,
+      standingCapacity: input.standingCapacity,
+      noiseMeasurementRpm: input.noiseMeasurementRpm,
+      stationaryNoiseDb: input.stationaryNoiseDb,
+      drivingNoiseDb: input.drivingNoiseDb,
+      co2EmissionsGKm: input.co2EmissionsGKm,
+      vehicleClass: input.vehicleClass,
+      driveType: input.driveType,
+      civMentions: input.civMentions,
+      civDocument: civData ? { create: civData } : undefined,
       vin: input.vin,
       brand: { connect: { id: input.brandId } },
+      vehicleType: input.vehicleType,
+      civNumber: input.civNumber,
+      nationalEmissionsCode: input.nationalEmissionsCode,
       variant: input.variant,
       version: input.version,
       commercialName: input.commercialName,
       vehicleCategory: input.vehicleCategory,
+      vehicleCategoryOther: input.vehicleCategoryOther,
       nationalCategory: input.nationalCategory,
+      nationalCategoryOther: input.nationalCategoryOther,
       bodyType: input.bodyType,
+      bodyTypeOther: input.bodyTypeOther,
       typeApprovalNumber: input.typeApprovalNumber,
       nationalRegistryNumber: input.nationalRegistryNumber,
       seatsCount: input.seatsCount,
       engineSerialNumber: input.engineSerialNumber,
       ratedEngineRpm: input.ratedEngineRpm,
       fuelType: input.fuelType,
+      fuelTypeOther: input.fuelTypeOther,
       propulsionSystem: input.propulsionSystem,
       electricMotorPowerKw: input.electricMotorPowerKw,
       powerToWeightRatioKwKg: input.powerToWeightRatioKwKg,
@@ -266,27 +329,50 @@ export class ScootersService {
   private toUpdateData(
     input: v1.scooters.UpdateScooterInput,
     existing: Scooter,
-    nextPowertrainType: string,
-    nextEngineCc: number | null,
   ): Prisma.ScooterUpdateInput {
+    const civData = civMetadataWrite(input);
     return {
+      maxAxle3MassKg: input.maxAxle3MassKg,
+      maxAxle4MassKg: input.maxAxle4MassKg,
+      maxAxle5MassKg: input.maxAxle5MassKg,
+      brakedTrailerMassKg: input.brakedTrailerMassKg,
+      unbrakedTrailerMassKg: input.unbrakedTrailerMassKg,
+      couplingPointMassKg: input.couplingPointMassKg,
+      standingCapacity: input.standingCapacity,
+      noiseMeasurementRpm: input.noiseMeasurementRpm,
+      stationaryNoiseDb: input.stationaryNoiseDb,
+      drivingNoiseDb: input.drivingNoiseDb,
+      co2EmissionsGKm: input.co2EmissionsGKm,
+      vehicleClass: input.vehicleClass,
+      driveType: input.driveType,
+      civMentions: input.civMentions,
+      civDocument: civData
+        ? { upsert: { create: civData, update: civData } }
+        : undefined,
       vin: input.vin,
       brand:
         input.brandId === undefined
           ? undefined
           : { connect: { id: input.brandId } },
+      vehicleType: input.vehicleType,
+      civNumber: input.civNumber,
+      nationalEmissionsCode: input.nationalEmissionsCode,
       variant: input.variant,
       version: input.version,
       commercialName: input.commercialName,
       vehicleCategory: input.vehicleCategory,
+      vehicleCategoryOther: input.vehicleCategoryOther,
       nationalCategory: input.nationalCategory,
+      nationalCategoryOther: input.nationalCategoryOther,
       bodyType: input.bodyType,
+      bodyTypeOther: input.bodyTypeOther,
       typeApprovalNumber: input.typeApprovalNumber,
       nationalRegistryNumber: input.nationalRegistryNumber,
       seatsCount: input.seatsCount,
       engineSerialNumber: input.engineSerialNumber,
       ratedEngineRpm: input.ratedEngineRpm,
       fuelType: input.fuelType,
+      fuelTypeOther: input.fuelTypeOther,
       propulsionSystem: input.propulsionSystem,
       electricMotorPowerKw: input.electricMotorPowerKw,
       powerToWeightRatioKwKg: input.powerToWeightRatioKwKg,
@@ -314,8 +400,7 @@ export class ScootersService {
       manufactureYear: input.manufactureYear,
       powertrainType: input.powertrainType,
       engineCode: input.engineCode,
-      engineDisplacementCc:
-        nextPowertrainType === "electric" ? null : nextEngineCc,
+      engineDisplacementCc: input.engineDisplacementCc,
       powerKw: input.powerKw,
       ...this.toRegistrationWriteData(
         this.toNextRegistrationState(existing, input),
@@ -625,12 +710,24 @@ export class ScootersService {
 
   private assertValidPowertrain(
     powertrainType: v1.scooters.ScooterPowertrainType,
-    engineDisplacementCc: number | null | undefined,
+    values: object,
   ): void {
-    if (powertrainType === "electric" && engineDisplacementCc) {
-      throw new BadRequestException(
-        "Engine cc is only allowed for combustion scooters",
-      );
+    const fuel = (values as { fuelType?: v1.scooters.Scooter["fuelType"] })
+      .fuelType;
+    if (!v1.scooters.fuelMatchesPowertrain(powertrainType, fuel)) {
+      throw new BadRequestException({
+        message: "Fuel does not match the selected powertrain.",
+        details: { field: "fuelType" },
+      });
+    }
+    for (const field of v1.scooters.inactivePowertrainFields(powertrainType)) {
+      if ((values as Record<string, unknown>)[field] != null) {
+        throw new BadRequestException({
+          message:
+            "Clear incompatible fields explicitly when changing powertrain.",
+          details: { field },
+        });
+      }
     }
   }
 

@@ -171,6 +171,7 @@ model MediaAsset {
   createdAt        DateTime              @default(now())
   deletedAt        DateTime?
   documentPhotos   PersonDocumentPhoto[]
+  scooterDocuments ScooterDocument[]
 
   @@index([provider, bucket])
   @@index([uploadedByUserId])
@@ -240,8 +241,10 @@ model ScooterBrand {
 }
 
 enum PowertrainType {
+  unpowered
   electric
   combustion
+  hybrid
 }
 
 enum ScooterRegistrationType {
@@ -259,13 +262,72 @@ enum DrivingLicenseCategory {
   A
 }
 
+enum ScooterVehicleCategory {
+  M1
+  M2
+  M3
+  N1
+  N2
+  N3
+  O1
+  O2
+  O3
+  O4
+  L1e
+  L2e
+  L3e
+  L4e
+  L5e
+  L6e
+  L7e
+  other
+}
+
+enum ScooterUseCategory {
+  motorcycle
+  other
+}
+
+enum ScooterBodyType {
+  two_wheel_moped
+  two_wheel_motorcycle
+  other
+}
+
+enum ScooterFuelType {
+  petrol
+  diesel
+  electric
+  petrol_electric
+  diesel_electric
+  other
+}
+
 /// Scooter inventory; technical details can be completed after acquisition.
 model Scooter {
   id String @id @default(cuid())
 
+  maxAxle3MassKg        Int?
+  maxAxle4MassKg        Int?
+  maxAxle5MassKg        Int?
+  brakedTrailerMassKg   Int?
+  unbrakedTrailerMassKg Int?
+  couplingPointMassKg   Int?
+  standingCapacity      Int?
+  noiseMeasurementRpm   Int?
+  stationaryNoiseDb     Decimal?
+  drivingNoiseDb        Decimal?
+  co2EmissionsGKm       Decimal?
+  vehicleClass          String?
+  driveType             String?
+  civMentions           String?
+  civDocument           VehicleCivDocument?
+
   // Identity
   vin             String  @unique
   brandId         String
+  vehicleType     String?
+  civNumber       String?
   model           String?
   variant         String?
   version         String?
@@ -274,9 +336,12 @@ model Scooter {
   color           String?
 
   // Classification / homologation
-  vehicleCategory        String?
-  nationalCategory       String?
-  bodyType               String?
+  vehicleCategory        ScooterVehicleCategory?
+  vehicleCategoryOther   String?
+  nationalCategory       ScooterUseCategory?
+  nationalCategoryOther  String?
+  bodyType               ScooterBodyType?
+  bodyTypeOther          String?
   typeApprovalNumber     String?
   nationalRegistryNumber String?
   seatsCount             Int?
@@ -288,12 +353,14 @@ model Scooter {
   engineDisplacementCc   Int?
   powerKw                Decimal?
   ratedEngineRpm         Int?
-  fuelType               String?
+  fuelType               ScooterFuelType?
+  fuelTypeOther          String?
   propulsionSystem       String?
   electricMotorPowerKw   Decimal?
   powerToWeightRatioKwKg Decimal?
   maxSpeedKmh            Int?
   emissionsStandard      String?
+  nationalEmissionsCode  String?
 
   // Masses
   curbWeightKg                    Int?
@@ -333,8 +400,9 @@ model Scooter {
   temporaryRegistrationExpiresAt DateTime?               @db.Date
   requiredLicenseCategory        DrivingLicenseCategory  @default(none)
 
-  // Relations (acquisition, documents, insurance, issues and maintenance deferred)
-  brand ScooterBrand @relation(fields: [brandId], references: [id], onDelete: Restrict)
+  // Relations (acquisition, insurance, issues and maintenance deferred)
+  brand     ScooterBrand      @relation(fields: [brandId], references: [id], onDelete: Restrict)
+  documents ScooterDocument[]
 
   // Metadata
   createdAt DateTime  @default(now())
@@ -1180,4 +1248,54 @@ model SettlementOperation {
   operation       FinancialOperation @relation(fields: [operationId], references: [id], onDelete: Restrict)
 
   @@id([settlementRunId, operationId])
+}
+
+enum ScooterDocumentType {
+  civ
+  registration_certificate
+}
+
+/// One PDF or image; multiple files can describe the pages of a document.
+model ScooterDocument {
+  id        String              @id @default(cuid())
+  scooterId String
+  scooter   Scooter             @relation(fields: [scooterId], references: [id], onDelete: Cascade)
+  type      ScooterDocumentType
+  fileName  String
+  assetId   String              @unique
+  asset     MediaAsset          @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  createdAt DateTime            @default(now())
+  deletedAt DateTime?
+
+  @@index([scooterId, type, deletedAt])
+}
+
+/// Metadata of the current CIV. Normalized specifications and CIV number stay
+/// on the existing vehicle; its ScooterDocument(type=civ) records hold the files.
+model VehicleCivDocument {
+  id               String             @id @default(cuid())
+  scooterId        String             @unique
+  scooter          Scooter            @relation(fields: [scooterId], references: [id], onDelete: Cascade)
+  version          CivDocumentVersion @default(unknown)
+  issuedAt         DateTime?          @db.Date
+  issuingAuthority String?
+  rawFields        Json?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+}
+
+enum CivDocumentVersion {
+  v1993   @map("1993")
+  v2016   @map("2016")
+  v2024   @map("2024")
+  unknown
+}
+
+/// Open vocabulary of values actually saved by administrators. These are
+/// suggestions, not an exhaustive or officially approved RAR nomenclature.
+model CivVocabularyEntry {
+  field String
+  value String
+
+  @@id([field, value])
 }

@@ -1,30 +1,59 @@
+import { civMetadataResponse } from "./civ-metadata";
 import { v1 } from "@repo/api-shared";
 
 import { toDateOnlyString } from "../common/dates/date-only";
-import type { Scooter as ScooterRow } from "../generated/prisma/client";
+import type {
+  Scooter as ScooterRow,
+  VehicleCivDocument,
+} from "../generated/prisma/client";
 
 type ScooterRowWithBrand = ScooterRow & {
   brand: { name: string };
+  civDocument?: VehicleCivDocument | null;
 };
 
 export function toScooter(row: ScooterRowWithBrand): v1.scooters.Scooter {
   return {
+    ...(row.civDocument === undefined
+      ? {}
+      : civMetadataResponse(row.civDocument)),
+    maxAxle3MassKg: row.maxAxle3MassKg ?? null,
+    maxAxle4MassKg: row.maxAxle4MassKg ?? null,
+    maxAxle5MassKg: row.maxAxle5MassKg ?? null,
+    brakedTrailerMassKg: row.brakedTrailerMassKg ?? null,
+    unbrakedTrailerMassKg: row.unbrakedTrailerMassKg ?? null,
+    couplingPointMassKg: row.couplingPointMassKg ?? null,
+    standingCapacity: row.standingCapacity ?? null,
+    noiseMeasurementRpm: row.noiseMeasurementRpm ?? null,
+    vehicleClass: row.vehicleClass ?? null,
+    driveType: row.driveType ?? null,
+    civMentions: row.civMentions ?? null,
+    stationaryNoiseDb: row.stationaryNoiseDb?.toNumber() ?? null,
+    drivingNoiseDb: row.drivingNoiseDb?.toNumber() ?? null,
+    co2EmissionsGKm: row.co2EmissionsGKm?.toNumber() ?? null,
     id: row.id,
     vin: row.vin,
     brandId: row.brandId,
     brand: row.brand.name,
+    vehicleType: row.vehicleType,
+    civNumber: row.civNumber,
+    nationalEmissionsCode: row.nationalEmissionsCode,
     variant: row.variant,
     version: row.version,
     commercialName: row.commercialName,
     vehicleCategory: row.vehicleCategory,
+    vehicleCategoryOther: row.vehicleCategoryOther,
     nationalCategory: row.nationalCategory,
+    nationalCategoryOther: row.nationalCategoryOther,
     bodyType: row.bodyType,
+    bodyTypeOther: row.bodyTypeOther,
     typeApprovalNumber: row.typeApprovalNumber,
     nationalRegistryNumber: row.nationalRegistryNumber,
     seatsCount: row.seatsCount,
     engineSerialNumber: row.engineSerialNumber,
     ratedEngineRpm: row.ratedEngineRpm,
     fuelType: row.fuelType,
+    fuelTypeOther: row.fuelTypeOther,
     propulsionSystem: row.propulsionSystem,
     electricMotorPowerKw: row.electricMotorPowerKw?.toNumber() ?? null,
     powerToWeightRatioKwKg: row.powerToWeightRatioKwKg?.toNumber() ?? null,

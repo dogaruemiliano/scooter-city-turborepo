@@ -1,3 +1,12 @@
+import {
+  civMetadataSchema,
+  civAdditionalSpecificationsSchema,
+} from "../vehicle-civ/vehicle-civ.schemas";
+import {
+  scooterDocumentDraftsSchema,
+  scooterDocumentListSchema,
+  SCOOTER_DOCUMENT_MAX_FILES,
+} from "./scooter-documents.schemas";
 /**
  * Scooters-domain Zod schemas.
  */
@@ -12,6 +21,10 @@ import {
   requiredTrimmedStringSchema,
 } from "../common/common.schemas";
 import {
+  inactivePowertrainFields,
+  fuelMatchesPowertrain,
+  SCOOTER_CIV_OPTIONS,
+  SCOOTER_CIV_FIELDS,
   SCOOTER_LIST_SORTS,
   SCOOTER_POWERTRAIN_TYPES,
   SCOOTER_REGISTRATION_TYPES,
@@ -25,11 +38,11 @@ const MAX_ENGINE_TYPE_LENGTH = 100;
 const MAX_NOTES_LENGTH = 2_000;
 const MAX_SEARCH_LENGTH = 200;
 const MAX_PAGE_SIZE = 100;
-const MIN_MANUFACTURE_YEAR = 1950;
+const MIN_MANUFACTURE_YEAR = 1800;
 const MAX_MANUFACTURE_YEAR = new Date().getUTCFullYear() + 1;
-const MAX_ENGINE_CC = 2_000;
+const MAX_ENGINE_CC = 2_147_483_647;
 const MAX_MILEAGE_KM = 2_147_483_647;
-const MAX_POWER_KW = 200;
+const MAX_POWER_KW = Number.MAX_SAFE_INTEGER;
 const MAX_PLATE_INPUT_LENGTH = 64;
 const REGISTERED_ON_FUTURE_MESSAGE =
   "Registration date must be today or earlier.";
@@ -181,19 +194,37 @@ const nullableTechnicalIntegerSchema = z
 
 // Technical details may be omitted on create and explicitly cleared on update.
 export const scooterTechnicalDetailsSchema = z.object({
+  ...civAdditionalSpecificationsSchema.shape,
+  vehicleType: nullableTrimmedStringSchema(MAX_TEXT_LENGTH).optional(),
+  civNumber: nullableTrimmedStringSchema(MAX_TEXT_LENGTH).optional(),
+  nationalEmissionsCode:
+    nullableTrimmedStringSchema(MAX_TEXT_LENGTH).optional(),
   variant: nullableTrimmedStringSchema(MAX_TEXT_LENGTH).optional(),
   version: nullableTrimmedStringSchema(MAX_TEXT_LENGTH).optional(),
   commercialName: nullableTrimmedStringSchema(MAX_TEXT_LENGTH).optional(),
-  vehicleCategory: nullableTrimmedStringSchema(MAX_TEXT_LENGTH).optional(),
-  nationalCategory: nullableTrimmedStringSchema(MAX_TEXT_LENGTH).optional(),
-  bodyType: nullableTrimmedStringSchema(MAX_TEXT_LENGTH).optional(),
-  typeApprovalNumber: nullableTrimmedStringSchema(MAX_TEXT_LENGTH).optional(),
-  nationalRegistryNumber:
+  vehicleCategory: z
+    .enum(SCOOTER_CIV_OPTIONS.vehicleCategory)
+    .nullable()
+    .optional(),
+  vehicleCategoryOther: nullableTrimmedStringSchema(MAX_TEXT_LENGTH).optional(),
+  nationalCategory: z
+    .enum(SCOOTER_CIV_OPTIONS.nationalCategory)
+    .nullable()
+    .optional(),
+  nationalCategoryOther:
     nullableTrimmedStringSchema(MAX_TEXT_LENGTH).optional(),
+  bodyType: z.enum(SCOOTER_CIV_OPTIONS.bodyType).nullable().optional(),
+  bodyTypeOther: nullableTrimmedStringSchema(MAX_TEXT_LENGTH).optional(),
+  typeApprovalNumber: nullableTrimmedStringSchema(MAX_TEXT_LENGTH).optional(),
+  nationalRegistryNumber: nullableTrimmedStringSchema(MAX_TEXT_LENGTH)
+    // This field is also in response DTOs, so preserve its JSON Schema type.
+    .overwrite((value) => value?.toUpperCase() ?? null)
+    .optional(),
   seatsCount: nullableTechnicalIntegerSchema.optional(),
   engineSerialNumber: nullableTrimmedStringSchema(MAX_TEXT_LENGTH).optional(),
   ratedEngineRpm: nullableTechnicalIntegerSchema.optional(),
-  fuelType: nullableTrimmedStringSchema(MAX_TEXT_LENGTH).optional(),
+  fuelType: z.enum(SCOOTER_CIV_OPTIONS.fuelType).nullable().optional(),
+  fuelTypeOther: nullableTrimmedStringSchema(MAX_TEXT_LENGTH).optional(),
   propulsionSystem: nullableTrimmedStringSchema(MAX_TEXT_LENGTH).optional(),
   electricMotorPowerKw: z.number().nonnegative().nullable().optional(),
   powerToWeightRatioKwKg: z.number().nonnegative().nullable().optional(),
@@ -223,6 +254,8 @@ export const scooterTechnicalDetailsSchema = z.object({
 
 export const scooterSchema = z
   .object({
+    documents: scooterDocumentListSchema.optional(),
+    ...civMetadataSchema.shape,
     ...scooterTechnicalDetailsSchema.shape,
     id: z.string(),
     vin: z.string(),
@@ -252,6 +285,8 @@ export type Scooter = z.infer<typeof scooterSchema>;
 
 export const createScooterInputSchema = z
   .object({
+    documentDrafts: scooterDocumentDraftsSchema.optional(),
+    ...civMetadataSchema.shape,
     ...scooterTechnicalDetailsSchema.shape,
     vin: vinSchema,
     brandId: requiredTrimmedStringSchema(MAX_TEXT_LENGTH),
@@ -285,6 +320,7 @@ export const createScooterInputSchema = z
   .strict()
   .superRefine((input, ctx) => {
     validateScooterPowertrainForCreate(input, ctx);
+    validateScooterCivOptions(input, ctx);
     validateScooterRegistrationForCreate(input, ctx);
   })
   .meta({ id: "CreateScooterInput" });
@@ -293,6 +329,12 @@ export type CreateScooterInput = z.infer<typeof createScooterInputSchema>;
 
 export const updateScooterInputSchema = z
   .object({
+    documentDrafts: scooterDocumentDraftsSchema.optional(),
+    removedDocumentIds: z
+      .array(z.string().min(1))
+      .max(SCOOTER_DOCUMENT_MAX_FILES)
+      .optional(),
+    ...civMetadataSchema.shape,
     ...scooterTechnicalDetailsSchema.shape,
     vin: vinSchema.optional(),
     brandId: requiredTrimmedStringSchema(MAX_TEXT_LENGTH).optional(),
@@ -326,6 +368,7 @@ export const updateScooterInputSchema = z
   .strict()
   .superRefine((input, ctx) => {
     validateScooterPowertrainForUpdate(input, ctx);
+    validateScooterCivOptions(input, ctx, true);
     validateScooterRegistrationForUpdate(input, ctx);
   })
   .meta({ id: "UpdateScooterInput" });
@@ -468,34 +511,32 @@ function isValidPermanentLetterSuffix(value: string): boolean {
 function validateScooterPowertrainForCreate(
   input: {
     powertrainType?: z.infer<typeof scooterPowertrainTypeSchema>;
-    engineDisplacementCc?: number | null;
-  },
+  } & Record<string, unknown>,
   ctx: z.RefinementCtx,
 ): void {
-  if (input.powertrainType === "electric" && input.engineDisplacementCc) {
+  if (
+    !fuelMatchesPowertrain(
+      input.powertrainType,
+      input.fuelType as string | null | undefined,
+    )
+  ) {
     ctx.addIssue({
       code: "custom",
-      message: "Engine cc is only allowed for combustion scooters.",
-      path: ["engineDisplacementCc"],
+      path: ["fuelType"],
+      message: "Fuel does not match the selected powertrain.",
     });
+  }
+  for (const field of inactivePowertrainFields(input.powertrainType ?? "")) {
+    if (input[field] != null)
+      ctx.addIssue({
+        code: "custom",
+        message: "This field does not apply to the selected powertrain.",
+        path: [field],
+      });
   }
 }
 
-function validateScooterPowertrainForUpdate(
-  input: {
-    powertrainType?: z.infer<typeof scooterPowertrainTypeSchema>;
-    engineDisplacementCc?: number | null;
-  },
-  ctx: z.RefinementCtx,
-): void {
-  if (input.powertrainType === "electric" && input.engineDisplacementCc) {
-    ctx.addIssue({
-      code: "custom",
-      message: "Engine cc is only allowed for combustion scooters.",
-      path: ["engineDisplacementCc"],
-    });
-  }
-}
+const validateScooterPowertrainForUpdate = validateScooterPowertrainForCreate;
 
 function validateScooterRegistrationForCreate(
   input: {
@@ -672,5 +713,32 @@ function validateRegistrationDates(
       message: REGISTRATION_EXPIRES_ON_ORDER_MESSAGE,
       path: ["temporaryRegistrationExpiresAt"],
     });
+  }
+}
+
+function validateScooterCivOptions(
+  input: Record<string, unknown>,
+  ctx: z.RefinementCtx,
+  partial = false,
+) {
+  for (const field of SCOOTER_CIV_FIELDS) {
+    if (input[field] === "other" && !input[`${field}Other`]) {
+      ctx.addIssue({
+        code: "custom",
+        path: [`${field}Other`],
+        message: "The exact CIV value is required.",
+      });
+    }
+    if (
+      (input[field] !== undefined || !partial) &&
+      input[field] !== "other" &&
+      input[`${field}Other`] != null
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: [`${field}Other`],
+        message: "Custom text is only allowed for other.",
+      });
+    }
   }
 }

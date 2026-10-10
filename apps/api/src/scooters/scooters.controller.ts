@@ -1,3 +1,6 @@
+import { ScooterDocumentsService } from "./scooter-documents.service";
+import type { AuthPrincipal } from "../auth/auth.types";
+import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import {
   Body,
   Controller,
@@ -36,7 +39,10 @@ import { ScootersService } from "./scooters.service";
 @RequireRoles("ADMIN")
 @Controller({ path: "scooters", version: "1" })
 export class ScootersController {
-  constructor(private readonly scooters: ScootersService) {}
+  constructor(
+    private readonly scooters: ScootersService,
+    private readonly documents: ScooterDocumentsService,
+  ) {}
 
   @Post()
   @ApiOperation({
@@ -46,8 +52,9 @@ export class ScootersController {
   @ZodResponse({ status: HttpStatus.CREATED, type: Scooter })
   async create(
     @Body() input: CreateScooterInput,
+    @CurrentUser() user: AuthPrincipal,
   ): Promise<v1.scooters.Scooter> {
-    return toScooter(await this.scooters.create(input));
+    return toScooter(await this.scooters.create(input, user.id));
   }
 
   @Get()
@@ -77,7 +84,7 @@ export class ScootersController {
     if (!row) {
       throw new NotFoundException("Scooter not found");
     }
-    return toScooter(row);
+    return { ...toScooter(row), documents: await this.documents.list(id) };
   }
 
   @Patch(":id")
@@ -89,8 +96,9 @@ export class ScootersController {
   async update(
     @Param("id") id: string,
     @Body() input: UpdateScooterInput,
+    @CurrentUser() user: AuthPrincipal,
   ): Promise<v1.scooters.Scooter> {
-    return toScooter(await this.scooters.update(id, input));
+    return toScooter(await this.scooters.update(id, input, user.id));
   }
 
   @Delete(":id")

@@ -336,3 +336,57 @@ test("technical details accept explicit null, reject invalid quantities, and pre
     );
   }
 });
+
+test("CIV enums reject arbitrary values and require custom text for other", () => {
+  for (const field of v1.scooters.SCOOTER_CIV_FIELDS) {
+    assert.equal(
+      v1.scooters.updateScooterInputSchema.safeParse({
+        [field]: "unknown-value",
+      }).success,
+      false,
+    );
+    assert.equal(
+      v1.scooters.updateScooterInputSchema.safeParse({ [field]: "other" })
+        .success,
+      false,
+    );
+    assert.equal(
+      v1.scooters.updateScooterInputSchema.safeParse({
+        [field]: "other",
+        [`${field}Other`]: "Exact CIV text",
+      }).success,
+      true,
+    );
+  }
+});
+
+test("propulsion rules allow hybrid and reject incompatible technical fields", () => {
+  assert.equal(
+    v1.scooters.updateScooterInputSchema.safeParse({
+      powertrainType: "hybrid",
+      engineDisplacementCc: 125,
+      electricMotorPowerKw: 3.5,
+    }).success,
+    true,
+  );
+  assert.equal(
+    v1.scooters.updateScooterInputSchema.safeParse({
+      powertrainType: "combustion",
+      electricMotorPowerKw: 3.5,
+    }).success,
+    false,
+  );
+  assert.equal(
+    v1.scooters.updateScooterInputSchema.safeParse({
+      powertrainType: "electric",
+      fuelTankCapacityLiters: 5,
+    }).success,
+    false,
+  );
+  assert.deepEqual(
+    v1.scooters.updateScooterInputSchema.parse({
+      nationalRegistryNumber: " ab-001/c ",
+    }),
+    { nationalRegistryNumber: "AB-001/C" },
+  );
+});

@@ -1,3 +1,5 @@
+import { ImageStorageService } from "../src/image-storage/image-storage.service";
+import { Readable } from "node:stream";
 /**
  * HTTP-level e2e tests for the admin-managed `/v1/scooters` endpoints.
  */
@@ -134,6 +136,355 @@ describe("Scooters HTTP surface (e2e)", () => {
     };
   }
 
+  it("round-trips general vehicle CIV data and preserves original fields on partial updates", async () => {
+    const admin = await freshSession(["ADMIN"]);
+    const cookie = [`access_token=${admin.accessToken}`];
+    const rawFields = {
+      "13": "ENG-123",
+      "N.5": "-",
+      unmapped: "Original text",
+    };
+    const created = await req()
+      .post(v1.scooters.ROUTES.create)
+      .set("Cookie", cookie)
+      .send(
+        scooterInput({
+          vehicleCategory: "M3",
+          vehicleClass: "III",
+          engineDisplacementCc: 12800,
+          powerKw: 350.125,
+          maxAxle3MassKg: 8000,
+          maxAxle4MassKg: null,
+          maxAxle5MassKg: null,
+          brakedTrailerMassKg: 3500,
+          unbrakedTrailerMassKg: 750,
+          standingCapacity: 0,
+          stationaryNoiseDb: 82.125,
+          co2EmissionsGKm: 120.25,
+          driveType: "4x2",
+          civVersion: "2024",
+          civIssuedAt: "2024-06-10",
+          civIssuingAuthority: "RAR București",
+          civRawFields: rawFields,
+          civMentions: "Official CIV mentions",
+          notes: "Operational note",
+        }),
+      )
+      .expect(201);
+    const vehicle = v1.scooters.scooterSchema.parse(created.body);
+    expect(vehicle).toMatchObject({
+      vehicleCategory: "M3",
+      civVersion: "2024",
+      civIssuedAt: "2024-06-10",
+      maxAxle5MassKg: null,
+      standingCapacity: 0,
+      powerKw: 350.125,
+      civRawFields: rawFields,
+    });
+    const list = await req()
+      .get(v1.scooters.ROUTES.list)
+      .query({ search: vehicle.vin })
+      .set("Cookie", cookie)
+      .expect(200);
+    expect(
+      v1.scooters.scooterListSchema.parse(list.body).items[0],
+    ).not.toHaveProperty("civRawFields");
+    const updated = await req()
+      .patch(v1.scooters.ROUTES.update(vehicle.id))
+      .set("Cookie", cookie)
+      .send({ civVersion: "2016", notes: "Changed operational note" })
+      .expect(200);
+    expect(v1.scooters.scooterSchema.parse(updated.body)).toMatchObject({
+      civVersion: "2016",
+      civIssuedAt: "2024-06-10",
+      civRawFields: rawFields,
+      civMentions: "Official CIV mentions",
+      stationaryNoiseDb: 82.125,
+    });
+    await req().get(v1.vehicleCiv.CIV_ROUTES.vocabulary).expect(401);
+    const vocabulary = await req()
+      .get(v1.vehicleCiv.CIV_ROUTES.vocabulary)
+      .set("Cookie", cookie)
+      .expect(200);
+    expect(v1.vehicleCiv.civVocabularySchema.parse(vocabulary.body)).toEqual(
+      expect.arrayContaining([
+        { field: "driveType", value: "4x2" },
+        { field: "vehicleClass", value: "III" },
+      ]),
+    );
+    await req()
+      .patch(v1.scooters.ROUTES.update(vehicle.id))
+      .set("Cookie", cookie)
+      .send({ maxAxle3MassKg: -1 })
+      .expect(400);
+    const cleared = await req()
+      .patch(v1.scooters.ROUTES.update(vehicle.id))
+      .set("Cookie", cookie)
+      .send({ civRawFields: null, maxAxle3MassKg: null, civIssuedAt: null })
+      .expect(200);
+    expect(v1.scooters.scooterSchema.parse(cleared.body)).toMatchObject({
+      civRawFields: null,
+      maxAxle3MassKg: null,
+      civIssuedAt: null,
+      civVersion: "2016",
+    });
+    const trailer = await req()
+      .post(v1.scooters.ROUTES.create)
+      .set("Cookie", cookie)
+      .send({
+        vin: uniqueVin(),
+        brandId: yamahaBrand.id,
+        vehicleCategory: "O2",
+        powertrainType: "unpowered",
+        axlesCount: 2,
+      })
+      .expect(201);
+    expect(v1.scooters.scooterSchema.parse(trailer.body)).toMatchObject({
+      civVersion: "unknown",
+      powerKw: null,
+      engineDisplacementCc: null,
+    });
+  });
+
+  it("authorizes and validates draft upload requests before signing private uploads", async () => {
+    const admin = await freshSession(["ADMIN"]);
+    const input = {
+      type: "civ",
+      contentType: "application/pdf",
+      byteSize: 9,
+      checksumSha256: "a".repeat(64),
+    };
+    const route = v1.scooters.ROUTES.documents.createDraftUpload;
+    await req().post(route).send(input).expect(401);
+    const member = await freshSession(["USER"]);
+    await req()
+      .post(route)
+      .set("Cookie", [`access_token=${member.accessToken}`])
+      .send(input)
+      .expect(403);
+    const cookie = [`access_token=${admin.accessToken}`];
+    const storageKey = `test-scooter-${Date.now()}/draft.pdf`;
+    const sign = jest
+      .spyOn(app.get(ImageStorageService), "createPresignedDocumentUpload")
+      .mockResolvedValue({
+        provider: "s3",
+        bucket: "test-private",
+        storageKey,
+        uploadUrl: "https://storage.example.com/upload",
+        uploadToken: "signed-token",
+        method: "PUT",
+        headers: { "Content-Type": "application/pdf" },
+        expiresAt: new Date(Date.now() + 60_000),
+        uploadTokenExpiresAt: new Date(Date.now() + 86_400_000),
+        maxBytes: 10_485_760,
+      });
+    try {
+      for (const invalid of [
+        { type: "insurance" },
+        { contentType: "image/svg+xml" },
+        { byteSize: 0 },
+        { byteSize: 10_485_761 },
+      ]) {
+        await req()
+          .post(route)
+          .set("Cookie", cookie)
+          .send({ ...input, ...invalid })
+          .expect(400);
+      }
+      expect(sign).not.toHaveBeenCalled();
+      const result = await req()
+        .post(route)
+        .set("Cookie", cookie)
+        .send(input)
+        .expect(201);
+      expect(
+        v1.scooters.scooterDocumentUploadSchema.parse(result.body).uploadToken,
+      ).toBe("signed-token");
+      expect(
+        await prisma.draftUpload.findUnique({ where: { storageKey } }),
+      ).toMatchObject({
+        userId: admin.userId,
+        purpose: "scooter-document:civ",
+        claimedAt: null,
+      });
+    } finally {
+      sign.mockRestore();
+      await prisma.draftUpload.deleteMany({ where: { storageKey } });
+    }
+  });
+
+  it("saves CIV and certificate drafts atomically, streams private content, and rolls back invalid edits", async () => {
+    const admin = await freshSession(["ADMIN"]);
+    const cookie = [`access_token=${admin.accessToken}`];
+    const storage = app.get(ImageStorageService);
+    const keys = [
+      `test-scooter-${Date.now()}/civ.pdf`,
+      `test-scooter-${Date.now()}/front.jpg`,
+    ];
+    const stored = keys.map((storageKey, index) => ({
+      provider: "s3" as const,
+      bucket: "test-private",
+      storageKey,
+      contentType: index
+        ? ("image/jpeg" as const)
+        : ("application/pdf" as const),
+      byteSize: 9,
+      checksumSha256: "a".repeat(64),
+      imageWidth: null,
+      imageHeight: null,
+      pageCount: null,
+    }));
+    for (const [index, asset] of stored.entries()) {
+      await prisma.draftUpload.create({
+        data: {
+          userId: admin.userId,
+          provider: asset.provider,
+          bucket: asset.bucket,
+          storageKey: asset.storageKey,
+          contentType: asset.contentType,
+          byteSize: asset.byteSize,
+          checksumSha256: asset.checksumSha256,
+          purpose: index
+            ? "scooter-document:registration_certificate"
+            : "scooter-document:civ",
+          expiresAt: new Date(Date.now() + 60_000),
+        },
+      });
+    }
+    const complete = jest
+      .spyOn(storage, "completePresignedDocumentUpload")
+      .mockImplementation((token) => Promise.resolve(stored[Number(token)]));
+    const read = jest.spyOn(storage, "readDocument").mockImplementation(() =>
+      Promise.resolve({
+        body: Readable.from(Buffer.from("%PDF-test")),
+        contentType: "application/pdf",
+        contentLength: 9,
+      }),
+    );
+    try {
+      const documentDrafts: v1.scooters.ScooterDocumentDraft[] = [
+        { type: "civ", fileName: "CIV.pdf", uploadToken: "0" },
+        {
+          type: "registration_certificate",
+          fileName: "front.jpg",
+          uploadToken: "1",
+        },
+      ];
+      const otherAdmin = await freshSession(["ADMIN"]);
+      const foreignVin = uniqueVin();
+      await req()
+        .post(v1.scooters.ROUTES.create)
+        .set("Cookie", [`access_token=${otherAdmin.accessToken}`])
+        .send(scooterInput({ vin: foreignVin, documentDrafts }))
+        .expect(400);
+      expect(
+        await prisma.scooter.findUnique({ where: { vin: foreignVin } }),
+      ).toBeNull();
+      const created = await req()
+        .post(v1.scooters.ROUTES.create)
+        .set("Cookie", cookie)
+        .send(scooterInput({ documentDrafts }));
+      expect(created.status).toBe(201);
+      const id = v1.scooters.scooterSchema.parse(created.body).id;
+      const detail = await req()
+        .get(v1.scooters.ROUTES.get(id))
+        .set("Cookie", cookie)
+        .expect(200);
+      const savedDocuments = v1.scooters.scooterSchema.parse(
+        detail.body,
+      ).documents!;
+      expect(savedDocuments).toHaveLength(2);
+      expect(JSON.stringify(detail.body)).not.toContain('"asset"');
+      expect(JSON.stringify(detail.body)).not.toContain('"storageKey"');
+      expect(complete).toHaveBeenCalledWith(
+        "0",
+        `scooter-document:civ:${admin.userId}`,
+      );
+      expect(complete).toHaveBeenCalledWith(
+        "1",
+        `scooter-document:registration_certificate:${admin.userId}`,
+      );
+      const contentUrl = savedDocuments[0].contentUrl;
+      await req().get(contentUrl).expect(401);
+      const member = await freshSession(["USER"]);
+      await req()
+        .get(contentUrl)
+        .set("Cookie", [`access_token=${member.accessToken}`])
+        .expect(403);
+      const content = await req()
+        .get(contentUrl)
+        .set("Cookie", cookie)
+        .expect(200);
+      expect(content.headers["cache-control"]).toBe("private, no-store");
+      expect(content.headers["x-content-type-options"]).toBe("nosniff");
+      const reusedVin = uniqueVin();
+      await req()
+        .post(v1.scooters.ROUTES.create)
+        .set("Cookie", cookie)
+        .send(scooterInput({ vin: reusedVin, documentDrafts }))
+        .expect(400);
+      expect(
+        await prisma.scooter.findUnique({ where: { vin: reusedVin } }),
+      ).toBeNull();
+      const removedDocumentIds = [savedDocuments[0].id];
+      await req()
+        .patch(v1.scooters.ROUTES.update(id))
+        .set("Cookie", cookie)
+        .send({ color: "red", documentDrafts, removedDocumentIds })
+        .expect(400);
+      const unchanged = await req()
+        .get(v1.scooters.ROUTES.get(id))
+        .set("Cookie", cookie)
+        .expect(200);
+      expect(v1.scooters.scooterSchema.parse(unchanged.body).color).toBe(
+        "blue",
+      );
+      expect(
+        v1.scooters.scooterSchema.parse(unchanged.body).documents,
+      ).toHaveLength(2);
+      const other = await req()
+        .post(v1.scooters.ROUTES.create)
+        .set("Cookie", cookie)
+        .send(scooterInput())
+        .expect(201);
+      await req()
+        .patch(
+          v1.scooters.ROUTES.update(
+            v1.scooters.scooterSchema.parse(other.body).id,
+          ),
+        )
+        .set("Cookie", cookie)
+        .send({ removedDocumentIds })
+        .expect(400);
+      await req()
+        .patch(v1.scooters.ROUTES.update(id))
+        .set("Cookie", cookie)
+        .send({ removedDocumentIds })
+        .expect(200);
+      await req().get(contentUrl).set("Cookie", cookie).expect(404);
+      await req()
+        .delete(v1.scooters.ROUTES.delete(id))
+        .set("Cookie", cookie)
+        .expect(204);
+      await req()
+        .get(savedDocuments[1].contentUrl)
+        .set("Cookie", cookie)
+        .expect(404);
+    } finally {
+      complete.mockRestore();
+      read.mockRestore();
+      await prisma.scooterDocument.deleteMany({
+        where: { asset: { storageKey: { in: keys } } },
+      });
+      await prisma.mediaAsset.deleteMany({
+        where: { storageKey: { in: keys } },
+      });
+      await prisma.draftUpload.deleteMany({
+        where: { storageKey: { in: keys } },
+      });
+    }
+  });
+
   it("creates incomplete scooters, fills technical data and clears it without losing unrelated fields", async () => {
     const admin = await freshSession(["ADMIN"]);
     const cookie = [`access_token=${admin.accessToken}`];
@@ -157,17 +508,22 @@ describe("Scooters HTTP surface (e2e)", () => {
       variant: "test-value",
       version: "test-value",
       commercialName: "test-value",
-      vehicleCategory: "test-value",
-      nationalCategory: "test-value",
-      bodyType: "test-value",
+      vehicleCategory: "other",
+      vehicleCategoryOther: "test-value",
+      nationalCategory: "other",
+      nationalCategoryOther: "test-value",
+      bodyType: "other",
+      bodyTypeOther: "test-value",
       typeApprovalNumber: "test-value",
-      nationalRegistryNumber: "test-value",
+      nationalRegistryNumber: "TEST-VALUE",
       seatsCount: 12,
       engineSerialNumber: "test-value",
       ratedEngineRpm: 12,
-      fuelType: "test-value",
+      fuelType: "other",
+      fuelTypeOther: "test-value",
       propulsionSystem: "test-value",
       electricMotorPowerKw: 0.125,
+      powertrainType: "hybrid",
       powerToWeightRatioKwKg: 0.125,
       maxSpeedKmh: 12,
       emissionsStandard: "test-value",
@@ -209,7 +565,9 @@ describe("Scooters HTTP surface (e2e)", () => {
     expect(noted.status).toBe(200);
     expect(noted.body).toMatchObject(details);
     const clearedFields = Object.fromEntries(
-      Object.keys(details).map((key) => [key, null]),
+      Object.keys(details)
+        .filter((key) => key !== "powertrainType")
+        .map((key) => [key, null]),
     );
     const cleared = await req()
       .patch(v1.scooters.ROUTES.update(createdScooter.id))
@@ -238,6 +596,74 @@ describe("Scooters HTTP surface (e2e)", () => {
       model: null,
       manufactureYear: null,
     });
+  });
+
+  it("enforces CIV enums and requires explicit clearing when changing propulsion", async () => {
+    const admin = await freshSession(["ADMIN"]);
+    const cookie = [`access_token=${admin.accessToken}`];
+    const created = await req()
+      .post(v1.scooters.ROUTES.create)
+      .set("Cookie", cookie)
+      .send({
+        vin: uniqueVin(),
+        brandId: yamahaBrand.id,
+        powertrainType: "hybrid",
+        fuelType: "petrol_electric",
+        engineDisplacementCc: 125,
+        fuelTankCapacityLiters: 5.5,
+        electricMotorPowerKw: 3.25,
+        bodyType: "other",
+        bodyTypeOther: "Legacy CIV body",
+        vehicleType: "TYPE-1",
+        civNumber: "CIV-1",
+        nationalEmissionsCode: "E5",
+      });
+    expect(created.status).toBe(201);
+    const path = v1.scooters.ROUTES.update(
+      v1.scooters.scooterSchema.parse(created.body).id,
+    );
+    for (const json of [
+      { bodyType: "invented" },
+      { fuelType: "other" },
+      { powertrainType: "electric" },
+      { bodyType: "two_wheel_moped" },
+    ]) {
+      expect(
+        (await req().patch(path).set("Cookie", cookie).send(json)).status,
+      ).toBe(400);
+    }
+    const unchanged = await req().get(path).set("Cookie", cookie);
+    expect(unchanged.body).toMatchObject({
+      powertrainType: "hybrid",
+      engineDisplacementCc: 125,
+      bodyTypeOther: "Legacy CIV body",
+    });
+    const electric = await req().patch(path).set("Cookie", cookie).send({
+      powertrainType: "electric",
+      engineDisplacementCc: null,
+      fuelTankCapacityLiters: null,
+      nationalEmissionsCode: null,
+      fuelType: "electric",
+      bodyType: "two_wheel_moped",
+      bodyTypeOther: null,
+    });
+    expect(electric.status).toBe(200);
+    expect(electric.body).toMatchObject({
+      powertrainType: "electric",
+      electricMotorPowerKw: 3.25,
+      bodyType: "two_wheel_moped",
+      bodyTypeOther: null,
+      vehicleType: "TYPE-1",
+      civNumber: "CIV-1",
+    });
+    expect(
+      (
+        await req()
+          .patch(path)
+          .set("Cookie", cookie)
+          .send({ fuelType: "petrol" })
+      ).status,
+    ).toBe(400);
   });
 
   it("requires an admin user", async () => {
@@ -338,6 +764,7 @@ describe("Scooters HTTP surface (e2e)", () => {
       .set("Cookie", [`access_token=${admin.accessToken}`])
       .send({
         powertrainType: "electric",
+        engineDisplacementCc: null,
       });
     expect(electricRes.status).toBe(200);
     const electric = v1.scooters.scooterSchema.parse(electricRes.body);

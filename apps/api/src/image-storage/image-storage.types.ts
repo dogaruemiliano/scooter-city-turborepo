@@ -24,6 +24,7 @@ export const DOCUMENT_STORAGE_CATEGORIES = [
   "expense-invoice",
   "finance-document",
   "scooter-sale-document",
+  "scooter-document",
 ] as const;
 
 export type DocumentStorageCategory =
