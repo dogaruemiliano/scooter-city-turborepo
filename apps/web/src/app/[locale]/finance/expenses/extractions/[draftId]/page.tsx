@@ -17,7 +17,7 @@ import { formatMinorAmount } from "@/lib/finance-format";
 import {
   fetchFinance,
   financeCookieHeader,
-  requireFinanceAdmin,
+  requireFinancePermission,
 } from "../../../_lib/finance-server";
 import { FINANCE_PATHS } from "../../../_lib/links";
 
@@ -39,7 +39,7 @@ export default async function ExpenseExtractionPage({
   const { locale: rawLocale, draftId } = await params;
   const locale = resolveRouteLocale(rawLocale);
   const path = FINANCE_PATHS.expenseExtraction(draftId);
-  await requireFinanceAdmin(locale, path);
+  await requireFinancePermission(locale, path, "finance.expenses.create");
   const draft = await fetchFinance(
     locale,
     path,

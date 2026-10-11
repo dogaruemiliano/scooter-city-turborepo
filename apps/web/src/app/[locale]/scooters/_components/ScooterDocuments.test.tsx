@@ -117,6 +117,7 @@ function pdf(name = "CIV.pdf") {
   return file;
 }
 beforeEach(() => {
+  access.user = { isSuperAdmin: true, effectiveScopes: {} };
   vi.clearAllMocks();
   vi.stubGlobal("fetch", mocks.put);
   let nextId = 0;
@@ -991,3 +992,44 @@ async function browserConfirmVin(user: ReturnType<typeof userEvent.setup>) {
   const label = await screen.findByText("I checked CIV.pdf");
   await user.click(label);
 }
+
+const access = vi.hoisted(() => ({
+  user: { isSuperAdmin: true, effectiveScopes: {} as Record<string, string[]> },
+}));
+vi.mock("@/components/auth/SessionProvider", () => ({
+  useOptionalSession: () => access,
+}));
+
+describe("document capabilities", () => {
+  it("keeps previews available to readers while hiding upload, replacement, and removal", async () => {
+    access.user = {
+      isSuperAdmin: false,
+      effectiveScopes: { "scooter_documents.read": ["ALL"] },
+    };
+    const browser = userEvent.setup();
+    const view = renderWithMessages(<Harness />);
+    expect(view.container.querySelector('input[type="file"]')).toBeNull();
+    await browser.click(
+      screen.getByRole("button", { name: "Preview old.pdf" }),
+    );
+    expect(
+      screen.queryByRole("button", {
+        name: messages.en.scooters.documents.remove,
+      }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", {
+        name: messages.en.scooters.documents.change,
+      }),
+    ).not.toBeInTheDocument();
+    expect(mocks.api).not.toHaveBeenCalled();
+  });
+  it("hides document controls and previews without document-read permission", () => {
+    access.user = { isSuperAdmin: false, effectiveScopes: {} };
+    const view = renderWithMessages(<Harness />);
+    expect(
+      screen.queryByRole("button", { name: "Preview old.pdf" }),
+    ).not.toBeInTheDocument();
+    expect(view.container.querySelector('input[type="file"]')).toBeNull();
+  });
+});

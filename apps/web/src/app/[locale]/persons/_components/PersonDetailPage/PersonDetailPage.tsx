@@ -1,5 +1,8 @@
 "use client";
 
+import { useOptionalSession } from "@/components/auth/SessionProvider";
+import { canAccess } from "@/lib/access";
+
 import { v1 } from "@repo/api-shared";
 import { useRouter } from "next/navigation";
 import { useLocale } from "next-intl";
@@ -8,6 +11,7 @@ import { useState } from "react";
 import { PageTitleOverride } from "@/components/PageTitleOverride";
 import { webApi } from "@/lib/api";
 
+import { PersonAppAccess } from "./PersonAppAccess";
 import { ActivitySection } from "./ActivitySection";
 import {
   getRentalReadiness,
@@ -32,6 +36,7 @@ export function PersonDetailPage({
   documentPhotos,
   personsHref,
 }: PersonDetailPageProps) {
+  const session = useOptionalSession();
   const locale = useLocale();
   const router = useRouter();
   const readiness = getRentalReadiness(person);
@@ -176,6 +181,9 @@ export function PersonDetailPage({
         onDeletePerson={deletePerson}
       />
 
+      {session?.user?.isSuperAdmin ? (
+        <PersonAppAccess personId={person.id} />
+      ) : null}
       <ReadinessSection issues={readiness.issues} />
       <div className="grid min-w-0 gap-6 lg:grid-cols-3">
         <div className="min-w-0 lg:col-span-2">
@@ -187,18 +195,22 @@ export function PersonDetailPage({
         </div>
         <PersonNotesSection notes={person.notes} />
       </div>
-      <PersonDocumentsSection
-        documents={person.documents}
-        photosByDocumentId={{ ...documentPhotos, ...photosByDocumentId }}
-        locale={locale}
-        busyAction={busyAction}
-        onCreateDocument={createDocument}
-        onUpdateDocument={updateDocument}
-        onDeleteDocument={deleteDocument}
-        onUploadDocumentPhoto={uploadDocumentPhoto}
-        onDeleteDocumentPhoto={deleteDocumentPhoto}
-      />
-      <ActivitySection events={auditEvents} locale={locale} />
+      {canAccess(session?.user, "person_documents.read") ? (
+        <PersonDocumentsSection
+          documents={person.documents}
+          photosByDocumentId={{ ...documentPhotos, ...photosByDocumentId }}
+          locale={locale}
+          busyAction={busyAction}
+          onCreateDocument={createDocument}
+          onUpdateDocument={updateDocument}
+          onDeleteDocument={deleteDocument}
+          onUploadDocumentPhoto={uploadDocumentPhoto}
+          onDeleteDocumentPhoto={deleteDocumentPhoto}
+        />
+      ) : null}
+      {canAccess(session?.user, "persons.audit.read") ? (
+        <ActivitySection events={auditEvents} locale={locale} />
+      ) : null}
     </div>
   );
 }

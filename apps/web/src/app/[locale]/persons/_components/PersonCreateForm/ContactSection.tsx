@@ -2,6 +2,9 @@
 
 import {
   Input,
+  Checkbox,
+  Field,
+  FieldLabel,
   PhoneNumberInput,
   type PhoneNumberInputChangeDetails,
   FormSection,
@@ -38,6 +41,7 @@ export function ContactSection({
   ) => void;
 }) {
   const t = useTranslations("persons");
+  const tAccess = useTranslations("workspace.access");
   const emailInputRef = useRef<HTMLInputElement>(null);
   const emailError = fieldErrors.email;
 
@@ -67,6 +71,18 @@ export function ContactSection({
           inputRef={emailInputRef}
         />
       </FormField>
+      <Field orientation="horizontal">
+        <Checkbox
+          id={`${formId}-link-account`}
+          checked={form.linkExistingAccount ?? false}
+          onCheckedChange={(checked) =>
+            onSetFormValue("linkExistingAccount", !!checked)
+          }
+        />
+        <FieldLabel htmlFor={`${formId}-link-account`}>
+          {tAccess("linkExisting")}
+        </FieldLabel>
+      </Field>
       <FormField id={`${formId}-phone`} label={t("fields.phone")} required>
         <PhoneNumberInput
           id={`${formId}-phone`}

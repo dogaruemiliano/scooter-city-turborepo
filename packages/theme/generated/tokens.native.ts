@@ -181,6 +181,7 @@ export const tokens = {
   typography: {
     fontFamily: {
       sans: "Montserrat_400Regular",
+      body: "Montserrat_400Regular",
       mono: "Menlo",
     },
     fontFamilyByWeight: {

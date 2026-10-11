@@ -7,6 +7,7 @@ import { aspectRatio } from "../src/tokens/aspect-ratio.js";
 import { radius } from "../src/tokens/radius.js";
 import { motion } from "../src/tokens/motion.js";
 import { semanticColors } from "../src/tokens/semantic.js";
+import { typography } from "../src/tokens/typography.js";
 import { zIndex } from "../src/tokens/z-index.js";
 import { buildCss, buildNative } from "./build-tokens.js";
 
@@ -127,6 +128,54 @@ test("popover and bottom-sheet surfaces are distinct from the page in every them
 
   assert.notEqual(semanticColors.light.card, semanticColors.light.background);
   assert.notEqual(semanticColors.dark.card, semanticColors.dark.background);
+});
+
+test("access workspace inherits every active theme color and exposes the requested type pairing", () => {
+  const css = buildCss();
+  const workspace = css.match(/\.access-workspace \{([^}]+)\}/)?.[1];
+  assert.ok(workspace);
+  assert.ok(
+    workspace.includes(`font-family: ${typography.fontFamily.body.web};`),
+  );
+  // Any workspace-local semantic variable would mask a root theme change.
+  assert.doesNotMatch(workspace, /--[\w-]+\s*:/);
+  assert.doesNotMatch(workspace, /(?:background|color(?:-scheme)?)\s*:/);
+  assert.ok(css.includes(`--font-body: ${typography.fontFamily.body.web};`));
+  assert.ok(css.includes(`--font-sans: ${typography.fontFamily.sans.web};`));
+  assert.doesNotMatch(css, /:root\[data-theme=['"]access/);
+  assert.doesNotMatch(css, /--color-access-slate-/);
+});
+
+test("native controls follow the selected or system theme", () => {
+  const css = buildCss();
+  assert.match(css, /:root \{\n {2}color-scheme: light;/);
+  assert.match(
+    css,
+    /@media \(prefers-color-scheme: dark\) \{\n {2}:root:not\(\[data-theme='light'\]\) \{\n {4}color-scheme: dark;/,
+  );
+  assert.match(
+    css,
+    /:root\[data-theme='dark'\], \.dark \{\n {2}color-scheme: dark;/,
+  );
+  assert.match(
+    css,
+    /:root\[data-theme='minimal'\], \.minimal \{\n {2}color-scheme: dark;/,
+  );
+});
+
+test("Default and Deny selections remain readable in every theme", () => {
+  for (const [scheme, colors] of Object.entries(semanticColors)) {
+    for (const [foreground, background] of [
+      ["secondaryForeground", "secondary"],
+      ["destructiveForeground", "destructive"],
+    ] as const) {
+      const contrast = wcagContrast(colors[foreground], colors[background]);
+      assert.ok(
+        contrast >= 4.5,
+        `${scheme}: ${foreground} on ${background} is ${contrast.toFixed(2)}:1`,
+      );
+    }
+  }
 });
 
 test("photo-overlay captions remain readable over the brightest image", () => {

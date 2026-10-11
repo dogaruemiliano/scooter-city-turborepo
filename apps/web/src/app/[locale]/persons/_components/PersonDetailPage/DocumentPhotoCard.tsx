@@ -1,5 +1,8 @@
 "use client";
 
+import { useOptionalSession } from "@/components/auth/SessionProvider";
+import { canAccess } from "@/lib/access";
+
 import { v1 } from "@repo/api-shared";
 import { Button } from "@repo/ui/components";
 import { FileTextIcon, Trash2Icon } from "lucide-react";
@@ -35,6 +38,7 @@ export function DocumentPhotoCard({
   ) => Promise<boolean>;
   onDeletePhoto: (slot: v1.persons.PersonDocumentPhotoSlot) => Promise<boolean>;
 }) {
+  const session = useOptionalSession();
   const t = useTranslations("persons");
   const [failedUpload, setFailedUpload] = useState<File | null>(null);
   const [deleteConfirmationOpen, setDeleteConfirmationOpen] = useState(false);
@@ -79,7 +83,11 @@ export function DocumentPhotoCard({
           ) : undefined
         }
         alt={photoAlt}
-        disabled={disabled || deleteConfirmationOpen}
+        disabled={
+          disabled ||
+          deleteConfirmationOpen ||
+          !canAccess(session?.user, "person_documents.write")
+        }
         missingLabel={t("detail.documents.missingPhoto")}
         addLabel={t("detail.documents.addPhoto")}
         formatsLabel={t("detail.documents.photoFileTypesShort")}
@@ -99,7 +107,9 @@ export function DocumentPhotoCard({
           }
         }}
         action={
-          photo && !deleteConfirmationOpen ? (
+          photo &&
+          !deleteConfirmationOpen &&
+          canAccess(session?.user, "person_documents.delete") ? (
             <Button
               type="button"
               variant="outline"

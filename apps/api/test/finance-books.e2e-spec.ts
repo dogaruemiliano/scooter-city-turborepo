@@ -44,10 +44,21 @@ describeIsolated("Finance book management (isolated PostgreSQL)", () => {
       data: {
         email: "finance-owner@example.test",
         roles: ["ADMIN", "SUPER_ADMIN"],
+        loginStatus: "ACTIVE",
+        isSuperAdmin: true,
       },
     });
     const admin = await prisma.user.create({
-      data: { email: "finance-admin@example.test", roles: ["ADMIN"] },
+      data: {
+        email: "finance-admin@example.test",
+        roles: ["ADMIN"],
+        loginStatus: "ACTIVE",
+        permissionOverrides: {
+          create: v1.access.permissionCatalog
+            .filter((p) => p.key.startsWith("finance."))
+            .map((p) => ({ permissionKey: p.key, scopes: ["ALL"] })),
+        },
+      },
     });
     ownerId = owner.id;
     superToken = (await auth.issueSession({ user: owner })).accessToken;
@@ -172,7 +183,16 @@ describeIsolated("Finance book management (isolated PostgreSQL)", () => {
 
   it("initializes pool memberships from the company's current shares", async () => {
     const partner = await prisma.user.create({
-      data: { email: "finance-partner@example.test", roles: ["ADMIN"] },
+      data: {
+        email: "finance-partner@example.test",
+        roles: ["ADMIN"],
+        loginStatus: "ACTIVE",
+        permissionOverrides: {
+          create: v1.access.permissionCatalog
+            .filter((p) => p.key.startsWith("finance."))
+            .map((p) => ({ permissionKey: p.key, scopes: ["ALL"] })),
+        },
+      },
     });
     await prisma.financeBookMember.updateMany({
       where: { bookId: companyId },

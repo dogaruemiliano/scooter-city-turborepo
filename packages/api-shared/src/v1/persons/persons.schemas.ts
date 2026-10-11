@@ -376,6 +376,7 @@ export type UpdatePersonDocumentInput = z.infer<
 
 export const createPersonInputSchema = z
   .object({
+    linkExistingAccount: z.boolean().optional(),
     documentWorkflow: personDocumentWorkflowSchema.optional(),
     email: normalizedEmailSchema,
     phone: normalizedPhoneSchema,

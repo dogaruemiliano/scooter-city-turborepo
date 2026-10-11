@@ -18,11 +18,14 @@
  * auth controllers that use this service. The template defers any
  * role/permission layer to a future session.
  */
-import { Injectable } from "@nestjs/common";
+import { ConflictException, Injectable } from "@nestjs/common";
 
 // `Prisma` namespace lives in `client` (the runtime file). The pure-type
 // barrel at `models` doesn't re-export the namespace.
 import type { Prisma, User } from "../generated/prisma/client";
+import { AuditEventType } from "../audit/audit.types";
+import { lockAccessLifecycle } from "../auth/utils/admission";
+import type { RequestMetadata } from "../common/http/request-metadata";
 import { PrismaService } from "../prisma/prisma.service";
 
 @Injectable()
@@ -77,12 +80,35 @@ export class UsersService {
    * linked to the preserved `User` row. Personal-data anonymization is a
    * separate retention workflow and is intentionally not performed here.
    */
-  deactivateAccount(id: string): Promise<User> {
+  deactivateAccount(id: string, metadata?: RequestMetadata): Promise<User> {
     return this.prisma.$transaction(async (tx) => {
+      await lockAccessLifecycle(tx);
       const user = await tx.user.findUniqueOrThrow({ where: { id } });
+      if (
+        user.isSuperAdmin &&
+        user.deletedAt === null &&
+        user.loginStatus === "ACTIVE"
+      ) {
+        const remaining = await tx.user.count({
+          where: {
+            id: { not: id },
+            isSuperAdmin: true,
+            loginStatus: "ACTIVE",
+            deletedAt: null,
+          },
+        });
+        if (remaining === 0)
+          throw new ConflictException(
+            "The last active super admin cannot be deactivated",
+          );
+      }
       const deactivated = await tx.user.update({
         where: { id },
-        data: { deletedAt: user.deletedAt ?? new Date() },
+        data: {
+          deletedAt: user.deletedAt ?? new Date(),
+          loginStatus: "DISABLED",
+          accessRevision: { increment: 1 },
+        },
       });
 
       // RefreshToken also cascades from Session, but deleting it explicitly
@@ -95,6 +121,20 @@ export class UsersService {
         },
       });
       await tx.authAccount.deleteMany({ where: { userId: id } });
+      await tx.userInvitation.updateMany({
+        where: { userId: id, activatedAt: null, cancelledAt: null },
+        data: { cancelledAt: new Date() },
+      });
+      await tx.auditEvent.create({
+        data: {
+          type: AuditEventType.ACCOUNT_DELETED,
+          userId: id,
+          targetType: "User",
+          targetId: id,
+          ...metadata,
+          meta: { before: user.loginStatus, after: "DISABLED" },
+        },
+      });
 
       return deactivated;
     });

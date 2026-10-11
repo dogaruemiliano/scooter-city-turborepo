@@ -26,6 +26,7 @@
  */
 import { z } from "zod";
 
+import { effectiveScopesSchema, roleVersionSchema } from "../access";
 import { userSchema } from "../users/users.schemas";
 import { AUTH_METHOD_IDS, OAUTH_PROVIDERS } from "./auth.constants";
 
@@ -92,6 +93,11 @@ export const sessionUserSchema = userSchema
   })
   .extend({
     linkedProviders: z.array(z.enum(OAUTH_PROVIDERS)),
+    isSuperAdmin: z.boolean().default(false),
+    effectiveScopes: effectiveScopesSchema.default({}),
+    accessRevision: z.number().int().default(1),
+    portalEligible: z.boolean().default(false),
+    roleVersions: z.array(roleVersionSchema).default([]),
   })
   .meta({ id: "SessionUser" });
 

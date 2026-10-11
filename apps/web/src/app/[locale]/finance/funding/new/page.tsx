@@ -6,7 +6,7 @@ import { resolveRouteLocale } from "@/i18n/paths";
 import {
   fetchFinance,
   financeCookieHeader,
-  requireFinanceAdmin,
+  requireFinancePermission,
 } from "../../_lib/finance-server";
 import { FINANCE_PATHS } from "../../_lib/links";
 import { FundingForm } from "../_components/FundingForm";
@@ -27,7 +27,11 @@ export default async function NewFundingPage({ params }: NewFundingPageProps) {
   const { locale: rawLocale } = await params;
   const locale = resolveRouteLocale(rawLocale);
   const path = FINANCE_PATHS.newFunding;
-  const user = await requireFinanceAdmin(locale, path);
+  const user = await requireFinancePermission(
+    locale,
+    path,
+    "finance.funding.create",
+  );
   const cookieHeader = await financeCookieHeader();
   const [books, accounts] = await Promise.all([
     fetchFinance(

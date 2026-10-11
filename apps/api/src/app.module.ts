@@ -10,6 +10,10 @@ import { ZodSerializerInterceptor, ZodValidationPipe } from "nestjs-zod";
 import { MiddlewareConsumer, Module, NestModule } from "@nestjs/common";
 import { LoggerModule } from "nestjs-pino";
 
+import { AccessModule } from "./access/access.module";
+import { ProblemsModule } from "./problems/problems.module";
+import { RentalsModule } from "./rentals/rentals.module";
+import { PortalModule } from "./portal/portal.module";
 import { AuditModule } from "./audit/audit.module";
 import { buildAuthConfig } from "./auth/auth.config";
 import { AuthModule } from "./auth/auth.module";
@@ -44,6 +48,10 @@ const env = loadEnv();
     MailerModule,
     SmsModule.forRoot(env),
     AuditModule,
+    AccessModule,
+    ProblemsModule,
+    RentalsModule,
+    PortalModule,
 
     // Internal (non-global) feature modules.
     UsersModule,

@@ -3,6 +3,13 @@ import type { v1 } from "@repo/api-shared";
 
 import { Prisma, type User } from "../../../generated/prisma/client";
 import { PrismaService } from "../../../prisma/prisma.service";
+import {
+  isSerializationConflict,
+  lockAccessLifecycle,
+  requireLoginEligible,
+} from "../../utils/admission";
+import { CoreAuthService } from "./core-auth.service";
+import type { IssueSessionInput, IssueSessionResult } from "./core-auth.types";
 
 const MAX_TRANSACTION_ATTEMPTS = 3;
 
@@ -27,29 +34,30 @@ export interface ResolveVerifiedOAuthAccountInput {
 
 export type ResolvedOAuthAccount =
   | { kind: "existing-link"; user: User }
-  | { kind: "linked-to-existing"; user: User }
-  | { kind: "new-user"; user: User };
+  | { kind: "linked-to-existing"; user: User };
 
 export type OAuthAccountResolution =
-  | ResolvedOAuthAccount
+  | (ResolvedOAuthAccount & { issued: IssueSessionResult })
   | { kind: "unverified-email" }
   | { kind: "missing-email" };
 
 @Injectable()
 export class OAuthAccountResolver {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly coreAuth: CoreAuthService,
+  ) {}
 
   async resolve(
     input: ResolveOAuthAccountInput,
+    context: Omit<IssueSessionInput, "user"> = {},
   ): Promise<OAuthAccountResolution> {
     for (let attempt = 1; attempt <= MAX_TRANSACTION_ATTEMPTS; attempt += 1) {
       try {
-        return await this.resolveInTransaction(input);
+        return await this.resolveInTransaction(input, context);
       } catch (error) {
         const shouldRetry =
-          error instanceof Prisma.PrismaClientKnownRequestError &&
-          error.code === "P2034" &&
-          attempt < MAX_TRANSACTION_ATTEMPTS;
+          isSerializationConflict(error) && attempt < MAX_TRANSACTION_ATTEMPTS;
 
         if (!shouldRetry) {
           throw error;
@@ -69,6 +77,7 @@ export class OAuthAccountResolver {
     tx: Prisma.TransactionClient,
     input: ResolveVerifiedOAuthAccountInput,
   ): Promise<ResolvedOAuthAccount> {
+    await lockAccessLifecycle(tx);
     const existingLink = await this.findExistingLink(tx, input);
     if (existingLink) return existingLink;
 
@@ -77,27 +86,27 @@ export class OAuthAccountResolver {
 
   private resolveInTransaction(
     input: ResolveOAuthAccountInput,
+    context: Omit<IssueSessionInput, "user"> = {},
   ): Promise<OAuthAccountResolution> {
     return this.prisma.$transaction(
       async (tx) => {
-        const existingLink = await this.findExistingLink(tx, input);
-        if (existingLink) return existingLink;
-
-        if (input.email === null) {
-          return { kind: "missing-email" };
+        await lockAccessLifecycle(tx);
+        let resolution: ResolvedOAuthAccount | null =
+          await this.findExistingLink(tx, input);
+        if (!resolution) {
+          if (input.email === null) return { kind: "missing-email" };
+          // The independent OTP path remains indistinguishable for unknown emails.
+          if (!input.emailVerified) return { kind: "unverified-email" };
+          resolution = await this.resolveVerifiedEmailWithoutExistingLink(tx, {
+            ...input,
+            email: input.email,
+          });
         }
-
-        // Do not query User by an unverified provider email. Returning
-        // before that lookup makes existing and non-existing local
-        // addresses follow the same response path.
-        if (!input.emailVerified) {
-          return { kind: "unverified-email" };
-        }
-
-        return this.resolveVerifiedEmailWithoutExistingLink(tx, {
-          ...input,
-          email: input.email,
+        const issued = await this.coreAuth.issueSessionInTransaction(tx, {
+          ...context,
+          user: resolution.user,
         });
+        return { ...resolution, issued };
       },
       {
         isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
@@ -123,9 +132,7 @@ export class OAuthAccountResolver {
     });
 
     if (!existingAccount) return null;
-    if (existingAccount.user.deletedAt !== null) {
-      throw new UnauthorizedException("Account is unavailable");
-    }
+    await requireLoginEligible(tx, existingAccount.user);
 
     if (
       input.existingEmailPolicy === "sync" &&
@@ -154,9 +161,7 @@ export class OAuthAccountResolver {
     });
 
     if (existingUser) {
-      if (existingUser.deletedAt !== null) {
-        throw new UnauthorizedException("Account is unavailable");
-      }
+      await requireLoginEligible(tx, existingUser);
 
       await tx.authAccount.create({
         data: {
@@ -173,22 +178,6 @@ export class OAuthAccountResolver {
       };
     }
 
-    const user = await tx.user.create({
-      data: {
-        email: normalizedEmail,
-        emailVerified: new Date(),
-        firstName: input.firstName,
-        lastName: input.lastName,
-        authAccounts: {
-          create: {
-            provider: input.provider,
-            providerId: input.providerId,
-            email: input.email,
-          },
-        },
-      },
-    });
-
-    return { kind: "new-user", user };
+    throw new UnauthorizedException("Account is unavailable");
   }
 }

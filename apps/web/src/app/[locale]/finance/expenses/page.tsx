@@ -4,12 +4,13 @@ import { buttonVariants } from "@repo/ui/components";
 import type { Metadata } from "next";
 
 import { Link } from "@/i18n/navigation";
+import { canAccess } from "@/lib/access";
 import { resolveRouteLocale } from "@/i18n/paths";
 import { OperationList } from "../_components/OperationList";
 import {
   fetchFinance,
   financeCookieHeader,
-  requireFinanceAdmin,
+  requireFinancePermission,
 } from "../_lib/finance-server";
 import { FINANCE_PATHS } from "../_lib/links";
 
@@ -35,7 +36,11 @@ export default async function ExpensesRoutePage({
   const locale = resolveRouteLocale(rawLocale);
   const path = FINANCE_PATHS.expenses;
 
-  await requireFinanceAdmin(locale, path);
+  const user = await requireFinancePermission(
+    locale,
+    path,
+    "finance.operations.read",
+  );
   const cookieHeader = await financeCookieHeader();
 
   const [books, operations] = await Promise.all([
@@ -73,9 +78,11 @@ export default async function ExpensesRoutePage({
           </p>
         </div>
 
-        <Link href={FINANCE_PATHS.newExpense} className={buttonVariants()}>
-          {t.overview.newExpense}
-        </Link>
+        {canAccess(user, "finance.expenses.create") ? (
+          <Link href={FINANCE_PATHS.newExpense} className={buttonVariants()}>
+            {t.overview.newExpense}
+          </Link>
+        ) : null}
       </header>
 
       <OperationList

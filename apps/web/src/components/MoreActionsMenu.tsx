@@ -13,6 +13,8 @@ import { EllipsisVerticalIcon } from "lucide-react";
 import { Fragment, type ReactNode } from "react";
 
 import { PageHeaderActions } from "@/components/PageHeaderActions";
+import { useOptionalSession } from "@/components/auth/SessionProvider";
+import { canAccess } from "@/lib/access";
 
 export type MoreActionsItem = {
   key: string;
@@ -21,6 +23,7 @@ export type MoreActionsItem = {
   onClick: () => void;
   disabled?: boolean;
   variant?: "default" | "destructive";
+  permission?: string;
 };
 
 export function MoreActionsMenu({
@@ -30,6 +33,15 @@ export function MoreActionsMenu({
   ariaLabel: string;
   groups: MoreActionsItem[][];
 }) {
+  const session = useOptionalSession();
+  const visibleGroups = groups
+    .map((group) =>
+      group.filter(
+        (item) => !item.permission || canAccess(session?.user, item.permission),
+      ),
+    )
+    .filter((group) => group.length > 0);
+  if (visibleGroups.length === 0) return null;
   return (
     <PageHeaderActions>
       <DropdownMenu>
@@ -39,7 +51,7 @@ export function MoreActionsMenu({
           <EllipsisVerticalIcon aria-hidden="true" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-auto min-w-48">
-          {groups.map((group, index) => (
+          {visibleGroups.map((group, index) => (
             <Fragment key={group.map((item) => item.key).join("-")}>
               {index > 0 ? <DropdownMenuSeparator /> : null}
               <DropdownMenuGroup>

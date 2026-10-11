@@ -1,3 +1,4 @@
+import { RequireAllScope } from "../access/access.decorators";
 import {
   Body,
   Controller,
@@ -22,7 +23,6 @@ import type { Request, Response } from "express";
 import { pipeline } from "node:stream/promises";
 import type { AuthPrincipal } from "../auth/auth.types";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
-import { RequireRoles } from "../common/decorators/roles.decorator";
 import { ScooterDocumentsService } from "./scooter-documents.service";
 import { ScooterDocumentAnalysisService } from "./scooter-document-analysis.service";
 
@@ -46,7 +46,6 @@ class ScooterDocumentList extends createZodDto(
 @ApiTags("scooters")
 @ApiCookieAuth(v1.auth.ACCESS_TOKEN_COOKIE)
 @ApiBearerAuth("bearer")
-@RequireRoles("ADMIN")
 @Controller({ path: "scooters", version: "1" })
 export class ScooterDocumentsController {
   constructor(
@@ -54,6 +53,7 @@ export class ScooterDocumentsController {
     private readonly analysis: ScooterDocumentAnalysisService,
   ) {}
 
+  @RequireAllScope("scooter_documents.extract")
   @Post("document-extraction")
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
@@ -85,6 +85,7 @@ export class ScooterDocumentsController {
     }
   }
 
+  @RequireAllScope("scooter_documents.write")
   @Post("document-draft-upload-url")
   @ZodResponse({ status: 201, type: ScooterDocumentUpload })
   createUpload(
@@ -94,12 +95,14 @@ export class ScooterDocumentsController {
     return this.documents.createUpload(input, user.id);
   }
 
+  @RequireAllScope("scooter_documents.read")
   @Get(":id/documents")
   @ZodResponse({ type: ScooterDocumentList })
   list(@Param("id") id: string) {
     return this.documents.list(id);
   }
 
+  @RequireAllScope("scooter_documents.read")
   @Get(":id/documents/:documentId/content")
   async content(
     @Param("id") id: string,

@@ -6,7 +6,7 @@ import { resolveRouteLocale } from "@/i18n/paths";
 import {
   fetchFinance,
   financeCookieHeader,
-  requireFinanceAdmin,
+  requireFinancePermission,
 } from "../_lib/finance-server";
 import { FINANCE_PATHS } from "../_lib/links";
 import { SettlementPanel } from "./_components/SettlementPanel";
@@ -31,7 +31,7 @@ export default async function SettlementRoutePage({
   const locale = resolveRouteLocale(rawLocale);
   const path = FINANCE_PATHS.settlement;
 
-  await requireFinanceAdmin(locale, path);
+  await requireFinancePermission(locale, path, "finance.settlements.preview");
   const cookieHeader = await financeCookieHeader();
 
   const books = await fetchFinance(

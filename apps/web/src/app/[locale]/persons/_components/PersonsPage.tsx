@@ -1,5 +1,8 @@
 "use client";
 
+import { useOptionalSession } from "@/components/auth/SessionProvider";
+import { canAccess } from "@/lib/access";
+
 import { ApiError, v1 } from "@repo/api-shared";
 import {
   Alert,
@@ -69,6 +72,7 @@ function PersonsPageContent({
   initialList,
   initialQuery,
 }: PersonsPageProps) {
+  const session = useOptionalSession();
   const t = useTranslations("persons");
   const locale = useLocale();
   const [list, setList] = useState(initialList);
@@ -322,10 +326,12 @@ function PersonsPageContent({
   return (
     <div className="mx-auto flex w-full max-w-screen-xl flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
       <div className="flex justify-end">
-        <Link href={createHref} className={buttonVariants()}>
-          <UserPlusIcon data-icon="inline-start" />
-          {t("actions.add")}
-        </Link>
+        {canAccess(session?.user, "persons.create") ? (
+          <Link href={createHref} className={buttonVariants()}>
+            <UserPlusIcon data-icon="inline-start" />
+            {t("actions.add")}
+          </Link>
+        ) : null}
       </div>
 
       {feedback ? (

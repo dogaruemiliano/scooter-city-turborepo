@@ -122,7 +122,12 @@ beforeEach(() => {
   mocks.meFromApi.mockResolvedValue({
     id: "user-1",
     email: "admin@example.com",
-    roles: ["ADMIN"],
+    roles: [],
+    effectiveScopes: {
+      "persons.read": ["ALL"],
+      "persons.audit.read": ["ALL"],
+      "person_documents.read": ["ALL"],
+    },
   });
   mocks.notFound.mockImplementation(() => {
     throw new Error("NEXT_NOT_FOUND");
@@ -257,3 +262,24 @@ function renderRoute() {
     params: Promise.resolve({ locale: "en", id: "person-1" }),
   });
 }
+
+vi.mock("@/components/auth/SessionProvider", () => ({
+  useOptionalSession: () => ({
+    user: {
+      effectiveScopes: {
+        "persons.read": ["ALL"],
+        "persons.create": ["ALL"],
+        "persons.update": ["ALL"],
+        "persons.archive": ["ALL"],
+        "persons.audit.read": ["ALL"],
+        "person_documents.read": ["ALL"],
+        "person_documents.write": ["ALL"],
+        "person_documents.delete": ["ALL"],
+        "scooters.read": ["ALL"],
+        "scooters.create": ["ALL"],
+        "scooters.update": ["ALL"],
+        "scooters.archive": ["ALL"],
+      },
+    },
+  }),
+}));

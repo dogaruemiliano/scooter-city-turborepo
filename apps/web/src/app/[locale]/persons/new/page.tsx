@@ -1,3 +1,4 @@
+import { canAccess } from "@/lib/access";
 import { messages } from "@repo/i18n";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
@@ -12,7 +13,6 @@ import { PersonCreateForm } from "../_components/PersonCreateForm";
 
 const PERSONS_PATH = "/persons";
 const PERSONS_NEW_PATH = "/persons/new";
-const ADMIN_ROLE = "ADMIN";
 
 interface NewPersonRoutePageProps {
   params: Promise<{ locale: string }>;
@@ -42,7 +42,7 @@ export default async function NewPersonRoutePage({
     );
   }
 
-  if (!user.roles.includes(ADMIN_ROLE)) {
+  if (!canAccess(user, "persons.create")) {
     notFound();
   }
 

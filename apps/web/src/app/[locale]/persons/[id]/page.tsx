@@ -1,3 +1,4 @@
+import { canAccess } from "@/lib/access";
 import { ApiError, v1 } from "@repo/api-shared";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
@@ -14,7 +15,6 @@ import { meFromApi } from "@/lib/auth-server";
 import { PersonDetailPage } from "../_components/PersonDetailPage";
 
 const PERSONS_PATH = "/persons";
-const ADMIN_ROLE = "ADMIN";
 
 interface PersonRoutePageProps {
   params: Promise<{ locale: string; id: string }>;
@@ -46,21 +46,20 @@ export default async function PersonRoutePage({
     redirect(getLocalizedSignInPath(locale, detailPath));
   }
 
-  if (!user.roles.includes(ADMIN_ROLE)) {
+  if (!canAccess(user, "persons.read")) {
     notFound();
   }
 
   const cookieHeader = (await cookies()).toString();
   const [person, auditEvents] = await Promise.all([
     personFromApi(locale, id, detailPath, cookieHeader),
-    auditEventsFromApi(locale, id, detailPath, cookieHeader),
+    canAccess(user, "persons.audit.read")
+      ? auditEventsFromApi(locale, id, detailPath, cookieHeader)
+      : Promise.resolve([]),
   ]);
-  const documentPhotos = await documentPhotosFromApi(
-    locale,
-    person,
-    detailPath,
-    cookieHeader,
-  );
+  const documentPhotos = canAccess(user, "person_documents.read")
+    ? await documentPhotosFromApi(locale, person, detailPath, cookieHeader)
+    : {};
 
   return (
     <PersonDetailPage

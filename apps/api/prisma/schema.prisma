@@ -36,25 +36,27 @@ datasource db {
 /// backed by exactly one User. Person creation must create both records in one
 /// database transaction.
 model Person {
-  id           String           @id @default(cuid())
-  userId       String           @unique
-  user         User             @relation(fields: [userId], references: [id], onDelete: Restrict)
-  email        String           @unique
-  phone        String           @unique
-  firstName    String
-  lastName     String
-  cnp          String?          @unique
-  dateOfBirth  DateTime?        @db.Date
-  addressLine1 String?
-  addressLine2 String?
-  city         String?
-  region       String?
-  countryCode  String?
-  notes        String?
-  createdAt    DateTime         @default(now())
-  updatedAt    DateTime         @updatedAt
-  deletedAt    DateTime?
-  documents    PersonDocument[]
+  id                    String           @id @default(cuid())
+  userId                String           @unique
+  user                  User             @relation(fields: [userId], references: [id], onDelete: Restrict)
+  email                 String           @unique
+  phone                 String           @unique
+  firstName             String
+  lastName              String
+  cnp                   String?          @unique
+  dateOfBirth           DateTime?        @db.Date
+  addressLine1          String?
+  addressLine2          String?
+  city                  String?
+  region                String?
+  countryCode           String?
+  notes                 String?
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+  deletedAt             DateTime?
+  documents             PersonDocument[]
+  customerAccessEnabled Boolean          @default(false)
+  rentals               Rental[]
 
   @@index([deletedAt])
   @@index([lastName, firstName])
@@ -103,22 +105,31 @@ model PersonDocument {
 /// If a future variant needs password login, add `passwordHash` back via
 /// migration; nothing else has to move.
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  emailVerified DateTime?
-  phone         String?   @unique
-  phoneVerified DateTime?
-  firstName     String?
-  lastName      String?
-  /// Authorization roles. Snapshotted into access-JWT claims at issue
-  /// time; downstream services read `request.user.roles`. Re-read the
-  /// DB for fresh values; the JWT can lag by up to JWT_ACCESS_TTL.
-  roles         String[]  @default([])
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id                  String                   @id @default(cuid())
+  email               String                   @unique
+  emailVerified       DateTime?
+  phone               String?                  @unique
+  phoneVerified       DateTime?
+  firstName           String?
+  lastName            String?
+  /// Legacy JWT/contract compatibility only. Not a source of authority.
+  /// Live roles and overrides are loaded from relations on every request.
+  roles               String[]                 @default([])
+  loginStatus         LoginStatus              @default(DISABLED)
+  isSuperAdmin        Boolean                  @default(false)
+  accessRevision      Int                      @default(1)
+  roleMemberships     UserRole[]
+  permissionOverrides UserPermissionOverride[]
+  invitations         UserInvitation[]         @relation("InvitationUser")
+  invitationsSent     UserInvitation[]         @relation("InvitationSender")
+  reportedProblems    ScooterProblem[]         @relation("ProblemReporter")
+  assignedProblems    ScooterProblem[]         @relation("ProblemAssignee")
+  createdRentals      Rental[]                 @relation("RentalCreator")
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
   /// Account deactivation marker. DELETE /v1/auth/me sets this value while
   /// preserving the User row and its business history.
-  deletedAt     DateTime?
+  deletedAt           DateTime?
 
   sessions                Session[]
   refreshTokens           RefreshToken[]
@@ -311,9 +322,11 @@ model ScooterFleetCounter {
 
 /// Scooter inventory; technical details can be completed after acquisition.
 model Scooter {
-  id          String @id @default(cuid())
+  problems    ScooterProblem[]
+  rentals     Rental[]
+  id          String           @id @default(cuid())
   /// Permanent fleet-wide number, including soft-deleted scooters.
-  fleetNumber Int    @unique
+  fleetNumber Int              @unique
 
   maxAxle3MassKg        Int?
   maxAxle4MassKg        Int?
@@ -1272,6 +1285,7 @@ enum ScooterDocumentType {
 
 /// One PDF or image; multiple files can describe the pages of a document.
 model ScooterDocument {
+  customerVisible   Boolean                 @default(false)
   id                String                  @id @default(cuid())
   scooterId         String
   scooter           Scooter                 @relation(fields: [scooterId], references: [id], onDelete: Cascade)
@@ -1337,4 +1351,135 @@ model ScooterInsurancePolicy {
 
   @@unique([id, scooterId])
   @@index([scooterId, validUntil])
+}
+
+enum LoginStatus {
+  DISABLED
+  INVITED
+  ACTIVE
+  SUSPENDED
+}
+
+enum PermissionScope {
+  OWN
+  ASSIGNED
+  AVAILABLE
+  ALL
+}
+
+enum InvitationDeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+model Role {
+  id          String           @id @default(cuid())
+  slug        String           @unique
+  name        String
+  description String           @default("")
+  revision    Int              @default(1)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  archivedAt  DateTime?
+  members     UserRole[]
+  permissions RolePermission[]
+}
+
+model UserRole {
+  userId     String
+  roleId     String
+  assignedAt DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+  role       Role     @relation(fields: [roleId], references: [id], onDelete: Restrict)
+
+  @@id([userId, roleId])
+  @@index([roleId])
+}
+
+model RolePermission {
+  roleId        String
+  permissionKey String
+  scopes        PermissionScope[]
+  role          Role              @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionKey])
+}
+
+model UserPermissionOverride {
+  userId        String
+  permissionKey String
+  scopes        PermissionScope[]
+  reason        String?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  user          User              @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@id([userId, permissionKey])
+}
+
+model UserInvitation {
+  id             String                   @id @default(cuid())
+  userId         String
+  email          String
+  generation     Int
+  invitedById    String?
+  expiresAt      DateTime
+  activatedAt    DateTime?
+  cancelledAt    DateTime?
+  deliveryStatus InvitationDeliveryStatus @default(PENDING)
+  createdAt      DateTime                 @default(now())
+  user           User                     @relation("InvitationUser", fields: [userId], references: [id], onDelete: Restrict)
+  invitedBy      User?                    @relation("InvitationSender", fields: [invitedById], references: [id], onDelete: SetNull)
+
+  @@unique([userId], map: "UserInvitation_current_unique", where: { activatedAt: null, cancelledAt: null })
+  @@unique([userId, generation])
+  @@index([userId, expiresAt])
+}
+
+model ScooterProblem {
+  id              String    @id @default(cuid())
+  scooterId       String
+  scooter         Scooter   @relation(fields: [scooterId], references: [id], onDelete: Restrict)
+  description     String
+  priority        String    @default("normal")
+  status          String    @default("open")
+  reporterId      String
+  reporter        User      @relation("ProblemReporter", fields: [reporterId], references: [id], onDelete: Restrict)
+  assigneeId      String?
+  assignee        User?     @relation("ProblemAssignee", fields: [assigneeId], references: [id], onDelete: Restrict)
+  workNotes       String    @default("")
+  resolutionNotes String?
+  revision        Int       @default(1)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  resolvedAt      DateTime?
+
+  @@index([scooterId, status])
+  @@index([assigneeId, status])
+  @@index([status, assigneeId])
+}
+
+model Rental {
+  id              String    @id @default(cuid())
+  personId        String
+  person          Person    @relation(fields: [personId], references: [id], onDelete: Restrict)
+  scooterId       String
+  scooter         Scooter   @relation(fields: [scooterId], references: [id], onDelete: Restrict)
+  startsAt        DateTime
+  endsAt          DateTime
+  status          String    @default("reserved")
+  customerNotes   String?
+  internalNotes   String?
+  revision        Int       @default(1)
+  createdByUserId String
+  createdBy       User      @relation("RentalCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  handedOverAt    DateTime?
+  returnedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([scooterId], map: "Rental_one_active_scooter", where: { status: "active" })
+  @@index([personId, createdAt])
+  @@index([scooterId, status, startsAt, endsAt])
 }

@@ -103,6 +103,7 @@ describe("Core auth HTTP surface (e2e)", () => {
 
   async function freshSession(): Promise<IssuedSession> {
     const user = await users.createOne({
+      loginStatus: "ACTIVE",
       email: `ctrl-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`,
     });
     createdUserIds.push(user.id);
@@ -274,6 +275,22 @@ describe("Core auth HTTP surface (e2e)", () => {
       .set("Authorization", `Bearer ${issued.refreshToken}`);
 
     expect(res.status).toBe(401);
+  });
+
+  it("rejects existing access and refresh tokens immediately after suspension", async () => {
+    const issued = await freshSession();
+    await prisma.user.update({
+      where: { id: issued.userId },
+      data: { loginStatus: "SUSPENDED" },
+    });
+    const access = await req()
+      .get("/v1/auth/me")
+      .set("Authorization", `Bearer ${issued.accessToken}`);
+    expect(access.status).toBe(401);
+    const refresh = await req()
+      .post("/v1/auth/refresh")
+      .send({ refreshToken: issued.refreshToken });
+    expect(refresh.status).toBe(401);
   });
 
   it("GET /v1/auth/sessions returns active sessions with current=true on the calling one", async () => {
@@ -491,6 +508,7 @@ describe("Core auth HTTP surface (e2e)", () => {
   it("DELETE /v1/auth/accounts/:provider refuses if it would leave no auth method", async () => {
     // User has ONLY a Google AuthAccount, no verified email/phone.
     const user = await users.createOne({
+      loginStatus: "ACTIVE",
       email: `lonely-${Date.now()}@example.com`,
       // explicitly leave emailVerified, phoneVerified null
     });
@@ -514,6 +532,7 @@ describe("Core auth HTTP surface (e2e)", () => {
 
   it("does not count a verified phone as a fallback when SMS auth is disabled", async () => {
     const user = await users.createOne({
+      loginStatus: "ACTIVE",
       email: `phone-only-${Date.now()}@example.com`,
       phone: `+407${Math.floor(10000000 + Math.random() * 89999999)}`,
       phoneVerified: new Date(),
@@ -539,6 +558,7 @@ describe("Core auth HTTP surface (e2e)", () => {
   it("DELETE /v1/auth/accounts/:provider removes every link for that provider when another auth method remains", async () => {
     // Verified email → user can fall back to email-OTP.
     const user = await users.createOne({
+      loginStatus: "ACTIVE",
       email: `multi-${Date.now()}@example.com`,
       emailVerified: new Date(),
     });
@@ -584,6 +604,7 @@ describe("Core auth HTTP surface (e2e)", () => {
 
   it("parallel provider unlinks cannot remove both remaining auth methods", async () => {
     const user = await users.createOne({
+      loginStatus: "ACTIVE",
       email: `parallel-unlink-${Date.now()}@example.com`,
     });
     createdUserIds.push(user.id);

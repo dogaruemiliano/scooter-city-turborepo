@@ -80,6 +80,7 @@ export type PersonDocumentPhotoDraftUploads = Partial<
 >;
 
 export interface CreatePersonFormState {
+  linkExistingAccount?: boolean;
   citizenship: PersonCitizenship;
   nationalIdFormat: NationalIdFormat;
   documentDrafts: Partial<

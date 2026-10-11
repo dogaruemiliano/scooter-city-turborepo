@@ -4,6 +4,7 @@ import type { SupportedLocale } from "@repo/i18n";
 
 import { AuditService } from "../../../audit/audit.service";
 import { AuditEventType } from "../../../audit/audit.types";
+import { requireLoginEligible } from "../../utils/admission";
 import { CoreAuthService } from "../core-auth/core-auth.service";
 import type { IssueSessionResult } from "../core-auth/core-auth.types";
 import {
@@ -68,20 +69,11 @@ export class EmailOtpService {
         let user = await tx.user.findUnique({
           where: { email: challenge.target },
         });
-        if (user?.deletedAt) {
-          throw new UnauthorizedException(GENERIC_INVALID_MESSAGE);
-        }
-        const created = user === null;
-        const emailVerifiedNow = created || user?.emailVerified === null;
-
-        if (!user) {
-          user = await tx.user.create({
-            data: {
-              email: challenge.target,
-              emailVerified: now,
-            },
-          });
-        } else if (emailVerifiedNow) {
+        await requireLoginEligible(tx, user);
+        if (!user) throw new UnauthorizedException(GENERIC_INVALID_MESSAGE);
+        const created = false;
+        const emailVerifiedNow = user.emailVerified === null;
+        if (emailVerifiedNow) {
           user = await tx.user.update({
             where: { id: user.id },
             data: { emailVerified: now },
@@ -99,6 +91,7 @@ export class EmailOtpService {
             email: user.email,
             roles: user.roles,
           },
+          proofIssuedAt: challenge.createdAt,
           userAgent: input.userAgent,
           ip: input.ip,
         });

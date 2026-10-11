@@ -15,6 +15,7 @@ import { PersonDetailPage } from "./PersonDetailPage";
 
 const mocks = vi.hoisted(() => ({
   apiFetch: vi.fn(),
+  documentWrite: true,
   refresh: vi.fn(),
   replace: vi.fn(),
   push: vi.fn(),
@@ -130,6 +131,7 @@ const documentPhotos = {
 
 beforeEach(() => {
   mocks.apiFetch.mockReset();
+  mocks.documentWrite = true;
   mocks.refresh.mockReset();
   mocks.replace.mockReset();
 
@@ -636,6 +638,40 @@ describe("PersonDetailPage", () => {
     expect(screen.queryByText("Document saved")).not.toBeInTheDocument();
   });
 
+  it("allows document deletion without granting document editing", async () => {
+    mocks.documentWrite = false;
+    mocks.apiFetch.mockResolvedValue(undefined);
+    const browser = userEvent.setup();
+    renderDetail();
+    await browser.click(
+      screen.getByRole("button", { name: "View National ID" }),
+    );
+    expect(
+      screen.queryByRole("button", { name: "Edit document" }),
+    ).not.toBeInTheDocument();
+    await browser.click(
+      screen.getByRole("button", { name: "Delete document" }),
+    );
+    const sheets = document.querySelectorAll(
+      '[data-slot="bottom-sheet-popup"]',
+    );
+    expect(sheets).toHaveLength(2);
+    expect(sheets[1]).toHaveClass("bg-popover");
+    expect(sheets[1]).not.toHaveClass("bg-background");
+    await browser.click(
+      within(sheets[1] as HTMLElement).getByRole("button", {
+        name: "Delete document",
+      }),
+    );
+    await waitFor(() =>
+      expect(mocks.apiFetch).toHaveBeenCalledWith(
+        v1.persons.ROUTES.documents.delete(readyPerson.id, identityDocument.id),
+        v1.common.noContentSchema,
+        { method: "DELETE" },
+      ),
+    );
+  });
+
   it("soft-deletes documents and the person with confirmation", async () => {
     mocks.apiFetch.mockResolvedValue(undefined);
     const browser = userEvent.setup();
@@ -1031,3 +1067,24 @@ function renderDetail(
     </NextIntlClientProvider>,
   );
 }
+
+vi.mock("@/components/auth/SessionProvider", () => ({
+  useOptionalSession: () => ({
+    user: {
+      effectiveScopes: {
+        "persons.read": ["ALL"],
+        "persons.create": ["ALL"],
+        "persons.update": ["ALL"],
+        "persons.archive": ["ALL"],
+        "persons.audit.read": ["ALL"],
+        "person_documents.read": ["ALL"],
+        "person_documents.write": mocks.documentWrite ? ["ALL"] : [],
+        "person_documents.delete": ["ALL"],
+        "scooters.read": ["ALL"],
+        "scooters.create": ["ALL"],
+        "scooters.update": ["ALL"],
+        "scooters.archive": ["ALL"],
+      },
+    },
+  }),
+}));

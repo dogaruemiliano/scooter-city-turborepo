@@ -1,3 +1,5 @@
+import { accessCatalog } from "./catalogs/access";
+import { workspaceCatalog } from "./catalogs/workspace";
 import type { SupportedLocale } from "./locales";
 import { apiCatalog } from "./catalogs/api";
 import { appShellCatalog } from "./catalogs/app-shell";
@@ -19,6 +21,8 @@ export type MessageCatalogs = Readonly<Record<SupportedLocale, MessageTree>>;
 
 export const messages = {
   en: {
+    access: accessCatalog.en,
+    workspace: workspaceCatalog.en,
     shared: sharedCatalog.en,
     auth: authCatalog.en,
     appShell: appShellCatalog.en,
@@ -32,6 +36,8 @@ export const messages = {
     mobilePlatform: mobilePlatformCatalog.en,
   },
   ro: {
+    access: accessCatalog.ro,
+    workspace: workspaceCatalog.ro,
     shared: sharedCatalog.ro,
     auth: authCatalog.ro,
     appShell: appShellCatalog.ro,

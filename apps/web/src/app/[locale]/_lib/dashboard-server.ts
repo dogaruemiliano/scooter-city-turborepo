@@ -3,11 +3,12 @@ import "server-only";
 import { ApiError, v1 } from "@repo/api-shared";
 import type { SupportedLocale } from "@repo/i18n";
 import { cookies } from "next/headers";
-import { notFound, redirect } from "next/navigation";
+import { redirect } from "next/navigation";
 
 import { getLocalizedSignInPath, localizePath } from "@/i18n/paths";
 import { webApi } from "@/lib/api";
 import { meFromApi } from "@/lib/auth-server";
+import { canAccess, type AccessIdentity } from "@/lib/access";
 
 const CASH_ROLES: readonly v1.finance.LedgerAccountRole[] = [
   "BANK",
@@ -37,46 +38,60 @@ export async function loadDashboard(locale: SupportedLocale) {
     redirect(getLocalizedSignInPath(locale, localizePath("/", locale)));
   }
 
-  if (!user.roles.includes(v1.auth.AUTH_ROLES.ADMIN)) {
+  if (
+    !user.isSuperAdmin &&
+    !Object.values(user.effectiveScopes ?? {}).some(
+      (scopes) => scopes.length > 0,
+    )
+  ) {
     return { user, overview: null };
   }
 
   const cookieHeader = (await cookies()).toString();
 
   // Keep the page header and shortcuts available while the overview streams.
-  return { user, overview: loadOverview(locale, cookieHeader) };
+  return { user, overview: loadOverview(locale, cookieHeader, user) };
 }
 
 async function loadOverview(
   locale: SupportedLocale,
   cookieHeader: string,
+  user: AccessIdentity,
 ): Promise<DashboardOverviewData> {
   const [books, balances, operations, fleet] = await Promise.all([
-    fetchOverviewResource(
-      locale,
-      cookieHeader,
-      v1.finance.ROUTES.books,
-      v1.finance.financeBookListSchema,
-    ),
-    fetchOverviewResource(
-      locale,
-      cookieHeader,
-      // Inactive custody accounts can still hold money after an associate leaves.
-      `${v1.finance.ROUTES.accounts.balances}?bookType=COMPANY&includeInactive=true`,
-      v1.finance.ledgerAccountBalanceListSchema,
-    ),
-    fetchOverviewResource(
-      locale,
-      cookieHeader,
-      `${v1.finance.ROUTES.operations.list}?bookType=COMPANY&pageSize=${RECENT_OPERATION_COUNT}`,
-      v1.finance.financialOperationListSchema,
-    ),
-    fetchOverviewResource(
-      locale,
-      cookieHeader,
-      `${v1.scooters.ROUTES.list}?page=1&pageSize=1&includeDeleted=false`,
-      v1.scooters.scooterListSchema,
-    ),
+    canAccess(user, "finance.books.read")
+      ? fetchOverviewResource(
+          locale,
+          cookieHeader,
+          v1.finance.ROUTES.books,
+          v1.finance.financeBookListSchema,
+        )
+      : Promise.resolve(null),
+    canAccess(user, "finance.accounts.read")
+      ? fetchOverviewResource(
+          locale,
+          cookieHeader,
+          // Inactive custody accounts can still hold money after an associate leaves.
+          `${v1.finance.ROUTES.accounts.balances}?bookType=COMPANY&includeInactive=true`,
+          v1.finance.ledgerAccountBalanceListSchema,
+        )
+      : Promise.resolve(null),
+    canAccess(user, "finance.operations.read")
+      ? fetchOverviewResource(
+          locale,
+          cookieHeader,
+          `${v1.finance.ROUTES.operations.list}?bookType=COMPANY&pageSize=${RECENT_OPERATION_COUNT}`,
+          v1.finance.financialOperationListSchema,
+        )
+      : Promise.resolve(null),
+    canAccess(user, "scooters.read", "ALL")
+      ? fetchOverviewResource(
+          locale,
+          cookieHeader,
+          `${v1.scooters.ROUTES.list}?page=1&pageSize=1&includeDeleted=false`,
+          v1.scooters.scooterListSchema,
+        )
+      : Promise.resolve(null),
   ]);
 
   const companyBook = books?.items.find((book) => book.type === "COMPANY");
@@ -130,7 +145,7 @@ async function fetchOverviewResource<Output>(
       redirect(getLocalizedSignInPath(locale, localizePath("/", locale)));
     }
     if (error instanceof ApiError && error.status === 403) {
-      notFound();
+      return null;
     }
 
     // A failed service must not turn other available summaries into zeroes.

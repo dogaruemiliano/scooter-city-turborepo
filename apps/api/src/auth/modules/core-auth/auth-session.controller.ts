@@ -23,6 +23,7 @@ import { v1 } from "@repo/api-shared";
 import type { Request, Response } from "express";
 import { ZodResponse } from "nestjs-zod";
 
+import { SelfService } from "../../../access/access.decorators";
 import { AuditService } from "../../../audit/audit.service";
 import { AuditEventType } from "../../../audit/audit.types";
 import { getRequestMetadata } from "../../../common/http/request-metadata";
@@ -82,6 +83,7 @@ export class AuthSessionController {
     };
   }
 
+  @SelfService()
   @Post("logout")
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiCookieAuth(v1.auth.ACCESS_TOKEN_COOKIE)
@@ -105,6 +107,7 @@ export class AuthSessionController {
     });
   }
 
+  @SelfService()
   @Post("logout-all")
   @ApiCookieAuth(v1.auth.ACCESS_TOKEN_COOKIE)
   @ApiOperation({
@@ -128,6 +131,7 @@ export class AuthSessionController {
     return { sessionsRevoked: revoked };
   }
 
+  @SelfService()
   @Get("sessions")
   @ApiCookieAuth(v1.auth.ACCESS_TOKEN_COOKIE)
   @ApiOperation({
@@ -149,6 +153,7 @@ export class AuthSessionController {
     }));
   }
 
+  @SelfService()
   @Delete("sessions/:id")
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiCookieAuth(v1.auth.ACCESS_TOKEN_COOKIE)

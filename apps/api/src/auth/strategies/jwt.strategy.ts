@@ -12,6 +12,7 @@ import { PassportStrategy } from "@nestjs/passport";
 import { Strategy } from "passport-jwt";
 
 import type { AuthPrincipal, JwtPayload } from "../auth.types";
+import { AccessService } from "../../access/access.service";
 import { PrismaService } from "../../prisma/prisma.service";
 import { accessTokenExtractor } from "../utils/jwt-extractors";
 import type { KeyRing } from "../utils/keys";
@@ -22,6 +23,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, "jwt") {
   constructor(
     @Inject(KEY_RING) ring: KeyRing,
     private readonly prisma: PrismaService,
+    private readonly access: AccessService,
   ) {
     super({
       jwtFromRequest: accessTokenExtractor,
@@ -68,19 +70,22 @@ export class JwtStrategy extends PassportStrategy(Strategy, "jwt") {
         id: payload.sid,
         userId: payload.sub,
         revokedAt: null,
-        user: { deletedAt: null },
+        user: { deletedAt: null, loginStatus: "ACTIVE" },
       },
-      select: { id: true },
+      select: { id: true, user: { select: { email: true, roles: true } } },
     });
     if (!activeSession) {
       throw new UnauthorizedException("Session is no longer active");
     }
 
+    const access = await this.access.getSnapshot(payload.sub);
     return {
       id: payload.sub,
-      email: payload.email,
+      email: activeSession.user.email,
       sessionId: payload.sid,
-      roles: payload.roles,
+      roles: activeSession.user.roles,
+      ...access,
+      access,
     };
   }
 }

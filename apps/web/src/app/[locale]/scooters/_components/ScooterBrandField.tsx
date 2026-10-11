@@ -1,5 +1,8 @@
 "use client";
 
+import { useOptionalSession } from "@/components/auth/SessionProvider";
+import { canAccess } from "@/lib/access";
+
 import { v1 } from "@repo/api-shared";
 import { Button, SheetSelect } from "@repo/ui/components";
 import { useIsMobile } from "@repo/ui/hooks/use-mobile";
@@ -46,6 +49,10 @@ function BrandPicker({
 }) {
   const t = useTranslations("scooters");
   const mobile = useIsMobile();
+  const canManage = canAccess(
+    useOptionalSession()?.user,
+    "scooter_brands.manage",
+  );
   const { control, setValue } = useFormContext<ScooterEditorValues>();
   const { field } = useController({ control, name: "brandId" });
   const { id, disabled, error, errorId, required } = useFormFieldControl();
@@ -57,6 +64,7 @@ function BrandPicker({
   }));
 
   function createAction(select?: (value: string) => void) {
+    if (!canManage) return null;
     return (
       <BrandFormSheet
         trigger={
@@ -106,7 +114,7 @@ function BrandPicker({
           field.onChange(value);
           field.onBlur();
         }}
-        renderHeaderAction={createAction}
+        renderHeaderAction={canManage ? createAction : undefined}
       />
     );
   }

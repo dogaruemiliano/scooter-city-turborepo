@@ -105,6 +105,22 @@ describe("AppleAuthController (e2e)", () => {
     await app.close();
   });
 
+  async function approve(
+    email: string,
+    profile: { firstName?: string; lastName?: string } = {},
+  ) {
+    const user = await prisma.user.create({
+      data: {
+        email,
+        loginStatus: "ACTIVE",
+        emailVerified: new Date(),
+        ...profile,
+      },
+    });
+    createdUserIds.push(user.id);
+    return user;
+  }
+
   function uniqueSuffix(): string {
     return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   }
@@ -127,9 +143,10 @@ describe("AppleAuthController (e2e)", () => {
     return rows.map((r) => r.type);
   }
 
-  it("first sign-in with verified email creates the user, links the account, and returns a TokenPair", async () => {
+  it("first sign-in for an approved user links the account and returns a TokenPair", async () => {
     const idToken = `tok-new-${uniqueSuffix()}`;
     const email = `apple-new-${uniqueSuffix()}@example.com`;
+    await approve(email, { firstName: "Ada", lastName: "Lovelace" });
     const sub = `apple-sub-new-${uniqueSuffix()}`;
     verifier.registerToken(idToken, {
       sub,
@@ -174,7 +191,6 @@ describe("AppleAuthController (e2e)", () => {
       const events = await latestAuditTypesForUser(user.id);
       expect(events).toEqual(
         expect.arrayContaining([
-          AuditEventType.SIGNUP,
           AuditEventType.OAUTH_LINKED,
           AuditEventType.LOGIN_SUCCESS,
         ]),
@@ -185,6 +201,7 @@ describe("AppleAuthController (e2e)", () => {
   it("second sign-in with the same sub but no email reuses the existing user — no new rows, no extra OAUTH_LINKED", async () => {
     const sub = `apple-sub-repeat-${uniqueSuffix()}`;
     const email = `apple-repeat-${uniqueSuffix()}@example.com`;
+    await approve(email, { firstName: "Ada", lastName: "Lovelace" });
 
     // First sign-in: Apple sends email + verified.
     const firstToken = `tok-first-${uniqueSuffix()}`;
@@ -244,6 +261,7 @@ describe("AppleAuthController (e2e)", () => {
   it("accepts a private-relay email address", async () => {
     const idToken = `tok-pr-${uniqueSuffix()}`;
     const email = `xyz-${uniqueSuffix()}@privaterelay.appleid.com`;
+    await approve(email);
     verifier.registerToken(idToken, {
       sub: `apple-sub-pr-${uniqueSuffix()}`,
       email,
@@ -265,7 +283,7 @@ describe("AppleAuthController (e2e)", () => {
     const email = `apple-link-${uniqueSuffix()}@example.com`;
     // Pre-existing user with no Apple account.
     const user = await prisma.user.create({
-      data: { email, emailVerified: new Date() },
+      data: { email, emailVerified: new Date(), loginStatus: "ACTIVE" },
     });
     createdUserIds.push(user.id);
 
@@ -299,10 +317,12 @@ describe("AppleAuthController (e2e)", () => {
     expect(events).not.toContain(AuditEventType.SIGNUP);
   });
 
-  it("returns the same verification challenge for existing and unknown unverified emails, then completes both safely", async () => {
+  it("returns the same verification challenge for existing and unknown unverified emails, then admits only the approved account", async () => {
     const existingEmail = `apple-unverified-existing-${uniqueSuffix()}@example.com`;
     const unknownEmail = `apple-unverified-unknown-${uniqueSuffix()}@example.com`;
-    const user = await prisma.user.create({ data: { email: existingEmail } });
+    const user = await prisma.user.create({
+      data: { email: existingEmail, loginStatus: "ACTIVE" },
+    });
     createdUserIds.push(user.id);
 
     const existingToken = `tok-unverified-existing-${uniqueSuffix()}`;
@@ -346,7 +366,7 @@ describe("AppleAuthController (e2e)", () => {
     );
     createdChallengeIds.push(existingBody.challengeId, unknownBody.challengeId);
     expect(mailer.findLastTo(existingEmail)?.text).toContain("000000");
-    expect(mailer.findLastTo(unknownEmail)?.text).toContain("000000");
+    expect(mailer.findLastTo(unknownEmail)).toBeUndefined();
 
     expect(
       await prisma.user.findUnique({ where: { email: unknownEmail } }),
@@ -372,19 +392,35 @@ describe("AppleAuthController (e2e)", () => {
     const unknownVerify = await request(server())
       .post(v1.auth.ROUTES.oauthEmailVerification.verify)
       .send({ challengeId: unknownBody.challengeId, code: "000000" });
-    expect(unknownVerify.status).toBe(200);
+    expect(unknownVerify.status).toBe(401);
 
     const created = await prisma.user.findUnique({
       where: { email: unknownEmail },
       include: { authAccounts: true },
     });
-    expect(created).not.toBeNull();
-    if (created) {
-      createdUserIds.push(created.id);
-      expect(created.emailVerified).not.toBeNull();
-      expect(created.authAccounts).toHaveLength(1);
-      expect(created.authAccounts[0]?.provider).toBe("apple");
-    }
+    expect(created).toBeNull();
+  });
+
+  it("rejects an unknown verified Apple identity without creating an account", async () => {
+    const idToken = `tok-unknown-${uniqueSuffix()}`;
+    const email = `apple-unknown-${uniqueSuffix()}@example.com`;
+    const sub = `apple-sub-unknown-${uniqueSuffix()}`;
+    verifier.registerToken(idToken, {
+      sub,
+      email,
+      emailVerified: true,
+      audience: APPLE_AUDIENCE,
+    });
+    const response = await request(server())
+      .post(v1.auth.ROUTES.apple)
+      .send({ idToken });
+    expect(response.status).toBe(401);
+    expect(await prisma.user.findUnique({ where: { email } })).toBeNull();
+    expect(
+      await prisma.authAccount.findUnique({
+        where: { provider_providerId: { provider: "apple", providerId: sub } },
+      }),
+    ).toBeNull();
   });
 
   it("returns 401 when the verifier rejects the token", async () => {
@@ -435,9 +471,11 @@ describe("AppleAuthController (e2e)", () => {
 
   it("sets HttpOnly cookies on success", async () => {
     const idToken = `tok-cookies-${uniqueSuffix()}`;
+    const email = `apple-cookies-${uniqueSuffix()}@example.com`;
+    await approve(email);
     verifier.registerToken(idToken, {
       sub: `apple-sub-cookies-${uniqueSuffix()}`,
-      email: `apple-cookies-${uniqueSuffix()}@example.com`,
+      email,
       emailVerified: true,
       audience: APPLE_AUDIENCE,
     });

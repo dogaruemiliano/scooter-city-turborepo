@@ -116,6 +116,7 @@ export class OAuthEmailVerificationService {
             email: user.email,
             roles: user.roles,
           },
+          proofIssuedAt: challenge.createdAt,
           userAgent: input.userAgent,
           ip: input.ip,
         });
@@ -124,7 +125,7 @@ export class OAuthEmailVerificationService {
           provider,
           resolution,
           user,
-          emailVerifiedNow: emailVerifiedNow || resolution.kind === "new-user",
+          emailVerifiedNow,
           issued,
         };
       },
@@ -171,16 +172,6 @@ export class OAuthEmailVerificationService {
     result: FinalizedOAuthEmailAuth,
     input: VerifyOAuthEmailVerificationInput,
   ): Promise<void> {
-    if (result.resolution.kind === "new-user") {
-      await this.audit.record({
-        type: AuditEventType.SIGNUP,
-        userId: result.user.id,
-        ip: input.ip,
-        userAgent: input.userAgent,
-        meta: { method: result.provider, verification: "email-otp" },
-      });
-    }
-
     if (result.resolution.kind !== "existing-link") {
       await this.audit.record({
         type: AuditEventType.OAUTH_LINKED,

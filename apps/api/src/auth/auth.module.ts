@@ -27,6 +27,8 @@ import { PassportModule } from "@nestjs/passport";
 import { ScheduleModule } from "@nestjs/schedule";
 import { v1 } from "@repo/api-shared";
 
+import { AccessModule } from "../access/access.module";
+import { AccessGuard } from "../access/access.guard";
 import type { AuthModuleConfig } from "./auth.config";
 import {
   AUTH_ENABLED_METHODS,
@@ -62,6 +64,7 @@ export class AuthModule {
       KeysModule,
       AuthThrottlingModule,
       CoreAuthModule,
+      AccessModule,
       JwksModule,
       ...resolveEnabledAuthMethodModules(enabledMethods),
     ];
@@ -73,6 +76,7 @@ export class AuthModule {
       },
       JwtStrategy,
       { provide: APP_GUARD, useClass: JwtAuthGuard },
+      { provide: APP_GUARD, useClass: AccessGuard },
     ];
 
     // ─── Cleanup cron ──────────────────────────────────────────────

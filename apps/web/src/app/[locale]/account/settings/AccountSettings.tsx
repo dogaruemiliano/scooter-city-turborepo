@@ -245,17 +245,24 @@ export function AccountSettings({
               />
             </div>
             <div className="flex flex-col gap-2 md:col-span-2">
-              <span className="text-sm font-medium">Roles</span>
+              <span className="text-sm font-medium">App access</span>
               <div className="flex flex-wrap gap-2">
-                {user.roles.length > 0 ? (
-                  user.roles.map((role) => (
-                    <Badge key={role} variant="secondary">
-                      {role}
-                    </Badge>
-                  ))
+                {user.isSuperAdmin ? (
+                  <Badge variant="secondary">Super administrator</Badge>
+                ) : Object.values(user.effectiveScopes).some(
+                    (scopes) => scopes.length,
+                  ) ? (
+                  <Badge variant="secondary">
+                    {
+                      Object.values(user.effectiveScopes).filter(
+                        (scopes) => scopes.length,
+                      ).length
+                    }{" "}
+                    permissions
+                  </Badge>
                 ) : (
                   <span className="text-sm text-muted-foreground">
-                    No roles assigned
+                    No app permissions assigned
                   </span>
                 )}
               </div>

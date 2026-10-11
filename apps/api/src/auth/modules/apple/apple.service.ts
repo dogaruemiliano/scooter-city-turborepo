@@ -27,7 +27,6 @@ import type { SupportedLocale } from "@repo/i18n";
 
 import { AuditService } from "../../../audit/audit.service";
 import { AuditEventType } from "../../../audit/audit.types";
-import { CoreAuthService } from "../core-auth/core-auth.service";
 import { OAuthAccountResolver } from "../core-auth/oauth-account-resolver.service";
 import { GENERIC_OAUTH_SIGN_IN_MESSAGE } from "../core-auth/oauth-sign-in.constants";
 import { OAuthEmailVerificationService } from "../oauth-email-verification/oauth-email-verification.service";
@@ -63,7 +62,6 @@ export type AppleSignInResult =
 export class AppleAuthService {
   constructor(
     private readonly verifier: AppleVerifier,
-    private readonly coreAuth: CoreAuthService,
     private readonly accountResolver: OAuthAccountResolver,
     private readonly emailVerification: OAuthEmailVerificationService,
     private readonly audit: AuditService,
@@ -76,25 +74,24 @@ export class AppleAuthService {
    * @throws UnauthorizedException — token verification failed, or an
    *   unlinked identity did not provide any email to verify.
    *
-   * Side effects (in order):
-   *  1. `audit.record({ type: SIGNUP })` if a new User was created.
-   *  2. `audit.record({ type: OAUTH_LINKED })` if a new AuthAccount row
-   *     was inserted (either from signup or from an auto-link).
-   *  3. `coreAuth.issueSession(...)` mints session + tokens.
-   *  4. `audit.record({ type: LOGIN_SUCCESS })` always.
+   * Provider linking, admission activation, and session issuance are atomic.
+   * Success audits are recorded after that transaction commits.
    */
   async signIn(args: AppleSignInArgs): Promise<AppleSignInResult> {
     const claims = await this.verifyOrAudit(args);
 
-    const resolution = await this.accountResolver.resolve({
-      provider: "apple",
-      providerId: claims.sub,
-      email: claims.email ?? null,
-      emailVerified: claims.emailVerified === true,
-      firstName: args.fullName?.givenName ?? null,
-      lastName: args.fullName?.familyName ?? null,
-      existingEmailPolicy: "preserve",
-    });
+    const resolution = await this.accountResolver.resolve(
+      {
+        provider: "apple",
+        providerId: claims.sub,
+        email: claims.email ?? null,
+        emailVerified: claims.emailVerified === true,
+        firstName: args.fullName?.givenName ?? null,
+        lastName: args.fullName?.familyName ?? null,
+        existingEmailPolicy: "preserve",
+      },
+      { userAgent: args.userAgent ?? null, ip: args.ip ?? null },
+    );
 
     if (resolution.kind === "unverified-email") {
       if (!claims.email) {
@@ -128,15 +125,6 @@ export class AppleAuthService {
       throw new UnauthorizedException(GENERIC_OAUTH_SIGN_IN_MESSAGE);
     }
 
-    if (resolution.kind === "new-user") {
-      await this.audit.record({
-        type: AuditEventType.SIGNUP,
-        userId: resolution.user.id,
-        ip: args.ip ?? null,
-        userAgent: args.userAgent ?? null,
-        meta: { method: "apple" },
-      });
-    }
     if (resolution.kind !== "existing-link") {
       await this.audit.record({
         type: AuditEventType.OAUTH_LINKED,
@@ -147,15 +135,7 @@ export class AppleAuthService {
       });
     }
 
-    const issued = await this.coreAuth.issueSession({
-      user: {
-        id: resolution.user.id,
-        email: resolution.user.email,
-        roles: resolution.user.roles,
-      },
-      userAgent: args.userAgent ?? null,
-      ip: args.ip ?? null,
-    });
+    const issued = resolution.issued;
 
     await this.audit.record({
       type: AuditEventType.LOGIN_SUCCESS,

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { ApiError, v1 } from "@repo/api-shared";
+import { ApiError } from "@repo/api-shared";
 import type { SupportedLocale } from "@repo/i18n";
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
@@ -9,44 +9,32 @@ import type { ZodType } from "zod";
 import { getLocalizedSignInPath, localizePath } from "@/i18n/paths";
 import { webApi } from "@/lib/api";
 import { meFromApi } from "@/lib/auth-server";
+import { canAccess } from "@/lib/access";
 
-const ADMIN_ROLE = v1.auth.AUTH_ROLES.ADMIN;
-const SUPER_ADMIN_ROLE = v1.auth.AUTH_ROLES.SUPER_ADMIN;
-
-/**
- * The finance module is admin-only. Anyone else gets a 404 rather than a 403,
- * so the existence of the company's books is not confirmed to a signed-in
- * user who has no business seeing them.
- */
-export async function requireFinanceAdmin(
+export async function requireFinancePermission(
   locale: SupportedLocale,
   returnPath: string,
+  permission: string,
 ) {
-  return requireFinanceRole(locale, returnPath, ADMIN_ROLE);
+  return requireFinanceAccess(locale, returnPath, permission);
 }
 
 export async function requireFinanceSuperAdmin(
   locale: SupportedLocale,
   returnPath: string,
 ) {
-  return requireFinanceRole(locale, returnPath, SUPER_ADMIN_ROLE);
+  return requireFinanceAccess(locale, returnPath);
 }
 
-async function requireFinanceRole(
+async function requireFinanceAccess(
   locale: SupportedLocale,
   returnPath: string,
-  role: string,
+  action?: string,
 ) {
   const user = await meFromApi();
-
-  if (!user) {
+  if (!user)
     redirect(getLocalizedSignInPath(locale, localizePath(returnPath, locale)));
-  }
-
-  if (!user.roles.includes(role)) {
-    notFound();
-  }
-
+  if (action ? !canAccess(user, action) : !user.isSuperAdmin) notFound();
   return user;
 }
 

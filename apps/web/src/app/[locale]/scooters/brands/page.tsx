@@ -1,3 +1,4 @@
+import { canAccess } from "@/lib/access";
 import { ApiError, v1 } from "@repo/api-shared";
 import { messages } from "@repo/i18n";
 import { Button } from "@repo/ui/components";
@@ -18,7 +19,6 @@ import { BrandFormSheet } from "../_components/BrandFormSheet";
 import { BrandTable } from "../_components/BrandTable";
 
 const BRANDS_PATH = "/scooters/brands";
-const ADMIN_ROLE = "ADMIN";
 
 interface BrandsPageProps {
   params: Promise<{ locale: string }>;
@@ -41,7 +41,7 @@ export default async function BrandsPage({ params }: BrandsPageProps) {
     redirect(getLocalizedSignInPath(locale, localizePath(BRANDS_PATH, locale)));
   }
 
-  if (!user.roles.includes(ADMIN_ROLE)) {
+  if (!canAccess(user, "scooter_brands.read")) {
     notFound();
   }
 
@@ -51,16 +51,18 @@ export default async function BrandsPage({ params }: BrandsPageProps) {
 
   return (
     <main className="mx-auto flex w-full max-w-screen-xl flex-1 flex-col gap-8 px-4 py-6 sm:px-6 lg:px-8">
-      <div className="flex justify-end">
-        <BrandFormSheet
-          trigger={
-            <Button type="button">
-              <PlusIcon aria-hidden="true" data-icon="inline-start" />
-              {t("brands.list.createButton")}
-            </Button>
-          }
-        />
-      </div>
+      {canAccess(user, "scooter_brands.manage") ? (
+        <div className="flex justify-end">
+          <BrandFormSheet
+            trigger={
+              <Button type="button">
+                <PlusIcon aria-hidden="true" data-icon="inline-start" />
+                {t("brands.list.createButton")}
+              </Button>
+            }
+          />
+        </div>
+      ) : null}
       <BrandTable brands={brands.items} />
     </main>
   );

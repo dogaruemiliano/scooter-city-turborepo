@@ -113,3 +113,7 @@ it("unblocks the wizard after verified correction and reuses it when returning t
   expect(screen.getByText("2 / 4 · CIV")).toBeInTheDocument();
   expect(apiFetch).toHaveBeenCalledTimes(2);
 });
+
+vi.mock("@/components/auth/SessionProvider", () => ({
+  useOptionalSession: () => ({ user: { isSuperAdmin: true } }),
+}));

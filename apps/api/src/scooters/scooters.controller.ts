@@ -1,8 +1,11 @@
+import { AccessProjectionInterceptor } from "../access/access-projection.interceptor";
+import { RequireAllScope } from "../access/access.decorators";
 import { ScooterDocumentsService } from "./scooter-documents.service";
 import type { AuthPrincipal } from "../auth/auth.types";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import {
   Body,
+  UseInterceptors,
   Controller,
   Delete,
   Get,
@@ -24,7 +27,6 @@ import {
 import { v1 } from "@repo/api-shared";
 import { ZodResponse } from "nestjs-zod";
 
-import { RequireRoles } from "../common/decorators/roles.decorator";
 import { CreateScooterInput } from "./dto/create-scooter.input";
 import { ListScootersQuery } from "./dto/list-scooters.query";
 import { Scooter } from "./dto/scooter";
@@ -36,7 +38,7 @@ import { ScootersService } from "./scooters.service";
 @ApiTags("scooters")
 @ApiCookieAuth(v1.auth.ACCESS_TOKEN_COOKIE)
 @ApiBearerAuth("bearer")
-@RequireRoles("ADMIN")
+@UseInterceptors(AccessProjectionInterceptor)
 @Controller({ path: "scooters", version: "1" })
 export class ScootersController {
   constructor(
@@ -44,6 +46,7 @@ export class ScootersController {
     private readonly documents: ScooterDocumentsService,
   ) {}
 
+  @RequireAllScope("scooters.create")
   @Post()
   @ApiOperation({
     operationId: "ScootersController_create_v1",
@@ -57,6 +60,7 @@ export class ScootersController {
     return toScooter(await this.scooters.create(input, user.id));
   }
 
+  @RequireAllScope("scooters.read")
   @Get()
   @ApiOperation({
     operationId: "ScootersController_list_v1",
@@ -73,6 +77,7 @@ export class ScootersController {
     };
   }
 
+  @RequireAllScope("scooters.read")
   @Get(":id")
   @ApiOperation({
     operationId: "ScootersController_get_v1",
@@ -87,6 +92,7 @@ export class ScootersController {
     return { ...toScooter(row), documents: await this.documents.list(id) };
   }
 
+  @RequireAllScope("scooters.update")
   @Patch(":id")
   @ApiOperation({
     operationId: "ScootersController_update_v1",
@@ -101,6 +107,7 @@ export class ScootersController {
     return toScooter(await this.scooters.update(id, input, user.id));
   }
 
+  @RequireAllScope("scooters.archive")
   @Delete(":id")
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({

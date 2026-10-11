@@ -132,6 +132,7 @@ describe("CoreAuthService timing channels (e2e)", () => {
     // Success path baseline: create user, issue session, rotate happy.
     const successMean = await meanMs(async () => {
       const user = await users.createOne({
+        loginStatus: "ACTIVE",
         email: `timing-${Date.now()}-${Math.random()}@example.com`,
       });
       createdUserIds.push(user.id);
@@ -143,6 +144,7 @@ describe("CoreAuthService timing channels (e2e)", () => {
     // bcrypt-style hash compare fails inside rotateTokens.
     const burnMean = await meanMs(async () => {
       const user = await users.createOne({
+        loginStatus: "ACTIVE",
         email: `timing-burn-${Date.now()}-${Math.random()}@example.com`,
       });
       createdUserIds.push(user.id);

@@ -1,4 +1,6 @@
 "use client";
+import { useOptionalSession } from "@/components/auth/SessionProvider";
+import { canAccess } from "@/lib/access";
 
 import { ApiError, v1 } from "@repo/api-shared";
 import {
@@ -115,6 +117,8 @@ export function BrandTable({
 }: {
   brands: v1.scooterBrands.ScooterBrand[];
 }) {
+  const session = useOptionalSession();
+  const mayManage = canAccess(session?.user, "scooter_brands.manage");
   const t = useTranslations("scooters");
 
   if (brands.length === 0) {
@@ -143,23 +147,30 @@ export function BrandTable({
               return (
                 <TableRow key={brand.id}>
                   <TableCell className="p-0">
-                    <BrandFormSheet
-                      brand={brand}
-                      trigger={
-                        <button
-                          type="button"
-                          className="flex min-h-16 w-full items-center px-2 py-2 text-left outline-none transition-colors duration-fast ease-standard focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-                        >
-                          <BrandRowContent
-                            brand={brand}
-                            scooterCountLabel={scooterCountLabel}
-                          />
-                        </button>
-                      }
-                    />
+                    {mayManage ? (
+                      <BrandFormSheet
+                        brand={brand}
+                        trigger={
+                          <button
+                            type="button"
+                            className="flex min-h-16 w-full items-center px-2 py-2 text-left outline-none transition-colors duration-fast ease-standard focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                          >
+                            <BrandRowContent
+                              brand={brand}
+                              scooterCountLabel={scooterCountLabel}
+                            />
+                          </button>
+                        }
+                      />
+                    ) : (
+                      <BrandRowContent
+                        brand={brand}
+                        scooterCountLabel={scooterCountLabel}
+                      />
+                    )}
                   </TableCell>
                   <TableCell className="p-2">
-                    <DeleteBrandButton brand={brand} />
+                    {mayManage ? <DeleteBrandButton brand={brand} /> : null}
                   </TableCell>
                 </TableRow>
               );
@@ -178,22 +189,29 @@ export function BrandTable({
               key={brand.id}
               className="flex items-center gap-1 overflow-hidden rounded-xl border border-border bg-card transition-colors duration-fast ease-standard hover:bg-muted"
             >
-              <BrandFormSheet
-                brand={brand}
-                trigger={
-                  <button
-                    type="button"
-                    className="flex min-h-16 flex-1 items-center p-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-                  >
-                    <BrandRowContent
-                      brand={brand}
-                      scooterCountLabel={scooterCountLabel}
-                    />
-                  </button>
-                }
-              />
+              {mayManage ? (
+                <BrandFormSheet
+                  brand={brand}
+                  trigger={
+                    <button
+                      type="button"
+                      className="flex min-h-16 flex-1 items-center p-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                    >
+                      <BrandRowContent
+                        brand={brand}
+                        scooterCountLabel={scooterCountLabel}
+                      />
+                    </button>
+                  }
+                />
+              ) : (
+                <BrandRowContent
+                  brand={brand}
+                  scooterCountLabel={scooterCountLabel}
+                />
+              )}
               <div className="pr-2">
-                <DeleteBrandButton brand={brand} />
+                {mayManage ? <DeleteBrandButton brand={brand} /> : null}
               </div>
             </li>
           );

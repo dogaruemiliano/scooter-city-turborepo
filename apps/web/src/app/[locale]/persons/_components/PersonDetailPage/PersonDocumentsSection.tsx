@@ -1,5 +1,8 @@
 "use client";
 
+import { useOptionalSession } from "@/components/auth/SessionProvider";
+import { canAccess } from "@/lib/access";
+
 import { v1 } from "@repo/api-shared";
 import { FileTextIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -43,6 +46,7 @@ export function PersonDocumentsSection({
     slot: v1.persons.PersonDocumentPhotoSlot,
   ) => Promise<boolean>;
 }) {
+  const session = useOptionalSession();
   const t = useTranslations("persons");
   const identityDocument = documents.find((document) =>
     v1.persons.isPersonIdentityDocumentType(document.type),
@@ -88,13 +92,13 @@ export function PersonDocumentsSection({
               onDeleteDocumentPhoto(identityDocument.id, slot)
             }
           />
-        ) : (
+        ) : canAccess(session?.user, "person_documents.write") ? (
           <EmptyDocumentDetailCard
             slot="identity"
             busy={busyAction !== null}
             onCreate={onCreateDocument}
           />
-        )}
+        ) : null}
         {driverLicenseDocument ? (
           <DocumentDetailCard
             document={driverLicenseDocument}
@@ -112,13 +116,13 @@ export function PersonDocumentsSection({
               onDeleteDocumentPhoto(driverLicenseDocument.id, slot)
             }
           />
-        ) : (
+        ) : canAccess(session?.user, "person_documents.write") ? (
           <EmptyDocumentDetailCard
             slot="driverLicense"
             busy={busyAction !== null}
             onCreate={onCreateDocument}
           />
-        )}
+        ) : null}
         {supplementaryDocuments.map((document) => (
           <DocumentDetailCard
             key={document.id}
@@ -135,7 +139,8 @@ export function PersonDocumentsSection({
           />
         ))}
       </div>
-      {availableSupplementaryTypes.length > 0 ? (
+      {availableSupplementaryTypes.length > 0 &&
+      canAccess(session?.user, "person_documents.write") ? (
         <div>
           <DocumentFormDialog
             title={t("detail.dialogs.addDocumentTitle")}

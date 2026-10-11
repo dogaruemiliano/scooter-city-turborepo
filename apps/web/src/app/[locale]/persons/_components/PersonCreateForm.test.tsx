@@ -1749,3 +1749,17 @@ async function submitPerson(browser: ReturnType<typeof userEvent.setup>) {
   showReviewStep("Document details");
   await browser.click(screen.getByRole("button", { name: "Create person" }));
 }
+
+vi.mock("@/components/auth/SessionProvider", async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import("@/components/auth/SessionProvider")
+  >()),
+  useOptionalSession: () => ({
+    user: {
+      effectiveScopes: {
+        "person_documents.write": ["ALL"],
+        "person_documents.extract": ["ALL"],
+      },
+    },
+  }),
+}));

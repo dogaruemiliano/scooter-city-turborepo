@@ -34,6 +34,12 @@ describe("OTP delivery quotas (e2e)", () => {
     return app.getHttpServer() as Server;
   };
 
+  async function approveEmail(email: string) {
+    if (!prisma) throw new Error("Test app is not running");
+    await prisma.user.create({ data: { email, loginStatus: "ACTIVE" } });
+    return email;
+  }
+
   async function boot(
     limits: QuotaLimits,
     mailerType: Type<MailerService> = SpyMailerService,
@@ -82,6 +88,9 @@ describe("OTP delivery quotas (e2e)", () => {
         where: { target: { endsWith: "@quota.test" } },
       });
       await prisma.otpDeliveryQuota.deleteMany();
+      await prisma.user.deleteMany({
+        where: { email: { endsWith: "@quota.test" } },
+      });
     }
     if (app) await app.close();
     app = undefined;
@@ -92,7 +101,7 @@ describe("OTP delivery quotas (e2e)", () => {
 
   it("counts only actual deliveries and returns a generic 429 with Retry-After", async () => {
     await boot({ targetHour: 2, targetDay: 2, ipHour: 100 });
-    const email = uniqueEmail("target");
+    const email = await approveEmail(uniqueEmail("target"));
 
     const initial = await request(server())
       .post(v1.auth.ROUTES.emailOtp.request)
@@ -169,7 +178,7 @@ describe("OTP delivery quotas (e2e)", () => {
 
   it("shares target quotas between email auth and OAuth email verification", async () => {
     await boot({ targetHour: 1, targetDay: 10, ipHour: 100 });
-    const email = uniqueEmail("oauth-shared");
+    const email = await approveEmail(uniqueEmail("oauth-shared"));
 
     const emailResponse = await request(server())
       .post(v1.auth.ROUTES.emailOtp.request)
@@ -198,6 +207,7 @@ describe("OTP delivery quotas (e2e)", () => {
     const limits = { targetHour: 1, targetDay: 10, ipHour: 100 };
     const email = uniqueEmail("restart");
     await boot(limits);
+    await approveEmail(email);
 
     const first = await request(server())
       .post(v1.auth.ROUTES.emailOtp.request)
@@ -225,13 +235,15 @@ describe("OTP delivery quotas (e2e)", () => {
   it("atomically permits one concurrent delivery at the IP boundary", async () => {
     await boot({ targetHour: 100, targetDay: 100, ipHour: 1 });
 
+    const firstEmail = await approveEmail(uniqueEmail("ip-a"));
+    const secondEmail = await approveEmail(uniqueEmail("ip-b"));
     const responses = await Promise.all([
       request(server())
         .post(v1.auth.ROUTES.emailOtp.request)
-        .send({ email: uniqueEmail("ip-a") }),
+        .send({ email: firstEmail }),
       request(server())
         .post(v1.auth.ROUTES.emailOtp.request)
-        .send({ email: uniqueEmail("ip-b") }),
+        .send({ email: secondEmail }),
     ]);
 
     expect(responses.map((response) => response.status).sort()).toEqual([
@@ -250,7 +262,7 @@ describe("OTP delivery quotas (e2e)", () => {
       { targetHour: 1, targetDay: 1, ipHour: 1 },
       FailOnceMailerService,
     );
-    const email = uniqueEmail("mail-failure");
+    const email = await approveEmail(uniqueEmail("mail-failure"));
     const failingMailer = mailer as FailOnceMailerService;
     failingMailer.failNext();
 

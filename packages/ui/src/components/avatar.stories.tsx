@@ -38,6 +38,22 @@ export const Sizes: Story = {
       <Avatar size="lg">
         <AvatarFallback>LG</AvatarFallback>
       </Avatar>
+      <Avatar size="xl">
+        <AvatarFallback>XL</AvatarFallback>
+      </Avatar>
+    </div>
+  ),
+};
+
+export const SquareInitials: Story = {
+  render: () => (
+    <div className="flex items-center gap-4">
+      <Avatar shape="square" size="lg" aria-label="Alex Morgan">
+        <AvatarFallback>AM</AvatarFallback>
+      </Avatar>
+      <Avatar shape="square" size="xl" aria-label="Maria Ionescu">
+        <AvatarFallback>MI</AvatarFallback>
+      </Avatar>
     </div>
   ),
 };

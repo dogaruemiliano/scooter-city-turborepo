@@ -7,12 +7,13 @@ import type { Metadata } from "next";
 
 import { Link } from "@/i18n/navigation";
 import { resolveRouteLocale } from "@/i18n/paths";
+import { canAccess } from "@/lib/access";
 import { formatMinorAmount } from "@/lib/finance-format";
 import { OperationList } from "./_components/OperationList";
 import {
   fetchFinance,
   financeCookieHeader,
-  requireFinanceAdmin,
+  requireFinancePermission,
 } from "./_lib/finance-server";
 import { FINANCE_PATHS } from "./_lib/links";
 
@@ -38,7 +39,11 @@ export default async function FinanceRoutePage({
   const locale = resolveRouteLocale(rawLocale);
   const path = FINANCE_PATHS.overview;
 
-  const user = await requireFinanceAdmin(locale, path);
+  const user = await requireFinancePermission(
+    locale,
+    path,
+    "finance.accounts.read",
+  );
   const cookieHeader = await financeCookieHeader();
 
   const [books, balances, operations] = await Promise.all([
@@ -60,16 +65,18 @@ export default async function FinanceRoutePage({
       v1.finance.ledgerAccountBalanceListSchema,
       cookieHeader,
     ),
-    fetchFinance(
-      locale,
-      path,
-      `${v1.finance.ROUTES.operations.list}?${new URLSearchParams({
-        bookType: "COMPANY",
-        pageSize: String(RECENT_OPERATION_COUNT),
-      })}`,
-      v1.finance.financialOperationListSchema,
-      cookieHeader,
-    ),
+    canAccess(user, "finance.operations.read")
+      ? fetchFinance(
+          locale,
+          path,
+          `${v1.finance.ROUTES.operations.list}?${new URLSearchParams({
+            bookType: "COMPANY",
+            pageSize: String(RECENT_OPERATION_COUNT),
+          })}`,
+          v1.finance.financialOperationListSchema,
+          cookieHeader,
+        )
+      : Promise.resolve(null),
   ]);
 
   const t = messages[locale].finance;
@@ -101,30 +108,36 @@ export default async function FinanceRoutePage({
           </p>
         </div>
 
-        <Link
-          href={FINANCE_PATHS.newExpense}
-          className={cn(buttonVariants(), "shrink-0 self-start")}
-        >
-          <Plus aria-hidden="true" data-icon="inline-start" />
-          {t.overview.newExpense}
-        </Link>
+        {canAccess(user, "finance.expenses.create") ? (
+          <Link
+            href={FINANCE_PATHS.newExpense}
+            className={cn(buttonVariants(), "shrink-0 self-start")}
+          >
+            <Plus aria-hidden="true" data-icon="inline-start" />
+            {t.overview.newExpense}
+          </Link>
+        ) : null}
       </header>
 
       <section className="flex min-w-0 flex-col gap-4">
         <div className="flex flex-wrap items-center gap-2">
-          <Link
-            href={FINANCE_PATHS.newFunding}
-            className={buttonVariants({ variant: "outline" })}
-          >
-            {t.overview.addCompanyMoney}
-          </Link>
-          <Link
-            href={FINANCE_PATHS.settlement}
-            className={buttonVariants({ variant: "ghost" })}
-          >
-            {t.overview.viewSettlement}
-          </Link>
-          {user?.roles.includes(v1.auth.AUTH_ROLES.SUPER_ADMIN) ? (
+          {canAccess(user, "finance.funding.create") ? (
+            <Link
+              href={FINANCE_PATHS.newFunding}
+              className={buttonVariants({ variant: "outline" })}
+            >
+              {t.overview.addCompanyMoney}
+            </Link>
+          ) : null}
+          {canAccess(user, "finance.settlements.preview") ? (
+            <Link
+              href={FINANCE_PATHS.settlement}
+              className={buttonVariants({ variant: "ghost" })}
+            >
+              {t.overview.viewSettlement}
+            </Link>
+          ) : null}
+          {user?.isSuperAdmin ? (
             <Link
               href={FINANCE_PATHS.settings}
               className={cn(buttonVariants({ variant: "ghost" }), "sm:ml-auto")}
@@ -159,25 +172,27 @@ export default async function FinanceRoutePage({
         </Card>
       </section>
 
-      <section className="flex min-w-0 flex-col gap-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold">{t.operations.title}</h2>
-          <Link
-            href={FINANCE_PATHS.operations}
-            className={buttonVariants({ variant: "ghost", size: "sm" })}
-          >
-            {t.overview.viewOperations}
-            <ArrowRight aria-hidden="true" data-icon="inline-end" />
-          </Link>
-        </div>
+      {operations ? (
+        <section className="flex min-w-0 flex-col gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold">{t.operations.title}</h2>
+            <Link
+              href={FINANCE_PATHS.operations}
+              className={buttonVariants({ variant: "ghost", size: "sm" })}
+            >
+              {t.overview.viewOperations}
+              <ArrowRight aria-hidden="true" data-icon="inline-end" />
+            </Link>
+          </div>
 
-        <OperationList
-          items={operations.items}
-          currency={currency}
-          locale={locale}
-          emptyLabel={t.overview.empty}
-        />
-      </section>
+          <OperationList
+            items={operations.items}
+            currency={currency}
+            locale={locale}
+            emptyLabel={t.overview.empty}
+          />
+        </section>
+      ) : null}
     </div>
   );
 }

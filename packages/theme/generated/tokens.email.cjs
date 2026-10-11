@@ -114,6 +114,11 @@ exports.tokens = {
         "native": "Montserrat_400Regular",
         "email": "Arial, Helvetica, sans-serif"
       },
+      "body": {
+        "web": "var(--font-open-sans, 'Open Sans'), ui-sans-serif, system-ui, sans-serif",
+        "native": "Montserrat_400Regular",
+        "email": "Arial, Helvetica, sans-serif"
+      },
       "mono": {
         "web": "var(--font-mono, ui-monospace), SFMono-Regular, Menlo, Consolas, monospace",
         "native": "Menlo"

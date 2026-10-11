@@ -1,3 +1,5 @@
+import { AccessProjectionInterceptor } from "../access/access-projection.interceptor";
+import { RequireAllScope } from "../access/access.decorators";
 import {
   BadRequestException,
   Body,
@@ -37,7 +39,6 @@ import { ZodResponse } from "nestjs-zod";
 
 import type { AuthPrincipal } from "../auth/auth.types";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
-import { RequireRoles } from "../common/decorators/roles.decorator";
 import { getRequestMetadata } from "../common/http/request-metadata";
 import { CompletePersonDocumentPhotoUploadInput } from "./dto/complete-person-document-photo-upload.input";
 import { CreatePersonDocumentInput } from "./dto/create-person-document.input";
@@ -68,7 +69,7 @@ import { PersonDocumentExtraction } from "./dto/person-document-extraction";
 @ApiTags("persons")
 @ApiCookieAuth(v1.auth.ACCESS_TOKEN_COOKIE)
 @ApiBearerAuth("bearer")
-@RequireRoles("ADMIN")
+@UseInterceptors(AccessProjectionInterceptor)
 @Controller({ path: "persons", version: "1" })
 export class PersonsController {
   constructor(
@@ -76,6 +77,7 @@ export class PersonsController {
     private readonly documentAnalysis: PersonDocumentAnalysisService,
   ) {}
 
+  @RequireAllScope("person_documents.extract")
   @Post("document-extraction")
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
@@ -92,6 +94,7 @@ export class PersonsController {
     return this.documentAnalysis.analyze(input, user.id);
   }
 
+  @RequireAllScope("persons.create")
   @Post()
   @ApiOperation({
     operationId: "PersonsController_create_v1",
@@ -111,20 +114,28 @@ export class PersonsController {
     );
   }
 
+  @RequireAllScope("persons.read")
   @Get()
   @ApiOperation({
     operationId: "PersonsController_list_v1",
     summary: "List admin-managed person records",
   })
   @ZodResponse({ type: PersonList })
-  async list(@Query() query: ListPersonsQuery): Promise<v1.persons.PersonList> {
-    const result = await this.persons.list(query);
+  async list(
+    @Query() query: ListPersonsQuery,
+    @CurrentUser() user: AuthPrincipal,
+  ): Promise<v1.persons.PersonList> {
+    const result = await this.persons.list(
+      query,
+      v1.access.hasPermission(user.access, "person_documents.read", "ALL"),
+    );
     return {
       ...result,
       items: result.items.map(toPerson),
     };
   }
 
+  @RequireAllScope("persons.read")
   @Get(":id")
   @ApiOperation({
     operationId: "PersonsController_get_v1",
@@ -139,6 +150,7 @@ export class PersonsController {
     return toPerson(row);
   }
 
+  @RequireAllScope("persons.audit.read")
   @Get(":id/audit-events")
   @ApiOperation({
     operationId: "PersonsController_listAuditEvents_v1",
@@ -147,10 +159,15 @@ export class PersonsController {
   @ZodResponse({ type: PersonAuditEventList })
   async listAuditEvents(
     @Param("id") id: string,
+    @CurrentUser() user: AuthPrincipal,
   ): Promise<v1.persons.PersonAuditEvent[]> {
-    return this.persons.listAuditEvents(id);
+    return this.persons.listAuditEvents(
+      id,
+      v1.access.hasPermission(user.access, "person_documents.read", "ALL"),
+    );
   }
 
+  @RequireAllScope("person_documents.read")
   @Get(":id/documents")
   @ApiOperation({
     operationId: "PersonsController_listDocuments_v1",
@@ -163,6 +180,7 @@ export class PersonsController {
     return (await this.persons.listDocuments(id)).map(toPersonDocument);
   }
 
+  @RequireAllScope("person_documents.write")
   @Post(":id/documents")
   @ApiOperation({
     operationId: "PersonsController_createDocument_v1",
@@ -183,6 +201,7 @@ export class PersonsController {
     );
   }
 
+  @RequireAllScope("person_documents.read")
   @Get(":id/documents/:documentId")
   @ApiOperation({
     operationId: "PersonsController_getDocument_v1",
@@ -200,6 +219,7 @@ export class PersonsController {
     return toPersonDocument(row);
   }
 
+  @RequireAllScope("person_documents.write")
   @Patch(":id/documents/:documentId")
   @ApiOperation({
     operationId: "PersonsController_updateDocument_v1",
@@ -221,6 +241,7 @@ export class PersonsController {
     );
   }
 
+  @RequireAllScope("person_documents.write")
   @Post(":id/documents/:documentId/replace")
   @ApiOperation({
     operationId: "PersonsController_replaceDocument_v1",
@@ -242,6 +263,7 @@ export class PersonsController {
     );
   }
 
+  @RequireAllScope("person_documents.delete")
   @Delete(":id/documents/:documentId")
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
@@ -261,6 +283,7 @@ export class PersonsController {
     });
   }
 
+  @RequireAllScope("person_documents.read")
   @Get(":id/documents/:documentId/photos")
   @ApiOperation({
     operationId: "PersonsController_listDocumentPhotos_v1",
@@ -276,6 +299,7 @@ export class PersonsController {
     );
   }
 
+  @RequireAllScope("person_documents.write")
   @Put(":id/documents/:documentId/photos/:slot")
   @UseInterceptors(FileInterceptor("file", { storage: memoryStorage() }))
   @ApiConsumes("multipart/form-data")
@@ -319,6 +343,7 @@ export class PersonsController {
     );
   }
 
+  @RequireAllScope("person_documents.write")
   @Post(":id/documents/:documentId/photos/:slot/upload-url")
   @ApiOperation({
     operationId: "PersonsController_createDocumentPhotoUploadUrl_v1",
@@ -341,6 +366,7 @@ export class PersonsController {
     );
   }
 
+  @RequireAllScope("person_documents.write")
   @Post("document-photo-draft-upload-url")
   @ApiOperation({
     operationId: "PersonsController_createDocumentPhotoDraftUploadUrl_v1",
@@ -354,6 +380,7 @@ export class PersonsController {
     return this.persons.createDocumentPhotoDraftUploadUrl(input, user.id);
   }
 
+  @RequireAllScope("person_documents.write")
   @Post(":id/documents/:documentId/photos/:slot/complete-upload")
   @ApiOperation({
     operationId: "PersonsController_completeDocumentPhotoUpload_v1",
@@ -379,6 +406,7 @@ export class PersonsController {
     );
   }
 
+  @RequireAllScope("person_documents.read")
   @Get(":id/documents/:documentId/photos/:slot/content")
   @ApiOperation({
     operationId: "PersonsController_getDocumentPhotoContent_v1",
@@ -414,6 +442,7 @@ export class PersonsController {
     await pipeline(content.body, res);
   }
 
+  @RequireAllScope("person_documents.delete")
   @Delete(":id/documents/:documentId/photos/:slot")
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
@@ -429,6 +458,7 @@ export class PersonsController {
     await this.persons.softDeleteDocumentPhoto(id, documentId, slot);
   }
 
+  @RequireAllScope("persons.update")
   @Patch(":id")
   @ApiOperation({
     operationId: "PersonsController_update_v1",
@@ -449,6 +479,7 @@ export class PersonsController {
     );
   }
 
+  @RequireAllScope("persons.archive")
   @Delete(":id")
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({

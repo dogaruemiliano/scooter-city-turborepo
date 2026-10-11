@@ -1,3 +1,7 @@
+import {
+  RequireAllScope,
+  RequireSuperAdmin,
+} from "../../access/access.decorators";
 /**
  * Finance HTTP surface.
  *
@@ -33,7 +37,6 @@ import { ZodResponse } from "nestjs-zod";
 
 import type { AuthPrincipal } from "../../auth/auth.types";
 import { CurrentUser } from "../../auth/decorators/current-user.decorator";
-import { RequireRoles } from "../../common/decorators/roles.decorator";
 import { CreateExpenseUseCase } from "../application/expenses/create-expense.use-case";
 import { CreateExpenseReceiptUploadUseCase } from "../application/expenses/create-expense-receipt-upload.use-case";
 import { AnalyzeExpenseReceiptUseCase } from "../application/expenses/analyze-expense-receipt.use-case";
@@ -104,7 +107,6 @@ const IDEMPOTENCY_HEADER_DOC = {
 @ApiTags("finance")
 @ApiCookieAuth(v1.auth.ACCESS_TOKEN_COOKIE)
 @ApiBearerAuth("bearer")
-@RequireRoles(v1.auth.AUTH_ROLES.ADMIN)
 @UseInterceptors(FinanceErrorInterceptor)
 @Controller({ path: "finance", version: "1" })
 export class FinanceController {
@@ -130,6 +132,7 @@ export class FinanceController {
   // Reference data
   // ---------------------------------------------------------------------
 
+  @RequireAllScope("finance.books.read")
   @Get("books")
   @ApiOperation({
     operationId: "FinanceController_listBooks_v1",
@@ -140,8 +143,8 @@ export class FinanceController {
     return this.queries.listBooks();
   }
 
+  @RequireSuperAdmin()
   @Post("books")
-  @RequireRoles(v1.auth.AUTH_ROLES.SUPER_ADMIN)
   @ApiOperation({
     operationId: "FinanceController_createBook_v1",
     summary: "Create and initialize a finance book",
@@ -154,8 +157,8 @@ export class FinanceController {
     return this.books.create(input, user.id);
   }
 
+  @RequireSuperAdmin()
   @Put("books/:bookId")
-  @RequireRoles(v1.auth.AUTH_ROLES.SUPER_ADMIN)
   @ApiOperation({
     operationId: "FinanceController_updateBook_v1",
     summary: "Update a finance book's localized names",
@@ -168,8 +171,8 @@ export class FinanceController {
     return this.books.update(bookId, input);
   }
 
+  @RequireSuperAdmin()
   @Get("company-identity")
-  @RequireRoles(v1.auth.AUTH_ROLES.SUPER_ADMIN)
   @ApiOperation({
     operationId: "FinanceController_getCompanyIdentity_v1",
     summary: "Get the legal identity used to match company receipts",
@@ -179,8 +182,8 @@ export class FinanceController {
     return this.companyIdentity.get();
   }
 
+  @RequireSuperAdmin()
   @Put("company-identity")
-  @RequireRoles(v1.auth.AUTH_ROLES.SUPER_ADMIN)
   @ApiOperation({
     operationId: "FinanceController_upsertCompanyIdentity_v1",
     summary: "Configure the legal identity used to match company receipts",
@@ -192,8 +195,8 @@ export class FinanceController {
     return this.companyIdentity.upsert(input);
   }
 
+  @RequireSuperAdmin()
   @Get("company-associates")
-  @RequireRoles(v1.auth.AUTH_ROLES.SUPER_ADMIN)
   @ApiOperation({
     operationId: "FinanceController_getCompanyAssociates_v1",
     summary: "List active company associates and ownership shares",
@@ -203,8 +206,8 @@ export class FinanceController {
     return this.companyAssociates.get();
   }
 
+  @RequireSuperAdmin()
   @Put("company-associates")
-  @RequireRoles(v1.auth.AUTH_ROLES.SUPER_ADMIN)
   @ApiOperation({
     operationId: "FinanceController_updateCompanyAssociates_v1",
     summary: "Replace active company associates and ownership shares",
@@ -216,6 +219,7 @@ export class FinanceController {
     return this.companyAssociates.update(input);
   }
 
+  @RequireAllScope("finance.suppliers.read")
   @Get("suppliers")
   @ApiOperation({
     operationId: "FinanceController_listSuppliers_v1",
@@ -228,6 +232,7 @@ export class FinanceController {
     return this.suppliers.list(query);
   }
 
+  @RequireAllScope("finance.suppliers.manage")
   @Post("suppliers")
   @ApiOperation({
     operationId: "FinanceController_createSupplier_v1",
@@ -240,6 +245,7 @@ export class FinanceController {
     return this.suppliers.create(input);
   }
 
+  @RequireAllScope("finance.suppliers.manage")
   @Patch("suppliers/:supplierId")
   @ApiOperation({
     operationId: "FinanceController_updateSupplier_v1",
@@ -253,6 +259,7 @@ export class FinanceController {
     return this.suppliers.update(supplierId, input);
   }
 
+  @RequireAllScope("finance.accounts.read")
   @Get("accounts")
   @ApiOperation({
     operationId: "FinanceController_listAccounts_v1",
@@ -265,6 +272,7 @@ export class FinanceController {
     return this.queries.listAccounts(query);
   }
 
+  @RequireAllScope("finance.accounts.read")
   @Get("account-balances")
   @ApiOperation({
     operationId: "FinanceController_listAccountBalances_v1",
@@ -277,6 +285,7 @@ export class FinanceController {
     return this.queries.listAccountBalances(query);
   }
 
+  @RequireAllScope("finance.accounts.read")
   @Get("accounts/:accountId")
   @ApiOperation({
     operationId: "FinanceController_getAccount_v1",
@@ -289,6 +298,7 @@ export class FinanceController {
     return this.queries.getAccount(accountId);
   }
 
+  @RequireAllScope("finance.accounts.read")
   @Get("accounts/:accountId/balance")
   @ApiOperation({
     operationId: "FinanceController_getAccountBalance_v1",
@@ -301,6 +311,7 @@ export class FinanceController {
     return this.queries.getAccountBalance(accountId);
   }
 
+  @RequireAllScope("finance.reference.read")
   @Get("expense-categories")
   @ApiOperation({
     operationId: "FinanceController_listExpenseCategories_v1",
@@ -313,6 +324,7 @@ export class FinanceController {
     return this.queries.listExpenseCategories(query);
   }
 
+  @RequireAllScope("finance.reference.read")
   @Get("cost-objects")
   @ApiOperation({
     operationId: "FinanceController_listCostObjects_v1",
@@ -329,6 +341,7 @@ export class FinanceController {
   // Operations
   // ---------------------------------------------------------------------
 
+  @RequireAllScope("finance.operations.read")
   @Get("operations")
   @ApiOperation({
     operationId: "FinanceController_listOperations_v1",
@@ -341,6 +354,7 @@ export class FinanceController {
     return this.queries.listOperations(query);
   }
 
+  @RequireAllScope("finance.operations.read")
   @Get("operations/:operationId")
   @ApiOperation({
     operationId: "FinanceController_getOperation_v1",
@@ -353,6 +367,7 @@ export class FinanceController {
     return this.queries.getOperation(operationId);
   }
 
+  @RequireAllScope("finance.operations.reverse")
   @Post("operations/:operationId/reverse")
   @ApiOperation({
     operationId: "FinanceController_reverseOperation_v1",
@@ -380,6 +395,7 @@ export class FinanceController {
   // Expenses
   // ---------------------------------------------------------------------
 
+  @RequireAllScope("finance.expenses.create")
   @Post("expenses/receipt-draft-upload-url")
   @ApiOperation({
     operationId: "FinanceController_createExpenseReceiptDraftUpload_v1",
@@ -393,6 +409,7 @@ export class FinanceController {
     return this.createExpenseReceiptUpload.execute(input, user.id);
   }
 
+  @RequireAllScope("finance.expenses.create")
   @Post("expenses/extractions")
   @ApiOperation({
     operationId: "FinanceController_analyzeExpenseReceipt_v1",
@@ -406,6 +423,7 @@ export class FinanceController {
     return this.analyzeExpenseReceipt.execute(input, user.id);
   }
 
+  @RequireAllScope("finance.expenses.create")
   @Get("expenses/extractions/:draftId")
   @ApiOperation({
     operationId: "FinanceController_getExpenseExtractionDraft_v1",
@@ -419,6 +437,7 @@ export class FinanceController {
     return this.expenseExtractionDrafts.get(draftId, user.id);
   }
 
+  @RequireAllScope("finance.expenses.create")
   @Post("expenses/preview")
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -432,6 +451,7 @@ export class FinanceController {
     return this.previewExpense.execute(input);
   }
 
+  @RequireAllScope("finance.expenses.create")
   @Post("expenses")
   @ApiOperation({
     operationId: "FinanceController_createExpense_v1",
@@ -455,6 +475,7 @@ export class FinanceController {
   // Company funding
   // ---------------------------------------------------------------------
 
+  @RequireAllScope("finance.funding.create")
   @Post("funding/preview")
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -468,6 +489,7 @@ export class FinanceController {
     return this.previewAssociateFunding.execute(input);
   }
 
+  @RequireAllScope("finance.funding.create")
   @Post("funding/proof-draft-upload-url")
   @ApiOperation({
     operationId: "FinanceController_createFundingProofDraftUpload_v1",
@@ -481,6 +503,7 @@ export class FinanceController {
     return this.createFundingProofUpload.execute(input, user.id);
   }
 
+  @RequireAllScope("finance.funding.create")
   @Post("funding")
   @ApiOperation({
     operationId: "FinanceController_createAssociateFunding_v1",
@@ -504,6 +527,7 @@ export class FinanceController {
   // Settlement
   // ---------------------------------------------------------------------
 
+  @RequireAllScope("finance.settlements.preview")
   @Post("settlements/preview")
   @HttpCode(HttpStatus.OK)
   @ApiOperation({

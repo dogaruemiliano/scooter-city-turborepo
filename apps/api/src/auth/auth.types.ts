@@ -1,3 +1,5 @@
+import type { AccessService } from "../access/access.service";
+
 /**
  * Internal auth-context shapes.
  *
@@ -21,6 +23,7 @@ export interface JwtPayload {
 }
 
 export interface AuthPrincipal {
+  access?: Awaited<ReturnType<AccessService["getSnapshot"]>>;
   id: string;
   email: string;
   sessionId: string;

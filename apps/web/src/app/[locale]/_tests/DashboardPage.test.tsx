@@ -53,7 +53,15 @@ describe("dashboard page", () => {
 
   it("gives admins direct links into the existing financial and fleet workflows", async () => {
     mocks.loadDashboard.mockResolvedValue({
-      user: { email: "admin@example.com" },
+      user: {
+        email: "admin@example.com",
+        effectiveScopes: {
+          "finance.expenses.create": ["ALL"],
+          "finance.funding.create": ["ALL"],
+          "persons.read": ["ALL"],
+          "scooters.read": ["ALL"],
+        },
+      },
       overview: Promise.resolve({ cash: null, fleet: null, operations: null }),
     });
 

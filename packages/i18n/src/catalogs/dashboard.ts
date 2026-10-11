@@ -34,7 +34,8 @@ export const dashboardCatalog = {
     loading: "Loading your overview",
     account: {
       title: "Welcome to ScooterCity",
-      description: "Manage your profile, sign-in methods and active devices.",
+      description:
+        "No app permissions have been assigned. You can manage your profile, sign-in methods and active devices.",
       heading: "Your account",
       signedInAs: "Signed in as",
       settings: "Open account settings",
@@ -77,7 +78,7 @@ export const dashboardCatalog = {
     account: {
       title: "Bun venit la ScooterCity",
       description:
-        "Gestionează profilul, metodele de autentificare și dispozitivele active.",
+        "Nu au fost atribuite permisiuni în aplicație. Poți gestiona profilul, metodele de autentificare și dispozitivele active.",
       heading: "Contul tău",
       signedInAs: "Autentificat cu",
       settings: "Deschide setările contului",

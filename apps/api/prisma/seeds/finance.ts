@@ -154,9 +154,10 @@ export async function seedFinance(prisma: PrismaClient): Promise<void> {
         email: associate.email,
         firstName: associate.firstName,
         lastName: associate.lastName,
-        roles: [v1.auth.AUTH_ROLES.ADMIN],
+        roles: [],
+        loginStatus: "DISABLED",
       },
-      update: { roles: [v1.auth.AUTH_ROLES.ADMIN], deletedAt: null },
+      update: {},
     });
   }
 

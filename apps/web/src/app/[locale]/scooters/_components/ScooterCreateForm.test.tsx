@@ -1070,3 +1070,7 @@ async function fillDateParts(
 function requiredLabel(text: string) {
   return screen.getByText(text).closest("div") ?? screen.getByText(text);
 }
+
+vi.mock("@/components/auth/SessionProvider", () => ({
+  useOptionalSession: () => ({ user: { isSuperAdmin: true } }),
+}));

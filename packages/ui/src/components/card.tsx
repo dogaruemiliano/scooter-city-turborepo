@@ -2,22 +2,35 @@ import * as React from "react";
 
 import { cn } from "@repo/ui/lib/utils";
 
-function Card({
+type CardElement = "div" | "article" | "section" | "form";
+
+type CardProps<Element extends CardElement = "div"> = {
+  as?: Element;
+  size?: "default" | "sm";
+  surface?: "default" | "raised";
+} & Omit<React.ComponentProps<Element>, "as">;
+
+function Card<Element extends CardElement = "div">({
+  as,
   className,
   size = "default",
+  surface = "default",
   ...props
-}: React.ComponentProps<"div"> & { size?: "default" | "sm" }) {
-  return (
-    <div
-      data-slot="card"
-      data-size={size}
-      className={cn(
-        "group/card flex flex-col gap-(--card-spacing) overflow-hidden rounded-xl border border-border bg-card py-(--card-spacing) text-sm text-card-foreground [--card-spacing:--spacing(4)] has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:--spacing(3)] data-[size=sm]:has-data-[slot=card-footer]:pb-0 minimal:rounded-none minimal:border-x-0 minimal:border-t-0 minimal:border-b minimal:border-border minimal:pt-0 minimal:pb-3 minimal:shadow-none *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl",
-        className,
-      )}
-      {...props}
-    />
-  );
+}: CardProps<Element>) {
+  return React.createElement(as ?? "div", {
+    "data-slot": "card",
+    "data-size": size,
+    "data-surface": surface,
+    className: cn(
+      "group/card flex min-w-0 flex-col gap-(--card-spacing) overflow-hidden rounded-xl border border-border bg-card py-(--card-spacing) text-sm text-card-foreground [--card-spacing:--spacing(5)] has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 minimal:rounded-none minimal:border-x-0 minimal:border-t-0 minimal:border-b minimal:border-border minimal:pt-0 minimal:pb-3 minimal:shadow-none *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl",
+      surface === "raised" &&
+        "rounded-2xl bg-popover text-popover-foreground [--card-spacing:--spacing(4)] md:[--card-spacing:--spacing(6)]",
+      size === "sm" &&
+        "[--card-spacing:--spacing(3)] md:[--card-spacing:--spacing(3)]",
+      className,
+    ),
+    ...props,
+  });
 }
 
 function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
@@ -38,7 +51,7 @@ function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="card-title"
       className={cn(
-        "text-base leading-snug font-medium group-data-[size=sm]/card:text-sm",
+        "font-sans text-base leading-snug font-semibold group-data-[size=sm]/card:text-sm",
         className,
       )}
       {...props}
@@ -84,7 +97,7 @@ function CardFooter({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="card-footer"
       className={cn(
-        "flex items-center rounded-b-xl border-t border-border bg-muted p-(--card-spacing) minimal:rounded-none minimal:border-0 minimal:bg-transparent minimal:px-0 minimal:pt-0 minimal:pb-3",
+        "flex items-center rounded-b-xl border-t border-border bg-inherit p-(--card-spacing) minimal:rounded-none minimal:border-0 minimal:bg-transparent minimal:px-0 minimal:pt-0 minimal:pb-3",
         className,
       )}
       {...props}
@@ -100,4 +113,5 @@ export {
   CardAction,
   CardDescription,
   CardContent,
+  type CardProps,
 };

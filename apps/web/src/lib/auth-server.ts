@@ -14,7 +14,7 @@ export type SessionUser = v1.auth.SessionUser;
 /**
  * Verifies the `access_token` cookie locally against the API's JWKS and
  * returns the session derived from JWT claims. Fast (no network round-trip)
- * — suitable for the root layout and every protected page's gate check.
+ * — suitable only as an identity hint, never as an authorization gate.
  *
  * Trade-off: detects token *invalidation* up to 15min late (the
  * `JWT_ACCESS_TTL`). Pages that need DB-fresh user fields (profile, billing,
@@ -90,8 +90,8 @@ export async function activeSessionsFromApi(): Promise<
   }
 }
 
-export async function requireUser(): Promise<SessionIdentity> {
-  const me = await meOnServer();
+export async function requireUser(): Promise<SessionUser> {
+  const me = await meFromApi();
   if (!me) redirect("/sign-in");
   return me;
 }

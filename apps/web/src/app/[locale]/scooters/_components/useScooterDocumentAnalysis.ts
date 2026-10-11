@@ -1,5 +1,8 @@
 "use client";
 
+import { useOptionalSession } from "@/components/auth/SessionProvider";
+import { canAccess } from "@/lib/access";
+
 import { ApiError, v1 } from "@repo/api-shared";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { webApi } from "@/lib/api";
@@ -52,6 +55,10 @@ export function useScooterDocumentAnalysis(
   documents: ScooterDocumentsEditor,
   scooterId?: string,
 ) {
+  const canExtract = canAccess(
+    useOptionalSession()?.user,
+    "scooter_documents.extract",
+  );
   const [entries, setEntries] = useState<Record<string, DocumentAnalysisState>>(
     {},
   );
@@ -118,7 +125,7 @@ export function useScooterDocumentAnalysis(
       ),
     );
     setRunning(false);
-  }, [signature]);
+  }, [signature, canExtract]);
   useEffect(() => {
     mounted.current = true;
     const pendingControllers = controllers.current;
@@ -130,7 +137,11 @@ export function useScooterDocumentAnalysis(
   }, []);
 
   const run = useCallback(async () => {
-    if (activeRun.current || latest.current.some((source) => !source.ready))
+    if (
+      !canExtract ||
+      activeRun.current ||
+      latest.current.some((source) => !source.ready)
+    )
       return null;
     activeRun.current = true;
     setRunning(true);
@@ -189,7 +200,7 @@ export function useScooterDocumentAnalysis(
     activeRun.current = false;
     setRunning(false);
     return latest.current.map((source) => cache.current.get(source.key));
-  }, []);
+  }, [canExtract]);
 
   const dismissFailures = useCallback(() => {
     for (const [key, state] of cache.current)

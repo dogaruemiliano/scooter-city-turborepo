@@ -8,12 +8,12 @@ import FinanceRoutePage from "../page";
 
 const mocks = vi.hoisted(() => ({
   fetchFinance: vi.fn(),
-  requireFinanceAdmin: vi.fn().mockResolvedValue(undefined),
+  requireFinancePermission: vi.fn().mockResolvedValue({ isSuperAdmin: true }),
 }));
 
 vi.mock("../_lib/finance-server", () => ({
   fetchFinance: mocks.fetchFinance,
-  requireFinanceAdmin: mocks.requireFinanceAdmin,
+  requireFinancePermission: mocks.requireFinancePermission,
   financeCookieHeader: async () => "session=finance-admin",
 }));
 
@@ -110,6 +110,52 @@ describe("Finance overview", () => {
       messages.en.finance.overview.sections.cash,
     );
     expect(cashLabel.nextElementSibling).toHaveTextContent(/RON\s+750\.00/);
-    expect(mocks.requireFinanceAdmin).toHaveBeenCalledWith("en", "/finance");
+    expect(mocks.requireFinancePermission).toHaveBeenCalledWith(
+      "en",
+      "/finance",
+      "finance.accounts.read",
+    );
+  });
+  it("does not fetch operational history or show write controls to a balance-only viewer", async () => {
+    mocks.fetchFinance.mockClear();
+    mocks.requireFinancePermission.mockResolvedValueOnce({
+      effectiveScopes: {
+        "finance.accounts.read": ["ALL"],
+        "finance.books.read": ["ALL"],
+      },
+    });
+    mocks.fetchFinance.mockImplementation(
+      async (_locale: string, _returnPath: string, path: string) => {
+        if (path.split("?")[0] === v1.finance.ROUTES.books)
+          return { items: [] };
+        if (path.split("?")[0] === v1.finance.ROUTES.accounts.balances)
+          return { items: [bankBalance] };
+        throw new Error(`Unexpected unauthorized fetch: ${path}`);
+      },
+    );
+    render(
+      await FinanceRoutePage({ params: Promise.resolve({ locale: "en" }) }),
+    );
+    expect(mocks.fetchFinance).toHaveBeenCalledTimes(2);
+    expect(
+      screen.queryByRole("link", {
+        name: messages.en.finance.overview.newExpense,
+      }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", {
+        name: messages.en.finance.overview.addCompanyMoney,
+      }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", {
+        name: messages.en.finance.overview.viewSettlement,
+      }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", {
+        name: messages.en.finance.overview.viewOperations,
+      }),
+    ).not.toBeInTheDocument();
   });
 });

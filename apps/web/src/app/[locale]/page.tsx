@@ -1,3 +1,4 @@
+import { canAccess } from "@/lib/access";
 import type { Metadata } from "next";
 import { messages } from "@repo/i18n";
 import { buttonVariants, Card } from "@repo/ui/components";
@@ -77,39 +78,83 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
             {t.description}
           </p>
         </div>
-        <Link href={FINANCE_PATHS.newExpense} className={buttonVariants()}>
-          <PlusIcon aria-hidden="true" data-icon="inline-start" />
-          {t.newExpense}
-        </Link>
+        {canAccess(user, "finance.expenses.create") ? (
+          <Link href={FINANCE_PATHS.newExpense} className={buttonVariants()}>
+            <PlusIcon aria-hidden="true" data-icon="inline-start" />
+            {t.newExpense}
+          </Link>
+        ) : null}
       </header>
 
       <nav
         aria-label={t.shortcuts}
         className="flex flex-wrap items-center gap-2"
       >
-        <Link
-          href={FINANCE_PATHS.newFunding}
-          className={buttonVariants({ variant: "outline", size: "sm" })}
-        >
-          {t.links.funding}
-        </Link>
-        <Link
-          href="/scooters"
-          className={buttonVariants({ variant: "outline", size: "sm" })}
-        >
-          {t.links.scooters}
-        </Link>
-        <Link
-          href="/persons"
-          className={buttonVariants({ variant: "outline", size: "sm" })}
-        >
-          {t.links.people}
-        </Link>
+        {canAccess(user, "finance.funding.create") ? (
+          <Link
+            href={FINANCE_PATHS.newFunding}
+            className={buttonVariants({ variant: "outline", size: "sm" })}
+          >
+            {t.links.funding}
+          </Link>
+        ) : null}
+        {canAccess(user, "scooters.read", "ALL") ? (
+          <Link
+            href="/scooters"
+            className={buttonVariants({ variant: "outline", size: "sm" })}
+          >
+            {t.links.scooters}
+          </Link>
+        ) : null}
+        {canAccess(user, "persons.read") ? (
+          <Link
+            href="/persons"
+            className={buttonVariants({ variant: "outline", size: "sm" })}
+          >
+            {t.links.people}
+          </Link>
+        ) : null}
+        {canAccess(user, "problems.read") ? (
+          <Link
+            href="/problems"
+            className={buttonVariants({ variant: "outline", size: "sm" })}
+          >
+            {messages[locale].appShell.nav.problems}
+          </Link>
+        ) : null}
+        {canAccess(user, "portal.rentals.read") ? (
+          <Link
+            href="/my-rentals"
+            className={buttonVariants({ variant: "outline", size: "sm" })}
+          >
+            {messages[locale].appShell.nav.myRentals}
+          </Link>
+        ) : null}
+        {canAccess(user, "rentals.read") ? (
+          <Link
+            href="/rentals"
+            className={buttonVariants({ variant: "outline", size: "sm" })}
+          >
+            {messages[locale].appShell.nav.rentals}
+          </Link>
+        ) : null}
+        {user.isSuperAdmin ? (
+          <Link
+            href="/users"
+            className={buttonVariants({ variant: "outline", size: "sm" })}
+          >
+            {messages[locale].appShell.nav.users}
+          </Link>
+        ) : null}
       </nav>
 
-      <Suspense fallback={<DashboardOverviewSkeleton locale={locale} />}>
-        <DashboardOverview data={overview} locale={locale} />
-      </Suspense>
+      {canAccess(user, "finance.accounts.read") ||
+      canAccess(user, "finance.operations.read") ||
+      canAccess(user, "scooters.read", "ALL") ? (
+        <Suspense fallback={<DashboardOverviewSkeleton locale={locale} />}>
+          <DashboardOverview data={overview} locale={locale} />
+        </Suspense>
+      ) : null}
     </div>
   );
 }

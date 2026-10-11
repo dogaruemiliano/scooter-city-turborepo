@@ -588,3 +588,24 @@ function personRecord(
     ...overrides,
   };
 }
+
+vi.mock("@/components/auth/SessionProvider", () => ({
+  useOptionalSession: () => ({
+    user: {
+      effectiveScopes: {
+        "persons.read": ["ALL"],
+        "persons.create": ["ALL"],
+        "persons.update": ["ALL"],
+        "persons.archive": ["ALL"],
+        "persons.audit.read": ["ALL"],
+        "person_documents.read": ["ALL"],
+        "person_documents.write": ["ALL"],
+        "person_documents.delete": ["ALL"],
+        "scooters.read": ["ALL"],
+        "scooters.create": ["ALL"],
+        "scooters.update": ["ALL"],
+        "scooters.archive": ["ALL"],
+      },
+    },
+  }),
+}));

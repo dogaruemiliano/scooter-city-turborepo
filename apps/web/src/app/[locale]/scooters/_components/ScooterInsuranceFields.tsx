@@ -1,5 +1,8 @@
 "use client";
 
+import { useOptionalSession } from "@/components/auth/SessionProvider";
+import { canAccess } from "@/lib/access";
+
 import { v1 } from "@repo/api-shared";
 import { Button, Checkbox, FormSection } from "@repo/ui/components";
 import { PlusIcon } from "lucide-react";
@@ -48,6 +51,9 @@ export function ScooterInsuranceDocuments({
 }) {
   const t = useTranslations("scooters.insurance");
   const { fields, append, remove } = insurance;
+  const user = useOptionalSession()?.user;
+  const canWrite = canAccess(user, "scooter_documents.write");
+  if (!canAccess(user, "scooter_documents.read")) return null;
   if (!editing) {
     const policy = fields[0];
     return (
@@ -76,7 +82,7 @@ export function ScooterInsuranceDocuments({
             documents={documents}
             disabled={disabled}
           />
-          {!persistedPolicyIds.includes(policy.id) ? (
+          {canWrite && !persistedPolicyIds.includes(policy.id) ? (
             <Button
               type="button"
               variant="text"
@@ -94,18 +100,20 @@ export function ScooterInsuranceDocuments({
           ) : null}
         </div>
       ))}
-      <Button
-        type="button"
-        variant="outline"
-        className="justify-self-start"
-        disabled={disabled || fields.length >= 100}
-        onClick={() =>
-          append(insuranceEditorDefaults(), { shouldFocus: false })
-        }
-      >
-        <PlusIcon aria-hidden="true" />
-        {t("add")}
-      </Button>
+      {canWrite ? (
+        <Button
+          type="button"
+          variant="outline"
+          className="justify-self-start"
+          disabled={disabled || fields.length >= 100}
+          onClick={() =>
+            append(insuranceEditorDefaults(), { shouldFocus: false })
+          }
+        >
+          <PlusIcon aria-hidden="true" />
+          {t("add")}
+        </Button>
+      ) : null}
     </section>
   );
 }
@@ -123,7 +131,11 @@ export function ScooterInsuranceFields({
   const locale = useLocale();
   const { control } = useFormContext<ScooterEditorValues>();
   const policies = useWatch({ control, name: "insurancePolicies" }) ?? [];
+  const user = useOptionalSession()?.user;
+  const canWrite = canAccess(user, "scooter_documents.write");
+  const readOnly = disabled || !canWrite;
   const vin = useWatch({ control, name: "vin" });
+  if (!canAccess(user, "scooter_documents.read")) return null;
   return (
     <>
       {v1.scooters.insurancePeriodsOverlap(policies) ? (
@@ -149,7 +161,7 @@ export function ScooterInsuranceFields({
                 <FormField
                   name={name}
                   label={t(`fields.${field}`)}
-                  disabled={disabled}
+                  disabled={readOnly}
                   labelSuffix={
                     field === "validFrom" || field === "validUntil"
                       ? "-day"
@@ -194,7 +206,7 @@ export function ScooterInsuranceFields({
               name={`insurancePolicies.${index}.vinReviewConfirmed`}
               controlId={`insurance-${policy.id}-vin-review`}
               label={t("fields.vinReviewConfirmed")}
-              disabled={disabled}
+              disabled={readOnly}
             >
               <Controller
                 control={control}
@@ -206,7 +218,7 @@ export function ScooterInsuranceFields({
                     onCheckedChange={field.onChange}
                     onBlur={field.onBlur}
                     ref={field.ref}
-                    disabled={disabled}
+                    disabled={readOnly}
                     aria-label={t("fields.vinReviewConfirmed")}
                   />
                 )}
@@ -217,12 +229,12 @@ export function ScooterInsuranceFields({
               <ScooterVinReference />
             </FormField>
           ) : null}
-          {onRemovePolicy ? (
+          {canWrite && onRemovePolicy ? (
             <Button
               type="button"
               variant="text"
               className="justify-self-start"
-              disabled={disabled}
+              disabled={readOnly}
               onClick={() => onRemovePolicy(index)}
             >
               {t("removeDraft")}

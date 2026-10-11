@@ -68,6 +68,7 @@ function extractionWarnings(
 export function useDocumentExtraction(
   state: ExtractionState,
   setState: Dispatch<SetStateAction<ExtractionState>>,
+  enabled = true,
 ) {
   const [jobs, setJobs] = useState<Record<string, DocumentExtractionJob>>({});
   const requests = useRef(
@@ -77,6 +78,12 @@ export function useDocumentExtraction(
   const forceReading = useRef(new Set<string>());
 
   useEffect(() => {
+    if (!enabled) {
+      for (const request of requests.current.values())
+        request.controller.abort();
+      requests.current.clear();
+      return;
+    }
     const active = new Map(
       state.form.documents.map((document) => [
         document.key,
@@ -200,7 +207,7 @@ export function useDocumentExtraction(
       }
       void extract();
     }
-  }, [state.form.documents, state.readings, setState, jobs]);
+  }, [state.form.documents, state.readings, setState, jobs, enabled]);
 
   useEffect(
     () => () => {
@@ -223,7 +230,7 @@ export function useDocumentExtraction(
   }
 
   const pendingDocumentKeys = new Set(
-    state.form.documents.flatMap((document) => {
+    (enabled ? state.form.documents : []).flatMap((document) => {
       const signature = documentExtractionSignature(document);
       return signature &&
         (jobs[document.key]?.signature !== signature ||
@@ -233,10 +240,11 @@ export function useDocumentExtraction(
     }),
   );
   return {
-    jobs,
+    jobs: enabled ? jobs : {},
     pending: pendingDocumentKeys.size > 0,
     pendingDocumentKeys,
     retry: (key: string) => {
+      if (!enabled) return;
       forceReading.current.add(key);
       cancelDocument(key);
     },
