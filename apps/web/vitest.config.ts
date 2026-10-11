@@ -19,5 +19,8 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
+    // Turbo also runs API tests/builds. Leave CPU capacity for those tasks so
+    // DOM-heavy interaction tests don't exhaust their timeout under contention.
+    maxWorkers: "50%",
   },
 });

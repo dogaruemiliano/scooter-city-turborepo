@@ -1212,12 +1212,16 @@ describe("Scooters HTTP surface (e2e)", () => {
       for (const search of [undefined, input.vin]) {
         const response = await req()
           .get(v1.scooters.ROUTES.list)
-          .query({ search, pageSize: 100 })
+          // The fixture follows the seeded inventory in ascending fleet order.
+          // Request the newest scooter so this covers both list paths even
+          // when the database contains more than one page of seed data.
+          .query({ search, sort: "fleetNumberDesc", pageSize: 1 })
           .set("Cookie", cookie)
           .expect(200);
         const item = v1.scooters.scooterListSchema
           .parse(response.body)
           .items.find((item) => item.id === scooter.id);
+        expect(item).toBeDefined();
         expect(item?.insuranceAttention).toBe(expected);
         expect(item).not.toHaveProperty("insurancePolicies");
       }

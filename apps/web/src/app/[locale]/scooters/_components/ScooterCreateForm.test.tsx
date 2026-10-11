@@ -1012,9 +1012,13 @@ async function selectBrand(
   browser: ReturnType<typeof userEvent.setup>,
   name: string,
 ) {
-  await browser.click(screen.getByLabelText("Brand"));
+  const trigger = screen.getByLabelText("Brand");
+  await browser.click(trigger);
   await browser.click(
     await screen.findByRole("option", { name: new RegExp(name) }),
+  );
+  await waitFor(() =>
+    expect(trigger).toHaveAttribute("aria-expanded", "false"),
   );
 }
 
@@ -1042,8 +1046,13 @@ async function chooseSelectOption(
   label: string,
   option: string,
 ) {
-  await browser.click(screen.getByRole("combobox", { name: label }));
+  // Label queries avoid scanning every combobox in the large CIV form.
+  const trigger = screen.getByLabelText(label);
+  await browser.click(trigger);
   await browser.click(await screen.findByRole("option", { name: option }));
+  await waitFor(() =>
+    expect(trigger).toHaveAttribute("aria-expanded", "false"),
+  );
 }
 
 async function fillDateParts(
