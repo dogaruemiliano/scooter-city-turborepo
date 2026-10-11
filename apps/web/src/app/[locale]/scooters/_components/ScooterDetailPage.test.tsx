@@ -33,6 +33,8 @@ const scooter: v1.scooters.Scooter = {
   vin: "JYARN23E0RA123456",
   brandId: "brand-yamaha",
   brand: "Yamaha",
+  fleetNumber: 1,
+  brandCode: "YAM",
   model: "NMAX",
   color: "White",
   manufactureYear: 2026,
@@ -72,7 +74,7 @@ describe("ScooterDetailPage", () => {
     renderDetail();
 
     expect(
-      screen.getByRole("heading", { name: "Yamaha NMAX" }),
+      screen.getByRole("heading", { name: "001 YAM" }),
     ).toBeInTheDocument();
     expect(screen.getAllByText("JYARN23E0RA123456")[0]).toBeInTheDocument();
     expect(screen.getByText("White")).toBeInTheDocument();
@@ -92,7 +94,7 @@ describe("ScooterDetailPage", () => {
       "lucide-ellipsis-vertical",
     );
     expect(moreActionsButton.parentElement).toContainElement(
-      screen.getByRole("heading", { name: "Yamaha NMAX" }),
+      screen.getByRole("heading", { name: "001 YAM" }),
     );
     expect(
       screen.queryByRole("heading", { name: "Maintenance and repairs" }),

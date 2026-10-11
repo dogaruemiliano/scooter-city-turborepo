@@ -76,7 +76,7 @@ export function ScooterDetailPage({
   const [registrationOpen, setRegistrationOpen] = useState(false);
   const [registrationDialogKey, setRegistrationDialogKey] = useState(0);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const title = [scooter.brand, scooter.model].filter(Boolean).join(" ");
+  const title = v1.scooters.scooterDisplayCode(scooter);
   const scooterEditHref = `${scootersHref}/${encodeURIComponent(scooter.id)}/edit`;
   const registrationActionLabel =
     scooter.registrationType === "unregistered"
@@ -148,6 +148,9 @@ export function ScooterDetailPage({
         <div className="flex min-w-0 items-start justify-between gap-3">
           <div className="min-w-0">
             <h1 className="break-words text-2xl font-semibold">{title}</h1>
+            <p className="break-words text-sm text-muted-foreground">
+              {[scooter.brand, scooter.model].filter(Boolean).join(" ")}
+            </p>
             <p className="break-words text-sm text-muted-foreground">
               {scooter.vin}
             </p>

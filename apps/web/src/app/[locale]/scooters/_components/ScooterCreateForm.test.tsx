@@ -61,6 +61,8 @@ const createdScooter: v1.scooters.Scooter = {
   vin: "JYARN23E0RA123456",
   brandId: "brand-1",
   brand: "Yamaha",
+  fleetNumber: 1,
+  brandCode: "YAM",
   model: "NMAX",
   color: "White",
   manufactureYear: 2026,

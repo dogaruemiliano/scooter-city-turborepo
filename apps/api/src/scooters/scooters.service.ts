@@ -21,8 +21,31 @@ const scooterInclude = {
   insurancePolicies: { orderBy: [{ validUntil: "desc" }, { id: "asc" }] },
 } satisfies Prisma.ScooterInclude;
 
+const scooterListInclude = {
+  brand: true,
+  insurancePolicies: { select: { validFrom: true, validUntil: true } },
+} satisfies Prisma.ScooterInclude;
+
+function toScooterListRow({
+  insurancePolicies,
+  ...scooter
+}: Prisma.ScooterGetPayload<{
+  include: typeof scooterListInclude;
+}>): ScooterWithBrand {
+  return {
+    ...scooter,
+    insuranceAttention: v1.scooters.insuranceAttention(
+      insurancePolicies.map((policy) => ({
+        validFrom: toDateOnlyString(policy.validFrom),
+        validUntil: toDateOnlyString(policy.validUntil),
+      })),
+    ),
+  };
+}
+
 type ScooterWithBrand = Scooter & {
-  brand: { name: string };
+  insuranceAttention?: v1.scooters.InsuranceAttention | null;
+  brand: { name: string; code: string };
 };
 
 interface SearchIdRow {
@@ -67,8 +90,14 @@ export class ScootersService {
         userId,
       );
       return await this.prisma.$transaction(async (tx) => {
+        // Updating the singleton row serializes concurrent allocations. A failed
+        // scooter/document save rolls this increment back as part of the transaction.
+        const counter = await tx.scooterFleetCounter.update({
+          where: { id: 1 },
+          data: { lastNumber: { increment: 1 } },
+        });
         const scooter = await tx.scooter.create({
-          data,
+          data: { ...data, fleetNumber: counter.lastNumber },
           include: scooterInclude,
         });
         if (input.insurancePolicies?.length)
@@ -107,14 +136,19 @@ export class ScootersService {
       this.prisma.scooter.count({ where }),
       this.prisma.scooter.findMany({
         where,
-        include: { brand: true },
+        include: scooterListInclude,
         orderBy: this.toScooterOrderBy(query),
         skip: (query.page - 1) * query.pageSize,
         take: query.pageSize,
       }),
     ]);
 
-    return { items, page: query.page, pageSize: query.pageSize, total };
+    return {
+      items: items.map(toScooterListRow),
+      page: query.page,
+      pageSize: query.pageSize,
+      total,
+    };
   }
 
   private async search(query: v1.scooters.ListScootersQuery): Promise<{
@@ -153,12 +187,12 @@ export class ScootersService {
     const order = new Map(ids.map((id, index) => [id, index]));
     const items = await this.prisma.scooter.findMany({
       where: { id: { in: ids } },
-      include: { brand: true },
+      include: scooterListInclude,
     });
     items.sort((first, second) => order.get(first.id)! - order.get(second.id)!);
 
     return {
-      items,
+      items: items.map(toScooterListRow),
       page: query.page,
       pageSize: query.pageSize,
       total: countRows[0]?.total ?? 0,
@@ -271,7 +305,7 @@ export class ScootersService {
 
   private toCreateData(
     input: v1.scooters.CreateScooterInput,
-  ): Prisma.ScooterCreateInput {
+  ): Omit<Prisma.ScooterCreateInput, "fleetNumber"> {
     const civData = civMetadataWrite(input);
     return {
       maxAxle3MassKg: input.maxAxle3MassKg,
@@ -582,9 +616,18 @@ export class ScootersService {
   }
 
   private toSearchCte(query: v1.scooters.ListScootersQuery): PrismaRuntime.Sql {
-    const term = query.search!.toLowerCase();
+    const term = query.search!.replace(/\s+/g, " ").trim().toLowerCase();
     const pattern = `%${term}%`;
+    const fleetNumberText = PrismaRuntime.sql`s."fleetNumber"::text`;
+    // PostgreSQL lpad truncates strings longer than its width: preserve 1000+.
+    const fleetCode = PrismaRuntime.sql`lower(lpad(${fleetNumberText}, greatest(3, length(${fleetNumberText})), '0') || ' ' || sb.code)`;
+    const exactFleetMatch = PrismaRuntime.sql`(
+      ${fleetNumberText} = ${term.replace(/^0+(?=\d)/, "")} OR
+      ${fleetCode} = ${term} OR
+      lower(${fleetNumberText} || ' ' || sb.code) = ${term.replace(/^0+(?=\d)/, "")}
+    )`;
     const scooterText = PrismaRuntime.sql`lower(
+      ${fleetCode} || ' ' ||
       coalesce(s.vin, '') || ' ' ||
       coalesce(sb.name, '') || ' ' ||
       coalesce(s.model, '') || ' ' ||
@@ -604,6 +647,8 @@ export class ScootersService {
       WITH base AS (
         SELECT
           s.id,
+          s."fleetNumber",
+          ${exactFleetMatch} AS exact_fleet_match,
           s.vin,
           sb.name AS brand,
           s.model,
@@ -618,6 +663,8 @@ export class ScootersService {
       scored AS (
         SELECT
           b.id,
+          b."fleetNumber",
+          b.exact_fleet_match,
           b.vin,
           b.brand,
           b.model,
@@ -665,7 +712,10 @@ export class ScootersService {
     term: string,
     pattern: string,
   ): PrismaRuntime.Sql {
-    const clauses = [PrismaRuntime.sql`b.scooter_text ILIKE ${pattern}`];
+    const clauses = [
+      PrismaRuntime.sql`b.exact_fleet_match`,
+      PrismaRuntime.sql`b.scooter_text ILIKE ${pattern}`,
+    ];
 
     if (term.length >= 3) {
       clauses.push(PrismaRuntime.sql`${term} <% b.scooter_text`);
@@ -678,6 +728,11 @@ export class ScootersService {
     query: v1.scooters.ListScootersQuery,
   ): Prisma.ScooterOrderByWithRelationInput[] {
     switch (this.resolveListSort(query)) {
+      case "fleetNumberAsc":
+      case "relevance":
+        return [{ fleetNumber: "asc" }];
+      case "fleetNumberDesc":
+        return [{ fleetNumber: "desc" }];
       case "vinDesc":
         return [{ vin: "desc" }, { id: "asc" }];
       case "brandAsc":
@@ -696,7 +751,6 @@ export class ScootersService {
         return [{ updatedAt: "desc" }, { id: "asc" }];
       case "updatedAtAsc":
         return [{ updatedAt: "asc" }, { id: "asc" }];
-      case "relevance":
       case "vinAsc":
         return [{ vin: "asc" }, { id: "asc" }];
     }
@@ -706,6 +760,10 @@ export class ScootersService {
     query: v1.scooters.ListScootersQuery,
   ): PrismaRuntime.Sql {
     switch (this.resolveListSort(query)) {
+      case "fleetNumberAsc":
+        return PrismaRuntime.sql`"fleetNumber" ASC`;
+      case "fleetNumberDesc":
+        return PrismaRuntime.sql`"fleetNumber" DESC`;
       case "vinAsc":
         return PrismaRuntime.sql`vin ASC, score DESC, id ASC`;
       case "vinDesc":
@@ -727,7 +785,7 @@ export class ScootersService {
       case "updatedAtAsc":
         return PrismaRuntime.sql`"updatedAt" ASC, score DESC, id ASC`;
       case "relevance":
-        return PrismaRuntime.sql`score DESC, vin ASC, id ASC`;
+        return PrismaRuntime.sql`exact_fleet_match DESC, score DESC, "fleetNumber" ASC`;
     }
   }
 
@@ -735,10 +793,10 @@ export class ScootersService {
     query: v1.scooters.ListScootersQuery,
   ): v1.scooters.ScooterListSort {
     if (query.sort === "relevance" && !query.search) {
-      return "vinAsc";
+      return "fleetNumberAsc";
     }
 
-    return query.sort ?? (query.search ? "relevance" : "vinAsc");
+    return query.sort ?? (query.search ? "relevance" : "fleetNumberAsc");
   }
 
   private assertValidPowertrain(

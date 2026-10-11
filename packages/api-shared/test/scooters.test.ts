@@ -6,6 +6,40 @@ import { v1 } from "../src";
 const today = v1.common.dateOnlyToday();
 const tomorrow = addDateOnlyDays(today, 1);
 
+test("fleet labels use at least three digits and the current brand code", () => {
+  for (const [fleetNumber, brandCode, expected] of [
+    [1, "IVA", "001 IVA"],
+    [2, "KYM", "002 KYM"],
+    [999, "AGM", "999 AGM"],
+    [1000, "IVA", "1000 IVA"],
+  ] as const) {
+    assert.equal(
+      v1.scooters.scooterDisplayCode({ fleetNumber, brandCode }),
+      expected,
+    );
+  }
+});
+
+test("fleet numbers are assigned by the server and cannot be supplied or edited", () => {
+  assert.equal(
+    v1.scooters.createScooterInputSchema.safeParse({
+      ...baseScooterInput(),
+      fleetNumber: 4,
+    }).success,
+    false,
+  );
+  assert.equal(
+    v1.scooters.updateScooterInputSchema.safeParse({ fleetNumber: 4 }).success,
+    false,
+  );
+  for (const sort of ["fleetNumberAsc", "fleetNumberDesc"]) {
+    assert.equal(
+      v1.scooters.listScootersQuerySchema.parse({ sort }).sort,
+      sort,
+    );
+  }
+});
+
 test("scooter create schema accepts a valid scooter", () => {
   assert.equal(
     v1.scooters.createScooterInputSchema.parse({
@@ -60,6 +94,7 @@ test("scooter list items use the basic scooter contract", () => {
     vin: "JYARN23E0RA123456",
     brandId: "brand-1",
     brand: "Yamaha",
+    fleetNumber: 1,
     brandCode: "YAM",
     model: "NMAX",
     color: "White",

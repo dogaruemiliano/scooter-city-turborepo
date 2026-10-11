@@ -1188,6 +1188,188 @@ describe("Scooters HTTP surface (e2e)", () => {
     expect(reportIssueRes.status).toBe(404);
   });
 
+  it("returns compact insurance attention on both list paths and clears it after renewal", async () => {
+    const admin = await freshSession(["ADMIN"]);
+    const cookie = [`access_token=${admin.accessToken}`];
+    const input = scooterInput();
+    const policy = {
+      id: crypto.randomUUID(),
+      insuredName: "Example SRL",
+      validFrom: "2000-01-01",
+      validUntil: "2000-12-31",
+      premiumAmount: 100,
+      currency: "RON",
+      documentVin: input.vin,
+      vinReviewConfirmed: false,
+    };
+    const created = await req()
+      .post(v1.scooters.ROUTES.create)
+      .set("Cookie", cookie)
+      .send({ ...input, insurancePolicies: [policy] })
+      .expect(201);
+    const scooter = v1.scooters.scooterSchema.parse(created.body);
+    async function checkAttention(expected: "expired" | null) {
+      for (const search of [undefined, input.vin]) {
+        const response = await req()
+          .get(v1.scooters.ROUTES.list)
+          .query({ search, pageSize: 100 })
+          .set("Cookie", cookie)
+          .expect(200);
+        const item = v1.scooters.scooterListSchema
+          .parse(response.body)
+          .items.find((item) => item.id === scooter.id);
+        expect(item?.insuranceAttention).toBe(expected);
+        expect(item).not.toHaveProperty("insurancePolicies");
+      }
+    }
+    await checkAttention("expired");
+    await req()
+      .patch(v1.scooters.ROUTES.update(scooter.id))
+      .set("Cookie", cookie)
+      .send({
+        insurancePolicies: [
+          {
+            ...policy,
+            id: crypto.randomUUID(),
+            validFrom: v1.common.dateOnlyToday(),
+            validUntil: v1.common.dateOnlyToday(),
+          },
+        ],
+      })
+      .expect(200);
+    await checkAttention(null);
+  });
+
+  it("allocates consecutive global fleet numbers under concurrent creation and rolls back failures", async () => {
+    const admin = await freshSession(["ADMIN"]);
+    const cookie = [`access_token=${admin.accessToken}`];
+    const before = await prisma.scooterFleetCounter.findUniqueOrThrow({
+      where: { id: 1 },
+    });
+    const inputs = Array.from({ length: 4 }, (_, index) =>
+      scooterInput({
+        brandId: index % 2 ? hondaBrand.id : yamahaBrand.id,
+      }),
+    );
+    const responses = await Promise.all(
+      inputs.map((input) =>
+        req().post(v1.scooters.ROUTES.create).set("Cookie", cookie).send(input),
+      ),
+    );
+    expect(responses.map((response) => response.status)).toEqual([
+      201, 201, 201, 201,
+    ]);
+    const numbers = responses.map(
+      (response) => v1.scooters.scooterSchema.parse(response.body).fleetNumber,
+    );
+    expect(numbers.sort((a, b) => a - b)).toEqual(
+      [1, 2, 3, 4].map((n) => before.lastNumber + n),
+    );
+
+    const duplicate = await req()
+      .post(v1.scooters.ROUTES.create)
+      .set("Cookie", cookie)
+      .send(inputs[0]);
+    expect(duplicate.status).toBe(409);
+    const next = await req()
+      .post(v1.scooters.ROUTES.create)
+      .set("Cookie", cookie)
+      .send(scooterInput());
+    expect(next.status).toBe(201);
+    expect(v1.scooters.scooterSchema.parse(next.body).fleetNumber).toBe(
+      before.lastNumber + 5,
+    );
+  });
+
+  it("keeps fleet numbers through brand changes and deletion, and searches by fleet identity", async () => {
+    const admin = await freshSession(["ADMIN"]);
+    const cookie = [`access_token=${admin.accessToken}`];
+    const createdRes = await req()
+      .post(v1.scooters.ROUTES.create)
+      .set("Cookie", cookie)
+      .send(scooterInput());
+    expect(createdRes.status).toBe(201);
+    const created = v1.scooters.scooterSchema.parse(createdRes.body);
+    const changed = await req()
+      .patch(v1.scooters.ROUTES.update(created.id))
+      .set("Cookie", cookie)
+      .send({ brandId: hondaBrand.id });
+    expect(changed.status).toBe(200);
+    const updated = v1.scooters.scooterSchema.parse(changed.body);
+    expect(updated.fleetNumber).toBe(created.fleetNumber);
+    expect(updated.brandCode).not.toBe(created.brandCode);
+
+    for (const search of [
+      String(updated.fleetNumber),
+      String(updated.fleetNumber).padStart(3, "0"),
+      v1.scooters.scooterDisplayCode(updated).toLowerCase().replace(" ", "   "),
+    ]) {
+      const res = await req()
+        .get(v1.scooters.ROUTES.list)
+        .query({ search })
+        .set("Cookie", cookie);
+      expect(res.status).toBe(200);
+      expect(v1.scooters.scooterListSchema.parse(res.body).items[0]?.id).toBe(
+        updated.id,
+      );
+    }
+    for (const search of [undefined, updated.brandCode]) {
+      for (const sort of [
+        undefined,
+        "fleetNumberAsc",
+        "fleetNumberDesc",
+      ] as const) {
+        if (search && !sort) continue;
+        const res = await req()
+          .get(v1.scooters.ROUTES.list)
+          .query({ search, sort, pageSize: 100 })
+          .set("Cookie", cookie);
+        expect(res.status).toBe(200);
+        const numbers = v1.scooters.scooterListSchema
+          .parse(res.body)
+          .items.map((s) => s.fleetNumber);
+        expect(numbers).toEqual(
+          [...numbers].sort((a, b) =>
+            sort === "fleetNumberDesc" ? b - a : a - b,
+          ),
+        );
+      }
+    }
+
+    expect(
+      (
+        await req()
+          .patch(v1.scooters.ROUTES.update(created.id))
+          .set("Cookie", cookie)
+          .send({ fleetNumber: 999 })
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await req()
+          .delete(v1.scooters.ROUTES.delete(created.id))
+          .set("Cookie", cookie)
+      ).status,
+    ).toBe(204);
+    const next = await req()
+      .post(v1.scooters.ROUTES.create)
+      .set("Cookie", cookie)
+      .send(scooterInput());
+    expect(v1.scooters.scooterSchema.parse(next.body).fleetNumber).toBe(
+      created.fleetNumber + 1,
+    );
+    await prisma.scooter.update({
+      where: { id: created.id },
+      data: { deletedAt: null },
+    });
+    const restored = await req()
+      .get(v1.scooters.ROUTES.get(created.id))
+      .set("Cookie", cookie);
+    expect(v1.scooters.scooterSchema.parse(restored.body).fleetNumber).toBe(
+      created.fleetNumber,
+    );
+  });
+
   it("lets admins create, read, update, and soft-delete scooters", async () => {
     const admin = await freshSession(["ADMIN"]);
     const input = scooterInput();

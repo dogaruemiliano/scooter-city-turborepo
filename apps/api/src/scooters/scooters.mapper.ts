@@ -9,13 +9,17 @@ import type {
 } from "../generated/prisma/client";
 
 type ScooterRowWithBrand = ScooterRow & {
-  brand: { name: string };
+  insuranceAttention?: v1.scooters.InsuranceAttention | null;
+  brand: { name: string; code: string };
   civDocument?: VehicleCivDocument | null;
   insurancePolicies?: ScooterInsurancePolicy[];
 };
 
 export function toScooter(row: ScooterRowWithBrand): v1.scooters.Scooter {
   return {
+    ...(row.insuranceAttention !== undefined
+      ? { insuranceAttention: row.insuranceAttention }
+      : {}),
     ...(row.insurancePolicies
       ? {
           insurancePolicies: row.insurancePolicies.map((policy) => ({
@@ -52,9 +56,11 @@ export function toScooter(row: ScooterRowWithBrand): v1.scooters.Scooter {
     drivingNoiseDb: row.drivingNoiseDb?.toNumber() ?? null,
     co2EmissionsGKm: row.co2EmissionsGKm?.toNumber() ?? null,
     id: row.id,
+    fleetNumber: row.fleetNumber,
     vin: row.vin,
     brandId: row.brandId,
     brand: row.brand.name,
+    brandCode: row.brand.code,
     vehicleType: row.vehicleType,
     civNumber: row.civNumber,
     nationalEmissionsCode: row.nationalEmissionsCode,

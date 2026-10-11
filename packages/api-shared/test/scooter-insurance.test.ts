@@ -13,6 +13,29 @@ const policy = {
   documentVin: "LXYTCKP05P0000001",
   vinReviewConfirmed: false,
 };
+test("list attention considers all policies and never treats unknown coverage as expired", () => {
+  const today = "2026-10-11";
+  const expired = { validFrom: "2025-01-01", validUntil: "2025-12-31" };
+  const future = { validFrom: "2027-01-01", validUntil: "2027-12-31" };
+  const unknown = { validFrom: null, validUntil: null };
+  assert.equal(v1.scooters.insuranceAttention([], today), null);
+  assert.equal(v1.scooters.insuranceAttention([expired], today), "expired");
+  assert.equal(v1.scooters.insuranceAttention([expired, policy], today), null);
+  assert.equal(v1.scooters.insuranceAttention([future], today), "upcoming");
+  assert.equal(
+    v1.scooters.insuranceAttention([expired, future], today),
+    "expired",
+  );
+  assert.equal(
+    v1.scooters.insuranceAttention([expired, unknown], today),
+    "review",
+  );
+  assert.equal(v1.scooters.insuranceAttention([unknown, policy], today), null);
+  assert.equal(
+    v1.scooters.insuranceAttention([policy], policy.validUntil),
+    null,
+  );
+});
 test("insurance validates coverage dates, money, VIN and explicit review", () => {
   assert.ok(v1.scooters.insurancePolicyInputSchema.safeParse(policy).success);
   for (const change of [

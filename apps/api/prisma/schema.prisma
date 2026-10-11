@@ -303,9 +303,17 @@ enum ScooterFuelType {
   other
 }
 
+/// Singleton counter; incremented in the same transaction as scooter creation.
+model ScooterFleetCounter {
+  id         Int @id
+  lastNumber Int @default(0)
+}
+
 /// Scooter inventory; technical details can be completed after acquisition.
 model Scooter {
-  id String @id @default(cuid())
+  id          String @id @default(cuid())
+  /// Permanent fleet-wide number, including soft-deleted scooters.
+  fleetNumber Int    @unique
 
   maxAxle3MassKg        Int?
   maxAxle4MassKg        Int?

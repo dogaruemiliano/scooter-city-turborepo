@@ -1,5 +1,7 @@
 "use client";
 
+import { PageTitleOverride } from "@/components/PageTitleOverride";
+
 import { ApiError, v1 } from "@repo/api-shared";
 import { Button, Checkbox, buttonVariants } from "@repo/ui/components";
 import Link from "next/link";
@@ -361,6 +363,18 @@ export function ScooterEditor({
 
   return (
     <div className="mx-auto flex w-full max-w-screen-lg flex-1 flex-col gap-6 px-4 pt-6 pb-12 sm:px-6 sm:pt-10 sm:pb-16">
+      {scooter ? (
+        <>
+          <PageTitleOverride title={v1.scooters.scooterDisplayCode(scooter)} />
+          <h1 className="text-2xl font-semibold">
+            {v1.scooters.scooterDisplayCode(scooter)}
+          </h1>
+        </>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          {t("fleetNumber.assignedOnSave")}
+        </p>
+      )}
       <CivVocabularyContext value={vocabulary}>
         <FormProvider {...form}>
           <form

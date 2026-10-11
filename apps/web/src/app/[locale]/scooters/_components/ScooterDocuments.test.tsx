@@ -58,6 +58,8 @@ const scooter: v1.scooters.Scooter = {
   vin: "LXYTCKP05P0000001",
   brandId: "brand",
   brand: "Yamaha",
+  fleetNumber: 1,
+  brandCode: "YAM",
   model: null,
   color: null,
   manufactureYear: null,

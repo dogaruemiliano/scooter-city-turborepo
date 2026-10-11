@@ -50,6 +50,8 @@ const scooter: v1.scooters.ScooterListItem = {
   vin: "JYARN23E0RA123456",
   brandId: "brand-yamaha",
   brand: "Yamaha",
+  fleetNumber: 1,
+  brandCode: "YAM",
   model: "NMAX",
   color: "White",
   manufactureYear: 2026,
@@ -97,13 +99,15 @@ describe("ScootersPage", () => {
       "/en/scooters/new",
     );
     expect(screen.getByText("Yamaha NMAX")).toBeInTheDocument();
-    expect(screen.getByText("JYARN23E0RA123456")).toBeInTheDocument();
+    expect(screen.getByText("001 YAM")).toBeInTheDocument();
+    expect(screen.queryByText("JYARN23E0RA123456")).not.toBeInTheDocument();
     expect(screen.getByText("White")).toBeInTheDocument();
     expect(screen.getByText("125 cc")).toBeInTheDocument();
     expect(screen.getByText("Unregistered")).toBeInTheDocument();
-    expect(
-      screen.getByRole("link", { name: "View Yamaha NMAX" }),
-    ).toHaveAttribute("href", "/en/scooters/scooter-1");
+    expect(screen.getByRole("link", { name: "View 001 YAM" })).toHaveAttribute(
+      "href",
+      "/en/scooters/scooter-1",
+    );
     expect(screen.queryByText("Rows per page")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Go to next page")).not.toBeInTheDocument();
   });
@@ -116,10 +120,84 @@ describe("ScootersPage", () => {
       "/scooters/new",
     );
     expect(screen.getByText("Neînmatriculat")).toBeInTheDocument();
-    expect(
-      screen.getByRole("link", { name: "Vezi Yamaha NMAX" }),
-    ).toHaveAttribute("href", "/scooters/scooter-1");
+    expect(screen.getByText("001 YAM")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Vezi 001 YAM" })).toHaveAttribute(
+      "href",
+      "/scooters/scooter-1",
+    );
     expect(screen.getByRole("button", { name: "Filtre" })).toBeInTheDocument();
+  });
+
+  it("prioritizes the plate and rental details, with mileage as secondary information", () => {
+    renderScooters(
+      scooterList([
+        scooterRecord({
+          registrationType: "local",
+          registrationNumber: "VL-BUJORENI-175",
+          requiredLicenseCategory: "AM",
+          currentMileageKm: 12500,
+        }),
+      ]),
+    );
+    expect(screen.getByText("001 YAM").parentElement).toContainElement(
+      screen.getByText("VL-BUJORENI-175"),
+    );
+    expect(screen.getByText("Licence: AM")).toBeInTheDocument();
+    expect(screen.getByLabelText("Mileage: 12,500 km")).toBeInTheDocument();
+    expect(screen.queryByText(scooter.vin)).not.toBeInTheDocument();
+    expect(screen.queryByText("2026")).not.toBeInTheDocument();
+    expect(screen.queryByText("Local")).not.toBeInTheDocument();
+  });
+
+  it("shows specific attention messages in Romanian", () => {
+    renderScooters(
+      scooterList([
+        scooterRecord({
+          insuranceAttention: "expired",
+          speedometerWorking: false,
+          odometerWorking: false,
+        }),
+      ]),
+      "ro",
+    );
+    expect(
+      screen.getByText(
+        "Asigurare expirată · Vitezometrul nu funcționează · Odometrul nu funcționează",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("keeps unknown checks neutral and shows zero mileage", () => {
+    renderScooters(
+      scooterList([
+        scooterRecord({
+          insuranceAttention: null,
+          speedometerWorking: null,
+          odometerWorking: null,
+          currentMileageKm: 0,
+        }),
+      ]),
+    );
+    expect(screen.getByLabelText("Mileage: 0 km")).toBeInTheDocument();
+    expect(
+      screen.queryByText(/not working|Insurance expired|Check insurance/),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows electric propulsion without combustion capacity and flags future coverage", () => {
+    renderScooters(
+      scooterList([
+        scooterRecord({
+          powertrainType: "electric",
+          engineDisplacementCc: null,
+          insuranceAttention: "upcoming",
+        }),
+      ]),
+    );
+    expect(screen.getByText("Electric")).toBeInTheDocument();
+    expect(screen.queryByText(/cc$/)).not.toBeInTheDocument();
+    expect(screen.getByText("Insurance not yet active")).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Mileage:/)).not.toBeInTheDocument();
   });
 
   it("debounces search through the backend list endpoint", async () => {
@@ -161,6 +239,8 @@ describe("ScootersPage", () => {
       id: "scooter-2",
       vin: "JYARN23E0RA654321",
       brand: "Honda",
+      fleetNumber: 2,
+      brandCode: "HON",
       model: "PCX",
     });
     mocks.apiFetch
@@ -256,6 +336,8 @@ describe("ScootersPage", () => {
       id: "scooter-2",
       vin: "JYARN23E0RA654321",
       brand: "Honda",
+      fleetNumber: 2,
+      brandCode: "HON",
       model: "PCX",
     });
     mocks.apiFetch.mockResolvedValueOnce(
@@ -289,6 +371,8 @@ describe("ScootersPage", () => {
       id: "scooter-2",
       vin: "JYARN23E0RA654321",
       brand: "Honda",
+      fleetNumber: 2,
+      brandCode: "HON",
       model: "PCX",
     });
     mocks.apiFetch.mockResolvedValueOnce(
@@ -323,6 +407,8 @@ describe("ScootersPage", () => {
       id: "scooter-2",
       vin: "JYARN23E0RA654321",
       brand: "Honda",
+      fleetNumber: 2,
+      brandCode: "HON",
       model: "PCX",
     });
     mocks.apiFetch

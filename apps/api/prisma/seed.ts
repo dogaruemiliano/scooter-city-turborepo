@@ -628,13 +628,32 @@ async function seedScooters(): Promise<void> {
     if (!brandId) {
       throw new Error(`Unknown scooter brand in seed data: ${seed.brand}`);
     }
-    await prisma.scooter.upsert({
-      where: { id: seed.id },
-      create: {
-        id: seed.id,
-        ...scooterData(seed, brandId),
-      },
-      update: scooterData(seed, brandId),
+    await prisma.$transaction(async (tx) => {
+      // Serialize with normal creation and other seed runs without consuming a
+      // number when this seed record already exists.
+      await tx.scooterFleetCounter.update({
+        where: { id: 1 },
+        data: { lastNumber: { increment: 0 } },
+      });
+      const existing = await tx.scooter.findUnique({ where: { id: seed.id } });
+      if (existing) {
+        await tx.scooter.update({
+          where: { id: seed.id },
+          data: scooterData(seed, brandId),
+        });
+      } else {
+        const counter = await tx.scooterFleetCounter.update({
+          where: { id: 1 },
+          data: { lastNumber: { increment: 1 } },
+        });
+        await tx.scooter.create({
+          data: {
+            id: seed.id,
+            ...scooterData(seed, brandId),
+            fleetNumber: counter.lastNumber,
+          },
+        });
+      }
     });
   }
 }

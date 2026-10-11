@@ -41,6 +41,8 @@ const scooter: v1.scooters.Scooter = {
   vin: "JYARN23E0RA123456",
   brandId: "brand-yamaha",
   brand: "Yamaha",
+  fleetNumber: 1,
+  brandCode: "YAM",
   model: "NMAX",
   color: "White",
   manufactureYear: 2026,
@@ -84,7 +86,7 @@ describe("ScooterRoutePage metadata", () => {
       generateMetadata({
         params: Promise.resolve({ locale: "ro", id: "scooter-1" }),
       }),
-    ).resolves.toEqual({ title: "Yamaha NMAX" });
+    ).resolves.toEqual({ title: "001 YAM" });
 
     expect(mocks.apiFetch).toHaveBeenCalledWith(
       v1.scooters.ROUTES.get("scooter-1"),

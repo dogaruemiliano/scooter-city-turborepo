@@ -1,4 +1,5 @@
 import {
+  insuranceAttentionSchema,
   insurancePoliciesInputSchema,
   insurancePolicySchema,
 } from "./scooter-insurance.schemas";
@@ -261,12 +262,22 @@ export const scooterSchema = z
   .object({
     documents: scooterDocumentListSchema.optional(),
     insurancePolicies: z.array(insurancePolicySchema).optional(),
+    insuranceAttention: insuranceAttentionSchema.nullable().optional(),
     ...civMetadataSchema.shape,
     ...scooterTechnicalDetailsSchema.shape,
     id: z.string(),
+    fleetNumber: z
+      .number()
+      .int()
+      .positive()
+      .max(2_147_483_647)
+      .describe("Permanent fleet-wide number, assigned by the server."),
     vin: z.string(),
     brandId: z.string(),
     brand: z.string().describe("Display name of the scooter's brand."),
+    brandCode: z
+      .string()
+      .describe("Current short code of the scooter's brand."),
     model: z.string().nullable(),
     color: z.string().nullable(),
     manufactureYear: z.number().int().nullable(),

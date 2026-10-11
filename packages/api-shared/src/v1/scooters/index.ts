@@ -1,4 +1,5 @@
 export * from "./scooters.constants";
+export * from "./scooter-identity";
 export * from "./scooters.schemas";
 export * from "./scooter-documents.schemas";
 export * from "./scooter-document-extraction.schemas";

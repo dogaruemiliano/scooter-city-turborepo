@@ -34,6 +34,8 @@ export type ScooterRequiredDriverLicenseType =
 
 export const SCOOTER_LIST_SORTS = [
   "relevance",
+  "fleetNumberAsc",
+  "fleetNumberDesc",
   "vinAsc",
   "vinDesc",
   "brandAsc",

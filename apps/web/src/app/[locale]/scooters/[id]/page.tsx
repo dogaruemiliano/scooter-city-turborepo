@@ -98,5 +98,5 @@ function scooterDetailPath(
 }
 
 function scooterTitle(scooter: v1.scooters.Scooter): string {
-  return `${scooter.brand} ${scooter.model}`;
+  return v1.scooters.scooterDisplayCode(scooter);
 }

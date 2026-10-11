@@ -76,6 +76,25 @@ export const insurancePolicySchema = insurancePolicyInputSchema.safeExtend({
 });
 export type InsurancePolicy = z.infer<typeof insurancePolicySchema>;
 
+export const insuranceAttentionSchema = z.enum([
+  "expired",
+  "upcoming",
+  "review",
+]);
+export type InsuranceAttention = z.infer<typeof insuranceAttentionSchema>;
+
+/** No warning is not a readiness guarantee: a scooter may have no recorded policy. */
+export function insuranceAttention(
+  policies: Pick<InsurancePolicyInput, "validFrom" | "validUntil">[],
+  today = dateOnlyToday(),
+): InsuranceAttention | null {
+  const statuses = policies.map((policy) => insuranceStatus(policy, today));
+  if (!statuses.length || statuses.includes("active")) return null;
+  if (statuses.includes("review")) return "review";
+  if (statuses.includes("expired")) return "expired";
+  return "upcoming";
+}
+
 export function insuranceStatus(
   policy: Pick<InsurancePolicyInput, "validFrom" | "validUntil">,
   today = dateOnlyToday(),
