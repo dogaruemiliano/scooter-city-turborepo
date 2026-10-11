@@ -117,10 +117,14 @@ describe("ScooterCreateForm document wizard", () => {
     expect(
       screen.getByRole("button", { name: "Import JSON" }),
     ).toBeInTheDocument();
-    expect(screen.queryByLabelText("VIN")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Power (kW)")).not.toBeInTheDocument();
     expect(
-      screen.queryByLabelText("Current mileage (km)"),
+      screen.queryByRole("textbox", { name: "VIN" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("textbox", { name: "Power (kW)" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("textbox", { name: "Current mileage (km)" }),
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Create scooter" }),
@@ -174,12 +178,18 @@ describe("ScooterCreateForm document wizard", () => {
     await chooseSelectOption(browser, "Registration type", "Unregistered");
     await chooseSelectOption(browser, "GPS installed", "No");
     await chooseSelectOption(browser, "Speedometer working", "Yes");
-    await browser.type(screen.getByLabelText("Current mileage (km)"), "0");
     await browser.type(
-      screen.getByLabelText("Actual maximum speed (km/h)"),
+      screen.getByRole("textbox", { name: "Current mileage (km)" }),
       "0",
     );
-    await browser.type(screen.getByLabelText("Notes"), "Needs inspection");
+    await browser.type(
+      screen.getByRole("textbox", { name: "Actual maximum speed (km/h)" }),
+      "0",
+    );
+    await browser.type(
+      screen.getByRole("textbox", { name: "Notes" }),
+      "Needs inspection",
+    );
     await browser.click(screen.getByRole("button", { name: "Back" }));
     expect(screen.getByText("1 / 2 · Documents")).toBeInTheDocument();
     expect(mocks.apiFetch).not.toHaveBeenCalled();
@@ -193,11 +203,15 @@ describe("ScooterCreateForm document wizard", () => {
     expect(
       screen.getByRole("combobox", { name: "Speedometer working" }),
     ).toHaveTextContent("Yes");
-    expect(screen.getByLabelText("Current mileage (km)")).toHaveValue("0");
-    expect(screen.getByLabelText("Actual maximum speed (km/h)")).toHaveValue(
-      "0",
+    expect(
+      screen.getByRole("textbox", { name: "Current mileage (km)" }),
+    ).toHaveValue("0");
+    expect(
+      screen.getByRole("textbox", { name: "Actual maximum speed (km/h)" }),
+    ).toHaveValue("0");
+    expect(screen.getByRole("textbox", { name: "Notes" })).toHaveValue(
+      "Needs inspection",
     );
-    expect(screen.getByLabelText("Notes")).toHaveValue("Needs inspection");
     await browser.click(screen.getByRole("button", { name: "Create scooter" }));
     await waitFor(() => expect(mocks.apiFetch).toHaveBeenCalledOnce());
     expect(mocks.apiFetch.mock.calls[0]![2].json).toMatchObject({
@@ -283,16 +297,31 @@ describe("Scooter create controls with the create resolver", () => {
     mocks.apiFetch.mockResolvedValueOnce(createdScooter);
     const browser = userEvent.setup();
     renderControls();
-    await browser.type(screen.getByLabelText("VIN"), "JYARN23E0RA123456");
-    await browser.type(screen.getByLabelText("Model"), "PCX");
+    await browser.type(
+      screen.getByRole("textbox", { name: "VIN" }),
+      "JYARN23E0RA123456",
+    );
+    await browser.type(screen.getByRole("textbox", { name: "Model" }), "PCX");
     await chooseSelectOption(browser, "Propulsion system", "Combustion");
     await browser.click(screen.getByRole("button", { name: "Brand" }));
     await browser.click(screen.getByRole("button", { name: "Add new brand" }));
-    await browser.type(await screen.findByLabelText("Name"), "Honda");
-    await browser.click(screen.getByRole("button", { name: "Create brand" }));
-    expect(await screen.findByRole("alert")).toBeInTheDocument();
-    expect(screen.getByLabelText("Name")).toHaveValue("Honda");
-    await browser.click(screen.getByRole("button", { name: "Create brand" }));
+    const createSheet = within(
+      await screen.findByRole("dialog", { name: "Add new brand" }),
+    );
+    await browser.type(
+      createSheet.getByRole("textbox", { name: "Name" }),
+      "Honda",
+    );
+    await browser.click(
+      createSheet.getByRole("button", { name: "Create brand" }),
+    );
+    expect(await createSheet.findByRole("alert")).toBeInTheDocument();
+    expect(createSheet.getByRole("textbox", { name: "Name" })).toHaveValue(
+      "Honda",
+    );
+    await browser.click(
+      createSheet.getByRole("button", { name: "Create brand" }),
+    );
     await waitFor(() =>
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
     );
@@ -300,7 +329,7 @@ describe("Scooter create controls with the create resolver", () => {
     expect(screen.getByRole("button", { name: "Brand" })).toHaveTextContent(
       "Honda",
     );
-    expect(screen.getByLabelText("Model")).toHaveValue("PCX");
+    expect(screen.getByRole("textbox", { name: "Model" })).toHaveValue("PCX");
     expect(mocks.apiFetch).toHaveBeenCalledTimes(2);
     await browser.click(screen.getByRole("button", { name: "Create scooter" }));
     await waitFor(() => expect(mocks.apiFetch).toHaveBeenCalledTimes(3));
@@ -315,7 +344,10 @@ describe("Scooter create controls with the create resolver", () => {
     const browser = userEvent.setup();
     renderWizard();
     await enterOperationalStep(browser);
-    await browser.type(screen.getByLabelText("VIN"), "JYARN23E0RA123456");
+    await browser.type(
+      screen.getByRole("textbox", { name: "VIN" }),
+      "JYARN23E0RA123456",
+    );
     await browser.click(screen.getByRole("button", { name: "Create scooter" }));
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "Brand" })).toHaveFocus(),
@@ -337,27 +369,35 @@ describe("Scooter create controls with the create resolver", () => {
     ).toHaveTextContent("Select powertrain");
     expect(screen.queryByRole("heading", { level: 1 })).not.toBeInTheDocument();
     expect(screen.getByText("Registration")).toBeInTheDocument();
-    expect(screen.getByLabelText("Engine capacity (cm³)")).toHaveValue("");
-    expect(screen.getByLabelText("Current mileage (km)")).toHaveValue("");
+    expect(
+      screen.getByRole("textbox", { name: "Engine capacity (cm³)" }),
+    ).toHaveValue("");
+    expect(
+      screen.getByRole("textbox", { name: "Current mileage (km)" }),
+    ).toHaveValue("");
   });
 
   it("hides incompatible fields and restores the draft when switching back", async () => {
     const browser = userEvent.setup();
 
     renderControls();
-    const engineCcInput = screen.getByLabelText("Engine capacity (cm³)");
+    const engineCcInput = screen.getByRole("textbox", {
+      name: "Engine capacity (cm³)",
+    });
     expect(engineCcInput).toHaveValue("");
     await browser.clear(engineCcInput);
     await browser.type(engineCcInput, "125");
     await chooseSelectOption(browser, "Propulsion system", "Electric");
 
     expect(
-      screen.queryByLabelText("Engine capacity (cm³)"),
+      screen.queryByRole("textbox", { name: "Engine capacity (cm³)" }),
     ).not.toBeInTheDocument();
 
     await chooseSelectOption(browser, "Propulsion system", "Combustion");
 
-    expect(screen.getByLabelText("Engine capacity (cm³)")).toHaveValue("125");
+    expect(
+      screen.getByRole("textbox", { name: "Engine capacity (cm³)" }),
+    ).toHaveValue("125");
   });
 
   it("requires identity fields but permits unknown technical data", async () => {
@@ -387,7 +427,10 @@ describe("Scooter create controls with the create resolver", () => {
     const browser = userEvent.setup();
     renderWizard();
     await enterOperationalStep(browser);
-    await browser.type(screen.getByLabelText("VIN"), "jyarn23e0ra123456");
+    await browser.type(
+      screen.getByRole("textbox", { name: "VIN" }),
+      "jyarn23e0ra123456",
+    );
     await selectBrand(browser, "Yamaha");
     await chooseSelectOption(browser, "Propulsion system", "Combustion");
     await chooseSelectOption(browser, "Registration type", "Unregistered");
@@ -417,6 +460,18 @@ describe("Scooter create controls with the create resolver", () => {
 
     renderControls();
     await fillRequiredScooterForm(browser);
+    for (const [label, value] of [
+      ["Model", "NMAX"],
+      ["Color", "White"],
+      ["Manufacture year", "2026"],
+      ["Engine capacity (cm³)", "125"],
+      ["Power (kW)", "8.5"],
+      ["Notes", "Maker papers received"],
+    ] as const) {
+      fireEvent.change(screen.getByRole("textbox", { name: label }), {
+        target: { value },
+      });
+    }
     await browser.click(screen.getByRole("button", { name: "Create scooter" }));
 
     await waitFor(() =>
@@ -457,7 +512,10 @@ describe("Scooter create controls with the create resolver", () => {
 
     renderControls();
     await fillRequiredScooterForm(browser);
-    await browser.type(screen.getByLabelText("Current mileage (km)"), "4200");
+    await browser.type(
+      screen.getByRole("textbox", { name: "Current mileage (km)" }),
+      "4200",
+    );
     await browser.click(screen.getByRole("button", { name: "Create scooter" }));
 
     await waitFor(() =>
@@ -478,7 +536,10 @@ describe("Scooter create controls with the create resolver", () => {
 
       renderControls();
       await fillRequiredScooterForm(browser);
-      await browser.type(screen.getByLabelText("Current mileage (km)"), value);
+      await browser.type(
+        screen.getByRole("textbox", { name: "Current mileage (km)" }),
+        value,
+      );
       await browser.click(
         screen.getByRole("button", { name: "Create scooter" }),
       );
@@ -497,7 +558,9 @@ describe("Scooter create controls with the create resolver", () => {
     async (speedFirst) => {
       const browser = userEvent.setup();
       renderControls();
-      const speed = screen.getByLabelText("Maximum speed (km/h)");
+      const speed = screen.getByRole("textbox", {
+        name: "Maximum speed (km/h)",
+      });
       if (speedFirst) fireEvent.change(speed, { target: { value: "25" } });
       await chooseSelectOption(browser, "Registration type", "Local");
       if (!speedFirst) fireEvent.change(speed, { target: { value: "25" } });
@@ -532,20 +595,23 @@ describe("Scooter create controls with the create resolver", () => {
     renderControls();
     await browser.click(screen.getByRole("button", { name: "Import JSON" }));
     await browser.click(screen.getByRole("button", { name: "Edit JSON" }));
-    fireEvent.change(screen.getByLabelText("Extracted data (JSON)"), {
-      target: {
-        value: JSON.stringify({
-          brandName: "Yamaha",
-          vin: createdScooter.vin,
-          powertrainType: "combustion",
-          maxSpeedKmh: 25,
-          registrationType: "local",
-          registrationNumber: "14947",
-          registrationDate: "2026-01-01",
-          requiredLicenseCategory: null,
-        }),
+    fireEvent.change(
+      screen.getByRole("textbox", { name: "Extracted data (JSON)" }),
+      {
+        target: {
+          value: JSON.stringify({
+            brandName: "Yamaha",
+            vin: createdScooter.vin,
+            powertrainType: "combustion",
+            maxSpeedKmh: 25,
+            registrationType: "local",
+            registrationNumber: "14947",
+            registrationDate: "2026-01-01",
+            requiredLicenseCategory: null,
+          }),
+        },
       },
-    });
+    );
     await browser.click(screen.getByRole("button", { name: "Fill fields" }));
     expect(
       screen.getByRole("combobox", { name: /Required driver license/ }),
@@ -582,9 +648,12 @@ describe("Scooter create controls with the create resolver", () => {
     await fillRequiredScooterForm(browser);
     await chooseSelectOption(browser, "Registration type", "National");
     expect(
-      screen.queryByLabelText("Registration expires on"),
+      screen.queryByRole("textbox", { name: "Registration expires on" }),
     ).not.toBeInTheDocument();
-    await browser.type(screen.getByLabelText("Plate number"), "cj12abc");
+    await browser.type(
+      screen.getByRole("textbox", { name: "Plate number" }),
+      "cj12abc",
+    );
     await fillDateParts(browser, "Registered on", v1.common.dateOnlyToday());
     await chooseSelectOption(browser, "Required driver license", "A1");
     await browser.click(screen.getByRole("button", { name: "Create scooter" }));
@@ -613,17 +682,17 @@ describe("Scooter create controls with the create resolver", () => {
     renderControls();
     await chooseSelectOption(browser, "Registration type", "National");
     expect(
-      screen.queryByLabelText("Registration expires on"),
+      screen.queryByRole("textbox", { name: "Registration expires on" }),
     ).not.toBeInTheDocument();
 
     await chooseSelectOption(browser, "Registration type", "Local");
     expect(
-      screen.queryByLabelText("Registration expires on"),
+      screen.queryByRole("textbox", { name: "Registration expires on" }),
     ).not.toBeInTheDocument();
 
     await chooseSelectOption(browser, "Registration type", "Temporary");
     expect(
-      screen.getByLabelText("Registration expires on"),
+      screen.getByRole("textbox", { name: "Registration expires on" }),
     ).toBeInTheDocument();
   });
 
@@ -633,7 +702,10 @@ describe("Scooter create controls with the create resolver", () => {
     renderControls();
     await fillRequiredScooterForm(browser);
     await chooseSelectOption(browser, "Registration type", "National");
-    await browser.type(screen.getByLabelText("Plate number"), "CJ 00 ABC");
+    await browser.type(
+      screen.getByRole("textbox", { name: "Plate number" }),
+      "CJ 00 ABC",
+    );
     await fillDateParts(browser, "Registered on", v1.common.dateOnlyToday());
     await browser.click(screen.getByRole("button", { name: "Create scooter" }));
 
@@ -664,7 +736,7 @@ describe("Scooter create controls with the create resolver", () => {
         await screen.findAllByText("A scooter with this VIN already exists.")
       )[0],
     ).toBeInTheDocument();
-    expect(screen.getByLabelText("VIN")).toHaveAttribute(
+    expect(screen.getByRole("textbox", { name: "VIN" })).toHaveAttribute(
       "aria-invalid",
       "true",
     );
@@ -674,8 +746,13 @@ describe("Scooter create controls with the create resolver", () => {
     renderWizard();
     await enterOperationalStep(browser);
     await browser.click(screen.getByRole("button", { name: "Create scooter" }));
-    await waitFor(() => expect(screen.getByLabelText("VIN")).toHaveFocus());
-    await browser.type(screen.getByLabelText("VIN"), "JYARN23E0RA123456");
+    await waitFor(() =>
+      expect(screen.getByRole("textbox", { name: "VIN" })).toHaveFocus(),
+    );
+    await browser.type(
+      screen.getByRole("textbox", { name: "VIN" }),
+      "JYARN23E0RA123456",
+    );
     await browser.click(screen.getByRole("button", { name: "Create scooter" }));
     await waitFor(() =>
       expect(screen.getByRole("combobox", { name: "Brand" })).toHaveFocus(),
@@ -688,17 +765,21 @@ describe("Scooter create controls with the create resolver", () => {
     renderControls("ro");
     await chooseSelectOption(browser, "Sistem de propulsie", "Termic");
     await browser.type(
-      screen.getByLabelText("Număr de identificare vehicul — VIN"),
+      screen.getByRole("textbox", {
+        name: "Număr de identificare vehicul — VIN",
+      }),
       "JYARN23E0RA123456",
     );
     await browser.click(screen.getByRole("combobox", { name: "Marcă" }));
     await browser.click(await screen.findByRole("option", { name: /Yamaha/ }));
     await browser.type(
-      screen.getByLabelText("Capacitate rezervor (L)"),
+      screen.getByRole("textbox", { name: "Capacitate rezervor (L)" }),
       "5,25",
     );
     await browser.type(
-      screen.getByLabelText("Număr locuri, inclusiv conducătorul"),
+      screen.getByRole("textbox", {
+        name: "Număr locuri, inclusiv conducătorul",
+      }),
       "2",
     );
     await browser.click(
@@ -721,11 +802,17 @@ describe("Scooter create controls with the create resolver", () => {
     mocks.apiFetch.mockResolvedValueOnce(createdScooter);
     const browser = userEvent.setup();
     const view = renderControls();
-    await browser.type(screen.getByLabelText("VIN"), "JYARN23E0RA123456");
+    await browser.type(
+      screen.getByRole("textbox", { name: "VIN" }),
+      "JYARN23E0RA123456",
+    );
     await chooseSelectOption(browser, "Propulsion system", "Combustion");
-    await browser.type(screen.getByLabelText("Model"), "PCX");
+    await browser.type(screen.getByRole("textbox", { name: "Model" }), "PCX");
     await browser.click(screen.getByRole("button", { name: "Add new brand" }));
-    await browser.type(await screen.findByLabelText("Name"), "Honda");
+    await browser.type(
+      await screen.findByRole("textbox", { name: "Name" }),
+      "Honda",
+    );
     await browser.click(screen.getByRole("button", { name: "Create brand" }));
     await waitFor(() =>
       expect(screen.getByRole("combobox", { name: "Brand" })).toHaveValue(
@@ -738,7 +825,7 @@ describe("Scooter create controls with the create resolver", () => {
         <CreateControlsHarness brands={[...brands]} />
       </NextIntlClientProvider>,
     );
-    expect(screen.getByLabelText("Model")).toHaveValue("PCX");
+    expect(screen.getByRole("textbox", { name: "Model" })).toHaveValue("PCX");
     expect(screen.getByRole("combobox", { name: "Brand" })).toHaveValue(
       "Honda",
     );
@@ -756,16 +843,21 @@ describe("Scooter create controls with the create resolver", () => {
     renderControls();
     await fillRequiredScooterForm(browser);
     await chooseSelectOption(browser, "Registration type", "Temporary");
-    await browser.type(screen.getByLabelText("Plate number"), "INVALID");
     await browser.type(
-      screen.getByLabelText("Registration certificate number"),
+      screen.getByRole("textbox", { name: "Plate number" }),
+      "INVALID",
+    );
+    await browser.type(
+      screen.getByRole("textbox", { name: "Registration certificate number" }),
       "CERT-1",
     );
     await fillDateParts(browser, "Registration expires on", "2025-01-01");
     await browser.click(screen.getByRole("button", { name: "Create scooter" }));
     expect(await screen.findByText("Scooter not created")).toBeInTheDocument();
     await chooseSelectOption(browser, "Registration type", "Unregistered");
-    expect(screen.queryByLabelText("Plate number")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("textbox", { name: "Plate number" }),
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByText(
         "Plate number does not match the selected registration type.",
@@ -787,17 +879,24 @@ describe("Scooter create controls with the create resolver", () => {
     const browser = userEvent.setup();
     renderControls();
     await chooseSelectOption(browser, "Registration type", "Temporary");
-    await browser.type(screen.getByLabelText("Plate number"), "CJ 0123");
+    await browser.type(
+      screen.getByRole("textbox", { name: "Plate number" }),
+      "CJ 0123",
+    );
     await fillDateParts(browser, "Registration expires on", "2025-01-01");
     await chooseSelectOption(browser, "Registration type", "National");
-    expect(screen.getByLabelText("Plate number")).toHaveValue("CJ 0123");
+    expect(screen.getByRole("textbox", { name: "Plate number" })).toHaveValue(
+      "CJ 0123",
+    );
     expect(
       await screen.findByText(
         "Plate number does not match the selected registration type.",
       ),
     ).toBeInTheDocument();
     await chooseSelectOption(browser, "Registration type", "Temporary");
-    expect(screen.getByLabelText("Registration expires on")).toHaveValue("");
+    expect(
+      screen.getByRole("textbox", { name: "Registration expires on" }),
+    ).toHaveValue("");
     await waitFor(() =>
       expect(
         screen.queryByText(
@@ -811,24 +910,29 @@ describe("Scooter create controls with the create resolver", () => {
     renderControls();
     await fillRequiredScooterForm(browser);
     await chooseSelectOption(browser, "Registration type", "National");
-    await browser.type(screen.getByLabelText("Plate number"), "CJ 12 ABC");
+    await browser.type(
+      screen.getByRole("textbox", { name: "Plate number" }),
+      "CJ 12 ABC",
+    );
     await chooseSelectOption(browser, "Required driver license", "A1");
     await browser.click(screen.getByRole("button", { name: "Create scooter" }));
     await waitFor(() =>
-      expect(screen.getByLabelText("Registered on")).toHaveAttribute(
-        "aria-invalid",
-        "true",
-      ),
+      expect(
+        screen.getByRole("textbox", { name: "Registered on" }),
+      ).toHaveAttribute("aria-invalid", "true"),
     );
     await fillDateParts(browser, "Registered on", "2025-01-01");
-    await browser.clear(screen.getByLabelText("Power (kW)"));
-    await browser.type(screen.getByLabelText("Power (kW)"), "0");
+    await browser.clear(screen.getByRole("textbox", { name: "Power (kW)" }));
+    await browser.type(
+      screen.getByRole("textbox", { name: "Power (kW)" }),
+      "0",
+    );
     await browser.click(screen.getByRole("button", { name: "Create scooter" }));
     expect(
       await screen.findByText("Power (kW) must be greater than zero."),
     ).toBeInTheDocument();
     await browser.type(
-      screen.getByLabelText("Current mileage (km)"),
+      screen.getByRole("textbox", { name: "Current mileage (km)" }),
       "2147483648",
     );
     await browser.click(screen.getByRole("button", { name: "Create scooter" }));
@@ -850,18 +954,18 @@ describe("CIV selections", () => {
     await chooseSelectOption(browser, "Fuel type or energy source", "Petrol");
     await chooseSelectOption(browser, "Body type", "Other value from CIV");
     await browser.type(
-      screen.getByLabelText("Body type — other"),
+      screen.getByRole("textbox", { name: "Body type — other" }),
       "Legacy body specification",
     );
     await browser.type(
-      screen.getByLabelText("National registry number"),
+      screen.getByRole("textbox", { name: "National registry number" }),
       "ab-001/c",
     );
-    expect(screen.getByLabelText("National registry number")).toHaveValue(
-      "AB-001/C",
-    );
     expect(
-      screen.queryByLabelText("Electric motor power (kW)"),
+      screen.getByRole("textbox", { name: "National registry number" }),
+    ).toHaveValue("AB-001/C");
+    expect(
+      screen.queryByRole("textbox", { name: "Electric motor power (kW)" }),
     ).not.toBeInTheDocument();
     await browser.click(screen.getByRole("button", { name: "Create scooter" }));
     await waitFor(() => expect(mocks.apiFetch).toHaveBeenCalledOnce());
@@ -880,17 +984,16 @@ describe("CIV selections", () => {
     await chooseSelectOption(browser, "Body type", "Other value from CIV");
     await browser.click(screen.getByRole("button", { name: "Create scooter" }));
     expect(mocks.apiFetch).not.toHaveBeenCalled();
-    expect(screen.getByLabelText("Body type — other")).toHaveAttribute(
-      "aria-invalid",
-      "true",
-    );
+    expect(
+      screen.getByRole("textbox", { name: "Body type — other" }),
+    ).toHaveAttribute("aria-invalid", "true");
     await browser.type(
-      screen.getByLabelText("Body type — other"),
+      screen.getByRole("textbox", { name: "Body type — other" }),
       "Custom body",
     );
     await chooseSelectOption(browser, "Body type", "L1e-B — Two-wheel moped");
     expect(
-      screen.queryByLabelText("Body type — other"),
+      screen.queryByRole("textbox", { name: "Body type — other" }),
     ).not.toBeInTheDocument();
     await browser.click(screen.getByRole("button", { name: "Create scooter" }));
     await waitFor(() => expect(mocks.apiFetch).toHaveBeenCalledOnce());
@@ -904,18 +1007,18 @@ describe("CIV selections", () => {
     renderControls("ro");
     await chooseSelectOption(browser, "Sistem de propulsie", "Hibrid");
     await browser.type(
-      screen.getByLabelText("Putere motor electric (kW)"),
+      screen.getByRole("textbox", { name: "Putere motor electric (kW)" }),
       "3.25",
     );
-    expect(screen.getByLabelText("Putere motor electric (kW)")).toHaveValue(
-      "3,25",
-    );
     expect(
-      screen.getByLabelText("Capacitate cilindrică (cm³)"),
+      screen.getByRole("textbox", { name: "Putere motor electric (kW)" }),
+    ).toHaveValue("3,25");
+    expect(
+      screen.getByRole("textbox", { name: "Capacitate cilindrică (cm³)" }),
     ).toBeInTheDocument();
     await chooseSelectOption(browser, "Sistem de propulsie", "Electric");
     expect(
-      screen.queryByLabelText("Capacitate rezervor (L)"),
+      screen.queryByRole("textbox", { name: "Capacitate rezervor (L)" }),
     ).not.toBeInTheDocument();
   });
 });
@@ -1003,7 +1106,10 @@ async function enterOperationalStep(
 }
 
 async function fillWizardIdentity(browser: ReturnType<typeof userEvent.setup>) {
-  await browser.type(screen.getByLabelText("VIN"), "jyarn23e0ra123456");
+  await browser.type(
+    screen.getByRole("textbox", { name: "VIN" }),
+    "jyarn23e0ra123456",
+  );
   await selectBrand(browser, "Yamaha");
   await chooseSelectOption(browser, "Propulsion system", "Combustion");
 }
@@ -1012,7 +1118,7 @@ async function selectBrand(
   browser: ReturnType<typeof userEvent.setup>,
   name: string,
 ) {
-  const trigger = screen.getByLabelText("Brand");
+  const trigger = screen.getByRole("combobox", { name: "Brand" });
   await browser.click(trigger);
   await browser.click(
     await screen.findByRole("option", { name: new RegExp(name) }),
@@ -1025,20 +1131,13 @@ async function selectBrand(
 async function fillRequiredScooterForm(
   browser: ReturnType<typeof userEvent.setup>,
 ) {
-  fireEvent.change(screen.getByLabelText("VIN"), {
+  // Optional field normalization is covered by its own test. Keep shared setup
+  // to the identity fields needed to submit the controls harness.
+  fireEvent.change(screen.getByRole("textbox", { name: "VIN" }), {
     target: { value: "jyarn23e0ra123456" },
   });
   await selectBrand(browser, "Yamaha");
   await chooseSelectOption(browser, "Propulsion system", "Combustion");
-  for (const [label, value] of [
-    ["Model", "NMAX"],
-    ["Color", "White"],
-    ["Manufacture year", "2026"],
-    ["Engine capacity (cm³)", "125"],
-    ["Power (kW)", "8.5"],
-    ["Notes", "Maker papers received"],
-  ])
-    fireEvent.change(screen.getByLabelText(label!), { target: { value } });
 }
 
 async function chooseSelectOption(
@@ -1046,8 +1145,8 @@ async function chooseSelectOption(
   label: string,
   option: string,
 ) {
-  // Label queries avoid scanning every combobox in the large CIV form.
-  const trigger = screen.getByLabelText(label);
+  // Role queries avoid jsdom resolving labels for every element in the CIV form.
+  const trigger = screen.getByRole("combobox", { name: label });
   await browser.click(trigger);
   await browser.click(await screen.findByRole("option", { name: option }));
   await waitFor(() =>
@@ -1062,9 +1161,15 @@ async function fillDateParts(
 ) {
   const [year, month, day] = value.split("-");
 
-  await browser.type(screen.getByLabelText(label), day ?? "");
-  await browser.type(screen.getByLabelText(`${label} MM`), month ?? "");
-  await browser.type(screen.getByLabelText(`${label} YYYY`), year ?? "");
+  await browser.type(screen.getByRole("textbox", { name: label }), day ?? "");
+  await browser.type(
+    screen.getByRole("textbox", { name: `${label} MM` }),
+    month ?? "",
+  );
+  await browser.type(
+    screen.getByRole("textbox", { name: `${label} YYYY` }),
+    year ?? "",
+  );
 }
 
 function requiredLabel(text: string) {
