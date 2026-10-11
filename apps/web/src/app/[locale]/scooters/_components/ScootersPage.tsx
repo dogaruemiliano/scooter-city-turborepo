@@ -576,10 +576,10 @@ function effectiveListSort(
   query: v1.scooters.ListScootersQuery,
 ): v1.scooters.ScooterListSort {
   if (query.sort === "relevance" && !query.search) {
-    return "vinAsc";
+    return "fleetNumberAsc";
   }
 
-  return query.sort ?? (query.search ? "relevance" : "vinAsc");
+  return query.sort ?? (query.search ? "relevance" : "fleetNumberAsc");
 }
 
 function isDefaultSort(
@@ -590,7 +590,7 @@ function isDefaultSort(
     return true;
   }
 
-  return sort === (query.search ? "relevance" : "vinAsc");
+  return sort === (query.search ? "relevance" : "fleetNumberAsc");
 }
 
 function operationalFilterCount(query: v1.scooters.ListScootersQuery): number {

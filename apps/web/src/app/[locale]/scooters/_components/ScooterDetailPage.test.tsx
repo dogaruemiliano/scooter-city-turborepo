@@ -33,19 +33,25 @@ const scooter: v1.scooters.Scooter = {
   vin: "JYARN23E0RA123456",
   brandId: "brand-yamaha",
   brand: "Yamaha",
+  fleetNumber: 1,
+  brandCode: "YAM",
   model: "NMAX",
   color: "White",
   manufactureYear: 2026,
   powertrainType: "combustion",
-  engineType: null,
-  engineCc: 125,
+  engineCode: null,
+  engineDisplacementCc: 125,
   powerKw: 8.5,
   registrationType: "unregistered",
-  plateNumber: null,
-  registeredOn: null,
-  registrationExpiresOn: null,
-  requiredDriverLicenseType: "none",
+  registrationNumber: null,
+  registrationDate: null,
+  temporaryRegistrationExpiresAt: null,
+  requiredLicenseCategory: "none",
   currentMileageKm: 1_200,
+  hasGps: null,
+  odometerWorking: null,
+  speedometerWorking: null,
+  actualMaxSpeedKmh: null,
   notes: "Maker papers received",
   createdAt: "2026-06-25T10:00:00.000Z",
   updatedAt: "2026-06-25T11:00:00.000Z",
@@ -68,7 +74,7 @@ describe("ScooterDetailPage", () => {
     renderDetail();
 
     expect(
-      screen.getByRole("heading", { name: "Yamaha NMAX" }),
+      screen.getByRole("heading", { name: "001 YAM" }),
     ).toBeInTheDocument();
     expect(screen.getAllByText("JYARN23E0RA123456")[0]).toBeInTheDocument();
     expect(screen.getByText("White")).toBeInTheDocument();
@@ -88,7 +94,7 @@ describe("ScooterDetailPage", () => {
       "lucide-ellipsis-vertical",
     );
     expect(moreActionsButton.parentElement).toContainElement(
-      screen.getByRole("heading", { name: "Yamaha NMAX" }),
+      screen.getByRole("heading", { name: "001 YAM" }),
     );
     expect(
       screen.queryByRole("heading", { name: "Maintenance and repairs" }),
@@ -110,9 +116,9 @@ describe("ScooterDetailPage", () => {
     mocks.apiFetch.mockResolvedValueOnce({
       ...scooter,
       registrationType: "national",
-      plateNumber: "CJ 12 ABC",
-      registeredOn: "2026-01-16",
-      requiredDriverLicenseType: "A1",
+      registrationNumber: "CJ 12 ABC",
+      registrationDate: "2026-01-16",
+      requiredLicenseCategory: "A1",
     });
     const browser = userEvent.setup();
 
@@ -139,10 +145,10 @@ describe("ScooterDetailPage", () => {
           method: "PATCH",
           json: {
             registrationType: "national",
-            plateNumber: "CJ 12 ABC",
-            registeredOn: "2026-01-16",
-            registrationExpiresOn: null,
-            requiredDriverLicenseType: "A1",
+            registrationNumber: "CJ 12 ABC",
+            registrationDate: "2026-01-16",
+            temporaryRegistrationExpiresAt: null,
+            requiredLicenseCategory: "A1",
           },
         },
       ),
@@ -156,9 +162,9 @@ describe("ScooterDetailPage", () => {
     renderDetail("en", {
       ...scooter,
       registrationType: "national",
-      plateNumber: "CJ 12 ABC",
-      registeredOn: "2026-01-16",
-      requiredDriverLicenseType: "A1",
+      registrationNumber: "CJ 12 ABC",
+      registrationDate: "2026-01-16",
+      requiredLicenseCategory: "A1",
     });
 
     await browser.click(screen.getByRole("button", { name: "More actions" }));

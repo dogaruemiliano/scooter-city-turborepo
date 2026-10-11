@@ -13,6 +13,8 @@ import {
   Textarea,
 } from "@repo/ui/components";
 import { cn } from "@repo/ui/lib/utils";
+import { DecimalInput } from "@repo/ui/components/decimal-input";
+import { NormalizedInput } from "@repo/ui/components/normalized-input";
 import type { ComponentProps } from "react";
 import { Controller, useFormContext } from "react-hook-form";
 
@@ -31,12 +33,62 @@ const EMPTY_SELECT_VALUE = "__none__";
 
 export function FormInput({
   type = "text",
+  normalize,
   ...props
-}: Omit<ComponentProps<typeof Input>, "name">) {
+}: Omit<ComponentProps<typeof Input>, "name"> & {
+  normalize?: (value: string) => string;
+}) {
   const { controlProps, name } = useFormFieldControl();
-  const { register } = useFormContext();
+  const { register, control } = useFormContext();
+
+  if (normalize)
+    return (
+      <Controller
+        control={control}
+        name={name}
+        render={({ field }) => (
+          <NormalizedInput
+            {...controlProps}
+            {...props}
+            ref={field.ref}
+            name={field.name}
+            value={field.value ?? ""}
+            onValueChange={field.onChange}
+            onBlur={field.onBlur}
+            normalize={normalize}
+          />
+        )}
+      />
+    );
 
   return <Input {...controlProps} {...props} type={type} {...register(name)} />;
+}
+
+export function FormDecimalInput(
+  props: Omit<
+    ComponentProps<typeof DecimalInput>,
+    "name" | "value" | "onValueChange"
+  >,
+) {
+  const { controlProps, name } = useFormFieldControl();
+  const { control } = useFormContext();
+  return (
+    <Controller
+      control={control}
+      name={name}
+      render={({ field }) => (
+        <DecimalInput
+          {...controlProps}
+          {...props}
+          ref={field.ref}
+          name={field.name}
+          value={field.value ?? ""}
+          onValueChange={field.onChange}
+          onBlur={field.onBlur}
+        />
+      )}
+    />
+  );
 }
 
 export function FormTextarea(

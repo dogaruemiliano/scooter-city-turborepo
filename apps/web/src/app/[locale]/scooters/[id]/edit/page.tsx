@@ -3,6 +3,7 @@ import { messages } from "@repo/i18n";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
+import { cache } from "react";
 
 import {
   getLocalizedSignInPath,
@@ -23,11 +24,18 @@ interface EditScooterRoutePageProps {
 export async function generateMetadata({
   params,
 }: EditScooterRoutePageProps): Promise<Metadata> {
-  const { locale: rawLocale } = await params;
+  const { locale: rawLocale, id } = await params;
   const locale = resolveRouteLocale(rawLocale);
+  const cookieHeader = (await cookies()).toString();
+  const scooter = await scooterFromApi(
+    locale,
+    id,
+    scooterEditPath(id, locale),
+    cookieHeader,
+  );
 
   return {
-    title: messages[locale].scooters.editPage.title,
+    title: `${v1.scooters.scooterDisplayCode(scooter)} · ${messages[locale].scooters.editPage.title}`,
   };
 }
 
@@ -48,9 +56,16 @@ export default async function EditScooterRoutePage({
   }
 
   const cookieHeader = (await cookies()).toString();
-  const [scooter, brands] = await Promise.all([
+  const [scooter, brands, vocabulary] = await Promise.all([
     scooterFromApi(locale, id, editPath, cookieHeader),
     scooterBrandsFromApi(locale, editPath, cookieHeader),
+    webApi
+      .fetch(
+        v1.vehicleCiv.CIV_ROUTES.vocabulary,
+        v1.vehicleCiv.civVocabularySchema,
+        { headers: { cookie: cookieHeader }, cache: "no-store" },
+      )
+      .catch((error: unknown) => handleEditFetchError(error, locale, editPath)),
   ]);
 
   return (
@@ -60,12 +75,13 @@ export default async function EditScooterRoutePage({
         `${SCOOTERS_PATH}/${encodeURIComponent(id)}`,
         locale,
       )}
+      vocabulary={vocabulary}
       brands={brands.items}
     />
   );
 }
 
-async function scooterFromApi(
+const scooterFromApi = cache(async function scooterFromApi(
   locale: ReturnType<typeof resolveRouteLocale>,
   id: string,
   editPath: string,
@@ -80,7 +96,7 @@ async function scooterFromApi(
   } catch (error) {
     handleEditFetchError(error, locale, editPath);
   }
-}
+});
 
 async function scooterBrandsFromApi(
   locale: ReturnType<typeof resolveRouteLocale>,

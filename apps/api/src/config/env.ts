@@ -181,6 +181,40 @@ export const envSchema = z
       .describe(
         "Person-document extraction request timeout in milliseconds, capped at 45000. Requests are not automatically retried.",
       ),
+    SCOOTER_DOCUMENT_EXTRACTION_DRIVER: z
+      .enum(["disabled", "openai", "fake"])
+      .default("disabled")
+      .describe(
+        "Scooter-document extraction backend. OpenAI sends uploaded vehicle documents to the Responses API. Fake is for local/CI fixtures only.",
+      ),
+    SCOOTER_DOCUMENT_EXTRACTION_OPENAI_API_KEY: z
+      .preprocess(
+        (value) =>
+          typeof value === "string" && value.trim().length === 0
+            ? undefined
+            : value,
+        z.string().trim().min(1).optional(),
+      )
+      .describe(
+        "Secret OpenAI API key required when SCOOTER_DOCUMENT_EXTRACTION_DRIVER=openai. Server-only; never expose in the web app.",
+      ),
+    SCOOTER_DOCUMENT_EXTRACTION_MODEL: z
+      .string()
+      .trim()
+      .min(1)
+      .default("gpt-5.4-2026-03-05")
+      .describe(
+        "Pinned vision model for scooter-document extraction. Must support Responses image/PDF inputs and strict structured outputs.",
+      ),
+    SCOOTER_DOCUMENT_EXTRACTION_TIMEOUT_MS: z.coerce
+      .number()
+      .int()
+      .positive()
+      .max(90_000)
+      .default(90_000)
+      .describe(
+        "Scooter-document extraction request timeout in milliseconds, capped at 90000 for full-resolution documents. Requests are not automatically retried.",
+      ),
 
     /* JWT ----------------------------------------------------------------- */
     JWT_PRIVATE_KEY: z
@@ -448,6 +482,22 @@ export const envSchema = z
         path: ["PERSON_DOCUMENT_EXTRACTION_DRIVER"],
         message:
           "PERSON_DOCUMENT_EXTRACTION_DRIVER=fake cannot be used in production.",
+      });
+    }
+    requireIf(
+      v.SCOOTER_DOCUMENT_EXTRACTION_DRIVER === "openai",
+      "SCOOTER_DOCUMENT_EXTRACTION_OPENAI_API_KEY",
+      "SCOOTER_DOCUMENT_EXTRACTION_DRIVER=openai",
+    );
+    if (
+      v.NODE_ENV === "production" &&
+      v.SCOOTER_DOCUMENT_EXTRACTION_DRIVER === "fake"
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["SCOOTER_DOCUMENT_EXTRACTION_DRIVER"],
+        message:
+          "SCOOTER_DOCUMENT_EXTRACTION_DRIVER=fake cannot be used in production.",
       });
     }
   });

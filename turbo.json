@@ -19,7 +19,15 @@
     },
     "test:e2e": {
       "dependsOn": ["^build"],
-      "cache": false
+      "cache": false,
+      "passThroughEnv": [
+        "DATABASE_URL",
+        "NODE_ENV",
+        "JWT_ACCESS_SECRET",
+        "JWT_REFRESH_SECRET",
+        "REFRESH_TOKEN_HMAC_SECRET",
+        "OTP_HMAC_SECRET"
+      ]
     },
     "dev": {
       "dependsOn": ["^build"],

@@ -67,6 +67,14 @@ pnpm gen:env
 | `pnpm --filter api db:generate` | Regenerate the Prisma client.                                  |
 | `pnpm --filter api spec`        | Print OpenAPI JSON from the compiled API.                      |
 
+E2E tests require `DATABASE_URL` to be explicitly set in the shell to a disposable
+test database. Migrate and seed that database before running `pnpm test:e2e` or
+`pnpm --filter api test:e2e`. The runner rejects a missing URL before loading
+`.env` or the unit-test defaults, and Turbo passes the supplied URL through.
+The finance-book setup suite additionally requires an empty, migrated database
+whose name starts with `finance_books_test`; run it without seeding using
+`pnpm --filter api test:e2e finance-books.e2e-spec.ts`.
+
 Do not use destructive Prisma reset commands unless a human explicitly decides
 that data loss is acceptable.
 

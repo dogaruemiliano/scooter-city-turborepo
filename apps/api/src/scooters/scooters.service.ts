@@ -1,3 +1,7 @@
+import { writeInsurancePolicies } from "./scooter-insurance";
+import { CivVocabularyService } from "./civ-vocabulary.service";
+import { civMetadataWrite } from "./civ-metadata";
+import { ScooterDocumentsService } from "./scooter-documents.service";
 import {
   BadRequestException,
   ConflictException,
@@ -13,10 +17,35 @@ import { PrismaService } from "../prisma/prisma.service";
 
 const scooterInclude = {
   brand: true,
-} as const;
+  civDocument: true,
+  insurancePolicies: { orderBy: [{ validUntil: "desc" }, { id: "asc" }] },
+} satisfies Prisma.ScooterInclude;
+
+const scooterListInclude = {
+  brand: true,
+  insurancePolicies: { select: { validFrom: true, validUntil: true } },
+} satisfies Prisma.ScooterInclude;
+
+function toScooterListRow({
+  insurancePolicies,
+  ...scooter
+}: Prisma.ScooterGetPayload<{
+  include: typeof scooterListInclude;
+}>): ScooterWithBrand {
+  return {
+    ...scooter,
+    insuranceAttention: v1.scooters.insuranceAttention(
+      insurancePolicies.map((policy) => ({
+        validFrom: toDateOnlyString(policy.validFrom),
+        validUntil: toDateOnlyString(policy.validUntil),
+      })),
+    ),
+  };
+}
 
 type ScooterWithBrand = Scooter & {
-  brand: { name: string };
+  insuranceAttention?: v1.scooters.InsuranceAttention | null;
+  brand: { name: string; code: string };
 };
 
 interface SearchIdRow {
@@ -32,28 +61,60 @@ const SCOOTER_PLATE_CONFLICT_CODE = "SCOOTER_PLATE_CONFLICT";
 
 interface RegistrationState {
   registrationType: v1.scooters.ScooterRegistrationType;
-  plateNumber: string | null;
-  registeredOn: string | null;
-  registrationExpiresOn: string | null;
-  requiredDriverLicenseType: v1.scooters.ScooterRequiredDriverLicenseType;
+  registrationNumber: string | null;
+  registrationDate: string | null;
+  temporaryRegistrationExpiresAt: string | null;
+  requiredLicenseCategory: v1.scooters.ScooterRequiredDriverLicenseType;
 }
 
 @Injectable()
 export class ScootersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly documents: ScooterDocumentsService,
+    private readonly civVocabulary: CivVocabularyService,
+  ) {}
 
   async create(
     input: v1.scooters.CreateScooterInput,
+    userId?: string,
   ): Promise<ScooterWithBrand> {
-    this.assertValidPowertrain(input.powertrainType, input.engineCc);
+    this.assertValidPowertrain(input.powertrainType, input);
 
     try {
       const data = this.toCreateData(input);
-      await this.assertActivePlateAvailable(data.plateNumberNormalized);
+      await this.assertActivePlateAvailable(data.registrationNumberNormalized);
 
-      return await this.prisma.scooter.create({
-        data,
-        include: scooterInclude,
+      const prepared = await this.documents.prepare(
+        input.documentDrafts,
+        userId,
+      );
+      return await this.prisma.$transaction(async (tx) => {
+        // Updating the singleton row serializes concurrent allocations. A failed
+        // scooter/document save rolls this increment back as part of the transaction.
+        const counter = await tx.scooterFleetCounter.update({
+          where: { id: 1 },
+          data: { lastNumber: { increment: 1 } },
+        });
+        const scooter = await tx.scooter.create({
+          data: { ...data, fleetNumber: counter.lastNumber },
+          include: scooterInclude,
+        });
+        if (input.insurancePolicies?.length)
+          await writeInsurancePolicies(
+            tx,
+            scooter.id,
+            scooter.vin,
+            input.insurancePolicies,
+          );
+        await this.documents.apply(tx, scooter.id, prepared, [], userId);
+        await this.civVocabulary.remember(tx, input);
+        return input.insurancePolicies?.length
+          ? tx.scooter.findUniqueOrThrow({
+              where: { id: scooter.id },
+              include: scooterInclude,
+            })
+          : scooter;
       });
     } catch (error) {
       this.handleWriteError(error);
@@ -75,14 +136,19 @@ export class ScootersService {
       this.prisma.scooter.count({ where }),
       this.prisma.scooter.findMany({
         where,
-        include: scooterInclude,
+        include: scooterListInclude,
         orderBy: this.toScooterOrderBy(query),
         skip: (query.page - 1) * query.pageSize,
         take: query.pageSize,
       }),
     ]);
 
-    return { items, page: query.page, pageSize: query.pageSize, total };
+    return {
+      items: items.map(toScooterListRow),
+      page: query.page,
+      pageSize: query.pageSize,
+      total,
+    };
   }
 
   private async search(query: v1.scooters.ListScootersQuery): Promise<{
@@ -121,12 +187,12 @@ export class ScootersService {
     const order = new Map(ids.map((id, index) => [id, index]));
     const items = await this.prisma.scooter.findMany({
       where: { id: { in: ids } },
-      include: scooterInclude,
+      include: scooterListInclude,
     });
     items.sort((first, second) => order.get(first.id)! - order.get(second.id)!);
 
     return {
-      items,
+      items: items.map(toScooterListRow),
       page: query.page,
       pageSize: query.pageSize,
       total: countRows[0]?.total ?? 0,
@@ -143,6 +209,7 @@ export class ScootersService {
   async update(
     id: string,
     input: v1.scooters.UpdateScooterInput,
+    userId?: string,
   ): Promise<ScooterWithBrand> {
     try {
       const existing = await this.prisma.scooter.findFirst({
@@ -154,34 +221,68 @@ export class ScootersService {
 
       const nextPowertrainType =
         input.powertrainType ?? existing.powertrainType;
-      const nextEngineCc =
-        nextPowertrainType === "electric"
-          ? null
-          : input.engineCc !== undefined
-            ? input.engineCc
-            : existing.engineCc;
+      const changingPowertrain = nextPowertrainType !== existing.powertrainType;
       this.assertValidPowertrain(
-        nextPowertrainType as v1.scooters.ScooterPowertrainType,
-        nextEngineCc,
-      );
-
-      const data = this.toUpdateData(
-        input,
-        existing,
         nextPowertrainType,
-        nextEngineCc,
+        changingPowertrain ? { ...existing, ...input } : input,
       );
+      for (const field of v1.scooters.SCOOTER_CIV_FIELDS) {
+        const otherField = `${field}Other` as const;
+        if (input[field] === undefined && input[otherField] === undefined)
+          continue;
+        const next =
+          input[field] === undefined ? existing[field] : input[field];
+        const text =
+          input[otherField] === undefined
+            ? existing[otherField]
+            : input[otherField];
+        if ((next === "other" && !text) || (next !== "other" && text != null)) {
+          throw new BadRequestException({
+            message: "The CIV selection and custom value must match.",
+            details: { field: otherField },
+          });
+        }
+      }
+      const data = this.toUpdateData(input, existing);
       await this.assertActivePlateAvailable(
-        typeof data.plateNumberNormalized === "string"
-          ? data.plateNumberNormalized
+        typeof data.registrationNumberNormalized === "string"
+          ? data.registrationNumberNormalized
           : null,
         id,
       );
 
-      return await this.prisma.scooter.update({
-        where: { id },
-        data,
-        include: scooterInclude,
+      const prepared = await this.documents.prepare(
+        input.documentDrafts,
+        userId,
+      );
+      return await this.prisma.$transaction(async (tx) => {
+        const scooter = await tx.scooter.update({
+          where: { id, deletedAt: null },
+          data: { ...data, updatedAt: new Date() },
+          include: scooterInclude,
+        });
+        if (input.insurancePolicies?.length || input.vin !== undefined)
+          await writeInsurancePolicies(
+            tx,
+            id,
+            scooter.vin,
+            input.insurancePolicies,
+          );
+        await this.documents.apply(
+          tx,
+          id,
+          prepared,
+          input.removedDocumentIds,
+          userId,
+          input.documentExtractions,
+        );
+        await this.civVocabulary.remember(tx, input);
+        return input.insurancePolicies?.length
+          ? tx.scooter.findUniqueOrThrow({
+              where: { id: scooter.id },
+              include: scooterInclude,
+            })
+          : scooter;
       });
     } catch (error) {
       this.handleWriteError(error);
@@ -204,25 +305,87 @@ export class ScootersService {
 
   private toCreateData(
     input: v1.scooters.CreateScooterInput,
-  ): Prisma.ScooterCreateInput {
+  ): Omit<Prisma.ScooterCreateInput, "fleetNumber"> {
+    const civData = civMetadataWrite(input);
     return {
+      maxAxle3MassKg: input.maxAxle3MassKg,
+      maxAxle4MassKg: input.maxAxle4MassKg,
+      maxAxle5MassKg: input.maxAxle5MassKg,
+      brakedTrailerMassKg: input.brakedTrailerMassKg,
+      unbrakedTrailerMassKg: input.unbrakedTrailerMassKg,
+      couplingPointMassKg: input.couplingPointMassKg,
+      standingCapacity: input.standingCapacity,
+      noiseMeasurementRpm: input.noiseMeasurementRpm,
+      stationaryNoiseDb: input.stationaryNoiseDb,
+      drivingNoiseDb: input.drivingNoiseDb,
+      co2EmissionsGKm: input.co2EmissionsGKm,
+      vehicleClass: input.vehicleClass,
+      driveType: input.driveType,
+      civDocument: civData ? { create: civData } : undefined,
       vin: input.vin,
       brand: { connect: { id: input.brandId } },
+      vehicleType: input.vehicleType,
+      civNumber: input.civNumber,
+      nationalEmissionsCode: input.nationalEmissionsCode,
+      variant: input.variant,
+      version: input.version,
+      commercialName: input.commercialName,
+      vehicleCategory: input.vehicleCategory,
+      vehicleCategoryOther: input.vehicleCategoryOther,
+      nationalCategory: input.nationalCategory,
+      nationalCategoryOther: input.nationalCategoryOther,
+      bodyType: input.bodyType,
+      bodyTypeOther: input.bodyTypeOther,
+      typeApprovalNumber: input.typeApprovalNumber,
+      nationalRegistryNumber: input.nationalRegistryNumber,
+      seatsCount: input.seatsCount,
+      engineSerialNumber: input.engineSerialNumber,
+      ratedEngineRpm: input.ratedEngineRpm,
+      fuelType: input.fuelType,
+      fuelTypeOther: input.fuelTypeOther,
+      propulsionSystem: input.propulsionSystem,
+      electricMotorPowerKw: input.electricMotorPowerKw,
+      powerToWeightRatioKwKg: input.powerToWeightRatioKwKg,
+      maxSpeedKmh: input.maxSpeedKmh,
+      emissionsStandard: input.emissionsStandard,
+      curbWeightKg: input.curbWeightKg,
+      actualWeightKg: input.actualWeightKg,
+      maxTechnicallyPermissibleMassKg: input.maxTechnicallyPermissibleMassKg,
+      maxTrainMassKg: input.maxTrainMassKg,
+      maxAxle1MassKg: input.maxAxle1MassKg,
+      maxAxle2MassKg: input.maxAxle2MassKg,
+      axlesCount: input.axlesCount,
+      lengthMm: input.lengthMm,
+      widthMm: input.widthMm,
+      heightMm: input.heightMm,
+      wheelbaseMm: input.wheelbaseMm,
+      frontTyreSpecification: input.frontTyreSpecification,
+      rearTyreSpecification: input.rearTyreSpecification,
+      frontSuspension: input.frontSuspension,
+      rearSuspension: input.rearSuspension,
+      fuelTankCapacityLiters: input.fuelTankCapacityLiters,
+      registrationCertificateNumber: input.registrationCertificateNumber,
       model: input.model,
       color: input.color,
       manufactureYear: input.manufactureYear,
       powertrainType: input.powertrainType,
-      engineType: input.engineType ?? null,
-      engineCc: input.powertrainType === "electric" ? null : input.engineCc,
+      engineCode: input.engineCode ?? null,
+      engineDisplacementCc:
+        input.powertrainType === "electric" ? null : input.engineDisplacementCc,
       powerKw: input.powerKw ?? null,
       ...this.toRegistrationWriteData({
         registrationType: input.registrationType ?? "unregistered",
-        plateNumber: input.plateNumber ?? null,
-        registeredOn: input.registeredOn ?? null,
-        registrationExpiresOn: input.registrationExpiresOn ?? null,
-        requiredDriverLicenseType: input.requiredDriverLicenseType ?? "none",
+        registrationNumber: input.registrationNumber ?? null,
+        registrationDate: input.registrationDate ?? null,
+        temporaryRegistrationExpiresAt:
+          input.temporaryRegistrationExpiresAt ?? null,
+        requiredLicenseCategory: input.requiredLicenseCategory ?? "none",
       }),
       currentMileageKm: input.currentMileageKm ?? null,
+      hasGps: input.hasGps,
+      odometerWorking: input.odometerWorking,
+      speedometerWorking: input.speedometerWorking,
+      actualMaxSpeedKmh: input.actualMaxSpeedKmh,
       notes: input.notes,
     };
   }
@@ -230,26 +393,86 @@ export class ScootersService {
   private toUpdateData(
     input: v1.scooters.UpdateScooterInput,
     existing: Scooter,
-    nextPowertrainType: string,
-    nextEngineCc: number | null,
   ): Prisma.ScooterUpdateInput {
+    const civData = civMetadataWrite(input);
     return {
+      maxAxle3MassKg: input.maxAxle3MassKg,
+      maxAxle4MassKg: input.maxAxle4MassKg,
+      maxAxle5MassKg: input.maxAxle5MassKg,
+      brakedTrailerMassKg: input.brakedTrailerMassKg,
+      unbrakedTrailerMassKg: input.unbrakedTrailerMassKg,
+      couplingPointMassKg: input.couplingPointMassKg,
+      standingCapacity: input.standingCapacity,
+      noiseMeasurementRpm: input.noiseMeasurementRpm,
+      stationaryNoiseDb: input.stationaryNoiseDb,
+      drivingNoiseDb: input.drivingNoiseDb,
+      co2EmissionsGKm: input.co2EmissionsGKm,
+      vehicleClass: input.vehicleClass,
+      driveType: input.driveType,
+      civDocument: civData
+        ? { upsert: { create: civData, update: civData } }
+        : undefined,
       vin: input.vin,
       brand:
         input.brandId === undefined
           ? undefined
           : { connect: { id: input.brandId } },
+      vehicleType: input.vehicleType,
+      civNumber: input.civNumber,
+      nationalEmissionsCode: input.nationalEmissionsCode,
+      variant: input.variant,
+      version: input.version,
+      commercialName: input.commercialName,
+      vehicleCategory: input.vehicleCategory,
+      vehicleCategoryOther: input.vehicleCategoryOther,
+      nationalCategory: input.nationalCategory,
+      nationalCategoryOther: input.nationalCategoryOther,
+      bodyType: input.bodyType,
+      bodyTypeOther: input.bodyTypeOther,
+      typeApprovalNumber: input.typeApprovalNumber,
+      nationalRegistryNumber: input.nationalRegistryNumber,
+      seatsCount: input.seatsCount,
+      engineSerialNumber: input.engineSerialNumber,
+      ratedEngineRpm: input.ratedEngineRpm,
+      fuelType: input.fuelType,
+      fuelTypeOther: input.fuelTypeOther,
+      propulsionSystem: input.propulsionSystem,
+      electricMotorPowerKw: input.electricMotorPowerKw,
+      powerToWeightRatioKwKg: input.powerToWeightRatioKwKg,
+      maxSpeedKmh: input.maxSpeedKmh,
+      emissionsStandard: input.emissionsStandard,
+      curbWeightKg: input.curbWeightKg,
+      actualWeightKg: input.actualWeightKg,
+      maxTechnicallyPermissibleMassKg: input.maxTechnicallyPermissibleMassKg,
+      maxTrainMassKg: input.maxTrainMassKg,
+      maxAxle1MassKg: input.maxAxle1MassKg,
+      maxAxle2MassKg: input.maxAxle2MassKg,
+      axlesCount: input.axlesCount,
+      lengthMm: input.lengthMm,
+      widthMm: input.widthMm,
+      heightMm: input.heightMm,
+      wheelbaseMm: input.wheelbaseMm,
+      frontTyreSpecification: input.frontTyreSpecification,
+      rearTyreSpecification: input.rearTyreSpecification,
+      frontSuspension: input.frontSuspension,
+      rearSuspension: input.rearSuspension,
+      fuelTankCapacityLiters: input.fuelTankCapacityLiters,
+      registrationCertificateNumber: input.registrationCertificateNumber,
       model: input.model,
       color: input.color,
       manufactureYear: input.manufactureYear,
       powertrainType: input.powertrainType,
-      engineType: input.engineType,
-      engineCc: nextPowertrainType === "electric" ? null : nextEngineCc,
+      engineCode: input.engineCode,
+      engineDisplacementCc: input.engineDisplacementCc,
       powerKw: input.powerKw,
       ...this.toRegistrationWriteData(
         this.toNextRegistrationState(existing, input),
       ),
       currentMileageKm: input.currentMileageKm,
+      hasGps: input.hasGps,
+      odometerWorking: input.odometerWorking,
+      speedometerWorking: input.speedometerWorking,
+      actualMaxSpeedKmh: input.actualMaxSpeedKmh,
       notes: input.notes,
     };
   }
@@ -259,36 +482,34 @@ export class ScootersService {
     input: v1.scooters.UpdateScooterInput,
   ): RegistrationState {
     const registrationType =
-      input.registrationType ??
-      (existing.registrationType as v1.scooters.ScooterRegistrationType);
+      input.registrationType ?? existing.registrationType;
 
     if (registrationType === "unregistered") {
       return {
         registrationType,
-        plateNumber: null,
-        registeredOn: null,
-        registrationExpiresOn: null,
-        requiredDriverLicenseType: "none",
+        registrationNumber: null,
+        registrationDate: null,
+        temporaryRegistrationExpiresAt: null,
+        requiredLicenseCategory: "none",
       };
     }
 
     return {
       registrationType,
-      plateNumber:
-        input.plateNumber !== undefined
-          ? input.plateNumber
-          : existing.plateNumber,
-      registeredOn:
-        input.registeredOn !== undefined
-          ? input.registeredOn
-          : toDateOnlyString(existing.registeredOn),
-      registrationExpiresOn:
-        input.registrationExpiresOn !== undefined
-          ? input.registrationExpiresOn
-          : toDateOnlyString(existing.registrationExpiresOn),
-      requiredDriverLicenseType:
-        input.requiredDriverLicenseType ??
-        (existing.requiredDriverLicenseType as v1.scooters.ScooterRequiredDriverLicenseType),
+      registrationNumber:
+        input.registrationNumber !== undefined
+          ? input.registrationNumber
+          : existing.registrationNumber,
+      registrationDate:
+        input.registrationDate !== undefined
+          ? input.registrationDate
+          : toDateOnlyString(existing.registrationDate),
+      temporaryRegistrationExpiresAt:
+        input.temporaryRegistrationExpiresAt !== undefined
+          ? input.temporaryRegistrationExpiresAt
+          : toDateOnlyString(existing.temporaryRegistrationExpiresAt),
+      requiredLicenseCategory:
+        input.requiredLicenseCategory ?? existing.requiredLicenseCategory,
     };
   }
 
@@ -297,47 +518,47 @@ export class ScootersService {
   ): Pick<
     Prisma.ScooterCreateInput,
     | "registrationType"
-    | "plateNumber"
-    | "plateNumberNormalized"
-    | "registeredOn"
-    | "registrationExpiresOn"
-    | "requiredDriverLicenseType"
+    | "registrationNumber"
+    | "registrationNumberNormalized"
+    | "registrationDate"
+    | "temporaryRegistrationExpiresAt"
+    | "requiredLicenseCategory"
   > {
     if (state.registrationType === "unregistered") {
       return {
         registrationType: "unregistered",
-        plateNumber: null,
-        plateNumberNormalized: null,
-        registeredOn: null,
-        registrationExpiresOn: null,
-        requiredDriverLicenseType: "none",
+        registrationNumber: null,
+        registrationNumberNormalized: null,
+        registrationDate: null,
+        temporaryRegistrationExpiresAt: null,
+        requiredLicenseCategory: "none",
       };
     }
 
-    if (!state.plateNumber) {
+    if (!state.registrationNumber) {
       throw new BadRequestException(
         "Plate number is required for registered scooters",
       );
     }
 
-    if (!state.registeredOn) {
+    if (!state.registrationDate) {
       throw new BadRequestException(
         "Registration date is required for registered scooters",
       );
     }
 
     if (
-      state.registeredOn > v1.common.dateOnlyToday() ||
+      state.registrationDate > v1.common.dateOnlyToday() ||
       (state.registrationType === "temporary" &&
-        state.registrationExpiresOn &&
-        state.registrationExpiresOn < state.registeredOn)
+        state.temporaryRegistrationExpiresAt &&
+        state.temporaryRegistrationExpiresAt < state.registrationDate)
     ) {
       throw new BadRequestException("Registration dates are invalid");
     }
 
     if (
       state.registrationType === "temporary" &&
-      !state.registrationExpiresOn
+      !state.temporaryRegistrationExpiresAt
     ) {
       throw new BadRequestException(
         "Registration expiry date is required for temporary plates",
@@ -346,7 +567,7 @@ export class ScootersService {
 
     const normalized = v1.scooters.validatePlateForRegistrationType(
       state.registrationType,
-      state.plateNumber,
+      state.registrationNumber,
     );
     if (!normalized) {
       throw new BadRequestException(
@@ -356,14 +577,15 @@ export class ScootersService {
 
     return {
       registrationType: state.registrationType,
-      plateNumber: normalized.displayValue,
-      plateNumberNormalized: normalized.compactValue,
-      registeredOn: toDateOnlyDate(state.registeredOn)!,
-      registrationExpiresOn:
-        state.registrationType === "temporary" && state.registrationExpiresOn
-          ? toDateOnlyDate(state.registrationExpiresOn)!
+      registrationNumber: normalized.displayValue,
+      registrationNumberNormalized: normalized.compactValue,
+      registrationDate: toDateOnlyDate(state.registrationDate)!,
+      temporaryRegistrationExpiresAt:
+        state.registrationType === "temporary" &&
+        state.temporaryRegistrationExpiresAt
+          ? toDateOnlyDate(state.temporaryRegistrationExpiresAt)!
           : null,
-      requiredDriverLicenseType: state.requiredDriverLicenseType,
+      requiredLicenseCategory: state.requiredLicenseCategory,
     };
   }
 
@@ -384,9 +606,9 @@ export class ScootersService {
       and.push({ registrationType: query.registrationType });
     }
 
-    if (query.requiredDriverLicenseType) {
+    if (query.requiredLicenseCategory) {
       and.push({
-        requiredDriverLicenseType: query.requiredDriverLicenseType,
+        requiredLicenseCategory: query.requiredLicenseCategory,
       });
     }
 
@@ -394,21 +616,30 @@ export class ScootersService {
   }
 
   private toSearchCte(query: v1.scooters.ListScootersQuery): PrismaRuntime.Sql {
-    const term = query.search!.toLowerCase();
+    const term = query.search!.replace(/\s+/g, " ").trim().toLowerCase();
     const pattern = `%${term}%`;
+    const fleetNumberText = PrismaRuntime.sql`s."fleetNumber"::text`;
+    // PostgreSQL lpad truncates strings longer than its width: preserve 1000+.
+    const fleetCode = PrismaRuntime.sql`lower(lpad(${fleetNumberText}, greatest(3, length(${fleetNumberText})), '0') || ' ' || sb.code)`;
+    const exactFleetMatch = PrismaRuntime.sql`(
+      ${fleetNumberText} = ${term.replace(/^0+(?=\d)/, "")} OR
+      ${fleetCode} = ${term} OR
+      lower(${fleetNumberText} || ' ' || sb.code) = ${term.replace(/^0+(?=\d)/, "")}
+    )`;
     const scooterText = PrismaRuntime.sql`lower(
+      ${fleetCode} || ' ' ||
       coalesce(s.vin, '') || ' ' ||
       coalesce(sb.name, '') || ' ' ||
       coalesce(s.model, '') || ' ' ||
       coalesce(s.color, '') || ' ' ||
       coalesce(s."manufactureYear"::text, '') || ' ' ||
-      coalesce(s."powertrainType", '') || ' ' ||
-      coalesce(s."engineCc"::text, '') || ' ' ||
+      coalesce(s."powertrainType"::text, '') || ' ' ||
+      coalesce(s."engineDisplacementCc"::text, '') || ' ' ||
       coalesce((s."powerKw"::numeric(10, 2))::text, '') || ' ' ||
-      coalesce(s."registrationType", '') || ' ' ||
-      coalesce(s."plateNumber", '') || ' ' ||
-      coalesce(s."plateNumberNormalized", '') || ' ' ||
-      coalesce(s."requiredDriverLicenseType", '') || ' ' ||
+      coalesce(s."registrationType"::text, '') || ' ' ||
+      coalesce(s."registrationNumber", '') || ' ' ||
+      coalesce(s."registrationNumberNormalized", '') || ' ' ||
+      coalesce(s."requiredLicenseCategory"::text, '') || ' ' ||
       coalesce(s.notes, '')
     )`;
 
@@ -416,6 +647,8 @@ export class ScootersService {
       WITH base AS (
         SELECT
           s.id,
+          s."fleetNumber",
+          ${exactFleetMatch} AS exact_fleet_match,
           s.vin,
           sb.name AS brand,
           s.model,
@@ -430,6 +663,8 @@ export class ScootersService {
       scored AS (
         SELECT
           b.id,
+          b."fleetNumber",
+          b.exact_fleet_match,
           b.vin,
           b.brand,
           b.model,
@@ -454,19 +689,19 @@ export class ScootersService {
 
     if (query.powertrainType) {
       clauses.push(
-        PrismaRuntime.sql`s."powertrainType" = ${query.powertrainType}`,
+        PrismaRuntime.sql`s."powertrainType"::text = ${query.powertrainType}`,
       );
     }
 
     if (query.registrationType) {
       clauses.push(
-        PrismaRuntime.sql`s."registrationType" = ${query.registrationType}`,
+        PrismaRuntime.sql`s."registrationType"::text = ${query.registrationType}`,
       );
     }
 
-    if (query.requiredDriverLicenseType) {
+    if (query.requiredLicenseCategory) {
       clauses.push(
-        PrismaRuntime.sql`s."requiredDriverLicenseType" = ${query.requiredDriverLicenseType}`,
+        PrismaRuntime.sql`s."requiredLicenseCategory"::text = ${query.requiredLicenseCategory}`,
       );
     }
 
@@ -477,7 +712,10 @@ export class ScootersService {
     term: string,
     pattern: string,
   ): PrismaRuntime.Sql {
-    const clauses = [PrismaRuntime.sql`b.scooter_text ILIKE ${pattern}`];
+    const clauses = [
+      PrismaRuntime.sql`b.exact_fleet_match`,
+      PrismaRuntime.sql`b.scooter_text ILIKE ${pattern}`,
+    ];
 
     if (term.length >= 3) {
       clauses.push(PrismaRuntime.sql`${term} <% b.scooter_text`);
@@ -490,6 +728,11 @@ export class ScootersService {
     query: v1.scooters.ListScootersQuery,
   ): Prisma.ScooterOrderByWithRelationInput[] {
     switch (this.resolveListSort(query)) {
+      case "fleetNumberAsc":
+      case "relevance":
+        return [{ fleetNumber: "asc" }];
+      case "fleetNumberDesc":
+        return [{ fleetNumber: "desc" }];
       case "vinDesc":
         return [{ vin: "desc" }, { id: "asc" }];
       case "brandAsc":
@@ -508,7 +751,6 @@ export class ScootersService {
         return [{ updatedAt: "desc" }, { id: "asc" }];
       case "updatedAtAsc":
         return [{ updatedAt: "asc" }, { id: "asc" }];
-      case "relevance":
       case "vinAsc":
         return [{ vin: "asc" }, { id: "asc" }];
     }
@@ -518,6 +760,10 @@ export class ScootersService {
     query: v1.scooters.ListScootersQuery,
   ): PrismaRuntime.Sql {
     switch (this.resolveListSort(query)) {
+      case "fleetNumberAsc":
+        return PrismaRuntime.sql`"fleetNumber" ASC`;
+      case "fleetNumberDesc":
+        return PrismaRuntime.sql`"fleetNumber" DESC`;
       case "vinAsc":
         return PrismaRuntime.sql`vin ASC, score DESC, id ASC`;
       case "vinDesc":
@@ -539,7 +785,7 @@ export class ScootersService {
       case "updatedAtAsc":
         return PrismaRuntime.sql`"updatedAt" ASC, score DESC, id ASC`;
       case "relevance":
-        return PrismaRuntime.sql`score DESC, vin ASC, id ASC`;
+        return PrismaRuntime.sql`exact_fleet_match DESC, score DESC, "fleetNumber" ASC`;
     }
   }
 
@@ -547,40 +793,46 @@ export class ScootersService {
     query: v1.scooters.ListScootersQuery,
   ): v1.scooters.ScooterListSort {
     if (query.sort === "relevance" && !query.search) {
-      return "vinAsc";
+      return "fleetNumberAsc";
     }
 
-    return query.sort ?? (query.search ? "relevance" : "vinAsc");
+    return query.sort ?? (query.search ? "relevance" : "fleetNumberAsc");
   }
 
   private assertValidPowertrain(
     powertrainType: v1.scooters.ScooterPowertrainType,
-    engineCc: number | null | undefined,
+    values: object,
   ): void {
-    if (powertrainType === "combustion" && !engineCc) {
-      throw new BadRequestException(
-        "Engine cc is required for combustion scooters",
-      );
+    const fuel = (values as { fuelType?: v1.scooters.Scooter["fuelType"] })
+      .fuelType;
+    if (!v1.scooters.fuelMatchesPowertrain(powertrainType, fuel)) {
+      throw new BadRequestException({
+        message: "Fuel does not match the selected powertrain.",
+        details: { field: "fuelType" },
+      });
     }
-
-    if (powertrainType === "electric" && engineCc) {
-      throw new BadRequestException(
-        "Engine cc is only allowed for combustion scooters",
-      );
+    for (const field of v1.scooters.inactivePowertrainFields(powertrainType)) {
+      if ((values as Record<string, unknown>)[field] != null) {
+        throw new BadRequestException({
+          message:
+            "Clear incompatible fields explicitly when changing powertrain.",
+          details: { field },
+        });
+      }
     }
   }
 
   private async assertActivePlateAvailable(
-    plateNumberNormalized: string | null | undefined,
+    registrationNumberNormalized: string | null | undefined,
     excludeId?: string,
   ): Promise<void> {
-    if (!plateNumberNormalized) {
+    if (!registrationNumberNormalized) {
       return;
     }
 
     const existing = await this.prisma.scooter.findFirst({
       where: {
-        plateNumberNormalized,
+        registrationNumberNormalized,
         deletedAt: null,
         ...(excludeId ? { id: { not: excludeId } } : {}),
       },
@@ -591,7 +843,7 @@ export class ScootersService {
       throw new ConflictException({
         code: SCOOTER_PLATE_CONFLICT_CODE,
         message: "Scooter plate number already exists",
-        details: { field: "plateNumber" },
+        details: { field: "registrationNumber" },
       });
     }
   }
@@ -609,13 +861,13 @@ export class ScootersService {
           : [];
 
       if (
-        fields.includes("plateNumberNormalized") ||
-        fields.includes("Scooter_active_plateNumberNormalized_key")
+        fields.includes("registrationNumberNormalized") ||
+        fields.includes("Scooter_active_registrationNumberNormalized_key")
       ) {
         throw new ConflictException({
           code: SCOOTER_PLATE_CONFLICT_CODE,
           message: "Scooter plate number already exists",
-          details: { field: "plateNumber" },
+          details: { field: "registrationNumber" },
         });
       }
 

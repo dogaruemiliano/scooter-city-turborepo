@@ -6,6 +6,40 @@ import { v1 } from "../src";
 const today = v1.common.dateOnlyToday();
 const tomorrow = addDateOnlyDays(today, 1);
 
+test("fleet labels use at least three digits and the current brand code", () => {
+  for (const [fleetNumber, brandCode, expected] of [
+    [1, "IVA", "001 IVA"],
+    [2, "KYM", "002 KYM"],
+    [999, "AGM", "999 AGM"],
+    [1000, "IVA", "1000 IVA"],
+  ] as const) {
+    assert.equal(
+      v1.scooters.scooterDisplayCode({ fleetNumber, brandCode }),
+      expected,
+    );
+  }
+});
+
+test("fleet numbers are assigned by the server and cannot be supplied or edited", () => {
+  assert.equal(
+    v1.scooters.createScooterInputSchema.safeParse({
+      ...baseScooterInput(),
+      fleetNumber: 4,
+    }).success,
+    false,
+  );
+  assert.equal(
+    v1.scooters.updateScooterInputSchema.safeParse({ fleetNumber: 4 }).success,
+    false,
+  );
+  for (const sort of ["fleetNumberAsc", "fleetNumberDesc"]) {
+    assert.equal(
+      v1.scooters.listScootersQuerySchema.parse({ sort }).sort,
+      sort,
+    );
+  }
+});
+
 test("scooter create schema accepts a valid scooter", () => {
   assert.equal(
     v1.scooters.createScooterInputSchema.parse({
@@ -15,7 +49,7 @@ test("scooter create schema accepts a valid scooter", () => {
       color: "White",
       manufactureYear: 2026,
       powertrainType: "combustion",
-      engineCc: 125,
+      engineDisplacementCc: 125,
       powerKw: 9.5,
       notes: null,
     }).brandId,
@@ -60,20 +94,25 @@ test("scooter list items use the basic scooter contract", () => {
     vin: "JYARN23E0RA123456",
     brandId: "brand-1",
     brand: "Yamaha",
+    fleetNumber: 1,
     brandCode: "YAM",
     model: "NMAX",
     color: "White",
     manufactureYear: 2026,
     powertrainType: "combustion",
-    engineType: null,
-    engineCc: 125,
+    engineCode: null,
+    engineDisplacementCc: 125,
     powerKw: 9.5,
     registrationType: "unregistered",
-    plateNumber: null,
-    registeredOn: null,
-    registrationExpiresOn: null,
-    requiredDriverLicenseType: "A1",
+    registrationNumber: null,
+    registrationDate: null,
+    temporaryRegistrationExpiresAt: null,
+    requiredLicenseCategory: "A1",
     currentMileageKm: 12_250,
+    hasGps: null,
+    odometerWorking: null,
+    speedometerWorking: null,
+    actualMaxSpeedKmh: null,
     notes: null,
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
@@ -90,9 +129,9 @@ test("scooter create schema accepts registered scooters", () => {
     v1.scooters.createScooterInputSchema.parse({
       ...baseScooterInput(),
       registrationType: "national",
-      plateNumber: "CJ 12 ABC",
-      registeredOn: today,
-      requiredDriverLicenseType: "A1",
+      registrationNumber: "CJ 12 ABC",
+      registrationDate: today,
+      requiredLicenseCategory: "A1",
     }).registrationType,
     "national",
   );
@@ -101,10 +140,10 @@ test("scooter create schema accepts registered scooters", () => {
     v1.scooters.createScooterInputSchema.parse({
       ...baseScooterInput({ vin: "JYARN23E0RA123458" }),
       registrationType: "local",
-      plateNumber: "CLUJ-123",
-      registeredOn: today,
-      requiredDriverLicenseType: "none",
-    }).requiredDriverLicenseType,
+      registrationNumber: "CLUJ-123",
+      registrationDate: today,
+      requiredLicenseCategory: "none",
+    }).requiredLicenseCategory,
     "none",
   );
 
@@ -112,11 +151,11 @@ test("scooter create schema accepts registered scooters", () => {
     v1.scooters.createScooterInputSchema.parse({
       ...baseScooterInput({ vin: "JYARN23E0RA123459" }),
       registrationType: "temporary",
-      plateNumber: "B 012345",
-      registeredOn: today,
-      registrationExpiresOn: today,
-      requiredDriverLicenseType: "AM",
-    }).registrationExpiresOn,
+      registrationNumber: "B 012345",
+      registrationDate: today,
+      temporaryRegistrationExpiresAt: today,
+      requiredLicenseCategory: "AM",
+    }).temporaryRegistrationExpiresAt,
     today,
   );
 });
@@ -126,7 +165,7 @@ test("scooter registration schema enforces unregistered and date rules", () => {
     v1.scooters.createScooterInputSchema.safeParse({
       ...baseScooterInput(),
       registrationType: "unregistered",
-      plateNumber: "CJ 12 ABC",
+      registrationNumber: "CJ 12 ABC",
     }).success,
     false,
   );
@@ -135,9 +174,9 @@ test("scooter registration schema enforces unregistered and date rules", () => {
     v1.scooters.createScooterInputSchema.safeParse({
       ...baseScooterInput(),
       registrationType: "temporary",
-      plateNumber: "CJ 0123",
-      registeredOn: today,
-      requiredDriverLicenseType: "AM",
+      registrationNumber: "CJ 0123",
+      registrationDate: today,
+      requiredLicenseCategory: "AM",
     }).success,
     false,
   );
@@ -146,9 +185,9 @@ test("scooter registration schema enforces unregistered and date rules", () => {
     v1.scooters.createScooterInputSchema.safeParse({
       ...baseScooterInput(),
       registrationType: "national",
-      plateNumber: "CJ 12 ABC",
-      registeredOn: tomorrow,
-      requiredDriverLicenseType: "A1",
+      registrationNumber: "CJ 12 ABC",
+      registrationDate: tomorrow,
+      requiredLicenseCategory: "A1",
     }).success,
     false,
   );
@@ -157,10 +196,10 @@ test("scooter registration schema enforces unregistered and date rules", () => {
     v1.scooters.createScooterInputSchema.safeParse({
       ...baseScooterInput(),
       registrationType: "temporary",
-      plateNumber: "CJ 0123",
-      registeredOn: today,
-      registrationExpiresOn: addDateOnlyDays(today, -1),
-      requiredDriverLicenseType: "AM",
+      registrationNumber: "CJ 0123",
+      registrationDate: today,
+      temporaryRegistrationExpiresAt: addDateOnlyDays(today, -1),
+      requiredLicenseCategory: "AM",
     }).success,
     false,
   );
@@ -169,10 +208,10 @@ test("scooter registration schema enforces unregistered and date rules", () => {
     v1.scooters.createScooterInputSchema.safeParse({
       ...baseScooterInput(),
       registrationType: "national",
-      plateNumber: "CJ 12 ABC",
-      registeredOn: today,
-      registrationExpiresOn: today,
-      requiredDriverLicenseType: "A1",
+      registrationNumber: "CJ 12 ABC",
+      registrationDate: today,
+      temporaryRegistrationExpiresAt: today,
+      requiredLicenseCategory: "A1",
     }).success,
     false,
   );
@@ -180,19 +219,19 @@ test("scooter registration schema enforces unregistered and date rules", () => {
   assert.equal(
     v1.scooters.updateScooterInputSchema.safeParse({
       registrationType: "local",
-      registrationExpiresOn: today,
+      temporaryRegistrationExpiresAt: today,
     }).success,
     false,
   );
 });
 
 test("scooter licence enum accepts expected categories", () => {
-  for (const requiredDriverLicenseType of ["none", "AM", "A1", "A2", "A"]) {
+  for (const requiredLicenseCategory of ["none", "AM", "A1", "A2", "A"]) {
     assert.equal(
       v1.scooters.updateScooterInputSchema.parse({
-        requiredDriverLicenseType,
-      }).requiredDriverLicenseType,
-      requiredDriverLicenseType,
+        requiredLicenseCategory,
+      }).requiredLicenseCategory,
+      requiredLicenseCategory,
     );
   }
 });
@@ -231,12 +270,15 @@ test("local plate validation allows constrained local identifiers", () => {
 
 function assertPlate(
   registrationType: v1.scooters.ScooterRegistrationType,
-  plateNumber: string,
+  registrationNumber: string,
   displayValue: string,
   compactValue: string,
 ): void {
   assert.deepEqual(
-    v1.scooters.validatePlateForRegistrationType(registrationType, plateNumber),
+    v1.scooters.validatePlateForRegistrationType(
+      registrationType,
+      registrationNumber,
+    ),
     {
       registrationType,
       displayValue,
@@ -247,10 +289,13 @@ function assertPlate(
 
 function assertInvalidPlate(
   registrationType: v1.scooters.ScooterRegistrationType,
-  plateNumber: string,
+  registrationNumber: string,
 ): void {
   assert.equal(
-    v1.scooters.validatePlateForRegistrationType(registrationType, plateNumber),
+    v1.scooters.validatePlateForRegistrationType(
+      registrationType,
+      registrationNumber,
+    ),
     null,
   );
 }
@@ -263,7 +308,7 @@ function baseScooterInput(overrides: Record<string, unknown> = {}) {
     color: "White",
     manufactureYear: 2026,
     powertrainType: "combustion",
-    engineCc: 125,
+    engineDisplacementCc: 125,
     notes: null,
     ...overrides,
   };
@@ -274,3 +319,113 @@ function addDateOnlyDays(value: string, days: number): string {
   date.setUTCDate(date.getUTCDate() + days);
   return date.toISOString().slice(0, 10);
 }
+
+test("scooters can be recorded before their technical details are known", () => {
+  const minimal = {
+    vin: "JYARN23E0RA123456",
+    brandId: "brand-1",
+    powertrainType: "combustion",
+  };
+  assert.deepEqual(
+    v1.scooters.createScooterInputSchema.parse(minimal),
+    minimal,
+  );
+  const unknown = {
+    model: null,
+    manufactureYear: null,
+    engineDisplacementCc: null,
+    color: null,
+  };
+  assert.equal(
+    v1.scooters.createScooterInputSchema.safeParse({ ...minimal, ...unknown })
+      .success,
+    true,
+  );
+  assert.deepEqual(
+    v1.scooters.updateScooterInputSchema.parse(unknown),
+    unknown,
+  );
+});
+
+test("technical details accept explicit null, reject invalid quantities, and preserve omitted updates", () => {
+  const fields = v1.scooters.scooterTechnicalDetailsSchema.shape;
+  const cleared = Object.fromEntries(
+    Object.keys(fields).map((key) => [key, null]),
+  );
+  assert.deepEqual(
+    v1.scooters.updateScooterInputSchema.parse(cleared),
+    cleared,
+  );
+  assert.deepEqual(
+    v1.scooters.updateScooterInputSchema.parse({ notes: "Papers pending" }),
+    { notes: "Papers pending" },
+  );
+  for (const input of [
+    { seatsCount: -1 },
+    { lengthMm: 2.5 },
+    { ratedEngineRpm: 2_147_483_648 },
+    { fuelTankCapacityLiters: -1 },
+    { powerToWeightRatioKwKg: Infinity },
+    { electricMotorPowerKw: NaN },
+    { version: "v".repeat(121) },
+  ]) {
+    assert.equal(
+      v1.scooters.updateScooterInputSchema.safeParse(input).success,
+      false,
+    );
+  }
+});
+
+test("CIV enums reject arbitrary values and require custom text for other", () => {
+  for (const field of v1.scooters.SCOOTER_CIV_FIELDS) {
+    assert.equal(
+      v1.scooters.updateScooterInputSchema.safeParse({
+        [field]: "unknown-value",
+      }).success,
+      false,
+    );
+    assert.equal(
+      v1.scooters.updateScooterInputSchema.safeParse({ [field]: "other" })
+        .success,
+      false,
+    );
+    assert.equal(
+      v1.scooters.updateScooterInputSchema.safeParse({
+        [field]: "other",
+        [`${field}Other`]: "Exact CIV text",
+      }).success,
+      true,
+    );
+  }
+});
+
+test("propulsion rules allow hybrid and reject incompatible technical fields", () => {
+  assert.equal(
+    v1.scooters.updateScooterInputSchema.safeParse({
+      powertrainType: "hybrid",
+      engineDisplacementCc: 125,
+      electricMotorPowerKw: 3.5,
+    }).success,
+    true,
+  );
+  assert.equal(
+    v1.scooters.updateScooterInputSchema.safeParse({
+      powertrainType: "combustion",
+      electricMotorPowerKw: 3.5,
+    }).success,
+    false,
+  );
+  assert.equal(
+    v1.scooters.updateScooterInputSchema.safeParse({
+      powertrainType: "electric",
+      fuelTankCapacityLiters: 5,
+    }).success,
+    false,
+  );
+  assert.deepEqual(
+    v1.scooters.updateScooterInputSchema.parse({
+      nationalRegistryNumber: " ab-001/c ",
+    }),
+    { nationalRegistryNumber: "AB-001/C" },
+  );
+});

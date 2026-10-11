@@ -86,7 +86,8 @@ model PersonDocument {
   photos             PersonDocumentPhoto[]
 
   @@unique([personId, type], map: "person_document_active_type_unique", where: { deletedAt: null })
-  @@unique([personId], map: "person_document_active_identity_unique", where: raw("\"deletedAt\" IS NULL AND \"type\" IN ('passport', 'nationalId', 'other')"))
+  // Match PostgreSQL's normalized predicate to avoid repeated index rebuild migrations.
+  @@unique([personId], map: "person_document_active_identity_unique", where: raw("((\"deletedAt\" IS NULL) AND (type = ANY (ARRAY['passport'::text, 'nationalId'::text, 'other'::text])))"))
   @@index([personId, deletedAt])
   @@index([personId, type, status, issuingCountryCode, expiresOn], map: "PersonDocument_active_filters_idx", where: { deletedAt: null })
   @@index([type])
@@ -170,6 +171,7 @@ model MediaAsset {
   createdAt        DateTime              @default(now())
   deletedAt        DateTime?
   documentPhotos   PersonDocumentPhoto[]
+  scooterDocuments ScooterDocument[]
 
   @@index([provider, bucket])
   @@index([uploadedByUserId])
@@ -238,37 +240,193 @@ model ScooterBrand {
   scooters  Scooter[]
 }
 
-/// Scooter inventory record with Romanian registration metadata.
-model Scooter {
-  id                        String       @id @default(cuid())
-  vin                       String       @unique
-  brandId                   String
-  brand                     ScooterBrand @relation(fields: [brandId], references: [id], onDelete: Restrict)
-  model                     String
-  color                     String?
-  manufactureYear           Int
-  powertrainType            String
-  engineType                String?
-  engineCc                  Int?
-  powerKw                   Float?
-  registrationType          String       @default("unregistered")
-  plateNumber               String?
-  plateNumberNormalized     String?
-  registeredOn              DateTime?    @db.Date
-  registrationExpiresOn     DateTime?    @db.Date
-  requiredDriverLicenseType String       @default("none")
-  /// Enforced as non-negative by a database CHECK constraint.
-  currentMileageKm          Int?
-  notes                     String?
-  createdAt                 DateTime     @default(now())
-  updatedAt                 DateTime     @updatedAt
-  deletedAt                 DateTime?
+enum PowertrainType {
+  unpowered
+  electric
+  combustion
+  hybrid
+}
 
-  @@unique([plateNumberNormalized], map: "Scooter_active_plateNumberNormalized_key", where: raw("\"deletedAt\" IS NULL AND \"plateNumberNormalized\" IS NOT NULL"))
+enum ScooterRegistrationType {
+  unregistered
+  national
+  local
+  temporary
+}
+
+enum DrivingLicenseCategory {
+  none
+  AM
+  A1
+  A2
+  A
+}
+
+enum ScooterVehicleCategory {
+  M1
+  M2
+  M3
+  N1
+  N2
+  N3
+  O1
+  O2
+  O3
+  O4
+  L1e
+  L2e
+  L3e
+  L4e
+  L5e
+  L6e
+  L7e
+  other
+}
+
+enum ScooterUseCategory {
+  motorcycle
+  other
+}
+
+enum ScooterBodyType {
+  two_wheel_moped
+  two_wheel_motorcycle
+  other
+}
+
+enum ScooterFuelType {
+  petrol
+  diesel
+  electric
+  petrol_electric
+  diesel_electric
+  other
+}
+
+/// Singleton counter; incremented in the same transaction as scooter creation.
+model ScooterFleetCounter {
+  id         Int @id
+  lastNumber Int @default(0)
+}
+
+/// Scooter inventory; technical details can be completed after acquisition.
+model Scooter {
+  id          String @id @default(cuid())
+  /// Permanent fleet-wide number, including soft-deleted scooters.
+  fleetNumber Int    @unique
+
+  maxAxle3MassKg        Int?
+  maxAxle4MassKg        Int?
+  maxAxle5MassKg        Int?
+  brakedTrailerMassKg   Int?
+  unbrakedTrailerMassKg Int?
+  couplingPointMassKg   Int?
+  standingCapacity      Int?
+  noiseMeasurementRpm   Int?
+  stationaryNoiseDb     Decimal?
+  drivingNoiseDb        Decimal?
+  co2EmissionsGKm       Decimal?
+  vehicleClass          String?
+  driveType             String?
+  civDocument           VehicleCivDocument?
+
+  // Identity
+  vin             String  @unique
+  brandId         String
+  vehicleType     String?
+  civNumber       String?
+  model           String?
+  variant         String?
+  version         String?
+  commercialName  String?
+  manufactureYear Int?
+  color           String?
+
+  // Classification / homologation
+  vehicleCategory        ScooterVehicleCategory?
+  vehicleCategoryOther   String?
+  nationalCategory       ScooterUseCategory?
+  nationalCategoryOther  String?
+  bodyType               ScooterBodyType?
+  bodyTypeOther          String?
+  typeApprovalNumber     String?
+  nationalRegistryNumber String?
+  seatsCount             Int?
+
+  // Powertrain / engine
+  powertrainType         PowertrainType
+  engineCode             String?
+  engineSerialNumber     String?
+  engineDisplacementCc   Int?
+  powerKw                Decimal?
+  ratedEngineRpm         Int?
+  fuelType               ScooterFuelType?
+  fuelTypeOther          String?
+  propulsionSystem       String?
+  electricMotorPowerKw   Decimal?
+  powerToWeightRatioKwKg Decimal?
+  maxSpeedKmh            Int?
+  emissionsStandard      String?
+  nationalEmissionsCode  String?
+
+  // Masses
+  curbWeightKg                    Int?
+  actualWeightKg                  Int?
+  maxTechnicallyPermissibleMassKg Int?
+  maxTrainMassKg                  Int?
+  maxAxle1MassKg                  Int?
+  maxAxle2MassKg                  Int?
+
+  // Dimensions / chassis
+  axlesCount  Int?
+  lengthMm    Int?
+  widthMm     Int?
+  heightMm    Int?
+  wheelbaseMm Int?
+
+  // Wheels / suspension
+  frontTyreSpecification String?
+  rearTyreSpecification  String?
+  frontSuspension        String?
+  rearSuspension         String?
+
+  // Other technical data
+  fuelTankCapacityLiters Decimal?
+
+  // Current operational data
+  /// Enforced as non-negative by a database CHECK constraint.
+  currentMileageKm   Int?
+  hasGps             Boolean?
+  odometerWorking    Boolean?
+  speedometerWorking Boolean?
+  /// Real-world measurement, separate from the document's maximum speed.
+  actualMaxSpeedKmh  Int?
+  notes              String?
+
+  // Registration — current state
+  registrationType               ScooterRegistrationType @default(unregistered)
+  registrationNumber             String?
+  registrationNumberNormalized   String?
+  registrationDate               DateTime?               @db.Date
+  registrationCertificateNumber  String?
+  temporaryRegistrationExpiresAt DateTime?               @db.Date
+  requiredLicenseCategory        DrivingLicenseCategory  @default(none)
+
+  // Relations (acquisition, issues and maintenance deferred)
+  brand             ScooterBrand             @relation(fields: [brandId], references: [id], onDelete: Restrict)
+  documents         ScooterDocument[]
+  insurancePolicies ScooterInsurancePolicy[]
+
+  // Metadata
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@unique([registrationNumberNormalized], map: "Scooter_active_registrationNumberNormalized_key", where: raw("\"deletedAt\" IS NULL AND \"registrationNumberNormalized\" IS NOT NULL"))
   @@index([deletedAt])
   @@index([powertrainType, deletedAt])
   @@index([registrationType, deletedAt])
-  @@index([requiredDriverLicenseType, deletedAt])
+  @@index([requiredLicenseCategory, deletedAt])
   @@index([brandId, model])
 }
 
@@ -1103,4 +1261,80 @@ model SettlementOperation {
   operation       FinancialOperation @relation(fields: [operationId], references: [id], onDelete: Restrict)
 
   @@id([settlementRunId, operationId])
+}
+
+enum ScooterDocumentType {
+  import_document
+  civ
+  registration_certificate
+  insurance
+}
+
+/// One PDF or image; multiple files can describe the pages of a document.
+model ScooterDocument {
+  id                String                  @id @default(cuid())
+  scooterId         String
+  scooter           Scooter                 @relation(fields: [scooterId], references: [id], onDelete: Cascade)
+  insurancePolicyId String?
+  insurancePolicy   ScooterInsurancePolicy? @relation(fields: [insurancePolicyId, scooterId], references: [id, scooterId], onDelete: Restrict)
+  type              ScooterDocumentType
+  fileName          String
+  extractedData     Json?
+  assetId           String                  @unique
+  asset             MediaAsset              @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  createdAt         DateTime                @default(now())
+  deletedAt         DateTime?
+
+  @@index([scooterId, type, deletedAt])
+}
+
+/// Metadata of the current CIV. Normalized specifications and CIV number stay
+/// on the existing vehicle; its ScooterDocument(type=civ) records hold the files.
+model VehicleCivDocument {
+  id               String             @id @default(cuid())
+  scooterId        String             @unique
+  scooter          Scooter            @relation(fields: [scooterId], references: [id], onDelete: Cascade)
+  version          CivDocumentVersion @default(unknown)
+  issuedAt         DateTime?          @db.Date
+  issuingAuthority String?
+  rawFields        Json?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+}
+
+enum CivDocumentVersion {
+  v1993   @map("1993")
+  v2016   @map("2016")
+  v2024   @map("2024")
+  unknown
+}
+
+/// Open vocabulary of values actually saved by administrators. These are
+/// suggestions, not an exhaustive or officially approved RAR nomenclature.
+model CivVocabularyEntry {
+  field String
+  value String
+
+  @@id([field, value])
+}
+
+/// A historical policy. Coverage status is derived from dates, never stored.
+model ScooterInsurancePolicy {
+  id                 String            @id @default(cuid())
+  scooterId          String
+  scooter            Scooter           @relation(fields: [scooterId], references: [id], onDelete: Cascade)
+  insuredName        String?
+  validFrom          DateTime?         @db.Date
+  validUntil         DateTime?         @db.Date
+  premiumAmount      Decimal?          @db.Decimal(12, 2)
+  currency           String?           @db.VarChar(3)
+  documentVin        String?           @db.VarChar(17)
+  vinReviewConfirmed Boolean           @default(false)
+  rawFields          Json?
+  documents          ScooterDocument[]
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  @@unique([id, scooterId])
+  @@index([scooterId, validUntil])
 }

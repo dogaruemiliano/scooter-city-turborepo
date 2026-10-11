@@ -2,13 +2,14 @@
 
 import { Label } from "@repo/ui/components";
 import { cn } from "@repo/ui/lib/utils";
+import { TriangleAlertIcon } from "lucide-react";
 import { createContext, useContext, useId, type ReactNode } from "react";
 import { get, useFormContext, useFormState } from "react-hook-form";
 
 interface FormFieldContextValue {
   /** Element id of the control; the label's `htmlFor`. */
   id: string;
-  /** Id of the error paragraph, or `undefined` when the field is valid. */
+  /** Id of the error or warning description, when present. */
   errorId: string | undefined;
   error: string | undefined;
   name: string;
@@ -18,6 +19,11 @@ interface FormFieldContextValue {
 }
 
 const FormFieldContext = createContext<FormFieldContextValue | null>(null);
+
+/** Optional, non-blocking review feedback, keyed by form field path. */
+export const FormFieldWarningsContext = createContext<
+  Readonly<Record<string, string>>
+>({});
 
 /**
  * Accessibility props every control inside a {@link FormField} must spread, so
@@ -57,6 +63,7 @@ export interface FormFieldProps {
    * focusable input is a sub-element — the date field's `-day` input.
    */
   labelSuffix?: string;
+  labelHint?: string;
 }
 
 /**
@@ -70,6 +77,7 @@ export function FormField({
   disabled = false,
   label,
   labelSuffix,
+  labelHint,
   name,
   required = false,
 }: FormFieldProps) {
@@ -78,7 +86,9 @@ export function FormField({
   const { control } = useFormContext();
   const { errors } = useFormState({ control, name });
   const error = get(errors, name)?.message as string | undefined;
-  const errorId = error ? `${id}-error` : undefined;
+  const warnings = useContext(FormFieldWarningsContext);
+  const warning = !error ? warnings[name] : undefined;
+  const errorId = error ? `${id}-error` : warning ? `${id}-warning` : undefined;
 
   return (
     <FormFieldContext.Provider
@@ -86,8 +96,14 @@ export function FormField({
     >
       <div
         data-field-name={name}
+        data-warning={warning ? true : undefined}
         data-disabled={disabled || undefined}
-        className={cn("flex min-w-0 flex-col gap-2", className)}
+        className={cn(
+          "flex min-w-0 flex-col gap-2",
+          warning &&
+            "[&_[data-slot=input]]:border-warning [&_[data-slot=textarea]]:border-warning [&_[data-slot=select-trigger]]:border-warning [&_[data-slot=search-select-control]]:border-warning [&_[data-slot=input-group]]:border-warning [&_button[aria-haspopup=dialog]]:border-warning",
+          className,
+        )}
       >
         <div
           className={cn(
@@ -101,6 +117,11 @@ export function FormField({
           >
             {label}
           </Label>
+          {labelHint ? (
+            <span aria-hidden="true" className="text-xs text-muted-foreground">
+              {labelHint}
+            </span>
+          ) : null}
           {required ? (
             <span
               aria-hidden="true"
@@ -109,9 +130,20 @@ export function FormField({
               *
             </span>
           ) : null}
+          {warning ? (
+            <span title={warning} className="text-warning">
+              <TriangleAlertIcon aria-hidden="true" className="size-4" />
+            </span>
+          ) : null}
         </div>
 
         {children}
+
+        {warning ? (
+          <p id={errorId} className="sr-only">
+            {warning}
+          </p>
+        ) : null}
 
         {error ? (
           <p id={errorId} role="alert" className="text-sm text-destructive">

@@ -436,6 +436,8 @@
   --transition-duration-countdown-tick: 1000ms;
   --duration-orientation-hint: 2400ms;
   --transition-duration-orientation-hint: 2400ms;
+  --duration-clipboard-feedback: 3000ms;
+  --transition-duration-clipboard-feedback: 3000ms;
   --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
   --ease-decelerate: cubic-bezier(0, 0, 0.2, 1);
   --ease-accelerate: cubic-bezier(0.4, 0, 1, 1);

@@ -121,4 +121,58 @@ describe("environment schema", () => {
       ).toThrow("PERSON_DOCUMENT_EXTRACTION_TIMEOUT_MS");
     },
   );
+
+  it("keeps scooter extraction independently disabled by default", () => {
+    const source = validEnv({ PERSON_DOCUMENT_EXTRACTION_DRIVER: "fake" });
+    delete source.SCOOTER_DOCUMENT_EXTRACTION_DRIVER;
+    expect(loadEnv(source).SCOOTER_DOCUMENT_EXTRACTION_DRIVER).toBe("disabled");
+  });
+
+  it("requires a separate nonempty scooter API key and defaults the pinned model", () => {
+    expect(() =>
+      loadEnv(
+        validEnv({
+          SCOOTER_DOCUMENT_EXTRACTION_DRIVER: "openai",
+          SCOOTER_DOCUMENT_EXTRACTION_OPENAI_API_KEY: " ",
+        }),
+      ),
+    ).toThrow("SCOOTER_DOCUMENT_EXTRACTION_OPENAI_API_KEY");
+    expect(
+      loadEnv(
+        validEnv({
+          SCOOTER_DOCUMENT_EXTRACTION_DRIVER: "openai",
+          SCOOTER_DOCUMENT_EXTRACTION_OPENAI_API_KEY: "test-key",
+        }),
+      ).SCOOTER_DOCUMENT_EXTRACTION_MODEL,
+    ).toBe("gpt-5.4-2026-03-05");
+  });
+
+  it("forbids fake scooter extraction in production", () => {
+    expect(() =>
+      loadEnv(
+        validEnv({
+          NODE_ENV: "production",
+          SCOOTER_DOCUMENT_EXTRACTION_DRIVER: "fake",
+        }),
+      ),
+    ).toThrow("SCOOTER_DOCUMENT_EXTRACTION_DRIVER");
+  });
+
+  it.each(["0", "90001"])(
+    "rejects invalid scooter-extraction timeout %s",
+    (timeout) => {
+      expect(() =>
+        loadEnv(validEnv({ SCOOTER_DOCUMENT_EXTRACTION_TIMEOUT_MS: timeout })),
+      ).toThrow("SCOOTER_DOCUMENT_EXTRACTION_TIMEOUT_MS");
+    },
+  );
+  it("allows 90 seconds for full-resolution scooter documents", () => {
+    const source = validEnv();
+    delete source.SCOOTER_DOCUMENT_EXTRACTION_TIMEOUT_MS;
+    expect(loadEnv(source).SCOOTER_DOCUMENT_EXTRACTION_TIMEOUT_MS).toBe(90_000);
+    expect(
+      loadEnv(validEnv({ SCOOTER_DOCUMENT_EXTRACTION_TIMEOUT_MS: "90000" }))
+        .SCOOTER_DOCUMENT_EXTRACTION_TIMEOUT_MS,
+    ).toBe(90_000);
+  });
 });

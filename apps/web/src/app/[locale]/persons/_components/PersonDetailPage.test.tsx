@@ -450,6 +450,13 @@ describe("PersonDetailPage", () => {
     await browser.click(screen.getByRole("button", { name: "Contact" }));
 
     const contactSheet = await screen.findByRole("dialog");
+    expect(contactSheet).toHaveClass("bg-popover");
+    expect(contactSheet).not.toHaveClass("bg-background");
+    for (const surface of contactSheet.querySelectorAll(
+      '[data-slot="bottom-sheet-content"], [data-slot="bottom-sheet-header"], [data-slot="bottom-sheet-body"]',
+    )) {
+      expect(surface).not.toHaveClass("bg-background");
+    }
     expect(
       within(contactSheet).getByRole("heading", {
         name: "Contact Ada Lovelace",

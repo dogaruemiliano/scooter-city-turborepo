@@ -14,6 +14,8 @@ export * from "./dropdown-menu";
 export * from "./field";
 export * from "./form-section";
 export * from "./input";
+export * from "./decimal-input";
+export * from "./normalized-input";
 export * from "./input-group";
 export * from "./image-capture";
 export * from "./image-editor";
@@ -40,3 +42,5 @@ export * from "./textarea";
 export * from "./tooltip";
 export * from "./toggle";
 export * from "./toggle-group";
+
+export * from "./document-input";

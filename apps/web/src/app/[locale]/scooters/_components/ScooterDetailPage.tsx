@@ -1,4 +1,5 @@
 "use client";
+import { ScooterInsuranceList } from "./ScooterInsuranceFields";
 
 import { v1 } from "@repo/api-shared";
 import {
@@ -38,8 +39,10 @@ import { useId, useState, type FormEvent, type ReactNode } from "react";
 import { MoreActionsMenu } from "@/components/MoreActionsMenu";
 import { PageTitleOverride } from "@/components/PageTitleOverride";
 import { webApi } from "@/lib/api";
-import { FeedbackAlert, formErrorsFromIssues } from "./ScooterCreateForm";
-import { ScooterRegistrationFormFields } from "./ScooterFormFields";
+import { FeedbackAlert, formErrorsFromIssues } from "./scooter-feedback";
+import { CivDetails } from "./CivDetails";
+import { ScooterDocumentList } from "./ScooterDocumentUpload";
+import { ScooterRegistrationFormFields } from "./ScooterRegistrationFormFields";
 import {
   buildScooterRegistrationInputCandidate,
   fieldFromIssue,
@@ -73,7 +76,7 @@ export function ScooterDetailPage({
   const [registrationOpen, setRegistrationOpen] = useState(false);
   const [registrationDialogKey, setRegistrationDialogKey] = useState(0);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const title = `${scooter.brand} ${scooter.model}`;
+  const title = v1.scooters.scooterDisplayCode(scooter);
   const scooterEditHref = `${scootersHref}/${encodeURIComponent(scooter.id)}/edit`;
   const registrationActionLabel =
     scooter.registrationType === "unregistered"
@@ -146,6 +149,9 @@ export function ScooterDetailPage({
           <div className="min-w-0">
             <h1 className="break-words text-2xl font-semibold">{title}</h1>
             <p className="break-words text-sm text-muted-foreground">
+              {[scooter.brand, scooter.model].filter(Boolean).join(" ")}
+            </p>
+            <p className="break-words text-sm text-muted-foreground">
               {scooter.vin}
             </p>
           </div>
@@ -201,7 +207,10 @@ export function ScooterDetailPage({
       <DetailSection title={t("sections.identity")}>
         <DetailField label={t("fields.vin")} value={scooter.vin} />
         <DetailField label={t("fields.brand")} value={scooter.brand} />
-        <DetailField label={t("fields.model")} value={scooter.model} />
+        <DetailField
+          label={t("fields.model")}
+          value={scooter.model ?? t("detail.emptyValue")}
+        />
         <DetailField
           label={t("fields.color")}
           value={scooter.color ?? t("detail.emptyValue")}
@@ -216,21 +225,25 @@ export function ScooterDetailPage({
       <DetailSection title={t("sections.technical")}>
         <DetailField
           label={t("fields.manufactureYear")}
-          value={String(scooter.manufactureYear)}
+          value={
+            scooter.manufactureYear == null
+              ? t("detail.emptyValue")
+              : String(scooter.manufactureYear)
+          }
         />
         <DetailField
           label={t("fields.powertrainType")}
           value={t(`powertrainTypes.${scooter.powertrainType}`)}
         />
         <DetailField
-          label={t("fields.engineType")}
-          value={scooter.engineType ?? t("detail.emptyValue")}
+          label={t("fields.engineCode")}
+          value={scooter.engineCode ?? t("detail.emptyValue")}
         />
         <DetailField
-          label={t("fields.engineCc")}
+          label={t("fields.engineDisplacementCc")}
           value={
-            scooter.engineCc
-              ? t("list.ccValue", { cc: scooter.engineCc })
+            scooter.engineDisplacementCc
+              ? t("list.ccValue", { cc: scooter.engineDisplacementCc })
               : t("detail.emptyValue")
           }
         />
@@ -242,14 +255,6 @@ export function ScooterDetailPage({
               : t("detail.emptyValue")
           }
         />
-        <DetailField
-          label={t("fields.currentMileageKm")}
-          value={
-            scooter.currentMileageKm == null
-              ? t("detail.emptyValue")
-              : new Intl.NumberFormat(locale).format(scooter.currentMileageKm)
-          }
-        />
       </DetailSection>
 
       <DetailSection title={t("sections.registration")}>
@@ -258,31 +263,31 @@ export function ScooterDetailPage({
           value={t(`registrationTypes.${scooter.registrationType}`)}
         />
         <DetailField
-          label={t("fields.plateNumber")}
-          value={scooter.plateNumber ?? t("detail.emptyValue")}
+          label={t("fields.registrationNumber")}
+          value={scooter.registrationNumber ?? t("detail.emptyValue")}
         />
         <DetailField
-          label={t("fields.registeredOn")}
+          label={t("fields.registrationDate")}
           value={
-            scooter.registeredOn
-              ? formatDate(scooter.registeredOn, locale)
+            scooter.registrationDate
+              ? formatDate(scooter.registrationDate, locale)
               : t("detail.emptyValue")
           }
         />
         {scooter.registrationType === "temporary" ? (
           <DetailField
-            label={t("fields.registrationExpiresOn")}
+            label={t("fields.temporaryRegistrationExpiresAt")}
             value={
-              scooter.registrationExpiresOn
-                ? formatDate(scooter.registrationExpiresOn, locale)
+              scooter.temporaryRegistrationExpiresAt
+                ? formatDate(scooter.temporaryRegistrationExpiresAt, locale)
                 : t("detail.emptyValue")
             }
           />
         ) : null}
         <DetailField
-          label={t("fields.requiredDriverLicenseType")}
+          label={t("fields.requiredLicenseCategory")}
           value={t(
-            `requiredDriverLicenseTypes.${scooter.requiredDriverLicenseType}`,
+            `requiredDriverLicenseTypes.${scooter.requiredLicenseCategory}`,
           )}
         />
       </DetailSection>
@@ -304,7 +309,31 @@ export function ScooterDetailPage({
         ) : null}
       </DetailSection>
 
-      <DetailSection title={t("sections.notes")}>
+      <DetailSection title={t("sections.operational")}>
+        {(["hasGps", "odometerWorking", "speedometerWorking"] as const).map(
+          (field) => (
+            <DetailField
+              key={field}
+              label={t(`fields.${field}`)}
+              value={
+                scooter[field] == null
+                  ? t("operational.unknown")
+                  : t(scooter[field] ? "operational.yes" : "operational.no")
+              }
+            />
+          ),
+        )}
+        {(["currentMileageKm", "actualMaxSpeedKmh"] as const).map((field) => (
+          <DetailField
+            key={field}
+            label={t(`fields.${field}`)}
+            value={
+              scooter[field] == null
+                ? t("detail.emptyValue")
+                : new Intl.NumberFormat(locale).format(scooter[field])
+            }
+          />
+        ))}
         <DetailField
           label={t("fields.notes")}
           value={scooter.notes ?? t("detail.emptyValue")}
@@ -312,6 +341,9 @@ export function ScooterDetailPage({
         />
       </DetailSection>
 
+      <CivDetails scooter={scooter} />
+      <ScooterDocumentList documents={scooter.documents ?? []} />
+      <ScooterInsuranceList scooter={scooter} />
       <ScooterRegistrationDialog
         key={`edit-scooter-registration-${registrationDialogKey}`}
         scooter={scooter}
@@ -581,8 +613,8 @@ function PowertrainBadge({ scooter }: { scooter: v1.scooters.Scooter }) {
   return (
     <Badge variant="outline">
       <Icon aria-hidden="true" data-icon="inline-start" />
-      {scooter.powertrainType === "combustion" && scooter.engineCc
-        ? t("list.ccValue", { cc: scooter.engineCc })
+      {scooter.powertrainType !== "electric" && scooter.engineDisplacementCc
+        ? t("list.ccValue", { cc: scooter.engineDisplacementCc })
         : t(`powertrainTypes.${scooter.powertrainType}`)}
     </Badge>
   );
