@@ -66,6 +66,17 @@ beforeEach(() => {
 });
 
 describe("automatic document reading", () => {
+  it("does not start or wait for extraction when capability is absent", () => {
+    const { result } = renderHook(() => {
+      const [state, setState] = useState(initial());
+      return useDocumentExtraction(state, setState, false);
+    });
+    expect(api.fetch).not.toHaveBeenCalled();
+    expect(result.current.pending).toBe(false);
+    expect(result.current.pendingDocumentKeys.size).toBe(0);
+    expect(result.current.jobs).toEqual({});
+  });
+
   it("does not repeat or abort ID extraction when only the selected format changes", async () => {
     const state = createExtractionState(createEmptyCreateForm("romanian"));
     state.form.documents[0]!.photos = initial().form.documents[0]!.photos;

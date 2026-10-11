@@ -24,6 +24,7 @@ export function createPersonInput(
   ) => string,
 ): { input?: Record<string, unknown>; error?: FieldValidationError } {
   const input: Record<string, unknown> = {
+    ...(form.linkExistingAccount ? { linkExistingAccount: true } : {}),
     documentWorkflow: documentWorkflow(form),
     email: form.email,
     phone: normalizePhoneForSubmit(form),

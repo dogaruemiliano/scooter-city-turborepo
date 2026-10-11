@@ -20,7 +20,17 @@ vi.mock("next/navigation", () => ({
   redirect: mocks.redirect,
 }));
 
-const user = { id: "admin-1", email: "admin@example.com", roles: ["ADMIN"] };
+const user = {
+  id: "admin-1",
+  email: "admin@example.com",
+  roles: ["ADMIN"],
+  effectiveScopes: {
+    "finance.books.read": ["ALL"],
+    "finance.accounts.read": ["ALL"],
+    "finance.operations.read": ["ALL"],
+    "scooters.read": ["ALL"],
+  },
+};
 const companyBook = {
   id: "company-book",
   name: "Company",
@@ -53,6 +63,20 @@ beforeEach(() => {
 });
 
 describe("dashboard data", () => {
+  it("fetches only the summaries the current user can read", async () => {
+    mocks.meFromApi.mockResolvedValue({
+      ...user,
+      effectiveScopes: { "scooters.read": ["ALL"] },
+    });
+    const { overview } = await loadDashboard("en");
+    await expect(overview).resolves.toEqual({
+      cash: null,
+      operations: null,
+      fleet: { totalScooters: 12 },
+    });
+    expect(mocks.apiFetch).toHaveBeenCalledTimes(1);
+    expect(mocks.apiFetch.mock.calls[0]![0]).toContain("/scooters?");
+  });
   it("redirects signed-out visitors before accessing administrative resources", async () => {
     mocks.meFromApi.mockResolvedValue(null);
 
@@ -63,9 +87,9 @@ describe("dashboard data", () => {
   });
 
   it.each([{ roles: [] }, { roles: ["SUPER_ADMIN"] }, { roles: ["USER"] }])(
-    "only exposes account access when the current user lacks ADMIN ($roles)",
+    "legacy role strings do not grant dashboard access ($roles)",
     async ({ roles }) => {
-      const member = { ...user, roles };
+      const member = { ...user, roles, effectiveScopes: {} };
       mocks.meFromApi.mockResolvedValue(member);
 
       await expect(loadDashboard("ro")).resolves.toEqual({
@@ -199,12 +223,17 @@ describe("dashboard data", () => {
       );
 
       const { overview } = await loadDashboard("ro");
-      await expect(overview).rejects.toThrow(
-        status === 401 ? "redirect" : "not-found",
-      );
-      if (status === 401)
+      if (status === 401) {
+        await expect(overview).rejects.toThrow("redirect");
         expect(mocks.redirect).toHaveBeenCalledWith("/sign-in?next=%2F");
-      else expect(mocks.notFound).toHaveBeenCalledOnce();
+      } else {
+        await expect(overview).resolves.toMatchObject({
+          cash: null,
+          operations: null,
+          fleet: { totalScooters: 12 },
+        });
+        expect(mocks.notFound).not.toHaveBeenCalled();
+      }
     },
   );
 });

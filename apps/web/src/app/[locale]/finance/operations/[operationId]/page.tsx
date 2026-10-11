@@ -7,7 +7,7 @@ import { FinancialOperationDetails } from "../../_components/FinancialOperationD
 import {
   fetchFinance,
   financeCookieHeader,
-  requireFinanceAdmin,
+  requireFinancePermission,
 } from "../../_lib/finance-server";
 import { FINANCE_PATHS } from "../../_lib/links";
 
@@ -31,7 +31,7 @@ export default async function OperationRoutePage({
   const locale = resolveRouteLocale(rawLocale);
   const path = FINANCE_PATHS.operation(operationId);
 
-  await requireFinanceAdmin(locale, path);
+  await requireFinancePermission(locale, path, "finance.operations.read");
   const cookieHeader = await financeCookieHeader();
 
   const [operation, books] = await Promise.all([

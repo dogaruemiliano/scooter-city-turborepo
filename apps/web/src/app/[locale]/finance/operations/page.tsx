@@ -3,13 +3,14 @@ import { messages } from "@repo/i18n";
 import { buttonVariants } from "@repo/ui/components";
 import type { Metadata } from "next";
 
+import { canAccess } from "@/lib/access";
 import { resolveRouteLocale } from "@/i18n/paths";
 import { Link } from "@/i18n/navigation";
 import { OperationList } from "../_components/OperationList";
 import {
   fetchFinance,
   financeCookieHeader,
-  requireFinanceAdmin,
+  requireFinancePermission,
 } from "../_lib/finance-server";
 import { FINANCE_PATHS } from "../_lib/links";
 
@@ -35,7 +36,11 @@ export default async function OperationsRoutePage({
   const locale = resolveRouteLocale(rawLocale);
   const path = FINANCE_PATHS.operations;
 
-  await requireFinanceAdmin(locale, path);
+  const user = await requireFinancePermission(
+    locale,
+    path,
+    "finance.operations.read",
+  );
   const cookieHeader = await financeCookieHeader();
 
   const [books, operations] = await Promise.all([
@@ -69,9 +74,11 @@ export default async function OperationsRoutePage({
           <h1 className="text-xl font-medium">{t.title}</h1>
           <p className="text-sm text-muted-foreground">{t.description}</p>
         </div>
-        <Link href={FINANCE_PATHS.newFunding} className={buttonVariants()}>
-          {messages[locale].finance.overview.addCompanyMoney}
-        </Link>
+        {canAccess(user, "finance.funding.create") ? (
+          <Link href={FINANCE_PATHS.newFunding} className={buttonVariants()}>
+            {messages[locale].finance.overview.addCompanyMoney}
+          </Link>
+        ) : null}
       </header>
 
       <OperationList

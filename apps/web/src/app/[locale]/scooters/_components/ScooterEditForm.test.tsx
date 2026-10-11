@@ -75,6 +75,7 @@ const brands: v1.scooterBrands.ScooterBrand[] = [
 ];
 
 beforeEach(() => {
+  access.user = { isSuperAdmin: true, effectiveScopes: {} };
   mocks.apiFetch.mockReset();
   mocks.refresh.mockReset();
   mocks.push.mockReset();
@@ -757,3 +758,69 @@ function renderEditForm(locale: SupportedLocale = "en") {
     </NextIntlClientProvider>,
   );
 }
+
+const access = vi.hoisted(() => ({
+  user: { isSuperAdmin: true, effectiveScopes: {} as Record<string, string[]> },
+}));
+vi.mock("@/components/auth/SessionProvider", () => ({
+  useOptionalSession: () => access,
+}));
+
+it("saves scooter fields without document writes or inline brand creation for a limited operator", async () => {
+  access.user = {
+    isSuperAdmin: false,
+    effectiveScopes: {
+      "scooters.update": ["ALL"],
+      "scooter_documents.read": ["ALL"],
+      "scooter_brands.read": ["ALL"],
+    },
+  };
+  mocks.apiFetch.mockResolvedValue(scooter);
+  const browser = userEvent.setup();
+  render(
+    <NextIntlClientProvider locale="en" messages={messages.en}>
+      <ScooterEditForm
+        scooter={{
+          ...scooter,
+          civVersion: "2024",
+          insurancePolicies: [
+            {
+              id: "policy-readonly",
+              insuredName: null,
+              validFrom: null,
+              validUntil: null,
+              premiumAmount: null,
+              currency: null,
+              documentVin: scooter.vin,
+              vinReviewConfirmed: false,
+              createdAt: scooter.createdAt,
+              updatedAt: scooter.updatedAt,
+            },
+          ],
+        }}
+        brands={brands}
+        scooterHref="/scooters/s"
+      />
+    </NextIntlClientProvider>,
+  );
+  expect(
+    screen.queryByRole("button", { name: "Import JSON" }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", {
+      name: messages.en.scooters.brandPicker.addNew,
+    }),
+  ).not.toBeInTheDocument();
+  expect(screen.getByLabelText("Insured name")).toBeDisabled();
+  await browser.type(screen.getByLabelText("Variant"), "Sport");
+  await browser.click(screen.getByRole("button", { name: "Save" }));
+  await waitFor(() => expect(mocks.apiFetch).toHaveBeenCalled());
+  expect(mocks.apiFetch).toHaveBeenCalledWith(
+    v1.scooters.ROUTES.update(scooter.id),
+    expect.anything(),
+    {
+      method: "PATCH",
+      json: { variant: "Sport" },
+    },
+  );
+});

@@ -1,4 +1,8 @@
 "use client";
+
+import { useOptionalSession } from "@/components/auth/SessionProvider";
+import { canAccess } from "@/lib/access";
+
 import {
   ScooterInsuranceDocuments,
   ScooterInsuranceFields,
@@ -84,6 +88,8 @@ export function ScooterEditorFields({
   importResult?: Extract<DocumentImportResult, { ok: true }>;
 }) {
   const t = useTranslations("scooters");
+  const user = useOptionalSession()?.user;
+  const canReadDocuments = canAccess(user, "scooter_documents.read");
   const { control } = useFormContext<ScooterEditorValues>();
   const insurance = useFieldArray({
     control,
@@ -99,7 +105,7 @@ export function ScooterEditorFields({
   }, [importResult, onLicenseImport]);
   const { documentWarnings, clearDocumentWarnings } = useScooterImportReview();
   const fieldProps = { brands, onBrandCreated, disabled, powertrain };
-  const showDocuments = !step || step === "documents";
+  const showDocuments = canReadDocuments && (!step || step === "documents");
   const showTechnical = !step || step === "civ" || step === "import_document";
   const fallbackIdentity = [
     ...new Set(
@@ -195,7 +201,10 @@ export function ScooterEditorFields({
           />
         </>
       ) : null}
-      {step && step !== "documents" && step !== "operational" ? (
+      {canReadDocuments &&
+      step &&
+      step !== "documents" &&
+      step !== "operational" ? (
         <div
           className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
           aria-label={t(`documents.${step}`)}
@@ -241,8 +250,11 @@ export function ScooterEditorFields({
           </Button>
         </div>
       ))}
-      {!step || step === "civ" ? (
-        <CivMetadataFields disabled={disabled} compact={Boolean(step)} />
+      {canReadDocuments && (!step || step === "civ") ? (
+        <CivMetadataFields
+          disabled={disabled || !canAccess(user, "scooter_documents.write")}
+          compact={Boolean(step)}
+        />
       ) : null}
       {showTechnical ? (
         <ScooterTechnicalFields
@@ -389,12 +401,22 @@ function ScooterEditorFieldControl({
   ...props
 }: EditorFieldProps & { name: ScooterEditorField }) {
   const t = useTranslations("scooters");
+  const user = useOptionalSession()?.user;
+  const documentField = [
+    "civVersion",
+    "civIssuedAt",
+    "civIssuingAuthority",
+  ].includes(name);
+  if (documentField && !canAccess(user, "scooter_documents.read")) return null;
+  const fieldDisabled =
+    props.disabled ||
+    (documentField && !canAccess(user, "scooter_documents.write"));
   if (name === "civVersion")
     return (
       <FormField
         name={name}
         label={t(`fields.${name}`)}
-        disabled={props.disabled}
+        disabled={fieldDisabled}
       >
         <FormSelect
           options={v1.vehicleCiv.CIV_VERSIONS.map((value) => ({
@@ -410,7 +432,7 @@ function ScooterEditorFieldControl({
         name={name}
         label={t(`fields.${name}`)}
         labelSuffix="day"
-        disabled={props.disabled}
+        disabled={fieldDisabled}
       >
         <FormDateField maxDate={v1.common.dateOnlyToday()} />
       </FormField>
@@ -420,7 +442,7 @@ function ScooterEditorFieldControl({
       <FormField
         name={name}
         label={t(`fields.${name}`)}
-        disabled={props.disabled}
+        disabled={fieldDisabled}
       >
         <FormSelect
           emptyOption={{ label: t("operational.unknown") }}
@@ -435,7 +457,7 @@ function ScooterEditorFieldControl({
     return (
       <ScooterCivSelect
         name={name as keyof typeof v1.scooters.SCOOTER_CIV_OPTIONS}
-        disabled={props.disabled}
+        disabled={fieldDisabled}
         powertrain={props.powertrain}
       />
     );
@@ -444,12 +466,12 @@ function ScooterEditorFieldControl({
       <ScooterBrandField
         brands={props.brands}
         onBrandCreated={props.onBrandCreated}
-        disabled={props.disabled}
+        disabled={fieldDisabled}
       />
     );
   if (name === "powertrainType")
-    return <ScooterPowertrainField disabled={props.disabled} />;
-  return <ScooterTextField name={name} disabled={props.disabled} />;
+    return <ScooterPowertrainField disabled={fieldDisabled} />;
+  return <ScooterTextField name={name} disabled={fieldDisabled} />;
 }
 
 function ScooterTextField({

@@ -1,5 +1,8 @@
 "use client";
 
+import { useOptionalSession } from "@/components/auth/SessionProvider";
+import { canAccess } from "@/lib/access";
+
 import { ApiError, v1 } from "@repo/api-shared";
 import {
   BottomSheet,
@@ -39,6 +42,11 @@ export function ExpenseSupplierPicker({
   detectedTaxIdentifier,
   onSupplierChange,
 }: ExpenseSupplierPickerProps) {
+  const session = useOptionalSession();
+  const canManageSuppliers = canAccess(
+    session?.user,
+    "finance.suppliers.manage",
+  );
   const t = useTranslations("finance.expense.captureSheet.supplierPicker");
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<PickerMode>("list");
@@ -64,6 +72,7 @@ export function ExpenseSupplierPicker({
   }, [search, suppliers]);
 
   function showForm(supplier?: v1.finance.Supplier) {
+    if (!canManageSuppliers) return;
     setEditingId(supplier?.id);
     setName(supplier?.name ?? detectedName);
     setTaxIdentifier(supplier?.taxIdentifier ?? detectedTaxIdentifier);
@@ -75,9 +84,9 @@ export function ExpenseSupplierPicker({
     const selected = suppliers.find(
       (supplier) => supplier.id === selectedSupplierId,
     );
-    if (selected) {
+    if (canManageSuppliers && selected) {
       showForm(selected);
-    } else if (detectedName || detectedTaxIdentifier) {
+    } else if (canManageSuppliers && (detectedName || detectedTaxIdentifier)) {
       showForm();
     } else {
       setMode("list");
@@ -88,6 +97,7 @@ export function ExpenseSupplierPicker({
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!canManageSuppliers) return;
     setBusy(true);
     setError(undefined);
     try {
@@ -129,19 +139,21 @@ export function ExpenseSupplierPicker({
         {t("chooseTitle")}
       </BottomSheetTrigger>
       <BottomSheetContent initialFocus={mode === "form" ? nameInputRef : true}>
-        {mode === "list" ? (
+        {mode === "list" || !canManageSuppliers ? (
           <>
             <BottomSheetHeader className="flex-row items-center justify-between gap-3">
               <BottomSheetTitle>{t("chooseTitle")}</BottomSheetTitle>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                aria-label={t("add")}
-                onClick={() => showForm()}
-              >
-                <PlusIcon aria-hidden="true" />
-              </Button>
+              {canManageSuppliers ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label={t("add")}
+                  onClick={() => showForm()}
+                >
+                  <PlusIcon aria-hidden="true" />
+                </Button>
+              ) : null}
             </BottomSheetHeader>
             <BottomSheetBody safeAreaBottom className="gap-3 px-0">
               <div className="px-4">

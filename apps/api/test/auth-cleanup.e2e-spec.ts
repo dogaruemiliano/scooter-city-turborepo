@@ -50,6 +50,7 @@ describe("AuthCleanupService (e2e)", () => {
 
   async function freshUser() {
     const user = await users.createOne({
+      loginStatus: "ACTIVE",
       email: `cleanup-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`,
     });
     createdUserIds.push(user.id);

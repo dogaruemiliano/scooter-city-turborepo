@@ -10,7 +10,7 @@
  *   2. Same email exists, no AuthAccount, Google says email is verified → auto-link.
  *   3. No AuthAccount and Google did not verify the email → email OTP
  *      challenge, with no local-user lookup before the proof succeeds.
- *   4. Verified email with no local match → fresh `User` + `AuthAccount`.
+ *   4. Verified email with no approved local match → reject.
  *
  * The verification of the ID token itself lives behind
  * {@link GoogleVerifier}. Cookie writes remain in the controller; this
@@ -22,7 +22,6 @@ import type { SupportedLocale } from "@repo/i18n";
 
 import { AuditService } from "../../../audit/audit.service";
 import { AuditEventType } from "../../../audit/audit.types";
-import { CoreAuthService } from "../core-auth/core-auth.service";
 import {
   OAuthAccountResolver,
   type OAuthAccountResolution,
@@ -56,7 +55,6 @@ export type GoogleSignInResult =
 export class GoogleAuthService {
   constructor(
     @Inject(GoogleVerifier) private readonly verifier: GoogleVerifier,
-    private readonly coreAuth: CoreAuthService,
     private readonly accountResolver: OAuthAccountResolver,
     private readonly emailVerification: OAuthEmailVerificationService,
     private readonly audit: AuditService,
@@ -69,7 +67,7 @@ export class GoogleAuthService {
   async signIn(args: GoogleSignInArgs): Promise<GoogleSignInResult> {
     const claims = await this.verifyOrAudit(args);
 
-    const resolution = await this.resolveUser(claims);
+    const resolution = await this.resolveUser(claims, args);
 
     if (resolution.kind === "unverified-email") {
       return {
@@ -100,15 +98,6 @@ export class GoogleAuthService {
       throw new UnauthorizedException(GENERIC_OAUTH_SIGN_IN_MESSAGE);
     }
 
-    if (resolution.kind === "new-user") {
-      await this.audit.record({
-        type: AuditEventType.SIGNUP,
-        userId: resolution.user.id,
-        ip: args.ip ?? null,
-        userAgent: args.userAgent ?? null,
-        meta: { method: "google" },
-      });
-    }
     if (resolution.kind !== "existing-link") {
       await this.audit.record({
         type: AuditEventType.OAUTH_LINKED,
@@ -119,15 +108,7 @@ export class GoogleAuthService {
       });
     }
 
-    const issued = await this.coreAuth.issueSession({
-      user: {
-        id: resolution.user.id,
-        email: resolution.user.email,
-        roles: resolution.user.roles,
-      },
-      userAgent: args.userAgent ?? null,
-      ip: args.ip ?? null,
-    });
+    const issued = resolution.issued;
 
     await this.audit.record({
       type: AuditEventType.LOGIN_SUCCESS,
@@ -151,16 +132,20 @@ export class GoogleAuthService {
 
   private async resolveUser(
     claims: GoogleIdTokenClaims,
+    args: GoogleSignInArgs,
   ): Promise<OAuthAccountResolution> {
-    return this.accountResolver.resolve({
-      provider: "google",
-      providerId: claims.sub,
-      email: claims.email,
-      emailVerified: claims.emailVerified,
-      firstName: this.firstName(claims.name),
-      lastName: this.lastName(claims.name),
-      existingEmailPolicy: "sync",
-    });
+    return this.accountResolver.resolve(
+      {
+        provider: "google",
+        providerId: claims.sub,
+        email: claims.email,
+        emailVerified: claims.emailVerified,
+        firstName: this.firstName(claims.name),
+        lastName: this.lastName(claims.name),
+        existingEmailPolicy: "sync",
+      },
+      { userAgent: args.userAgent ?? null, ip: args.ip ?? null },
+    );
   }
 
   private async verifyOrAudit(

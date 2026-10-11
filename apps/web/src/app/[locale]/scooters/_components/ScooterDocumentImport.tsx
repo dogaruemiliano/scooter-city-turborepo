@@ -1,5 +1,8 @@
 "use client";
 
+import { useOptionalSession } from "@/components/auth/SessionProvider";
+import { canAccess } from "@/lib/access";
+
 import { v1 } from "@repo/api-shared";
 import { Button, Checkbox, Label, Textarea } from "@repo/ui/components";
 import {
@@ -54,6 +57,10 @@ export function ScooterDocumentImport({
   secondary?: boolean;
 }) {
   const t = useTranslations("scooters");
+  const canWrite = canAccess(
+    useOptionalSession()?.user,
+    "scooter_documents.write",
+  );
   const id = useId();
   const form = useFormContext<ScooterEditorValues>();
   const [vinReviewed, setVinReviewed] = useState(false);
@@ -161,6 +168,7 @@ export function ScooterDocumentImport({
   }
 
   function apply() {
+    if (!canWrite) return;
     setError(null);
     const result = parseJson(json);
     if (!result.ok) {
@@ -204,6 +212,8 @@ export function ScooterDocumentImport({
     if (editing) void form.trigger();
     changeOpen(false);
   }
+
+  if (!canWrite) return null;
 
   return (
     <div

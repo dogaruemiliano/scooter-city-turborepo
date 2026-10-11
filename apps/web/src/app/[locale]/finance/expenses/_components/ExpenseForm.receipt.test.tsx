@@ -20,6 +20,10 @@ const mocks = vi.hoisted(() => ({
   refresh: vi.fn(),
 }));
 
+vi.mock("@/components/auth/SessionProvider", () => ({
+  useOptionalSession: () => ({ user: { isSuperAdmin: true } }),
+}));
+
 vi.mock("../_lib/expense-api", () => ({
   createExpense: mocks.create,
   createSupplier: mocks.createSupplier,

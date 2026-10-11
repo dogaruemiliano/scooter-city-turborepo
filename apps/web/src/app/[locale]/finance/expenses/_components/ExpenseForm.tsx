@@ -12,6 +12,9 @@
  * enough to post, the form asks the API what it would do; nothing here adds
  * up debits and credits on its own.
  */
+import { useOptionalSession } from "@/components/auth/SessionProvider";
+import { canAccess } from "@/lib/access";
+
 import { ApiError, v1 } from "@repo/api-shared";
 import type { SupportedLocale } from "@repo/i18n";
 import {
@@ -90,6 +93,11 @@ export function ExpenseForm({
   extractionDraftId,
   initialFocusField,
 }: ExpenseFormProps) {
+  const session = useOptionalSession();
+  const canManageSuppliers = canAccess(
+    session?.user,
+    "finance.suppliers.manage",
+  );
   const t = useTranslations("finance.expense");
   const tCommon = useTranslations("finance.common");
   const tErrors = useTranslations("finance.errors");
@@ -271,6 +279,7 @@ export function ExpenseForm({
       let valuesToSave = submitted;
       const extractedDocument = submitted.documents[0];
       if (
+        canManageSuppliers &&
         extractionDraftId &&
         !submitted.supplierId &&
         extractedDocument?.supplierName &&

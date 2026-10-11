@@ -50,6 +50,7 @@ export function PersonDetailHeader({
               [
                 {
                   key: "edit",
+                  permission: "persons.update",
                   label: t("actions.editPerson"),
                   icon: <PencilIcon data-icon="inline-start" />,
                   disabled: busyAction !== null,
@@ -59,6 +60,7 @@ export function PersonDetailHeader({
               [
                 {
                   key: "delete",
+                  permission: "persons.archive",
                   label: t("actions.deletePerson"),
                   icon: <Trash2Icon data-icon="inline-start" />,
                   variant: "destructive",

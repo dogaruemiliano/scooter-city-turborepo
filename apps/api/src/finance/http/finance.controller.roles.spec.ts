@@ -1,10 +1,12 @@
 import { Reflector } from "@nestjs/core";
-import { v1 } from "@repo/api-shared";
 
-import { REQUIRED_ROLES_KEY } from "../../common/authz/roles.constants";
+import {
+  ACCESS_POLICY,
+  type AccessPolicy,
+} from "../../access/access.decorators";
 import { FinanceController } from "./finance.controller";
 
-describe("FinanceController role requirements", () => {
+describe("FinanceController permission requirements", () => {
   const reflector = new Reflector();
 
   it.each([
@@ -21,21 +23,25 @@ describe("FinanceController role requirements", () => {
     "restricts finance and company management handlers to SUPER_ADMIN",
     (handler) => {
       expect(
-        reflector.getAllAndOverride<string[]>(REQUIRED_ROLES_KEY, [
+        reflector.getAllAndOverride<AccessPolicy>(ACCESS_POLICY, [
           handler,
           FinanceController,
         ]),
-      ).toEqual([v1.auth.AUTH_ROLES.SUPER_ADMIN]);
+      ).toEqual({ kind: "super" });
     },
   );
 
-  it("keeps the remaining finance handlers available to ADMIN users", () => {
+  it("requires the corresponding permission on ordinary finance handlers", () => {
     expect(
-      reflector.getAllAndOverride<string[]>(REQUIRED_ROLES_KEY, [
+      reflector.getAllAndOverride<AccessPolicy>(ACCESS_POLICY, [
         // eslint-disable-next-line @typescript-eslint/unbound-method -- Inspect the original method's metadata without invoking it.
         FinanceController.prototype.listBooks,
         FinanceController,
       ]),
-    ).toEqual([v1.auth.AUTH_ROLES.ADMIN]);
+    ).toEqual({
+      kind: "permissions",
+      keys: ["finance.books.read"],
+      scope: "ALL",
+    });
   });
 });

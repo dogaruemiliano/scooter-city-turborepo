@@ -400,27 +400,21 @@ export class PrismaFinanceRepository {
                 email: requested.email,
                 firstName: requested.firstName || null,
                 lastName: requested.lastName || null,
-                roles: [v1.auth.AUTH_ROLES.ADMIN],
+                loginStatus: "DISABLED",
               },
             });
           } else {
             const firstName = requested.firstName || null;
             const lastName = requested.lastName || null;
-            const needsAdminRole = !user.roles.includes(
-              v1.auth.AUTH_ROLES.ADMIN,
-            );
             const identityChanged =
               user.firstName !== firstName || user.lastName !== lastName;
 
-            if (needsAdminRole || identityChanged) {
+            if (identityChanged) {
               user = await tx.user.update({
                 where: { id: user.id },
                 data: {
                   firstName,
                   lastName,
-                  ...(needsAdminRole
-                    ? { roles: [...user.roles, v1.auth.AUTH_ROLES.ADMIN] }
-                    : {}),
                 },
               });
             }

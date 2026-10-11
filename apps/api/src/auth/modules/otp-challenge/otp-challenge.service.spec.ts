@@ -38,7 +38,10 @@ describe("OTP verification transaction retries", () => {
     };
     const findUnique = jest.fn().mockResolvedValue(challenge);
     const updateMany = jest.fn().mockResolvedValue({ count: 1 });
-    const tx = { otpChallenge: { findUnique, updateMany } };
+    const tx = {
+      $executeRaw: jest.fn().mockResolvedValue(1),
+      otpChallenge: { findUnique, updateMany },
+    };
     const transaction = jest.fn(
       (operation: (client: Prisma.TransactionClient) => Promise<unknown>) =>
         operation(tx as unknown as Prisma.TransactionClient),
@@ -127,4 +130,118 @@ describe("OTP verification transaction retries", () => {
       expect(jest.getTimerCount()).toBe(0);
     },
   );
+});
+
+describe("OTP admission and anti-enumeration", () => {
+  it.each([null, "DISABLED", "SUSPENDED", "INVITED"])(
+    "returns generic metadata without email or challenge creation for %s admission",
+    async (loginStatus) => {
+      const create = jest.fn();
+      const tx = {
+        $executeRaw: jest.fn().mockResolvedValue(1),
+        $queryRaw: jest.fn().mockResolvedValue([]),
+        user: {
+          findUnique: jest.fn().mockResolvedValue(
+            loginStatus === null
+              ? null
+              : {
+                  id: "user",
+                  email: "member@example.com",
+                  deletedAt: null,
+                  loginStatus,
+                },
+          ),
+        },
+        userInvitation: { findFirst: jest.fn().mockResolvedValue(null) },
+        otpChallenge: { create },
+      };
+      const prisma = {
+        $transaction: (operation: (client: unknown) => Promise<unknown>) =>
+          operation(tx),
+      } as unknown as PrismaService;
+      const mailer = new SpyMailerService();
+      const service = new OtpChallengeService(
+        prisma,
+        mailer,
+        {} as OtpDeliveryQuotaService,
+        { OTP_TTL: "10m" } as Env,
+      );
+      await expect(
+        service.createOrReuse({
+          purpose: OTP_PURPOSE_AUTH,
+          target: "member@example.com",
+          ip: null,
+        }),
+      ).resolves.toEqual({
+        status: "verification_required",
+        challengeId: expect.any(String) as string,
+        expiresInSec: 600,
+        resendAfterSec: 30,
+      });
+      expect(create).not.toHaveBeenCalled();
+      expect(tx.$executeRaw).toHaveBeenCalledWith([
+        "SELECT pg_advisory_xact_lock_shared(726001)",
+      ]);
+      expect(tx.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
+        tx.$queryRaw.mock.invocationCallOrder[0],
+      );
+      expect(tx.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
+        tx.user.findUnique.mock.invocationCallOrder[0],
+      );
+      expect(mailer.getOutbox()).toHaveLength(0);
+    },
+  );
+
+  it("suppresses resend after an account is suspended", async () => {
+    const now = new Date();
+    const tx = {
+      $executeRaw: jest.fn().mockResolvedValue(1),
+      $queryRaw: jest.fn().mockResolvedValue([]),
+      user: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "user",
+          email: "member@example.com",
+          deletedAt: null,
+          loginStatus: "SUSPENDED",
+        }),
+      },
+      otpChallenge: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "challenge",
+          activeKey: "active",
+          target: "member@example.com",
+          usedAt: null,
+          expiresAt: new Date(now.getTime() + 60_000),
+          attemptsCount: 0,
+        }),
+        update: jest.fn(),
+      },
+    };
+    const prisma = {
+      $transaction: (operation: (client: unknown) => Promise<unknown>) =>
+        operation(tx),
+    } as unknown as PrismaService;
+    const mailer = new SpyMailerService();
+    const service = new OtpChallengeService(
+      prisma,
+      mailer,
+      {} as OtpDeliveryQuotaService,
+      { OTP_TTL: "10m", OTP_MAX_ATTEMPTS: 5 } as Env,
+    );
+    await expect(service.resend("challenge", null)).resolves.toMatchObject({
+      status: "verification_required",
+      challengeId: "challenge",
+    });
+    expect(tx.otpChallenge.update).not.toHaveBeenCalled();
+    expect(tx.$executeRaw).toHaveBeenCalledWith([
+      "SELECT pg_advisory_xact_lock_shared(726001)",
+    ]);
+    expect(tx.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      tx.otpChallenge.findUnique.mock.invocationCallOrder[0],
+    );
+    expect(tx.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      tx.user.findUnique.mock.invocationCallOrder[0],
+    );
+    expect(mailer.getOutbox()).toHaveLength(0);
+  });
 });

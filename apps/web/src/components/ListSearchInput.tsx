@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  Button,
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-} from "@repo/ui/components";
-import { SearchIcon, XIcon } from "lucide-react";
+import { SearchField } from "@repo/ui/components/search-field";
 import type { FormEvent } from "react";
 
 interface ListSearchInputProps {
@@ -40,40 +34,16 @@ export function ListSearchInput({
 
   return (
     <form role="search" className="w-full" onSubmit={submitSearch}>
-      <label htmlFor={id} className="sr-only">
-        {label}
-      </label>
-      <InputGroup>
-        <InputGroupAddon aria-hidden="true">
-          <SearchIcon />
-        </InputGroupAddon>
-        <InputGroupInput
-          id={id}
-          type="search"
-          inputMode="search"
-          enterKeyHint="search"
-          autoComplete="off"
-          className="px-0 [&::-webkit-search-cancel-button]:hidden"
-          placeholder={placeholder}
-          value={value}
-          disabled={disabled}
-          onChange={(event) => onChange(event.target.value)}
-        />
-        {value ? (
-          <InputGroupAddon className="px-1">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              aria-label={clearLabel}
-              disabled={disabled}
-              onClick={() => void onClear()}
-            >
-              <XIcon />
-            </Button>
-          </InputGroupAddon>
-        ) : null}
-      </InputGroup>
+      <SearchField
+        id={id}
+        label={label}
+        clearLabel={clearLabel}
+        placeholder={placeholder}
+        value={value}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.value)}
+        onClear={onClear}
+      />
     </form>
   );
 }

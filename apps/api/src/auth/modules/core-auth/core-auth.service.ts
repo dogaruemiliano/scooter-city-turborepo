@@ -27,6 +27,7 @@ import { Inject, Injectable, UnauthorizedException } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import bcrypt from "bcrypt";
 
+import { AuditEventType } from "../../../audit/audit.types";
 import { ENV } from "../../../config/config.module";
 import type { Env } from "../../../config/env";
 import { Prisma } from "../../../generated/prisma/client";
@@ -36,6 +37,7 @@ import type {
   User,
 } from "../../../generated/prisma/client";
 import { PrismaService } from "../../../prisma/prisma.service";
+import { lockAccessLifecycle } from "../../utils/admission";
 import { hashRefreshToken, safeEqualHex } from "../../utils/hash";
 import type { KeyRing } from "../../utils/keys";
 import { KEY_RING } from "../../utils/keys.module";
@@ -88,7 +90,11 @@ export class CoreAuthService {
     tx: Prisma.TransactionClient,
     input: IssueSessionInput,
   ): Promise<IssueSessionResult> {
-    const activeUser = await tx.user.findFirst({
+    await lockAccessLifecycle(tx);
+    // A SERIALIZABLE caller may have waited with an older snapshot. Reject
+    // that snapshot before issuing a session if admission changed meanwhile.
+    await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${input.user.id} FOR SHARE`;
+    let activeUser = await tx.user.findFirst({
       where: {
         id: input.user.id,
         deletedAt: null,
@@ -97,10 +103,60 @@ export class CoreAuthService {
         id: true,
         email: true,
         roles: true,
+        loginStatus: true,
       },
     });
-    if (!activeUser) {
+    if (
+      !activeUser ||
+      !["ACTIVE", "INVITED"].includes(activeUser.loginStatus)
+    ) {
       throw new UnauthorizedException("Account is unavailable");
+    }
+    if (activeUser.loginStatus === "INVITED") {
+      const now = new Date();
+      const invitation = await tx.userInvitation.findFirst({
+        where: {
+          userId: activeUser.id,
+          email: activeUser.email,
+          activatedAt: null,
+          cancelledAt: null,
+          expiresAt: { gt: now },
+          ...(input.proofIssuedAt
+            ? { createdAt: { lte: input.proofIssuedAt } }
+            : {}),
+        },
+        orderBy: { generation: "desc" },
+      });
+      if (!invitation)
+        throw new UnauthorizedException("Account is unavailable");
+      const activated = await tx.userInvitation.updateMany({
+        where: {
+          id: invitation.id,
+          activatedAt: null,
+          cancelledAt: null,
+          expiresAt: { gt: now },
+        },
+        data: { activatedAt: now },
+      });
+      if (activated.count !== 1)
+        throw new UnauthorizedException("Account is unavailable");
+      activeUser = await tx.user.update({
+        where: { id: activeUser.id },
+        data: { loginStatus: "ACTIVE", accessRevision: { increment: 1 } },
+        select: { id: true, email: true, roles: true, loginStatus: true },
+      });
+      await tx.auditEvent.create({
+        data: {
+          type: AuditEventType.ACCESS_ACTIVATED,
+          userId: activeUser.id,
+          targetType: "User",
+          targetId: activeUser.id,
+          meta: {
+            invitationId: invitation.id,
+            generation: invitation.generation,
+          },
+        },
+      });
     }
 
     const session = await tx.session.create({
@@ -143,6 +199,10 @@ export class CoreAuthService {
     // transaction would roll back any burn-writes we did along the way,
     // which is the opposite of what we want for reuse-detection.
     const result = await this.prisma.$transaction(async (tx) => {
+      // Refreshes share this lock with each other. Admission changes take its
+      // exclusive counterpart, so suspension cannot race new token issuance.
+      // The existing per-token row locks still serialize only the same chain.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock_shared(726001)`;
       // Acquire the row-level lock on the presented jti. Concurrent
       // rotations of the same token block here; concurrent rotations of
       // *different* tokens proceed in parallel.
@@ -171,7 +231,7 @@ export class CoreAuthService {
           id: row.sessionId,
           userId: row.userId,
           revokedAt: null,
-          user: { deletedAt: null },
+          user: { deletedAt: null, loginStatus: "ACTIVE" },
         },
         select: { id: true },
       });
@@ -387,6 +447,7 @@ export class CoreAuthService {
       where: {
         id: previousRow.userId,
         deletedAt: null,
+        loginStatus: "ACTIVE",
       },
       select: { id: true, email: true, roles: true },
     });

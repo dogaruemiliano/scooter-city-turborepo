@@ -43,6 +43,7 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 beforeEach(() => {
+  access.user = { isSuperAdmin: true, effectiveScopes: {} };
   apiFetch.mockReset();
 });
 
@@ -437,4 +438,26 @@ describe("direct document analysis", () => {
       original.uploadToken,
     );
   });
+});
+
+const access = vi.hoisted(() => ({
+  user: { isSuperAdmin: true, effectiveScopes: {} as Record<string, string[]> },
+}));
+vi.mock("@/components/auth/SessionProvider", () => ({
+  useOptionalSession: () => access,
+}));
+
+it("does not request extraction without the extraction capability", async () => {
+  access.user = {
+    isSuperAdmin: false,
+    effectiveScopes: { "scooter_documents.write": ["ALL"] },
+  };
+  const hook = renderHook(() =>
+    useScooterDocumentAnalysis(documents([draft("one")])),
+  );
+  await act(async () => {
+    expect(await hook.result.current.run()).toBeNull();
+  });
+  expect(apiFetch).not.toHaveBeenCalled();
+  expect(hook.result.current.running).toBe(false);
 });

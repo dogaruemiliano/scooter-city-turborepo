@@ -1,3 +1,4 @@
+import { canAccess } from "@/lib/access";
 import { ApiError, v1 } from "@repo/api-shared";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
@@ -14,7 +15,6 @@ import { meFromApi } from "@/lib/auth-server";
 import { ScooterDetailPage } from "../_components/ScooterDetailPage";
 
 const SCOOTERS_PATH = "/scooters";
-const ADMIN_ROLE = "ADMIN";
 
 interface ScooterRoutePageProps {
   params: Promise<{ locale: string; id: string }>;
@@ -46,7 +46,7 @@ export default async function ScooterRoutePage({
     redirect(getLocalizedSignInPath(locale, detailPath));
   }
 
-  if (!user.roles.includes(ADMIN_ROLE)) {
+  if (!canAccess(user, "scooters.read", "ALL")) {
     notFound();
   }
 

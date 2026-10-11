@@ -7,6 +7,9 @@
  * sections, mirroring the model. The journal entry is last and framed as
  * supporting detail — true, but not the thing most readers came for.
  */
+import { useOptionalSession } from "@/components/auth/SessionProvider";
+import { canAccess } from "@/lib/access";
+
 import { ApiError, v1 } from "@repo/api-shared";
 import type { SupportedLocale } from "@repo/i18n";
 import {
@@ -59,9 +62,13 @@ export function FinancialOperationDetails({
   const [reversing, setReversing] = useState(false);
   const [reverseError, setReverseError] = useState<string | null>(null);
 
-  const canReverse = operation.status === "POSTED";
+  const session = useOptionalSession();
+  const canReverse =
+    operation.status === "POSTED" &&
+    canAccess(session?.user, "finance.operations.reverse");
 
   async function onReverse() {
+    if (!canReverse) return;
     setReversing(true);
     setReverseError(null);
 
@@ -98,7 +105,9 @@ export function FinancialOperationDetails({
           </p>
         </div>
 
-        <Badge variant={canReverse ? "outline" : "secondary"}>
+        <Badge
+          variant={operation.status === "POSTED" ? "outline" : "secondary"}
+        >
           {tOperations(`statuses.${operation.status}`)}
         </Badge>
       </header>

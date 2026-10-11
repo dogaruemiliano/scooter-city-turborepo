@@ -1,6 +1,1878 @@
 {
   "openapi": "3.0.0",
   "paths": {
+    "/v1/access/permissions": {
+      "get": {
+        "operationId": "AccessRolesController_catalog_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["access"]
+      }
+    },
+    "/v1/access/roles": {
+      "get": {
+        "operationId": "AccessRolesController_list_v1",
+        "parameters": [],
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessRoleList_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["access"]
+      },
+      "post": {
+        "operationId": "AccessRolesController_create_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRoleInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessRole_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["access"]
+      }
+    },
+    "/v1/access/roles/{id}": {
+      "get": {
+        "operationId": "AccessRolesController_get_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessRole_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["access"]
+      },
+      "put": {
+        "operationId": "AccessRolesController_update_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateRoleInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessRole_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["access"]
+      }
+    },
+    "/v1/access/roles/{id}/audit-events": {
+      "get": {
+        "operationId": "AccessRolesController_history_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessAuditList_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["access"]
+      }
+    },
+    "/v1/access/roles/{id}/preview": {
+      "post": {
+        "operationId": "AccessRolesController_preview_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateRoleInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleAccessPreview_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["access"]
+      }
+    },
+    "/v1/access/roles/{id}/archive": {
+      "post": {
+        "operationId": "AccessRolesController_archive_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevisionInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessRole_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["access"]
+      }
+    },
+    "/v1/users": {
+      "get": {
+        "operationId": "AccessUsersController_list_v1",
+        "parameters": [
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 200,
+              "default": "",
+              "type": "string"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 0,
+              "maximum": 9007199254740991,
+              "default": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessUserList_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["users"]
+      },
+      "post": {
+        "operationId": "AccessUsersController_create_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessUser_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["users"]
+      }
+    },
+    "/v1/users/{id}": {
+      "get": {
+        "operationId": "AccessUsersController_get_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessUser_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["users"]
+      }
+    },
+    "/v1/users/{id}/audit-events": {
+      "get": {
+        "operationId": "AccessUsersController_history_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessAuditList_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["users"]
+      }
+    },
+    "/v1/users/{id}/access/preview": {
+      "post": {
+        "operationId": "AccessUsersController_preview_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserAccessInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessPreview_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["users"]
+      }
+    },
+    "/v1/users/{id}/access": {
+      "put": {
+        "operationId": "AccessUsersController_update_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserAccessInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessUser_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["users"]
+      }
+    },
+    "/v1/users/{id}/invitations": {
+      "post": {
+        "operationId": "AccessUsersController_invite_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevisionInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessUser_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["users"]
+      }
+    },
+    "/v1/users/{id}/invitations/current": {
+      "delete": {
+        "operationId": "AccessUsersController_cancel_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevisionInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessUser_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["users"]
+      }
+    },
+    "/v1/users/{id}/status": {
+      "put": {
+        "operationId": "AccessUsersController_status_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StatusInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessUser_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["users"]
+      }
+    },
+    "/v1/users/{id}/super-admin": {
+      "put": {
+        "operationId": "AccessUsersController_designation_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SuperAdminInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessUser_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["users"]
+      }
+    },
+    "/v1/persons/{id}/app-access": {
+      "get": {
+        "operationId": "PersonAccessController_get_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessUser_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["persons"]
+      },
+      "put": {
+        "operationId": "PersonAccessController_update_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerAccessInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessUser_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["persons"]
+      }
+    },
+    "/v1/problems": {
+      "get": {
+        "operationId": "ProblemsController_list_v1",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "default": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25,
+              "type": "integer"
+            }
+          },
+          {
+            "name": "view",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["assigned", "available", "all"]
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["open", "in_progress", "resolved", "cancelled"]
+            }
+          },
+          {
+            "name": "scooterId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemList_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["problems"]
+      },
+      "post": {
+        "operationId": "ProblemsController_create_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["problems"]
+      }
+    },
+    "/v1/problems/eligible-assignees": {
+      "get": {
+        "operationId": "ProblemsController_assignees_v1",
+        "parameters": [
+          {
+            "name": "search",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssigneeList_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["problems"]
+      }
+    },
+    "/v1/problems/scooters/{id}": {
+      "get": {
+        "operationId": "ProblemsController_scooter_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MaintenanceScooter_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["problems"]
+      }
+    },
+    "/v1/problems/{id}": {
+      "get": {
+        "operationId": "ProblemsController_get_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["problems"]
+      },
+      "patch": {
+        "operationId": "ProblemsController_update_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["problems"]
+      }
+    },
+    "/v1/problems/{id}/claim": {
+      "post": {
+        "operationId": "ProblemsController_claim_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevisionInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["problems"]
+      }
+    },
+    "/v1/problems/{id}/assignee": {
+      "put": {
+        "operationId": "ProblemsController_assign_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["problems"]
+      }
+    },
+    "/v1/problems/{id}/priority": {
+      "put": {
+        "operationId": "ProblemsController_prioritize_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PriorityInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["problems"]
+      }
+    },
+    "/v1/problems/{id}/resolve": {
+      "post": {
+        "operationId": "ProblemsController_resolve_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["problems"]
+      }
+    },
+    "/v1/problems/{id}/reopen": {
+      "post": {
+        "operationId": "ProblemsController_reopen_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevisionInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["problems"]
+      }
+    },
+    "/v1/problems/{id}/cancel": {
+      "post": {
+        "operationId": "ProblemsController_cancel_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevisionInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["problems"]
+      }
+    },
+    "/v1/rentals": {
+      "get": {
+        "operationId": "RentalsController_list_v1",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "default": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25,
+              "type": "integer"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["reserved", "active", "returned", "cancelled"]
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RentalList_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["rentals"]
+      },
+      "post": {
+        "operationId": "RentalsController_create_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rental_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["rentals"]
+      }
+    },
+    "/v1/rentals/scooters/{id}/documents": {
+      "get": {
+        "operationId": "RentalsController_documents_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["rentals"]
+      }
+    },
+    "/v1/rentals/scooter-documents/{id}/visibility": {
+      "patch": {
+        "operationId": "RentalsController_visibility_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VisibilityInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["rentals"]
+      }
+    },
+    "/v1/rentals/{id}": {
+      "get": {
+        "operationId": "RentalsController_get_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rental_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["rentals"]
+      }
+    },
+    "/v1/rentals/{id}/handover": {
+      "post": {
+        "operationId": "RentalsController_handover_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransitionInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rental_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["rentals"]
+      }
+    },
+    "/v1/rentals/{id}/return": {
+      "post": {
+        "operationId": "RentalsController_returnRental_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransitionInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rental_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["rentals"]
+      }
+    },
+    "/v1/rentals/{id}/cancel": {
+      "post": {
+        "operationId": "RentalsController_cancel_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransitionInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rental_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["rentals"]
+      }
+    },
+    "/v1/portal/me": {
+      "get": {
+        "operationId": "PortalController_me_v1",
+        "parameters": [],
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Profile_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["portal"]
+      }
+    },
+    "/v1/portal/rentals": {
+      "get": {
+        "operationId": "PortalController_rentals_v1",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "default": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25,
+              "type": "integer"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["reserved", "active", "returned", "cancelled"]
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RentalList_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["portal"]
+      }
+    },
+    "/v1/portal/rentals/{id}": {
+      "get": {
+        "operationId": "PortalController_rental_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rental_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["portal"]
+      }
+    },
+    "/v1/portal/rentals/{id}/scooter-documents": {
+      "get": {
+        "operationId": "PortalController_documents_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentList_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["portal"]
+      }
+    },
+    "/v1/portal/rentals/{id}/scooter-documents/{documentId}/content": {
+      "get": {
+        "operationId": "PortalController_content_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "documentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["portal"]
+      }
+    },
     "/healthz": {
       "get": {
         "operationId": "HealthController_check",
@@ -181,6 +2053,89 @@
           }
         ],
         "summary": "List the company and associate-pool finance books",
+        "tags": ["finance"]
+      },
+      "post": {
+        "operationId": "FinanceController_createBook_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateFinanceBookInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FinanceBook_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Create and initialize a finance book",
+        "tags": ["finance"]
+      }
+    },
+    "/v1/finance/books/{bookId}": {
+      "put": {
+        "operationId": "FinanceController_updateBook_v1",
+        "parameters": [
+          {
+            "name": "bookId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateFinanceBookInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FinanceBook_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Update a finance book's localized names",
         "tags": ["finance"]
       }
     },
@@ -2472,6 +4427,181 @@
         "tags": ["persons"]
       }
     },
+    "/v1/vehicle-civ/vocabulary": {
+      "get": {
+        "operationId": "CivVocabularyController_list_v1",
+        "parameters": [],
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CivVocabulary_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["vehicle-civ"]
+      }
+    },
+    "/v1/scooters/document-extraction": {
+      "post": {
+        "operationId": "ScooterDocumentsController_analyzeDocument_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnalyzeScooterDocumentInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScooterDocumentAnalysis_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Extract suggested scooter fields from one owned document for review",
+        "tags": ["scooters"]
+      }
+    },
+    "/v1/scooters/document-draft-upload-url": {
+      "post": {
+        "operationId": "ScooterDocumentsController_createUpload_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateScooterDocumentUpload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScooterDocumentUpload_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["scooters"]
+      }
+    },
+    "/v1/scooters/{id}/documents": {
+      "get": {
+        "operationId": "ScooterDocumentsController_list_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScooterDocumentList_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["scooters"]
+      }
+    },
+    "/v1/scooters/{id}/documents/{documentId}/content": {
+      "get": {
+        "operationId": "ScooterDocumentsController_content_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "documentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["scooters"]
+      }
+    },
     "/v1/scooters": {
       "post": {
         "operationId": "ScootersController_create_v1",
@@ -2550,7 +4680,7 @@
             "in": "query",
             "schema": {
               "type": "string",
-              "enum": ["electric", "combustion"]
+              "enum": ["electric", "combustion", "hybrid", "unpowered"]
             }
           },
           {
@@ -2579,6 +4709,8 @@
               "type": "string",
               "enum": [
                 "relevance",
+                "fleetNumberAsc",
+                "fleetNumberDesc",
                 "vinAsc",
                 "vinDesc",
                 "brandAsc",
@@ -3378,6 +5510,1548 @@
       }
     },
     "schemas": {
+      "AccessRole_Output": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "number"
+          },
+          "archivedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "memberCount": {
+            "type": "number"
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "permissionKey": {
+                  "type": "string",
+                  "enum": [
+                    "persons.read",
+                    "persons.create",
+                    "persons.update",
+                    "persons.archive",
+                    "persons.audit.read",
+                    "person_documents.read",
+                    "person_documents.write",
+                    "person_documents.delete",
+                    "person_documents.extract",
+                    "scooters.read",
+                    "scooters.create",
+                    "scooters.update",
+                    "scooters.archive",
+                    "scooter_documents.read",
+                    "scooter_documents.write",
+                    "scooter_documents.extract",
+                    "scooter_brands.read",
+                    "scooter_brands.manage",
+                    "vehicle_civ.read",
+                    "finance.books.read",
+                    "finance.suppliers.read",
+                    "finance.accounts.read",
+                    "finance.operations.read",
+                    "finance.reference.read",
+                    "finance.suppliers.manage",
+                    "finance.expenses.create",
+                    "finance.funding.create",
+                    "finance.operations.reverse",
+                    "finance.settlements.preview",
+                    "problems.read",
+                    "problems.create",
+                    "problems.update",
+                    "problems.resolve",
+                    "problems.claim",
+                    "problems.assign",
+                    "problems.prioritize",
+                    "problems.reopen",
+                    "portal.profile.read",
+                    "portal.rentals.read",
+                    "portal.scooter_documents.read",
+                    "rentals.read",
+                    "rentals.create",
+                    "rentals.handover",
+                    "rentals.return"
+                  ]
+                },
+                "scopes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": ["OWN", "ASSIGNED", "AVAILABLE", "ALL"]
+                  }
+                }
+              },
+              "required": ["permissionKey", "scopes"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "name",
+          "description",
+          "revision",
+          "archivedAt",
+          "memberCount",
+          "permissions"
+        ],
+        "additionalProperties": false
+      },
+      "AccessRoleList_Output": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AccessRole_Output"
+            }
+          }
+        },
+        "required": ["items"],
+        "additionalProperties": false
+      },
+      "CreateRoleInput": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{1,63}$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "description": {
+            "default": "",
+            "type": "string",
+            "maxLength": 1000
+          },
+          "permissions": {
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "permissionKey": {
+                  "type": "string",
+                  "enum": [
+                    "persons.read",
+                    "persons.create",
+                    "persons.update",
+                    "persons.archive",
+                    "persons.audit.read",
+                    "person_documents.read",
+                    "person_documents.write",
+                    "person_documents.delete",
+                    "person_documents.extract",
+                    "scooters.read",
+                    "scooters.create",
+                    "scooters.update",
+                    "scooters.archive",
+                    "scooter_documents.read",
+                    "scooter_documents.write",
+                    "scooter_documents.extract",
+                    "scooter_brands.read",
+                    "scooter_brands.manage",
+                    "vehicle_civ.read",
+                    "finance.books.read",
+                    "finance.suppliers.read",
+                    "finance.accounts.read",
+                    "finance.operations.read",
+                    "finance.reference.read",
+                    "finance.suppliers.manage",
+                    "finance.expenses.create",
+                    "finance.funding.create",
+                    "finance.operations.reverse",
+                    "finance.settlements.preview",
+                    "problems.read",
+                    "problems.create",
+                    "problems.update",
+                    "problems.resolve",
+                    "problems.claim",
+                    "problems.assign",
+                    "problems.prioritize",
+                    "problems.reopen",
+                    "portal.profile.read",
+                    "portal.rentals.read",
+                    "portal.scooter_documents.read",
+                    "rentals.read",
+                    "rentals.create",
+                    "rentals.handover",
+                    "rentals.return"
+                  ]
+                },
+                "scopes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": ["OWN", "ASSIGNED", "AVAILABLE", "ALL"]
+                  }
+                }
+              },
+              "required": ["permissionKey", "scopes"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": ["slug", "name", "permissions"],
+        "additionalProperties": false
+      },
+      "AccessAuditList_Output": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "createdAt": {
+                  "type": "string"
+                },
+                "userId": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "meta": {}
+              },
+              "required": ["id", "type", "createdAt", "userId", "meta"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": ["items"],
+        "additionalProperties": false
+      },
+      "UpdateRoleInput": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "description": {
+            "default": "",
+            "type": "string",
+            "maxLength": 1000
+          },
+          "permissions": {
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "permissionKey": {
+                  "type": "string",
+                  "enum": [
+                    "persons.read",
+                    "persons.create",
+                    "persons.update",
+                    "persons.archive",
+                    "persons.audit.read",
+                    "person_documents.read",
+                    "person_documents.write",
+                    "person_documents.delete",
+                    "person_documents.extract",
+                    "scooters.read",
+                    "scooters.create",
+                    "scooters.update",
+                    "scooters.archive",
+                    "scooter_documents.read",
+                    "scooter_documents.write",
+                    "scooter_documents.extract",
+                    "scooter_brands.read",
+                    "scooter_brands.manage",
+                    "vehicle_civ.read",
+                    "finance.books.read",
+                    "finance.suppliers.read",
+                    "finance.accounts.read",
+                    "finance.operations.read",
+                    "finance.reference.read",
+                    "finance.suppliers.manage",
+                    "finance.expenses.create",
+                    "finance.funding.create",
+                    "finance.operations.reverse",
+                    "finance.settlements.preview",
+                    "problems.read",
+                    "problems.create",
+                    "problems.update",
+                    "problems.resolve",
+                    "problems.claim",
+                    "problems.assign",
+                    "problems.prioritize",
+                    "problems.reopen",
+                    "portal.profile.read",
+                    "portal.rentals.read",
+                    "portal.scooter_documents.read",
+                    "rentals.read",
+                    "rentals.create",
+                    "rentals.handover",
+                    "rentals.return"
+                  ]
+                },
+                "scopes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": ["OWN", "ASSIGNED", "AVAILABLE", "ALL"]
+                  }
+                }
+              },
+              "required": ["permissionKey", "scopes"],
+              "additionalProperties": false
+            }
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "exclusiveMinimum": true,
+            "maximum": 9007199254740991,
+            "minimum": 0
+          }
+        },
+        "required": ["name", "permissions", "expectedRevision"],
+        "additionalProperties": false
+      },
+      "RoleAccessPreview_Output": {
+        "type": "object",
+        "properties": {
+          "memberCount": {
+            "type": "number"
+          },
+          "affectedMembers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "email": {
+                  "type": "string"
+                },
+                "before": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": ["OWN", "ASSIGNED", "AVAILABLE", "ALL"]
+                    }
+                  }
+                },
+                "after": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": ["OWN", "ASSIGNED", "AVAILABLE", "ALL"]
+                    }
+                  }
+                },
+                "missingPrerequisites": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "email",
+                "before",
+                "after",
+                "missingPrerequisites"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": ["memberCount", "affectedMembers"],
+        "additionalProperties": false
+      },
+      "RevisionInput": {
+        "type": "object",
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "exclusiveMinimum": true,
+            "maximum": 9007199254740991,
+            "minimum": 0
+          }
+        },
+        "required": ["revision"],
+        "additionalProperties": false
+      },
+      "AccessUser_Output": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "firstName": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastName": {
+            "type": "string",
+            "nullable": true
+          },
+          "loginStatus": {
+            "type": "string",
+            "enum": ["DISABLED", "INVITED", "ACTIVE", "SUSPENDED"]
+          },
+          "isSuperAdmin": {
+            "type": "boolean"
+          },
+          "accessRevision": {
+            "type": "number"
+          },
+          "deletedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AccessRole_Output"
+            }
+          },
+          "overrides": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "permissionKey": {
+                  "type": "string",
+                  "enum": [
+                    "persons.read",
+                    "persons.create",
+                    "persons.update",
+                    "persons.archive",
+                    "persons.audit.read",
+                    "person_documents.read",
+                    "person_documents.write",
+                    "person_documents.delete",
+                    "person_documents.extract",
+                    "scooters.read",
+                    "scooters.create",
+                    "scooters.update",
+                    "scooters.archive",
+                    "scooter_documents.read",
+                    "scooter_documents.write",
+                    "scooter_documents.extract",
+                    "scooter_brands.read",
+                    "scooter_brands.manage",
+                    "vehicle_civ.read",
+                    "finance.books.read",
+                    "finance.suppliers.read",
+                    "finance.accounts.read",
+                    "finance.operations.read",
+                    "finance.reference.read",
+                    "finance.suppliers.manage",
+                    "finance.expenses.create",
+                    "finance.funding.create",
+                    "finance.operations.reverse",
+                    "finance.settlements.preview",
+                    "problems.read",
+                    "problems.create",
+                    "problems.update",
+                    "problems.resolve",
+                    "problems.claim",
+                    "problems.assign",
+                    "problems.prioritize",
+                    "problems.reopen",
+                    "portal.profile.read",
+                    "portal.rentals.read",
+                    "portal.scooter_documents.read",
+                    "rentals.read",
+                    "rentals.create",
+                    "rentals.handover",
+                    "rentals.return"
+                  ]
+                },
+                "scopes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": ["OWN", "ASSIGNED", "AVAILABLE", "ALL"]
+                  }
+                },
+                "reason": {
+                  "type": "string",
+                  "maxLength": 500,
+                  "nullable": true
+                }
+              },
+              "required": ["permissionKey", "scopes"],
+              "additionalProperties": false
+            }
+          },
+          "effectiveScopes": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["OWN", "ASSIGNED", "AVAILABLE", "ALL"]
+              }
+            }
+          },
+          "portalEligible": {
+            "type": "boolean"
+          },
+          "personId": {
+            "type": "string",
+            "nullable": true
+          },
+          "invitation": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "generation": {
+                "type": "number"
+              },
+              "expiresAt": {
+                "type": "string"
+              },
+              "activatedAt": {
+                "type": "string",
+                "nullable": true
+              },
+              "cancelledAt": {
+                "type": "string",
+                "nullable": true
+              },
+              "deliveryStatus": {
+                "type": "string",
+                "enum": ["PENDING", "SENT", "FAILED"]
+              }
+            },
+            "required": [
+              "id",
+              "generation",
+              "expiresAt",
+              "activatedAt",
+              "cancelledAt",
+              "deliveryStatus"
+            ],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "firstName",
+          "lastName",
+          "loginStatus",
+          "isSuperAdmin",
+          "accessRevision",
+          "deletedAt",
+          "roles",
+          "overrides",
+          "effectiveScopes",
+          "portalEligible",
+          "personId",
+          "invitation"
+        ],
+        "additionalProperties": false
+      },
+      "AccessUserList_Output": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AccessUser_Output"
+            }
+          },
+          "total": {
+            "type": "number"
+          }
+        },
+        "required": ["items", "total"],
+        "additionalProperties": false
+      },
+      "CreateUserInput": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "firstName": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "lastName": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "roles": {
+            "maxItems": 1,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "revision": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": ["id", "revision"]
+            }
+          },
+          "overrides": {
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "permissionKey": {
+                  "type": "string",
+                  "enum": [
+                    "persons.read",
+                    "persons.create",
+                    "persons.update",
+                    "persons.archive",
+                    "persons.audit.read",
+                    "person_documents.read",
+                    "person_documents.write",
+                    "person_documents.delete",
+                    "person_documents.extract",
+                    "scooters.read",
+                    "scooters.create",
+                    "scooters.update",
+                    "scooters.archive",
+                    "scooter_documents.read",
+                    "scooter_documents.write",
+                    "scooter_documents.extract",
+                    "scooter_brands.read",
+                    "scooter_brands.manage",
+                    "vehicle_civ.read",
+                    "finance.books.read",
+                    "finance.suppliers.read",
+                    "finance.accounts.read",
+                    "finance.operations.read",
+                    "finance.reference.read",
+                    "finance.suppliers.manage",
+                    "finance.expenses.create",
+                    "finance.funding.create",
+                    "finance.operations.reverse",
+                    "finance.settlements.preview",
+                    "problems.read",
+                    "problems.create",
+                    "problems.update",
+                    "problems.resolve",
+                    "problems.claim",
+                    "problems.assign",
+                    "problems.prioritize",
+                    "problems.reopen",
+                    "portal.profile.read",
+                    "portal.rentals.read",
+                    "portal.scooter_documents.read",
+                    "rentals.read",
+                    "rentals.create",
+                    "rentals.handover",
+                    "rentals.return"
+                  ]
+                },
+                "scopes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": ["OWN", "ASSIGNED", "AVAILABLE", "ALL"]
+                  }
+                },
+                "reason": {
+                  "type": "string",
+                  "maxLength": 500,
+                  "nullable": true
+                }
+              },
+              "required": ["permissionKey", "scopes"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": ["email", "roles", "overrides"],
+        "additionalProperties": false
+      },
+      "UserAccessInput": {
+        "type": "object",
+        "properties": {
+          "expectedRevision": {
+            "type": "integer",
+            "exclusiveMinimum": true,
+            "maximum": 9007199254740991,
+            "minimum": 0
+          },
+          "roles": {
+            "maxItems": 1,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "revision": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": ["id", "revision"]
+            }
+          },
+          "overrides": {
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "permissionKey": {
+                  "type": "string",
+                  "enum": [
+                    "persons.read",
+                    "persons.create",
+                    "persons.update",
+                    "persons.archive",
+                    "persons.audit.read",
+                    "person_documents.read",
+                    "person_documents.write",
+                    "person_documents.delete",
+                    "person_documents.extract",
+                    "scooters.read",
+                    "scooters.create",
+                    "scooters.update",
+                    "scooters.archive",
+                    "scooter_documents.read",
+                    "scooter_documents.write",
+                    "scooter_documents.extract",
+                    "scooter_brands.read",
+                    "scooter_brands.manage",
+                    "vehicle_civ.read",
+                    "finance.books.read",
+                    "finance.suppliers.read",
+                    "finance.accounts.read",
+                    "finance.operations.read",
+                    "finance.reference.read",
+                    "finance.suppliers.manage",
+                    "finance.expenses.create",
+                    "finance.funding.create",
+                    "finance.operations.reverse",
+                    "finance.settlements.preview",
+                    "problems.read",
+                    "problems.create",
+                    "problems.update",
+                    "problems.resolve",
+                    "problems.claim",
+                    "problems.assign",
+                    "problems.prioritize",
+                    "problems.reopen",
+                    "portal.profile.read",
+                    "portal.rentals.read",
+                    "portal.scooter_documents.read",
+                    "rentals.read",
+                    "rentals.create",
+                    "rentals.handover",
+                    "rentals.return"
+                  ]
+                },
+                "scopes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": ["OWN", "ASSIGNED", "AVAILABLE", "ALL"]
+                  }
+                },
+                "reason": {
+                  "type": "string",
+                  "maxLength": 500,
+                  "nullable": true
+                }
+              },
+              "required": ["permissionKey", "scopes"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": ["expectedRevision", "roles", "overrides"],
+        "additionalProperties": false
+      },
+      "AccessPreview_Output": {
+        "type": "object",
+        "properties": {
+          "before": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["OWN", "ASSIGNED", "AVAILABLE", "ALL"]
+              }
+            }
+          },
+          "after": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["OWN", "ASSIGNED", "AVAILABLE", "ALL"]
+              }
+            }
+          },
+          "missingPrerequisites": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": ["before", "after", "missingPrerequisites"],
+        "additionalProperties": false
+      },
+      "StatusInput": {
+        "type": "object",
+        "properties": {
+          "expectedRevision": {
+            "type": "integer",
+            "exclusiveMinimum": true,
+            "maximum": 9007199254740991,
+            "minimum": 0
+          },
+          "status": {
+            "type": "string",
+            "enum": ["ACTIVE", "SUSPENDED", "DISABLED"]
+          }
+        },
+        "required": ["expectedRevision", "status"],
+        "additionalProperties": false
+      },
+      "SuperAdminInput": {
+        "type": "object",
+        "properties": {
+          "expectedRevision": {
+            "type": "integer",
+            "exclusiveMinimum": true,
+            "maximum": 9007199254740991,
+            "minimum": 0
+          },
+          "isSuperAdmin": {
+            "type": "boolean"
+          }
+        },
+        "required": ["expectedRevision", "isSuperAdmin"],
+        "additionalProperties": false
+      },
+      "CustomerAccessInput": {
+        "type": "object",
+        "properties": {
+          "expectedRevision": {
+            "type": "integer",
+            "exclusiveMinimum": true,
+            "maximum": 9007199254740991,
+            "minimum": 0
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": ["expectedRevision", "enabled"],
+        "additionalProperties": false
+      },
+      "ProblemList_Output": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "scooterId": {
+                  "type": "string"
+                },
+                "scooter": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "fleetNumber": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "model": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "brandName": {
+                      "type": "string"
+                    },
+                    "registrationNumber": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "fleetNumber",
+                    "model",
+                    "brandName",
+                    "registrationNumber"
+                  ],
+                  "additionalProperties": false
+                },
+                "description": {
+                  "type": "string"
+                },
+                "priority": {
+                  "type": "string",
+                  "enum": ["low", "normal", "high", "urgent"]
+                },
+                "status": {
+                  "type": "string",
+                  "enum": ["open", "in_progress", "resolved", "cancelled"]
+                },
+                "assigneeId": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "assigneeNeedsReassignment": {
+                  "type": "boolean"
+                },
+                "revision": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "workNotes": {
+                  "type": "string"
+                },
+                "resolutionNotes": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "createdAt": {
+                  "type": "string"
+                },
+                "updatedAt": {
+                  "type": "string"
+                },
+                "resolvedAt": {
+                  "type": "string",
+                  "nullable": true
+                }
+              },
+              "required": [
+                "id",
+                "scooterId",
+                "scooter",
+                "description",
+                "priority",
+                "status",
+                "assigneeId",
+                "revision",
+                "createdAt",
+                "updatedAt",
+                "resolvedAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "total": {
+            "type": "number"
+          },
+          "page": {
+            "type": "number"
+          },
+          "pageSize": {
+            "type": "number"
+          }
+        },
+        "required": ["items", "total", "page", "pageSize"],
+        "additionalProperties": false
+      },
+      "AssigneeList_Output": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "firstName": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "lastName": {
+                  "type": "string",
+                  "nullable": true
+                }
+              },
+              "required": ["id", "firstName", "lastName"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": ["items"],
+        "additionalProperties": false
+      },
+      "MaintenanceScooter_Output": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "fleetNumber": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "model": {
+            "type": "string",
+            "nullable": true
+          },
+          "brandName": {
+            "type": "string"
+          },
+          "registrationNumber": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "fleetNumber",
+          "model",
+          "brandName",
+          "registrationNumber"
+        ],
+        "additionalProperties": false
+      },
+      "Problem_Output": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "scooterId": {
+            "type": "string"
+          },
+          "scooter": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "fleetNumber": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "model": {
+                "type": "string",
+                "nullable": true
+              },
+              "brandName": {
+                "type": "string"
+              },
+              "registrationNumber": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": [
+              "id",
+              "fleetNumber",
+              "model",
+              "brandName",
+              "registrationNumber"
+            ],
+            "additionalProperties": false
+          },
+          "description": {
+            "type": "string"
+          },
+          "priority": {
+            "type": "string",
+            "enum": ["low", "normal", "high", "urgent"]
+          },
+          "status": {
+            "type": "string",
+            "enum": ["open", "in_progress", "resolved", "cancelled"]
+          },
+          "assigneeId": {
+            "type": "string",
+            "nullable": true
+          },
+          "assigneeNeedsReassignment": {
+            "type": "boolean"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "workNotes": {
+            "type": "string"
+          },
+          "resolutionNotes": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "resolvedAt": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "scooterId",
+          "scooter",
+          "description",
+          "priority",
+          "status",
+          "assigneeId",
+          "revision",
+          "createdAt",
+          "updatedAt",
+          "resolvedAt"
+        ],
+        "additionalProperties": false
+      },
+      "CreateInput": {
+        "type": "object",
+        "properties": {
+          "personId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "scooterId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "endsAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "customerNotes": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "internalNotes": {
+            "type": "string",
+            "maxLength": 4000
+          }
+        },
+        "required": ["personId", "scooterId", "startsAt", "endsAt"],
+        "additionalProperties": false
+      },
+      "UpdateInput": {
+        "type": "object",
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "exclusiveMinimum": true,
+            "maximum": 9007199254740991,
+            "minimum": 0
+          },
+          "workNotes": {
+            "type": "string",
+            "maxLength": 10000
+          },
+          "startWork": {
+            "type": "boolean"
+          }
+        },
+        "required": ["revision"],
+        "additionalProperties": false
+      },
+      "AssignInput": {
+        "type": "object",
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "exclusiveMinimum": true,
+            "maximum": 9007199254740991,
+            "minimum": 0
+          },
+          "assigneeId": {
+            "type": "string",
+            "minLength": 1,
+            "nullable": true
+          }
+        },
+        "required": ["revision", "assigneeId"],
+        "additionalProperties": false
+      },
+      "PriorityInput": {
+        "type": "object",
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "exclusiveMinimum": true,
+            "maximum": 9007199254740991,
+            "minimum": 0
+          },
+          "priority": {
+            "type": "string",
+            "enum": ["low", "normal", "high", "urgent"]
+          }
+        },
+        "required": ["revision", "priority"],
+        "additionalProperties": false
+      },
+      "ResolveInput": {
+        "type": "object",
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "exclusiveMinimum": true,
+            "maximum": 9007199254740991,
+            "minimum": 0
+          },
+          "resolutionNotes": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          }
+        },
+        "required": ["revision", "resolutionNotes"],
+        "additionalProperties": false
+      },
+      "RentalList_Output": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "scooterId": {
+                  "type": "string"
+                },
+                "scooter": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "fleetNumber": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "model": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "brandName": {
+                      "type": "string"
+                    },
+                    "registrationNumber": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "fleetNumber",
+                    "model",
+                    "brandName",
+                    "registrationNumber"
+                  ],
+                  "additionalProperties": false
+                },
+                "startsAt": {
+                  "type": "string"
+                },
+                "endsAt": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": ["reserved", "active", "returned", "cancelled"]
+                },
+                "customerNotes": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "revision": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "handedOverAt": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "returnedAt": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "createdAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "scooterId",
+                "scooter",
+                "startsAt",
+                "endsAt",
+                "status",
+                "customerNotes",
+                "revision",
+                "handedOverAt",
+                "returnedAt",
+                "createdAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "total": {
+            "type": "number"
+          },
+          "page": {
+            "type": "number"
+          },
+          "pageSize": {
+            "type": "number"
+          }
+        },
+        "required": ["items", "total", "page", "pageSize"],
+        "additionalProperties": false
+      },
+      "VisibilityInput": {
+        "type": "object",
+        "properties": {
+          "customerVisible": {
+            "type": "boolean"
+          }
+        },
+        "required": ["customerVisible"],
+        "additionalProperties": false
+      },
+      "Rental_Output": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "scooterId": {
+            "type": "string"
+          },
+          "scooter": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "fleetNumber": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "model": {
+                "type": "string",
+                "nullable": true
+              },
+              "brandName": {
+                "type": "string"
+              },
+              "registrationNumber": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": [
+              "id",
+              "fleetNumber",
+              "model",
+              "brandName",
+              "registrationNumber"
+            ],
+            "additionalProperties": false
+          },
+          "startsAt": {
+            "type": "string"
+          },
+          "endsAt": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["reserved", "active", "returned", "cancelled"]
+          },
+          "customerNotes": {
+            "type": "string",
+            "nullable": true
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "handedOverAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "returnedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "scooterId",
+          "scooter",
+          "startsAt",
+          "endsAt",
+          "status",
+          "customerNotes",
+          "revision",
+          "handedOverAt",
+          "returnedAt",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      },
+      "TransitionInput": {
+        "type": "object",
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "exclusiveMinimum": true,
+            "maximum": 9007199254740991,
+            "minimum": 0
+          }
+        },
+        "required": ["revision"],
+        "additionalProperties": false
+      },
+      "Profile_Output": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "firstName": {
+            "type": "string"
+          },
+          "lastName": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "firstName", "lastName"],
+        "additionalProperties": false
+      },
+      "DocumentList_Output": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string",
+                  "enum": ["registration_certificate", "insurance"]
+                },
+                "fileName": {
+                  "type": "string"
+                },
+                "contentType": {
+                  "type": "string"
+                },
+                "byteSize": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "createdAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "type",
+                "fileName",
+                "contentType",
+                "byteSize",
+                "createdAt"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": ["items"],
+        "additionalProperties": false
+      },
       "FinanceBook_Output": {
         "type": "object",
         "properties": {
@@ -3386,6 +7060,22 @@
           },
           "name": {
             "type": "string"
+          },
+          "names": {
+            "type": "object",
+            "properties": {
+              "ro": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "en": {
+                "type": "string",
+                "maxLength": 200
+              }
+            },
+            "required": ["ro"],
+            "additionalProperties": false
           },
           "type": {
             "type": "string",
@@ -3401,7 +7091,14 @@
             }
           }
         },
-        "required": ["id", "name", "type", "functionalCurrency", "members"],
+        "required": [
+          "id",
+          "name",
+          "names",
+          "type",
+          "functionalCurrency",
+          "members"
+        ],
         "additionalProperties": false
       },
       "FinanceBookMember_Output": {
@@ -3483,6 +7180,54 @@
           }
         },
         "required": ["items"],
+        "additionalProperties": false
+      },
+      "CreateFinanceBookInput": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["COMPANY", "ASSOCIATE_POOL"]
+          },
+          "names": {
+            "type": "object",
+            "properties": {
+              "ro": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "en": {
+                "type": "string",
+                "maxLength": 200
+              }
+            },
+            "required": ["ro"]
+          }
+        },
+        "required": ["type", "names"],
+        "additionalProperties": false
+      },
+      "UpdateFinanceBookInput": {
+        "type": "object",
+        "properties": {
+          "names": {
+            "type": "object",
+            "properties": {
+              "ro": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "en": {
+                "type": "string",
+                "maxLength": 200
+              }
+            },
+            "required": ["ro"]
+          }
+        },
+        "required": ["names"],
         "additionalProperties": false
       },
       "FinanceLegalIdentity_Output": {
@@ -6562,6 +10307,9 @@
       "CreatePersonInput": {
         "type": "object",
         "properties": {
+          "linkExistingAccount": {
+            "type": "boolean"
+          },
           "documentWorkflow": {
             "type": "string",
             "enum": ["romanianClassic", "romanianElectronic", "foreign"]
@@ -7520,9 +11268,657 @@
         },
         "additionalProperties": false
       },
+      "CivVocabulary_Output": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "field": {
+              "type": "string",
+              "enum": [
+                "vehicleClass",
+                "driveType",
+                "color",
+                "frontSuspension",
+                "rearSuspension",
+                "emissionsStandard",
+                "nationalEmissionsCode"
+              ]
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "required": ["field", "value"],
+          "additionalProperties": false
+        }
+      },
+      "AnalyzeScooterDocumentInput": {
+        "type": "object",
+        "properties": {
+          "sourceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "source": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": ["draft"]
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "import_document",
+                      "civ",
+                      "registration_certificate",
+                      "insurance"
+                    ]
+                  },
+                  "uploadToken": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 8192
+                  }
+                },
+                "required": ["kind", "type", "uploadToken"],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": ["saved"]
+                  },
+                  "scooterId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "documentId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  }
+                },
+                "required": ["kind", "scooterId", "documentId"],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "required": ["sourceId", "source"],
+        "additionalProperties": false
+      },
+      "ScooterDocumentAnalysis_Output": {
+        "type": "object",
+        "properties": {
+          "sourceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "documentType": {
+            "type": "string",
+            "enum": [
+              "import_document",
+              "civ",
+              "registration_certificate",
+              "insurance"
+            ]
+          },
+          "extractedData": {
+            "type": "object",
+            "properties": {
+              "vin": {
+                "type": "string",
+                "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
+                "nullable": true
+              },
+              "fields": {
+                "type": "object",
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "maxLength": 2000
+                    },
+                    {
+                      "type": "number"
+                    }
+                  ],
+                  "nullable": true
+                }
+              },
+              "rawFields": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string",
+                  "maxLength": 2000,
+                  "nullable": true
+                }
+              },
+              "vinReview": {
+                "type": "object",
+                "properties": {
+                  "method": {
+                    "type": "string",
+                    "enum": ["manual"]
+                  },
+                  "originalVin": {
+                    "type": "string",
+                    "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
+                    "nullable": true
+                  }
+                },
+                "required": ["method", "originalVin"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["vin", "fields", "rawFields"],
+            "additionalProperties": false
+          },
+          "issues": {
+            "type": "array",
+            "maxItems": 200,
+            "items": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120
+                },
+                "code": {
+                  "type": "string",
+                  "enum": [
+                    "unreadable",
+                    "invalidValue",
+                    "conflictingValues",
+                    "typeMismatch",
+                    "noData"
+                  ]
+                }
+              },
+              "required": ["field", "code"],
+              "additionalProperties": false
+            }
+          },
+          "reviewRequired": {
+            "type": "boolean",
+            "enum": [true]
+          }
+        },
+        "required": [
+          "sourceId",
+          "documentType",
+          "extractedData",
+          "issues",
+          "reviewRequired"
+        ],
+        "additionalProperties": false
+      },
+      "CreateScooterDocumentUpload": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "import_document",
+              "civ",
+              "registration_certificate",
+              "insurance"
+            ]
+          },
+          "contentType": {
+            "type": "string",
+            "enum": ["application/pdf", "image/jpeg", "image/png", "image/webp"]
+          },
+          "byteSize": {
+            "type": "integer",
+            "exclusiveMinimum": true,
+            "maximum": 10485760,
+            "minimum": 0
+          },
+          "checksumSha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": ["type", "contentType", "byteSize", "checksumSha256"],
+        "additionalProperties": false
+      },
+      "ScooterDocumentUpload_Output": {
+        "type": "object",
+        "properties": {
+          "uploadUrl": {
+            "type": "string",
+            "format": "uri"
+          },
+          "uploadToken": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string",
+            "enum": ["PUT"]
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "expiresAt": {
+            "type": "string"
+          },
+          "maxBytes": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "uploadUrl",
+          "uploadToken",
+          "method",
+          "headers",
+          "expiresAt",
+          "maxBytes"
+        ],
+        "additionalProperties": false
+      },
+      "ScooterDocument_Output": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "insurancePolicyId": {
+            "type": "string",
+            "nullable": true
+          },
+          "extractedData": {
+            "type": "object",
+            "properties": {
+              "vin": {
+                "type": "string",
+                "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
+                "nullable": true
+              },
+              "fields": {
+                "type": "object",
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "maxLength": 2000
+                    },
+                    {
+                      "type": "number"
+                    }
+                  ],
+                  "nullable": true
+                }
+              },
+              "rawFields": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string",
+                  "maxLength": 2000,
+                  "nullable": true
+                }
+              },
+              "vinReview": {
+                "type": "object",
+                "properties": {
+                  "method": {
+                    "type": "string",
+                    "enum": ["manual"]
+                  },
+                  "originalVin": {
+                    "type": "string",
+                    "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
+                    "nullable": true
+                  }
+                },
+                "required": ["method", "originalVin"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["vin", "fields", "rawFields"],
+            "additionalProperties": false,
+            "nullable": true
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "import_document",
+              "civ",
+              "registration_certificate",
+              "insurance"
+            ]
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "contentType": {
+            "type": "string",
+            "enum": ["application/pdf", "image/jpeg", "image/png", "image/webp"]
+          },
+          "byteSize": {
+            "type": "number"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "contentUrl": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "fileName",
+          "contentType",
+          "byteSize",
+          "createdAt",
+          "contentUrl"
+        ],
+        "additionalProperties": false
+      },
+      "ScooterDocumentList_Output": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/ScooterDocument_Output"
+        }
+      },
       "CreateScooterInput": {
         "type": "object",
         "properties": {
+          "insurancePolicies": {
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120
+                },
+                "insuredName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 250,
+                  "nullable": true
+                },
+                "validFrom": {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "nullable": true
+                },
+                "validUntil": {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "nullable": true
+                },
+                "premiumAmount": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 9999999999.99,
+                  "multipleOf": 0.01,
+                  "nullable": true
+                },
+                "currency": {
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$",
+                  "nullable": true
+                },
+                "documentVin": {
+                  "type": "string",
+                  "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
+                  "nullable": true
+                },
+                "vinReviewConfirmed": {
+                  "default": false,
+                  "type": "boolean"
+                },
+                "rawFields": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string",
+                    "maxLength": 500,
+                    "nullable": true
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "insuredName",
+                "validFrom",
+                "validUntil",
+                "premiumAmount",
+                "currency",
+                "documentVin"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "documentDrafts": {
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "insurancePolicyId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120
+                },
+                "extractedData": {
+                  "type": "object",
+                  "properties": {
+                    "vin": {
+                      "type": "string",
+                      "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
+                      "nullable": true
+                    },
+                    "fields": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "maxLength": 2000
+                          },
+                          {
+                            "type": "number"
+                          }
+                        ],
+                        "nullable": true
+                      }
+                    },
+                    "rawFields": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string",
+                        "maxLength": 2000,
+                        "nullable": true
+                      }
+                    },
+                    "vinReview": {
+                      "type": "object",
+                      "properties": {
+                        "method": {
+                          "type": "string",
+                          "enum": ["manual"]
+                        },
+                        "originalVin": {
+                          "type": "string",
+                          "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
+                          "nullable": true
+                        }
+                      },
+                      "required": ["method", "originalVin"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["vin", "fields", "rawFields"],
+                  "additionalProperties": false,
+                  "nullable": true
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "import_document",
+                    "civ",
+                    "registration_certificate",
+                    "insurance"
+                  ]
+                },
+                "fileName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 255,
+                  "pattern": "^[^\\x00-\\x1f\\x7f/\\\\]+$"
+                },
+                "uploadToken": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 8192
+                }
+              },
+              "required": ["type", "fileName", "uploadToken"],
+              "additionalProperties": false
+            }
+          },
+          "civVersion": {
+            "type": "string",
+            "enum": ["1993", "2016", "2024", "unknown"]
+          },
+          "civIssuedAt": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "nullable": true
+          },
+          "civIssuingAuthority": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "civRawFields": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "additionalProperties": {
+              "type": "string",
+              "maxLength": 2000
+            },
+            "nullable": true
+          },
+          "maxAxle3MassKg": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "maxAxle4MassKg": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "maxAxle5MassKg": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "brakedTrailerMassKg": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "unbrakedTrailerMassKg": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "couplingPointMassKg": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "standingCapacity": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "noiseMeasurementRpm": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "stationaryNoiseDb": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "nullable": true
+          },
+          "drivingNoiseDb": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "nullable": true
+          },
+          "co2EmissionsGKm": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "nullable": true
+          },
+          "vehicleClass": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "driveType": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "vehicleType": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "civNumber": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "nationalEmissionsCode": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
           "variant": {
             "type": "string",
             "minLength": 1,
@@ -7543,17 +11939,52 @@
           },
           "vehicleCategory": {
             "type": "string",
+            "enum": [
+              "L1e",
+              "L2e",
+              "L3e",
+              "L4e",
+              "L5e",
+              "L6e",
+              "L7e",
+              "M1",
+              "M2",
+              "M3",
+              "N1",
+              "N2",
+              "N3",
+              "O1",
+              "O2",
+              "O3",
+              "O4",
+              "other",
+              null
+            ],
+            "nullable": true
+          },
+          "vehicleCategoryOther": {
+            "type": "string",
             "minLength": 1,
             "maxLength": 120,
             "nullable": true
           },
           "nationalCategory": {
             "type": "string",
+            "enum": ["motorcycle", "other", null],
+            "nullable": true
+          },
+          "nationalCategoryOther": {
+            "type": "string",
             "minLength": 1,
             "maxLength": 120,
             "nullable": true
           },
           "bodyType": {
+            "type": "string",
+            "enum": ["two_wheel_moped", "two_wheel_motorcycle", "other", null],
+            "nullable": true
+          },
+          "bodyTypeOther": {
             "type": "string",
             "minLength": 1,
             "maxLength": 120,
@@ -7590,6 +12021,19 @@
             "nullable": true
           },
           "fuelType": {
+            "type": "string",
+            "enum": [
+              "petrol",
+              "diesel",
+              "electric",
+              "petrol_electric",
+              "diesel_electric",
+              "other",
+              null
+            ],
+            "nullable": true
+          },
+          "fuelTypeOther": {
             "type": "string",
             "minLength": 1,
             "maxLength": 120,
@@ -7746,13 +12190,13 @@
           },
           "manufactureYear": {
             "type": "integer",
-            "minimum": 1950,
+            "minimum": 1800,
             "maximum": 2027,
             "nullable": true
           },
           "powertrainType": {
             "type": "string",
-            "enum": ["electric", "combustion"]
+            "enum": ["electric", "combustion", "hybrid", "unpowered"]
           },
           "engineCode": {
             "type": "string",
@@ -7763,13 +12207,13 @@
           "engineDisplacementCc": {
             "type": "integer",
             "exclusiveMinimum": 0,
-            "maximum": 2000,
+            "maximum": 2147483647,
             "nullable": true
           },
           "powerKw": {
             "type": "number",
             "exclusiveMinimum": 0,
-            "maximum": 200,
+            "maximum": 9007199254740991,
             "nullable": true
           },
           "registrationType": {
@@ -7801,6 +12245,24 @@
             "maximum": 2147483647,
             "nullable": true
           },
+          "hasGps": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "odometerWorking": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "speedometerWorking": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "actualMaxSpeedKmh": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
           "notes": {
             "type": "string",
             "minLength": 1,
@@ -7814,6 +12276,215 @@
       "Scooter_Output": {
         "type": "object",
         "properties": {
+          "documents": {
+            "$ref": "#/components/schemas/ScooterDocumentList_Output"
+          },
+          "insurancePolicies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120
+                },
+                "insuredName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 250,
+                  "nullable": true
+                },
+                "validFrom": {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "nullable": true
+                },
+                "validUntil": {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "nullable": true
+                },
+                "premiumAmount": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 9999999999.99,
+                  "multipleOf": 0.01,
+                  "nullable": true
+                },
+                "currency": {
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$",
+                  "nullable": true
+                },
+                "documentVin": {
+                  "type": "string",
+                  "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
+                  "nullable": true
+                },
+                "vinReviewConfirmed": {
+                  "default": false,
+                  "type": "boolean"
+                },
+                "rawFields": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string",
+                    "maxLength": 500,
+                    "nullable": true
+                  }
+                },
+                "createdAt": {
+                  "type": "string"
+                },
+                "updatedAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "insuredName",
+                "validFrom",
+                "validUntil",
+                "premiumAmount",
+                "currency",
+                "documentVin",
+                "vinReviewConfirmed",
+                "createdAt",
+                "updatedAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "insuranceAttention": {
+            "type": "string",
+            "enum": ["expired", "upcoming", "review", null],
+            "nullable": true
+          },
+          "civVersion": {
+            "type": "string",
+            "enum": ["1993", "2016", "2024", "unknown"]
+          },
+          "civIssuedAt": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "nullable": true
+          },
+          "civIssuingAuthority": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "civRawFields": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "additionalProperties": {
+              "type": "string",
+              "maxLength": 2000
+            },
+            "nullable": true
+          },
+          "maxAxle3MassKg": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "maxAxle4MassKg": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "maxAxle5MassKg": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "brakedTrailerMassKg": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "unbrakedTrailerMassKg": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "couplingPointMassKg": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "standingCapacity": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "noiseMeasurementRpm": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "stationaryNoiseDb": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "nullable": true
+          },
+          "drivingNoiseDb": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "nullable": true
+          },
+          "co2EmissionsGKm": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "nullable": true
+          },
+          "vehicleClass": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "driveType": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "vehicleType": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "civNumber": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "nationalEmissionsCode": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
           "variant": {
             "type": "string",
             "minLength": 1,
@@ -7834,17 +12505,52 @@
           },
           "vehicleCategory": {
             "type": "string",
+            "enum": [
+              "L1e",
+              "L2e",
+              "L3e",
+              "L4e",
+              "L5e",
+              "L6e",
+              "L7e",
+              "M1",
+              "M2",
+              "M3",
+              "N1",
+              "N2",
+              "N3",
+              "O1",
+              "O2",
+              "O3",
+              "O4",
+              "other",
+              null
+            ],
+            "nullable": true
+          },
+          "vehicleCategoryOther": {
+            "type": "string",
             "minLength": 1,
             "maxLength": 120,
             "nullable": true
           },
           "nationalCategory": {
             "type": "string",
+            "enum": ["motorcycle", "other", null],
+            "nullable": true
+          },
+          "nationalCategoryOther": {
+            "type": "string",
             "minLength": 1,
             "maxLength": 120,
             "nullable": true
           },
           "bodyType": {
+            "type": "string",
+            "enum": ["two_wheel_moped", "two_wheel_motorcycle", "other", null],
+            "nullable": true
+          },
+          "bodyTypeOther": {
             "type": "string",
             "minLength": 1,
             "maxLength": 120,
@@ -7881,6 +12587,19 @@
             "nullable": true
           },
           "fuelType": {
+            "type": "string",
+            "enum": [
+              "petrol",
+              "diesel",
+              "electric",
+              "petrol_electric",
+              "diesel_electric",
+              "other",
+              null
+            ],
+            "nullable": true
+          },
+          "fuelTypeOther": {
             "type": "string",
             "minLength": 1,
             "maxLength": 120,
@@ -8018,6 +12737,13 @@
           "id": {
             "type": "string"
           },
+          "fleetNumber": {
+            "type": "integer",
+            "exclusiveMinimum": true,
+            "maximum": 2147483647,
+            "description": "Permanent fleet-wide number, assigned by the server.",
+            "minimum": 0
+          },
           "vin": {
             "type": "string"
           },
@@ -8027,6 +12753,10 @@
           "brand": {
             "type": "string",
             "description": "Display name of the scooter's brand."
+          },
+          "brandCode": {
+            "type": "string",
+            "description": "Current short code of the scooter's brand."
           },
           "model": {
             "type": "string",
@@ -8044,7 +12774,7 @@
           },
           "powertrainType": {
             "type": "string",
-            "enum": ["electric", "combustion"]
+            "enum": ["electric", "combustion", "hybrid", "unpowered"]
           },
           "engineCode": {
             "type": "string",
@@ -8087,6 +12817,24 @@
             "maximum": 2147483647,
             "nullable": true
           },
+          "hasGps": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "odometerWorking": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "speedometerWorking": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "actualMaxSpeedKmh": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
           "notes": {
             "type": "string",
             "nullable": true
@@ -8106,9 +12854,11 @@
         },
         "required": [
           "id",
+          "fleetNumber",
           "vin",
           "brandId",
           "brand",
+          "brandCode",
           "model",
           "color",
           "manufactureYear",
@@ -8122,6 +12872,10 @@
           "temporaryRegistrationExpiresAt",
           "requiredLicenseCategory",
           "currentMileageKm",
+          "hasGps",
+          "odometerWorking",
+          "speedometerWorking",
+          "actualMaxSpeedKmh",
           "notes",
           "createdAt",
           "updatedAt",
@@ -8163,6 +12917,363 @@
       "UpdateScooterInput": {
         "type": "object",
         "properties": {
+          "insurancePolicies": {
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120
+                },
+                "insuredName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 250,
+                  "nullable": true
+                },
+                "validFrom": {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "nullable": true
+                },
+                "validUntil": {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "nullable": true
+                },
+                "premiumAmount": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 9999999999.99,
+                  "multipleOf": 0.01,
+                  "nullable": true
+                },
+                "currency": {
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$",
+                  "nullable": true
+                },
+                "documentVin": {
+                  "type": "string",
+                  "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
+                  "nullable": true
+                },
+                "vinReviewConfirmed": {
+                  "default": false,
+                  "type": "boolean"
+                },
+                "rawFields": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string",
+                    "maxLength": 500,
+                    "nullable": true
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "insuredName",
+                "validFrom",
+                "validUntil",
+                "premiumAmount",
+                "currency",
+                "documentVin"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "documentDrafts": {
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "insurancePolicyId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120
+                },
+                "extractedData": {
+                  "type": "object",
+                  "properties": {
+                    "vin": {
+                      "type": "string",
+                      "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
+                      "nullable": true
+                    },
+                    "fields": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "maxLength": 2000
+                          },
+                          {
+                            "type": "number"
+                          }
+                        ],
+                        "nullable": true
+                      }
+                    },
+                    "rawFields": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string",
+                        "maxLength": 2000,
+                        "nullable": true
+                      }
+                    },
+                    "vinReview": {
+                      "type": "object",
+                      "properties": {
+                        "method": {
+                          "type": "string",
+                          "enum": ["manual"]
+                        },
+                        "originalVin": {
+                          "type": "string",
+                          "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
+                          "nullable": true
+                        }
+                      },
+                      "required": ["method", "originalVin"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["vin", "fields", "rawFields"],
+                  "additionalProperties": false,
+                  "nullable": true
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "import_document",
+                    "civ",
+                    "registration_certificate",
+                    "insurance"
+                  ]
+                },
+                "fileName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 255,
+                  "pattern": "^[^\\x00-\\x1f\\x7f/\\\\]+$"
+                },
+                "uploadToken": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 8192
+                }
+              },
+              "required": ["type", "fileName", "uploadToken"],
+              "additionalProperties": false
+            }
+          },
+          "documentExtractions": {
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "documentId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120
+                },
+                "extractedData": {
+                  "type": "object",
+                  "properties": {
+                    "vin": {
+                      "type": "string",
+                      "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
+                      "nullable": true
+                    },
+                    "fields": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "maxLength": 2000
+                          },
+                          {
+                            "type": "number"
+                          }
+                        ],
+                        "nullable": true
+                      }
+                    },
+                    "rawFields": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string",
+                        "maxLength": 2000,
+                        "nullable": true
+                      }
+                    },
+                    "vinReview": {
+                      "type": "object",
+                      "properties": {
+                        "method": {
+                          "type": "string",
+                          "enum": ["manual"]
+                        },
+                        "originalVin": {
+                          "type": "string",
+                          "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
+                          "nullable": true
+                        }
+                      },
+                      "required": ["method", "originalVin"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["vin", "fields", "rawFields"],
+                  "additionalProperties": false,
+                  "nullable": true
+                }
+              },
+              "required": ["documentId", "extractedData"],
+              "additionalProperties": false
+            }
+          },
+          "removedDocumentIds": {
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "civVersion": {
+            "type": "string",
+            "enum": ["1993", "2016", "2024", "unknown"]
+          },
+          "civIssuedAt": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "nullable": true
+          },
+          "civIssuingAuthority": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "civRawFields": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "additionalProperties": {
+              "type": "string",
+              "maxLength": 2000
+            },
+            "nullable": true
+          },
+          "maxAxle3MassKg": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "maxAxle4MassKg": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "maxAxle5MassKg": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "brakedTrailerMassKg": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "unbrakedTrailerMassKg": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "couplingPointMassKg": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "standingCapacity": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "noiseMeasurementRpm": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "stationaryNoiseDb": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "nullable": true
+          },
+          "drivingNoiseDb": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "nullable": true
+          },
+          "co2EmissionsGKm": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "nullable": true
+          },
+          "vehicleClass": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "driveType": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "vehicleType": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "civNumber": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "nationalEmissionsCode": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
           "variant": {
             "type": "string",
             "minLength": 1,
@@ -8183,17 +13294,52 @@
           },
           "vehicleCategory": {
             "type": "string",
+            "enum": [
+              "L1e",
+              "L2e",
+              "L3e",
+              "L4e",
+              "L5e",
+              "L6e",
+              "L7e",
+              "M1",
+              "M2",
+              "M3",
+              "N1",
+              "N2",
+              "N3",
+              "O1",
+              "O2",
+              "O3",
+              "O4",
+              "other",
+              null
+            ],
+            "nullable": true
+          },
+          "vehicleCategoryOther": {
+            "type": "string",
             "minLength": 1,
             "maxLength": 120,
             "nullable": true
           },
           "nationalCategory": {
             "type": "string",
+            "enum": ["motorcycle", "other", null],
+            "nullable": true
+          },
+          "nationalCategoryOther": {
+            "type": "string",
             "minLength": 1,
             "maxLength": 120,
             "nullable": true
           },
           "bodyType": {
+            "type": "string",
+            "enum": ["two_wheel_moped", "two_wheel_motorcycle", "other", null],
+            "nullable": true
+          },
+          "bodyTypeOther": {
             "type": "string",
             "minLength": 1,
             "maxLength": 120,
@@ -8230,6 +13376,19 @@
             "nullable": true
           },
           "fuelType": {
+            "type": "string",
+            "enum": [
+              "petrol",
+              "diesel",
+              "electric",
+              "petrol_electric",
+              "diesel_electric",
+              "other",
+              null
+            ],
+            "nullable": true
+          },
+          "fuelTypeOther": {
             "type": "string",
             "minLength": 1,
             "maxLength": 120,
@@ -8386,13 +13545,13 @@
           },
           "manufactureYear": {
             "type": "integer",
-            "minimum": 1950,
+            "minimum": 1800,
             "maximum": 2027,
             "nullable": true
           },
           "powertrainType": {
             "type": "string",
-            "enum": ["electric", "combustion"]
+            "enum": ["electric", "combustion", "hybrid", "unpowered"]
           },
           "engineCode": {
             "type": "string",
@@ -8403,13 +13562,13 @@
           "engineDisplacementCc": {
             "type": "integer",
             "exclusiveMinimum": 0,
-            "maximum": 2000,
+            "maximum": 2147483647,
             "nullable": true
           },
           "powerKw": {
             "type": "number",
             "exclusiveMinimum": 0,
-            "maximum": 200,
+            "maximum": 9007199254740991,
             "nullable": true
           },
           "registrationType": {
@@ -8436,6 +13595,24 @@
             "enum": ["none", "AM", "A1", "A2", "A"]
           },
           "currentMileageKm": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "hasGps": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "odometerWorking": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "speedometerWorking": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "actualMaxSpeedKmh": {
             "type": "integer",
             "minimum": 0,
             "maximum": 2147483647,
@@ -8664,6 +13841,50 @@
               "type": "string",
               "enum": ["google", "apple"]
             }
+          },
+          "isSuperAdmin": {
+            "type": "boolean",
+            "default": false
+          },
+          "effectiveScopes": {
+            "type": "object",
+            "default": {},
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["OWN", "ASSIGNED", "AVAILABLE", "ALL"]
+              }
+            }
+          },
+          "accessRevision": {
+            "type": "integer",
+            "default": 1,
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "portalEligible": {
+            "type": "boolean",
+            "default": false
+          },
+          "roleVersions": {
+            "type": "array",
+            "default": [],
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "revision": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": ["id", "revision"],
+              "additionalProperties": false
+            }
           }
         },
         "required": [
@@ -8676,7 +13897,12 @@
           "lastName",
           "roles",
           "createdAt",
-          "linkedProviders"
+          "linkedProviders",
+          "isSuperAdmin",
+          "effectiveScopes",
+          "accessRevision",
+          "portalEligible",
+          "roleVersions"
         ],
         "additionalProperties": false
       },

@@ -89,6 +89,9 @@ describe("Scooters HTTP surface (e2e)", () => {
       });
     }
     if (prisma && createdUserIds.length > 0) {
+      await prisma.userPermissionOverride.deleteMany({
+        where: { userId: { in: createdUserIds } },
+      });
       await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
     }
     await app?.close();
@@ -107,6 +110,20 @@ describe("Scooters HTTP surface (e2e)", () => {
     const user = await users.createOne({
       email: `scooters-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`,
       roles,
+      loginStatus: "ACTIVE",
+      isSuperAdmin: roles.includes("SUPER_ADMIN"),
+      permissionOverrides: {
+        create: roles.includes("ADMIN")
+          ? v1.access.permissionCatalog
+              .filter((p) => !p.key.startsWith("portal."))
+              .map((p) => ({
+                permissionKey: p.key,
+                scopes: p.scopes.includes("ALL")
+                  ? ["ALL" as const]
+                  : [...p.scopes],
+              }))
+          : [],
+      },
     });
     createdUserIds.push(user.id);
     const issued = await coreAuth.issueSession({ user });

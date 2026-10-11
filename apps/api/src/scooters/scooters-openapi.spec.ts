@@ -1,3 +1,4 @@
+import { AccessService } from "../access/access.service";
 import { CivVocabularyController } from "./civ-vocabulary.controller";
 import { CivVocabularyService } from "./civ-vocabulary.service";
 import { ScooterDocumentsService } from "./scooter-documents.service";
@@ -19,6 +20,7 @@ describe("Scooter OpenAPI document", () => {
         CivVocabularyController,
       ],
       providers: [
+        { provide: AccessService, useValue: {} },
         { provide: CivVocabularyService, useValue: {} },
         { provide: ScootersService, useValue: {} },
         { provide: ScooterDocumentsService, useValue: {} },

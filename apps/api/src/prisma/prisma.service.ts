@@ -23,6 +23,7 @@ import {
   OnModuleDestroy,
   OnModuleInit,
 } from "@nestjs/common";
+import { createCaslExtension } from "@casl/prisma/runtime";
 import { PrismaPg } from "@prisma/adapter-pg";
 
 import { ENV } from "../config/config.module";
@@ -74,6 +75,11 @@ export class PrismaService
       adapter,
       log: env.NODE_ENV === "production" ? ["warn", "error"] : ["error"],
     });
+  }
+
+  /** Extended query client for direct CASL empty-condition handling. */
+  get authorized() {
+    return this.$extends(createCaslExtension());
   }
 
   async onModuleInit(): Promise<void> {

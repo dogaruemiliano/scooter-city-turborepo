@@ -1,3 +1,4 @@
+import { RequireAllScope } from "../access/access.decorators";
 import {
   Body,
   Controller,
@@ -18,7 +19,6 @@ import {
 import { v1 } from "@repo/api-shared";
 import { ZodResponse } from "nestjs-zod";
 
-import { RequireRoles } from "../common/decorators/roles.decorator";
 import { CreateScooterBrandInput } from "./dto/create-scooter-brand.input";
 import { ScooterBrand } from "./dto/scooter-brand";
 import { ScooterBrandList } from "./dto/scooter-brand-list";
@@ -29,11 +29,11 @@ import { ScooterBrandsService } from "./scooter-brands.service";
 @ApiTags("scooter-brands")
 @ApiCookieAuth(v1.auth.ACCESS_TOKEN_COOKIE)
 @ApiBearerAuth("bearer")
-@RequireRoles("ADMIN")
 @Controller({ path: "scooter-brands", version: "1" })
 export class ScooterBrandsController {
   constructor(private readonly scooterBrands: ScooterBrandsService) {}
 
+  @RequireAllScope("scooter_brands.manage")
   @Post()
   @ApiOperation({
     operationId: "ScooterBrandsController_create_v1",
@@ -46,6 +46,7 @@ export class ScooterBrandsController {
     return toScooterBrand(await this.scooterBrands.create(input));
   }
 
+  @RequireAllScope("scooter_brands.read")
   @Get()
   @ApiOperation({
     operationId: "ScooterBrandsController_list_v1",
@@ -57,6 +58,7 @@ export class ScooterBrandsController {
     return { items: items.map(toScooterBrand) };
   }
 
+  @RequireAllScope("scooter_brands.manage")
   @Patch(":id")
   @ApiOperation({
     operationId: "ScooterBrandsController_update_v1",
@@ -70,6 +72,7 @@ export class ScooterBrandsController {
     return toScooterBrand(await this.scooterBrands.update(id, input));
   }
 
+  @RequireAllScope("scooter_brands.manage")
   @Delete(":id")
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({

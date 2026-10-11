@@ -1,11 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import {
-  Inject,
-  Injectable,
-  Logger,
-  UnauthorizedException,
-} from "@nestjs/common";
+import { Inject, Injectable, Logger } from "@nestjs/common";
 import { fallbackLocale, type SupportedLocale } from "@repo/i18n";
 import ms from "ms";
 
@@ -15,6 +10,11 @@ import { Prisma, type OtpChallenge } from "../../../generated/prisma/client";
 import { renderOtpEmail } from "../../../mailer/templates/otp-email";
 import { MailerService } from "../../../mailer/mailer.service";
 import { PrismaService } from "../../../prisma/prisma.service";
+import {
+  isLoginEligible,
+  isSerializationConflict,
+  lockAccessLifecycle,
+} from "../../utils/admission";
 import { hashOtp, safeEqualHex } from "../../utils/hash";
 import { deriveOtpCode } from "../../utils/otp-code";
 
@@ -27,7 +27,6 @@ export const OTP_CHANNEL_EMAIL = "EMAIL";
 export const OTP_PURPOSE_AUTH = "AUTH";
 export const OTP_PURPOSE_OAUTH_EMAIL_VERIFY = "OAUTH_EMAIL_VERIFY";
 
-const GENERIC_INVALID_MESSAGE = "Invalid or expired code";
 const MAX_TRANSACTION_ATTEMPTS = 3;
 const TRANSACTION_RETRY_DELAY_MS = 10;
 const FIRST_RESEND_DELAY_MS = 30_000;
@@ -104,9 +103,19 @@ export class OtpChallengeService {
     input: CreateEmailChallengeInput,
   ): Promise<OtpChallengeMetadata> {
     const normalized = this.normalizeInput(input);
-    const reservation = await this.runSerializable((tx) =>
-      this.reserveInitialDelivery(tx, normalized),
-    );
+    const reservation = await this.runSerializable(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock_shared(726001)`;
+      await this.lockAdmissionUser(tx, normalized.target);
+      const user = await tx.user.findUnique({
+        where: { email: normalized.target },
+      });
+      if (!(await isLoginEligible(tx, user))) return null;
+      return this.reserveInitialDelivery(tx, {
+        ...normalized,
+        userId: user?.id,
+      });
+    });
+    if (!reservation) return this.unavailableMetadata();
 
     await this.deliverOrRollback(reservation);
     return this.toMetadata(reservation.challenge);
@@ -117,13 +126,12 @@ export class OtpChallengeService {
     ip: string | null,
     locale?: SupportedLocale,
   ): Promise<OtpChallengeMetadata> {
-    const reservation = await this.runSerializable((tx) =>
-      this.reserveResend(tx, challengeId, ip, locale),
-    );
+    const reservation = await this.runSerializable(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock_shared(726001)`;
+      return this.reserveResend(tx, challengeId, ip, locale);
+    });
 
-    if (!reservation) {
-      throw new UnauthorizedException(GENERIC_INVALID_MESSAGE);
-    }
+    if (!reservation) return this.unavailableMetadata(challengeId);
 
     await this.deliverOrRollback(reservation);
     return this.toMetadata(reservation.challenge);
@@ -138,6 +146,8 @@ export class OtpChallengeService {
     ) => Promise<T>,
   ): Promise<VerifyChallengeResult<T>> {
     return this.runSerializable(async (tx) => {
+      // Acquire before claiming the challenge, matching access-change lock order.
+      await lockAccessLifecycle(tx);
       const challenge = await tx.otpChallenge.findUnique({
         where: { id: input.challengeId },
       });
@@ -300,6 +310,26 @@ export class OtpChallengeService {
       where: { id: challengeId },
     });
     if (!challenge || !this.isActive(challenge, new Date())) return null;
+    await this.lockAdmissionUser(tx, challenge.target);
+    const user = await tx.user.findUnique({
+      where: { email: challenge.target },
+    });
+    if (!(await isLoginEligible(tx, user))) return null;
+    if (challenge.userId !== null && user?.id !== challenge.userId) return null;
+    if (user?.loginStatus === "INVITED") {
+      const invitation = await tx.userInvitation.findFirst({
+        where: {
+          userId: user.id,
+          email: user.email,
+          activatedAt: null,
+          cancelledAt: null,
+          expiresAt: { gt: new Date() },
+          createdAt: { lte: challenge.createdAt },
+        },
+        select: { id: true },
+      });
+      if (!invitation) return null;
+    }
 
     return this.reserveExistingDelivery(
       tx,
@@ -308,6 +338,12 @@ export class OtpChallengeService {
       ip,
       this.localeFor(locale),
     );
+  }
+
+  private async lockAdmissionUser(tx: Prisma.TransactionClient, email: string) {
+    // A SERIALIZABLE snapshot may predate a wait for the lifecycle lock. A
+    // locking read retries if the account changed while that lock was held.
+    await tx.$queryRaw`SELECT id FROM "User" WHERE email = ${email} FOR SHARE`;
   }
 
   private async reserveExistingDelivery(
@@ -482,6 +518,18 @@ export class OtpChallengeService {
     return LATER_RESEND_DELAY_MS;
   }
 
+  private unavailableMetadata(
+    challengeId: string = randomUUID(),
+  ): OtpChallengeMetadata {
+    // No challenge, identity, or email is created for an unapproved address.
+    return {
+      status: "verification_required",
+      challengeId,
+      expiresInSec: Math.ceil(ms(this.env.OTP_TTL as ms.StringValue) / 1000),
+      resendAfterSec: FIRST_RESEND_DELAY_MS / 1000,
+    };
+  }
+
   private toMetadata(challenge: OtpChallenge): OtpChallengeMetadata {
     const now = Date.now();
     const expiresInSec = Math.max(
@@ -511,8 +559,9 @@ export class OtpChallengeService {
         });
       } catch (error) {
         const retryable =
-          error instanceof Prisma.PrismaClientKnownRequestError &&
-          (error.code === "P2034" || error.code === "P2002");
+          isSerializationConflict(error) ||
+          (error instanceof Prisma.PrismaClientKnownRequestError &&
+            error.code === "P2002");
         if (!retryable || attempt === MAX_TRANSACTION_ATTEMPTS) throw error;
 
         // Give the conflicting transaction time to finish before retrying.

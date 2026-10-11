@@ -19,3 +19,7 @@ export * as scooterBrands from "./scooter-brands";
 export * as scooters from "./scooters";
 export * as users from "./users";
 export * as vehicleCiv from "./vehicle-civ";
+
+export * as access from "./access";
+export * as problems from "./problems";
+export * as rentals from "./rentals";

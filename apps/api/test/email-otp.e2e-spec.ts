@@ -22,6 +22,14 @@ import { PrismaService } from "../src/prisma/prisma.service";
 import { UsersService } from "../src/users/users.service";
 
 const DEV_OTP = "000000";
+const provisionedIds: string[] = [];
+async function approve(prisma: PrismaService, email: string) {
+  const user = await prisma.user.create({
+    data: { email, loginStatus: "ACTIVE" },
+  });
+  provisionedIds.push(user.id);
+  return user;
+}
 
 describe("EmailOtpController (e2e)", () => {
   let app: INestApplication;
@@ -60,6 +68,10 @@ describe("EmailOtpController (e2e)", () => {
       await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
     }
     await prisma.otpDeliveryQuota.deleteMany();
+    await prisma.userInvitation.deleteMany({
+      where: { userId: { in: provisionedIds } },
+    });
+    await prisma.user.deleteMany({ where: { id: { in: provisionedIds } } });
     await app.close();
   });
 
@@ -70,6 +82,7 @@ describe("EmailOtpController (e2e)", () => {
   async function freshUser(opts: { emailVerified?: Date | null } = {}) {
     const email = uniqueEmail("existing");
     const user = await users.createOne({
+      loginStatus: "ACTIVE",
       email,
       ...(opts.emailVerified !== undefined
         ? { emailVerified: opts.emailVerified }
@@ -119,17 +132,16 @@ describe("EmailOtpController (e2e)", () => {
       await prisma.otpChallenge.findUnique({
         where: { id: unknownChallenge.challengeId },
       }),
-    ).toMatchObject({
-      target: unknownEmail,
-      purpose: "AUTH",
-      channel: "EMAIL",
-      userId: null,
-      attemptsCount: 0,
-      sentCount: 1,
-      usedAt: null,
-    });
+    ).toBeNull();
     expect(mailer.findLastTo(existing.email)?.text).toContain(DEV_OTP);
-    expect(mailer.findLastTo(unknownEmail)?.text).toContain(DEV_OTP);
+    expect(mailer.findLastTo(unknownEmail)).toBeUndefined();
+    const rejected = await request(server())
+      .post(v1.auth.ROUTES.emailOtp.verify)
+      .send({ challengeId: unknownChallenge.challengeId, code: DEV_OTP });
+    expect(rejected.status).toBe(401);
+    expect(
+      await prisma.user.findUnique({ where: { email: unknownEmail } }),
+    ).toBeNull();
   });
 
   it("localizes OTP email and known error envelopes from request locale", async () => {
@@ -146,6 +158,7 @@ describe("EmailOtpController (e2e)", () => {
     });
 
     const email = uniqueEmail("localized");
+    await approve(prisma, email);
     const challenge = await requestChallenge(email, { "X-Locale": "ro" });
     expect(mailer.findLastTo(email)).toMatchObject({
       subject: `${DEV_OTP} este codul tău de autentificare Scooter City`,
@@ -166,8 +179,20 @@ describe("EmailOtpController (e2e)", () => {
     });
   });
 
-  it("verifies a new email, creates one user and session, and emits signup audits", async () => {
+  it("activates an invited email, creates one session, and records admission", async () => {
     const email = uniqueEmail("signup");
+    const invited = await prisma.user.create({
+      data: { email, loginStatus: "INVITED" },
+    });
+    provisionedIds.push(invited.id);
+    await prisma.userInvitation.create({
+      data: {
+        userId: invited.id,
+        email,
+        generation: 1,
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+    });
     const challenge = await requestChallenge(email);
 
     const response = await request(server())
@@ -195,7 +220,7 @@ describe("EmailOtpController (e2e)", () => {
     });
     expect(user).not.toBeNull();
     if (!user) throw new Error("Expected email OTP signup to create a user");
-    createdUserIds.push(user.id);
+    expect(user.loginStatus).toBe("ACTIVE");
     expect(user.emailVerified).not.toBeNull();
     expect(user.sessions).toHaveLength(1);
 
@@ -211,7 +236,7 @@ describe("EmailOtpController (e2e)", () => {
     ).map((row) => row.type);
     expect(auditTypes).toEqual(
       expect.arrayContaining([
-        AuditEventType.SIGNUP,
+        AuditEventType.ACCESS_ACTIVATED,
         AuditEventType.EMAIL_VERIFIED,
         AuditEventType.LOGIN_SUCCESS,
       ]),
@@ -240,8 +265,77 @@ describe("EmailOtpController (e2e)", () => {
     expect(auditTypes).not.toContain(AuditEventType.SIGNUP);
   });
 
+  it.each(["DISABLED", "SUSPENDED"] as const)(
+    "rejects an already-delivered OTP after access becomes %s",
+    async (loginStatus) => {
+      const user = await freshUser();
+      const challenge = await requestChallenge(user.email);
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { loginStatus },
+      });
+      const response = await request(server())
+        .post(v1.auth.ROUTES.emailOtp.verify)
+        .send({ challengeId: challenge.challengeId, code: DEV_OTP });
+      expect(response.status).toBe(401);
+      expect(await prisma.session.count({ where: { userId: user.id } })).toBe(
+        0,
+      );
+      expect(
+        (await prisma.user.findUniqueOrThrow({ where: { id: user.id } }))
+          .loginStatus,
+      ).toBe(loginStatus);
+    },
+  );
+
+  it("does not accept an old OTP for a replacement invitation generation", async () => {
+    const email = uniqueEmail("replaced-invitation");
+    const user = await prisma.user.create({
+      data: { email, loginStatus: "INVITED" },
+    });
+    provisionedIds.push(user.id);
+    const original = await prisma.userInvitation.create({
+      data: {
+        userId: user.id,
+        email,
+        generation: 1,
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+    });
+    const challenge = await requestChallenge(email);
+    const proof = await prisma.otpChallenge.findUniqueOrThrow({
+      where: { id: challenge.challengeId },
+    });
+    await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(726001)`;
+      await tx.userInvitation.update({
+        where: { id: original.id },
+        data: { cancelledAt: new Date() },
+      });
+      await tx.userInvitation.create({
+        data: {
+          userId: user.id,
+          email,
+          generation: 2,
+          createdAt: new Date(proof.createdAt.getTime() + 1),
+          expiresAt: new Date(Date.now() + 60_000),
+        },
+      });
+    });
+    const response = await request(server())
+      .post(v1.auth.ROUTES.emailOtp.verify)
+      .send({ challengeId: challenge.challengeId, code: DEV_OTP });
+    expect(response.status).toBe(401);
+    expect(await prisma.session.count({ where: { userId: user.id } })).toBe(0);
+    expect(
+      (await prisma.user.findUniqueOrThrow({ where: { id: user.id } }))
+        .loginStatus,
+    ).toBe("INVITED");
+  });
+
   it("reuses the challenge, keeps the same code, and applies 30s/2m/5m resend backoff", async () => {
     const email = uniqueEmail("resend");
+    await approve(prisma, email);
     const challenge = await requestChallenge(email);
     const initialRow = await prisma.otpChallenge.findUniqueOrThrow({
       where: { id: challenge.challengeId },
@@ -316,7 +410,9 @@ describe("EmailOtpController (e2e)", () => {
   });
 
   it("locks after OTP_MAX_ATTEMPTS and does not reset attempts on resend", async () => {
-    const challenge = await requestChallenge(uniqueEmail("locked"));
+    const challenge = await requestChallenge(
+      (await approve(prisma, uniqueEmail("locked"))).email,
+    );
 
     for (let attempt = 0; attempt < 5; attempt += 1) {
       const response = await request(server())
@@ -338,11 +434,13 @@ describe("EmailOtpController (e2e)", () => {
     const resend = await request(server())
       .post(v1.auth.ROUTES.otp.resend)
       .send({ challengeId: challenge.challengeId });
-    expect(resend.status).toBe(401);
+    expect(resend.status).toBe(202);
   });
 
   it("rejects expired, replayed, and cross-purpose challenges uniformly", async () => {
-    const expired = await requestChallenge(uniqueEmail("expired"));
+    const expired = await requestChallenge(
+      (await approve(prisma, uniqueEmail("expired"))).email,
+    );
     await prisma.otpChallenge.update({
       where: { id: expired.challengeId },
       data: { expiresAt: new Date(Date.now() - 1) },
@@ -354,6 +452,7 @@ describe("EmailOtpController (e2e)", () => {
     expect(expiredResponse.status).toBe(401);
 
     const replayEmail = uniqueEmail("replay");
+    await approve(prisma, replayEmail);
     const replay = await requestChallenge(replayEmail);
     const success = await request(server())
       .post(v1.auth.ROUTES.emailOtp.verify)
@@ -390,8 +489,9 @@ describe("EmailOtpController (e2e)", () => {
     expect(crossPurpose.status).toBe(401);
   });
 
-  it("allows exactly one concurrent verification to create the user and session", async () => {
+  it("allows exactly one concurrent verification to issue a session", async () => {
     const email = uniqueEmail("concurrent");
+    await approve(prisma, email);
     const challenge = await requestChallenge(email);
 
     const responses = await Promise.all([
@@ -444,11 +544,16 @@ describe("EmailOtpController throttling (e2e)", () => {
       where: { id: { in: challengeIds } },
     });
     await prisma.otpDeliveryQuota.deleteMany();
+    await prisma.userInvitation.deleteMany({
+      where: { userId: { in: provisionedIds } },
+    });
+    await prisma.user.deleteMany({ where: { id: { in: provisionedIds } } });
     await app.close();
   });
 
   it("the 21st request from one IP returns 429", async () => {
     const email = uniqueEmail("throttle");
+    await approve(prisma, email);
     for (let requestNumber = 1; requestNumber <= 20; requestNumber += 1) {
       const response = await request(server())
         .post(v1.auth.ROUTES.emailOtp.request)
@@ -497,6 +602,10 @@ describe("EmailOtp delivery rollback (e2e)", () => {
       where: { id: { in: challengeIds } },
     });
     await prisma.otpDeliveryQuota.deleteMany();
+    await prisma.userInvitation.deleteMany({
+      where: { userId: { in: provisionedIds } },
+    });
+    await prisma.user.deleteMany({ where: { id: { in: provisionedIds } } });
     await app.close();
   });
 
@@ -506,6 +615,7 @@ describe("EmailOtp delivery rollback (e2e)", () => {
 
   it("deletes a newly-created challenge when initial delivery fails", async () => {
     const email = uniqueEmail("initial-mail-failure");
+    await approve(prisma, email);
     mailer.failNext();
 
     const response = await request(server())
@@ -519,6 +629,7 @@ describe("EmailOtp delivery rollback (e2e)", () => {
 
   it("restores resend counters and cooldown when resend delivery fails", async () => {
     const email = uniqueEmail("resend-mail-failure");
+    await approve(prisma, email);
     const initial = await request(server())
       .post(v1.auth.ROUTES.emailOtp.request)
       .send({ email });

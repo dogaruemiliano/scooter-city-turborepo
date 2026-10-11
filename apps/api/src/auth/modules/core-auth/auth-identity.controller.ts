@@ -22,6 +22,8 @@ import { v1 } from "@repo/api-shared";
 import type { Request, Response } from "express";
 import { ZodResponse } from "nestjs-zod";
 
+import { AccessService } from "../../../access/access.service";
+import { SelfService } from "../../../access/access.decorators";
 import { AuditService } from "../../../audit/audit.service";
 import { AuditEventType } from "../../../audit/audit.types";
 import { getRequestMetadata } from "../../../common/http/request-metadata";
@@ -35,12 +37,14 @@ import { SessionUser } from "./dto/session-user";
 import { LinkedAccountService } from "./linked-account.service";
 import { UpdateProfileInput } from "./dto/update-profile.input";
 
+@SelfService()
 @ApiTags("auth")
 @ApiCookieAuth(v1.auth.ACCESS_TOKEN_COOKIE)
 @Controller({ path: "auth", version: "1" })
 export class AuthIdentityController {
   constructor(
     private readonly users: UsersService,
+    private readonly access: AccessService,
     private readonly linkedAccounts: LinkedAccountService,
     private readonly audit: AuditService,
     @Inject(ENV) private readonly env: Env,
@@ -57,7 +61,7 @@ export class AuthIdentityController {
     if (!row) {
       throw new UnauthorizedException();
     }
-    return this.toSessionUser(row);
+    return this.toSessionUser(row, user);
   }
 
   @Patch("me")
@@ -75,7 +79,7 @@ export class AuthIdentityController {
     if (!row) {
       throw new UnauthorizedException();
     }
-    return this.toSessionUser(row);
+    return this.toSessionUser(row, user);
   }
 
   @Delete("me")
@@ -91,14 +95,8 @@ export class AuthIdentityController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ): Promise<void> {
-    await this.users.deactivateAccount(user.id);
+    await this.users.deactivateAccount(user.id, getRequestMetadata(req));
     clearAuthCookies(res, this.env);
-    await this.audit.record({
-      type: AuditEventType.ACCOUNT_DELETED,
-      userId: user.id,
-      ...getRequestMetadata(req),
-      meta: { mode: "soft-delete" },
-    });
   }
 
   @Delete("accounts/:provider")
@@ -123,11 +121,14 @@ export class AuthIdentityController {
     });
   }
 
-  private toSessionUser(
+  private async toSessionUser(
     row: NonNullable<
       Awaited<ReturnType<UsersService["findAccountProfileById"]>>
     >,
-  ): v1.auth.SessionUser {
+    principal: AuthPrincipal,
+  ): Promise<v1.auth.SessionUser> {
+    const access =
+      principal.access ?? (await this.access.getSnapshot(principal.id));
     const linkedProviders = Array.from(
       new Set(
         row.authAccounts
@@ -147,6 +148,11 @@ export class AuthIdentityController {
       firstName: row.firstName,
       lastName: row.lastName,
       roles: row.roles,
+      isSuperAdmin: access.isSuperAdmin,
+      effectiveScopes: access.effectiveScopes,
+      accessRevision: access.accessRevision,
+      portalEligible: access.portalEligible,
+      roleVersions: access.roleVersions,
       linkedProviders,
       createdAt: row.createdAt.toISOString(),
     };

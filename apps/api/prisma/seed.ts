@@ -52,6 +52,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { v1 } from "@repo/api-shared";
 
 import { PrismaClient } from "../src/generated/prisma/client";
+import { seedAccessRoles } from "./seeds/access";
 import { seedFinance } from "./seeds/finance";
 
 if (process.env.NODE_ENV === "production") {
@@ -434,6 +435,7 @@ const SCOOTER_SEEDS: ScooterSeed[] = buildGeneratedScooterSeeds(
 
 async function main(): Promise<void> {
   const now = new Date();
+  await prisma.$transaction((tx) => seedAccessRoles(tx));
 
   // Local admin user. The production guard above prevents this account from
   // being created in production environments.
@@ -443,12 +445,11 @@ async function main(): Promise<void> {
       id: FIXED_IDS.admin,
       email: "admin@email.com",
       firstName: "Admin",
+      loginStatus: "ACTIVE",
+      isSuperAdmin: true,
       roles: [v1.auth.AUTH_ROLES.ADMIN, v1.auth.AUTH_ROLES.SUPER_ADMIN],
     },
-    update: {
-      roles: [v1.auth.AUTH_ROLES.ADMIN, v1.auth.AUTH_ROLES.SUPER_ADMIN],
-      deletedAt: null,
-    },
+    update: {},
   });
 
   // Email-OTP user — no OAuth links.
@@ -456,6 +457,7 @@ async function main(): Promise<void> {
     where: { id: FIXED_IDS.emailOtp },
     create: {
       id: FIXED_IDS.emailOtp,
+      loginStatus: "ACTIVE",
       email: "test-email-otp@example.com",
       firstName: "Test",
       lastName: "EmailOtp",
@@ -471,6 +473,7 @@ async function main(): Promise<void> {
     where: { id: FIXED_IDS.sms },
     create: {
       id: FIXED_IDS.sms,
+      loginStatus: "ACTIVE",
       email: "test-sms@example.com",
       phone: "+40700000001",
       firstName: "Test",
@@ -506,6 +509,7 @@ async function main(): Promise<void> {
       where: { id: seed.id },
       create: {
         id: seed.id,
+        loginStatus: "ACTIVE",
         email: seed.email,
         emailVerified: now,
         firstName: "Test",

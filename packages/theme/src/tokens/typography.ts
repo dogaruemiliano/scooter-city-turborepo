@@ -8,6 +8,12 @@ export const typography = {
       native: "Montserrat_400Regular",
       email: "Arial, Helvetica, sans-serif",
     },
+    body: {
+      web: "var(--font-open-sans, 'Open Sans'), ui-sans-serif, system-ui, sans-serif",
+      // The native app retains its bundled typeface; Open Sans is web-only.
+      native: "Montserrat_400Regular",
+      email: "Arial, Helvetica, sans-serif",
+    },
     mono: {
       web: "var(--font-mono, ui-monospace), SFMono-Regular, Menlo, Consolas, monospace",
       native: "Menlo",

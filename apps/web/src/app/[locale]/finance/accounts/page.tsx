@@ -7,7 +7,7 @@ import { AccountBalanceTable } from "../_components/AccountBalanceTable";
 import {
   fetchFinance,
   financeCookieHeader,
-  requireFinanceAdmin,
+  requireFinancePermission,
 } from "../_lib/finance-server";
 import { FINANCE_PATHS } from "../_lib/links";
 
@@ -31,7 +31,7 @@ export default async function AccountsRoutePage({
   const locale = resolveRouteLocale(rawLocale);
   const path = FINANCE_PATHS.accounts;
 
-  await requireFinanceAdmin(locale, path);
+  await requireFinancePermission(locale, path, "finance.accounts.read");
   const cookieHeader = await financeCookieHeader();
 
   const [books, balances] = await Promise.all([

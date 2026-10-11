@@ -73,6 +73,7 @@ describe("CoreAuthService rotation (e2e)", () => {
   /** Creates a user + initial session so the test can present a real refresh token. */
   async function freshSession() {
     const user = await users.createOne({
+      loginStatus: "ACTIVE",
       email: `core-auth-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`,
     });
     createdUserIds.push(user.id);

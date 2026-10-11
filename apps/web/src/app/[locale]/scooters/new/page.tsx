@@ -1,3 +1,4 @@
+import { canAccess } from "@/lib/access";
 import { v1 } from "@repo/api-shared";
 import { messages } from "@repo/i18n";
 import type { Metadata } from "next";
@@ -15,7 +16,6 @@ import { ScooterCreateForm } from "../_components/ScooterCreateForm";
 
 const SCOOTERS_PATH = "/scooters";
 const SCOOTERS_NEW_PATH = "/scooters/new";
-const ADMIN_ROLE = "ADMIN";
 
 interface NewScooterRoutePageProps {
   params: Promise<{ locale: string }>;
@@ -45,7 +45,7 @@ export default async function NewScooterRoutePage({
     );
   }
 
-  if (!user.roles.includes(ADMIN_ROLE)) {
+  if (!canAccess(user, "scooters.create")) {
     notFound();
   }
 

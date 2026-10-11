@@ -1,5 +1,7 @@
 "use client";
 
+import { canVisit } from "@/lib/access";
+
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -23,7 +25,6 @@ import {
   UsersRoundIcon,
   type LucideIcon,
 } from "lucide-react";
-import { v1 } from "@repo/api-shared";
 import type { SupportedLocale } from "@repo/i18n";
 import {
   Avatar,
@@ -94,13 +95,26 @@ const DASHBOARD_NAVIGATION_ITEM = {
 
 const NAVIGATION_GROUPS = [
   {
+    labelKey: "serviceGroup",
+    items: [
+      { href: "/problems", labelKey: "problems", icon: Settings2Icon },
+      { href: "/rentals", labelKey: "rentals", icon: BikeIcon },
+      { href: "/my-rentals", labelKey: "myRentals", icon: BikeIcon },
+    ],
+  },
+  {
+    labelKey: "accessGroup",
+    items: [
+      { href: "/users", labelKey: "users", icon: UsersRoundIcon },
+      { href: "/roles", labelKey: "roles", icon: Settings2Icon },
+    ],
+  },
+  {
     labelKey: "entitiesGroup",
-    requiredRole: "ADMIN",
     items: [{ href: "/persons", labelKey: "persons", icon: UsersRoundIcon }],
   },
   {
     labelKey: "scootersGroup",
-    requiredRole: "ADMIN",
     items: [
       { href: "/scooters", labelKey: "scooterList", icon: BikeIcon },
       { href: "/scooters/brands", labelKey: "scooterBrands", icon: TagIcon },
@@ -108,7 +122,6 @@ const NAVIGATION_GROUPS = [
   },
   {
     labelKey: "financeGroup",
-    requiredRole: "ADMIN",
     items: [
       {
         href: "/finance",
@@ -140,13 +153,11 @@ const NAVIGATION_GROUPS = [
         href: "/finance/settings",
         labelKey: "financeSettings",
         icon: Settings2Icon,
-        requiredRole: v1.auth.AUTH_ROLES.SUPER_ADMIN,
       },
     ],
   },
   {
     labelKey: "companyGroup",
-    requiredRole: v1.auth.AUTH_ROLES.SUPER_ADMIN,
     items: [
       {
         href: "/company/settings",
@@ -358,18 +369,24 @@ function AppSidebar({
 }) {
   const tNav = useTranslations("appShell.nav");
   const { user } = useSession();
-  const navigationGroups = NAVIGATION_GROUPS.filter(
-    (group) =>
-      !("requiredRole" in group) ||
-      user?.roles.includes(group.requiredRole) === true,
-  ).map((group) => ({
+  // The mobile drawer unmounts AccountMenu when closed; keep the preference here.
+  const [themePreference, setThemePreference] = useState(
+    initialThemePreference,
+  );
+
+  function changeTheme(nextPreference: unknown) {
+    if (!isThemePreference(nextPreference)) {
+      return;
+    }
+
+    applyThemePreference(nextPreference);
+    setThemePreference(nextPreference);
+  }
+
+  const navigationGroups = NAVIGATION_GROUPS.map((group) => ({
     ...group,
-    items: group.items.filter(
-      (item) =>
-        !("requiredRole" in item) ||
-        user?.roles.includes(item.requiredRole) === true,
-    ),
-  }));
+    items: group.items.filter((item) => canVisit(user, item.href)),
+  })).filter((group) => group.items.length > 0);
 
   return (
     <Sidebar collapsible="icon">
@@ -503,7 +520,8 @@ function AppSidebar({
         <AccountMenu
           key={user?.id ?? "signed-out"}
           locale={locale}
-          initialThemePreference={initialThemePreference}
+          themePreference={themePreference}
+          onThemeChange={changeTheme}
         />
       </SidebarFooter>
       <SidebarRail />
@@ -541,10 +559,12 @@ function isActiveNavigationItem(
 
 function AccountMenu({
   locale,
-  initialThemePreference,
+  themePreference,
+  onThemeChange,
 }: {
   locale: SupportedLocale;
-  initialThemePreference: ThemePreference;
+  themePreference: ThemePreference;
+  onThemeChange: (preference: unknown) => void;
 }) {
   const tAccount = useTranslations("appShell.accountMenu");
   const tTheme = useTranslations("theme");
@@ -552,9 +572,6 @@ function AccountMenu({
   const { isMobile } = useSidebar();
   const { user } = useSession();
   const { busy, logout } = useLogout();
-  const [themePreference, setThemePreference] = useState(
-    initialThemePreference,
-  );
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [accountMenuOverlayTarget, setAccountMenuOverlayTarget] =
     useState<HTMLElement | null>(null);
@@ -568,15 +585,6 @@ function AccountMenu({
   const email = user?.email ?? tAccount("noActiveSession");
   const displayName = user ? displayNameFromUser(user) : tAccount("account");
   const initials = user ? initialsFromUser(user) : "?";
-
-  function changeTheme(nextPreference: unknown) {
-    if (!isThemePreference(nextPreference)) {
-      return;
-    }
-
-    applyThemePreference(nextPreference);
-    setThemePreference(nextPreference);
-  }
 
   return (
     <>
@@ -642,7 +650,7 @@ function AccountMenu({
                   <DropdownMenuSubContent>
                     <DropdownMenuRadioGroup
                       value={themePreference}
-                      onValueChange={changeTheme}
+                      onValueChange={onThemeChange}
                     >
                       <DropdownMenuRadioItem value="light">
                         {tTheme("options.light")}

@@ -153,6 +153,18 @@ describe("Finance HTTP surface (e2e)", () => {
     const owner = await prisma.user.findUniqueOrThrow({
       where: { id: emilianoId },
     });
+    await prisma.user.update({
+      where: { id: owner.id },
+      data: {
+        loginStatus: "ACTIVE",
+        permissionOverrides: {
+          deleteMany: {},
+          create: v1.access.permissionCatalog
+            .filter((p) => p.key.startsWith("finance."))
+            .map((p) => ({ permissionKey: p.key, scopes: ["ALL"] })),
+        },
+      },
+    });
     ownerToken = (await coreAuth.issueSession({ user: owner })).accessToken;
 
     for (const row of await prisma.ledgerAccount.findMany({
@@ -210,6 +222,9 @@ describe("Finance HTTP surface (e2e)", () => {
     }
 
     if (prisma && createdUserIds.length > 0) {
+      await prisma.userPermissionOverride.deleteMany({
+        where: { userId: { in: createdUserIds } },
+      });
       await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
     }
 
@@ -242,6 +257,20 @@ describe("Finance HTTP surface (e2e)", () => {
     const user = await users.createOne({
       email: `${handle}@example.com`,
       roles,
+      loginStatus: "ACTIVE",
+      isSuperAdmin: roles.includes("SUPER_ADMIN"),
+      permissionOverrides: {
+        create: roles.includes("ADMIN")
+          ? v1.access.permissionCatalog
+              .filter((p) => !p.key.startsWith("portal."))
+              .map((p) => ({
+                permissionKey: p.key,
+                scopes: p.scopes.includes("ALL")
+                  ? ["ALL" as const]
+                  : [...p.scopes],
+              }))
+          : [],
+      },
     });
     createdUserIds.push(user.id);
     return user;

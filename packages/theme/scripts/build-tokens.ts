@@ -88,6 +88,7 @@ const cssColorLines = (colors: Record<string, string>, indent: string) =>
 export function buildCss(): string {
   assertColorContract();
   const lines: string[] = [BANNER, "", ":root {"];
+  lines.push("  color-scheme: light;");
   lines.push(`  --radius: ${pxToRem(radiusBase)};`);
   lines.push(...cssColorLines(semanticColors.light, "  "));
   lines.push("}", "");
@@ -95,15 +96,23 @@ export function buildCss(): string {
   const darkLines = cssColorLines(semanticColors.dark, "    ");
   lines.push("@media (prefers-color-scheme: dark) {");
   lines.push("  :root:not([data-theme='light']) {");
+  lines.push("    color-scheme: dark;");
   lines.push(...darkLines);
   lines.push("  }");
   lines.push("}", "");
   lines.push(":root[data-theme='dark'], .dark {");
+  lines.push("  color-scheme: dark;");
   lines.push(...cssColorLines(semanticColors.dark, "  "));
   lines.push("}", "");
 
   lines.push(":root[data-theme='minimal'], .minimal {");
+  lines.push("  color-scheme: dark;");
   lines.push(...cssColorLines(semanticColors.minimal, "  "));
+  lines.push("}", "");
+
+  lines.push(".access-workspace {");
+  // Colors intentionally inherit the active theme, including runtime overrides.
+  lines.push(`  font-family: ${typography.fontFamily.body.web};`);
   lines.push("}", "");
 
   lines.push("@theme {");

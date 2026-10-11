@@ -1,3 +1,4 @@
+import { canAccess } from "@/lib/access";
 import { ApiError, v1 } from "@repo/api-shared";
 import { messages } from "@repo/i18n";
 import type { Metadata } from "next";
@@ -15,7 +16,6 @@ import { meFromApi } from "@/lib/auth-server";
 import { ScooterEditForm } from "../../_components/ScooterEditForm";
 
 const SCOOTERS_PATH = "/scooters";
-const ADMIN_ROLE = "ADMIN";
 
 interface EditScooterRoutePageProps {
   params: Promise<{ locale: string; id: string }>;
@@ -51,7 +51,7 @@ export default async function EditScooterRoutePage({
     redirect(getLocalizedSignInPath(locale, editPath));
   }
 
-  if (!user.roles.includes(ADMIN_ROLE)) {
+  if (!canAccess(user, "scooters.update")) {
     notFound();
   }
 

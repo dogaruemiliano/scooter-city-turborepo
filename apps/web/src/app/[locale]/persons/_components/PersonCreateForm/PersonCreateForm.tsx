@@ -12,6 +12,9 @@ import { usePersonLeaveGuard } from "./usePersonLeaveGuard";
 import { licenseNameDifferences } from "./license-name-comparison";
 import { LicenseNameConfirmation } from "./LicenseNameConfirmation";
 
+import { useOptionalSession } from "@/components/auth/SessionProvider";
+import { canAccess } from "@/lib/access";
+import { ContactPersonCreateForm } from "./ContactPersonCreateForm";
 import { webApi } from "@/lib/api";
 import { PageHeaderNavigation } from "@/components/PageHeaderNavigation";
 import {
@@ -74,7 +77,17 @@ import type {
   PersonDocumentFormFieldKey,
 } from "./types";
 
-export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
+export function PersonCreateForm(props: PersonCreateFormProps) {
+  const session = useOptionalSession();
+  return canAccess(session?.user, "person_documents.write") ? (
+    <DocumentPersonCreateForm {...props} />
+  ) : (
+    <ContactPersonCreateForm {...props} />
+  );
+}
+
+function DocumentPersonCreateForm({ personsHref }: PersonCreateFormProps) {
+  const session = useOptionalSession();
   const t = useTranslations("persons");
   const locale = useLocale();
   const router = useRouter();
@@ -100,7 +113,11 @@ export function PersonCreateForm({ personsHref }: PersonCreateFormProps) {
     navigation.hasProgress,
     t("leaveForm.confirm"),
   );
-  const extraction = useDocumentExtraction(extractionState, setExtractionState);
+  const extraction = useDocumentExtraction(
+    extractionState,
+    setExtractionState,
+    canAccess(session?.user, "person_documents.extract"),
+  );
   function setForm(
     update: (current: CreatePersonFormState) => CreatePersonFormState,
   ) {

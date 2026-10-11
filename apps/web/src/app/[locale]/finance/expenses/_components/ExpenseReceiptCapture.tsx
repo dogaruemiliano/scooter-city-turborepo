@@ -1,5 +1,8 @@
 "use client";
 
+import { useOptionalSession } from "@/components/auth/SessionProvider";
+import { canAccess } from "@/lib/access";
+
 import { ApiError, v1 } from "@repo/api-shared";
 import {
   BottomSheet,
@@ -46,6 +49,11 @@ export function ExpenseReceiptCapture({
   suppliers,
   currentUserId,
 }: ExpenseReceiptCaptureProps) {
+  const session = useOptionalSession();
+  const canManageSuppliers = canAccess(
+    session?.user,
+    "finance.suppliers.manage",
+  );
   const t = useTranslations("finance.expense.captureSheet");
   const router = useRouter();
   const readyReviewRef = useRef(false);
@@ -117,6 +125,7 @@ export function ExpenseReceiptCapture({
       let valuesToSave = reviewValues;
       const document = reviewValues.documents[0];
       if (
+        canManageSuppliers &&
         !reviewValues.supplierId &&
         document?.supplierName &&
         document.supplierTaxId

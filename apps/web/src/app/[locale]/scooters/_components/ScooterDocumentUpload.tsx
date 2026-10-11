@@ -1,4 +1,8 @@
 "use client";
+
+import { useOptionalSession } from "@/components/auth/SessionProvider";
+import { canAccess } from "@/lib/access";
+
 import { v1 } from "@repo/api-shared";
 import { Button, FormSection } from "@repo/ui/components";
 import {
@@ -68,6 +72,9 @@ export function ScooterDocumentUpload({
 }) {
   const t = useTranslations("scooters.documents");
   const extractionT = useTranslations("scooters.extraction");
+  const user = useOptionalSession()?.user;
+  const canRead = canAccess(user, "scooter_documents.read");
+  const canWrite = canAccess(user, "scooter_documents.write");
   const analysis = useContext(ScooterDocumentAnalysisContext);
   const matchesCategory = (item: {
     type: v1.scooters.ScooterDocumentType;
@@ -137,6 +144,26 @@ export function ScooterDocumentUpload({
       return t("invalidName");
     return null;
   }
+  if (!canRead) return null;
+  if (!canWrite)
+    return (
+      <div className="grid gap-3">
+        {existing.map((document) => (
+          <ScooterFilePreview
+            key={document.id}
+            document={document}
+            disabled={disabled}
+          />
+        ))}
+        {drafts.map((draft) => (
+          <ScooterFilePreview
+            key={draft.id}
+            draft={draft}
+            disabled={disabled}
+          />
+        ))}
+      </div>
+    );
   function remove(id: string) {
     if (existing.some((document) => document.id === id))
       documents.removeExisting(id);
@@ -231,6 +258,9 @@ export function ScooterFilePreview({
 }) {
   const t = useTranslations("scooters.documents");
   const [open, setOpen] = useState(false);
+  const user = useOptionalSession()?.user;
+  const canRead = canAccess(user, "scooter_documents.read");
+  const canWrite = canAccess(user, "scooter_documents.write");
   const fileName = document?.fileName ?? draft!.file.name;
   const type = document?.type ?? draft!.type;
   const labels = useDocumentLabels(type, fileName, compact);
@@ -248,9 +278,10 @@ export function ScooterFilePreview({
       : analysis?.status === "processing"
         ? extractionT("processing")
         : undefined;
+  if (!canRead) return null;
   return (
     <div className="grid min-w-0 content-start gap-2">
-      {onReplace && validate ? (
+      {canWrite && onReplace && validate ? (
         <DocumentInput
           value={{ src: url, fileName, contentType }}
           labels={labels}

@@ -36,6 +36,8 @@ import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { useId, useState, type FormEvent, type ReactNode } from "react";
 
+import { useOptionalSession } from "@/components/auth/SessionProvider";
+import { canAccess } from "@/lib/access";
 import { MoreActionsMenu } from "@/components/MoreActionsMenu";
 import { PageTitleOverride } from "@/components/PageTitleOverride";
 import { webApi } from "@/lib/api";
@@ -69,6 +71,7 @@ export function ScooterDetailPage({
   scootersHref,
 }: ScooterDetailPageProps) {
   const t = useTranslations("scooters");
+  const session = useOptionalSession();
   const locale = useLocale();
   const router = useRouter();
   const [feedback, setFeedback] = useState<Feedback | null>(null);
@@ -161,6 +164,7 @@ export function ScooterDetailPage({
               [
                 {
                   key: "registration",
+                  permission: "scooters.update",
                   label: registrationActionLabel,
                   icon: <PencilIcon data-icon="inline-start" />,
                   disabled: busyAction !== null,
@@ -171,6 +175,7 @@ export function ScooterDetailPage({
                 },
                 {
                   key: "edit",
+                  permission: "scooters.update",
                   label: t("actions.editScooter"),
                   icon: <PencilIcon data-icon="inline-start" />,
                   disabled: busyAction !== null,
@@ -180,6 +185,7 @@ export function ScooterDetailPage({
               [
                 {
                   key: "delete",
+                  permission: "scooters.archive",
                   label: t("actions.deleteScooter"),
                   icon: <Trash2Icon data-icon="inline-start" />,
                   variant: "destructive",
@@ -342,7 +348,9 @@ export function ScooterDetailPage({
       </DetailSection>
 
       <CivDetails scooter={scooter} />
-      <ScooterDocumentList documents={scooter.documents ?? []} />
+      {canAccess(session?.user, "scooter_documents.read") ? (
+        <ScooterDocumentList documents={scooter.documents ?? []} />
+      ) : null}
       <ScooterInsuranceList scooter={scooter} />
       <ScooterRegistrationDialog
         key={`edit-scooter-registration-${registrationDialogKey}`}

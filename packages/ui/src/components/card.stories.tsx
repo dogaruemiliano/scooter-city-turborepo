@@ -81,3 +81,37 @@ export const Small: Story = {
     </Card>
   ),
 };
+
+export const RaisedEditor: Story = {
+  render: () => (
+    <Card as="section" surface="raised" aria-label="Member permissions">
+      <CardHeader>
+        <CardTitle>Edit permissions</CardTitle>
+        <CardDescription>Review member access before saving.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <p className="text-sm text-muted-foreground">
+          Raised surfaces use the shared popover colors and responsive spacing.
+        </p>
+      </CardContent>
+      <CardFooter className="justify-end gap-3">
+        <Button variant="secondary">Cancel</Button>
+        <Button>Save changes</Button>
+      </CardFooter>
+    </Card>
+  ),
+};
+
+export const CompactRows: Story = {
+  render: () => (
+    <Card className="gap-0 py-0">
+      <CardHeader className="border-b py-4">
+        <CardTitle>Recent activity</CardTitle>
+      </CardHeader>
+      <CardContent className="divide-y">
+        <p className="py-3">Scooter service completed</p>
+        <p className="py-3">Rental documents updated</p>
+      </CardContent>
+    </Card>
+  ),
+};

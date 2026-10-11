@@ -16,6 +16,8 @@ export interface TokenPair {
 export interface IssueSessionInput {
   /** Only `id` + `email` + `roles` are read; pass the full row if convenient. */
   user: Pick<User, "id" | "email" | "roles">;
+  /** OTP creation time binds acceptance to the invitation that preceded it. */
+  proofIssuedAt?: Date;
   userAgent?: string | null;
   ip?: string | null;
 }

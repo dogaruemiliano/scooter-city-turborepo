@@ -1,3 +1,4 @@
+import { canAccess } from "@/lib/access";
 import { ApiError, v1 } from "@repo/api-shared";
 import { messages } from "@repo/i18n";
 import type { Metadata } from "next";
@@ -14,7 +15,6 @@ import { meFromApi } from "@/lib/auth-server";
 import { PersonEditForm } from "../../_components/PersonEditForm";
 
 const PERSONS_PATH = "/persons";
-const ADMIN_ROLE = "ADMIN";
 
 interface EditPersonRoutePageProps {
   params: Promise<{ locale: string; id: string }>;
@@ -46,7 +46,7 @@ export default async function EditPersonRoutePage({
     redirect(getLocalizedSignInPath(locale, editPath));
   }
 
-  if (!user.roles.includes(ADMIN_ROLE)) {
+  if (!canAccess(user, "persons.update")) {
     notFound();
   }
 

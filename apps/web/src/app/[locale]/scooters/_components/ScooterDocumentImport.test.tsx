@@ -593,3 +593,7 @@ describe("scooter JSON import feedback", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });
+
+vi.mock("@/components/auth/SessionProvider", () => ({
+  useOptionalSession: () => ({ user: { isSuperAdmin: true } }),
+}));

@@ -1,5 +1,8 @@
 "use client";
 
+import { useOptionalSession } from "@/components/auth/SessionProvider";
+import { canAccess } from "@/lib/access";
+
 import { v1 } from "@repo/api-shared";
 import {
   Badge,
@@ -7,6 +10,7 @@ import {
   BottomSheetBody,
   BottomSheetClose,
   BottomSheetContent,
+  BottomSheetDescription,
   BottomSheetFooter,
   BottomSheetHeader,
   BottomSheetTitle,
@@ -14,8 +18,14 @@ import {
   Button,
 } from "@repo/ui/components";
 import { cn } from "@repo/ui/lib/utils";
-import { CalendarDaysIcon, ChevronRightIcon, PencilIcon } from "lucide-react";
+import {
+  CalendarDaysIcon,
+  ChevronRightIcon,
+  PencilIcon,
+  Trash2Icon,
+} from "lucide-react";
 import { useTranslations } from "next-intl";
+import { useState } from "react";
 
 import {
   documentStatusClasses,
@@ -59,6 +69,8 @@ export function DocumentDetailCard({
   ) => Promise<boolean>;
   onDeletePhoto: (slot: v1.persons.PersonDocumentPhotoSlot) => Promise<boolean>;
 }) {
+  const session = useOptionalSession();
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const t = useTranslations("persons");
   const typeLabel = t(`documentTypes.${document.type}`);
   const statusLabel = t(`documentStatuses.${document.status}`);
@@ -88,9 +100,7 @@ export function DocumentDetailCard({
           <DocumentSummary
             type={document.type}
             number={[
-              document.type === "passport"
-                ? ""
-                : document.series,
+              document.type === "passport" ? "" : document.series,
               document.number,
             ]
               .filter(Boolean)
@@ -224,24 +234,82 @@ export function DocumentDetailCard({
           ) : null}
         </BottomSheetBody>
         <BottomSheetFooter className="sm:flex-row-reverse sm:justify-start">
-          <DocumentFormDialog
-            title={t("detail.dialogs.editDocumentTitle")}
-            triggerLabel={t("actions.editDocument")}
-            triggerIcon={<PencilIcon data-icon="inline-start" />}
-            triggerVariant="default"
-            triggerDisabled={busyAction !== null}
-            document={document}
-            allowedTypes={
-              isDriverLicense ? DRIVER_LICENSE_DOCUMENT_TYPES : undefined
-            }
-            busy={busyAction === `document:update:${document.id}`}
-            deleteBusy={busyAction === `document:delete:${document.id}`}
-            submitMode="update"
-            onSubmit={(input) =>
-              onUpdate(input as v1.persons.UpdatePersonDocumentInput)
-            }
-            onDelete={onDelete}
-          />
+          {canAccess(session?.user, "person_documents.write") ? (
+            <DocumentFormDialog
+              title={t("detail.dialogs.editDocumentTitle")}
+              triggerLabel={t("actions.editDocument")}
+              triggerIcon={<PencilIcon data-icon="inline-start" />}
+              triggerVariant="default"
+              triggerDisabled={busyAction !== null}
+              document={document}
+              allowedTypes={
+                isDriverLicense ? DRIVER_LICENSE_DOCUMENT_TYPES : undefined
+              }
+              busy={busyAction === `document:update:${document.id}`}
+              deleteBusy={busyAction === `document:delete:${document.id}`}
+              submitMode="update"
+              onSubmit={(input) =>
+                onUpdate(input as v1.persons.UpdatePersonDocumentInput)
+              }
+              onDelete={
+                canAccess(session?.user, "person_documents.delete")
+                  ? onDelete
+                  : undefined
+              }
+            />
+          ) : null}
+          {!canAccess(session?.user, "person_documents.write") &&
+          canAccess(session?.user, "person_documents.delete") ? (
+            <BottomSheet open={deleteOpen} onOpenChange={setDeleteOpen}>
+              <BottomSheetTrigger
+                render={
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    disabled={busyAction !== null}
+                  />
+                }
+              >
+                <Trash2Icon data-icon="inline-start" />
+                {t("actions.deleteDocument")}
+              </BottomSheetTrigger>
+              <BottomSheetContent className="lg:w-md">
+                <BottomSheetHeader>
+                  <BottomSheetTitle>
+                    {t("detail.dialogs.deleteDocumentTitle")}
+                  </BottomSheetTitle>
+                  <BottomSheetDescription>
+                    {t("detail.dialogs.deleteDocumentDescription")}
+                  </BottomSheetDescription>
+                </BottomSheetHeader>
+                <BottomSheetFooter>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    disabled={busyAction !== null}
+                    onClick={async () => {
+                      if (await onDelete()) setDeleteOpen(false);
+                    }}
+                  >
+                    {busyAction === `document:delete:${document.id}`
+                      ? t("actions.deleting")
+                      : t("actions.deleteDocument")}
+                  </Button>
+                  <BottomSheetClose
+                    render={
+                      <Button
+                        type="button"
+                        variant="text"
+                        disabled={busyAction !== null}
+                      />
+                    }
+                  >
+                    {t("actions.cancel")}
+                  </BottomSheetClose>
+                </BottomSheetFooter>
+              </BottomSheetContent>
+            </BottomSheet>
+          ) : null}
           <BottomSheetClose render={<Button type="button" variant="text" />}>
             {t("actions.close")}
           </BottomSheetClose>

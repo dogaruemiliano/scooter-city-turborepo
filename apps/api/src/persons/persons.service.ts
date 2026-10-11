@@ -143,17 +143,45 @@ export class PersonsService {
     }
   }
 
-  async list(query: v1.persons.ListPersonsQuery): Promise<{
+  async list(
+    query: v1.persons.ListPersonsQuery,
+    canReadDocuments = true,
+  ): Promise<{
     items: PersonWithDocuments[];
     page: number;
     pageSize: number;
     total: number;
   }> {
-    if (query.search) {
+    if (query.search && canReadDocuments) {
       return this.search(query);
     }
 
     const where = this.toListWhere(query);
+    if (query.search && !canReadDocuments) {
+      where.AND = [
+        ...(Array.isArray(where.AND)
+          ? where.AND
+          : where.AND
+            ? [where.AND]
+            : []),
+        {
+          OR: [
+            "email",
+            "phone",
+            "firstName",
+            "lastName",
+            "cnp",
+            "addressLine1",
+            "addressLine2",
+            "city",
+            "region",
+            "notes",
+          ].map((field) => ({
+            [field]: { contains: query.search, mode: "insensitive" },
+          })),
+        },
+      ];
+    }
     const [total, items] = await this.prisma.$transaction([
       this.prisma.person.count({ where }),
       this.prisma.person.findMany({
@@ -225,6 +253,7 @@ export class PersonsService {
 
   async listAuditEvents(
     personId: string,
+    canReadDocuments = true,
   ): Promise<v1.persons.PersonAuditEvent[]> {
     await this.ensureActivePerson(personId);
 
@@ -232,7 +261,11 @@ export class PersonsService {
       where: {
         targetType: PERSON_AUDIT_TARGET_TYPE,
         targetId: personId,
-        type: { in: [...v1.persons.PERSON_AUDIT_EVENT_TYPES] },
+        type: {
+          in: v1.persons.PERSON_AUDIT_EVENT_TYPES.filter(
+            (type) => canReadDocuments || !type.startsWith("PERSON_DOCUMENT_"),
+          ),
+        },
       },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take: PERSON_AUDIT_EVENT_LIMIT,
@@ -271,15 +304,7 @@ export class PersonsService {
           }),
           include: this.personInclude(),
         });
-        await tx.user.update({
-          where: { id: existing.userId },
-          data: {
-            email: updated.email,
-            phone: updated.phone,
-            firstName: updated.firstName,
-            lastName: updated.lastName,
-          },
-        });
+        // Contact edits never change the linked account's login identity.
 
         await this.recordPersonAudit(tx, {
           type: AuditEventType.PERSON_UPDATED,
@@ -311,6 +336,10 @@ export class PersonsService {
         data: { deletedAt: new Date() },
       });
 
+      await tx.user.update({
+        where: { id: existing.userId },
+        data: { accessRevision: { increment: 1 } },
+      });
       await this.recordPersonAudit(tx, {
         type: AuditEventType.PERSON_DELETED,
         personId: id,
@@ -1000,6 +1029,11 @@ export class PersonsService {
 
     const existingUser = emailUser ?? phoneUser;
     if (existingUser) {
+      if (existingUser.deletedAt !== null) {
+        throw new ConflictException(
+          "A deactivated account cannot be linked to a person",
+        );
+      }
       const existingPerson = await tx.person.findUnique({
         where: { userId: existingUser.id },
       });
@@ -1027,14 +1061,12 @@ export class PersonsService {
         );
       }
 
-      return tx.user.update({
-        where: { id: existingUser.id },
-        data: {
-          phone: existingUser.phone ?? input.phone,
-          firstName: input.firstName,
-          lastName: input.lastName,
-        },
-      });
+      if (!input.linkExistingAccount) {
+        throw new ConflictException(
+          "This email already has an account. Explicitly confirm linking the existing account.",
+        );
+      }
+      return existingUser;
     }
 
     return tx.user.create({
@@ -1043,6 +1075,7 @@ export class PersonsService {
         phone: input.phone,
         firstName: input.firstName,
         lastName: input.lastName,
+        loginStatus: "DISABLED",
       },
     });
   }

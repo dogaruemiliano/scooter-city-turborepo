@@ -6,7 +6,7 @@ import { resolveRouteLocale } from "@/i18n/paths";
 import {
   fetchFinance,
   financeCookieHeader,
-  requireFinanceAdmin,
+  requireFinancePermission,
 } from "../../_lib/finance-server";
 import { FINANCE_PATHS } from "../../_lib/links";
 import { ExpenseReceiptCapture } from "../_components/ExpenseReceiptCapture";
@@ -31,7 +31,11 @@ export default async function NewExpenseRoutePage({
   const locale = resolveRouteLocale(rawLocale);
   const path = FINANCE_PATHS.newExpense;
 
-  const currentUser = await requireFinanceAdmin(locale, path);
+  const currentUser = await requireFinancePermission(
+    locale,
+    path,
+    "finance.expenses.create",
+  );
   const cookieHeader = await financeCookieHeader();
   const [books, accounts, categories, costObjects, suppliers] =
     await Promise.all([

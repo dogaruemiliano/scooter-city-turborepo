@@ -1,5 +1,8 @@
 "use client";
 
+import { useOptionalSession } from "@/components/auth/SessionProvider";
+import { canAccess } from "@/lib/access";
+
 import { PageTitleOverride } from "@/components/PageTitleOverride";
 
 import { ApiError, v1 } from "@repo/api-shared";
@@ -61,6 +64,9 @@ export function ScooterEditor({
 }: ScooterEditorProps) {
   const t = useTranslations("scooters");
   const router = useRouter();
+  const user = useOptionalSession()?.user;
+  const canWriteDocuments = canAccess(user, "scooter_documents.write");
+  const canExtract = canAccess(user, "scooter_documents.extract");
   const [createdBrands, setCreatedBrands] = useState<
     v1.scooterBrands.ScooterBrand[]
   >([]);
@@ -213,6 +219,24 @@ export function ScooterEditor({
     setRequestError(null);
     try {
       const json = scooter ? scooterChangedFields(input, dirtyFields) : input;
+      const payload: v1.scooters.UpdateScooterInput = {
+        ...json,
+        ...documents.payload,
+        ...(input.insurancePolicies?.length
+          ? { insurancePolicies: input.insurancePolicies }
+          : {}),
+        ...(importedRawFields ? { civRawFields: importedRawFields } : {}),
+      };
+      if (!canWriteDocuments) {
+        delete payload.documentDrafts;
+        delete payload.documentExtractions;
+        delete payload.removedDocumentIds;
+        delete payload.insurancePolicies;
+        delete payload.civVersion;
+        delete payload.civIssuedAt;
+        delete payload.civIssuingAuthority;
+        delete payload.civRawFields;
+      }
       await webApi.fetch(
         scooter
           ? v1.scooters.ROUTES.update(scooter.id)
@@ -220,14 +244,7 @@ export function ScooterEditor({
         v1.scooters.scooterSchema,
         {
           method: scooter ? "PATCH" : "POST",
-          json: {
-            ...json,
-            ...documents.payload,
-            ...(input.insurancePolicies?.length
-              ? { insurancePolicies: input.insurancePolicies }
-              : {}),
-            ...(importedRawFields ? { civRawFields: importedRawFields } : {}),
-          },
+          json: payload,
         },
       );
       router.push(returnHref);
@@ -344,7 +361,7 @@ export function ScooterEditor({
   }
 
   async function extractAndContinue() {
-    if (analysis.running || documents.blocked) return;
+    if (!canExtract || analysis.running || documents.blocked) return;
     setAnalysisError(null);
     if (importedCurrentDocuments && !hasFailedAnalysis) {
       if (isWizard) await continueWizard();
@@ -384,9 +401,10 @@ export function ScooterEditor({
             onSubmit={(event) => {
               if (isWizard && !wizard.last) {
                 event.preventDefault();
-                if (wizard.step === "documents" && extraction.sources.length)
-                  void extractAndContinue();
-                else void continueWizard();
+                if (wizard.step === "documents" && extraction.sources.length) {
+                  if (canExtract) void extractAndContinue();
+                  else void continueManually();
+                } else void continueWizard();
                 return;
               }
               void form.handleSubmit(submit, (errors) => {
@@ -559,7 +577,8 @@ export function ScooterEditor({
               ) : null}
               {isWizard && !wizard.last ? (
                 <>
-                  {wizard.step === "documents" &&
+                  {canExtract &&
+                  wizard.step === "documents" &&
                   extraction.sources.length > 0 &&
                   (!importedCurrentDocuments || hasFailedAnalysis) ? (
                     <Button
@@ -587,7 +606,8 @@ export function ScooterEditor({
                     }
                   >
                     {t(
-                      wizard.step === "documents" &&
+                      canExtract &&
+                        wizard.step === "documents" &&
                         extraction.sources.length &&
                         (!importedCurrentDocuments || hasFailedAnalysis)
                         ? analysis.running
@@ -604,7 +624,7 @@ export function ScooterEditor({
                 </>
               ) : (
                 <>
-                  {scooter && extraction.sources.length ? (
+                  {canExtract && scooter && extraction.sources.length ? (
                     <Button
                       type="button"
                       variant="outline"

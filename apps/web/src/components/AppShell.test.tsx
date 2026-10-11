@@ -5,6 +5,7 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
+import { v1 } from "@repo/api-shared";
 import { messages, type SupportedLocale } from "@repo/i18n";
 import { TooltipProvider } from "@repo/ui/components/tooltip";
 import { NextIntlClientProvider } from "next-intl";
@@ -17,6 +18,13 @@ import { PageHeaderNavigation } from "./PageHeaderNavigation";
 import { PageTitleOverride } from "./PageTitleOverride";
 import { SessionProvider } from "./auth/SessionProvider";
 import type { SessionIdentity } from "../lib/auth-types";
+
+const staffScopes = Object.fromEntries(
+  v1.access.permissionCatalog.map((permission) => [
+    permission.key,
+    [...permission.scopes],
+  ]),
+);
 
 class TestPointerEvent extends MouseEvent {
   pointerType: string;
@@ -63,6 +71,8 @@ vi.mock("../i18n/navigation", () => ({
 }));
 
 beforeEach(() => {
+  delete document.documentElement.dataset.theme;
+  document.cookie = "theme=; path=/; max-age=0";
   mocks.apiFetch.mockReset();
   mocks.apiFetch.mockResolvedValue({});
   mocks.pathname = "/";
@@ -248,6 +258,79 @@ describe("AppShell", () => {
     );
   });
 
+  it("keeps the selected theme when the mobile drawer is closed and reopened", async () => {
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: 390,
+    });
+    mocks.pathname = "/en";
+    renderAppShell();
+
+    const trigger = await screen.findByRole("button", {
+      name: "Open navigation",
+    });
+
+    async function openThemeMenu(label: string) {
+      fireEvent.mouseDown(
+        await screen.findByRole("button", { name: "Open account menu" }),
+      );
+      fireEvent.mouseDown(
+        await screen.findByRole("menuitem", {
+          name: new RegExp(`Theme.*${label}`),
+        }),
+      );
+    }
+
+    fireEvent.click(trigger);
+    const drawer = await screen.findByRole("dialog", { name: "Sidebar" });
+    expect(drawer).toHaveClass("bg-popover", "text-popover-foreground");
+    expect(drawer).not.toHaveClass("bg-background");
+    expect(drawer.querySelector(".bg-background")).toBeNull();
+    await openThemeMenu("System");
+    expect(
+      await screen.findByRole("menuitemradio", { name: "System" }),
+    ).toHaveAttribute("aria-checked", "true");
+
+    for (const label of ["Light", "Dark", "Minimal", "System"]) {
+      fireEvent.click(
+        await screen.findByRole("menuitemradio", { name: label }),
+      );
+      const preference = label.toLowerCase();
+      expect(document.documentElement.dataset.theme).toBe(
+        preference === "system" ? undefined : preference,
+      );
+      if (preference === "system") {
+        expect(document.cookie).not.toMatch(/(?:^|;\s*)theme=/);
+      } else {
+        expect(document.cookie).toContain(`theme=${preference}`);
+      }
+
+      // Close the drawer through navigation, then wait for its contents to unmount.
+      const dashboardLink = screen
+        .getAllByRole("link", { name: "Dashboard" })
+        .at(-1)!;
+      dashboardLink.addEventListener(
+        "click",
+        (event) => event.preventDefault(),
+        {
+          once: true,
+        },
+      );
+      fireEvent.click(dashboardLink);
+      await waitFor(() =>
+        expect(
+          screen.queryByRole("button", { name: "Open account menu" }),
+        ).not.toBeInTheDocument(),
+      );
+
+      fireEvent.click(trigger);
+      await openThemeMenu(label);
+      expect(
+        await screen.findByRole("menuitemradio", { name: label }),
+      ).toHaveAttribute("aria-checked", "true");
+    }
+  });
+
   it("closes the mobile drawer when a navigation link is pressed", async () => {
     Object.defineProperty(window, "innerWidth", {
       configurable: true,
@@ -257,7 +340,9 @@ describe("AppShell", () => {
     renderAppShell({
       id: "admin-1",
       email: "admin@example.com",
-      roles: ["ADMIN"],
+      roles: [],
+      isSuperAdmin: false,
+      effectiveScopes: staffScopes,
     });
 
     const trigger = await screen.findByRole("button", {
@@ -292,7 +377,9 @@ describe("AppShell", () => {
     renderAppShell({
       id: "admin-1",
       email: "admin@example.com",
-      roles: ["ADMIN"],
+      roles: [],
+      isSuperAdmin: false,
+      effectiveScopes: staffScopes,
     });
 
     const backButton = await screen.findByRole("button", { name: "Înapoi" });
@@ -316,7 +403,9 @@ describe("AppShell", () => {
     renderAppShell({
       id: "admin-1",
       email: "admin@example.com",
-      roles: ["ADMIN"],
+      roles: [],
+      isSuperAdmin: false,
+      effectiveScopes: staffScopes,
     });
 
     expect(
@@ -554,7 +643,9 @@ describe("AppShell", () => {
     renderAppShell({
       id: "admin-1",
       email: "admin@example.com",
-      roles: ["ADMIN", "SUPER_ADMIN"],
+      roles: [],
+      isSuperAdmin: true,
+      effectiveScopes: staffScopes,
     });
 
     expect(screen.getByRole("link", { name: "Persoane" })).toHaveAttribute(
@@ -597,7 +688,9 @@ describe("AppShell", () => {
     renderAppShell({
       id: "admin-1",
       email: "admin@example.com",
-      roles: ["ADMIN"],
+      roles: [],
+      isSuperAdmin: false,
+      effectiveScopes: staffScopes,
     });
 
     expect(screen.queryByText("Firmă")).not.toBeInTheDocument();
@@ -618,7 +711,9 @@ describe("AppShell", () => {
     renderAppShell({
       id: "admin-1",
       email: "admin@example.com",
-      roles: ["ADMIN"],
+      roles: [],
+      isSuperAdmin: false,
+      effectiveScopes: staffScopes,
     });
 
     expect(
@@ -643,7 +738,9 @@ describe("AppShell", () => {
     const { unmount } = renderAppShell({
       id: "admin-1",
       email: "admin@example.com",
-      roles: ["ADMIN"],
+      roles: [],
+      isSuperAdmin: false,
+      effectiveScopes: staffScopes,
     });
 
     expect(screen.getByText("Page content")).toBeInTheDocument();
@@ -658,7 +755,9 @@ describe("AppShell", () => {
     renderAppShell({
       id: "admin-1",
       email: "admin@example.com",
-      roles: ["ADMIN"],
+      roles: [],
+      isSuperAdmin: false,
+      effectiveScopes: staffScopes,
     });
 
     expect(screen.getByText("Page content")).toBeInTheDocument();
@@ -674,7 +773,9 @@ describe("AppShell", () => {
     const { unmount } = renderAppShell({
       id: "admin-1",
       email: "admin@example.com",
-      roles: ["ADMIN"],
+      roles: [],
+      isSuperAdmin: false,
+      effectiveScopes: staffScopes,
     });
 
     expect(
@@ -687,7 +788,9 @@ describe("AppShell", () => {
     renderAppShell({
       id: "admin-1",
       email: "admin@example.com",
-      roles: ["ADMIN"],
+      roles: [],
+      isSuperAdmin: false,
+      effectiveScopes: staffScopes,
     });
 
     expect(
@@ -705,7 +808,9 @@ describe("AppShell", () => {
     renderAppShell({
       id: "admin-1",
       email: "admin@example.com",
-      roles: ["ADMIN"],
+      roles: [],
+      isSuperAdmin: false,
+      effectiveScopes: staffScopes,
     });
 
     expect(
@@ -719,7 +824,9 @@ describe("AppShell", () => {
     renderAppShell({
       id: "admin-1",
       email: "admin@example.com",
-      roles: ["ADMIN"],
+      roles: [],
+      isSuperAdmin: false,
+      effectiveScopes: staffScopes,
     });
 
     expect(
@@ -733,7 +840,9 @@ describe("AppShell", () => {
     renderAppShell({
       id: "admin-1",
       email: "admin@example.com",
-      roles: ["ADMIN"],
+      roles: [],
+      isSuperAdmin: false,
+      effectiveScopes: staffScopes,
     });
 
     expect(
@@ -747,7 +856,9 @@ describe("AppShell", () => {
     renderAppShell({
       id: "admin-1",
       email: "admin@example.com",
-      roles: ["ADMIN"],
+      roles: [],
+      isSuperAdmin: false,
+      effectiveScopes: staffScopes,
     });
 
     expect(screen.getByRole("link", { name: "Scutere" })).toHaveAttribute(
@@ -762,7 +873,9 @@ describe("AppShell", () => {
     renderAppShell({
       id: "admin-1",
       email: "admin@example.com",
-      roles: ["ADMIN"],
+      roles: [],
+      isSuperAdmin: false,
+      effectiveScopes: staffScopes,
     });
 
     expect(
@@ -777,7 +890,9 @@ describe("AppShell", () => {
       {
         id: "admin-1",
         email: "admin@example.com",
-        roles: ["ADMIN"],
+        roles: [],
+        isSuperAdmin: false,
+        effectiveScopes: staffScopes,
       },
       <>
         <PageTitleOverride title="Ada Lovelace" />
@@ -803,7 +918,9 @@ describe("AppShell", () => {
       {
         id: "admin-1",
         email: "admin@example.com",
-        roles: ["ADMIN"],
+        roles: [],
+        isSuperAdmin: false,
+        effectiveScopes: staffScopes,
       },
       <>
         <PageTitleOverride title="Ada Lovelace" />
@@ -836,6 +953,7 @@ function renderAppShell(
   },
   children: ReactNode = <div>Page content</div>,
 ) {
+  mocks.apiFetch.mockResolvedValue(initialUser);
   const locale: SupportedLocale = mocks.pathname.startsWith("/en")
     ? "en"
     : "ro";

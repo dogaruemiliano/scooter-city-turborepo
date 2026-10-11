@@ -1,3 +1,4 @@
+import { canAccess } from "@/lib/access";
 import { ApiError, v1 } from "@repo/api-shared";
 import { messages } from "@repo/i18n";
 import type { Metadata } from "next";
@@ -15,7 +16,6 @@ import { PersonsPage } from "./_components/PersonsPage";
 
 const PERSONS_PATH = "/persons";
 const PERSONS_NEW_PATH = "/persons/new";
-const ADMIN_ROLE = "ADMIN";
 
 interface PersonsRoutePageProps {
   params: Promise<{ locale: string }>;
@@ -48,7 +48,7 @@ export default async function PersonsRoutePage({
     );
   }
 
-  if (!user.roles.includes(ADMIN_ROLE)) {
+  if (!canAccess(user, "persons.read")) {
     notFound();
   }
 

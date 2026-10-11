@@ -39,4 +39,6 @@ export const emailSizing = { content: 560 } as const;
 /** Viewport-relative sizing for web document editors. */
 export const viewportSizing = {
   documentEditor: "80vw",
+  accessDirectory: "60dvh",
+  accessEditor: "80dvh",
 } as const;
