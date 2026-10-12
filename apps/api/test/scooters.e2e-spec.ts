@@ -2,6 +2,8 @@ import { ImageStorageService } from "../src/image-storage/image-storage.service"
 import { Readable } from "node:stream";
 import { createHash } from "node:crypto";
 import { ScooterDocumentExtractionService } from "../src/scooter-document-extraction/scooter-document-extraction.service";
+import { ScooterDocumentDispatcherService } from "../src/scooter-document-jobs/scooter-document-dispatcher.service";
+import { ScooterDocumentCleanupService } from "../src/scooter-document-jobs/scooter-document-cleanup.service";
 import { ENV } from "../src/config/config.module";
 import type { Env } from "../src/config/env";
 /**
@@ -59,7 +61,13 @@ describe("Scooters HTTP surface (e2e)", () => {
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      // Exercise HTTP admission/persistence without scheduled AWS/provider work.
+      .overrideProvider(ScooterDocumentDispatcherService)
+      .useValue({})
+      .overrideProvider(ScooterDocumentCleanupService)
+      .useValue({})
+      .compile();
     app = moduleRef.createNestApplication();
     app.enableVersioning({ type: VersioningType.URI, defaultVersion: "1" });
     app.use(cookieParser());
@@ -616,14 +624,14 @@ describe("Scooters HTTP surface (e2e)", () => {
         headers: { "Content-Type": "application/pdf" },
         expiresAt: new Date(Date.now() + 60_000),
         uploadTokenExpiresAt: new Date(Date.now() + 86_400_000),
-        maxBytes: 10_485_760,
+        maxBytes: v1.scooters.SCOOTER_DOCUMENT_MAX_BYTES,
       });
     try {
       for (const invalid of [
         { type: "unknown" },
         { contentType: "image/svg+xml" },
         { byteSize: 0 },
-        { byteSize: 10_485_761 },
+        { byteSize: v1.scooters.SCOOTER_DOCUMENT_MAX_BYTES + 1 },
       ]) {
         await req()
           .post(route)
@@ -635,11 +643,19 @@ describe("Scooters HTTP surface (e2e)", () => {
       const result = await req()
         .post(route)
         .set("Cookie", cookie)
-        .send(input)
+        .send({ ...input, byteSize: v1.scooters.SCOOTER_DOCUMENT_MAX_BYTES })
         .expect(201);
+      expect(sign).toHaveBeenCalledWith(
+        expect.objectContaining({
+          byteSize: v1.scooters.SCOOTER_DOCUMENT_MAX_BYTES,
+        }),
+      );
       expect(
-        v1.scooters.scooterDocumentUploadSchema.parse(result.body).uploadToken,
-      ).toBe("signed-token");
+        v1.scooters.scooterDocumentUploadSchema.parse(result.body),
+      ).toMatchObject({
+        uploadToken: "signed-token",
+        maxBytes: v1.scooters.SCOOTER_DOCUMENT_MAX_BYTES,
+      });
       expect(
         await prisma.draftUpload.findUnique({ where: { storageKey } }),
       ).toMatchObject({
@@ -653,12 +669,50 @@ describe("Scooters HTTP surface (e2e)", () => {
     }
   });
 
-  it("extracts only authorized usable drafts without claiming uploads or saving records", async () => {
-    const route = v1.scooters.ROUTES.documents.extract;
+  it("keeps synchronous extraction retired without reading files or invoking AI", async () => {
+    const admin = await freshSession(["ADMIN"]);
+    const read = jest.spyOn(app.get(ImageStorageService), "readDocument");
+    const analyze = jest.spyOn(
+      app.get(ScooterDocumentExtractionService),
+      "analyze",
+    );
+    try {
+      const response = await req()
+        .post(v1.scooters.ROUTES.documents.extract)
+        .set("Cookie", [`access_token=${admin.accessToken}`])
+        .send({
+          sourceId: "legacy-source",
+          source: { kind: "draft", type: "civ", uploadToken: "test-token" },
+        })
+        .expect(503);
+      expect(response.body).toMatchObject({
+        error: { code: "DOCUMENT_EXTRACTION_DISABLED" },
+      });
+      expect(read).not.toHaveBeenCalled();
+      expect(analyze).not.toHaveBeenCalled();
+    } finally {
+      read.mockRestore();
+      analyze.mockRestore();
+    }
+  });
+
+  it("queues only authorized usable drafts without reading files, claiming uploads or saving scooters", async () => {
+    const route = v1.scooters.ROUTES.documents.startExtractionJob;
     const admin = await freshSession(["ADMIN"]);
     const member = await freshSession(["USER"]);
+    const otherAdmin = await freshSession(["ADMIN"]);
     const cookie = [`access_token=${admin.accessToken}`];
-    const input: v1.scooters.AnalyzeScooterDocumentInput = {
+    const otherCookie = [`access_token=${otherAdmin.accessToken}`];
+    const sessionResponse = await req()
+      .post(v1.scooters.ROUTES.documents.createEditorSession)
+      .set("Cookie", cookie)
+      .expect(201);
+    const session = v1.scooters.scooterDocumentEditorSessionSchema.parse(
+      sessionResponse.body,
+    );
+    const input: v1.scooters.StartScooterDocumentExtractionJobInput = {
+      sessionId: session.id,
+      attemptId: crypto.randomUUID(),
       sourceId: "browser-source-id",
       source: { kind: "draft", type: "civ", uploadToken: "test-token" },
     };
@@ -681,70 +735,69 @@ describe("Scooters HTTP surface (e2e)", () => {
       contentType: "image/jpeg" as const,
       byteSize: bytes.length,
       checksumSha256: createHash("sha256").update(bytes).digest("hex"),
-      imageWidth: null,
-      imageHeight: null,
-      pageCount: null,
     };
     const baseline = {
       userId: admin.userId,
+      editorSessionId: session.id,
       purpose: "scooter-document:civ",
-      expiresAt: new Date(Date.now() + 60_000),
+      expiresAt: new Date(Date.now() + 3_600_000),
       claimedAt: null,
       cleanupStartedAt: null,
       checksumSha256: stored.checksumSha256,
     };
-    const {
-      imageWidth: _width,
-      imageHeight: _height,
-      pageCount: _pages,
-      ...metadata
-    } = stored;
-    void _width;
-    void _height;
-    void _pages;
     const draft = await prisma.draftUpload.create({
-      data: { ...metadata, ...baseline },
+      data: { ...stored, ...baseline },
     });
     const storage = app.get(ImageStorageService);
     const verify = jest
       .spyOn(storage, "verifyDocumentUploadToken")
-      .mockReturnValue(stored);
-    const read = jest.spyOn(storage, "readDocument").mockImplementation(() =>
-      Promise.resolve({
-        body: Readable.from([bytes]),
-        contentType: stored.contentType,
-        contentLength: bytes.length,
-      }),
+      .mockReturnValue({
+        ...stored,
+        imageWidth: null,
+        imageHeight: null,
+        pageCount: null,
+      });
+    const read = jest.spyOn(storage, "readDocument");
+    const analyze = jest.spyOn(
+      app.get(ScooterDocumentExtractionService),
+      "analyze",
     );
-    const extractedData = {
-      vin: "L5YAUCZB9H1148984",
-      fields: { powerKw: 1.8 },
-      rawFields: { "P.2": "1,8" },
-    };
-    const analyze = jest
-      .spyOn(app.get(ScooterDocumentExtractionService), "analyze")
-      .mockResolvedValue({ extractedData, issues: [] });
+    const env = app.get<Env>(ENV);
+    const wasEnabled = env.SCOOTER_DOCUMENT_EXTRACTION_JOBS_ENABLED;
     try {
+      env.SCOOTER_DOCUMENT_EXTRACTION_JOBS_ENABLED = false;
+      await req().post(route).set("Cookie", cookie).send(input).expect(503);
+      expect(verify).not.toHaveBeenCalled();
+      env.SCOOTER_DOCUMENT_EXTRACTION_JOBS_ENABLED = true;
       const scooterCount = await prisma.scooter.count();
       const assetCount = await prisma.mediaAsset.count();
       const response = await req()
         .post(route)
         .set("Cookie", cookie)
         .send(input)
-        .expect(200);
-      expect(
-        v1.scooters.scooterDocumentAnalysisSchema.parse(response.body),
-      ).toEqual({
+        .expect(202);
+      const job = v1.scooters.scooterDocumentExtractionJobSchema.parse(
+        response.body,
+      );
+      expect(job).toMatchObject({
         sourceId: input.sourceId,
         documentType: "civ",
-        extractedData,
-        issues: [],
-        reviewRequired: true,
+        status: "queued",
       });
+      expect(job.result).toBeUndefined();
       expect(verify).toHaveBeenCalledWith(
         "test-token",
         `scooter-document:civ:${admin.userId}`,
       );
+      expect(
+        await prisma.scooterDocumentJob.findUniqueOrThrow({
+          where: { id: job.id },
+        }),
+      ).toMatchObject({
+        sessionId: session.id,
+        draftUploadId: draft.id,
+        userId: admin.userId,
+      });
       expect(
         (
           await prisma.draftUpload.findUniqueOrThrow({
@@ -754,8 +807,41 @@ describe("Scooters HTTP surface (e2e)", () => {
       ).toBeNull();
       expect(await prisma.scooter.count()).toBe(scooterCount);
       expect(await prisma.mediaAsset.count()).toBe(assetCount);
-      analyze.mockClear();
-      read.mockClear();
+      const repeated = await req()
+        .post(route)
+        .set("Cookie", cookie)
+        .send(input)
+        .expect(202);
+      expect(
+        v1.scooters.scooterDocumentExtractionJobSchema.parse(repeated.body).id,
+      ).toBe(job.id);
+      expect(
+        await prisma.scooterDocumentJob.count({
+          where: { sessionId: session.id },
+        }),
+      ).toBe(1);
+      const statusRoute = v1.scooters.ROUTES.documents.extractionJob(job.id);
+      await req().get(statusRoute).expect(401);
+      await req().get(statusRoute).set("Cookie", otherCookie).expect(404);
+      const status = await req()
+        .get(statusRoute)
+        .set("Cookie", cookie)
+        .expect(200);
+      expect(
+        v1.scooters.scooterDocumentExtractionJobSchema.parse(status.body),
+      ).toEqual(job);
+      const cancelRoute = v1.scooters.ROUTES.documents.cancelExtractionJob(
+        job.id,
+      );
+      await req().post(cancelRoute).set("Cookie", otherCookie).expect(404);
+      const cancelled = await req()
+        .post(cancelRoute)
+        .set("Cookie", cookie)
+        .expect(200);
+      expect(
+        v1.scooters.scooterDocumentExtractionJobSchema.parse(cancelled.body)
+          .status,
+      ).toBe("cancelled");
       for (const invalid of [
         { expiresAt: new Date(Date.now() - 60_000) },
         { claimedAt: new Date() },
@@ -763,47 +849,59 @@ describe("Scooters HTTP surface (e2e)", () => {
         { userId: member.userId },
         { purpose: "scooter-document:insurance" },
         { checksumSha256: "0".repeat(64) },
+        { editorSessionId: null },
       ]) {
         await prisma.draftUpload.update({
           where: { id: draft.id },
           data: { ...baseline, ...invalid },
         });
-        const rejected = await req()
+        await req()
           .post(route)
           .set("Cookie", cookie)
-          .send(input)
+          .send({ ...input, attemptId: crypto.randomUUID() })
           .expect(400);
-        expect(rejected.body).toMatchObject({
-          error: { code: "DOCUMENT_EXTRACTION_INVALID_SOURCE" },
-        });
       }
-      expect(read).not.toHaveBeenCalled();
-      expect(analyze).not.toHaveBeenCalled();
       await req()
         .post(route)
         .set("Cookie", cookie)
         .send({
-          sourceId: "missing",
+          ...input,
+          attemptId: crypto.randomUUID(),
           source: {
             kind: "saved",
             scooterId: "unrelated",
             documentId: "missing",
           },
         })
-        .expect(400);
+        .expect(404);
       await req()
         .post(route)
         .set("Cookie", cookie)
         .send({
           ...input,
+          attemptId: crypto.randomUUID(),
           source: { ...input.source, url: "https://untrusted.example/file" },
         })
         .expect(400);
+      expect(
+        await prisma.scooterDocumentJob.count({
+          where: { sessionId: session.id },
+        }),
+      ).toBe(1);
+      expect(read).not.toHaveBeenCalled();
+      expect(analyze).not.toHaveBeenCalled();
     } finally {
+      env.SCOOTER_DOCUMENT_EXTRACTION_JOBS_ENABLED = wasEnabled;
       verify.mockRestore();
       read.mockRestore();
       analyze.mockRestore();
+      await prisma.scooterDocumentJob.deleteMany({
+        where: { sessionId: session.id },
+      });
       await prisma.draftUpload.delete({ where: { id: draft.id } });
+      await prisma.scooterDocumentEditorSession.delete({
+        where: { id: session.id },
+      });
     }
   });
 
