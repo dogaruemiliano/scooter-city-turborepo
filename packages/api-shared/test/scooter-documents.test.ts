@@ -9,6 +9,12 @@ const upload = {
 };
 
 test("scooter uploads accept only the supported document types and supported files", () => {
+  assert.ok(
+    v1.scooters.createScooterDocumentUploadSchema.safeParse({
+      ...upload,
+      byteSize: 15 * 1024 * 1024,
+    }).success,
+  );
   for (const type of v1.scooters.SCOOTER_DOCUMENT_TYPES) {
     for (const contentType of v1.scooters.SCOOTER_DOCUMENT_CONTENT_TYPES) {
       assert.ok(
@@ -21,6 +27,8 @@ test("scooter uploads accept only the supported document types and supported fil
     }
   }
   for (const invalid of [
+    { sessionId: "" },
+    { sessionId: "x".repeat(121) },
     { type: "unknown" },
     { contentType: "image/svg+xml" },
     { byteSize: 0 },
@@ -35,6 +43,33 @@ test("scooter uploads accept only the supported document types and supported fil
       false,
     );
   }
+});
+
+test("new upload and save requests bind to a session while legacy inputs remain accepted", () => {
+  const sessionId = "editor-session";
+  assert.equal(
+    v1.scooters.createScooterDocumentUploadSchema.parse({
+      ...upload,
+      sessionId,
+    }).sessionId,
+    sessionId,
+  );
+  assert.equal(
+    v1.scooters.createScooterInputSchema.parse({
+      sessionId,
+      vin: "LXYTCKP05P0000001",
+      brandId: "brand",
+      powertrainType: "electric",
+    }).sessionId,
+    sessionId,
+  );
+  assert.deepEqual(v1.scooters.updateScooterInputSchema.parse({ sessionId }), {
+    sessionId,
+  });
+  assert.equal(
+    v1.scooters.updateScooterInputSchema.safeParse({ sessionId: "" }).success,
+    false,
+  );
 });
 
 test("document-only edits and multi-page drafts are supported without altering scooter fields", () => {

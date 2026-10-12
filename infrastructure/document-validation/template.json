@@ -1,0 +1,231 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Isolated scooter-document validation. References existing storage without changing its lifecycle or bucket policy.",
+  "Parameters": {
+    "StorageBucketName": { "Type": "String", "MinLength": 3 },
+    "StoragePrefix": {
+      "Type": "String",
+      "AllowedPattern": "[A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)*",
+      "Description": "Existing IMAGE_STORAGE_S3_PREFIX without leading/trailing slash."
+    },
+    "CodeBucket": { "Type": "String" },
+    "CodeKey": {
+      "Type": "String",
+      "Description": "Immutable key for the bundled document-validation.zip."
+    },
+    "FunctionName": {
+      "Type": "String",
+      "Default": "scooter-document-validation",
+      "AllowedPattern": "[A-Za-z0-9_-]+"
+    },
+    "KmsKeyArn": {
+      "Type": "String",
+      "Default": "",
+      "Description": "Existing storage CMK ARN if SSE-KMS is enabled."
+    },
+    "MaxDocumentBytes": {
+      "Type": "Number",
+      "Default": 15728640,
+      "MinValue": 1,
+      "MaxValue": 15728640
+    }
+  },
+  "Conditions": {
+    "UsesKms": { "Fn::Not": [{ "Fn::Equals": [{ "Ref": "KmsKeyArn" }, ""] }] }
+  },
+  "Resources": {
+    "ValidationLogs": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "LogGroupName": { "Fn::Sub": "/aws/lambda/${FunctionName}" },
+        "RetentionInDays": 14
+      }
+    },
+    "ValidationRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": { "Service": "lambda.amazonaws.com" },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "validate-scooter-documents",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": ["s3:GetObject"],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:s3:::${StorageBucketName}/${StoragePrefix}/scooter-documents/*"
+                    },
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:s3:::${StorageBucketName}/${StoragePrefix}/extraction-temporary/*"
+                    }
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": "s3:ListBucket",
+                  "Resource": {
+                    "Fn::Sub": "arn:${AWS::Partition}:s3:::${StorageBucketName}"
+                  },
+                  "Condition": {
+                    "StringLike": {
+                      "s3:prefix": [
+                        { "Fn::Sub": "${StoragePrefix}/scooter-documents/*" },
+                        { "Fn::Sub": "${StoragePrefix}/extraction-temporary/*" }
+                      ]
+                    }
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": "s3:PutObject",
+                  "Resource": {
+                    "Fn::Sub": "arn:${AWS::Partition}:s3:::${StorageBucketName}/${StoragePrefix}/extraction-temporary/*"
+                  },
+                  "Condition": { "StringEquals": { "s3:if-none-match": "*" } }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": ["logs:CreateLogStream", "logs:PutLogEvents"],
+                  "Resource": {
+                    "Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${FunctionName}:*"
+                  }
+                },
+                {
+                  "Fn::If": [
+                    "UsesKms",
+                    {
+                      "Effect": "Allow",
+                      "Action": ["kms:Decrypt", "kms:GenerateDataKey"],
+                      "Resource": { "Ref": "KmsKeyArn" },
+                      "Condition": {
+                        "StringEquals": {
+                          "kms:ViaService": {
+                            "Fn::Sub": "s3.${AWS::Region}.${AWS::URLSuffix}"
+                          }
+                        }
+                      }
+                    },
+                    { "Ref": "AWS::NoValue" }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "ValidationFunction": {
+      "Type": "AWS::Lambda::Function",
+      "DependsOn": "ValidationLogs",
+      "Properties": {
+        "FunctionName": { "Ref": "FunctionName" },
+        "Runtime": "nodejs24.x",
+        "Architectures": ["arm64"],
+        "Handler": "index.handler",
+        "Code": {
+          "S3Bucket": { "Ref": "CodeBucket" },
+          "S3Key": { "Ref": "CodeKey" }
+        },
+        "Role": { "Fn::GetAtt": ["ValidationRole", "Arn"] },
+        "MemorySize": 1024,
+        "Timeout": 60,
+        "ReservedConcurrentExecutions": 2,
+        "Environment": {
+          "Variables": {
+            "DOCUMENT_VALIDATION_BUCKET": { "Ref": "StorageBucketName" },
+            "DOCUMENT_VALIDATION_PREFIX": { "Ref": "StoragePrefix" },
+            "DOCUMENT_VALIDATION_MAX_BYTES": { "Ref": "MaxDocumentBytes" },
+            "DOCUMENT_VALIDATION_KMS_KEY_ID": { "Ref": "KmsKeyArn" }
+          }
+        }
+      }
+    },
+    "ApiValidationPolicy": {
+      "Type": "AWS::IAM::ManagedPolicy",
+      "Properties": {
+        "Description": "Attach to the existing API identity; allows validation invocation and tracked snapshot access/cleanup.",
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": "lambda:InvokeFunction",
+              "Resource": { "Fn::GetAtt": ["ValidationFunction", "Arn"] }
+            },
+            {
+              "Effect": "Allow",
+              "Action": ["s3:GetObject", "s3:GetObjectVersion"],
+              "Resource": {
+                "Fn::Sub": "arn:${AWS::Partition}:s3:::${StorageBucketName}/${StoragePrefix}/extraction-temporary/*"
+              }
+            },
+            {
+              "Effect": "Allow",
+              "Action": ["s3:DeleteObject", "s3:DeleteObjectVersion"],
+              "Resource": [
+                {
+                  "Fn::Sub": "arn:${AWS::Partition}:s3:::${StorageBucketName}/${StoragePrefix}/scooter-documents/*"
+                },
+                {
+                  "Fn::Sub": "arn:${AWS::Partition}:s3:::${StorageBucketName}/${StoragePrefix}/extraction-temporary/*"
+                }
+              ]
+            },
+            {
+              "Effect": "Allow",
+              "Action": ["s3:ListBucket", "s3:ListBucketVersions"],
+              "Resource": {
+                "Fn::Sub": "arn:${AWS::Partition}:s3:::${StorageBucketName}"
+              },
+              "Condition": {
+                "StringLike": {
+                  "s3:prefix": [
+                    { "Fn::Sub": "${StoragePrefix}/scooter-documents/*" },
+                    { "Fn::Sub": "${StoragePrefix}/extraction-temporary/*" }
+                  ]
+                }
+              }
+            },
+            {
+              "Fn::If": [
+                "UsesKms",
+                {
+                  "Effect": "Allow",
+                  "Action": ["kms:Decrypt", "kms:GenerateDataKey"],
+                  "Resource": { "Ref": "KmsKeyArn" },
+                  "Condition": {
+                    "StringEquals": {
+                      "kms:ViaService": {
+                        "Fn::Sub": "s3.${AWS::Region}.${AWS::URLSuffix}"
+                      }
+                    }
+                  }
+                },
+                { "Ref": "AWS::NoValue" }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  },
+  "Outputs": {
+    "ValidationFunctionName": { "Value": { "Ref": "ValidationFunction" } },
+    "ApiValidationPolicyArn": { "Value": { "Ref": "ApiValidationPolicy" } },
+    "TemporaryPrefix": {
+      "Value": { "Fn::Sub": "${StoragePrefix}/extraction-temporary/" }
+    }
+  }
+}

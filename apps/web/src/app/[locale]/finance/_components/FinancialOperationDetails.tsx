@@ -21,6 +21,7 @@ import {
   Card,
   Input,
   Label,
+  ListItems,
   Separator,
 } from "@repo/ui/components";
 import { useRouter } from "next/navigation";
@@ -268,12 +269,13 @@ export function FinancialOperationDetails({
       {operation.expense && operation.expense.payments.length > 0 ? (
         <Card className="flex flex-col gap-3 p-4">
           <h2 className="text-base font-medium">{t("sections.payments")}</h2>
-          <ul className="flex flex-col gap-2 text-sm">
-            {operation.expense.payments.map((payment) => (
-              <li
-                key={payment.id}
-                className="flex flex-wrap items-baseline justify-between gap-2"
-              >
+          <ListItems
+            items={operation.expense.payments}
+            getItemKey={(payment) => payment.id}
+            className="gap-2 text-sm"
+            itemClassName="flex flex-wrap items-baseline justify-between gap-2"
+            renderItem={(payment) => (
+              <>
                 <span>
                   {payment.sourceType === "BOOK_ACCOUNT"
                     ? (payment.sourceAccount?.name ??
@@ -290,21 +292,22 @@ export function FinancialOperationDetails({
                 <span className="font-medium tabular-nums">
                   {formatMinorAmount(payment.amountMinor, currency, locale)}
                 </span>
-              </li>
-            ))}
-          </ul>
+              </>
+            )}
+          />
         </Card>
       ) : null}
 
       {operation.allocations.length > 0 ? (
         <Card className="flex flex-col gap-3 p-4">
           <h2 className="text-base font-medium">{t("sections.allocations")}</h2>
-          <ul className="flex flex-col gap-2 text-sm">
-            {operation.allocations.map((allocation) => (
-              <li
-                key={allocation.id}
-                className="flex flex-wrap items-baseline justify-between gap-2"
-              >
+          <ListItems
+            items={operation.allocations}
+            getItemKey={(allocation) => allocation.id}
+            className="gap-2 text-sm"
+            itemClassName="flex flex-wrap items-baseline justify-between gap-2"
+            renderItem={(allocation) => (
+              <>
                 <span>
                   {allocation.type === "COMMON"
                     ? tExpense("allocations.types.COMMON")
@@ -315,18 +318,22 @@ export function FinancialOperationDetails({
                 <span className="font-medium tabular-nums">
                   {formatMinorAmount(allocation.amountMinor, currency, locale)}
                 </span>
-              </li>
-            ))}
-          </ul>
+              </>
+            )}
+          />
         </Card>
       ) : null}
 
       {operation.documents.length > 0 ? (
         <Card className="flex flex-col gap-3 p-4">
           <h2 className="text-base font-medium">{t("sections.documents")}</h2>
-          <ul className="flex flex-col gap-2 text-sm">
-            {operation.documents.map((document) => (
-              <li key={document.id} className="flex flex-col">
+          <ListItems
+            items={operation.documents}
+            getItemKey={(document) => document.id}
+            className="gap-2 text-sm"
+            itemClassName="flex flex-col"
+            renderItem={(document) => (
+              <>
                 <span>
                   {tExpense(`documents.types.${document.type}`)}
                   {document.type === "INVOICE" && document.documentSeries
@@ -344,9 +351,9 @@ export function FinancialOperationDetails({
                     {document.supplierName}
                   </span>
                 ) : null}
-              </li>
-            ))}
-          </ul>
+              </>
+            )}
+          />
         </Card>
       ) : null}
 

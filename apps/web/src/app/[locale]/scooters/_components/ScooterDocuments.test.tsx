@@ -1,4 +1,4 @@
-import { v1 } from "@repo/api-shared";
+import { ApiError, v1 } from "@repo/api-shared";
 import { messages } from "@repo/i18n";
 import {
   render,
@@ -27,7 +27,30 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/api", () => ({
   webApi: {
-    fetch: mocks.api,
+    fetch: async (path: string, ...args: unknown[]) => {
+      if (path === v1.scooters.ROUTES.documents.createEditorSession)
+        return {
+          id: "editor-session",
+          expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
+        };
+      if (
+        path ===
+        v1.scooters.ROUTES.documents.discardEditorSession("editor-session")
+      )
+        return { ok: true };
+      const result = await mocks.api(path, ...args);
+      return path === v1.scooters.ROUTES.documents.startExtractionJob &&
+        result?.extractedData
+        ? {
+            id: `job-${result.sourceId}`,
+            sourceId: result.sourceId,
+            documentType: result.documentType,
+            status: "completed",
+            result,
+            expiresAt: new Date(Date.now() + 300_000).toISOString(),
+          }
+        : result;
+    },
     url: (path: string) => `https://api.example.com${path}`,
   },
 }));
@@ -83,9 +106,12 @@ const scooter: v1.scooters.Scooter = {
   deletedAt: null,
   documents: [existing],
 };
-function renderWithMessages(child: React.ReactNode) {
+function renderWithMessages(
+  child: React.ReactNode,
+  locale: "en" | "ro" = "en",
+) {
   return render(
-    <NextIntlClientProvider locale="en" messages={messages.en}>
+    <NextIntlClientProvider locale={locale} messages={messages[locale]}>
       {child}
     </NextIntlClientProvider>,
   );
@@ -143,7 +169,7 @@ beforeEach(() => {
           method: "PUT",
           headers: { "Content-Type": "application/pdf" },
           expiresAt: "",
-          maxBytes: 10_485_760,
+          maxBytes: 15_728_640,
         }
       : scooter,
   );
@@ -152,6 +178,166 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("Scooter documents", () => {
+  it("shows the actual server size limit in Romanian in a standalone preview", () => {
+    renderWithMessages(
+      <ScooterFilePreview
+        draft={{
+          id: "failed-upload",
+          type: "civ",
+          file: pdf(),
+          status: "failed",
+          uploadError: "uploadLimit",
+          uploadMaxBytes: 10 * 1024 * 1024,
+        }}
+        disabled={false}
+        onReplace={() => undefined}
+        validate={() => null}
+      />,
+      "ro",
+    );
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Serverul acceptă fișiere de maximum 10 MB.",
+    );
+    expect(screen.queryByText("Încărcarea a eșuat")).not.toBeInTheDocument();
+  });
+
+  it("uploads a file above the old 10 MB limit and allows saving", async () => {
+    const browser = userEvent.setup();
+    renderWithMessages(<Harness initial={[]} />);
+    const file = pdf();
+    Object.defineProperty(file, "size", { value: 12 * 1024 * 1024 });
+    await browser.upload(
+      screen.getByLabelText("Add Vehicle identity card (CIV)", {
+        selector: "input",
+      }),
+      file,
+    );
+    await browser.click(
+      within(screen.getByRole("dialog")).getByRole("button", { name: "Save" }),
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Save test" })).toBeEnabled(),
+    );
+    expect(mocks.api).toHaveBeenCalledWith(
+      v1.scooters.ROUTES.documents.createDraftUpload,
+      v1.scooters.scooterDocumentUploadSchema,
+      expect.objectContaining({
+        json: expect.objectContaining({ byteSize: 12 * 1024 * 1024 }),
+      }),
+    );
+    expect(mocks.put).toHaveBeenCalledWith(
+      "https://s3.example.com/upload",
+      expect.objectContaining({ method: "PUT", body: file }),
+    );
+  });
+
+  it.each([
+    [
+      new ApiError(413, "too large", "FILE_TOO_LARGE", {
+        maxBytes: 10 * 1024 * 1024,
+      }),
+      "The server accepts files up to 10 MB.",
+    ],
+    [
+      new ApiError(413, "too large"),
+      "The server rejected this file because it exceeds its upload limit.",
+    ],
+    [
+      new ApiError(503, "private storage details", "IMAGE_STORAGE_UNAVAILABLE"),
+      "File storage is temporarily unavailable.",
+    ],
+    [new TypeError("Failed to fetch"), "The upload connection failed."],
+  ])(
+    "shows actionable upload errors instead of the generic failure: %s",
+    async (error, message) => {
+      mocks.api.mockRejectedValueOnce(error);
+      const browser = userEvent.setup();
+      renderWithMessages(<Harness initial={[]} />);
+      await browser.upload(
+        screen.getByLabelText("Add Vehicle identity card (CIV)", {
+          selector: "input",
+        }),
+        pdf(),
+      );
+      await browser.click(
+        within(screen.getByRole("dialog")).getByRole("button", {
+          name: "Save",
+        }),
+      );
+      expect(await screen.findByRole("alert")).toHaveTextContent(message);
+      expect(screen.getByRole("button", { name: "Save test" })).toBeDisabled();
+      expect(mocks.put).not.toHaveBeenCalled();
+    },
+  );
+
+  it("checks the server's returned upload limit before sending file bytes to S3", async () => {
+    mocks.api.mockResolvedValueOnce({
+      uploadUrl: "https://s3.example.com/upload",
+      uploadToken: "token",
+      method: "PUT",
+      headers: {},
+      maxBytes: 10 * 1024 * 1024,
+    });
+    const browser = userEvent.setup();
+    renderWithMessages(<Harness initial={[]} />);
+    const file = pdf();
+    Object.defineProperty(file, "size", { value: 12 * 1024 * 1024 });
+    await browser.upload(
+      screen.getByLabelText("Add Vehicle identity card (CIV)", {
+        selector: "input",
+      }),
+      file,
+    );
+    await browser.click(
+      within(screen.getByRole("dialog")).getByRole("button", { name: "Save" }),
+    );
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "The server accepts files up to 10 MB.",
+    );
+    expect(mocks.put).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["queued", "Waiting to analyze…"],
+    ["validating", "Preparing document…"],
+    ["running", "Analyzing document…"],
+  ] as const)("announces %s in the grouped upload preview", (phase, label) => {
+    renderWithMessages(
+      <ScooterDocumentAnalysisContext
+        value={{ doc: { status: "processing", phase } }}
+      >
+        <Harness />
+      </ScooterDocumentAnalysisContext>,
+    );
+    expect(
+      within(screen.getByRole("button", { name: "Preview old.pdf" })).getByText(
+        label,
+      ),
+    ).toHaveClass("sr-only");
+  });
+  it("shows restart guidance for closed sessions without an upload retry loop", async () => {
+    mocks.api.mockRejectedValueOnce(
+      new ApiError(400, "closed", "DOCUMENT_EDITOR_SESSION_UNAVAILABLE"),
+    );
+    const browser = userEvent.setup();
+    renderWithMessages(<Harness initial={[]} />);
+    await browser.upload(
+      screen.getByLabelText("Add Vehicle identity card (CIV)", {
+        selector: "input",
+      }),
+      pdf(),
+    );
+    await browser.click(
+      within(screen.getByRole("dialog")).getByRole("button", { name: "Save" }),
+    );
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      messages.en.scooters.documents.sessionExpired,
+    );
+    expect(
+      screen.queryByRole("button", { name: "Retry upload" }),
+    ).not.toBeInTheDocument();
+    expect(mocks.put).not.toHaveBeenCalled();
+  });
   it("uses the shared preview corner indicator during extraction without adding status text below it", () => {
     renderWithMessages(
       <ScooterDocumentAnalysisContext value={{ doc: { status: "processing" } }}>
@@ -171,7 +357,7 @@ describe("Scooter documents", () => {
     );
     const defaultRequest = mocks.api.getMockImplementation()!;
     mocks.api.mockImplementation(async (path, schema, options) => {
-      if (path !== v1.scooters.ROUTES.documents.extract)
+      if (path !== v1.scooters.ROUTES.documents.startExtractionJob)
         return defaultRequest(path, schema, options);
       const { sourceId, source } = options.json;
       return {
@@ -236,9 +422,16 @@ describe("Scooter documents", () => {
     }
     expect(
       mocks.api.mock.calls.filter(
-        ([path]) => path === v1.scooters.ROUTES.documents.extract,
+        ([path]) => path === v1.scooters.ROUTES.documents.startExtractionJob,
       ),
     ).toHaveLength(0);
+    expect(
+      mocks.api.mock.calls
+        .filter(
+          ([path]) => path === v1.scooters.ROUTES.documents.createDraftUpload,
+        )
+        .every(([, , options]) => options.json.sessionId === "editor-session"),
+    ).toBe(true);
     await browser.click(
       screen.getByRole("button", { name: "Extract and continue" }),
     );
@@ -274,7 +467,7 @@ describe("Scooter documents", () => {
     await browser.click(screen.getByRole("button", { name: "Continue" }));
     expect(
       mocks.api.mock.calls.filter(
-        ([path]) => path === v1.scooters.ROUTES.documents.extract,
+        ([path]) => path === v1.scooters.ROUTES.documents.startExtractionJob,
       ),
     ).toHaveLength(3);
     expect(
@@ -284,6 +477,9 @@ describe("Scooter documents", () => {
     ).toHaveLength(0);
     await browser.click(screen.getByRole("button", { name: "Create scooter" }));
     await waitFor(() => expect(mocks.push).toHaveBeenCalledWith("/scooters"));
+    expect(mocks.api.mock.calls.at(-1)![2].json.sessionId).toBe(
+      "editor-session",
+    );
     const payload = mocks.api.mock.calls.at(-1)![2].json;
     expect(payload.requiredLicenseCategory).toBe("none");
     expect(
@@ -301,7 +497,7 @@ describe("Scooter documents", () => {
   it("requires explicit verification when direct AI cannot read a VIN", async () => {
     const defaultRequest = mocks.api.getMockImplementation()!;
     mocks.api.mockImplementation(async (path, schema, options) => {
-      if (path !== v1.scooters.ROUTES.documents.extract)
+      if (path !== v1.scooters.ROUTES.documents.startExtractionJob)
         return defaultRequest(path, schema, options);
       return {
         sourceId: options.json.sourceId,
@@ -350,7 +546,7 @@ describe("Scooter documents", () => {
     expect(screen.getByLabelText("Color")).toHaveValue("White");
     expect(
       mocks.api.mock.calls.filter(
-        ([path]) => path === v1.scooters.ROUTES.documents.extract,
+        ([path]) => path === v1.scooters.ROUTES.documents.startExtractionJob,
       ),
     ).toHaveLength(1);
   });
@@ -900,7 +1096,7 @@ describe("Scooter documents", () => {
     Object.defineProperty(file, "size", { value: 20_000_000 });
     fireEvent.change(input, { target: { files: [file] } });
     expect(screen.getByRole("alert")).toHaveTextContent(
-      "The file is too large. Maximum size: 10 MB.",
+      "The file is too large. Maximum size: 15 MB.",
     );
     expect(mocks.api).not.toHaveBeenCalled();
   });
@@ -927,7 +1123,10 @@ describe("Scooter documents", () => {
       expect(mocks.api).toHaveBeenCalledWith(
         v1.scooters.ROUTES.update("s"),
         v1.scooters.scooterSchema,
-        { method: "PATCH", json: { removedDocumentIds: ["doc"] } },
+        {
+          method: "PATCH",
+          json: { sessionId: "editor-session", removedDocumentIds: ["doc"] },
+        },
       ),
     );
   });
@@ -970,6 +1169,7 @@ describe("Scooter documents", () => {
       {
         method: "PATCH",
         json: {
+          sessionId: "editor-session",
           documentDrafts: [
             { type: "civ", fileName: "CIV.pdf", uploadToken: "token" },
           ],

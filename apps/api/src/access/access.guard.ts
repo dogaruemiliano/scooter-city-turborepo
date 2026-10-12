@@ -40,22 +40,38 @@ export class AccessGuard implements CanActivate {
       return true;
     }
     const ability = createAbility(snapshot);
-    const keys = [...policy.keys];
+    const allowed = (key: (typeof policy.keys)[number]) =>
+      ability.can(key, subjectFor(key)) &&
+      (!policy.scope ||
+        snapshot.isSuperAdmin ||
+        snapshot.effectiveScopes[key]?.includes(policy.scope));
+    if (
+      policy.match === "any"
+        ? !policy.keys.some(allowed)
+        : !policy.keys.every(allowed)
+    )
+      throw new ForbiddenException("Permission required");
+    // Alternative entry permissions never turn nested write grants into alternatives.
+    const keys: typeof policy.keys = [];
     // Domain writes can carry nested documents; they require independent authority.
     const body = req.body ?? {};
     if (
-      keys.includes("persons.read") &&
+      policy.keys.includes("persons.read") &&
       Object.keys(req.query ?? {}).some((k) => k.startsWith("document"))
     )
       keys.push("person_documents.read");
     if (
-      keys.some((k) => k === "persons.create" || k === "persons.update") &&
+      policy.keys.some(
+        (k) => k === "persons.create" || k === "persons.update",
+      ) &&
       Array.isArray(body.documents) &&
       body.documents.length
     )
       keys.push("person_documents.write");
     if (
-      keys.some((k) => k === "scooters.create" || k === "scooters.update") &&
+      policy.keys.some(
+        (k) => k === "scooters.create" || k === "scooters.update",
+      ) &&
       [
         "documentDrafts",
         "documentExtractions",
@@ -69,13 +85,7 @@ export class AccessGuard implements CanActivate {
     )
       keys.push("scooter_documents.write");
     for (const key of keys) {
-      if (
-        !ability.can(key, subjectFor(key)) ||
-        (policy.scope &&
-          !snapshot.isSuperAdmin &&
-          !snapshot.effectiveScopes[key]?.includes(policy.scope))
-      )
-        throw new ForbiddenException("Permission required");
+      if (!allowed(key)) throw new ForbiddenException("Permission required");
     }
     return true;
   }

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 
-import { Alert, AlertDescription, Button } from "@repo/ui/components";
+import { ListLoadMore } from "@repo/ui/components/list";
 import { useTranslations } from "next-intl";
 
 const PREFETCH_ROOT_MARGIN = "400px 0px";
@@ -46,37 +46,17 @@ export function InfiniteListFooter({
     return () => observer.disconnect();
   }, [error, hasMore, loading, onLoadMore]);
 
-  if (!hasMore && !error) {
-    return null;
-  }
-
   return (
-    <div className="flex flex-col items-center gap-3 py-2" aria-live="polite">
+    <ListLoadMore
+      hasMore={hasMore}
+      loading={loading}
+      error={error}
+      onLoadMore={() => void onLoadMore()}
+      loadingLabel={t("status.loading")}
+      loadMoreLabel={t("actions.loadMore")}
+      retryLabel={t("actions.retry")}
+    >
       <div ref={sentinelRef} aria-hidden="true" className="h-px w-full" />
-      {error ? (
-        <Alert variant="destructive" className="w-full max-w-md">
-          <AlertDescription>{error}</AlertDescription>
-          <div className="mt-3 flex justify-end">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => void onLoadMore()}
-            >
-              {t("actions.retry")}
-            </Button>
-          </div>
-        </Alert>
-      ) : loading ? (
-        <p className="text-sm text-muted-foreground">{t("status.loading")}</p>
-      ) : (
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => void onLoadMore()}
-        >
-          {t("actions.loadMore")}
-        </Button>
-      )}
-    </div>
+    </ListLoadMore>
   );
 }

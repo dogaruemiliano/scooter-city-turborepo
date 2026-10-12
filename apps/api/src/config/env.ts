@@ -91,7 +91,7 @@ export const envSchema = z
       .number()
       .int()
       .positive()
-      .default(10 * 1024 * 1024)
+      .default(15 * 1024 * 1024)
       .describe("Maximum accepted image upload size in bytes."),
     IMAGE_STORAGE_S3_BUCKET: z
       .string()
@@ -214,6 +214,33 @@ export const envSchema = z
       .default(90_000)
       .describe(
         "Scooter-document extraction request timeout in milliseconds, capped at 90000 for full-resolution documents. Requests are not automatically retried.",
+      ),
+    SCOOTER_DOCUMENT_EXTRACTION_JOBS_ENABLED: boolFromString
+      .default(false)
+      .describe(
+        "Enable direct-S3 background scooter extraction. Production requires validation Lambda and an OpenAI webhook. Development can use isolated local validation and provider polling. Cleanup continues when disabled.",
+      ),
+    SCOOTER_DOCUMENT_VALIDATION_DRIVER: z
+      .enum(["lambda", "local"])
+      .default("lambda")
+      .describe(
+        "Document validation executor. Use lambda in production; local runs the same validator in a separate bounded Node process for development.",
+      ),
+    SCOOTER_DOCUMENT_VALIDATION_FUNCTION_NAME: z
+      .string()
+      .trim()
+      .min(1)
+      .optional()
+      .describe(
+        "AWS Lambda function name or ARN for isolated scooter document validation.",
+      ),
+    SCOOTER_DOCUMENT_EXTRACTION_WEBHOOK_SECRET: z
+      .string()
+      .trim()
+      .min(1)
+      .optional()
+      .describe(
+        "Server-only OpenAI webhook signing secret for scooter extraction events.",
       ),
 
     /* JWT ----------------------------------------------------------------- */
@@ -489,6 +516,30 @@ export const envSchema = z
       "SCOOTER_DOCUMENT_EXTRACTION_OPENAI_API_KEY",
       "SCOOTER_DOCUMENT_EXTRACTION_DRIVER=openai",
     );
+    requireIf(
+      v.SCOOTER_DOCUMENT_EXTRACTION_JOBS_ENABLED &&
+        v.SCOOTER_DOCUMENT_EXTRACTION_DRIVER === "openai" &&
+        v.SCOOTER_DOCUMENT_VALIDATION_DRIVER === "lambda",
+      "SCOOTER_DOCUMENT_VALIDATION_FUNCTION_NAME",
+      "SCOOTER_DOCUMENT_EXTRACTION_JOBS_ENABLED=true",
+    );
+    requireIf(
+      v.SCOOTER_DOCUMENT_EXTRACTION_JOBS_ENABLED &&
+        v.SCOOTER_DOCUMENT_EXTRACTION_DRIVER === "openai" &&
+        v.NODE_ENV === "production",
+      "SCOOTER_DOCUMENT_EXTRACTION_WEBHOOK_SECRET",
+      "SCOOTER_DOCUMENT_EXTRACTION_JOBS_ENABLED=true",
+    );
+    if (
+      v.NODE_ENV === "production" &&
+      v.SCOOTER_DOCUMENT_VALIDATION_DRIVER === "local"
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["SCOOTER_DOCUMENT_VALIDATION_DRIVER"],
+        message: "Local document validation cannot be used in production.",
+      });
+    }
     if (
       v.NODE_ENV === "production" &&
       v.SCOOTER_DOCUMENT_EXTRACTION_DRIVER === "fake"

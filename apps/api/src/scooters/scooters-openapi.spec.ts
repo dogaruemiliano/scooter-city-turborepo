@@ -3,7 +3,8 @@ import { CivVocabularyController } from "./civ-vocabulary.controller";
 import { CivVocabularyService } from "./civ-vocabulary.service";
 import { ScooterDocumentsService } from "./scooter-documents.service";
 import { ScooterDocumentsController } from "./scooter-documents.controller";
-import { ScooterDocumentAnalysisService } from "./scooter-document-analysis.service";
+import { ScooterDocumentJobsController } from "../scooter-document-jobs/scooter-document-jobs.controller";
+import { ScooterDocumentJobsService } from "../scooter-document-jobs/scooter-document-jobs.service";
 import { Test } from "@nestjs/testing";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { cleanupOpenApiDoc } from "nestjs-zod";
@@ -17,6 +18,7 @@ describe("Scooter OpenAPI document", () => {
       controllers: [
         ScootersController,
         ScooterDocumentsController,
+        ScooterDocumentJobsController,
         CivVocabularyController,
       ],
       providers: [
@@ -24,7 +26,7 @@ describe("Scooter OpenAPI document", () => {
         { provide: CivVocabularyService, useValue: {} },
         { provide: ScootersService, useValue: {} },
         { provide: ScooterDocumentsService, useValue: {} },
-        { provide: ScooterDocumentAnalysisService, useValue: {} },
+        { provide: ScooterDocumentJobsService, useValue: {} },
       ],
     }).compile();
     const app = module.createNestApplication();
@@ -37,7 +39,14 @@ describe("Scooter OpenAPI document", () => {
       expect(document.paths["/vehicle-civ/vocabulary"].get).toBeDefined();
       expect(document.paths["/scooters/{id}"].patch).toBeDefined();
       expect(
-        document.paths["/scooters/document-extraction"].post?.responses[200],
+        document.paths["/scooters/document-extraction"].post?.responses[503],
+      ).toBeDefined();
+      expect(
+        document.paths["/scooters/document-extraction"].post?.deprecated,
+      ).toBe(true);
+      expect(
+        document.paths["/scooters/document-extraction-jobs"].post
+          ?.responses[202],
       ).toBeDefined();
       expect(
         document.components?.schemas?.AnalyzeScooterDocumentInput,

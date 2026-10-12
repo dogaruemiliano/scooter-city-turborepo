@@ -218,9 +218,12 @@ export function ScooterEditor({
     submitting.current = true;
     setRequestError(null);
     try {
+      const sessionId = await documents.ensureSession();
+      documents.beginSave();
       const json = scooter ? scooterChangedFields(input, dirtyFields) : input;
       const payload: v1.scooters.UpdateScooterInput = {
         ...json,
+        sessionId,
         ...documents.payload,
         ...(input.insurancePolicies?.length
           ? { insurancePolicies: input.insurancePolicies }
@@ -247,9 +250,15 @@ export function ScooterEditor({
           json: payload,
         },
       );
+      documents.saved();
       router.push(returnHref);
       router.refresh();
     } catch (error) {
+      documents.saveFailed();
+      if (documents.handleSessionError(error)) {
+        setRequestError(t("feedback.sessionExpired"));
+        return;
+      }
       const serverErrors = scooterServerFieldErrors(error, t);
       if (Object.keys(serverErrors).length) {
         const errors: FieldErrors<ScooterEditorValues> = {};
@@ -433,7 +442,11 @@ export function ScooterEditor({
                   ? "feedback.updateErrorTitle"
                   : "feedback.createErrorTitle",
               )}
-              message={requestError}
+              message={
+                documents.sessionUnavailable
+                  ? t("feedback.sessionExpired")
+                  : requestError
+              }
             />
             <ScooterDocumentAnalysisContext value={analysis.entries}>
               <ScooterImportReviewProvider
@@ -551,6 +564,15 @@ export function ScooterEditor({
               </p>
             ) : null}
             <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              {analysis.running ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={analysis.cancel}
+                >
+                  {t("extraction.cancel")}
+                </Button>
+              ) : null}
               <Link
                 href={returnHref}
                 className={buttonVariants({ variant: "outline" })}

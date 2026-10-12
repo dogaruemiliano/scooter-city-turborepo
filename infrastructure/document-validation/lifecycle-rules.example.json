@@ -1,0 +1,22 @@
+{
+  "Rules": [
+    {
+      "ID": "scooter-extraction-temporary-expiry",
+      "Status": "Enabled",
+      "Filter": {
+        "Prefix": "REPLACE_WITH_STORAGE_PREFIX/extraction-temporary/"
+      },
+      "Expiration": { "Days": 1 },
+      "NoncurrentVersionExpiration": { "NoncurrentDays": 1 },
+      "AbortIncompleteMultipartUpload": { "DaysAfterInitiation": 1 }
+    },
+    {
+      "ID": "scooter-extraction-temporary-delete-markers",
+      "Status": "Enabled",
+      "Filter": {
+        "Prefix": "REPLACE_WITH_STORAGE_PREFIX/extraction-temporary/"
+      },
+      "Expiration": { "ExpiredObjectDeleteMarker": true }
+    }
+  ]
+}

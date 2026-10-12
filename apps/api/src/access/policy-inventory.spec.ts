@@ -17,6 +17,7 @@ const policyNames = new Set([
   "SelfService",
   "RequirePermissions",
   "RequireAllScope",
+  "RequireAnyAllScope",
   "RequireSuperAdmin",
 ]);
 function decorators(node: ts.Node) {

@@ -13,7 +13,7 @@ export const SCOOTER_DOCUMENT_MAX_PAGES =
 
 /** Verify originals, preparing a lossless analysis copy only for passwordless encrypted PDFs. */
 export async function readScooterDocumentSource(
-  storage: ImageStorageService,
+  storage: Pick<ImageStorageService, "readDocument">,
   source: StoredDocument,
   maxBytes: number,
   signal?: AbortSignal,
@@ -140,7 +140,7 @@ export async function readScooterDocumentSource(
   }
 }
 
-async function prepareDocumentBytes(
+export async function prepareDocumentBytes(
   bytes: Buffer,
   contentType: string,
   maxBytes: number,

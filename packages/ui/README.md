@@ -75,3 +75,45 @@ All surfaces, selection tones, focus rings, and disabled states inherit semantic
 theme tokens. Keep permission catalogs, roles, translated copy, and API calls in
 the feature that uses these controls. Storybook contains examples of each control
 and both standard and raised cards.
+
+## Collection pages
+
+Use `ListLayout` and `ListItems` for new browsing lists. The layout keeps Filters
+on the left, the permitted primary action on the right, and search underneath.
+Pass `filters`, `action`, `search`, `summary`, and `footer` only when meaningful;
+read-only lists do not need placeholder controls.
+
+`ListItems<T>` accepts `items`, `getItemKey`, `renderItem`, and an optional `empty`
+element. It supplies the list and item semantics and consistent vertical spacing;
+the renderer supplies a feature-specific card or row, not another `<li>`. Use
+`ordered` for chronological sequences. Financial tables can remain semantic
+`Table` elements inside `ListLayout` instead of becoming invalid list children.
+
+`ListFilterSheet<T>` accepts applied `value`, `defaultValue`, translated labels,
+`appliedCount`, and `onApply`. Its children receive `{ value, setValue }` for the
+draft. Update drafts immutably. Opening copies the applied value; Reset replaces
+only the draft; Cancel/Escape/swipe discard it. Only Apply calls `onApply`. Return
+`false` or reject to keep the draft open after failure; supply `applyErrorLabel`
+for localized feedback. Submission is guarded against duplicates.
+
+Use `SheetSelect` (or `CountrySheetSelect`) for choice fields inside filters.
+It opens a secondary sheet, returns selection to the parent draft, and closes
+only the secondary sheet. Supply visible labels and localized option-search,
+clear, empty, and close copy. Do not rely on FormData for SheetSelect values.
+
+Use `ListEmpty`, `ListStatus`, `ListPagination`, and `ListLoadMore` for collection
+states and footer presentation. Distinguish an empty collection from no matches,
+initial loading from refreshing visible records, and stale results after an
+error. `ListPagination` supports callbacks or ordinary hrefs. The web app's
+`InfiniteListFooter` owns its observer and delegates presentation to `ListLoadMore`.
+
+These primitives do not fetch data or know about routing, permissions, schemas,
+or translations. Server routes can compose `ListLayout`/`ListItems` directly and
+render a small client filter island. Keep render callbacks within one rendering
+boundary; do not pass functions from a Server Component to a Client Component.
+Feature items and filters belong in their route's `_components` folder.
+
+Storybook **Collections/List** demonstrates custom/expandable items, nested
+selection, search, paging, read-only lists, empty/loading/error states, and a
+financial table. Implementation coverage and exceptions are recorded in
+[`docs/plan/shared-list-layout.md`](../../docs/plan/shared-list-layout.md).

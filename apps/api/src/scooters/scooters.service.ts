@@ -14,6 +14,7 @@ import { toDateOnlyDate, toDateOnlyString } from "../common/dates/date-only";
 import type { Prisma, Scooter } from "../generated/prisma/client";
 import { Prisma as PrismaRuntime } from "../generated/prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
+import { editorSaveFingerprint } from "../scooter-document-jobs/document-job-lifecycle";
 
 const scooterInclude = {
   brand: true,
@@ -82,6 +83,8 @@ export class ScootersService {
     this.assertValidPowertrain(input.powertrainType, input);
 
     try {
+      const replay = await this.completedEditorSave(input, userId);
+      if (replay) return replay;
       const data = this.toCreateData(input);
       await this.assertActivePlateAvailable(data.registrationNumberNormalized);
 
@@ -107,7 +110,16 @@ export class ScootersService {
             scooter.vin,
             input.insurancePolicies,
           );
-        await this.documents.apply(tx, scooter.id, prepared, [], userId);
+        await this.documents.apply(
+          tx,
+          scooter.id,
+          prepared,
+          [],
+          userId,
+          [],
+          input.sessionId,
+          editorSaveFingerprint(input),
+        );
         await this.civVocabulary.remember(tx, input);
         return input.insurancePolicies?.length
           ? tx.scooter.findUniqueOrThrow({
@@ -117,6 +129,8 @@ export class ScootersService {
           : scooter;
       });
     } catch (error) {
+      const replay = await this.completedEditorSave(input, userId);
+      if (replay) return replay;
       this.handleWriteError(error);
     }
   }
@@ -212,6 +226,8 @@ export class ScootersService {
     userId?: string,
   ): Promise<ScooterWithBrand> {
     try {
+      const replay = await this.completedEditorSave(input, userId, id);
+      if (replay) return replay;
       const existing = await this.prisma.scooter.findFirst({
         where: { id, deletedAt: null },
       });
@@ -275,6 +291,8 @@ export class ScootersService {
           input.removedDocumentIds,
           userId,
           input.documentExtractions,
+          input.sessionId,
+          editorSaveFingerprint(input),
         );
         await this.civVocabulary.remember(tx, input);
         return input.insurancePolicies?.length
@@ -285,8 +303,33 @@ export class ScootersService {
           : scooter;
       });
     } catch (error) {
+      const replay = await this.completedEditorSave(input, userId, id);
+      if (replay) return replay;
       this.handleWriteError(error);
     }
+  }
+
+  private async completedEditorSave(
+    input: { sessionId?: string },
+    userId?: string,
+    scooterId?: string,
+  ): Promise<ScooterWithBrand | null> {
+    if (!input.sessionId || !userId) return null;
+    const session = await this.prisma.scooterDocumentEditorSession.findFirst({
+      where: { id: input.sessionId, userId },
+    });
+    if (!session?.scooterId || !session.saveFingerprint) return null;
+    if (
+      session.saveFingerprint !== editorSaveFingerprint(input) ||
+      (scooterId && session.scooterId !== scooterId)
+    )
+      throw new BadRequestException(
+        "This editor session already saved a different request.",
+      );
+    const scooter = await this.findActiveById(session.scooterId);
+    if (!scooter)
+      throw new NotFoundException("Previously saved scooter is unavailable.");
+    return scooter;
   }
 
   async softDelete(id: string): Promise<void> {

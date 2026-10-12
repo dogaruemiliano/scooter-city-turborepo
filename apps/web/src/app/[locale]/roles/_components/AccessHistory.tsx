@@ -1,5 +1,6 @@
 "use client";
 import { useCallback } from "react";
+import { ListItems, ListEmpty } from "@repo/ui/components/list";
 import { v1 } from "@repo/api-shared";
 import { useLocale, useTranslations } from "next-intl";
 import { webApi } from "@/lib/api";
@@ -20,10 +21,14 @@ export function AccessHistory({ path }: { path: string }) {
       <h2 className="text-lg font-semibold">{t("access.audit")}</h2>
       {!remote.data ? (
         <RemoteState error={remote.error} retry={remote.reload} />
-      ) : remote.data.items.length ? (
-        <ol className="divide-y">
-          {remote.data.items.map((event) => (
-            <li key={event.id} className="flex flex-col gap-2 py-3">
+      ) : (
+        <ListItems
+          ordered
+          items={remote.data.items}
+          getItemKey={(event) => event.id}
+          empty={<ListEmpty>{t("access.noAudit")}</ListEmpty>}
+          renderItem={(event) => (
+            <div className="flex flex-col gap-2">
               <div className="flex flex-wrap justify-between gap-3">
                 <span className="font-medium">
                   {event.type.replaceAll("_", " ").toLowerCase()}
@@ -43,11 +48,9 @@ export function AccessHistory({ path }: { path: string }) {
                   {JSON.stringify(event.meta, null, 2)}
                 </pre>
               </details>
-            </li>
-          ))}
-        </ol>
-      ) : (
-        <p className="text-sm text-muted-foreground">{t("access.noAudit")}</p>
+            </div>
+          )}
+        />
       )}
     </section>
   );

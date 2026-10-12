@@ -8,6 +8,7 @@ export type AccessPolicy =
       kind: "permissions";
       keys: v1.access.PermissionKey[];
       scope?: v1.access.PermissionScope;
+      match?: "any";
     };
 export const SelfService = () =>
   SetMetadata(ACCESS_POLICY, { kind: "self" } satisfies AccessPolicy);
@@ -23,4 +24,15 @@ export const RequireAllScope = (...keys: v1.access.PermissionKey[]) =>
     kind: "permissions",
     keys,
     scope: "ALL",
+  } satisfies AccessPolicy);
+/** For shared editor infrastructure; domain mutations still enforce their own grants. */
+export const RequireAnyAllScope = (
+  first: v1.access.PermissionKey,
+  ...rest: v1.access.PermissionKey[]
+) =>
+  SetMetadata(ACCESS_POLICY, {
+    kind: "permissions",
+    keys: [first, ...rest],
+    scope: "ALL",
+    match: "any",
   } satisfies AccessPolicy);

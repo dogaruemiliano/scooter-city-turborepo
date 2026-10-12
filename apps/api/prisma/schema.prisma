@@ -212,6 +212,12 @@ model DraftUpload {
   /// Set while abandoned-upload cleanup owns the object. Domain attachment
   /// claims require this to be null; stale cleanup claims may be retried.
   cleanupStartedAt       DateTime?
+  editorSessionId        String?
+  editorSession          ScooterDocumentEditorSession? @relation(fields: [editorSessionId], references: [id], onDelete: Restrict)
+  uploadUrlExpiresAt     DateTime?
+  writeSafeAfter         DateTime?
+  processingUntil        DateTime?
+  cleanedAt              DateTime?
   createdAt              DateTime                @default(now())
   expenseExtractionDraft ExpenseExtractionDraft?
 
@@ -219,6 +225,114 @@ model DraftUpload {
   @@index([claimedAt, expiresAt])
   @@index([claimedAt, cleanupStartedAt, expiresAt])
   @@index([purpose, expiresAt])
+  @@index([editorSessionId, claimedAt, cleanedAt])
+}
+
+/// Ownership boundary for unsaved scooter attachments. Never cascades away
+/// resource identities needed to recover cleanup after a remote failure.
+model ScooterDocumentEditorSession {
+  id          String @id @default(cuid())
+  userId      String
+  status      String @default("open")
+  scooterId   String?
+  saveFingerprint String?
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  uploads     DraftUpload[]
+  jobs        ScooterDocumentJob[]
+  resources   ScooterDocumentResource[]
+
+  @@index([status, expiresAt])
+  @@index([userId, createdAt])
+}
+
+model ScooterDocumentJob {
+  id                    String @id @default(cuid())
+  userId                String
+  sessionId             String
+  session               ScooterDocumentEditorSession @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  attemptId             String
+  sourceId              String
+  documentType          ScooterDocumentType
+  draftUploadId         String?
+  documentId            String?
+  scooterId             String?
+  sourceFingerprint     String
+  requestBinding        String
+  source                Json
+  validatedSource       Json?
+  model                 String
+  promptVersion         String
+  status                String @default("queued")
+  providerResponseId    String? @unique
+  submissionUncertainAt DateTime?
+  cancellationAt        DateTime?
+  result                Json?
+  errorCode             String?
+  expiresAt             DateTime
+  nextRunAt             DateTime @default(now())
+  leaseId               String?
+  leaseUntil            DateTime?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  resources             ScooterDocumentResource[]
+
+  @@unique([userId, attemptId])
+  @@index([status, nextRunAt, leaseUntil])
+  @@index([sessionId, status])
+  @@index([draftUploadId])
+  @@index([expiresAt])
+}
+
+/// A non-content ledger, retained through partial cleanup and late writers.
+model ScooterDocumentResource {
+  id                  String @id @default(cuid())
+  identity            String @unique
+  sessionId           String?
+  session             ScooterDocumentEditorSession? @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  jobId               String?
+  job                 ScooterDocumentJob? @relation(fields: [jobId], references: [id], onDelete: Restrict)
+  draftUploadId       String?
+  kind                String
+  bucket              String?
+  storageKey          String?
+  providerId          String?
+  status              String @default("reserved")
+  lastPossibleWriteAt DateTime
+  cleanupAfter        DateTime
+  leaseId             String?
+  leaseUntil          DateTime?
+  attempts            Int @default(0)
+  errorCode           String?
+  deletedAt           DateTime?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([status, cleanupAfter, leaseUntil])
+  @@index([sessionId])
+  @@index([jobId])
+  @@index([draftUploadId])
+}
+
+model ScooterDocumentProviderEvent {
+  id          String @id
+  responseId  String
+  processedAt DateTime?
+  nextRunAt   DateTime @default(now())
+  leaseId     String?
+  leaseUntil  DateTime?
+  attempts    Int @default(0)
+  errorCode   String?
+  createdAt   DateTime @default(now())
+
+  @@index([processedAt, nextRunAt, leaseUntil])
+}
+
+model ScooterDocumentReconciliationCursor {
+  id String @id
+  continuationToken String?
+  updatedAt DateTime @updatedAt
 }
 
 /// Photo attached to one person document slot.

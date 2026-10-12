@@ -24,6 +24,15 @@ import type {
   DocumentDraft,
   ScooterDocumentsEditor,
 } from "./useScooterDocuments";
+import type { DocumentAnalysisState } from "./useScooterDocumentAnalysis";
+
+function processingMessage(state: DocumentAnalysisState | undefined) {
+  const phase = state?.status === "processing" ? state.phase : undefined;
+  if (!phase) return "processing";
+  if (phase === "validating") return "preparing";
+  if (phase === "submitting" || phase === "running") return "analyzing";
+  return "queued";
+}
 
 function useDocumentLabels(
   type: v1.scooters.ScooterDocumentType,
@@ -94,7 +103,7 @@ export function ScooterDocumentUpload({
       uploaded: true,
       status:
         analysis[document.id]?.status === "processing"
-          ? extractionT("processing")
+          ? extractionT(processingMessage(analysis[document.id]))
           : undefined,
     })),
     ...drafts.map((draft) => ({
@@ -107,10 +116,18 @@ export function ScooterDocumentUpload({
         draft.status === "uploading"
           ? t("uploading")
           : analysis[draft.id]?.status === "processing"
-            ? extractionT("processing")
+            ? extractionT(processingMessage(analysis[draft.id]))
             : undefined,
-      uploadError: draft.status === "failed" ? t("failed") : undefined,
-      onRetry: () => documents.retry(draft),
+      uploadError:
+        draft.status === "failed"
+          ? t(draft.uploadError ?? "failed", {
+              maxSize: (draft.uploadMaxBytes ?? 0) / (1024 * 1024),
+            })
+          : undefined,
+      onRetry:
+        draft.uploadError === "sessionExpired"
+          ? undefined
+          : () => documents.retry(draft),
     })),
   ];
   const labels = useDocumentLabels(
@@ -276,7 +293,7 @@ export function ScooterFilePreview({
     draft?.status === "uploading"
       ? t("uploading")
       : analysis?.status === "processing"
-        ? extractionT("processing")
+        ? extractionT(processingMessage(analysis))
         : undefined;
   if (!canRead) return null;
   return (
@@ -292,8 +309,16 @@ export function ScooterFilePreview({
           validate={validate}
           onConfirm={onReplace}
           onRemove={onRemove}
-          uploadError={draft?.status === "failed" ? t("failed") : undefined}
-          onRetry={onRetry}
+          uploadError={
+            draft?.status === "failed"
+              ? t(draft.uploadError ?? "failed", {
+                  maxSize: (draft.uploadMaxBytes ?? 0) / (1024 * 1024),
+                })
+              : undefined
+          }
+          onRetry={
+            draft?.uploadError === "sessionExpired" ? undefined : onRetry
+          }
         />
       ) : (
         <DocumentPreview

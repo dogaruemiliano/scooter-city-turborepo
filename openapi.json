@@ -4456,6 +4456,7 @@
     },
     "/v1/scooters/document-extraction": {
       "post": {
+        "deprecated": true,
         "operationId": "ScooterDocumentsController_analyzeDocument_v1",
         "parameters": [],
         "requestBody": {
@@ -4469,15 +4470,8 @@
           }
         },
         "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ScooterDocumentAnalysis_Output"
-                }
-              }
-            }
+          "503": {
+            "description": "Synchronous extraction is retired. Reload the editor to use background jobs."
           }
         },
         "security": [
@@ -4488,7 +4482,7 @@
             "access_token": []
           }
         ],
-        "summary": "Extract suggested scooter fields from one owned document for review",
+        "summary": "Retired synchronous extraction; use document-extraction-jobs",
         "tags": ["scooters"]
       }
     },
@@ -4864,6 +4858,178 @@
           }
         ],
         "summary": "Soft-delete one active scooter inventory record",
+        "tags": ["scooters"]
+      }
+    },
+    "/v1/scooters/document-editor-sessions": {
+      "post": {
+        "operationId": "ScooterDocumentJobsController_createSession_v1",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScooterDocumentEditorSession_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["scooters"]
+      }
+    },
+    "/v1/scooters/document-editor-sessions/{id}/discard": {
+      "post": {
+        "operationId": "ScooterDocumentJobsController_discard_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscardScooterDocumentEditorSession_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["scooters"]
+      }
+    },
+    "/v1/scooters/document-extraction-jobs": {
+      "post": {
+        "operationId": "ScooterDocumentJobsController_start_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartScooterDocumentExtractionJobInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScooterDocumentExtractionJob_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["scooters"]
+      }
+    },
+    "/v1/scooters/document-extraction-jobs/{id}": {
+      "get": {
+        "operationId": "ScooterDocumentJobsController_status_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScooterDocumentExtractionJob_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["scooters"]
+      }
+    },
+    "/v1/scooters/document-extraction-jobs/{id}/cancel": {
+      "post": {
+        "operationId": "ScooterDocumentJobsController_cancel_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScooterDocumentExtractionJob_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
         "tags": ["scooters"]
       }
     },
@@ -11355,117 +11521,14 @@
         "required": ["sourceId", "source"],
         "additionalProperties": false
       },
-      "ScooterDocumentAnalysis_Output": {
+      "CreateScooterDocumentUpload": {
         "type": "object",
         "properties": {
-          "sourceId": {
+          "sessionId": {
             "type": "string",
             "minLength": 1,
             "maxLength": 120
           },
-          "documentType": {
-            "type": "string",
-            "enum": [
-              "import_document",
-              "civ",
-              "registration_certificate",
-              "insurance"
-            ]
-          },
-          "extractedData": {
-            "type": "object",
-            "properties": {
-              "vin": {
-                "type": "string",
-                "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
-                "nullable": true
-              },
-              "fields": {
-                "type": "object",
-                "additionalProperties": {
-                  "anyOf": [
-                    {
-                      "type": "string",
-                      "maxLength": 2000
-                    },
-                    {
-                      "type": "number"
-                    }
-                  ],
-                  "nullable": true
-                }
-              },
-              "rawFields": {
-                "type": "object",
-                "additionalProperties": {
-                  "type": "string",
-                  "maxLength": 2000,
-                  "nullable": true
-                }
-              },
-              "vinReview": {
-                "type": "object",
-                "properties": {
-                  "method": {
-                    "type": "string",
-                    "enum": ["manual"]
-                  },
-                  "originalVin": {
-                    "type": "string",
-                    "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
-                    "nullable": true
-                  }
-                },
-                "required": ["method", "originalVin"],
-                "additionalProperties": false
-              }
-            },
-            "required": ["vin", "fields", "rawFields"],
-            "additionalProperties": false
-          },
-          "issues": {
-            "type": "array",
-            "maxItems": 200,
-            "items": {
-              "type": "object",
-              "properties": {
-                "field": {
-                  "type": "string",
-                  "minLength": 1,
-                  "maxLength": 120
-                },
-                "code": {
-                  "type": "string",
-                  "enum": [
-                    "unreadable",
-                    "invalidValue",
-                    "conflictingValues",
-                    "typeMismatch",
-                    "noData"
-                  ]
-                }
-              },
-              "required": ["field", "code"],
-              "additionalProperties": false
-            }
-          },
-          "reviewRequired": {
-            "type": "boolean",
-            "enum": [true]
-          }
-        },
-        "required": [
-          "sourceId",
-          "documentType",
-          "extractedData",
-          "issues",
-          "reviewRequired"
-        ],
-        "additionalProperties": false
-      },
-      "CreateScooterDocumentUpload": {
-        "type": "object",
-        "properties": {
           "type": {
             "type": "string",
             "enum": [
@@ -11482,7 +11545,7 @@
           "byteSize": {
             "type": "integer",
             "exclusiveMinimum": true,
-            "maximum": 10485760,
+            "maximum": 15728640,
             "minimum": 0
           },
           "checksumSha256": {
@@ -11638,6 +11701,11 @@
       "CreateScooterInput": {
         "type": "object",
         "properties": {
+          "sessionId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
           "insurancePolicies": {
             "maxItems": 100,
             "type": "array",
@@ -12917,6 +12985,11 @@
       "UpdateScooterInput": {
         "type": "object",
         "properties": {
+          "sessionId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
           "insurancePolicies": {
             "maxItems": 100,
             "type": "array",
@@ -13625,6 +13698,273 @@
             "nullable": true
           }
         },
+        "additionalProperties": false
+      },
+      "ScooterDocumentEditorSession_Output": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          }
+        },
+        "required": ["id", "expiresAt"],
+        "additionalProperties": false
+      },
+      "DiscardScooterDocumentEditorSession_Output": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "enum": [true]
+          }
+        },
+        "required": ["ok"],
+        "additionalProperties": false
+      },
+      "StartScooterDocumentExtractionJobInput": {
+        "type": "object",
+        "properties": {
+          "sourceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "source": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": ["draft"]
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "import_document",
+                      "civ",
+                      "registration_certificate",
+                      "insurance"
+                    ]
+                  },
+                  "uploadToken": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 8192
+                  }
+                },
+                "required": ["kind", "type", "uploadToken"],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": ["saved"]
+                  },
+                  "scooterId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "documentId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  }
+                },
+                "required": ["kind", "scooterId", "documentId"],
+                "additionalProperties": false
+              }
+            ]
+          },
+          "sessionId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "attemptId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          }
+        },
+        "required": ["sourceId", "source", "sessionId", "attemptId"],
+        "additionalProperties": false
+      },
+      "ScooterDocumentAnalysis_Output": {
+        "type": "object",
+        "properties": {
+          "sourceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "documentType": {
+            "type": "string",
+            "enum": [
+              "import_document",
+              "civ",
+              "registration_certificate",
+              "insurance"
+            ]
+          },
+          "extractedData": {
+            "type": "object",
+            "properties": {
+              "vin": {
+                "type": "string",
+                "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
+                "nullable": true
+              },
+              "fields": {
+                "type": "object",
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "maxLength": 2000
+                    },
+                    {
+                      "type": "number"
+                    }
+                  ],
+                  "nullable": true
+                }
+              },
+              "rawFields": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string",
+                  "maxLength": 2000,
+                  "nullable": true
+                }
+              },
+              "vinReview": {
+                "type": "object",
+                "properties": {
+                  "method": {
+                    "type": "string",
+                    "enum": ["manual"]
+                  },
+                  "originalVin": {
+                    "type": "string",
+                    "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
+                    "nullable": true
+                  }
+                },
+                "required": ["method", "originalVin"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["vin", "fields", "rawFields"],
+            "additionalProperties": false
+          },
+          "issues": {
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120
+                },
+                "code": {
+                  "type": "string",
+                  "enum": [
+                    "unreadable",
+                    "invalidValue",
+                    "conflictingValues",
+                    "typeMismatch",
+                    "noData"
+                  ]
+                }
+              },
+              "required": ["field", "code"],
+              "additionalProperties": false
+            }
+          },
+          "reviewRequired": {
+            "type": "boolean",
+            "enum": [true]
+          }
+        },
+        "required": [
+          "sourceId",
+          "documentType",
+          "extractedData",
+          "issues",
+          "reviewRequired"
+        ],
+        "additionalProperties": false
+      },
+      "ScooterDocumentExtractionJob_Output": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "sourceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "documentType": {
+            "type": "string",
+            "enum": [
+              "import_document",
+              "civ",
+              "registration_certificate",
+              "insurance"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "validating",
+              "submitting",
+              "submission_unknown",
+              "running",
+              "completed",
+              "failed",
+              "cancelled",
+              "expired"
+            ]
+          },
+          "result": {
+            "$ref": "#/components/schemas/ScooterDocumentAnalysis_Output"
+          },
+          "errorCode": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "retryAfterMs": {
+            "type": "integer",
+            "exclusiveMinimum": true,
+            "maximum": 60000,
+            "minimum": 0
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          }
+        },
+        "required": ["id", "sourceId", "documentType", "status", "expiresAt"],
         "additionalProperties": false
       },
       "CreateScooterBrandInput": {

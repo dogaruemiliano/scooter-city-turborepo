@@ -38,9 +38,19 @@ export class ScooterDocumentExtractionService {
     input: AnalyzeScooterDocumentInput,
   ): Promise<ScooterDocumentExtractionResult> {
     validateSource(input);
-    const parsed = scooterDocumentModelOutputSchema.safeParse(
+    return this.normalize(
+      input.documentType,
       await this.provider.analyze(input),
     );
+  }
+
+  /** Apply the same review rules to asynchronously retrieved provider output. */
+  normalize(
+    documentType: v1.scooters.ScooterDocumentType,
+    output: unknown,
+  ): ScooterDocumentExtractionResult {
+    const input = { documentType };
+    const parsed = scooterDocumentModelOutputSchema.safeParse(output);
     if (!parsed.success) {
       throw new DocumentExtractionError(
         "DOCUMENT_EXTRACTION_FAILED",

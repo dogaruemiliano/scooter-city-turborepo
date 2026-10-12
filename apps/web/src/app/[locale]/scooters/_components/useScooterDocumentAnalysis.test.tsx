@@ -8,7 +8,23 @@ import type {
 } from "./useScooterDocuments";
 
 const apiFetch = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/api", () => ({ webApi: { fetch: apiFetch } }));
+vi.mock("@/lib/api", () => ({
+  webApi: {
+    fetch: async (...args: unknown[]) => {
+      const result = await apiFetch(...args);
+      return result?.extractedData
+        ? {
+            id: `job-${result.sourceId}`,
+            sourceId: result.sourceId,
+            documentType: result.documentType,
+            status: "completed",
+            result,
+            expiresAt: new Date(Date.now() + 300_000).toISOString(),
+          }
+        : result;
+    },
+  },
+}));
 function draft(id: string, type: DocumentDraft["type"] = "civ"): DocumentDraft {
   return {
     id,
@@ -19,7 +35,12 @@ function draft(id: string, type: DocumentDraft["type"] = "civ"): DocumentDraft {
   };
 }
 function documents(drafts: DocumentDraft[]) {
-  return { drafts, existing: [] } as unknown as ScooterDocumentsEditor;
+  return {
+    drafts,
+    existing: [],
+    ensureSession: async () => "session",
+    handleSessionError: vi.fn(),
+  } as unknown as ScooterDocumentsEditor;
 }
 function response(
   sourceId: string,
@@ -142,6 +163,7 @@ describe("direct document analysis", () => {
     ["DOCUMENT_EXTRACTION_FAILED", 502, "failed"],
     ["DOCUMENT_EXTRACTION_BAD_DOCUMENT", 400, "unsupported"],
     ["DOCUMENT_EXTRACTION_UNSUPPORTED_DOCUMENT", 400, "unsupported"],
+    ["DOCUMENT_EDITOR_SESSION_UNAVAILABLE", 400, "sessionExpired"],
   ] as const)(
     "maps %s to the appropriate insurance error message",
     async (code, status, error) => {
@@ -242,12 +264,12 @@ describe("direct document analysis", () => {
       { initialProps: { files: [importer] } },
     );
     let run!: ReturnType<typeof hook.result.current.run>;
-    act(() => {
+    await act(async () => {
       run = hook.result.current.run();
     });
     const signal = apiFetch.mock.calls[0]![2].signal as AbortSignal;
     hook.rerender({ files: [importer, draft("civ")] });
-    expect(signal.aborted).toBe(true);
+    expect(signal.aborted).toBe(false); // The start POST can still reveal a job to cancel.
     await act(async () => {
       request.resolve(response("import", "import_document"));
       expect(await run).toBeNull();
@@ -290,7 +312,7 @@ describe("direct document analysis", () => {
       useScooterDocumentAnalysis(documents(attached)),
     );
     let run!: ReturnType<typeof hook.result.current.run>;
-    act(() => {
+    await act(async () => {
       run = hook.result.current.run();
     });
     expect(apiFetch).toHaveBeenCalledTimes(2);
@@ -349,12 +371,12 @@ describe("direct document analysis", () => {
       { initialProps: { files: [original] } },
     );
     let run!: ReturnType<typeof hook.result.current.run>;
-    act(() => {
+    await act(async () => {
       run = hook.result.current.run();
     });
     const signal = apiFetch.mock.calls[0]![2].signal as AbortSignal;
     hook.rerender({ files: [] });
-    expect(signal.aborted).toBe(true);
+    expect(signal.aborted).toBe(false); // The start POST can still reveal a job to cancel.
     await act(async () => {
       request.resolve(response("one"));
       expect(await run).toBeNull();
@@ -398,13 +420,13 @@ describe("direct document analysis", () => {
     const hook = renderHook(() =>
       useScooterDocumentAnalysis(documents(attached)),
     );
-    act(() => {
+    await act(async () => {
       void hook.result.current.run();
       void hook.result.current.run();
     });
     expect(apiFetch).toHaveBeenCalledTimes(1);
     hook.unmount();
-    expect(apiFetch.mock.calls[0]![2].signal.aborted).toBe(true);
+    expect(apiFetch.mock.calls[0]![2].signal.aborted).toBe(false);
     request.resolve(response("one"));
   });
 

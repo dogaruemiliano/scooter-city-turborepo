@@ -53,6 +53,14 @@ export type ScooterListSort = (typeof SCOOTER_LIST_SORTS)[number];
 export const ROUTES = {
   documents: {
     extract: "/v1/scooters/document-extraction",
+    createEditorSession: "/v1/scooters/document-editor-sessions",
+    discardEditorSession: (id: string): string =>
+      `/v1/scooters/document-editor-sessions/${encodeURIComponent(id)}/discard`,
+    startExtractionJob: "/v1/scooters/document-extraction-jobs",
+    extractionJob: (id: string): string =>
+      `/v1/scooters/document-extraction-jobs/${encodeURIComponent(id)}`,
+    cancelExtractionJob: (id: string): string =>
+      `/v1/scooters/document-extraction-jobs/${encodeURIComponent(id)}/cancel`,
     createDraftUpload: "/v1/scooters/document-draft-upload-url",
     list: (id: string): string => `/v1/scooters/${id}/documents`,
     content: (id: string, documentId: string): string =>

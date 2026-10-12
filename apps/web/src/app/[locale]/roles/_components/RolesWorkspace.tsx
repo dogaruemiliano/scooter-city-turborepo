@@ -10,7 +10,14 @@ import {
   Wrench,
 } from "lucide-react";
 import { v1 } from "@repo/api-shared";
-import { Badge, Button, buttonVariants } from "@repo/ui/components";
+import {
+  Badge,
+  Button,
+  buttonVariants,
+  ListLayout,
+  ListItems,
+  ListStatus,
+} from "@repo/ui/components";
 import { Card, CardContent, CardHeader } from "@repo/ui/components/card";
 import { FormActions } from "@repo/ui/components/form-actions";
 import { useTranslations } from "next-intl";
@@ -42,6 +49,7 @@ function isBaseRole(role: v1.access.Role) {
 
 export function RolesWorkspace({ id }: { id?: string }) {
   const t = useTranslations("workspace");
+  const shared = useTranslations("shared");
   const load = useCallback(
     () =>
       webApi.fetch("/v1/access/roles", v1.access.roleListSchema, {
@@ -81,10 +89,7 @@ export function RolesWorkspace({ id }: { id?: string }) {
           )}
         </>
       ) : (
-        <section
-          className="flex min-w-0 flex-col gap-5"
-          aria-labelledby="role-library-title"
-        >
+        <ListLayout aria-labelledby="role-library-title">
           <div className="flex flex-col gap-2">
             <h2
               id="role-library-title"
@@ -96,26 +101,41 @@ export function RolesWorkspace({ id }: { id?: string }) {
               {t("access.member.roleLibraryHelp")}
             </p>
           </div>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <Card as="article">
-              <CardHeader>
-                <Shield className="size-6 text-primary" aria-hidden="true" />
-              </CardHeader>
-              <CardContent className="flex flex-col gap-2">
-                <h3 className="font-sans text-base font-semibold">
-                  {t("access.member.roleNames.superAdmin")}
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  {t("access.member.roleDescriptions.superAdmin")}
-                </p>
-              </CardContent>
-              <CardContent className="mt-auto">
-                <p className="border-t pt-4 text-xs leading-relaxed text-muted-foreground">
-                  {t("access.member.superRoleHelp")}
-                </p>
-              </CardContent>
-            </Card>
-            {v1.access.BASE_ROLE_SLUGS.map((slug) => {
+          <ListStatus
+            loading={remote.loading}
+            error={remote.error}
+            loadingLabel={shared("status.refreshing")}
+            retryLabel={shared("actions.retry")}
+            onRetry={remote.reload}
+          />
+          <ListItems
+            items={["superAdmin", ...v1.access.BASE_ROLE_SLUGS] as const}
+            getItemKey={(slug) => slug}
+            renderItem={(slug) => {
+              if (slug === "superAdmin")
+                return (
+                  <Card as="article">
+                    <CardHeader>
+                      <Shield
+                        className="size-6 text-primary"
+                        aria-hidden="true"
+                      />
+                    </CardHeader>
+                    <CardContent className="flex flex-col gap-2">
+                      <h3 className="font-sans text-base font-semibold">
+                        {t("access.member.roleNames.superAdmin")}
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        {t("access.member.roleDescriptions.superAdmin")}
+                      </p>
+                    </CardContent>
+                    <CardContent className="mt-auto">
+                      <p className="border-t pt-4 text-xs leading-relaxed text-muted-foreground">
+                        {t("access.member.superRoleHelp")}
+                      </p>
+                    </CardContent>
+                  </Card>
+                );
               const profile = roles.find(
                 (item) => item.slug === slug && !item.archivedAt,
               );
@@ -159,9 +179,9 @@ export function RolesWorkspace({ id }: { id?: string }) {
                   </CardContent>
                 </Card>
               );
-            })}
-          </div>
-        </section>
+            }}
+          />
+        </ListLayout>
       )}
     </AccessWorkspace>
   );

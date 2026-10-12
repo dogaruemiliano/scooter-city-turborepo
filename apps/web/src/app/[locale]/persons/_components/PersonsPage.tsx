@@ -5,17 +5,13 @@ import { canAccess } from "@/lib/access";
 
 import { ApiError, v1 } from "@repo/api-shared";
 import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
   buttonVariants,
   CountrySheetSelect,
   Label,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  ListFilterSheet,
+  ListLayout,
+  ListStatus,
+  SheetSelect,
 } from "@repo/ui/components";
 import { UserPlusIcon } from "lucide-react";
 import Link from "next/link";
@@ -29,9 +25,7 @@ import {
 } from "react";
 
 import { InfiniteListFooter } from "@/components/InfiniteListFooter";
-import { ListFilterSheet } from "@/components/ListFilterSheet";
 import { ListSearchInput } from "@/components/ListSearchInput";
-import { ListSortSelect } from "@/components/ListSortSelect";
 import { webApi } from "@/lib/api";
 import { PersonList } from "./PersonList";
 import { DatePartsField } from "@/components/DateField";
@@ -42,15 +36,22 @@ interface PersonsPageProps {
   initialQuery: v1.persons.ListPersonsQuery;
 }
 
-interface Feedback {
-  kind: "error";
-  title: string;
-  message: string;
-}
-
 const LIST_PAGE_SIZE = 25;
 const ALL_FILTERS = "all";
 const SEARCH_DEBOUNCE_MS = 500;
+const QUERY_KEYS = [
+  "search",
+  "recordStatus",
+  "documentType",
+  "documentStatus",
+  "documentExpiry",
+  "documentExpiresFrom",
+  "documentExpiresTo",
+  "countryCode",
+  "documentIssuingCountryCode",
+  "sort",
+  "includeDeleted",
+] as const;
 
 export function PersonsPage({
   createHref,
@@ -74,18 +75,22 @@ function PersonsPageContent({
 }: PersonsPageProps) {
   const session = useOptionalSession();
   const t = useTranslations("persons");
+  const tShared = useTranslations("shared");
   const locale = useLocale();
   const [list, setList] = useState(initialList);
+  const [filterNavigationKey, setFilterNavigationKey] = useState(0);
   const [query, setQuery] = useState<v1.persons.ListPersonsQuery>(initialQuery);
   const [draftQuery, setDraftQuery] =
     useState<v1.persons.ListPersonsQuery>(initialQuery);
   const [listLoading, setListLoading] = useState(false);
   const [appendLoading, setAppendLoading] = useState(false);
   const [appendError, setAppendError] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const [listError, setListError] = useState<string | null>(null);
   const requestIdRef = useRef(0);
+  const lastRequestRef = useRef(initialQuery);
   const appendLoadingRef = useRef(false);
   const searchDebounceReadyRef = useRef(false);
+  const pendingSearchRef = useRef<string | null>(null);
   const searchDebounceTimeoutRef = useRef<number | null>(null);
 
   const clearSearchDebounce = useCallback(() => {
@@ -102,7 +107,7 @@ function PersonsPageContent({
       nextQuery: v1.persons.ListPersonsQuery,
       options: {
         clearFeedback?: boolean;
-        history?: "push" | "replace";
+        history?: "push" | "replace" | "none";
         preserveDraft?: boolean;
       } = {},
     ) => {
@@ -113,12 +118,14 @@ function PersonsPageContent({
       });
       const requestId = requestIdRef.current + 1;
       requestIdRef.current = requestId;
+      pendingSearchRef.current = normalizedSearch(parsedQuery.search);
+      lastRequestRef.current = parsedQuery;
       appendLoadingRef.current = false;
       setListLoading(true);
       setAppendLoading(false);
       setAppendError(null);
       if (options.clearFeedback !== false) {
-        setFeedback(null);
+        setListError(null);
       }
 
       try {
@@ -129,30 +136,32 @@ function PersonsPageContent({
         );
 
         if (requestId !== requestIdRef.current) {
-          return;
+          return false;
         }
 
-        updatePersonsUrl(parsedQuery, options.history ?? "push");
+        if (options.history !== "none") {
+          updatePersonsUrl(parsedQuery, options.history ?? "push");
+        }
         setList(nextList);
         setQuery(parsedQuery);
         if (!options.preserveDraft) {
           setDraftQuery(parsedQuery);
         }
+        return true;
       } catch (error) {
         if (requestId !== requestIdRef.current) {
-          return;
+          return false;
         }
 
-        setFeedback({
-          kind: "error",
-          title: t("feedback.listErrorTitle"),
-          message:
-            error instanceof ApiError
-              ? error.message
-              : t("feedback.genericError"),
-        });
+        setListError(
+          error instanceof ApiError
+            ? error.message
+            : t("feedback.genericError"),
+        );
+        return false;
       } finally {
         if (requestId === requestIdRef.current) {
+          pendingSearchRef.current = null;
           setListLoading(false);
         }
       }
@@ -218,7 +227,10 @@ function PersonsPageContent({
       return;
     }
 
-    if (draftQuery.search === query.search) {
+    if (
+      normalizedSearch(draftQuery.search) === normalizedSearch(query.search) ||
+      pendingSearchRef.current === normalizedSearch(draftQuery.search)
+    ) {
       return;
     }
 
@@ -256,7 +268,7 @@ function PersonsPageContent({
     if (search === normalizedSearch(query.search)) return;
 
     await loadPersons({
-      ...draftQuery,
+      ...query,
       search: search || undefined,
       page: 1,
       pageSize: LIST_PAGE_SIZE,
@@ -284,343 +296,370 @@ function PersonsPageContent({
     );
   }
 
-  async function changeSort(value: string | null) {
-    if (!value) {
-      return;
+  useEffect(() => {
+    const pathname = window.location.pathname;
+    function restoreLocation() {
+      if (window.location.pathname !== pathname) return;
+      clearSearchDebounce();
+      const params = new URLSearchParams(window.location.search);
+      const restoredQuery = v1.persons.listPersonsQuerySchema.safeParse({
+        ...Object.fromEntries(
+          QUERY_KEYS.map((key) => [key, params.get(key) ?? undefined]),
+        ),
+        page: 1,
+        pageSize: LIST_PAGE_SIZE,
+      });
+      if (!restoredQuery.success) {
+        // URL validation remains the server route's responsibility.
+        window.location.reload();
+        return;
+      }
+      setFilterNavigationKey((current) => current + 1);
+      setDraftQuery(restoredQuery.data);
+      void loadPersons(restoredQuery.data, { history: "none" });
     }
 
-    clearSearchDebounce();
-    const sort = value as v1.persons.PersonListSort;
-    const nextQuery = {
-      ...draftQuery,
-      page: 1,
-      pageSize: LIST_PAGE_SIZE,
-      sort: isDefaultSort(draftQuery, sort) ? undefined : sort,
-    };
-
-    setDraftQuery(nextQuery);
-    await loadPersons(nextQuery);
-  }
-
-  async function resetFilters() {
-    clearSearchDebounce();
-    await loadPersons({
-      page: 1,
-      pageSize: LIST_PAGE_SIZE,
-      includeDeleted: false,
-    });
-  }
-
-  function setDraftValue<Key extends keyof v1.persons.ListPersonsQuery>(
-    key: Key,
-    value: v1.persons.ListPersonsQuery[Key],
-  ) {
-    setDraftQuery((current) => ({
-      ...current,
-      [key]: value,
-    }));
-  }
+    window.addEventListener("popstate", restoreLocation);
+    return () => window.removeEventListener("popstate", restoreLocation);
+  }, [clearSearchDebounce, loadPersons]);
 
   const hasMore = list.items.length < list.total;
 
+  const selectLabels = {
+    searchPlaceholder: tShared("list.selectSearch"),
+    clearSearchLabel: tShared("list.selectClearSearch"),
+    emptyMessage: tShared("list.selectEmpty"),
+    closeLabel: tShared("actions.close"),
+  };
+
   return (
     <div className="mx-auto flex w-full max-w-screen-xl flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
-      <div className="flex justify-end">
-        {canAccess(session?.user, "persons.create") ? (
-          <Link href={createHref} className={buttonVariants()}>
-            <UserPlusIcon data-icon="inline-start" />
-            {t("actions.add")}
-          </Link>
-        ) : null}
-      </div>
-
-      {feedback ? (
-        <Alert variant="destructive">
-          <AlertTitle>{feedback.title}</AlertTitle>
-          <AlertDescription>{feedback.message}</AlertDescription>
-        </Alert>
-      ) : null}
-
-      <div className="flex flex-col gap-4">
-        <div className="grid w-full gap-3 lg:grid-cols-2 lg:items-end">
-          <div className="w-full lg:max-w-md">
-            <ListSearchInput
-              id="persons-search"
-              label={t("list.searchLabel")}
-              clearLabel={t("list.clearSearchLabel")}
-              placeholder={t("placeholders.search")}
-              value={draftQuery.search ?? ""}
-              onChange={(search) => {
-                setDraftQuery((current) => ({
-                  ...current,
-                  search: search || undefined,
-                  sort:
-                    current.sort === "relevance" && !search
-                      ? undefined
-                      : current.sort,
-                }));
-              }}
-              onClear={clearPersonsSearch}
-              onSearch={searchPersons}
-            />
-          </div>
-
-          <div className="flex w-full items-center justify-between gap-4 lg:justify-end">
-            <ListSortSelect
-              id="persons-sort"
-              label={t("filters.sort")}
-              value={effectiveListSort(draftQuery)}
-              values={v1.persons.PERSON_LIST_SORTS.filter(
-                (sort) => sort !== "relevance" || draftQuery.search,
-              )}
-              getOptionLabel={(sort) => t(`listSorts.${sort}`)}
-              onValueChange={(value) => void changeSort(value)}
-            />
-
-            <ListFilterSheet
-              appliedCount={operationalFilterCount(query)}
-              applyLabel={t("actions.apply")}
-              description={t("filters.description")}
-              disabled={listLoading}
-              formId="persons-filter-form"
-              onApply={() =>
-                loadPersons({
-                  ...draftQuery,
-                  page: 1,
-                  pageSize: LIST_PAGE_SIZE,
-                })
+      <ListLayout
+        action={
+          canAccess(session?.user, "persons.create") ? (
+            <Link href={createHref} className={buttonVariants()}>
+              <UserPlusIcon data-icon="inline-start" />
+              {t("actions.add")}
+            </Link>
+          ) : null
+        }
+        filters={
+          <ListFilterSheet
+            key={filterNavigationKey}
+            value={{ ...query, search: draftQuery.search }}
+            defaultValue={{
+              page: 1,
+              pageSize: LIST_PAGE_SIZE,
+              includeDeleted: false,
+              search: draftQuery.search,
+            }}
+            appliedCount={operationalFilterCount(query)}
+            applyLabel={t("actions.apply")}
+            cancelLabel={t("actions.cancel")}
+            applyErrorLabel={tShared("list.applyError")}
+            description={t("filters.description")}
+            disabled={listLoading}
+            onApply={(value) => {
+              clearSearchDebounce();
+              return loadPersons({
+                ...value,
+                search: normalizedSearch(draftQuery.search) || undefined,
+                page: 1,
+                pageSize: LIST_PAGE_SIZE,
+              });
+            }}
+            resetLabel={t("filters.reset")}
+            title={t("filters.title")}
+          >
+            {({ value, setValue }) => {
+              function setFilterValue<
+                Key extends keyof v1.persons.ListPersonsQuery,
+              >(key: Key, fieldValue: v1.persons.ListPersonsQuery[Key]) {
+                setValue((current) => ({ ...current, [key]: fieldValue }));
               }
-              onReset={resetFilters}
-              resetLabel={t("filters.reset")}
-              title={t("filters.title")}
-            >
-              <div className="grid gap-4 sm:grid-cols-2">
-                <FilterField
-                  id="persons-record-status"
-                  label={t("filters.recordStatus")}
-                >
-                  <Select
-                    value={effectiveRecordStatus(draftQuery)}
-                    onValueChange={(value) => {
-                      setDraftQuery((current) => ({
-                        ...current,
-                        includeDeleted: false,
-                        recordStatus:
-                          value === "active"
+              return (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <FilterField id="persons-sort" label={t("filters.sort")}>
+                    <SheetSelect
+                      {...selectLabels}
+                      id="persons-sort"
+                      label={t("filters.sort")}
+                      value={effectiveListSort(value)}
+                      options={v1.persons.PERSON_LIST_SORTS.filter(
+                        (sort) => sort !== "relevance" || draftQuery.search,
+                      ).map((sort) => ({
+                        value: sort,
+                        label: t(`listSorts.${sort}`),
+                      }))}
+                      onValueChange={(sort) =>
+                        setFilterValue(
+                          "sort",
+                          isDefaultSort(
+                            { ...value, search: draftQuery.search },
+                            sort as v1.persons.PersonListSort,
+                          )
                             ? undefined
-                            : (value as v1.persons.PersonRecordStatus),
-                      }));
-                    }}
+                            : (sort as v1.persons.PersonListSort),
+                        )
+                      }
+                    />
+                  </FilterField>
+
+                  <FilterField
+                    id="persons-record-status"
+                    label={t("filters.recordStatus")}
                   >
-                    <SelectTrigger
+                    <SheetSelect
+                      {...selectLabels}
                       id="persons-record-status"
-                      className="w-full"
-                    >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {v1.persons.PERSON_RECORD_STATUSES.map((status) => (
-                        <SelectItem key={status} value={status}>
-                          {t(`recordStatus.${status}`)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </FilterField>
+                      label={t("filters.recordStatus")}
+                      value={effectiveRecordStatus(value)}
+                      onValueChange={(value) => {
+                        setValue((current) => ({
+                          ...current,
+                          includeDeleted: false,
+                          recordStatus:
+                            value === "active"
+                              ? undefined
+                              : (value as v1.persons.PersonRecordStatus),
+                        }));
+                      }}
+                      options={v1.persons.PERSON_RECORD_STATUSES.map(
+                        (status) => ({
+                          value: status,
+                          label: t(`recordStatus.${status}`),
+                        }),
+                      )}
+                    />
+                  </FilterField>
 
-                <FilterField
-                  id="persons-document-type"
-                  label={t("filters.documentType")}
-                >
-                  <Select
-                    value={draftQuery.documentType ?? ALL_FILTERS}
-                    onValueChange={(value) =>
-                      setDraftValue(
-                        "documentType",
-                        value === ALL_FILTERS
-                          ? undefined
-                          : (value as v1.persons.PersonDocumentType),
-                      )
-                    }
+                  <FilterField
+                    id="persons-document-type"
+                    label={t("filters.documentType")}
                   >
-                    <SelectTrigger
+                    <SheetSelect
+                      {...selectLabels}
                       id="persons-document-type"
-                      className="w-full"
-                    >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={ALL_FILTERS}>
-                        {t("filters.all")}
-                      </SelectItem>
-                      {v1.persons.PERSON_DOCUMENT_TYPES.map((type) => (
-                        <SelectItem key={type} value={type}>
-                          {t(`documentTypes.${type}`)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </FilterField>
+                      label={t("filters.documentType")}
+                      value={value.documentType ?? ALL_FILTERS}
+                      onValueChange={(value) =>
+                        setFilterValue(
+                          "documentType",
+                          value === ALL_FILTERS
+                            ? undefined
+                            : (value as v1.persons.PersonDocumentType),
+                        )
+                      }
+                      options={[
+                        { value: ALL_FILTERS, label: t("filters.all") },
+                        ...v1.persons.PERSON_DOCUMENT_TYPES.map((option) => ({
+                          value: option,
+                          label: t(`documentTypes.${option}`),
+                        })),
+                      ]}
+                    />
+                  </FilterField>
 
-                <FilterField
-                  id="persons-document-status"
-                  label={t("filters.documentStatus")}
-                >
-                  <Select
-                    value={draftQuery.documentStatus ?? ALL_FILTERS}
-                    onValueChange={(value) =>
-                      setDraftValue(
-                        "documentStatus",
-                        value === ALL_FILTERS
-                          ? undefined
-                          : (value as v1.persons.PersonDocumentStatus),
-                      )
-                    }
+                  <FilterField
+                    id="persons-document-status"
+                    label={t("filters.documentStatus")}
                   >
-                    <SelectTrigger
+                    <SheetSelect
+                      {...selectLabels}
                       id="persons-document-status"
-                      className="w-full"
-                    >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={ALL_FILTERS}>
-                        {t("filters.all")}
-                      </SelectItem>
-                      {v1.persons.PERSON_DOCUMENT_STATUSES.map((status) => (
-                        <SelectItem key={status} value={status}>
-                          {t(`documentStatuses.${status}`)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </FilterField>
+                      label={t("filters.documentStatus")}
+                      value={value.documentStatus ?? ALL_FILTERS}
+                      onValueChange={(value) =>
+                        setFilterValue(
+                          "documentStatus",
+                          value === ALL_FILTERS
+                            ? undefined
+                            : (value as v1.persons.PersonDocumentStatus),
+                        )
+                      }
+                      options={[
+                        { value: ALL_FILTERS, label: t("filters.all") },
+                        ...v1.persons.PERSON_DOCUMENT_STATUSES.map(
+                          (option) => ({
+                            value: option,
+                            label: t(`documentStatuses.${option}`),
+                          }),
+                        ),
+                      ]}
+                    />
+                  </FilterField>
 
-                <FilterField
-                  id="persons-document-expiry"
-                  label={t("filters.documentExpiry")}
-                >
-                  <Select
-                    value={draftQuery.documentExpiry ?? ALL_FILTERS}
-                    onValueChange={(value) =>
-                      setDraftValue(
-                        "documentExpiry",
-                        value === ALL_FILTERS
-                          ? undefined
-                          : (value as v1.persons.PersonDocumentExpiry),
-                      )
-                    }
+                  <FilterField
+                    id="persons-document-expiry"
+                    label={t("filters.documentExpiry")}
                   >
-                    <SelectTrigger
+                    <SheetSelect
+                      {...selectLabels}
                       id="persons-document-expiry"
-                      className="w-full"
-                    >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={ALL_FILTERS}>
-                        {t("filters.all")}
-                      </SelectItem>
-                      {v1.persons.PERSON_DOCUMENT_EXPIRIES.map((expiry) => (
-                        <SelectItem key={expiry} value={expiry}>
-                          {t(`documentExpiries.${expiry}`)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </FilterField>
+                      label={t("filters.documentExpiry")}
+                      value={value.documentExpiry ?? ALL_FILTERS}
+                      onValueChange={(value) =>
+                        setFilterValue(
+                          "documentExpiry",
+                          value === ALL_FILTERS
+                            ? undefined
+                            : (value as v1.persons.PersonDocumentExpiry),
+                        )
+                      }
+                      options={[
+                        { value: ALL_FILTERS, label: t("filters.all") },
+                        ...v1.persons.PERSON_DOCUMENT_EXPIRIES.map(
+                          (option) => ({
+                            value: option,
+                            label: t(`documentExpiries.${option}`),
+                          }),
+                        ),
+                      ]}
+                    />
+                  </FilterField>
 
-                <FilterField
-                  id="persons-document-expires-from-day"
-                  label={t("filters.documentExpiresFrom")}
-                >
-                  <DatePartsField
-                    baseId="persons-document-expires-from"
+                  <FilterField
+                    id="persons-document-expires-from-day"
                     label={t("filters.documentExpiresFrom")}
-                    locale={locale}
-                    value={draftQuery.documentExpiresFrom ?? ""}
-                    onChange={(value) =>
-                      setDraftValue("documentExpiresFrom", value || undefined)
-                    }
-                  />
-                </FilterField>
+                  >
+                    <DatePartsField
+                      baseId="persons-document-expires-from"
+                      label={t("filters.documentExpiresFrom")}
+                      locale={locale}
+                      value={value.documentExpiresFrom ?? ""}
+                      onChange={(value) =>
+                        setFilterValue(
+                          "documentExpiresFrom",
+                          value || undefined,
+                        )
+                      }
+                    />
+                  </FilterField>
 
-                <FilterField
-                  id="persons-document-expires-to-day"
-                  label={t("filters.documentExpiresTo")}
-                >
-                  <DatePartsField
-                    baseId="persons-document-expires-to"
+                  <FilterField
+                    id="persons-document-expires-to-day"
                     label={t("filters.documentExpiresTo")}
-                    locale={locale}
-                    value={draftQuery.documentExpiresTo ?? ""}
-                    onChange={(value) =>
-                      setDraftValue("documentExpiresTo", value || undefined)
-                    }
-                  />
-                </FilterField>
+                  >
+                    <DatePartsField
+                      baseId="persons-document-expires-to"
+                      label={t("filters.documentExpiresTo")}
+                      locale={locale}
+                      value={value.documentExpiresTo ?? ""}
+                      onChange={(value) =>
+                        setFilterValue("documentExpiresTo", value || undefined)
+                      }
+                    />
+                  </FilterField>
 
-                <FilterField
-                  id="persons-country"
-                  label={t("filters.countryCode")}
-                >
-                  <CountrySheetSelect
+                  <FilterField
                     id="persons-country"
                     label={t("filters.countryCode")}
-                    labelledById="persons-country-label"
-                    locale={locale}
-                    value={draftQuery.countryCode}
-                    placeholder={t("filters.all")}
-                    onValueChange={(value) =>
-                      setDraftValue("countryCode", value)
-                    }
-                    onClear={() => setDraftValue("countryCode", undefined)}
-                    clearOptionLabel={t("filters.all")}
-                    searchPlaceholder={t("countryPicker.search")}
-                    clearSearchLabel={t("countryPicker.clearSearch")}
-                    emptyMessage={t("countryPicker.empty")}
-                    closeLabel={t("actions.close")}
-                  />
-                </FilterField>
+                  >
+                    <CountrySheetSelect
+                      id="persons-country"
+                      label={t("filters.countryCode")}
+                      labelledById="persons-country-label"
+                      locale={locale}
+                      value={value.countryCode}
+                      placeholder={t("filters.all")}
+                      onValueChange={(value) =>
+                        setFilterValue("countryCode", value)
+                      }
+                      onClear={() => setFilterValue("countryCode", undefined)}
+                      clearOptionLabel={t("filters.all")}
+                      searchPlaceholder={t("countryPicker.search")}
+                      clearSearchLabel={t("countryPicker.clearSearch")}
+                      emptyMessage={t("countryPicker.empty")}
+                      closeLabel={t("actions.close")}
+                    />
+                  </FilterField>
 
-                <FilterField
-                  id="persons-document-issuing-country"
-                  label={t("filters.documentIssuingCountryCode")}
-                >
-                  <CountrySheetSelect
+                  <FilterField
                     id="persons-document-issuing-country"
                     label={t("filters.documentIssuingCountryCode")}
-                    labelledById="persons-document-issuing-country-label"
-                    locale={locale}
-                    value={draftQuery.documentIssuingCountryCode}
-                    placeholder={t("filters.all")}
-                    onValueChange={(value) =>
-                      setDraftValue("documentIssuingCountryCode", value)
-                    }
-                    onClear={() =>
-                      setDraftValue("documentIssuingCountryCode", undefined)
-                    }
-                    clearOptionLabel={t("filters.all")}
-                    searchPlaceholder={t("countryPicker.search")}
-                    clearSearchLabel={t("countryPicker.clearSearch")}
-                    emptyMessage={t("countryPicker.empty")}
-                    closeLabel={t("actions.close")}
-                  />
-                </FilterField>
-              </div>
-            </ListFilterSheet>
-          </div>
-        </div>
-
-        <PersonList items={list.items} />
-
-        <InfiniteListFooter
-          hasMore={hasMore && !listLoading}
-          loading={appendLoading}
-          error={appendError}
-          onLoadMore={loadNextPersonsPage}
+                  >
+                    <CountrySheetSelect
+                      id="persons-document-issuing-country"
+                      label={t("filters.documentIssuingCountryCode")}
+                      labelledById="persons-document-issuing-country-label"
+                      locale={locale}
+                      value={value.documentIssuingCountryCode}
+                      placeholder={t("filters.all")}
+                      onValueChange={(value) =>
+                        setFilterValue("documentIssuingCountryCode", value)
+                      }
+                      onClear={() =>
+                        setFilterValue("documentIssuingCountryCode", undefined)
+                      }
+                      clearOptionLabel={t("filters.all")}
+                      searchPlaceholder={t("countryPicker.search")}
+                      clearSearchLabel={t("countryPicker.clearSearch")}
+                      emptyMessage={t("countryPicker.empty")}
+                      closeLabel={t("actions.close")}
+                    />
+                  </FilterField>
+                </div>
+              );
+            }}
+          </ListFilterSheet>
+        }
+        search={
+          <ListSearchInput
+            id="persons-search"
+            label={t("list.searchLabel")}
+            clearLabel={t("list.clearSearchLabel")}
+            placeholder={t("placeholders.search")}
+            value={draftQuery.search ?? ""}
+            onChange={(search) => {
+              setDraftQuery((current) => ({
+                ...current,
+                search: search || undefined,
+                sort:
+                  current.sort === "relevance" && !search
+                    ? undefined
+                    : current.sort,
+              }));
+            }}
+            onClear={clearPersonsSearch}
+            onSearch={searchPersons}
+          />
+        }
+        summary={
+          listLoading || listError ? (
+            <>
+              <ListStatus
+                loading={listLoading}
+                error={listError}
+                loadingLabel={tShared("status.refreshing")}
+                retryLabel={tShared("actions.retry")}
+                onRetry={() => void loadPersons(lastRequestRef.current)}
+              />
+              {(listLoading || listError) && list.items.length > 0 ? (
+                <p role="status">{tShared("list.staleResults")}</p>
+              ) : null}
+            </>
+          ) : null
+        }
+        footer={
+          hasMore || appendLoading || appendError ? (
+            <InfiniteListFooter
+              hasMore={hasMore && !listLoading}
+              loading={appendLoading}
+              error={appendError}
+              onLoadMore={loadNextPersonsPage}
+            />
+          ) : null
+        }
+      >
+        <PersonList
+          items={list.items}
+          emptyMessage={
+            query.search || operationalFilterCount(query) > 0
+              ? tShared("list.noResults")
+              : undefined
+          }
         />
-      </div>
+      </ListLayout>
     </div>
   );
 }
@@ -652,11 +691,19 @@ function updatePersonsUrl(
   query: v1.persons.ListPersonsQuery,
   history: "push" | "replace",
 ) {
-  const params = new URLSearchParams();
+  const params = new URLSearchParams(window.location.search);
+  for (const key of QUERY_KEYS) params.delete(key);
+  params.delete("page");
+  params.delete("pageSize");
   appendPersonsQueryParams(params, query);
 
   const search = params.toString();
-  const href = `${window.location.pathname}${search ? `?${search}` : ""}`;
+  const href = `${window.location.pathname}${search ? `?${search}` : ""}${window.location.hash}`;
+  if (
+    `${window.location.pathname}${window.location.search}${window.location.hash}` ===
+    href
+  )
+    return;
   if (history === "replace") {
     window.history.replaceState(null, "", href);
     return;
@@ -719,6 +766,7 @@ function isDefaultSort(
 
 function operationalFilterCount(query: v1.persons.ListPersonsQuery): number {
   return [
+    query.sort && !isDefaultSort(query, query.sort),
     query.includeDeleted,
     query.recordStatus,
     query.documentType,

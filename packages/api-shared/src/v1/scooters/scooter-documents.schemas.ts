@@ -13,7 +13,7 @@ export const SCOOTER_DOCUMENT_CONTENT_TYPES = [
   "image/png",
   "image/webp",
 ] as const;
-export const SCOOTER_DOCUMENT_MAX_BYTES = 10 * 1024 * 1024;
+export const SCOOTER_DOCUMENT_MAX_BYTES = 15 * 1024 * 1024;
 export const SCOOTER_DOCUMENT_MAX_FILES = 20;
 export const scooterDocumentTypeSchema = z.enum(SCOOTER_DOCUMENT_TYPES);
 export type ScooterDocumentType = z.infer<typeof scooterDocumentTypeSchema>;
@@ -40,6 +40,7 @@ export const scooterDocumentDraftsSchema = z
   .max(SCOOTER_DOCUMENT_MAX_FILES);
 export const createScooterDocumentUploadSchema = z
   .object({
+    sessionId: z.string().min(1).max(120).optional(),
     type: scooterDocumentTypeSchema,
     contentType: z.enum(SCOOTER_DOCUMENT_CONTENT_TYPES),
     byteSize: z.number().int().positive().max(SCOOTER_DOCUMENT_MAX_BYTES),

@@ -63,7 +63,7 @@ describe("ScooterDocumentsService", () => {
         { kind: "draft", type: "civ", uploadToken: "token" },
         "admin",
       ),
-    ).resolves.toEqual({ documentType: "civ", stored });
+    ).resolves.toEqual({ documentType: "civ", stored, draftUploadId: "draft" });
     expect(storage.verifyDocumentUploadToken).toHaveBeenCalledWith(
       "token",
       "scooter-document:civ:admin",
@@ -180,7 +180,7 @@ describe("ScooterDocumentsService", () => {
       }) as unknown,
     });
     expect(result).not.toHaveProperty("storageKey");
-    expect(result.maxBytes).toBe(10 * 1024 * 1024);
+    expect(result.maxBytes).toBe(15 * 1024 * 1024);
   });
   it("atomically claims unexpired unclaimed drafts before creating assets", async () => {
     await service.apply(tx, "scooter", [{ ...draft, stored }], [], "admin");

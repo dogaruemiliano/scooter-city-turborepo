@@ -4,6 +4,7 @@ import { AccessGuard } from "./access.guard";
 import {
   ACCESS_POLICY,
   RequireAllScope,
+  RequireAnyAllScope,
   RequirePermissions,
   RequireSuperAdmin,
   SelfService,
@@ -20,6 +21,13 @@ class TestController {
   @RequirePermissions("problems.read") problems() {}
   @RequireAllScope("scooters.read") scooters(this: void) {}
   @RequireAllScope("scooters.update") update() {}
+  @RequireAnyAllScope(
+    "scooters.create",
+    "scooters.update",
+    "scooter_documents.write",
+    "scooter_documents.extract",
+  )
+  editorSession() {}
 }
 const snapshot: AccessSnapshot = {
   userId: "u",
@@ -105,6 +113,49 @@ describe("default-deny authorization", () => {
           },
           { removedDocumentIds: ["private"] },
         ),
+      ),
+    ).rejects.toThrow();
+  });
+  it.each([
+    "scooters.create",
+    "scooters.update",
+    "scooter_documents.write",
+    "scooter_documents.extract",
+  ])(
+    "allows editor infrastructure with %s while retaining scope and nested checks",
+    async (key) => {
+      const user = {
+        id: "u",
+        access: { ...snapshot, effectiveScopes: { [key]: ["ALL"] } },
+      };
+      await expect(
+        guard.canActivate(context("editorSession", user as never)),
+      ).resolves.toBe(true);
+      await expect(
+        guard.canActivate(
+          context("editorSession", { id: "u", access: snapshot }),
+        ),
+      ).rejects.toThrow();
+      if (key !== "scooter_documents.write")
+        await expect(
+          guard.canActivate(
+            context("editorSession", user as never, {
+              removedDocumentIds: ["private"],
+            }),
+          ),
+        ).rejects.toThrow();
+    },
+  );
+  it("does not admit assigned-only grants through an alternative ALL policy", async () => {
+    await expect(
+      guard.canActivate(
+        context("editorSession", {
+          id: "u",
+          access: {
+            ...snapshot,
+            effectiveScopes: { "scooters.update": ["ASSIGNED"] },
+          },
+        }),
       ),
     ).rejects.toThrow();
   });

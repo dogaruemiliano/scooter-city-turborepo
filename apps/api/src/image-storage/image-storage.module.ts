@@ -1,5 +1,9 @@
 import { Module } from "@nestjs/common";
-import { S3Client, type PutObjectCommand } from "@aws-sdk/client-s3";
+import {
+  S3Client,
+  type GetObjectCommand,
+  type PutObjectCommand,
+} from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 import { ENV } from "../config/config.module";
@@ -9,7 +13,7 @@ import { ImageStorageService } from "./image-storage.service";
 
 export interface S3Presigner {
   getSignedUrl(
-    command: PutObjectCommand,
+    command: PutObjectCommand | GetObjectCommand,
     expiresIn: number,
     options?: S3PresignOptions,
   ): Promise<string>;

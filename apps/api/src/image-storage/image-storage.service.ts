@@ -9,8 +9,10 @@ import {
 } from "@nestjs/common";
 import {
   DeleteObjectCommand,
+  DeleteObjectsCommand,
   GetObjectCommand,
   HeadObjectCommand,
+  ListObjectVersionsCommand,
   PutObjectCommand,
   S3Client,
   S3ServiceException,
@@ -25,6 +27,8 @@ import {
 } from "node:crypto";
 import { Readable } from "node:stream";
 import { Logger } from "nestjs-pino";
+import { v1 } from "@repo/api-shared";
+import { DocumentExtractionError } from "../document-extraction/document-extraction.errors";
 
 import { ENV } from "../config/config.module";
 import type { Env } from "../config/env";
@@ -126,6 +130,7 @@ export class ImageStorageService {
       Key: storageKey,
       Body: input.buffer,
       ContentType: contentType,
+      ChecksumSHA256: Buffer.from(checksumSha256, "hex").toString("base64"),
     };
 
     if (this.env.IMAGE_STORAGE_S3_KMS_KEY_ID) {
@@ -402,8 +407,207 @@ export class ImageStorageService {
     return this.readImage(storageKey, signal);
   }
 
+  /** Reserve this key in the job transaction before invoking validation. */
+  createDocumentAnalysisKey(jobId: string): string {
+    if (!/^[a-zA-Z0-9_-]{1,120}$/.test(jobId))
+      throw new BadRequestException("Invalid document analysis identifier");
+    return `${this.prefix}/extraction-temporary/${jobId}`;
+  }
+
+  /** Metadata-only verification; document bytes never pass through the API. */
+  async createDocumentReadUrl(
+    source: StoredDocument,
+    ttlSeconds = 600,
+  ): Promise<string> {
+    this.assertSafeStorageKey(source.storageKey);
+    if (
+      source.provider !== IMAGE_STORAGE_PROVIDER_S3 ||
+      source.bucket !== this.bucket ||
+      !source.storageKey.startsWith(`${this.prefix}/`) ||
+      !SUPPORTED_DOCUMENT_CONTENT_TYPES.includes(source.contentType) ||
+      !Number.isInteger(source.byteSize) ||
+      source.byteSize <= 0 ||
+      source.byteSize >
+        Math.min(
+          this.env.IMAGE_STORAGE_MAX_BYTES,
+          v1.scooters.SCOOTER_DOCUMENT_MAX_BYTES,
+        ) ||
+      !SHA_256_HEX_PATTERN.test(source.checksumSha256) ||
+      !Number.isInteger(ttlSeconds) ||
+      ttlSeconds < 1 ||
+      ttlSeconds > 3600
+    ) {
+      throw new DocumentExtractionError(
+        "DOCUMENT_EXTRACTION_INVALID_SOURCE",
+        "Document is not available for extraction.",
+        false,
+      );
+    }
+    try {
+      const head = await this.s3.send(
+        new HeadObjectCommand({
+          Bucket: this.bucket,
+          Key: source.storageKey,
+          ChecksumMode: "ENABLED",
+        }),
+        { abortSignal: AbortSignal.timeout(10_000) },
+      );
+      if (
+        head.ContentLength !== source.byteSize ||
+        head.ContentType !== source.contentType ||
+        head.ChecksumType === "COMPOSITE" ||
+        head.ChecksumSHA256 !==
+          Buffer.from(source.checksumSha256, "hex").toString("base64")
+      ) {
+        throw new DocumentExtractionError(
+          "DOCUMENT_EXTRACTION_INVALID_SOURCE",
+          "Document metadata does not match.",
+          false,
+        );
+      }
+      return await this.presigner.getSignedUrl(
+        new GetObjectCommand({
+          Bucket: this.bucket,
+          Key: source.storageKey,
+          ...(head.VersionId ? { VersionId: head.VersionId } : {}),
+          ResponseContentType: source.contentType,
+          ResponseContentDisposition: "inline",
+          ResponseCacheControl: "private, no-store",
+        }),
+        ttlSeconds,
+      );
+    } catch (error) {
+      if (error instanceof DocumentExtractionError) throw error;
+      throw new DocumentExtractionError(
+        isMissingObjectError(error)
+          ? "DOCUMENT_EXTRACTION_INVALID_SOURCE"
+          : "DOCUMENT_EXTRACTION_READ_FAILED",
+        "Document access could not be prepared.",
+        !isMissingObjectError(error),
+      );
+    }
+  }
+
+  /** Include hidden versions/markers; only temporary keys can be reconciled. */
+  async listDocumentAnalysisObjects(
+    input: { continuationToken?: string; maxKeys?: number } = {},
+  ): Promise<{
+    objects: Array<{ storageKey: string; lastModified: Date | null }>;
+    continuationToken?: string;
+  }> {
+    const maxKeys = input.maxKeys ?? 100;
+    if (!Number.isInteger(maxKeys) || maxKeys < 1 || maxKeys > 1000)
+      throw new BadRequestException("Invalid document reconciliation limit");
+    const prefix = `${this.prefix}/extraction-temporary/`;
+    const cursor = input.continuationToken
+      ? parseDocumentReconciliationCursor(input.continuationToken, prefix)
+      : undefined;
+    const result = await this.s3.send(
+      new ListObjectVersionsCommand({
+        Bucket: this.bucket,
+        Prefix: prefix,
+        MaxKeys: maxKeys,
+        ...(cursor
+          ? { KeyMarker: cursor.key, VersionIdMarker: cursor.version }
+          : {}),
+      }),
+    );
+    const objects = new Map<string, Date | null>();
+    for (const item of [
+      ...(result.Versions ?? []),
+      ...(result.DeleteMarkers ?? []),
+    ]) {
+      if (!item.Key?.startsWith(prefix)) continue;
+      const lastModified = item.LastModified ?? null;
+      const previous = objects.get(item.Key);
+      if (!previous || (lastModified && lastModified > previous))
+        objects.set(item.Key, lastModified);
+    }
+    if (
+      result.IsTruncated &&
+      (!result.NextKeyMarker || !result.NextKeyMarker.startsWith(prefix))
+    )
+      throw new ServiceUnavailableException(
+        "Document reconciliation listing must be retried",
+      );
+    return {
+      objects: Array.from(objects, ([storageKey, lastModified]) => ({
+        storageKey,
+        lastModified,
+      })),
+      ...(result.IsTruncated
+        ? {
+            continuationToken: Buffer.from(
+              JSON.stringify({
+                v: 1,
+                key: result.NextKeyMarker,
+                version: result.NextVersionIdMarker,
+              }),
+            ).toString("base64url"),
+          }
+        : {}),
+    };
+  }
+
   deleteDocument(storageKey: string): Promise<void> {
     return this.deleteImage(storageKey);
+  }
+
+  /** Caller must hold the cleanup claim; also erases noncurrent versions/markers. */
+  async deleteDocumentForCleanup(storageKey: string): Promise<void> {
+    this.assertSafeStorageKey(storageKey);
+    if (!storageKey.startsWith(`${this.prefix}/`))
+      throw new BadRequestException("Invalid document cleanup prefix");
+    let keyMarker: string | undefined;
+    let versionIdMarker: string | undefined;
+    // Bound one cleanup pass. A retry resumes by listing the surviving versions.
+    for (let page = 0; page < 10; page++) {
+      const result = await this.s3.send(
+        new ListObjectVersionsCommand({
+          Bucket: this.bucket,
+          Prefix: storageKey,
+          KeyMarker: keyMarker,
+          VersionIdMarker: versionIdMarker,
+          MaxKeys: 1000,
+        }),
+      );
+      const objects = [
+        ...(result.Versions ?? []),
+        ...(result.DeleteMarkers ?? []),
+      ]
+        .filter((version) => version.Key === storageKey && version.VersionId)
+        .map((version) => ({ Key: storageKey, VersionId: version.VersionId! }));
+      if (objects.length) {
+        const deleted = await this.s3.send(
+          new DeleteObjectsCommand({
+            Bucket: this.bucket,
+            Delete: { Objects: objects, Quiet: true },
+          }),
+        );
+        if (
+          deleted.Errors?.some(
+            (error) =>
+              !["NoSuchKey", "NoSuchVersion"].includes(error.Code ?? ""),
+          )
+        )
+          throw new ServiceUnavailableException(
+            "Document cleanup must be retried",
+          );
+      }
+      if (!result.IsTruncated || result.NextKeyMarker !== storageKey) return;
+      if (
+        !result.NextVersionIdMarker ||
+        result.NextVersionIdMarker === versionIdMarker
+      )
+        throw new ServiceUnavailableException(
+          "Document cleanup listing must be retried",
+        );
+      keyMarker = result.NextKeyMarker;
+      versionIdMarker = result.NextVersionIdMarker;
+    }
+    throw new ServiceUnavailableException(
+      "Document cleanup requires another pass",
+    );
   }
 
   async deleteImage(storageKey: string): Promise<void> {
@@ -454,7 +658,11 @@ export class ImageStorageService {
     }
 
     if (byteSize > this.env.IMAGE_STORAGE_MAX_BYTES) {
-      throw new PayloadTooLargeException("Image file is too large");
+      throw new PayloadTooLargeException({
+        code: "FILE_TOO_LARGE",
+        message: "File exceeds the configured upload limit.",
+        details: { maxBytes: this.env.IMAGE_STORAGE_MAX_BYTES },
+      });
     }
   }
 
@@ -645,6 +853,37 @@ export class ImageStorageService {
       );
     }
     return this.env.IMAGE_STORAGE_UPLOAD_TOKEN_SECRET;
+  }
+}
+
+function parseDocumentReconciliationCursor(
+  token: string,
+  prefix: string,
+): { key: string; version?: string } {
+  try {
+    if (token.length > 8192) throw new Error();
+    const parsed = JSON.parse(
+      Buffer.from(token, "base64url").toString("utf8"),
+    ) as unknown;
+    if (typeof parsed !== "object" || parsed === null) throw new Error();
+    const cursor = parsed as Record<string, unknown>;
+    if (
+      cursor.v !== 1 ||
+      typeof cursor.key !== "string" ||
+      cursor.key.length > 1024 ||
+      !cursor.key.startsWith(prefix) ||
+      (cursor.version !== undefined &&
+        (typeof cursor.version !== "string" || cursor.version.length > 2048))
+    )
+      throw new Error();
+    return {
+      key: cursor.key,
+      ...(typeof cursor.version === "string"
+        ? { version: cursor.version }
+        : {}),
+    };
+  } catch {
+    throw new BadRequestException("Invalid document reconciliation cursor");
   }
 }
 

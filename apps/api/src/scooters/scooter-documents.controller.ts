@@ -7,32 +7,28 @@ import {
   HttpStatus,
   Param,
   Post,
-  Req,
   Res,
+  ServiceUnavailableException,
 } from "@nestjs/common";
 import {
   ApiBearerAuth,
   ApiCookieAuth,
   ApiOperation,
+  ApiResponse,
   ApiTags,
 } from "@nestjs/swagger";
 import { Throttle } from "@nestjs/throttler";
 import { v1 } from "@repo/api-shared";
 import { createZodDto, ZodResponse } from "nestjs-zod";
-import type { Request, Response } from "express";
+import type { Response } from "express";
 import { pipeline } from "node:stream/promises";
 import type { AuthPrincipal } from "../auth/auth.types";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { ScooterDocumentsService } from "./scooter-documents.service";
-import { ScooterDocumentAnalysisService } from "./scooter-document-analysis.service";
 
 class AnalyzeScooterDocumentInput extends createZodDto(
   v1.scooters.analyzeScooterDocumentInputSchema,
 ) {}
-class ScooterDocumentAnalysis extends createZodDto(
-  v1.scooters.scooterDocumentAnalysisSchema,
-) {}
-
 class CreateScooterDocumentUpload extends createZodDto(
   v1.scooters.createScooterDocumentUploadSchema,
 ) {}
@@ -48,41 +44,29 @@ class ScooterDocumentList extends createZodDto(
 @ApiBearerAuth("bearer")
 @Controller({ path: "scooters", version: "1" })
 export class ScooterDocumentsController {
-  constructor(
-    private readonly documents: ScooterDocumentsService,
-    private readonly analysis: ScooterDocumentAnalysisService,
-  ) {}
+  constructor(private readonly documents: ScooterDocumentsService) {}
 
   @RequireAllScope("scooter_documents.extract")
   @Post("document-extraction")
-  @HttpCode(HttpStatus.OK)
+  @HttpCode(HttpStatus.SERVICE_UNAVAILABLE)
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @ApiOperation({
     operationId: "ScooterDocumentsController_analyzeDocument_v1",
-    summary:
-      "Extract suggested scooter fields from one owned document for review",
+    summary: "Retired synchronous extraction; use document-extraction-jobs",
+    deprecated: true,
   })
-  @ZodResponse({ status: HttpStatus.OK, type: ScooterDocumentAnalysis })
-  async analyzeDocument(
-    @Body() input: AnalyzeScooterDocumentInput,
-    @CurrentUser() user: AuthPrincipal,
-    @Req() req: Request,
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    const controller = new AbortController();
-    const abort = () => controller.abort();
-    const close = () => {
-      if (!res.writableEnded) abort();
-    };
-    req.once("aborted", abort);
-    res.once("close", close);
-    try {
-      if (req.aborted) abort();
-      return await this.analysis.analyze(input, user.id, controller.signal);
-    } finally {
-      req.removeListener("aborted", abort);
-      res.removeListener("close", close);
-    }
+  @ApiResponse({
+    status: HttpStatus.SERVICE_UNAVAILABLE,
+    description:
+      "Synchronous extraction is retired. Reload the editor to use background jobs.",
+  })
+  analyzeDocument(@Body() input: AnalyzeScooterDocumentInput): never {
+    void input;
+    throw new ServiceUnavailableException({
+      code: "DOCUMENT_EXTRACTION_DISABLED",
+      message:
+        "Reload the editor to use background document extraction. Manual entry remains available.",
+    });
   }
 
   @RequireAllScope("scooter_documents.write")

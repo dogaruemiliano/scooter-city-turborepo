@@ -6,6 +6,10 @@ export const scootersCatalog = {
       manual: "Complete manually",
       retry: "Retry failed documents",
       processing: "Extracting…",
+      queued: "Waiting to analyze…",
+      preparing: "Preparing document…",
+      analyzing: "Analyzing document…",
+      cancel: "Cancel extraction",
       vinReview: {
         title: "Check document VINs",
         description:
@@ -30,6 +34,9 @@ export const scootersCatalog = {
         invalidSource:
           "This upload is no longer available. Upload the document again.",
         timeout: "Extraction timed out. Retry this document.",
+        cancelled: "Extraction cancelled. Retry or complete manually.",
+        sessionExpired:
+          "This editing session has closed. Copy unsaved changes, reload the page, and upload the documents again.",
         throttled: "Too many extraction requests. Try again shortly.",
         unavailable:
           "AI extraction is temporarily unavailable. Try again or complete manually.",
@@ -202,7 +209,7 @@ export const scootersCatalog = {
       addAction: "Add",
       unsupportedFormat:
         "Unsupported format. Choose a PDF, JPG, PNG or WebP file.",
-      tooLarge: "The file is too large. Maximum size: 10 MB.",
+      tooLarge: "The file is too large. Maximum size: 15 MB.",
       emptyFile: "The file is empty. Choose another file.",
       insurance: "Insurance policy",
       chooseFiles: "Add PDF or image",
@@ -228,14 +235,26 @@ export const scootersCatalog = {
       import_document: "Import documents",
       registration_certificate: "Registration certificate",
       add: "Add {document}",
-      hint: "Optional. PDF, JPG, PNG or WebP, up to 10 MB per file. Files are attached when you save.",
-      invalidFile: "Choose a non-empty PDF, JPG, PNG or WebP file up to 10 MB.",
+      hint: "Optional. PDF, JPG, PNG or WebP, up to 15 MB per file. Files are attached when you save.",
+      invalidFile: "Choose a non-empty PDF, JPG, PNG or WebP file up to 15 MB.",
       invalidName:
         "Rename the file without slashes or special control characters (maximum 255 characters).",
       tooMany: "You can attach up to 20 files per scooter.",
       uploading: "Uploading…",
       ready: "Ready to save",
       failed: "Upload failed",
+      uploadLimit:
+        "The server accepts files up to {maxSize, number} MB. Choose a smaller file or contact an administrator.",
+      serverTooLarge:
+        "The server rejected this file because it exceeds its upload limit. Choose a smaller file or contact an administrator.",
+      storageUnavailable:
+        "File storage is temporarily unavailable. Try uploading again.",
+      uploadDenied:
+        "The upload was denied. Try again; if it still fails, sign in again or contact an administrator.",
+      connectionFailed:
+        "The upload connection failed. Check your connection and try again.",
+      sessionExpired:
+        "This editing session has closed. Copy unsaved changes, reload the page, and upload the documents again.",
       retry: "Retry upload",
       remove: "Remove",
       undo: "Undo removal",
@@ -271,6 +290,8 @@ export const scootersCatalog = {
       moreActions: "More actions",
     },
     feedback: {
+      sessionExpired:
+        "This editing session has closed. Copy unsaved changes, reload the page, and upload the documents again.",
       vinConflict: "A scooter with this VIN already exists.",
       plateConflict: "A scooter with this plate number already exists.",
       brandUnavailable: "This brand is unavailable. Select another brand.",
@@ -861,6 +882,10 @@ export const scootersCatalog = {
       manual: "Completează manual",
       retry: "Reîncearcă documentele nereușite",
       processing: "Se extrage…",
+      queued: "Se așteaptă analiza…",
+      preparing: "Se pregătește documentul…",
+      analyzing: "Se analizează documentul…",
+      cancel: "Anulează extragerea",
       vinReview: {
         title: "Verifică VIN-urile documentelor",
         description:
@@ -888,6 +913,10 @@ export const scootersCatalog = {
         invalidSource:
           "Fișierul încărcat nu mai este disponibil. Încarcă documentul din nou.",
         timeout: "Extragerea a durat prea mult. Reîncearcă acest document.",
+        cancelled:
+          "Extragerea a fost anulată. Reîncearcă sau completează manual.",
+        sessionExpired:
+          "Sesiunea de editare s-a încheiat. Copiază modificările nesalvate, reîncarcă pagina și încarcă din nou documentele.",
         throttled:
           "Sunt prea multe cereri de extragere. Reîncearcă în câteva momente.",
         unavailable:
@@ -1068,7 +1097,7 @@ export const scootersCatalog = {
       addAction: "Adaugă",
       unsupportedFormat:
         "Format neacceptat. Alege un fișier PDF, JPG, PNG sau WebP.",
-      tooLarge: "Fișierul este prea mare. Dimensiunea maximă este de 10 MB.",
+      tooLarge: "Fișierul este prea mare. Dimensiunea maximă este de 15 MB.",
       emptyFile: "Fișierul este gol. Alege alt fișier.",
       insurance: "Poliță de asigurare",
       chooseFiles: "Adaugă PDF sau imagine",
@@ -1096,15 +1125,27 @@ export const scootersCatalog = {
       import_document: "Documente de import",
       registration_certificate: "Certificat de înmatriculare",
       add: "Adaugă {document}",
-      hint: "Opțional. PDF, JPG, PNG sau WebP, maximum 10 MB per fișier. Fișierele se atașează la salvare.",
+      hint: "Opțional. PDF, JPG, PNG sau WebP, maximum 15 MB per fișier. Fișierele se atașează la salvare.",
       invalidFile:
-        "Alege un fișier PDF, JPG, PNG sau WebP care nu este gol, de maximum 10 MB.",
+        "Alege un fișier PDF, JPG, PNG sau WebP care nu este gol, de maximum 15 MB.",
       invalidName:
         "Redenumește fișierul fără bare oblice sau caractere de control (maximum 255 de caractere).",
       tooMany: "Poți atașa maximum 20 de fișiere per scuter.",
       uploading: "Se încarcă…",
       ready: "Pregătit pentru salvare",
       failed: "Încărcarea a eșuat",
+      uploadLimit:
+        "Serverul acceptă fișiere de maximum {maxSize, number} MB. Alege un fișier mai mic sau contactează un administrator.",
+      serverTooLarge:
+        "Serverul a respins fișierul deoarece depășește limita de încărcare. Alege un fișier mai mic sau contactează un administrator.",
+      storageUnavailable:
+        "Stocarea fișierelor este temporar indisponibilă. Încearcă din nou încărcarea.",
+      uploadDenied:
+        "Încărcarea a fost refuzată. Încearcă din nou; dacă problema persistă, autentifică-te din nou sau contactează un administrator.",
+      connectionFailed:
+        "Conexiunea pentru încărcare a eșuat. Verifică conexiunea și încearcă din nou.",
+      sessionExpired:
+        "Sesiunea de editare s-a încheiat. Copiază modificările nesalvate, reîncarcă pagina și încarcă din nou documentele.",
       retry: "Reîncearcă încărcarea",
       remove: "Elimină",
       undo: "Anulează eliminarea",
@@ -1141,6 +1182,8 @@ export const scootersCatalog = {
     },
     feedback: {
       vinConflict: "Există deja un scuter cu acest VIN.",
+      sessionExpired:
+        "Sesiunea de editare s-a încheiat. Copiază modificările nesalvate, reîncarcă pagina și încarcă din nou documentele.",
       plateConflict: "Există deja un scuter cu acest număr de înmatriculare.",
       brandUnavailable: "Acest brand nu este disponibil. Selectează alt brand.",
       listErrorTitle: "Scuterele nu au fost încărcate",
