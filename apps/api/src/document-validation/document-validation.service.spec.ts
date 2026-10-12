@@ -26,6 +26,7 @@ function setup(overrides: NodeJS.ProcessEnv = {}) {
     IMAGE_STORAGE_S3_PREFIX: "documents",
     SCOOTER_DOCUMENT_EXTRACTION_DRIVER: "openai",
     SCOOTER_DOCUMENT_EXTRACTION_OPENAI_API_KEY: "synthetic-key",
+    SCOOTER_DOCUMENT_VALIDATION_DRIVER: "lambda",
     SCOOTER_DOCUMENT_VALIDATION_FUNCTION_NAME: "validator",
     ...overrides,
   });
