@@ -98,11 +98,11 @@ export function PersonListItem({ person }: { person: v1.persons.Person }) {
           <div className="flex min-w-0 flex-col gap-1">
             <CardTitle className="flex items-start justify-between gap-2">
               <span className="truncate">{fullName}</span>
-              <span className="text-xs font-light text-muted-foreground">
+              <span className="shrink-0 text-xs font-light text-muted-foreground">
                 {formatDate(person.createdAt, locale)}
               </span>
             </CardTitle>
-            <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+            <div className="flex items-start justify-between gap-2">
               <div className="flex min-w-0 flex-col items-start gap-x-4 gap-y-1.5 text-sm text-muted-foreground md:flex-1 md:flex-row md:flex-wrap md:items-center">
                 <span className="inline-flex min-w-0 max-w-full items-center gap-1.5 font-medium">
                   <MailIcon
@@ -122,8 +122,8 @@ export function PersonListItem({ person }: { person: v1.persons.Person }) {
                   <Badge variant="outline">{t("recordStatus.deleted")}</Badge>
                 )}
               </div>
-              <div className="min-w-0 md:flex md:flex-1 md:justify-end">
-                <div className="flex items-center gap-2 md:justify-end">
+              <div className="shrink-0 md:flex md:flex-1 md:justify-end">
+                <div className="flex items-center justify-end gap-2">
                   {documentIndicators.map((indicator) => {
                     const state = getDocumentIndicatorState(indicator.document);
 
