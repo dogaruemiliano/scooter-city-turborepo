@@ -103,7 +103,7 @@ export function PersonListItem({ person }: { person: v1.persons.Person }) {
               </span>
             </CardTitle>
             <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-              <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-muted-foreground md:flex-1">
+              <div className="flex min-w-0 flex-col items-start gap-x-4 gap-y-1.5 text-sm text-muted-foreground md:flex-1 md:flex-row md:flex-wrap md:items-center">
                 <span className="inline-flex min-w-0 max-w-full items-center gap-1.5 font-medium">
                   <MailIcon
                     aria-hidden="true"
