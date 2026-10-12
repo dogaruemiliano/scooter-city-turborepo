@@ -306,6 +306,7 @@ export type Scooter = z.infer<typeof scooterSchema>;
 
 export const createScooterInputSchema = z
   .object({
+    sessionId: z.string().min(1).max(120).optional(),
     insurancePolicies: insurancePoliciesInputSchema.optional(),
     documentDrafts: scooterDocumentDraftsSchema.optional(),
     ...civMetadataSchema.shape,
@@ -356,6 +357,7 @@ export type CreateScooterInput = z.infer<typeof createScooterInputSchema>;
 
 export const updateScooterInputSchema = z
   .object({
+    sessionId: z.string().min(1).max(120).optional(),
     insurancePolicies: insurancePoliciesInputSchema.optional(),
     documentDrafts: scooterDocumentDraftsSchema.optional(),
     documentExtractions: z

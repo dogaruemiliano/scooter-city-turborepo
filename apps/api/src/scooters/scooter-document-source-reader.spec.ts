@@ -7,14 +7,13 @@ import {
   PDFRawStream,
 } from "pdf-lib";
 import { PDFDocument as EncryptedPDFDocument } from "@cantoo/pdf-lib";
-import type { ImageStorageService } from "../image-storage/image-storage.service";
 import type { StoredDocument } from "../image-storage/image-storage.types";
 import {
   readScooterDocumentSource,
   SCOOTER_DOCUMENT_READ_TIMEOUT_MS,
 } from "./scooter-document-source-reader";
 
-const MAX_BYTES = 10 * 1024 * 1024;
+const MAX_BYTES = 15 * 1024 * 1024;
 async function pdfBytes(pages = 2, encrypted = false) {
   const pdf = await PDFDocument.create();
   for (let i = 0; i < pages; i++) pdf.addPage();
@@ -65,12 +64,7 @@ function setup(
       .mockResolvedValue({ body, contentType, contentLength: bytes.length }),
   };
   const read = (signal?: AbortSignal, limit = MAX_BYTES) =>
-    readScooterDocumentSource(
-      storage as unknown as ImageStorageService,
-      source,
-      limit,
-      signal,
-    );
+    readScooterDocumentSource(storage, source, limit, signal);
   return { source, storage, body, read };
 }
 

@@ -94,6 +94,7 @@ describe("DraftUploadCleanupService", () => {
     expect(prisma.draftUpload.findMany).toHaveBeenCalledWith({
       where: {
         claimedAt: null,
+        editorSessionId: null,
         expiresAt: { lt: expiredBefore },
         OR: availableCleanupClaim,
       },

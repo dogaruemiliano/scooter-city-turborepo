@@ -3,7 +3,8 @@ import type { SupportedLocale } from "@repo/i18n";
 import {
   Badge,
   Card,
-  CardContent,
+  ListEmpty,
+  ListItems,
   Table,
   TableBody,
   TableCell,
@@ -39,61 +40,57 @@ export async function OperationList({
   const t = await getTranslations("finance.operations");
 
   if (items.length === 0) {
-    return (
-      <Card>
-        <CardContent className="flex min-h-36 items-center justify-center text-center">
-          <p className="text-sm text-muted-foreground">{emptyLabel}</p>
-        </CardContent>
-      </Card>
-    );
+    return <ListEmpty>{emptyLabel}</ListEmpty>;
   }
 
   return (
     <>
       <Card className="gap-0 py-0 md:hidden">
-        <ul>
-          {items.map((item) => (
-            <li key={item.id} className="border-b last:border-b-0">
-              <Link
-                href={FINANCE_PATHS.operation(item.id)}
-                className="block min-h-16 p-5 outline-none transition-colors duration-fast ease-standard hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-xs text-muted-foreground">
-                    {formatFinanceDate(item.occurredAt, locale)}
-                  </p>
-                  <Badge
-                    variant={item.status === "POSTED" ? "outline" : "secondary"}
-                  >
-                    {t(`statuses.${item.status}`)}
-                  </Badge>
-                </div>
-
-                <p className="mt-3 font-medium wrap-anywhere">
-                  {item.description ?? t(`kinds.${item.kind}`)}
+        <ListItems
+          items={items}
+          getItemKey={(item) => item.id}
+          className="gap-0"
+          itemClassName="border-b last:border-b-0"
+          renderItem={(item) => (
+            <Link
+              href={FINANCE_PATHS.operation(item.id)}
+              className="block min-h-16 p-5 outline-none transition-colors duration-fast ease-standard hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs text-muted-foreground">
+                  {formatFinanceDate(item.occurredAt, locale)}
                 </p>
-                <p className="mt-1 text-xs leading-relaxed wrap-anywhere text-muted-foreground">
-                  {[
-                    t(`kinds.${item.kind}`),
-                    item.categoryName,
-                    item.costObjectName,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </p>
-                <p
-                  className={cn(
-                    "mt-3 text-base font-semibold wrap-anywhere tabular-nums",
-                    item.status === "REVERSED" &&
-                      "text-muted-foreground line-through",
-                  )}
+                <Badge
+                  variant={item.status === "POSTED" ? "outline" : "secondary"}
                 >
-                  {formatMinorAmount(item.amountMinor, currency, locale)}
-                </p>
-              </Link>
-            </li>
-          ))}
-        </ul>
+                  {t(`statuses.${item.status}`)}
+                </Badge>
+              </div>
+
+              <p className="mt-3 font-medium wrap-anywhere">
+                {item.description ?? t(`kinds.${item.kind}`)}
+              </p>
+              <p className="mt-1 text-xs leading-relaxed wrap-anywhere text-muted-foreground">
+                {[
+                  t(`kinds.${item.kind}`),
+                  item.categoryName,
+                  item.costObjectName,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
+              <p
+                className={cn(
+                  "mt-3 text-base font-semibold wrap-anywhere tabular-nums",
+                  item.status === "REVERSED" &&
+                    "text-muted-foreground line-through",
+                )}
+              >
+                {formatMinorAmount(item.amountMinor, currency, locale)}
+              </p>
+            </Link>
+          )}
+        />
       </Card>
 
       <Card className="hidden py-0 md:flex">

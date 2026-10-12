@@ -39,6 +39,12 @@ vi.mock("./useScooterDocuments", () => ({
     persisted = extractions;
     return {
       drafts: files,
+      ensureSession: async () => "session",
+      handleSessionError: vi.fn(),
+      beginSave: vi.fn(),
+      saved: vi.fn(),
+      saveFailed: vi.fn(),
+      discardSession: vi.fn(),
       existing: [],
       removed: [],
       removedIds: [],
@@ -61,12 +67,20 @@ it("unblocks the wizard after verified correction and reuses it when returning t
   const misread = "LXYTC2P05P0000001";
   apiFetch.mockImplementation((_route, _schema, { json }) => {
     const vin = json.sourceId === "civ" ? correct : misread;
-    return Promise.resolve({
+    const result = {
       sourceId: json.sourceId,
       documentType: json.source.type,
       extractedData: { vin, fields: { vin }, rawFields: { E: vin } },
       issues: [],
       reviewRequired: true,
+    };
+    return Promise.resolve({
+      id: `job-${json.sourceId}`,
+      sourceId: json.sourceId,
+      documentType: json.source.type,
+      status: "completed",
+      result,
+      expiresAt: new Date(Date.now() + 300_000).toISOString(),
     });
   });
   const user = userEvent.setup();

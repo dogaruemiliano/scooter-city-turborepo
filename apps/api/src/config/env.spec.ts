@@ -15,6 +15,59 @@ function validEnv(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
 }
 
 describe("environment schema", () => {
+  it("keeps background extraction disabled until explicitly enabled", () => {
+    const source = validEnv();
+    delete source.SCOOTER_DOCUMENT_EXTRACTION_JOBS_ENABLED;
+    expect(loadEnv(source).SCOOTER_DOCUMENT_EXTRACTION_JOBS_ENABLED).toBe(
+      false,
+    );
+  });
+
+  it.each([
+    "SCOOTER_DOCUMENT_VALIDATION_FUNCTION_NAME",
+    "SCOOTER_DOCUMENT_EXTRACTION_WEBHOOK_SECRET",
+  ])(
+    "requires %s when production OpenAI background jobs are enabled",
+    (key) => {
+      const source = validEnv({
+        NODE_ENV: "production",
+        SCOOTER_DOCUMENT_VALIDATION_DRIVER: "lambda",
+        SCOOTER_DOCUMENT_EXTRACTION_JOBS_ENABLED: "true",
+        SCOOTER_DOCUMENT_EXTRACTION_DRIVER: "openai",
+        SCOOTER_DOCUMENT_EXTRACTION_OPENAI_API_KEY: "test-key",
+        SCOOTER_DOCUMENT_VALIDATION_FUNCTION_NAME: "test-validator",
+        SCOOTER_DOCUMENT_EXTRACTION_WEBHOOK_SECRET: "test-signing-secret",
+      });
+      delete source[key];
+      expect(() => loadEnv(source)).toThrow(key);
+    },
+  );
+
+  it("allows real local background extraction without Lambda or a public webhook", () => {
+    const source = validEnv({
+      NODE_ENV: "development",
+      SCOOTER_DOCUMENT_EXTRACTION_JOBS_ENABLED: "true",
+      SCOOTER_DOCUMENT_EXTRACTION_DRIVER: "openai",
+      SCOOTER_DOCUMENT_EXTRACTION_OPENAI_API_KEY: "test-key",
+      SCOOTER_DOCUMENT_VALIDATION_DRIVER: "local",
+    });
+    delete source.SCOOTER_DOCUMENT_VALIDATION_FUNCTION_NAME;
+    delete source.SCOOTER_DOCUMENT_EXTRACTION_WEBHOOK_SECRET;
+    expect(loadEnv(source).SCOOTER_DOCUMENT_EXTRACTION_JOBS_ENABLED).toBe(true);
+  });
+
+  it("forbids the local validator in production even when new jobs are disabled", () => {
+    expect(() =>
+      loadEnv(
+        validEnv({
+          NODE_ENV: "production",
+          SCOOTER_DOCUMENT_VALIDATION_DRIVER: "local",
+          SCOOTER_DOCUMENT_EXTRACTION_JOBS_ENABLED: "false",
+        }),
+      ),
+    ).toThrow("SCOOTER_DOCUMENT_VALIDATION_DRIVER");
+  });
+
   it.each(["SMTP_USER", "SMTP_PASSWORD"] as const)("requires %s", (key) => {
     const source = validEnv();
     delete source[key];

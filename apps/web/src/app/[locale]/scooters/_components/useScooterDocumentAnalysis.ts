@@ -5,8 +5,13 @@ import { canAccess } from "@/lib/access";
 
 import { ApiError, v1 } from "@repo/api-shared";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { webApi } from "@/lib/api";
 import type { ScooterDocumentsEditor } from "./useScooterDocuments";
+import {
+  cancelDocumentAnalysisAttempt,
+  createDocumentAnalysisAttempt,
+  runDocumentAnalysisAttempt,
+  type DocumentAnalysisAttempt,
+} from "./scooter-document-analysis-job";
 import {
   reviewScooterDocumentVin,
   type ScooterVinCorrection,
@@ -22,10 +27,15 @@ export type AnalysisError =
   | "invalidSource"
   | "timeout"
   | "throttled"
+  | "cancelled"
+  | "sessionExpired"
   | "unavailable"
   | "failed";
 export type DocumentAnalysisState =
-  | { status: "processing" }
+  | {
+      status: "processing";
+      phase?: v1.scooters.ScooterDocumentExtractionJob["status"];
+    }
   | { status: "success"; analysis: v1.scooters.ScooterDocumentAnalysis }
   | { status: "failed"; error: AnalysisError };
 
@@ -42,6 +52,8 @@ function analysisError(error: unknown): AnalysisError {
     DOCUMENT_EXTRACTION_ACCESS_DENIED: "invalidSource",
     DOCUMENT_EXTRACTION_INVALID_SOURCE: "invalidSource",
     DOCUMENT_EXTRACTION_TIMEOUT: "timeout",
+    DOCUMENT_EXTRACTION_CANCELLED: "cancelled",
+    DOCUMENT_EDITOR_SESSION_UNAVAILABLE: "sessionExpired",
     DOCUMENT_EXTRACTION_THROTTLED: "throttled",
     DOCUMENT_EXTRACTION_UNAVAILABLE: "unavailable",
   };
@@ -65,6 +77,7 @@ export function useScooterDocumentAnalysis(
   const [running, setRunning] = useState(false);
   const cache = useRef(new Map<string, DocumentAnalysisState>());
   const controllers = useRef(new Set<AbortController>());
+  const attempts = useRef(new Map<string, DocumentAnalysisAttempt>());
   const generation = useRef(0);
   const activeRun = useRef(false);
   const mounted = useRef(true);
@@ -103,6 +116,8 @@ export function useScooterDocumentAnalysis(
   ].filter((source) => !hasCiv || source.documentType !== "import_document");
   const signature = JSON.stringify(sources.map(({ key }) => key));
   const latest = useRef(sources);
+  const ensureSession = documents.ensureSession;
+  const handleSessionError = documents.handleSessionError;
   // Event callbacks and pending requests always compare against the committed sources.
   useEffect(() => {
     latest.current = sources;
@@ -112,6 +127,12 @@ export function useScooterDocumentAnalysis(
     activeRun.current = false;
     controllers.current.forEach((controller) => controller.abort());
     controllers.current.clear();
+    for (const [key, attempt] of attempts.current) {
+      if (!attempt.terminal) {
+        cancelDocumentAnalysisAttempt(attempt);
+        attempts.current.delete(key);
+      }
+    }
     const activeKeys = new Set(latest.current.map((source) => source.key));
     for (const [key, state] of cache.current)
       if (!activeKeys.has(key) || state.status === "processing")
@@ -129,10 +150,13 @@ export function useScooterDocumentAnalysis(
   useEffect(() => {
     mounted.current = true;
     const pendingControllers = controllers.current;
+    const pendingAttempts = attempts.current;
     return () => {
       mounted.current = false;
       generation.current += 1;
       pendingControllers.forEach((controller) => controller.abort());
+      for (const attempt of pendingAttempts.values())
+        cancelDocumentAnalysisAttempt(attempt);
     };
   }, []);
 
@@ -167,14 +191,23 @@ export function useScooterDocumentAnalysis(
         controllers.current.add(controller);
         publish(source, { status: "processing" });
         try {
-          const analysis = await webApi.fetch(
-            v1.scooters.ROUTES.documents.extract,
-            v1.scooters.scooterDocumentAnalysisSchema,
-            {
-              method: "POST",
-              json: { sourceId: source.id, source: source.source },
-              signal: controller.signal,
-            },
+          const sessionId = await ensureSession();
+          if (!current() || controller.signal.aborted) return;
+          let attempt = attempts.current.get(source.key);
+          if (!attempt || attempt.terminal) {
+            attempt = createDocumentAnalysisAttempt({
+              sourceId: source.id,
+              source: source.source,
+              sessionId,
+              attemptId: crypto.randomUUID(),
+            });
+            attempts.current.set(source.key, attempt);
+          }
+          const analysis = await runDocumentAnalysisAttempt(
+            attempt,
+            source.documentType,
+            controller.signal,
+            (phase) => publish(source, { status: "processing", phase }),
           );
           if (
             analysis.sourceId !== source.id ||
@@ -183,6 +216,7 @@ export function useScooterDocumentAnalysis(
             throw new Error("Unexpected document source");
           publish(source, { status: "success", analysis });
         } catch (error) {
+          handleSessionError(error);
           if (!controller.signal.aborted)
             publish(source, { status: "failed", error: analysisError(error) });
         } finally {
@@ -200,7 +234,34 @@ export function useScooterDocumentAnalysis(
     activeRun.current = false;
     setRunning(false);
     return latest.current.map((source) => cache.current.get(source.key));
-  }, [canExtract]);
+  }, [canExtract, ensureSession, handleSessionError]);
+
+  const cancel = useCallback(() => {
+    generation.current += 1;
+    activeRun.current = false;
+    controllers.current.forEach((controller) => controller.abort());
+    controllers.current.clear();
+    for (const [key, attempt] of attempts.current) {
+      if (!attempt.terminal) {
+        cancelDocumentAnalysisAttempt(attempt);
+        attempts.current.delete(key);
+      }
+    }
+    for (const [key, state] of cache.current)
+      if (state.status === "processing")
+        cache.current.set(key, { status: "failed", error: "cancelled" });
+    setEntries((previous) =>
+      Object.fromEntries(
+        Object.entries(previous).map(([id, state]) => [
+          id,
+          state.status === "processing"
+            ? { status: "failed", error: "cancelled" }
+            : state,
+        ]),
+      ),
+    );
+    setRunning(false);
+  }, []);
 
   const dismissFailures = useCallback(() => {
     for (const [key, state] of cache.current)
@@ -243,5 +304,5 @@ export function useScooterDocumentAnalysis(
     return Object.values(nextEntries);
   }, []);
 
-  return { entries, running, run, dismissFailures, reviewVins };
+  return { entries, running, run, cancel, dismissFailures, reviewVins };
 }

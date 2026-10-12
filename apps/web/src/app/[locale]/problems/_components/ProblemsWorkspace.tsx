@@ -2,12 +2,18 @@
 import { useCallback, useState } from "react";
 import { v1 } from "@repo/api-shared";
 import {
-  Badge,
   Button,
   Field,
   FieldGroup,
   FieldLabel,
   Textarea,
+  ListEmpty,
+  ListFilterSheet,
+  ListItems,
+  ListLayout,
+  ListPagination,
+  ListStatus,
+  SheetSelect,
 } from "@repo/ui/components";
 import { useTranslations } from "next-intl";
 import { useSession } from "@/components/auth/SessionProvider";
@@ -16,148 +22,221 @@ import { webApi } from "@/lib/api";
 import {
   Choice,
   Feedback,
-  RemoteState,
   useRemote,
   useTask,
-  WorkspacePage,
 } from "@/components/WorkspaceForm";
 import { EntityPicker } from "@/components/EntityPicker";
+import { PageTitleOverride } from "@/components/PageTitleOverride";
+import { ProblemListItem } from "./ProblemListItem";
+
+type ProblemFilters = {
+  view: "assigned" | "available" | "all";
+  status: v1.problems.Problem["status"] | "";
+};
 
 export function ProblemsWorkspace() {
   const t = useTranslations("workspace");
+  const shared = useTranslations("shared");
   const { user } = useSession();
-  const [chosen, setChosen] = useState<string | null>(null);
+  const defaultView = canAccess(user, "problems.read", "ASSIGNED")
+    ? "assigned"
+    : canAccess(user, "problems.read", "AVAILABLE")
+      ? "available"
+      : "all";
+  const [chosen, setChosen] = useState<ProblemFilters | null>(null);
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
-  const view =
-    chosen ??
-    (canAccess(user, "problems.read", "ASSIGNED")
-      ? "assigned"
-      : canAccess(user, "problems.read", "AVAILABLE")
-        ? "available"
-        : "all");
-  const load = useCallback(
-    () =>
-      webApi.fetch(
-        `/v1/problems?view=${view}&page=${page}`,
-        v1.problems.problemListSchema,
-        { cache: "no-store" },
-      ),
-    [view, page],
-  );
+  const filters: ProblemFilters = chosen ?? { view: defaultView, status: "" };
+  const { view, status } = filters;
+  const load = useCallback(() => {
+    const query = new URLSearchParams({ view, page: String(page) });
+    if (status) query.set("status", status);
+    return webApi.fetch(
+      `/v1/problems?${query}`,
+      v1.problems.problemListSchema,
+      { cache: "no-store" },
+    );
+  }, [view, status, page]);
   const remote = useRemote(load);
-  const selectedProblem = remote.data?.items.find(
-    (item) => item.id === selected,
-  );
   return (
-    <WorkspacePage
-      title={t("problems.title")}
-      description={t("problems.description")}
-    >
-      <div className="flex flex-wrap items-end gap-4">
-        <Choice
-          label={t("problems.view")}
-          value={view}
-          onChange={(value) => {
-            setChosen(value);
-            setPage(1);
-            setSelected(null);
-          }}
-          options={[
-            ...(canAccess(user, "problems.read", "ASSIGNED")
-              ? [{ value: "assigned", label: t("problems.mine") }]
-              : []),
-            ...(canAccess(user, "problems.read", "AVAILABLE")
-              ? [{ value: "available", label: t("problems.available") }]
-              : []),
-            ...(canAccess(user, "problems.read", "ALL")
-              ? [{ value: "all", label: t("problems.all") }]
-              : []),
-          ]}
-        />
-        {canAccess(user, "problems.create") ? (
-          <Button onClick={() => setCreating(!creating)}>
-            {creating ? t("cancel") : t("problems.add")}
-          </Button>
-        ) : null}
-      </div>
-      {creating ? (
-        <CreateProblem
-          onSaved={() => {
-            setCreating(false);
-            remote.reload();
-          }}
-        />
-      ) : null}
-      {remote.error ? <Feedback error={remote.error} /> : null}
-      {!remote.data ? (
-        <RemoteState error={remote.error} retry={remote.reload} />
-      ) : (
-        <>
-          <div className="divide-y rounded-lg border">
-            {remote.data.items.map((problem) => (
-              <article key={problem.id} className="flex flex-col gap-3 p-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <Button
-                    variant="link"
-                    className="justify-start"
-                    onClick={() =>
-                      setSelected(selected === problem.id ? null : problem.id)
+    <main className="flex min-w-0 flex-col gap-6 p-4 md:p-8">
+      <PageTitleOverride title={t("problems.title")} />
+      <ListLayout
+        summary={
+          remote.data && (remote.loading || remote.error)
+            ? shared("list.staleResults")
+            : undefined
+        }
+        filters={
+          <ListFilterSheet<ProblemFilters>
+            value={filters}
+            defaultValue={{ view: defaultView, status: "" }}
+            onApply={(value) => {
+              setChosen(value);
+              setPage(1);
+              setSelected(null);
+            }}
+            appliedCount={
+              Number(view !== defaultView) + Number(Boolean(status))
+            }
+            title={shared("list.filters")}
+            applyLabel={shared("list.apply")}
+            resetLabel={shared("list.reset")}
+            cancelLabel={shared("actions.cancel")}
+            applyErrorLabel={shared("list.applyError")}
+          >
+            {({ value, setValue }) => (
+              <>
+                <Field>
+                  <FieldLabel htmlFor="service-view-filter">
+                    {t("problems.view")}
+                  </FieldLabel>
+                  <SheetSelect
+                    id="service-view-filter"
+                    label={t("problems.view")}
+                    value={value.view}
+                    onValueChange={(view) =>
+                      setValue({
+                        ...value,
+                        view: view as ProblemFilters["view"],
+                      })
                     }
-                  >
-                    {problem.scooter.brandName} {problem.scooter.model} ·{" "}
-                    {problem.scooter.fleetNumber}
-                  </Button>
-                  <div className="flex gap-2">
-                    {problem.assigneeNeedsReassignment ? (
-                      <Badge variant="destructive">
-                        {t("problems.reassignRequired")}
-                      </Badge>
-                    ) : null}
-                    <Badge variant="secondary">
-                      {t(`problems.${problem.status}`)}
-                    </Badge>
-                    <Badge variant="outline">
-                      {t(`problems.${problem.priority}`)}
-                    </Badge>
-                  </div>
-                </div>
-                <p className="whitespace-pre-wrap text-sm">
-                  {problem.description}
-                </p>
-                {selectedProblem?.id === problem.id ? (
+                    options={[
+                      ...(canAccess(user, "problems.read", "ASSIGNED")
+                        ? [{ value: "assigned", label: t("problems.mine") }]
+                        : []),
+                      ...(canAccess(user, "problems.read", "AVAILABLE")
+                        ? [
+                            {
+                              value: "available",
+                              label: t("problems.available"),
+                            },
+                          ]
+                        : []),
+                      ...(canAccess(user, "problems.read", "ALL")
+                        ? [{ value: "all", label: t("problems.all") }]
+                        : []),
+                    ]}
+                    searchPlaceholder={shared("list.selectSearch")}
+                    clearSearchLabel={shared("list.selectClearSearch")}
+                    emptyMessage={shared("list.selectEmpty")}
+                    closeLabel={shared("actions.close")}
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="service-status-filter">
+                    {t("status")}
+                  </FieldLabel>
+                  <SheetSelect
+                    id="service-status-filter"
+                    label={t("status")}
+                    value={value.status}
+                    placeholder={shared("list.all")}
+                    onValueChange={(status) =>
+                      setValue({
+                        ...value,
+                        status: v1.problems.problemStatusSchema.parse(status),
+                      })
+                    }
+                    options={v1.problems.problemStatusSchema.options.map(
+                      (status) => ({
+                        value: status,
+                        label: t(`problems.${status}`),
+                      }),
+                    )}
+                    onClear={() => setValue({ ...value, status: "" })}
+                    clearOptionLabel={shared("list.all")}
+                    searchPlaceholder={shared("list.selectSearch")}
+                    clearSearchLabel={shared("list.selectClearSearch")}
+                    emptyMessage={shared("list.selectEmpty")}
+                    closeLabel={shared("actions.close")}
+                  />
+                </Field>
+              </>
+            )}
+          </ListFilterSheet>
+        }
+        action={
+          canAccess(user, "problems.create") ? (
+            <Button onClick={() => setCreating(!creating)}>
+              {creating ? t("cancel") : t("problems.add")}
+            </Button>
+          ) : undefined
+        }
+        footer={
+          remote.data ? (
+            <ListPagination
+              canPrevious={!remote.loading && page > 1}
+              canNext={
+                !remote.loading &&
+                page * remote.data.pageSize < remote.data.total
+              }
+              onPrevious={() => {
+                setPage((value) => value - 1);
+                setSelected(null);
+              }}
+              onNext={() => {
+                setPage((value) => value + 1);
+                setSelected(null);
+              }}
+              label={shared("list.pagination")}
+              previousLabel={t("previous")}
+              nextLabel={t("next")}
+            />
+          ) : undefined
+        }
+      >
+        {creating ? (
+          <CreateProblem
+            onSaved={() => {
+              setCreating(false);
+              remote.reload();
+            }}
+          />
+        ) : null}
+        <ListStatus
+          initial={!remote.data}
+          loading={remote.loading}
+          error={remote.error}
+          loadingLabel={shared(
+            remote.data ? "status.refreshing" : "status.loading",
+          )}
+          retryLabel={t("retry")}
+          onRetry={remote.reload}
+        />
+        {remote.data ? (
+          <ListItems
+            items={remote.data.items}
+            getItemKey={(problem) => problem.id}
+            empty={
+              <ListEmpty>
+                {status || view !== defaultView
+                  ? shared("list.noResults")
+                  : t("empty")}
+              </ListEmpty>
+            }
+            renderItem={(problem) => (
+              <ProblemListItem
+                problem={problem}
+                expanded={selected === problem.id}
+                onToggle={() =>
+                  setSelected(selected === problem.id ? null : problem.id)
+                }
+              >
+                {selected === problem.id ? (
                   <ProblemWork
                     key={`${problem.id}-${problem.revision}`}
                     problem={problem}
                     reload={remote.reload}
                   />
                 ) : null}
-              </article>
-            ))}
-          </div>
-          {remote.data.items.length === 0 ? (
-            <p className="text-muted-foreground">{t("empty")}</p>
-          ) : null}
-          <div className="flex gap-3">
-            <Button
-              variant="outline"
-              disabled={page === 1}
-              onClick={() => setPage((value) => value - 1)}
-            >
-              {t("previous")}
-            </Button>
-            <Button
-              variant="outline"
-              disabled={page * remote.data.pageSize >= remote.data.total}
-              onClick={() => setPage((value) => value + 1)}
-            >
-              {t("next")}
-            </Button>
-          </div>
-        </>
-      )}
-    </WorkspacePage>
+              </ProblemListItem>
+            )}
+          />
+        ) : null}
+      </ListLayout>
+    </main>
   );
 }
 function CreateProblem({ onSaved }: { onSaved: () => void }) {

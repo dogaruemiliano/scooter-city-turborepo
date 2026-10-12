@@ -13,6 +13,12 @@ import {
   Avatar,
   AvatarFallback,
   Badge,
+  buttonVariants,
+  ListLayout,
+  ListItems,
+  ListEmpty,
+  ListPagination,
+  ListStatus,
   Button,
   Card,
   CardContent,
@@ -80,6 +86,7 @@ function MemberAvatar({
 
 export function UsersWorkspace({ id }: { id?: string }) {
   const t = useTranslations("workspace");
+  const shared = useTranslations("shared");
   const locale = useLocale();
   const router = useRouter();
   const [search, setSearch] = useState("");
@@ -179,99 +186,111 @@ export function UsersWorkspace({ id }: { id?: string }) {
               id="member-directory-list"
               className={`${id && !mobileDirectory ? "hidden lg:flex" : "flex"} min-w-0 flex-col gap-4`}
             >
-              <div className="flex items-center justify-between gap-3">
-                <h2 className="font-sans text-sm font-semibold">
-                  {t("access.member.teamMembers", {
-                    count: new Intl.NumberFormat(locale).format(
-                      remote.data.users.total,
-                    ),
-                  })}
-                </h2>
-                <Link
-                  href="/users/new"
-                  onClick={(event) => navigate(event, "/users/new")}
-                  className="inline-flex min-h-11 items-center gap-1 rounded-md text-sm font-semibold text-link outline-none hover:text-link-hover focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <UserPlus className="size-4" aria-hidden="true" />
-                  {t("access.member.add")}
-                </Link>
-              </div>
-              <SearchField
-                id="member-search"
-                name="memberSearch"
-                label={t("access.member.searchMembers")}
-                placeholder={t("access.member.searchPlaceholder")}
-                value={search}
-                onChange={(event) => {
-                  setSearch(event.target.value);
-                  setOffset(0);
-                }}
-              />
-              {remote.error ? <Feedback error={remote.error} /> : null}
-              <div className="flex flex-col gap-3 lg:max-h-(--container-access-directory) lg:overflow-y-auto lg:pr-1">
-                {remote.data.users.items.map((user) => (
+              <ListLayout
+                action={
                   <Link
-                    href={`/users/${user.id}`}
-                    key={user.id}
-                    aria-current={id === user.id ? "page" : undefined}
-                    onClick={(event) => navigate(event, `/users/${user.id}`)}
-                    className="group block min-w-0 rounded-xl [content-visibility:auto] outline-none focus-visible:ring-2 focus-visible:ring-ring minimal:rounded-none"
+                    href="/users/new"
+                    onClick={(event) => navigate(event, "/users/new")}
+                    className={buttonVariants()}
                   >
-                    <Card
-                      size="sm"
-                      className={`transition-colors duration-fast group-hover:border-primary ${id === user.id ? "border-primary bg-popover" : "border-transparent"}`}
-                    >
-                      <CardContent className="flex min-w-0 items-center gap-3">
-                        <MemberAvatar user={user} />
-                        <span className="flex min-w-0 flex-1 flex-col gap-1">
-                          <span
-                            className={`truncate text-sm font-semibold ${id === user.id ? "text-link" : "text-foreground"}`}
-                          >
-                            {memberName(user)}
-                          </span>
-                          <span className="truncate text-xs text-muted-foreground">
-                            {user.email}
-                          </span>
-                          <span className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                            <span className="font-medium text-foreground">
-                              {labelFor(user)}
-                            </span>
-                            <span aria-hidden="true">·</span>
-                            {t(`access.${user.loginStatus.toLowerCase()}`)}
-                          </span>
-                        </span>
-                      </CardContent>
-                    </Card>
+                    <UserPlus aria-hidden="true" data-icon="inline-start" />
+                    {t("access.member.add")}
                   </Link>
-                ))}
-                {remote.data.users.items.length === 0 ? (
-                  <Card size="sm">
-                    <CardContent className="text-muted-foreground">
-                      {t("access.member.noMembers")}
-                    </CardContent>
-                  </Card>
-                ) : null}
-              </div>
-              {remote.data.users.total > 100 ? (
-                <div className="flex gap-2">
-                  <Button
-                    variant="ghost"
-                    disabled={!offset}
-                    onClick={() =>
-                      setOffset((value) => Math.max(0, value - 100))
-                    }
-                  >
-                    {t("previous")}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    disabled={offset + 100 >= remote.data.users.total}
-                    onClick={() => setOffset((value) => value + 100)}
-                  >
-                    {t("next")}
-                  </Button>
-                </div>
-              ) : null}
+                }
+                search={
+                  <SearchField
+                    id="member-search"
+                    name="memberSearch"
+                    label={t("access.member.searchMembers")}
+                    placeholder={t("access.member.searchPlaceholder")}
+                    value={search}
+                    clearLabel={shared("list.selectClearSearch")}
+                    onClear={() => {
+                      setSearch("");
+                      setOffset(0);
+                    }}
+                    onChange={(event) => {
+                      setSearch(event.target.value);
+                      setOffset(0);
+                    }}
+                  />
+                }
+                summary={
+                  <h2 className="font-sans text-sm font-semibold">
+                    {t("access.member.teamMembers", {
+                      count: new Intl.NumberFormat(locale).format(
+                        remote.data.users.total,
+                      ),
+                    })}
+                  </h2>
+                }
+                footer={
+                  remote.data.users.total > 100 ? (
+                    <ListPagination
+                      canPrevious={offset > 0 && !remote.loading}
+                      canNext={
+                        offset + 100 < remote.data.users.total &&
+                        !remote.loading
+                      }
+                      onPrevious={() =>
+                        setOffset((value) => Math.max(0, value - 100))
+                      }
+                      onNext={() => setOffset((value) => value + 100)}
+                      previousLabel={t("previous")}
+                      nextLabel={t("next")}
+                      label={shared("list.pagination")}
+                    />
+                  ) : null
+                }
+              >
+                <ListStatus
+                  loading={remote.loading}
+                  error={remote.error}
+                  loadingLabel={shared("status.refreshing")}
+                  retryLabel={shared("actions.retry")}
+                  onRetry={remote.reload}
+                />
+                <ListItems
+                  items={remote.data.users.items}
+                  getItemKey={(user) => user.id}
+                  className="lg:max-h-(--container-access-directory) lg:overflow-y-auto lg:pr-1"
+                  empty={<ListEmpty>{t("access.member.noMembers")}</ListEmpty>}
+                  renderItem={(user) => (
+                    <Link
+                      href={`/users/${user.id}`}
+                      aria-current={id === user.id ? "page" : undefined}
+                      onClick={(event) => navigate(event, `/users/${user.id}`)}
+                      className="group block min-w-0 rounded-xl [content-visibility:auto] outline-none focus-visible:ring-2 focus-visible:ring-ring minimal:rounded-none"
+                    >
+                      <Card
+                        size="sm"
+                        className={`transition-colors duration-fast group-hover:border-primary ${id === user.id ? "border-primary bg-popover" : "border-transparent"}`}
+                      >
+                        <CardContent className="flex min-w-0 items-center gap-3">
+                          <MemberAvatar user={user} />
+                          <span className="flex min-w-0 flex-1 flex-col gap-1">
+                            <span
+                              className={`truncate text-sm font-semibold ${id === user.id ? "text-link" : "text-foreground"}`}
+                            >
+                              {memberName(user)}
+                            </span>
+                            <span className="truncate text-xs text-muted-foreground">
+                              {user.email}
+                            </span>
+                            <span className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                              <span className="font-medium text-foreground">
+                                {labelFor(user)}
+                              </span>
+                              <span aria-hidden="true">·</span>
+                              {t(`access.${user.loginStatus.toLowerCase()}`)}
+                            </span>
+                          </span>
+                        </CardContent>
+                      </Card>
+                    </Link>
+                  )}
+                />
+              </ListLayout>
             </div>
           </aside>
           <div className="min-w-0 lg:col-span-2 xl:col-span-3">

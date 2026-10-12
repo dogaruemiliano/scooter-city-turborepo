@@ -1,8 +1,12 @@
 "use client";
 
-import { v1 } from "@repo/api-shared";
+import { ApiError, v1 } from "@repo/api-shared";
 import { useRef, useState } from "react";
 import { webApi } from "@/lib/api";
+import {
+  isScooterEditorSessionUnavailable,
+  useScooterEditorSession,
+} from "./useScooterEditorSession";
 
 export interface DocumentDraft {
   id: string;
@@ -11,11 +15,46 @@ export interface DocumentDraft {
   file: File;
   status: "uploading" | "ready" | "failed";
   uploadToken?: string;
+  uploadError?:
+    | "sessionExpired"
+    | "uploadLimit"
+    | "serverTooLarge"
+    | "storageUnavailable"
+    | "uploadDenied"
+    | "connectionFailed";
+  uploadMaxBytes?: number;
+}
+
+function uploadFailure(
+  error: unknown,
+): Pick<DocumentDraft, "uploadError" | "uploadMaxBytes"> {
+  if (isScooterEditorSessionUnavailable(error))
+    return { uploadError: "sessionExpired" };
+  if (error instanceof ApiError) {
+    if (error.status === 413 || error.code === "FILE_TOO_LARGE") {
+      const details = error.details;
+      const maxBytes =
+        details && typeof details === "object" && "maxBytes" in details
+          ? details.maxBytes
+          : undefined;
+      return typeof maxBytes === "number" &&
+        Number.isSafeInteger(maxBytes) &&
+        maxBytes > 0
+        ? { uploadError: "uploadLimit", uploadMaxBytes: maxBytes }
+        : { uploadError: "serverTooLarge" };
+    }
+    if (error.status === 401 || error.status === 403)
+      return { uploadError: "uploadDenied" };
+    if (error.status >= 500) return { uploadError: "storageUnavailable" };
+  }
+  if (error instanceof TypeError) return { uploadError: "connectionFailed" };
+  return {};
 }
 
 export function useScooterDocuments(
   existing: v1.scooters.ScooterDocument[] = [],
 ) {
+  const editorSession = useScooterEditorSession();
   const [drafts, setDrafts] = useState<DocumentDraft[]>([]);
   const [extractions, setExtractions] = useState<
     Record<string, v1.scooters.ScooterDocumentExtractedData | null>
@@ -28,10 +67,18 @@ export function useScooterDocuments(
     uploading.current.add(draft.id);
     setDrafts((current) =>
       current.map((item) =>
-        item.id === draft.id ? { ...item, status: "uploading" } : item,
+        item.id === draft.id
+          ? {
+              ...item,
+              status: "uploading",
+              uploadError: undefined,
+              uploadMaxBytes: undefined,
+            }
+          : item,
       ),
     );
     try {
+      const sessionId = await editorSession.ensureSession();
       const digest = await crypto.subtle.digest(
         "SHA-256",
         await draft.file.arrayBuffer(),
@@ -45,6 +92,7 @@ export function useScooterDocuments(
         {
           method: "POST",
           json: {
+            sessionId,
             type: draft.type,
             contentType: draft.file.type,
             byteSize: draft.file.size,
@@ -52,12 +100,22 @@ export function useScooterDocuments(
           },
         },
       );
+      if (draft.file.size > upload.maxBytes)
+        throw new ApiError(
+          413,
+          "File exceeds the upload limit",
+          "FILE_TOO_LARGE",
+          {
+            maxBytes: upload.maxBytes,
+          },
+        );
       const response = await fetch(upload.uploadUrl, {
         method: upload.method,
         headers: upload.headers,
         body: draft.file,
       });
-      if (!response.ok) throw new Error("Upload failed");
+      if (!response.ok)
+        throw new ApiError(response.status, "Storage rejected the upload");
       setDrafts((current) =>
         current.map((item) =>
           item.id === draft.id
@@ -65,11 +123,17 @@ export function useScooterDocuments(
             : item,
         ),
       );
-    } catch {
+    } catch (error) {
+      editorSession.handleSessionError(error);
       setDrafts((current) =>
         current.map((item) =>
           item.id === draft.id
-            ? { ...item, status: "failed", uploadToken: undefined }
+            ? {
+                ...item,
+                status: "failed",
+                uploadToken: undefined,
+                ...uploadFailure(error),
+              }
             : item,
         ),
       );
@@ -95,6 +159,7 @@ export function useScooterDocuments(
   }
 
   return {
+    ...editorSession,
     drafts,
     extractions,
     setExtractions,

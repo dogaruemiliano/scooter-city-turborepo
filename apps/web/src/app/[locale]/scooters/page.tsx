@@ -141,5 +141,5 @@ function isDefaultSort(
     return true;
   }
 
-  return sort === (query.search ? "relevance" : "vinAsc");
+  return sort === (query.search ? "relevance" : "fleetNumberAsc");
 }

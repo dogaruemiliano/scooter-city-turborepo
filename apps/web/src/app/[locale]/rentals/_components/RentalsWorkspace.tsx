@@ -8,13 +8,14 @@ import {
   FieldGroup,
   FieldLabel,
   Input,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
   Textarea,
+  ListEmpty,
+  ListFilterSheet,
+  ListItems,
+  ListLayout,
+  ListPagination,
+  ListStatus,
+  SheetSelect,
 } from "@repo/ui/components";
 import { useLocale, useTranslations } from "next-intl";
 import { z } from "zod";
@@ -30,6 +31,7 @@ import {
   WorkspacePage,
 } from "@/components/WorkspaceForm";
 import { EntityPicker } from "@/components/EntityPicker";
+import { RentalListItem } from "./RentalListItem";
 
 type Rental = v1.rentals.Rental | v1.rentals.CustomerRental;
 type RentalList = {
@@ -46,9 +48,10 @@ export function RentalsWorkspace({
   id?: string;
 }) {
   const t = useTranslations("workspace");
-  const locale = useLocale();
+  const shared = useTranslations("shared");
   const { user } = useSession();
   const [page, setPage] = useState(1);
+  const [status, setStatus] = useState<Rental["status"] | "">("");
   const [creating, setCreating] = useState(false);
   const endpoint = portal ? "/v1/portal/rentals" : "/v1/rentals";
   const load = useCallback(async (): Promise<RentalList> => {
@@ -64,16 +67,18 @@ export function RentalsWorkspace({
           });
       return { items: [item], total: 1, page: 1, pageSize: 1 };
     }
+    const query = new URLSearchParams({ page: String(page) });
+    if (status) query.set("status", status);
     return portal
       ? webApi.fetch(
-          `${endpoint}?page=${page}`,
+          `${endpoint}?${query}`,
           v1.rentals.customerRentalListSchema,
           { cache: "no-store" },
         )
-      : webApi.fetch(`${endpoint}?page=${page}`, v1.rentals.rentalListSchema, {
+      : webApi.fetch(`${endpoint}?${query}`, v1.rentals.rentalListSchema, {
           cache: "no-store",
         });
-  }, [endpoint, id, page, portal]);
+  }, [endpoint, id, page, portal, status]);
   const remote = useRemote(load);
   return (
     <WorkspacePage
@@ -89,91 +94,132 @@ export function RentalsWorkspace({
       }
     >
       {id ? (
-        <Link href={portal ? "/my-rentals" : "/rentals"}>{t("back")}</Link>
-      ) : !portal && canAccess(user, "rentals.create") ? (
-        <Button className="self-start" onClick={() => setCreating(!creating)}>
-          {creating ? t("cancel") : t("rentals.add")}
-        </Button>
-      ) : null}
-      {creating ? (
-        <CreateRental
-          onSaved={() => {
-            setCreating(false);
-            remote.reload();
-          }}
-        />
-      ) : null}
-      {!remote.data ? (
-        <RemoteState error={remote.error} retry={remote.reload} />
-      ) : id && remote.data.items[0] ? (
-        <RentalDetail
-          key={`${id}-${remote.data.items[0].revision}`}
-          rental={remote.data.items[0]}
-          portal={portal}
-          reload={remote.reload}
-        />
-      ) : (
         <>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t("rentals.scooter")}</TableHead>
-                {!portal ? <TableHead>{t("rentals.person")}</TableHead> : null}
-                <TableHead>{t("rentals.startsAt")}</TableHead>
-                <TableHead>{t("rentals.endsAt")}</TableHead>
-                <TableHead>{t("status")}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {remote.data.items.map((rental) => (
-                <TableRow key={rental.id}>
-                  <TableCell>
-                    <Link
-                      href={`${portal ? "/my-rentals" : "/rentals"}/${rental.id}`}
-                      className="font-medium underline underline-offset-4"
-                    >
-                      {rental.scooter.brandName} {rental.scooter.model} ·{" "}
-                      {rental.scooter.fleetNumber}
-                    </Link>
-                  </TableCell>
-                  {"person" in rental ? (
-                    <TableCell>
-                      {rental.person.firstName} {rental.person.lastName}
-                    </TableCell>
-                  ) : null}
-                  <TableCell>
-                    {new Date(rental.startsAt).toLocaleString(locale)}
-                  </TableCell>
-                  <TableCell>
-                    {new Date(rental.endsAt).toLocaleString(locale)}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="secondary">
-                      {t(`rentals.${rental.status}`)}
-                    </Badge>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          {!remote.data.items.length ? <p>{t("empty")}</p> : null}
-          <div className="flex gap-3">
-            <Button
-              variant="outline"
-              disabled={page === 1}
-              onClick={() => setPage((value) => value - 1)}
-            >
-              {t("previous")}
-            </Button>
-            <Button
-              variant="outline"
-              disabled={page * remote.data.pageSize >= remote.data.total}
-              onClick={() => setPage((value) => value + 1)}
-            >
-              {t("next")}
-            </Button>
-          </div>
+          <Link href={portal ? "/my-rentals" : "/rentals"}>{t("back")}</Link>
+          {!remote.data ? (
+            <RemoteState error={remote.error} retry={remote.reload} />
+          ) : remote.data.items[0] ? (
+            <RentalDetail
+              key={`${id}-${remote.data.items[0].revision}`}
+              rental={remote.data.items[0]}
+              portal={portal}
+              reload={remote.reload}
+            />
+          ) : (
+            <ListEmpty>{t("empty")}</ListEmpty>
+          )}
         </>
+      ) : (
+        <ListLayout
+          summary={
+            remote.data && (remote.loading || remote.error)
+              ? shared("list.staleResults")
+              : undefined
+          }
+          filters={
+            <ListFilterSheet<{ status: Rental["status"] | "" }>
+              value={{ status }}
+              defaultValue={{ status: "" }}
+              onApply={(value) => {
+                setStatus(value.status);
+                setPage(1);
+              }}
+              appliedCount={Number(Boolean(status))}
+              title={shared("list.filters")}
+              applyLabel={shared("list.apply")}
+              resetLabel={shared("list.reset")}
+              cancelLabel={shared("actions.cancel")}
+              applyErrorLabel={shared("list.applyError")}
+            >
+              {({ value, setValue }) => (
+                <Field>
+                  <FieldLabel htmlFor="rental-status-filter">
+                    {t("status")}
+                  </FieldLabel>
+                  <SheetSelect
+                    id="rental-status-filter"
+                    label={t("status")}
+                    value={value.status}
+                    placeholder={shared("list.all")}
+                    onValueChange={(status) =>
+                      setValue({
+                        status: v1.rentals.rentalStatusSchema.parse(status),
+                      })
+                    }
+                    options={v1.rentals.rentalStatusSchema.options.map(
+                      (status) => ({
+                        value: status,
+                        label: t(`rentals.${status}`),
+                      }),
+                    )}
+                    onClear={() => setValue({ status: "" })}
+                    clearOptionLabel={shared("list.all")}
+                    searchPlaceholder={shared("list.selectSearch")}
+                    clearSearchLabel={shared("list.selectClearSearch")}
+                    emptyMessage={shared("list.selectEmpty")}
+                    closeLabel={shared("actions.close")}
+                  />
+                </Field>
+              )}
+            </ListFilterSheet>
+          }
+          action={
+            !portal && canAccess(user, "rentals.create") ? (
+              <Button onClick={() => setCreating(!creating)}>
+                {creating ? t("cancel") : t("rentals.add")}
+              </Button>
+            ) : undefined
+          }
+          footer={
+            remote.data ? (
+              <ListPagination
+                canPrevious={!remote.loading && page > 1}
+                canNext={
+                  !remote.loading &&
+                  page * remote.data.pageSize < remote.data.total
+                }
+                onPrevious={() => setPage((value) => value - 1)}
+                onNext={() => setPage((value) => value + 1)}
+                label={shared("list.pagination")}
+                previousLabel={t("previous")}
+                nextLabel={t("next")}
+              />
+            ) : undefined
+          }
+        >
+          {creating ? (
+            <CreateRental
+              onSaved={() => {
+                setCreating(false);
+                remote.reload();
+              }}
+            />
+          ) : null}
+          <ListStatus
+            initial={!remote.data}
+            loading={remote.loading}
+            error={remote.error}
+            loadingLabel={shared(
+              remote.data ? "status.refreshing" : "status.loading",
+            )}
+            retryLabel={t("retry")}
+            onRetry={remote.reload}
+          />
+          {remote.data ? (
+            <ListItems
+              items={remote.data.items}
+              getItemKey={(rental) => rental.id}
+              empty={
+                <ListEmpty>
+                  {status ? shared("list.noResults") : t("empty")}
+                </ListEmpty>
+              }
+              renderItem={(rental) => (
+                <RentalListItem rental={rental} portal={portal} />
+              )}
+            />
+          ) : null}
+        </ListLayout>
       )}
     </WorkspacePage>
   );
@@ -314,7 +360,7 @@ function RentalDetail({
         <Badge variant="secondary">{t(`rentals.${rental.status}`)}</Badge>
       </header>
       <dl className="grid gap-4 sm:grid-cols-2">
-        {"person" in rental ? (
+        {!portal && "person" in rental ? (
           <div>
             <dt className="text-sm text-muted-foreground">
               {t("rentals.person")}
@@ -345,7 +391,7 @@ function RentalDetail({
           </p>
         </section>
       ) : null}
-      {"internalNotes" in rental && rental.internalNotes ? (
+      {!portal && "internalNotes" in rental && rental.internalNotes ? (
         <section>
           <h3 className="font-medium">{t("rentals.internalNotes")}</h3>
           <p className="mt-2 whitespace-pre-wrap text-sm">
@@ -419,13 +465,13 @@ function CustomerDocuments({ rentalId }: { rentalId: string }) {
       <h2 className="text-lg font-semibold">{t("rentals.documents")}</h2>
       {!remote.data ? (
         <RemoteState error={remote.error} retry={remote.reload} />
-      ) : remote.data.items.length ? (
-        <ul className="divide-y">
-          {remote.data.items.map((document) => (
-            <li
-              key={document.id}
-              className="flex flex-wrap items-center justify-between gap-3 py-3"
-            >
+      ) : (
+        <ListItems
+          items={remote.data.items}
+          getItemKey={(document) => document.id}
+          empty={<ListEmpty>{t("rentals.noDocuments")}</ListEmpty>}
+          renderItem={(document) => (
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <span>{document.fileName}</span>
               <Button
                 variant="outline"
@@ -456,13 +502,9 @@ function CustomerDocuments({ rentalId }: { rentalId: string }) {
               >
                 {t("rentals.download")}
               </Button>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="text-sm text-muted-foreground">
-          {t("rentals.noDocuments")}
-        </p>
+            </div>
+          )}
+        />
       )}
       <Feedback error={task.error} />
     </section>
@@ -498,47 +540,49 @@ function PublicationDocuments({ scooterId }: { scooterId: string }) {
       {!remote.data ? (
         <RemoteState error={remote.error} retry={remote.reload} />
       ) : (
-        remote.data.items.map((document) => (
-          <div
-            key={document.id}
-            className="flex flex-wrap items-center justify-between gap-3 py-3"
-          >
-            <div>
-              <p>{document.fileName}</p>
-              {document.customerVisible ? (
-                <Badge variant="secondary">
-                  {t("rentals.customerVisible")}
-                </Badge>
+        <ListItems
+          items={remote.data.items}
+          getItemKey={(document) => document.id}
+          empty={<ListEmpty>{t("rentals.noDocuments")}</ListEmpty>}
+          renderItem={(document) => (
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p>{document.fileName}</p>
+                {document.customerVisible ? (
+                  <Badge variant="secondary">
+                    {t("rentals.customerVisible")}
+                  </Badge>
+                ) : null}
+              </div>
+              {canAccess(user, "scooter_documents.write") ? (
+                <Button
+                  variant="outline"
+                  disabled={task.busy}
+                  onClick={() =>
+                    void task.run(async () => {
+                      await webApi.fetch(
+                        `/v1/rentals/scooter-documents/${document.id}/visibility`,
+                        z.object({
+                          id: z.string(),
+                          customerVisible: z.boolean(),
+                        }),
+                        {
+                          method: "PATCH",
+                          json: { customerVisible: !document.customerVisible },
+                        },
+                      );
+                      remote.reload();
+                    })
+                  }
+                >
+                  {document.customerVisible
+                    ? t("rentals.unpublish")
+                    : t("rentals.publish")}
+                </Button>
               ) : null}
             </div>
-            {canAccess(user, "scooter_documents.write") ? (
-              <Button
-                variant="outline"
-                disabled={task.busy}
-                onClick={() =>
-                  void task.run(async () => {
-                    await webApi.fetch(
-                      `/v1/rentals/scooter-documents/${document.id}/visibility`,
-                      z.object({
-                        id: z.string(),
-                        customerVisible: z.boolean(),
-                      }),
-                      {
-                        method: "PATCH",
-                        json: { customerVisible: !document.customerVisible },
-                      },
-                    );
-                    remote.reload();
-                  })
-                }
-              >
-                {document.customerVisible
-                  ? t("rentals.unpublish")
-                  : t("rentals.publish")}
-              </Button>
-            ) : null}
-          </div>
-        ))
+          )}
+        />
       )}
       <Feedback error={task.error} success={task.success} />
     </section>

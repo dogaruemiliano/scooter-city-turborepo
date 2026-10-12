@@ -2,7 +2,6 @@ import { Module } from "@nestjs/common";
 import { ENV } from "../config/config.module";
 import type { Env } from "../config/env";
 import { DocumentExtractionError } from "../document-extraction/document-extraction.errors";
-import { OpenAiScooterDocumentExtractionProvider } from "./openai-scooter-document-extraction.provider";
 import { ScooterDocumentExtractionService } from "./scooter-document-extraction.service";
 import { SCOOTER_DOCUMENT_EXTRACTION_PROVIDER } from "./scooter-document-extraction.types";
 import type { ScooterDocumentExtractionProvider } from "./scooter-document-extraction.types";
@@ -15,11 +14,20 @@ export function createScooterDocumentExtractionProvider(
       throw new Error(
         "Scooter-document extraction requires a server-side API key.",
       );
-    return new OpenAiScooterDocumentExtractionProvider({
-      apiKey: env.SCOOTER_DOCUMENT_EXTRACTION_OPENAI_API_KEY,
-      model: env.SCOOTER_DOCUMENT_EXTRACTION_MODEL,
-      timeoutMs: env.SCOOTER_DOCUMENT_EXTRACTION_TIMEOUT_MS,
-    });
+    // Keep the legacy benchmark transport out of the web process's module
+    // graph: importing it eagerly loads native canvas/PDF rendering libraries.
+    const apiKey = env.SCOOTER_DOCUMENT_EXTRACTION_OPENAI_API_KEY;
+    return {
+      analyze: async (input) => {
+        const { OpenAiScooterDocumentExtractionProvider } =
+          await import("./openai-scooter-document-extraction.provider.js");
+        return new OpenAiScooterDocumentExtractionProvider({
+          apiKey,
+          model: env.SCOOTER_DOCUMENT_EXTRACTION_MODEL,
+          timeoutMs: env.SCOOTER_DOCUMENT_EXTRACTION_TIMEOUT_MS,
+        }).analyze(input);
+      },
+    };
   }
   if (env.SCOOTER_DOCUMENT_EXTRACTION_DRIVER === "fake") {
     if (env.NODE_ENV === "production")

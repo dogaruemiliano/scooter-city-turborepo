@@ -1,6 +1,6 @@
 import type { v1 } from "@repo/api-shared";
 import type { SupportedLocale } from "@repo/i18n";
-import { Card } from "@repo/ui/components";
+import { Card, ListEmpty, ListItems } from "@repo/ui/components";
 import { getTranslations } from "next-intl/server";
 
 import { formatMinorAmount } from "@/lib/finance-format";
@@ -41,52 +41,49 @@ export async function AccountBalanceTable({
     .filter((group) => group.rows.length > 0);
 
   if (grouped.length === 0) {
-    return (
-      <Card className="p-6">
-        <p className="text-sm text-muted-foreground">{t("empty")}</p>
-      </Card>
-    );
+    return <ListEmpty>{t("empty")}</ListEmpty>;
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      {grouped.map((group) => (
-        <section key={group.category} className="flex flex-col gap-2">
+    <ListItems
+      items={grouped}
+      getItemKey={(group) => group.category}
+      renderItem={(group) => (
+        <section className="flex flex-col gap-2">
           <h2 className="text-base font-medium">
             {t(`categories.${group.category}`)}
           </h2>
 
           <Card className="gap-0 py-0 md:hidden">
-            <ul>
-              {group.rows.map((balance) => (
-                <li
-                  key={balance.accountId}
-                  className="border-b p-3 last:border-b-0"
-                >
-                  <div className="grid grid-cols-2 gap-x-3 gap-y-1">
-                    <p className="min-w-0 break-words font-medium">
-                      {balance.name}
-                    </p>
+            <ListItems
+              items={group.rows}
+              getItemKey={(balance) => balance.accountId}
+              className="gap-0"
+              itemClassName="border-b p-3 last:border-b-0"
+              renderItem={(balance) => (
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+                  <p className="min-w-0 break-words font-medium">
+                    {balance.name}
+                  </p>
 
-                    <p className="min-w-0 break-words text-right font-medium tabular-nums">
-                      {formatMinorAmount(
-                        balance.displayBalanceMinor,
-                        currency,
-                        locale,
-                      )}
-                    </p>
+                  <p className="min-w-0 break-words text-right font-medium tabular-nums">
+                    {formatMinorAmount(
+                      balance.displayBalanceMinor,
+                      currency,
+                      locale,
+                    )}
+                  </p>
 
-                    <p className="min-w-0 break-words text-muted-foreground">
-                      {t(`roles.${balance.role}`)}
-                    </p>
+                  <p className="min-w-0 break-words text-muted-foreground">
+                    {t(`roles.${balance.role}`)}
+                  </p>
 
-                    <p className="min-w-0 text-right tabular-nums text-muted-foreground">
-                      {t("postingCount", { count: balance.postingCount })}
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ul>
+                  <p className="min-w-0 text-right tabular-nums text-muted-foreground">
+                    {t("postingCount", { count: balance.postingCount })}
+                  </p>
+                </div>
+              )}
+            />
           </Card>
 
           <Card className="hidden gap-0 overflow-hidden py-0 md:flex">
@@ -133,7 +130,7 @@ export async function AccountBalanceTable({
             </table>
           </Card>
         </section>
-      ))}
-    </div>
+      )}
+    />
   );
 }

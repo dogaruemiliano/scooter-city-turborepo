@@ -1,5 +1,10 @@
 # Scooter document extraction
 
+The synchronous transport described below is the historical implementation. The
+current job API, direct S3 inputs, deployment settings and abandoned-resource
+cleanup are documented in [Background scooter document extraction](background-document-extraction.md).
+The validation and review rules below still apply.
+
 The scooter editor reads uploaded import documents, CIVs, registration certificates,
 and insurance policies before the scooter is saved. **Extrage și continuă** starts
 extraction and then opens the existing document review steps. Manual entry and JSON
@@ -51,7 +56,7 @@ source evidence stays in the editor until the final save stores the existing
 Results in an unsaved form are not durable and do not resume after a browser reload.
 
 The server validates actual byte length, SHA-256, media signatures and PDF structure.
-Files are limited to 10 MiB (or the lower storage limit), and PDFs to ten actual pages.
+Files are limited to 15 MiB (or the lower storage limit), and PDFs to ten actual pages.
 PDFs requiring an opening password, malformed PDFs and oversized PDFs receive
 explicit errors; pages are never silently truncated. Storage reads are bounded
 separately from the provider timeout.

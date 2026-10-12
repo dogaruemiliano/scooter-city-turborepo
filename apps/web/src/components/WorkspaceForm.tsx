@@ -148,6 +148,11 @@ export function useRemote<T>(load: () => Promise<T>) {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
+  const [settled, setSettled] = useState<{
+    load: typeof load;
+    version: number;
+  } | null>(null);
+  const loading = settled?.load !== load || settled?.version !== version;
   const reload = useCallback(() => setVersion((v) => v + 1), []);
   useEffect(() => {
     let active = true;
@@ -161,12 +166,22 @@ export function useRemote<T>(load: () => Promise<T>) {
       .catch((cause) => {
         if (active)
           setError(cause instanceof Error ? cause.message : String(cause));
+      })
+      .finally(() => {
+        if (active) setSettled({ load, version });
       });
     return () => {
       active = false;
     };
   }, [load, version]);
-  return { data, error, reload, setData };
+  return {
+    data,
+    error: loading ? null : error,
+    reload,
+    setData,
+    loading,
+    refreshing: loading && data !== null,
+  };
 }
 
 export function RemoteState({

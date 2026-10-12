@@ -1,5 +1,6 @@
 import { v1 } from "@repo/api-shared";
 import { messages } from "@repo/i18n";
+import { ListLayout } from "@repo/ui/components";
 import type { Metadata } from "next";
 
 import { resolveRouteLocale } from "@/i18n/paths";
@@ -58,10 +59,12 @@ export default async function AccountsRoutePage({
     "RON";
 
   return (
-    <AccountBalanceTable
-      balances={balances.items}
-      currency={currency}
-      locale={locale}
-    />
+    <ListLayout>
+      <AccountBalanceTable
+        balances={balances.items}
+        currency={currency}
+        locale={locale}
+      />
+    </ListLayout>
   );
 }

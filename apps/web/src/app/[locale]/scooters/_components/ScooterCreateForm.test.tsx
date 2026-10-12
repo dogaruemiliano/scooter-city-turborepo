@@ -34,7 +34,30 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/lib/api", () => ({
   webApi: {
-    fetch: mocks.apiFetch,
+    fetch: async (path: string, ...args: unknown[]) => {
+      if (path === v1.scooters.ROUTES.documents.createEditorSession)
+        return {
+          id: "editor-session",
+          expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
+        };
+      if (
+        path ===
+        v1.scooters.ROUTES.documents.discardEditorSession("editor-session")
+      )
+        return { ok: true };
+      const result = await mocks.apiFetch(path, ...args);
+      return path === v1.scooters.ROUTES.documents.startExtractionJob &&
+        result?.extractedData
+        ? {
+            id: `job-${result.sourceId}`,
+            sourceId: result.sourceId,
+            documentType: result.documentType,
+            status: "completed",
+            result,
+            expiresAt: new Date(Date.now() + 300_000).toISOString(),
+          }
+        : result;
+    },
   },
 }));
 

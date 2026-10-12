@@ -5,17 +5,12 @@ import { canAccess } from "@/lib/access";
 
 import { ApiError, v1 } from "@repo/api-shared";
 import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
   buttonVariants,
   Label,
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  ListFilterSheet,
+  ListLayout,
+  ListStatus,
+  SheetSelect,
 } from "@repo/ui/components";
 import { PlusIcon } from "lucide-react";
 import Link from "next/link";
@@ -29,9 +24,7 @@ import {
 } from "react";
 
 import { InfiniteListFooter } from "@/components/InfiniteListFooter";
-import { ListFilterSheet } from "@/components/ListFilterSheet";
 import { ListSearchInput } from "@/components/ListSearchInput";
-import { ListSortSelect } from "@/components/ListSortSelect";
 import { webApi } from "@/lib/api";
 import { ScooterList } from "./ScooterList";
 
@@ -42,16 +35,17 @@ interface ScootersPageProps {
   /** Scooter IDs with an active sale, resolved for `initialList`. */
 }
 
-interface Feedback {
-  kind: "error";
-  title: string;
-  message: string;
-}
-
 const LIST_PAGE_SIZE = 25;
 const ALL_FILTERS = "all";
 const ACTIVE_RECORDS = "active";
 const SEARCH_DEBOUNCE_MS = 500;
+const QUERY_KEYS = [
+  "search",
+  "powertrainType",
+  "registrationType",
+  "sort",
+  "includeDeleted",
+] as const;
 
 export function ScootersPage({
   createHref,
@@ -75,7 +69,9 @@ function ScootersPageContent({
 }: ScootersPageProps) {
   const session = useOptionalSession();
   const t = useTranslations("scooters");
+  const tShared = useTranslations("shared");
   const [list, setList] = useState(initialList);
+  const [filterNavigationKey, setFilterNavigationKey] = useState(0);
   const [query, setQuery] =
     useState<v1.scooters.ListScootersQuery>(initialQuery);
   const [draftQuery, setDraftQuery] =
@@ -83,10 +79,12 @@ function ScootersPageContent({
   const [listLoading, setListLoading] = useState(false);
   const [appendLoading, setAppendLoading] = useState(false);
   const [appendError, setAppendError] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const [listError, setListError] = useState<string | null>(null);
   const requestIdRef = useRef(0);
+  const lastRequestRef = useRef(initialQuery);
   const appendLoadingRef = useRef(false);
   const searchDebounceReadyRef = useRef(false);
+  const pendingSearchRef = useRef<string | null>(null);
   const searchDebounceTimeoutRef = useRef<number | null>(null);
 
   const clearSearchDebounce = useCallback(() => {
@@ -103,7 +101,7 @@ function ScootersPageContent({
       nextQuery: v1.scooters.ListScootersQuery,
       options: {
         clearFeedback?: boolean;
-        history?: "push" | "replace";
+        history?: "push" | "replace" | "none";
         preserveDraft?: boolean;
       } = {},
     ) => {
@@ -114,12 +112,14 @@ function ScootersPageContent({
       });
       const requestId = requestIdRef.current + 1;
       requestIdRef.current = requestId;
+      pendingSearchRef.current = normalizedSearch(parsedQuery.search);
+      lastRequestRef.current = parsedQuery;
       appendLoadingRef.current = false;
       setListLoading(true);
       setAppendLoading(false);
       setAppendError(null);
       if (options.clearFeedback !== false) {
-        setFeedback(null);
+        setListError(null);
       }
 
       try {
@@ -130,30 +130,32 @@ function ScootersPageContent({
         );
 
         if (requestId !== requestIdRef.current) {
-          return;
+          return false;
         }
 
-        updateScootersUrl(parsedQuery, options.history ?? "push");
+        if (options.history !== "none") {
+          updateScootersUrl(parsedQuery, options.history ?? "push");
+        }
         setList(nextList);
         setQuery(parsedQuery);
         if (!options.preserveDraft) {
           setDraftQuery(parsedQuery);
         }
+        return true;
       } catch (error) {
         if (requestId !== requestIdRef.current) {
-          return;
+          return false;
         }
 
-        setFeedback({
-          kind: "error",
-          title: t("feedback.listErrorTitle"),
-          message:
-            error instanceof ApiError
-              ? error.message
-              : t("feedback.genericError"),
-        });
+        setListError(
+          error instanceof ApiError
+            ? error.message
+            : t("feedback.genericError"),
+        );
+        return false;
       } finally {
         if (requestId === requestIdRef.current) {
+          pendingSearchRef.current = null;
           setListLoading(false);
         }
       }
@@ -219,7 +221,10 @@ function ScootersPageContent({
       return;
     }
 
-    if (draftQuery.search === query.search) {
+    if (
+      normalizedSearch(draftQuery.search) === normalizedSearch(query.search) ||
+      pendingSearchRef.current === normalizedSearch(draftQuery.search)
+    ) {
       return;
     }
 
@@ -257,7 +262,7 @@ function ScootersPageContent({
     if (search === normalizedSearch(query.search)) return;
 
     await loadScooters({
-      ...draftQuery,
+      ...query,
       search: search || undefined,
       page: 1,
       pageSize: LIST_PAGE_SIZE,
@@ -285,238 +290,258 @@ function ScootersPageContent({
     );
   }
 
-  async function changeSort(value: string | null) {
-    if (!value) {
-      return;
+  useEffect(() => {
+    const pathname = window.location.pathname;
+    function restoreLocation() {
+      if (window.location.pathname !== pathname) return;
+      clearSearchDebounce();
+      const params = new URLSearchParams(window.location.search);
+      const restoredQuery = v1.scooters.listScootersQuerySchema.safeParse({
+        ...Object.fromEntries(
+          QUERY_KEYS.map((key) => [key, params.get(key) ?? undefined]),
+        ),
+        page: 1,
+        pageSize: LIST_PAGE_SIZE,
+      });
+      if (!restoredQuery.success) {
+        // URL validation remains the server route's responsibility.
+        window.location.reload();
+        return;
+      }
+      setFilterNavigationKey((current) => current + 1);
+      setDraftQuery(restoredQuery.data);
+      void loadScooters(restoredQuery.data, { history: "none" });
     }
 
-    clearSearchDebounce();
-    const sort = value as v1.scooters.ScooterListSort;
-    const nextQuery = {
-      ...draftQuery,
-      page: 1,
-      pageSize: LIST_PAGE_SIZE,
-      sort: isDefaultSort(draftQuery, sort) ? undefined : sort,
-    };
-
-    setDraftQuery(nextQuery);
-    await loadScooters(nextQuery);
-  }
-
-  async function resetFilters() {
-    clearSearchDebounce();
-    await loadScooters({
-      page: 1,
-      pageSize: LIST_PAGE_SIZE,
-      includeDeleted: false,
-    });
-  }
-
-  function setDraftValue<Key extends keyof v1.scooters.ListScootersQuery>(
-    key: Key,
-    value: v1.scooters.ListScootersQuery[Key],
-  ) {
-    setDraftQuery((current) => ({
-      ...current,
-      [key]: value,
-    }));
-  }
+    window.addEventListener("popstate", restoreLocation);
+    return () => window.removeEventListener("popstate", restoreLocation);
+  }, [clearSearchDebounce, loadScooters]);
 
   const hasMore = list.items.length < list.total;
 
+  const selectLabels = {
+    searchPlaceholder: tShared("list.selectSearch"),
+    clearSearchLabel: tShared("list.selectClearSearch"),
+    emptyMessage: tShared("list.selectEmpty"),
+    closeLabel: tShared("actions.close"),
+  };
+
   return (
     <div className="mx-auto flex w-full max-w-screen-xl flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
-      <div className="flex justify-end">
-        {canAccess(session?.user, "scooters.create") ? (
-          <Link href={createHref} className={buttonVariants()}>
-            <PlusIcon data-icon="inline-start" />
-            {t("actions.add")}
-          </Link>
-        ) : null}
-      </div>
-
-      {feedback ? (
-        <Alert variant="destructive">
-          <AlertTitle>{feedback.title}</AlertTitle>
-          <AlertDescription>{feedback.message}</AlertDescription>
-        </Alert>
-      ) : null}
-
-      <div className="flex flex-col gap-4">
-        <div className="grid w-full gap-3 lg:grid-cols-2 lg:items-end">
-          <div className="w-full lg:max-w-md">
-            <ListSearchInput
-              id="scooters-search"
-              label={t("list.searchLabel")}
-              clearLabel={t("list.clearSearchLabel")}
-              placeholder={t("placeholders.search")}
-              value={draftQuery.search ?? ""}
-              onChange={(search) => {
-                setDraftQuery((current) => ({
-                  ...current,
-                  search: search || undefined,
-                  sort:
-                    current.sort === "relevance" && !search
-                      ? undefined
-                      : current.sort,
-                }));
-              }}
-              onClear={clearScootersSearch}
-              onSearch={searchScooters}
-            />
-          </div>
-
-          <div className="flex w-full items-center justify-between gap-4 lg:justify-end">
-            <ListSortSelect
-              id="scooters-sort"
-              label={t("filters.sort")}
-              value={effectiveListSort(draftQuery)}
-              values={v1.scooters.SCOOTER_LIST_SORTS.filter(
-                (sort) => sort !== "relevance" || draftQuery.search,
-              )}
-              getOptionLabel={(sort) => t(`listSorts.${sort}`)}
-              onValueChange={(value) => void changeSort(value)}
-            />
-
-            <ListFilterSheet
-              appliedCount={operationalFilterCount(query)}
-              applyLabel={t("actions.apply")}
-              description={t("filters.description")}
-              disabled={listLoading}
-              formId="scooters-filter-form"
-              onApply={() =>
-                loadScooters({
-                  ...draftQuery,
-                  page: 1,
-                  pageSize: LIST_PAGE_SIZE,
-                })
+      <ListLayout
+        action={
+          canAccess(session?.user, "scooters.create") ? (
+            <Link href={createHref} className={buttonVariants()}>
+              <PlusIcon data-icon="inline-start" />
+              {t("actions.add")}
+            </Link>
+          ) : null
+        }
+        filters={
+          <ListFilterSheet
+            key={filterNavigationKey}
+            value={{ ...query, search: draftQuery.search }}
+            defaultValue={{
+              page: 1,
+              pageSize: LIST_PAGE_SIZE,
+              includeDeleted: false,
+              search: draftQuery.search,
+            }}
+            appliedCount={operationalFilterCount(query)}
+            applyLabel={t("actions.apply")}
+            cancelLabel={t("actions.cancel")}
+            applyErrorLabel={tShared("list.applyError")}
+            description={t("filters.description")}
+            disabled={listLoading}
+            onApply={(value) => {
+              clearSearchDebounce();
+              return loadScooters({
+                ...value,
+                search: normalizedSearch(draftQuery.search) || undefined,
+                page: 1,
+                pageSize: LIST_PAGE_SIZE,
+              });
+            }}
+            resetLabel={t("filters.reset")}
+            title={t("filters.title")}
+          >
+            {({ value, setValue }) => {
+              function setFilterValue<
+                Key extends keyof v1.scooters.ListScootersQuery,
+              >(key: Key, fieldValue: v1.scooters.ListScootersQuery[Key]) {
+                setValue((current) => ({ ...current, [key]: fieldValue }));
               }
-              onReset={resetFilters}
-              resetLabel={t("filters.reset")}
-              title={t("filters.title")}
-            >
-              <div className="grid gap-4 sm:grid-cols-2">
-                <FilterField
-                  id="scooters-record-status"
-                  label={t("filters.recordStatus")}
-                >
-                  <Select
-                    value={
-                      draftQuery.includeDeleted ? ALL_FILTERS : ACTIVE_RECORDS
-                    }
-                    onValueChange={(value) =>
-                      setDraftValue("includeDeleted", value === ALL_FILTERS)
-                    }
+              return (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <FilterField id="scooters-sort" label={t("filters.sort")}>
+                    <SheetSelect
+                      {...selectLabels}
+                      id="scooters-sort"
+                      label={t("filters.sort")}
+                      value={effectiveListSort(value)}
+                      options={v1.scooters.SCOOTER_LIST_SORTS.filter(
+                        (sort) => sort !== "relevance" || draftQuery.search,
+                      ).map((sort) => ({
+                        value: sort,
+                        label: t(`listSorts.${sort}`),
+                      }))}
+                      onValueChange={(sort) =>
+                        setFilterValue(
+                          "sort",
+                          isDefaultSort(
+                            { ...value, search: draftQuery.search },
+                            sort as v1.scooters.ScooterListSort,
+                          )
+                            ? undefined
+                            : (sort as v1.scooters.ScooterListSort),
+                        )
+                      }
+                    />
+                  </FilterField>
+
+                  <FilterField
+                    id="scooters-record-status"
+                    label={t("filters.recordStatus")}
                   >
-                    <SelectTrigger
+                    <SheetSelect
+                      {...selectLabels}
                       id="scooters-record-status"
-                      className="w-full"
-                    >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        <SelectItem value={ACTIVE_RECORDS}>
-                          {t("recordStatus.active")}
-                        </SelectItem>
-                        <SelectItem value={ALL_FILTERS}>
-                          {t("recordStatus.all")}
-                        </SelectItem>
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                </FilterField>
+                      label={t("filters.recordStatus")}
+                      value={
+                        value.includeDeleted ? ALL_FILTERS : ACTIVE_RECORDS
+                      }
+                      onValueChange={(value) =>
+                        setFilterValue("includeDeleted", value === ALL_FILTERS)
+                      }
+                      options={[
+                        {
+                          value: ACTIVE_RECORDS,
+                          label: t("recordStatus.active"),
+                        },
+                        { value: ALL_FILTERS, label: t("recordStatus.all") },
+                      ]}
+                    />
+                  </FilterField>
 
-                <FilterField
-                  id="scooters-powertrain-type"
-                  label={t("filters.powertrainType")}
-                >
-                  <Select
-                    value={draftQuery.powertrainType ?? ALL_FILTERS}
-                    onValueChange={(value) =>
-                      setDraftValue(
-                        "powertrainType",
-                        value === ALL_FILTERS
-                          ? undefined
-                          : (value as v1.scooters.ScooterPowertrainType),
-                      )
-                    }
+                  <FilterField
+                    id="scooters-powertrain-type"
+                    label={t("filters.powertrainType")}
                   >
-                    <SelectTrigger
+                    <SheetSelect
+                      {...selectLabels}
                       id="scooters-powertrain-type"
-                      className="w-full"
-                    >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        <SelectItem value={ALL_FILTERS}>
-                          {t("filters.all")}
-                        </SelectItem>
-                        {v1.scooters.SCOOTER_POWERTRAIN_TYPES.map((type) => (
-                          <SelectItem key={type} value={type}>
-                            {t(`powertrainTypes.${type}`)}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                </FilterField>
+                      label={t("filters.powertrainType")}
+                      value={value.powertrainType ?? ALL_FILTERS}
+                      onValueChange={(value) =>
+                        setFilterValue(
+                          "powertrainType",
+                          value === ALL_FILTERS
+                            ? undefined
+                            : (value as v1.scooters.ScooterPowertrainType),
+                        )
+                      }
+                      options={[
+                        { value: ALL_FILTERS, label: t("filters.all") },
+                        ...v1.scooters.SCOOTER_POWERTRAIN_TYPES.map(
+                          (option) => ({
+                            value: option,
+                            label: t(`powertrainTypes.${option}`),
+                          }),
+                        ),
+                      ]}
+                    />
+                  </FilterField>
 
-                <FilterField
-                  id="scooters-registration-type"
-                  label={t("filters.registrationType")}
-                >
-                  <Select
-                    value={draftQuery.registrationType ?? ALL_FILTERS}
-                    onValueChange={(value) =>
-                      setDraftValue(
-                        "registrationType",
-                        value === ALL_FILTERS
-                          ? undefined
-                          : (value as v1.scooters.ScooterRegistrationType),
-                      )
-                    }
+                  <FilterField
+                    id="scooters-registration-type"
+                    label={t("filters.registrationType")}
                   >
-                    <SelectTrigger
+                    <SheetSelect
+                      {...selectLabels}
                       id="scooters-registration-type"
-                      className="w-full"
-                    >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        <SelectItem value={ALL_FILTERS}>
-                          {t("filters.all")}
-                        </SelectItem>
-                        {v1.scooters.SCOOTER_REGISTRATION_TYPES.map(
-                          (registrationType) => (
-                            <SelectItem
-                              key={registrationType}
-                              value={registrationType}
-                            >
-                              {t(`registrationTypes.${registrationType}`)}
-                            </SelectItem>
-                          ),
-                        )}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                </FilterField>
-              </div>
-            </ListFilterSheet>
-          </div>
-        </div>
-
-        <ScooterList items={list.items} />
-
-        <InfiniteListFooter
-          hasMore={hasMore && !listLoading}
-          loading={appendLoading}
-          error={appendError}
-          onLoadMore={loadNextScootersPage}
+                      label={t("filters.registrationType")}
+                      value={value.registrationType ?? ALL_FILTERS}
+                      onValueChange={(value) =>
+                        setFilterValue(
+                          "registrationType",
+                          value === ALL_FILTERS
+                            ? undefined
+                            : (value as v1.scooters.ScooterRegistrationType),
+                        )
+                      }
+                      options={[
+                        { value: ALL_FILTERS, label: t("filters.all") },
+                        ...v1.scooters.SCOOTER_REGISTRATION_TYPES.map(
+                          (option) => ({
+                            value: option,
+                            label: t(`registrationTypes.${option}`),
+                          }),
+                        ),
+                      ]}
+                    />
+                  </FilterField>
+                </div>
+              );
+            }}
+          </ListFilterSheet>
+        }
+        search={
+          <ListSearchInput
+            id="scooters-search"
+            label={t("list.searchLabel")}
+            clearLabel={t("list.clearSearchLabel")}
+            placeholder={t("placeholders.search")}
+            value={draftQuery.search ?? ""}
+            onChange={(search) => {
+              setDraftQuery((current) => ({
+                ...current,
+                search: search || undefined,
+                sort:
+                  current.sort === "relevance" && !search
+                    ? undefined
+                    : current.sort,
+              }));
+            }}
+            onClear={clearScootersSearch}
+            onSearch={searchScooters}
+          />
+        }
+        summary={
+          listLoading || listError ? (
+            <>
+              <ListStatus
+                loading={listLoading}
+                error={listError}
+                loadingLabel={tShared("status.refreshing")}
+                retryLabel={tShared("actions.retry")}
+                onRetry={() => void loadScooters(lastRequestRef.current)}
+              />
+              {(listLoading || listError) && list.items.length > 0 ? (
+                <p role="status">{tShared("list.staleResults")}</p>
+              ) : null}
+            </>
+          ) : null
+        }
+        footer={
+          hasMore || appendLoading || appendError ? (
+            <InfiniteListFooter
+              hasMore={hasMore && !listLoading}
+              loading={appendLoading}
+              error={appendError}
+              onLoadMore={loadNextScootersPage}
+            />
+          ) : null
+        }
+      >
+        <ScooterList
+          items={list.items}
+          emptyMessage={
+            query.search || operationalFilterCount(query) > 0
+              ? tShared("list.noResults")
+              : undefined
+          }
         />
-      </div>
+      </ListLayout>
     </div>
   );
 }
@@ -548,11 +573,19 @@ function updateScootersUrl(
   query: v1.scooters.ListScootersQuery,
   history: "push" | "replace",
 ) {
-  const params = new URLSearchParams();
+  const params = new URLSearchParams(window.location.search);
+  for (const key of QUERY_KEYS) params.delete(key);
+  params.delete("page");
+  params.delete("pageSize");
   appendScootersQueryParams(params, query);
 
   const search = params.toString();
-  const href = `${window.location.pathname}${search ? `?${search}` : ""}`;
+  const href = `${window.location.pathname}${search ? `?${search}` : ""}${window.location.hash}`;
+  if (
+    `${window.location.pathname}${window.location.search}${window.location.hash}` ===
+    href
+  )
+    return;
   if (history === "replace") {
     window.history.replaceState(null, "", href);
     return;
@@ -601,6 +634,7 @@ function isDefaultSort(
 
 function operationalFilterCount(query: v1.scooters.ListScootersQuery): number {
   return [
+    query.sort && !isDefaultSort(query, query.sort),
     query.includeDeleted,
     query.powertrainType,
     query.registrationType,

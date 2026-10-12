@@ -1,6 +1,6 @@
 import { v1 } from "@repo/api-shared";
 import { messages, type SupportedLocale } from "@repo/i18n";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -96,6 +96,103 @@ beforeEach(() => {
 });
 
 describe("PersonsPage", () => {
+  it("does not repeatedly fetch a whitespace-normalized search", async () => {
+    mocks.apiFetch.mockResolvedValue(personList([], { total: 0 }));
+    const browser = userEvent.setup();
+    renderPersons();
+    await browser.type(screen.getByLabelText("Search persons"), "ada   ");
+    expect(
+      await screen.findByText(messages.en.shared.list.noResults),
+    ).toBeVisible();
+    await act(() => new Promise((resolve) => window.setTimeout(resolve, 650)));
+    expect(mocks.apiFetch).toHaveBeenCalledTimes(1);
+    expect(window.location.search).toBe("?search=ada");
+  });
+
+  it("restores applied filters and results on browser Back and Forward", async () => {
+    mocks.apiFetch
+      .mockResolvedValueOnce(personList([], { total: 0 }))
+      .mockResolvedValueOnce(personList([person]))
+      .mockResolvedValueOnce(personList([], { total: 0 }));
+    const browser = userEvent.setup();
+    renderPersons();
+    await browser.click(screen.getByRole("button", { name: "Filters" }));
+    await browser.click(screen.getByRole("button", { name: "Document type" }));
+    await browser.click(screen.getByRole("button", { name: "Passport" }));
+    await browser.click(screen.getByRole("button", { name: "Apply" }));
+    await waitFor(() =>
+      expect(window.location.search).toBe("?documentType=passport"),
+    );
+
+    act(() => {
+      window.history.back();
+    });
+    await waitFor(() =>
+      expect(mocks.apiFetch).toHaveBeenLastCalledWith(
+        `${v1.persons.ROUTES.list}?page=1&pageSize=25`,
+        v1.persons.personListSchema,
+        { cache: "no-store" },
+      ),
+    );
+    expect(await screen.findByText("Ada Lovelace")).toBeVisible();
+    expect(window.location.search).toBe("");
+    await browser.click(screen.getByRole("button", { name: "Filters" }));
+    expect(
+      screen.getByRole("button", { name: "Document type" }),
+    ).toHaveTextContent("All");
+
+    act(() => {
+      window.history.forward();
+    });
+    await waitFor(() => expect(mocks.apiFetch).toHaveBeenCalledTimes(3));
+    expect(
+      await screen.findByText(messages.en.shared.list.noResults),
+    ).toBeVisible();
+    expect(window.location.search).toBe("?documentType=passport");
+    expect(
+      screen.queryByRole("dialog", { name: "Filters" }),
+    ).not.toBeInTheDocument();
+    await browser.click(screen.getByRole("button", { name: "Filters" }));
+    expect(
+      screen.getByRole("button", { name: "Document type" }),
+    ).toHaveTextContent("Passport");
+  });
+
+  it("discards a nested filter selection when the parent sheet is cancelled", async () => {
+    const browser = userEvent.setup();
+    renderPersons();
+    await browser.click(screen.getByRole("button", { name: "Filters" }));
+    const sheet = screen.getByRole("dialog", { name: "Filters" });
+    expect(sheet).toHaveClass("bg-popover");
+    expect(sheet).not.toHaveClass("bg-background");
+    for (const surface of sheet.querySelectorAll(
+      "[data-slot=bottom-sheet-header], [data-slot=bottom-sheet-body], [data-slot=bottom-sheet-footer]",
+    )) {
+      expect(surface).not.toHaveClass("bg-background");
+    }
+    await browser.click(screen.getByRole("button", { name: "Document type" }));
+    expect(screen.getByRole("dialog", { name: "Document type" })).toBeVisible();
+    await browser.click(
+      await screen.findByRole("button", { name: "Passport" }),
+    );
+    expect(screen.getByRole("dialog", { name: "Filters" })).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "Document type" }),
+    ).toHaveTextContent("Passport");
+    expect(mocks.apiFetch).not.toHaveBeenCalled();
+    await browser.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "Filters" }),
+      ).not.toBeInTheDocument(),
+    );
+    await browser.click(screen.getByRole("button", { name: "Filters" }));
+    expect(
+      screen.getByRole("button", { name: "Document type" }),
+    ).toHaveTextContent("All");
+    expect(mocks.apiFetch).not.toHaveBeenCalled();
+  });
+
   it("renders the initial persons list", () => {
     renderPersons();
 
@@ -227,9 +324,13 @@ describe("PersonsPage", () => {
     renderPersons();
 
     const filters = screen.getByRole("button", { name: "Filters" });
-    const sort = screen.getByRole("combobox", { name: "Sort" });
+    expect(
+      screen.queryByRole("button", { name: "Sort" }),
+    ).not.toBeInTheDocument();
     expect(filters).toHaveAttribute("aria-expanded", "false");
-    expect(sort.closest("div")?.parentElement).toContainElement(filters);
+    expect(filters.closest("[data-slot=list-header]")).toContainElement(
+      screen.getByRole("link", { name: "Add person" }),
+    );
 
     await browser.click(filters);
 
@@ -251,7 +352,9 @@ describe("PersonsPage", () => {
         { cache: "no-store" },
       ),
     );
-    expect(await screen.findByText("No persons found.")).toBeInTheDocument();
+    expect(
+      await screen.findByText(messages.en.shared.list.noResults),
+    ).toBeInTheDocument();
     expect(window.location.search).toBe("?search=hopper");
   });
 
@@ -289,7 +392,9 @@ describe("PersonsPage", () => {
         { cache: "no-store" },
       ),
     );
-    expect(await screen.findByText("No persons found.")).toBeInTheDocument();
+    expect(
+      await screen.findByText(messages.en.shared.list.noResults),
+    ).toBeInTheDocument();
 
     await browser.click(
       screen.getByRole("button", { name: "Clear person search" }),
@@ -330,7 +435,9 @@ describe("PersonsPage", () => {
         { cache: "no-store" },
       ),
     );
-    expect(await screen.findByText("No persons found.")).toBeInTheDocument();
+    expect(
+      await screen.findByText(messages.en.shared.list.noResults),
+    ).toBeInTheDocument();
     expect(screen.queryByText("Grace Hopper")).not.toBeInTheDocument();
   });
 
@@ -339,10 +446,14 @@ describe("PersonsPage", () => {
     const browser = userEvent.setup();
 
     renderPersons();
-    await browser.click(screen.getByRole("combobox", { name: "Sort" }));
+    await browser.click(screen.getByRole("button", { name: "Filters" }));
+    await browser.click(screen.getByRole("button", { name: "Sort" }));
     await browser.click(
-      await screen.findByRole("option", { name: "Name Z-A" }),
+      await screen.findByRole("button", { name: "Name Z-A" }),
     );
+    expect(mocks.apiFetch).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog", { name: "Filters" })).toBeVisible();
+    await browser.click(screen.getByRole("button", { name: "Apply" }));
 
     await waitFor(() =>
       expect(mocks.apiFetch).toHaveBeenCalledWith(
@@ -396,13 +507,14 @@ describe("PersonsPage", () => {
     });
 
     expect(screen.getByLabelText("Search persons")).toHaveValue("ada");
-    expect(screen.getByRole("combobox", { name: "Sort" })).toHaveTextContent(
-      "Email Z-A",
-    );
     const filtersButton = screen.getByRole("button", { name: "Filters" });
-    expect(filtersButton).toHaveTextContent("2");
+    expect(filtersButton).toHaveTextContent("3");
 
     await browser.click(filtersButton);
+    expect(screen.getByRole("button", { name: "Sort" })).toHaveTextContent(
+      "Email Z-A",
+    );
+
     expect(screen.getByRole("button", { name: "Country" })).toHaveTextContent(
       "Romania",
     );
@@ -411,7 +523,7 @@ describe("PersonsPage", () => {
     ).toHaveTextContent("United States");
   });
 
-  it("resets URL-backed filters", async () => {
+  it("resets draft filters on Apply while preserving visible search", async () => {
     mocks.apiFetch.mockResolvedValueOnce(personList([person]));
     const browser = userEvent.setup();
 
@@ -430,15 +542,18 @@ describe("PersonsPage", () => {
 
     await browser.click(screen.getByRole("button", { name: "Filters" }));
     await browser.click(screen.getByRole("button", { name: "Reset" }));
+    expect(mocks.apiFetch).not.toHaveBeenCalled();
+    expect(window.location.search).toBe("?search=ada&countryCode=RO");
+    await browser.click(screen.getByRole("button", { name: "Apply" }));
 
     await waitFor(() =>
       expect(mocks.apiFetch).toHaveBeenCalledWith(
-        `${v1.persons.ROUTES.list}?page=1&pageSize=25`,
+        `${v1.persons.ROUTES.list}?page=1&pageSize=25&search=ada`,
         v1.persons.personListSchema,
         { cache: "no-store" },
       ),
     );
-    expect(window.location.search).toBe("");
+    expect(window.location.search).toBe("?search=ada");
   });
 
   it("loads and appends the next page when the sentinel intersects", async () => {

@@ -22,7 +22,30 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/api", () => ({
   webApi: {
     url: (path: string) => path,
-    fetch: mocks.apiFetch,
+    fetch: async (path: string, ...args: unknown[]) => {
+      if (path === v1.scooters.ROUTES.documents.createEditorSession)
+        return {
+          id: "editor-session",
+          expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
+        };
+      if (
+        path ===
+        v1.scooters.ROUTES.documents.discardEditorSession("editor-session")
+      )
+        return { ok: true };
+      const result = await mocks.apiFetch(path, ...args);
+      return path === v1.scooters.ROUTES.documents.startExtractionJob &&
+        result?.extractedData
+        ? {
+            id: `job-${result.sourceId}`,
+            sourceId: result.sourceId,
+            documentType: result.documentType,
+            status: "completed",
+            result,
+            expiresAt: new Date(Date.now() + 300_000).toISOString(),
+          }
+        : result;
+    },
   },
 }));
 
@@ -273,6 +296,7 @@ describe("ScooterEditForm", () => {
         v1.scooters.scooterSchema,
         expect.objectContaining({
           json: {
+            sessionId: "editor-session",
             powerKw: 9.25,
             civVersion: "2024",
             civRawFields: { E: scooter.vin, "P.2": "9,25" },
@@ -703,6 +727,7 @@ describe("ScooterEditForm", () => {
     await browser.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(mocks.apiFetch).toHaveBeenCalledOnce());
     expect(mocks.apiFetch.mock.calls[0]![2].json).toEqual({
+      sessionId: "editor-session",
       lengthMm: 1900,
       fuelTankCapacityLiters: 5.25,
     });
@@ -721,6 +746,7 @@ describe("ScooterEditForm", () => {
     await browser.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(mocks.apiFetch).toHaveBeenCalledOnce());
     expect(mocks.apiFetch.mock.calls[0]![2].json).toEqual({
+      sessionId: "editor-session",
       powertrainType: "electric",
       engineDisplacementCc: null,
       ratedEngineRpm: null,
@@ -820,7 +846,7 @@ it("saves scooter fields without document writes or inline brand creation for a 
     expect.anything(),
     {
       method: "PATCH",
-      json: { variant: "Sport" },
+      json: { sessionId: "editor-session", variant: "Sport" },
     },
   );
 });

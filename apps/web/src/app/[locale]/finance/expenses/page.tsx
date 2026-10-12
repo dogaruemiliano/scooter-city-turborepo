@@ -1,12 +1,19 @@
 import { v1 } from "@repo/api-shared";
 import { messages } from "@repo/i18n";
-import { buttonVariants } from "@repo/ui/components";
+import { buttonVariants, ListLayout } from "@repo/ui/components";
 import type { Metadata } from "next";
 
 import { Link } from "@/i18n/navigation";
 import { canAccess } from "@/lib/access";
 import { resolveRouteLocale } from "@/i18n/paths";
 import { OperationList } from "../_components/OperationList";
+import { OperationFilters } from "../_components/OperationFilters";
+import { OperationPagination } from "../_components/OperationPagination";
+import {
+  financeSearchParams,
+  readOperationQuery,
+  type FinanceSearchParams,
+} from "../_lib/operation-list-query";
 import {
   fetchFinance,
   financeCookieHeader,
@@ -18,6 +25,7 @@ const PAGE_SIZE = 25;
 
 interface ExpensesRoutePageProps {
   params: Promise<{ locale: string }>;
+  searchParams?: Promise<FinanceSearchParams>;
 }
 
 export async function generateMetadata({
@@ -31,10 +39,17 @@ export async function generateMetadata({
 
 export default async function ExpensesRoutePage({
   params,
+  searchParams,
 }: ExpensesRoutePageProps) {
   const { locale: rawLocale } = await params;
   const locale = resolveRouteLocale(rawLocale);
   const path = FINANCE_PATHS.expenses;
+  const search = financeSearchParams((await searchParams) ?? {});
+  const { filters, apiQuery } = readOperationQuery(
+    search,
+    PAGE_SIZE,
+    "EXPENSE",
+  );
 
   const user = await requireFinancePermission(
     locale,
@@ -54,10 +69,7 @@ export default async function ExpensesRoutePage({
     fetchFinance(
       locale,
       path,
-      `${v1.finance.ROUTES.operations.list}?${new URLSearchParams({
-        kind: "EXPENSE",
-        pageSize: String(PAGE_SIZE),
-      })}`,
+      `${v1.finance.ROUTES.operations.list}?${apiQuery}`,
       v1.finance.financialOperationListSchema,
       cookieHeader,
     ),
@@ -70,27 +82,50 @@ export default async function ExpensesRoutePage({
 
   return (
     <div className="flex flex-col gap-6">
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-xl font-medium">{t.expense.listTitle}</h1>
-          <p className="text-sm text-muted-foreground">
-            {t.expense.listDescription}
-          </p>
-        </div>
-
-        {canAccess(user, "finance.expenses.create") ? (
-          <Link href={FINANCE_PATHS.newExpense} className={buttonVariants()}>
-            {t.overview.newExpense}
-          </Link>
-        ) : null}
+      <header className="flex flex-col gap-1">
+        <h1 className="text-xl font-medium">{t.expense.listTitle}</h1>
+        <p className="text-sm text-muted-foreground">
+          {t.expense.listDescription}
+        </p>
       </header>
 
-      <OperationList
-        items={operations.items}
-        currency={currency}
-        locale={locale}
-        emptyLabel={t.operations.empty}
-      />
+      <ListLayout
+        filters={
+          <OperationFilters
+            value={filters}
+            books={books.items.map(({ id, name, type }) => ({
+              id,
+              name,
+              type,
+            }))}
+            fixedKind="EXPENSE"
+          />
+        }
+        action={
+          canAccess(user, "finance.expenses.create") ? (
+            <Link href={FINANCE_PATHS.newExpense} className={buttonVariants()}>
+              {t.overview.newExpense}
+            </Link>
+          ) : null
+        }
+        footer={
+          <OperationPagination
+            operations={operations}
+            locale={locale}
+            pathname={path}
+            search={search}
+            filters={filters}
+            fixedKind="EXPENSE"
+          />
+        }
+      >
+        <OperationList
+          items={operations.items}
+          currency={currency}
+          locale={locale}
+          emptyLabel={t.operations.empty}
+        />
+      </ListLayout>
     </div>
   );
 }

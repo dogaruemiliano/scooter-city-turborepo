@@ -1,12 +1,19 @@
 import { v1 } from "@repo/api-shared";
 import { messages } from "@repo/i18n";
-import { buttonVariants } from "@repo/ui/components";
+import { buttonVariants, ListLayout } from "@repo/ui/components";
 import type { Metadata } from "next";
 
 import { canAccess } from "@/lib/access";
 import { resolveRouteLocale } from "@/i18n/paths";
 import { Link } from "@/i18n/navigation";
 import { OperationList } from "../_components/OperationList";
+import { OperationFilters } from "../_components/OperationFilters";
+import { OperationPagination } from "../_components/OperationPagination";
+import {
+  financeSearchParams,
+  readOperationQuery,
+  type FinanceSearchParams,
+} from "../_lib/operation-list-query";
 import {
   fetchFinance,
   financeCookieHeader,
@@ -18,6 +25,7 @@ const PAGE_SIZE = 50;
 
 interface OperationsRoutePageProps {
   params: Promise<{ locale: string }>;
+  searchParams?: Promise<FinanceSearchParams>;
 }
 
 export async function generateMetadata({
@@ -31,10 +39,13 @@ export async function generateMetadata({
 
 export default async function OperationsRoutePage({
   params,
+  searchParams,
 }: OperationsRoutePageProps) {
   const { locale: rawLocale } = await params;
   const locale = resolveRouteLocale(rawLocale);
   const path = FINANCE_PATHS.operations;
+  const search = financeSearchParams((await searchParams) ?? {});
+  const { filters, apiQuery } = readOperationQuery(search, PAGE_SIZE);
 
   const user = await requireFinancePermission(
     locale,
@@ -54,9 +65,7 @@ export default async function OperationsRoutePage({
     fetchFinance(
       locale,
       path,
-      `${v1.finance.ROUTES.operations.list}?${new URLSearchParams({
-        pageSize: String(PAGE_SIZE),
-      })}`,
+      `${v1.finance.ROUTES.operations.list}?${apiQuery}`,
       v1.finance.financialOperationListSchema,
       cookieHeader,
     ),
@@ -69,24 +78,46 @@ export default async function OperationsRoutePage({
 
   return (
     <div className="flex flex-col gap-6">
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-xl font-medium">{t.title}</h1>
-          <p className="text-sm text-muted-foreground">{t.description}</p>
-        </div>
-        {canAccess(user, "finance.funding.create") ? (
-          <Link href={FINANCE_PATHS.newFunding} className={buttonVariants()}>
-            {messages[locale].finance.overview.addCompanyMoney}
-          </Link>
-        ) : null}
+      <header className="flex flex-col gap-1">
+        <h1 className="text-xl font-medium">{t.title}</h1>
+        <p className="text-sm text-muted-foreground">{t.description}</p>
       </header>
 
-      <OperationList
-        items={operations.items}
-        currency={currency}
-        locale={locale}
-        emptyLabel={t.empty}
-      />
+      <ListLayout
+        filters={
+          <OperationFilters
+            value={filters}
+            books={books.items.map(({ id, name, type }) => ({
+              id,
+              name,
+              type,
+            }))}
+          />
+        }
+        action={
+          canAccess(user, "finance.funding.create") ? (
+            <Link href={FINANCE_PATHS.newFunding} className={buttonVariants()}>
+              {messages[locale].finance.overview.addCompanyMoney}
+            </Link>
+          ) : null
+        }
+        footer={
+          <OperationPagination
+            operations={operations}
+            locale={locale}
+            pathname={path}
+            search={search}
+            filters={filters}
+          />
+        }
+      >
+        <OperationList
+          items={operations.items}
+          currency={currency}
+          locale={locale}
+          emptyLabel={t.empty}
+        />
+      </ListLayout>
     </div>
   );
 }

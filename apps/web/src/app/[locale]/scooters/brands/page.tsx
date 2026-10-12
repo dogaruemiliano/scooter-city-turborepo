@@ -1,7 +1,7 @@
 import { canAccess } from "@/lib/access";
 import { ApiError, v1 } from "@repo/api-shared";
 import { messages } from "@repo/i18n";
-import { Button } from "@repo/ui/components";
+import { Button, ListLayout } from "@repo/ui/components";
 import { PlusIcon } from "lucide-react";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
@@ -51,19 +51,22 @@ export default async function BrandsPage({ params }: BrandsPageProps) {
 
   return (
     <main className="mx-auto flex w-full max-w-screen-xl flex-1 flex-col gap-8 px-4 py-6 sm:px-6 lg:px-8">
-      {canAccess(user, "scooter_brands.manage") ? (
-        <div className="flex justify-end">
-          <BrandFormSheet
-            trigger={
-              <Button type="button">
-                <PlusIcon aria-hidden="true" data-icon="inline-start" />
-                {t("brands.list.createButton")}
-              </Button>
-            }
-          />
-        </div>
-      ) : null}
-      <BrandTable brands={brands.items} />
+      <ListLayout
+        action={
+          canAccess(user, "scooter_brands.manage") ? (
+            <BrandFormSheet
+              trigger={
+                <Button type="button">
+                  <PlusIcon aria-hidden="true" data-icon="inline-start" />
+                  {t("brands.list.createButton")}
+                </Button>
+              }
+            />
+          ) : null
+        }
+      >
+        <BrandTable brands={brands.items} />
+      </ListLayout>
     </main>
   );
 }

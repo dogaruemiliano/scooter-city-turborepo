@@ -8,6 +8,11 @@ import { Prisma } from "../generated/prisma/client";
 import { ImageStorageService } from "../image-storage/image-storage.service";
 import type { StoredDocument } from "../image-storage/image-storage.types";
 import { PrismaService } from "../prisma/prisma.service";
+import {
+  requireOpenEditorSession,
+  saveEditorSession,
+  UPLOAD_WRITE_GRACE_MS,
+} from "../scooter-document-jobs/document-job-lifecycle";
 
 const purpose = (type: v1.scooters.ScooterDocumentType) =>
   `scooter-document:${type}`;
@@ -32,19 +37,54 @@ export class ScooterDocumentsService {
       scope: scope(userId, input.type),
       completionTokenTtlSeconds: 86_400,
     });
-    await this.prisma.draftUpload.create({
-      data: {
-        userId,
-        provider: upload.provider,
-        bucket: upload.bucket,
-        storageKey: upload.storageKey,
-        contentType: input.contentType,
-        byteSize: input.byteSize,
-        checksumSha256: input.checksumSha256,
-        purpose: purpose(input.type),
-        expiresAt: upload.uploadTokenExpiresAt ?? upload.expiresAt,
-      },
-    });
+    const data = {
+      userId,
+      provider: upload.provider,
+      bucket: upload.bucket,
+      storageKey: upload.storageKey,
+      contentType: input.contentType,
+      byteSize: input.byteSize,
+      checksumSha256: input.checksumSha256,
+      purpose: purpose(input.type),
+      expiresAt: upload.uploadTokenExpiresAt ?? upload.expiresAt,
+    };
+    if (input.sessionId) {
+      await this.prisma.$transaction(async (tx) => {
+        const session = await requireOpenEditorSession(
+          tx,
+          input.sessionId!,
+          userId,
+        );
+        const writeSafeAfter = new Date(
+          upload.expiresAt.getTime() + UPLOAD_WRITE_GRACE_MS,
+        );
+        const draft = await tx.draftUpload.create({
+          data: {
+            ...data,
+            editorSessionId: session.id,
+            uploadUrlExpiresAt: upload.expiresAt,
+            writeSafeAfter,
+          },
+        });
+        await tx.scooterDocumentResource.create({
+          data: {
+            identity: `s3:${upload.bucket}:${upload.storageKey}`,
+            sessionId: session.id,
+            draftUploadId: draft.id,
+            kind: "original",
+            bucket: upload.bucket,
+            storageKey: upload.storageKey,
+            lastPossibleWriteAt: writeSafeAfter,
+            cleanupAfter: data.expiresAt,
+          },
+        });
+      });
+    } else
+      await this.prisma.draftUpload.create({
+        data: {
+          ...data,
+        },
+      });
     return {
       uploadUrl: upload.uploadUrl,
       uploadToken: upload.uploadToken,
@@ -86,6 +126,9 @@ export class ScooterDocumentsService {
   ): Promise<{
     documentType: v1.scooters.ScooterDocumentType;
     stored: StoredDocument;
+    draftUploadId?: string;
+    documentId?: string;
+    scooterId?: string;
   }> {
     if (source.kind === "draft") {
       const stored = this.storage.verifyDocumentUploadToken(
@@ -112,7 +155,7 @@ export class ScooterDocumentsService {
         throw new BadRequestException(
           "Document upload is not available. Upload it again.",
         );
-      return { documentType: source.type, stored };
+      return { documentType: source.type, stored, draftUploadId: draft.id };
     }
     const document = await this.prisma.scooterDocument.findFirst({
       where: {
@@ -135,6 +178,8 @@ export class ScooterDocumentsService {
       throw new BadRequestException("Unsupported document storage metadata");
     return {
       documentType: document.type,
+      documentId: document.id,
+      scooterId: document.scooterId,
       stored: {
         provider: "s3",
         bucket: asset.bucket,
@@ -157,7 +202,10 @@ export class ScooterDocumentsService {
     removedIds: string[] = [],
     userId?: string,
     extractions: v1.scooters.ScooterDocumentExtractionUpdate[] = [],
+    sessionId?: string,
+    saveFingerprint?: string,
   ) {
+    await saveEditorSession(tx, sessionId, userId, scooterId, saveFingerprint);
     const ids = [...new Set(removedIds)];
     if (ids.length) {
       const removed = await tx.scooterDocument.updateMany({
@@ -220,6 +268,7 @@ export class ScooterDocumentsService {
           purpose: purpose(type),
           claimedAt: null,
           cleanupStartedAt: null,
+          editorSessionId: sessionId ?? null,
           expiresAt: { gt: now },
           provider: stored.provider,
           bucket: stored.bucket,
@@ -233,7 +282,7 @@ export class ScooterDocumentsService {
         throw new BadRequestException(
           "Document upload expired or was already used. Upload it again.",
         );
-      await tx.scooterDocument.create({
+      const document = await tx.scooterDocument.create({
         data: {
           scooter: { connect: { id: scooterId } },
           type,
@@ -255,6 +304,19 @@ export class ScooterDocumentsService {
           },
         },
       });
+      if (sessionId) {
+        await tx.scooterDocumentJob.updateMany({
+          where: {
+            sessionId,
+            sourceFingerprint: stored.checksumSha256 + ":" + stored.storageKey,
+          },
+          data: { documentId: document.id, scooterId, draftUploadId: null },
+        });
+        await tx.scooterDocumentResource.updateMany({
+          where: { sessionId, storageKey: stored.storageKey, kind: "original" },
+          data: { status: "retained" },
+        });
+      }
     }
   }
 

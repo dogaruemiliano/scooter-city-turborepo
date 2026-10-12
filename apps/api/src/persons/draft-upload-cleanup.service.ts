@@ -45,6 +45,7 @@ export class DraftUploadCleanupService {
     const expired = await this.prisma.draftUpload.findMany({
       where: {
         claimedAt: null,
+        editorSessionId: null,
         expiresAt: { lt: expiredBefore },
         OR: [
           { cleanupStartedAt: null },

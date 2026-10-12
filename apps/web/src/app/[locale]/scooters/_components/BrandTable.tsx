@@ -5,12 +5,8 @@ import { canAccess } from "@/lib/access";
 import { ApiError, v1 } from "@repo/api-shared";
 import {
   Button,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  ListEmpty,
+  ListItems,
   Tooltip,
   TooltipContent,
   TooltipTrigger,
@@ -121,102 +117,47 @@ export function BrandTable({
   const mayManage = canAccess(session?.user, "scooter_brands.manage");
   const t = useTranslations("scooters");
 
-  if (brands.length === 0) {
-    return (
-      <div className="rounded-lg border border-border bg-card p-6 text-center text-sm text-muted-foreground">
-        {t("brands.list.empty")}
-      </div>
-    );
-  }
-
   return (
-    <section>
-      <div className="hidden overflow-hidden rounded-xl border border-border bg-card md:block">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t("brands.columns.name")}</TableHead>
-              <TableHead className="w-16" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {brands.map((brand) => {
-              const scooterCountLabel = t("brands.list.scooterCount", {
-                count: brand.scooterCount,
-              });
-              return (
-                <TableRow key={brand.id}>
-                  <TableCell className="p-0">
-                    {mayManage ? (
-                      <BrandFormSheet
-                        brand={brand}
-                        trigger={
-                          <button
-                            type="button"
-                            className="flex min-h-16 w-full items-center px-2 py-2 text-left outline-none transition-colors duration-fast ease-standard focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-                          >
-                            <BrandRowContent
-                              brand={brand}
-                              scooterCountLabel={scooterCountLabel}
-                            />
-                          </button>
-                        }
-                      />
-                    ) : (
-                      <BrandRowContent
-                        brand={brand}
-                        scooterCountLabel={scooterCountLabel}
-                      />
-                    )}
-                  </TableCell>
-                  <TableCell className="p-2">
-                    {mayManage ? <DeleteBrandButton brand={brand} /> : null}
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </div>
-
-      <ul className="grid gap-2 md:hidden">
-        {brands.map((brand) => {
-          const scooterCountLabel = t("brands.list.scooterCount", {
-            count: brand.scooterCount,
-          });
-          return (
-            <li
-              key={brand.id}
-              className="flex items-center gap-1 overflow-hidden rounded-xl border border-border bg-card transition-colors duration-fast ease-standard hover:bg-muted"
-            >
-              {mayManage ? (
-                <BrandFormSheet
-                  brand={brand}
-                  trigger={
-                    <button
-                      type="button"
-                      className="flex min-h-16 flex-1 items-center p-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-                    >
-                      <BrandRowContent
-                        brand={brand}
-                        scooterCountLabel={scooterCountLabel}
-                      />
-                    </button>
-                  }
-                />
-              ) : (
-                <BrandRowContent
-                  brand={brand}
-                  scooterCountLabel={scooterCountLabel}
-                />
-              )}
-              <div className="pr-2">
-                {mayManage ? <DeleteBrandButton brand={brand} /> : null}
-              </div>
-            </li>
-          );
-        })}
-      </ul>
-    </section>
+    <ListItems
+      items={brands}
+      getItemKey={(brand) => brand.id}
+      empty={<ListEmpty>{t("brands.list.empty")}</ListEmpty>}
+      renderItem={(brand) => (
+        <article className="flex items-center gap-1 overflow-hidden rounded-xl border border-border bg-card transition-colors duration-fast ease-standard hover:bg-muted">
+          {mayManage ? (
+            <BrandFormSheet
+              brand={brand}
+              trigger={
+                <button
+                  type="button"
+                  className="flex min-h-16 min-w-0 flex-1 items-center p-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                >
+                  <BrandRowContent
+                    brand={brand}
+                    scooterCountLabel={t("brands.list.scooterCount", {
+                      count: brand.scooterCount,
+                    })}
+                  />
+                </button>
+              }
+            />
+          ) : (
+            <div className="min-w-0 flex-1 p-3">
+              <BrandRowContent
+                brand={brand}
+                scooterCountLabel={t("brands.list.scooterCount", {
+                  count: brand.scooterCount,
+                })}
+              />
+            </div>
+          )}
+          {mayManage ? (
+            <div className="pr-2">
+              <DeleteBrandButton brand={brand} />
+            </div>
+          ) : null}
+        </article>
+      )}
+    />
   );
 }

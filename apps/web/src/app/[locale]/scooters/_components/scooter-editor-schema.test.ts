@@ -35,6 +35,7 @@ describe("scooter editor conversion", () => {
             ![
               "propulsionSystem",
               "documentDrafts",
+              "sessionId",
               "civRawFields",
               "insurancePolicies",
             ].includes(field),

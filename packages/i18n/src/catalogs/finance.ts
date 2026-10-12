@@ -123,9 +123,16 @@ export const financeCatalog = {
         REVERSED: "Reversed",
       },
       filters: {
+        description:
+          "Choose which operations to show. Apply to update the list.",
+        book: "Book",
+        bookType: "Book type",
         kind: "Type",
         status: "Status",
         treatment: "Treatment",
+        from: "From (inclusive, UTC)",
+        to: "Before (exclusive, UTC)",
+        invalidRange: "The end must be after the start. Check the date range.",
       },
     },
     operation: {
@@ -746,9 +753,17 @@ export const financeCatalog = {
         REVERSED: "Stornată",
       },
       filters: {
+        description:
+          "Alege operațiunile afișate. Apasă Aplică pentru a actualiza lista.",
+        book: "Registru",
+        bookType: "Tip de registru",
         kind: "Tip",
         status: "Stare",
         treatment: "Tratament",
+        from: "De la (inclusiv, UTC)",
+        to: "Înainte de (exclusiv, UTC)",
+        invalidRange:
+          "Sfârșitul trebuie să fie după început. Verifică intervalul.",
       },
     },
     operation: {

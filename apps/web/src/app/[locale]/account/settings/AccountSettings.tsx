@@ -24,6 +24,8 @@ import {
   Input,
   Label,
   Separator,
+  ListItems,
+  ListEmpty,
 } from "@repo/ui/components";
 import { usePathname, useRouter } from "next/navigation";
 import { useId, useState, type FormEvent } from "react";
@@ -284,39 +286,40 @@ export function AccountSettings({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col">
-            {sessions.map((session, index) => (
-              <div key={session.id}>
-                {index > 0 ? <Separator /> : null}
-                <div className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-medium">
-                        {describeSession(session)}
-                      </span>
-                      {session.current ? <Badge>Current</Badge> : null}
-                    </div>
-                    <p className="mt-1 break-words text-sm text-muted-foreground">
-                      {session.userAgent ?? "User agent unavailable"}
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Last used {formatSessionDate(session.lastUsedAt)}
-                      {session.ip ? ` · ${session.ip}` : ""}
-                    </p>
+          <ListItems
+            aria-label="Active sessions"
+            items={sessions}
+            getItemKey={(session) => session.id}
+            itemClassName="border-b border-border pb-4 last:border-b-0 last:pb-0"
+            renderItem={(session) => (
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium">
+                      {describeSession(session)}
+                    </span>
+                    {session.current ? <Badge>Current</Badge> : null}
                   </div>
-                  {!session.current ? (
-                    <ConfirmationDialog
-                      triggerLabel="Revoke"
-                      title="Revoke this session?"
-                      description="This device will lose refresh access and must sign in again."
-                      confirmLabel="Revoke session"
-                      onConfirm={() => revokeSession(session.id)}
-                    />
-                  ) : null}
+                  <p className="mt-1 break-words text-sm text-muted-foreground">
+                    {session.userAgent ?? "User agent unavailable"}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Last used {formatSessionDate(session.lastUsedAt)}
+                    {session.ip ? ` · ${session.ip}` : ""}
+                  </p>
                 </div>
+                {!session.current ? (
+                  <ConfirmationDialog
+                    triggerLabel="Revoke"
+                    title="Revoke this session?"
+                    description="This device will lose refresh access and must sign in again."
+                    confirmLabel="Revoke session"
+                    onConfirm={() => revokeSession(session.id)}
+                  />
+                ) : null}
               </div>
-            ))}
-          </div>
+            )}
+          />
         </CardContent>
         <CardFooter className="justify-between gap-4">
           <span className="text-xs text-muted-foreground">
@@ -347,18 +350,28 @@ export function AccountSettings({
               status={user.emailVerified ? "Verified" : "Not verified"}
             />
           ) : null}
-          {user.linkedProviders.map((provider, index) => {
-            const canUnlink = hasFallbackAfterUnlink(
-              provider,
-              user,
-              enabledMethods,
-            );
-            return (
-              <div key={provider}>
-                {enabledMethods.includes("emailOtp") || index > 0 ? (
-                  <Separator />
-                ) : null}
-                <div className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+          {enabledMethods.includes("emailOtp") &&
+          user.linkedProviders.length > 0 ? (
+            <Separator className="mb-4" />
+          ) : null}
+          <ListItems
+            aria-label="Linked sign-in providers"
+            items={user.linkedProviders}
+            getItemKey={(provider) => provider}
+            itemClassName="border-b border-border pb-4 last:border-b-0 last:pb-0"
+            empty={
+              !enabledMethods.includes("emailOtp") ? (
+                <ListEmpty>No enabled sign-in methods are linked.</ListEmpty>
+              ) : null
+            }
+            renderItem={(provider) => {
+              const canUnlink = hasFallbackAfterUnlink(
+                provider,
+                user,
+                enabledMethods,
+              );
+              return (
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <div className="font-medium">
                       {PROVIDER_LABELS[provider]}
@@ -378,15 +391,9 @@ export function AccountSettings({
                     onConfirm={() => unlinkProvider(provider)}
                   />
                 </div>
-              </div>
-            );
-          })}
-          {!enabledMethods.includes("emailOtp") &&
-          user.linkedProviders.length === 0 ? (
-            <p className="py-4 text-sm text-muted-foreground">
-              No enabled sign-in methods are linked.
-            </p>
-          ) : null}
+              );
+            }}
+          />
         </CardContent>
       </Card>
 

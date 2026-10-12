@@ -1,7 +1,9 @@
 import {
   DeleteObjectCommand,
+  DeleteObjectsCommand,
   GetObjectCommand,
   HeadObjectCommand,
+  ListObjectVersionsCommand,
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
@@ -17,11 +19,12 @@ import type { Logger } from "nestjs-pino";
 import { loadEnv, type Env } from "../config/env";
 import type { S3Presigner, S3PresignOptions } from "./image-storage.module";
 import { ImageStorageService } from "./image-storage.service";
+import type { StoredDocument } from "./image-storage.types";
 
 type SendMock = jest.Mock<unknown, [unknown]>;
 type PresignMock = jest.Mock<
   Promise<string>,
-  [PutObjectCommand, number, S3PresignOptions?]
+  [PutObjectCommand | GetObjectCommand, number, S3PresignOptions?]
 >;
 interface LoggerMock {
   error: jest.Mock;
@@ -96,6 +99,272 @@ function createService(
 }
 
 describe("ImageStorageService", () => {
+  it.each([11 * 1024 * 1024, 15 * 1024 * 1024])(
+    "presigns a %i-byte scooter document with the 15 MB runtime setting",
+    async (byteSize) => {
+      const { service } = createService(
+        undefined,
+        testEnv({ IMAGE_STORAGE_MAX_BYTES: "15728640" }),
+      );
+      const upload = await service.createPresignedDocumentUpload({
+        contentType: "application/pdf",
+        byteSize,
+        checksumSha256: "a".repeat(64),
+        category: "scooter-document",
+        scope: "scooter-document:civ:user-1",
+      });
+      expect(upload.maxBytes).toBe(15 * 1024 * 1024);
+      expect(
+        service.verifyDocumentUploadToken(
+          upload.uploadToken,
+          "scooter-document:civ:user-1",
+        ).byteSize,
+      ).toBe(byteSize);
+    },
+  );
+
+  it("reports an explicit lower runtime limit before requesting an S3 URL", async () => {
+    const { service, presign } = createService(
+      undefined,
+      testEnv({ IMAGE_STORAGE_MAX_BYTES: "10485760" }),
+    );
+    const error: unknown = await service
+      .createPresignedDocumentUpload({
+        contentType: "application/pdf",
+        byteSize: 11 * 1024 * 1024,
+        checksumSha256: "a".repeat(64),
+        category: "scooter-document",
+        scope: "scooter-document:civ:user-1",
+      })
+      .catch((error: unknown) => error);
+    expect(error).toBeInstanceOf(PayloadTooLargeException);
+    expect((error as PayloadTooLargeException).getResponse()).toMatchObject({
+      code: "FILE_TOO_LARGE",
+      details: { maxBytes: 10 * 1024 * 1024 },
+    });
+    expect(presign).not.toHaveBeenCalled();
+  });
+
+  const snapshot: StoredDocument = {
+    provider: "s3",
+    bucket: "private-bucket",
+    storageKey: "document-photos-test/extraction-temporary/job-1",
+    contentType: "application/pdf",
+    byteSize: 10,
+    checksumSha256: "a".repeat(64),
+    imageWidth: null,
+    imageHeight: null,
+    pageCount: null,
+  };
+  const snapshotHead = {
+    ContentType: snapshot.contentType,
+    ContentLength: snapshot.byteSize,
+    ChecksumSHA256: Buffer.from(snapshot.checksumSha256, "hex").toString(
+      "base64",
+    ),
+    ChecksumType: "FULL_OBJECT",
+    VersionId: "immutable-version",
+  };
+
+  it("signs GET only after verifying server checksum and pins the verified version", async () => {
+    const { service, send, presign } = createService(
+      jest.fn().mockResolvedValue(snapshotHead),
+    );
+    await expect(
+      service.createDocumentReadUrl(snapshot, 600),
+    ).resolves.toContain("expires=600");
+    expect((send.mock.calls[0][0] as HeadObjectCommand).input).toEqual({
+      Bucket: snapshot.bucket,
+      Key: snapshot.storageKey,
+      ChecksumMode: "ENABLED",
+    });
+    const get = presign.mock.calls[0][0];
+    expect(get).toBeInstanceOf(GetObjectCommand);
+    expect(get.input).toMatchObject({
+      Bucket: snapshot.bucket,
+      Key: snapshot.storageKey,
+      VersionId: "immutable-version",
+      ResponseContentType: snapshot.contentType,
+      ResponseCacheControl: "private, no-store",
+    });
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    { ContentLength: 11 },
+    { ContentType: "image/png" },
+    { ChecksumSHA256: undefined },
+    { ChecksumSHA256: "other" },
+    { ChecksumType: "COMPOSITE" },
+  ])("never signs mismatched or missing checksum metadata", async (changes) => {
+    const { service, presign } = createService(
+      jest.fn().mockResolvedValue({ ...snapshotHead, ...changes }),
+    );
+    await expect(service.createDocumentReadUrl(snapshot)).rejects.toMatchObject(
+      { code: "DOCUMENT_EXTRACTION_INVALID_SOURCE" },
+    );
+    expect(presign).not.toHaveBeenCalled();
+  });
+
+  it("rejects wrong buckets, untrusted prefixes and oversized sources before HEAD", async () => {
+    const { service, send } = createService();
+    for (const changes of [
+      { bucket: "other" },
+      { storageKey: "other/source.pdf" },
+      { byteSize: 33 },
+    ])
+      await expect(
+        service.createDocumentReadUrl({ ...snapshot, ...changes }),
+      ).rejects.toMatchObject({ code: "DOCUMENT_EXTRACTION_INVALID_SOURCE" });
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("returns stable errors when signing access fails", async () => {
+    const { service, logger } = createService(
+      jest.fn().mockRejectedValue(s3Error("AccessDenied")),
+    );
+    await expect(service.createDocumentReadUrl(snapshot)).rejects.toMatchObject(
+      {
+        code: "DOCUMENT_EXTRACTION_READ_FAILED",
+        message: "Document access could not be prepared.",
+      },
+    );
+    expect(logger.error).not.toHaveBeenCalled();
+  });
+
+  it("reserves safe deterministic snapshot keys and lists only the temporary prefix", async () => {
+    const send = jest.fn<Promise<unknown>, [unknown]>().mockResolvedValue({
+      Versions: [
+        {
+          Key: snapshot.storageKey,
+          VersionId: "hidden-version",
+          LastModified: new Date("2026-10-11"),
+        },
+        { Key: "document-photos-test/scooter-documents/original" },
+      ],
+      DeleteMarkers: [
+        {
+          Key: snapshot.storageKey,
+          VersionId: "marker",
+          LastModified: new Date("2026-10-12"),
+        },
+      ],
+      IsTruncated: true,
+      NextKeyMarker: snapshot.storageKey,
+      NextVersionIdMarker: "older-version",
+    });
+    const { service } = createService(send);
+    expect(service.createDocumentAnalysisKey("job-1")).toBe(
+      snapshot.storageKey,
+    );
+    expect(() => service.createDocumentAnalysisKey("../original")).toThrow(
+      BadRequestException,
+    );
+    const page = await service.listDocumentAnalysisObjects({ maxKeys: 50 });
+    expect(page.objects).toEqual([
+      {
+        storageKey: snapshot.storageKey,
+        lastModified: new Date("2026-10-12"),
+      },
+    ]);
+    expect(typeof page.continuationToken).toBe("string");
+    expect((send.mock.calls[0][0] as ListObjectVersionsCommand).input).toEqual({
+      Bucket: snapshot.bucket,
+      Prefix: "document-photos-test/extraction-temporary/",
+      MaxKeys: 50,
+    });
+    await service.listDocumentAnalysisObjects({
+      continuationToken: page.continuationToken,
+    });
+    expect(
+      (send.mock.calls[1][0] as ListObjectVersionsCommand).input,
+    ).toMatchObject({
+      KeyMarker: snapshot.storageKey,
+      VersionIdMarker: "older-version",
+    });
+  });
+
+  it("discovers version-only and marker-only orphans and refuses foreign cursors", async () => {
+    const send = jest.fn<Promise<unknown>, [unknown]>().mockResolvedValue({
+      Versions: [
+        {
+          Key: snapshot.storageKey,
+          VersionId: "hidden",
+          LastModified: new Date("2026-10-10"),
+        },
+      ],
+      DeleteMarkers: [
+        {
+          Key: `${snapshot.storageKey}-marker-only`,
+          VersionId: "marker",
+          LastModified: new Date("2026-10-11"),
+        },
+      ],
+    });
+    const { service } = createService(send);
+    await expect(service.listDocumentAnalysisObjects()).resolves.toEqual({
+      objects: [
+        {
+          storageKey: snapshot.storageKey,
+          lastModified: new Date("2026-10-10"),
+        },
+        {
+          storageKey: `${snapshot.storageKey}-marker-only`,
+          lastModified: new Date("2026-10-11"),
+        },
+      ],
+    });
+    send.mockClear();
+    await expect(
+      service.listDocumentAnalysisObjects({
+        continuationToken: Buffer.from(
+          JSON.stringify({ v: 1, key: "private/original", version: "1" }),
+        ).toString("base64url"),
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("deletes every exact-key version and marker without deleting adjacent prefix matches", async () => {
+    const send: SendMock = jest
+      .fn<unknown, [unknown]>()
+      .mockImplementation((command: unknown) => {
+        if (command instanceof ListObjectVersionsCommand)
+          return Promise.resolve({
+            Versions: [
+              { Key: snapshot.storageKey, VersionId: "v1" },
+              { Key: `${snapshot.storageKey}-other`, VersionId: "other" },
+            ],
+            DeleteMarkers: [{ Key: snapshot.storageKey, VersionId: "marker" }],
+          });
+        return Promise.resolve({});
+      });
+    const { service } = createService(send);
+    await service.deleteDocumentForCleanup(snapshot.storageKey);
+    expect(
+      (send.mock.calls[1][0] as DeleteObjectsCommand).input.Delete,
+    ).toEqual({
+      Objects: [
+        { Key: snapshot.storageKey, VersionId: "v1" },
+        { Key: snapshot.storageKey, VersionId: "marker" },
+      ],
+      Quiet: true,
+    });
+  });
+
+  it("does not mark partial version deletion as success", async () => {
+    const send = jest
+      .fn()
+      .mockResolvedValueOnce({
+        Versions: [{ Key: snapshot.storageKey, VersionId: "v1" }],
+      })
+      .mockResolvedValueOnce({ Errors: [{ Code: "AccessDenied" }] });
+    const { service } = createService(send);
+    await expect(
+      service.deleteDocumentForCleanup(snapshot.storageKey),
+    ).rejects.toBeInstanceOf(ServiceUnavailableException);
+  });
+
   it("verifies document upload tokens without reading, deleting, or completing objects", async () => {
     const { service, send } = createService();
     const upload = await service.createPresignedDocumentUpload({

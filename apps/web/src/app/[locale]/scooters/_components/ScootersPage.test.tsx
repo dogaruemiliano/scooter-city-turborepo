@@ -1,6 +1,6 @@
 import { v1 } from "@repo/api-shared";
 import { messages, type SupportedLocale } from "@repo/i18n";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -91,6 +91,139 @@ beforeEach(() => {
 });
 
 describe("ScootersPage", () => {
+  it("does not repeatedly fetch a whitespace-normalized search", async () => {
+    mocks.apiFetch.mockResolvedValue(scooterList([], { total: 0 }));
+    const browser = userEvent.setup();
+    renderScooters();
+    await browser.type(screen.getByLabelText("Search scooters"), "yamaha   ");
+    expect(
+      await screen.findByText(messages.en.shared.list.noResults),
+    ).toBeVisible();
+    await act(() => new Promise((resolve) => window.setTimeout(resolve, 650)));
+    expect(mocks.apiFetch).toHaveBeenCalledTimes(1);
+    expect(window.location.search).toBe("?search=yamaha");
+  });
+
+  it("restores applied filters and results on browser Back and Forward", async () => {
+    mocks.apiFetch
+      .mockResolvedValueOnce(scooterList([], { total: 0 }))
+      .mockResolvedValueOnce(scooterList([scooter]))
+      .mockResolvedValueOnce(scooterList([], { total: 0 }));
+    const browser = userEvent.setup();
+    renderScooters();
+    await browser.click(screen.getByRole("button", { name: "Filters" }));
+    await browser.click(
+      screen.getByRole("button", { name: "Propulsion system" }),
+    );
+    await browser.click(screen.getByRole("button", { name: "Electric" }));
+    await browser.click(screen.getByRole("button", { name: "Apply" }));
+    await waitFor(() =>
+      expect(window.location.search).toBe("?powertrainType=electric"),
+    );
+
+    act(() => {
+      window.history.back();
+    });
+    await waitFor(() =>
+      expect(mocks.apiFetch).toHaveBeenLastCalledWith(
+        `${v1.scooters.ROUTES.list}?page=1&pageSize=25`,
+        v1.scooters.scooterListSchema,
+        { cache: "no-store" },
+      ),
+    );
+    expect(await screen.findByText("Yamaha NMAX")).toBeVisible();
+    expect(window.location.search).toBe("");
+    await browser.click(screen.getByRole("button", { name: "Filters" }));
+    expect(
+      screen.getByRole("button", { name: "Propulsion system" }),
+    ).toHaveTextContent("All");
+
+    act(() => {
+      window.history.forward();
+    });
+    await waitFor(() => expect(mocks.apiFetch).toHaveBeenCalledTimes(3));
+    expect(
+      await screen.findByText(messages.en.shared.list.noResults),
+    ).toBeVisible();
+    expect(window.location.search).toBe("?powertrainType=electric");
+    expect(
+      screen.queryByRole("dialog", { name: "Filters" }),
+    ).not.toBeInTheDocument();
+    await browser.click(screen.getByRole("button", { name: "Filters" }));
+    expect(
+      screen.getByRole("button", { name: "Propulsion system" }),
+    ).toHaveTextContent("Electric");
+  });
+
+  it("keeps failed filter drafts open and retries the same selection", async () => {
+    mocks.apiFetch
+      .mockRejectedValueOnce(new Error("Offline"))
+      .mockResolvedValueOnce(scooterList([], { total: 0 }));
+    const browser = userEvent.setup();
+    renderScooters();
+    await browser.click(screen.getByRole("button", { name: "Filters" }));
+    await browser.click(
+      screen.getByRole("button", { name: "Propulsion system" }),
+    );
+    await browser.click(screen.getByRole("button", { name: "Electric" }));
+    await browser.click(screen.getByRole("button", { name: "Apply" }));
+    expect(
+      await screen.findByText(messages.en.shared.list.applyError),
+    ).toBeVisible();
+    expect(screen.getByRole("dialog", { name: "Filters" })).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "Propulsion system" }),
+    ).toHaveTextContent("Electric");
+    expect(window.location.search).toBe("");
+    await browser.click(screen.getByRole("button", { name: "Apply" }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "Filters" }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(window.location.search).toBe("?powertrainType=electric");
+    expect(mocks.apiFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("discards a nested filter selection when the parent sheet is cancelled", async () => {
+    const browser = userEvent.setup();
+    renderScooters();
+    await browser.click(screen.getByRole("button", { name: "Filters" }));
+    const sheet = screen.getByRole("dialog", { name: "Filters" });
+    expect(sheet).toHaveClass("bg-popover");
+    expect(sheet).not.toHaveClass("bg-background");
+    for (const surface of sheet.querySelectorAll(
+      "[data-slot=bottom-sheet-header], [data-slot=bottom-sheet-body], [data-slot=bottom-sheet-footer]",
+    )) {
+      expect(surface).not.toHaveClass("bg-background");
+    }
+    await browser.click(
+      screen.getByRole("button", { name: "Propulsion system" }),
+    );
+    expect(
+      screen.getByRole("dialog", { name: "Propulsion system" }),
+    ).toBeVisible();
+    await browser.click(
+      await screen.findByRole("button", { name: "Electric" }),
+    );
+    expect(screen.getByRole("dialog", { name: "Filters" })).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "Propulsion system" }),
+    ).toHaveTextContent("Electric");
+    expect(mocks.apiFetch).not.toHaveBeenCalled();
+    await browser.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "Filters" }),
+      ).not.toBeInTheDocument(),
+    );
+    await browser.click(screen.getByRole("button", { name: "Filters" }));
+    expect(
+      screen.getByRole("button", { name: "Propulsion system" }),
+    ).toHaveTextContent("All");
+    expect(mocks.apiFetch).not.toHaveBeenCalled();
+  });
+
   it("renders the initial scooter list", () => {
     renderScooters();
 
@@ -214,7 +347,9 @@ describe("ScootersPage", () => {
         { cache: "no-store" },
       ),
     );
-    expect(await screen.findByText("No scooters found.")).toBeInTheDocument();
+    expect(
+      await screen.findByText(messages.en.shared.list.noResults),
+    ).toBeInTheDocument();
     expect(window.location.search).toBe("?search=yamah");
   });
 
@@ -261,7 +396,9 @@ describe("ScootersPage", () => {
         { cache: "no-store" },
       ),
     );
-    expect(await screen.findByText("No scooters found.")).toBeInTheDocument();
+    expect(
+      await screen.findByText(messages.en.shared.list.noResults),
+    ).toBeInTheDocument();
     expect(screen.queryByText("Honda PCX")).not.toBeInTheDocument();
   });
 
@@ -270,10 +407,14 @@ describe("ScootersPage", () => {
     const browser = userEvent.setup();
 
     renderScooters();
-    await browser.click(screen.getByRole("combobox", { name: "Sort" }));
+    await browser.click(screen.getByRole("button", { name: "Filters" }));
+    await browser.click(screen.getByRole("button", { name: "Sort" }));
     await browser.click(
-      await screen.findByRole("option", { name: "Brand Z-A" }),
+      await screen.findByRole("button", { name: "Brand Z-A" }),
     );
+    expect(mocks.apiFetch).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog", { name: "Filters" })).toBeVisible();
+    await browser.click(screen.getByRole("button", { name: "Apply" }));
 
     await waitFor(() =>
       expect(mocks.apiFetch).toHaveBeenCalledWith(
@@ -292,10 +433,10 @@ describe("ScootersPage", () => {
     renderScooters();
     await browser.click(screen.getByRole("button", { name: "Filters" }));
     await browser.click(
-      screen.getByRole("combobox", { name: "Propulsion system" }),
+      screen.getByRole("button", { name: "Propulsion system" }),
     );
     await browser.click(
-      await screen.findByRole("option", { name: "Electric" }),
+      await screen.findByRole("button", { name: "Electric" }),
     );
     await browser.click(screen.getByRole("button", { name: "Apply" }));
 
@@ -315,9 +456,9 @@ describe("ScootersPage", () => {
 
     renderScooters();
     await browser.click(screen.getByRole("button", { name: "Filters" }));
-    await browser.click(screen.getByRole("combobox", { name: "Registration" }));
+    await browser.click(screen.getByRole("button", { name: "Registration" }));
     await browser.click(
-      await screen.findByRole("option", { name: "National" }),
+      await screen.findByRole("button", { name: "National" }),
     );
     await browser.click(screen.getByRole("button", { name: "Apply" }));
 

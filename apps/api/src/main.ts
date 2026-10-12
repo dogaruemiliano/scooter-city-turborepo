@@ -72,6 +72,7 @@ async function bootstrap(): Promise<void> {
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     bufferLogs: true,
+    rawBody: true,
     cors: false, // configured below with explicit origin list
   });
 
@@ -124,6 +125,12 @@ async function bootstrap(): Promise<void> {
 
   await app.listen(env.PORT);
   app.get(PinoLogger).log(`API listening on :${env.PORT}`, "Bootstrap");
+  app
+    .get(PinoLogger)
+    .log(
+      `Scooter document extraction: jobs=${env.SCOOTER_DOCUMENT_EXTRACTION_JOBS_ENABLED ? "enabled" : "disabled"}, provider=${env.SCOOTER_DOCUMENT_EXTRACTION_DRIVER}, validator=${env.SCOOTER_DOCUMENT_VALIDATION_DRIVER}`,
+      "Bootstrap",
+    );
 }
 
 void bootstrap();
