@@ -442,10 +442,9 @@ describe("direct document analysis", () => {
   it("cancels queued files as well as active files without automatic restart", async () => {
     const pending = deferred<v1.scooters.ScooterDocumentAnalysis>();
     apiFetch.mockReturnValue(pending.promise);
+    const attached = [draft("one"), draft("two"), draft("three")];
     const hook = renderHook(() =>
-      useScooterDocumentAnalysis(
-        documents([draft("one"), draft("two"), draft("three")]),
-      ),
+      useScooterDocumentAnalysis(documents(attached)),
     );
     let run!: ReturnType<typeof hook.result.current.run>;
     await act(async () => {
