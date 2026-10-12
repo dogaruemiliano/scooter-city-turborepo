@@ -17,7 +17,7 @@ function FormActions({
     <div
       data-slot="form-actions"
       className={cn(
-        "flex min-w-0 shrink-0 flex-col gap-3 border-t border-border bg-inherit p-4 sm:flex-row sm:items-center sm:justify-end md:px-6 minimal:border-0 minimal:px-0",
+        "flex min-w-0 shrink-0 flex-col gap-3 border-t border-border bg-inherit p-4 sm:flex-row sm:items-center sm:justify-end md:px-6",
         className,
       )}
       {...props}

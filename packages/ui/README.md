@@ -63,8 +63,7 @@ matching individual entry points.
 `Card` is the common card and editor surface. Use its header/content/footer slots
 for spacing, `size="sm"` for compact content, and `surface="raised"` for editor
 panels. `as="article"`, `as="section"`, and `as="form"` preserve the appropriate
-HTML semantics. Footer surfaces match the card, and minimal-theme geometry is
-centralized in the component. Existing `className` overrides remain available for
+HTML semantics. Footer surfaces match the card. Existing `className` overrides remain available for
 layouts such as tables that need `py-0` or `gap-0`.
 
 Use `Avatar shape="square"` for member initials, with `size="lg"` or `size="xl"`.

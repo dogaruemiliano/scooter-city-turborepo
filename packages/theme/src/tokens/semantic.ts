@@ -138,11 +138,6 @@ const dark: Record<keyof typeof light, string> = {
   mediaScrim: "oklch(0 0 0 / 65%)",
 };
 
-const minimal: Record<keyof typeof light, string> = {
-  ...dark,
-  card: dark.background,
-};
-
-export const semanticColors = { light, dark, minimal } as const;
+export const semanticColors = { light, dark } as const;
 
 export type ThemeColors = typeof light;

@@ -260,7 +260,7 @@ export function UsersWorkspace({ id }: { id?: string }) {
                       href={`/users/${user.id}`}
                       aria-current={id === user.id ? "page" : undefined}
                       onClick={(event) => navigate(event, `/users/${user.id}`)}
-                      className="group block min-w-0 rounded-xl [content-visibility:auto] outline-none focus-visible:ring-2 focus-visible:ring-ring minimal:rounded-none"
+                      className="group block min-w-0 rounded-xl [content-visibility:auto] outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       <Card
                         size="sm"

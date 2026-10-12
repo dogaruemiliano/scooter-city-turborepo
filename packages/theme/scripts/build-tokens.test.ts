@@ -32,7 +32,8 @@ test("CSS exposes the brand palette and every semantic color to Tailwind", () =>
     assert.ok(css.includes(`--color-${cssName}: var(--${cssName});`));
   }
 
-  assert.match(css, /:root\[data-theme='minimal'\], \.minimal/);
+  assert.doesNotMatch(css, /minimal/);
+  assert.deepEqual(Object.keys(semanticColors), ["light", "dark"]);
   assert.doesNotMatch(css, /--color-surface-/);
 });
 
@@ -156,10 +157,6 @@ test("native controls follow the selected or system theme", () => {
   assert.match(
     css,
     /:root\[data-theme='dark'\], \.dark \{\n {2}color-scheme: dark;/,
-  );
-  assert.match(
-    css,
-    /:root\[data-theme='minimal'\], \.minimal \{\n {2}color-scheme: dark;/,
   );
 });
 

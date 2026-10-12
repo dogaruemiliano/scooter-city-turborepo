@@ -12,7 +12,7 @@ import { aspectRatio } from "./tokens/aspect-ratio";
 import { zIndex } from "./tokens/z-index";
 import { breakpoints } from "./tokens/breakpoints";
 
-export type ColorScheme = "light" | "dark" | "minimal";
+export type ColorScheme = "light" | "dark";
 
 /**
  * Combined token set. Use `tokens.color[scheme]` to get the active color palette.

@@ -4,7 +4,6 @@ export const themeCatalog = {
     options: {
       light: "Light",
       dark: "Dark",
-      minimal: "Minimal",
       system: "System",
     },
   },
@@ -13,7 +12,6 @@ export const themeCatalog = {
     options: {
       light: "Luminos",
       dark: "Întunecat",
-      minimal: "Minimal",
       system: "Sistem",
     },
   },
