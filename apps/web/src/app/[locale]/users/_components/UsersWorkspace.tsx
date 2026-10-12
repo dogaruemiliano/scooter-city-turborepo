@@ -264,7 +264,8 @@ export function UsersWorkspace({ id }: { id?: string }) {
                     >
                       <Card
                         size="sm"
-                        className={`transition-colors duration-fast group-hover:border-primary ${id === user.id ? "border-primary bg-popover" : "border-transparent"}`}
+                        border={id === user.id ? "primary" : undefined}
+                        className={`transition-colors duration-fast group-hover:border-primary ${id === user.id ? "bg-popover" : ""}`}
                       >
                         <CardContent className="flex min-w-0 items-center gap-3">
                           <MemberAvatar user={user} />

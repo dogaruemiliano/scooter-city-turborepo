@@ -8,6 +8,7 @@ type CardProps<Element extends CardElement = "div"> = {
   as?: Element;
   size?: "default" | "sm";
   surface?: "default" | "raised";
+  border?: "transparent" | "default" | "primary";
 } & Omit<React.ComponentProps<Element>, "as">;
 
 function Card<Element extends CardElement = "div">({
@@ -15,14 +16,21 @@ function Card<Element extends CardElement = "div">({
   className,
   size = "default",
   surface = "default",
+  border = "transparent",
   ...props
 }: CardProps<Element>) {
   return React.createElement(as ?? "div", {
     "data-slot": "card",
     "data-size": size,
     "data-surface": surface,
+    "data-border": border,
     className: cn(
-      "group/card flex min-w-0 flex-col gap-(--card-spacing) overflow-hidden rounded-xl border border-border bg-card py-(--card-spacing) text-sm text-card-foreground [--card-spacing:--spacing(5)] has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl",
+      "group/card flex min-w-0 flex-col gap-(--card-spacing) overflow-hidden rounded-xl border bg-card py-(--card-spacing) text-sm text-card-foreground [--card-spacing:--spacing(5)] has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl",
+      {
+        transparent: "border-transparent",
+        default: "border-border",
+        primary: "border-primary",
+      }[border],
       surface === "raised" &&
         "rounded-2xl bg-popover text-popover-foreground [--card-spacing:--spacing(4)] md:[--card-spacing:--spacing(6)]",
       size === "sm" &&

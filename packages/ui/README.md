@@ -60,7 +60,9 @@ matching individual entry points.
   provide translated labels, button types, busy/disabled states, and handlers.
   It does not own submission or confirmation logic.
 
-`Card` is the common card and editor surface. Use its header/content/footer slots
+`Card` is the common card and editor surface. Its outer border is transparent by
+default; use `border="default"` for the neutral theme border or `border="primary"`
+for brand emphasis. Footer dividers retain their neutral border. Use its header/content/footer slots
 for spacing, `size="sm"` for compact content, and `surface="raised"` for editor
 panels. `as="article"`, `as="section"`, and `as="form"` preserve the appropriate
 HTML semantics. Footer surfaces match the card. Existing `className` overrides remain available for
