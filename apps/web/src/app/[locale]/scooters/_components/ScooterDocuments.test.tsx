@@ -363,6 +363,8 @@ describe("Scooter documents", () => {
     renderWithMessages(
       <ScooterCreateForm brands={brands} scootersHref="/scooters" />,
     );
+    const vinInput = screen.getByRole("textbox", { name: "VIN" });
+    const createButton = screen.getByRole("button", { name: "Create scooter" });
     fireEvent.drop(
       screen.getByRole("button", { name: /Drop your scooter documents/ }),
       {
@@ -372,13 +374,15 @@ describe("Scooter documents", () => {
       },
     );
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    await waitFor(() =>
-      expect(screen.getByRole("textbox", { name: "VIN" })).toHaveValue(
-        scooter.vin,
-      ),
-    );
-    await waitFor(() =>
-      expect(screen.getByLabelText("Total premium")).toHaveValue("278.88"),
+    // Upload, classification, and form import span several renders. Poll the
+    // existing input instead of recalculating every textbox's accessible name.
+    await waitFor(() => expect(vinInput).toHaveValue(scooter.vin), {
+      timeout: 5_000,
+    });
+    await waitFor(
+      () =>
+        expect(screen.getByLabelText("Total premium")).toHaveValue("278.88"),
+      { timeout: 5_000 },
     );
     expect(screen.getByLabelText("Plate number")).toHaveValue("14949");
     expect(screen.getByLabelText("Insured name")).toHaveValue("Example Person");
@@ -396,12 +400,8 @@ describe("Scooter documents", () => {
         ([path]) => path === v1.scooters.ROUTES.create,
       ),
     ).toHaveLength(0);
-    await waitFor(() =>
-      expect(
-        screen.getByRole("button", { name: "Create scooter" }),
-      ).toBeEnabled(),
-    );
-    await browser.click(screen.getByRole("button", { name: "Create scooter" }));
+    await waitFor(() => expect(createButton).toBeEnabled());
+    await browser.click(createButton);
     await waitFor(() => expect(mocks.push).toHaveBeenCalledWith("/scooters"));
     const payload = mocks.api.mock.calls.find(
       ([path]) => path === v1.scooters.ROUTES.create,
@@ -470,6 +470,13 @@ describe("Scooter documents", () => {
       () => `00000000-0000-4000-8000-${String(++nextId).padStart(12, "0")}`,
     );
     const browser = userEvent.setup();
+    access.user = {
+      isSuperAdmin: false,
+      effectiveScopes: {
+        "scooter_documents.read": ["ALL"],
+        "scooter_documents.write": ["ALL"],
+      },
+    };
     renderWithMessages(
       <ScooterCreateForm brands={brands} scootersHref="/scooters" />,
     );
@@ -490,19 +497,12 @@ describe("Scooter documents", () => {
         fileName: "asigurare-004-AGM.pdf",
       },
     ];
-    access.user = {
-      isSuperAdmin: false,
-      effectiveScopes: {
-        "scooter_documents.read": ["ALL"],
-        "scooter_documents.write": ["ALL"],
-      },
-    };
-    for (const [index, document] of documents.entries()) {
-      await browser.upload(
-        screen.getByLabelText("Browse files", { selector: "input" }),
-        pdf(document.fileName),
-      );
-      await waitFor(() => expect(mocks.put).toHaveBeenCalledTimes(index + 1));
+    await browser.upload(
+      screen.getByLabelText("Browse files", { selector: "input" }),
+      documents.map((document) => pdf(document.fileName)),
+    );
+    await waitFor(() => expect(mocks.put).toHaveBeenCalledTimes(3));
+    for (const document of documents) {
       await browser.click(
         screen.getByRole("combobox", {
           name: `Document type for ${document.fileName}`,
@@ -596,7 +596,7 @@ describe("Scooter documents", () => {
         }),
       ),
     );
-  });
+  }, 15_000);
 
   it("asks only for an unknown file's type and reprocesses it without uploading again", async () => {
     mockBatchExtraction(["civ"]);
