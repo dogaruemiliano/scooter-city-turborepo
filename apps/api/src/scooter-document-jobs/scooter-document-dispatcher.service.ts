@@ -1,3 +1,4 @@
+import { DocumentExtractionError } from "../document-extraction/document-extraction.errors";
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import { Cron } from "@nestjs/schedule";
 import { randomUUID } from "node:crypto";
@@ -242,7 +243,7 @@ export class ScooterDocumentDispatcherService {
         attemptedProviderSubmission = true;
         const response = await this.provider.start({
           jobId: job.id,
-          documentType: job.documentType,
+          documentType: job.documentType ?? "unclassified",
           url,
           contentType: source.contentType,
         });
@@ -356,22 +357,27 @@ export class ScooterDocumentDispatcherService {
     let result: Prisma.InputJsonValue | typeof Prisma.DbNull = Prisma.DbNull;
     if (response.status === "completed" && !response.errorCode) {
       try {
+        const documentType =
+          job.documentType ?? this.extraction.detectType(response.output);
         const normalized = this.extraction.normalize(
-          job.documentType,
+          documentType,
           response.output,
         );
         result = jsonValue(
           v1.scooters.scooterDocumentAnalysisSchema.parse({
             ...normalized,
             sourceId: job.sourceId,
-            documentType: job.documentType,
+            documentType,
             reviewRequired: true,
           }),
         );
         status = "completed";
-      } catch {
+      } catch (error) {
         status = "failed";
-        errorCode = "DOCUMENT_EXTRACTION_FAILED";
+        errorCode =
+          error instanceof DocumentExtractionError
+            ? error.code
+            : "DOCUMENT_EXTRACTION_FAILED";
       }
     } else if (!["queued", "in_progress"].includes(response.status)) {
       status = response.status === "cancelled" ? "cancelled" : "failed";

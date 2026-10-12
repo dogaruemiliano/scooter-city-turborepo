@@ -1,5 +1,8 @@
 import { z } from "zod";
-import { scooterDocumentTypeSchema } from "./scooter-documents.schemas";
+import {
+  scooterDocumentTypeSchema,
+  scooterDocumentUploadTypeSchema,
+} from "./scooter-documents.schemas";
 import { scooterDocumentExtractedDataSchema } from "./scooter-document-extraction.schemas";
 
 export const SCOOTER_DOCUMENT_EXTRACTION_MAX_PAGES = 10;
@@ -15,7 +18,8 @@ export const analyzeScooterDocumentInputSchema = z
       z
         .object({
           kind: z.literal("draft"),
-          type: scooterDocumentTypeSchema,
+          type: scooterDocumentUploadTypeSchema,
+          uploadType: z.literal("unclassified").optional(),
           uploadToken: z.string().min(1).max(8192),
         })
         .strict(),
@@ -108,7 +112,7 @@ export const scooterDocumentExtractionJobSchema = z
   .object({
     id: identifier,
     sourceId: identifier,
-    documentType: scooterDocumentTypeSchema,
+    documentType: scooterDocumentUploadTypeSchema,
     status: z.enum(SCOOTER_DOCUMENT_EXTRACTION_JOB_STATUSES),
     result: scooterDocumentAnalysisSchema.optional(),
     errorCode: z.string().min(1).max(120).optional(),
@@ -126,7 +130,8 @@ export const scooterDocumentExtractionJobSchema = z
     if (
       job.result &&
       (job.result.sourceId !== job.sourceId ||
-        job.result.documentType !== job.documentType)
+        (job.documentType !== "unclassified" &&
+          job.result.documentType !== job.documentType))
     )
       context.addIssue({
         code: "custom",

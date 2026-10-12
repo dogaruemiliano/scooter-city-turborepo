@@ -44,6 +44,23 @@ export class ScooterDocumentExtractionService {
     );
   }
 
+  detectType(output: unknown): v1.scooters.ScooterDocumentType {
+    const parsed = scooterDocumentModelOutputSchema.safeParse(output);
+    if (!parsed.success)
+      throw new DocumentExtractionError(
+        "DOCUMENT_EXTRACTION_FAILED",
+        "Document extraction returned unusable data.",
+        true,
+      );
+    if (!parsed.data.detectedDocumentType)
+      throw new DocumentExtractionError(
+        "DOCUMENT_EXTRACTION_TYPE_UNKNOWN",
+        "Choose the document type or replace this file.",
+        false,
+      );
+    return parsed.data.detectedDocumentType;
+  }
+
   /** Apply the same review rules to asynchronously retrieved provider output. */
   normalize(
     documentType: v1.scooters.ScooterDocumentType,
@@ -140,15 +157,13 @@ export class ScooterDocumentExtractionService {
         typeof version === "string" &&
         (v1.vehicleCiv.CIV_VERSIONS as readonly string[]).includes(version)
       ) {
-        const rubric = v1.vehicleCiv.civFieldHint(
-          version as v1.vehicleCiv.CivVersion,
-          key === "brandName"
-            ? "brandId"
-            : key === "powertrainType"
-              ? "propulsionSystem"
-              : key,
-        );
-        if (rubric && value !== null && rawFields[rubric] === value) return;
+        if (
+          value !== null &&
+          Object.entries(rawFields).some(
+            ([label, reading]) => rawTarget(label) === key && reading === value,
+          )
+        )
+          return;
       }
       if (input.documentType === "insurance" && (value?.length ?? 0) > 500) {
         issue(key, "invalidValue");
@@ -362,7 +377,9 @@ function rawFieldTarget(
     )
   )
     return "vin";
-  const code = /^([A-Z](?:\.\d+)?|\d+(?:\.\d+)?)(?:\s|$)/.exec(label)?.[1];
+  const code = /^([A-Z](?:\.\d+)?|\d+(?:\.\d+)?)(?:\.?\s|\.?$)/.exec(
+    label,
+  )?.[1];
   if (code === "E" && type !== "insurance") return "vin";
   if (type !== "civ" || !code) return undefined;
   if (code === "D.2" && /variant/i.test(label)) return "variant";

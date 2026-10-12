@@ -24,6 +24,7 @@ import {
   FormSelect,
   FormTextarea,
 } from "@/components/form/controls";
+import { ScooterBatchDocuments } from "./ScooterBatchDocuments";
 import { ScooterDocumentImport } from "./ScooterDocumentImport";
 import {
   ScooterDocumentUpload,
@@ -60,6 +61,9 @@ interface EditorFieldProps {
 
 export function ScooterEditorFields({
   brands,
+  combinedReview = false,
+  onRetryAnalysis,
+  analyzing = false,
   persistedPolicyIds,
   documents,
   editing,
@@ -73,6 +77,9 @@ export function ScooterEditorFields({
   onApplyImport,
   importResult,
 }: {
+  combinedReview?: boolean;
+  onRetryAnalysis?: (sourceId: string) => void;
+  analyzing?: boolean;
   persistedPolicyIds: string[];
   rawFields: Record<string, string>;
   onRawFields: (fields: Record<string, string>) => void;
@@ -152,35 +159,48 @@ export function ScooterEditorFields({
     <>
       {showDocuments ? (
         <>
-          <FormSection title={t("documents.title")}>
-            <div
-              className={
-                step === "documents"
-                  ? "grid grid-cols-2 gap-3 sm:col-span-2 lg:grid-cols-4"
-                  : "grid gap-4 sm:col-span-2"
-              }
-            >
-              {(
-                ["import_document", "civ", "registration_certificate"] as const
-              ).map((type) => (
-                <ScooterDocumentUpload
-                  key={type}
-                  type={type}
+          {!editing ? (
+            <ScooterBatchDocuments
+              documents={documents}
+              disabled={disabled}
+              analyzing={analyzing}
+              onRetryAnalysis={onRetryAnalysis}
+            />
+          ) : (
+            <FormSection title={t("documents.title")}>
+              <div
+                className={
+                  step === "documents"
+                    ? "grid grid-cols-2 gap-3 sm:col-span-2 lg:grid-cols-4"
+                    : "grid gap-4 sm:col-span-2"
+                }
+              >
+                {(
+                  [
+                    "import_document",
+                    "civ",
+                    "registration_certificate",
+                  ] as const
+                ).map((type) => (
+                  <ScooterDocumentUpload
+                    key={type}
+                    type={type}
+                    documents={documents}
+                    disabled={disabled}
+                    compact={step === "documents"}
+                  />
+                ))}
+                <ScooterInsuranceDocuments
                   documents={documents}
                   disabled={disabled}
+                  persistedPolicyIds={persistedPolicyIds}
+                  insurance={insurance}
+                  editing={editing}
                   compact={step === "documents"}
                 />
-              ))}
-              <ScooterInsuranceDocuments
-                documents={documents}
-                disabled={disabled}
-                persistedPolicyIds={persistedPolicyIds}
-                insurance={insurance}
-                editing={editing}
-                compact={step === "documents"}
-              />
-            </div>
-          </FormSection>
+              </div>
+            </FormSection>
+          )}
           <ScooterDocumentImport
             secondary
             sources={importSources}
@@ -250,18 +270,33 @@ export function ScooterEditorFields({
           </Button>
         </div>
       ))}
-      {canReadDocuments && (!step || step === "civ") ? (
-        <CivMetadataFields
-          disabled={disabled || !canAccess(user, "scooter_documents.write")}
-          compact={Boolean(step)}
-        />
-      ) : null}
       {showTechnical ? (
         <ScooterTechnicalFields
           key={step ?? "edit"}
           {...fieldProps}
-          compact={Boolean(step)}
+          compact={Boolean(step) || combinedReview}
+          revealedFields={
+            combinedReview ? Object.keys(importResult?.values ?? {}) : []
+          }
         />
+      ) : null}
+      {canReadDocuments && (!step || step === "civ") ? (
+        combinedReview &&
+        !importSources?.some((source) => source.type === "civ") ? (
+          <details>
+            <summary className="cursor-pointer py-3 text-sm font-medium">
+              {t("sections.civDocument")}
+            </summary>
+            <CivMetadataFields
+              disabled={disabled || !canAccess(user, "scooter_documents.write")}
+            />
+          </details>
+        ) : (
+          <CivMetadataFields
+            disabled={disabled || !canAccess(user, "scooter_documents.write")}
+            compact={Boolean(step)}
+          />
+        )
       ) : null}
       {step === "operational" && fallbackIdentity.length ? (
         <FormSection title={t("wizard.missingIdentity")}>
@@ -318,8 +353,9 @@ export function ScooterEditorFields({
 
 function ScooterTechnicalFields({
   compact,
+  revealedFields = [],
   ...props
-}: EditorFieldProps & { compact: boolean }) {
+}: EditorFieldProps & { compact: boolean; revealedFields?: string[] }) {
   const t = useTranslations("scooters");
   const {
     getValues,
@@ -352,15 +388,16 @@ function ScooterTechnicalFields({
         !(field === "fuelType" && props.powertrain === "electric"),
     ),
   }));
+  const visible = new Set([...initiallyVisible, ...revealedFields]);
   const hasOther =
     compact &&
     sections.some((section) =>
-      section.fields.some((field) => !initiallyVisible.has(field)),
+      section.fields.some((field) => !visible.has(field)),
     );
   const showOtherForReview = sections.some((section) =>
     section.fields.some(
       (field) =>
-        !initiallyVisible.has(field) &&
+        !visible.has(field) &&
         (warnings[field] ||
           warnings[`${field}Other`] ||
           get(errors, field) ||
@@ -370,7 +407,7 @@ function ScooterTechnicalFields({
   function renderSections(other: boolean) {
     return sections.map((section) => {
       const fields = section.fields.filter(
-        (field) => !compact || initiallyVisible.has(field) !== other,
+        (field) => !compact || visible.has(field) !== other,
       );
       return fields.length ? (
         <FormSection key={section.title} title={t(`sections.${section.title}`)}>

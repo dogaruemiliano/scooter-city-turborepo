@@ -65,6 +65,12 @@ export class ScooterDocumentAnalysisService {
           "Document storage does not match.",
           false,
         );
+      if (source.documentType === "unclassified")
+        throw new DocumentExtractionError(
+          "DOCUMENT_EXTRACTION_INVALID_SOURCE",
+          "Automatic classification requires a background job.",
+          false,
+        );
       const bytes = await readScooterDocumentSource(
         this.storage,
         source.stored,

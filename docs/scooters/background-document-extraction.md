@@ -4,6 +4,22 @@ Scooter extraction uses durable database jobs. The browser still uploads directl
 
 The feature defaults to disabled. Deploy the validation infrastructure and configure the provider webhook before enabling it. Manual scooter entry remains available. Person and expense extraction use their existing independent paths.
 
+## Batch scooter creation
+
+Validation revision 2 normalizes rotation in the temporary analysis copy of scanned PDFs. A portrait MediaBox with `/Rotate 90` becomes an explicitly landscape page with rotation zero, preserving the image streams and visible crop. This avoids relying on the provider's handling of scanner rotation. PDFs with annotations are left unchanged to preserve their appearances. The original download is untouched. Deploy the updated validation Lambda as well as the API; local validation uses the updated worker automatically. Existing completed results must be explicitly reanalyzed.
+
+The create screen accepts any subset of CIV, import, registration and insurance files in one drop or multi-file selection. Upload and extraction start on selection; originals are previewed on demand. A single combined form reviews the extracted values and saves the scooter and attachments together. English and Romanian labels are supported.
+
+Apply `20261012200000_unclassified_scooter_document_jobs` before deploying the new API. It makes only the job's requested `documentType` nullable; saved documents still require one of the four concrete types. No existing data is rewritten. Deploy the API before the web client.
+
+New batch uploads use `type: "unclassified"` and an editor session. Their signed token and draft ledger remain bound to the original `scooter-document:unclassified:<user>` scope through classification, manual reassignment, extraction and final save. Requests using those tokens include `uploadType: "unclassified"`; this never permits a token belonging to another user, session or upload purpose. Existing category-specific uploads retain their original scope.
+
+For an unclassified job, the provider identifies the document from its contents and extracts fields in the same request. The server then normalizes only fields authorized for the detected type. The job response retains `documentType: "unclassified"` for source binding, while its completed result has the concrete detected type. Ambiguous/unsupported content, including a combined PDF with different document types, returns `DOCUMENT_EXTRACTION_TYPE_UNKNOWN`. The operator chooses a type or replaces the file; no category is silently guessed. Multipage files of one type are supported.
+
+Changing a draft's type reuses its original upload and starts a new extraction attempt. Removed or reassigned files invalidate their old evidence. Successful results are reused, failed files have individual retry controls, and cancellation includes queued files so they cannot restart automatically. Manual field edits remain protected. Missing categories are optional; required identity/registration fields and unresolved or conflicting VINs still require resolution. When CIV and import documents coexist, CIV retains technical authority.
+
+The fake provider deliberately cannot classify file contents: choose a type manually when using it. The automated tests use synthetic files and mocked provider output; evaluate classification accuracy on representative authorized documents before relying on it operationally.
+
 ## Local development
 
 To use real OpenAI extraction locally without deploying Lambda or exposing a public webhook, add these settings to `apps/api/.env` and restart the API:

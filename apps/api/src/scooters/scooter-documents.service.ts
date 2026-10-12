@@ -14,9 +14,9 @@ import {
   UPLOAD_WRITE_GRACE_MS,
 } from "../scooter-document-jobs/document-job-lifecycle";
 
-const purpose = (type: v1.scooters.ScooterDocumentType) =>
+const purpose = (type: v1.scooters.ScooterDocumentUploadType) =>
   `scooter-document:${type}`;
-const scope = (userId: string, type: v1.scooters.ScooterDocumentType) =>
+const scope = (userId: string, type: v1.scooters.ScooterDocumentUploadType) =>
   `${purpose(type)}:${userId}`;
 type Prepared = v1.scooters.ScooterDocumentDraft & { stored: StoredDocument };
 
@@ -109,7 +109,7 @@ export class ScooterDocumentsService {
     for (const draft of drafts) {
       const stored = await this.storage.completePresignedDocumentUpload(
         draft.uploadToken,
-        scope(userId!, draft.type),
+        scope(userId!, draft.uploadType ?? draft.type),
       );
       if (keys.has(stored.storageKey))
         throw new BadRequestException("Duplicate document upload");
@@ -124,7 +124,7 @@ export class ScooterDocumentsService {
     source: v1.scooters.AnalyzeScooterDocumentInput["source"],
     userId: string,
   ): Promise<{
-    documentType: v1.scooters.ScooterDocumentType;
+    documentType: v1.scooters.ScooterDocumentUploadType;
     stored: StoredDocument;
     draftUploadId?: string;
     documentId?: string;
@@ -133,12 +133,12 @@ export class ScooterDocumentsService {
     if (source.kind === "draft") {
       const stored = this.storage.verifyDocumentUploadToken(
         source.uploadToken,
-        scope(userId, source.type),
+        scope(userId, source.uploadType ?? source.type),
       );
       const draft = await this.prisma.draftUpload.findFirst({
         where: {
           userId,
-          purpose: purpose(source.type),
+          purpose: purpose(source.uploadType ?? source.type),
           storageKey: stored.storageKey,
           provider: stored.provider,
           bucket: stored.bucket,
@@ -244,6 +244,7 @@ export class ScooterDocumentsService {
       fileName,
       insurancePolicyId,
       extractedData,
+      uploadType,
     } of prepared) {
       if (type === "insurance") {
         if (
@@ -265,7 +266,7 @@ export class ScooterDocumentsService {
         where: {
           storageKey: stored.storageKey,
           userId,
-          purpose: purpose(type),
+          purpose: purpose(uploadType ?? type),
           claimedAt: null,
           cleanupStartedAt: null,
           editorSessionId: sessionId ?? null,

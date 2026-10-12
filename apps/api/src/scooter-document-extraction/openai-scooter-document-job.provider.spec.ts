@@ -31,6 +31,23 @@ const completed = (parts: unknown[], metadata = { jobId: "job-1" }) =>
   });
 
 describe("OpenAI background scooter extraction", () => {
+  it("classifies an unlabelled document and extracts in one request with all type-specific rules", async () => {
+    const { provider, fetcher } = setup(
+      Response.json({ id: "resp_123", status: "queued" }),
+    );
+    await provider.start({ ...input, documentType: "unclassified" });
+    const body = JSON.parse(fetcher.mock.calls[0][1]!.body as string) as {
+      instructions: string;
+      max_output_tokens: number;
+    };
+    expect(body.max_output_tokens).toBe(12_000);
+    expect(body.instructions).toContain("First identify the document type");
+    expect(body.instructions).toContain("several distinct document types");
+    expect(body.instructions).toContain("ASIGURAT");
+    expect(body.instructions).toContain("current Romanian registration");
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
   it("distinguishes a definite submission rejection from an ambiguous provider failure", async () => {
     await expect(
       setup(new Response(null, { status: 429 })).provider.start(input),

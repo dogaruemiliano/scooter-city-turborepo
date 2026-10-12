@@ -44,7 +44,7 @@ function documents(drafts: DocumentDraft[]) {
 }
 function response(
   sourceId: string,
-  documentType: DocumentDraft["type"] = "civ",
+  documentType: v1.scooters.ScooterDocumentType = "civ",
 ): v1.scooters.ScooterDocumentAnalysis {
   return {
     sourceId,
@@ -411,6 +411,59 @@ describe("direct document analysis", () => {
       await hook.result.current.run();
     });
     expect(apiFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps in-flight work when another file is added", async () => {
+    const pending = deferred<v1.scooters.ScooterDocumentAnalysis>();
+    apiFetch.mockReturnValueOnce(pending.promise);
+    const first = draft("first");
+    const hook = renderHook(
+      ({ files }) => useScooterDocumentAnalysis(documents(files)),
+      { initialProps: { files: [first] } },
+    );
+    let run!: ReturnType<typeof hook.result.current.run>;
+    await act(async () => {
+      run = hook.result.current.run({ automatic: true });
+    });
+    hook.rerender({ files: [first, draft("second")] });
+    await act(async () => {
+      pending.resolve(response("first"));
+      await run;
+    });
+    expect(hook.result.current.entries.first?.status).toBe("success");
+    apiFetch.mockResolvedValueOnce(response("second"));
+    await act(async () => {
+      await hook.result.current.run({ automatic: true });
+    });
+    expect(apiFetch).toHaveBeenCalledTimes(2);
+    expect(hook.result.current.entries.second?.status).toBe("success");
+  });
+
+  it("cancels queued files as well as active files without automatic restart", async () => {
+    const pending = deferred<v1.scooters.ScooterDocumentAnalysis>();
+    apiFetch.mockReturnValue(pending.promise);
+    const attached = [draft("one"), draft("two"), draft("three")];
+    const hook = renderHook(() =>
+      useScooterDocumentAnalysis(documents(attached)),
+    );
+    let run!: ReturnType<typeof hook.result.current.run>;
+    await act(async () => {
+      run = hook.result.current.run({ automatic: true });
+    });
+    await act(async () => {
+      hook.result.current.cancel();
+      await run;
+    });
+    expect(hook.result.current.entries.three).toEqual({
+      status: "failed",
+      error: "cancelled",
+    });
+    const calls = apiFetch.mock.calls.length;
+    await act(async () => {
+      await hook.result.current.run({ automatic: true });
+    });
+    expect(apiFetch).toHaveBeenCalledTimes(calls);
+    expect(hook.result.current.running).toBe(false);
   });
 
   it("prevents duplicate runs and aborts on unmount", async () => {

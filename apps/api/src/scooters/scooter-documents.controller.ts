@@ -71,6 +71,10 @@ export class ScooterDocumentsController {
 
   @RequireAllScope("scooter_documents.write")
   @Post("document-draft-upload-url")
+  @ApiOperation({
+    summary:
+      "Upload a scooter document with a known type or automatic detection",
+  })
   @ZodResponse({ status: 201, type: ScooterDocumentUpload })
   createUpload(
     @Body() input: CreateScooterDocumentUpload,

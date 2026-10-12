@@ -24,6 +24,8 @@ export const scootersCatalog = {
         reviewed: "VIN corrected after manual review",
       },
       errors: {
+        unknownType:
+          "We could not identify this document. Choose its type, or replace a combined PDF with separate documents.",
         disabled:
           "AI extraction is not enabled. Complete the fields manually or import JSON.",
         unsupported: "This document cannot be read. Use a clear PDF or image.",
@@ -199,6 +201,18 @@ export const scootersCatalog = {
         "No unique brand matches “{brand}”. Select it or add it using the brand field.",
     },
     documents: {
+      batch: {
+        drop: "Drop your scooter documents",
+        browse: "Browse files",
+        hint: "CIV · Import · Registration · Insurance. Add any combination. PDF, JPG, PNG or WebP, up to 15 MB each.",
+        unknown: "Choose document type",
+        typeLabel: "Document type for {name}",
+        duplicate: "This file is already attached.",
+        read: "Details extracted",
+        manualTypes: "Choose each document's type and enter its details below.",
+        review:
+          "Review the filled details below, then create the scooter. You can add more documents at any time.",
+      },
       title: "Documents",
       compact: {
         import_document: "Import",
@@ -900,6 +914,8 @@ export const scootersCatalog = {
         reviewed: "VIN corectat după verificare manuală",
       },
       errors: {
+        unknownType:
+          "Nu am putut identifica documentul. Alege tipul sau înlocuiește PDF-ul combinat cu documente separate.",
         disabled:
           "Extragerea AI nu este activată. Completează manual sau importă JSON.",
         unsupported:
@@ -1087,6 +1103,19 @@ export const scootersCatalog = {
         "Marca „{brand}” nu are o potrivire unică. Selecteaz-o sau adaug-o din câmpul Marcă.",
     },
     documents: {
+      batch: {
+        drop: "Trage documentele scuterului aici",
+        browse: "Alege fișiere",
+        hint: "CIV · Import · Înmatriculare · Asigurare. Adaugă orice combinație. PDF, JPG, PNG sau WebP, maximum 15 MB fiecare.",
+        unknown: "Alege tipul documentului",
+        typeLabel: "Tipul documentului {name}",
+        duplicate: "Acest fișier este deja atașat.",
+        read: "Date extrase",
+        manualTypes:
+          "Alege tipul fiecărui document și completează datele mai jos.",
+        review:
+          "Verifică datele completate mai jos, apoi creează scuterul. Poți adăuga alte documente oricând.",
+      },
       title: "Documente",
       compact: {
         import_document: "Import",

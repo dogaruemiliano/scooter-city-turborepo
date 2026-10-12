@@ -41,6 +41,46 @@ function setup(
 }
 
 describe("scooter document extraction normalization", () => {
+  it.each(v1.scooters.SCOOTER_DOCUMENT_TYPES)(
+    "detects %s before applying its field authority",
+    (type) => {
+      const { service } = setup();
+      const output = {
+        detectedDocumentType: type,
+        vin: VIN,
+        fields: [field("registrationNumber", "14949"), field("powerKw", 8)],
+        rawFields: [],
+      };
+      const detected = service.detectType(output);
+      expect(detected).toBe(type);
+      const normalized = service.normalize(detected, output);
+      if (type !== "registration_certificate")
+        expect(normalized.extractedData.fields).not.toHaveProperty(
+          "registrationNumber",
+        );
+      if (type === "registration_certificate" || type === "insurance")
+        expect(normalized.extractedData.fields).not.toHaveProperty("powerKw");
+    },
+  );
+  it("leaves unrecognizable documents unresolved instead of inventing a category", async () => {
+    const { service } = setup();
+    await expect(
+      Promise.resolve().then(() =>
+        service.detectType({
+          detectedDocumentType: null,
+          vin: null,
+          fields: [],
+          rawFields: [],
+        }),
+      ),
+    ).rejects.toMatchObject({ code: "DOCUMENT_EXTRACTION_TYPE_UNKNOWN" });
+    await expect(
+      Promise.resolve().then(() =>
+        service.detectType({ detectedDocumentType: "civ" }),
+      ),
+    ).rejects.toMatchObject({ code: "DOCUMENT_EXTRACTION_FAILED" });
+  });
+
   it("preserves zeroes, confirmed-empty dashes, unknown values and raw formatting", async () => {
     const { service } = setup(
       [
@@ -283,6 +323,44 @@ describe("scooter document extraction normalization", () => {
     expect(result.extractedData.fields).not.toHaveProperty(
       "electricMotorPowerKw",
     );
+  });
+
+  it("does not flag valid CIV readings when labelled rubric evidence fills the raw-field limit", async () => {
+    const { service } = setup(
+      [
+        field("civVersion", "2024"),
+        field("brandName", "SYNTHETIC"),
+        field("powertrainType", "combustion"),
+        field("color", "Negru"),
+        field("seatsCount", 2),
+        field("standingCapacity", 0),
+      ],
+      {
+        rawFields: [
+          { key: "vin", value: VIN },
+          { key: "civVersion", value: "2024" },
+          { key: "brandName", value: "SYNTHETIC" },
+          { key: "powertrainType", value: "combustion" },
+          { key: "R. Culoare vehicul", value: "Negru" },
+          { key: "S.1. Număr locuri", value: "2" },
+          { key: "S.2. Număr locuri în picioare", value: "0" },
+          ...Array.from({ length: 93 }, (_, index) => ({
+            key: `unmapped-${index}`,
+            value: "0",
+          })),
+        ],
+      },
+    );
+    const result = await service.analyze(input);
+    expect(result.issues).toEqual([]);
+    expect(result.extractedData.fields).toMatchObject({
+      color: "Negru",
+      seatsCount: 2,
+      standingCapacity: 0,
+    });
+    expect(Object.keys(result.extractedData.rawFields)).toHaveLength(100);
+    expect(result.extractedData.rawFields).not.toHaveProperty("color");
+    expect(result.extractedData.rawFields["R. Culoare vehicul"]).toBe("Negru");
   });
 
   it("requires explicit VIN review for missing and invalid VINs", async () => {

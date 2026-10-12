@@ -62,7 +62,7 @@ vi.mock("./useScooterDocuments", () => ({
   },
 }));
 
-it("unblocks the wizard after verified correction and reuses it when returning to documents", async () => {
+it("unblocks the combined review after verified VIN correction without re-extraction", async () => {
   const correct = "LXYTCZP05P0000001";
   const misread = "LXYTC2P05P0000001";
   apiFetch.mockImplementation((_route, _schema, { json }) => {
@@ -89,13 +89,9 @@ it("unblocks the wizard after verified correction and reuses it when returning t
       <ScooterEditor brands={[]} returnHref="/en/scooters" />
     </NextIntlClientProvider>,
   );
-  await user.click(
-    screen.getByRole("button", { name: "Extract and continue" }),
-  );
   expect(
     await screen.findByRole("heading", { name: "Check document VINs" }),
   ).toBeInTheDocument();
-  expect(screen.getByText("1 / 4 · Documents")).toBeInTheDocument();
   expect(apiFetch).toHaveBeenCalledTimes(2);
   fireEvent.change(screen.getByLabelText("registration.pdf"), {
     target: { value: correct },
@@ -119,12 +115,8 @@ it("unblocks the wizard after verified correction and reuses it when returning t
     vinReview: { method: "manual", originalVin: misread },
   });
   expect(apiFetch).toHaveBeenCalledTimes(2);
-  await user.click(screen.getByRole("button", { name: "Continue" }));
-  expect(screen.getByText("2 / 4 · CIV")).toBeInTheDocument();
   expect(screen.getByLabelText("VIN")).toHaveValue(correct);
-  await user.click(screen.getByRole("button", { name: "Back" }));
-  await user.click(screen.getByRole("button", { name: "Continue" }));
-  expect(screen.getByText("2 / 4 · CIV")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Create scooter" })).toBeEnabled();
   expect(apiFetch).toHaveBeenCalledTimes(2);
 });
 

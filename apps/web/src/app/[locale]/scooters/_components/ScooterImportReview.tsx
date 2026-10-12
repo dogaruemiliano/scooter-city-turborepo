@@ -18,6 +18,7 @@ import {
   activeImportReviews,
   importFieldReviews,
   insuranceFieldReviews,
+  remainingCivDocumentWarnings,
   unresolvedDocumentRubrics,
   type ImportFieldReview,
 } from "./scooter-import-review";
@@ -66,9 +67,6 @@ export function ScooterImportReviewProvider({
     ) => {
       const fieldReviews = importFieldReviews(result, snapshot);
       setReviews(fieldReviews);
-      const mappedCodes = new Set(
-        fieldReviews.flatMap((review) => review.rawCodes),
-      );
       const unmapped = unresolvedDocumentRubrics(result, snapshot);
       const documentFields = Object.entries(
         result.unresolvedDocumentFields ?? {},
@@ -79,15 +77,16 @@ export function ScooterImportReviewProvider({
           )?.type;
           return {
             sourceId,
-            fields: fields.filter((field) =>
+            fields:
               type === "civ"
-                ? !mappedCodes.has(field)
-                : type === "insurance"
-                  ? !(
-                      v1.scooters.INSURANCE_FIELDS as readonly string[]
-                    ).includes(field)
-                  : true,
-            ),
+                ? remainingCivDocumentWarnings(fields, fieldReviews)
+                : fields.filter((field) =>
+                    type === "insurance"
+                      ? !(
+                          v1.scooters.INSURANCE_FIELDS as readonly string[]
+                        ).includes(field)
+                      : true,
+                  ),
           };
         })
         .filter((item) => item.fields.length);

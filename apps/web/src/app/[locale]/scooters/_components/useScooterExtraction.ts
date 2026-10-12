@@ -93,12 +93,14 @@ export function useScooterExtraction(options: Options) {
       fileName: doc.fileName,
       insurancePolicyId: doc.insurancePolicyId,
     })),
-    ...documents.drafts.map((doc) => ({
-      sourceId: doc.id,
-      type: doc.type,
-      fileName: doc.file.name,
-      insurancePolicyId: doc.insurancePolicyId,
-    })),
+    ...documents.drafts
+      .filter((doc) => doc.type !== null)
+      .map((doc) => ({
+        sourceId: doc.id,
+        type: doc.type,
+        fileName: doc.file.name,
+        insurancePolicyId: doc.insurancePolicyId,
+      })),
   ]);
   const sources = useMemo<DocumentSource[]>(
     () => JSON.parse(signature),

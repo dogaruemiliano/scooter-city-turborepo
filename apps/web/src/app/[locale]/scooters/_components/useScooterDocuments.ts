@@ -1,7 +1,7 @@
 "use client";
 
 import { ApiError, v1 } from "@repo/api-shared";
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { webApi } from "@/lib/api";
 import {
   isScooterEditorSessionUnavailable,
@@ -10,7 +10,9 @@ import {
 
 export interface DocumentDraft {
   id: string;
-  type: v1.scooters.ScooterDocumentType;
+  type: v1.scooters.ScooterDocumentType | null;
+  uploadType?: "unclassified";
+  requestedType?: v1.scooters.ScooterDocumentType;
   insurancePolicyId?: string;
   file: File;
   status: "uploading" | "ready" | "failed";
@@ -93,7 +95,7 @@ export function useScooterDocuments(
           method: "POST",
           json: {
             sessionId,
-            type: draft.type,
+            type: draft.uploadType ?? draft.type,
             contentType: draft.file.type,
             byteSize: draft.file.size,
             checksumSha256,
@@ -143,13 +145,14 @@ export function useScooterDocuments(
   }
 
   function add(
-    type: v1.scooters.ScooterDocumentType,
+    type: v1.scooters.ScooterDocumentType | null,
     files: File[],
     insurancePolicyId?: string,
   ) {
     const items: DocumentDraft[] = files.map((file) => ({
       id: crypto.randomUUID(),
       type,
+      ...(type === null ? { uploadType: "unclassified" as const } : {}),
       insurancePolicyId,
       file,
       status: "uploading",
@@ -158,8 +161,39 @@ export function useScooterDocuments(
     for (const item of items) void upload(item);
   }
 
+  const classify = useCallback(
+    (id: string, type: v1.scooters.ScooterDocumentType, manual = false) => {
+      const policyId = type === "insurance" ? crypto.randomUUID() : undefined;
+      setDrafts((current) =>
+        current.map((item) => {
+          if (
+            item.id !== id ||
+            item.type === type ||
+            (!manual && item.type !== null)
+          )
+            return item;
+          return {
+            ...item,
+            type,
+            ...(manual ? { requestedType: type } : {}),
+            insurancePolicyId:
+              type === "insurance"
+                ? (item.insurancePolicyId ??
+                  current.find(
+                    (draft) => draft.type === "insurance" && draft.id !== id,
+                  )?.insurancePolicyId ??
+                  policyId)
+                : undefined,
+          };
+        }),
+      );
+    },
+    [],
+  );
+
   return {
     ...editorSession,
+    classify,
     drafts,
     extractions,
     setExtractions,
@@ -176,7 +210,9 @@ export function useScooterDocuments(
       setRemovedIds((current) => [...current, id]),
     undoRemove: (id: string) =>
       setRemovedIds((current) => current.filter((item) => item !== id)),
-    blocked: drafts.some((item) => item.status !== "ready"),
+    blocked: drafts.some(
+      (item) => item.status !== "ready" || item.type === null,
+    ),
     changed:
       drafts.length > 0 ||
       removedIds.length > 0 ||
@@ -188,9 +224,16 @@ export function useScooterDocuments(
       ...(drafts.length
         ? {
             documentDrafts: drafts
-              .filter((item) => item.status === "ready")
+              .filter(
+                (
+                  item,
+                ): item is DocumentDraft & {
+                  type: v1.scooters.ScooterDocumentType;
+                } => item.status === "ready" && item.type !== null,
+              )
               .map((item) => ({
                 type: item.type,
+                ...(item.uploadType ? { uploadType: item.uploadType } : {}),
                 ...(item.insurancePolicyId
                   ? { insurancePolicyId: item.insurancePolicyId }
                   : {}),

@@ -115,7 +115,7 @@ function transient(error: unknown) {
 function verifySource(
   attempt: DocumentAnalysisAttempt,
   job: v1.scooters.ScooterDocumentExtractionJob,
-  documentType: v1.scooters.ScooterDocumentType,
+  documentType: v1.scooters.ScooterDocumentUploadType,
 ) {
   if (
     job.sourceId !== attempt.input.sourceId ||
@@ -132,7 +132,7 @@ function verifySource(
 /** Transport failures retain the attempt so Retry resumes the same paid work. */
 export async function runDocumentAnalysisAttempt(
   attempt: DocumentAnalysisAttempt,
-  documentType: v1.scooters.ScooterDocumentType,
+  documentType: v1.scooters.ScooterDocumentUploadType,
   signal: AbortSignal,
   onProgress: (
     status: v1.scooters.ScooterDocumentExtractionJob["status"],
@@ -190,7 +190,8 @@ export async function runDocumentAnalysisAttempt(
         if (
           !result ||
           result.sourceId !== attempt.input.sourceId ||
-          result.documentType !== documentType
+          (documentType !== "unclassified" &&
+            result.documentType !== documentType)
         )
           throw new ApiError(
             502,

@@ -254,7 +254,7 @@ model ScooterDocumentJob {
   session               ScooterDocumentEditorSession @relation(fields: [sessionId], references: [id], onDelete: Restrict)
   attemptId             String
   sourceId              String
-  documentType          ScooterDocumentType
+  documentType          ScooterDocumentType?
   draftUploadId         String?
   documentId            String?
   scooterId             String?

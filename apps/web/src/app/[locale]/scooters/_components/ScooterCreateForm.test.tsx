@@ -122,47 +122,30 @@ beforeEach(() => {
 
 afterEach(() => vi.unstubAllGlobals());
 
-describe("ScooterCreateForm document wizard", () => {
-  it("starts with ordered documents and hides identification and operational inputs", () => {
+describe("ScooterCreateForm combined review", () => {
+  it("shows a shared drop zone and one form with a final create action", () => {
     renderWizard();
-    const uploaders = [
-      "Add Import documents",
-      "Add Vehicle identity card (CIV)",
-      "Add Registration certificate",
-      "Add Insurance policy",
-    ].map((name) => screen.getByRole("button", { name }));
-    for (let i = 1; i < uploaders.length; i++) {
-      expect(uploaders[i - 1]!.compareDocumentPosition(uploaders[i]!)).toBe(
-        Node.DOCUMENT_POSITION_FOLLOWING,
-      );
-    }
-    expect(screen.getByText("1 / 2 · Documents")).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Import JSON" }),
+      screen.getByRole("button", { name: /Drop your scooter documents/ }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Browse files")).toHaveAttribute("multiple");
+    expect(screen.getByRole("textbox", { name: "VIN" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("textbox", { name: "Current mileage (km)" }),
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole("textbox", { name: "VIN" }),
-    ).not.toBeInTheDocument();
+      screen.getByRole("button", { name: "Create scooter" }),
+    ).toBeInTheDocument();
     expect(
-      screen.queryByRole("textbox", { name: "Power (kW)" }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("textbox", { name: "Current mileage (km)" }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "Create scooter" }),
+      screen.queryByRole("button", { name: "Continue" }),
     ).not.toBeInTheDocument();
     expect(mocks.apiFetch).not.toHaveBeenCalled();
   });
 
-  it("creates only at the final step and requires the registration state explicitly", async () => {
+  it("creates from the combined form and requires the registration state explicitly", async () => {
     mocks.apiFetch.mockResolvedValueOnce(createdScooter);
     const browser = userEvent.setup();
     renderWizard();
-    await enterOperationalStep(browser);
-    expect(
-      screen.getByText("2 / 2 · Operational information"),
-    ).toBeInTheDocument();
     expect(mocks.apiFetch).not.toHaveBeenCalled();
     await fillWizardIdentity(browser);
     expect(
@@ -192,11 +175,10 @@ describe("ScooterCreateForm document wizard", () => {
     expect(mocks.refresh).toHaveBeenCalledOnce();
   });
 
-  it("preserves operational values and identification through back navigation without saving", async () => {
+  it("saves operational values and identification together", async () => {
     mocks.apiFetch.mockResolvedValueOnce(createdScooter);
     const browser = userEvent.setup();
     renderWizard();
-    await enterOperationalStep(browser);
     await fillWizardIdentity(browser);
     await chooseSelectOption(browser, "Registration type", "Unregistered");
     await chooseSelectOption(browser, "GPS installed", "No");
@@ -213,10 +195,7 @@ describe("ScooterCreateForm document wizard", () => {
       screen.getByRole("textbox", { name: "Notes" }),
       "Needs inspection",
     );
-    await browser.click(screen.getByRole("button", { name: "Back" }));
-    expect(screen.getByText("1 / 2 · Documents")).toBeInTheDocument();
     expect(mocks.apiFetch).not.toHaveBeenCalled();
-    await enterOperationalStep(browser);
     expect(
       screen.getByRole("combobox", { name: "GPS installed" }),
     ).toHaveTextContent("No");
@@ -366,7 +345,6 @@ describe("Scooter create controls with the create resolver", () => {
     vi.stubGlobal("innerWidth", 390);
     const browser = userEvent.setup();
     renderWizard();
-    await enterOperationalStep(browser);
     await browser.type(
       screen.getByRole("textbox", { name: "VIN" }),
       "JYARN23E0RA123456",
@@ -427,7 +405,6 @@ describe("Scooter create controls with the create resolver", () => {
     const browser = userEvent.setup();
 
     renderWizard();
-    await enterOperationalStep(browser);
     await browser.click(screen.getByRole("button", { name: "Create scooter" }));
 
     expect(await screen.findByText("Scooter not created")).toBeInTheDocument();
@@ -449,7 +426,6 @@ describe("Scooter create controls with the create resolver", () => {
     });
     const browser = userEvent.setup();
     renderWizard();
-    await enterOperationalStep(browser);
     await browser.type(
       screen.getByRole("textbox", { name: "VIN" }),
       "jyarn23e0ra123456",
@@ -749,7 +725,6 @@ describe("Scooter create controls with the create resolver", () => {
     const browser = userEvent.setup();
 
     renderWizard();
-    await enterOperationalStep(browser);
     await fillWizardIdentity(browser);
     await chooseSelectOption(browser, "Registration type", "Unregistered");
     await browser.click(screen.getByRole("button", { name: "Create scooter" }));
@@ -767,7 +742,6 @@ describe("Scooter create controls with the create resolver", () => {
   it("focuses the first invalid control, including the brand search", async () => {
     const browser = userEvent.setup();
     renderWizard();
-    await enterOperationalStep(browser);
     await browser.click(screen.getByRole("button", { name: "Create scooter" }));
     await waitFor(() =>
       expect(screen.getByRole("textbox", { name: "VIN" })).toHaveFocus(),
@@ -1114,17 +1088,6 @@ function renderWizard(locale: SupportedLocale = "en") {
     <NextIntlClientProvider locale={locale} messages={messages[locale]}>
       <ScooterCreateForm scootersHref="/en/scooters" brands={brands} />
     </NextIntlClientProvider>,
-  );
-}
-
-async function enterOperationalStep(
-  browser: ReturnType<typeof userEvent.setup>,
-) {
-  await browser.click(
-    screen.getByRole("button", { name: "Continue without documents" }),
-  );
-  await waitFor(() =>
-    expect(screen.getByText("2 / 2 · Operational information")).toHaveFocus(),
   );
 }
 
