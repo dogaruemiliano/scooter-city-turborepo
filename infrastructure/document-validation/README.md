@@ -29,6 +29,10 @@ Lambda's role reads only `${StoragePrefix}/scooter-documents/` and `${StoragePre
 
 Ensure no browser upload presigner or other service can write to `extraction-temporary`. Do not grant the API a new write permission for that prefix. Account/bucket policies can grant extra permissions beyond the role policy, so inspect the combined policy when provisioning.
 
+`ReservedConcurrency` defaults to two executions. If AWS rejects creation because this would reduce unreserved account concurrency below its minimum, set this stack parameter to `0`. The template then omits `ReservedConcurrentExecutions`, allowing shared account capacity; it does not set Lambda's actual reservation to zero, which would disable invocations. This removes the function-specific concurrency cap and reservation. Application job admission limits still apply, and shared capacity may be throttled by other functions. Restore a positive reservation after obtaining enough regional quota if dedicated capacity is needed.
+
+For a stack in `ROLLBACK_COMPLETE`, delete the failed stack and create it again with the updated template and parameter. This template does not manage the existing S3 bucket, so deleting this failed stack does not delete the bucket or uploaded files. The Lambda ZIP is unchanged.
+
 ## Temporary-object lifecycle safeguard
 
 `lifecycle-rules.example.json` contains two prefix-scoped rules: one-day expiry of current/noncurrent temporary versions, and deletion of expired markers. Replace the placeholder with the exact configured prefix and **merge** the two entries into the bucket's current lifecycle rules. Read and preserve every existing rule first; `put-bucket-lifecycle-configuration` replaces the entire configuration. Review the resulting configuration before applying it. Never use the broader storage prefix or `scooter-documents/` as the expiration filter: saved originals retain those keys.

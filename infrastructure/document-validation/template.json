@@ -23,6 +23,12 @@
       "Default": "",
       "Description": "Existing storage CMK ARN if SSE-KMS is enabled."
     },
+    "ReservedConcurrency": {
+      "Type": "Number",
+      "Default": 2,
+      "MinValue": 0,
+      "Description": "Reserved executions. Set 0 to omit the reservation and use shared account capacity (does not disable the function)."
+    },
     "MaxDocumentBytes": {
       "Type": "Number",
       "Default": 15728640,
@@ -31,7 +37,10 @@
     }
   },
   "Conditions": {
-    "UsesKms": { "Fn::Not": [{ "Fn::Equals": [{ "Ref": "KmsKeyArn" }, ""] }] }
+    "UsesKms": { "Fn::Not": [{ "Fn::Equals": [{ "Ref": "KmsKeyArn" }, ""] }] },
+    "ReservesConcurrency": {
+      "Fn::Not": [{ "Fn::Equals": [{ "Ref": "ReservedConcurrency" }, 0] }]
+    }
   },
   "Resources": {
     "ValidationLogs": {
@@ -141,7 +150,13 @@
         "Role": { "Fn::GetAtt": ["ValidationRole", "Arn"] },
         "MemorySize": 1024,
         "Timeout": 60,
-        "ReservedConcurrentExecutions": 2,
+        "ReservedConcurrentExecutions": {
+          "Fn::If": [
+            "ReservesConcurrency",
+            { "Ref": "ReservedConcurrency" },
+            { "Ref": "AWS::NoValue" }
+          ]
+        },
         "Environment": {
           "Variables": {
             "DOCUMENT_VALIDATION_BUCKET": { "Ref": "StorageBucketName" },
