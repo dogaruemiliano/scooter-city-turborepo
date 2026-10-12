@@ -350,6 +350,8 @@ describe("Scooter documents", () => {
     expect(screen.getAllByText("Extracting…")).toHaveLength(1);
     expect(screen.queryByText(/Extracted/)).not.toBeInTheDocument();
   });
+  // Three uploads and five review steps can exceed the default 5s on CI
+  // while other suites run. Keep the full workflow and its assertions together.
   it("extracts uploaded documents directly, reviews the dynamic steps, and saves only at the end", async () => {
     let nextId = 0;
     vi.mocked(crypto.randomUUID).mockImplementation(
@@ -492,7 +494,7 @@ describe("Scooter documents", () => {
       premiumAmount: 278.88,
       currency: "RON",
     });
-  });
+  }, 15_000);
 
   it("requires explicit verification when direct AI cannot read a VIN", async () => {
     const defaultRequest = mocks.api.getMockImplementation()!;
