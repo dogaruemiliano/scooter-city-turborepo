@@ -6,7 +6,7 @@ import {
   ListObjectsV2Command,
   PutObjectCommand,
 } from "@aws-sdk/client-s3";
-import { PDFDocument } from "pdf-lib";
+import { degrees, PDFDocument } from "pdf-lib";
 import { createDocumentValidationHandler } from "./document-validation.lambda";
 import type { ValidateDocumentInput } from "./document-validation.types";
 
@@ -90,7 +90,7 @@ describe("isolated document validation Lambda", () => {
       ChecksumSHA256: Buffer.from(input.source.checksumSha256, "hex").toString(
         "base64",
       ),
-      Metadata: { "validation-revision": "1" },
+      Metadata: { "validation-revision": "2" },
     });
     expect(
       send.mock.calls.filter(
@@ -178,6 +178,31 @@ describe("isolated document validation Lambda", () => {
     const { handler, input, saved } = setup(bytes, "application/pdf");
     await expect(handler(input)).resolves.toMatchObject({ ok: true });
     expect(saved()?.Body).toEqual(bytes);
+  });
+
+  it("stores an upright analysis copy of rotated scanner pages with its own checksum", async () => {
+    const pdf = await PDFDocument.create();
+    const page = pdf.addPage([595, 842]);
+    page.setRotation(degrees(90));
+    page.drawText("Synthetic scan");
+    const original = Buffer.from(await pdf.save());
+    const { handler, input, saved } = setup(original, "application/pdf");
+    const result = await handler(input);
+    expect(result.ok).toBe(true);
+    const prepared = saved()?.Body as Buffer;
+    const analysis = await PDFDocument.load(prepared);
+    expect(analysis.getPage(0).getSize()).toEqual({ width: 842, height: 595 });
+    expect(analysis.getPage(0).getRotation().angle).toBe(0);
+    expect(saved()?.Key).not.toBe(input.source.storageKey);
+    expect(result).toMatchObject({
+      document: {
+        byteSize: prepared.length,
+        checksumSha256: createHash("sha256").update(prepared).digest("hex"),
+      },
+    });
+    expect(
+      (await PDFDocument.load(original)).getPage(0).getRotation().angle,
+    ).toBe(90);
   });
 
   it("handles a conditional-write race by returning only a matching immutable winner", async () => {

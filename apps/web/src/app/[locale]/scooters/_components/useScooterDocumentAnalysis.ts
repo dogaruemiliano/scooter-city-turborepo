@@ -18,6 +18,7 @@ import {
 } from "./scooter-vin-review";
 
 export type AnalysisError =
+  | "unknownType"
   | "disabled"
   | "unsupported"
   | "tooLarge"
@@ -42,6 +43,7 @@ export type DocumentAnalysisState =
 function analysisError(error: unknown): AnalysisError {
   if (!(error instanceof ApiError)) return "failed";
   const codes: Record<string, AnalysisError> = {
+    DOCUMENT_EXTRACTION_TYPE_UNKNOWN: "unknownType",
     DOCUMENT_EXTRACTION_DISABLED: "disabled",
     DOCUMENT_EXTRACTION_BAD_DOCUMENT: "unsupported",
     DOCUMENT_EXTRACTION_UNSUPPORTED_DOCUMENT: "unsupported",
@@ -76,7 +78,7 @@ export function useScooterDocumentAnalysis(
   );
   const [running, setRunning] = useState(false);
   const cache = useRef(new Map<string, DocumentAnalysisState>());
-  const controllers = useRef(new Set<AbortController>());
+  const controllers = useRef(new Map<string, AbortController>());
   const attempts = useRef(new Map<string, DocumentAnalysisAttempt>());
   const generation = useRef(0);
   const activeRun = useRef(false);
@@ -98,17 +100,18 @@ export function useScooterDocumentAnalysis(
     })),
     ...documents.drafts.map((doc) => ({
       id: doc.id,
-      documentType: doc.type,
+      documentType: doc.requestedType ?? doc.uploadType ?? doc.type!,
       key: JSON.stringify([
         doc.id,
-        doc.type,
+        doc.requestedType ?? doc.uploadType ?? doc.type,
         doc.file.name,
         doc.file.size,
         doc.file.lastModified,
       ]),
       source: {
         kind: "draft" as const,
-        type: doc.type,
+        type: doc.requestedType ?? doc.uploadType ?? doc.type!,
+        ...(doc.uploadType ? { uploadType: doc.uploadType } : {}),
         uploadToken: doc.uploadToken!,
       },
       ready: doc.status === "ready" && Boolean(doc.uploadToken),
@@ -123,19 +126,28 @@ export function useScooterDocumentAnalysis(
     latest.current = sources;
   });
   useEffect(() => {
-    generation.current += 1;
-    activeRun.current = false;
-    controllers.current.forEach((controller) => controller.abort());
-    controllers.current.clear();
+    if (!canExtract) {
+      generation.current += 1;
+      activeRun.current = false;
+    }
+    const activeKeys = new Set(latest.current.map((source) => source.key));
+    for (const [key, controller] of controllers.current) {
+      if (!activeKeys.has(key) || !canExtract) {
+        controller.abort();
+        controllers.current.delete(key);
+      }
+    }
     for (const [key, attempt] of attempts.current) {
-      if (!attempt.terminal) {
+      if (!activeKeys.has(key) || !canExtract) {
         cancelDocumentAnalysisAttempt(attempt);
         attempts.current.delete(key);
       }
     }
-    const activeKeys = new Set(latest.current.map((source) => source.key));
     for (const [key, state] of cache.current)
-      if (!activeKeys.has(key) || state.status === "processing")
+      if (
+        !activeKeys.has(key) ||
+        (!canExtract && state.status === "processing")
+      )
         cache.current.delete(key);
     setEntries(
       Object.fromEntries(
@@ -145,7 +157,6 @@ export function useScooterDocumentAnalysis(
         }),
       ),
     );
-    setRunning(false);
   }, [signature, canExtract]);
   useEffect(() => {
     mounted.current = true;
@@ -160,81 +171,102 @@ export function useScooterDocumentAnalysis(
     };
   }, []);
 
-  const run = useCallback(async () => {
-    if (
-      !canExtract ||
-      activeRun.current ||
-      latest.current.some((source) => !source.ready)
-    )
-      return null;
-    activeRun.current = true;
-    setRunning(true);
-    const version = generation.current;
-    const pending = latest.current.filter(
-      (source) => cache.current.get(source.key)?.status !== "success",
-    );
-    const current = () => mounted.current && generation.current === version;
-    const publish = (
-      source: (typeof pending)[number],
-      state: DocumentAnalysisState,
-    ) => {
-      if (!current() || !latest.current.some((item) => item.key === source.key))
-        return;
-      cache.current.set(source.key, state);
-      setEntries((previous) => ({ ...previous, [source.id]: state }));
-    };
-    let index = 0;
-    async function worker() {
-      while (current() && index < pending.length) {
-        const source = pending[index++]!;
-        const controller = new AbortController();
-        controllers.current.add(controller);
-        publish(source, { status: "processing" });
-        try {
-          const sessionId = await ensureSession();
-          if (!current() || controller.signal.aborted) return;
-          let attempt = attempts.current.get(source.key);
-          if (!attempt || attempt.terminal) {
-            attempt = createDocumentAnalysisAttempt({
-              sourceId: source.id,
-              source: source.source,
-              sessionId,
-              attemptId: crypto.randomUUID(),
-            });
-            attempts.current.set(source.key, attempt);
+  const run = useCallback(
+    async (options: { automatic?: boolean; sourceId?: string } = {}) => {
+      if (!canExtract || activeRun.current) return null;
+      activeRun.current = true;
+      setRunning(true);
+      const version = generation.current;
+      const pending = latest.current.filter(
+        (source) =>
+          source.ready &&
+          (!options.sourceId || source.id === options.sourceId) &&
+          cache.current.get(source.key)?.status !== "success" &&
+          (!options.automatic || !cache.current.has(source.key)),
+      );
+      const current = () => mounted.current && generation.current === version;
+      const publish = (
+        source: (typeof pending)[number],
+        state: DocumentAnalysisState,
+      ) => {
+        if (
+          !current() ||
+          !latest.current.some((item) => item.key === source.key)
+        )
+          return;
+        cache.current.set(source.key, state);
+        setEntries((previous) => ({ ...previous, [source.id]: state }));
+      };
+      let index = 0;
+      async function worker() {
+        while (current() && index < pending.length) {
+          const source = pending[index++]!;
+          const controller = new AbortController();
+          if (!latest.current.some((item) => item.key === source.key)) continue;
+          controllers.current.set(source.key, controller);
+          publish(source, { status: "processing" });
+          try {
+            const sessionId = await ensureSession();
+            if (!current() || controller.signal.aborted) return;
+            let attempt = attempts.current.get(source.key);
+            if (!attempt || attempt.terminal) {
+              attempt = createDocumentAnalysisAttempt({
+                sourceId: source.id,
+                source: source.source,
+                sessionId,
+                attemptId: crypto.randomUUID(),
+              });
+              attempts.current.set(source.key, attempt);
+            }
+            const analysis = await runDocumentAnalysisAttempt(
+              attempt,
+              source.documentType,
+              controller.signal,
+              (phase) => publish(source, { status: "processing", phase }),
+            );
+            if (
+              analysis.sourceId !== source.id ||
+              (source.documentType !== "unclassified" &&
+                analysis.documentType !== source.documentType)
+            )
+              throw new Error("Unexpected document source");
+            publish(source, { status: "success", analysis });
+          } catch (error) {
+            handleSessionError(error);
+            if (!controller.signal.aborted)
+              publish(source, {
+                status: "failed",
+                error: analysisError(error),
+              });
+          } finally {
+            controllers.current.delete(source.key);
           }
-          const analysis = await runDocumentAnalysisAttempt(
-            attempt,
-            source.documentType,
-            controller.signal,
-            (phase) => publish(source, { status: "processing", phase }),
-          );
-          if (
-            analysis.sourceId !== source.id ||
-            analysis.documentType !== source.documentType
-          )
-            throw new Error("Unexpected document source");
-          publish(source, { status: "success", analysis });
-        } catch (error) {
-          handleSessionError(error);
-          if (!controller.signal.aborted)
-            publish(source, { status: "failed", error: analysisError(error) });
-        } finally {
-          controllers.current.delete(controller);
         }
       }
-    }
-    await Promise.all(
-      Array.from(
-        { length: v1.scooters.SCOOTER_DOCUMENT_EXTRACTION_CLIENT_CONCURRENCY },
-        () => worker(),
-      ),
-    );
-    if (!current()) return null;
-    activeRun.current = false;
-    setRunning(false);
-    return latest.current.map((source) => cache.current.get(source.key));
-  }, [canExtract, ensureSession, handleSessionError]);
+      await Promise.all(
+        Array.from(
+          {
+            length: v1.scooters.SCOOTER_DOCUMENT_EXTRACTION_CLIENT_CONCURRENCY,
+          },
+          () => worker(),
+        ),
+      );
+      if (!current()) {
+        if (mounted.current && !activeRun.current) setRunning(false);
+        return null;
+      }
+      activeRun.current = false;
+      setRunning(false);
+      if (
+        pending.some(
+          (source) => !latest.current.some((item) => item.key === source.key),
+        )
+      )
+        return null;
+      return latest.current.map((source) => cache.current.get(source.key));
+    },
+    [canExtract, ensureSession, handleSessionError],
+  );
 
   const cancel = useCallback(() => {
     generation.current += 1;
@@ -247,17 +279,16 @@ export function useScooterDocumentAnalysis(
         attempts.current.delete(key);
       }
     }
-    for (const [key, state] of cache.current)
-      if (state.status === "processing")
-        cache.current.set(key, { status: "failed", error: "cancelled" });
-    setEntries((previous) =>
+    for (const source of latest.current) {
+      if (source.ready && cache.current.get(source.key)?.status !== "success")
+        cache.current.set(source.key, { status: "failed", error: "cancelled" });
+    }
+    setEntries(
       Object.fromEntries(
-        Object.entries(previous).map(([id, state]) => [
-          id,
-          state.status === "processing"
-            ? { status: "failed", error: "cancelled" }
-            : state,
-        ]),
+        latest.current.flatMap((source) => {
+          const state = cache.current.get(source.key);
+          return state ? [[source.id, state]] : [];
+        }),
       ),
     );
     setRunning(false);
@@ -304,5 +335,12 @@ export function useScooterDocumentAnalysis(
     return Object.values(nextEntries);
   }, []);
 
-  return { entries, running, run, cancel, dismissFailures, reviewVins };
+  return {
+    entries,
+    running: canExtract && running,
+    run,
+    cancel,
+    dismissFailures,
+    reviewVins,
+  };
 }

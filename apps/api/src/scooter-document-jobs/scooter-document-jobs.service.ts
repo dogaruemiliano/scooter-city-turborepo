@@ -81,7 +81,8 @@ export class ScooterDocumentJobsService {
         if (
           existing.sessionId !== session.id ||
           existing.sourceFingerprint !== fingerprint ||
-          existing.sourceId !== input.sourceId
+          existing.sourceId !== input.sourceId ||
+          existing.requestBinding !== requestBinding
         )
           throw new BadRequestException(
             "The extraction attempt belongs to a different source.",
@@ -136,7 +137,8 @@ export class ScooterDocumentJobsService {
           sessionId: session.id,
           attemptId: input.attemptId,
           sourceId: input.sourceId,
-          documentType: source.documentType,
+          documentType:
+            source.documentType === "unclassified" ? null : source.documentType,
           draftUploadId: source.draftUploadId,
           documentId: source.documentId,
           scooterId: source.scooterId,
@@ -144,7 +146,7 @@ export class ScooterDocumentJobsService {
           requestBinding,
           source: jsonValue(source.stored),
           model: this.env.SCOOTER_DOCUMENT_EXTRACTION_MODEL,
-          promptVersion: "scooter-v1-direct-url",
+          promptVersion: "scooter-v2-auto-type",
           expiresAt,
         },
       });
@@ -286,7 +288,7 @@ export class ScooterDocumentJobsService {
     return v1.scooters.scooterDocumentExtractionJobSchema.parse({
       id: job.id,
       sourceId: job.sourceId,
-      documentType: job.documentType,
+      documentType: job.documentType ?? "unclassified",
       status: job.status,
       ...(job.status === "completed" ? { result: job.result } : {}),
       ...(job.errorCode ? { errorCode: job.errorCode } : {}),

@@ -61,7 +61,7 @@ export class OpenAiScooterDocumentJobProvider {
   async start(
     input: {
       jobId: string;
-      documentType: v1.scooters.ScooterDocumentType;
+      documentType: v1.scooters.ScooterDocumentUploadType;
       url: string;
       contentType: string;
     },
@@ -106,7 +106,7 @@ export class OpenAiScooterDocumentJobProvider {
         store: false,
         metadata: { jobId: input.jobId },
         ...(original ? { reasoning: { effort: "low" } } : {}),
-        max_output_tokens: ["civ", "import_document"].includes(
+        max_output_tokens: ["civ", "import_document", "unclassified"].includes(
           input.documentType,
         )
           ? 12_000
@@ -146,7 +146,8 @@ export class OpenAiScooterDocumentJobProvider {
         status: "completed",
         jobId: value.jobId,
         output: {
-          detectedDocumentType: value.documentType,
+          detectedDocumentType:
+            value.documentType === "unclassified" ? null : value.documentType,
           vin: null,
           fields: [],
           rawFields: [],

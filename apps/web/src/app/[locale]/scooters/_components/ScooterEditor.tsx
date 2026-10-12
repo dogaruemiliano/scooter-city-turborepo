@@ -16,8 +16,6 @@ import { FormProvider, get, type FieldErrors, useWatch } from "react-hook-form";
 import { FormSummary } from "@/components/form/FormSummary";
 import { webApi } from "@/lib/api";
 import { useZodForm } from "@/lib/form/use-zod-form";
-import { importFieldReviews } from "./scooter-import-review";
-import { useScooterWizard } from "./useScooterWizard";
 import { useScooterExtraction } from "./useScooterExtraction";
 import { useScooterDocuments } from "./useScooterDocuments";
 import {
@@ -39,12 +37,11 @@ import {
   scooterServerFieldErrors,
 } from "./scooter-editor-messages";
 import {
-  CREATE_FIELDS,
+  insuranceEditorDefaults,
   scooterChangedFields,
   scooterCreateFormSchema,
   scooterEditFormSchema,
   scooterEditorDefaults,
-  type ScooterEditorField,
   type ScooterEditorValues,
 } from "./scooter-editor-schema";
 import { scooterFieldConflict } from "./scooter-feedback";
@@ -81,7 +78,6 @@ export function ScooterEditor({
   > | null>(null);
   const documents = useScooterDocuments(scooter?.documents);
   const analysis = useScooterDocumentAnalysis(documents, scooter?.id);
-  const [checkingDocumentVins, setCheckingDocumentVins] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [vinReviewRequired, setVinReviewRequired] = useState(false);
   const [importedSignature, setImportedSignature] = useState<string | null>(
@@ -111,24 +107,6 @@ export function ScooterEditor({
     initialRawFields: scooter?.civRawFields ?? {},
     onRawFields: setImportedRawFields,
   });
-  const importedFallbackFields = extraction.reviewResult
-    ? [
-        ...new Set([
-          ...Object.keys(extraction.reviewResult.values),
-          ...importFieldReviews(extraction.reviewResult, form.getValues()).map(
-            (review) => review.field,
-          ),
-        ]),
-      ].filter((field): field is ScooterEditorField =>
-        (CREATE_FIELDS as readonly string[]).includes(field),
-      )
-    : [];
-  const wizard = useScooterWizard(
-    form,
-    extraction.sources,
-    importedFallbackFields,
-  );
-  const isWizard = !scooter;
   const sourceSignature = JSON.stringify(extraction.sources);
   const importedCurrentDocuments = importedSignature === sourceSignature;
   const hasFailedAnalysis = Object.values(analysis.entries).some(
@@ -153,16 +131,14 @@ export function ScooterEditor({
     setPreviousAnalysisSignature(sourceSignature);
     setAnalysisError(null);
     setVinReviewRequired(false);
-    setCheckingDocumentVins(false);
   }
-  const progressRef = useRef<HTMLParagraphElement>(null);
   const unverifiedSources = extraction.unverifiedSources.filter(
     (source) =>
-      !isWizard ||
-      (wizard.step === "documents" && checkingDocumentVins) ||
-      wizard.step === "operational" ||
-      source.type === wizard.step ||
-      (wizard.step === "civ" && source.type === "import_document"),
+      Boolean(scooter) ||
+      !canExtract ||
+      analysis.entries[source.sourceId]?.status === "failed" ||
+      (!analysis.running &&
+        analysis.entries[source.sourceId]?.status === "success"),
   );
   const { isSubmitting, isDirty, dirtyFields, submitCount } = form.formState;
   const powertrain = useWatch({
@@ -178,7 +154,6 @@ export function ScooterEditor({
 
   function focusErrors(errors: FieldErrors<ScooterEditorValues>) {
     pendingFocus.current = errors;
-    if (isWizard) wizard.errorStep(errors);
   }
 
   useEffect(() => {
@@ -204,7 +179,7 @@ export function ScooterEditor({
       }
     });
     return () => cancelAnimationFrame(frame);
-  }, [isSubmitting, submitCount, wizard.step]);
+  }, [isSubmitting, submitCount]);
 
   async function submit(input: v1.scooters.UpdateScooterInput) {
     if (
@@ -302,27 +277,6 @@ export function ScooterEditor({
     }
   }
 
-  async function continueWizard() {
-    if (
-      documents.blocked ||
-      (wizard.step !== "documents" &&
-        (extraction.vinMismatch || unverifiedSources.length))
-    )
-      return;
-    setRequestError(null);
-    if (await wizard.next())
-      requestAnimationFrame(() => progressRef.current?.focus());
-    else {
-      pendingFocus.current = form.formState.errors;
-      requestAnimationFrame(() => {
-        const field = formRef.current?.querySelector<HTMLElement>(
-          '[aria-invalid="true"]',
-        );
-        field?.focus();
-      });
-    }
-  }
-
   function applyAnalysis(entries: (DocumentAnalysisState | undefined)[]) {
     const successes = entries.flatMap((entry) =>
       entry?.status === "success" ? [entry.analysis] : [],
@@ -362,7 +316,6 @@ export function ScooterEditor({
       );
     });
     if (unresolved) {
-      setCheckingDocumentVins(true);
       return false;
     }
     setImportedSignature(sourceSignature);
@@ -373,19 +326,106 @@ export function ScooterEditor({
     if (!canExtract || analysis.running || documents.blocked) return;
     setAnalysisError(null);
     if (importedCurrentDocuments && !hasFailedAnalysis) {
-      if (isWizard) await continueWizard();
       return;
     }
     const results = await analysis.run();
     if (!results || results.some((entry) => entry?.status === "failed")) return;
-    if (applyAnalysis(results) && isWizard) await continueWizard();
+    applyAnalysis(results);
   }
 
-  async function continueManually() {
-    if (analysis.running || documents.blocked) return;
-    setAnalysisError(null);
-    if (applyAnalysis(Object.values(analysis.entries))) await continueWizard();
-  }
+  // Uploading is the user's intent to analyze. Never retry a failed paid request automatically.
+  const runAnalysis = analysis.run;
+  useEffect(() => {
+    if (
+      scooter ||
+      !canExtract ||
+      analysis.running ||
+      (importedCurrentDocuments &&
+        documents.drafts.every(
+          (draft) => draft.type && documents.extractions[draft.id],
+        ))
+    )
+      return;
+    if (
+      documents.drafts.some(
+        (draft) =>
+          draft.status === "ready" &&
+          !analysis.entries[draft.id] &&
+          !(
+            (draft.requestedType ?? draft.uploadType ?? draft.type) ===
+              "import_document" &&
+            documents.drafts.some((item) => item.type === "civ")
+          ),
+      )
+    )
+      void runAnalysis({ automatic: true });
+  }, [
+    scooter,
+    canExtract,
+    documents.drafts,
+    analysis.entries,
+    analysis.running,
+    runAnalysis,
+    importedCurrentDocuments,
+    documents.extractions,
+  ]);
+
+  const classify = documents.classify;
+  useEffect(() => {
+    if (scooter) return;
+    for (const draft of documents.drafts) {
+      const entry = analysis.entries[draft.id];
+      if (draft.type === null && entry?.status === "success")
+        classify(draft.id, entry.analysis.documentType);
+    }
+  }, [scooter, documents.drafts, analysis.entries, classify]);
+
+  useEffect(() => {
+    if (scooter) return;
+    const policies = form.getValues("insurancePolicies") ?? [];
+    const missing = [
+      ...new Set(
+        documents.drafts
+          .filter(
+            (draft) =>
+              draft.type === "insurance" &&
+              draft.insurancePolicyId &&
+              !policies.some((policy) => policy.id === draft.insurancePolicyId),
+          )
+          .map((draft) => draft.insurancePolicyId!),
+      ),
+    ];
+    if (missing.length)
+      form.setValue(
+        "insurancePolicies",
+        [
+          ...policies,
+          ...missing.map((id) => ({
+            ...insuranceEditorDefaults(),
+            id,
+          })),
+        ],
+        { shouldDirty: true },
+      );
+  }, [scooter, documents.drafts, form]);
+
+  const automaticImport = useRef("");
+  useEffect(() => {
+    if (scooter || analysis.running) return;
+    const successes = Object.values(analysis.entries).filter(
+      (entry) =>
+        entry.status === "success" &&
+        extraction.sources.some(
+          (source) =>
+            source.sourceId === entry.analysis.sourceId &&
+            source.type === entry.analysis.documentType,
+        ),
+    );
+    const signature = JSON.stringify([sourceSignature, successes]);
+    if (!successes.length || signature === automaticImport.current) return;
+    automaticImport.current = signature;
+    applyAnalysis(successes);
+  });
 
   return (
     <div className="mx-auto flex w-full max-w-screen-lg flex-1 flex-col gap-6 px-4 pt-6 pb-12 sm:px-6 sm:pt-10 sm:pb-16">
@@ -408,34 +448,12 @@ export function ScooterEditor({
             className="grid gap-8"
             noValidate
             onSubmit={(event) => {
-              if (isWizard && !wizard.last) {
-                event.preventDefault();
-                if (wizard.step === "documents" && extraction.sources.length) {
-                  if (canExtract) void extractAndContinue();
-                  else void continueManually();
-                } else void continueWizard();
-                return;
-              }
               void form.handleSubmit(submit, (errors) => {
                 setRequestError(null);
                 focusErrors(errors);
               })(event);
             }}
           >
-            {isWizard ? (
-              <p
-                ref={progressRef}
-                tabIndex={-1}
-                aria-live="polite"
-                className="text-sm text-muted-foreground outline-none"
-              >
-                {t("wizard.progress", {
-                  current: wizard.index + 1,
-                  total: wizard.steps.length,
-                  step: t(`wizard.steps.${wizard.step}`),
-                })}
-              </p>
-            ) : null}
             <FormSummary
               title={t(
                 scooter
@@ -455,12 +473,11 @@ export function ScooterEditor({
                 sources={extraction.sources}
               >
                 <ScooterEditorFields
-                  step={isWizard ? wizard.step : undefined}
-                  fallbackFields={
-                    extraction.vinMismatch
-                      ? [...new Set([...wizard.fallbackFields, "vin" as const])]
-                      : wizard.fallbackFields
-                  }
+                  combinedReview={!scooter}
+                  onRetryAnalysis={(sourceId) => {
+                    void analysis.run({ sourceId });
+                  }}
+                  analyzing={analysis.running}
                   importSources={extraction.sources}
                   importResult={extraction.reviewResult}
                   onApplyImport={(result) => {
@@ -488,7 +505,7 @@ export function ScooterEditor({
                     }))
                   }
                   editing={Boolean(scooter)}
-                  disabled={isSubmitting || analysis.running}
+                  disabled={isSubmitting}
                 />
               </ScooterImportReviewProvider>
             </ScooterDocumentAnalysisContext>
@@ -584,119 +601,55 @@ export function ScooterEditor({
               >
                 {t("actions.cancel")}
               </Link>
-              {isWizard && wizard.index > 0 ? (
+              {canExtract && scooter && extraction.sources.length ? (
                 <Button
                   type="button"
                   variant="outline"
-                  disabled={isSubmitting}
+                  disabled={
+                    isSubmitting ||
+                    documents.blocked ||
+                    analysis.running ||
+                    (importedCurrentDocuments && !hasFailedAnalysis)
+                  }
                   onClick={() => {
-                    wizard.back();
-                    requestAnimationFrame(() => progressRef.current?.focus());
+                    void extractAndContinue();
                   }}
                 >
-                  {t("wizard.back")}
+                  {t(
+                    analysis.running
+                      ? "extraction.processing"
+                      : hasFailedAnalysis
+                        ? "extraction.retry"
+                        : "extraction.extract",
+                  )}
                 </Button>
               ) : null}
-              {isWizard && !wizard.last ? (
-                <>
-                  {canExtract &&
-                  wizard.step === "documents" &&
-                  extraction.sources.length > 0 &&
-                  (!importedCurrentDocuments || hasFailedAnalysis) ? (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={
-                        isSubmitting || documents.blocked || analysis.running
-                      }
-                      onClick={() => {
-                        void continueManually();
-                      }}
-                    >
-                      {t("extraction.manual")}
-                    </Button>
-                  ) : null}
-                  <Button
-                    type="submit"
-                    disabled={
-                      isSubmitting ||
-                      analysis.running ||
-                      documents.blocked ||
-                      (wizard.step !== "documents" &&
-                        (extraction.vinMismatch ||
-                          unverifiedSources.length > 0))
-                    }
-                  >
-                    {t(
-                      canExtract &&
-                        wizard.step === "documents" &&
-                        extraction.sources.length &&
-                        (!importedCurrentDocuments || hasFailedAnalysis)
-                        ? analysis.running
-                          ? "extraction.processing"
-                          : hasFailedAnalysis
-                            ? "extraction.retry"
-                            : "extraction.extractAndContinue"
-                        : wizard.step === "documents" &&
-                            !extraction.sources.length
-                          ? "wizard.continueWithoutDocuments"
-                          : "wizard.continue",
-                    )}
-                  </Button>
-                </>
-              ) : (
-                <>
-                  {canExtract && scooter && extraction.sources.length ? (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={
-                        isSubmitting ||
-                        documents.blocked ||
-                        analysis.running ||
-                        (importedCurrentDocuments && !hasFailedAnalysis)
-                      }
-                      onClick={() => {
-                        void extractAndContinue();
-                      }}
-                    >
-                      {t(
-                        analysis.running
-                          ? "extraction.processing"
-                          : hasFailedAnalysis
-                            ? "extraction.retry"
-                            : "extraction.extract",
-                      )}
-                    </Button>
-                  ) : null}
-                  <Button
-                    type="submit"
-                    disabled={
-                      isSubmitting ||
-                      analysis.running ||
-                      documents.blocked ||
-                      extraction.vinMismatch ||
-                      extraction.unverifiedSources.length > 0 ||
-                      Boolean(
-                        scooter &&
-                        !isDirty &&
-                        !documents.changed &&
-                        !importedRawFields,
-                      )
-                    }
-                  >
-                    {t(
-                      scooter
-                        ? isSubmitting
-                          ? "actions.saving"
-                          : "actions.save"
-                        : isSubmitting
-                          ? "actions.creating"
-                          : "actions.create",
-                    )}
-                  </Button>
-                </>
-              )}
+              <Button
+                type="submit"
+                disabled={
+                  isSubmitting ||
+                  analysis.running ||
+                  documents.blocked ||
+                  extraction.vinMismatch ||
+                  extraction.unverifiedSources.length > 0 ||
+                  Boolean(
+                    scooter &&
+                    !isDirty &&
+                    !documents.changed &&
+                    !importedRawFields,
+                  )
+                }
+              >
+                {t(
+                  scooter
+                    ? isSubmitting
+                      ? "actions.saving"
+                      : "actions.save"
+                    : isSubmitting
+                      ? "actions.creating"
+                      : "actions.create",
+                )}
+              </Button>
             </div>
           </form>
         </FormProvider>

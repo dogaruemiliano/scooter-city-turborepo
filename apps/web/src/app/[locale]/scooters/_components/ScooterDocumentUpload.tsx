@@ -35,18 +35,22 @@ function processingMessage(state: DocumentAnalysisState | undefined) {
 }
 
 function useDocumentLabels(
-  type: v1.scooters.ScooterDocumentType,
+  type: v1.scooters.ScooterDocumentType | null,
   fileName?: string,
   compact = false,
 ): DocumentInputLabels {
   const t = useTranslations("scooters.documents");
   return {
-    label: compact ? t(`compact.${type}`) : t(type),
-    add: t("add", { document: t(type) }),
+    label: type
+      ? compact
+        ? t(`compact.${type}`)
+        : t(type)
+      : t("batch.unknown"),
+    add: t("add", { document: t(type ?? "batch.unknown") }),
     addAction: t("addAction"),
-    preview: t("preview", { name: fileName ?? t(type) }),
-    title: fileName ?? t(type),
-    imageAlt: fileName ?? t(type),
+    preview: t("preview", { name: fileName ?? t(type ?? "batch.unknown") }),
+    title: fileName ?? t(type ?? "batch.unknown"),
+    imageAlt: fileName ?? t(type ?? "batch.unknown"),
     close: t("closePreview"),
     change: t("change"),
     actions: t("actions"),
@@ -86,7 +90,7 @@ export function ScooterDocumentUpload({
   const canWrite = canAccess(user, "scooter_documents.write");
   const analysis = useContext(ScooterDocumentAnalysisContext);
   const matchesCategory = (item: {
-    type: v1.scooters.ScooterDocumentType;
+    type: v1.scooters.ScooterDocumentType | null;
     insurancePolicyId?: string | null;
   }) =>
     item.type === type &&

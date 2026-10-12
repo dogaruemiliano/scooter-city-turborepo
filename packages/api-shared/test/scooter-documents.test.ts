@@ -103,3 +103,36 @@ test("document-only edits and multi-page drafts are supported without altering s
     false,
   );
 });
+
+test("unclassified is an upload state, never a saved document category", () => {
+  assert.ok(
+    v1.scooters.createScooterDocumentUploadSchema.safeParse({
+      ...upload,
+      type: "unclassified",
+    }).success,
+  );
+  const draft = {
+    fileName: "scan.pdf",
+    uploadToken: "token",
+    uploadType: "unclassified",
+  };
+  assert.ok(
+    v1.scooters.scooterDocumentDraftSchema.safeParse({ ...draft, type: "civ" })
+      .success,
+  );
+  assert.equal(
+    v1.scooters.scooterDocumentDraftSchema.safeParse({
+      ...draft,
+      type: "unclassified",
+    }).success,
+    false,
+  );
+  assert.equal(
+    v1.scooters.scooterDocumentDraftSchema.safeParse({
+      ...draft,
+      type: "civ",
+      uploadType: "insurance",
+    }).success,
+    false,
+  );
+});

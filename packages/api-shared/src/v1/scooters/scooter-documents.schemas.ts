@@ -16,6 +16,14 @@ export const SCOOTER_DOCUMENT_CONTENT_TYPES = [
 export const SCOOTER_DOCUMENT_MAX_BYTES = 15 * 1024 * 1024;
 export const SCOOTER_DOCUMENT_MAX_FILES = 20;
 export const scooterDocumentTypeSchema = z.enum(SCOOTER_DOCUMENT_TYPES);
+/** Unclassified is a staging state only; saved documents always have a concrete type. */
+export const scooterDocumentUploadTypeSchema = z.enum([
+  ...SCOOTER_DOCUMENT_TYPES,
+  "unclassified",
+]);
+export type ScooterDocumentUploadType = z.infer<
+  typeof scooterDocumentUploadTypeSchema
+>;
 export type ScooterDocumentType = z.infer<typeof scooterDocumentTypeSchema>;
 const fileNameSchema = z
   .string()
@@ -32,6 +40,7 @@ export const scooterDocumentDraftSchema = z
     type: scooterDocumentTypeSchema,
     fileName: fileNameSchema,
     uploadToken: z.string().min(1).max(8192),
+    uploadType: z.literal("unclassified").optional(),
   })
   .strict();
 export type ScooterDocumentDraft = z.infer<typeof scooterDocumentDraftSchema>;
@@ -41,7 +50,7 @@ export const scooterDocumentDraftsSchema = z
 export const createScooterDocumentUploadSchema = z
   .object({
     sessionId: z.string().min(1).max(120).optional(),
-    type: scooterDocumentTypeSchema,
+    type: scooterDocumentUploadTypeSchema,
     contentType: z.enum(SCOOTER_DOCUMENT_CONTENT_TYPES),
     byteSize: z.number().int().positive().max(SCOOTER_DOCUMENT_MAX_BYTES),
     checksumSha256: z.string().regex(/^[a-f0-9]{64}$/),

@@ -26,12 +26,15 @@ describe("ScooterDocumentsService", () => {
   const prisma = {
     draftUpload: {
       create: jest.fn(),
-      updateMany: jest.fn(),
+      updateMany: jest.fn<
+        Promise<{ count: number }>,
+        [Prisma.DraftUploadUpdateManyArgs]
+      >(),
       findFirst: jest.fn(),
     },
     scooterDocument: {
       count: jest.fn(),
-      create: jest.fn(),
+      create: jest.fn<unknown, [Prisma.ScooterDocumentCreateArgs]>(),
       updateMany: jest.fn(),
       findFirst: jest.fn(),
       findMany: jest.fn(),
@@ -56,6 +59,47 @@ describe("ScooterDocumentsService", () => {
     prisma.draftUpload.updateMany.mockResolvedValue({ count: 1 });
     prisma.scooterDocument.count.mockResolvedValue(0);
   });
+  it("keeps unclassified uploads bound to their owner through detection, reassignment and save", async () => {
+    prisma.draftUpload.findFirst.mockResolvedValue({ id: "draft" });
+    const selected = {
+      ...draft,
+      type: "registration_certificate" as const,
+      uploadType: "unclassified" as const,
+    };
+    await expect(
+      service.resolveAnalysisSource(
+        { kind: "draft", type: "unclassified", uploadToken: "token" },
+        "admin",
+      ),
+    ).resolves.toMatchObject({
+      documentType: "unclassified",
+      draftUploadId: "draft",
+    });
+    await expect(
+      service.resolveAnalysisSource({ kind: "draft", ...selected }, "admin"),
+    ).resolves.toMatchObject({ documentType: "registration_certificate" });
+    expect(storage.verifyDocumentUploadToken).toHaveBeenLastCalledWith(
+      "token",
+      "scooter-document:unclassified:admin",
+    );
+    const prepared = await service.prepare([selected], "admin");
+    expect(storage.completePresignedDocumentUpload).toHaveBeenCalledWith(
+      "token",
+      "scooter-document:unclassified:admin",
+    );
+    await service.apply(tx, "scooter", prepared, [], "admin");
+    expect(prisma.draftUpload.updateMany.mock.calls[0][0]).toMatchObject({
+      where: {
+        userId: "admin",
+        purpose: "scooter-document:unclassified",
+        claimedAt: null,
+      },
+    });
+    expect(prisma.scooterDocument.create.mock.calls[0][0]).toMatchObject({
+      data: { type: "registration_certificate" },
+    });
+  });
+
   it("resolves signed drafts read-only with ownership, expiry, claim, cleanup and metadata predicates", async () => {
     prisma.draftUpload.findFirst.mockResolvedValue({ id: "draft" });
     await expect(

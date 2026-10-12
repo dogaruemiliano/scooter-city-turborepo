@@ -42,7 +42,7 @@ export const DOCUMENT_VALIDATION_LAMBDA = Symbol("DOCUMENT_VALIDATION_LAMBDA");
 /** Keep CloudFormation's hard execution limit and cleanup grace in sync. */
 export const DOCUMENT_VALIDATION_MAX_RUNTIME_MS = 60_000;
 export const DOCUMENT_VALIDATION_INVOKE_TIMEOUT_MS = 65_000;
-export const DOCUMENT_VALIDATION_REVISION = "1";
+export const DOCUMENT_VALIDATION_REVISION = "2";
 
 export function isSafeDocumentStorageKey(value: unknown): value is string {
   return (

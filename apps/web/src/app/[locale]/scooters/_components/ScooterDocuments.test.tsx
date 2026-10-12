@@ -44,7 +44,8 @@ vi.mock("@/lib/api", () => ({
         ? {
             id: `job-${result.sourceId}`,
             sourceId: result.sourceId,
-            documentType: result.documentType,
+            documentType: (args[1] as { json: { source: { type: string } } })
+              .json.source.type,
             status: "completed",
             result,
             expiresAt: new Date(Date.now() + 300_000).toISOString(),
@@ -350,150 +351,80 @@ describe("Scooter documents", () => {
     expect(screen.getAllByText("Extracting…")).toHaveLength(1);
     expect(screen.queryByText(/Extracted/)).not.toBeInTheDocument();
   });
-  // Three uploads and five review steps can exceed the default 5s on CI
-  // while other suites run. Keep the full workflow and its assertions together.
-  it("extracts uploaded documents directly, reviews the dynamic steps, and saves only at the end", async () => {
-    let nextId = 0;
-    vi.mocked(crypto.randomUUID).mockImplementation(
-      () => `00000000-0000-4000-8000-${String(++nextId).padStart(12, "0")}`,
-    );
-    const defaultRequest = mocks.api.getMockImplementation()!;
-    mocks.api.mockImplementation(async (path, schema, options) => {
-      if (path !== v1.scooters.ROUTES.documents.startExtractionJob)
-        return defaultRequest(path, schema, options);
-      const { sourceId, source } = options.json;
-      return {
-        sourceId,
-        documentType: source.type,
-        extractedData: {
-          vin: scooter.vin,
-          fields:
-            source.type === "civ"
-              ? {
-                  brandName: "Yamaha",
-                  powertrainType: "combustion",
-                  maxSpeedKmh: 25,
-                  powerKw: null,
-                }
-              : source.type === "registration_certificate"
-                ? {
-                    registrationType: "local",
-                    registrationNumber: "14949",
-                    registrationDate: "2026-09-01",
-                  }
-                : {
-                    insuredName: "Example Person",
-                    validFrom: "2026-09-01",
-                    validUntil: "2027-08-31",
-                    premiumAmount: 278.88,
-                    currency: "RON",
-                  },
-          rawFields:
-            source.type === "civ" ? { E: scooter.vin, "P.2": "illegible" } : {},
-        },
-        issues:
-          source.type === "civ"
-            ? [{ field: "powerKw", code: "unreadable" }]
-            : [],
-        reviewRequired: true,
-      };
-    });
+  it("drops all four types together, fills one review form, and saves them in one action", async () => {
+    const types = [
+      "import_document",
+      "civ",
+      "registration_certificate",
+      "insurance",
+    ] as const;
+    mockBatchExtraction(types);
     const browser = userEvent.setup();
     renderWithMessages(
       <ScooterCreateForm brands={brands} scootersHref="/scooters" />,
     );
-    for (const label of [
-      "Vehicle identity card (CIV)",
-      "Registration certificate",
-      "Insurance policy",
-    ]) {
-      await browser.upload(
-        screen.getByLabelText(`Add ${label}`, { selector: "input" }),
-        pdf(),
-      );
-      await browser.click(
-        within(screen.getByRole("dialog")).getByRole("button", {
-          name: "Save",
-        }),
-      );
-      await waitFor(() =>
-        expect(
-          screen.getByRole("button", { name: "Extract and continue" }),
-        ).toBeEnabled(),
-      );
-    }
-    expect(
-      mocks.api.mock.calls.filter(
-        ([path]) => path === v1.scooters.ROUTES.documents.startExtractionJob,
+    fireEvent.drop(
+      screen.getByRole("button", { name: /Drop your scooter documents/ }),
+      {
+        dataTransfer: {
+          files: types.map((_, index) => pdf(`scan-${index}.pdf`)),
+        },
+      },
+    );
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByRole("textbox", { name: "VIN" })).toHaveValue(
+        scooter.vin,
       ),
-    ).toHaveLength(0);
-    expect(
-      mocks.api.mock.calls
-        .filter(
-          ([path]) => path === v1.scooters.ROUTES.documents.createDraftUpload,
-        )
-        .every(([, , options]) => options.json.sessionId === "editor-session"),
-    ).toBe(true);
-    await browser.click(
-      screen.getByRole("button", { name: "Extract and continue" }),
     );
     await waitFor(() =>
-      expect(screen.getByText("2 / 5 · CIV")).toBeInTheDocument(),
+      expect(screen.getByLabelText("Total premium")).toHaveValue("278.88"),
     );
-    expect(screen.getByLabelText(/^VIN/)).toHaveValue(scooter.vin);
-    expect(
-      screen.getByLabelText(/Power \(kW\)/).closest("[data-field-name]"),
-    ).toHaveAttribute("data-warning", "true");
-    await browser.click(screen.getByRole("button", { name: "Back" }));
-    expect(
-      screen.getByText("1 field could not be interpreted."),
-    ).toBeInTheDocument();
-    await browser.click(screen.getByRole("button", { name: "Continue" }));
-    await browser.clear(screen.getByLabelText(/^Maximum speed/));
-    await browser.type(screen.getByLabelText(/^Maximum speed/), "45");
-    await browser.click(screen.getByRole("button", { name: "Continue" }));
     expect(screen.getByLabelText("Plate number")).toHaveValue("14949");
-    expect(
-      screen.getByRole("combobox", { name: "Required driver license" }),
-    ).toHaveTextContent("Select license category");
-    await browser.click(screen.getByRole("button", { name: "Back" }));
-    await browser.clear(screen.getByLabelText(/^Maximum speed/));
-    await browser.type(screen.getByLabelText(/^Maximum speed/), "25");
-    await browser.click(screen.getByRole("button", { name: "Continue" }));
-    expect(
-      screen.getByRole("combobox", { name: "Required driver license" }),
-    ).toHaveTextContent("None");
-    await browser.click(screen.getByRole("button", { name: "Continue" }));
     expect(screen.getByLabelText("Insured name")).toHaveValue("Example Person");
-    expect(screen.getByLabelText("Total premium")).toHaveValue("278.88");
-    await browser.click(screen.getByRole("button", { name: "Continue" }));
+    for (const [index, type] of types.entries())
+      expect(
+        screen.getByRole("combobox", {
+          name: `Document type for scan-${index}.pdf`,
+        }),
+      ).toHaveTextContent(messages.en.scooters.documents[type]);
     expect(
-      mocks.api.mock.calls.filter(
-        ([path]) => path === v1.scooters.ROUTES.documents.startExtractionJob,
-      ),
-    ).toHaveLength(3);
+      screen.queryByRole("button", { name: "Continue" }),
+    ).not.toBeInTheDocument();
     expect(
       mocks.api.mock.calls.filter(
         ([path]) => path === v1.scooters.ROUTES.create,
       ),
     ).toHaveLength(0);
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Create scooter" }),
+      ).toBeEnabled(),
+    );
     await browser.click(screen.getByRole("button", { name: "Create scooter" }));
     await waitFor(() => expect(mocks.push).toHaveBeenCalledWith("/scooters"));
-    expect(mocks.api.mock.calls.at(-1)![2].json.sessionId).toBe(
-      "editor-session",
-    );
-    const payload = mocks.api.mock.calls.at(-1)![2].json;
-    expect(payload.requiredLicenseCategory).toBe("none");
+    const payload = mocks.api.mock.calls.find(
+      ([path]) => path === v1.scooters.ROUTES.create,
+    )![2].json;
+    expect(payload.documentDrafts).toHaveLength(4);
+    expect(
+      payload.documentDrafts.map((doc: { type: string }) => doc.type),
+    ).toEqual(types);
     expect(
       payload.documentDrafts.every(
-        (document: { extractedData?: unknown }) => document.extractedData,
+        (doc: { uploadType: string; extractedData: unknown }) =>
+          doc.uploadType === "unclassified" && doc.extractedData,
       ),
     ).toBe(true);
     expect(payload.insurancePolicies[0]).toMatchObject({
       insuredName: "Example Person",
       premiumAmount: 278.88,
-      currency: "RON",
     });
+    expect(
+      mocks.api.mock.calls.filter(
+        ([path]) => path === v1.scooters.ROUTES.documents.startExtractionJob,
+      ),
+    ).toHaveLength(4);
   }, 15_000);
 
   it("requires explicit verification when direct AI cannot read a VIN", async () => {
@@ -514,21 +445,8 @@ describe("Scooter documents", () => {
       <ScooterCreateForm brands={brands} scootersHref="/scooters" />,
     );
     await browser.upload(
-      screen.getByLabelText("Add Vehicle identity card (CIV)", {
-        selector: "input",
-      }),
+      screen.getByLabelText("Browse files", { selector: "input" }),
       pdf(),
-    );
-    await browser.click(
-      within(screen.getByRole("dialog")).getByRole("button", { name: "Save" }),
-    );
-    await waitFor(() =>
-      expect(
-        screen.getByRole("button", { name: "Extract and continue" }),
-      ).toBeEnabled(),
-    );
-    await browser.click(
-      screen.getByRole("button", { name: "Extract and continue" }),
     );
     const vinConfirmation = await screen.findByRole("checkbox", {
       name: "I checked CIV.pdf",
@@ -537,14 +455,7 @@ describe("Scooter documents", () => {
       "Not available yet",
     );
     await browser.click(vinConfirmation);
-    expect(screen.getByText("1 / 3 · Documents")).toBeInTheDocument();
-    await browser.click(
-      screen.getByRole("button", { name: "Extract and continue" }),
-    );
-    await waitFor(() =>
-      expect(screen.getByText("2 / 3 · CIV")).toBeInTheDocument(),
-    );
-    expect(screen.getByLabelText(/^VIN/)).toHaveValue("");
+    expect(screen.getByRole("textbox", { name: "VIN" })).toHaveValue("");
     expect(screen.getByLabelText("Color")).toHaveValue("White");
     expect(
       mocks.api.mock.calls.filter(
@@ -579,19 +490,27 @@ describe("Scooter documents", () => {
         fileName: "asigurare-004-AGM.pdf",
       },
     ];
+    access.user = {
+      isSuperAdmin: false,
+      effectiveScopes: {
+        "scooter_documents.read": ["ALL"],
+        "scooter_documents.write": ["ALL"],
+      },
+    };
     for (const [index, document] of documents.entries()) {
-      const file = pdf();
-      Object.defineProperty(file, "name", { value: document.fileName });
       await browser.upload(
-        screen.getByLabelText(`Add ${document.label}`, { selector: "input" }),
-        file,
-      );
-      await browser.click(
-        within(screen.getByRole("dialog")).getByRole("button", {
-          name: "Save",
-        }),
+        screen.getByLabelText("Browse files", { selector: "input" }),
+        pdf(document.fileName),
       );
       await waitFor(() => expect(mocks.put).toHaveBeenCalledTimes(index + 1));
+      await browser.click(
+        screen.getByRole("combobox", {
+          name: `Document type for ${document.fileName}`,
+        }),
+      );
+      await browser.click(
+        await screen.findByRole("option", { name: document.label }),
+      );
     }
     const vin = "L5YAUCZB9H1148984";
     const copy = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue();
@@ -649,15 +568,11 @@ describe("Scooter documents", () => {
     ).toBeInTheDocument();
     await browser.click(screen.getByRole("button", { name: "Fill fields" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-    await browser.click(screen.getByRole("button", { name: "Continue" }));
-    expect(screen.getByLabelText(/^VIN/)).toHaveValue(vin);
-    await browser.click(screen.getByRole("button", { name: "Continue" }));
+    expect(screen.getByRole("textbox", { name: "VIN" })).toHaveValue(vin);
     expect(screen.getByLabelText("Plate number")).toHaveValue("14949");
-    await browser.click(screen.getByRole("button", { name: "Continue" }));
     expect(screen.getByLabelText("Insured name")).toHaveValue(
       "DOGARU EMILIANO CONSTANTIN",
     );
-    await browser.click(screen.getByRole("button", { name: "Continue" }));
     expect(mocks.api).toHaveBeenCalledTimes(3);
     await browser.click(screen.getByRole("button", { name: "Create scooter" }));
     await waitFor(() => expect(mocks.push).toHaveBeenCalledWith("/scooters"));
@@ -683,58 +598,137 @@ describe("Scooter documents", () => {
     );
   });
 
-  it("groups four document inputs under one title without help and creates only one optional insurance", async () => {
+  it("asks only for an unknown file's type and reprocesses it without uploading again", async () => {
+    mockBatchExtraction(["civ"]);
+    const fallback = mocks.api.getMockImplementation()!;
+    mocks.api.mockImplementation(async (path, schema, options) => {
+      if (
+        path === v1.scooters.ROUTES.documents.startExtractionJob &&
+        options.json.source.type === "unclassified"
+      )
+        throw new ApiError(
+          422,
+          "Unknown document",
+          "DOCUMENT_EXTRACTION_TYPE_UNKNOWN",
+        );
+      return fallback(path, schema, options);
+    });
     const browser = userEvent.setup();
+    renderWithMessages(
+      <ScooterCreateForm brands={brands} scootersHref="/scooters" />,
+    );
+    await browser.upload(
+      screen.getByLabelText("Browse files", { selector: "input" }),
+      pdf("scan.pdf"),
+    );
+    expect(
+      await screen.findByText(/We could not identify this document/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Create scooter" }),
+    ).toBeDisabled();
+    await browser.click(
+      screen.getByRole("combobox", { name: "Document type for scan.pdf" }),
+    );
+    await browser.click(
+      await screen.findByRole("option", {
+        name: "Vehicle identity card (CIV)",
+      }),
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("textbox", { name: "VIN" })).toHaveValue(
+        scooter.vin,
+      ),
+    );
+    expect(mocks.put).toHaveBeenCalledTimes(1);
+    const attempts = mocks.api.mock.calls.filter(
+      ([path]) => path === v1.scooters.ROUTES.documents.startExtractionJob,
+    );
+    expect(attempts).toHaveLength(2);
+    expect(attempts[1]![2].json.source).toMatchObject({
+      type: "civ",
+      uploadType: "unclassified",
+    });
+  });
+
+  it("keeps successful files when another fails and retries only the failed file", async () => {
+    mockBatchExtraction(["civ", "registration_certificate"]);
+    const fallback = mocks.api.getMockImplementation()!;
+    let failures = 0;
+    mocks.api.mockImplementation(async (path, schema, options) => {
+      if (
+        path === v1.scooters.ROUTES.documents.startExtractionJob &&
+        options.json.source.uploadToken === "token-registration_certificate" &&
+        failures++ === 0
+      )
+        throw new ApiError(422, "Failed", "DOCUMENT_EXTRACTION_FAILED");
+      return fallback(path, schema, options);
+    });
+    const browser = userEvent.setup();
+    renderWithMessages(
+      <ScooterCreateForm brands={brands} scootersHref="/scooters" />,
+    );
+    await browser.upload(
+      screen.getByLabelText("Browse files", { selector: "input" }),
+      [pdf("one.pdf"), pdf("two.pdf")],
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("textbox", { name: "VIN" })).toHaveValue(
+        scooter.vin,
+      ),
+    );
+    const retry = await screen.findByRole("button", {
+      name: "Retry failed documents",
+    });
+    await waitFor(() => expect(retry).toBeEnabled());
+    fireEvent.change(screen.getByLabelText("Color"), {
+      target: { value: "Blue" },
+    });
+    await browser.click(retry);
+    await waitFor(() =>
+      expect(screen.getByLabelText("Plate number")).toHaveValue("14949"),
+    );
+    expect(screen.getByLabelText("Color")).toHaveValue("Blue");
+    expect(mocks.put).toHaveBeenCalledTimes(2);
+    expect(
+      mocks.api.mock.calls.filter(
+        ([path]) => path === v1.scooters.ROUTES.documents.startExtractionJob,
+      ),
+    ).toHaveLength(3);
+  });
+
+  it("rejects invalid files and duplicates while accepting valid files from the same drop", async () => {
+    mockBatchExtraction(["civ"]);
+    renderWithMessages(
+      <ScooterCreateForm brands={brands} scootersHref="/scooters" />,
+    );
+    const valid = pdf("scan.pdf");
+    const invalid = new File(["text"], "notes.txt", { type: "text/plain" });
+    fireEvent.drop(
+      screen.getByRole("button", { name: /Drop your scooter documents/ }),
+      { dataTransfer: { files: [valid, invalid, valid] } },
+    );
+    expect(
+      screen.getByText(/notes.txt: Unsupported format/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/scan.pdf: This file is already attached/),
+    ).toBeInTheDocument();
+    await waitFor(() => expect(mocks.put).toHaveBeenCalledTimes(1));
+  });
+
+  it("offers one multi-file input and leaves missing categories optional", () => {
     const { container } = renderWithMessages(
       <ScooterCreateForm brands={brands} scootersHref="/scooters" />,
     );
     expect(
       container.querySelectorAll('input[type="file"][multiple]'),
-    ).toHaveLength(4);
-    const section = screen
-      .getByRole("heading", { name: "Documents", level: 2 })
-      .closest("section")!;
-    expect(within(section).getAllByRole("heading")).toHaveLength(1);
-    expect(
-      screen.getByRole("button", { name: "Add Insurance policy" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: /^Add insurance$/ }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("heading", { name: "Vehicle identity card (CIV)" }),
-    ).not.toBeInTheDocument();
-    expect(screen.queryByText(/Optional. PDF/)).not.toBeInTheDocument();
+    ).toHaveLength(1);
+    expect(screen.getByLabelText("VIN")).toBeInTheDocument();
     expect(screen.queryByLabelText("Insured name")).not.toBeInTheDocument();
-    const input = container.querySelectorAll(
-      'input[type="file"][multiple]',
-    )[3]!;
-    fireEvent.change(input, { target: { files: [pdf()] } });
-    await browser.click(
-      within(screen.getByRole("dialog")).getByRole("button", { name: "Save" }),
-    );
-    await waitFor(() => expect(mocks.put).toHaveBeenCalledTimes(1));
-    expect(screen.queryByLabelText("Insured name")).not.toBeInTheDocument();
-    await browser.click(
-      screen.getByRole("button", { name: "Complete manually" }),
-    );
-    await browser.click(
-      screen.getByRole("checkbox", { name: "I checked CIV.pdf" }),
-    );
-    await browser.click(
-      screen.getByRole("button", { name: "Complete manually" }),
-    );
-    expect(screen.getAllByLabelText("Insured name")).toHaveLength(1);
     expect(
-      screen.queryByRole("button", { name: "Add Insurance policy" }),
-    ).not.toBeInTheDocument();
-    await browser.click(
-      screen.getByRole("button", { name: "Remove new policy" }),
-    );
-    expect(
-      screen.getByRole("button", { name: "Add Insurance policy" }),
-    ).toBeInTheDocument();
-    expect(screen.queryByLabelText("Insured name")).not.toBeInTheDocument();
+      screen.getByRole("button", { name: "Create scooter" }),
+    ).toBeEnabled();
   });
 
   it("uses one import preview with a plus for multiple attachments and removes them individually", async () => {
@@ -780,52 +774,68 @@ describe("Scooter documents", () => {
     expect(screen.getByText("1 document")).toBeInTheDocument();
   });
 
-  it("keeps multiple insurance attachments in one policy", async () => {
+  it("keeps multiple insurance pages attached to one optional policy", async () => {
+    mockBatchExtraction(["insurance", "insurance"]);
     const browser = userEvent.setup();
     renderWithMessages(
       <ScooterCreateForm brands={brands} scootersHref="/scooters" />,
     );
     await browser.upload(
-      screen.getByLabelText("Add Insurance policy", { selector: "input" }),
-      [pdf("insurance-front.pdf"), pdf("insurance-back.pdf")],
+      screen.getByLabelText("Browse files", { selector: "input" }),
+      [pdf("front.pdf"), pdf("back.pdf")],
     );
-    await browser.click(
-      within(screen.getByRole("dialog")).getByRole("button", { name: "Save" }),
+    await waitFor(() =>
+      expect(screen.getByLabelText("Insured name")).toHaveValue(
+        "Example Person",
+      ),
     );
-    await waitFor(() => expect(mocks.put).toHaveBeenCalledTimes(2));
-    expect(screen.getByText("2 documents")).toBeInTheDocument();
-    await browser.upload(
-      screen.getByLabelText("Add another document", { selector: "input" }),
-      pdf("insurance-annex.pdf"),
-    );
-    await browser.click(
-      within(screen.getByRole("dialog")).getByRole("button", { name: "Save" }),
-    );
-    await waitFor(() => expect(mocks.put).toHaveBeenCalledTimes(3));
-    expect(screen.getByText("3 documents")).toBeInTheDocument();
-    await browser.click(
-      screen.getByRole("button", { name: "Complete manually" }),
-    );
-    await browser.click(
-      screen.getByRole("checkbox", { name: "I checked insurance-front.pdf" }),
-    );
-    await browser.click(
-      screen.getByRole("checkbox", { name: "I checked insurance-back.pdf" }),
-    );
-    await browser.click(
-      screen.getByRole("checkbox", { name: "I checked insurance-annex.pdf" }),
-    );
-    await browser.click(
-      screen.getByRole("button", { name: "Complete manually" }),
+    await waitFor(() =>
+      expect(screen.getAllByText("Details extracted")).toHaveLength(2),
     );
     expect(screen.getAllByLabelText("Insured name")).toHaveLength(1);
-    expect(screen.getByText("2 / 3 · Insurance")).toBeInTheDocument();
     await browser.click(
-      screen.getByRole("button", { name: "Remove new policy" }),
+      screen.getByRole("button", { name: "Remove front.pdf" }),
     );
+    expect(screen.getByLabelText("Insured name")).toHaveValue("Example Person");
+    await browser.click(
+      screen.getByRole("button", { name: "Remove back.pdf" }),
+    );
+    await waitFor(() =>
+      expect(screen.queryByLabelText("Insured name")).not.toBeInTheDocument(),
+    );
+  });
+
+  it("allows a partial batch and adds another document without re-extracting the first", async () => {
+    mockBatchExtraction(["civ", "registration_certificate"]);
+    const browser = userEvent.setup();
+    renderWithMessages(
+      <ScooterCreateForm brands={brands} scootersHref="/scooters" />,
+    );
+    await browser.upload(
+      screen.getByLabelText("Browse files", { selector: "input" }),
+      pdf("first.pdf"),
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("textbox", { name: "VIN" })).toHaveValue(
+        scooter.vin,
+      ),
+    );
+    fireEvent.change(screen.getByLabelText("Color"), {
+      target: { value: "Blue" },
+    });
+    await browser.upload(
+      screen.getByLabelText("Browse files", { selector: "input" }),
+      pdf("second.pdf"),
+    );
+    await waitFor(() =>
+      expect(screen.getByLabelText("Plate number")).toHaveValue("14949"),
+    );
+    expect(screen.getByLabelText("Color")).toHaveValue("Blue");
     expect(
-      screen.getByRole("button", { name: "Add Insurance policy" }),
-    ).toBeInTheDocument();
+      mocks.api.mock.calls.filter(
+        ([path]) => path === v1.scooters.ROUTES.documents.startExtractionJob,
+      ),
+    ).toHaveLength(2);
     expect(screen.queryByLabelText("Insured name")).not.toBeInTheDocument();
   });
 
@@ -981,27 +991,6 @@ describe("Scooter documents", () => {
     expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:preview");
   });
 
-  it("shows uploads in source order before revealing any document fields", () => {
-    const { container } = renderWithMessages(
-      <ScooterCreateForm brands={brands} scootersHref="/scooters" />,
-    );
-    const inputs = Array.from(
-      container.querySelectorAll('input[type="file"][multiple]'),
-    );
-    expect(inputs.map((input) => input.getAttribute("aria-label"))).toEqual([
-      "Add Import documents",
-      "Add Vehicle identity card (CIV)",
-      "Add Registration certificate",
-      "Add Insurance policy",
-    ]);
-    expect(screen.queryByLabelText(/VIN/)).not.toBeInTheDocument();
-    expect(
-      screen.queryByLabelText("Registration type"),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "Create scooter" }),
-    ).not.toBeInTheDocument();
-  });
   it("retains failed uploads for retry and blocks save until ready", async () => {
     mocks.put.mockResolvedValueOnce({ ok: false });
     const user = userEvent.setup();
@@ -1180,6 +1169,57 @@ describe("Scooter documents", () => {
     );
   });
 });
+
+function mockBatchExtraction(
+  types: readonly v1.scooters.ScooterDocumentType[],
+) {
+  const fallback = mocks.api.getMockImplementation()!;
+  let uploadIndex = 0;
+  mocks.api.mockImplementation(async (path, schema, options) => {
+    if (path === v1.scooters.ROUTES.documents.createDraftUpload) {
+      const upload = await fallback(path, schema, options);
+      return { ...upload, uploadToken: `token-${types[uploadIndex++]}` };
+    }
+    if (path !== v1.scooters.ROUTES.documents.startExtractionJob)
+      return fallback(path, schema, options);
+    const { sourceId, source } = options.json;
+    const type =
+      source.type === "unclassified"
+        ? source.uploadToken.slice("token-".length)
+        : source.type;
+    return {
+      sourceId,
+      documentType: type,
+      reviewRequired: true,
+      issues: [],
+      extractedData: {
+        vin: scooter.vin,
+        fields:
+          type === "civ" || type === "import_document"
+            ? {
+                brandName: "Yamaha",
+                powertrainType: "combustion",
+                maxSpeedKmh: 25,
+                color: "White",
+              }
+            : type === "registration_certificate"
+              ? {
+                  registrationType: "local",
+                  registrationNumber: "14949",
+                  registrationDate: "2026-09-01",
+                }
+              : {
+                  insuredName: "Example Person",
+                  validFrom: "2026-09-01",
+                  validUntil: "2027-08-31",
+                  premiumAmount: 278.88,
+                  currency: "RON",
+                },
+        rawFields: {},
+      },
+    };
+  });
+}
 
 async function removeFromViewer(
   user: ReturnType<typeof userEvent.setup>,

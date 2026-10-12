@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   activeImportReviews,
   importFieldReviews,
+  remainingCivDocumentWarnings,
   unresolvedDocumentRubrics,
 } from "./scooter-import-review";
 import { parseDocumentImport } from "./scooter-document-import";
@@ -34,6 +35,20 @@ function review(source: unknown, snapshot = current) {
 }
 
 describe("import field review", () => {
+  it("counts semantic CIV raw fields once while retaining independent document warnings", () => {
+    const reviews = ["vin", "color", "brandId", "variant"].map((field) => ({
+      field,
+      value: "",
+      rawCodes: field === "vin" ? ["E"] : [],
+    }));
+    expect(
+      remainingCivDocumentWarnings(
+        ["vin", "E", "color", "brandName", "variant", "unknown rubric"],
+        reviews,
+      ),
+    ).toEqual(["unknown rubric"]);
+    expect(remainingCivDocumentWarnings(["vin"], [])).toEqual(["vin"]);
+  });
   it("deduplicates raw and normalized fields and excludes inapplicable controls", () => {
     const reviews = review({
       powerKw: null,

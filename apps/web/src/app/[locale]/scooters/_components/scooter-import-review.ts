@@ -18,6 +18,24 @@ const rawLabels: Record<string, string> = {
   "d.2 - versiune": "version",
 };
 
+/** A semantic raw key is the same warning as its editable CIV field. */
+export function remainingCivDocumentWarnings(
+  fields: string[],
+  reviews: ImportFieldReview[],
+): string[] {
+  const covered = new Set(
+    reviews
+      .filter((review) => !review.policyId)
+      .flatMap((review) => [
+        review.field,
+        ...review.rawCodes,
+        ...(review.field === "brandId" ? ["brandName"] : []),
+        ...(review.field === "powertrainType" ? ["propulsionSystem"] : []),
+      ]),
+  );
+  return [...new Set(fields)].filter((field) => !covered.has(field));
+}
+
 /** Raw rubrics and structured properties referring to one input count once. */
 export function importFieldReviews(
   result: Extract<DocumentImportResult, { ok: true }>,

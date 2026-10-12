@@ -4520,6 +4520,7 @@
             "access_token": []
           }
         ],
+        "summary": "Upload a scooter document with a known type or automatic detection",
         "tags": ["scooters"]
       }
     },
@@ -11482,8 +11483,13 @@
                       "import_document",
                       "civ",
                       "registration_certificate",
-                      "insurance"
+                      "insurance",
+                      "unclassified"
                     ]
+                  },
+                  "uploadType": {
+                    "type": "string",
+                    "enum": ["unclassified"]
                   },
                   "uploadToken": {
                     "type": "string",
@@ -11535,7 +11541,8 @@
               "import_document",
               "civ",
               "registration_certificate",
-              "insurance"
+              "insurance",
+              "unclassified"
             ]
           },
           "contentType": {
@@ -11857,6 +11864,10 @@
                   "type": "string",
                   "minLength": 1,
                   "maxLength": 8192
+                },
+                "uploadType": {
+                  "type": "string",
+                  "enum": ["unclassified"]
                 }
               },
               "required": ["type", "fileName", "uploadToken"],
@@ -13141,6 +13152,10 @@
                   "type": "string",
                   "minLength": 1,
                   "maxLength": 8192
+                },
+                "uploadType": {
+                  "type": "string",
+                  "enum": ["unclassified"]
                 }
               },
               "required": ["type", "fileName", "uploadToken"],
@@ -13751,8 +13766,13 @@
                       "import_document",
                       "civ",
                       "registration_certificate",
-                      "insurance"
+                      "insurance",
+                      "unclassified"
                     ]
+                  },
+                  "uploadType": {
+                    "type": "string",
+                    "enum": ["unclassified"]
                   },
                   "uploadToken": {
                     "type": "string",
@@ -13927,7 +13947,8 @@
               "import_document",
               "civ",
               "registration_certificate",
-              "insurance"
+              "insurance",
+              "unclassified"
             ]
           },
           "status": {

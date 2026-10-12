@@ -15,6 +15,7 @@ import {
   type StoredDocument,
 } from "../image-storage/image-storage.types";
 import { readScooterDocumentSource } from "../scooters/scooter-document-source-reader";
+import { normalizeDocumentAnalysisPdf } from "./document-analysis-pdf";
 import {
   DOCUMENT_VALIDATION_MAX_RUNTIME_MS,
   DOCUMENT_VALIDATION_REVISION,
@@ -67,7 +68,7 @@ export function createDocumentValidationHandler(
         controller.signal,
       );
       if (existing) return { ok: true, document: existing };
-      const bytes = await readScooterDocumentSource(
+      const originalBytes = await readScooterDocumentSource(
         {
           readDocument: async (storageKey, signal) => {
             const result = await s3.send(
@@ -93,6 +94,14 @@ export function createDocumentValidationHandler(
         controller.signal,
       );
       controller.signal.throwIfAborted();
+      const bytes =
+        input.source.contentType === "application/pdf"
+          ? await normalizeDocumentAnalysisPdf(
+              originalBytes,
+              Math.min(config.maxBytes, v1.scooters.SCOOTER_DOCUMENT_MAX_BYTES),
+              controller.signal,
+            )
+          : originalBytes;
       const checksumSha256 = createHash("sha256").update(bytes).digest("hex");
       try {
         await s3.send(
