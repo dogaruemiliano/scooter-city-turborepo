@@ -10,7 +10,7 @@ import { Button, Checkbox, buttonVariants } from "@repo/ui/components";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { FormProvider, get, type FieldErrors, useWatch } from "react-hook-form";
 
 import { FormSummary } from "@/components/form/FormSummary";
@@ -18,6 +18,7 @@ import { webApi } from "@/lib/api";
 import { useZodForm } from "@/lib/form/use-zod-form";
 import { useScooterExtraction } from "./useScooterExtraction";
 import { useScooterDocuments } from "./useScooterDocuments";
+import { ScooterPhotos } from "./ScooterPhotos";
 import {
   useScooterDocumentAnalysis,
   type DocumentAnalysisState,
@@ -161,6 +162,18 @@ export function ScooterEditor({
       (!analysis.running &&
         analysis.entries[source.sourceId]?.status === "success"),
   );
+  const [photosBusy, setPhotosBusy] = useState(false);
+  const [photoDrafts, setPhotoDrafts] = useState<
+    v1.scooters.ScooterPhotoDraft[]
+  >([]);
+  const [photosBlocked, setPhotosBlocked] = useState(false);
+  const onPhotoDraftsChange = useCallback(
+    (drafts: v1.scooters.ScooterPhotoDraft[], blocked: boolean) => {
+      setPhotoDrafts(drafts);
+      setPhotosBlocked(blocked);
+    },
+    [],
+  );
   const { isSubmitting, isDirty, dirtyFields, submitCount } = form.formState;
   const powertrain = useWatch({
     control: form.control,
@@ -209,6 +222,8 @@ export function ScooterEditor({
   async function submit(input: v1.scooters.UpdateScooterInput) {
     if (
       submitting.current ||
+      photosBusy ||
+      photosBlocked ||
       analysis.running ||
       documents.blocked ||
       vinReviewRequired ||
@@ -224,6 +239,7 @@ export function ScooterEditor({
       const json = scooter ? scooterChangedFields(input, dirtyFields) : input;
       const payload: v1.scooters.UpdateScooterInput = {
         ...json,
+        ...(!scooter && photoDrafts.length ? { photoDrafts } : {}),
         sessionId,
         ...documents.payload,
         ...(input.insurancePolicies?.length
@@ -506,7 +522,7 @@ export function ScooterEditor({
         <FormProvider {...form}>
           <form
             ref={formRef}
-            className={`grid min-w-0 gap-8 ${!scooter ? "[&_[data-slot=label]]:text-sm [&_[data-slot=label]]:font-medium [&_[data-slot=segmented-radio-group]>label>span]:text-sm [&_[data-slot=segmented-radio-group]>label>span]:font-medium [&_[data-slot=form-section]_h2]:text-base [&_[data-slot=form-section]_h2]:font-semibold [&_[data-slot=form-section]_h2]:normal-case [&_[data-slot=form-section]_h2]:tracking-normal" : ""}`}
+            className="grid min-w-0 gap-8"
             noValidate
             onSubmit={(event) => {
               void form.handleSubmit(submit, (errors) => {
@@ -535,6 +551,16 @@ export function ScooterEditor({
                   sources={extraction.sources}
                 >
                   <ScooterEditorFields
+                    photos={
+                      scooter ? (
+                        <ScooterPhotos
+                          scooterId={scooter.id}
+                          number={2}
+                          disabled={isSubmitting}
+                          onBusyChange={setPhotosBusy}
+                        />
+                      ) : undefined
+                    }
                     step={scooter ? undefined : "documents"}
                     combinedReview={!scooter}
                     onRetryAnalysis={(sourceId) => {
@@ -578,6 +604,15 @@ export function ScooterEditor({
                         {t("creation.scooterDetails")}
                       </h2>
                       <ScooterCreateFields
+                        photos={
+                          <ScooterPhotos
+                            panel
+                            number={2}
+                            disabled={isSubmitting}
+                            onBusyChange={setPhotosBusy}
+                            onDraftsChange={onPhotoDraftsChange}
+                          />
+                        }
                         brands={availableBrands}
                         onBrandCreated={(brand) =>
                           setCreatedBrands((current) => [...current, brand])
@@ -747,10 +782,10 @@ export function ScooterEditor({
               <Link
                 href={returnHref}
                 className={buttonVariants({ variant: "outline" })}
-                aria-disabled={isSubmitting}
-                tabIndex={isSubmitting ? -1 : undefined}
+                aria-disabled={isSubmitting || photosBusy}
+                tabIndex={isSubmitting || photosBusy ? -1 : undefined}
                 onClick={(event) => {
-                  if (isSubmitting) event.preventDefault();
+                  if (isSubmitting || photosBusy) event.preventDefault();
                 }}
               >
                 {t("actions.cancel")}
@@ -781,6 +816,8 @@ export function ScooterEditor({
               <Button
                 type="submit"
                 disabled={
+                  photosBusy ||
+                  photosBlocked ||
                   isSubmitting ||
                   analysis.running ||
                   documents.blocked ||

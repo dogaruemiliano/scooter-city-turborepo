@@ -341,6 +341,7 @@ export const tokens = {
     documentStep: 0.5,
   },
   aspectRatio: {
+    scooterPhoto: 1.3333333333333333,
     documentLandscape: 1.586,
     identityCardPortrait: 0.6305170239596469,
     receiptPortrait: 0.3333333333333333,

@@ -29,6 +29,7 @@ import {
 } from "./CivVocabularyContext";
 import { CivMetadataFields } from "./CivMetadataFields";
 import { ScooterTechnicalFields } from "./ScooterEditorFields";
+import { ScooterPhotos } from "./ScooterPhotos";
 import {
   scooterChangedFields,
   scooterEditFormSchema,
@@ -56,6 +57,7 @@ export function ScooterCreationComplete({
   const user = useOptionalSession()?.user;
   const [completing, setCompleting] = useState(false);
   const [requestError, setRequestError] = useState<string | null>(null);
+  const [photosBusy, setPhotosBusy] = useState(false);
   const form = useZodForm<ScooterEditorValues, v1.scooters.UpdateScooterInput>(
     scooterEditFormSchema,
     {
@@ -64,8 +66,9 @@ export function ScooterCreationComplete({
       messageOverride: (issue, path) => scooterEditorMessage(issue, path, t),
     },
   );
-  const busy = form.formState.isSubmitting;
+  const busy = form.formState.isSubmitting || photosBusy;
   function finish() {
+    if (photosBusy) return;
     router.push(returnHref);
     router.refresh();
   }
@@ -106,6 +109,12 @@ export function ScooterCreationComplete({
         <AlertTitle>{t("creation.created")}</AlertTitle>
         <AlertDescription>{t("creation.createdDescription")}</AlertDescription>
       </Alert>
+      <ScooterPhotos
+        scooterId={scooter.id}
+        panel
+        disabled={form.formState.isSubmitting}
+        onBusyChange={setPhotosBusy}
+      />
       {!completing ? (
         <Card>
           <CardHeader>
@@ -113,7 +122,7 @@ export function ScooterCreationComplete({
             <CardDescription>{t("creation.savedCode")}</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-3">
-            <Button type="button" onClick={finish}>
+            <Button type="button" onClick={finish} disabled={busy}>
               {t("creation.finish")}
               <ArrowRightIcon aria-hidden="true" data-icon="inline-end" />
             </Button>
@@ -121,6 +130,7 @@ export function ScooterCreationComplete({
               <Button
                 type="button"
                 variant="outline"
+                disabled={busy}
                 onClick={() => setCompleting(true)}
               >
                 {t("creation.completeCiv")}

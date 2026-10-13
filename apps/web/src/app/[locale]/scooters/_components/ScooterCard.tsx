@@ -35,9 +35,10 @@ import { useLocale, useTranslations } from "next-intl";
 import { useState } from "react";
 
 import { localizePath, resolveRouteLocale } from "@/i18n/paths";
+import { webApi } from "@/lib/api";
 
-// Presentation only: the list API does not yet supply these fields. Missing
-// rental/inspection data must never imply availability or roadworthiness.
+// Supplemental presentation data. Missing rental/inspection data must never
+// imply availability or roadworthiness; photos use the API's internal cover.
 export interface ScooterCardDetails {
   photoUrl?: string | null;
   rentalStatus?: "available" | "rented" | "reserved" | "maintenance" | null;
@@ -86,8 +87,7 @@ function ScooterPhoto({ src, code }: { src?: string | null; code: string }) {
           src={src}
           alt={t("photoAlt", { code })}
           fill
-          // Photo storage is not connected yet; allow supplied preview URLs
-          // without assuming an optimization host or stripping authentication.
+          // Private API images must retain the browser's authentication cookies.
           unoptimized
           sizes={`(min-width: ${tokens.breakpoints.sm}px) ${tokens.spacing[36]}px, ${tokens.spacing[24]}px`}
           className="object-contain p-2"
@@ -173,7 +173,15 @@ export function ScooterCard({
       ) : null}
       <CardContent className="pointer-events-none flex flex-1 flex-col gap-4 p-4 sm:p-5">
         <div className="flex items-start gap-3 sm:gap-4">
-          <ScooterPhoto src={details.photoUrl} code={code} />
+          <ScooterPhoto
+            src={
+              details.photoUrl ??
+              (scooter.internalCoverUrl
+                ? webApi.url(scooter.internalCoverUrl)
+                : null)
+            }
+            code={code}
+          />
           <div className="min-w-0 flex-1 py-1">
             <div className="flex min-w-0 flex-col items-start gap-1">
               <h2 className="text-xl font-semibold leading-tight tabular-nums">

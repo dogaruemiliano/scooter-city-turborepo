@@ -25,6 +25,44 @@ import { useScooterDocuments } from "./useScooterDocuments";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ScooterCreateForm } from "./ScooterCreateForm";
+vi.mock("./ScooterPhotos", () => ({
+  ScooterPhotos: ({
+    number,
+    onDraftsChange,
+  }: {
+    number?: number;
+    onDraftsChange?: (
+      drafts: v1.scooters.ScooterPhotoDraft[],
+      blocked: boolean,
+    ) => void;
+  }) => (
+    <section>
+      <h2>{String(number).padStart(2, "0")}. Photos</h2>
+      {onDraftsChange ? (
+        <button
+          type="button"
+          onClick={() =>
+            onDraftsChange(
+              [
+                {
+                  uploadToken: "draft-token",
+                  fileName: "front.jpg",
+                  caption: "Front view",
+                  showToCustomers: true,
+                  internalCover: true,
+                  customerCover: true,
+                },
+              ],
+              false,
+            )
+          }
+        >
+          Stage test photo
+        </button>
+      ) : null}
+    </section>
+  ),
+}));
 
 const mocks = vi.hoisted(() => ({
   apiFetch: vi.fn(),
@@ -123,6 +161,61 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("ScooterCreateForm combined review", () => {
+  it("keeps new forms empty when navigating from the list and returning to create again", async () => {
+    function NavigationFixture() {
+      const [creating, setCreating] = useState(false);
+      return creating ? (
+        <>
+          <button type="button" onClick={() => setCreating(false)}>
+            Back to scooters
+          </button>
+          <ScooterCreateForm scootersHref="/en/scooters" brands={brands} />
+        </>
+      ) : (
+        <button type="button" onClick={() => setCreating(true)}>
+          Create scooter
+        </button>
+      );
+    }
+    const user = userEvent.setup();
+    render(
+      <NextIntlClientProvider locale="en" messages={messages.en}>
+        <NavigationFixture />
+      </NextIntlClientProvider>,
+      { reactStrictMode: true },
+    );
+    for (let visit = 0; visit < 2; visit++) {
+      await user.click(screen.getByRole("button", { name: "Create scooter" }));
+      expect(
+        screen.getByRole("button", { name: /Drop your scooter documents/ }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Import more documents" }),
+      ).not.toBeInTheDocument();
+      await user.click(
+        screen.getByRole("button", { name: "Back to scooters" }),
+      );
+    }
+    expect(mocks.apiFetch).not.toHaveBeenCalled();
+  });
+  it("shows the initial document drop area when a fresh create form mounts in Strict Mode", () => {
+    render(
+      <NextIntlClientProvider locale="en" messages={messages.en}>
+        <ScooterCreateForm scootersHref="/en/scooters" brands={brands} />
+      </NextIntlClientProvider>,
+      { reactStrictMode: true },
+    );
+    expect(
+      screen.getByRole("button", { name: /Drop your scooter documents/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Import more documents" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(messages.en.scooters.creation.importComplete),
+    ).not.toBeInTheDocument();
+    expect(mocks.apiFetch).not.toHaveBeenCalled();
+  });
   it("shows a shared drop zone and one form with a final create action", () => {
     renderWizard();
     expect(
@@ -134,7 +227,7 @@ describe("ScooterCreateForm combined review", () => {
       screen.getByRole("textbox", { name: "Current mileage (km)" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: /05.*Condition & equipment/ }),
+      screen.getByRole("heading", { name: /06.*Condition & equipment/ }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Create scooter" }),
@@ -143,6 +236,38 @@ describe("ScooterCreateForm combined review", () => {
       screen.queryByRole("button", { name: "Continue" }),
     ).not.toBeInTheDocument();
     expect(mocks.apiFetch).not.toHaveBeenCalled();
+  });
+
+  it("places photos second and submits their draft settings with the scooter", async () => {
+    mocks.apiFetch.mockResolvedValueOnce(createdScooter);
+    const browser = userEvent.setup();
+    renderWizard();
+    const headings = screen
+      .getAllByRole("heading")
+      .map((heading) => heading.textContent);
+    const galleryIndex = headings.findIndex((text) =>
+      text?.includes("02. Photos"),
+    );
+    expect(galleryIndex).toBeGreaterThan(0);
+    expect(headings[galleryIndex - 1]).toMatch(/01/);
+    expect(headings[galleryIndex + 1]).toMatch(/03/);
+    await browser.click(
+      screen.getByRole("button", { name: "Stage test photo" }),
+    );
+    await fillWizardIdentity(browser);
+    await chooseSelectOption(browser, "Registration type", "Unregistered");
+    await browser.click(screen.getByRole("button", { name: "Create scooter" }));
+    await waitFor(() => expect(mocks.apiFetch).toHaveBeenCalledOnce());
+    expect(mocks.apiFetch.mock.calls[0]![2].json.photoDrafts).toEqual([
+      {
+        uploadToken: "draft-token",
+        fileName: "front.jpg",
+        caption: "Front view",
+        showToCustomers: true,
+        internalCover: true,
+        customerCover: true,
+      },
+    ]);
   });
 
   it("revalidates VIN on every change after its first blur, including after an error clears", async () => {
@@ -384,7 +509,7 @@ describe("Scooter creation follow-up and optional steps", () => {
     await fillWizardIdentity(browser);
     await chooseSelectOption(browser, "Registration type", "Unregistered");
     expect(
-      screen.getByRole("heading", { name: /05.*Condition & equipment/ }),
+      screen.getByRole("heading", { name: /06.*Condition & equipment/ }),
     ).toBeInTheDocument();
     await browser.type(
       screen.getByRole("textbox", { name: "Current mileage (km)" }),

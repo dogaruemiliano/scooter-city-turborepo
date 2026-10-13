@@ -6,6 +6,7 @@ import { NextIntlClientProvider } from "next-intl";
 import { useState } from "react";
 import { expect, it, vi } from "vitest";
 import { ScooterEditor } from "./ScooterEditor";
+vi.mock("./ScooterPhotos", () => ({ ScooterPhotos: () => null }));
 import type { DocumentDraft } from "./useScooterDocuments";
 
 const apiFetch = vi.hoisted(() => vi.fn());

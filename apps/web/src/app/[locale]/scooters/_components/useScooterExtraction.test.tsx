@@ -57,7 +57,11 @@ interface Props {
   editing?: boolean;
   existingExtraction?: Record<string, ExtractedDocumentData>;
 }
-function setup(initialProps: Props, defaults = scooterEditorDefaults()) {
+function setup(
+  initialProps: Props,
+  defaults = scooterEditorDefaults(),
+  reactStrictMode = false,
+) {
   const onRawFields = vi.fn();
   const hook = renderHook(
     (props: Props) => {
@@ -108,7 +112,7 @@ function setup(initialProps: Props, defaults = scooterEditorDefaults()) {
         }),
       };
     },
-    { initialProps },
+    { initialProps, reactStrictMode },
   );
   function apply(
     data: Record<string, ExtractedDocumentData>,
@@ -144,6 +148,46 @@ function setup(initialProps: Props, defaults = scooterEditorDefaults()) {
 }
 
 describe("document extraction lifecycle", () => {
+  it("keeps an empty create form unimported when Strict Mode replays mount effects", () => {
+    const hook = setup({ attached: [] }, scooterEditorDefaults(), true);
+    expect(hook.result.current.extraction.sources).toEqual([]);
+    expect(hook.result.current.extraction.reviewResult).toBeUndefined();
+    hook.rerender({ attached: [] });
+    expect(hook.result.current.extraction.reviewResult).toBeUndefined();
+    expect(hook.result.current.form.formState.isDirty).toBe(false);
+    expect(hook.onRawFields).not.toHaveBeenCalled();
+  });
+
+  it("does not replay persisted extraction on Strict Mode mounts", () => {
+    const hook = setup(
+      {
+        attached: [civ],
+        existing: true,
+        editing: true,
+        existingExtraction: { [civ.sourceId]: extracted({ color: "Printed" }) },
+      },
+      { ...scooterEditorDefaults(), color: "Saved correction" },
+      true,
+    );
+    expect(hook.result.current.form.getValues("color")).toBe(
+      "Saved correction",
+    );
+    expect(hook.result.current.extraction.reviewResult).toBeUndefined();
+    expect(hook.result.current.form.formState.isDirty).toBe(false);
+  });
+
+  it("preserves manual corrections when the final document is removed", () => {
+    const hook = setup({ attached: [civ] });
+    hook.apply({ [civ.sourceId]: extracted({ color: "Printed" }) });
+    act(() =>
+      hook.result.current.form.setValue("color", "Corrected", {
+        shouldDirty: true,
+      }),
+    );
+    hook.rerender({ attached: [] });
+    expect(hook.result.current.extraction.sources).toEqual([]);
+    expect(hook.result.current.form.getValues("color")).toBe("Corrected");
+  });
   it("reviews import VINs only while there is no CIV", () => {
     const hook = setup({ attached: [importer] });
     expect(hook.result.current.extraction.unverifiedSources).toEqual([

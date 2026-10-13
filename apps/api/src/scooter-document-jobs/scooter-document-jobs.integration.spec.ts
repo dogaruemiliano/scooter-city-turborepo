@@ -137,9 +137,17 @@ integration("durable scooter document lifecycle (isolated PostgreSQL)", () => {
       jobs,
       env,
     );
-    scooters = new ScootersService(db, documents, {
-      remember: () => Promise.resolve(undefined),
-    } as unknown as CivVocabularyService);
+    scooters = new ScootersService(
+      db,
+      documents,
+      {
+        remember: () => Promise.resolve(undefined),
+      } as unknown as CivVocabularyService,
+      {
+        prepareDrafts: async () => [],
+        applyDrafts: async () => undefined,
+      } as unknown as import("../scooters/scooter-photos.service").ScooterPhotosService,
+    );
   });
 
   afterAll(async () => {

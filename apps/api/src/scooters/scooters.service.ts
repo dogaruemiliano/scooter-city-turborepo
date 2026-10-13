@@ -15,14 +15,23 @@ import type { Prisma, Scooter } from "../generated/prisma/client";
 import { Prisma as PrismaRuntime } from "../generated/prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { editorSaveFingerprint } from "../scooter-document-jobs/document-job-lifecycle";
+import { ScooterPhotosService } from "./scooter-photos.service";
+
+const internalCoverPhotos = {
+  where: { deletedAt: null, internalCover: true, asset: { deletedAt: null } },
+  select: { id: true },
+  take: 1,
+} satisfies Prisma.Scooter$photosArgs;
 
 const scooterInclude = {
+  photos: internalCoverPhotos,
   brand: true,
   civDocument: true,
   insurancePolicies: { orderBy: [{ validUntil: "desc" }, { id: "asc" }] },
 } satisfies Prisma.ScooterInclude;
 
 const scooterListInclude = {
+  photos: internalCoverPhotos,
   brand: true,
   insurancePolicies: { select: { validFrom: true, validUntil: true } },
 } satisfies Prisma.ScooterInclude;
@@ -74,6 +83,7 @@ export class ScootersService {
     private readonly prisma: PrismaService,
     private readonly documents: ScooterDocumentsService,
     private readonly civVocabulary: CivVocabularyService,
+    private readonly photos: ScooterPhotosService,
   ) {}
 
   async create(
@@ -90,6 +100,10 @@ export class ScootersService {
 
       const prepared = await this.documents.prepare(
         input.documentDrafts,
+        userId,
+      );
+      const preparedPhotos = await this.photos.prepareDrafts(
+        input.photoDrafts,
         userId,
       );
       return await this.prisma.$transaction(async (tx) => {
@@ -121,7 +135,8 @@ export class ScootersService {
           editorSaveFingerprint(input),
         );
         await this.civVocabulary.remember(tx, input);
-        return input.insurancePolicies?.length
+        await this.photos.applyDrafts(tx, scooter.id, preparedPhotos, userId);
+        return input.insurancePolicies?.length || preparedPhotos.length
           ? tx.scooter.findUniqueOrThrow({
               where: { id: scooter.id },
               include: scooterInclude,

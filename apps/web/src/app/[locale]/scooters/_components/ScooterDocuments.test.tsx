@@ -20,6 +20,8 @@ import { useScooterDocuments } from "./useScooterDocuments";
 import { ScooterCreateForm } from "./ScooterCreateForm";
 import { ScooterEditForm } from "./ScooterEditForm";
 import { ScooterBatchDocuments } from "./ScooterBatchDocuments";
+// Photo requests are covered by the gallery suite, independently of document uploads.
+vi.mock("./ScooterPhotos", () => ({ ScooterPhotos: () => null }));
 
 const mocks = vi.hoisted(() => ({
   api: vi.fn(),

@@ -3,7 +3,10 @@ import { messages, type SupportedLocale } from "@repo/i18n";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+vi.mock("@/lib/api", () => ({
+  webApi: { url: (path: string) => `http://localhost:3000${path}` },
+}));
 
 import { ScooterCard, type ScooterCardDetails } from "./ScooterCard";
 
@@ -54,6 +57,20 @@ function field(label: string) {
 }
 
 describe("ScooterCard", () => {
+  it("uses the selected internal cover from the list API", () => {
+    render(
+      card(undefined, "en", {
+        ...scooter,
+        internalCoverUrl: "/v1/scooters/scooter-1/photos/photo-1/content",
+      }),
+    );
+    expect(
+      screen.getByRole("img", { name: "Scooter 001 YAM" }),
+    ).toHaveAttribute(
+      "src",
+      "http://localhost:3000/v1/scooters/scooter-1/photos/photo-1/content",
+    );
+  });
   it("keeps unknown operational data explicit, even when instrument checks pass", () => {
     render(
       card(undefined, "en", {

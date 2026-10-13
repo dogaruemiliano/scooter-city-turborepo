@@ -183,6 +183,7 @@ model MediaAsset {
   deletedAt        DateTime?
   documentPhotos   PersonDocumentPhoto[]
   scooterDocuments ScooterDocument[]
+  scooterPhotos    ScooterPhoto[]
 
   @@index([provider, bucket])
   @@index([uploadedByUserId])
@@ -436,6 +437,7 @@ model ScooterFleetCounter {
 
 /// Scooter inventory; technical details can be completed after acquisition.
 model Scooter {
+  photos      ScooterPhoto[]
   problems    ScooterProblem[]
   rentals     Rental[]
   id          String           @id @default(cuid())
@@ -1395,6 +1397,25 @@ enum ScooterDocumentType {
   civ
   registration_certificate
   insurance
+}
+
+/// Fleet photos remain private; showToCustomers curates the future customer gallery.
+model ScooterPhoto {
+  id              String     @id @default(cuid())
+  scooterId       String
+  scooter         Scooter    @relation(fields: [scooterId], references: [id], onDelete: Cascade)
+  assetId         String     @unique
+  asset           MediaAsset @relation(fields: [assetId], references: [id])
+  fileName        String
+  caption         String?
+  position        Int
+  showToCustomers Boolean    @default(false)
+  internalCover   Boolean    @default(false)
+  customerCover   Boolean    @default(false)
+  createdAt       DateTime   @default(now())
+  deletedAt       DateTime?
+
+  @@index([scooterId, deletedAt, position])
 }
 
 /// One PDF or image; multiple files can describe the pages of a document.

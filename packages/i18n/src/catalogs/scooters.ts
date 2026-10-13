@@ -1,5 +1,71 @@
 export const scootersCatalog = {
   en: {
+    photos: {
+      title: "Photos",
+      count: "{count} / 20 photos",
+      upload: "Upload photos",
+      addPhotos: "Add photos",
+      addOtherPhotos: "Add other photos",
+      futureNotice:
+        "The customer gallery isn’t live yet. Photos selected for customers will appear when it launches.",
+      draftNotice:
+        "Photos upload privately now and are attached when you create the scooter. Unused uploads expire automatically.",
+      saveNotice:
+        "Photo changes save immediately, separately from the scooter form.",
+      empty: "No photos yet",
+      emptyHelp:
+        "Add photos of this scooter. New photos are internal by default. JPEG, PNG or WebP, up to 15 MB each.",
+      emptyReadOnly: "Photos added by your team will appear here.",
+      emptyFilter: "No photos match this filter.",
+      loading: "Loading photos…",
+      filter: "Filter photos",
+      filters: {
+        all: "All",
+        internal: "Internal",
+        customer: "Selected for customers",
+      },
+      internal: "Internal",
+      selectedForCustomers: "Selected for customers",
+      internalCover: "Internal cover",
+      customerCover: "Customer cover",
+      open: "Open photo: {name}",
+      details: "Photo details",
+      close: "Close photo",
+      previous: "Previous photo",
+      next: "Next photo",
+      caption: "Caption",
+      noCaption: "No caption",
+      saveCaption: "Save caption",
+      showToCustomers: "Show to customers",
+      visibilityHelp:
+        "Select this photo for the future customer gallery. Turning this off also clears its customer cover selection.",
+      cover: "Cover photo",
+      setInternalCover: "Set as internal cover",
+      setCustomerCover: "Set as customer cover",
+      customerCoverHelp:
+        "Select this photo for customers before making it the customer cover.",
+      order: "Photo order",
+      earlier: "Move earlier",
+      later: "Move later",
+      reorderHelp:
+        "Drag photos in the All view to reorder, or open a photo and use Move earlier / Move later.",
+      uploading: "Uploading… {progress}%",
+      processing: "Saving photo…",
+      uploadFailed: "Photo wasn’t saved. Retry the upload or remove it.",
+      imageFailed: "Photo couldn’t be loaded.",
+      retry: "Retry",
+      remove: "Remove",
+      delete: "Delete photo",
+      deleteConfirm:
+        "Delete this photo from the scooter gallery? Its cover selections will also be removed.",
+      cancel: "Cancel",
+      errors: {
+        load: "Photos couldn’t be loaded. Try again.",
+        save: "The change couldn’t be saved. Try again; reload the gallery if its photo order has changed.",
+        files:
+          "Choose up to 20 photos in total. Each must be a JPEG, PNG or WebP image, up to 15 MB.",
+      },
+    },
     creation: {
       description:
         "Register a vehicle with its identity, documents, and initial registration.",
@@ -999,6 +1065,73 @@ export const scootersCatalog = {
     },
   },
   ro: {
+    photos: {
+      title: "Fotografii",
+      count: "{count} / 20 fotografii",
+      upload: "Încarcă fotografii",
+      addPhotos: "Adaugă fotografii",
+      addOtherPhotos: "Adaugă alte fotografii",
+      futureNotice:
+        "Galeria pentru clienți nu este încă disponibilă. Fotografiile selectate pentru clienți vor apărea la lansarea ei.",
+      draftNotice:
+        "Fotografiile sunt încărcate privat și asociate la crearea scuterului. Încărcările nefolosite expiră automat.",
+      saveNotice:
+        "Modificările fotografiilor se salvează imediat, separat de formularul scuterului.",
+      empty: "Nicio fotografie încă",
+      emptyHelp:
+        "Adaugă fotografii ale acestui scuter. Fotografiile noi sunt interne implicit. JPEG, PNG sau WebP, maximum 15 MB fiecare.",
+      emptyReadOnly: "Fotografiile adăugate de echipă vor apărea aici.",
+      emptyFilter: "Nicio fotografie nu corespunde acestui filtru.",
+      loading: "Se încarcă fotografiile…",
+      filter: "Filtrează fotografiile",
+      filters: {
+        all: "Toate",
+        internal: "Interne",
+        customer: "Selectate pentru clienți",
+      },
+      internal: "Internă",
+      selectedForCustomers: "Selectată pentru clienți",
+      internalCover: "Copertă internă",
+      customerCover: "Copertă pentru clienți",
+      open: "Deschide fotografia: {name}",
+      details: "Detaliile fotografiei",
+      close: "Închide fotografia",
+      previous: "Fotografia precedentă",
+      next: "Fotografia următoare",
+      caption: "Descriere",
+      noCaption: "Fără descriere",
+      saveCaption: "Salvează descrierea",
+      showToCustomers: "Afișează clienților",
+      visibilityHelp:
+        "Selectează fotografia pentru viitoarea galerie a clienților. Dezactivarea elimină și selecția ei ca fotografie de copertă pentru clienți.",
+      cover: "Fotografie de copertă",
+      setInternalCover: "Setează ca fotografie de copertă internă",
+      setCustomerCover: "Setează ca fotografie de copertă pentru clienți",
+      customerCoverHelp:
+        "Selectează fotografia pentru clienți înainte de a o seta ca fotografie de copertă pentru ei.",
+      order: "Ordinea fotografiilor",
+      earlier: "Mută mai devreme",
+      later: "Mută mai târziu",
+      reorderHelp:
+        "Trage fotografiile în vizualizarea Toate pentru a schimba ordinea, sau deschide o fotografie și folosește Mută mai devreme / Mută mai târziu.",
+      uploading: "Se încarcă… {progress}%",
+      processing: "Se salvează fotografia…",
+      uploadFailed:
+        "Fotografia nu a fost salvată. Reîncearcă încărcarea sau elimin-o.",
+      imageFailed: "Fotografia nu a putut fi încărcată.",
+      retry: "Reîncearcă",
+      remove: "Elimină",
+      delete: "Șterge fotografia",
+      deleteConfirm:
+        "Ștergi această fotografie din galeria scuterului? Selecțiile ei ca fotografie de copertă vor fi eliminate.",
+      cancel: "Anulează",
+      errors: {
+        load: "Fotografiile nu au putut fi încărcate. Încearcă din nou.",
+        save: "Modificarea nu a putut fi salvată. Încearcă din nou; reîncarcă galeria dacă ordinea fotografiilor s-a schimbat.",
+        files:
+          "Alege maximum 20 de fotografii în total. Fiecare trebuie să fie JPEG, PNG sau WebP, de maximum 15 MB.",
+      },
+    },
     creation: {
       description:
         "Înregistrează un vehicul cu datele de identificare, documentele și înregistrarea inițială.",

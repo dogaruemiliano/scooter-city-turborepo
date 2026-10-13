@@ -41,7 +41,14 @@ import { CivMetadataFields } from "./CivMetadataFields";
 import { useScooterLicenseAutofill } from "./useScooterLicenseAutofill";
 import { useCivFieldHint } from "./useCivFieldHint";
 import { useCivVocabulary } from "./CivVocabularyContext";
-import { useContext, useEffect, useId, useState } from "react";
+import {
+  Fragment,
+  useContext,
+  useEffect,
+  useId,
+  useState,
+  type ReactNode,
+} from "react";
 import type { DocumentImportResult } from "./scooter-document-import";
 import type { DocumentSource } from "./scooter-document-sources";
 import { OPERATIONAL_FIELDS, type ScooterWizardStep } from "./scooter-wizard";
@@ -83,6 +90,7 @@ export function ScooterEditorFields({
   importSources,
   onApplyImport,
   importResult,
+  photos,
 }: {
   combinedReview?: boolean;
   onRetryAnalysis?: (sourceId: string) => void;
@@ -101,6 +109,7 @@ export function ScooterEditorFields({
   importSources?: DocumentSource[];
   onApplyImport?: (result: Extract<DocumentImportResult, { ok: true }>) => void;
   importResult?: Extract<DocumentImportResult, { ok: true }>;
+  photos?: ReactNode;
 }) {
   const t = useTranslations("scooters");
   const user = useOptionalSession()?.user;
@@ -292,6 +301,7 @@ export function ScooterEditorFields({
           key={step ?? "edit"}
           {...fieldProps}
           compact={Boolean(step) || combinedReview}
+          photos={photos}
           revealedFields={
             combinedReview ? Object.keys(importResult?.values ?? {}) : []
           }
@@ -312,6 +322,7 @@ export function ScooterEditorFields({
           <CivMetadataFields
             disabled={disabled || !canAccess(user, "scooter_documents.write")}
             compact={Boolean(step)}
+            number={photos ? 9 : undefined}
           />
         )
       ) : null}
@@ -330,6 +341,7 @@ export function ScooterEditorFields({
       ) : null}
       {!step || step === "insurance" ? (
         <ScooterInsuranceFields
+          number={photos ? (canReadDocuments ? 10 : 9) : undefined}
           disabled={disabled}
           fieldKeys={insurance.fields.map((field) => field.formKey)}
           onRemovePolicy={
@@ -346,7 +358,10 @@ export function ScooterEditorFields({
         />
       ) : null}
       {!step || step === "operational" ? (
-        <FormSection title={t("sections.operational")}>
+        <FormSection
+          title={t("sections.operational")}
+          number={photos ? (canReadDocuments ? 11 : 9) : undefined}
+        >
           {OPERATIONAL_FIELDS.map((name) => (
             <ScooterEditorFieldControl key={name} name={name} {...fieldProps} />
           ))}
@@ -360,11 +375,13 @@ export function ScooterTechnicalFields({
   compact,
   revealedFields = [],
   excludeFields = [],
+  photos,
   ...props
 }: EditorFieldProps & {
   compact: boolean;
   revealedFields?: string[];
   excludeFields?: readonly string[];
+  photos?: ReactNode;
 }) {
   const t = useTranslations("scooters");
   const {
@@ -416,16 +433,22 @@ export function ScooterTechnicalFields({
     ),
   );
   function renderSections(other: boolean) {
-    return sections.map((section) => {
+    return sections.map((section, index) => {
       const fields = section.fields.filter(
         (field) => !compact || visible.has(field) !== other,
       );
       return fields.length ? (
-        <FormSection key={section.title} title={t(`sections.${section.title}`)}>
-          {fields.map((name) => (
-            <ScooterEditorFieldControl key={name} name={name} {...props} />
-          ))}
-        </FormSection>
+        <Fragment key={section.title}>
+          <FormSection
+            title={t(`sections.${section.title}`)}
+            number={photos ? (index === 0 ? 1 : index + 2) : undefined}
+          >
+            {fields.map((name) => (
+              <ScooterEditorFieldControl key={name} name={name} {...props} />
+            ))}
+          </FormSection>
+          {index === 0 && !other ? photos : null}
+        </Fragment>
       ) : null;
     });
   }
