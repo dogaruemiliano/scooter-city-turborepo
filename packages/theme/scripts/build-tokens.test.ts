@@ -165,6 +165,16 @@ test("sheet-select rows are distinct while the sheet retains its popover surface
   assert.doesNotMatch(surface, /\bbg-background\b/);
 });
 
+test("snap-point sheets reserve offscreen height to keep the footer visible", () => {
+  const surface = readFileSync(
+    new URL("../../ui/src/components/bottom-sheet.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(surface, /data-snap-points:pb-\(--drawer-snap-point-offset\)/);
+  assert.match(surface, /lg:data-snap-points:pb-0/);
+  assert.doesNotMatch(surface, /\[--bottom-sheet-stack-offset:0\]/);
+});
+
 test("access workspace inherits every active theme color and exposes the requested type pairing", () => {
   const css = buildCss();
   const workspace = css.match(/\.access-workspace \{([^}]+)\}/)?.[1];

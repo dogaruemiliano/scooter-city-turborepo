@@ -9,6 +9,10 @@ import { ImageIcon, PlusIcon } from "lucide-react";
 import { useOptionalSession } from "@/components/auth/SessionProvider";
 import { canAccess } from "@/lib/access";
 import { webApi } from "@/lib/api";
+import { FileDropOverlay } from "@repo/ui/components/file-drop-overlay";
+import { useFileDrop } from "@repo/ui/hooks/use-file-drop";
+import { ImageViewer } from "@repo/ui/components/image-viewer";
+import { SortableGrid } from "@repo/ui/components/sortable-grid";
 import { useScooterPhotos } from "./useScooterPhotos";
 
 export function ScooterPhotos({
@@ -72,21 +76,29 @@ export function ScooterPhotoGallery({
 }) {
   const t = useTranslations("scooters.photos");
   const gallery = useScooterPhotos(scooterId);
+  const [activePhotoId, setActivePhotoId] = useState<string | null>(null);
+  const [sortingBusy, setSortingBusy] = useState(false);
   useEffect(() => {
-    onBusyChange?.(gallery.busy);
+    onBusyChange?.(gallery.busy || sortingBusy);
     return () => onBusyChange?.(false);
-  }, [gallery.busy, onBusyChange]);
+  }, [gallery.busy, sortingBusy, onBusyChange]);
   useEffect(() => {
-    onDraftsChange?.(gallery.drafts, gallery.blocked);
-  }, [gallery.drafts, gallery.blocked, onDraftsChange]);
+    onDraftsChange?.(gallery.drafts, gallery.blocked || sortingBusy);
+  }, [gallery.drafts, gallery.blocked, sortingBusy, onDraftsChange]);
   const input = useRef<HTMLInputElement>(null);
-  const [draggedId, setDraggedId] = useState<string | null>(null);
-  const busy = gallery.busy || disabled;
+  const busy = gallery.busy || disabled || sortingBusy;
   const photoCount = gallery.photos.length + gallery.uploads.length;
   const canUpload =
     editable && photoCount < v1.scooters.SCOOTER_PHOTO_MAX_FILES;
 
-  function uploadCard(label: string, cover = false) {
+  const { dragging: filesOverGrid, handlers: fileDropHandlers } = useFileDrop({
+    disabled: !canUpload || busy,
+    onFiles: (files) => {
+      void gallery.add(files);
+    },
+  });
+
+  function uploadCard(label: string) {
     return (
       <button
         key={label}
@@ -94,37 +106,12 @@ export function ScooterPhotoGallery({
         disabled={busy}
         style={{ aspectRatio: aspectRatio.scooterPhoto }}
         className="flex min-w-0 flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-border bg-transparent p-4 text-center text-sm font-medium text-muted-foreground transition-colors duration-normal ease-standard enabled:hover:border-primary enabled:active:border-primary enabled:active:border-solid focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-        onClick={() => {
-          if (!input.current) return;
-          input.current.multiple = !cover;
-          input.current.click();
-        }}
-        onDragOver={(event) => {
-          if (!busy && event.dataTransfer.types.includes("Files"))
-            event.preventDefault();
-        }}
-        onDrop={(event) => {
-          event.preventDefault();
-          if (busy) return;
-          const files = Array.from(event.dataTransfer.files);
-          if (files.length) void gallery.add(cover ? files.slice(0, 1) : files);
-        }}
+        onClick={() => input.current?.click()}
       >
         <PlusIcon aria-hidden="true" className="size-6" />
         <span>{label}</span>
       </button>
     );
-  }
-
-  function move(photoId: string, targetId: string) {
-    if (busy || photoId === targetId) return;
-    const ids = gallery.photos.map((photo) => photo.id);
-    const from = ids.indexOf(photoId);
-    const to = ids.indexOf(targetId);
-    if (from < 0 || to < 0) return;
-    ids.splice(from, 1);
-    ids.splice(to, 0, photoId);
-    void gallery.reorder(ids);
   }
 
   return (
@@ -178,27 +165,33 @@ export function ScooterPhotoGallery({
         ) : null}
         {!gallery.loading && gallery.error !== "load" ? (
           <>
-            <div className="grid min-w-0 grid-cols-2 gap-4 lg:grid-cols-3">
-              {!photoCount && canUpload ? uploadCard(t("cover"), true) : null}
-              {gallery.photos.map((photo) => (
-                <div
-                  key={photo.id}
-                  className="group min-w-0 overflow-hidden rounded-xl border border-border bg-control"
-                  draggable={editable && !busy}
-                  onDragStart={(event) => {
-                    setDraggedId(photo.id);
-                    event.dataTransfer.effectAllowed = "move";
-                  }}
-                  onDragEnd={() => setDraggedId(null)}
-                  onDragOver={(event) => {
-                    if (draggedId && !busy) event.preventDefault();
-                  }}
-                  onDrop={(event) => {
-                    event.preventDefault();
-                    if (draggedId && !busy) move(draggedId, photo.id);
-                    setDraggedId(null);
-                  }}
-                >
+            <div className="relative" {...fileDropHandlers}>
+              <SortableGrid
+                items={gallery.photos}
+                className="grid min-w-0 grid-cols-2 gap-4 lg:grid-cols-3"
+                disabled={
+                  !editable ||
+                  gallery.busy ||
+                  disabled ||
+                  gallery.uploads.length > 0
+                }
+                instructions={t("sortInstructions")}
+                onItemPress={(photo) => setActivePhotoId(photo.id)}
+                getItemLabel={(photo) =>
+                  t("open", { name: photo.caption || photo.fileName })
+                }
+                removal={
+                  editable
+                    ? {
+                        label: t("deleteDrop"),
+                        activeLabel: t("deleteDropActive"),
+                        onRemove: (photo) => gallery.remove(photo.id),
+                      }
+                    : undefined
+                }
+                onOrderChange={gallery.reorder}
+                onInteractionChange={setSortingBusy}
+                renderItem={(photo) => (
                   <div className="relative isolate overflow-hidden">
                     <PhotoImage
                       src={
@@ -212,69 +205,91 @@ export function ScooterPhotoGallery({
                       <PhotoBadges photo={photo} overlay />
                     </div>
                   </div>
-                </div>
-              ))}
-              {gallery.uploads.map((upload) => (
-                <div
-                  key={upload.id}
-                  className="min-w-0 overflow-hidden rounded-xl border border-border bg-control"
-                >
-                  <PhotoImage src={upload.preview} alt={upload.file.name} />
-                  <div className="grid gap-2 p-3">
-                    <p className="truncate text-sm font-medium">
-                      {upload.file.name}
-                    </p>
-                    {upload.status === "uploading" ? (
-                      <>
-                        <p
-                          role="status"
-                          className="text-xs text-muted-foreground"
-                        >
-                          {t(
-                            upload.progress === 100
-                              ? "processing"
-                              : "uploading",
-                            { progress: upload.progress },
-                          )}
+                )}
+              >
+                {!photoCount && canUpload ? uploadCard(t("cover")) : null}
+                {gallery.uploads.map((upload) => (
+                  <div
+                    key={upload.id}
+                    data-slot="photo-upload-preview"
+                    style={{ aspectRatio: aspectRatio.scooterPhoto }}
+                    className="relative min-w-0 overflow-hidden rounded-xl border border-border bg-control"
+                  >
+                    <div className="absolute inset-0">
+                      <PhotoImage src={upload.preview} alt={upload.file.name} />
+                    </div>
+                    <div
+                      data-slot="photo-upload-overlay"
+                      className="absolute inset-2 flex min-h-0 flex-col justify-end"
+                    >
+                      <div className="grid min-h-0 gap-2 overflow-y-auto rounded-lg bg-document-overlay p-2 text-foreground">
+                        <p className="truncate text-sm font-medium">
+                          {upload.file.name}
                         </p>
-                        <Progress
-                          value={upload.progress}
-                          aria-label={t("uploading", {
-                            progress: upload.progress,
-                          })}
-                        />
-                      </>
-                    ) : (
-                      <>
-                        <p role="alert" className="text-xs text-destructive">
-                          {t("uploadFailed")}
-                        </p>
-                        <div className="flex flex-wrap gap-2">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            disabled={busy}
-                            onClick={() => void gallery.retry(upload)}
-                          >
-                            {t("retry")}
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="ghost"
-                            disabled={busy}
-                            onClick={() => gallery.discard(upload)}
-                          >
-                            {t("remove")}
-                          </Button>
-                        </div>
-                      </>
-                    )}
+                        {upload.status === "uploading" ? (
+                          <>
+                            <p
+                              role="status"
+                              className="text-xs text-muted-foreground"
+                            >
+                              {t(
+                                upload.progress === 100
+                                  ? "processing"
+                                  : "uploading",
+                                { progress: upload.progress },
+                              )}
+                            </p>
+                            <Progress
+                              value={upload.progress}
+                              aria-label={t("uploading", {
+                                progress: upload.progress,
+                              })}
+                            />
+                          </>
+                        ) : (
+                          <>
+                            <p
+                              role="alert"
+                              className="text-xs text-destructive"
+                            >
+                              {t("uploadFailed")}
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                disabled={busy}
+                                onClick={() => void gallery.retry(upload)}
+                              >
+                                {t("retry")}
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                disabled={busy}
+                                onClick={() => gallery.discard(upload)}
+                              >
+                                {t("remove")}
+                              </Button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              ))}
-              {canUpload && photoCount > 0 ? uploadCard(t("addPhotos")) : null}
+                ))}
+                {canUpload && photoCount > 0
+                  ? uploadCard(t("addPhotos"))
+                  : null}
+              </SortableGrid>
+              {filesOverGrid && canUpload && !busy ? (
+                <FileDropOverlay
+                  label={t("dropOverlay")}
+                  icon={<ImageIcon aria-hidden="true" className="size-8" />}
+                />
+              ) : null}
             </div>
             {!editable && !photoCount ? (
               <p className="text-sm text-muted-foreground">
@@ -284,6 +299,34 @@ export function ScooterPhotoGallery({
           </>
         ) : null}
       </div>
+      <ImageViewer
+        open={activePhotoId !== null}
+        onOpenChange={(open) => {
+          if (!open) setActivePhotoId(null);
+        }}
+        activeId={activePhotoId}
+        onActiveIdChange={setActivePhotoId}
+        title={t("details")}
+        images={gallery.photos.map((photo) => ({
+          id: photo.id,
+          src: scooterId ? webApi.url(photo.contentUrl) : photo.contentUrl,
+          alt: photo.caption || photo.fileName,
+          fileName: photo.fileName,
+        }))}
+        labels={{
+          close: t("close"),
+          previous: t("previous"),
+          next: t("next"),
+          grid: t("grid"),
+          zoomIn: t("zoomIn"),
+          zoomOut: t("zoomOut"),
+          resetZoom: t("resetZoom"),
+          loading: t("imageLoading"),
+          error: t("imageFailed"),
+          retry: t("retry"),
+          position: (index, count) => t("position", { index, count }),
+        }}
+      />
     </FormSection>
   );
 }
@@ -302,13 +345,10 @@ function PhotoBadges({
         variant="outline"
         className={overlay ? "bg-popover text-popover-foreground" : undefined}
       >
-        {t(photo.showToCustomers ? "selectedForCustomers" : "internal")}
+        {t(photo.isPublic ? "public" : "internal")}
       </Badge>
-      {photo.internalCover ? (
-        <Badge variant="secondary">{t("internalCover")}</Badge>
-      ) : null}
-      {photo.customerCover ? (
-        <Badge variant="secondary">{t("customerCover")}</Badge>
+      {photo.type === "GALLERY_COVER" ? (
+        <Badge variant="secondary">{t("coverBadge")}</Badge>
       ) : null}
     </div>
   );

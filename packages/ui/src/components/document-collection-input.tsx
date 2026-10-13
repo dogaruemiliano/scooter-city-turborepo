@@ -8,6 +8,8 @@ import type {
   DocumentCollectionLabels,
   DocumentInputItem,
 } from "./document-input";
+import { FileDropOverlay } from "./file-drop-overlay";
+import { useFileDrop } from "../hooks/use-file-drop";
 import { DocumentPreview } from "./document-preview";
 import { DocumentViewer } from "./document-viewer";
 
@@ -43,6 +45,10 @@ export function DocumentCollectionInput({
   const replacementId = useRef<string | null>(null);
   const sequence = useRef(0);
   const [open, setOpen] = useState(false);
+  const [documentDirection, setDocumentDirection] = useState<-1 | 1>();
+  const [initialPdfPage, setInitialPdfPage] = useState<"first" | "last">(
+    "first",
+  );
   const [activeId, setActiveId] = useState<string | null>(null);
   const [pending, setPending] = useState<DocumentInputItem[]>([]);
   const [replacements, setReplacements] = useState<Record<string, File>>({});
@@ -68,7 +74,18 @@ export function DocumentCollectionInput({
   const failed = values.find((item) => item.uploadError);
   const status = values.find((item) => item.status)?.status;
 
+  function moveDocument(direction: -1 | 1) {
+    const item = items[activeIndex + direction];
+    if (!item) return;
+    setDocumentDirection(direction);
+    setInitialPdfPage(direction < 0 ? "last" : "first");
+    setActiveId(item.id);
+    setError(null);
+  }
+
   function close() {
+    setDocumentDirection(undefined);
+    setInitialPdfPage("first");
     setOpen(false);
     setPending([]);
     setReplacements({});
@@ -166,6 +183,10 @@ export function DocumentCollectionInput({
     close();
   }
 
+  const { dragging, handlers } = useFileDrop({
+    disabled,
+    onFiles: add,
+  });
   const addButton = (className?: string) => (
     <Button
       type="button"
@@ -185,11 +206,7 @@ export function DocumentCollectionInput({
       data-slot="document-input"
       data-multiple="true"
       className="min-w-0"
-      onDragOver={(event) => event.preventDefault()}
-      onDrop={(event) => {
-        event.preventDefault();
-        add(Array.from(event.dataTransfer.files));
-      }}
+      {...handlers}
     >
       <input
         ref={input}
@@ -217,6 +234,9 @@ export function DocumentCollectionInput({
         }}
       />
       <div className="relative">
+        {dragging ? (
+          <FileDropOverlay label={labels.add} className="rounded-lg" />
+        ) : null}
         <DocumentPreview
           id={id}
           src={coverSrc}
@@ -283,6 +303,12 @@ export function DocumentCollectionInput({
         onOpenChange={(next) => {
           if (!next) close();
         }}
+        entryDirection={documentDirection}
+        initialPdfPage={initialPdfPage}
+        onPrevious={activeIndex > 0 ? () => moveDocument(-1) : undefined}
+        onNext={
+          activeIndex < items.length - 1 ? () => moveDocument(1) : undefined
+        }
         src={activeSrc}
         contentType={active?.contentType}
         fileName={active?.fileName}
@@ -316,8 +342,7 @@ export function DocumentCollectionInput({
               aria-label={labels.previousDocument}
               disabled={activeIndex === 0}
               onClick={() => {
-                setActiveId(items[activeIndex - 1]!.id);
-                setError(null);
+                moveDocument(-1);
               }}
             >
               <ChevronLeftIcon aria-hidden="true" className="size-5" />
@@ -335,8 +360,7 @@ export function DocumentCollectionInput({
               aria-label={labels.nextDocument}
               disabled={activeIndex >= items.length - 1}
               onClick={() => {
-                setActiveId(items[activeIndex + 1]!.id);
-                setError(null);
+                moveDocument(1);
               }}
             >
               <ChevronRightIcon aria-hidden="true" className="size-5" />

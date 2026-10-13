@@ -1,6 +1,13 @@
+import { aspectRatio } from "@repo/theme";
 import { v1 } from "@repo/api-shared";
 import { messages } from "@repo/i18n";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import {
+  act,
+  render,
+  screen,
+  waitFor,
+  fireEvent,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -21,9 +28,9 @@ const photo = (
   id,
   fileName: `${id}.jpg`,
   caption: null,
-  showToCustomers: false,
-  internalCover: id === "one",
-  customerCover: false,
+  isPublic: false,
+  type: id === "one" ? "GALLERY_COVER" : "GALLERY",
+
   position: id === "one" ? 0 : 1,
   contentUrl: `/v1/scooters/scooter-1/photos/${id}/content`,
   createdAt: "2026-10-13T10:00:00Z",
@@ -42,15 +49,142 @@ function renderGallery(editable = true, locale: "en" | "ro" = "en") {
 beforeEach(() => {
   mocks.fetch
     .mockReset()
-    .mockResolvedValue([photo("one"), photo("two", { showToCustomers: true })]);
+    .mockResolvedValue([photo("one"), photo("two", { isPublic: true })]);
   Object.defineProperty(window, "PointerEvent", {
     configurable: true,
     value: MouseEvent,
   });
 });
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
 
 describe("Scooter photo gallery", () => {
+  it("shows one Cover badge independently of public visibility", async () => {
+    mocks.fetch.mockResolvedValue([
+      photo("one", { isPublic: true }),
+      photo("two"),
+    ]);
+    renderGallery(false);
+    const image = await screen.findByAltText("one.jpg");
+    const item = image.closest('[data-sortable-id="one"]')!;
+    expect(item).toContainElement(screen.getByText("Cover"));
+    expect(item).toContainElement(screen.getByText("Public"));
+    expect(screen.getAllByText("Cover")).toHaveLength(1);
+    expect(screen.queryByText("Internal cover")).toBeNull();
+    expect(screen.queryByText("Customer cover")).toBeNull();
+  });
+
+  it.each([true, false])(
+    "deletes through the existing API and retains photos on failure (success: %s)",
+    async (success) => {
+      mocks.fetch.mockImplementation(async (_path, _schema, options) => {
+        if (options?.method === "DELETE") {
+          if (!success) throw new Error("Delete failed");
+          return [photo("one")];
+        }
+        return [photo("one"), photo("two")];
+      });
+      Object.defineProperty(Element.prototype, "getAnimations", {
+        configurable: true,
+        value: () => [],
+      });
+      Object.defineProperty(Element.prototype, "animate", {
+        configurable: true,
+        value: () => ({
+          finished: Promise.resolve(),
+          cancel() {},
+          finish() {},
+          addEventListener() {},
+          removeEventListener() {},
+        }),
+      });
+      Object.defineProperty(document, "getAnimations", {
+        configurable: true,
+        value: () => [],
+      });
+      vi.stubGlobal(
+        "IntersectionObserver",
+        class {
+          observe() {}
+          unobserve() {}
+          disconnect() {}
+          takeRecords() {
+            return [];
+          }
+        },
+      );
+      vi.spyOn(
+        HTMLElement.prototype,
+        "getBoundingClientRect",
+      ).mockImplementation(function (this: HTMLElement) {
+        if (this.dataset.slot === "sortable-delete-reveal")
+          return DOMRect.fromRect({ x: 0, y: 284, width: 240, height: 96 });
+        if (this.dataset.slot === "sortable-delete-area")
+          return DOMRect.fromRect({ x: 0, y: 300, width: 240, height: 80 });
+        const index = Array.from(
+          document.querySelectorAll("[data-sortable-id]"),
+        ).indexOf(this);
+        return DOMRect.fromRect({
+          x: index >= 0 ? index * 120 : 0,
+          y: 0,
+          width: index >= 0 ? 100 : 240,
+          height: index >= 0 ? 100 : 240,
+        });
+      });
+      renderGallery();
+      const card = await screen.findByRole("button", {
+        name: "Open photo: two.jpg",
+      });
+      card.focus();
+      fireEvent.keyDown(card, { key: " ", code: "Space" });
+      await waitFor(() => expect(card).toHaveAttribute("aria-pressed", "true"));
+      fireEvent.keyDown(card, { key: "ArrowDown", code: "ArrowDown" });
+      await screen.findByText("Release to delete this photo");
+      fireEvent.keyDown(card, { key: " ", code: "Space" });
+      await waitFor(() =>
+        expect(mocks.fetch).toHaveBeenCalledWith(
+          routes.photo("scooter-1", "two"),
+          expect.anything(),
+          expect.objectContaining({ method: "DELETE" }),
+        ),
+      );
+      if (success)
+        await waitFor(() =>
+          expect(screen.queryByAltText("two.jpg")).toBeNull(),
+        );
+      else {
+        expect(await screen.findByRole("alert")).toHaveTextContent(
+          "The change couldn’t be saved",
+        );
+        expect(screen.getByAltText("two.jpg")).toBeInTheDocument();
+      }
+      expect(screen.queryByRole("dialog")).toBeNull();
+    },
+  );
+
+  it.each([true, false])(
+    "opens photos and navigates in the shared viewer (editable: %s)",
+    async (editable) => {
+      const user = userEvent.setup();
+      renderGallery(editable);
+      await user.click(
+        await screen.findByRole("button", { name: "Open photo: two.jpg" }),
+      );
+      const dialog = screen.getByRole("dialog");
+      expect(dialog).toHaveAttribute("data-slot", "image-viewer");
+      expect(dialog.querySelector("img")).toHaveAttribute(
+        "src",
+        "http://localhost:3000/v1/scooters/scooter-1/photos/two/content",
+      );
+      await user.click(screen.getByRole("button", { name: "Previous photo" }));
+      expect(dialog.querySelector("img")).toHaveAttribute("alt", "one.jpg");
+      await user.click(screen.getByRole("button", { name: "Close photo" }));
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    },
+  );
+
   it("uploads create-form photos privately and keeps their settings until submission", async () => {
     vi.stubGlobal("crypto", webcrypto);
     vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:draft-preview");
@@ -105,9 +239,8 @@ describe("Scooter photo gallery", () => {
             uploadToken: "draft-token",
             fileName: "draft.jpg",
             caption: null,
-            showToCustomers: false,
-            internalCover: true,
-            customerCover: false,
+            isPublic: false,
+            type: "GALLERY_COVER",
           },
         ],
         false,
@@ -119,6 +252,96 @@ describe("Scooter photo gallery", () => {
     );
     expect(mocks.fetch).toHaveBeenCalledTimes(1);
     expect(mocks.fetch.mock.calls[0]?.[0]).toBe(routes.draftUpload);
+  });
+
+  it("keeps upload and processing progress inside the fixed-size image preview", async () => {
+    vi.stubGlobal("crypto", webcrypto);
+    vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:upload-preview");
+    vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+    const requests: UploadRequest[] = [];
+    let attach!: (photos: v1.scooters.ScooterPhoto[]) => void;
+    class UploadRequest {
+      upload = {
+        onprogress: null as
+          | null
+          | ((event: {
+              lengthComputable: boolean;
+              loaded: number;
+              total: number;
+            }) => void),
+      };
+      status = 200;
+      onload: (() => void) | null = null;
+      onloadend: (() => void) | null = null;
+      constructor() {
+        requests.push(this);
+      }
+      open() {}
+      setRequestHeader() {}
+      abort() {}
+      send() {}
+    }
+    vi.stubGlobal("XMLHttpRequest", UploadRequest);
+    mocks.fetch.mockImplementation(
+      async (path: string, _schema: unknown, options?: { method?: string }) => {
+        if (path.endsWith("/upload-url"))
+          return {
+            uploadUrl: "https://uploads.example/photo",
+            uploadToken: "token",
+            headers: {},
+            maxBytes: 1000,
+          };
+        if (options?.method === "POST")
+          return new Promise<v1.scooters.ScooterPhoto[]>((resolve) => {
+            attach = resolve;
+          });
+        return [];
+      },
+    );
+    renderGallery();
+    await screen.findByRole("button", { name: "Cover photo" });
+    const file = new File(["image"], "upload.jpg", { type: "image/jpeg" });
+    Object.defineProperty(file, "arrayBuffer", {
+      value: async () => new TextEncoder().encode("image").buffer,
+    });
+    await userEvent
+      .setup()
+      .upload(
+        screen.getByLabelText("Upload photos", { selector: "input" }),
+        file,
+      );
+    await waitFor(() => expect(requests).toHaveLength(1));
+    const request = requests[0]!;
+    const preview = (await screen.findByAltText("upload.jpg")).closest(
+      '[data-slot="photo-upload-preview"]',
+    )!;
+    const overlay = preview.querySelector(
+      '[data-slot="photo-upload-overlay"]',
+    )!;
+    expect(preview).toHaveStyle({ aspectRatio: aspectRatio.scooterPhoto });
+    expect(overlay).toHaveClass("absolute", "inset-2");
+    await act(async () => {
+      request.upload.onprogress?.({
+        lengthComputable: true,
+        loaded: 5,
+        total: 10,
+      });
+    });
+    expect(screen.getByRole("progressbar")).toHaveAttribute(
+      "aria-valuenow",
+      "50",
+    );
+    expect(overlay).toContainElement(screen.getByRole("progressbar"));
+    await act(async () => {
+      request.onload?.();
+      request.onloadend?.();
+    });
+    expect(await screen.findByText("Saving photo…")).toBeInTheDocument();
+    expect(overlay).toContainElement(screen.getByText("Saving photo…"));
+    expect(preview).toHaveStyle({ aspectRatio: aspectRatio.scooterPhoto });
+    await act(async () => attach([photo("one")]));
+    expect(await screen.findByAltText("one.jpg")).toBeInTheDocument();
+    expect(screen.queryByRole("progressbar")).toBeNull();
   });
 
   it("keeps failed upload previews and retries the attachment without reuploading bytes", async () => {
@@ -193,6 +416,15 @@ describe("Scooter photo gallery", () => {
       "src",
       "blob:photo-preview",
     );
+    const failedPreview = screen
+      .getByAltText("scooter.jpg")
+      .closest('[data-slot="photo-upload-preview"]')!;
+    expect(failedPreview).toHaveStyle({
+      aspectRatio: aspectRatio.scooterPhoto,
+    });
+    expect(
+      failedPreview.querySelector('[data-slot="photo-upload-overlay"]'),
+    ).toContainElement(screen.getByRole("button", { name: "Retry" }));
     await user.click(screen.getByRole("button", { name: "Retry" }));
     await screen.findByAltText("one.jpg");
     expect(send).toHaveBeenCalledTimes(1);
@@ -212,14 +444,15 @@ describe("Scooter photo gallery", () => {
     expect(grid.children[0]).toContainElement(first);
     expect(grid.children[1]).toContainElement(second);
     expect(grid.children[2]).toBe(add);
-    expect(first.parentElement).toContainElement(
-      screen.getByText("Internal cover"),
-    );
+    expect(first.parentElement).toContainElement(screen.getByText("Cover"));
     expect(
       screen.queryByText(/customer gallery isn’t live yet/),
     ).not.toBeInTheDocument();
     await user.click(first);
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByRole("dialog")).toHaveAttribute(
+      "data-slot",
+      "image-viewer",
+    );
     expect(mocks.fetch).toHaveBeenCalledTimes(1);
   });
 
@@ -237,7 +470,43 @@ describe("Scooter photo gallery", () => {
       selector: "input",
     });
     await user.click(cover);
-    expect(picker).not.toHaveAttribute("multiple");
+    expect(picker).toHaveAttribute("multiple");
+  });
+
+  it("covers the whole grid for external files, survives child crossings, and accepts drops over photos", async () => {
+    renderGallery();
+    const image = await screen.findByAltText("one.jpg");
+    const transfer = {
+      types: ["Files"],
+      files: [new File(["pdf"], "bad.pdf", { type: "application/pdf" })],
+    };
+    fireEvent.dragEnter(image, { dataTransfer: transfer });
+    const overlay = screen
+      .getByText("Drop it like it's hot")
+      .closest("[data-slot=file-drop-overlay]")!;
+    expect(overlay).toHaveClass("absolute", "inset-0", "pointer-events-none");
+    fireEvent.dragEnter(screen.getByAltText("two.jpg"), {
+      dataTransfer: transfer,
+    });
+    fireEvent.dragLeave(image, { dataTransfer: transfer });
+    expect(screen.getByText("Drop it like it's hot")).toBeInTheDocument();
+    fireEvent.drop(image, { dataTransfer: transfer });
+    expect(screen.queryByText("Drop it like it's hot")).not.toBeInTheDocument();
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Each must be a JPEG",
+    );
+    expect(mocks.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("hides the file overlay on leave and ignores photo reordering drags", async () => {
+    renderGallery();
+    const image = await screen.findByAltText("one.jpg");
+    fireEvent.dragEnter(image, { dataTransfer: { types: ["text/plain"] } });
+    expect(screen.queryByText("Drop it like it's hot")).not.toBeInTheDocument();
+    fireEvent.dragEnter(image, { dataTransfer: { types: ["Files"] } });
+    expect(screen.getByText("Drop it like it's hot")).toBeInTheDocument();
+    fireEvent.dragLeave(image, { dataTransfer: { types: ["Files"] } });
+    expect(screen.queryByText("Drop it like it's hot")).not.toBeInTheDocument();
   });
 
   it("accepts dropped files through the add card and validates them", async () => {

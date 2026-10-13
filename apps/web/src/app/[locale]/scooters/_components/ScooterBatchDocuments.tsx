@@ -19,6 +19,8 @@ import {
   SelectValue,
   Spinner,
 } from "@repo/ui/components";
+import { FileDropOverlay } from "@repo/ui/components/file-drop-overlay";
+import { useFileDrop } from "@repo/ui/hooks/use-file-drop";
 import { DocumentViewer } from "@repo/ui/components/document-viewer";
 import { useObjectUrl } from "@repo/ui/hooks/use-object-url";
 import { CheckIcon, FileTextIcon, SparklesIcon, XIcon } from "lucide-react";
@@ -56,7 +58,6 @@ export function ScooterBatchDocuments({
   const extraction = useTranslations("scooters.extraction");
   const [errors, setErrors] = useState<string[]>([]);
   const [expandedImport, setExpandedImport] = useState<typeof importResult>();
-  const [dragging, setDragging] = useState(false);
   const analysisEntries = useContext(ScooterDocumentAnalysisContext);
   const compact =
     documents.existing.length + documents.drafts.length > 0 &&
@@ -91,6 +92,14 @@ export function ScooterBatchDocuments({
       ),
     })),
   ];
+  const { dragging, handlers: fileDropHandlers } = useFileDrop({
+    disabled,
+    onFiles: (files) => {
+      setExpandedImport(importResult);
+      add(files);
+    },
+  });
+
   if (!canWrite) return null;
 
   function add(files: File[]) {
@@ -187,33 +196,20 @@ export function ScooterBatchDocuments({
               <Button
                 type="button"
                 variant="outline"
-                className={`w-full justify-center border-dashed text-center duration-normal enabled:hover:border-primary enabled:active:border-primary enabled:active:border-solid ${dragging && !disabled ? "border-primary bg-accent text-accent-foreground" : "bg-transparent"}`}
+                className="relative w-full justify-center border-dashed bg-transparent text-center duration-normal enabled:hover:border-primary enabled:active:border-primary enabled:active:border-solid"
                 disabled={disabled}
+                aria-label={creation("importMore")}
                 onClick={() => setExpandedImport(importResult)}
-                onDragOver={(event) => {
-                  if (!event.dataTransfer.types.includes("Files")) return;
-                  event.preventDefault();
-                  if (!disabled) setDragging(true);
-                }}
-                onDragLeave={(event) => {
-                  if (
-                    !event.currentTarget.contains(
-                      event.relatedTarget instanceof Node
-                        ? event.relatedTarget
-                        : null,
-                    )
-                  )
-                    setDragging(false);
-                }}
-                onDrop={(event) => {
-                  event.preventDefault();
-                  setDragging(false);
-                  if (disabled || !event.dataTransfer.files.length) return;
-                  setExpandedImport(importResult);
-                  add(Array.from(event.dataTransfer.files));
-                }}
+                {...fileDropHandlers}
               >
                 {creation("importMore")}
+                {dragging ? (
+                  <FileDropOverlay
+                    compact
+                    label={creation("importMore")}
+                    className="rounded-lg"
+                  />
+                ) : null}
               </Button>
             </li>
           </ul>

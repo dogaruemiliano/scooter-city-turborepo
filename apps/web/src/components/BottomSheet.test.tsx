@@ -3,7 +3,7 @@ import {
   BottomSheetContent,
   BottomSheetTitle,
 } from "@repo/ui/components/bottom-sheet";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { describe, expect, it } from "vitest";
@@ -21,6 +21,39 @@ function Example({ dismissible = true }: { dismissible?: boolean }) {
 }
 
 describe("shared bottom-sheet dismissal", () => {
+  it("keeps a scrolled list gesture separate from the next swipe at the top", () => {
+    render(
+      <BottomSheet open>
+        <BottomSheetContent>
+          <BottomSheetTitle>Scrollable options</BottomSheetTitle>
+          <div data-testid="list" style={{ overflowY: "auto" }}>
+            <span>Option</span>
+          </div>
+        </BottomSheetContent>
+      </BottomSheet>,
+    );
+    const list = screen.getByTestId("list");
+    Object.defineProperties(list, {
+      scrollHeight: { value: 600 },
+      clientHeight: { value: 200 },
+    });
+    const viewport = list.closest('[data-slot="bottom-sheet-viewport"]')!;
+    list.scrollTop = 80;
+    fireEvent.touchStart(screen.getByText("Option"), { touches: [] });
+    expect(viewport).toHaveAttribute("data-base-ui-swipe-ignore");
+    list.scrollTop = 0;
+    fireEvent.touchMove(list, { touches: [] });
+    expect(viewport).toHaveAttribute("data-base-ui-swipe-ignore");
+    fireEvent.touchEnd(list, { touches: [] });
+    expect(viewport).not.toHaveAttribute("data-base-ui-swipe-ignore");
+    fireEvent.touchStart(list, { touches: [] });
+    expect(viewport).not.toHaveAttribute("data-base-ui-swipe-ignore");
+    list.scrollTop = 80;
+    fireEvent.touchStart(list, { touches: [] });
+    fireEvent.touchCancel(list);
+    expect(viewport).not.toHaveAttribute("data-base-ui-swipe-ignore");
+  });
+
   it("keeps ordinary sheets dismissible with Escape", async () => {
     render(<Example />);
     await userEvent.setup().keyboard("{Escape}");

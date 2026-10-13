@@ -9,11 +9,31 @@ import { PrismaService } from "../prisma/prisma.service";
 import { ImageStorageService } from "../image-storage/image-storage.service";
 import type { StoredImage } from "../image-storage/image-storage.types";
 
+const galleryTypes = [...v1.scooters.SCOOTER_GALLERY_PHOTO_TYPES];
+const galleryFilter = { type: { in: galleryTypes } };
+
 const purpose = (id: string) => `scooter-photo:${id}`;
 const scope = (id: string, userId: string) => `${purpose(id)}:${userId}`;
 const draftPurpose = "scooter-photo-draft";
 const draftScope = (userId: string) => `${draftPurpose}:${userId}`;
 type PreparedPhoto = v1.scooters.ScooterPhotoDraft & { stored: StoredImage };
+
+function photoAssetData(
+  stored: StoredImage,
+  uploadedByUserId?: string,
+): Prisma.MediaAssetUncheckedCreateWithoutScooterPhotosInput {
+  // Storage completion also returns document metadata at runtime. Only these
+  // fields belong to MediaAsset; spreading the response passes invalid fields.
+  return {
+    provider: stored.provider,
+    bucket: stored.bucket,
+    storageKey: stored.storageKey,
+    contentType: stored.contentType,
+    byteSize: stored.byteSize,
+    checksumSha256: stored.checksumSha256,
+    uploadedByUserId,
+  };
+}
 
 @Injectable()
 export class ScooterPhotosService {
@@ -44,20 +64,29 @@ export class ScooterPhotosService {
   async list(id: string) {
     await this.requireScooter(id);
     const photos = await this.prisma.scooterPhoto.findMany({
-      where: { scooterId: id, deletedAt: null, asset: { deletedAt: null } },
+      where: {
+        scooterId: id,
+        deletedAt: null,
+        ...galleryFilter,
+        asset: { deletedAt: null },
+      },
       orderBy: [{ position: "asc" }, { id: "asc" }],
     });
-    return photos.map((photo) => ({
-      id: photo.id,
-      fileName: photo.fileName,
-      caption: photo.caption,
-      position: photo.position,
-      showToCustomers: photo.showToCustomers,
-      internalCover: photo.internalCover,
-      customerCover: photo.customerCover,
-      contentUrl: v1.scooters.ROUTES.photos.content(id, photo.id),
-      createdAt: photo.createdAt.toISOString(),
-    }));
+    return photos.flatMap((photo) => {
+      if (photo.type !== "GALLERY" && photo.type !== "GALLERY_COVER") return [];
+      return [
+        {
+          id: photo.id,
+          fileName: photo.fileName,
+          caption: photo.caption,
+          position: photo.position,
+          isPublic: photo.isPublic,
+          type: photo.type,
+          contentUrl: v1.scooters.ROUTES.photos.content(id, photo.id),
+          createdAt: photo.createdAt.toISOString(),
+        },
+      ];
+    });
   }
 
   async createUpload(
@@ -67,7 +96,7 @@ export class ScooterPhotosService {
   ) {
     await this.requireScooter(id);
     const count = await this.prisma.scooterPhoto.count({
-      where: { scooterId: id, deletedAt: null },
+      where: { scooterId: id, deletedAt: null, ...galleryFilter },
     });
     if (count >= v1.scooters.SCOOTER_PHOTO_MAX_FILES)
       throw new BadRequestException("Too many scooter photos");
@@ -158,7 +187,7 @@ export class ScooterPhotosService {
     photos: PreparedPhoto[],
     userId?: string,
   ) {
-    const hasCover = photos.some((photo) => photo.internalCover);
+    const hasCover = photos.some((photo) => photo.type === "GALLERY_COVER");
     if (photos.length && !userId)
       throw new BadRequestException("Photo uploads require an owner");
     for (const [position, photo] of photos.entries()) {
@@ -189,10 +218,12 @@ export class ScooterPhotosService {
           fileName: photo.fileName,
           caption: photo.caption,
           position,
-          internalCover: photo.internalCover || (!hasCover && position === 0),
-          showToCustomers: photo.showToCustomers,
-          customerCover: photo.customerCover,
-          asset: { create: { ...photo.stored, uploadedByUserId: userId } },
+          type:
+            photo.type === "GALLERY_COVER" || (!hasCover && position === 0)
+              ? "GALLERY_COVER"
+              : "GALLERY",
+          isPublic: photo.isPublic,
+          asset: { create: photoAssetData(photo.stored, userId) },
         },
       });
     }
@@ -215,13 +246,14 @@ export class ScooterPhotosService {
         where: {
           scooterId: id,
           deletedAt: null,
+          ...galleryFilter,
           asset: { storageKey: stored.storageKey, uploadedByUserId: userId },
         },
       });
       if (existing) return;
       const photos = await tx.scooterPhoto.findMany({
-        where: { scooterId: id, deletedAt: null },
-        select: { position: true, internalCover: true },
+        where: { scooterId: id, deletedAt: null, ...galleryFilter },
+        select: { position: true, type: true },
       });
       if (photos.length >= v1.scooters.SCOOTER_PHOTO_MAX_FILES)
         throw new BadRequestException("Too many scooter photos");
@@ -253,8 +285,10 @@ export class ScooterPhotosService {
           position:
             photos.reduce((max, photo) => Math.max(max, photo.position), -1) +
             1,
-          internalCover: !photos.some((photo) => photo.internalCover),
-          asset: { create: { ...stored, uploadedByUserId: userId } },
+          type: photos.some((photo) => photo.type === "GALLERY_COVER")
+            ? "GALLERY"
+            : "GALLERY_COVER",
+          asset: { create: photoAssetData(stored, userId) },
         },
       });
     });
@@ -269,28 +303,21 @@ export class ScooterPhotosService {
     await this.prisma.$transaction(async (tx) => {
       await this.lock(tx, id);
       const photo = await tx.scooterPhoto.findFirst({
-        where: { id: photoId, scooterId: id, deletedAt: null },
-      });
-      if (!photo) throw new NotFoundException("Photo not found");
-      const showToCustomers = input.showToCustomers ?? photo.showToCustomers;
-      if (input.customerCover && !showToCustomers)
-        throw new BadRequestException(
-          "Customer cover must be selected for customers",
-        );
-      for (const field of ["internalCover", "customerCover"] as const) {
-        if (input[field])
-          await tx.scooterPhoto.updateMany({
-            where: { scooterId: id, deletedAt: null, [field]: true },
-            data: { [field]: false },
-          });
-      }
-      await tx.scooterPhoto.update({
-        where: { id: photoId },
-        data: {
-          ...input,
-          ...(showToCustomers ? {} : { customerCover: false }),
+        where: {
+          id: photoId,
+          scooterId: id,
+          deletedAt: null,
+          ...galleryFilter,
         },
       });
+      if (!photo) throw new NotFoundException("Photo not found");
+      if (input.type === "GALLERY_COVER") {
+        await tx.scooterPhoto.updateMany({
+          where: { scooterId: id, deletedAt: null, type: "GALLERY_COVER" },
+          data: { type: "GALLERY" },
+        });
+      }
+      await tx.scooterPhoto.update({ where: { id: photoId }, data: input });
     });
     return this.list(id);
   }
@@ -299,7 +326,7 @@ export class ScooterPhotosService {
     await this.prisma.$transaction(async (tx) => {
       await this.lock(tx, id);
       const photos = await tx.scooterPhoto.findMany({
-        where: { scooterId: id, deletedAt: null },
+        where: { scooterId: id, deletedAt: null, ...galleryFilter },
         select: { id: true },
       });
       const ids = new Set(photoIds);
@@ -324,27 +351,31 @@ export class ScooterPhotosService {
     await this.prisma.$transaction(async (tx) => {
       await this.lock(tx, id);
       const photo = await tx.scooterPhoto.findFirst({
-        where: { id: photoId, scooterId: id, deletedAt: null },
+        where: {
+          id: photoId,
+          scooterId: id,
+          deletedAt: null,
+          ...galleryFilter,
+        },
       });
       if (!photo) throw new NotFoundException("Photo not found");
       await tx.scooterPhoto.update({
         where: { id: photoId },
         data: {
           deletedAt: new Date(),
-          internalCover: false,
-          customerCover: false,
+          type: "GALLERY",
         },
       });
-      // Keep an internal identifier when the previous cover is removed.
-      if (photo.internalCover) {
+      // Keep a gallery cover when the previous cover is removed.
+      if (photo.type === "GALLERY_COVER") {
         const next = await tx.scooterPhoto.findFirst({
-          where: { scooterId: id, deletedAt: null },
+          where: { scooterId: id, deletedAt: null, ...galleryFilter },
           orderBy: [{ position: "asc" }, { id: "asc" }],
         });
         if (next)
           await tx.scooterPhoto.update({
             where: { id: next.id },
-            data: { internalCover: true },
+            data: { type: "GALLERY_COVER" },
           });
       }
     });
@@ -357,6 +388,7 @@ export class ScooterPhotosService {
         id: photoId,
         scooterId: id,
         deletedAt: null,
+        ...galleryFilter,
         scooter: { deletedAt: null },
         asset: { deletedAt: null },
       },

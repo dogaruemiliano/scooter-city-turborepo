@@ -8,13 +8,26 @@ export const SCOOTER_PHOTO_CONTENT_TYPES = [
   "image/webp",
 ] as const;
 
+/** Rental evidence is stored separately and is never part of gallery endpoints. */
+export const SCOOTER_PHOTO_TYPES = [
+  "GALLERY",
+  "GALLERY_COVER",
+  "RENTAL_BEFORE",
+  "RENTAL_AFTER",
+] as const;
+export const SCOOTER_GALLERY_PHOTO_TYPES = [
+  "GALLERY",
+  "GALLERY_COVER",
+] as const;
+export const scooterPhotoTypeSchema = z.enum(SCOOTER_PHOTO_TYPES);
+export type ScooterPhotoType = z.infer<typeof scooterPhotoTypeSchema>;
+
 export const scooterPhotoSchema = z.object({
   id: z.string(),
   fileName: z.string(),
   caption: z.string().nullable(),
-  showToCustomers: z.boolean(),
-  internalCover: z.boolean(),
-  customerCover: z.boolean(),
+  isPublic: z.boolean(),
+  type: z.enum(SCOOTER_GALLERY_PHOTO_TYPES),
   position: z.number().int().nonnegative(),
   contentUrl: z.string(),
   createdAt: z.string(),
@@ -43,9 +56,8 @@ export const attachScooterPhotoSchema = z.object({
 export type AttachScooterPhoto = z.infer<typeof attachScooterPhotoSchema>;
 export const scooterPhotoDraftSchema = attachScooterPhotoSchema.extend({
   caption: z.string().trim().max(500).nullable(),
-  showToCustomers: z.boolean(),
-  internalCover: z.boolean(),
-  customerCover: z.boolean(),
+  isPublic: z.boolean(),
+  type: z.enum(SCOOTER_GALLERY_PHOTO_TYPES),
 });
 export type ScooterPhotoDraft = z.infer<typeof scooterPhotoDraftSchema>;
 export const scooterPhotoDraftsSchema = z
@@ -58,20 +70,13 @@ export const scooterPhotoDraftsSchema = z
   )
   .refine(
     (photos) =>
-      photos.filter((photo) => photo.internalCover).length <= 1 &&
-      photos.filter((photo) => photo.customerCover).length <= 1,
-    "Only one cover per audience is allowed",
-  )
-  .refine(
-    (photos) =>
-      photos.every((photo) => !photo.customerCover || photo.showToCustomers),
-    "Customer cover must be selected for customers",
+      photos.filter((photo) => photo.type === "GALLERY_COVER").length <= 1,
+    "Only one gallery cover is allowed",
   );
 export const updateScooterPhotoSchema = z.object({
   caption: z.string().trim().max(500).nullable().optional(),
-  showToCustomers: z.boolean().optional(),
-  internalCover: z.literal(true).optional(),
-  customerCover: z.literal(true).optional(),
+  isPublic: z.boolean().optional(),
+  type: z.literal("GALLERY_COVER").optional(),
 });
 export type UpdateScooterPhoto = z.infer<typeof updateScooterPhotoSchema>;
 export const reorderScooterPhotosSchema = z.object({

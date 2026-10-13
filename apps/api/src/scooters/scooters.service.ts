@@ -17,21 +17,21 @@ import { PrismaService } from "../prisma/prisma.service";
 import { editorSaveFingerprint } from "../scooter-document-jobs/document-job-lifecycle";
 import { ScooterPhotosService } from "./scooter-photos.service";
 
-const internalCoverPhotos = {
-  where: { deletedAt: null, internalCover: true, asset: { deletedAt: null } },
+const galleryCoverPhotos = {
+  where: { deletedAt: null, type: "GALLERY_COVER", asset: { deletedAt: null } },
   select: { id: true },
   take: 1,
 } satisfies Prisma.Scooter$photosArgs;
 
 const scooterInclude = {
-  photos: internalCoverPhotos,
+  photos: galleryCoverPhotos,
   brand: true,
   civDocument: true,
   insurancePolicies: { orderBy: [{ validUntil: "desc" }, { id: "asc" }] },
 } satisfies Prisma.ScooterInclude;
 
 const scooterListInclude = {
-  photos: internalCoverPhotos,
+  photos: galleryCoverPhotos,
   brand: true,
   insurancePolicies: { select: { validFrom: true, validUntil: true } },
 } satisfies Prisma.ScooterInclude;

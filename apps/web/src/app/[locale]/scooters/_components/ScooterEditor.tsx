@@ -35,7 +35,6 @@ import { ScooterImportReviewProvider } from "./ScooterImportReview";
 import { ScooterEditorFields } from "./ScooterEditorFields";
 import { ScooterCreateFields } from "./ScooterCreateFields";
 import { ScooterCreateActions } from "./ScooterCreateActions";
-import { ScooterCreationComplete } from "./ScooterCreationComplete";
 import {
   scooterEditorMessage,
   scooterServerFieldErrors,
@@ -93,8 +92,7 @@ export function ScooterEditor({
   const submitting = useRef(false);
   const pendingFocus = useRef<FieldErrors<ScooterEditorValues> | null>(null);
   const [requestError, setRequestError] = useState<string | null>(null);
-  const [createdScooter, setCreatedScooter] =
-    useState<v1.scooters.Scooter | null>(null);
+  const [saveCompleted, setSaveCompleted] = useState(false);
   const form = useZodForm<ScooterEditorValues, v1.scooters.UpdateScooterInput>(
     scooter ? scooterEditFormSchema : scooterCreateFormSchema,
     {
@@ -222,6 +220,7 @@ export function ScooterEditor({
   async function submit(input: v1.scooters.UpdateScooterInput) {
     if (
       submitting.current ||
+      saveCompleted ||
       photosBusy ||
       photosBlocked ||
       analysis.running ||
@@ -268,12 +267,13 @@ export function ScooterEditor({
         },
       );
       documents.saved();
-      if (scooter) {
-        router.push(returnHref);
-        router.refresh();
-      } else {
-        setCreatedScooter(savedScooter);
-      }
+      setSaveCompleted(true);
+      router.push(
+        scooter
+          ? returnHref
+          : `${returnHref.replace(/\/$/, "")}/${encodeURIComponent(savedScooter.id)}`,
+      );
+      router.refresh();
     } catch (error) {
       documents.saveFailed();
       if (documents.handleSessionError(error)) {
@@ -388,7 +388,7 @@ export function ScooterEditor({
   useEffect(() => {
     if (
       scooter ||
-      createdScooter ||
+      saveCompleted ||
       !canExtract ||
       analysis.running ||
       (importedCurrentDocuments &&
@@ -412,7 +412,7 @@ export function ScooterEditor({
       void runAnalysis({ automatic: true });
   }, [
     scooter,
-    createdScooter,
+    saveCompleted,
     canExtract,
     documents.drafts,
     analysis.entries,
@@ -424,16 +424,16 @@ export function ScooterEditor({
 
   const classify = documents.classify;
   useEffect(() => {
-    if (scooter || createdScooter) return;
+    if (scooter || saveCompleted) return;
     for (const draft of documents.drafts) {
       const entry = analysis.entries[draft.id];
       if (draft.type === null && entry?.status === "success")
         classify(draft.id, entry.analysis.documentType);
     }
-  }, [scooter, createdScooter, documents.drafts, analysis.entries, classify]);
+  }, [scooter, saveCompleted, documents.drafts, analysis.entries, classify]);
 
   useEffect(() => {
-    if (scooter || createdScooter) return;
+    if (scooter || saveCompleted) return;
     const policies = form.getValues("insurancePolicies") ?? [];
     const missing = [
       ...new Set(
@@ -453,11 +453,11 @@ export function ScooterEditor({
         [{ ...insuranceEditorDefaults(), ...policies[0], id: missing[0]! }],
         { shouldDirty: true },
       );
-  }, [scooter, createdScooter, documents.drafts, form]);
+  }, [scooter, saveCompleted, documents.drafts, form]);
 
   const automaticImport = useRef("");
   useEffect(() => {
-    if (scooter || createdScooter || analysis.running) return;
+    if (scooter || saveCompleted || analysis.running) return;
     const successes = Object.values(analysis.entries).filter(
       (entry) =>
         entry.status === "success" &&
@@ -472,16 +472,6 @@ export function ScooterEditor({
     automaticImport.current = signature;
     applyAnalysis(successes);
   });
-
-  if (createdScooter)
-    return (
-      <ScooterCreationComplete
-        scooter={createdScooter}
-        returnHref={returnHref}
-        brands={availableBrands}
-        vocabulary={vocabulary}
-      />
-    );
 
   const createFormValid =
     scooterCreateFormSchema.safeParse(createValues).success;
@@ -816,6 +806,7 @@ export function ScooterEditor({
               <Button
                 type="submit"
                 disabled={
+                  saveCompleted ||
                   photosBusy ||
                   photosBlocked ||
                   isSubmitting ||

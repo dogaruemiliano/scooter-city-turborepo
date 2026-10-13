@@ -157,9 +157,8 @@ export function useScooterPhotos(scooterId?: string) {
               uploadToken,
               fileName: item.file.name,
               caption: null,
-              showToCustomers: false,
-              internalCover: current.length === 0,
-              customerCover: false,
+              isPublic: false,
+              type: current.length === 0 ? "GALLERY_COVER" : "GALLERY",
               position: current.length,
               contentUrl: item.preview,
               createdAt: new Date().toISOString(),
@@ -285,9 +284,8 @@ export function useScooterPhotos(scooterId?: string) {
                 uploadToken: photo.uploadToken,
                 fileName: photo.fileName,
                 caption: photo.caption,
-                showToCustomers: photo.showToCustomers,
-                internalCover: photo.internalCover,
-                customerCover: photo.customerCover,
+                isPublic: photo.isPublic,
+                type: photo.type,
               },
             ]
           : [],
@@ -321,19 +319,13 @@ export function useScooterPhotos(scooterId?: string) {
       if (operation.current) return false;
       setPhotos((current) =>
         current.map((photo) => {
-          if (photo.id === photoId)
-            return {
-              ...photo,
-              ...input,
-              customerCover:
-                input.showToCustomers === false
-                  ? false
-                  : (input.customerCover ?? photo.customerCover),
-            };
+          if (photo.id === photoId) return { ...photo, ...input };
           return {
             ...photo,
-            internalCover: input.internalCover ? false : photo.internalCover,
-            customerCover: input.customerCover ? false : photo.customerCover,
+            type:
+              input.type === "GALLERY_COVER" && photo.type === "GALLERY_COVER"
+                ? "GALLERY"
+                : photo.type,
           };
         }),
       );
@@ -356,9 +348,12 @@ export function useScooterPhotos(scooterId?: string) {
         return remaining.map((photo, position) => ({
           ...photo,
           position,
-          internalCover: removed?.internalCover
-            ? position === 0
-            : photo.internalCover,
+          type:
+            removed?.type === "GALLERY_COVER"
+              ? position === 0
+                ? "GALLERY_COVER"
+                : "GALLERY"
+              : photo.type,
         }));
       });
       return true;

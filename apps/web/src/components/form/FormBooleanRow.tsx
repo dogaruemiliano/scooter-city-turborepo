@@ -44,11 +44,7 @@ export function FormBooleanRow<T extends FieldValues>({
                 : "grid min-w-0 gap-2 @boolean-row/boolean-row:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] @boolean-row/boolean-row:items-center"
             }
           >
-            <Label
-              data-slot="boolean-row-label"
-              htmlFor={id}
-              className="text-base font-medium text-foreground wrap-anywhere"
-            >
+            <Label htmlFor={id} className="wrap-anywhere">
               {label}
             </Label>
             <SegmentedRadioGroup<BooleanDraft>
@@ -62,7 +58,6 @@ export function FormBooleanRow<T extends FieldValues>({
               disabled={disabled}
               deselectValue=""
               showCheckmark
-              optionClassName="min-h-12 text-sm font-medium"
               aria-invalid={fieldState.invalid || undefined}
               aria-describedby={fieldState.error ? `${id}-error` : undefined}
               options={[

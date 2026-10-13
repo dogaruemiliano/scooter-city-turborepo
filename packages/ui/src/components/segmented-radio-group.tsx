@@ -79,7 +79,7 @@ function SegmentedRadioGroup<Value extends string>({
         aria-label={label}
         aria-disabled={disabled || undefined}
         className={cn(
-          "grid min-w-0 grid-cols-2 rounded-xl border border-input bg-muted p-1 @form-controls/segmented:grid-cols-[repeat(var(--segmented-columns),minmax(0,1fr))]",
+          "grid min-h-12 min-w-0 grid-cols-2 rounded-xl border border-input bg-muted p-1 md:min-h-11 @form-controls/segmented:grid-cols-[repeat(var(--segmented-columns),minmax(0,1fr))]",
           className,
         )}
       >
@@ -87,7 +87,7 @@ function SegmentedRadioGroup<Value extends string>({
           <label
             key={option.value}
             className={cn(
-              "flex min-h-11 min-w-0 cursor-pointer",
+              "flex min-h-0 min-w-0 cursor-pointer",
               optionClassName,
             )}
           >
@@ -120,7 +120,7 @@ function SegmentedRadioGroup<Value extends string>({
             />
             <span
               className={cn(
-                "flex min-h-11 w-full min-w-0 items-center justify-center gap-1 rounded-md px-2 py-2 text-center text-xs font-semibold wrap-anywhere outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-inset peer-focus-visible:ring-ring peer-disabled:cursor-not-allowed",
+                "flex min-h-0 w-full min-w-0 items-center justify-center gap-1 rounded-md px-2 py-1 text-center text-sm font-medium wrap-anywhere outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-inset peer-focus-visible:ring-ring peer-disabled:cursor-not-allowed",
                 value === option.value
                   ? selectedTone[option.tone ?? "neutral"]
                   : "text-muted-foreground hover:bg-muted peer-disabled:bg-disabled peer-disabled:text-disabled-foreground",

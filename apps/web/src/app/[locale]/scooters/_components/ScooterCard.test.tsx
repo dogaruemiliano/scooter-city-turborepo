@@ -61,7 +61,7 @@ describe("ScooterCard", () => {
     render(
       card(undefined, "en", {
         ...scooter,
-        internalCoverUrl: "/v1/scooters/scooter-1/photos/photo-1/content",
+        coverUrl: "/v1/scooters/scooter-1/photos/photo-1/content",
       }),
     );
     expect(

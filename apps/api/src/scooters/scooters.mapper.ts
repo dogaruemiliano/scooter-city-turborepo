@@ -20,7 +20,7 @@ export function toScooter(row: ScooterRowWithBrand): v1.scooters.Scooter {
   return {
     ...(row.photos
       ? {
-          internalCoverUrl: row.photos[0]
+          coverUrl: row.photos[0]
             ? v1.scooters.ROUTES.photos.content(row.id, row.photos[0].id)
             : null,
         }

@@ -176,9 +176,7 @@ export function ScooterCard({
           <ScooterPhoto
             src={
               details.photoUrl ??
-              (scooter.internalCoverUrl
-                ? webApi.url(scooter.internalCoverUrl)
-                : null)
+              (scooter.coverUrl ? webApi.url(scooter.coverUrl) : null)
             }
             code={code}
           />

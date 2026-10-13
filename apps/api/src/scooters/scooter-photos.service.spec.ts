@@ -8,9 +8,8 @@ describe("ScooterPhotosService", () => {
   const photo = {
     id: "photo-1",
     position: 0,
-    showToCustomers: false,
-    internalCover: true,
-    customerCover: false,
+    isPublic: false,
+    type: "GALLERY_COVER",
   };
   const stored = {
     provider: "s3",
@@ -54,8 +53,57 @@ describe("ScooterPhotosService", () => {
     prisma.scooterPhoto.findFirst.mockResolvedValue(photo);
     prisma.scooterPhoto.findMany.mockResolvedValue([]);
     prisma.draftUpload.updateMany.mockResolvedValue({ count: 1 });
-    storage.completePresignedUpload.mockResolvedValue(stored);
+    storage.completePresignedUpload.mockResolvedValue({
+      ...stored,
+      imageWidth: null,
+      imageHeight: null,
+      pageCount: null,
+    });
   });
+
+  it("lists gallery photos and never exposes rental evidence", async () => {
+    const row = {
+      ...photo,
+      fileName: "photo.jpg",
+      caption: null,
+      createdAt: new Date("2026-10-14"),
+    };
+    prisma.scooterPhoto.findMany.mockResolvedValue([
+      row,
+      { ...row, id: "before", type: "RENTAL_BEFORE" },
+      { ...row, id: "after", type: "RENTAL_AFTER" },
+    ]);
+    const result = await service.list("scooter-1");
+    expect(result.map((item) => item.id)).toEqual(["photo-1"]);
+    expect(prisma.scooterPhoto.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          type: { in: ["GALLERY", "GALLERY_COVER"] },
+        }) as unknown,
+      }),
+    );
+  });
+  it.each(["update", "remove", "content"] as const)(
+    "restricts gallery %s to gallery photo types",
+    async (action) => {
+      prisma.scooterPhoto.findFirst.mockResolvedValue(null);
+      await expect(
+        action === "update"
+          ? service.update("scooter-1", "rental-photo", {
+              type: "GALLERY_COVER",
+            })
+          : service[action]("scooter-1", "rental-photo"),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.scooterPhoto.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            type: { in: ["GALLERY", "GALLERY_COVER"] },
+          }) as unknown,
+        }),
+      );
+      expect(prisma.scooterPhoto.update).not.toHaveBeenCalled();
+    },
+  );
 
   it("claims private creation uploads for their owner and preserves gallery settings", async () => {
     const drafts = [
@@ -63,9 +111,8 @@ describe("ScooterPhotosService", () => {
         uploadToken: "token",
         fileName: "front.jpg",
         caption: "Front view",
-        showToCustomers: true,
-        internalCover: true,
-        customerCover: true,
+        isPublic: true,
+        type: "GALLERY_COVER" as const,
       },
     ];
     const prepared = await service.prepareDrafts(drafts, "user-1");
@@ -86,16 +133,17 @@ describe("ScooterPhotosService", () => {
           purpose: "scooter-photo-draft",
           claimedAt: null,
           cleanupStartedAt: null,
-        }),
+        }) as unknown,
       }),
     );
     expect(prisma.scooterPhoto.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         caption: "Front view",
-        customerCover: true,
+
         position: 0,
         scooter: { connect: { id: "new-scooter" } },
-      }),
+        asset: { create: { ...stored, uploadedByUserId: "user-1" } },
+      }) as unknown,
     });
   });
 
@@ -106,9 +154,8 @@ describe("ScooterPhotosService", () => {
           uploadToken: "token",
           fileName: "front.jpg",
           caption: null,
-          showToCustomers: false,
-          internalCover: false,
-          customerCover: false,
+          isPublic: false,
+          type: "GALLERY",
         },
       ],
       "user-1",
@@ -125,38 +172,33 @@ describe("ScooterPhotosService", () => {
     expect(prisma.scooterPhoto.create).not.toHaveBeenCalled();
   });
 
-  it("rejects an internal photo as a customer cover", async () => {
-    await expect(
-      service.update("scooter-1", "photo-1", { customerCover: true }),
-    ).rejects.toBeInstanceOf(BadRequestException);
-    expect(prisma.scooterPhoto.update).not.toHaveBeenCalled();
-  });
-
-  it("clears the customer cover when a photo becomes internal", async () => {
-    prisma.scooterPhoto.findFirst.mockResolvedValue({
-      ...photo,
-      showToCustomers: true,
-      customerCover: true,
-    });
-    await service.update("scooter-1", "photo-1", { showToCustomers: false });
-    expect(prisma.scooterPhoto.update).toHaveBeenCalledWith({
-      where: { id: "photo-1" },
-      data: { showToCustomers: false, customerCover: false },
-    });
-  });
+  it.each([false, true])(
+    "preserves the cover independently of public visibility (%s)",
+    async (isPublic) => {
+      await service.update("scooter-1", "photo-1", { isPublic });
+      expect(prisma.scooterPhoto.update).toHaveBeenCalledWith({
+        where: { id: "photo-1" },
+        data: { isPublic },
+      });
+      expect(prisma.scooterPhoto.updateMany).not.toHaveBeenCalled();
+    },
+  );
 
   it("clears the previous cover before assigning a new one", async () => {
     await service.update("scooter-1", "photo-1", {
-      internalCover: true,
-      showToCustomers: true,
-      customerCover: true,
+      type: "GALLERY_COVER",
+      isPublic: true,
     });
-    expect(prisma.scooterPhoto.updateMany).toHaveBeenCalledTimes(2);
+    expect(prisma.scooterPhoto.updateMany).toHaveBeenCalledTimes(1);
+    expect(prisma.scooterPhoto.updateMany).toHaveBeenCalledWith({
+      where: { scooterId: "scooter-1", deletedAt: null, type: "GALLERY_COVER" },
+      data: { type: "GALLERY" },
+    });
     expect(prisma.scooter.updateMany.mock.invocationCallOrder[0]).toBeLessThan(
       prisma.scooterPhoto.updateMany.mock.invocationCallOrder[0],
     );
     expect(
-      prisma.scooterPhoto.updateMany.mock.invocationCallOrder[1],
+      prisma.scooterPhoto.updateMany.mock.invocationCallOrder[0],
     ).toBeLessThan(prisma.scooterPhoto.update.mock.invocationCallOrder[0]);
   });
 
@@ -172,7 +214,7 @@ describe("ScooterPhotosService", () => {
     expect(prisma.scooterPhoto.update).not.toHaveBeenCalled();
   });
 
-  it("claims an owner- and scooter-scoped upload and makes the first photo the internal cover", async () => {
+  it("claims an owner- and scooter-scoped upload and makes the first photo the gallery cover", async () => {
     prisma.scooterPhoto.findFirst.mockResolvedValue(null);
     await service.attach(
       "scooter-1",
@@ -198,7 +240,7 @@ describe("ScooterPhotosService", () => {
     expect(prisma.scooterPhoto.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          internalCover: true,
+          type: "GALLERY_COVER",
           position: 0,
           asset: { create: { ...stored, uploadedByUserId: "owner" } },
         }) as unknown,
@@ -255,6 +297,7 @@ describe("ScooterPhotosService", () => {
           id: "foreign",
           scooterId: "scooter-1",
           deletedAt: null,
+          type: { in: ["GALLERY", "GALLERY_COVER"] },
           scooter: { deletedAt: null },
           asset: { deletedAt: null },
         },
@@ -263,14 +306,14 @@ describe("ScooterPhotosService", () => {
     expect(storage.readImage).not.toHaveBeenCalled();
   });
 
-  it("selects the next internal cover when its previous photo is deleted", async () => {
+  it("selects the next gallery cover when its previous photo is deleted", async () => {
     prisma.scooterPhoto.findFirst
       .mockResolvedValueOnce(photo)
       .mockResolvedValueOnce({ id: "photo-2" });
     await service.remove("scooter-1", "photo-1");
     expect(prisma.scooterPhoto.update).toHaveBeenLastCalledWith({
       where: { id: "photo-2" },
-      data: { internalCover: true },
+      data: { type: "GALLERY_COVER" },
     });
   });
 });

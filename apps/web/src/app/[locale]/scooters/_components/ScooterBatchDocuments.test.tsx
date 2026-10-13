@@ -111,13 +111,12 @@ describe("Scooter batch document states", () => {
       name: "Import more documents",
     });
     fireEvent.dragOver(target, { dataTransfer: { types: ["Files"] } });
-    expect(target).toHaveClass(
-      "border-primary",
-      "bg-accent",
-      "text-accent-foreground",
+    expect(target.querySelector('[data-slot="file-drop-overlay"]')).toHaveClass(
+      "bg-file-drop-overlay",
+      "backdrop-blur-file-drop",
     );
     fireEvent.dragLeave(target, { relatedTarget: null });
-    expect(target).not.toHaveClass("bg-accent");
+    expect(target.querySelector('[data-slot="file-drop-overlay"]')).toBeNull();
     const pdf = new File(["pdf"], "registration.pdf", {
       type: "application/pdf",
     });
@@ -179,7 +178,7 @@ describe("Scooter batch document states", () => {
     });
     expect(target).toBeDisabled();
     fireEvent.dragOver(target, { dataTransfer: { types: ["Files"] } });
-    expect(target).not.toHaveClass("bg-accent");
+    expect(target.querySelector('[data-slot="file-drop-overlay"]')).toBeNull();
     drop(target, [
       new File(["pdf"], "registration.pdf", { type: "application/pdf" }),
     ]);
@@ -195,7 +194,7 @@ describe("Scooter batch document states", () => {
       name: "Import more documents",
     });
     fireEvent.dragOver(target, { dataTransfer: { types: ["text/plain"] } });
-    expect(target).not.toHaveClass("bg-accent");
+    expect(target.querySelector('[data-slot="file-drop-overlay"]')).toBeNull();
     drop(target, []);
     expect(add).not.toHaveBeenCalled();
     expect(target).toBeInTheDocument();

@@ -261,7 +261,7 @@ export const scooterTechnicalDetailsSchema = z.object({
 
 export const scooterSchema = z
   .object({
-    internalCoverUrl: z.string().nullable().optional(),
+    coverUrl: z.string().nullable().optional(),
     documents: scooterDocumentListSchema.optional(),
     insurancePolicies: z.array(insurancePolicySchema).optional(),
     insuranceAttention: insuranceAttentionSchema.nullable().optional(),

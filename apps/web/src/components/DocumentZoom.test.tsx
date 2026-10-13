@@ -96,6 +96,26 @@ function zoomTo(scale: number) {
 }
 
 describe("shared document focal-point zoom", () => {
+  it("prevents native selection while double-click zoom still works", () => {
+    const { viewport } = setup();
+    expect(viewport).toHaveClass("select-none", "[-webkit-touch-callout:none]");
+    const mouseDown = new MouseEvent("mousedown", {
+      bubbles: true,
+      cancelable: true,
+      detail: 2,
+    });
+    fireEvent(viewport, mouseDown);
+    expect(mouseDown.defaultPrevented).toBe(true);
+    const doubleClick = new MouseEvent("dblclick", {
+      bubbles: true,
+      cancelable: true,
+      clientX: 300,
+      clientY: 200,
+    });
+    fireEvent(viewport, doubleClick);
+    expect(doubleClick.defaultPrevented).toBe(true);
+    expect(viewport).toHaveAttribute("data-zoom", String(magnification.loupe));
+  });
   it.each([
     [300, 200, 200, 150],
     [700, 500, -200, -150],

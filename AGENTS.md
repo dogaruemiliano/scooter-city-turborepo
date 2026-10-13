@@ -28,6 +28,21 @@ Every visual or motion value — color, spacing, radius, typography, shadow, mot
 
 <!-- END:theme-tokens-rule -->
 
+<!-- BEGIN:shared-ui-consistency-rule -->
+
+# Shared UI styling must stay consistent across the app
+
+Use shared components from `@repo/ui` and shared form components for consistent typography, colors, spacing, and control sizing across pages. When improving a shared component's appearance, update its shared default instead of adding page-specific descendant selectors or duplicating styling at call sites. Preserve purposeful variants and state styling; ordinary instances of the same component must look alike.
+
+- `Label`: `text-sm`, `font-medium`, `leading-snug`, `text-muted-foreground`.
+- `SegmentedRadioGroup` option text: `text-sm`, `font-medium`. Single-row groups match `Input` height using theme spacing tokens: `min-h-12`, `md:min-h-11`; wrapped content can grow for readability.
+- `FormSection` headings: `text-base`, `font-semibold`, normal case, normal letter spacing.
+- Composite inputs use shared `InputGroup` styling for the outer surface and focus state; inner controls omit duplicate chrome.
+- Do not override the shared `Label` component's `data-slot="label"`; shared styling and selectors depend on it.
+- All design values must continue to come from theme tokens.
+
+<!-- END:shared-ui-consistency-rule -->
+
 <!-- BEGIN:bottom-sheet-surface-rule -->
 
 # Bottom sheets must be visually distinct from the page

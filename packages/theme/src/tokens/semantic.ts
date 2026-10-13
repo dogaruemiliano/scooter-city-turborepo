@@ -25,6 +25,7 @@ const light = {
   muted: p.mist[100],
   mutedForeground: p.mist[600],
   accent: p.cyan[50],
+  fileDropOverlay: withAlpha(p.cyan[50], 0.35),
   accentForeground: p.cyan[900],
   destructive: p.red[600],
   destructiveForeground: p.mist[50],
@@ -33,6 +34,9 @@ const light = {
   control: p.mist[0],
   // Document chrome stays readable while allowing the source to show through.
   documentOverlay: withAlpha(p.mist[0], 0.8),
+  // Fixed black/white strokes stay visible over media in either color scheme.
+  imageGridLine: p.mist[1000],
+  imageGridOutline: p.mist[0],
   documentOverlayBorder: withAlpha(p.mist[200], 0.6),
   ring: p.cyan[700],
   chart1: p.cyan[600],
@@ -100,6 +104,7 @@ const dark: Record<keyof typeof light, string> = {
   muted: p.neutral[850],
   mutedForeground: p.neutral[400],
   accent: p.cyan[950],
+  fileDropOverlay: withAlpha(p.cyan[950], 0.35),
   accentForeground: p.cyan[100],
   destructive: p.red[400],
   destructiveForeground: p.mist[950],
@@ -107,6 +112,9 @@ const dark: Record<keyof typeof light, string> = {
   input: p.neutral[800],
   control: p.neutral[1000],
   documentOverlay: withAlpha(p.neutral[1000], 0.8),
+  // Fixed black/white strokes stay visible over media in either color scheme.
+  imageGridLine: p.mist[1000],
+  imageGridOutline: p.mist[0],
   documentOverlayBorder: withAlpha(p.neutral[800], 0.6),
   ring: p.cyan[500],
   chart1: p.cyan[500],
@@ -163,6 +171,7 @@ export const semanticColors = { light, dark } as const;
 /** Backdrop blur radii in px, shared by floating surfaces in every theme. */
 export const semanticBlur = {
   floatingSurface: spacing[3],
+  fileDrop: spacing[1],
 } as const;
 
 export type ThemeColors = typeof light;

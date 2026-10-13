@@ -48,9 +48,8 @@ vi.mock("./ScooterPhotos", () => ({
                   uploadToken: "draft-token",
                   fileName: "front.jpg",
                   caption: "Front view",
-                  showToCustomers: true,
-                  internalCover: true,
-                  customerCover: true,
+                  isPublic: true,
+                  type: "GALLERY_COVER",
                 },
               ],
               false,
@@ -263,9 +262,8 @@ describe("ScooterCreateForm combined review", () => {
         uploadToken: "draft-token",
         fileName: "front.jpg",
         caption: "Front view",
-        showToCustomers: true,
-        internalCover: true,
-        customerCover: true,
+        isPublic: true,
+        type: "GALLERY_COVER",
       },
     ]);
   });
@@ -318,10 +316,16 @@ describe("ScooterCreateForm combined review", () => {
       speedometerWorking: null,
       actualMaxSpeedKmh: null,
     });
-    expect(await screen.findByText("Scooter created")).toBeInTheDocument();
-    expect(mocks.push).not.toHaveBeenCalled();
-    await browser.click(screen.getByRole("button", { name: "Finish" }));
-    expect(mocks.push).toHaveBeenCalledWith("/en/scooters");
+
+    await waitFor(() =>
+      expect(mocks.push).toHaveBeenCalledWith(
+        `/en/scooters/${createdScooter.id}`,
+      ),
+    );
+    expect(screen.queryByText("Scooter created")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Finish" }),
+    ).not.toBeInTheDocument();
     expect(mocks.refresh).toHaveBeenCalledOnce();
   });
 
@@ -439,68 +443,25 @@ describe("Scooter creation follow-up and optional steps", () => {
     expect(mocks.apiFetch).not.toHaveBeenCalled();
   });
 
-  it("preserves a created scooter when the optional CIV update fails", async () => {
-    mocks.apiFetch
-      .mockResolvedValueOnce(createdScooter)
-      .mockRejectedValueOnce(new ApiError(500, "Unavailable"));
+  it("blocks duplicate creation while navigation to the saved scooter is pending", async () => {
+    mocks.apiFetch.mockResolvedValueOnce(createdScooter);
     const browser = userEvent.setup();
     renderWizard();
     await fillWizardIdentity(browser);
     await chooseSelectOption(browser, "Registration type", "Unregistered");
     await browser.click(screen.getByRole("button", { name: "Create scooter" }));
-    await browser.click(
-      await screen.findByRole("button", { name: "Complete CIV details" }),
-    );
-    await browser.type(
-      screen.getByRole("textbox", { name: "Length (mm)" }),
-      "1800",
-    );
-    await browser.click(
-      screen.getByRole("button", { name: "Save details & finish" }),
-    );
-    expect(
-      await screen.findByText(/additional details were not saved/),
-    ).toBeInTheDocument();
-    expect(mocks.apiFetch.mock.calls.map((call) => call[2].method)).toEqual([
-      "POST",
-      "PATCH",
-    ]);
-    expect(mocks.apiFetch.mock.calls[1]![2].json).toEqual({ lengthMm: 1800 });
-    expect(mocks.push).not.toHaveBeenCalled();
-    await browser.click(screen.getByRole("button", { name: "Finish" }));
-    expect(mocks.push).toHaveBeenCalledWith("/en/scooters");
-    expect(mocks.apiFetch).toHaveBeenCalledTimes(2);
-  });
-
-  it("saves optional CIV details against the newly created record", async () => {
-    mocks.apiFetch
-      .mockResolvedValueOnce(createdScooter)
-      .mockResolvedValueOnce({ ...createdScooter, lengthMm: 1900 });
-    const browser = userEvent.setup();
-    renderWizard();
-    expect(
-      screen.queryByRole("textbox", { name: "Length (mm)" }),
-    ).not.toBeInTheDocument();
-    await fillWizardIdentity(browser);
-    await chooseSelectOption(browser, "Registration type", "Unregistered");
-    await browser.click(screen.getByRole("button", { name: "Create scooter" }));
-    await browser.click(
-      await screen.findByRole("button", { name: "Complete CIV details" }),
-    );
-    await browser.type(
-      screen.getByRole("textbox", { name: "Length (mm)" }),
-      "1900",
-    );
-    await browser.click(
-      screen.getByRole("button", { name: "Save details & finish" }),
-    );
     await waitFor(() =>
-      expect(mocks.push).toHaveBeenCalledWith("/en/scooters"),
+      expect(mocks.push).toHaveBeenCalledWith(
+        `/en/scooters/${createdScooter.id}`,
+      ),
     );
-    expect(mocks.apiFetch.mock.calls[1]![0]).toBe(
-      v1.scooters.ROUTES.update(createdScooter.id),
-    );
-    expect(mocks.apiFetch.mock.calls[1]![2].json).toEqual({ lengthMm: 1900 });
+    const create = screen.getByRole("button", { name: "Create scooter" });
+    expect(create).toBeDisabled();
+    await browser.click(create);
+    expect(mocks.apiFetch).toHaveBeenCalledOnce();
+    expect(
+      screen.queryByRole("button", { name: "Complete CIV details" }),
+    ).not.toBeInTheDocument();
   });
 
   it("keeps section 5 inline when recovering an invalid mileage", async () => {
