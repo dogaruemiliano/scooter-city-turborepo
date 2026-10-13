@@ -729,6 +729,11 @@ describe.each(["ro", "en"] as const)(
     );
 
     it("localizes server failures when resending a code", async () => {
+      // Force a millisecond boundary between clock reads during initialization.
+      let currentTime = Date.now();
+      const clock = vi
+        .spyOn(Date, "now")
+        .mockImplementation(() => currentTime++);
       mocks.apiFetch
         .mockResolvedValueOnce(
           createChallenge("00000000-0000-4000-8000-000000000022", {
@@ -738,6 +743,7 @@ describe.each(["ro", "en"] as const)(
         .mockRejectedValueOnce(serverError());
       renderSignInMethods({ locale });
       await requestEmailCode();
+      clock.mockRestore();
       await act(async () => {
         fireEvent.click(
           screen.getByRole("button", { name: copy.auth.otp.resendCode }),

@@ -41,10 +41,10 @@ export function OtpChallengeForm({
   const [busy, setBusy] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const [expiresAt, setExpiresAt] = useState(
-    () => Date.now() + challenge.expiresInSec * SECOND_MS,
+    () => now + challenge.expiresInSec * SECOND_MS,
   );
   const [resendAt, setResendAt] = useState(
-    () => Date.now() + challenge.resendAfterSec * SECOND_MS,
+    () => now + challenge.resendAfterSec * SECOND_MS,
   );
 
   useEffect(() => {
