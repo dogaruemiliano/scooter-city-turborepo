@@ -219,7 +219,9 @@ export function ScooterDocumentImport({
     <div
       className={
         secondary
-          ? "grid justify-items-start gap-3"
+          ? editing
+            ? "grid justify-items-start gap-3"
+            : "grid justify-items-center gap-3"
           : "grid gap-4 border-y border-border py-8 sm:py-10"
       }
     >
