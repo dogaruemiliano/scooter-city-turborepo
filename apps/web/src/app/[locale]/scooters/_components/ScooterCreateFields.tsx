@@ -176,34 +176,38 @@ export function ScooterCreateFields({
         <p className="text-sm text-muted-foreground sm:col-span-2">
           {t("creation.conditionHelp")}
         </p>
-        <div className="grid gap-2 sm:col-span-2">
-          {(["hasGps", "speedometerWorking", "odometerWorking"] as const).map(
-            (name) => (
-              <FormBooleanRow<ScooterEditorValues>
-                key={name}
-                name={name}
-                label={t(`operational.rows.${name}`)}
-                falseLabel={t(
-                  name === "hasGps"
-                    ? "operational.withoutGps"
-                    : "operational.defective",
-                )}
-                trueLabel={t(
-                  name === "hasGps"
-                    ? "operational.withGps"
-                    : "operational.functional",
-                )}
-                disabled={disabled}
-              />
-            ),
-          )}
-        </div>
-        {OPERATIONAL_FIELDS.filter(
-          (name) =>
-            !["hasGps", "speedometerWorking", "odometerWorking"].includes(name),
-        ).map((name) => (
-          <ScooterEditorFieldControl key={name} name={name} {...props} />
-        ))}
+        {(
+          [
+            "odometerWorking",
+            "currentMileageKm",
+            "speedometerWorking",
+            "actualMaxSpeedKmh",
+            "hasGps",
+          ] as const
+        ).map((name) =>
+          name === "currentMileageKm" || name === "actualMaxSpeedKmh" ? (
+            <ScooterEditorFieldControl key={name} name={name} {...props} />
+          ) : (
+            <FormBooleanRow<ScooterEditorValues>
+              key={name}
+              name={name}
+              label={t(`operational.rows.${name}`)}
+              falseLabel={t(
+                name === "hasGps"
+                  ? "operational.withoutGps"
+                  : "operational.defective",
+              )}
+              trueLabel={t(
+                name === "hasGps"
+                  ? "operational.withGps"
+                  : "operational.functional",
+              )}
+              disabled={disabled}
+              stacked
+            />
+          ),
+        )}
+        <ScooterEditorFieldControl name="notes" {...props} />
       </FormSection>
       <BottomSheet
         open={technicalReviewOpen}
