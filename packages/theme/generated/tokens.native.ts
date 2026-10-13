@@ -8,6 +8,7 @@ export const tokens = {
       card: "#FFFFFF",
       cardForeground: "#12161B",
       popover: "#FFFFFF",
+      floatingActionSurface: "#FFFFFFB3",
       popoverForeground: "#12161B",
       selectableRow: "#F9FBFB",
       primary: "#06B6D4",
@@ -80,6 +81,7 @@ export const tokens = {
       card: "#141414",
       cardForeground: "#F9FBFB",
       popover: "#1F1F1F",
+      floatingActionSurface: "#1F1F1FB3",
       popoverForeground: "#F9FBFB",
       selectableRow: "#141414",
       primary: "#06B6D4",
@@ -185,6 +187,9 @@ export const tokens = {
     "3xl": 24,
     "4xl": 28,
     full: 9999,
+  },
+  blur: {
+    floatingSurface: 12,
   },
   typography: {
     fontFamily: {

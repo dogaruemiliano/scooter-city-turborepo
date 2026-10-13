@@ -390,7 +390,7 @@ function AppSidebar({
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader className="border-b border-sidebar-border">
+      <SidebarHeader className="border-b border-sidebar-border md:h-16 md:shrink-0 md:justify-center">
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
@@ -399,9 +399,9 @@ function AppSidebar({
               className="justify-start duration-normal ease-linear"
               render={<Link href={localizePath("/", locale)} />}
             >
-              <span className="flex min-w-0 flex-1 items-center justify-start gap-2 overflow-hidden transition-[gap] duration-normal ease-linear group-data-[collapsible=icon]:gap-0">
+              <span className="flex min-w-0 flex-1 items-center justify-start gap-2 overflow-hidden">
                 <span
-                  className="flex h-8 w-16 shrink-0 items-center justify-center overflow-hidden transition-[width] duration-normal ease-linear group-data-[collapsible=icon]:w-8"
+                  className="flex h-8 w-16 shrink-0 items-center justify-center overflow-hidden md:w-8"
                   data-sidebar-logo-part="mark"
                 >
                   <Image
@@ -426,7 +426,7 @@ function AppSidebar({
                   />
                 </span>
                 <span
-                  className="flex h-5 max-w-36 min-w-0 overflow-hidden opacity-100 transition-[max-width,opacity,transform] duration-normal ease-linear group-data-[collapsible=icon]:max-w-0 group-data-[collapsible=icon]:-translate-x-1 group-data-[collapsible=icon]:opacity-0"
+                  className="flex h-5 w-36 shrink-0 overflow-hidden"
                   data-sidebar-logo-part="title"
                 >
                   <Image
@@ -478,7 +478,9 @@ function AppSidebar({
                   }
                 >
                   <LayoutDashboardIcon aria-hidden="true" />
-                  <span>{tNav(DASHBOARD_NAVIGATION_ITEM.labelKey)}</span>
+                  <span className="min-w-0 flex-1 overflow-hidden whitespace-nowrap">
+                    {tNav(DASHBOARD_NAVIGATION_ITEM.labelKey)}
+                  </span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
@@ -487,7 +489,16 @@ function AppSidebar({
 
         {navigationGroups.map((group) => (
           <SidebarGroup key={group.labelKey}>
-            <SidebarGroupLabel>{tNav(group.labelKey)}</SidebarGroupLabel>
+            <SidebarGroupLabel className="relative overflow-hidden group-data-[collapsible=icon]:mt-0 group-data-[collapsible=icon]:opacity-100 motion-reduce:transition-none">
+              <span className="shrink-0 origin-center whitespace-nowrap transition-[transform,opacity] duration-normal ease-linear group-data-[collapsible=icon]:scale-y-0 group-data-[collapsible=icon]:opacity-0 motion-reduce:transition-none">
+                {tNav(group.labelKey)}
+              </span>
+              <span
+                aria-hidden="true"
+                data-slot="sidebar-group-divider"
+                className="absolute inset-x-2 h-px origin-center scale-x-0 bg-sidebar-border opacity-0 transition-[transform,opacity] duration-normal ease-linear group-data-[collapsible=icon]:scale-x-100 group-data-[collapsible=icon]:opacity-100 motion-reduce:transition-none"
+              />
+            </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 {group.items.map((item) => {
@@ -505,7 +516,9 @@ function AppSidebar({
                         render={<Link href={localizePath(item.href, locale)} />}
                       >
                         <Icon aria-hidden="true" />
-                        <span>{label}</span>
+                        <span className="min-w-0 flex-1 overflow-hidden whitespace-nowrap">
+                          {label}
+                        </span>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                   );
@@ -610,7 +623,7 @@ function AccountMenu({
               <Avatar size="md">
                 <AvatarFallback>{initials}</AvatarFallback>
               </Avatar>
-              <span className="flex min-w-0 flex-1 flex-col">
+              <span className="flex min-w-0 flex-1 flex-col md:w-[calc(var(--sidebar-width)-var(--spacing-24))] md:flex-none">
                 <span className="truncate font-medium">{displayName}</span>
                 <span className="truncate text-xs text-sidebar-muted-foreground">
                   {email}

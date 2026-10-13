@@ -23,7 +23,11 @@ export function ScooterCreateActions({
     <FormActions
       sticky
       status={status}
-      className={ready ? "self-end" : "static bottom-auto sm:bottom-auto"}
+      className={
+        ready
+          ? "self-end bg-floating-action-surface backdrop-blur-floating-surface"
+          : "static bottom-auto sm:bottom-auto"
+      }
       data-slot="create-actions"
       data-sticky={ready}
     >

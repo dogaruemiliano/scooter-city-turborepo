@@ -152,7 +152,7 @@ export function Sidebar({
         data-collapsible={open ? "" : collapsible}
         data-slot="sidebar-gap"
         className={cn(
-          "relative w-(--sidebar-width) bg-transparent transition-[width] duration-normal ease-linear",
+          "relative w-(--sidebar-width) bg-transparent transition-[width] duration-normal ease-linear motion-reduce:transition-none",
           "data-[collapsible=offcanvas]:w-0",
           "group-data-[side=right]:rotate-180",
           variant === "floating" || variant === "inset"
@@ -164,7 +164,7 @@ export function Sidebar({
         data-slot="sidebar-container"
         data-side={side}
         className={cn(
-          "fixed inset-y-0 z-navigation hidden h-svh transition-[left,right,width] duration-normal ease-linear data-[side=left]:left-0 data-[side=left]:group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)] data-[side=right]:right-0 data-[side=right]:group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)] md:flex",
+          "fixed inset-y-0 z-navigation hidden h-svh transition-[left,right,width] duration-normal ease-linear motion-reduce:transition-none data-[side=left]:left-0 data-[side=left]:group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)] data-[side=right]:right-0 data-[side=right]:group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)] md:flex",
           sidebarContainerWidth,
           variant === "floating" || variant === "inset"
             ? "p-2"

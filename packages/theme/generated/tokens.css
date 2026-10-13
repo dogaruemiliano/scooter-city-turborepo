@@ -8,6 +8,7 @@
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.198264 0.011840 254.1076);
   --popover: oklch(1 0 0);
+  --floating-action-surface: oklch(1 0 0 / 70%);
   --popover-foreground: oklch(0.198264 0.011840 254.1076);
   --selectable-row: oklch(0.987 0.002 197.1);
   --primary: #06b6d4;
@@ -83,6 +84,7 @@
     --card: #141414;
     --card-foreground: oklch(0.987 0.002 197.1);
     --popover: #1f1f1f;
+    --floating-action-surface: #1f1f1fb3;
     --popover-foreground: oklch(0.987 0.002 197.1);
     --selectable-row: #141414;
     --primary: #06b6d4;
@@ -158,6 +160,7 @@
   --card: #141414;
   --card-foreground: oklch(0.987 0.002 197.1);
   --popover: #1f1f1f;
+  --floating-action-surface: #1f1f1fb3;
   --popover-foreground: oklch(0.987 0.002 197.1);
   --selectable-row: #141414;
   --primary: #06b6d4;
@@ -230,6 +233,7 @@
 }
 
 @theme {
+  --blur-floating-surface: 0.75rem;
   --color-neutral-50: #fafafa;
   --color-neutral-100: #f4f4f5;
   --color-neutral-200: #e4e4e7;
@@ -444,6 +448,7 @@
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
   --color-popover: var(--popover);
+  --color-floating-action-surface: var(--floating-action-surface);
   --color-popover-foreground: var(--popover-foreground);
   --color-selectable-row: var(--selectable-row);
   --color-primary: var(--primary);

@@ -7,10 +7,23 @@ import { converter, formatHex, wcagContrast } from "culori";
 import { aspectRatio } from "../src/tokens/aspect-ratio.js";
 import { radius } from "../src/tokens/radius.js";
 import { motion } from "../src/tokens/motion.js";
-import { semanticColors } from "../src/tokens/semantic.js";
+import { semanticColors, semanticBlur } from "../src/tokens/semantic.js";
 import { typography } from "../src/tokens/typography.js";
 import { zIndex } from "../src/tokens/z-index.js";
 import { buildCss, buildNative } from "./build-tokens.js";
+
+test("floating surface blur is available to web and native consumers", () => {
+  assert.ok(
+    buildCss().includes(
+      `--blur-floating-surface: ${semanticBlur.floatingSurface / 16}rem;`,
+    ),
+  );
+  assert.ok(
+    buildNative().includes(
+      `"floatingSurface": ${semanticBlur.floatingSurface}`,
+    ),
+  );
+});
 
 test("all themes expose the same flat keys", () => {
   const lightKeys = Object.keys(semanticColors.light).sort();

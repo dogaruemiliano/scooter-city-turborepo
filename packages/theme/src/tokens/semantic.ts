@@ -1,4 +1,5 @@
 import { primitives as p } from "./primitives";
+import { spacing } from "./spacing";
 
 function withAlpha(color: string, opacity: number): string {
   return color.startsWith("#")
@@ -14,6 +15,7 @@ const light = {
   card: p.mist[0],
   cardForeground: p.charcoal[950],
   popover: p.mist[0],
+  floatingActionSurface: withAlpha(p.mist[0], 0.7),
   popoverForeground: p.charcoal[950],
   selectableRow: p.mist[50],
   primary: p.cyan.action,
@@ -88,6 +90,7 @@ const dark: Record<keyof typeof light, string> = {
   card: p.neutral[900],
   cardForeground: p.mist[50],
   popover: p.neutral[850],
+  floatingActionSurface: withAlpha(p.neutral[850], 0.7),
   popoverForeground: p.mist[50],
   selectableRow: p.neutral[900],
   primary: p.cyan.action,
@@ -156,5 +159,10 @@ const dark: Record<keyof typeof light, string> = {
 };
 
 export const semanticColors = { light, dark } as const;
+
+/** Backdrop blur radii in px, shared by floating surfaces in every theme. */
+export const semanticBlur = {
+  floatingSurface: spacing[3],
+} as const;
 
 export type ThemeColors = typeof light;

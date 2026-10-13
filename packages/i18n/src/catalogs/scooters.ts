@@ -21,6 +21,7 @@ export const scootersCatalog = {
       conditionEquipment: "Condition & equipment",
       optional: "Optional",
       complete: "Complete",
+      missingData: "Missing data",
       conditionHelp:
         "Record mileage, equipment, and instrument checks when you have inspected the scooter.",
       conditionAction: "Record initial condition",
@@ -1012,6 +1013,7 @@ export const scootersCatalog = {
       conditionEquipment: "Stare și echipare",
       optional: "Opțional",
       complete: "Complet",
+      missingData: "Date lipsă",
       conditionHelp:
         "Completează kilometrajul, echiparea și verificarea instrumentelor după inspectarea scuterului.",
       conditionAction: "Completează starea inițială",
