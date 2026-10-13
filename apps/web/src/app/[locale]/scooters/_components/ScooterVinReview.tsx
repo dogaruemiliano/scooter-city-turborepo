@@ -46,16 +46,32 @@ export function ScooterVinReview({
   documents,
   disabled,
   onApply,
+  initialVin = "",
+  showSummary = true,
+  onClose,
 }: {
   documents: VinReviewDocument[];
   disabled: boolean;
   onApply: (corrections: ScooterVinCorrection[], vin: string) => boolean | void;
+  initialVin?: string;
+  showSummary?: boolean;
+  onClose?: () => void;
 }) {
   const t = useTranslations("scooters.extraction.vinReview");
   const id = useId();
-  const [step, setStep] = useState<"vin" | "documents">("vin");
+  const initial =
+    v1.scooters.scooterDocumentExtractedDataSchema.shape.vin.safeParse(
+      initialVin.trim().toUpperCase(),
+    );
+  const [step, setStep] = useState<"vin" | "documents">(
+    initial.success &&
+      initial.data &&
+      documents.some((doc) => doc.vin !== initial.data)
+      ? "documents"
+      : "vin",
+  );
   const [open, setOpen] = useState(true);
-  const [value, setValue] = useState("");
+  const [value, setValue] = useState(initialVin.trim().toUpperCase());
   const [activeIndex, setActiveIndex] = useState(0);
   const [error, setError] = useState(false);
   const parsed =
@@ -78,26 +94,31 @@ export function ScooterVinReview({
 
   return (
     <>
-      <Alert variant="warning">
-        <TriangleAlertIcon aria-hidden="true" />
-        <AlertTitle>{t("title")}</AlertTitle>
-        <AlertDescription className="grid gap-3">
-          <p>{t("description")}</p>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={disabled}
-            className="justify-self-start"
-            onClick={() => setOpen(true)}
-          >
-            {t("resume")}
-          </Button>
-        </AlertDescription>
-      </Alert>
+      {showSummary ? (
+        <Alert variant="warning">
+          <TriangleAlertIcon aria-hidden="true" />
+          <AlertTitle>{t("title")}</AlertTitle>
+          <AlertDescription className="grid gap-3">
+            <p>{t("description")}</p>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={disabled}
+              className="justify-self-start"
+              onClick={() => setOpen(true)}
+            >
+              {t("resume")}
+            </Button>
+          </AlertDescription>
+        </Alert>
+      ) : null}
       <BottomSheet
-        dismissible={false}
+        dismissible={onClose ? !disabled : false}
         open={open && step === "vin"}
-        onOpenChange={setOpen}
+        onOpenChange={(next) => {
+          setOpen(next);
+          if (!next) onClose?.();
+        }}
       >
         <BottomSheetContent className="lg:w-[calc(var(--breakpoint-sm)-var(--spacing-16))]">
           <BottomSheetHeader>
@@ -156,10 +177,13 @@ export function ScooterVinReview({
         </BottomSheetContent>
       </BottomSheet>
       <BottomSheet
-        dismissible={false}
+        dismissible={onClose ? !disabled : false}
         showHandle={false}
         open={open && step === "documents"}
-        onOpenChange={setOpen}
+        onOpenChange={(next) => {
+          setOpen(next);
+          if (!next) onClose?.();
+        }}
       >
         <BottomSheetContent
           fullScreen

@@ -7,34 +7,37 @@ import { Button, FormActions } from "@repo/ui/components";
 export function ScooterCreateActions({
   enabled = true,
   ready,
+  pending = false,
   status,
   review,
   children,
 }: {
   enabled?: boolean;
   ready: boolean;
+  pending?: boolean;
   status: ReactNode;
   review?: { label: string; onClick: () => void; disabled?: boolean };
   children: ReactNode;
 }) {
   if (!enabled) return <FormActions status={status}>{children}</FormActions>;
+  const floating = !pending && (ready || Boolean(review));
 
   return (
     <FormActions
       sticky
       status={status}
       className={
-        ready
-          ? "self-end bg-floating-action-surface backdrop-blur-floating-surface"
+        floating
+          ? `self-end bg-floating-action-surface backdrop-blur-floating-surface ${review ? "animate-in slide-in-from-bottom-4 duration-normal motion-reduce:animate-none" : ""}`
           : "static bottom-auto sm:bottom-auto"
       }
       data-slot="create-actions"
-      data-sticky={ready}
+      data-sticky={floating}
     >
-      {review ? (
+      {review && !pending ? (
         <Button
           type="button"
-          className="bg-warning text-warning-foreground hover:bg-warning-hover active:bg-warning-active"
+          variant="warning"
           disabled={review.disabled}
           onClick={review.onClick}
         >

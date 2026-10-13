@@ -474,6 +474,12 @@ export function ScooterEditor({
     extraction.vinMismatch ||
     extraction.unverifiedSources.length,
   );
+  const documentsProcessing =
+    analysis.running ||
+    documents.drafts.some((document) => document.status === "uploading") ||
+    Object.values(analysis.entries).some(
+      (entry) => entry.status === "processing",
+    );
   const createStatus = t(
     analysis.running
       ? "creation.analyzing"
@@ -593,15 +599,18 @@ export function ScooterEditor({
                   </p>
                 ) : null}
                 {(vinReviewRequested ||
-                  vinReviewRequired ||
-                  (extraction.vinMismatch &&
-                    v1.scooters.scooterDocumentExtractedDataSchema.shape.vin.safeParse(
-                      form.getValues("vin"),
-                    ).success)) &&
+                  Boolean(
+                    scooter && (vinReviewRequired || extraction.vinMismatch),
+                  )) &&
                 vinReviewDocuments.length ? (
                   <ScooterVinReview
                     key={JSON.stringify([sourceSignature, vinReviewDocuments])}
                     documents={vinReviewDocuments}
+                    initialVin={!scooter ? form.getValues("vin") : ""}
+                    showSummary={Boolean(scooter)}
+                    onClose={
+                      !scooter ? () => setVinReviewRequested(false) : undefined
+                    }
                     disabled={
                       isSubmitting || analysis.running || documents.blocked
                     }
@@ -633,12 +642,12 @@ export function ScooterEditor({
                     }}
                   />
                 ) : null}
-                {extraction.vinMismatch ? (
+                {scooter && extraction.vinMismatch ? (
                   <p role="alert" className="text-sm text-destructive">
                     {t("documentImport.vinMismatch", { fields: "VIN" })}
                   </p>
                 ) : null}
-                {unverifiedSources.length ? (
+                {scooter && unverifiedSources.length ? (
                   <div className="grid gap-4 rounded-xl border border-border bg-card p-4 sm:p-6">
                     <p className="text-sm font-medium text-warning">
                       {t("wizard.verifyVin")}
@@ -693,7 +702,28 @@ export function ScooterEditor({
             <ScooterCreateActions
               enabled={!scooter}
               ready={scooterRequiredFieldsValid(createValues)}
-              status={scooter ? undefined : createStatus}
+              pending={documentsProcessing}
+              status={
+                scooter
+                  ? undefined
+                  : needsDocumentReview && !documentsProcessing
+                    ? t(
+                        extraction.vinMismatch || vinReviewRequired
+                          ? "creation.documentVinMismatchCheck"
+                          : "creation.documentVinUnknownCheck",
+                        {
+                          documents: vinReviewDocuments
+                            .filter(
+                              (document) =>
+                                !document.vin ||
+                                document.vin !== createValues.vin,
+                            )
+                            .map((document) => document.fileName)
+                            .join(", "),
+                        },
+                      )
+                    : createStatus
+              }
               review={
                 !scooter && needsDocumentReview
                   ? {

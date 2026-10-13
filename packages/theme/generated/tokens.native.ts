@@ -233,6 +233,26 @@ export const tokens = {
     },
   },
   shadow: {
+    warning: {
+      shadowColor: "#E17100",
+      shadowOffset: {
+        width: 0,
+        height: 6,
+      },
+      shadowOpacity: 0.2,
+      shadowRadius: 12,
+      elevation: 3,
+    },
+    disabled: {
+      shadowColor: "#A1A1AA",
+      shadowOffset: {
+        width: 0,
+        height: 6,
+      },
+      shadowOpacity: 0.1,
+      shadowRadius: 12,
+      elevation: 3,
+    },
     primary: {
       shadowColor: "#06B6D4",
       shadowOffset: {

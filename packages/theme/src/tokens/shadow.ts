@@ -2,6 +2,8 @@
  * Shadow tokens. Web uses box-shadow strings; native uses iOS shadow props + Android elevation.
  * The same logical token (sm/md/lg/xl) renders the closest equivalent on each platform.
  */
+import { primitives } from "./primitives";
+
 export type NativeShadow = {
   shadowColor: string;
   shadowOffset: { width: number; height: number };
@@ -16,9 +18,29 @@ export type ShadowToken = {
 };
 
 export const shadow: Record<
-  "none" | "sm" | "md" | "lg" | "xl" | "primary",
+  "none" | "sm" | "md" | "lg" | "xl" | "primary" | "warning" | "disabled",
   ShadowToken
 > = {
+  warning: {
+    web: "0 6px 24px -8px color-mix(in oklch, var(--warning) 40%, transparent)",
+    native: {
+      shadowColor: primitives.amber[600],
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.2,
+      shadowRadius: 12,
+      elevation: 3,
+    },
+  },
+  disabled: {
+    web: "0 6px 24px -8px color-mix(in oklch, var(--disabled-foreground) 20%, transparent)",
+    native: {
+      shadowColor: primitives.neutral[400],
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.1,
+      shadowRadius: 12,
+      elevation: 3,
+    },
+  },
   primary: {
     web: "0 6px 24px -8px rgb(6 182 212 / 0.4)",
     native: {
