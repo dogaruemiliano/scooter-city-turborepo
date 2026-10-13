@@ -11,6 +11,7 @@ import { magnification } from "./tokens/magnification";
 import { aspectRatio } from "./tokens/aspect-ratio";
 import { zIndex } from "./tokens/z-index";
 import { breakpoints } from "./tokens/breakpoints";
+import { bottomSheet } from "./tokens/bottom-sheet";
 
 export type ColorScheme = "light" | "dark";
 
@@ -30,6 +31,7 @@ export const tokens = {
   aspectRatio,
   zIndex,
   breakpoints,
+  bottomSheet,
 } as const;
 
 export type Tokens = typeof tokens;

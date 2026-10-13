@@ -20,6 +20,8 @@ import {
   type FuzzySearchKey,
 } from "@repo/ui/lib/fuzzy-search";
 import { cn } from "@repo/ui/lib/utils";
+import { bottomSheet, breakpoints } from "@repo/theme";
+import { useIsMobile } from "@repo/ui/hooks/use-mobile";
 
 export interface SheetSelectOption {
   value: string;
@@ -41,6 +43,7 @@ export interface SheetSelectProps {
   options: readonly SheetSelectOption[];
   onValueChange: (value: string) => void;
   triggerRef?: React.Ref<HTMLButtonElement>;
+  onBlur?: () => void;
   /** Optional action inside the sheet; call `select` to select and close it. */
   renderHeaderAction?: (select: (value: string) => void) => React.ReactNode;
   id?: string;
@@ -68,6 +71,7 @@ export interface SheetSelectProps {
   emptyMessage?: string;
   closeLabel?: string;
   className?: string;
+  optionClassName?: string;
 }
 
 function SheetSelect({
@@ -76,6 +80,7 @@ function SheetSelect({
   options,
   onValueChange,
   triggerRef,
+  onBlur,
   renderHeaderAction,
   id,
   labelledById,
@@ -91,7 +96,9 @@ function SheetSelect({
   emptyMessage = "No options found",
   closeLabel = "Close",
   className,
+  optionClassName,
 }: SheetSelectProps) {
+  const mobile = useIsMobile(breakpoints.lg);
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
   const searchInputRef = React.useRef<HTMLInputElement>(null);
@@ -122,6 +129,8 @@ function SheetSelect({
 
   return (
     <BottomSheet
+      snapPoints={mobile ? [bottomSheet.selectSnapPoint] : undefined}
+      snapPoint={mobile ? bottomSheet.selectSnapPoint : null}
       open={open}
       onOpenChange={(nextOpen) => {
         setOpen(nextOpen);
@@ -135,6 +144,7 @@ function SheetSelect({
         id={id}
         disabled={disabled}
         ref={triggerRef}
+        onBlur={onBlur}
         render={
           <button
             type="button"
@@ -166,7 +176,15 @@ function SheetSelect({
         }
       />
 
-      <BottomSheetContent initialFocus={searchInputRef}>
+      <BottomSheetContent
+        initialFocus={searchInputRef}
+        className="lg:h-(--select-sheet-height)"
+        style={
+          {
+            "--select-sheet-height": bottomSheet.selectHeight,
+          } as React.CSSProperties
+        }
+      >
         <BottomSheetHeader>
           <div className="flex items-center justify-between gap-2">
             <BottomSheetTitle>{label}</BottomSheetTitle>
@@ -214,10 +232,11 @@ function SheetSelect({
                     onClick={clear}
                     aria-current={selectedValue ? undefined : "true"}
                     className={cn(
-                      "flex w-full items-center justify-between gap-2 rounded px-3 py-2 text-left text-sm outline-none transition-colors duration-fast ease-standard focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:text-disabled-foreground",
+                      "flex h-10 w-full items-center justify-between gap-2 rounded px-3 py-2 text-left text-sm outline-none transition-colors duration-fast ease-standard focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:text-disabled-foreground",
                       selectedValue
-                        ? "text-muted-foreground hover:bg-accent/50"
+                        ? "bg-selectable-row text-muted-foreground hover:bg-accent/50"
                         : "bg-accent font-medium text-accent-foreground",
+                      optionClassName,
                     )}
                   >
                     <span className="truncate">{clearOptionLabel}</span>
@@ -240,10 +259,11 @@ function SheetSelect({
                       option.value === selectedValue ? "true" : undefined
                     }
                     className={cn(
-                      "flex w-full items-center justify-between gap-2 rounded px-3 py-2 text-left text-sm outline-none transition-colors duration-fast ease-standard focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:text-disabled-foreground",
+                      "flex h-10 w-full items-center justify-between gap-2 rounded px-3 py-2 text-left text-sm outline-none transition-colors duration-fast ease-standard focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:text-disabled-foreground",
                       option.value === selectedValue
                         ? "bg-accent font-medium text-accent-foreground"
-                        : "text-foreground hover:bg-accent/50",
+                        : "bg-selectable-row text-foreground hover:bg-accent/50",
+                      optionClassName,
                     )}
                   >
                     <span className="truncate">{option.label}</span>

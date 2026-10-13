@@ -25,14 +25,14 @@ function Card<Element extends CardElement = "div">({
     "data-surface": surface,
     "data-border": border,
     className: cn(
-      "group/card flex min-w-0 flex-col gap-(--card-spacing) overflow-hidden rounded-xl border bg-card py-(--card-spacing) text-sm text-card-foreground [--card-spacing:--spacing(5)] has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl",
+      "group/card flex min-w-0 flex-col gap-(--card-spacing) overflow-hidden rounded-xl border bg-card py-(--card-spacing-y) text-sm text-card-foreground [--card-spacing:--spacing(3)] [--card-spacing-y:--spacing(3)] md:[--card-spacing:--spacing(5)] md:[--card-spacing-y:var(--card-spacing)] has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl",
       {
         transparent: "border-transparent",
         default: "border-border",
         primary: "border-primary",
       }[border],
       surface === "raised" &&
-        "rounded-2xl bg-popover text-popover-foreground [--card-spacing:--spacing(4)] md:[--card-spacing:--spacing(6)]",
+        "rounded-2xl bg-popover text-popover-foreground [--card-spacing:--spacing(3)] md:[--card-spacing:--spacing(6)]",
       size === "sm" &&
         "[--card-spacing:--spacing(3)] md:[--card-spacing:--spacing(3)]",
       className,
@@ -46,7 +46,7 @@ function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="card-header"
       className={cn(
-        "group/card-header @container/card-header grid min-w-0 auto-rows-min items-start gap-1 rounded-t-xl px-(--card-spacing) has-data-[slot=card-action]:grid-cols-[minmax(0,1fr)_auto] has-data-[slot=card-description]:grid-rows-[auto_auto] [&>*]:min-w-0 [.border-b]:pb-(--card-spacing)",
+        "group/card-header @container/card-header grid min-w-0 auto-rows-min items-start gap-1 rounded-t-xl px-(--card-spacing) has-data-[slot=card-action]:grid-cols-[minmax(0,1fr)_auto] has-data-[slot=card-description]:grid-rows-[auto_auto] [&>*]:min-w-0 [.border-b]:pb-(--card-spacing-y)",
         className,
       )}
       {...props}
@@ -108,7 +108,7 @@ function CardFooter({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="card-footer"
       className={cn(
-        "flex items-center rounded-b-xl border-t border-border bg-inherit p-(--card-spacing)",
+        "flex items-center rounded-b-xl border-t border-border bg-inherit px-(--card-spacing) py-(--card-spacing-y)",
         className,
       )}
       {...props}

@@ -15,6 +15,7 @@ import { Card, CardHeader, CardContent } from "./card";
 function FormSection({
   title,
   number,
+  status,
   panel = false,
   columns = 2,
   className,
@@ -23,6 +24,7 @@ function FormSection({
 }: React.ComponentProps<"section"> & {
   title?: string;
   number?: number;
+  status?: React.ReactNode;
   panel?: boolean;
   columns?: 1 | 2;
 }) {
@@ -50,7 +52,12 @@ function FormSection({
         className={cn("@container/form-section", className)}
         {...props}
       >
-        <CardHeader>{heading}</CardHeader>
+        <CardHeader>
+          <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
+            {heading}
+            {status}
+          </div>
+        </CardHeader>
         <CardContent className={fieldsClassName}>{children}</CardContent>
       </Card>
     );
@@ -60,7 +67,10 @@ function FormSection({
       className={cn("@container/form-section grid min-w-0 gap-4", className)}
       {...props}
     >
-      {heading}
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
+        {heading}
+        {status}
+      </div>
       <div className={fieldsClassName}>{children}</div>
     </section>
   );

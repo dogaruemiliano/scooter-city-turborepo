@@ -7,6 +7,7 @@ export declare const tokens: {
     "cardForeground": "#12161B",
     "popover": "#FFFFFF",
     "popoverForeground": "#12161B",
+    "selectableRow": "#F9FBFB",
     "primary": "#06B6D4",
     "primaryForeground": "#12161B",
     "secondary": "#F1F3F3",

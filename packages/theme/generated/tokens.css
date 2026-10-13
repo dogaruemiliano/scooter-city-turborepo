@@ -9,6 +9,7 @@
   --card-foreground: oklch(0.198264 0.011840 254.1076);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.198264 0.011840 254.1076);
+  --selectable-row: oklch(0.987 0.002 197.1);
   --primary: #06b6d4;
   --primary-foreground: oklch(0.198264 0.011840 254.1076);
   --secondary: oklch(0.963 0.002 197.1);
@@ -83,6 +84,7 @@
     --card-foreground: oklch(0.987 0.002 197.1);
     --popover: #1f1f1f;
     --popover-foreground: oklch(0.987 0.002 197.1);
+    --selectable-row: #141414;
     --primary: #06b6d4;
     --primary-foreground: oklch(0.198264 0.011840 254.1076);
     --secondary: #1f1f1f;
@@ -157,6 +159,7 @@
   --card-foreground: oklch(0.987 0.002 197.1);
   --popover: #1f1f1f;
   --popover-foreground: oklch(0.987 0.002 197.1);
+  --selectable-row: #141414;
   --primary: #06b6d4;
   --primary-foreground: oklch(0.198264 0.011840 254.1076);
   --secondary: #1f1f1f;
@@ -354,6 +357,7 @@
   --container-document-review: 60dvh;
   --container-form-columns: 640px;
   --container-form-controls: 384px;
+  --container-boolean-row: 32em;
   --container-access-directory: 60dvh;
   --container-access-editor: 80dvh;
 
@@ -441,6 +445,7 @@
   --color-card-foreground: var(--card-foreground);
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
+  --color-selectable-row: var(--selectable-row);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);

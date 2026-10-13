@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFileSync } from "node:fs";
 
 import { converter, formatHex, wcagContrast } from "culori";
 
@@ -129,6 +130,26 @@ test("popover and bottom-sheet surfaces are distinct from the page in every them
 
   assert.notEqual(semanticColors.light.card, semanticColors.light.background);
   assert.notEqual(semanticColors.dark.card, semanticColors.dark.background);
+});
+
+test("sheet-select rows are distinct while the sheet retains its popover surface", () => {
+  for (const colors of Object.values(semanticColors)) {
+    assert.notEqual(formatHex(colors.selectableRow), formatHex(colors.popover));
+    assert.ok(wcagContrast(colors.foreground, colors.selectableRow) >= 4.5);
+  }
+  const sheet = readFileSync(
+    new URL("../../ui/src/components/sheet-select.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.doesNotMatch(sheet, /\bbg-background\b/);
+  assert.match(sheet, /snapPoints=\{mobile \? \[bottomSheet.selectSnapPoint\]/);
+  assert.match(sheet, /lg:h-\(--select-sheet-height\)/);
+  const surface = readFileSync(
+    new URL("../../ui/src/components/bottom-sheet.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(surface, /\bbg-popover\b/);
+  assert.doesNotMatch(surface, /\bbg-background\b/);
 });
 
 test("access workspace inherits every active theme color and exposes the requested type pairing", () => {

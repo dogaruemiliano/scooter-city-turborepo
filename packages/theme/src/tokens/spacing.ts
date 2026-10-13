@@ -44,6 +44,7 @@ export const viewportSizing = {
   documentReview: "60dvh",
   formColumns: `${breakpoints.sm}px`,
   formControls: `${spacing[96]}px`,
+  booleanRow: "32em",
   accessDirectory: "60dvh",
   accessEditor: "80dvh",
 } as const;

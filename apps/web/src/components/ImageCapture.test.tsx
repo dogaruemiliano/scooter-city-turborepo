@@ -401,7 +401,7 @@ describe("shared ImageCapture", () => {
     const reset = screen.getByRole("button", { name: "Reset" });
     expect(rotate.closest("header")).not.toBeNull();
     expect(reset.closest("header")).not.toBeNull();
-    expect(reset).toHaveClass("text-primary");
+    expect(reset).toHaveClass("text-link");
     expect(reset).toHaveTextContent("Reset");
     expect(reset.querySelector(".lucide-rotate-ccw")).toBeNull();
 

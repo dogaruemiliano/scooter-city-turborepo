@@ -10,6 +10,7 @@ export function FileDropZone({
   label,
   browseLabel,
   hint,
+  requirements,
   accept,
   disabled,
   onFiles,
@@ -17,12 +18,14 @@ export function FileDropZone({
   label: string;
   browseLabel: string;
   hint: string;
+  requirements?: string;
   accept: string;
   disabled?: boolean;
   onFiles: (files: File[]) => void;
 }) {
   const input = useRef<HTMLInputElement>(null);
   const hintId = useId();
+  const requirementsId = useId();
   const [dragging, setDragging] = useState(false);
   return (
     <>
@@ -43,7 +46,7 @@ export function FileDropZone({
       <button
         type="button"
         disabled={disabled}
-        aria-describedby={hintId}
+        aria-describedby={requirements ? `${hintId} ${requirementsId}` : hintId}
         className={cn(
           "flex w-full flex-col items-center gap-4 rounded-2xl border-2 border-dashed bg-control px-6 py-10 text-center outline-none transition-colors duration-fast ease-standard hover:border-primary focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
           dragging ? "border-primary" : "border-border",
@@ -75,6 +78,11 @@ export function FileDropZone({
         >
           {browseLabel}
         </span>
+        {requirements ? (
+          <span id={requirementsId} className="text-xs text-muted-foreground">
+            {requirements}
+          </span>
+        ) : null}
       </button>
     </>
   );

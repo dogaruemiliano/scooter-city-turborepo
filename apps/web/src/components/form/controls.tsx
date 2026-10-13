@@ -224,6 +224,7 @@ export function FormCountrySelect(
           id={id}
           invalid={Boolean(error)}
           labelledById={`${id}-label`}
+          onBlur={field.onBlur}
           onValueChange={(value) => {
             field.onChange(value);
             field.onBlur();
@@ -276,6 +277,12 @@ export function FormSelect({
       name={name}
       render={({ field }) => (
         <Select
+          items={[
+            ...(emptyOption
+              ? [{ value: EMPTY_SELECT_VALUE, label: emptyOption.label }]
+              : []),
+            ...options,
+          ]}
           value={
             field.value
               ? String(field.value)
@@ -292,6 +299,7 @@ export function FormSelect({
         >
           <SelectTrigger
             ref={field.ref}
+            onBlur={field.onBlur}
             aria-describedby={errorId}
             aria-invalid={error ? true : undefined}
             aria-required={required || undefined}
