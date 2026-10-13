@@ -12,6 +12,13 @@ import { NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ScooterEditForm } from "./ScooterEditForm";
+vi.mock("./ScooterPhotos", () => ({
+  ScooterPhotos: ({ number }: { number?: number }) => (
+    <section>
+      <h2>{String(number).padStart(2, "0")}. Photos</h2>
+    </section>
+  ),
+}));
 import { scooterEditorDefaults } from "./scooter-editor-schema";
 
 const mocks = vi.hoisted(() => ({
@@ -170,6 +177,16 @@ describe("ScooterEditForm", () => {
         />
       </NextIntlClientProvider>,
     );
+    const headings = screen
+      .getAllByRole("heading")
+      .map((heading) => heading.textContent);
+    const galleryIndex = headings.findIndex((text) =>
+      text?.includes("02. Photos"),
+    );
+    expect(galleryIndex).toBeGreaterThan(0);
+    expect(headings[galleryIndex - 1]).toMatch(/01/);
+    expect(headings[galleryIndex + 1]).toMatch(/03/);
+
     expect(screen.getByLabelText("Insured name")).toHaveValue("");
     await browser.click(screen.getByRole("button", { name: "Import JSON" }));
     await browser.click(screen.getByRole("button", { name: "Edit JSON" }));

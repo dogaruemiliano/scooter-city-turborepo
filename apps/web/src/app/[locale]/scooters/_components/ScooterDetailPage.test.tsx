@@ -6,6 +6,8 @@ import { NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ScooterDetailPage } from "./ScooterDetailPage";
+// Gallery API interactions are covered independently in ScooterPhotos.test.tsx.
+vi.mock("./ScooterPhotos", () => ({ ScooterPhotos: () => null }));
 
 const mocks = vi.hoisted(() => ({
   apiFetch: vi.fn(),

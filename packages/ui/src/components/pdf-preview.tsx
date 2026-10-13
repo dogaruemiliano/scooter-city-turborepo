@@ -13,7 +13,11 @@ import {
   getPdfThumbnail,
   rememberPdfThumbnail,
 } from "../lib/pdf-document";
-import { DocumentZoom, type DocumentZoomLabels } from "./document-zoom";
+import {
+  DocumentZoom,
+  type DocumentZoomLabels,
+  type MediaNavigationProps,
+} from "./document-zoom";
 import { Button } from "./button";
 import type { DocumentPreviewHeaderProps } from "./document-preview-header";
 
@@ -33,13 +37,22 @@ export function PdfPreview({
   onClosePress,
   closeLabel,
   headerActions,
+  onPrevious,
+  onNext,
+  leftActions,
+  rightActions,
+  initialPage = "first",
+  entryDirection,
 }: {
   src: string;
   label: string;
   labels: PdfPreviewLabels;
   thumbnail?: boolean;
   zoomLabels?: DocumentZoomLabels;
-} & Omit<DocumentPreviewHeaderProps, "caption">) {
+  initialPage?: "first" | "last";
+} & Omit<DocumentPreviewHeaderProps, "caption"> &
+  MediaNavigationProps) {
+  const [pageDirection, setPageDirection] = useState<-1 | 1>();
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
   const [failed, setFailed] = useState(false);
   const [pageNumber, setPageNumber] = useState(1);
@@ -49,7 +62,10 @@ export function PdfPreview({
     const resource = acquirePdf(src);
     void resource.promise
       .then((document) => {
-        if (!disposed) setPdf(document);
+        if (!disposed) {
+          setPdf(document);
+          setPageNumber(initialPage === "last" ? document.numPages : 1);
+        }
       })
       .catch(() => {
         if (!disposed) setFailed(true);
@@ -58,7 +74,19 @@ export function PdfPreview({
       disposed = true;
       resource.release();
     };
-  }, [src]);
+  }, [src, initialPage]);
+  function previous() {
+    if (pageNumber > 1) {
+      setPageDirection(-1);
+      setPageNumber(pageNumber - 1);
+    } else onPrevious?.();
+  }
+  function next() {
+    if (pdf && pageNumber < pdf.numPages) {
+      setPageDirection(1);
+      setPageNumber(pageNumber + 1);
+    } else onNext?.();
+  }
   const page = (scale = 1) => (
     <PdfPage
       key={pageNumber}
@@ -79,7 +107,7 @@ export function PdfPreview({
         className="size-11 min-h-11 hover:bg-document-overlay disabled:border-transparent disabled:bg-transparent"
         aria-label={labels.previousPage}
         disabled={pageNumber === 1}
-        onClick={() => setPageNumber(pageNumber - 1)}
+        onClick={previous}
       >
         <ChevronLeftIcon aria-hidden="true" />
       </Button>
@@ -93,7 +121,7 @@ export function PdfPreview({
         className="size-11 min-h-11 hover:bg-document-overlay disabled:border-transparent disabled:bg-transparent"
         aria-label={labels.nextPage}
         disabled={pageNumber === pdf.numPages}
-        onClick={() => setPageNumber(pageNumber + 1)}
+        onClick={next}
       >
         <ChevronRightIcon aria-hidden="true" />
       </Button>
@@ -132,6 +160,15 @@ export function PdfPreview({
     >
       {!thumbnail && zoomLabels ? (
         <DocumentZoom
+          entryDirection={pageDirection ?? entryDirection}
+          onPrevious={
+            pdf && (pageNumber > 1 || onPrevious) ? previous : undefined
+          }
+          onNext={
+            pdf && (pageNumber < pdf.numPages || onNext) ? next : undefined
+          }
+          leftActions={leftActions}
+          rightActions={rightActions}
           resetKey={pageNumber}
           labels={zoomLabels}
           navigation={navigation}

@@ -35,7 +35,7 @@ function FormSection({
       : "[&>*]:col-span-full!",
   );
   const heading = title ? (
-    <h2 className="flex min-w-0 items-center gap-3 text-sm font-semibold uppercase tracking-wide wrap-anywhere">
+    <h2 className="flex min-w-0 items-center gap-3 text-base font-semibold normal-case tracking-normal wrap-anywhere">
       <span
         aria-hidden="true"
         className="h-5 w-1 shrink-0 rounded-full bg-foreground"

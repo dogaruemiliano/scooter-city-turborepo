@@ -321,6 +321,10 @@ export function useScooterExtraction(options: Options) {
     const { documents, sources, form, brands, editing, initialRawFields } =
       latest.current;
     const previous = previousSources.current;
+    // Mount effects can replay. Reconcile only when source identities change;
+    // an unchanged empty list is not a successful document import.
+    if (previous && JSON.stringify(previous) === JSON.stringify(sources))
+      return;
     previousSources.current = sources;
     const activeIds = new Set(sources.map((entry) => entry.sourceId));
     const hasCiv = sources.some((entry) => entry.type === "civ");

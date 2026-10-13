@@ -17,12 +17,14 @@ export function FormBooleanRow<T extends FieldValues>({
   falseLabel,
   trueLabel,
   disabled,
+  stacked = false,
 }: {
   name: FieldPathByValue<T, string>;
   label: string;
   falseLabel: string;
   trueLabel: string;
   disabled?: boolean;
+  stacked?: boolean;
 }) {
   const { control } = useFormContext<T>();
   const id = useId();
@@ -35,12 +37,14 @@ export function FormBooleanRow<T extends FieldValues>({
           className="@container/boolean-row min-w-0 text-base"
           data-field-name={name}
         >
-          <div className="grid min-w-0 gap-2 @boolean-row/boolean-row:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] @boolean-row/boolean-row:items-center">
-            <Label
-              data-slot="boolean-row-label"
-              htmlFor={id}
-              className="text-base font-medium text-foreground wrap-anywhere"
-            >
+          <div
+            className={
+              stacked
+                ? "grid min-w-0 gap-2"
+                : "grid min-w-0 gap-2 @boolean-row/boolean-row:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] @boolean-row/boolean-row:items-center"
+            }
+          >
+            <Label htmlFor={id} className="wrap-anywhere">
               {label}
             </Label>
             <SegmentedRadioGroup<BooleanDraft>
@@ -54,7 +58,6 @@ export function FormBooleanRow<T extends FieldValues>({
               disabled={disabled}
               deselectValue=""
               showCheckmark
-              optionClassName="min-h-12 text-sm font-medium"
               aria-invalid={fieldState.invalid || undefined}
               aria-describedby={fieldState.error ? `${id}-error` : undefined}
               options={[

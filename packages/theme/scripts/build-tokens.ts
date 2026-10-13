@@ -11,6 +11,7 @@ import { aspectRatio } from "../src/tokens/aspect-ratio.js";
 import { breakpoints } from "../src/tokens/breakpoints.js";
 import { magnification } from "../src/tokens/magnification.js";
 import { motion } from "../src/tokens/motion.js";
+import { opacity } from "../src/tokens/opacity.js";
 import { primitives } from "../src/tokens/primitives.js";
 import { radius, radiusBase } from "../src/tokens/radius.js";
 import { semanticColors, semanticBlur } from "../src/tokens/semantic.js";
@@ -156,6 +157,10 @@ export function buildCss(): string {
     lines.push(`  --ease-${kebab(key)}: ${value};`);
   }
   lines.push("");
+  for (const [key, value] of Object.entries(opacity)) {
+    lines.push(`  --opacity-${kebab(key)}: ${value};`);
+  }
+  lines.push("");
   for (const [key, value] of Object.entries(zIndex)) {
     lines.push(`  --z-${kebab(key)}: ${value};`);
   }
@@ -228,6 +233,7 @@ export function buildNative(): string {
       ]),
     ),
     motion,
+    opacity,
     magnification,
     aspectRatio,
     zIndex,

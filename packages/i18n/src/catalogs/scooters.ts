@@ -1,5 +1,79 @@
 export const scootersCatalog = {
   en: {
+    photos: {
+      title: "Photos",
+      count: "{count} / 20 photos",
+      upload: "Upload photos",
+      dropOverlay: "Drop it like it's hot",
+      addPhotos: "Add photos",
+      sortPhoto: "Reorder photo: {name}",
+      sortInstructions:
+        "Drag to reorder. With the keyboard, press Space to pick up, use arrow keys to move, and press Space to drop or Escape to cancel. From the last row, press Arrow Down to move to the delete area and Space to delete.",
+      addOtherPhotos: "Add other photos",
+      futureNotice:
+        "The customer gallery isn’t live yet. Photos selected for customers will appear when it launches.",
+      draftNotice:
+        "Photos upload privately now and are attached when you create the scooter. Unused uploads expire automatically.",
+      saveNotice:
+        "Photo changes save immediately, separately from the scooter form.",
+      empty: "No photos yet",
+      emptyHelp:
+        "Add photos of this scooter. New photos are internal by default. JPEG, PNG or WebP, up to 15 MB each.",
+      emptyReadOnly: "Photos added by your team will appear here.",
+      emptyFilter: "No photos match this filter.",
+      loading: "Loading photos…",
+      filter: "Filter photos",
+      filters: {
+        all: "All",
+        internal: "Internal",
+        customer: "Selected for customers",
+      },
+      internal: "Internal",
+      selectedForCustomers: "Selected for customers",
+      coverBadge: "Cover",
+      public: "Public",
+      open: "Open photo: {name}",
+      details: "Photo details",
+      close: "Close photo",
+      grid: "Toggle image grid",
+      zoomIn: "Zoom in",
+      zoomOut: "Zoom out",
+      resetZoom: "Reset zoom",
+      imageLoading: "Loading photo…",
+      position: "{index} / {count}",
+      previous: "Previous photo",
+      next: "Next photo",
+      caption: "Caption",
+      noCaption: "No caption",
+      saveCaption: "Save caption",
+      isPublic: "Public photo",
+      visibilityHelp: "Public visibility is independent of the gallery cover.",
+      cover: "Cover photo",
+      setCover: "Set as cover",
+      order: "Photo order",
+      earlier: "Move earlier",
+      later: "Move later",
+      reorderHelp:
+        "Drag photos in the All view to reorder, or open a photo and use Move earlier / Move later.",
+      uploading: "Uploading… {progress}%",
+      processing: "Saving photo…",
+      uploadFailed: "Photo wasn’t saved. Retry the upload or remove it.",
+      imageFailed: "Photo couldn’t be loaded.",
+      retry: "Retry",
+      remove: "Remove",
+      delete: "Delete photo",
+      deleteDrop: "Drag a photo here to delete it",
+      deleteDropActive: "Release to delete this photo",
+      deleteConfirm:
+        "Delete this photo from the scooter gallery? If it is the cover, the next photo becomes the cover.",
+      cancel: "Cancel",
+      errors: {
+        load: "Photos couldn’t be loaded. Try again.",
+        save: "The change couldn’t be saved. Try again; reload the gallery if its photo order has changed.",
+        files:
+          "Choose up to 20 photos in total. Each must be a JPEG, PNG or WebP image, up to 15 MB.",
+      },
+    },
     creation: {
       description:
         "Register a vehicle with its identity, documents, and initial registration.",
@@ -999,6 +1073,82 @@ export const scootersCatalog = {
     },
   },
   ro: {
+    photos: {
+      title: "Fotografii",
+      count: "{count} / 20 fotografii",
+      upload: "Încarcă fotografii",
+      dropOverlay: "Drop it like it's hot",
+      addPhotos: "Adaugă fotografii",
+      sortPhoto: "Reordonează fotografia: {name}",
+      sortInstructions:
+        "Trage pentru reordonare. Cu tastatura, apasă Spațiu pentru selectare, săgețile pentru mutare și Spațiu pentru plasare sau Escape pentru anulare. Din ultimul rând, apasă Săgeată jos pentru zona de ștergere și Spațiu pentru a șterge.",
+      addOtherPhotos: "Adaugă alte fotografii",
+      futureNotice:
+        "Galeria pentru clienți nu este încă disponibilă. Fotografiile selectate pentru clienți vor apărea la lansarea ei.",
+      draftNotice:
+        "Fotografiile sunt încărcate privat și asociate la crearea scuterului. Încărcările nefolosite expiră automat.",
+      saveNotice:
+        "Modificările fotografiilor se salvează imediat, separat de formularul scuterului.",
+      empty: "Nicio fotografie încă",
+      emptyHelp:
+        "Adaugă fotografii ale acestui scuter. Fotografiile noi sunt interne implicit. JPEG, PNG sau WebP, maximum 15 MB fiecare.",
+      emptyReadOnly: "Fotografiile adăugate de echipă vor apărea aici.",
+      emptyFilter: "Nicio fotografie nu corespunde acestui filtru.",
+      loading: "Se încarcă fotografiile…",
+      filter: "Filtrează fotografiile",
+      filters: {
+        all: "Toate",
+        internal: "Interne",
+        customer: "Selectate pentru clienți",
+      },
+      internal: "Internă",
+      selectedForCustomers: "Selectată pentru clienți",
+      coverBadge: "Copertă",
+      public: "Publică",
+      open: "Deschide fotografia: {name}",
+      details: "Detaliile fotografiei",
+      close: "Închide fotografia",
+      grid: "Comută grila imaginii",
+      zoomIn: "Mărește",
+      zoomOut: "Micșorează",
+      resetZoom: "Resetează mărirea",
+      imageLoading: "Se încarcă fotografia…",
+      position: "{index} / {count}",
+      previous: "Fotografia precedentă",
+      next: "Fotografia următoare",
+      caption: "Descriere",
+      noCaption: "Fără descriere",
+      saveCaption: "Salvează descrierea",
+      isPublic: "Fotografie publică",
+      visibilityHelp:
+        "Vizibilitatea publică este independentă de fotografia de copertă.",
+      cover: "Fotografie de copertă",
+      setCover: "Setează ca fotografie de copertă",
+      order: "Ordinea fotografiilor",
+      earlier: "Mută mai devreme",
+      later: "Mută mai târziu",
+      reorderHelp:
+        "Trage fotografiile în vizualizarea Toate pentru a schimba ordinea, sau deschide o fotografie și folosește Mută mai devreme / Mută mai târziu.",
+      uploading: "Se încarcă… {progress}%",
+      processing: "Se salvează fotografia…",
+      uploadFailed:
+        "Fotografia nu a fost salvată. Reîncearcă încărcarea sau elimin-o.",
+      imageFailed: "Fotografia nu a putut fi încărcată.",
+      retry: "Reîncearcă",
+      remove: "Elimină",
+      delete: "Șterge fotografia",
+      deleteDrop: "Trage o fotografie aici pentru a o șterge",
+      deleteDropActive: "Eliberează pentru a șterge fotografia",
+      deleteConfirm:
+        "Ștergi această fotografie din galeria scuterului? Selecțiile ei ca fotografie de copertă vor fi eliminate.",
+      cancel: "Anulează",
+      errors: {
+        load: "Fotografiile nu au putut fi încărcate. Încearcă din nou.",
+        save: "Modificarea nu a putut fi salvată. Încearcă din nou; reîncarcă galeria dacă ordinea fotografiilor s-a schimbat.",
+        files:
+          "Alege maximum 20 de fotografii în total. Fiecare trebuie să fie JPEG, PNG sau WebP, de maximum 15 MB.",
+      },
+    },
     creation: {
       description:
         "Înregistrează un vehicul cu datele de identificare, documentele și înregistrarea inițială.",

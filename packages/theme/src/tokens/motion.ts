@@ -3,6 +3,9 @@
  * curve via Reanimated's Easing.bezier(...).
  */
 export const motion = {
+  gesture: {
+    sortableTrailingZone: 0.3,
+  },
   duration: {
     instant: 0,
     fast: 150,

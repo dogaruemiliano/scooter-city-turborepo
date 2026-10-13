@@ -2,7 +2,15 @@
 
 import { magnification, motion, spacing } from "@repo/theme";
 import { MinusIcon, PlusIcon } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from "react";
 import { Button } from "./button";
 import {
   DocumentPreviewHeader,
@@ -15,7 +23,17 @@ export type DocumentZoomLabels = {
   resetZoom: string;
 };
 
+export type MediaNavigationProps = {
+  onPrevious?: () => void;
+  onNext?: () => void;
+  leftActions?: ReactNode;
+  rightActions?: ReactNode;
+  entryDirection?: -1 | 1;
+};
+
 type DocumentPointer = {
+  axis?: "x" | "y";
+  navigable: boolean;
   x: number;
   y: number;
   startX: number;
@@ -34,13 +52,105 @@ export function DocumentZoom({
   onClosePress,
   closeLabel,
   headerActions,
+  onPrevious,
+  onNext,
+  leftActions,
+  rightActions,
+  entryDirection,
+  onSwipeDown,
+  swipeDownTarget,
 }: {
   children: (scale: number) => ReactNode;
   labels: DocumentZoomLabels;
   navigation?: ReactNode;
-  resetKey?: number;
-} & DocumentPreviewHeaderProps) {
+  resetKey?: string | number;
+  /** Opt-in dismissal; document review viewers remain locked. */
+  onSwipeDown?: () => void;
+  /** Move the complete viewer surface instead of the image when dismissing. */
+  swipeDownTarget?: RefObject<HTMLElement | null>;
+} & DocumentPreviewHeaderProps &
+  MediaNavigationProps) {
   const viewport = useRef<HTMLDivElement>(null);
+  const stage = useRef<HTMLDivElement>(null);
+  const slideAnimation = useRef<Animation | null>(null);
+  const navigating = useRef(false);
+  const dragOffset = useRef(0);
+  const [slideOffset, setSlideOffset] = useState(0);
+  const dragOffsetY = useRef(0);
+  const [slideOffsetY, setSlideOffsetY] = useState(0);
+  const resetSlide = useCallback(() => {
+    dragOffset.current = 0;
+    dragOffsetY.current = 0;
+    setSlideOffset(0);
+    setSlideOffsetY(0);
+    if (swipeDownTarget?.current) swipeDownTarget.current.style.transform = "";
+  }, [swipeDownTarget]);
+  function snapBack() {
+    if (dragOffset.current || dragOffsetY.current)
+      slideTo(0, undefined, dragOffsetY.current ? "y" : "x");
+  }
+  const reducedMotion = () =>
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  function slideTo(offset: number, action?: () => void, axis: "x" | "y" = "x") {
+    const node =
+      axis === "y"
+        ? (swipeDownTarget?.current ?? stage.current)
+        : stage.current;
+    if (!node || reducedMotion() || !node.animate) {
+      resetSlide();
+      action?.();
+      return;
+    }
+    navigating.current = true;
+    const animation = node.animate(
+      [
+        {
+          transform: `translate${axis.toUpperCase()}(${axis === "x" ? dragOffset.current : dragOffsetY.current}px)`,
+        },
+        { transform: `translate${axis.toUpperCase()}(${offset}px)` },
+      ],
+      {
+        duration: motion.duration.fast,
+        easing: motion.easing.decelerate,
+        fill: "forwards",
+      },
+    );
+    slideAnimation.current = animation;
+    void animation.finished
+      .then(() => {
+        // Hold the complete sheet offscreen through the dialog's exit lifecycle.
+        if (axis === "y" && swipeDownTarget?.current && action) {
+          navigating.current = false;
+          action();
+          return;
+        }
+        resetSlide();
+        navigating.current = false;
+        action?.();
+        animation.cancel();
+      })
+      .catch(() => {});
+  }
+  useLayoutEffect(() => {
+    resetSlide();
+    navigating.current = false;
+    slideAnimation.current?.cancel();
+    const node = stage.current;
+    if (entryDirection && node?.animate && !reducedMotion()) {
+      slideAnimation.current = node.animate(
+        [
+          {
+            transform: `translateX(${entryDirection * (viewport.current?.clientWidth ?? 0)}px)`,
+          },
+          { transform: "translateX(0px)" },
+        ],
+        { duration: motion.duration.fast, easing: motion.easing.decelerate },
+      );
+    }
+    return () => {
+      slideAnimation.current?.cancel();
+    };
+  }, [resetKey, entryDirection, resetSlide]);
   const pointers = useRef(new Map<number, DocumentPointer>());
   const pointerSequence = useRef(0);
   const handledZoomSequence = useRef<number | null>(null);
@@ -107,6 +217,29 @@ export function DocumentZoom({
   return (
     <div
       className="relative flex min-h-0 min-w-0 flex-1 flex-col"
+      onKeyDown={(event) => {
+        if (
+          event.defaultPrevented ||
+          event.altKey ||
+          event.ctrlKey ||
+          event.metaKey ||
+          event.shiftKey ||
+          (event.target as HTMLElement).closest(
+            "input, textarea, select, [contenteditable=true], [role=slider], [role=menu], [role=listbox], [role=radio], [data-slot=media-left-actions], [data-slot=media-right-actions]",
+          )
+        )
+          return;
+        const action =
+          event.key === "ArrowLeft"
+            ? onPrevious
+            : event.key === "ArrowRight"
+              ? onNext
+              : undefined;
+        if (action) {
+          event.preventDefault();
+          action();
+        }
+      }}
       data-slot="document-zoom"
     >
       <DocumentPreviewHeader
@@ -118,9 +251,14 @@ export function DocumentZoom({
       <div
         ref={viewport}
         data-slot="document-zoom-viewport"
+        tabIndex={0}
         data-zoom={view.scale}
-        className="relative min-h-0 flex-1 touch-none overflow-hidden overscroll-none"
+        className="relative min-h-0 flex-1 touch-none overflow-hidden overscroll-none select-none [-webkit-touch-callout:none]"
+        onMouseDown={(event) => {
+          if (event.detail > 1) event.preventDefault();
+        }}
         onDoubleClick={(event) => {
+          event.preventDefault();
           // Touch is handled on pointer release. Compatibility mouse events
           // (including Firefox's touch emulation) must not toggle it again.
           if (
@@ -131,7 +269,7 @@ export function DocumentZoom({
           toggleZoom(event.clientX, event.clientY);
         }}
         onPointerDown={(event) => {
-          if (event.button !== 0) return;
+          if (event.button !== 0 || navigating.current) return;
           if (event.pointerType === "touch")
             lastTouchAt.current = event.timeStamp;
           else if (
@@ -142,9 +280,12 @@ export function DocumentZoom({
           pointerSequence.current += 1;
           const tap = pointers.current.size === 0;
           if (!tap) {
+            resetSlide();
             lastTap.current = null;
-            for (const pointer of pointers.current.values())
+            for (const pointer of pointers.current.values()) {
               pointer.tap = false;
+              pointer.navigable = false;
+            }
           }
           pointers.current.set(event.pointerId, {
             x: event.clientX,
@@ -153,6 +294,7 @@ export function DocumentZoom({
             startY: event.clientY,
             startedAt: event.timeStamp,
             tap,
+            navigable: tap && currentView.current.scale === 1,
           });
           event.currentTarget.setPointerCapture?.(event.pointerId);
         }}
@@ -162,6 +304,39 @@ export function DocumentZoom({
           if (event.pointerType === "touch")
             lastTouchAt.current = event.timeStamp;
           if (before.x === event.clientX && before.y === event.clientY) return;
+          if (
+            before.navigable &&
+            pointers.current.size === 1 &&
+            currentView.current.scale === 1 &&
+            (onPrevious || onNext || onSwipeDown)
+          ) {
+            const dx = event.clientX - before.startX;
+            const dy = event.clientY - before.startY;
+            if (
+              !before.axis &&
+              Math.max(Math.abs(dx), Math.abs(dy)) >= spacing[2]
+            ) {
+              before.axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
+              if (before.axis === "y" && onSwipeDown)
+                swipeDownTarget?.current
+                  ?.getAnimations?.()
+                  .forEach((animation) => animation.cancel());
+            }
+            if (before.axis === "x") {
+              const available = dx < 0 ? onNext : onPrevious;
+              dragOffset.current = available
+                ? dx
+                : Math.sign(dx) * Math.min(Math.abs(dx), spacing[3]);
+              setSlideOffset(dragOffset.current);
+            } else if (before.axis === "y" && onSwipeDown) {
+              dragOffsetY.current = Math.max(0, dy);
+              if (swipeDownTarget?.current)
+                swipeDownTarget.current.style.transform = dragOffsetY.current
+                  ? `translateY(${dragOffsetY.current}px)`
+                  : "";
+              else setSlideOffsetY(dragOffsetY.current);
+            }
+          }
           const oldPoints = [...pointers.current.values()];
           pointers.current.set(event.pointerId, {
             ...before,
@@ -196,6 +371,48 @@ export function DocumentZoom({
         onPointerUp={(event) => {
           const pointer = pointers.current.get(event.pointerId);
           pointers.current.delete(event.pointerId);
+          if (
+            pointer?.navigable &&
+            currentView.current.scale === 1 &&
+            pointers.current.size === 0
+          ) {
+            const dx = event.clientX - pointer.startX;
+            const dy = event.clientY - pointer.startY;
+            const axis =
+              pointer.axis ?? (Math.abs(dx) > Math.abs(dy) ? "x" : "y");
+            if (
+              axis === "y" &&
+              dy >= spacing[12] &&
+              Math.abs(dy) > Math.abs(dx) &&
+              onSwipeDown
+            ) {
+              lastTap.current = null;
+              slideTo(
+                swipeDownTarget?.current?.clientHeight ??
+                  viewport.current?.clientHeight ??
+                  0,
+                onSwipeDown,
+                "y",
+              );
+              return;
+            }
+            if (
+              axis === "x" &&
+              Math.abs(dx) >= spacing[12] &&
+              Math.abs(dx) > Math.abs(dy)
+            ) {
+              lastTap.current = null;
+              const action = dx < 0 ? onNext : onPrevious;
+              slideTo(
+                action
+                  ? (dx < 0 ? -1 : 1) * (viewport.current?.clientWidth ?? 0)
+                  : 0,
+                action,
+              );
+              return;
+            }
+          }
+          snapBack();
           if (event.pointerType !== "touch") return;
           lastTouchAt.current = event.timeStamp;
           if (
@@ -231,20 +448,42 @@ export function DocumentZoom({
         onPointerCancel={(event) => {
           pointers.current.delete(event.pointerId);
           lastTap.current = null;
+          snapBack();
         }}
-        onLostPointerCapture={(event) =>
-          pointers.current.delete(event.pointerId)
-        }
+        onLostPointerCapture={(event) => {
+          if (pointers.current.delete(event.pointerId)) {
+            lastTap.current = null;
+            snapBack();
+          }
+        }}
       >
         <div
+          ref={stage}
+          data-slot="media-slide"
           className={`absolute inset-0 flex min-h-0 flex-col ${animateZoom ? "transition-transform duration-fast ease-decelerate motion-reduce:transition-none" : "transition-none"}`}
           style={{
-            transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})`,
+            transform: `translate(${view.x + slideOffset}px, ${view.y + slideOffsetY}px) scale(${view.scale})`,
           }}
         >
           {children(view.scale)}
         </div>
       </div>
+      {leftActions ? (
+        <div
+          data-slot="media-left-actions"
+          className="absolute top-1/2 left-3 z-raised flex -translate-y-1/2 flex-col gap-2"
+        >
+          {leftActions}
+        </div>
+      ) : null}
+      {rightActions ? (
+        <div
+          data-slot="media-right-actions"
+          className="absolute top-1/2 right-3 z-raised flex -translate-y-1/2 flex-col gap-2"
+        >
+          {rightActions}
+        </div>
+      ) : null}
       <div
         data-slot="document-zoom-controls"
         className="absolute bottom-3 left-1/2 z-raised flex w-max max-w-[calc(100%-var(--spacing-4))] -translate-x-1/2 flex-wrap items-center justify-center rounded-xl border border-document-overlay-border bg-document-overlay p-1 text-foreground shadow-md"

@@ -14,8 +14,10 @@ import {
 
 export function ScooterCreateInsuranceFields({
   disabled,
+  number = 4,
 }: {
   disabled: boolean;
+  number?: number;
 }) {
   const t = useTranslations("scooters");
   const { control, getValues, setValue } =
@@ -41,7 +43,7 @@ export function ScooterCreateInsuranceFields({
       disabled={disabled}
       fieldKeys={policies.map((policy) => policy.id)}
       title={t("creation.insuranceDetails")}
-      number={4}
+      number={number}
       showPolicyStatus={policies.some(insuranceEditorHasContent)}
     />
   );

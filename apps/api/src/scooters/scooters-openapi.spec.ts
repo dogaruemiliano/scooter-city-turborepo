@@ -3,6 +3,11 @@ import { CivVocabularyController } from "./civ-vocabulary.controller";
 import { CivVocabularyService } from "./civ-vocabulary.service";
 import { ScooterDocumentsService } from "./scooter-documents.service";
 import { ScooterDocumentsController } from "./scooter-documents.controller";
+import {
+  ScooterPhotosController,
+  ScooterPhotoDraftsController,
+} from "./scooter-photos.controller";
+import { ScooterPhotosService } from "./scooter-photos.service";
 import { ScooterDocumentJobsController } from "../scooter-document-jobs/scooter-document-jobs.controller";
 import { ScooterDocumentJobsService } from "../scooter-document-jobs/scooter-document-jobs.service";
 import { Test } from "@nestjs/testing";
@@ -18,6 +23,8 @@ describe("Scooter OpenAPI document", () => {
       controllers: [
         ScootersController,
         ScooterDocumentsController,
+        ScooterPhotosController,
+        ScooterPhotoDraftsController,
         ScooterDocumentJobsController,
         CivVocabularyController,
       ],
@@ -26,6 +33,7 @@ describe("Scooter OpenAPI document", () => {
         { provide: CivVocabularyService, useValue: {} },
         { provide: ScootersService, useValue: {} },
         { provide: ScooterDocumentsService, useValue: {} },
+        { provide: ScooterPhotosService, useValue: {} },
         { provide: ScooterDocumentJobsService, useValue: {} },
       ],
     }).compile();
@@ -36,6 +44,16 @@ describe("Scooter OpenAPI document", () => {
         SwaggerModule.createDocument(app, new DocumentBuilder().build()),
       );
       expect(document.paths["/scooters"].post).toBeDefined();
+      expect(
+        document.paths["/scooters/photo-draft-upload-url"].post?.responses[201],
+      ).toBeDefined();
+      expect(document.paths["/scooters/{id}/photos"].get).toBeDefined();
+      expect(
+        document.paths["/scooters/{id}/photos"].post?.responses[201],
+      ).toBeDefined();
+      expect(
+        document.paths["/scooters/{id}/photos/{photoId}"].patch,
+      ).toBeDefined();
       expect(document.paths["/vehicle-civ/vocabulary"].get).toBeDefined();
       expect(document.paths["/scooters/{id}"].patch).toBeDefined();
       expect(

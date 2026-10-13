@@ -40,6 +40,8 @@ export const emailSizing = { content: 560 } as const;
 
 /** Web sizing for document editors and available-width form layouts. */
 export const viewportSizing = {
+  scooterPhotoPreview: "55dvh",
+  scooterPhotoPreviewMobile: "35dvh",
   documentEditor: "80vw",
   documentReview: "60dvh",
   formColumns: `${breakpoints.sm}px`,

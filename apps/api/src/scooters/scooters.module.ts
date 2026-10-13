@@ -7,6 +7,11 @@ import { ScooterDocumentJobsModule } from "../scooter-document-jobs/scooter-docu
 
 import { ScootersController } from "./scooters.controller";
 import { ScootersService } from "./scooters.service";
+import {
+  ScooterPhotosController,
+  ScooterPhotoDraftsController,
+} from "./scooter-photos.controller";
+import { ScooterPhotosService } from "./scooter-photos.service";
 
 @Module({
   imports: [ImageStorageModule, ScooterDocumentJobsModule],
@@ -14,8 +19,10 @@ import { ScootersService } from "./scooters.service";
     CivVocabularyController,
     ScooterDocumentsController,
     ScootersController,
+    ScooterPhotosController,
+    ScooterPhotoDraftsController,
   ],
-  providers: [ScootersService, CivVocabularyService],
+  providers: [ScootersService, CivVocabularyService, ScooterPhotosService],
   exports: [ScootersService],
 })
 export class ScootersModule {}

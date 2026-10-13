@@ -24,9 +24,11 @@ const metadataFields = [
 export function CivMetadataFields({
   disabled,
   compact = false,
+  number,
 }: {
   disabled: boolean;
   compact?: boolean;
+  number?: number;
 }) {
   const t = useTranslations("scooters");
   const {
@@ -63,7 +65,7 @@ export function CivMetadataFields({
   }
   const version = useWatch({ control, name: "civVersion" });
   return (
-    <FormSection title={t("sections.civDocument")}>
+    <FormSection title={t("sections.civDocument")} number={number}>
       <FormField
         name="civVersion"
         label={t("fields.civVersion")}

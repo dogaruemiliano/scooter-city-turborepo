@@ -44,6 +44,7 @@ import { webApi } from "@/lib/api";
 import { FeedbackAlert, formErrorsFromIssues } from "./scooter-feedback";
 import { CivDetails } from "./CivDetails";
 import { ScooterDocumentList } from "./ScooterDocumentUpload";
+import { ScooterPhotos } from "./ScooterPhotos";
 import { ScooterRegistrationFormFields } from "./ScooterRegistrationFormFields";
 import {
   buildScooterRegistrationInputCandidate,
@@ -76,6 +77,7 @@ export function ScooterDetailPage({
   const router = useRouter();
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [photosBusy, setPhotosBusy] = useState(false);
   const [registrationOpen, setRegistrationOpen] = useState(false);
   const [registrationDialogKey, setRegistrationDialogKey] = useState(0);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -167,7 +169,7 @@ export function ScooterDetailPage({
                   permission: "scooters.update",
                   label: registrationActionLabel,
                   icon: <PencilIcon data-icon="inline-start" />,
-                  disabled: busyAction !== null,
+                  disabled: busyAction !== null || photosBusy,
                   onClick: () => {
                     setRegistrationDialogKey((current) => current + 1);
                     setRegistrationOpen(true);
@@ -178,7 +180,7 @@ export function ScooterDetailPage({
                   permission: "scooters.update",
                   label: t("actions.editScooter"),
                   icon: <PencilIcon data-icon="inline-start" />,
-                  disabled: busyAction !== null,
+                  disabled: busyAction !== null || photosBusy,
                   onClick: () => router.push(scooterEditHref),
                 },
               ],
@@ -189,7 +191,7 @@ export function ScooterDetailPage({
                   label: t("actions.deleteScooter"),
                   icon: <Trash2Icon data-icon="inline-start" />,
                   variant: "destructive",
-                  disabled: busyAction !== null,
+                  disabled: busyAction !== null || photosBusy,
                   onClick: () => setDeleteOpen(true),
                 },
               ],
@@ -209,6 +211,12 @@ export function ScooterDetailPage({
       </div>
 
       {feedback ? <FeedbackAlert feedback={feedback} /> : null}
+      <ScooterPhotos
+        scooterId={scooter.id}
+        panel
+        disabled={Boolean(scooter.deletedAt) || busyAction !== null}
+        onBusyChange={setPhotosBusy}
+      />
 
       <DetailSection title={t("sections.identity")}>
         <DetailField label={t("fields.vin")} value={scooter.vin} />

@@ -359,18 +359,16 @@ describe("shared multiple document input", () => {
     expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
 
-  it("keeps PDF page controls independent from document navigation and supports zoom for both", async () => {
+  it("swipes through PDF pages and documents, returning to the last PDF page", async () => {
     vi.spyOn(HTMLCanvasElement.prototype, "toDataURL").mockReturnValue(
       "data:image/png;base64,preview",
     );
     const pdf = {
       numPages: 2,
-      getPage: vi
-        .fn()
-        .mockResolvedValue({
-          getViewport: () => ({ width: 600, height: 800 }),
-          render: () => ({ promise: Promise.resolve(), cancel: vi.fn() }),
-        }),
+      getPage: vi.fn().mockResolvedValue({
+        getViewport: () => ({ width: 600, height: 800 }),
+        render: () => ({ promise: Promise.resolve(), cancel: vi.fn() }),
+      }),
     };
     vi.mocked(loadPdf).mockResolvedValue({
       getDocument: () => ({
@@ -393,9 +391,30 @@ describe("shared multiple document input", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: labels.preview }));
     const dialog = screen.getByRole("dialog");
-    fireEvent.click(
-      await within(dialog).findByRole("button", { name: labels.nextPage }),
-    );
+    const swipe = (from: number, to: number) => {
+      const viewport = dialog.querySelector(
+        '[data-slot="document-zoom-viewport"]',
+      )!;
+      for (const [type, clientX] of [
+        ["pointerdown", from],
+        ["pointermove", to],
+        ["pointerup", to],
+      ] as const) {
+        const event = new MouseEvent(type, {
+          bubbles: true,
+          clientX,
+          clientY: 100,
+        });
+        Object.defineProperties(event, {
+          pointerId: { value: 1 },
+          pointerType: { value: "touch" },
+        });
+        fireEvent(viewport, event);
+      }
+    };
+
+    await within(dialog).findByRole("button", { name: labels.nextPage });
+    swipe(250, 100);
     await waitFor(() =>
       expect(
         within(dialog).getByRole("img", { name: "two-pages.pdf (2/2)" }),
@@ -405,9 +424,7 @@ describe("shared multiple document input", () => {
     expect(
       within(dialog).getByRole("button", { name: labels.zoomIn }),
     ).toBeEnabled();
-    fireEvent.click(
-      within(dialog).getByRole("button", { name: labels.nextDocument }),
-    );
+    swipe(250, 100);
     expect(
       within(dialog).getByRole("img", { name: "first.png" }),
     ).toBeInTheDocument();
@@ -418,13 +435,15 @@ describe("shared multiple document input", () => {
       within(dialog).getByRole("button", { name: labels.zoomIn }),
     );
     fireEvent.click(
-      within(dialog).getByRole("button", { name: labels.previousDocument }),
+      within(dialog).getByRole("button", { name: labels.resetZoom }),
     );
+    swipe(100, 250);
     await act(async () => {});
     expect(
       within(dialog).getByRole("button", { name: labels.previousPage }),
-    ).toBeDisabled();
+    ).toBeEnabled();
     expect(within(dialog).getByText("Document 1 of 2")).toBeInTheDocument();
+    expect(within(dialog).getByText("2 / 2")).toBeInTheDocument();
   });
 
   it("leaves the person form single-file contract unchanged", async () => {

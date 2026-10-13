@@ -51,6 +51,18 @@ export const SCOOTER_LIST_SORTS = [
 export type ScooterListSort = (typeof SCOOTER_LIST_SORTS)[number];
 
 export const ROUTES = {
+  photos: {
+    draftUpload: "/v1/scooters/photo-draft-upload-url",
+    list: (id: string) => `/v1/scooters/${encodeURIComponent(id)}/photos`,
+    upload: (id: string) =>
+      `/v1/scooters/${encodeURIComponent(id)}/photos/upload-url`,
+    reorder: (id: string) =>
+      `/v1/scooters/${encodeURIComponent(id)}/photos/reorder`,
+    photo: (id: string, photoId: string) =>
+      `/v1/scooters/${encodeURIComponent(id)}/photos/${encodeURIComponent(photoId)}`,
+    content: (id: string, photoId: string) =>
+      `/v1/scooters/${encodeURIComponent(id)}/photos/${encodeURIComponent(photoId)}/content`,
+  },
   documents: {
     extract: "/v1/scooters/document-extraction",
     createEditorSession: "/v1/scooters/document-editor-sessions",

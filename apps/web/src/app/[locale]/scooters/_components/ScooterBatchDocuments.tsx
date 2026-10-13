@@ -19,6 +19,8 @@ import {
   SelectValue,
   Spinner,
 } from "@repo/ui/components";
+import { FileDropOverlay } from "@repo/ui/components/file-drop-overlay";
+import { useFileDrop } from "@repo/ui/hooks/use-file-drop";
 import { DocumentViewer } from "@repo/ui/components/document-viewer";
 import { useObjectUrl } from "@repo/ui/hooks/use-object-url";
 import { CheckIcon, FileTextIcon, SparklesIcon, XIcon } from "lucide-react";
@@ -58,6 +60,7 @@ export function ScooterBatchDocuments({
   const [expandedImport, setExpandedImport] = useState<typeof importResult>();
   const analysisEntries = useContext(ScooterDocumentAnalysisContext);
   const compact =
+    documents.existing.length + documents.drafts.length > 0 &&
     Boolean(importResult) &&
     expandedImport !== importResult &&
     !analyzing &&
@@ -89,6 +92,14 @@ export function ScooterBatchDocuments({
       ),
     })),
   ];
+  const { dragging, handlers: fileDropHandlers } = useFileDrop({
+    disabled,
+    onFiles: (files) => {
+      setExpandedImport(importResult);
+      add(files);
+    },
+  });
+
   if (!canWrite) return null;
 
   function add(files: File[]) {
@@ -185,11 +196,20 @@ export function ScooterBatchDocuments({
               <Button
                 type="button"
                 variant="outline"
-                className="w-full justify-center border-dashed bg-transparent text-center"
+                className="relative w-full justify-center border-dashed bg-transparent text-center duration-normal enabled:hover:border-primary enabled:active:border-primary enabled:active:border-solid"
                 disabled={disabled}
+                aria-label={creation("importMore")}
                 onClick={() => setExpandedImport(importResult)}
+                {...fileDropHandlers}
               >
                 {creation("importMore")}
+                {dragging ? (
+                  <FileDropOverlay
+                    compact
+                    label={creation("importMore")}
+                    className="rounded-lg"
+                  />
+                ) : null}
               </Button>
             </li>
           </ul>

@@ -18,6 +18,7 @@ export const tokens = {
       muted: "#F1F3F3",
       mutedForeground: "#4B585B",
       accent: "#EFFBFC",
+      fileDropOverlay: "#EFFBFC59",
       accentForeground: "#114752",
       destructive: "#E7000B",
       destructiveForeground: "#F9FBFB",
@@ -25,6 +26,8 @@ export const tokens = {
       input: "#E3E7E8",
       control: "#FFFFFF",
       documentOverlay: "#FFFFFFCC",
+      imageGridLine: "#000000",
+      imageGridOutline: "#FFFFFF",
       documentOverlayBorder: "#E3E7E899",
       ring: "#14717F",
       chart1: "#2996A6",
@@ -91,6 +94,7 @@ export const tokens = {
       muted: "#1F1F1F",
       mutedForeground: "#A1A1AA",
       accent: "#102D34",
+      fileDropOverlay: "#102D3459",
       accentForeground: "#D9F4F7",
       destructive: "#FF6467",
       destructiveForeground: "#090B0C",
@@ -98,6 +102,8 @@ export const tokens = {
       input: "#27272A",
       control: "#050505",
       documentOverlay: "#050505CC",
+      imageGridLine: "#000000",
+      imageGridOutline: "#FFFFFF",
       documentOverlayBorder: "#27272A99",
       ring: "#44BBCB",
       chart1: "#44BBCB",
@@ -190,6 +196,7 @@ export const tokens = {
   },
   blur: {
     floatingSurface: 12,
+    fileDrop: 4,
   },
   typography: {
     fontFamily: {
@@ -315,6 +322,9 @@ export const tokens = {
     },
   },
   motion: {
+    gesture: {
+      sortableTrailingZone: 0.3,
+    },
     duration: {
       instant: 0,
       fast: 150,
@@ -335,12 +345,16 @@ export const tokens = {
       linear: "linear",
     },
   },
+  opacity: {
+    dragGhost: 0.3,
+  },
   magnification: {
     loupe: 2,
     documentMax: 4,
     documentStep: 0.5,
   },
   aspectRatio: {
+    scooterPhoto: 1.3333333333333333,
     documentLandscape: 1.586,
     identityCardPortrait: 0.6305170239596469,
     receiptPortrait: 0.3333333333333333,

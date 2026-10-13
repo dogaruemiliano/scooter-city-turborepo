@@ -13,6 +13,7 @@ import {
   SCOOTER_DOCUMENT_MAX_FILES,
 } from "./scooter-documents.schemas";
 import { scooterDocumentExtractionUpdateSchema } from "./scooter-document-extraction.schemas";
+import { scooterPhotoDraftsSchema } from "./scooter-photos.schemas";
 /**
  * Scooters-domain Zod schemas.
  */
@@ -260,6 +261,7 @@ export const scooterTechnicalDetailsSchema = z.object({
 
 export const scooterSchema = z
   .object({
+    coverUrl: z.string().nullable().optional(),
     documents: scooterDocumentListSchema.optional(),
     insurancePolicies: z.array(insurancePolicySchema).optional(),
     insuranceAttention: insuranceAttentionSchema.nullable().optional(),
@@ -306,6 +308,7 @@ export type Scooter = z.infer<typeof scooterSchema>;
 
 export const createScooterInputSchema = z
   .object({
+    photoDrafts: scooterPhotoDraftsSchema.optional(),
     sessionId: z.string().min(1).max(120).optional(),
     insurancePolicies: insurancePoliciesInputSchema.optional(),
     documentDrafts: scooterDocumentDraftsSchema.optional(),

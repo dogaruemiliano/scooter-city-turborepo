@@ -10,6 +10,7 @@ import type {
 
 type ScooterRowWithBrand = ScooterRow & {
   insuranceAttention?: v1.scooters.InsuranceAttention | null;
+  photos?: { id: string }[];
   brand: { name: string; code: string };
   civDocument?: VehicleCivDocument | null;
   insurancePolicies?: ScooterInsurancePolicy[];
@@ -17,6 +18,13 @@ type ScooterRowWithBrand = ScooterRow & {
 
 export function toScooter(row: ScooterRowWithBrand): v1.scooters.Scooter {
   return {
+    ...(row.photos
+      ? {
+          coverUrl: row.photos[0]
+            ? v1.scooters.ROUTES.photos.content(row.id, row.photos[0].id)
+            : null,
+        }
+      : {}),
     ...(row.insuranceAttention !== undefined
       ? { insuranceAttention: row.insuranceAttention }
       : {}),

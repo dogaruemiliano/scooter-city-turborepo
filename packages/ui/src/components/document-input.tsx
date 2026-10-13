@@ -3,6 +3,8 @@
 import { useRef, useState } from "react";
 import { useObjectUrl } from "../hooks/use-object-url";
 import { Button } from "./button";
+import { FileDropOverlay } from "./file-drop-overlay";
+import { useFileDrop } from "../hooks/use-file-drop";
 import { DocumentPreview } from "./document-preview";
 import { DocumentViewer } from "./document-viewer";
 import {
@@ -115,6 +117,10 @@ function SingleDocumentInput({
     setPending(null);
     setError(null);
   }
+  const { dragging, handlers } = useFileDrop({
+    disabled,
+    onFiles: (files) => select(files[0]),
+  });
   const picker = (
     <input
       ref={input}
@@ -130,17 +136,12 @@ function SingleDocumentInput({
     />
   );
   return (
-    <div
-      data-slot="document-input"
-      className="min-w-0"
-      onDragOver={(event) => event.preventDefault()}
-      onDrop={(event) => {
-        event.preventDefault();
-        select(event.dataTransfer.files[0]);
-      }}
-    >
+    <div data-slot="document-input" className="min-w-0" {...handlers}>
       {picker}
       <div className="relative">
+        {dragging ? (
+          <FileDropOverlay label={labels.add} className="rounded-lg" />
+        ) : null}
         <DocumentPreview
           id={id}
           src={src}

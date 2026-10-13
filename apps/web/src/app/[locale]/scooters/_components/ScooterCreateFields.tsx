@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import { useTranslations } from "next-intl";
 import { v1 } from "@repo/api-shared";
@@ -38,10 +38,12 @@ export function ScooterCreateFields({
   onBrandCreated,
   disabled,
   importResult,
+  photos,
 }: {
   brands: v1.scooterBrands.ScooterBrand[];
   onBrandCreated: (brand: v1.scooterBrands.ScooterBrand) => void;
   disabled: boolean;
+  photos?: ReactNode;
   importResult?: Extract<DocumentImportResult, { ok: true }>;
 }) {
   const t = useTranslations("scooters");
@@ -105,9 +107,10 @@ export function ScooterCreateFields({
           ),
         )}
       </FormSection>
+      {photos}
       <FormSection
         panel
-        number={2}
+        number={photos ? 3 : 2}
         title={t("creation.propulsion")}
         status={
           <ScooterSectionComplete
@@ -127,6 +130,7 @@ export function ScooterCreateFields({
             disabled={disabled}
           >
             <FormSegmentedRadioGroup
+              optionClassName="min-h-11"
               options={v1.scooters.SCOOTER_POWERTRAIN_TYPES.map((value) => ({
                 value,
                 label: t(`powertrainTypes.${value}`),
@@ -141,7 +145,7 @@ export function ScooterCreateFields({
       </FormSection>
       <ScooterInitialRegistrationFields
         panel
-        number={3}
+        number={photos ? 4 : 3}
         status={
           <ScooterSectionComplete
             fields={
@@ -161,10 +165,13 @@ export function ScooterCreateFields({
         disabled={disabled}
         onManualLicenseChange={license.onManualLicenseChange}
       />
-      <ScooterCreateInsuranceFields disabled={disabled} />
+      <ScooterCreateInsuranceFields
+        disabled={disabled}
+        number={photos ? 5 : 4}
+      />
       <FormSection
         panel
-        number={5}
+        number={photos ? 6 : 5}
         title={t("creation.conditionEquipment")}
         status={
           <div className="flex flex-wrap items-center gap-2">
@@ -176,34 +183,38 @@ export function ScooterCreateFields({
         <p className="text-sm text-muted-foreground sm:col-span-2">
           {t("creation.conditionHelp")}
         </p>
-        <div className="grid gap-2 sm:col-span-2">
-          {(["hasGps", "speedometerWorking", "odometerWorking"] as const).map(
-            (name) => (
-              <FormBooleanRow<ScooterEditorValues>
-                key={name}
-                name={name}
-                label={t(`operational.rows.${name}`)}
-                falseLabel={t(
-                  name === "hasGps"
-                    ? "operational.withoutGps"
-                    : "operational.defective",
-                )}
-                trueLabel={t(
-                  name === "hasGps"
-                    ? "operational.withGps"
-                    : "operational.functional",
-                )}
-                disabled={disabled}
-              />
-            ),
-          )}
-        </div>
-        {OPERATIONAL_FIELDS.filter(
-          (name) =>
-            !["hasGps", "speedometerWorking", "odometerWorking"].includes(name),
-        ).map((name) => (
-          <ScooterEditorFieldControl key={name} name={name} {...props} />
-        ))}
+        {(
+          [
+            "odometerWorking",
+            "currentMileageKm",
+            "speedometerWorking",
+            "actualMaxSpeedKmh",
+            "hasGps",
+          ] as const
+        ).map((name) =>
+          name === "currentMileageKm" || name === "actualMaxSpeedKmh" ? (
+            <ScooterEditorFieldControl key={name} name={name} {...props} />
+          ) : (
+            <FormBooleanRow<ScooterEditorValues>
+              key={name}
+              name={name}
+              label={t(`operational.rows.${name}`)}
+              falseLabel={t(
+                name === "hasGps"
+                  ? "operational.withoutGps"
+                  : "operational.defective",
+              )}
+              trueLabel={t(
+                name === "hasGps"
+                  ? "operational.withGps"
+                  : "operational.functional",
+              )}
+              disabled={disabled}
+              stacked
+            />
+          ),
+        )}
+        <ScooterEditorFieldControl name="notes" {...props} />
       </FormSection>
       <BottomSheet
         open={technicalReviewOpen}

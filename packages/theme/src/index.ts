@@ -7,6 +7,7 @@ import { radius } from "./tokens/radius";
 import { typography } from "./tokens/typography";
 import { shadow } from "./tokens/shadow";
 import { motion } from "./tokens/motion";
+import { opacity } from "./tokens/opacity";
 import { magnification } from "./tokens/magnification";
 import { aspectRatio } from "./tokens/aspect-ratio";
 import { zIndex } from "./tokens/z-index";
@@ -28,6 +29,7 @@ export const tokens = {
   typography,
   shadow,
   motion,
+  opacity,
   magnification,
   aspectRatio,
   zIndex,
