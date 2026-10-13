@@ -8,6 +8,7 @@ import {
   type DateParts,
 } from "@repo/ui/components/date-parts-input";
 import { Label } from "@repo/ui/components/label";
+import { Card, CardContent } from "@repo/ui/components/card";
 import { emptyDateParts } from "@repo/ui/lib/date-parts";
 
 const meta = {
@@ -97,5 +98,19 @@ export const Disabled: Story = {
       label={args.label}
       locale={args.locale}
     />
+  ),
+};
+
+export const NarrowCard: Story = {
+  render: () => (
+    <Card className="w-72 max-w-full">
+      <CardContent>
+        <DatePartsInputDemo
+          label="Înmatriculat la"
+          locale="ro"
+          defaultValue={{ day: "01", month: "10", year: "2026" }}
+        />
+      </CardContent>
+    </Card>
   ),
 };

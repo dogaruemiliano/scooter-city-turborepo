@@ -90,23 +90,26 @@ it("unblocks the combined review after verified VIN correction without re-extrac
     </NextIntlClientProvider>,
   );
   expect(
-    await screen.findByRole("heading", { name: "Check document VINs" }),
+    await screen.findByRole("heading", { name: "Verify the scooter VIN" }),
   ).toBeInTheDocument();
   expect(apiFetch).toHaveBeenCalledTimes(2);
-  fireEvent.change(screen.getByLabelText("registration.pdf"), {
+  await user.keyboard("{Escape}");
+  expect(
+    screen.getByRole("dialog", { name: "Verify the scooter VIN" }),
+  ).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText("Verified scooter VIN"), {
     target: { value: correct },
   });
   await user.click(
-    screen.getByRole("checkbox", {
-      name: "I checked the corrected VINs against the original documents",
-    }),
+    screen.getByRole("button", { name: "Continue to document review" }),
   );
-  await user.click(
-    screen.getByRole("button", { name: "Apply verified corrections" }),
-  );
+  const finish = screen.getByRole("button", { name: /Confirm & finish/ });
+  expect(finish).toBeDisabled();
+  await waitFor(() => expect(finish).toBeEnabled(), { timeout: 4000 });
+  await user.click(finish);
   await waitFor(() =>
     expect(
-      screen.queryByRole("heading", { name: "Check document VINs" }),
+      screen.queryByRole("heading", { name: "Verify mismatched documents" }),
     ).not.toBeInTheDocument(),
   );
   expect(persisted.registration).toMatchObject({

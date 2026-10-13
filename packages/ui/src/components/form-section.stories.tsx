@@ -90,3 +90,27 @@ export const FullWidthChild: Story = {
     </div>
   ),
 };
+
+export const NumberedPanel: Story = {
+  args: { title: "Vehicle identity", number: 1, panel: true },
+  render: (args) => (
+    <div className="max-w-(--breakpoint-lg)">
+      <FormSection {...args}>
+        <TextField id="panel-brand" label="Brand" />
+        <TextField id="panel-model" label="Model" />
+      </FormSection>
+    </div>
+  ),
+};
+
+export const NarrowReviewPanel: Story = {
+  args: { title: "Policy details", columns: 1, panel: true },
+  render: (args) => (
+    <div className="w-full max-w-96">
+      <FormSection {...args}>
+        <TextField id="review-insured" label="Insured name" />
+        <TextField id="review-valid-until" label="Valid until" />
+      </FormSection>
+    </div>
+  ),
+};

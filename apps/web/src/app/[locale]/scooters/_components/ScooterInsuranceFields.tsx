@@ -29,6 +29,7 @@ import {
 } from "./scooter-editor-schema";
 import type { ScooterDocumentsEditor } from "./useScooterDocuments";
 import { ScooterVinReference } from "./ScooterVinReference";
+import { cn } from "@repo/ui/lib/utils";
 
 export function ScooterInsuranceDocuments({
   documents,
@@ -122,10 +123,12 @@ export function ScooterInsuranceFields({
   disabled,
   fieldKeys,
   onRemovePolicy,
+  singleColumn = false,
 }: {
   disabled: boolean;
   fieldKeys: string[];
   onRemovePolicy?: (index: number) => void;
+  singleColumn?: boolean;
 }) {
   const t = useTranslations("scooters.insurance");
   const locale = useLocale();
@@ -147,8 +150,14 @@ export function ScooterInsuranceFields({
         <FormSection
           key={fieldKeys[index] ?? policy.id}
           title={t("policy", { number: index + 1 })}
+          columns={singleColumn ? 1 : 2}
         >
-          <p className="text-sm text-muted-foreground sm:col-span-2">
+          <p
+            className={cn(
+              "text-sm text-muted-foreground",
+              !singleColumn && "sm:col-span-2",
+            )}
+          >
             {t(`status.${v1.scooters.insuranceStatus(policy)}`)}
           </p>
           {v1.scooters.INSURANCE_FIELDS.map((field) => {
@@ -156,7 +165,12 @@ export function ScooterInsuranceFields({
             return (
               <div
                 key={field}
-                className={`grid gap-1 ${field === "insuredName" || field === "documentVin" ? "sm:col-span-2" : ""}`}
+                className={cn(
+                  "grid gap-1",
+                  !singleColumn &&
+                    (field === "insuredName" || field === "documentVin") &&
+                    "sm:col-span-2",
+                )}
               >
                 <FormField
                   name={name}
@@ -197,7 +211,13 @@ export function ScooterInsuranceFields({
           {policy.documentVin &&
           vin &&
           policy.documentVin.toUpperCase() !== vin.toUpperCase() ? (
-            <p role="alert" className="text-sm text-destructive sm:col-span-2">
+            <p
+              role="alert"
+              className={cn(
+                "text-sm text-destructive",
+                !singleColumn && "sm:col-span-2",
+              )}
+            >
               {t("vinMismatch")}
             </p>
           ) : null}

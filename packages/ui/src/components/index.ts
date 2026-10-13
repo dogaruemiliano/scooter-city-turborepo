@@ -12,6 +12,7 @@ export * from "./date-parts-input";
 export * from "./dialog";
 export * from "./dropdown-menu";
 export * from "./field";
+export * from "./file-drop-zone";
 export * from "./form-section";
 export * from "./form-actions";
 export * from "./input";

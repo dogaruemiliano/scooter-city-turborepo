@@ -5,6 +5,13 @@ import { canAccess } from "@/lib/access";
 import { v1 } from "@repo/api-shared";
 import {
   Button,
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  Badge,
+  FileDropZone,
   Select,
   SelectContent,
   SelectItem,
@@ -14,9 +21,9 @@ import {
 } from "@repo/ui/components";
 import { DocumentViewer } from "@repo/ui/components/document-viewer";
 import { useObjectUrl } from "@repo/ui/hooks/use-object-url";
-import { CheckIcon, FileTextIcon, UploadIcon, XIcon } from "lucide-react";
+import { CheckIcon, FileTextIcon, SparklesIcon, XIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useContext, useId, useRef, useState } from "react";
+import { useContext, useState } from "react";
 import { ScooterDocumentAnalysisContext } from "./ScooterDocumentAnalysisStatus";
 import type {
   DocumentDraft,
@@ -28,19 +35,20 @@ export function ScooterBatchDocuments({
   disabled,
   analyzing,
   onRetryAnalysis,
+  onCancelAnalysis,
 }: {
   documents: ScooterDocumentsEditor;
   disabled: boolean;
   analyzing: boolean;
   onRetryAnalysis?: (sourceId: string) => void;
+  onCancelAnalysis?: () => void;
 }) {
   const t = useTranslations("scooters.documents");
   const user = useOptionalSession()?.user;
   const canWrite = canAccess(user, "scooter_documents.write");
   const canExtract = canAccess(user, "scooter_documents.extract");
-  const input = useRef<HTMLInputElement>(null);
-  const hintId = useId();
-  const [dragging, setDragging] = useState(false);
+  const creation = useTranslations("scooters.creation");
+  const extraction = useTranslations("scooters.extraction");
   const [errors, setErrors] = useState<string[]>([]);
   if (!canWrite) return null;
 
@@ -89,92 +97,81 @@ export function ScooterBatchDocuments({
   }
 
   return (
-    <section className="grid gap-4" aria-label={t("title")}>
-      <input
-        ref={input}
-        type="file"
-        multiple
-        className="sr-only"
-        tabIndex={-1}
-        aria-label={t("batch.browse")}
-        accept={v1.scooters.SCOOTER_DOCUMENT_CONTENT_TYPES.join(",")}
-        disabled={disabled}
-        onChange={(event) => {
-          add(Array.from(event.target.files ?? []));
-          event.target.value = "";
-        }}
-      />
-      <button
-        type="button"
-        disabled={disabled}
-        aria-describedby={hintId}
-        className={`flex w-full flex-col items-center gap-3 rounded-lg border-2 border-dashed px-6 py-8 text-center outline-none transition-colors duration-fast ease-standard focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 ${dragging ? "border-primary bg-accent" : "border-border bg-card hover:border-primary hover:bg-accent"}`}
-        onClick={() => input.current?.click()}
-        onDragOver={(event) => {
-          event.preventDefault();
-          if (!disabled) setDragging(true);
-        }}
-        onDragLeave={(event) => {
-          if (!event.currentTarget.contains(event.relatedTarget as Node | null))
-            setDragging(false);
-        }}
-        onDrop={(event) => {
-          event.preventDefault();
-          setDragging(false);
-          add(Array.from(event.dataTransfer.files));
-        }}
-      >
-        <UploadIcon
-          className="size-6 text-muted-foreground"
-          aria-hidden="true"
+    <Card as="section" aria-label={t("title")}>
+      <CardHeader>
+        <div className="flex items-center justify-between gap-3">
+          <CardTitle className="flex min-w-0 items-center gap-2 [&_svg]:shrink-0">
+            <SparklesIcon aria-hidden="true" className="size-5" />
+            {creation("smartImport")}
+          </CardTitle>
+          {canExtract ? (
+            <Badge variant="outline">{creation("aiPowered")}</Badge>
+          ) : null}
+        </div>
+        <CardDescription>{creation("importHelp")}</CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-4">
+        <FileDropZone
+          label={t("batch.drop")}
+          browseLabel={t("batch.browse")}
+          hint={t("batch.hint")}
+          accept={v1.scooters.SCOOTER_DOCUMENT_CONTENT_TYPES.join(",")}
+          disabled={disabled}
+          onFiles={add}
         />
-        <span className="text-lg font-semibold">{t("batch.drop")}</span>
-        <span className="text-sm text-link underline underline-offset-4">
-          {t("batch.browse")}
-        </span>
-        <span id={hintId} className="text-sm text-muted-foreground">
-          {t("batch.hint")}
-        </span>
-      </button>
-      {!canExtract ? (
-        <p className="text-sm text-muted-foreground">
-          {t("batch.manualTypes")}
-        </p>
-      ) : null}
-      {errors.length ? (
-        <ul role="alert" className="grid gap-1 text-sm text-destructive">
-          {errors.map((error, index) => (
-            <li key={index}>{error}</li>
-          ))}
-        </ul>
-      ) : null}
-      {documents.drafts.length ? (
-        <>
-          <p className="text-sm text-muted-foreground" aria-live="polite">
-            {t("documentCount", { count: documents.drafts.length })}
+        {!canExtract ? (
+          <p className="text-sm text-muted-foreground">
+            {t("batch.manualTypes")}
           </p>
-          <ul className="divide-y divide-border">
-            {documents.drafts.map((draft) => (
-              <BatchDocumentRow
-                key={draft.id}
-                draft={draft}
-                disabled={disabled}
-                analyzing={analyzing}
-                canExtract={canExtract}
-                onType={(type) => documents.classify(draft.id, type, true)}
-                onRemove={() => documents.removeDraft(draft.id)}
-                onRetry={() =>
-                  draft.status === "failed"
-                    ? documents.retry(draft)
-                    : onRetryAnalysis?.(draft.id)
-                }
-              />
+        ) : null}
+        {errors.length ? (
+          <ul role="alert" className="grid gap-1 text-sm text-destructive">
+            {errors.map((error, index) => (
+              <li key={index}>{error}</li>
             ))}
           </ul>
-          <p className="text-sm text-muted-foreground">{t("batch.review")}</p>
-        </>
-      ) : null}
-    </section>
+        ) : null}
+        {documents.drafts.length ? (
+          <>
+            <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+              <p className="text-sm text-muted-foreground" aria-live="polite">
+                {t("documentCount", { count: documents.drafts.length })}
+              </p>
+              {analyzing && onCancelAnalysis ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={disabled}
+                  onClick={onCancelAnalysis}
+                >
+                  {extraction("cancel")}
+                </Button>
+              ) : null}
+            </div>
+            <ul className="grid min-w-0 grid-cols-1 gap-3 xl:grid-cols-2">
+              {documents.drafts.map((draft) => (
+                <BatchDocumentRow
+                  key={draft.id}
+                  draft={draft}
+                  disabled={disabled}
+                  analyzing={analyzing}
+                  canExtract={canExtract}
+                  onType={(type) => documents.classify(draft.id, type, true)}
+                  onRemove={() => documents.removeDraft(draft.id)}
+                  onRetry={() =>
+                    draft.status === "failed"
+                      ? documents.retry(draft)
+                      : onRetryAnalysis?.(draft.id)
+                  }
+                />
+              ))}
+            </ul>
+            <p className="text-sm text-muted-foreground">{t("batch.review")}</p>
+          </>
+        ) : null}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -227,7 +224,7 @@ function BatchDocumentRow({
     resetZoom: t("resetZoom"),
   };
   return (
-    <li className="flex items-start gap-3 py-4">
+    <li className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-3 rounded-xl border border-border bg-control p-3">
       <Button
         type="button"
         variant="outline"
@@ -238,47 +235,48 @@ function BatchDocumentRow({
       >
         <FileTextIcon className="size-5" aria-hidden="true" />
       </Button>
-      <div className="grid min-w-0 flex-1 gap-2 sm:grid-cols-2 sm:items-start">
-        <div className="grid min-w-0 gap-1">
-          <button
-            type="button"
-            className="truncate text-left text-sm font-medium underline-offset-4 hover:underline focus-visible:outline-ring"
-            onClick={() => setOpen(true)}
-          >
-            {draft.file.name}
-          </button>
-          <p
-            role={failed ? "alert" : "status"}
-            className={`flex items-start gap-1 text-sm ${failed ? "text-destructive" : "text-muted-foreground"}`}
-          >
-            {busy ? (
-              <Spinner className="shrink-0" />
-            ) : state?.status === "success" ? (
-              <CheckIcon
-                className="size-4 shrink-0 text-success"
-                aria-hidden="true"
-              />
-            ) : null}
-            {status}
-          </p>
-          {failed &&
-          draft.uploadError !== "sessionExpired" &&
-          state?.status !== "processing" &&
-          (draft.status === "failed" ||
-            (state?.status === "failed" &&
-              state.error !== "unknownType" &&
-              state.error !== "disabled")) ? (
-            <Button
-              type="button"
-              variant="text"
-              className="justify-self-start"
-              disabled={disabled || analyzing}
-              onClick={onRetry}
-            >
-              {draft.status === "failed" ? t("retry") : extractionT("retry")}
-            </Button>
+      <div className="grid min-w-0 gap-1">
+        <button
+          type="button"
+          className="truncate text-left text-sm font-medium underline-offset-4 hover:underline focus-visible:outline-ring"
+          title={draft.file.name}
+          onClick={() => setOpen(true)}
+        >
+          {draft.file.name}
+        </button>
+        <p
+          role={failed ? "alert" : "status"}
+          className={`flex min-w-0 items-start gap-1 text-sm wrap-anywhere ${failed ? "text-destructive" : "text-muted-foreground"}`}
+        >
+          {busy ? (
+            <Spinner className="shrink-0" />
+          ) : state?.status === "success" ? (
+            <CheckIcon
+              className="size-4 shrink-0 text-success"
+              aria-hidden="true"
+            />
           ) : null}
-        </div>
+          {status}
+        </p>
+        {failed &&
+        draft.uploadError !== "sessionExpired" &&
+        state?.status !== "processing" &&
+        (draft.status === "failed" ||
+          (state?.status === "failed" &&
+            state.error !== "unknownType" &&
+            state.error !== "disabled")) ? (
+          <Button
+            type="button"
+            variant="text"
+            className="justify-self-start"
+            disabled={disabled || analyzing}
+            onClick={onRetry}
+          >
+            {draft.status === "failed" ? t("retry") : extractionT("retry")}
+          </Button>
+        ) : null}
+      </div>
+      <div className="col-span-full row-start-2 min-w-0">
         <Select
           value={draft.type ?? ""}
           disabled={disabled}
@@ -306,7 +304,7 @@ function BatchDocumentRow({
         type="button"
         variant="ghost"
         size="icon"
-        className="shrink-0"
+        className="col-start-3 row-start-1 shrink-0"
         disabled={disabled}
         aria-label={t("removeFile", { name: draft.file.name })}
         onClick={onRemove}

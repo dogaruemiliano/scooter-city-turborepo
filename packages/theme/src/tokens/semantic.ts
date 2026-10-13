@@ -1,5 +1,13 @@
 import { primitives as p } from "./primitives";
 
+function withAlpha(color: string, opacity: number): string {
+  return color.startsWith("#")
+    ? `${color}${Math.round(opacity * 255)
+        .toString(16)
+        .padStart(2, "0")}`
+    : color.replace(/\)$/, ` / ${opacity * 100}%)`);
+}
+
 const light = {
   background: p.mist[100],
   foreground: p.charcoal[950],
@@ -7,7 +15,7 @@ const light = {
   cardForeground: p.charcoal[950],
   popover: p.mist[0],
   popoverForeground: p.charcoal[950],
-  primary: p.cyan[500],
+  primary: p.cyan.action,
   primaryForeground: p.charcoal[950],
   secondary: p.mist[100],
   secondaryForeground: p.mist[900],
@@ -19,6 +27,10 @@ const light = {
   destructiveForeground: p.mist[50],
   border: p.mist[200],
   input: p.mist[200],
+  control: p.mist[0],
+  // Document chrome stays readable while allowing the source to show through.
+  documentOverlay: withAlpha(p.mist[0], 0.8),
+  documentOverlayBorder: withAlpha(p.mist[200], 0.6),
   ring: p.cyan[700],
   chart1: p.cyan[600],
   chart2: p.charcoal[600],
@@ -28,7 +40,7 @@ const light = {
   sidebar: p.charcoal[950],
   sidebarForeground: p.charcoal[50],
   sidebarMutedForeground: p.charcoal[300],
-  sidebarPrimary: p.cyan[500],
+  sidebarPrimary: p.cyan.action,
   sidebarPrimaryForeground: p.charcoal[950],
   sidebarAccent: p.charcoal[800],
   sidebarAccentForeground: p.charcoal[50],
@@ -70,38 +82,41 @@ const light = {
 } as const;
 
 const dark: Record<keyof typeof light, string> = {
-  background: p.charcoal[1000],
+  background: p.neutral[950],
   foreground: p.mist[50],
-  card: p.charcoal[950],
+  card: p.neutral[900],
   cardForeground: p.mist[50],
-  popover: p.charcoal[900],
+  popover: p.neutral[850],
   popoverForeground: p.mist[50],
-  primary: p.cyan[500],
+  primary: p.cyan.action,
   primaryForeground: p.charcoal[950],
-  secondary: p.mist[800],
+  secondary: p.neutral[850],
   secondaryForeground: p.mist[50],
-  muted: p.mist[800],
-  mutedForeground: p.mist[400],
+  muted: p.neutral[850],
+  mutedForeground: p.neutral[400],
   accent: p.cyan[950],
   accentForeground: p.cyan[100],
   destructive: p.red[400],
   destructiveForeground: p.mist[950],
-  border: "oklch(1 0 0 / 10%)",
-  input: "oklch(1 0 0 / 15%)",
+  border: p.neutral[800],
+  input: p.neutral[800],
+  control: p.neutral[1000],
+  documentOverlay: withAlpha(p.neutral[1000], 0.8),
+  documentOverlayBorder: withAlpha(p.neutral[800], 0.6),
   ring: p.cyan[500],
   chart1: p.cyan[500],
   chart2: p.charcoal[300],
   chart3: p.cyan[200],
   chart4: p.charcoal[500],
   chart5: p.cyan[600],
-  sidebar: p.charcoal[950],
+  sidebar: p.neutral[950],
   sidebarForeground: p.charcoal[50],
-  sidebarMutedForeground: p.charcoal[300],
-  sidebarPrimary: p.cyan[500],
+  sidebarMutedForeground: p.neutral[400],
+  sidebarPrimary: p.cyan.action,
   sidebarPrimaryForeground: p.charcoal[950],
-  sidebarAccent: p.charcoal[800],
+  sidebarAccent: p.neutral[850],
   sidebarAccentForeground: p.charcoal[50],
-  sidebarBorder: p.charcoal[800],
+  sidebarBorder: p.neutral[800],
   sidebarRing: p.cyan[500],
   primaryHover: p.cyan[550],
   primaryActive: p.cyan[600],

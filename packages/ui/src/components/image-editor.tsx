@@ -242,7 +242,7 @@ export function ImageEditor({
             variant="text"
             disabled={busy}
             onClick={reset}
-            className="bg-background text-primary hover:text-primary-hover active:text-primary-active"
+            className="bg-background text-link hover:text-link-hover active:text-link-active"
           >
             {labels.reset}
           </Button>
@@ -313,7 +313,7 @@ export function ImageEditor({
                 className={cn(
                   "rounded-full border bg-background hover:bg-muted",
                   axis === item
-                    ? "border-primary text-primary hover:text-primary"
+                    ? "border-link text-link hover:text-link"
                     : "border-transparent text-foreground",
                 )}
               >

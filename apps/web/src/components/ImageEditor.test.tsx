@@ -150,7 +150,7 @@ describe("shared ImageEditor", () => {
         ),
     ).toEqual(["Cancel editing", "Reset", "Rotate photo 90°"]);
     expect(within(header).getByRole("button", { name: "Reset" })).toHaveClass(
-      "text-primary",
+      "text-link",
     );
     expect(within(header).queryByRole("heading")).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Edit photo" })).toHaveClass(

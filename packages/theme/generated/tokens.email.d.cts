@@ -7,7 +7,7 @@ export declare const tokens: {
     "cardForeground": "#12161B",
     "popover": "#FFFFFF",
     "popoverForeground": "#12161B",
-    "primary": "#44BBCB",
+    "primary": "#06B6D4",
     "primaryForeground": "#12161B",
     "secondary": "#F1F3F3",
     "secondaryForeground": "#161B1D",
@@ -19,6 +19,9 @@ export declare const tokens: {
     "destructiveForeground": "#F9FBFB",
     "border": "#E3E7E8",
     "input": "#E3E7E8",
+    "control": "#FFFFFF",
+    "documentOverlay": "#FFFFFFCC",
+    "documentOverlayBorder": "#E3E7E899",
     "ring": "#14717F",
     "chart1": "#2996A6",
     "chart2": "#627480",
@@ -28,7 +31,7 @@ export declare const tokens: {
     "sidebar": "#12161B",
     "sidebarForeground": "#F4F7F8",
     "sidebarMutedForeground": "#A8B5BF",
-    "sidebarPrimary": "#44BBCB",
+    "sidebarPrimary": "#06B6D4",
     "sidebarPrimaryForeground": "#12161B",
     "sidebarAccent": "#2C3540",
     "sidebarAccentForeground": "#F4F7F8",
@@ -98,24 +101,24 @@ export declare const tokens: {
   },
   "radius": {
     "none": 0,
-    "sm": 3.2,
-    "md": 5.2,
-    "lg": 7.2,
-    "xl": 11.2,
-    "2xl": 15.2,
-    "3xl": 19.2,
-    "4xl": 23.2,
+    "sm": 8,
+    "md": 10,
+    "lg": 12,
+    "xl": 16,
+    "2xl": 20,
+    "3xl": 24,
+    "4xl": 28,
     "full": 9999
   },
   "typography": {
     "fontFamily": {
       "sans": {
-        "web": "var(--font-montserrat, 'Montserrat Variable'), ui-sans-serif, system-ui, sans-serif",
+        "web": "var(--font-manrope, 'Manrope Variable'), ui-sans-serif, system-ui, sans-serif",
         "native": "Montserrat_400Regular",
         "email": "Arial, Helvetica, sans-serif"
       },
       "body": {
-        "web": "var(--font-open-sans, 'Open Sans'), ui-sans-serif, system-ui, sans-serif",
+        "web": "var(--font-manrope, 'Manrope Variable'), ui-sans-serif, system-ui, sans-serif",
         "native": "Montserrat_400Regular",
         "email": "Arial, Helvetica, sans-serif"
       },

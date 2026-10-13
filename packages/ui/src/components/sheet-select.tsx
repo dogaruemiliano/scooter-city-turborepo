@@ -146,7 +146,7 @@ function SheetSelect({
             aria-describedby={describedById}
             aria-invalid={invalid || undefined}
             className={cn(
-              "flex h-12 w-full items-center justify-between gap-2 rounded-lg border border-input bg-background px-3 py-2 text-base text-left outline-none transition-colors duration-fast ease-standard focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:bg-disabled disabled:text-disabled-foreground aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive md:h-11 md:text-sm",
+              "flex h-12 w-full items-center justify-between gap-2 rounded-lg border border-input bg-control px-3 py-2 text-base text-left outline-none transition-colors duration-fast ease-standard focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:bg-disabled disabled:text-disabled-foreground aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive md:h-11 md:text-sm",
               className,
             )}
           >
@@ -175,7 +175,7 @@ function SheetSelect({
         </BottomSheetHeader>
 
         <BottomSheetBody>
-          <div className="flex h-10 shrink-0 items-center rounded-lg border border-input bg-background px-3 transition-colors duration-fast ease-standard focus-within:border-ring focus-within:ring-2 focus-within:ring-ring">
+          <div className="flex h-10 shrink-0 items-center rounded-lg border border-input bg-control px-3 transition-colors duration-fast ease-standard focus-within:border-ring focus-within:ring-2 focus-within:ring-ring">
             <SearchIcon
               aria-hidden="true"
               className="pointer-events-none size-4 shrink-0 text-muted-foreground"

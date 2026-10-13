@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "@repo/ui/globals.css";
+@source "../**/*.{ts,tsx}";
 
 [data-sidebar-logo-theme="normal"] {
   display: none;

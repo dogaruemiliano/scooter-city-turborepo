@@ -5,6 +5,9 @@ import { tokens } from "@repo/theme";
 import {
   Badge,
   Button,
+  Card,
+  CardContent,
+  CardFooter,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -157,15 +160,18 @@ export function ScooterCard({
       : null;
 
   return (
-    <article className="relative isolate flex h-full min-w-0 flex-col rounded-xl border border-border bg-card text-card-foreground transition-colors duration-fast hover:border-border-strong">
+    <Card
+      as="article"
+      className="relative isolate h-full gap-0 py-0 transition-colors duration-fast hover:border-border-strong"
+    >
       {!scooter.deletedAt ? (
         <Link
           href={href}
           aria-label={t("actions.viewDetails", { name: code })}
-          className="absolute inset-0 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="absolute inset-0 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
         />
       ) : null}
-      <div className="pointer-events-none flex flex-1 flex-col gap-4 p-4 sm:p-5">
+      <CardContent className="pointer-events-none flex flex-1 flex-col gap-4 p-4 sm:p-5">
         <div className="flex items-start gap-3 sm:gap-4">
           <ScooterPhoto src={details.photoUrl} code={code} />
           <div className="min-w-0 flex-1 py-1">
@@ -251,8 +257,8 @@ export function ScooterCard({
             <span>{attention.join(" · ")}</span>
           </p>
         ) : null}
-      </div>
-      <div className="pointer-events-none flex flex-wrap items-center justify-between gap-4 border-t border-border px-4 py-3 sm:px-5">
+      </CardContent>
+      <CardFooter className="pointer-events-none flex-wrap justify-between gap-4 px-4 py-3 sm:px-5">
         <dl className="flex min-w-0 flex-wrap gap-x-6 gap-y-3">
           <div className="min-w-0">
             <dt className="text-xs text-muted-foreground">
@@ -320,7 +326,7 @@ export function ScooterCard({
             </DropdownMenu>
           </div>
         ) : null}
-      </div>
-    </article>
+      </CardFooter>
+    </Card>
   );
 }

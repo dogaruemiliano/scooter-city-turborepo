@@ -279,6 +279,20 @@ describe("document extraction lifecycle", () => {
     expect(saved.onRawFields).not.toHaveBeenCalled();
   });
 
+  it("replaces untouched smart defaults with documented engine and homologation", () => {
+    const hook = setup({ attached: [civ], editing: false });
+    hook.apply({
+      [civ.sourceId]: extracted({
+        powertrainType: "electric",
+        vehicleCategory: "L3e",
+      }),
+    });
+    expect(hook.result.current.form.getValues("powertrainType")).toBe(
+      "electric",
+    );
+    expect(hook.result.current.form.getValues("vehicleCategory")).toBe("L3e");
+  });
+
   it("preserves fields already edited before the first JSON import", () => {
     const hook = setup({ attached: [civ] });
     act(() =>

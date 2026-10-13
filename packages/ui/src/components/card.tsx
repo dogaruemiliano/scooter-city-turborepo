@@ -16,7 +16,7 @@ function Card<Element extends CardElement = "div">({
   className,
   size = "default",
   surface = "default",
-  border = "transparent",
+  border = "default",
   ...props
 }: CardProps<Element>) {
   return React.createElement(as ?? "div", {
@@ -46,7 +46,7 @@ function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="card-header"
       className={cn(
-        "group/card-header @container/card-header grid auto-rows-min items-start gap-1 rounded-t-xl px-(--card-spacing) has-data-[slot=card-action]:grid-cols-[1fr_auto] has-data-[slot=card-description]:grid-rows-[auto_auto] [.border-b]:pb-(--card-spacing)",
+        "group/card-header @container/card-header grid min-w-0 auto-rows-min items-start gap-1 rounded-t-xl px-(--card-spacing) has-data-[slot=card-action]:grid-cols-[minmax(0,1fr)_auto] has-data-[slot=card-description]:grid-rows-[auto_auto] [&>*]:min-w-0 [.border-b]:pb-(--card-spacing)",
         className,
       )}
       {...props}
@@ -59,7 +59,7 @@ function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="card-title"
       className={cn(
-        "font-sans text-base leading-snug font-semibold group-data-[size=sm]/card:text-sm",
+        "min-w-0 font-sans text-base leading-snug font-semibold wrap-anywhere group-data-[size=sm]/card:text-sm",
         className,
       )}
       {...props}
@@ -71,7 +71,10 @@ function CardDescription({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="card-description"
-      className={cn("text-sm text-muted-foreground", className)}
+      className={cn(
+        "min-w-0 text-sm text-muted-foreground wrap-anywhere",
+        className,
+      )}
       {...props}
     />
   );
@@ -94,7 +97,7 @@ function CardContent({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="card-content"
-      className={cn("px-(--card-spacing)", className)}
+      className={cn("min-w-0 px-(--card-spacing)", className)}
       {...props}
     />
   );

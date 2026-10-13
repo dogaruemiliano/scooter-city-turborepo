@@ -4,6 +4,7 @@ import {
   CountrySheetSelect,
   Input,
   PhoneNumberInput,
+  SegmentedRadioGroup,
   Select,
   SelectContent,
   SelectGroup,
@@ -85,6 +86,34 @@ export function FormDecimalInput(
           value={field.value ?? ""}
           onValueChange={field.onChange}
           onBlur={field.onBlur}
+        />
+      )}
+    />
+  );
+}
+
+export function FormSegmentedRadioGroup<Value extends string>(
+  props: Omit<
+    ComponentProps<typeof SegmentedRadioGroup<Value>>,
+    "name" | "value" | "onValueChange" | "label"
+  >,
+) {
+  const { controlProps, name, label } = useFormFieldControl();
+  const { control } = useFormContext();
+  return (
+    <Controller
+      control={control}
+      name={name}
+      render={({ field }) => (
+        <SegmentedRadioGroup
+          {...props}
+          {...controlProps}
+          label={label}
+          name={field.name}
+          value={field.value ?? ""}
+          onValueChange={field.onChange}
+          onBlur={field.onBlur}
+          inputRef={field.ref}
         />
       )}
     />

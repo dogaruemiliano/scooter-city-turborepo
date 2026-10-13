@@ -58,10 +58,45 @@ matching individual entry points.
   code decides what those choices mean.
 - `FormActions` arranges action children and an optional live `status`. Callers
   provide translated labels, button types, busy/disabled states, and handlers.
+  Use `sticky` for long editors: actions render in the shared Card, inset from
+  the bottom by page spacing (`4` on phones, `8` from `sm`) plus the safe area.
+  The page owns extra end-of-form clearance; use bottom padding `16` on phones
+  and `24` from `sm` so the card settles farther from the bottom edge.
   It does not own submission or confirmation logic.
+- `FormSection` groups related fields. Use `panel` for a bordered card and
+  `number` for ordered sections. It defaults to two columns on wider screens;
+  use `columns={1}` inside review panels. Two columns depend on the section's
+  available width (`formColumns`), rather than the viewport. Existing spanning
+  children revert to one full-width column in narrow sections.
+- `FileDropZone` acquires multiple files through drag and drop or a native picker.
+  Supply localized labels, `hint`, `accept`, and `onFiles`. The feature owns file
+  limits, validation, upload progress, and failures.
+- `DocumentViewer` accepts an optional `review` and `reviewTitle` for a document
+  comparison editor. It places the editor beside the preview on desktop and
+  below it on mobile. The feature owns draft state, validation, and applying or
+  discarding edits. Its review surface uses the popover token throughout.
+- `DocumentZoom` and `PdfPreview` share `DocumentPreviewHeader`: a translucent
+  overlay with a centered filename, optional right-hand `headerActions`, and a
+  left close button only when `onClosePress` is supplied (provide `closeLabel`).
+  Overflowing filenames scroll automatically, stopping for hover/focus or
+  reduced motion; the filename remains manually scrollable. `DocumentViewer`
+  supplies close and action controls through this overlay, including while PDFs
+  load or fail. Inline verification previews omit `onClosePress`.
+  Double-clicking or double-tapping a fitted document zooms in around that
+  point. From any zoom level above 100%, including 400%, the same gesture
+  restores the fitted 100% view. Each pointer gesture toggles once, including
+  when accompanying native mouse events arrive late. Dragging, pinching, and
+  long presses do not count as taps.
+  Discrete zoom actions use the fast/decelerate motion tokens; dragging and
+  pinching stay immediate, and reduced motion disables the transition. This
+  behavior is shared by images and PDFs.
+- `BottomSheet dismissible={false}` locks swipe, outside presses, and Escape
+  dismissal, and hides the drag handle. Keep it controlled and close it by
+  changing `open` after the required task completes. Ordinary sheets retain
+  their existing dismissal behavior.
 
-`Card` is the common card and editor surface. Its outer border is transparent by
-default; use `border="default"` for the neutral theme border or `border="primary"`
+`Card` is the common card and editor surface. Its outer border uses the neutral
+theme border by default; use `border="transparent"` to hide it or `border="primary"`
 for brand emphasis. Footer dividers retain their neutral border. Use its header/content/footer slots
 for spacing, `size="sm"` for compact content, and `surface="raised"` for editor
 panels. `as="article"`, `as="section"`, and `as="form"` preserve the appropriate

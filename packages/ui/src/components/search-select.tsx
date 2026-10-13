@@ -181,7 +181,7 @@ function SearchSelect({
       <ComboboxPrimitive.InputGroup
         data-slot="search-select-control"
         className={cn(
-          "flex h-12 w-full items-center rounded-lg border border-input bg-background transition-colors duration-fast ease-standard focus-within:border-ring focus-within:ring-2 focus-within:ring-ring has-aria-invalid:border-destructive has-aria-invalid:ring-2 has-aria-invalid:ring-destructive data-disabled:cursor-not-allowed data-disabled:bg-disabled data-disabled:text-disabled-foreground md:h-11",
+          "flex h-12 w-full items-center rounded-lg border border-input bg-control transition-colors duration-fast ease-standard focus-within:border-ring focus-within:ring-2 focus-within:ring-ring has-aria-invalid:border-destructive has-aria-invalid:ring-2 has-aria-invalid:ring-destructive data-disabled:cursor-not-allowed data-disabled:bg-disabled data-disabled:text-disabled-foreground md:h-11",
           className,
         )}
       >
@@ -224,7 +224,7 @@ function SearchSelect({
         >
           <ComboboxPrimitive.Popup
             data-slot="search-select-content"
-            className="group/search-select-content relative max-h-(--available-height) w-(--anchor-width) min-w-64 origin-(--transform-origin) overflow-hidden rounded-lg border border-border bg-popover text-popover-foreground shadow-md duration-fast ease-standard data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95"
+            className="group/search-select-content relative max-h-(--available-height) w-(--anchor-width) min-w-0 max-w-(--available-width) origin-(--transform-origin) overflow-hidden rounded-lg border border-border bg-popover text-popover-foreground shadow-md duration-fast ease-standard data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95"
           >
             <ComboboxPrimitive.Empty
               role="status"

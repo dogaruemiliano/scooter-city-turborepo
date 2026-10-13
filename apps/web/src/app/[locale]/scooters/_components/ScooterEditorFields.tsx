@@ -63,6 +63,7 @@ export function ScooterEditorFields({
   brands,
   combinedReview = false,
   onRetryAnalysis,
+  onCancelAnalysis,
   analyzing = false,
   persistedPolicyIds,
   documents,
@@ -79,6 +80,7 @@ export function ScooterEditorFields({
 }: {
   combinedReview?: boolean;
   onRetryAnalysis?: (sourceId: string) => void;
+  onCancelAnalysis?: () => void;
   analyzing?: boolean;
   persistedPolicyIds: string[];
   rawFields: Record<string, string>;
@@ -105,7 +107,9 @@ export function ScooterEditorFields({
   });
   const powertrain = useWatch({ control, name: "powertrainType" });
   // Keep the manual/automatic license state alive while navigating the wizard.
-  const licenseAutofill = useScooterLicenseAutofill(editing);
+  const licenseAutofill = useScooterLicenseAutofill(
+    editing || step === "documents",
+  );
   const onLicenseImport = licenseAutofill.onImport;
   useEffect(() => {
     if (importResult) onLicenseImport(importResult);
@@ -165,6 +169,7 @@ export function ScooterEditorFields({
               disabled={disabled}
               analyzing={analyzing}
               onRetryAnalysis={onRetryAnalysis}
+              onCancelAnalysis={onCancelAnalysis}
             />
           ) : (
             <FormSection title={t("documents.title")}>
@@ -351,11 +356,16 @@ export function ScooterEditorFields({
   );
 }
 
-function ScooterTechnicalFields({
+export function ScooterTechnicalFields({
   compact,
   revealedFields = [],
+  excludeFields = [],
   ...props
-}: EditorFieldProps & { compact: boolean; revealedFields?: string[] }) {
+}: EditorFieldProps & {
+  compact: boolean;
+  revealedFields?: string[];
+  excludeFields?: readonly string[];
+}) {
   const t = useTranslations("scooters");
   const {
     getValues,
@@ -385,6 +395,7 @@ function ScooterTechnicalFields({
     fields: section.fields.filter(
       (field) =>
         !inactive.has(field) &&
+        !excludeFields.includes(field) &&
         !(field === "fuelType" && props.powertrain === "electric"),
     ),
   }));
@@ -433,7 +444,7 @@ function ScooterTechnicalFields({
   );
 }
 
-function ScooterEditorFieldControl({
+export function ScooterEditorFieldControl({
   name,
   ...props
 }: EditorFieldProps & { name: ScooterEditorField }) {
@@ -606,14 +617,16 @@ function ScooterPowertrainField({ disabled }: { disabled: boolean }) {
 
 const uppercaseIdentifier = (value: string) => value.toUpperCase();
 
-function ScooterInitialRegistrationFields({
+export function ScooterInitialRegistrationFields({
   disabled,
   onManualLicenseChange,
   includeCertificateNumber = true,
+  panel = false,
 }: {
   disabled: boolean;
   onManualLicenseChange: () => void;
   includeCertificateNumber?: boolean;
+  panel?: boolean;
 }) {
   const t = useTranslations("scooters");
   const { control, getValues, setValue, clearErrors, setError } =
@@ -623,7 +636,7 @@ function ScooterInitialRegistrationFields({
   const registered =
     Boolean(registrationType) && registrationType !== "unregistered";
   return (
-    <FormSection title={t("sections.registration")}>
+    <FormSection panel={panel} title={t("sections.registration")}>
       {includeCertificateNumber ? (
         <ScooterTextField
           name="registrationCertificateNumber"

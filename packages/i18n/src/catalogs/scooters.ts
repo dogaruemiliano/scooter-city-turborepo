@@ -1,5 +1,60 @@
 export const scootersCatalog = {
   en: {
+    creation: {
+      description:
+        "Register a vehicle with its identity, documents, and initial registration.",
+      smartImport: "Smart Import",
+      importHelp:
+        "Upload vehicle documents to fill the form automatically. You can also enter everything manually.",
+      aiPowered: "AI powered",
+      propulsion: "Propulsion",
+      compliance: "Registration & insurance",
+      initialCondition: "Initial condition",
+      optional: "Optional",
+      conditionHelp:
+        "Record mileage, equipment, and instrument checks when you have inspected the scooter.",
+      conditionAction: "Record initial condition",
+      conditionDone: "Return to scooter",
+      conditionRecorded: "Initial condition recorded",
+      civLater:
+        "Full CIV specifications can be completed after the scooter is created.",
+      registrationSummary: "Registration",
+      documentsSummary: "Documents",
+      noDocuments: "No documents uploaded",
+      documentsCount: "{count} documents uploaded",
+      ready: "Required information complete",
+      incomplete: "Complete the required fields",
+      blocked: "Resolve document checks before creating",
+      analyzing: "Analyzing documents…",
+      insuranceDetails: "Insurance details",
+      insuranceHelp:
+        "Review the policy against the original document before applying changes.",
+      editInsurance: "Edit / review details",
+      addInsurance: "Add insurance details",
+      noInsurance: "No insurance policy recorded",
+      inspector: "Insurance policy verification",
+      policyMismatch: "VIN mismatch",
+      comparison: "Policy details",
+      fleetVin: "Scooter VIN",
+      scanVin: "Document VIN",
+      applyInsurance: "Apply verified details",
+      confirmCorrection:
+        "I checked this correction against the original document",
+      correctVin: "Use scooter VIN",
+      removePolicy: "Remove draft policy",
+      created: "Scooter created",
+      createdDescription:
+        "Your scooter is saved. You can finish now or complete its optional CIV details.",
+      completeCiv: "Complete CIV details",
+      finish: "Finish",
+      savedCode: "Assigned fleet number",
+      civTitle: "Complete CIV details",
+      civHelp:
+        "These details are optional. The scooter has already been created.",
+      saveCiv: "Save details & finish",
+      civSaveError:
+        "The scooter was created, but these additional details were not saved. Check the fields and try again, or finish without saving them.",
+    },
     extraction: {
       extractAndContinue: "Extract and continue",
       extract: "Extract from documents",
@@ -11,16 +66,40 @@ export const scootersCatalog = {
       analyzing: "Analyzing document…",
       cancel: "Cancel extraction",
       vinReview: {
-        title: "Check document VINs",
+        title: "Verify the scooter VIN",
         description:
-          "Open the document previews above and correct any misread characters. The original AI reading is kept with each correction.",
+          "Enter the scooter VIN manually. You’ll review the documents in the next step.",
+        vinLabel: "Verified scooter VIN",
+        extractedVin: "Extracted document VIN",
+        progressLabel: "Document verification progress",
+        documentStep: "Document {current} of {total}: {name}",
+        confirmAndNext: "Confirm & next document",
+        confirmAndFinish: "Confirm & finish",
+        waitToConfirm: "{action} ({seconds}s)",
+        continueConfirms:
+          "By continuing, you confirm this document’s VIN matches the verified scooter VIN.",
+        continue: "Continue to document review",
+        resume: "Review VIN and documents",
+        later: "Review later",
+        back: "Change VIN",
+        documentsTitle: "Verify mismatched documents",
+        documentsDescription:
+          "These documents have a different or unreadable VIN. Open each original and confirm that it belongs to this scooter.",
+        confirmDocument: "I verified {name} belongs to this scooter",
+        confirmed: "Verified",
+        needsReview: "Needs review",
+        preview: "Preview document",
+        replaceHint:
+          "If a document belongs to another scooter, close this review and replace or remove it. The original extracted VIN is kept when you confirm a correction.",
+        stale:
+          "The documents changed during review. Close this sheet and review the current documents again.",
         original: "AI reading: {vin}",
         unreadable: "unreadable",
         invalid: "Enter a VIN with 17 characters, without I, O or Q.",
         mismatch:
           "The VINs still differ. Check the originals before correcting them. If the documents belong to different scooters, replace the incorrect document.",
         confirm: "I checked the corrected VINs against the original documents",
-        apply: "Apply verified corrections",
+        apply: "Confirm documents",
         reviewed: "VIN corrected after manual review",
       },
       errors: {
@@ -890,6 +969,60 @@ export const scootersCatalog = {
     },
   },
   ro: {
+    creation: {
+      description:
+        "Înregistrează un vehicul cu datele de identificare, documentele și înregistrarea inițială.",
+      smartImport: "Import inteligent",
+      importHelp:
+        "Încarcă documentele vehiculului pentru completarea automată. Poți introduce toate datele și manual.",
+      aiPowered: "Asistat de AI",
+      propulsion: "Propulsie",
+      compliance: "Înregistrare și asigurare",
+      initialCondition: "Stare inițială",
+      optional: "Opțional",
+      conditionHelp:
+        "Completează kilometrajul, echiparea și verificarea instrumentelor după inspectarea scuterului.",
+      conditionAction: "Completează starea inițială",
+      conditionDone: "Înapoi la scuter",
+      conditionRecorded: "Stare inițială completată",
+      civLater:
+        "Specificațiile CIV complete pot fi adăugate după crearea scuterului.",
+      registrationSummary: "Înregistrare",
+      documentsSummary: "Documente",
+      noDocuments: "Niciun document încărcat",
+      documentsCount: "{count} documente încărcate",
+      ready: "Datele obligatorii sunt complete",
+      incomplete: "Completează câmpurile obligatorii",
+      blocked: "Rezolvă verificările documentelor înainte de creare",
+      analyzing: "Se analizează documentele…",
+      insuranceDetails: "Detalii asigurare",
+      insuranceHelp:
+        "Verifică polița față de documentul original înainte de aplicarea modificărilor.",
+      editInsurance: "Editează / verifică detaliile",
+      addInsurance: "Adaugă detalii asigurare",
+      noInsurance: "Nicio poliță înregistrată",
+      inspector: "Verificarea poliței de asigurare",
+      policyMismatch: "VIN diferit",
+      comparison: "Detalii poliță",
+      fleetVin: "VIN scuter",
+      scanVin: "VIN document",
+      applyInsurance: "Aplică detaliile verificate",
+      confirmCorrection:
+        "Am verificat această corectură față de documentul original",
+      correctVin: "Folosește VIN-ul scuterului",
+      removePolicy: "Elimină polița provizorie",
+      created: "Scuter creat",
+      createdDescription:
+        "Scuterul este salvat. Poți încheia acum sau completa detaliile CIV opționale.",
+      completeCiv: "Completează detaliile CIV",
+      finish: "Încheie",
+      savedCode: "Număr de flotă atribuit",
+      civTitle: "Completează detaliile CIV",
+      civHelp: "Aceste detalii sunt opționale. Scuterul a fost deja creat.",
+      saveCiv: "Salvează detaliile și încheie",
+      civSaveError:
+        "Scuterul a fost creat, dar detaliile suplimentare nu au fost salvate. Verifică datele și încearcă din nou sau încheie fără a le salva.",
+    },
     extraction: {
       extractAndContinue: "Extrage și continuă",
       extract: "Extrage din documente",
@@ -901,16 +1034,40 @@ export const scootersCatalog = {
       analyzing: "Se analizează documentul…",
       cancel: "Anulează extragerea",
       vinReview: {
-        title: "Verifică VIN-urile documentelor",
+        title: "Verifică VIN-ul scuterului",
         description:
-          "Deschide previzualizările documentelor de mai sus și corectează caracterele citite greșit. Citirea inițială a AI-ului se păstrează la fiecare corecție.",
+          "Introdu manual VIN-ul scuterului. Vei verifica documentele la pasul următor.",
+        vinLabel: "VIN-ul verificat al scuterului",
+        extractedVin: "VIN-ul extras din document",
+        progressLabel: "Progresul verificării documentelor",
+        documentStep: "Documentul {current} din {total}: {name}",
+        confirmAndNext: "Confirmă și continuă",
+        confirmAndFinish: "Confirmă și încheie",
+        waitToConfirm: "{action} ({seconds}s)",
+        continueConfirms:
+          "Continuând, confirmi că VIN-ul din acest document coincide cu VIN-ul verificat al scuterului.",
+        continue: "Continuă cu verificarea documentelor",
+        resume: "Verifică VIN-ul și documentele",
+        later: "Verific mai târziu",
+        back: "Schimbă VIN-ul",
+        documentsTitle: "Verifică documentele cu VIN diferit",
+        documentsDescription:
+          "Aceste documente au un VIN diferit sau ilizibil. Deschide fiecare original și confirmă că aparține acestui scuter.",
+        confirmDocument: "Am verificat că {name} aparține acestui scuter",
+        confirmed: "Verificat",
+        needsReview: "Necesită verificare",
+        preview: "Vezi documentul",
+        replaceHint:
+          "Dacă un document aparține altui scuter, închide verificarea și înlocuiește-l sau elimină-l. VIN-ul extras inițial se păstrează când confirmi o corecție.",
+        stale:
+          "Documentele s-au schimbat în timpul verificării. Închide acest panou și verifică din nou documentele actuale.",
         original: "Citire AI: {vin}",
         unreadable: "ilizibil",
         invalid: "Introdu un VIN de 17 caractere, fără I, O sau Q.",
         mismatch:
           "VIN-urile încă diferă. Verifică originalele înainte să le corectezi. Dacă documentele aparțin unor scutere diferite, înlocuiește documentul greșit.",
         confirm: "Am verificat VIN-urile corectate în documentele originale",
-        apply: "Aplică corecțiile verificate",
+        apply: "Confirmă documentele",
         reviewed: "VIN corectat după verificare manuală",
       },
       errors: {

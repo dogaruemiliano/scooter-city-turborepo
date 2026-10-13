@@ -1,3 +1,5 @@
+import { breakpoints } from "./breakpoints";
+
 /**
  * Spacing scale in px (4px base unit).
  * Web emits as rem (px / 16); native consumes as dp (numbers).
@@ -36,9 +38,12 @@ export type Spacing = typeof spacing;
 /** Maximum width for transactional email content, in px. */
 export const emailSizing = { content: 560 } as const;
 
-/** Viewport-relative sizing for web document editors. */
+/** Web sizing for document editors and available-width form layouts. */
 export const viewportSizing = {
   documentEditor: "80vw",
+  documentReview: "60dvh",
+  formColumns: `${breakpoints.sm}px`,
+  formControls: `${spacing[96]}px`,
   accessDirectory: "60dvh",
   accessEditor: "80dvh",
 } as const;

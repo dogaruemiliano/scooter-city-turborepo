@@ -221,7 +221,8 @@ export function scooterEditorDefaults(
     ]),
   ) as Record<ScooterEditorField, string>;
   values.civVersion = scooter?.civVersion ?? "unknown";
-  values.powertrainType = scooter?.powertrainType ?? "";
+  values.powertrainType = scooter ? scooter.powertrainType : "combustion";
+  if (!scooter) values.vehicleCategory = "L1e";
   values.registrationType = scooter?.registrationType ?? "";
   values.requiredLicenseCategory = scooter?.requiredLicenseCategory ?? "";
   values.insurancePolicies =

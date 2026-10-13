@@ -106,6 +106,8 @@ describe("scooter editor conversion", () => {
 
   it("does not assume registration or operational status for a new scooter", () => {
     const defaults = scooterEditorDefaults();
+    expect(defaults.powertrainType).toBe("combustion");
+    expect(defaults.vehicleCategory).toBe("L1e");
     expect(defaults.registrationType).toBe("");
     expect(defaults.requiredLicenseCategory).toBe("");
     expect(defaults.hasGps).toBe("");

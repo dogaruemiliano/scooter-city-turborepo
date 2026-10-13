@@ -5,7 +5,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@repo/ui/lib/utils";
 
 const badgeVariants = cva(
-  "group/badge inline-flex h-5 w-fit shrink-0 items-center justify-center gap-1 overflow-hidden rounded-full border border-transparent px-2 py-0.5 text-xs font-medium whitespace-nowrap transition-all duration-fast ease-standard focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive [&>svg]:pointer-events-none [&>svg]:size-3!",
+  "group/badge inline-flex min-h-5 w-fit min-w-0 max-w-full shrink-0 items-center justify-center gap-1 rounded-md border border-transparent px-2 py-0.5 text-xs font-medium whitespace-normal wrap-anywhere transition-all duration-fast ease-standard focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive [&>svg]:pointer-events-none [&>svg]:shrink-0 [&>svg]:size-3!",
   {
     variants: {
       variant: {
@@ -15,6 +15,8 @@ const badgeVariants = cva(
           "bg-secondary text-secondary-foreground [a]:hover:bg-secondary-hover",
         destructive:
           "bg-destructive-subtle text-destructive focus-visible:ring-destructive [a]:hover:bg-destructive [a]:hover:text-destructive-foreground",
+        warning: "border-warning/20 bg-warning-subtle text-warning",
+        success: "border-success/20 bg-success-subtle text-success",
         outline: "border-border text-foreground [a]:hover:bg-muted",
         ghost: "hover:bg-muted hover:text-foreground",
         link: "text-link underline-offset-4 hover:text-link-hover hover:underline",

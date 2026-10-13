@@ -37,11 +37,11 @@ test("CSS exposes the brand palette and every semantic color to Tailwind", () =>
   assert.doesNotMatch(css, /--color-surface-/);
 });
 
-test("primary actions and the sidebar preserve ScooterCity's logo colors", () => {
+test("primary actions use the approved cyan with a readable dark foreground", () => {
   for (const colors of Object.values(semanticColors)) {
-    assert.equal(formatHex(colors.primary), "#44bbcb");
+    assert.equal(formatHex(colors.primary), "#06b6d4");
     assert.equal(formatHex(colors.primaryForeground), "#12161b");
-    assert.equal(formatHex(colors.sidebar), "#12161b");
+    assert.notEqual(colors.sidebar, colors.sidebarPrimary);
     assert.equal(colors.sidebarPrimary, colors.primary);
     assert.equal(colors.sidebarPrimaryForeground, colors.primaryForeground);
     assert.notEqual(colors.sidebarAccent, colors.sidebarPrimary);
@@ -201,11 +201,11 @@ test("photo-overlay captions remain readable over the brightest image", () => {
 test("native output converts OKLCH and alpha to hexadecimal sRGB", () => {
   const native = buildNative();
   assert.doesNotMatch(native, /oklch\(/i);
-  assert.match(native, /"primary": "#44BBCB"/);
+  assert.match(native, /"primary": "#06B6D4"/);
   assert.match(native, /"primaryForeground": "#12161B"/);
   assert.match(native, /"sidebarMutedForeground": "#A8B5BF"/);
   assert.match(native, /"scrim": "#00000066"/);
-  assert.match(native, /"border": "#FFFFFF1A"/);
+  assert.match(native, /"border": "#27272A"/);
   assert.match(
     native,
     /"magnification": \{\n {4}"loupe": 2,\n {4}"documentMax": 4,\n {4}"documentStep": 0\.5\n {2}\}/,
@@ -213,11 +213,11 @@ test("native output converts OKLCH and alpha to hexadecimal sRGB", () => {
   assert.doesNotMatch(native, /"minimal": \{/);
 });
 
-test("radius values are derived from the 0.45rem preset base", () => {
-  assert.equal(radius.sm, 3.2);
-  assert.equal(radius.md, 5.2);
-  assert.equal(radius.lg, 7.2);
-  assert.equal(radius["4xl"], 23.2);
+test("radius values follow the approved rounded control scale", () => {
+  assert.equal(radius.sm, 8);
+  assert.equal(radius.md, 10);
+  assert.equal(radius.lg, 12);
+  assert.equal(radius["4xl"], 28);
   assert.equal(radius.full, 9999);
 });
 

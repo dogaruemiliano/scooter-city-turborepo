@@ -97,7 +97,7 @@ export function DatePartsInput({
   return (
     <div
       data-disabled={disabled || undefined}
-      className={cn("flex w-full items-center gap-2", className)}
+      className={cn("flex w-full min-w-0 items-center gap-2", className)}
       // The three parts are one field: only report a blur that leaves them all,
       // so tabbing from day to month does not trigger validation.
       onBlur={(event) => {
@@ -117,7 +117,7 @@ export function DatePartsInput({
         maxLength={2}
         placeholder={dayPlaceholder}
         value={value.day}
-        className="min-w-0 flex-1"
+        className="min-w-0 flex-1 px-2"
         onChange={(event) =>
           changePart("day", event.target.value, 2, monthRef.current)
         }
@@ -143,7 +143,7 @@ export function DatePartsInput({
         maxLength={2}
         placeholder={monthPlaceholder}
         value={value.month}
-        className="min-w-0 flex-1"
+        className="min-w-0 flex-1 px-2"
         onChange={(event) =>
           changePart("month", event.target.value, 2, yearRef.current)
         }
@@ -169,7 +169,7 @@ export function DatePartsInput({
         maxLength={4}
         placeholder={yearPlaceholder}
         value={value.year}
-        className="min-w-0 flex-1"
+        className="min-w-0 flex-2 px-2"
         onChange={(event) => changePart("year", event.target.value, 4)}
       />
       <CalendarPicker
