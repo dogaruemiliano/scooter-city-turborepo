@@ -279,6 +279,20 @@ describe("document extraction lifecycle", () => {
     expect(saved.onRawFields).not.toHaveBeenCalled();
   });
 
+  it("replaces untouched smart defaults with documented engine and homologation", () => {
+    const hook = setup({ attached: [civ], editing: false });
+    hook.apply({
+      [civ.sourceId]: extracted({
+        powertrainType: "electric",
+        vehicleCategory: "L3e",
+      }),
+    });
+    expect(hook.result.current.form.getValues("powertrainType")).toBe(
+      "electric",
+    );
+    expect(hook.result.current.form.getValues("vehicleCategory")).toBe("L3e");
+  });
+
   it("preserves fields already edited before the first JSON import", () => {
     const hook = setup({ attached: [civ] });
     act(() =>
@@ -296,6 +310,26 @@ describe("document extraction lifecycle", () => {
     expect(
       hook.result.current.extraction.reviewResult?.emptyConflicts,
     ).toContain("color");
+  });
+
+  it("preserves manually entered insurance when unrelated vehicle documents change", () => {
+    const policy = {
+      ...insuranceEditorDefaults(),
+      insuredName: "Manual policy",
+      documentVin: vin,
+    };
+    const hook = setup(
+      { attached: [], editing: false },
+      { ...scooterEditorDefaults(), insurancePolicies: [policy] },
+    );
+    expect(hook.result.current.form.getValues("insurancePolicies")).toEqual([
+      policy,
+    ]);
+    hook.rerender({ attached: [civ], editing: false });
+    hook.apply({ [civ.sourceId]: extracted({ color: "White" }) });
+    expect(hook.result.current.form.getValues("insurancePolicies")).toEqual([
+      policy,
+    ]);
   });
 
   it("fills a new insurance draft despite array dirtiness, preserves manual policy edits, and clears hidden policy after file removal", () => {

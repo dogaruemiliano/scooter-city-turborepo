@@ -3,10 +3,12 @@ import { v1 } from "@repo/api-shared";
 import { describe, expect, it } from "vitest";
 import {
   CREATE_FIELDS,
+  insuranceEditorDefaults,
   scooterChangedFields,
   scooterCreateFormSchema,
   scooterEditFormSchema,
   scooterEditorDefaults,
+  scooterRequiredFieldsValid,
 } from "./scooter-editor-schema";
 
 const validValues = () => ({
@@ -19,6 +21,51 @@ const validValues = () => ({
 });
 
 describe("scooter editor conversion", () => {
+  it("defaults insurance currency to RON", () => {
+    const policy: v1.scooters.InsurancePolicyInput = {
+      id: "policy-1",
+      insuredName: null,
+      validFrom: null,
+      validUntil: null,
+      premiumAmount: null,
+      currency: "",
+      documentVin: null,
+      vinReviewConfirmed: false,
+    };
+    expect(insuranceEditorDefaults().currency).toBe("RON");
+    expect(insuranceEditorDefaults(policy).currency).toBe("RON");
+    expect(
+      insuranceEditorDefaults({ ...policy, currency: "EUR" }).currency,
+    ).toBe("EUR");
+  });
+
+  it("omits the empty visible insurance placeholder from creation", () => {
+    const input = scooterCreateFormSchema.parse({
+      ...validValues(),
+      insurancePolicies: [insuranceEditorDefaults()],
+    });
+    expect(input.insurancePolicies).toEqual([]);
+  });
+
+  it("still validates incomplete insurance details and attached empty policy evidence", () => {
+    for (const policy of [
+      { ...insuranceEditorDefaults(), insuredName: "ScooterCity" },
+      { ...insuranceEditorDefaults(), sourceFileNames: ["insurance.pdf"] },
+    ]) {
+      const result = scooterCreateFormSchema.safeParse({
+        ...validValues(),
+        insurancePolicies: [policy],
+      });
+      expect(result.success).toBe(false);
+      if (!result.success)
+        expect(
+          result.error.issues.some(
+            (issue) =>
+              issue.path.join(".") === "insurancePolicies.0.vinReviewConfirmed",
+          ),
+        ).toBe(true);
+    }
+  });
   it("has localized labels for every form field in English and Romanian", () => {
     for (const locale of ["en", "ro"] as const)
       for (const field of CREATE_FIELDS) {
@@ -106,6 +153,8 @@ describe("scooter editor conversion", () => {
 
   it("does not assume registration or operational status for a new scooter", () => {
     const defaults = scooterEditorDefaults();
+    expect(defaults.powertrainType).toBe("combustion");
+    expect(defaults.vehicleCategory).toBe("L1e");
     expect(defaults.registrationType).toBe("");
     expect(defaults.requiredLicenseCategory).toBe("");
     expect(defaults.hasGps).toBe("");
@@ -216,7 +265,28 @@ describe("scooter editor conversion", () => {
     });
   });
 
-  it("normalizes plates and validates registration dates and explicit license selection", () => {
+  it.each([
+    ["national", "CJ 12 ABC"],
+    ["local", "14947"],
+    ["temporary", "CJ 0123"],
+  ])(
+    "requires only a plate for %s registration",
+    (registrationType, registrationNumber) => {
+      const values = {
+        ...validValues(),
+        registrationType,
+        registrationNumber,
+        requiredLicenseCategory: "",
+      };
+      expect(scooterCreateFormSchema.safeParse(values).success).toBe(true);
+      expect(
+        scooterCreateFormSchema.safeParse({ ...values, registrationNumber: "" })
+          .success,
+      ).toBe(false);
+    },
+  );
+
+  it("normalizes plates and validates registration dates", () => {
     const values = {
       ...validValues(),
       registrationType: "temporary",
@@ -231,12 +301,44 @@ describe("scooter editor conversion", () => {
     for (const change of [
       { registrationDate: "2099-01-01" },
       { temporaryRegistrationExpiresAt: "2025-05-31" },
-      { requiredLicenseCategory: "" },
       { registrationDate: "2025-02-30" },
     ]) {
       expect(
         scooterCreateFormSchema.safeParse({ ...values, ...change }).success,
       ).toBe(false);
     }
+  });
+});
+
+describe("required fields for create actions", () => {
+  it("accepts valid required fields independently of optional draft errors", () => {
+    expect(
+      scooterRequiredFieldsValid({
+        ...validValues(),
+        manufactureYear: "invalid",
+        currentMileageKm: "-1",
+      }),
+    ).toBe(true);
+  });
+  it.each(["vin", "brandId", "powertrainType", "registrationType"] as const)(
+    "rejects missing %s",
+    (field) => {
+      expect(
+        scooterRequiredFieldsValid({ ...validValues(), [field]: "" }),
+      ).toBe(false);
+    },
+  );
+  it("requires a valid plate when a registered type is selected", () => {
+    const values = { ...validValues(), registrationType: "national" };
+    expect(scooterRequiredFieldsValid(values)).toBe(false);
+    expect(
+      scooterRequiredFieldsValid({ ...values, registrationNumber: "INVALID" }),
+    ).toBe(false);
+    expect(
+      scooterRequiredFieldsValid({
+        ...values,
+        registrationNumber: "CJ 12 ABC",
+      }),
+    ).toBe(true);
   });
 });

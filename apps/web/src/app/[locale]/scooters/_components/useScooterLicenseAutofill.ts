@@ -33,7 +33,10 @@ export function useScooterLicenseAutofill(editing: boolean) {
       return;
     }
 
-    const suggestion = documentedLicenseSuggestion(maxSpeedKmh);
+    const suggestion =
+      registrationType === "local"
+        ? "none"
+        : documentedLicenseSuggestion(maxSpeedKmh);
     if (suggestion && !requiredLicenseCategory) {
       autoFilled.current = true;
       clearErrors("requiredLicenseCategory");

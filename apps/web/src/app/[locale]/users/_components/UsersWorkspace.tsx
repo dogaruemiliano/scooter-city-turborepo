@@ -260,11 +260,12 @@ export function UsersWorkspace({ id }: { id?: string }) {
                       href={`/users/${user.id}`}
                       aria-current={id === user.id ? "page" : undefined}
                       onClick={(event) => navigate(event, `/users/${user.id}`)}
-                      className="group block min-w-0 rounded-xl [content-visibility:auto] outline-none focus-visible:ring-2 focus-visible:ring-ring minimal:rounded-none"
+                      className="group block min-w-0 rounded-xl [content-visibility:auto] outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       <Card
                         size="sm"
-                        className={`transition-colors duration-fast group-hover:border-primary ${id === user.id ? "border-primary bg-popover" : "border-transparent"}`}
+                        border={id === user.id ? "primary" : undefined}
+                        className={`transition-colors duration-fast group-hover:border-primary ${id === user.id ? "bg-popover" : ""}`}
                       >
                         <CardContent className="flex min-w-0 items-center gap-3">
                           <MemberAvatar user={user} />

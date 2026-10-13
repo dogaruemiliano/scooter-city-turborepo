@@ -12,6 +12,7 @@ import { NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ScooterEditForm } from "./ScooterEditForm";
+import { scooterEditorDefaults } from "./scooter-editor-schema";
 
 const mocks = vi.hoisted(() => ({
   apiFetch: vi.fn(),
@@ -110,6 +111,25 @@ beforeEach(() => {
 });
 
 describe("ScooterEditForm", () => {
+  it("preserves existing engine, homologation, and license instead of applying create defaults", () => {
+    expect(
+      scooterEditorDefaults({
+        ...scooter,
+        powertrainType: "electric",
+        vehicleCategory: "L3e",
+        registrationType: "local",
+        requiredLicenseCategory: "A1",
+      }),
+    ).toMatchObject({
+      powertrainType: "electric",
+      vehicleCategory: "L3e",
+      requiredLicenseCategory: "A1",
+    });
+    expect(
+      scooterEditorDefaults({ ...scooter, vehicleCategory: null })
+        .vehicleCategory,
+    ).toBe("");
+  });
   it("fills the existing insurance document's policy and saves the normalized premium", async () => {
     const browser = userEvent.setup();
     mocks.apiFetch.mockResolvedValue(scooter);

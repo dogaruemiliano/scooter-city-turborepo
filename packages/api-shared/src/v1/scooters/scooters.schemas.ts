@@ -45,7 +45,7 @@ const MAX_NOTES_LENGTH = 2_000;
 const MAX_SEARCH_LENGTH = 200;
 const MAX_PAGE_SIZE = 100;
 const MIN_MANUFACTURE_YEAR = 1800;
-const MAX_MANUFACTURE_YEAR = new Date().getUTCFullYear() + 1;
+const MAX_MANUFACTURE_YEAR = new Date().getUTCFullYear();
 const MAX_ENGINE_CC = 2_147_483_647;
 const MAX_MILEAGE_KM = 2_147_483_647;
 const MAX_POWER_KW = Number.MAX_SAFE_INTEGER;
@@ -619,34 +619,6 @@ function validateScooterRegistrationForCreate(
       code: "custom",
       message: INVALID_PLATE_MESSAGE,
       path: ["registrationNumber"],
-    });
-  }
-
-  if (!input.registrationDate) {
-    ctx.addIssue({
-      code: "custom",
-      message: "Registration date is required for registered scooters.",
-      path: ["registrationDate"],
-    });
-  }
-
-  if (!input.requiredLicenseCategory) {
-    ctx.addIssue({
-      code: "custom",
-      message:
-        "Required driver license type is required for registered scooters.",
-      path: ["requiredLicenseCategory"],
-    });
-  }
-
-  if (
-    registrationType === "temporary" &&
-    !input.temporaryRegistrationExpiresAt
-  ) {
-    ctx.addIssue({
-      code: "custom",
-      message: "Registration expiry date is required for temporary plates.",
-      path: ["temporaryRegistrationExpiresAt"],
     });
   }
 

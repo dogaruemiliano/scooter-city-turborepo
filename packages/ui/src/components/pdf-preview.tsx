@@ -15,6 +15,7 @@ import {
 } from "../lib/pdf-document";
 import { DocumentZoom, type DocumentZoomLabels } from "./document-zoom";
 import { Button } from "./button";
+import type { DocumentPreviewHeaderProps } from "./document-preview-header";
 
 export type PdfPreviewLabels = {
   error: string;
@@ -29,13 +30,16 @@ export function PdfPreview({
   labels,
   thumbnail = false,
   zoomLabels,
+  onClosePress,
+  closeLabel,
+  headerActions,
 }: {
   src: string;
   label: string;
   labels: PdfPreviewLabels;
   thumbnail?: boolean;
   zoomLabels?: DocumentZoomLabels;
-}) {
+} & Omit<DocumentPreviewHeaderProps, "caption">) {
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
   const [failed, setFailed] = useState(false);
   const [pageNumber, setPageNumber] = useState(1);
@@ -66,34 +70,57 @@ export function PdfPreview({
       renderScale={scale}
     />
   );
-  const navigation =
-    pdf && pdf.numPages > 1 ? (
-      <>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          aria-label={labels.previousPage}
-          disabled={pageNumber === 1}
-          onClick={() => setPageNumber(pageNumber - 1)}
-        >
-          <ChevronLeftIcon aria-hidden="true" />
-        </Button>
-        <span role="status" className="text-sm tabular-nums">
-          {pageNumber} / {pdf.numPages}
-        </span>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          aria-label={labels.nextPage}
-          disabled={pageNumber === pdf.numPages}
-          onClick={() => setPageNumber(pageNumber + 1)}
-        >
-          <ChevronRightIcon aria-hidden="true" />
-        </Button>
-      </>
-    ) : null;
+  const navigation = pdf ? (
+    <>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="size-11 min-h-11 hover:bg-document-overlay disabled:border-transparent disabled:bg-transparent"
+        aria-label={labels.previousPage}
+        disabled={pageNumber === 1}
+        onClick={() => setPageNumber(pageNumber - 1)}
+      >
+        <ChevronLeftIcon aria-hidden="true" />
+      </Button>
+      <span role="status" className="px-1 text-xs tabular-nums">
+        {pageNumber} / {pdf.numPages}
+      </span>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="size-11 min-h-11 hover:bg-document-overlay disabled:border-transparent disabled:bg-transparent"
+        aria-label={labels.nextPage}
+        disabled={pageNumber === pdf.numPages}
+        onClick={() => setPageNumber(pageNumber + 1)}
+      >
+        <ChevronRightIcon aria-hidden="true" />
+      </Button>
+    </>
+  ) : null;
+  const content = (scale = 1) =>
+    failed ? (
+      <span
+        role="status"
+        className="flex h-full items-center justify-center gap-2 p-4 text-center text-sm text-muted-foreground"
+      >
+        <FileTextIcon className="size-6 shrink-0" aria-hidden="true" />
+        {labels.error}
+      </span>
+    ) : pdf ? (
+      page(scale)
+    ) : (
+      <span
+        aria-busy="true"
+        className="flex h-full items-center justify-center p-4"
+      >
+        <LoaderCircleIcon
+          className="size-6 animate-spin text-muted-foreground motion-reduce:animate-none"
+          aria-hidden="true"
+        />
+      </span>
+    );
   return (
     <span
       className={
@@ -103,43 +130,27 @@ export function PdfPreview({
       }
       data-slot="pdf-preview"
     >
-      {failed ? (
-        <span
-          role="status"
-          className="flex h-full items-center justify-center gap-2 p-4 text-center text-sm text-muted-foreground"
+      {!thumbnail && zoomLabels ? (
+        <DocumentZoom
+          resetKey={pageNumber}
+          labels={zoomLabels}
+          navigation={navigation}
+          caption={label}
+          onClosePress={onClosePress}
+          closeLabel={closeLabel}
+          headerActions={headerActions}
         >
-          <FileTextIcon className="size-6 shrink-0" aria-hidden="true" />
-          {labels.error}
-        </span>
-      ) : pdf ? (
-        !thumbnail && zoomLabels ? (
-          <DocumentZoom
-            resetKey={pageNumber}
-            labels={zoomLabels}
-            navigation={navigation}
-          >
-            {page}
-          </DocumentZoom>
-        ) : (
-          <>
-            {page()}
-            {!thumbnail ? (
-              <span className="flex items-center justify-center">
-                {navigation}
-              </span>
-            ) : null}
-          </>
-        )
+          {content}
+        </DocumentZoom>
       ) : (
-        <span
-          aria-busy="true"
-          className="flex h-full items-center justify-center p-4"
-        >
-          <LoaderCircleIcon
-            className="size-6 animate-spin text-muted-foreground motion-reduce:animate-none"
-            aria-hidden="true"
-          />
-        </span>
+        <>
+          {content()}
+          {!thumbnail && pdf && !failed ? (
+            <span className="flex items-center justify-center">
+              {navigation}
+            </span>
+          ) : null}
+        </>
       )}
     </span>
   );

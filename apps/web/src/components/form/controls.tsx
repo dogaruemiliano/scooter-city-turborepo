@@ -4,6 +4,7 @@ import {
   CountrySheetSelect,
   Input,
   PhoneNumberInput,
+  SegmentedRadioGroup,
   Select,
   SelectContent,
   SelectGroup,
@@ -85,6 +86,34 @@ export function FormDecimalInput(
           value={field.value ?? ""}
           onValueChange={field.onChange}
           onBlur={field.onBlur}
+        />
+      )}
+    />
+  );
+}
+
+export function FormSegmentedRadioGroup<Value extends string>(
+  props: Omit<
+    ComponentProps<typeof SegmentedRadioGroup<Value>>,
+    "name" | "value" | "onValueChange" | "label"
+  >,
+) {
+  const { controlProps, name, label } = useFormFieldControl();
+  const { control } = useFormContext();
+  return (
+    <Controller
+      control={control}
+      name={name}
+      render={({ field }) => (
+        <SegmentedRadioGroup
+          {...props}
+          {...controlProps}
+          label={label}
+          name={field.name}
+          value={field.value ?? ""}
+          onValueChange={field.onChange}
+          onBlur={field.onBlur}
+          inputRef={field.ref}
         />
       )}
     />
@@ -195,6 +224,7 @@ export function FormCountrySelect(
           id={id}
           invalid={Boolean(error)}
           labelledById={`${id}-label`}
+          onBlur={field.onBlur}
           onValueChange={(value) => {
             field.onChange(value);
             field.onBlur();
@@ -247,6 +277,12 @@ export function FormSelect({
       name={name}
       render={({ field }) => (
         <Select
+          items={[
+            ...(emptyOption
+              ? [{ value: EMPTY_SELECT_VALUE, label: emptyOption.label }]
+              : []),
+            ...options,
+          ]}
           value={
             field.value
               ? String(field.value)
@@ -263,6 +299,7 @@ export function FormSelect({
         >
           <SelectTrigger
             ref={field.ref}
+            onBlur={field.onBlur}
             aria-describedby={errorId}
             aria-invalid={error ? true : undefined}
             aria-required={required || undefined}

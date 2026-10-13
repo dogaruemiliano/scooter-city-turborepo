@@ -115,3 +115,15 @@ export const CompactRows: Story = {
     </Card>
   ),
 };
+
+export const BorderVariants: Story = {
+  render: () => (
+    <div className="flex flex-col gap-4">
+      {(["transparent", "default", "primary"] as const).map((border) => (
+        <Card key={border} border={border}>
+          <CardContent>{border} border</CardContent>
+        </Card>
+      ))}
+    </div>
+  ),
+};

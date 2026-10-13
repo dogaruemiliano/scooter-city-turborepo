@@ -1,4 +1,4 @@
-export const EXPLICIT_THEMES = ["light", "dark", "minimal"] as const;
+export const EXPLICIT_THEMES = ["light", "dark"] as const;
 export type ExplicitTheme = (typeof EXPLICIT_THEMES)[number];
 export type ThemePreference = ExplicitTheme | "system";
 

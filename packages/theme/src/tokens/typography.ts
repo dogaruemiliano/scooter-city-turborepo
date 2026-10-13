@@ -4,12 +4,12 @@
 export const typography = {
   fontFamily: {
     sans: {
-      web: "var(--font-montserrat, 'Montserrat Variable'), ui-sans-serif, system-ui, sans-serif",
+      web: "var(--font-manrope, 'Manrope Variable'), ui-sans-serif, system-ui, sans-serif",
       native: "Montserrat_400Regular",
       email: "Arial, Helvetica, sans-serif",
     },
     body: {
-      web: "var(--font-open-sans, 'Open Sans'), ui-sans-serif, system-ui, sans-serif",
+      web: "var(--font-manrope, 'Manrope Variable'), ui-sans-serif, system-ui, sans-serif",
       // The native app retains its bundled typeface; Open Sans is web-only.
       native: "Montserrat_400Regular",
       email: "Arial, Helvetica, sans-serif",

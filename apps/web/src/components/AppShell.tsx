@@ -658,9 +658,6 @@ function AccountMenu({
                       <DropdownMenuRadioItem value="dark">
                         {tTheme("options.dark")}
                       </DropdownMenuRadioItem>
-                      <DropdownMenuRadioItem value="minimal">
-                        {tTheme("options.minimal")}
-                      </DropdownMenuRadioItem>
                       <DropdownMenuRadioItem value="system">
                         {tTheme("options.system")}
                       </DropdownMenuRadioItem>

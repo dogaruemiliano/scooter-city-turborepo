@@ -105,11 +105,6 @@ export function buildCss(): string {
   lines.push(...cssColorLines(semanticColors.dark, "  "));
   lines.push("}", "");
 
-  lines.push(":root[data-theme='minimal'], .minimal {");
-  lines.push("  color-scheme: dark;");
-  lines.push(...cssColorLines(semanticColors.minimal, "  "));
-  lines.push("}", "");
-
   lines.push(".access-workspace {");
   // Colors intentionally inherit the active theme, including runtime overrides.
   lines.push(`  font-family: ${typography.fontFamily.body.web};`);

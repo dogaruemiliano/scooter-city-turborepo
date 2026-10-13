@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist_Mono, Montserrat, Open_Sans } from "next/font/google";
+import { Geist_Mono, Manrope } from "next/font/google";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { isSupportedLocale, supportedLocales } from "@repo/i18n";
@@ -17,13 +17,8 @@ import {
 } from "../../lib/theme-cookie";
 import "../globals.css";
 
-const montserrat = Montserrat({
-  variable: "--font-montserrat",
-  subsets: ["latin"],
-});
-
-const openSans = Open_Sans({
-  variable: "--font-open-sans",
+const manrope = Manrope({
+  variable: "--font-manrope",
   subsets: ["latin", "latin-ext"],
   display: "swap",
 });
@@ -44,6 +39,8 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export function generateStaticParams() {
@@ -76,7 +73,7 @@ export default async function RootLayout({
     <html
       lang={locale}
       data-theme={dataTheme}
-      className={`${montserrat.variable} ${openSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${manrope.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body suppressHydrationWarning className="relative min-h-full">
         <div className="isolate flex min-h-full flex-col">

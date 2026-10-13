@@ -291,7 +291,7 @@ describe("AppShell", () => {
       await screen.findByRole("menuitemradio", { name: "System" }),
     ).toHaveAttribute("aria-checked", "true");
 
-    for (const label of ["Light", "Dark", "Minimal", "System"]) {
+    for (const label of ["Light", "Dark", "System"]) {
       fireEvent.click(
         await screen.findByRole("menuitemradio", { name: label }),
       );

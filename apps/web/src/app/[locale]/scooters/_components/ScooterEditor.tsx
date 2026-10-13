@@ -32,6 +32,9 @@ import {
 } from "./CivVocabularyContext";
 import { ScooterImportReviewProvider } from "./ScooterImportReview";
 import { ScooterEditorFields } from "./ScooterEditorFields";
+import { ScooterCreateFields } from "./ScooterCreateFields";
+import { ScooterCreateActions } from "./ScooterCreateActions";
+import { ScooterCreationComplete } from "./ScooterCreationComplete";
 import {
   scooterEditorMessage,
   scooterServerFieldErrors,
@@ -42,6 +45,7 @@ import {
   scooterCreateFormSchema,
   scooterEditFormSchema,
   scooterEditorDefaults,
+  scooterRequiredFieldsValid,
   type ScooterEditorValues,
 } from "./scooter-editor-schema";
 import { scooterFieldConflict } from "./scooter-feedback";
@@ -80,6 +84,7 @@ export function ScooterEditor({
   const analysis = useScooterDocumentAnalysis(documents, scooter?.id);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [vinReviewRequired, setVinReviewRequired] = useState(false);
+  const [vinReviewRequested, setVinReviewRequested] = useState(false);
   const [importedSignature, setImportedSignature] = useState<string | null>(
     null,
   );
@@ -87,6 +92,8 @@ export function ScooterEditor({
   const submitting = useRef(false);
   const pendingFocus = useRef<FieldErrors<ScooterEditorValues> | null>(null);
   const [requestError, setRequestError] = useState<string | null>(null);
+  const [createdScooter, setCreatedScooter] =
+    useState<v1.scooters.Scooter | null>(null);
   const form = useZodForm<ScooterEditorValues, v1.scooters.UpdateScooterInput>(
     scooter ? scooterEditFormSchema : scooterCreateFormSchema,
     {
@@ -114,14 +121,27 @@ export function ScooterEditor({
   );
   const vinReviewDocuments = extraction.sources.flatMap((source) => {
     const entry = analysis.entries[source.sourceId];
-    if (entry?.status !== "success") return [];
-    const data = entry.analysis.extractedData;
+    const unverified = extraction.unverifiedSources.some(
+      (item) => item.sourceId === source.sourceId,
+    );
+    if (entry?.status !== "success" && !unverified) return [];
+    const data =
+      entry?.status === "success" ? entry.analysis.extractedData : undefined;
+    const draft = documents.drafts.find((item) => item.id === source.sourceId);
+    const saved = documents.existing.find(
+      (item) => item.id === source.sourceId,
+    );
     return [
       {
         sourceId: source.sourceId,
         fileName: source.fileName,
-        vin: data.vin,
-        originalVin: data.vinReview ? data.vinReview.originalVin : data.vin,
+        vin: data?.vin ?? null,
+        originalVin: data?.vinReview
+          ? data.vinReview.originalVin
+          : (data?.vin ?? null),
+        file: draft?.file,
+        src: saved ? webApi.url(saved.contentUrl) : undefined,
+        contentType: saved?.contentType,
       },
     ];
   });
@@ -131,6 +151,7 @@ export function ScooterEditor({
     setPreviousAnalysisSignature(sourceSignature);
     setAnalysisError(null);
     setVinReviewRequired(false);
+    setVinReviewRequested(false);
   }
   const unverifiedSources = extraction.unverifiedSources.filter(
     (source) =>
@@ -144,6 +165,10 @@ export function ScooterEditor({
   const powertrain = useWatch({
     control: form.control,
     name: "powertrainType",
+  });
+  const createValues = useWatch({
+    control: form.control,
+    disabled: Boolean(scooter),
   });
   const clearedFields =
     scooter && scooter.powertrainType !== powertrain
@@ -186,6 +211,7 @@ export function ScooterEditor({
       submitting.current ||
       analysis.running ||
       documents.blocked ||
+      vinReviewRequired ||
       extraction.vinMismatch ||
       extraction.unverifiedSources.length
     )
@@ -215,7 +241,7 @@ export function ScooterEditor({
         delete payload.civIssuingAuthority;
         delete payload.civRawFields;
       }
-      await webApi.fetch(
+      const savedScooter = await webApi.fetch(
         scooter
           ? v1.scooters.ROUTES.update(scooter.id)
           : v1.scooters.ROUTES.create,
@@ -226,8 +252,12 @@ export function ScooterEditor({
         },
       );
       documents.saved();
-      router.push(returnHref);
-      router.refresh();
+      if (scooter) {
+        router.push(returnHref);
+        router.refresh();
+      } else {
+        setCreatedScooter(savedScooter);
+      }
     } catch (error) {
       documents.saveFailed();
       if (documents.handleSessionError(error)) {
@@ -277,7 +307,10 @@ export function ScooterEditor({
     }
   }
 
-  function applyAnalysis(entries: (DocumentAnalysisState | undefined)[]) {
+  function applyAnalysis(
+    entries: (DocumentAnalysisState | undefined)[],
+    confirmedSourceIds: string[] = [],
+  ) {
     const successes = entries.flatMap((entry) =>
       entry?.status === "success" ? [entry.analysis] : [],
     );
@@ -312,6 +345,7 @@ export function ScooterEditor({
       );
       return (
         !success?.extractedData.vin &&
+        !confirmedSourceIds.includes(source.sourceId) &&
         !extraction.isVinConfirmed(source.sourceId)
       );
     });
@@ -338,6 +372,7 @@ export function ScooterEditor({
   useEffect(() => {
     if (
       scooter ||
+      createdScooter ||
       !canExtract ||
       analysis.running ||
       (importedCurrentDocuments &&
@@ -361,6 +396,7 @@ export function ScooterEditor({
       void runAnalysis({ automatic: true });
   }, [
     scooter,
+    createdScooter,
     canExtract,
     documents.drafts,
     analysis.entries,
@@ -372,16 +408,16 @@ export function ScooterEditor({
 
   const classify = documents.classify;
   useEffect(() => {
-    if (scooter) return;
+    if (scooter || createdScooter) return;
     for (const draft of documents.drafts) {
       const entry = analysis.entries[draft.id];
       if (draft.type === null && entry?.status === "success")
         classify(draft.id, entry.analysis.documentType);
     }
-  }, [scooter, documents.drafts, analysis.entries, classify]);
+  }, [scooter, createdScooter, documents.drafts, analysis.entries, classify]);
 
   useEffect(() => {
-    if (scooter) return;
+    if (scooter || createdScooter) return;
     const policies = form.getValues("insurancePolicies") ?? [];
     const missing = [
       ...new Set(
@@ -398,20 +434,14 @@ export function ScooterEditor({
     if (missing.length)
       form.setValue(
         "insurancePolicies",
-        [
-          ...policies,
-          ...missing.map((id) => ({
-            ...insuranceEditorDefaults(),
-            id,
-          })),
-        ],
+        [{ ...insuranceEditorDefaults(), ...policies[0], id: missing[0]! }],
         { shouldDirty: true },
       );
-  }, [scooter, documents.drafts, form]);
+  }, [scooter, createdScooter, documents.drafts, form]);
 
   const automaticImport = useRef("");
   useEffect(() => {
-    if (scooter || analysis.running) return;
+    if (scooter || createdScooter || analysis.running) return;
     const successes = Object.values(analysis.entries).filter(
       (entry) =>
         entry.status === "success" &&
@@ -427,25 +457,50 @@ export function ScooterEditor({
     applyAnalysis(successes);
   });
 
+  if (createdScooter)
+    return (
+      <ScooterCreationComplete
+        scooter={createdScooter}
+        returnHref={returnHref}
+        brands={availableBrands}
+        vocabulary={vocabulary}
+      />
+    );
+
+  const createFormValid =
+    scooterCreateFormSchema.safeParse(createValues).success;
+  const needsDocumentReview = Boolean(
+    vinReviewRequired ||
+    extraction.vinMismatch ||
+    extraction.unverifiedSources.length,
+  );
+  const createStatus = t(
+    analysis.running
+      ? "creation.analyzing"
+      : documents.blocked || needsDocumentReview
+        ? "creation.blocked"
+        : createFormValid
+          ? "creation.ready"
+          : "creation.incomplete",
+  );
+
   return (
-    <div className="mx-auto flex w-full max-w-screen-lg flex-1 flex-col gap-6 px-4 pt-6 pb-12 sm:px-6 sm:pt-10 sm:pb-16">
-      {scooter ? (
+    <div
+      className={`mx-auto flex w-full min-w-0 max-w-(--breakpoint-xl) flex-1 flex-col gap-6 px-4 pt-6 sm:px-8 sm:pt-8 ${scooter ? "pb-4" : "pb-[calc(var(--spacing-16)+env(safe-area-inset-bottom))] sm:pb-[calc(var(--spacing-24)+env(safe-area-inset-bottom))]"}`}
+    >
+      {scooter && (
         <>
           <PageTitleOverride title={v1.scooters.scooterDisplayCode(scooter)} />
           <h1 className="text-2xl font-semibold">
             {v1.scooters.scooterDisplayCode(scooter)}
           </h1>
         </>
-      ) : (
-        <p className="text-sm text-muted-foreground">
-          {t("fleetNumber.assignedOnSave")}
-        </p>
       )}
       <CivVocabularyContext value={vocabulary}>
         <FormProvider {...form}>
           <form
             ref={formRef}
-            className="grid gap-8"
+            className={`grid min-w-0 gap-8 ${!scooter ? "[&_[data-slot=label]]:text-sm [&_[data-slot=label]]:font-medium [&_[data-slot=segmented-radio-group]>label>span]:text-sm [&_[data-slot=segmented-radio-group]>label>span]:font-medium [&_[data-slot=form-section]_h2]:text-base [&_[data-slot=form-section]_h2]:font-semibold [&_[data-slot=form-section]_h2]:normal-case [&_[data-slot=form-section]_h2]:tracking-normal" : ""}`}
             noValidate
             onSubmit={(event) => {
               void form.handleSubmit(submit, (errors) => {
@@ -466,97 +521,152 @@ export function ScooterEditor({
                   : requestError
               }
             />
-            <ScooterDocumentAnalysisContext value={analysis.entries}>
-              <ScooterImportReviewProvider
-                editing={Boolean(scooter)}
-                result={extraction.reviewResult}
-                sources={extraction.sources}
-              >
-                <ScooterEditorFields
-                  combinedReview={!scooter}
-                  onRetryAnalysis={(sourceId) => {
-                    void analysis.run({ sourceId });
-                  }}
-                  analyzing={analysis.running}
-                  importSources={extraction.sources}
-                  importResult={extraction.reviewResult}
-                  onApplyImport={(result) => {
-                    extraction.applyImport(result, {
-                      confirmedUnknownVins: true,
-                    });
-                    analysis.dismissFailures();
-                    setImportedSignature(sourceSignature);
-                    setAnalysisError(null);
-                  }}
-                  documents={documents}
-                  persistedPolicyIds={
-                    scooter?.insurancePolicies?.map((policy) => policy.id) ?? []
-                  }
-                  brands={availableBrands}
-                  rawFields={importedRawFields ?? scooter?.civRawFields ?? {}}
-                  onBrandCreated={(brand) =>
-                    setCreatedBrands((current) => [...current, brand])
-                  }
-                  onRawFields={(fields) =>
-                    setImportedRawFields((current) => ({
-                      ...scooter?.civRawFields,
-                      ...current,
-                      ...fields,
-                    }))
-                  }
+            <div className="grid gap-4 scroll-mt-8">
+              <ScooterDocumentAnalysisContext value={analysis.entries}>
+                <ScooterImportReviewProvider
                   editing={Boolean(scooter)}
-                  disabled={isSubmitting}
-                />
-              </ScooterImportReviewProvider>
-            </ScooterDocumentAnalysisContext>
-            {analysisError ? (
-              <>
-                <p role="alert" className="text-sm text-destructive">
-                  {analysisError}
-                </p>
-                {vinReviewRequired && vinReviewDocuments.length ? (
+                  result={extraction.reviewResult}
+                  sources={extraction.sources}
+                >
+                  <ScooterEditorFields
+                    step={scooter ? undefined : "documents"}
+                    combinedReview={!scooter}
+                    onRetryAnalysis={(sourceId) => {
+                      void analysis.run({ sourceId });
+                    }}
+                    analyzing={analysis.running}
+                    onCancelAnalysis={analysis.cancel}
+                    importSources={extraction.sources}
+                    importResult={extraction.reviewResult}
+                    onApplyImport={(result) => {
+                      extraction.applyImport(result, {
+                        confirmedUnknownVins: true,
+                      });
+                      analysis.dismissFailures();
+                      setImportedSignature(sourceSignature);
+                      setAnalysisError(null);
+                    }}
+                    documents={documents}
+                    persistedPolicyIds={
+                      scooter?.insurancePolicies?.map((policy) => policy.id) ??
+                      []
+                    }
+                    brands={availableBrands}
+                    rawFields={importedRawFields ?? scooter?.civRawFields ?? {}}
+                    onBrandCreated={(brand) =>
+                      setCreatedBrands((current) => [...current, brand])
+                    }
+                    onRawFields={(fields) =>
+                      setImportedRawFields((current) => ({
+                        ...scooter?.civRawFields,
+                        ...current,
+                        ...fields,
+                      }))
+                    }
+                    editing={Boolean(scooter)}
+                    disabled={isSubmitting}
+                  />
+                  {!scooter ? (
+                    <section className="mt-8 grid min-w-0 gap-6 pt-8">
+                      <h2 className="text-xl font-semibold">
+                        {t("creation.scooterDetails")}
+                      </h2>
+                      <ScooterCreateFields
+                        brands={availableBrands}
+                        onBrandCreated={(brand) =>
+                          setCreatedBrands((current) => [...current, brand])
+                        }
+                        disabled={isSubmitting}
+                        importResult={extraction.reviewResult}
+                      />
+                    </section>
+                  ) : null}
+                </ScooterImportReviewProvider>
+              </ScooterDocumentAnalysisContext>
+              <div
+                className="grid gap-4 scroll-mt-8"
+                hidden={!needsDocumentReview && !analysisError}
+              >
+                {analysisError && !vinReviewRequired ? (
+                  <p role="alert" className="text-sm text-destructive">
+                    {analysisError}
+                  </p>
+                ) : null}
+                {(vinReviewRequested ||
+                  vinReviewRequired ||
+                  (extraction.vinMismatch &&
+                    v1.scooters.scooterDocumentExtractedDataSchema.shape.vin.safeParse(
+                      form.getValues("vin"),
+                    ).success)) &&
+                vinReviewDocuments.length ? (
                   <ScooterVinReview
                     key={JSON.stringify([sourceSignature, vinReviewDocuments])}
                     documents={vinReviewDocuments}
                     disabled={
                       isSubmitting || analysis.running || documents.blocked
                     }
-                    onApply={(corrections) => {
-                      const reviewed = analysis.reviewVins(corrections);
-                      if (reviewed) applyAnalysis(reviewed);
+                    onApply={(corrections, vin) => {
+                      const analyzed = corrections.filter(
+                        (correction) =>
+                          analysis.entries[correction.sourceId]?.status ===
+                          "success",
+                      );
+                      const manuallyConfirmed = corrections
+                        .filter(
+                          (correction) =>
+                            analysis.entries[correction.sourceId]?.status !==
+                            "success",
+                        )
+                        .map((correction) => correction.sourceId);
+                      const reviewed = analysis.reviewVins(analyzed);
+                      if (!reviewed) return false;
+                      form.setValue("vin", vin, {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                      });
+                      form.clearErrors("vin");
+                      if (!applyAnalysis(reviewed, manuallyConfirmed))
+                        return false;
+                      manuallyConfirmed.forEach(extraction.confirmVin);
+                      setVinReviewRequested(false);
+                      return true;
                     }}
                   />
                 ) : null}
-              </>
-            ) : null}
-            {extraction.vinMismatch ? (
-              <p role="alert" className="text-sm text-destructive">
-                {t("documentImport.vinMismatch", { fields: "VIN" })}
-              </p>
-            ) : null}
-            {unverifiedSources.length ? (
-              <div className="grid gap-3 rounded-md border border-warning p-4">
-                <p className="text-sm text-warning">{t("wizard.verifyVin")}</p>
-                <ScooterVinReference />
-                {unverifiedSources.map((source) => (
-                  <label
-                    key={source.sourceId}
-                    className="flex items-start gap-3 text-sm"
-                  >
-                    <Checkbox
-                      checked={false}
-                      disabled={isSubmitting}
-                      onCheckedChange={(checked) => {
-                        if (checked) extraction.confirmVin(source.sourceId);
-                      }}
-                    />
-                    <span className="min-w-0 break-words">
-                      {t("wizard.confirmVin", { fileName: source.fileName })}
-                    </span>
-                  </label>
-                ))}
+                {extraction.vinMismatch ? (
+                  <p role="alert" className="text-sm text-destructive">
+                    {t("documentImport.vinMismatch", { fields: "VIN" })}
+                  </p>
+                ) : null}
+                {unverifiedSources.length ? (
+                  <div className="grid gap-4 rounded-xl border border-border bg-card p-4 sm:p-6">
+                    <p className="text-sm font-medium text-warning">
+                      {t("wizard.verifyVin")}
+                    </p>
+                    <ScooterVinReference />
+                    {unverifiedSources.map((source) => (
+                      <label
+                        key={source.sourceId}
+                        className="flex items-start gap-3 rounded-lg bg-control p-3 text-sm"
+                      >
+                        <Checkbox
+                          checked={false}
+                          disabled={isSubmitting}
+                          onCheckedChange={(checked) => {
+                            if (checked) extraction.confirmVin(source.sourceId);
+                          }}
+                        />
+                        <span className="min-w-0 break-words">
+                          {t("wizard.confirmVin", {
+                            fileName: source.fileName,
+                          })}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                ) : null}
               </div>
-            ) : null}
+            </div>
             {scooter?.propulsionSystem ? (
               <p className="text-sm text-muted-foreground">
                 {t("civ.legacyPropulsion", { value: scooter.propulsionSystem })}
@@ -580,8 +690,22 @@ export function ScooterEditor({
                 })}
               </p>
             ) : null}
-            <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              {analysis.running ? (
+            <ScooterCreateActions
+              enabled={!scooter}
+              ready={scooterRequiredFieldsValid(createValues)}
+              status={scooter ? undefined : createStatus}
+              review={
+                !scooter && needsDocumentReview
+                  ? {
+                      label: t("creation.validateDocuments"),
+                      disabled:
+                        isSubmitting || analysis.running || documents.blocked,
+                      onClick: () => setVinReviewRequested(true),
+                    }
+                  : undefined
+              }
+            >
+              {scooter && analysis.running ? (
                 <Button
                   type="button"
                   variant="outline"
@@ -630,6 +754,7 @@ export function ScooterEditor({
                   isSubmitting ||
                   analysis.running ||
                   documents.blocked ||
+                  vinReviewRequired ||
                   extraction.vinMismatch ||
                   extraction.unverifiedSources.length > 0 ||
                   Boolean(
@@ -650,7 +775,7 @@ export function ScooterEditor({
                       : "actions.create",
                 )}
               </Button>
-            </div>
+            </ScooterCreateActions>
           </form>
         </FormProvider>
       </CivVocabularyContext>

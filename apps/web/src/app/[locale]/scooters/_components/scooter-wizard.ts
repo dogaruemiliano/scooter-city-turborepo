@@ -22,9 +22,9 @@ export const CIV_METADATA_FIELDS = [
 
 export const OPERATIONAL_FIELDS = [
   "hasGps",
-  "currentMileageKm",
-  "odometerWorking",
   "speedometerWorking",
+  "odometerWorking",
+  "currentMileageKm",
   "actualMaxSpeedKmh",
   "notes",
 ] as const satisfies readonly ScooterEditorField[];

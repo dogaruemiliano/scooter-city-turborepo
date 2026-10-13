@@ -83,6 +83,25 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("shared PDF previews", () => {
+  it.each(["image/png", "application/pdf"])(
+    "places the filename and working close button inside the %s preview overlay",
+    (contentType) => {
+      render(<DocumentPreview {...props} contentType={contentType} open />);
+      const dialog = screen.getByRole("dialog", { name: "CIV.pdf" });
+      const header = dialog.querySelector(
+        '[data-slot="document-preview-header"]',
+      )!;
+      expect(header.closest('[data-slot="document-zoom"]')).not.toBeNull();
+      expect(
+        within(header as HTMLElement).getByText("CIV.pdf"),
+      ).toBeInTheDocument();
+      fireEvent.click(
+        within(header as HTMLElement).getByRole("button", { name: "Close" }),
+      );
+      expect(props.onOpenChange).toHaveBeenCalledWith(false);
+    },
+  );
+
   it("reuses the card document and shows its thumbnail while the fullscreen page renders", async () => {
     const { rerender, unmount } = render(<DocumentPreview {...props} />);
     await waitFor(() =>
@@ -105,6 +124,7 @@ describe("shared PDF previews", () => {
       ).toHaveAttribute("src", "data:image/jpeg;base64,preview"),
     );
     expect(getDocument).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(finishRender).toBeTypeOf("function"));
     await act(async () => finishRender());
     expect(
       dialog.querySelector('[data-slot="pdf-instant-preview"]'),

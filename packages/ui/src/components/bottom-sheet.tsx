@@ -9,6 +9,7 @@ type BottomSheetContextValue = {
   hasSnapPoints: boolean;
   modal: BottomSheetPrimitive.Root.Props["modal"];
   showHandle: boolean;
+  dismissible: boolean;
 };
 
 const BottomSheetContext = React.createContext<BottomSheetContextValue | null>(
@@ -31,17 +32,23 @@ function BottomSheet({
   modal = true,
   showHandle = true,
   snapPoints,
+  dismissible = true,
+  disablePointerDismissal,
+  onOpenChange,
   ...props
 }: BottomSheetPrimitive.Root.Props & {
   showHandle?: boolean;
+  /** False locks gestures and dismissal; the caller closes after completion. */
+  dismissible?: boolean;
 }) {
   const contextValue = React.useMemo(
     () => ({
       hasSnapPoints: snapPoints != null && snapPoints.length > 0,
       modal,
-      showHandle,
+      showHandle: showHandle && dismissible,
+      dismissible,
     }),
-    [modal, showHandle, snapPoints],
+    [modal, showHandle, snapPoints, dismissible],
   );
 
   return (
@@ -52,6 +59,14 @@ function BottomSheet({
         snapPoints={snapPoints}
         swipeDirection="down"
         {...props}
+        disablePointerDismissal={!dismissible || disablePointerDismissal}
+        onOpenChange={(open, details) => {
+          if (!open && !dismissible) {
+            details.cancel();
+            return;
+          }
+          onOpenChange?.(open, details);
+        }}
       />
     </BottomSheetContext.Provider>
   );
@@ -114,7 +129,7 @@ function BottomSheetContent({
   fullScreen = false,
   ...props
 }: BottomSheetPrimitive.Popup.Props & { fullScreen?: boolean }) {
-  const { hasSnapPoints, modal, showHandle } = useBottomSheet();
+  const { hasSnapPoints, modal, showHandle, dismissible } = useBottomSheet();
 
   return (
     <BottomSheetPrimitive.VirtualKeyboardProvider>
@@ -127,6 +142,7 @@ function BottomSheetContent({
         <BottomSheetPrimitive.Viewport
           data-slot="bottom-sheet-viewport"
           data-modal={modal}
+          data-base-ui-swipe-ignore={dismissible ? undefined : ""}
           className="pointer-events-none fixed inset-0 z-modal select-none data-[modal=true]:pointer-events-auto"
         >
           <BottomSheetPrimitive.Popup

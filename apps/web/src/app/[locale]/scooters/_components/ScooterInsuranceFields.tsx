@@ -4,7 +4,15 @@ import { useOptionalSession } from "@/components/auth/SessionProvider";
 import { canAccess } from "@/lib/access";
 
 import { v1 } from "@repo/api-shared";
-import { Button, Checkbox, FormSection } from "@repo/ui/components";
+import {
+  Button,
+  Badge,
+  Checkbox,
+  FormSection,
+  InputGroup,
+  InputGroupAddon,
+} from "@repo/ui/components";
+import { ScooterSectionComplete } from "./ScooterSectionComplete";
 import { PlusIcon } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import {
@@ -25,10 +33,12 @@ import {
 } from "./ScooterDocumentUpload";
 import {
   insuranceEditorDefaults,
+  insuranceEditorHasContent,
   type ScooterEditorValues,
 } from "./scooter-editor-schema";
 import type { ScooterDocumentsEditor } from "./useScooterDocuments";
 import { ScooterVinReference } from "./ScooterVinReference";
+import { cn } from "@repo/ui/lib/utils";
 
 export function ScooterInsuranceDocuments({
   documents,
@@ -122,10 +132,20 @@ export function ScooterInsuranceFields({
   disabled,
   fieldKeys,
   onRemovePolicy,
+  singleColumn = false,
+  panel = false,
+  title,
+  number,
+  showPolicyStatus = true,
 }: {
   disabled: boolean;
   fieldKeys: string[];
   onRemovePolicy?: (index: number) => void;
+  singleColumn?: boolean;
+  panel?: boolean;
+  title?: string;
+  number?: number;
+  showPolicyStatus?: boolean;
 }) {
   const t = useTranslations("scooters.insurance");
   const locale = useLocale();
@@ -146,17 +166,52 @@ export function ScooterInsuranceFields({
       {policies.map((policy, index) => (
         <FormSection
           key={fieldKeys[index] ?? policy.id}
-          title={t("policy", { number: index + 1 })}
+          panel={panel}
+          title={title ?? t("policy", { number: index + 1 })}
+          number={number}
+          columns={singleColumn ? 1 : 2}
+          status={
+            <div className="flex flex-wrap items-center gap-2">
+              {showPolicyStatus ? (
+                <Badge
+                  variant={
+                    v1.scooters.insuranceStatus(policy) === "active"
+                      ? "success"
+                      : "warning"
+                  }
+                >
+                  {t(`status.${v1.scooters.insuranceStatus(policy)}`)}
+                </Badge>
+              ) : null}
+              <ScooterSectionComplete
+                fields={[
+                  ...[
+                    "insuredName",
+                    "validFrom",
+                    "validUntil",
+                    "premiumAmount",
+                  ].map((field) => `insurancePolicies.${index}.${field}`),
+                  ...(policy.documentVin
+                    ? [`insurancePolicies.${index}.documentVin`]
+                    : []),
+                  ...(!policy.documentVin && !policy.vinReviewConfirmed
+                    ? [`insurancePolicies.${index}.documentVin`]
+                    : []),
+                ]}
+              />
+            </div>
+          }
         >
-          <p className="text-sm text-muted-foreground sm:col-span-2">
-            {t(`status.${v1.scooters.insuranceStatus(policy)}`)}
-          </p>
           {v1.scooters.INSURANCE_FIELDS.map((field) => {
+            if (field === "currency" || field === "documentVin") return null;
             const name = `insurancePolicies.${index}.${field}` as const;
             return (
               <div
                 key={field}
-                className={`grid gap-1 ${field === "insuredName" || field === "documentVin" ? "sm:col-span-2" : ""}`}
+                className={cn(
+                  "grid gap-1",
+                  !singleColumn && field === "insuredName" && "sm:col-span-2",
+                )}
               >
                 <FormField
                   name={name}
@@ -171,23 +226,22 @@ export function ScooterInsuranceFields({
                   {field === "validFrom" || field === "validUntil" ? (
                     <FormDateField />
                   ) : field === "premiumAmount" ? (
-                    <FormDecimalInput
-                      locale={locale}
-                      placeholder={t(`placeholders.${field}`)}
-                    />
+                    <InputGroup>
+                      <FormDecimalInput
+                        locale={locale}
+                        placeholder={t(`placeholders.${field}`)}
+                        data-slot="input-group-control"
+                        className="flex-1 rounded-none border-0 bg-transparent shadow-none ring-0 focus-visible:border-transparent focus-visible:ring-0 disabled:bg-transparent aria-invalid:border-transparent aria-invalid:ring-0"
+                      />
+                      <InputGroupAddon>
+                        {policy.currency || "RON"}
+                      </InputGroupAddon>
+                    </InputGroup>
                   ) : (
                     <FormInput
                       placeholder={t(`placeholders.${field}`)}
-                      autoCapitalize={
-                        field === "documentVin" || field === "currency"
-                          ? "characters"
-                          : "words"
-                      }
-                      normalize={
-                        field === "documentVin" || field === "currency"
-                          ? (value) => value.toUpperCase()
-                          : undefined
-                      }
+                      autoCapitalize="words"
+                      normalize={(value) => value}
                     />
                   )}
                 </FormField>
@@ -197,11 +251,18 @@ export function ScooterInsuranceFields({
           {policy.documentVin &&
           vin &&
           policy.documentVin.toUpperCase() !== vin.toUpperCase() ? (
-            <p role="alert" className="text-sm text-destructive sm:col-span-2">
+            <p
+              role="alert"
+              className={cn(
+                "text-sm text-destructive",
+                !singleColumn && "sm:col-span-2",
+              )}
+            >
               {t("vinMismatch")}
             </p>
           ) : null}
-          {!policy.documentVin ? (
+          {!policy.documentVin &&
+          (showPolicyStatus || insuranceEditorHasContent(policy)) ? (
             <FormField
               name={`insurancePolicies.${index}.vinReviewConfirmed`}
               controlId={`insurance-${policy.id}-vin-review`}

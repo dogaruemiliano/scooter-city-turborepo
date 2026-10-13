@@ -9,7 +9,12 @@ import {
 } from "./ScooterInsuranceFields";
 
 import { v1 } from "@repo/api-shared";
-import { Button, FormSection } from "@repo/ui/components";
+import {
+  Button,
+  FormSection,
+  InputGroup,
+  InputGroupAddon,
+} from "@repo/ui/components";
 import { useLocale, useTranslations } from "next-intl";
 import { get, useFieldArray, useFormContext, useWatch } from "react-hook-form";
 
@@ -22,6 +27,7 @@ import {
   FormDecimalInput,
   FormInput,
   FormSelect,
+  FormSegmentedRadioGroup,
   FormTextarea,
 } from "@/components/form/controls";
 import { ScooterBatchDocuments } from "./ScooterBatchDocuments";
@@ -63,6 +69,7 @@ export function ScooterEditorFields({
   brands,
   combinedReview = false,
   onRetryAnalysis,
+  onCancelAnalysis,
   analyzing = false,
   persistedPolicyIds,
   documents,
@@ -79,6 +86,7 @@ export function ScooterEditorFields({
 }: {
   combinedReview?: boolean;
   onRetryAnalysis?: (sourceId: string) => void;
+  onCancelAnalysis?: () => void;
   analyzing?: boolean;
   persistedPolicyIds: string[];
   rawFields: Record<string, string>;
@@ -105,7 +113,9 @@ export function ScooterEditorFields({
   });
   const powertrain = useWatch({ control, name: "powertrainType" });
   // Keep the manual/automatic license state alive while navigating the wizard.
-  const licenseAutofill = useScooterLicenseAutofill(editing);
+  const licenseAutofill = useScooterLicenseAutofill(
+    editing || step === "documents",
+  );
   const onLicenseImport = licenseAutofill.onImport;
   useEffect(() => {
     if (importResult) onLicenseImport(importResult);
@@ -155,6 +165,26 @@ export function ScooterEditorFields({
           field === "temporaryRegistrationExpiresAt" ||
           field === "requiredLicenseCategory",
       ));
+  const jsonImport = (
+    <ScooterDocumentImport
+      secondary
+      sources={importSources}
+      onApplyImport={onApplyImport}
+      onImport={licenseAutofill.onImport}
+      insuranceFiles={[
+        ...documents.existing,
+        ...documents.drafts.map((doc) => ({
+          fileName: doc.file.name,
+          insurancePolicyId: doc.insurancePolicyId,
+        })),
+      ]}
+      brands={brands}
+      editing={editing}
+      disabled={disabled}
+      onRawFields={onRawFields}
+      rawFields={rawFields}
+    />
+  );
   return (
     <>
       {showDocuments ? (
@@ -165,7 +195,11 @@ export function ScooterEditorFields({
               disabled={disabled}
               analyzing={analyzing}
               onRetryAnalysis={onRetryAnalysis}
-            />
+              onCancelAnalysis={onCancelAnalysis}
+              importResult={importResult}
+            >
+              {jsonImport}
+            </ScooterBatchDocuments>
           ) : (
             <FormSection title={t("documents.title")}>
               <div
@@ -201,24 +235,7 @@ export function ScooterEditorFields({
               </div>
             </FormSection>
           )}
-          <ScooterDocumentImport
-            secondary
-            sources={importSources}
-            onApplyImport={onApplyImport}
-            onImport={licenseAutofill.onImport}
-            insuranceFiles={[
-              ...documents.existing,
-              ...documents.drafts.map((doc) => ({
-                fileName: doc.file.name,
-                insurancePolicyId: doc.insurancePolicyId,
-              })),
-            ]}
-            brands={brands}
-            editing={editing}
-            disabled={disabled}
-            onRawFields={onRawFields}
-            rawFields={rawFields}
-          />
+          {editing ? jsonImport : null}
         </>
       ) : null}
       {canReadDocuments &&
@@ -305,23 +322,11 @@ export function ScooterEditorFields({
           ))}
         </FormSection>
       ) : null}
-      {showRegistration ? (
-        editing ? (
-          <FormSection title={t("sections.registrationDocument")}>
-            <ScooterTextField
-              name="registrationCertificateNumber"
-              disabled={disabled}
-            />
-          </FormSection>
-        ) : (
-          <ScooterInitialRegistrationFields
-            disabled={disabled}
-            onManualLicenseChange={licenseAutofill.onManualLicenseChange}
-            includeCertificateNumber={
-              !step || step === "registration_certificate"
-            }
-          />
-        )
+      {showRegistration && !editing ? (
+        <ScooterInitialRegistrationFields
+          disabled={disabled}
+          onManualLicenseChange={licenseAutofill.onManualLicenseChange}
+        />
       ) : null}
       {!step || step === "insurance" ? (
         <ScooterInsuranceFields
@@ -351,11 +356,16 @@ export function ScooterEditorFields({
   );
 }
 
-function ScooterTechnicalFields({
+export function ScooterTechnicalFields({
   compact,
   revealedFields = [],
+  excludeFields = [],
   ...props
-}: EditorFieldProps & { compact: boolean; revealedFields?: string[] }) {
+}: EditorFieldProps & {
+  compact: boolean;
+  revealedFields?: string[];
+  excludeFields?: readonly string[];
+}) {
   const t = useTranslations("scooters");
   const {
     getValues,
@@ -385,6 +395,7 @@ function ScooterTechnicalFields({
     fields: section.fields.filter(
       (field) =>
         !inactive.has(field) &&
+        !excludeFields.includes(field) &&
         !(field === "fuelType" && props.powertrain === "electric"),
     ),
   }));
@@ -433,7 +444,7 @@ function ScooterTechnicalFields({
   );
 }
 
-function ScooterEditorFieldControl({
+export function ScooterEditorFieldControl({
   name,
   ...props
 }: EditorFieldProps & { name: ScooterEditorField }) {
@@ -481,11 +492,19 @@ function ScooterEditorFieldControl({
         label={t(`fields.${name}`)}
         disabled={fieldDisabled}
       >
-        <FormSelect
-          emptyOption={{ label: t("operational.unknown") }}
+        <FormSegmentedRadioGroup
+          deselectValue=""
           options={[
-            { value: "true", label: t("operational.yes") },
-            { value: "false", label: t("operational.no") },
+            {
+              value: "false",
+              label: t("operational.no"),
+              tone: "destructiveSubtle",
+            },
+            {
+              value: "true",
+              label: t("operational.yes"),
+              tone: "successSubtle",
+            },
           ]}
         />
       </FormField>
@@ -539,6 +558,25 @@ function ScooterTextField({
     >
       {name === "notes" ? (
         <FormTextarea placeholder={fieldPlaceholder} />
+      ) : name === "engineDisplacementCc" ||
+        name === "currentMileageKm" ||
+        name === "actualMaxSpeedKmh" ? (
+        <InputGroup>
+          <FormInput
+            placeholder={fieldPlaceholder}
+            inputMode="numeric"
+            list={suggestions.length ? listId : undefined}
+            data-slot="input-group-control"
+            className="flex-1 rounded-none border-0 bg-transparent shadow-none ring-0 focus-visible:border-transparent focus-visible:ring-0 disabled:bg-transparent aria-invalid:border-transparent aria-invalid:ring-0"
+          />
+          <InputGroupAddon>
+            {name === "engineDisplacementCc"
+              ? "cm³"
+              : name === "currentMileageKm"
+                ? "km"
+                : "km/h"}
+          </InputGroupAddon>
+        </InputGroup>
       ) : DECIMAL_FIELDS.has(name) ? (
         <FormDecimalInput locale={locale} placeholder={fieldPlaceholder} />
       ) : (
@@ -606,14 +644,18 @@ function ScooterPowertrainField({ disabled }: { disabled: boolean }) {
 
 const uppercaseIdentifier = (value: string) => value.toUpperCase();
 
-function ScooterInitialRegistrationFields({
+export function ScooterInitialRegistrationFields({
   disabled,
   onManualLicenseChange,
-  includeCertificateNumber = true,
+  panel = false,
+  number,
+  status,
 }: {
   disabled: boolean;
   onManualLicenseChange: () => void;
-  includeCertificateNumber?: boolean;
+  panel?: boolean;
+  number?: number;
+  status?: import("react").ReactNode;
 }) {
   const t = useTranslations("scooters");
   const { control, getValues, setValue, clearErrors, setError } =
@@ -623,13 +665,12 @@ function ScooterInitialRegistrationFields({
   const registered =
     Boolean(registrationType) && registrationType !== "unregistered";
   return (
-    <FormSection title={t("sections.registration")}>
-      {includeCertificateNumber ? (
-        <ScooterTextField
-          name="registrationCertificateNumber"
-          disabled={disabled}
-        />
-      ) : null}
+    <FormSection
+      panel={panel}
+      number={number}
+      status={status}
+      title={t("sections.registration")}
+    >
       <FormField
         name="registrationType"
         label={t("fields.registrationType")}
@@ -700,20 +741,10 @@ function ScooterInitialRegistrationFields({
               )}
             />
           </FormField>
-          <FormField
-            name="registrationDate"
-            label={t("fields.registrationDate")}
-            labelSuffix="day"
-            required
-            disabled={disabled}
-          >
-            <FormDateField maxDate={v1.common.dateOnlyToday()} />
-          </FormField>
 
           <FormField
             name="requiredLicenseCategory"
             label={t("fields.requiredLicenseCategory")}
-            required
             disabled={disabled}
           >
             <FormSelect
@@ -732,7 +763,6 @@ function ScooterInitialRegistrationFields({
               name="temporaryRegistrationExpiresAt"
               label={t("fields.temporaryRegistrationExpiresAt")}
               labelSuffix="day"
-              required
               disabled={disabled}
             >
               <FormDateField minDate={registrationDate || undefined} />

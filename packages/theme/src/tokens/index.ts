@@ -30,3 +30,4 @@ export type { ZIndex } from "./z-index";
 
 export { breakpoints } from "./breakpoints";
 export type { Breakpoints } from "./breakpoints";
+export { bottomSheet } from "./bottom-sheet";

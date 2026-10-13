@@ -78,6 +78,7 @@ function CountrySelect({
 }
 
 export interface CountrySheetSelectProps {
+  onBlur?: () => void;
   /** Sheet title, and the trigger's accessible name unless `labelledById` is set. */
   label: string;
   /**

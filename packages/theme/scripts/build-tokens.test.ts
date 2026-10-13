@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFileSync } from "node:fs";
 
 import { converter, formatHex, wcagContrast } from "culori";
 
@@ -32,15 +33,16 @@ test("CSS exposes the brand palette and every semantic color to Tailwind", () =>
     assert.ok(css.includes(`--color-${cssName}: var(--${cssName});`));
   }
 
-  assert.match(css, /:root\[data-theme='minimal'\], \.minimal/);
+  assert.doesNotMatch(css, /minimal/);
+  assert.deepEqual(Object.keys(semanticColors), ["light", "dark"]);
   assert.doesNotMatch(css, /--color-surface-/);
 });
 
-test("primary actions and the sidebar preserve ScooterCity's logo colors", () => {
+test("primary actions use the approved cyan with a readable dark foreground", () => {
   for (const colors of Object.values(semanticColors)) {
-    assert.equal(formatHex(colors.primary), "#44bbcb");
+    assert.equal(formatHex(colors.primary), "#06b6d4");
     assert.equal(formatHex(colors.primaryForeground), "#12161b");
-    assert.equal(formatHex(colors.sidebar), "#12161b");
+    assert.notEqual(colors.sidebar, colors.sidebarPrimary);
     assert.equal(colors.sidebarPrimary, colors.primary);
     assert.equal(colors.sidebarPrimaryForeground, colors.primaryForeground);
     assert.notEqual(colors.sidebarAccent, colors.sidebarPrimary);
@@ -130,6 +132,26 @@ test("popover and bottom-sheet surfaces are distinct from the page in every them
   assert.notEqual(semanticColors.dark.card, semanticColors.dark.background);
 });
 
+test("sheet-select rows are distinct while the sheet retains its popover surface", () => {
+  for (const colors of Object.values(semanticColors)) {
+    assert.notEqual(formatHex(colors.selectableRow), formatHex(colors.popover));
+    assert.ok(wcagContrast(colors.foreground, colors.selectableRow) >= 4.5);
+  }
+  const sheet = readFileSync(
+    new URL("../../ui/src/components/sheet-select.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.doesNotMatch(sheet, /\bbg-background\b/);
+  assert.match(sheet, /snapPoints=\{mobile \? \[bottomSheet.selectSnapPoint\]/);
+  assert.match(sheet, /lg:h-\(--select-sheet-height\)/);
+  const surface = readFileSync(
+    new URL("../../ui/src/components/bottom-sheet.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(surface, /\bbg-popover\b/);
+  assert.doesNotMatch(surface, /\bbg-background\b/);
+});
+
 test("access workspace inherits every active theme color and exposes the requested type pairing", () => {
   const css = buildCss();
   const workspace = css.match(/\.access-workspace \{([^}]+)\}/)?.[1];
@@ -156,10 +178,6 @@ test("native controls follow the selected or system theme", () => {
   assert.match(
     css,
     /:root\[data-theme='dark'\], \.dark \{\n {2}color-scheme: dark;/,
-  );
-  assert.match(
-    css,
-    /:root\[data-theme='minimal'\], \.minimal \{\n {2}color-scheme: dark;/,
   );
 });
 
@@ -204,11 +222,11 @@ test("photo-overlay captions remain readable over the brightest image", () => {
 test("native output converts OKLCH and alpha to hexadecimal sRGB", () => {
   const native = buildNative();
   assert.doesNotMatch(native, /oklch\(/i);
-  assert.match(native, /"primary": "#44BBCB"/);
+  assert.match(native, /"primary": "#06B6D4"/);
   assert.match(native, /"primaryForeground": "#12161B"/);
   assert.match(native, /"sidebarMutedForeground": "#A8B5BF"/);
   assert.match(native, /"scrim": "#00000066"/);
-  assert.match(native, /"border": "#FFFFFF1A"/);
+  assert.match(native, /"border": "#27272A"/);
   assert.match(
     native,
     /"magnification": \{\n {4}"loupe": 2,\n {4}"documentMax": 4,\n {4}"documentStep": 0\.5\n {2}\}/,
@@ -216,11 +234,11 @@ test("native output converts OKLCH and alpha to hexadecimal sRGB", () => {
   assert.doesNotMatch(native, /"minimal": \{/);
 });
 
-test("radius values are derived from the 0.45rem preset base", () => {
-  assert.equal(radius.sm, 3.2);
-  assert.equal(radius.md, 5.2);
-  assert.equal(radius.lg, 7.2);
-  assert.equal(radius["4xl"], 23.2);
+test("radius values follow the approved rounded control scale", () => {
+  assert.equal(radius.sm, 8);
+  assert.equal(radius.md, 10);
+  assert.equal(radius.lg, 12);
+  assert.equal(radius["4xl"], 28);
   assert.equal(radius.full, 9999);
 });
 

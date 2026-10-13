@@ -584,28 +584,14 @@ export class ScootersService {
       );
     }
 
-    if (!state.registrationDate) {
-      throw new BadRequestException(
-        "Registration date is required for registered scooters",
-      );
-    }
-
     if (
-      state.registrationDate > v1.common.dateOnlyToday() ||
-      (state.registrationType === "temporary" &&
-        state.temporaryRegistrationExpiresAt &&
-        state.temporaryRegistrationExpiresAt < state.registrationDate)
+      state.registrationDate &&
+      (state.registrationDate > v1.common.dateOnlyToday() ||
+        (state.registrationType === "temporary" &&
+          state.temporaryRegistrationExpiresAt &&
+          state.temporaryRegistrationExpiresAt < state.registrationDate))
     ) {
       throw new BadRequestException("Registration dates are invalid");
-    }
-
-    if (
-      state.registrationType === "temporary" &&
-      !state.temporaryRegistrationExpiresAt
-    ) {
-      throw new BadRequestException(
-        "Registration expiry date is required for temporary plates",
-      );
     }
 
     const normalized = v1.scooters.validatePlateForRegistrationType(
@@ -622,7 +608,7 @@ export class ScootersService {
       registrationType: state.registrationType,
       registrationNumber: normalized.displayValue,
       registrationNumberNormalized: normalized.compactValue,
-      registrationDate: toDateOnlyDate(state.registrationDate)!,
+      registrationDate: toDateOnlyDate(state.registrationDate),
       temporaryRegistrationExpiresAt:
         state.registrationType === "temporary" &&
         state.temporaryRegistrationExpiresAt

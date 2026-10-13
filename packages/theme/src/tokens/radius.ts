@@ -1,8 +1,8 @@
 /**
- * Shadcn radius scale derived from the selected preset's 0.45rem base.
+ * Shared radius scale derived from the approved 12px control base.
  * Web emits the equivalent CSS calculations; native consumes these dp values.
  */
-export const radiusBase = 7.2;
+export const radiusBase = 12;
 
 export const radius = {
   none: 0,

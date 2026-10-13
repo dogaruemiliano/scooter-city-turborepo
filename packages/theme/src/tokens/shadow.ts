@@ -15,7 +15,20 @@ export type ShadowToken = {
   native: NativeShadow;
 };
 
-export const shadow: Record<"none" | "sm" | "md" | "lg" | "xl", ShadowToken> = {
+export const shadow: Record<
+  "none" | "sm" | "md" | "lg" | "xl" | "primary",
+  ShadowToken
+> = {
+  primary: {
+    web: "0 6px 24px -8px rgb(6 182 212 / 0.4)",
+    native: {
+      shadowColor: "#06b6d4",
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.2,
+      shadowRadius: 12,
+      elevation: 3,
+    },
+  },
   none: {
     web: "none",
     native: {

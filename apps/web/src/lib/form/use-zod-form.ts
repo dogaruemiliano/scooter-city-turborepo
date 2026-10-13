@@ -38,9 +38,10 @@ export interface UseZodFormOptions<
  * `useForm` wired to a zod schema with localized messages.
  *
  * Validation timing is the app-wide contract: a field is first validated when
- * it loses focus after being edited (`onTouched`), then re-validated on every
- * change while it has an error (`reValidateMode`). Both can be overridden per
- * form, but prefer not to — consistency is the point.
+ * it first loses focus (`onTouched`), then re-validated on every change,
+ * even after its error clears. After submission, `reValidateMode: onChange`
+ * keeps correction feedback immediate. Both can be overridden per form,
+ * but prefer not to — consistency is the point.
  */
 export function useZodForm<
   Values extends FieldValues,

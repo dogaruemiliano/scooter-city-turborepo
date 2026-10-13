@@ -3,9 +3,26 @@
  * platform outputs are generated from the semantic contract.
  */
 export const primitives = {
+  // Neutral surfaces and action cyan from the approved UX Pilot screens.
+  neutral: {
+    50: "#fafafa",
+    100: "#f4f4f5",
+    200: "#e4e4e7",
+    300: "#d4d4d8",
+    400: "#a1a1aa",
+    500: "#71717a",
+    600: "#52525b",
+    700: "#3f3f46",
+    800: "#27272a",
+    850: "#1f1f1f",
+    900: "#141414",
+    950: "#0a0a0a",
+    1000: "#050505",
+  },
   // ScooterCity turquoise. 500 preserves the logo's #44BBCB in sRGB;
   // the darker steps support readable links and focus on light surfaces.
   cyan: {
+    action: "#06b6d4",
     50: "oklch(0.979459 0.012724 202.9263)",
     100: "oklch(0.948477 0.028509 204.7923)",
     200: "oklch(0.898236 0.051870 205.3585)",

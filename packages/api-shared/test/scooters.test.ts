@@ -57,6 +57,40 @@ test("scooter create schema accepts a valid scooter", () => {
   );
 });
 
+test("manufacture year accepts the current year and rejects future years on create and update", () => {
+  const currentYear = new Date().getUTCFullYear();
+  for (const manufactureYear of [currentYear - 1, currentYear]) {
+    assert.equal(
+      v1.scooters.createScooterInputSchema.safeParse({
+        ...baseScooterInput(),
+        manufactureYear,
+      }).success,
+      true,
+    );
+    assert.equal(
+      v1.scooters.updateScooterInputSchema.safeParse({ manufactureYear })
+        .success,
+      true,
+    );
+  }
+  for (const schema of [
+    v1.scooters.createScooterInputSchema,
+    v1.scooters.updateScooterInputSchema,
+  ]) {
+    const result = schema.safeParse({
+      ...baseScooterInput(),
+      manufactureYear: currentYear + 1,
+    });
+    assert.equal(result.success, false);
+    if (!result.success)
+      assert.ok(
+        result.error.issues.some(
+          (issue) => issue.path.join(".") === "manufactureYear",
+        ),
+      );
+  }
+});
+
 test("scooter mileage remains optional and constrained to nonnegative whole kilometres", () => {
   for (const currentMileageKm of [0, 12_250, 2_147_483_647, null]) {
     assert.equal(
@@ -178,7 +212,7 @@ test("scooter registration schema enforces unregistered and date rules", () => {
       registrationDate: today,
       requiredLicenseCategory: "AM",
     }).success,
-    false,
+    true,
   );
 
   assert.equal(

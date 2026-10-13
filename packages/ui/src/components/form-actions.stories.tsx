@@ -51,3 +51,23 @@ export const RaisedSurface: Story = {
     </Card>
   ),
 };
+
+/** The page owns additional end-of-form clearance; the sticky card owns its inset. */
+export const StickyCard: Story = {
+  render: () => (
+    <form className="grid min-w-0 gap-8 px-4 pb-16 sm:px-8 sm:pb-24">
+      <div className="min-h-dvh">
+        <p className="text-sm text-muted-foreground">
+          Scroll to see the action card float above the screen edge and settle
+          with extra space below it at the end of the form.
+        </p>
+      </div>
+      <FormActions sticky status="Review the required details before saving.">
+        <Button type="button" variant="outline">
+          Cancel
+        </Button>
+        <Button type="button">Save details and finish</Button>
+      </FormActions>
+    </form>
+  ),
+};

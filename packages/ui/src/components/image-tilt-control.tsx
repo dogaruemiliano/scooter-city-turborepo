@@ -113,7 +113,7 @@ export function ImageTiltControl({
         aria-hidden="true"
         className={cn(
           "mx-auto w-fit px-2 text-center text-sm tabular-nums",
-          currentValue !== 0 && "text-primary",
+          currentValue !== 0 && "text-link",
         )}
       >
         {degrees}
@@ -175,7 +175,7 @@ export function ImageTiltControl({
                   vectorEffect="non-scaling-stroke"
                   className={
                     zero
-                      ? "text-primary"
+                      ? "text-link"
                       : major
                         ? "text-foreground/75"
                         : "text-foreground/35"
@@ -193,7 +193,7 @@ export function ImageTiltControl({
             stroke="currentColor"
             strokeWidth={spacing[0.5]}
             vectorEffect="non-scaling-stroke"
-            className="text-primary"
+            className="text-link"
           />
         </svg>
       </div>

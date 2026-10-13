@@ -11,8 +11,9 @@ import { magnification } from "./tokens/magnification";
 import { aspectRatio } from "./tokens/aspect-ratio";
 import { zIndex } from "./tokens/z-index";
 import { breakpoints } from "./tokens/breakpoints";
+import { bottomSheet } from "./tokens/bottom-sheet";
 
-export type ColorScheme = "light" | "dark" | "minimal";
+export type ColorScheme = "light" | "dark";
 
 /**
  * Combined token set. Use `tokens.color[scheme]` to get the active color palette.
@@ -30,6 +31,7 @@ export const tokens = {
   aspectRatio,
   zIndex,
   breakpoints,
+  bottomSheet,
 } as const;
 
 export type Tokens = typeof tokens;

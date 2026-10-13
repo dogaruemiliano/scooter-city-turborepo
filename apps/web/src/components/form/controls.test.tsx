@@ -5,8 +5,14 @@ import { describe, expect, it } from "vitest";
 import { FormField } from "./FormField";
 import { FormSelect } from "./controls";
 
-function SelectFixture({ optional = false }: { optional?: boolean }) {
-  const form = useForm({ defaultValues: { category: "" } });
+function SelectFixture({
+  optional = false,
+  value = "",
+}: {
+  optional?: boolean;
+  value?: string;
+}) {
+  const form = useForm({ defaultValues: { category: value } });
 
   return (
     <FormProvider {...form}>
@@ -22,6 +28,13 @@ function SelectFixture({ optional = false }: { optional?: boolean }) {
 }
 
 describe("FormSelect", () => {
+  it("shows the option label for a selected value before opening the dropdown", () => {
+    render(<SelectFixture value="fuel" />);
+    expect(
+      screen.getByRole("combobox", { name: /category/i }),
+    ).toHaveTextContent("Fuel");
+  });
+
   it("shows a placeholder instead of the internal empty-value sentinel", () => {
     render(<SelectFixture />);
 

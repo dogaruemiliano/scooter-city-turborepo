@@ -147,7 +147,7 @@ export function insuranceEditorDefaults(
     validUntil: policy?.validUntil ?? "",
     premiumAmount:
       policy?.premiumAmount == null ? "" : String(policy.premiumAmount),
-    currency: policy?.currency ?? "",
+    currency: policy?.currency || "RON",
     documentVin: policy?.documentVin ?? "",
     vinReviewConfirmed: policy?.vinReviewConfirmed ?? false,
     rawFields: policy?.rawFields,
@@ -165,6 +165,18 @@ const insuranceEditorSchema = z.object({
   sourceFileNames: z.array(z.string()).optional(),
   rawFields: v1.scooters.insuranceRawFieldsSchema.optional(),
 });
+
+/** The visible, untouched create-form placeholder is not an insurance policy. */
+export function insuranceEditorHasContent(policy: InsuranceEditorValues) {
+  return (
+    v1.scooters.INSURANCE_FIELDS.some(
+      (field) => field !== "currency" && Boolean(policy[field].trim()),
+    ) ||
+    policy.vinReviewConfirmed ||
+    Boolean(policy.sourceFileNames?.length) ||
+    policy.rawFields !== undefined
+  );
+}
 
 export const DECIMAL_FIELDS = new Set<string>([
   "stationaryNoiseDb",
@@ -221,7 +233,8 @@ export function scooterEditorDefaults(
     ]),
   ) as Record<ScooterEditorField, string>;
   values.civVersion = scooter?.civVersion ?? "unknown";
-  values.powertrainType = scooter?.powertrainType ?? "";
+  values.powertrainType = scooter ? scooter.powertrainType : "combustion";
+  if (!scooter) values.vehicleCategory = "L1e";
   values.registrationType = scooter?.registrationType ?? "";
   values.requiredLicenseCategory = scooter?.requiredLicenseCategory ?? "";
   values.insurancePolicies =
@@ -311,9 +324,12 @@ export const scooterCreateFormSchema = rawCreateSchema
   })
   .transform(
     (values) =>
-      convertForm(values) as unknown as z.input<
-        typeof v1.scooters.createScooterInputSchema
-      >,
+      convertForm({
+        ...values,
+        insurancePolicies: values.insurancePolicies?.filter(
+          insuranceEditorHasContent,
+        ),
+      }) as unknown as z.input<typeof v1.scooters.createScooterInputSchema>,
   )
   .pipe(v1.scooters.createScooterInputSchema)
   .transform((input) => {
@@ -369,4 +385,21 @@ export function scooterChangedFields(
     }
   }
   return v1.scooters.updateScooterInputSchema.parse(changes);
+}
+
+/** Action visibility depends on required fields; optional drafts still validate on submit. */
+export function scooterRequiredFieldsValid(
+  values: Partial<Omit<ScooterEditorValues, "insurancePolicies">>,
+): boolean {
+  const required = scooterEditorDefaults();
+  for (const field of [
+    "vin",
+    "brandId",
+    "powertrainType",
+    "registrationType",
+    "registrationNumber",
+  ] as const) {
+    required[field] = values[field] ?? "";
+  }
+  return scooterCreateFormSchema.safeParse(required).success;
 }
