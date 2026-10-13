@@ -347,12 +347,6 @@ export function useScooterExtraction(options: Options) {
           });
       }
       // Persisted scooter fields are already reviewed; do not replay them on mount.
-      if (
-        !editing &&
-        !sources.some((entry) => entry.type === "insurance") &&
-        form.getValues("insurancePolicies")?.length
-      )
-        form.setValue("insurancePolicies", [], { shouldDirty: true });
       return;
     }
     const changedIds = new Set(
@@ -403,7 +397,11 @@ export function useScooterExtraction(options: Options) {
       }
       origins.current.delete(key);
     }
-    if (!editing && !sources.some((entry) => entry.type === "insurance")) {
+    if (
+      !editing &&
+      previous.some((entry) => entry.type === "insurance") &&
+      !sources.some((entry) => entry.type === "insurance")
+    ) {
       if (form.getValues("insurancePolicies")?.length)
         form.setValue("insurancePolicies", [], { shouldDirty: true });
       for (const [key, origin] of origins.current)

@@ -7,11 +7,6 @@ import { v1 } from "@repo/api-shared";
 import {
   Badge,
   Button,
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
   FormSection,
   BottomSheet,
   BottomSheetContent,
@@ -21,8 +16,8 @@ import {
   BottomSheetBody,
   BottomSheetFooter,
 } from "@repo/ui/components";
-import { GaugeIcon, ClipboardCheckIcon } from "lucide-react";
 import { FormField } from "@/components/form/FormField";
+import { FormBooleanRow } from "@/components/form/FormBooleanRow";
 import { FormSegmentedRadioGroup } from "@/components/form/controls";
 import {
   ScooterEditorFieldControl,
@@ -30,29 +25,24 @@ import {
   ScooterTechnicalFields,
 } from "./ScooterEditorFields";
 import { CivMetadataFields } from "./CivMetadataFields";
-import { ScooterInsuranceInspector } from "./ScooterInsuranceInspector";
+import { ScooterCreateInsuranceFields } from "./ScooterCreateInsuranceFields";
 import type { ScooterEditorValues } from "./scooter-editor-schema";
 import { OPERATIONAL_FIELDS } from "./scooter-wizard";
-import type { ScooterDocumentsEditor } from "./useScooterDocuments";
 import { useScooterLicenseAutofill } from "./useScooterLicenseAutofill";
 import type { DocumentImportResult } from "./scooter-document-import";
 import { useEffect } from "react";
-import type { ScooterVinCorrection } from "./scooter-vin-review";
+import { ScooterSectionComplete } from "./ScooterSectionComplete";
 
 export function ScooterCreateFields({
   brands,
   onBrandCreated,
   disabled,
-  documents,
   importResult,
-  onReviewVin,
 }: {
   brands: v1.scooterBrands.ScooterBrand[];
   onBrandCreated: (brand: v1.scooterBrands.ScooterBrand) => void;
   disabled: boolean;
-  documents: ScooterDocumentsEditor;
   importResult?: Extract<DocumentImportResult, { ok: true }>;
-  onReviewVin: (corrections: ScooterVinCorrection[]) => boolean;
 }) {
   const t = useTranslations("scooters");
   const {
@@ -60,9 +50,8 @@ export function ScooterCreateFields({
     formState: { errors, submitCount, isSubmitting },
   } = useFormContext<ScooterEditorValues>();
   const powertrain = useWatch({ control, name: "powertrainType" });
-  const operational = useWatch({ control, name: OPERATIONAL_FIELDS });
+  const registration = useWatch({ control, name: "registrationType" });
   const props = { brands, onBrandCreated, disabled, powertrain };
-  const [conditionOpen, setConditionOpen] = useState(false);
   const [technicalReviewOpen, setTechnicalReviewOpen] = useState(false);
   const openedAttempt = useRef(0);
   useEffect(() => {
@@ -77,10 +66,6 @@ export function ScooterCreateFields({
       "color",
       "powertrainType",
       "engineDisplacementCc",
-      "powerKw",
-      "electricMotorPowerKw",
-      "vehicleCategory",
-      "vehicleCategoryOther",
       "registrationType",
       "registrationNumber",
       "registrationDate",
@@ -91,9 +76,7 @@ export function ScooterCreateFields({
       ...OPERATIONAL_FIELDS,
     ]);
     const frame = requestAnimationFrame(() => {
-      if (OPERATIONAL_FIELDS.some((name) => errors[name]))
-        setConditionOpen(true);
-      else if (Object.keys(errors).some((name) => !mainFields.has(name)))
+      if (Object.keys(errors).some((name) => !mainFields.has(name)))
         setTechnicalReviewOpen(true);
     });
     return () => cancelAnimationFrame(frame);
@@ -106,14 +89,36 @@ export function ScooterCreateFields({
 
   return (
     <div className="grid min-w-0 gap-10">
-      <FormSection number={1} title={t("sections.identity")}>
+      <FormSection
+        panel
+        number={1}
+        title={t("sections.identity")}
+        status={
+          <ScooterSectionComplete
+            fields={["vin", "brandId", "model", "manufactureYear", "color"]}
+          />
+        }
+      >
         {(["vin", "brandId", "model", "manufactureYear", "color"] as const).map(
           (name) => (
             <ScooterEditorFieldControl key={name} name={name} {...props} />
           ),
         )}
       </FormSection>
-      <FormSection number={2} panel title={t("creation.propulsion")}>
+      <FormSection
+        panel
+        number={2}
+        title={t("creation.propulsion")}
+        status={
+          <ScooterSectionComplete
+            fields={
+              powertrain === "electric" || powertrain === "unpowered"
+                ? ["powertrainType"]
+                : ["powertrainType", "engineDisplacementCc"]
+            }
+          />
+        }
+      >
         <div className="sm:col-span-2">
           <FormField
             name="powertrainType"
@@ -133,81 +138,73 @@ export function ScooterCreateFields({
         {powertrain !== "electric" && powertrain !== "unpowered" ? (
           <ScooterEditorFieldControl name="engineDisplacementCc" {...props} />
         ) : null}
-        {powertrain !== "unpowered" ? (
-          <ScooterEditorFieldControl
-            name={
-              powertrain === "electric" ? "electricMotorPowerKw" : "powerKw"
-            }
-            {...props}
-          />
-        ) : null}
-        <ScooterEditorFieldControl name="vehicleCategory" {...props} />
       </FormSection>
-      <div className="grid gap-6">
-        <ScooterInitialRegistrationFields
-          panel
-          disabled={disabled}
-          onManualLicenseChange={license.onManualLicenseChange}
-        />
-        <ScooterInsuranceInspector
-          documents={documents}
-          disabled={disabled}
-          onReviewVin={onReviewVin}
-        />
-      </div>
-      <Card as="section">
-        <CardHeader>
-          <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
-            <CardTitle className="flex items-center gap-2">
-              <GaugeIcon aria-hidden="true" className="size-5" />
-              {t("creation.initialCondition")}
-            </CardTitle>
+      <ScooterInitialRegistrationFields
+        panel
+        number={3}
+        status={
+          <ScooterSectionComplete
+            fields={
+              registration === "unregistered"
+                ? ["registrationType"]
+                : [
+                    "registrationType",
+                    "registrationNumber",
+                    "requiredLicenseCategory",
+                    ...(registration === "temporary"
+                      ? ["temporaryRegistrationExpiresAt"]
+                      : []),
+                  ]
+            }
+          />
+        }
+        disabled={disabled}
+        onManualLicenseChange={license.onManualLicenseChange}
+      />
+      <ScooterCreateInsuranceFields disabled={disabled} />
+      <FormSection
+        panel
+        number={5}
+        title={t("creation.conditionEquipment")}
+        status={
+          <div className="flex flex-wrap items-center gap-2">
             <Badge variant="secondary">{t("creation.optional")}</Badge>
+            <ScooterSectionComplete fields={OPERATIONAL_FIELDS} />
           </div>
-          <CardDescription>{t("creation.conditionHelp")}</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-wrap items-center justify-between gap-3">
-          {operational.some(Boolean) ? (
-            <p className="flex items-center gap-2 text-sm text-success">
-              <ClipboardCheckIcon aria-hidden="true" className="size-4" />
-              {t("creation.conditionRecorded")}
-            </p>
-          ) : null}
-          <Button
-            type="button"
-            variant="outline"
-            disabled={disabled}
-            onClick={() => setConditionOpen(true)}
-          >
-            {t("creation.conditionAction")}
-          </Button>
-        </CardContent>
-      </Card>
-      <p className="text-sm leading-relaxed text-muted-foreground">
-        {t("creation.civLater")}
-      </p>
-      <BottomSheet open={conditionOpen} onOpenChange={setConditionOpen}>
-        <BottomSheetContent className="lg:w-96">
-          <BottomSheetHeader>
-            <BottomSheetTitle>
-              {t("creation.initialCondition")}
-            </BottomSheetTitle>
-            <BottomSheetDescription>
-              {t("creation.conditionHelp")}
-            </BottomSheetDescription>
-          </BottomSheetHeader>
-          <BottomSheetBody>
-            {OPERATIONAL_FIELDS.map((name) => (
-              <ScooterEditorFieldControl key={name} name={name} {...props} />
-            ))}
-          </BottomSheetBody>
-          <BottomSheetFooter>
-            <Button type="button" onClick={() => setConditionOpen(false)}>
-              {t("creation.conditionDone")}
-            </Button>
-          </BottomSheetFooter>
-        </BottomSheetContent>
-      </BottomSheet>
+        }
+      >
+        <p className="text-sm text-muted-foreground sm:col-span-2">
+          {t("creation.conditionHelp")}
+        </p>
+        <div className="grid gap-2 sm:col-span-2">
+          {(["hasGps", "speedometerWorking", "odometerWorking"] as const).map(
+            (name) => (
+              <FormBooleanRow<ScooterEditorValues>
+                key={name}
+                name={name}
+                label={t(`operational.rows.${name}`)}
+                falseLabel={t(
+                  name === "hasGps"
+                    ? "operational.withoutGps"
+                    : "operational.defective",
+                )}
+                trueLabel={t(
+                  name === "hasGps"
+                    ? "operational.withGps"
+                    : "operational.functional",
+                )}
+                disabled={disabled}
+              />
+            ),
+          )}
+        </div>
+        {OPERATIONAL_FIELDS.filter(
+          (name) =>
+            !["hasGps", "speedometerWorking", "odometerWorking"].includes(name),
+        ).map((name) => (
+          <ScooterEditorFieldControl key={name} name={name} {...props} />
+        ))}
+      </FormSection>
       <BottomSheet
         open={technicalReviewOpen}
         onOpenChange={setTechnicalReviewOpen}
@@ -220,7 +217,15 @@ export function ScooterCreateFields({
             </BottomSheetDescription>
           </BottomSheetHeader>
           <BottomSheetBody>
-            <ScooterTechnicalFields compact={false} {...props} />
+            <ScooterTechnicalFields
+              compact={false}
+              excludeFields={[
+                "vehicleCategory",
+                "powerKw",
+                "electricMotorPowerKw",
+              ]}
+              {...props}
+            />
             <CivMetadataFields disabled={disabled} />
           </BottomSheetBody>
           <BottomSheetFooter>

@@ -97,7 +97,8 @@ function BrandPicker({
       <SheetSelect
         id={id}
         triggerRef={field.ref}
-        label={t("fields.brand")}
+        onBlur={field.onBlur}
+        label={t("brandPicker.title")}
         labelledById={`${id}-label`}
         describedById={errorId}
         invalid={Boolean(error)}
@@ -105,6 +106,7 @@ function BrandPicker({
         disabled={disabled}
         value={field.value}
         options={options}
+        optionClassName="text-base"
         placeholder={t("brandPicker.placeholder")}
         searchPlaceholder={t("brandPicker.search")}
         clearSearchLabel={t("brandPicker.clearSearch")}

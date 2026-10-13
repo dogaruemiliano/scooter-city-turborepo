@@ -4,13 +4,23 @@ export const scootersCatalog = {
       description:
         "Register a vehicle with its identity, documents, and initial registration.",
       smartImport: "Smart Import",
+      automaticFill: "Fill automatically",
+      importAlternatives:
+        "Use AI to read vehicle documents or import extracted data as JSON. Both options fill the scooter details below. Importing is optional.",
+      or: "or",
+      importComplete:
+        "Data imported. Review and complete the scooter details below.",
+      importMore: "Import more documents",
+      scooterDetails: "Scooter details",
       importHelp:
         "Upload vehicle documents to fill the form automatically. You can also enter everything manually.",
       aiPowered: "AI powered",
       propulsion: "Propulsion",
       compliance: "Registration & insurance",
       initialCondition: "Initial condition",
+      conditionEquipment: "Condition & equipment",
       optional: "Optional",
+      complete: "Complete",
       conditionHelp:
         "Record mileage, equipment, and instrument checks when you have inspected the scooter.",
       conditionAction: "Record initial condition",
@@ -25,6 +35,7 @@ export const scootersCatalog = {
       ready: "Required information complete",
       incomplete: "Complete the required fields",
       blocked: "Resolve document checks before creating",
+      validateDocuments: "Validate the documents",
       analyzing: "Analyzing documents…",
       insuranceDetails: "Insurance details",
       insuranceHelp:
@@ -145,6 +156,15 @@ export const scootersCatalog = {
       confirmVin: "I checked {fileName}",
     },
     operational: {
+      rows: {
+        hasGps: "GPS installed",
+        speedometerWorking: "Speedometer",
+        odometerWorking: "Odometer",
+      },
+      defective: "Faulty",
+      withoutGps: "Without GPS",
+      withGps: "With GPS",
+      functional: "Working",
       unknown: "Not checked",
       yes: "Yes",
       no: "No",
@@ -283,7 +303,8 @@ export const scootersCatalog = {
       batch: {
         drop: "Drop your scooter documents",
         browse: "Browse files",
-        hint: "CIV · Import · Registration · Insurance. Add any combination. PDF, JPG, PNG or WebP, up to 15 MB each.",
+        hint: "CIV · Import · Registration · Insurance",
+        requirements: "PDF, JPG, PNG or WebP, up to 15 MB each.",
         unknown: "Choose document type",
         typeLabel: "Document type for {name}",
         duplicate: "This file is already attached.",
@@ -921,6 +942,7 @@ export const scootersCatalog = {
       more: "More pages",
     },
     brandPicker: {
+      title: "Choose a brand",
       clear: "Clear brand selection",
       clearSearch: "Clear brand search",
       toggle: "Show brands",
@@ -973,13 +995,23 @@ export const scootersCatalog = {
       description:
         "Înregistrează un vehicul cu datele de identificare, documentele și înregistrarea inițială.",
       smartImport: "Import inteligent",
+      automaticFill: "Completează automat",
+      importAlternatives:
+        "Folosește AI pentru citirea documentelor vehiculului sau importă datele extrase în format JSON. Ambele opțiuni completează datele scuterului de mai jos. Importul este opțional.",
+      or: "sau",
+      importComplete:
+        "Date importate. Verifică și completează datele scuterului de mai jos.",
+      importMore: "Importă alte documente",
+      scooterDetails: "Datele scuterului",
       importHelp:
         "Încarcă documentele vehiculului pentru completarea automată. Poți introduce toate datele și manual.",
       aiPowered: "Asistat de AI",
       propulsion: "Propulsie",
       compliance: "Înregistrare și asigurare",
       initialCondition: "Stare inițială",
+      conditionEquipment: "Stare și echipare",
       optional: "Opțional",
+      complete: "Complet",
       conditionHelp:
         "Completează kilometrajul, echiparea și verificarea instrumentelor după inspectarea scuterului.",
       conditionAction: "Completează starea inițială",
@@ -994,6 +1026,7 @@ export const scootersCatalog = {
       ready: "Datele obligatorii sunt complete",
       incomplete: "Completează câmpurile obligatorii",
       blocked: "Rezolvă verificările documentelor înainte de creare",
+      validateDocuments: "Validează documentele",
       analyzing: "Se analizează documentele…",
       insuranceDetails: "Detalii asigurare",
       insuranceHelp:
@@ -1119,6 +1152,15 @@ export const scootersCatalog = {
       confirmVin: "Am verificat {fileName}",
     },
     operational: {
+      rows: {
+        hasGps: "GPS instalat",
+        speedometerWorking: "Vitezometru",
+        odometerWorking: "Odometru",
+      },
+      defective: "Defect",
+      withoutGps: "Fără GPS",
+      withGps: "Cu GPS",
+      functional: "Funcțional",
       unknown: "Neverificat",
       yes: "Da",
       no: "Nu",
@@ -1263,7 +1305,8 @@ export const scootersCatalog = {
       batch: {
         drop: "Trage documentele scuterului aici",
         browse: "Alege fișiere",
-        hint: "CIV · Import · Înmatriculare · Asigurare. Adaugă orice combinație. PDF, JPG, PNG sau WebP, maximum 15 MB fiecare.",
+        hint: "CIV · Import · Înmatriculare · Asigurare",
+        requirements: "PDF, JPG, PNG sau WebP, maximum 15 MB fiecare.",
         unknown: "Alege tipul documentului",
         typeLabel: "Tipul documentului {name}",
         duplicate: "Acest fișier este deja atașat.",
@@ -1371,7 +1414,8 @@ export const scootersCatalog = {
       sessionExpired:
         "Sesiunea de editare s-a încheiat. Copiază modificările nesalvate, reîncarcă pagina și încarcă din nou documentele.",
       plateConflict: "Există deja un scuter cu acest număr de înmatriculare.",
-      brandUnavailable: "Acest brand nu este disponibil. Selectează alt brand.",
+      brandUnavailable:
+        "Această marcă nu este disponibilă. Selectează altă marcă.",
       listErrorTitle: "Scuterele nu au fost încărcate",
       createErrorTitle: "Scuterul nu a fost creat",
       createValidationFallback: "Verifică datele scuterului.",
@@ -1919,49 +1963,50 @@ export const scootersCatalog = {
       more: "Mai multe pagini",
     },
     brandPicker: {
-      clear: "Șterge brandul selectat",
+      title: "Alege o marcă",
+      clear: "Șterge marca selectată",
       clearSearch: "Șterge căutarea mărcilor",
-      toggle: "Afișează brandurile",
+      toggle: "Afișează mărcile",
       placeholder: "Caută sau selectează o marcă",
-      search: "Caută branduri",
-      empty: "Niciun brand găsit",
-      addNew: "Adaugă brand nou",
+      search: "Caută mărci",
+      empty: "Nicio marcă găsită",
+      addNew: "Adaugă o marcă nouă",
     },
     brands: {
       list: {
-        createButton: "Adaugă brand nou",
-        empty: "Niciun brand găsit.",
+        createButton: "Adaugă o marcă nouă",
+        empty: "Nicio marcă găsită.",
         scooterCount:
           "{count, plural, =0 {Niciun scuter} one {# scuter} few {# scutere} other {# de scutere}}",
-        delete: "Șterge brandul",
+        delete: "Șterge marca",
         deleteBlocked:
-          "Acest brand este folosit de scutere existente și nu poate fi șters.",
-        deleteError: "Brandul nu a putut fi șters.",
+          "Această marcă este folosită de scutere existente și nu poate fi ștearsă.",
+        deleteError: "Marca nu a putut fi ștearsă.",
       },
       columns: {
         name: "Nume",
       },
       create: {
-        title: "Adaugă brand nou",
+        title: "Adaugă o marcă nouă",
       },
       edit: {
-        title: "Editează brandul",
-        description: "Actualizează numele și codul brandului.",
-        trigger: "Editează brandul",
+        title: "Editează marca",
+        description: "Actualizează numele și codul mărcii.",
+        trigger: "Editează marca",
       },
       form: {
         name: "Nume",
         code: "Cod",
-        submit: "Creează brandul",
+        submit: "Creează marca",
         save: "Salvează",
-        error: "Brandul nu a putut fi salvat.",
+        error: "Marca nu a putut fi salvată.",
         inUseWarning:
-          "{count, plural, one {# scuter folosește} few {# scutere folosesc} other {# de scutere folosesc}} acest brand. Dacă schimbi codul, etichetele deja printate trebuie reprintate.",
+          "{count, plural, one {# scuter folosește} few {# scutere folosesc} other {# de scutere folosesc}} această marcă. Dacă schimbi codul, etichetele deja printate trebuie reprintate.",
       },
       confirm: {
-        title: "Sigur vrei să modifici acest brand?",
+        title: "Sigur vrei să modifici această marcă?",
         description:
-          "Scutere existente folosesc deja acest brand. Dacă schimbi numele sau codul, etichetele deja printate nu se vor mai potrivi și trebuie reprintate.",
+          "Scutere existente folosesc deja această marcă. Dacă schimbi numele sau codul, etichetele deja printate nu se vor mai potrivi și trebuie reprintate.",
         confirm: "Da, salvează modificările",
       },
     },

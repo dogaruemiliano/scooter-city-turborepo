@@ -23,7 +23,8 @@ import { DocumentViewer } from "@repo/ui/components/document-viewer";
 import { useObjectUrl } from "@repo/ui/hooks/use-object-url";
 import { CheckIcon, FileTextIcon, SparklesIcon, XIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useContext, useState } from "react";
+import { useContext, useState, type ReactNode } from "react";
+import type { DocumentImportResult } from "./scooter-document-import";
 import { ScooterDocumentAnalysisContext } from "./ScooterDocumentAnalysisStatus";
 import type {
   DocumentDraft,
@@ -36,12 +37,16 @@ export function ScooterBatchDocuments({
   analyzing,
   onRetryAnalysis,
   onCancelAnalysis,
+  children,
+  importResult,
 }: {
   documents: ScooterDocumentsEditor;
   disabled: boolean;
   analyzing: boolean;
   onRetryAnalysis?: (sourceId: string) => void;
   onCancelAnalysis?: () => void;
+  children?: ReactNode;
+  importResult?: Extract<DocumentImportResult, { ok: true }>;
 }) {
   const t = useTranslations("scooters.documents");
   const user = useOptionalSession()?.user;
@@ -50,6 +55,19 @@ export function ScooterBatchDocuments({
   const creation = useTranslations("scooters.creation");
   const extraction = useTranslations("scooters.extraction");
   const [errors, setErrors] = useState<string[]>([]);
+  const [expandedImport, setExpandedImport] = useState<typeof importResult>();
+  const analysisEntries = useContext(ScooterDocumentAnalysisContext);
+  const compact =
+    Boolean(importResult) &&
+    expandedImport !== importResult &&
+    !analyzing &&
+    !errors.length &&
+    !documents.drafts.some(
+      (draft) =>
+        draft.status === "failed" ||
+        draft.status === "uploading" ||
+        analysisEntries[draft.id]?.status === "failed",
+    );
   if (!canWrite) return null;
 
   function add(files: File[]) {
@@ -102,19 +120,33 @@ export function ScooterBatchDocuments({
         <div className="flex items-center justify-between gap-3">
           <CardTitle className="flex min-w-0 items-center gap-2 [&_svg]:shrink-0">
             <SparklesIcon aria-hidden="true" className="size-5" />
-            {creation("smartImport")}
+            {creation("automaticFill")}
           </CardTitle>
           {canExtract ? (
             <Badge variant="outline">{creation("aiPowered")}</Badge>
           ) : null}
         </div>
-        <CardDescription>{creation("importHelp")}</CardDescription>
+        <CardDescription>
+          {creation(compact ? "importComplete" : "importAlternatives")}
+        </CardDescription>
+        {compact ? (
+          <Button
+            type="button"
+            variant="outline"
+            className="justify-self-start"
+            disabled={disabled}
+            onClick={() => setExpandedImport(importResult)}
+          >
+            {creation("importMore")}
+          </Button>
+        ) : null}
       </CardHeader>
-      <CardContent className="grid gap-4">
+      <CardContent className={compact ? "hidden" : "grid gap-4"}>
         <FileDropZone
           label={t("batch.drop")}
           browseLabel={t("batch.browse")}
           hint={t("batch.hint")}
+          requirements={t("batch.requirements")}
           accept={v1.scooters.SCOOTER_DOCUMENT_CONTENT_TYPES.join(",")}
           disabled={disabled}
           onFiles={add}
@@ -169,6 +201,16 @@ export function ScooterBatchDocuments({
             </ul>
             <p className="text-sm text-muted-foreground">{t("batch.review")}</p>
           </>
+        ) : null}
+        {children ? (
+          <div className="grid gap-3">
+            <div className="flex items-center gap-3 text-sm text-muted-foreground">
+              <span className="h-px flex-1 bg-border" />
+              <span>{creation("or")}</span>
+              <span className="h-px flex-1 bg-border" />
+            </div>
+            {children}
+          </div>
         ) : null}
       </CardContent>
     </Card>

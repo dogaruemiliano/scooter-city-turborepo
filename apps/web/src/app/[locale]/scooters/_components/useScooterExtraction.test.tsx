@@ -312,6 +312,26 @@ describe("document extraction lifecycle", () => {
     ).toContain("color");
   });
 
+  it("preserves manually entered insurance when unrelated vehicle documents change", () => {
+    const policy = {
+      ...insuranceEditorDefaults(),
+      insuredName: "Manual policy",
+      documentVin: vin,
+    };
+    const hook = setup(
+      { attached: [], editing: false },
+      { ...scooterEditorDefaults(), insurancePolicies: [policy] },
+    );
+    expect(hook.result.current.form.getValues("insurancePolicies")).toEqual([
+      policy,
+    ]);
+    hook.rerender({ attached: [civ], editing: false });
+    hook.apply({ [civ.sourceId]: extracted({ color: "White" }) });
+    expect(hook.result.current.form.getValues("insurancePolicies")).toEqual([
+      policy,
+    ]);
+  });
+
   it("fills a new insurance draft despite array dirtiness, preserves manual policy edits, and clears hidden policy after file removal", () => {
     const defaults = scooterEditorDefaults();
     const hook = setup({ attached: [], editing: false }, defaults);

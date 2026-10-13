@@ -1,6 +1,7 @@
 import { ApiError, v1 } from "@repo/api-shared";
 import { messages } from "@repo/i18n";
 import {
+  act,
   render,
   screen,
   waitFor,
@@ -176,9 +177,113 @@ beforeEach(() => {
   );
   mocks.put.mockResolvedValue({ ok: true });
 });
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.useRealTimers();
+});
 
 describe("Scooter documents", () => {
+  it.each(["unreadable", "failed"])(
+    "opens the existing VIN and document sheets from the validation action after %s analysis",
+    async (status) => {
+      const defaultRequest = mocks.api.getMockImplementation()!;
+      mocks.api.mockImplementation(async (path, schema, options) => {
+        if (path !== v1.scooters.ROUTES.documents.startExtractionJob)
+          return defaultRequest(path, schema, options);
+        if (status === "failed")
+          throw new ApiError(
+            503,
+            "Analysis unavailable",
+            "DOCUMENT_EXTRACTION_UNAVAILABLE",
+          );
+        return {
+          sourceId: options.json.sourceId,
+          documentType: "civ",
+          extractedData: {
+            vin: null,
+            fields: { color: "White" },
+            rawFields: {},
+          },
+          issues: [{ field: "vin", code: "unreadable" }],
+          reviewRequired: true,
+        };
+      });
+      const browser = userEvent.setup();
+      renderWithMessages(
+        <ScooterCreateForm brands={brands} scootersHref="/scooters" />,
+      );
+      await browser.upload(
+        screen.getByLabelText("Browse files", { selector: "input" }),
+        pdf(),
+      );
+      if (status === "failed") {
+        await browser.click(
+          await screen.findByRole("combobox", {
+            name: "Document type for CIV.pdf",
+          }),
+        );
+        await browser.click(
+          await screen.findByRole("option", {
+            name: messages.en.scooters.documents.civ,
+          }),
+        );
+      }
+      if (status === "unreadable")
+        await screen.findByRole("checkbox", { name: "I checked CIV.pdf" });
+      const action = await screen.findByRole("button", {
+        name: "Validate the documents",
+      });
+      await waitFor(() => expect(action).toBeEnabled());
+      const t = messages.en.scooters.extraction.vinReview;
+      expect(
+        screen.queryByRole("dialog", { name: t.title }),
+      ).not.toBeInTheDocument();
+      await browser.click(action);
+      const identity = await screen.findByRole("dialog", { name: t.title });
+      expect(identity).toHaveClass("bg-popover");
+      expect(identity.querySelector(".bg-background")).toBeNull();
+      fireEvent.change(
+        within(identity).getByRole("textbox", { name: t.vinLabel }),
+        {
+          target: { value: scooter.vin },
+        },
+      );
+      vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
+      await browser.click(
+        within(identity).getByRole("button", { name: t.continue }),
+      );
+      const review = await screen.findByRole("dialog", {
+        name: t.documentsTitle,
+      });
+      expect(review).toHaveClass("bg-popover");
+      expect(review.querySelector(".bg-background")).toBeNull();
+      expect(
+        within(review).getByRole("region", { name: "Preview CIV.pdf" }),
+      ).toBeInTheDocument();
+      expect(within(review).queryByRole("checkbox")).not.toBeInTheDocument();
+      expect(within(review).getByRole("button", { name: /3s/ })).toBeDisabled();
+      act(() => vi.advanceTimersByTime(3000));
+      await browser.click(
+        within(review).getByRole("button", { name: t.confirmAndFinish }),
+      );
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Validate the documents" }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Create scooter" }),
+      ).toBeInTheDocument();
+      expect(screen.getByRole("textbox", { name: "VIN" })).toHaveValue(
+        scooter.vin,
+      );
+      expect(
+        mocks.api.mock.calls.filter(
+          ([path]) => path === v1.scooters.ROUTES.create,
+        ),
+      ).toHaveLength(0);
+    },
+  );
+
   it("shows the actual server size limit in Romanian in a standalone preview", () => {
     renderWithMessages(
       <ScooterFilePreview
@@ -364,7 +469,6 @@ describe("Scooter documents", () => {
       <ScooterCreateForm brands={brands} scootersHref="/scooters" />,
     );
     const vinInput = screen.getByRole("textbox", { name: "VIN" });
-    const createButton = screen.getByRole("button", { name: "Create scooter" });
     fireEvent.drop(
       screen.getByRole("button", { name: /Drop your scooter documents/ }),
       {
@@ -400,8 +504,13 @@ describe("Scooter documents", () => {
         ([path]) => path === v1.scooters.ROUTES.create,
       ),
     ).toHaveLength(0);
-    await waitFor(() => expect(createButton).toBeEnabled());
-    await browser.click(createButton);
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Create scooter" }),
+      ).toBeEnabled(),
+    );
+    await browser.click(screen.getByRole("button", { name: "Create scooter" }));
+    await browser.click(await screen.findByRole("button", { name: "Finish" }));
     await waitFor(() => expect(mocks.push).toHaveBeenCalledWith("/scooters"));
     const payload = mocks.api.mock.calls.find(
       ([path]) => path === v1.scooters.ROUTES.create,
@@ -575,6 +684,7 @@ describe("Scooter documents", () => {
     );
     expect(mocks.api).toHaveBeenCalledTimes(3);
     await browser.click(screen.getByRole("button", { name: "Create scooter" }));
+    await browser.click(await screen.findByRole("button", { name: "Finish" }));
     await waitFor(() => expect(mocks.push).toHaveBeenCalledWith("/scooters"));
     const payload = mocks.api.mock.calls.at(-1)![2].json;
     expect(payload).toMatchObject({
@@ -725,7 +835,7 @@ describe("Scooter documents", () => {
       container.querySelectorAll('input[type="file"][multiple]'),
     ).toHaveLength(1);
     expect(screen.getByLabelText("VIN")).toBeInTheDocument();
-    expect(screen.queryByLabelText("Insured name")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Insured name")).toHaveValue("");
     expect(
       screen.getByRole("button", { name: "Create scooter" }),
     ).toBeEnabled();
@@ -801,7 +911,7 @@ describe("Scooter documents", () => {
       screen.getByRole("button", { name: "Remove back.pdf" }),
     );
     await waitFor(() =>
-      expect(screen.queryByLabelText("Insured name")).not.toBeInTheDocument(),
+      expect(screen.getByLabelText("Insured name")).toHaveValue(""),
     );
   });
 
@@ -836,7 +946,7 @@ describe("Scooter documents", () => {
         ([path]) => path === v1.scooters.ROUTES.documents.startExtractionJob,
       ),
     ).toHaveLength(2);
-    expect(screen.queryByLabelText("Insured name")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Insured name")).toHaveValue("");
   });
 
   it("can undo removing one saved attachment while other attachments remain", async () => {
