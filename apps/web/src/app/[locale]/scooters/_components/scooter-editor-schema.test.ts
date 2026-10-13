@@ -82,6 +82,7 @@ describe("scooter editor conversion", () => {
             ![
               "propulsionSystem",
               "documentDrafts",
+              "photoDrafts",
               "sessionId",
               "civRawFields",
               "insurancePolicies",

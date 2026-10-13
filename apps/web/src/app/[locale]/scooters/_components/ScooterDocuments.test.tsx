@@ -671,8 +671,9 @@ describe("Scooter documents", () => {
       ).toBeEnabled(),
     );
     await browser.click(screen.getByRole("button", { name: "Create scooter" }));
-    await browser.click(await screen.findByRole("button", { name: "Finish" }));
-    await waitFor(() => expect(mocks.push).toHaveBeenCalledWith("/scooters"));
+    await waitFor(() =>
+      expect(mocks.push).toHaveBeenCalledWith(`/scooters/${scooter.id}`),
+    );
     const payload = mocks.api.mock.calls.find(
       ([path]) => path === v1.scooters.ROUTES.create,
     )![2].json;
@@ -874,8 +875,9 @@ describe("Scooter documents", () => {
     );
     expect(mocks.api).toHaveBeenCalledTimes(3);
     await browser.click(screen.getByRole("button", { name: "Create scooter" }));
-    await browser.click(await screen.findByRole("button", { name: "Finish" }));
-    await waitFor(() => expect(mocks.push).toHaveBeenCalledWith("/scooters"));
+    await waitFor(() =>
+      expect(mocks.push).toHaveBeenCalledWith(`/scooters/${scooter.id}`),
+    );
     const payload = mocks.api.mock.calls.at(-1)![2].json;
     expect(payload).toMatchObject({
       vin,

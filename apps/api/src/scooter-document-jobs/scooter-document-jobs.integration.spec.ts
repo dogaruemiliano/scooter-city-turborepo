@@ -144,8 +144,8 @@ integration("durable scooter document lifecycle (isolated PostgreSQL)", () => {
         remember: () => Promise.resolve(undefined),
       } as unknown as CivVocabularyService,
       {
-        prepareDrafts: async () => [],
-        applyDrafts: async () => undefined,
+        prepareDrafts: () => Promise.resolve([]),
+        applyDrafts: () => Promise.resolve(undefined),
       } as unknown as import("../scooters/scooter-photos.service").ScooterPhotosService,
     );
   });
