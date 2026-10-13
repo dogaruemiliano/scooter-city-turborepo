@@ -13,7 +13,7 @@ import { magnification } from "../src/tokens/magnification.js";
 import { motion } from "../src/tokens/motion.js";
 import { primitives } from "../src/tokens/primitives.js";
 import { radius, radiusBase } from "../src/tokens/radius.js";
-import { semanticColors } from "../src/tokens/semantic.js";
+import { semanticColors, semanticBlur } from "../src/tokens/semantic.js";
 import { shadow } from "../src/tokens/shadow.js";
 import { spacing, viewportSizing, emailSizing } from "../src/tokens/spacing.js";
 import { typography } from "../src/tokens/typography.js";
@@ -111,6 +111,9 @@ export function buildCss(): string {
   lines.push("}", "");
 
   lines.push("@theme {");
+  for (const [key, value] of Object.entries(semanticBlur)) {
+    lines.push(`  --blur-${kebab(key)}: ${pxToRem(value)};`);
+  }
   for (const [name, value] of flattenColors(primitives, "--color")) {
     lines.push(`  ${name}: ${value};`);
   }
@@ -201,6 +204,7 @@ export function buildNative(): string {
     },
     spacing,
     radius,
+    blur: semanticBlur,
     typography: {
       fontFamily: Object.fromEntries(
         Object.entries(typography.fontFamily).map(([key, value]) => [

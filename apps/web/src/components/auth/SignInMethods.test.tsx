@@ -263,6 +263,43 @@ describe("SignInMethods", () => {
     );
   });
 
+  it("keeps verification feedback visible through requests and pending navigation", async () => {
+    const challenge = createChallenge("00000000-0000-4000-8000-000000000001");
+    let resolveVerify!: (value: v1.auth.TokenPair) => void;
+    let resolveSession!: (value: v1.auth.SessionUser) => void;
+    const verification = new Promise<v1.auth.TokenPair>((resolve) => {
+      resolveVerify = resolve;
+    });
+    const session = new Promise<v1.auth.SessionUser>((resolve) => {
+      resolveSession = resolve;
+    });
+    mocks.apiFetch.mockImplementation((route: string) => {
+      if (route === v1.auth.ROUTES.emailOtp.request)
+        return Promise.resolve(challenge);
+      if (route === v1.auth.ROUTES.emailOtp.verify) return verification;
+      if (route === v1.auth.ROUTES.me) return session;
+      throw new Error(`Unexpected route: ${route}`);
+    });
+    const browser = userEvent.setup();
+    renderSignInMethods();
+    await browser.type(screen.getByLabelText("Email"), user.email);
+    await browser.click(
+      screen.getByRole("button", { name: "Continue with email" }),
+    );
+    await browser.type(getOtpInput(), "000000");
+    await browser.click(screen.getByRole("button", { name: "Verify code" }));
+    expect(screen.getByRole("button", { name: "Verifying..." })).toBeDisabled();
+    await act(async () => {
+      resolveVerify(tokenPair);
+    });
+    expect(screen.getByRole("button", { name: "Verifying..." })).toBeDisabled();
+    await act(async () => {
+      resolveSession(user);
+    });
+    expect(mocks.replace).toHaveBeenCalledWith("/dashboard");
+    expect(screen.getByRole("button", { name: "Verifying..." })).toBeDisabled();
+  });
+
   it("completes email OTP sign-in through the shared challenge form", async () => {
     const challenge = createChallenge("00000000-0000-4000-8000-000000000001");
     mocks.apiFetch.mockImplementation(async (route: string) => {
@@ -692,6 +729,11 @@ describe.each(["ro", "en"] as const)(
     );
 
     it("localizes server failures when resending a code", async () => {
+      // Force a millisecond boundary between clock reads during initialization.
+      let currentTime = Date.now();
+      const clock = vi
+        .spyOn(Date, "now")
+        .mockImplementation(() => currentTime++);
       mocks.apiFetch
         .mockResolvedValueOnce(
           createChallenge("00000000-0000-4000-8000-000000000022", {
@@ -701,6 +743,7 @@ describe.each(["ro", "en"] as const)(
         .mockRejectedValueOnce(serverError());
       renderSignInMethods({ locale });
       await requestEmailCode();
+      clock.mockRestore();
       await act(async () => {
         fireEvent.click(
           screen.getByRole("button", { name: copy.auth.otp.resendCode }),

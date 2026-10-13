@@ -28,6 +28,36 @@ function Harness({
 }
 
 describe("section completion", () => {
+  it("shows missing data before submitting an empty required section", () => {
+    render(<Harness fields={["vin", "brandId", "model"]} values={{}} />);
+    expect(screen.getByText("creation.missingData")).toBeInTheDocument();
+    expect(screen.queryByText("creation.complete")).toBeNull();
+  });
+
+  it("does not mark blank optional fields as missing data", () => {
+    render(<Harness fields={["notes", "hasGps"]} values={{}} />);
+    expect(screen.queryByText("creation.missingData")).toBeNull();
+  });
+
+  it("respects conditional registration requirements", () => {
+    const view = render(
+      <Harness
+        fields={["registrationType", "registrationNumber"]}
+        values={{ registrationType: "permanent" }}
+      />,
+    );
+    expect(screen.getByText("creation.missingData")).toBeInTheDocument();
+    view.unmount();
+    render(
+      <Harness
+        fields={["registrationType"]}
+        values={{ registrationType: "unregistered" }}
+      />,
+    );
+    expect(screen.queryByText("creation.missingData")).toBeNull();
+    expect(screen.getByText("creation.complete")).toBeInTheDocument();
+  });
+
   it("requires optional fields too and rejects invalid populated values", () => {
     for (const values of [{ model: "" }, { manufactureYear: "invalid" }]) {
       const view = render(

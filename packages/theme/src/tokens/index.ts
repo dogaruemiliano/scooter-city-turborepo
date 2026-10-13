@@ -1,7 +1,7 @@
 export { primitives } from "./primitives";
 export type { Primitives } from "./primitives";
 
-export { semanticColors } from "./semantic";
+export { semanticColors, semanticBlur } from "./semantic";
 export type { ThemeColors } from "./semantic";
 
 export { spacing, viewportSizing } from "./spacing";

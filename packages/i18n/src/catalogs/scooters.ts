@@ -21,6 +21,7 @@ export const scootersCatalog = {
       conditionEquipment: "Condition & equipment",
       optional: "Optional",
       complete: "Complete",
+      missingData: "Missing data",
       conditionHelp:
         "Record mileage, equipment, and instrument checks when you have inspected the scooter.",
       conditionAction: "Record initial condition",
@@ -36,6 +37,10 @@ export const scootersCatalog = {
       incomplete: "Complete the required fields",
       blocked: "Resolve document checks before creating",
       validateDocuments: "Validate the documents",
+      documentVinMismatchCheck:
+        "VIN differs between the scooter and its documents. Check: {documents}.",
+      documentVinUnknownCheck:
+        "The document VIN could not be verified. Check: {documents}.",
       analyzing: "Analyzing documents…",
       insuranceDetails: "Insurance details",
       insuranceHelp:
@@ -301,6 +306,9 @@ export const scootersCatalog = {
     },
     documents: {
       batch: {
+        attached: "Attached documents",
+        uploaded: "Uploaded",
+        uploadedAndAnalyzed: "Uploaded and analyzed",
         drop: "Drop your scooter documents",
         browse: "Browse files",
         hint: "CIV · Import · Registration · Insurance",
@@ -1012,6 +1020,7 @@ export const scootersCatalog = {
       conditionEquipment: "Stare și echipare",
       optional: "Opțional",
       complete: "Complet",
+      missingData: "Date lipsă",
       conditionHelp:
         "Completează kilometrajul, echiparea și verificarea instrumentelor după inspectarea scuterului.",
       conditionAction: "Completează starea inițială",
@@ -1027,6 +1036,10 @@ export const scootersCatalog = {
       incomplete: "Completează câmpurile obligatorii",
       blocked: "Rezolvă verificările documentelor înainte de creare",
       validateDocuments: "Validează documentele",
+      documentVinMismatchCheck:
+        "VIN-ul diferă între scuter și documente. Verifică: {documents}.",
+      documentVinUnknownCheck:
+        "VIN-ul documentelor nu a putut fi verificat. Verifică: {documents}.",
       analyzing: "Se analizează documentele…",
       insuranceDetails: "Detalii asigurare",
       insuranceHelp:
@@ -1303,6 +1316,9 @@ export const scootersCatalog = {
     },
     documents: {
       batch: {
+        attached: "Documente atașate",
+        uploaded: "Încărcat",
+        uploadedAndAnalyzed: "Încărcat și analizat",
         drop: "Trage documentele scuterului aici",
         browse: "Alege fișiere",
         hint: "CIV · Import · Înmatriculare · Asigurare",

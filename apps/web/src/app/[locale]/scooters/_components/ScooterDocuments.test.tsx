@@ -19,6 +19,7 @@ import { ScooterDocumentAnalysisContext } from "./ScooterDocumentAnalysisStatus"
 import { useScooterDocuments } from "./useScooterDocuments";
 import { ScooterCreateForm } from "./ScooterCreateForm";
 import { ScooterEditForm } from "./ScooterEditForm";
+import { ScooterBatchDocuments } from "./ScooterBatchDocuments";
 
 const mocks = vi.hoisted(() => ({
   api: vi.fn(),
@@ -183,6 +184,161 @@ afterEach(() => {
 });
 
 describe("Scooter documents", () => {
+  it("waits for the whole analysis batch before revealing document review actions", async () => {
+    const defaultRequest = mocks.api.getMockImplementation()!;
+    let finish!: () => void;
+    let count = 0;
+    mocks.api.mockImplementation((path, schema, options) => {
+      if (path !== v1.scooters.ROUTES.documents.startExtractionJob)
+        return defaultRequest(path, schema, options);
+      const result = {
+        sourceId: options.json.sourceId,
+        documentType: "civ",
+        extractedData: { vin: null, fields: {}, rawFields: {} },
+        issues: [],
+        reviewRequired: true,
+      };
+      if (++count === 1) return Promise.resolve(result);
+      return new Promise<typeof result>((resolve) => {
+        finish = () => resolve(result);
+      });
+    });
+    const browser = userEvent.setup();
+    renderWithMessages(
+      <ScooterCreateForm brands={brands} scootersHref="/scooters" />,
+    );
+    await browser.upload(
+      screen.getByLabelText("Browse files", { selector: "input" }),
+      [pdf("first.pdf"), pdf("second.pdf")],
+    );
+    await screen.findByText("Details extracted");
+    await waitFor(() => expect(finish).toBeDefined());
+    expect(
+      screen.queryByRole("button", { name: "Validate the documents" }),
+    ).not.toBeInTheDocument();
+    expect(
+      document.querySelector('[data-slot="create-actions"]'),
+    ).toHaveAttribute("data-sticky", "false");
+    await act(async () => {
+      finish();
+    });
+    const action = await screen.findByRole("button", {
+      name: "Validate the documents",
+    });
+    expect(action).toBeEnabled();
+    expect(action.closest('[data-slot="create-actions"]')).toHaveAttribute(
+      "data-sticky",
+      "true",
+    );
+  });
+  it("keeps a compact attached-document list with upload and analysis badges", async () => {
+    function Fixture() {
+      const documents = useScooterDocuments();
+      return (
+        <ScooterBatchDocuments
+          documents={{
+            ...documents,
+            drafts: [
+              { id: "civ", type: "civ", file: pdf("CIV.pdf"), status: "ready" },
+              {
+                id: "insurance",
+                type: "insurance",
+                file: pdf("insurance.pdf"),
+                status: "ready",
+              },
+            ],
+            extractions: {
+              civ: { vin: scooter.vin, fields: {}, rawFields: {} },
+            },
+          }}
+          disabled={false}
+          analyzing={false}
+          importResult={{
+            ok: true,
+            values: {},
+            confirmedEmpty: [],
+            unresolved: [],
+            unresolvedRawFields: [],
+            emptyConflicts: [],
+          }}
+        />
+      );
+    }
+    const browser = userEvent.setup();
+    renderWithMessages(<Fixture />);
+    const summary = within(
+      screen.getByRole("list", { name: "Attached documents" }),
+    );
+    const rows = summary.getAllByRole("listitem");
+    expect(rows).toHaveLength(3);
+    expect(
+      within(rows[2]!).getByRole("button", { name: "Import more documents" }),
+    ).toHaveClass("w-full", "justify-center", "text-center", "border-dashed");
+    expect(within(rows[0]!).getByText("CIV.pdf")).toBeInTheDocument();
+    expect(within(rows[0]!).getByText("CIV")).toBeInTheDocument();
+    expect(within(rows[0]!).getByText("Uploaded and analyzed")).toHaveClass(
+      "text-success",
+    );
+    expect(within(rows[1]!).getByText("insurance.pdf")).toBeInTheDocument();
+    expect(within(rows[1]!).getByText("Insurance")).toBeInTheDocument();
+    expect(within(rows[1]!).getByText("Uploaded")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Drop your scooter documents/ }),
+    ).not.toBeInTheDocument();
+    await browser.click(
+      screen.getByRole("button", { name: "Import more documents" }),
+    );
+    expect(
+      screen.queryByRole("list", { name: "Attached documents" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Drop your scooter documents/ }),
+    ).toBeInTheDocument();
+  });
+  it("requires an explicit review action after manually changing a valid VIN", async () => {
+    mockBatchExtraction(["civ"]);
+    const browser = userEvent.setup();
+    renderWithMessages(
+      <ScooterCreateForm brands={brands} scootersHref="/scooters" />,
+    );
+    await browser.upload(
+      screen.getByLabelText("Browse files", { selector: "input" }),
+      pdf(),
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("textbox", { name: "VIN" })).toHaveValue(
+        scooter.vin,
+      ),
+    );
+    const enteredVin = "LXYTCZP05P0000001";
+    fireEvent.change(screen.getByRole("textbox", { name: "VIN" }), {
+      target: { value: enteredVin },
+    });
+    const action = await screen.findByRole("button", {
+      name: "Validate the documents",
+    });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/VIN differs between the scooter/),
+    ).toHaveTextContent("CIV.pdf");
+    expect(action.closest('[data-slot="create-actions"]')).toHaveAttribute(
+      "data-sticky",
+      "true",
+    );
+    await browser.click(action);
+    const t = messages.en.scooters.extraction.vinReview;
+    expect(
+      await screen.findByRole("dialog", { name: t.documentsTitle }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("dialog", { name: t.title }),
+    ).not.toBeInTheDocument();
+    await browser.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "VIN" })).toHaveValue(
+      enteredVin,
+    );
+  });
   it.each(["unreadable", "failed"])(
     "opens the existing VIN and document sheets from the validation action after %s analysis",
     async (status) => {
@@ -229,7 +385,7 @@ describe("Scooter documents", () => {
         );
       }
       if (status === "unreadable")
-        await screen.findByRole("checkbox", { name: "I checked CIV.pdf" });
+        await screen.findByText(/The document VIN could not be verified/);
       const action = await screen.findByRole("button", {
         name: "Validate the documents",
       });
@@ -490,6 +646,9 @@ describe("Scooter documents", () => {
     );
     expect(screen.getByLabelText("Plate number")).toHaveValue("14949");
     expect(screen.getByLabelText("Insured name")).toHaveValue("Example Person");
+    await browser.click(
+      screen.getByRole("button", { name: "Import more documents" }),
+    );
     for (const [index, type] of types.entries())
       expect(
         screen.getByRole("combobox", {
@@ -557,14 +716,33 @@ describe("Scooter documents", () => {
       screen.getByLabelText("Browse files", { selector: "input" }),
       pdf(),
     );
-    const vinConfirmation = await screen.findByRole("checkbox", {
-      name: "I checked CIV.pdf",
+    const action = await screen.findByRole("button", {
+      name: "Validate the documents",
     });
-    expect(screen.getByText("Scooter VIN:")).toHaveTextContent(
-      "Not available yet",
+    expect(
+      screen.queryByRole("checkbox", { name: "I checked CIV.pdf" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    fireEvent.change(screen.getByRole("textbox", { name: "VIN" }), {
+      target: { value: scooter.vin },
+    });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
+    await browser.click(action);
+    const t = messages.en.scooters.extraction.vinReview;
+    const review = await screen.findByRole("dialog", {
+      name: t.documentsTitle,
+    });
+    expect(
+      screen.queryByRole("dialog", { name: t.title }),
+    ).not.toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(3000));
+    await browser.click(
+      within(review).getByRole("button", { name: t.confirmAndFinish }),
     );
-    await browser.click(vinConfirmation);
-    expect(screen.getByRole("textbox", { name: "VIN" })).toHaveValue("");
+    expect(screen.getByRole("textbox", { name: "VIN" })).toHaveValue(
+      scooter.vin,
+    );
     expect(screen.getByLabelText("Color")).toHaveValue("White");
     expect(
       mocks.api.mock.calls.filter(
@@ -612,6 +790,10 @@ describe("Scooter documents", () => {
     );
     await waitFor(() => expect(mocks.put).toHaveBeenCalledTimes(3));
     for (const document of documents) {
+      const expand = screen.queryByRole("button", {
+        name: "Import more documents",
+      });
+      if (expand) await browser.click(expand);
       await browser.click(
         screen.getByRole("combobox", {
           name: `Document type for ${document.fileName}`,
@@ -623,6 +805,12 @@ describe("Scooter documents", () => {
     }
     const vin = "L5YAUCZB9H1148984";
     const copy = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue();
+    {
+      const expand = screen.queryByRole("button", {
+        name: "Import more documents",
+      });
+      if (expand) await browser.click(expand);
+    }
     await browser.click(screen.getByRole("button", { name: "Import JSON" }));
     await browser.click(
       screen.getByRole("button", { name: "Copy extraction prompt" }),
@@ -903,10 +1091,22 @@ describe("Scooter documents", () => {
       expect(screen.getAllByText("Details extracted")).toHaveLength(2),
     );
     expect(screen.getAllByLabelText("Insured name")).toHaveLength(1);
+    {
+      const expand = screen.queryByRole("button", {
+        name: "Import more documents",
+      });
+      if (expand) await browser.click(expand);
+    }
     await browser.click(
       screen.getByRole("button", { name: "Remove front.pdf" }),
     );
     expect(screen.getByLabelText("Insured name")).toHaveValue("Example Person");
+    {
+      const expand = screen.queryByRole("button", {
+        name: "Import more documents",
+      });
+      if (expand) await browser.click(expand);
+    }
     await browser.click(
       screen.getByRole("button", { name: "Remove back.pdf" }),
     );

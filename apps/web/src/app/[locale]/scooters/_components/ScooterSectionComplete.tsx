@@ -1,7 +1,7 @@
 "use client";
 
 import { Badge } from "@repo/ui/components";
-import { CheckIcon } from "lucide-react";
+import { CheckIcon, CircleAlertIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { get, useFormContext, useWatch } from "react-hook-form";
 import {
@@ -21,22 +21,31 @@ export function ScooterSectionComplete({
   } = useFormContext<ScooterEditorValues>();
   const values = useWatch({ control });
   const result = scooterCreateFormSchema.safeParse(values);
+  const hasSectionIssues =
+    !result.success &&
+    result.error.issues.some((issue) =>
+      fields.some(
+        (field) =>
+          issue.path.join(".") === field ||
+          field.startsWith(`${issue.path.join(".")}.`),
+      ),
+    );
   const complete =
     fields.every((field) => {
       const value = get(values, field);
       return (
         value != null && String(value).trim() !== "" && !get(errors, field)
       );
-    }) &&
-    (result.success ||
-      !result.error.issues.some((issue) =>
-        fields.some(
-          (field) =>
-            issue.path.join(".") === field ||
-            field.startsWith(`${issue.path.join(".")}.`),
-        ),
-      ));
-  if (!complete) return null;
+    }) && !hasSectionIssues;
+  if (!complete) {
+    if (!hasSectionIssues) return null;
+    return (
+      <Badge variant="warning">
+        <CircleAlertIcon aria-hidden="true" />
+        {t("creation.missingData")}
+      </Badge>
+    );
+  }
   return (
     <Badge variant="success">
       <CheckIcon aria-hidden="true" />

@@ -41,10 +41,10 @@ export function OtpChallengeForm({
   const [busy, setBusy] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const [expiresAt, setExpiresAt] = useState(
-    () => Date.now() + challenge.expiresInSec * SECOND_MS,
+    () => now + challenge.expiresInSec * SECOND_MS,
   );
   const [resendAt, setResendAt] = useState(
-    () => Date.now() + challenge.resendAfterSec * SECOND_MS,
+    () => now + challenge.resendAfterSec * SECOND_MS,
   );
 
   useEffect(() => {
@@ -62,12 +62,13 @@ export function OtpChallengeForm({
 
   async function verifyCode(event: FormEvent) {
     event.preventDefault();
-    if (expired) return;
+    if (busy || expired) return;
 
     setError(null);
     setBusy(true);
 
     let verified = false;
+    let completed = false;
     try {
       await webApi.fetch(verifyRoute, v1.auth.tokenPairSchema, {
         method: "POST",
@@ -76,6 +77,7 @@ export function OtpChallengeForm({
       });
       verified = true;
       await onVerified();
+      completed = true;
     } catch (verificationError) {
       setError({
         cause: verificationError,
@@ -84,7 +86,8 @@ export function OtpChallengeForm({
           : "auth.otp.errors.invalidOrExpired",
       });
     } finally {
-      setBusy(false);
+      // Successful completion starts navigation; keep feedback until unmount.
+      if (!completed) setBusy(false);
     }
   }
 

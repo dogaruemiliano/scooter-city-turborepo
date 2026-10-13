@@ -8,6 +8,7 @@ export const tokens = {
       card: "#FFFFFF",
       cardForeground: "#12161B",
       popover: "#FFFFFF",
+      floatingActionSurface: "#FFFFFFB3",
       popoverForeground: "#12161B",
       selectableRow: "#F9FBFB",
       primary: "#06B6D4",
@@ -80,6 +81,7 @@ export const tokens = {
       card: "#141414",
       cardForeground: "#F9FBFB",
       popover: "#1F1F1F",
+      floatingActionSurface: "#1F1F1FB3",
       popoverForeground: "#F9FBFB",
       selectableRow: "#141414",
       primary: "#06B6D4",
@@ -186,6 +188,9 @@ export const tokens = {
     "4xl": 28,
     full: 9999,
   },
+  blur: {
+    floatingSurface: 12,
+  },
   typography: {
     fontFamily: {
       sans: "Montserrat_400Regular",
@@ -228,6 +233,26 @@ export const tokens = {
     },
   },
   shadow: {
+    warning: {
+      shadowColor: "#E17100",
+      shadowOffset: {
+        width: 0,
+        height: 6,
+      },
+      shadowOpacity: 0.2,
+      shadowRadius: 12,
+      elevation: 3,
+    },
+    disabled: {
+      shadowColor: "#A1A1AA",
+      shadowOffset: {
+        width: 0,
+        height: 6,
+      },
+      shadowOpacity: 0.1,
+      shadowRadius: 12,
+      elevation: 3,
+    },
     primary: {
       shadowColor: "#06B6D4",
       shadowOffset: {

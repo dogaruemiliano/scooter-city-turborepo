@@ -68,6 +68,27 @@ export function ScooterBatchDocuments({
         draft.status === "uploading" ||
         analysisEntries[draft.id]?.status === "failed",
     );
+  const attachedDocuments = [
+    ...documents.existing.map((document) => ({
+      id: document.id,
+      name: document.fileName,
+      type: document.type,
+      analyzed: Boolean(
+        document.extractedData ||
+        documents.extractions[document.id] ||
+        analysisEntries[document.id]?.status === "success",
+      ),
+    })),
+    ...documents.drafts.map((document) => ({
+      id: document.id,
+      name: document.file.name,
+      type: document.type,
+      analyzed: Boolean(
+        documents.extractions[document.id] ||
+        analysisEntries[document.id]?.status === "success",
+      ),
+    })),
+  ];
   if (!canWrite) return null;
 
   function add(files: File[]) {
@@ -129,19 +150,55 @@ export function ScooterBatchDocuments({
         <CardDescription>
           {creation(compact ? "importComplete" : "importAlternatives")}
         </CardDescription>
-        {compact ? (
-          <Button
-            type="button"
-            variant="outline"
-            className="justify-self-start"
-            disabled={disabled}
-            onClick={() => setExpandedImport(importResult)}
-          >
-            {creation("importMore")}
-          </Button>
-        ) : null}
       </CardHeader>
-      <CardContent className={compact ? "hidden" : "grid gap-4"}>
+      {compact ? (
+        <CardContent>
+          <ul aria-label={t("batch.attached")} className="grid min-w-0 gap-2">
+            {attachedDocuments.map((document) => (
+              <li
+                key={document.id}
+                className="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-lg bg-control px-3 py-2"
+              >
+                <div className="min-w-0 flex-1">
+                  <p
+                    className="truncate text-sm font-medium"
+                    title={document.name}
+                  >
+                    {document.name}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {document.type
+                      ? t(`compact.${document.type}`)
+                      : t("batch.unknown")}
+                  </p>
+                </div>
+                <Badge variant={document.analyzed ? "success" : "secondary"}>
+                  {t(
+                    document.analyzed
+                      ? "batch.uploadedAndAnalyzed"
+                      : "batch.uploaded",
+                  )}
+                </Badge>
+              </li>
+            ))}
+            <li className="min-w-0">
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full justify-center border-dashed bg-transparent text-center"
+                disabled={disabled}
+                onClick={() => setExpandedImport(importResult)}
+              >
+                {creation("importMore")}
+              </Button>
+            </li>
+          </ul>
+        </CardContent>
+      ) : null}
+      <CardContent
+        hidden={compact}
+        className={compact ? "hidden" : "grid gap-4"}
+      >
         <FileDropZone
           label={t("batch.drop")}
           browseLabel={t("batch.browse")}

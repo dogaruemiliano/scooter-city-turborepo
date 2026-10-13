@@ -18,6 +18,41 @@ function actions(container: HTMLElement) {
 }
 
 describe("ScooterCreateActions", () => {
+  it("keeps review actions out of the floating panel until processing finishes", () => {
+    const review = {
+      label: "Validate the documents",
+      onClick: vi.fn(),
+      disabled: true,
+    };
+    const { container, rerender } = render(
+      <ScooterCreateActions ready pending status="Analyzing" review={review}>
+        <button disabled>Create scooter</button>
+      </ScooterCreateActions>,
+    );
+    expect(actions(container)).toHaveAttribute("data-sticky", "false");
+    expect(actions(container)).toHaveClass("static");
+    expect(actions(container)).not.toHaveClass("animate-in");
+    expect(
+      screen.queryByRole("button", { name: review.label }),
+    ).not.toBeInTheDocument();
+    rerender(
+      <ScooterCreateActions
+        ready={false}
+        status="Review required"
+        review={{ ...review, disabled: false }}
+      >
+        <button>Create scooter</button>
+      </ScooterCreateActions>,
+    );
+    expect(actions(container)).toHaveAttribute("data-sticky", "true");
+    expect(actions(container)).toHaveClass("animate-in");
+    expect(screen.getByRole("button", { name: review.label })).toHaveClass(
+      "shadow-warning",
+    );
+    expect(screen.getByRole("button", { name: review.label })).not.toHaveClass(
+      "shadow-primary",
+    );
+  });
   it("keeps incomplete actions inline and switches to native sticky only when ready", () => {
     const { container, rerender } = render(<Fixture />);
     expect(actions(container)).toHaveClass("static", "bottom-auto");
@@ -37,7 +72,7 @@ describe("ScooterCreateActions", () => {
     const onClick = vi.fn();
     const { rerender } = render(
       <ScooterCreateActions
-        ready
+        ready={false}
         status="Review required"
         review={{ label: "Validate the documents", onClick }}
       >
@@ -52,6 +87,10 @@ describe("ScooterCreateActions", () => {
     });
     expect(review).toHaveClass("bg-warning", "text-warning-foreground");
     expect(review).toHaveAttribute("type", "button");
+    expect(review.closest('[data-slot="create-actions"]')).toHaveAttribute(
+      "data-sticky",
+      "true",
+    );
     review.click();
     expect(onClick).toHaveBeenCalledOnce();
     rerender(<Fixture ready />);

@@ -90,10 +90,30 @@ it("unblocks the combined review after verified VIN correction without re-extrac
     </NextIntlClientProvider>,
   );
   expect(
+    screen.queryByRole("dialog", { name: "Verify the scooter VIN" }),
+  ).not.toBeInTheDocument();
+  const validate = await screen.findByRole("button", {
+    name: messages.en.scooters.creation.validateDocuments,
+  });
+  await waitFor(() => expect(validate).toBeEnabled());
+  await user.click(validate);
+  expect(
     await screen.findByRole("heading", { name: "Verify the scooter VIN" }),
   ).toBeInTheDocument();
   expect(apiFetch).toHaveBeenCalledTimes(2);
   await user.keyboard("{Escape}");
+  await waitFor(() =>
+    expect(
+      screen.queryByRole("dialog", { name: "Verify the scooter VIN" }),
+    ).not.toBeInTheDocument(),
+  );
+  expect(persisted.registration?.vinReview).toBeUndefined();
+  expect(apiFetch).toHaveBeenCalledTimes(2);
+  await user.click(
+    screen.getByRole("button", {
+      name: messages.en.scooters.creation.validateDocuments,
+    }),
+  );
   expect(
     screen.getByRole("dialog", { name: "Verify the scooter VIN" }),
   ).toBeInTheDocument();
