@@ -62,6 +62,25 @@ async function serviceTab(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe("permission replacement editor", () => {
+  it("places the mode control in the row grid and keeps Romanian choices together", () => {
+    render(
+      <Harness
+        locale="ro"
+        initial={[{ permissionKey: "scooters.read", scopes: [] }]}
+        roles={[]}
+      />,
+    );
+    const row = permissionRow("Scutere · Vizualizare");
+    const modes = within(row).getByRole("radiogroup");
+    expect(modes.parentElement).toHaveClass("col-span-12", "lg:col-span-4");
+    expect(modes).toHaveClass("grid-cols-3");
+    expect(modes).not.toHaveClass("col-span-12", "lg:col-span-4");
+    expect(within(modes).getAllByRole("radio")).toHaveLength(3);
+    expect(
+      within(row).getByRole("combobox").parentElement?.parentElement,
+    ).toHaveClass("col-span-12");
+  });
+
   it("opens Service for a mechanic and shows inherited scopes as readouts", () => {
     render(<Harness />);
     expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
@@ -393,7 +412,9 @@ describe("permission replacement editor", () => {
       let count = 0;
       for (const tab of screen.getAllByRole("tab")) {
         await user.click(tab);
-        count += screen.getAllByRole("group").length;
+        count += within(
+          screen.getByRole("tabpanel", { name: tab.textContent! }),
+        ).getAllByRole("group").length;
       }
       expect(count).toBe(v1.access.permissionCatalog.length);
       expect(view.container.textContent).not.toContain("access.descriptions.");

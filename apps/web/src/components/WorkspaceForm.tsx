@@ -108,7 +108,7 @@ export function Feedback({
   );
 }
 
-export function useTask() {
+export function useTask(errorMessages: Readonly<Record<string, string>> = {}) {
   const t = useTranslations("workspace");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -128,11 +128,13 @@ export function useTask() {
       }
     } catch (cause) {
       setError(
-        cause instanceof ApiError && cause.status === 409
-          ? t("conflict")
-          : cause instanceof Error
-            ? cause.message
-            : t("error"),
+        cause instanceof ApiError && cause.code && errorMessages[cause.code]
+          ? errorMessages[cause.code]
+          : cause instanceof ApiError && cause.status === 409
+            ? t("conflict")
+            : cause instanceof Error
+              ? cause.message
+              : t("error"),
       );
       if (cause instanceof ApiError && [401, 403].includes(cause.status))
         window.dispatchEvent(new Event("access-changed"));

@@ -1,6 +1,10 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { useRemote } from "./WorkspaceForm";
+import { NextIntlClientProvider } from "next-intl";
+import { messages } from "@repo/i18n";
+import { ApiError } from "@repo/api-shared";
+import type { ReactNode } from "react";
+import { useRemote, useTask } from "./WorkspaceForm";
 
 describe("useRemote list request state", () => {
   it("retains existing data during refresh, exposes failures and retries", async () => {
@@ -45,4 +49,35 @@ describe("useRemote list request state", () => {
     expect(result.current.data).toEqual(["latest"]);
     expect(result.current.loading).toBe(false);
   });
+});
+
+it("shows a specific maintenance-hold error instead of suggesting a stale-record retry", async () => {
+  const { result } = renderHook(
+    () =>
+      useTask({
+        SCOOTER_MAINTENANCE_HOLD:
+          "Clear all blocking problems before rental creation.",
+      }),
+    {
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <NextIntlClientProvider locale="en" messages={messages.en}>
+          {children}
+        </NextIntlClientProvider>
+      ),
+    },
+  );
+  await act(async () =>
+    result.current.run(() =>
+      Promise.reject(
+        new ApiError(
+          409,
+          "Scooter has a maintenance hold",
+          "SCOOTER_MAINTENANCE_HOLD",
+        ),
+      ),
+    ),
+  );
+  expect(result.current.error).toBe(
+    "Clear all blocking problems before rental creation.",
+  );
 });

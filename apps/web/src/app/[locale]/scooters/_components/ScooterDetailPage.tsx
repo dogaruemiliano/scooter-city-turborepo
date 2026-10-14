@@ -1,4 +1,5 @@
 "use client";
+import { ScooterProblems } from "./ScooterProblems";
 import { ScooterInsuranceList } from "./ScooterInsuranceFields";
 
 import { v1 } from "@repo/api-shared";
@@ -72,6 +73,7 @@ export function ScooterDetailPage({
   scootersHref,
 }: ScooterDetailPageProps) {
   const t = useTranslations("scooters");
+  const problemsT = useTranslations("workspace.problems");
   const session = useOptionalSession();
   const locale = useLocale();
   const router = useRouter();
@@ -203,6 +205,9 @@ export function ScooterDetailPage({
           {scooter.deletedAt ? (
             <Badge variant="outline">{t("recordStatus.deleted")}</Badge>
           ) : null}
+          {(scooter.maintenanceHoldCount ?? 0) > 0 ? (
+            <Badge variant="destructive">{problemsT("maintenanceHold")}</Badge>
+          ) : null}
           <PowertrainBadge scooter={scooter} />
           <Badge variant="outline">
             {t(`registrationTypes.${scooter.registrationType}`)}
@@ -211,6 +216,9 @@ export function ScooterDetailPage({
       </div>
 
       {feedback ? <FeedbackAlert feedback={feedback} /> : null}
+      {canAccess(session?.user, "problems.read") ? (
+        <ScooterProblems scooterId={scooter.id} />
+      ) : null}
       <ScooterPhotos
         scooterId={scooter.id}
         panel

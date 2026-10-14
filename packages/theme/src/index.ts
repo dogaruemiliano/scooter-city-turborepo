@@ -2,7 +2,7 @@ export * from "./tokens/index";
 
 import { semanticColors, semanticBlur } from "./tokens/semantic";
 import { primitives } from "./tokens/primitives";
-import { spacing } from "./tokens/spacing";
+import { spacing, dashedSurface } from "./tokens/spacing";
 import { radius } from "./tokens/radius";
 import { typography } from "./tokens/typography";
 import { shadow } from "./tokens/shadow";
@@ -25,6 +25,7 @@ export const tokens = {
   color: semanticColors,
   blur: semanticBlur,
   spacing,
+  dashedSurface,
   radius,
   typography,
   shadow,

@@ -15,6 +15,10 @@ type SegmentedRadioOption<Value extends string> = {
     | "success"
     | "destructiveSubtle"
     | "successSubtle";
+  /** Semantic severity colors remain visible before selection. */
+  severity?: "low" | "moderate" | "high" | "critical";
+  /** Use the option tone for unselected text as well as its selected fill. */
+  colorUnselected?: boolean;
   disabled?: boolean;
 };
 
@@ -29,10 +33,16 @@ type SegmentedRadioGroupProps<Value extends string> = Omit<
   options: readonly SegmentedRadioOption<Value>[];
   disabled?: boolean;
   inputRef?: React.Ref<HTMLInputElement>;
+  required?: boolean;
   /** Clicking the selected option again restores this empty value. */
   deselectValue?: Value;
   showCheckmark?: boolean;
   optionClassName?: string;
+  appearance?: "segmented" | "pills";
+  /** Layout placement belongs on the outer query container. */
+  containerClassName?: string;
+  /** Keep a fixed number of columns instead of expanding to a single row. */
+  columns?: 1 | 2 | 3 | 4;
 };
 
 const selectedTone = {
@@ -44,7 +54,30 @@ const selectedTone = {
   successSubtle: "bg-success-subtle text-success",
 } as const;
 
-/** One required selection, using native radios for keyboard and form behavior. */
+const severityTone = {
+  low: "bg-severity-low text-severity-foreground",
+  moderate: "bg-severity-medium text-severity-foreground",
+  high: "bg-severity-high text-severity-foreground",
+  critical: "bg-severity-critical text-severity-foreground",
+} as const;
+
+const severityTextTone = {
+  low: "text-severity-low",
+  moderate: "text-severity-medium",
+  high: "text-severity-high",
+  critical: "text-severity-critical",
+} as const;
+
+const unselectedTone = {
+  primary: "text-primary",
+  neutral: "text-muted-foreground",
+  destructive: "text-destructive",
+  success: "text-success",
+  destructiveSubtle: "text-destructive",
+  successSubtle: "text-success",
+} as const;
+
+/** Controlled selection with optional deselection and native radio keyboard behavior. */
 function SegmentedRadioGroup<Value extends string>({
   label,
   name,
@@ -52,11 +85,15 @@ function SegmentedRadioGroup<Value extends string>({
   onValueChange,
   options,
   disabled,
+  required = false,
   id,
   inputRef,
   deselectValue,
   showCheckmark = false,
   optionClassName,
+  appearance = "segmented",
+  containerClassName,
+  columns,
   className,
   ...props
 }: SegmentedRadioGroupProps<Value>) {
@@ -65,21 +102,26 @@ function SegmentedRadioGroup<Value extends string>({
     options.findIndex((option) => option.value === value),
   );
   return (
-    <div className="@container/segmented min-w-0">
+    <div className={cn("@container/segmented min-w-0", containerClassName)}>
       <div
         {...props}
         style={
           {
             ...props.style,
-            "--segmented-columns": options.length,
+            "--segmented-columns": columns ?? options.length,
           } as React.CSSProperties
         }
         data-slot="segmented-radio-group"
         role="radiogroup"
         aria-label={label}
         aria-disabled={disabled || undefined}
+        aria-required={required || undefined}
         className={cn(
           "grid min-h-12 min-w-0 grid-cols-2 rounded-xl border border-input bg-muted p-1 md:min-h-11 @form-controls/segmented:grid-cols-[repeat(var(--segmented-columns),minmax(0,1fr))]",
+          columns !== undefined &&
+            "grid-cols-[repeat(var(--segmented-columns),minmax(0,1fr))]",
+          appearance === "pills" &&
+            "flex min-h-10 flex-wrap gap-2 rounded-none border-0 bg-transparent p-0 md:min-h-10",
           className,
         )}
       >
@@ -87,7 +129,8 @@ function SegmentedRadioGroup<Value extends string>({
           <label
             key={option.value}
             className={cn(
-              "flex min-h-0 min-w-0 cursor-pointer",
+              "flex min-h-10 min-w-0 cursor-pointer md:min-h-9",
+              appearance === "pills" && "min-h-10 items-center md:min-h-10",
               optionClassName,
             )}
           >
@@ -101,6 +144,7 @@ function SegmentedRadioGroup<Value extends string>({
               value={option.value}
               checked={value === option.value}
               disabled={disabled || option.disabled}
+              required={required}
               onChange={() => onValueChange(option.value)}
               onClick={() => {
                 if (deselectValue !== undefined && value === option.value)
@@ -121,9 +165,29 @@ function SegmentedRadioGroup<Value extends string>({
             <span
               className={cn(
                 "flex min-h-0 w-full min-w-0 items-center justify-center gap-1 rounded-md px-2 py-1 text-center text-sm font-medium wrap-anywhere outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-inset peer-focus-visible:ring-ring peer-disabled:cursor-not-allowed",
-                value === option.value
-                  ? selectedTone[option.tone ?? "neutral"]
-                  : "text-muted-foreground hover:bg-muted peer-disabled:bg-disabled peer-disabled:text-disabled-foreground",
+                appearance === "pills" &&
+                  "min-h-8 rounded-full border border-border px-4 py-1",
+                option.severity
+                  ? cn(
+                      value === option.value
+                        ? cn(
+                            severityTone[option.severity],
+                            "ring-2 ring-inset ring-severity-foreground",
+                          )
+                        : cn(
+                            severityTextTone[option.severity],
+                            "hover:bg-muted",
+                          ),
+                      "peer-disabled:opacity-50",
+                    )
+                  : value === option.value
+                    ? selectedTone[option.tone ?? "neutral"]
+                    : cn(
+                        option.colorUnselected
+                          ? unselectedTone[option.tone ?? "neutral"]
+                          : "text-muted-foreground",
+                        "hover:bg-muted peer-disabled:bg-disabled peer-disabled:text-disabled-foreground",
+                      ),
                 optionClassName,
               )}
             >

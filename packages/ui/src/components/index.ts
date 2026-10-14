@@ -6,6 +6,7 @@ export * from "./bottom-sheet";
 export * from "./button";
 export * from "./calendar-picker";
 export * from "./card";
+export * from "./horizontal-scroll-area";
 export * from "./checkbox";
 export * from "./country-select";
 export * from "./date-parts-input";
@@ -56,3 +57,6 @@ export * from "./image-viewer";
 export * from "./media-viewer";
 
 export * from "./file-drop-overlay";
+export * from "./person-row";
+export * from "./image-gallery";
+export * from "./image-gallery-editor";

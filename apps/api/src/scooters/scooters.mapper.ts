@@ -11,6 +11,8 @@ import type {
 type ScooterRowWithBrand = ScooterRow & {
   insuranceAttention?: v1.scooters.InsuranceAttention | null;
   photos?: { id: string }[];
+  problems?: { severity: v1.problems.Problem["severity"] }[];
+  _count?: { problems: number };
   brand: { name: string; code: string };
   civDocument?: VehicleCivDocument | null;
   insurancePolicies?: ScooterInsurancePolicy[];
@@ -18,6 +20,20 @@ type ScooterRowWithBrand = ScooterRow & {
 
 export function toScooter(row: ScooterRowWithBrand): v1.scooters.Scooter {
   return {
+    ...(row.problems
+      ? {
+          problemSeverityCounts: {
+            low: row.problems.filter((p) => p.severity === "low").length,
+            moderate: row.problems.filter((p) => p.severity === "moderate")
+              .length,
+            high: row.problems.filter((p) => p.severity === "high").length,
+            critical: row.problems.filter((p) => p.severity === "critical")
+              .length,
+            unknown: row.problems.filter((p) => p.severity === null).length,
+          },
+        }
+      : {}),
+    maintenanceHoldCount: row._count?.problems ?? 0,
     ...(row.photos
       ? {
           coverUrl: row.photos[0]

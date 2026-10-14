@@ -184,6 +184,7 @@ model MediaAsset {
   documentPhotos   PersonDocumentPhoto[]
   scooterDocuments ScooterDocument[]
   scooterPhotos    ScooterPhoto[]
+  problemPhotos    ScooterProblemPhoto[]
 
   @@index([provider, bucket])
   @@index([uploadedByUserId])
@@ -1586,7 +1587,14 @@ model ScooterProblem {
   id              String    @id @default(cuid())
   scooterId       String
   scooter         Scooter   @relation(fields: [scooterId], references: [id], onDelete: Restrict)
-  description     String
+  title           String
+  description     String    @default("")
+  checklist       Json      @default("[]")
+  severity        String?
+  blocksUsage     Boolean   @default(false)
+  holdClearedAt   DateTime?
+  holdClearedById String?
+  photos          ScooterProblemPhoto[]
   priority        String    @default("normal")
   status          String    @default("open")
   reporterId      String
@@ -1600,9 +1608,23 @@ model ScooterProblem {
   updatedAt       DateTime  @updatedAt
   resolvedAt      DateTime?
 
+  @@index([scooterId, blocksUsage])
+  @@index([severity, status])
   @@index([scooterId, status])
   @@index([assigneeId, status])
   @@index([status, assigneeId])
+}
+
+model ScooterProblemPhoto {
+  id        String         @id @default(cuid())
+  problemId String
+  problem   ScooterProblem @relation(fields: [problemId], references: [id], onDelete: Restrict)
+  assetId   String         @unique
+  asset     MediaAsset     @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  fileName  String
+  createdAt DateTime       @default(now())
+
+  @@index([problemId, createdAt])
 }
 
 model Rental {

@@ -464,7 +464,12 @@ describe("Scooter photo gallery", () => {
     expect(
       screen.queryByRole("button", { name: "Add other photos" }),
     ).not.toBeInTheDocument();
-    expect(cover).toHaveClass("border-2", "border-dashed", "bg-transparent");
+    expect(cover).toHaveClass(
+      "rounded-dashed-surface",
+      "border-(length:--dashed-surface-border-width)",
+      "border-dashed",
+      "bg-transparent",
+    );
     expect(cover.parentElement?.children).toHaveLength(1);
     const picker = screen.getByLabelText("Upload photos", {
       selector: "input",

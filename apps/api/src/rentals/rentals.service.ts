@@ -10,6 +10,7 @@ import { accessibleWhere } from "../access/access.ability";
 import { AuditService } from "../audit/audit.service";
 import { AuditEventType } from "../audit/audit.types";
 import { Prisma } from "../generated/prisma/client";
+import { assertScooterNotOnHold } from "../problems/maintenance-hold";
 import { PrismaService } from "../prisma/prisma.service";
 import {
   maintenanceScooterSelect,
@@ -128,6 +129,7 @@ export class RentalsService {
       });
       if (!scooter || !person)
         throw new NotFoundException("Active scooter and person are required");
+      await assertScooterNotOnHold(tx, input.scooterId);
       const overlap = await tx.rental.findFirst({
         where: {
           scooterId: input.scooterId,
@@ -212,6 +214,7 @@ export class RentalsService {
       if (row.status !== expected)
         throw new ConflictException(`Rental must be ${expected}`);
       if (action === "handover") {
+        await assertScooterNotOnHold(tx, row.scooterId);
         if (row.scooter.deletedAt || row.person.deletedAt)
           throw new ConflictException("Person or scooter has been archived");
         if (row.startsAt > now || row.endsAt <= now)

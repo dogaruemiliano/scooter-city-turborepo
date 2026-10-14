@@ -1,64 +1,92 @@
 "use client";
 import { useCallback, useState } from "react";
+import { Plus } from "lucide-react";
 import { v1 } from "@repo/api-shared";
 import {
-  Button,
   Field,
-  FieldGroup,
   FieldLabel,
-  Textarea,
   ListEmpty,
   ListFilterSheet,
-  ListItems,
   ListLayout,
   ListPagination,
   ListStatus,
   SheetSelect,
+  SegmentedRadioGroup,
 } from "@repo/ui/components";
-import { useTranslations } from "next-intl";
+import Link from "next/link";
+import { buttonVariants } from "@repo/ui/components/button";
+import { localizePath, resolveRouteLocale } from "@/i18n/paths";
+import { useLocale, useTranslations } from "next-intl";
 import { useSession } from "@/components/auth/SessionProvider";
 import { canAccess } from "@/lib/access";
 import { webApi } from "@/lib/api";
-import {
-  Choice,
-  Feedback,
-  useRemote,
-  useTask,
-} from "@/components/WorkspaceForm";
-import { EntityPicker } from "@/components/EntityPicker";
+import { useRemote } from "@/components/WorkspaceForm";
+import { memberName } from "./ProblemForms";
+import { ProblemDetailSheet } from "./ProblemDetailSheet";
 import { PageTitleOverride } from "@/components/PageTitleOverride";
 import { ProblemListItem } from "./ProblemListItem";
+import { ProblemList } from "./ProblemList";
 
 type ProblemFilters = {
-  view: "assigned" | "available" | "all";
+  view: "assigned" | "available" | "";
   status: v1.problems.Problem["status"] | "";
+  severity: v1.problems.Problem["severity"] | "";
+  scooterId: string;
+  assigneeId: string;
+  blocking: "" | "true" | "false";
 };
 
 export function ProblemsWorkspace() {
   const t = useTranslations("workspace");
   const shared = useTranslations("shared");
   const { user } = useSession();
-  const defaultView = canAccess(user, "problems.read", "ASSIGNED")
-    ? "assigned"
-    : canAccess(user, "problems.read", "AVAILABLE")
-      ? "available"
-      : "all";
+  const locale = resolveRouteLocale(useLocale());
+  const defaultView = "";
   const [chosen, setChosen] = useState<ProblemFilters | null>(null);
   const [page, setPage] = useState(1);
-  const [selected, setSelected] = useState<string | null>(null);
-  const [creating, setCreating] = useState(false);
-  const filters: ProblemFilters = chosen ?? { view: defaultView, status: "" };
-  const { view, status } = filters;
+  const [selected, setSelected] = useState<v1.problems.Problem | null>(null);
+  const filters: ProblemFilters = chosen ?? {
+    view: defaultView,
+    status: "",
+    severity: "",
+    scooterId: "",
+    assigneeId: "",
+    blocking: "",
+  };
+  const { view, status, severity, scooterId, assigneeId, blocking } = filters;
   const load = useCallback(() => {
-    const query = new URLSearchParams({ view, page: String(page) });
+    const query = new URLSearchParams({
+      ...(view ? { view } : {}),
+      page: String(page),
+    });
     if (status) query.set("status", status);
+    if (severity) query.set("severity", severity);
+    if (scooterId) query.set("scooterId", scooterId);
+    if (assigneeId === "unassigned") query.set("unassigned", "true");
+    else if (assigneeId) query.set("assigneeId", assigneeId);
+    if (blocking) query.set("blocking", blocking);
     return webApi.fetch(
       `/v1/problems?${query}`,
       v1.problems.problemListSchema,
       { cache: "no-store" },
     );
-  }, [view, status, page]);
+  }, [view, status, severity, scooterId, assigneeId, blocking, page]);
   const remote = useRemote(load);
+  const quickFilter = assigneeId
+    ? "custom"
+    : view === "assigned"
+      ? status
+        ? "custom"
+        : "mine"
+      : status === "open"
+        ? "open"
+        : status === "resolved"
+          ? "resolved"
+          : status
+            ? "custom"
+            : "";
+  const mayReadMine = canAccess(user, "problems.read", "ASSIGNED");
+
   return (
     <main className="flex min-w-0 flex-col gap-6 p-4 md:p-8">
       <PageTitleOverride title={t("problems.title")} />
@@ -71,14 +99,24 @@ export function ProblemsWorkspace() {
         filters={
           <ListFilterSheet<ProblemFilters>
             value={filters}
-            defaultValue={{ view: defaultView, status: "" }}
+            defaultValue={{
+              view: defaultView,
+              status: "",
+              severity: "",
+              scooterId: "",
+              assigneeId: "",
+              blocking: "",
+            }}
             onApply={(value) => {
               setChosen(value);
               setPage(1);
               setSelected(null);
             }}
             appliedCount={
-              Number(view !== defaultView) + Number(Boolean(status))
+              Number(view !== defaultView) +
+              [status, severity, scooterId, assigneeId, blocking].filter(
+                Boolean,
+              ).length
             }
             title={shared("list.filters")}
             applyLabel={shared("list.apply")}
@@ -89,68 +127,109 @@ export function ProblemsWorkspace() {
             {({ value, setValue }) => (
               <>
                 <Field>
-                  <FieldLabel htmlFor="service-view-filter">
-                    {t("problems.view")}
-                  </FieldLabel>
-                  <SheetSelect
+                  <FieldLabel>{t("problems.view")}</FieldLabel>
+                  <SegmentedRadioGroup<ProblemFilters["view"]>
                     id="service-view-filter"
+                    name="service-view-filter"
                     label={t("problems.view")}
                     value={value.view}
-                    onValueChange={(view) =>
-                      setValue({
-                        ...value,
-                        view: view as ProblemFilters["view"],
-                      })
+                    columns={
+                      canAccess(user, "problems.read", "ASSIGNED") &&
+                      canAccess(user, "problems.read", "AVAILABLE")
+                        ? 2
+                        : 1
                     }
+                    deselectValue=""
+                    showCheckmark
+                    onValueChange={(view) => setValue({ ...value, view })}
                     options={[
                       ...(canAccess(user, "problems.read", "ASSIGNED")
-                        ? [{ value: "assigned", label: t("problems.mine") }]
+                        ? [
+                            {
+                              value: "assigned" as const,
+                              label: t("problems.mine"),
+                            },
+                          ]
                         : []),
                       ...(canAccess(user, "problems.read", "AVAILABLE")
                         ? [
                             {
-                              value: "available",
+                              value: "available" as const,
                               label: t("problems.available"),
                             },
                           ]
                         : []),
-                      ...(canAccess(user, "problems.read", "ALL")
-                        ? [{ value: "all", label: t("problems.all") }]
-                        : []),
                     ]}
-                    searchPlaceholder={shared("list.selectSearch")}
-                    clearSearchLabel={shared("list.selectClearSearch")}
-                    emptyMessage={shared("list.selectEmpty")}
-                    closeLabel={shared("actions.close")}
                   />
                 </Field>
                 <Field>
-                  <FieldLabel htmlFor="service-status-filter">
-                    {t("status")}
-                  </FieldLabel>
-                  <SheetSelect
+                  <FieldLabel>{t("status")}</FieldLabel>
+                  <SegmentedRadioGroup<ProblemFilters["status"]>
                     id="service-status-filter"
+                    name="service-status-filter"
                     label={t("status")}
                     value={value.status}
-                    placeholder={shared("list.all")}
-                    onValueChange={(status) =>
-                      setValue({
-                        ...value,
-                        status: v1.problems.problemStatusSchema.parse(status),
-                      })
-                    }
+                    deselectValue=""
+                    columns={2}
+                    showCheckmark
+                    onValueChange={(status) => setValue({ ...value, status })}
                     options={v1.problems.problemStatusSchema.options.map(
                       (status) => ({
                         value: status,
                         label: t(`problems.${status}`),
                       }),
                     )}
-                    onClear={() => setValue({ ...value, status: "" })}
-                    clearOptionLabel={shared("list.all")}
-                    searchPlaceholder={shared("list.selectSearch")}
-                    clearSearchLabel={shared("list.selectClearSearch")}
-                    emptyMessage={shared("list.selectEmpty")}
-                    closeLabel={shared("actions.close")}
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel>{t("problems.severity")}</FieldLabel>
+                  <SegmentedRadioGroup
+                    id="service-severity-filter"
+                    name="service-severity-filter"
+                    label={t("problems.severity")}
+                    value={value.severity ?? ""}
+                    deselectValue=""
+                    columns={2}
+                    showCheckmark
+                    onValueChange={(severity) =>
+                      setValue({ ...value, severity })
+                    }
+                    options={v1.problems.problemSeveritySchema.options.map(
+                      (severity) => ({
+                        value: severity,
+                        label: t(`problems.${severity}`),
+                        severity,
+                      }),
+                    )}
+                  />
+                </Field>
+                <ProblemFilterOptions value={value} onChange={setValue} />
+                <Field>
+                  <FieldLabel>{t("problems.scooterCondition")}</FieldLabel>
+                  <SegmentedRadioGroup<ProblemFilters["blocking"]>
+                    id="service-blocking-filter"
+                    name="service-blocking-filter"
+                    label={t("problems.scooterCondition")}
+                    value={value.blocking}
+                    deselectValue=""
+                    showCheckmark
+                    onValueChange={(blocking) =>
+                      setValue({ ...value, blocking })
+                    }
+                    options={[
+                      {
+                        value: "false",
+                        label: t("problems.functional"),
+                        tone: "success",
+                        colorUnselected: true,
+                      },
+                      {
+                        value: "true",
+                        label: t("problems.defective"),
+                        tone: "destructive",
+                        colorUnselected: true,
+                      },
+                    ]}
                   />
                 </Field>
               </>
@@ -159,9 +238,13 @@ export function ProblemsWorkspace() {
         }
         action={
           canAccess(user, "problems.create") ? (
-            <Button onClick={() => setCreating(!creating)}>
-              {creating ? t("cancel") : t("problems.add")}
-            </Button>
+            <Link
+              href={localizePath("/problems/new", locale)}
+              className={buttonVariants()}
+            >
+              <Plus aria-hidden="true" data-icon="inline-start" />
+              {t("problems.add")}
+            </Link>
           ) : undefined
         }
         footer={
@@ -187,14 +270,50 @@ export function ProblemsWorkspace() {
           ) : undefined
         }
       >
-        {creating ? (
-          <CreateProblem
-            onSaved={() => {
-              setCreating(false);
-              remote.reload();
-            }}
-          />
-        ) : null}
+        <SegmentedRadioGroup
+          appearance="pills"
+          name="problem-quick-filter"
+          label={t("problems.quickFilters.label")}
+          value={quickFilter}
+          deselectValue=""
+          options={[
+            {
+              value: "open",
+              label: t("problems.quickFilters.open"),
+              tone: "primary",
+            },
+            ...(mayReadMine
+              ? [
+                  {
+                    value: "mine",
+                    label: t("problems.quickFilters.mine"),
+                    tone: "primary" as const,
+                  },
+                ]
+              : []),
+            {
+              value: "resolved",
+              label: t("problems.quickFilters.resolved"),
+              tone: "primary",
+            },
+          ]}
+          onValueChange={(next) => {
+            if (next === "custom") return;
+            setChosen({
+              ...filters,
+              view: next === "mine" ? "assigned" : "",
+              status:
+                next === "open"
+                  ? "open"
+                  : next === "resolved"
+                    ? "resolved"
+                    : "",
+              assigneeId: "",
+            });
+            setPage(1);
+            setSelected(null);
+          }}
+        />
         <ListStatus
           initial={!remote.data}
           loading={remote.loading}
@@ -206,9 +325,9 @@ export function ProblemsWorkspace() {
           onRetry={remote.reload}
         />
         {remote.data ? (
-          <ListItems
+          <ProblemList
             items={remote.data.items}
-            getItemKey={(problem) => problem.id}
+            status={status}
             empty={
               <ListEmpty>
                 {status || view !== defaultView
@@ -219,311 +338,94 @@ export function ProblemsWorkspace() {
             renderItem={(problem) => (
               <ProblemListItem
                 problem={problem}
-                expanded={selected === problem.id}
-                onToggle={() =>
-                  setSelected(selected === problem.id ? null : problem.id)
-                }
-              >
-                {selected === problem.id ? (
-                  <ProblemWork
-                    key={`${problem.id}-${problem.revision}`}
-                    problem={problem}
-                    reload={remote.reload}
-                  />
-                ) : null}
-              </ProblemListItem>
+                expanded={selected?.id === problem.id}
+                onToggle={() => setSelected(problem)}
+              />
             )}
           />
         ) : null}
       </ListLayout>
+      <ProblemDetailSheet
+        problem={selected}
+        onClose={() => setSelected(null)}
+        onChanged={(problem) => {
+          setSelected(problem);
+          remote.reload();
+        }}
+      />
     </main>
   );
 }
-function CreateProblem({ onSaved }: { onSaved: () => void }) {
-  const t = useTranslations("workspace");
-  const task = useTask();
-  const [scooterId, setScooter] = useState("");
-  const [description, setDescription] = useState("");
-  return (
-    <form
-      className="flex flex-col gap-4 rounded-lg border p-4"
-      onSubmit={(event) => {
-        event.preventDefault();
-        void task.run(async () => {
-          await webApi.fetch("/v1/problems", v1.problems.problemSchema, {
-            method: "POST",
-            json: v1.problems.createProblemInputSchema.parse({
-              scooterId,
-              description,
-            }),
-          });
-          onSaved();
-        });
-      }}
-    >
-      <EntityPicker
-        kind="scooters"
-        label={t("problems.scooter")}
-        value={scooterId}
-        onChange={setScooter}
-      />
-      <Field>
-        <FieldLabel htmlFor="problem-description">
-          {t("description")}
-        </FieldLabel>
-        <Textarea
-          id="problem-description"
-          required
-          value={description}
-          onChange={(event) => setDescription(event.target.value)}
-        />
-      </Field>
-      <Feedback error={task.error} />
-      <Button
-        className="self-start"
-        type="submit"
-        disabled={task.busy || !scooterId}
-      >
-        {t("problems.add")}
-      </Button>
-    </form>
-  );
-}
-function ProblemWork({
-  problem,
-  reload,
+function ProblemFilterOptions({
+  value,
+  onChange,
 }: {
-  problem: v1.problems.Problem;
-  reload: () => void;
+  value: ProblemFilters;
+  onChange: (value: ProblemFilters) => void;
 }) {
   const t = useTranslations("workspace");
-  const { user } = useSession();
-  const task = useTask();
-  const [notes, setNotes] = useState(problem.workNotes ?? "");
-  const [resolution, setResolution] = useState("");
-  const [assignee, setAssignee] = useState(problem.assigneeId ?? "");
-  const [priority, setPriority] = useState(problem.priority);
-  const [confirm, setConfirm] = useState<string | null>(null);
-  const mayAssign = canAccess(user, "problems.assign");
-  const loadAssignees = useCallback(
+  const shared = useTranslations("shared");
+  const load = useCallback(
     () =>
-      mayAssign
-        ? webApi.fetch(
-            "/v1/problems/eligible-assignees",
-            v1.problems.eligibleAssigneeListSchema,
-            { cache: "no-store" },
-          )
-        : Promise.resolve({ items: [] }),
-    [mayAssign],
+      webApi.fetch(
+        "/v1/problems/filter-options",
+        v1.problems.problemFilterOptionsSchema,
+        { cache: "no-store" },
+      ),
+    [],
   );
-  const assignees = useRemote(loadAssignees);
-  const own = problem.assigneeId === user?.id;
-  const editable =
-    problem.status === "open" || problem.status === "in_progress";
-  const can = (action: string) =>
-    canAccess(user, action, own ? "ASSIGNED" : "ALL");
-  async function mutate(path: string, method: string, json: unknown) {
-    await webApi.fetch(
-      `/v1/problems/${problem.id}${path}`,
-      v1.problems.problemSchema,
-      { method, json },
-    );
-    reload();
-  }
+  const remote = useRemote(load);
+  const common = {
+    placeholder: shared("list.all"),
+    clearOptionLabel: shared("list.all"),
+    searchPlaceholder: shared("list.selectSearch"),
+    clearSearchLabel: shared("list.selectClearSearch"),
+    emptyMessage: shared("list.selectEmpty"),
+    closeLabel: shared("actions.close"),
+  };
   return (
-    <div className="flex flex-col gap-4 border-t pt-4">
-      <Feedback error={task.error} success={task.success} />
-      {problem.status === "open" &&
-      !problem.assigneeId &&
-      canAccess(user, "problems.claim", "AVAILABLE") ? (
-        <Button
-          className="self-start"
-          disabled={task.busy}
-          onClick={() =>
-            void task.run(() =>
-              mutate("/claim", "POST", { revision: problem.revision }),
-            )
+    <>
+      <ListStatus
+        initial={!remote.data}
+        loading={remote.loading}
+        error={remote.error}
+        loadingLabel={shared("status.loading")}
+        retryLabel={t("retry")}
+        onRetry={remote.reload}
+      />
+      <Field>
+        <FieldLabel>{t("problems.scooter")}</FieldLabel>
+        <SheetSelect
+          {...common}
+          label={t("problems.scooter")}
+          value={value.scooterId}
+          onValueChange={(scooterId) => onChange({ ...value, scooterId })}
+          onClear={() => onChange({ ...value, scooterId: "" })}
+          options={
+            remote.data?.scooters?.map((scooter) => ({
+              value: scooter.id,
+              label: `${scooter.brandName} ${scooter.model ?? ""} · ${v1.scooters.scooterDisplayCode(scooter)}`,
+            })) ?? []
           }
-        >
-          {t("problems.claim")}
-        </Button>
-      ) : null}
-      {editable && can("problems.update") ? (
-        <form
-          className="flex flex-col gap-3"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void task.run(() =>
-              mutate("", "PATCH", {
-                revision: problem.revision,
-                workNotes: notes,
-              }),
-            );
-          }}
-        >
-          <Field>
-            <FieldLabel htmlFor={`notes-${problem.id}`}>
-              {t("problems.workNotes")}
-            </FieldLabel>
-            <Textarea
-              id={`notes-${problem.id}`}
-              value={notes}
-              onChange={(event) => setNotes(event.target.value)}
-            />
-          </Field>
-          <div className="flex gap-3">
-            <Button type="submit" disabled={task.busy}>
-              {t("save")}
-            </Button>
-            {problem.status === "open" ? (
-              <Button
-                type="button"
-                variant="outline"
-                disabled={task.busy}
-                onClick={() =>
-                  void task.run(() =>
-                    mutate("", "PATCH", {
-                      revision: problem.revision,
-                      startWork: true,
-                    }),
-                  )
-                }
-              >
-                {t("problems.start")}
-              </Button>
-            ) : null}
-          </div>
-        </form>
-      ) : problem.workNotes ? (
-        <p className="whitespace-pre-wrap text-sm">{problem.workNotes}</p>
-      ) : null}
-      {editable && can("problems.resolve") ? (
-        <form
-          className="flex flex-col gap-3"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void task.run(() =>
-              mutate("/resolve", "POST", {
-                revision: problem.revision,
-                resolutionNotes: resolution,
-              }),
-            );
-          }}
-        >
-          <Field>
-            <FieldLabel htmlFor={`resolution-${problem.id}`}>
-              {t("problems.resolution")}
-            </FieldLabel>
-            <Textarea
-              id={`resolution-${problem.id}`}
-              required
-              value={resolution}
-              onChange={(event) => setResolution(event.target.value)}
-            />
-          </Field>
-          <Button
-            className="self-start"
-            disabled={task.busy || !resolution.trim()}
-          >
-            {t("problems.resolve")}
-          </Button>
-        </form>
-      ) : problem.resolutionNotes ? (
-        <p className="whitespace-pre-wrap text-sm">{problem.resolutionNotes}</p>
-      ) : null}
-      {mayAssign && editable ? (
-        <FieldGroup>
-          <Choice
-            label={t("problems.assignee")}
-            value={assignee}
-            onChange={setAssignee}
-            options={[
-              { value: "", label: t("problems.unassigned") },
-              ...(assignees.data?.items.map((item) => ({
-                value: item.id,
-                label:
-                  [item.firstName, item.lastName].filter(Boolean).join(" ") ||
-                  item.id,
-              })) ?? []),
-            ]}
-          />
-          <Feedback error={assignees.error} />
-          <Button
-            className="self-start"
-            variant="outline"
-            disabled={task.busy}
-            onClick={() =>
-              void task.run(() =>
-                mutate("/assignee", "PUT", {
-                  revision: problem.revision,
-                  assigneeId: assignee || null,
-                }),
-              )
-            }
-          >
-            {t("problems.assign")}
-          </Button>
-        </FieldGroup>
-      ) : null}
-      {canAccess(user, "problems.prioritize") && editable ? (
-        <div className="flex flex-wrap items-end gap-3">
-          <Choice
-            label={t("problems.priority")}
-            value={priority}
-            onChange={(value) =>
-              setPriority(v1.problems.problemPrioritySchema.parse(value))
-            }
-            options={v1.problems.problemPrioritySchema.options.map((value) => ({
-              value,
-              label: t(`problems.${value}`),
-            }))}
-          />
-          <Button
-            variant="outline"
-            disabled={task.busy}
-            onClick={() =>
-              void task.run(() =>
-                mutate("/priority", "PUT", {
-                  revision: problem.revision,
-                  priority,
-                }),
-              )
-            }
-          >
-            {t("save")}
-          </Button>
-        </div>
-      ) : null}
-      <div className="flex flex-wrap gap-3">
-        {problem.status === "resolved" && canAccess(user, "problems.reopen") ? (
-          <Button variant="outline" onClick={() => setConfirm("reopen")}>
-            {t("problems.reopen")}
-          </Button>
-        ) : null}
-        {editable && canAccess(user, "problems.update", "ALL") ? (
-          <Button variant="outline" onClick={() => setConfirm("cancel")}>
-            {t("problems.cancel")}
-          </Button>
-        ) : null}
-      </div>
-      {confirm ? (
-        <div className="flex gap-3">
-          <Button
-            variant="destructive"
-            disabled={task.busy}
-            onClick={() =>
-              void task.run(() =>
-                mutate(`/${confirm}`, "POST", { revision: problem.revision }),
-              )
-            }
-          >
-            {t("access.confirm")}
-          </Button>
-          <Button variant="outline" onClick={() => setConfirm(null)}>
-            {t("cancel")}
-          </Button>
-        </div>
-      ) : null}
-    </div>
+        />
+      </Field>
+      <Field>
+        <FieldLabel>{t("problems.assignee")}</FieldLabel>
+        <SheetSelect
+          {...common}
+          label={t("problems.assignee")}
+          value={value.assigneeId}
+          onValueChange={(assigneeId) => onChange({ ...value, assigneeId })}
+          onClear={() => onChange({ ...value, assigneeId: "" })}
+          options={[
+            { value: "unassigned", label: t("problems.unassigned") },
+            ...(remote.data?.assignees?.map((member) => ({
+              value: member.id,
+              label: memberName(member),
+            })) ?? []),
+          ]}
+        />
+      </Field>
+    </>
   );
 }

@@ -111,6 +111,7 @@ export function ScooterCard({
   details?: ScooterCardDetails;
 }) {
   const t = useTranslations("scooters");
+  const problemsT = useTranslations("workspace.problems");
   const locale = useLocale();
   const routeLocale = resolveRouteLocale(locale);
   const code = v1.scooters.scooterDisplayCode(scooter);
@@ -172,6 +173,11 @@ export function ScooterCard({
         />
       ) : null}
       <CardContent className="pointer-events-none flex flex-1 flex-col gap-4 p-4 sm:p-5">
+        {(scooter.maintenanceHoldCount ?? 0) > 0 ? (
+          <Badge variant="destructive" className="self-start">
+            {problemsT("maintenanceHold")}
+          </Badge>
+        ) : null}
         <div className="flex items-start gap-3 sm:gap-4">
           <ScooterPhoto
             src={

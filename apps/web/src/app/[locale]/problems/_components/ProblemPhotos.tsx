@@ -1,0 +1,317 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { v1 } from "@repo/api-shared";
+import { aspectRatio } from "@repo/theme";
+import { Button } from "@repo/ui/components";
+import { ImageGallery } from "@repo/ui/components/image-gallery";
+import { ImageCapture } from "@repo/ui/components/image-capture";
+import { Camera, Plus } from "lucide-react";
+import { useTranslations } from "next-intl";
+import { webApi } from "@/lib/api";
+import { Feedback, useTask } from "@/components/WorkspaceForm";
+
+type PendingPhoto = { id: string; file: File; src: string };
+
+export function ProblemPhotos({
+  problem,
+  editable,
+  disabled,
+  onSave,
+  onBusyChange,
+  onReload,
+}: {
+  problem: v1.problems.Problem;
+  editable: boolean;
+  disabled: boolean;
+  onSave: (photos: v1.problems.ProblemPhotoDraft[]) => Promise<void>;
+  onBusyChange: (busy: boolean) => void;
+  onReload?: () => Promise<void>;
+}) {
+  const t = useTranslations("workspace.problems");
+  const galleryT = useTranslations("scooters.photos");
+  const task = useTask();
+  const input = useRef<HTMLInputElement>(null);
+  const [camera, setCamera] = useState(false);
+  const [pending, setPending] = useState<PendingPhoto[]>([]);
+  const pendingRef = useRef(pending);
+  const previews = useRef(new Set<string>());
+  const uploads = useRef(new Map<File, v1.problems.ProblemPhotoDraft>());
+  const [error, setError] = useState<string | null>(null);
+  const count = problem.photos.length + pending.length;
+  const busy = disabled || task.busy;
+  useEffect(() => {
+    onBusyChange(task.busy);
+    return () => onBusyChange(false);
+  }, [task.busy, onBusyChange]);
+  useEffect(() => {
+    const urls = previews.current;
+    return () => {
+      for (const url of urls) URL.revokeObjectURL(url);
+    };
+  }, []);
+
+  function add(files: File[]) {
+    if (
+      problem.photos.length + pendingRef.current.length + files.length >
+        v1.problems.PROBLEM_PHOTO_MAX_FILES ||
+      files.some(
+        (file) =>
+          !v1.scooters.SCOOTER_PHOTO_CONTENT_TYPES.includes(
+            file.type as (typeof v1.scooters.SCOOTER_PHOTO_CONTENT_TYPES)[number],
+          ) ||
+          !file.size ||
+          file.size > v1.scooters.SCOOTER_PHOTO_MAX_BYTES,
+      )
+    ) {
+      const message = t("photoLimits");
+      setError(message);
+      throw new Error(message);
+    }
+    const next = files.map((file) => {
+      const src = URL.createObjectURL(file);
+      previews.current.add(src);
+      return { id: crypto.randomUUID(), file, src };
+    });
+    pendingRef.current = [...pendingRef.current, ...next];
+    setPending(pendingRef.current);
+    setError(null);
+  }
+
+  const images = [
+    ...problem.photos.map((photo) => ({
+      id: photo.id,
+      src: webApi.url(photo.contentUrl),
+      alt: photo.fileName,
+      fileName: photo.fileName,
+    })),
+    ...pending.map((photo) => ({
+      id: photo.id,
+      src: photo.src,
+      alt: photo.file.name,
+      fileName: photo.file.name,
+    })),
+  ];
+  return (
+    <section className="flex flex-col gap-3" aria-label={t("attachments")}>
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-base font-semibold">{t("attachments")}</h3>
+        <span className="text-xs text-muted-foreground" aria-live="polite">
+          {t("attachmentCount", { count })}
+        </span>
+      </div>
+      <input
+        ref={input}
+        hidden
+        type="file"
+        multiple
+        accept={v1.scooters.SCOOTER_PHOTO_CONTENT_TYPES.join(",")}
+        aria-label={t("choosePhotos")}
+        disabled={busy}
+        onChange={(event) => {
+          const files = Array.from(event.target.files ?? []);
+          event.target.value = "";
+          try {
+            add(files);
+          } catch {
+            /* The validation message is displayed below. */
+          }
+        }}
+      />
+      <ImageGallery
+        items={images}
+        images={images}
+        title={t("attachments")}
+        disabled
+        instructions={galleryT("sortInstructions")}
+        onOrderChange={async () => false}
+        className="grid min-w-0 grid-cols-2 gap-3 sm:grid-cols-3"
+        getItemLabel={(photo) => galleryT("open", { name: photo.fileName })}
+        renderItem={(photo) => (
+          // Authenticated API images and local previews retain their original URLs.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={photo.src}
+            alt={photo.alt}
+            loading="lazy"
+            draggable={false}
+            style={{ aspectRatio: aspectRatio.scooterPhoto }}
+            className="block w-full bg-muted object-cover"
+          />
+        )}
+        labels={{
+          close: galleryT("close"),
+          previous: galleryT("previous"),
+          next: galleryT("next"),
+          grid: galleryT("grid"),
+          zoomIn: galleryT("zoomIn"),
+          zoomOut: galleryT("zoomOut"),
+          resetZoom: galleryT("resetZoom"),
+          loading: galleryT("imageLoading"),
+          error: galleryT("imageFailed"),
+          retry: galleryT("retry"),
+          position: (index, count) => galleryT("position", { index, count }),
+        }}
+      >
+        {editable && count < v1.problems.PROBLEM_PHOTO_MAX_FILES ? (
+          <Button
+            variant="outline"
+            className="h-full min-h-24 flex-col rounded-dashed-surface border-(length:--dashed-surface-border-width) border-dashed"
+            disabled={busy}
+            onClick={() => input.current?.click()}
+          >
+            <Plus aria-hidden="true" />
+            {t("choosePhotos")}
+          </Button>
+        ) : null}
+      </ImageGallery>
+      {editable ? (
+        <>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              disabled={busy || count >= v1.problems.PROBLEM_PHOTO_MAX_FILES}
+              onClick={() => setCamera(true)}
+            >
+              <Camera aria-hidden="true" />
+              {t("takePhotos")}
+            </Button>
+            {pending.length ? (
+              <Button
+                disabled={busy}
+                onClick={() =>
+                  void task.run(async () => {
+                    const drafts: v1.problems.ProblemPhotoDraft[] = [];
+                    for (const { file } of pending) {
+                      let draft = uploads.current.get(file);
+                      if (!draft) {
+                        const digest = await crypto.subtle.digest(
+                          "SHA-256",
+                          await file.arrayBuffer(),
+                        );
+                        const checksumSha256 = [...new Uint8Array(digest)]
+                          .map((byte) => byte.toString(16).padStart(2, "0"))
+                          .join("");
+                        const upload = await webApi.fetch(
+                          `/v1/problems/${problem.id}/photo-upload-url`,
+                          v1.problems.problemPhotoUploadSchema,
+                          {
+                            method: "POST",
+                            json: v1.problems.createProblemPhotoUploadSchema.parse(
+                              {
+                                contentType: file.type,
+                                byteSize: file.size,
+                                checksumSha256,
+                              },
+                            ),
+                          },
+                        );
+                        const response = await fetch(upload.uploadUrl, {
+                          method: "PUT",
+                          headers: upload.headers,
+                          body: file,
+                          credentials: "omit",
+                        });
+                        if (!response.ok) throw new Error(t("photoFailed"));
+                        draft = {
+                          uploadToken: upload.uploadToken,
+                          fileName: file.name,
+                        };
+                        uploads.current.set(file, draft);
+                      }
+                      drafts.push(draft);
+                    }
+                    await onSave(drafts);
+                    for (const photo of pending) {
+                      URL.revokeObjectURL(photo.src);
+                      previews.current.delete(photo.src);
+                    }
+                    uploads.current.clear();
+                    pendingRef.current = [];
+                    setPending([]);
+                  })
+                }
+              >
+                {t("savePhotos")}
+              </Button>
+            ) : null}
+          </div>
+          {pending.map((photo) => (
+            <div
+              key={photo.id}
+              className="flex items-center justify-between gap-3 text-sm"
+            >
+              <span className="min-w-0 wrap-anywhere">{photo.file.name}</span>
+              <Button
+                variant="ghost"
+                disabled={busy}
+                aria-label={`${t("removePhoto")}: ${photo.file.name}`}
+                onClick={() => {
+                  URL.revokeObjectURL(photo.src);
+                  previews.current.delete(photo.src);
+                  uploads.current.delete(photo.file);
+                  pendingRef.current = pendingRef.current.filter(
+                    (item) => item.id !== photo.id,
+                  );
+                  setPending(pendingRef.current);
+                }}
+              >
+                {t("removePhoto")}
+              </Button>
+            </div>
+          ))}
+          <p className="text-xs text-muted-foreground">{t("photoLimits")}</p>
+        </>
+      ) : !count ? (
+        <p className="text-sm text-muted-foreground">{galleryT("empty")}</p>
+      ) : null}
+      <Feedback error={error ?? task.error} />
+      {task.error && onReload ? (
+        <Button
+          variant="outline"
+          className="self-start"
+          disabled={busy}
+          onClick={() => void task.run(onReload)}
+        >
+          {galleryT("retry")}
+        </Button>
+      ) : null}
+      <ImageCapture
+        open={camera}
+        onOpenChange={setCamera}
+        allowCrop={false}
+        allowGallery={false}
+        keepOpenAfterCapture
+        onCapture={(file) => add([file])}
+        labels={{
+          title: t("takePhotos"),
+          close: t("donePhotos"),
+          capture: t("takePhotos"),
+          usePhoto: t("addPhoto"),
+          retake: t("retakePhoto"),
+          previewTitle: t("previewPhoto"),
+          previewAlt: t("previewPhoto"),
+          switchCamera: t("switchCamera"),
+          startingCamera: t("startingCamera"),
+          cameraUnavailable: t("cameraUnavailable"),
+          retryCamera: t("retryCamera"),
+          fileTooLarge: t("photoLimits"),
+          captureFailed: t("photoFailed"),
+          saveFailed: t("photoFailed"),
+        }}
+        cameraActions={
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              disabled={count >= v1.problems.PROBLEM_PHOTO_MAX_FILES}
+              onClick={() => input.current?.click()}
+            >
+              {t("choosePhotos")}
+            </Button>
+            <Button onClick={() => setCamera(false)}>{t("donePhotos")}</Button>
+          </div>
+        }
+      />
+    </section>
+  );
+}

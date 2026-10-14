@@ -5,6 +5,8 @@
 export const motion = {
   gesture: {
     sortableTrailingZone: 0.3,
+    // Horizontal board edge hover speed in pixels per second.
+    horizontalEdgeScrollSpeed: 320,
   },
   duration: {
     instant: 0,

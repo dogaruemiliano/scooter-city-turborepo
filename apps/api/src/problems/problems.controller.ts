@@ -7,6 +7,7 @@ import {
   Post,
   Put,
   Query,
+  Res,
 } from "@nestjs/common";
 import { ApiBearerAuth, ApiCookieAuth, ApiTags } from "@nestjs/swagger";
 import { v1 } from "@repo/api-shared";
@@ -14,8 +15,29 @@ import { createZodDto, ZodResponse } from "nestjs-zod";
 import type { AuthPrincipal } from "../auth/auth.types";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { RequirePermissions } from "../access/access.decorators";
+import type { Response } from "express";
+import { pipeline } from "node:stream/promises";
+import { ProblemPhotosService } from "./problem-photos.service";
+import { RequireAllScope } from "../access/access.decorators";
 import { ProblemsService } from "./problems.service";
 
+class FilterOptions extends createZodDto(
+  v1.problems.problemFilterOptionsSchema,
+) {}
+class CloseInput extends createZodDto(v1.problems.closeProblemInputSchema) {}
+class HoldInput extends createZodDto(v1.problems.problemHoldInputSchema) {}
+class CommentInput extends createZodDto(
+  v1.problems.problemCommentInputSchema,
+) {}
+class ActivityQuery extends createZodDto(v1.problems.activityQuerySchema) {}
+class ActivityList extends createZodDto(
+  v1.problems.problemActivityListSchema,
+) {}
+class Hold extends createZodDto(v1.problems.maintenanceHoldSchema) {}
+class UploadInput extends createZodDto(
+  v1.problems.createProblemPhotoUploadSchema,
+) {}
+class Upload extends createZodDto(v1.problems.problemPhotoUploadSchema) {}
 class CreateInput extends createZodDto(v1.problems.createProblemInputSchema) {}
 class UpdateInput extends createZodDto(v1.problems.updateProblemInputSchema) {}
 class ResolveInput extends createZodDto(
@@ -41,13 +63,23 @@ class MaintenanceScooter extends createZodDto(
 @ApiBearerAuth("bearer")
 @Controller({ path: "problems", version: "1" })
 export class ProblemsController {
-  constructor(private readonly problems: ProblemsService) {}
+  constructor(
+    private readonly problems: ProblemsService,
+    private readonly photos: ProblemPhotosService,
+  ) {}
 
   @Get()
   @RequirePermissions("problems.read")
   @ZodResponse({ type: ProblemList })
   list(@CurrentUser() user: AuthPrincipal, @Query() query: ListQuery) {
     return this.problems.list(user.id, query);
+  }
+
+  @Get("filter-options")
+  @RequirePermissions("problems.read")
+  @ZodResponse({ type: FilterOptions })
+  filterOptions(@CurrentUser() user: AuthPrincipal) {
+    return this.problems.filterOptions(user.id);
   }
 
   @Get("eligible-assignees")
@@ -68,6 +100,74 @@ export class ProblemsController {
   @ZodResponse({ type: MaintenanceScooter })
   scooter(@CurrentUser() user: AuthPrincipal, @Param("id") id: string) {
     return this.problems.scooter(user.id, id);
+  }
+
+  @Post("photo-draft-upload-url")
+  @RequireAllScope("problems.create")
+  @ZodResponse({ status: 201, type: Upload })
+  upload(@CurrentUser() user: AuthPrincipal, @Body() input: UploadInput) {
+    return this.photos.createUpload(user.id, input);
+  }
+
+  @Get("scooters/:id/hold")
+  @RequirePermissions("scooters.read")
+  @ZodResponse({ type: Hold })
+  maintenanceHold(@CurrentUser() user: AuthPrincipal, @Param("id") id: string) {
+    return this.problems.maintenanceHold(user.id, id);
+  }
+
+  @Get(":id/activity")
+  @RequirePermissions("problems.read")
+  @ZodResponse({ type: ActivityList })
+  activity(
+    @CurrentUser() user: AuthPrincipal,
+    @Param("id") id: string,
+    @Query() query: ActivityQuery,
+  ) {
+    return this.problems.activity(user.id, id, query);
+  }
+
+  @Post(":id/comments")
+  @RequirePermissions("problems.update", "problems.read")
+  @ZodResponse({ status: 201, type: Problem })
+  comment(
+    @CurrentUser() user: AuthPrincipal,
+    @Param("id") id: string,
+    @Body() input: CommentInput,
+  ) {
+    return this.problems.comment(user.id, id, input);
+  }
+
+  @Put(":id/hold")
+  @RequirePermissions("problems.update")
+  @ZodResponse({ type: Problem })
+  hold(
+    @CurrentUser() user: AuthPrincipal,
+    @Param("id") id: string,
+    @Body() input: HoldInput,
+  ) {
+    return this.problems.hold(user.id, id, input);
+  }
+
+  @Get(":id/photos/:photoId/content")
+  @RequirePermissions("problems.read")
+  async content(
+    @CurrentUser() user: AuthPrincipal,
+    @Param("id") id: string,
+    @Param("photoId") photoId: string,
+    @Res() res: Response,
+  ) {
+    await this.problems.get(user.id, id);
+    const content = await this.photos.content(id, photoId);
+    res.setHeader(
+      "Content-Type",
+      content.contentType ?? "application/octet-stream",
+    );
+    res.setHeader("Cache-Control", "private, no-store");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    if (content.contentLength !== null)
+      res.setHeader("Content-Length", String(content.contentLength));
+    await pipeline(content.body, res);
   }
 
   @Get(":id")
@@ -93,6 +193,17 @@ export class ProblemsController {
     @Body() input: UpdateInput,
   ) {
     return this.problems.update(user.id, id, input);
+  }
+
+  @Post(":id/photo-upload-url")
+  @RequirePermissions("problems.update")
+  @ZodResponse({ status: 201, type: Upload })
+  uploadForProblem(
+    @CurrentUser() user: AuthPrincipal,
+    @Param("id") id: string,
+    @Body() input: UploadInput,
+  ) {
+    return this.problems.createPhotoUpload(user.id, id, input);
   }
 
   @Post(":id/claim")
@@ -156,8 +267,13 @@ export class ProblemsController {
   cancel(
     @CurrentUser() user: AuthPrincipal,
     @Param("id") id: string,
-    @Body() input: RevisionInput,
+    @Body() input: CloseInput,
   ) {
-    return this.problems.cancel(user.id, id, input.revision);
+    return this.problems.cancel(
+      user.id,
+      id,
+      input.revision,
+      input.clearMaintenanceHold,
+    );
   }
 }

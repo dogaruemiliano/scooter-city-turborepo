@@ -63,7 +63,7 @@ export function EmptyDocumentDetailCard({
       >
         <Card
           size="sm"
-          className="pointer-events-none relative border-dashed transition-colors group-hover/document-card:bg-muted group-focus-visible/document-card:bg-muted/60 group-active/document-card:bg-muted/60 group-disabled/document-card:opacity-50"
+          className="pointer-events-none relative rounded-dashed-surface border-(length:--dashed-surface-border-width) border-dashed transition-colors group-hover/document-card:bg-muted group-focus-visible/document-card:bg-muted/60 group-active/document-card:bg-muted/60 group-disabled/document-card:opacity-50"
         >
           <CardHeader className="pr-10">
             <CardTitle className="flex min-w-0 items-center gap-2">

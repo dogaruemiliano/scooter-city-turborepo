@@ -8,6 +8,7 @@ import type { AccessService } from "../access/access.service";
 import type { AccessSnapshot } from "../access/access.resolver";
 import type { AuditService } from "../audit/audit.service";
 import type { PrismaService } from "../prisma/prisma.service";
+import type { ProblemPhotosService } from "./problem-photos.service";
 import { ProblemsService } from "./problems.service";
 
 const snapshot: AccessSnapshot = {
@@ -26,7 +27,15 @@ const snapshot: AccessSnapshot = {
 const row = {
   id: "problem",
   scooterId: "scooter",
+  title: "Brake issue",
   description: "Brake issue",
+  severity: "high",
+  blocksUsage: false,
+  holdClearedAt: null,
+  photos: [],
+  checklist: [],
+  assignee: { id: "mechanic", firstName: "Alex", lastName: null },
+  reporter: { id: "manager", firstName: "Manager", lastName: null },
   priority: "high",
   status: "open",
   reporterId: "manager",
@@ -42,7 +51,7 @@ const row = {
     fleetNumber: 1,
     model: "City",
     registrationNumber: null,
-    brand: { name: "Brand" },
+    brand: { name: "Brand", code: "BRD" },
   },
 };
 
@@ -52,12 +61,15 @@ describe("ProblemsService authorization and write conflicts", () => {
     $queryRaw: jest.fn(),
     scooterProblem: {
       findFirst: jest.fn(),
+      findUnique: jest.fn(),
       updateMany: jest.fn(),
       findUniqueOrThrow: jest.fn(),
       findMany: jest.fn(),
       count: jest.fn(),
     },
     user: { findFirst: jest.fn() },
+    scooter: { findFirst: jest.fn() },
+    auditEvent: { findMany: jest.fn(), count: jest.fn() },
   };
   const access = { getSnapshot: jest.fn() },
     audit = { recordRequired: jest.fn() };
@@ -65,6 +77,10 @@ describe("ProblemsService authorization and write conflicts", () => {
     db as unknown as PrismaService,
     access as unknown as AccessService,
     audit as unknown as AuditService,
+    {
+      prepare: jest.fn(),
+      attach: jest.fn(),
+    } as unknown as ProblemPhotosService,
   );
   beforeEach(() => {
     jest.resetAllMocks();
@@ -73,6 +89,7 @@ describe("ProblemsService authorization and write conflicts", () => {
     );
     access.getSnapshot.mockResolvedValue(snapshot);
     db.scooterProblem.findFirst.mockResolvedValue(row);
+    db.scooterProblem.findUnique.mockResolvedValue({ scooterId: "scooter" });
     db.scooterProblem.updateMany.mockResolvedValue({ count: 1 });
     db.scooterProblem.findUniqueOrThrow.mockResolvedValue({
       ...row,
@@ -83,6 +100,85 @@ describe("ProblemsService authorization and write conflicts", () => {
       firstName: "Alex",
       lastName: null,
     });
+  });
+
+  it("saves and audits checklist changes for the assigned mechanic", async () => {
+    const checklist = [
+      { id: "pads", text: "Install brake pads", completed: true },
+    ];
+    db.scooterProblem.findUniqueOrThrow.mockResolvedValue({
+      ...row,
+      revision: 2,
+      checklist,
+    });
+    const result = await service.update("mechanic", "problem", {
+      revision: 1,
+      checklist,
+    });
+    expect(result.checklist).toEqual(checklist);
+    expect(db.scooterProblem.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          checklist,
+          revision: { increment: 1 },
+        }) as unknown,
+      }),
+    );
+    expect(audit.recordRequired).toHaveBeenCalledWith(
+      db,
+      expect.objectContaining({
+        meta: expect.objectContaining({
+          after: expect.objectContaining({ checklist }) as unknown,
+        }) as unknown,
+      }),
+    );
+  });
+
+  it("denies a checklist edit by a non-assignee without all-scope authority", async () => {
+    db.scooterProblem.findFirst.mockResolvedValue({
+      ...row,
+      assigneeId: "other",
+    });
+    await expect(
+      service.update("mechanic", "problem", { revision: 1, checklist: [] }),
+    ).rejects.toThrow(ForbiddenException);
+    expect(db.scooterProblem.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("allows an admin to update another assignee's checklist", async () => {
+    access.getSnapshot.mockResolvedValue({
+      ...snapshot,
+      userId: "admin",
+      effectiveScopes: { "problems.update": ["ALL"], "problems.read": ["ALL"] },
+    });
+    await expect(
+      service.update("admin", "problem", { revision: 1, checklist: [] }),
+    ).resolves.toHaveProperty("checklist", []);
+  });
+
+  it("rejects checklist changes to closed tasks", async () => {
+    db.scooterProblem.findFirst.mockResolvedValue({
+      ...row,
+      status: "resolved",
+    });
+    await expect(
+      service.update("mechanic", "problem", { revision: 1, checklist: [] }),
+    ).rejects.toThrow(ConflictException);
+    expect(db.scooterProblem.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("rejects extra attachments beyond the task photo limit", async () => {
+    db.scooterProblem.findFirst.mockResolvedValue({
+      ...row,
+      photos: Array(10).fill({}),
+    });
+    await expect(
+      service.update("mechanic", "problem", {
+        revision: 1,
+        photos: [{ uploadToken: "token", fileName: "pads.jpg" }],
+      }),
+    ).rejects.toThrow("Too many problem photos");
+    expect(db.scooterProblem.updateMany).not.toHaveBeenCalled();
   });
 
   it("uses fresh assigned-scope filters and does not mutate an inaccessible problem", async () => {
@@ -168,5 +264,175 @@ describe("ProblemsService authorization and write conflicts", () => {
     expect(result).not.toHaveProperty("resolutionNotes");
     expect(result).not.toHaveProperty("reporterId");
     expect(result.scooter).not.toHaveProperty("notes");
+  });
+
+  it("requires an explicit clearance decision before resolving a blocker", async () => {
+    db.scooterProblem.findFirst.mockResolvedValue({
+      ...row,
+      blocksUsage: true,
+    });
+    await expect(
+      service.resolve("mechanic", "problem", {
+        revision: 1,
+        resolutionNotes: "Belt replaced",
+      }),
+    ).rejects.toThrow(ConflictException);
+    expect(db.scooterProblem.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("can resolve while retaining a hold, without touching any other report", async () => {
+    db.scooterProblem.findFirst.mockResolvedValue({
+      ...row,
+      blocksUsage: true,
+    });
+    db.scooterProblem.findUniqueOrThrow.mockResolvedValue({
+      ...row,
+      blocksUsage: true,
+      status: "resolved",
+      revision: 2,
+    });
+    const resolved = await service.resolve("mechanic", "problem", {
+      revision: 1,
+      resolutionNotes: "Awaiting safety inspection",
+      clearMaintenanceHold: false,
+    });
+    expect(resolved.blocksUsage).toBe(true);
+    expect(db.scooterProblem.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: "problem",
+          revision: 1,
+          assigneeId: "mechanic",
+          status: "open",
+        },
+        data: expect.not.objectContaining({ blocksUsage: false }) as unknown,
+      }),
+    );
+  });
+
+  it("clears only this hold and records who cleared it", async () => {
+    db.scooterProblem.findFirst.mockResolvedValue({
+      ...row,
+      blocksUsage: true,
+    });
+    await service.resolve("mechanic", "problem", {
+      revision: 1,
+      resolutionNotes: "Safety inspection passed",
+      clearMaintenanceHold: true,
+    });
+    expect(db.scooterProblem.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          blocksUsage: false,
+          holdClearedById: "mechanic",
+          holdClearedAt: expect.any(Date) as unknown,
+        }) as unknown,
+      }),
+    );
+  });
+
+  it("locks the scooter before locking or changing the report", async () => {
+    await service.hold("mechanic", "problem", {
+      revision: 1,
+      blocksUsage: true,
+    });
+    expect(
+      (
+        db.$queryRaw.mock.calls as unknown as [
+          TemplateStringsArray,
+          ...unknown[],
+        ][]
+      )[0][0].join(""),
+    ).toContain('FROM "Scooter"');
+    expect(
+      (
+        db.$queryRaw.mock.calls as unknown as [
+          TemplateStringsArray,
+          ...unknown[],
+        ][]
+      )[1][0].join(""),
+    ).toContain('FROM "ScooterProblem"');
+    expect(db.$queryRaw.mock.invocationCallOrder[1]).toBeLessThan(
+      db.scooterProblem.updateMany.mock.invocationCallOrder[0],
+    );
+  });
+
+  it("preserves progress during reassignment", async () => {
+    access.getSnapshot.mockResolvedValue({ ...snapshot, isSuperAdmin: true });
+    db.scooterProblem.findFirst.mockResolvedValue({
+      ...row,
+      status: "in_progress",
+    });
+    await service.assign("manager", "problem", {
+      revision: 1,
+      assigneeId: "mechanic",
+    });
+    expect(db.scooterProblem.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { assigneeId: "mechanic", revision: { increment: 1 } },
+      }),
+    );
+  });
+
+  it("keeps the previous resolution, assignee and hold when reopening", async () => {
+    access.getSnapshot.mockResolvedValue({ ...snapshot, isSuperAdmin: true });
+    db.scooterProblem.findFirst.mockResolvedValue({
+      ...row,
+      status: "resolved",
+      resolutionNotes: "Belt replaced",
+      blocksUsage: true,
+    });
+    await service.reopen("manager", "problem", 1);
+    expect(db.scooterProblem.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { status: "open", resolvedAt: null, revision: { increment: 1 } },
+      }),
+    );
+  });
+
+  it("rejects stale comments without recording a success", async () => {
+    db.scooterProblem.updateMany.mockResolvedValue({ count: 0 });
+    await expect(
+      service.comment("mechanic", "problem", {
+        revision: 1,
+        body: "Inspected brakes",
+      }),
+    ).rejects.toThrow(ConflictException);
+    expect(audit.recordRequired).not.toHaveBeenCalled();
+  });
+
+  it("only returns allowlisted history and preserves resolution notes", async () => {
+    db.$transaction.mockImplementation((queries: Promise<unknown>[]) =>
+      Promise.all(queries),
+    );
+    db.auditEvent.findMany.mockResolvedValue([
+      {
+        id: "event",
+        type: "PROBLEM_RESOLVED",
+        user: row.assignee,
+        createdAt: row.createdAt,
+        ip: "private",
+        meta: {
+          after: {
+            status: "resolved",
+            resolutionNotes: "Fixed brakes",
+            secret: "hidden",
+          },
+        },
+      },
+    ]);
+    db.auditEvent.count.mockResolvedValue(1);
+    const history = await service.activity("mechanic", "problem", {
+      page: 1,
+      pageSize: 25,
+    });
+    expect(history.items[0]).toMatchObject({
+      actor: row.assignee,
+      note: "Fixed brakes",
+      after: { status: "resolved" },
+    });
+    expect(history.items[0]).not.toHaveProperty("ip");
+    expect(history.items[0].after).not.toHaveProperty("secret");
+    expect(history.items[0].after).not.toHaveProperty("resolutionNotes");
   });
 });

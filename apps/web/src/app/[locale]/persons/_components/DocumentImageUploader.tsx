@@ -91,9 +91,10 @@ export function DocumentImageUploader({
           onFileSelected(event.dataTransfer.files?.[0] ?? null);
         }}
         className={cn(
-          "group relative flex h-40 cursor-pointer overflow-hidden rounded-lg border border-border bg-card transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-          !hasImage && "border-dashed bg-muted/40 hover:bg-muted",
-          hasImage && "hover:border-primary/60",
+          "group relative flex h-40 cursor-pointer overflow-hidden border-border bg-card transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+          !hasImage &&
+            "rounded-dashed-surface border-(length:--dashed-surface-border-width) border-dashed bg-muted/40 hover:bg-muted",
+          hasImage && "rounded-lg border hover:border-primary/60",
           disabled && "pointer-events-none cursor-not-allowed opacity-60",
         )}
       >

@@ -4,7 +4,7 @@ export type { Primitives } from "./primitives";
 export { semanticColors, semanticBlur } from "./semantic";
 export type { ThemeColors } from "./semantic";
 
-export { spacing, viewportSizing } from "./spacing";
+export { spacing, viewportSizing, dashedSurface } from "./spacing";
 export type { Spacing } from "./spacing";
 
 export { radius, radiusBase } from "./radius";

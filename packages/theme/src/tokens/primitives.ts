@@ -3,6 +3,12 @@
  * platform outputs are generated from the semantic contract.
  */
 export const primitives = {
+  repairSeverity: {
+    low: "#3B82F6",
+    medium: "#EAB308",
+    high: "#F97316",
+    critical: "#EF4444",
+  },
   // Neutral surfaces and action cyan from the approved UX Pilot screens.
   neutral: {
     50: "#fafafa",

@@ -27,7 +27,12 @@ const rental = {
   id: "rental-1",
   revision: 4,
   scooterId: "scooter-1",
-  scooter: { fleetNumber: 7, brandName: "Honda", model: "Vision" },
+  scooter: {
+    fleetNumber: 7,
+    brandCode: "HON",
+    brandName: "Honda",
+    model: "Vision",
+  },
   person: { id: "person-1", firstName: "Ada", lastName: "Lovelace" },
   status: "reserved",
   startsAt: "2026-10-10T09:00:00.000Z",
@@ -59,7 +64,7 @@ describe("rental collection", () => {
   it("applies a nested status draft and returns to the first page", async () => {
     const user = userEvent.setup();
     renderWorkspace();
-    await screen.findByRole("link", { name: "Honda Vision · 7" });
+    await screen.findByRole("link", { name: "Honda Vision · 007 HON" });
     expect(screen.getByText("Ada Lovelace")).toBeInTheDocument();
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Next" }));
@@ -93,7 +98,9 @@ describe("rental collection", () => {
   it("preserves portal endpoint and projection even if a richer record is passed", async () => {
     mocks.user.effectiveScopes = { "rentals.create": ["ALL"] };
     renderWorkspace({ portal: true });
-    const link = await screen.findByRole("link", { name: "Honda Vision · 7" });
+    const link = await screen.findByRole("link", {
+      name: "Honda Vision · 007 HON",
+    });
     expect(link).toHaveAttribute("href", "/my-rentals/rental-1");
     expect(mocks.fetch).toHaveBeenCalledWith(
       "/v1/portal/rentals?page=1",
@@ -110,7 +117,7 @@ describe("rental collection", () => {
   it("only offers creation to staff with its permission", async () => {
     mocks.user.effectiveScopes = { "rentals.create": ["ALL"] };
     renderWorkspace();
-    await screen.findByRole("link", { name: "Honda Vision · 7" });
+    await screen.findByRole("link", { name: "Honda Vision · 007 HON" });
     expect(
       screen.getByRole("button", { name: "Create rental" }),
     ).toBeInTheDocument();
@@ -119,7 +126,7 @@ describe("rental collection", () => {
   it("keeps rental detail outside the collection toolbar", async () => {
     mocks.fetch.mockResolvedValue(rental);
     renderWorkspace({ id: rental.id });
-    await screen.findByRole("heading", { name: "Honda Vision · 7" });
+    await screen.findByRole("heading", { name: "Honda Vision · 007 HON" });
     expect(mocks.fetch).toHaveBeenCalledWith(
       "/v1/rentals/rental-1",
       expect.anything(),
@@ -168,7 +175,7 @@ describe("rental detail document collections", () => {
   it("does not request documents without their permission", async () => {
     mocks.fetch.mockResolvedValue({ ...rental, status: "active" });
     renderWorkspace({ portal: true, id: rental.id });
-    await screen.findByRole("heading", { name: "Honda Vision · 7" });
+    await screen.findByRole("heading", { name: "Honda Vision · 007 HON" });
     expect(mocks.fetch).toHaveBeenCalledTimes(1);
     expect(
       screen.queryByRole("button", {

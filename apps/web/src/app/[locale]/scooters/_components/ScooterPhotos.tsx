@@ -11,8 +11,7 @@ import { canAccess } from "@/lib/access";
 import { webApi } from "@/lib/api";
 import { FileDropOverlay } from "@repo/ui/components/file-drop-overlay";
 import { useFileDrop } from "@repo/ui/hooks/use-file-drop";
-import { ImageViewer } from "@repo/ui/components/image-viewer";
-import { SortableGrid } from "@repo/ui/components/sortable-grid";
+import { ImageGallery } from "@repo/ui/components/image-gallery";
 import { useScooterPhotos } from "./useScooterPhotos";
 
 export function ScooterPhotos({
@@ -76,7 +75,6 @@ export function ScooterPhotoGallery({
 }) {
   const t = useTranslations("scooters.photos");
   const gallery = useScooterPhotos(scooterId);
-  const [activePhotoId, setActivePhotoId] = useState<string | null>(null);
   const [sortingBusy, setSortingBusy] = useState(false);
   useEffect(() => {
     onBusyChange?.(gallery.busy || sortingBusy);
@@ -105,7 +103,7 @@ export function ScooterPhotoGallery({
         type="button"
         disabled={busy}
         style={{ aspectRatio: aspectRatio.scooterPhoto }}
-        className="flex min-w-0 flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-border bg-transparent p-4 text-center text-sm font-medium text-muted-foreground transition-colors duration-normal ease-standard enabled:hover:border-primary enabled:active:border-primary enabled:active:border-solid focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+        className="flex min-w-0 flex-col items-center justify-center gap-3 rounded-dashed-surface border-(length:--dashed-surface-border-width) border-dashed border-border bg-transparent p-4 text-center text-sm font-medium text-muted-foreground transition-colors duration-normal ease-standard enabled:hover:border-primary enabled:active:border-primary enabled:active:border-solid focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
         onClick={() => input.current?.click()}
       >
         <PlusIcon aria-hidden="true" className="size-6" />
@@ -166,7 +164,29 @@ export function ScooterPhotoGallery({
         {!gallery.loading && gallery.error !== "load" ? (
           <>
             <div className="relative" {...fileDropHandlers}>
-              <SortableGrid
+              <ImageGallery
+                images={gallery.photos.map((photo) => ({
+                  id: photo.id,
+                  src: scooterId
+                    ? webApi.url(photo.contentUrl)
+                    : photo.contentUrl,
+                  alt: photo.caption || photo.fileName,
+                  fileName: photo.fileName,
+                }))}
+                labels={{
+                  close: t("close"),
+                  previous: t("previous"),
+                  next: t("next"),
+                  grid: t("grid"),
+                  zoomIn: t("zoomIn"),
+                  zoomOut: t("zoomOut"),
+                  resetZoom: t("resetZoom"),
+                  loading: t("imageLoading"),
+                  error: t("imageFailed"),
+                  retry: t("retry"),
+                  position: (index, count) => t("position", { index, count }),
+                }}
+                title={t("details")}
                 items={gallery.photos}
                 className="grid min-w-0 grid-cols-2 gap-4 lg:grid-cols-3"
                 disabled={
@@ -176,7 +196,6 @@ export function ScooterPhotoGallery({
                   gallery.uploads.length > 0
                 }
                 instructions={t("sortInstructions")}
-                onItemPress={(photo) => setActivePhotoId(photo.id)}
                 getItemLabel={(photo) =>
                   t("open", { name: photo.caption || photo.fileName })
                 }
@@ -283,7 +302,7 @@ export function ScooterPhotoGallery({
                 {canUpload && photoCount > 0
                   ? uploadCard(t("addPhotos"))
                   : null}
-              </SortableGrid>
+              </ImageGallery>
               {filesOverGrid && canUpload && !busy ? (
                 <FileDropOverlay
                   label={t("dropOverlay")}
@@ -299,34 +318,6 @@ export function ScooterPhotoGallery({
           </>
         ) : null}
       </div>
-      <ImageViewer
-        open={activePhotoId !== null}
-        onOpenChange={(open) => {
-          if (!open) setActivePhotoId(null);
-        }}
-        activeId={activePhotoId}
-        onActiveIdChange={setActivePhotoId}
-        title={t("details")}
-        images={gallery.photos.map((photo) => ({
-          id: photo.id,
-          src: scooterId ? webApi.url(photo.contentUrl) : photo.contentUrl,
-          alt: photo.caption || photo.fileName,
-          fileName: photo.fileName,
-        }))}
-        labels={{
-          close: t("close"),
-          previous: t("previous"),
-          next: t("next"),
-          grid: t("grid"),
-          zoomIn: t("zoomIn"),
-          zoomOut: t("zoomOut"),
-          resetZoom: t("resetZoom"),
-          loading: t("imageLoading"),
-          error: t("imageFailed"),
-          retry: t("retry"),
-          position: (index, count) => t("position", { index, count }),
-        }}
-      />
     </FormSection>
   );
 }

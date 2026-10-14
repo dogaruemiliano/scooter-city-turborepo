@@ -12,6 +12,15 @@ import { typography } from "../src/tokens/typography.js";
 import { zIndex } from "../src/tokens/z-index.js";
 import { buildCss, buildNative } from "./build-tokens.js";
 
+test("repair severity colors retain the approved meaning in both themes", () => {
+  for (const colors of Object.values(semanticColors)) {
+    assert.equal(colors.severityLow, "#3B82F6");
+    assert.equal(colors.severityMedium, "#EAB308");
+    assert.equal(colors.severityHigh, "#F97316");
+    assert.equal(colors.severityCritical, "#EF4444");
+  }
+});
+
 test("floating surface blur is available to web and native consumers", () => {
   assert.ok(
     buildCss().includes(
@@ -302,4 +311,12 @@ test("CSS exposes content aspect ratios through Tailwind's aspect namespace", ()
     css,
     new RegExp(`--aspect-receipt-portrait: ${aspectRatio.receiptPortrait};`),
   );
+});
+
+test("dashed surfaces expose the shared card radius and border width to web and native", () => {
+  const css = buildCss();
+  assert.equal(radius.dashedSurface, radius.xl);
+  assert.match(css, /--radius-dashed-surface: calc\(var\(--radius\) \+ 4px\);/);
+  assert.match(css, /--dashed-surface-border-width: 0\.125rem;/);
+  assert.match(buildNative(), /"dashedSurface": \{\s*"borderWidth": 2/);
 });

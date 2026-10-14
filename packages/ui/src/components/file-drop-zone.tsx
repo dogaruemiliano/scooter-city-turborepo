@@ -51,7 +51,7 @@ export function FileDropZone({
         aria-label={label}
         aria-describedby={requirements ? `${hintId} ${requirementsId}` : hintId}
         className={cn(
-          "relative flex w-full flex-col items-center gap-4 rounded-2xl border-2 border-dashed bg-control px-6 py-10 text-center outline-none transition-colors duration-normal ease-standard enabled:hover:border-primary enabled:active:border-primary enabled:active:border-solid focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
+          "relative flex w-full flex-col items-center gap-4 rounded-dashed-surface border-(length:--dashed-surface-border-width) border-dashed bg-control px-6 py-10 text-center outline-none transition-colors duration-normal ease-standard enabled:hover:border-primary enabled:active:border-primary enabled:active:border-solid focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
           dragging ? "border-primary" : "border-border",
         )}
         onClick={() => input.current?.click()}

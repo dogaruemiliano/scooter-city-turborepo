@@ -14,6 +14,7 @@ import {
 import { v1 } from "@repo/api-shared";
 import { Button } from "@repo/ui/components/button";
 import { Input } from "@repo/ui/components/input";
+import { Label } from "@repo/ui/components/label";
 import { NativeSelect } from "@repo/ui/components/native-select";
 import { SearchField } from "@repo/ui/components/search-field";
 import { SegmentedRadioGroup } from "@repo/ui/components/segmented-radio-group";
@@ -303,7 +304,7 @@ export function PermissionEditor({
                   aria-labelledby={`${rowId}-label`}
                   className="grid min-w-0 grid-cols-12 items-center gap-x-2 gap-y-2 py-3 lg:gap-x-4 lg:gap-y-3 lg:py-4"
                 >
-                  <div className="col-span-7 min-w-0 lg:col-span-5">
+                  <div className="col-span-12 min-w-0 lg:col-span-5">
                     <div className="flex items-center justify-between gap-1 lg:gap-2">
                       <h4
                         id={`${rowId}-label`}
@@ -322,7 +323,7 @@ export function PermissionEditor({
                               : [...current, permission.key],
                           )
                         }
-                        className={`flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1 rounded-md text-xs text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring lg:min-w-0 ${hasDetails ? "" : "lg:hidden"}`}
+                        className={`flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1 rounded-md text-xs text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring lg:min-w-0 ${hasDetails ? "" : "hidden"}`}
                       >
                         <span className="sr-only lg:not-sr-only">
                           {t("details")}
@@ -333,27 +334,30 @@ export function PermissionEditor({
                         />
                       </button>
                     </div>
-                    <p className="hidden text-xs leading-relaxed text-muted-foreground lg:block">
+                    <p className="text-sm leading-relaxed text-muted-foreground">
                       {descriptions(permission.key)}
                     </p>
                   </div>
-                  <div className="col-span-5 min-w-0 lg:col-span-3">
-                    <p
+                  <div className="col-span-12 min-w-0 lg:col-span-3">
+                    <Label
                       id={`${rowId}-scope-label`}
-                      className="sr-only text-xs text-muted-foreground lg:not-sr-only lg:mb-1"
+                      htmlFor={
+                        mode === "default" ? undefined : `${rowId}-scope`
+                      }
+                      className="mb-1"
                     >
                       {t("scope")}
-                    </p>
+                    </Label>
                     {mode === "default" ? (
                       <p
                         aria-labelledby={`${rowId}-label ${rowId}-scope-label`}
-                        className="flex min-h-11 items-center justify-end text-right text-xs lg:justify-start lg:text-left lg:text-sm"
+                        className="flex min-h-12 items-center text-sm md:min-h-11"
                       >
                         {displayScopes(selected)}
                       </p>
                     ) : (
                       <NativeSelect
-                        size="sm"
+                        id={`${rowId}-scope`}
                         aria-label={t("scopeFor", { permission: label })}
                         value={mode === "deny" ? "" : selected.join(",")}
                         disabled={disabled || mode !== "allow"}
@@ -387,7 +391,8 @@ export function PermissionEditor({
                     value={mode}
                     onValueChange={changeMode}
                     disabled={disabled}
-                    className="col-span-12 self-end lg:col-span-4"
+                    containerClassName="col-span-12 min-w-0 self-end lg:col-span-4"
+                    className={isUser ? "grid-cols-3" : "grid-cols-2"}
                     options={modes.map((option) => ({
                       value: option,
                       label: t(`modes.${option}`),
@@ -405,9 +410,6 @@ export function PermissionEditor({
                     className={`col-span-12 min-w-0 ${hasDetails ? "" : "lg:hidden"}`}
                   >
                     <div className="flex flex-col gap-3 pb-2 pl-4 text-xs text-muted-foreground">
-                      <p className="leading-relaxed lg:hidden">
-                        {descriptions(permission.key)}
-                      </p>
                       {isUser ? (
                         <p>
                           {sources

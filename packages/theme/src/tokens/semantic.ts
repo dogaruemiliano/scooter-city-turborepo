@@ -10,6 +10,11 @@ function withAlpha(color: string, opacity: number): string {
 }
 
 const light = {
+  severityLow: p.repairSeverity.low,
+  severityMedium: p.repairSeverity.medium,
+  severityHigh: p.repairSeverity.high,
+  severityCritical: p.repairSeverity.critical,
+  severityForeground: p.charcoal[950],
   background: p.mist[100],
   foreground: p.charcoal[950],
   card: p.mist[0],
@@ -89,6 +94,11 @@ const light = {
 } as const;
 
 const dark: Record<keyof typeof light, string> = {
+  severityLow: p.repairSeverity.low,
+  severityMedium: p.repairSeverity.medium,
+  severityHigh: p.repairSeverity.high,
+  severityCritical: p.repairSeverity.critical,
+  severityForeground: p.charcoal[950],
   background: p.neutral[950],
   foreground: p.mist[50],
   card: p.neutral[900],

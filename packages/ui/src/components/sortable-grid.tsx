@@ -472,7 +472,8 @@ function SortableGridItem({
       className={cn(
         "relative min-w-0 overflow-hidden rounded-xl border border-border bg-control outline-none focus-visible:ring-2 focus-visible:ring-ring",
         !disabled && "cursor-grab active:cursor-grabbing",
-        isDragSource && "border-2 border-dashed border-primary",
+        isDragSource &&
+          "rounded-dashed-surface border-(length:--dashed-surface-border-width) border-dashed border-primary",
       )}
     >
       <div
@@ -528,7 +529,7 @@ function DeleteDropArea({
             data-slot="sortable-delete-area"
             data-hovered={hovered || undefined}
             className={cn(
-              "flex min-h-20 w-full items-center justify-center gap-3 rounded-xl border-2 border-dashed border-destructive bg-destructive-subtle p-4 text-center text-sm font-semibold text-destructive transition-colors duration-fast ease-standard",
+              "flex min-h-20 w-full items-center justify-center gap-3 rounded-dashed-surface border-(length:--dashed-surface-border-width) border-dashed border-destructive bg-destructive-subtle p-4 text-center text-sm font-semibold text-destructive transition-colors duration-fast ease-standard",
               hovered &&
                 "border-solid bg-destructive text-destructive-foreground",
             )}

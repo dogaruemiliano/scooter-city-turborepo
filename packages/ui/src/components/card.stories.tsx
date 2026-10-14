@@ -5,6 +5,7 @@ import { Badge } from "@repo/ui/components/badge";
 import { Button } from "@repo/ui/components/button";
 import {
   Card,
+  CardAccent,
   CardAction,
   CardContent,
   CardDescription,
@@ -78,6 +79,24 @@ export const Small: Story = {
         <CardDescription>Checked-in patients</CardDescription>
       </CardHeader>
       <CardContent className="text-2xl font-semibold">4</CardContent>
+    </Card>
+  ),
+};
+
+export const StraightAccent: Story = {
+  render: () => (
+    <Card size="comfortable">
+      <CardAccent className="bg-severity-high" />
+      <CardHeader>
+        <CardDescription>High severity</CardDescription>
+        <CardTitle>Inspect front brake pads</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <p className="text-sm text-muted-foreground">
+          A straight accent uses the shared spacing token and follows the full
+          card height.
+        </p>
+      </CardContent>
     </Card>
   ),
 };

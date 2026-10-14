@@ -3,6 +3,11 @@
 export const tokens = {
   color: {
     light: {
+      severityLow: "#3B82F6",
+      severityMedium: "#EAB308",
+      severityHigh: "#F97316",
+      severityCritical: "#EF4444",
+      severityForeground: "#12161B",
       background: "#F1F3F3",
       foreground: "#12161B",
       card: "#FFFFFF",
@@ -79,6 +84,11 @@ export const tokens = {
       mediaScrim: "#000000A6",
     },
     dark: {
+      severityLow: "#3B82F6",
+      severityMedium: "#EAB308",
+      severityHigh: "#F97316",
+      severityCritical: "#EF4444",
+      severityForeground: "#12161B",
       background: "#0A0A0A",
       foreground: "#F9FBFB",
       card: "#141414",
@@ -183,12 +193,16 @@ export const tokens = {
     "1.5": 6,
     "2.5": 10,
   },
+  dashedSurface: {
+    borderWidth: 2,
+  },
   radius: {
     none: 0,
     sm: 8,
     md: 10,
     lg: 12,
     xl: 16,
+    dashedSurface: 16,
     "2xl": 20,
     "3xl": 24,
     "4xl": 28,
@@ -324,6 +338,7 @@ export const tokens = {
   motion: {
     gesture: {
       sortableTrailingZone: 0.3,
+      horizontalEdgeScrollSpeed: 320,
     },
     duration: {
       instant: 0,
