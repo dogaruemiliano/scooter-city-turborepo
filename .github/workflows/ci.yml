@@ -22,8 +22,8 @@ jobs:
           POSTGRES_DB: app
           POSTGRES_USER: app
           POSTGRES_PASSWORD: app
-        # CI has no host-Postgres conflict; 5434 keeps DATABASE_URL the same
-        # locally and in CI so .env.example values just work.
+        # Dedicated test databases are provisioned by the shared E2E runner.
+        # CI uses its own server; local tests use the Compose test profile.
         ports:
           - 5434:5432
         options: >-
@@ -60,16 +60,10 @@ jobs:
           NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL || 'https://api.ci.placeholder.invalid' }}
         run: pnpm --filter web build
 
-      - name: Prisma migrate + seed (E2E DB)
+      - name: Prepare databases and run E2E tests
         env:
-          DATABASE_URL: postgresql://app:app@localhost:5434/app
-        run: |
-          pnpm --filter api db:deploy
-          NODE_ENV=test pnpm --filter api db:seed
-
-      - name: E2E tests
-        env:
-          DATABASE_URL: postgresql://app:app@localhost:5434/app
+          E2E_DATABASE_URL: postgresql://app:app@localhost:5434/scooter_city_test
+          E2E_FINANCE_DATABASE_URL: postgresql://app:app@localhost:5434/finance_books_test
           JWT_ACCESS_SECRET: ${{ secrets.JWT_ACCESS_SECRET || 'ci-test-access-secret-padded-to-32-chars' }}
           JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET || 'ci-test-refresh-secret-padded-to-32-chars' }}
           REFRESH_TOKEN_HMAC_SECRET: ${{ secrets.REFRESH_TOKEN_HMAC_SECRET || 'ci-test-refresh-hmac-padded-to-32-chars-x' }}

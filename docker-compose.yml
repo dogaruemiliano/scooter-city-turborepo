@@ -20,5 +20,24 @@ services:
       timeout: 5s
       retries: 10
 
+  # Explicitly opt in with: docker compose --profile test up -d postgres-test
+  # No application volume is mounted. Tests can recreate all data after restart.
+  postgres-test:
+    profiles: [test]
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+    ports:
+      - "127.0.0.1:55434:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
 volumes:
   pgdata17:

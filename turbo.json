@@ -21,6 +21,8 @@
       "dependsOn": ["^build"],
       "cache": false,
       "passThroughEnv": [
+        "E2E_DATABASE_URL",
+        "E2E_FINANCE_DATABASE_URL",
         "DATABASE_URL",
         "NODE_ENV",
         "JWT_ACCESS_SECRET",

@@ -75,20 +75,20 @@ Local URLs:
 
 ## Daily Commands
 
-| Command                        | Purpose                                                                                                |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------ |
-| `pnpm dev`                     | Run development tasks across the workspace.                                                            |
-| `pnpm build`                   | Build all packages/apps.                                                                               |
-| `pnpm lint`                    | Run ESLint.                                                                                            |
-| `pnpm check-types`             | Run TypeScript checks.                                                                                 |
-| `pnpm test`                    | Run unit/package tests.                                                                                |
-| `pnpm test:e2e`                | Run API E2E tests.                                                                                     |
-| `pnpm init:local`              | Configure the local project name, env files, Docker Postgres, DB, seed, and shared builds after clone. |
-| `pnpm gen`                     | Regenerate env example and OpenAPI after API changes.                                                  |
-| `pnpm --filter api db:migrate` | Create/apply local Prisma migrations.                                                                  |
-| `pnpm --filter api db:deploy`  | Apply migrations without creating new ones.                                                            |
-| `pnpm --filter api db:seed`    | Seed local/test data.                                                                                  |
-| `pnpm --filter @repo/ui dev`   | Run Storybook.                                                                                         |
+| Command                        | Purpose                                                                                                            |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| `pnpm dev`                     | Run development tasks across the workspace.                                                                        |
+| `pnpm build`                   | Build all packages/apps.                                                                                           |
+| `pnpm lint`                    | Run ESLint.                                                                                                        |
+| `pnpm check-types`             | Run TypeScript checks.                                                                                             |
+| `pnpm test`                    | Run unit/package tests.                                                                                            |
+| `pnpm test:e2e`                | Prepare test databases and run API E2E tests; see [test environment setup](../apps/api/README.md#e2e-environment). |
+| `pnpm init:local`              | Configure the local project name, env files, Docker Postgres, DB, seed, and shared builds after clone.             |
+| `pnpm gen`                     | Regenerate env example and OpenAPI after API changes.                                                              |
+| `pnpm --filter api db:migrate` | Create/apply local Prisma migrations.                                                                              |
+| `pnpm --filter api db:deploy`  | Apply migrations without creating new ones.                                                                        |
+| `pnpm --filter api db:seed`    | Seed local/test data.                                                                                              |
+| `pnpm --filter @repo/ui dev`   | Run Storybook.                                                                                                     |
 
 ## `pnpm init:local` Options
 
