@@ -873,7 +873,7 @@ describe("Scooter create controls with the create resolver", () => {
     await chooseSelectOption(browser, "Registration type", "Local");
     expect(
       screen.getByRole("combobox", { name: /Required driver license/ }),
-    ).toHaveTextContent("None");
+    ).toHaveTextContent(messages.en.scooters.requiredDriverLicenseTypes.none);
     await chooseSelectOption(browser, "Required driver license", "A1");
     await chooseSelectOption(browser, "Registration type", "National");
     await chooseSelectOption(browser, "Registration type", "Local");
@@ -897,18 +897,22 @@ describe("Scooter create controls with the create resolver", () => {
         await screen.findByRole("combobox", {
           name: /Required driver license/,
         }),
-      ).toHaveTextContent("None");
+      ).toHaveTextContent(messages.en.scooters.requiredDriverLicenseTypes.none);
       fireEvent.change(speed, { target: { value: "45" } });
       await waitFor(() =>
         expect(
           screen.getByRole("combobox", { name: /Required driver license/ }),
-        ).toHaveTextContent("None"),
+        ).toHaveTextContent(
+          messages.en.scooters.requiredDriverLicenseTypes.none,
+        ),
       );
       fireEvent.change(speed, { target: { value: "25" } });
       await waitFor(() =>
         expect(
           screen.getByRole("combobox", { name: /Required driver license/ }),
-        ).toHaveTextContent("None"),
+        ).toHaveTextContent(
+          messages.en.scooters.requiredDriverLicenseTypes.none,
+        ),
       );
       await chooseSelectOption(browser, "Required driver license", "A1");
       fireEvent.change(speed, { target: { value: "45" } });
@@ -944,7 +948,7 @@ describe("Scooter create controls with the create resolver", () => {
     await browser.click(screen.getByRole("button", { name: "Fill fields" }));
     expect(
       screen.getByRole("combobox", { name: /Required driver license/ }),
-    ).toHaveTextContent("None");
+    ).toHaveTextContent(messages.en.scooters.requiredDriverLicenseTypes.none);
     expect(
       screen.queryByText(/field.*could not be interpreted/),
     ).not.toBeInTheDocument();

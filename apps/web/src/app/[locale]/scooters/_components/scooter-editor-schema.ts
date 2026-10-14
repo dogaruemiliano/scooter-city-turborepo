@@ -340,20 +340,16 @@ export const scooterCreateFormSchema = rawCreateSchema
     return { ...input, registrationNumber: plate?.displayValue || null };
   });
 
-// Registration lifecycle values never enter the edit resolver or PATCH.
+// Create and edit share registration controls; updates still send only changed values.
 export const scooterEditFormSchema = rawCreateSchema
-  .omit({
-    registrationType: true,
-    registrationNumber: true,
-    registrationDate: true,
-    temporaryRegistrationExpiresAt: true,
-    requiredLicenseCategory: true,
-  })
   .transform(
     (values) =>
-      convertForm(values) as unknown as z.input<
-        typeof v1.scooters.updateScooterInputSchema
-      >,
+      convertForm({
+        ...values,
+        insurancePolicies: values.insurancePolicies?.filter(
+          insuranceEditorHasContent,
+        ),
+      }) as unknown as z.input<typeof v1.scooters.updateScooterInputSchema>,
   )
   .pipe(v1.scooters.updateScooterInputSchema);
 
@@ -365,7 +361,7 @@ export function scooterChangedFields(
     input.powertrainType ?? "",
   );
   const changes = Object.fromEntries(
-    EDITOR_FIELDS.filter(
+    CREATE_FIELDS.filter(
       (field) =>
         dirty[field] && !(inactive as readonly string[]).includes(field),
     ).map((field) => [field, input[field]]),

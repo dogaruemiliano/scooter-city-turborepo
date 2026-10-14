@@ -179,21 +179,48 @@ export class ProblemsService {
         },
       ],
     };
-    const [items, total] = await this.prisma.$transaction([
-      this.prisma.scooterProblem.findMany({
-        where,
-        include: problemInclude,
-        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-        skip: (query.page - 1) * query.pageSize,
-        take: query.pageSize,
-      }),
-      this.prisma.scooterProblem.count({ where }),
-    ]);
+    const countWhere: Prisma.ScooterProblemWhereInput = {
+      AND: [
+        this.where(snapshot, "problems.read"),
+        {
+          ...(query.scooterId ? { scooterId: query.scooterId } : {}),
+          ...(query.severity ? { severity: query.severity } : {}),
+          ...(query.blocking !== undefined
+            ? { blocksUsage: query.blocking }
+            : {}),
+        },
+      ],
+    };
+    const [items, total, all, open, inProgress, mine, resolved] =
+      await this.prisma.$transaction([
+        this.prisma.scooterProblem.findMany({
+          where,
+          include: problemInclude,
+          orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+          skip: (query.page - 1) * query.pageSize,
+          take: query.pageSize,
+        }),
+        this.prisma.scooterProblem.count({ where }),
+        this.prisma.scooterProblem.count({ where: countWhere }),
+        this.prisma.scooterProblem.count({
+          where: { AND: [countWhere, { status: "open" }] },
+        }),
+        this.prisma.scooterProblem.count({
+          where: { AND: [countWhere, { status: "in_progress" }] },
+        }),
+        this.prisma.scooterProblem.count({
+          where: { AND: [countWhere, { assigneeId: userId }] },
+        }),
+        this.prisma.scooterProblem.count({
+          where: { AND: [countWhere, { status: "resolved" }] },
+        }),
+      ]);
     return {
       items: await this.project(items, snapshot),
       total,
       page: query.page,
       pageSize: query.pageSize,
+      quickFilterCounts: { all, open, in_progress: inProgress, mine, resolved },
     };
   }
 

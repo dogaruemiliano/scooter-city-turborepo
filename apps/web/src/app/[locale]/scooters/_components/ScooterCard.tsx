@@ -53,14 +53,14 @@ const rentalStyles = {
   rented: "bg-info-subtle text-info",
   reserved: "bg-accent text-accent-foreground",
   maintenance: "bg-warning-subtle text-foreground",
-  unknown: "bg-muted text-muted-foreground",
+  unknown: "text-muted-foreground",
 };
 const healthStyles = {
   healthy: "bg-success-subtle text-success",
   minor: "bg-warning-subtle text-foreground",
   major: "bg-destructive-subtle text-destructive",
   critical: "bg-destructive text-destructive-foreground",
-  unknown: "bg-muted text-muted-foreground",
+  unknown: "text-muted-foreground",
 };
 const rentalIcons = {
   available: CircleCheckIcon,
@@ -81,18 +81,20 @@ function ScooterPhoto({ src, code }: { src?: string | null; code: string }) {
   const t = useTranslations("scooters.card");
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
   return (
-    <div className="relative flex size-24 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted sm:h-32 sm:w-36">
+    <div className="relative flex h-36 w-32 shrink-0 items-center justify-center overflow-visible sm:h-48 sm:w-48">
       {src && src !== failedSrc ? (
-        <Image
-          src={src}
-          alt={t("photoAlt", { code })}
-          fill
-          // Private API images must retain the browser's authentication cookies.
-          unoptimized
-          sizes={`(min-width: ${tokens.breakpoints.sm}px) ${tokens.spacing[36]}px, ${tokens.spacing[24]}px`}
-          className="object-contain p-2"
-          onError={() => setFailedSrc(src)}
-        />
+        <div className="absolute -inset-y-5 -right-5 w-64 sm:-inset-y-6 sm:-right-6 sm:w-72">
+          <Image
+            src={src}
+            alt={t("photoAlt", { code })}
+            fill
+            // Private API images must retain the browser's authentication cookies.
+            unoptimized
+            sizes={`(min-width: ${tokens.breakpoints.sm}px) ${tokens.spacing[72]}px, ${tokens.spacing[64]}px`}
+            className="object-contain object-right"
+            onError={() => setFailedSrc(src)}
+          />
+        </div>
       ) : (
         <span className="flex flex-col items-center gap-2 px-2 text-center text-xs text-muted-foreground">
           <ImageIcon aria-hidden="true" className="size-6" />
@@ -163,7 +165,7 @@ export function ScooterCard({
   return (
     <Card
       as="article"
-      className="relative isolate h-full gap-0 py-0 transition-colors duration-fast hover:border-border-strong"
+      className="relative isolate h-full gap-0 py-0 transition-colors duration-fast motion-reduce:transition-none hover:border-border-strong"
     >
       {!scooter.deletedAt ? (
         <Link
@@ -172,30 +174,26 @@ export function ScooterCard({
           className="absolute inset-0 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
         />
       ) : null}
-      <CardContent className="pointer-events-none flex flex-1 flex-col gap-4 p-4 sm:p-5">
+      <CardContent className="pointer-events-none flex flex-1 flex-col gap-5 p-5 sm:gap-6 sm:p-6">
         {(scooter.maintenanceHoldCount ?? 0) > 0 ? (
           <Badge variant="destructive" className="self-start">
             {problemsT("maintenanceHold")}
           </Badge>
         ) : null}
-        <div className="flex items-start gap-3 sm:gap-4">
-          <ScooterPhoto
-            src={
-              details.photoUrl ??
-              (scooter.coverUrl ? webApi.url(scooter.coverUrl) : null)
-            }
-            code={code}
-          />
-          <div className="min-w-0 flex-1 py-1">
-            <div className="flex min-w-0 flex-col items-start gap-1">
-              <h2 className="text-xl font-semibold leading-tight tabular-nums">
+        <div className="flex items-center gap-4 sm:gap-5">
+          <div
+            className="relative min-w-0 flex-1 overflow-visible py-1"
+            style={{ zIndex: tokens.zIndex.raised }}
+          >
+            <div className="flex min-w-0 flex-col items-start gap-2">
+              <h2 className="break-words text-2xl font-semibold leading-tight tracking-tight tabular-nums sm:text-3xl">
                 {code}
               </h2>
               <span
                 className={cn(
                   "min-w-0 break-words text-sm",
                   scooter.registrationNumber
-                    ? "font-medium"
+                    ? "font-medium text-foreground"
                     : "text-muted-foreground",
                 )}
               >
@@ -205,7 +203,7 @@ export function ScooterCard({
                     : t("list.registrationMissing"))}
               </span>
             </div>
-            <p className="mt-2 break-words text-sm text-muted-foreground">
+            <p className="mt-3 break-words text-sm leading-snug text-muted-foreground">
               {model}
             </p>
             {scooter.deletedAt ? (
@@ -214,8 +212,15 @@ export function ScooterCard({
               </Badge>
             ) : null}
           </div>
+          <ScooterPhoto
+            src={
+              details.photoUrl ??
+              (scooter.coverUrl ? webApi.url(scooter.coverUrl) : null)
+            }
+            code={code}
+          />
         </div>
-        <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
           {scooter.color ? <span>{scooter.color}</span> : null}
           <span>{powertrain}</span>
           <span>
@@ -226,14 +231,15 @@ export function ScooterCard({
             })}
           </span>
         </div>
-        <dl className="grid grid-cols-2 gap-3 border-t border-border pt-4">
+        <dl className="grid grid-cols-2 gap-4 border-t border-border pt-5 sm:gap-6 sm:pt-6">
           <div className="min-w-0">
-            <dt className="mb-2 text-xs text-muted-foreground">
+            <dt className="mb-2 text-xs font-medium text-muted-foreground">
               {t("card.rentalLabel")}
             </dt>
             <dd
               className={cn(
-                "inline-flex max-w-full items-center gap-1.5 rounded-md px-2 py-2 sm:gap-2 sm:px-3 text-sm font-medium",
+                "inline-flex max-w-full items-center gap-2 rounded-md text-sm font-medium leading-snug",
+                rental !== "unknown" && "px-2 py-1.5",
                 rentalStyles[rental],
               )}
             >
@@ -244,12 +250,13 @@ export function ScooterCard({
             </dd>
           </div>
           <div className="min-w-0">
-            <dt className="mb-2 text-xs text-muted-foreground">
+            <dt className="mb-2 text-xs font-medium text-muted-foreground">
               {t("card.healthLabel")}
             </dt>
             <dd
               className={cn(
-                "inline-flex max-w-full items-center gap-1.5 rounded-md px-2 py-2 sm:gap-2 sm:px-3 text-sm font-medium",
+                "inline-flex max-w-full items-center gap-2 rounded-md text-sm font-medium leading-snug",
+                health !== "unknown" && "px-2 py-1.5",
                 healthStyles[health],
               )}
             >
@@ -261,7 +268,7 @@ export function ScooterCard({
           </div>
         </dl>
         {attention.length ? (
-          <p className="flex items-start gap-2 text-sm">
+          <p className="flex items-start gap-2 rounded-lg bg-warning-subtle p-3 text-sm text-foreground">
             <TriangleAlertIcon
               aria-hidden="true"
               className="mt-0.5 size-4 shrink-0 text-warning"
@@ -270,7 +277,7 @@ export function ScooterCard({
           </p>
         ) : null}
       </CardContent>
-      <CardFooter className="pointer-events-none flex-wrap justify-between gap-4 px-4 py-3 sm:px-5">
+      <CardFooter className="pointer-events-none flex-wrap justify-between gap-x-4 gap-y-3 bg-muted px-5 py-4 sm:px-6">
         <dl className="flex min-w-0 flex-wrap gap-x-6 gap-y-3">
           <div className="min-w-0">
             <dt className="text-xs text-muted-foreground">
@@ -278,7 +285,7 @@ export function ScooterCard({
             </dt>
             <dd
               className={cn(
-                "mt-1 break-words text-sm",
+                "mt-1 break-words text-sm font-medium",
                 !details.renterName && "text-muted-foreground",
               )}
             >

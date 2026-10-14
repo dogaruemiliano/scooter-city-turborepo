@@ -7,12 +7,18 @@ type FormActionsProps = ComponentProps<"div"> & {
   /** Context for the actions, such as validation feedback or a draft status. */
   status?: ReactNode;
   sticky?: boolean;
+  /** Page forms: reveal the floating actions when submission is valid. */
+  ready?: boolean;
+  /** Keeps ready actions visible while submission is in progress. */
+  pending?: boolean;
 };
 
 function FormActions({
   className,
   status,
   sticky = false,
+  ready,
+  pending = false,
   children,
   ...props
 }: FormActionsProps) {
@@ -33,12 +39,20 @@ function FormActions({
       </div>
     </>
   );
-  if (sticky)
+  const floating = ready === undefined ? sticky : ready || pending;
+  if (sticky || ready !== undefined)
     return (
       <Card
         data-slot="form-actions"
+        data-sticky={floating}
+        aria-busy={pending || undefined}
         className={cn(
           "@container/form-actions sticky bottom-[calc(var(--spacing-4)+env(safe-area-inset-bottom))] z-sticky gap-0 py-0 shadow-md sm:bottom-[calc(var(--spacing-8)+env(safe-area-inset-bottom))]",
+          ready !== undefined && "w-full",
+          ready !== undefined &&
+            (floating
+              ? "self-end bg-floating-action-surface backdrop-blur-floating-surface animate-in slide-in-from-bottom-4 duration-normal ease-decelerate motion-reduce:animate-none"
+              : "static bottom-auto sm:bottom-auto"),
           className,
         )}
         {...props}
@@ -51,6 +65,7 @@ function FormActions({
   return (
     <div
       data-slot="form-actions"
+      aria-busy={pending || undefined}
       className={cn(
         "@container/form-actions shrink-0 border-t border-border bg-inherit p-4 md:px-6",
         className,

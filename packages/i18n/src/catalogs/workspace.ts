@@ -224,6 +224,7 @@ export const workspaceCatalog = {
         label: "Quick filters",
         all: "All",
         open: "Open",
+        in_progress: "In progress",
         mine: "Mine",
         resolved: "Resolved",
       },
@@ -319,7 +320,7 @@ export const workspaceCatalog = {
       editPhotoHelp:
         "Drag the corners to crop, or adjust the rotation and perspective.",
       assign: "Update assignment",
-      unassigned: "Unassigned",
+      unassigned: "No assignee",
       priority: "Priority",
       reopen: "Reopen problem",
       cancel: "Dismiss report",
@@ -594,8 +595,9 @@ export const workspaceCatalog = {
       severityCount: "{severity}: {count} probleme",
       quickFilters: {
         label: "Filtre rapide",
-        all: "All",
-        open: "Open",
+        all: "Toate",
+        open: "Deschise",
+        in_progress: "În lucru",
         mine: "Ale mele",
         resolved: "Rezolvate",
       },
@@ -694,7 +696,7 @@ export const workspaceCatalog = {
       editPhotoHelp:
         "Trage de colțuri pentru a decupa sau ajustează rotația și perspectiva.",
       assign: "Actualizează atribuirea",
-      unassigned: "Neatribuit",
+      unassigned: "Fără responsabil",
       priority: "Prioritate",
       reopen: "Redeschide problema",
       cancel: "Respinge raportul",

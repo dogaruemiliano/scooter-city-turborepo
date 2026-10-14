@@ -98,6 +98,15 @@ export const problemListSchema = z.object({
   total: z.number(),
   page: z.number(),
   pageSize: z.number(),
+  quickFilterCounts: z
+    .object({
+      all: z.number().int().nonnegative(),
+      open: z.number().int().nonnegative(),
+      in_progress: z.number().int().nonnegative(),
+      mine: z.number().int().nonnegative(),
+      resolved: z.number().int().nonnegative(),
+    })
+    .optional(),
 });
 export const listProblemsQuerySchema = z
   .object({

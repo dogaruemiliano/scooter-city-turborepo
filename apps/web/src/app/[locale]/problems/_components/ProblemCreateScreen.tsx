@@ -15,7 +15,7 @@ export function ProblemCreateScreen({ scooterId }: { scooterId?: string }) {
     locale,
   );
   return (
-    <main className="flex min-w-0 flex-1 flex-col gap-6 px-4 pt-4 md:px-8 md:pt-8">
+    <main className="flex min-w-0 flex-1 flex-col gap-6 px-4 pt-4 pb-4 md:px-8 md:pt-8 md:pb-8">
       <PageTitleOverride title={t("problems.add")} />
       <div className="flex w-full max-w-(--breakpoint-md) flex-1 flex-col">
         <CreateProblem

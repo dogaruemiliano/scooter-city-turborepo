@@ -3,6 +3,12 @@
  * platform outputs are generated from the semantic contract.
  */
 export const primitives = {
+  violet: {
+    50: "#f5f3ff",
+    400: "#a78bfa",
+    600: "#7c3aed",
+    950: "#2e1065",
+  },
   repairSeverity: {
     low: "#3B82F6",
     medium: "#EAB308",

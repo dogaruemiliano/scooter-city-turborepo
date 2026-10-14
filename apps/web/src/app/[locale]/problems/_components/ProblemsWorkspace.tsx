@@ -1,6 +1,13 @@
 "use client";
 import { useCallback, useState } from "react";
-import { Plus } from "lucide-react";
+import {
+  CheckCheck,
+  CircleDot,
+  List,
+  Plus,
+  UserRound,
+  Wrench,
+} from "lucide-react";
 import { v1 } from "@repo/api-shared";
 import {
   Field,
@@ -36,6 +43,14 @@ type ProblemFilters = {
   blocking: "" | "true" | "false";
 };
 
+const quickFilterIcons = {
+  all: List,
+  open: CircleDot,
+  in_progress: Wrench,
+  mine: UserRound,
+  resolved: CheckCheck,
+} as const;
+
 export function ProblemsWorkspace() {
   const t = useTranslations("workspace");
   const shared = useTranslations("shared");
@@ -54,7 +69,7 @@ export function ProblemsWorkspace() {
     blocking: "",
   };
   const { view, status, severity, scooterId, assigneeId, blocking } = filters;
-  const load = useCallback(() => {
+  const load = useCallback(async () => {
     const query = new URLSearchParams({
       ...(view ? { view } : {}),
       page: String(page),
@@ -65,11 +80,45 @@ export function ProblemsWorkspace() {
     if (assigneeId === "unassigned") query.set("unassigned", "true");
     else if (assigneeId) query.set("assigneeId", assigneeId);
     if (blocking) query.set("blocking", blocking);
-    return webApi.fetch(
+    const result = await webApi.fetch(
       `/v1/problems?${query}`,
       v1.problems.problemListSchema,
       { cache: "no-store" },
     );
+    if (result.quickFilterCounts) return result;
+    const countKeys = [
+      "all",
+      "open",
+      "in_progress",
+      "mine",
+      "resolved",
+    ] as const;
+    const totals = await Promise.all(
+      countKeys.map(async (key) => {
+        const countQuery = new URLSearchParams({ page: "1", pageSize: "1" });
+        if (severity) countQuery.set("severity", severity);
+        if (scooterId) countQuery.set("scooterId", scooterId);
+        if (blocking) countQuery.set("blocking", blocking);
+        if (key === "mine") countQuery.set("view", "assigned");
+        else if (key !== "all") countQuery.set("status", key);
+        const response = await webApi.fetch(
+          `/v1/problems?${countQuery}`,
+          v1.problems.problemListSchema,
+          { cache: "no-store" },
+        );
+        return response.total;
+      }),
+    );
+    return {
+      ...result,
+      quickFilterCounts: {
+        all: totals[0]!,
+        open: totals[1]!,
+        in_progress: totals[2]!,
+        mine: totals[3]!,
+        resolved: totals[4]!,
+      },
+    };
   }, [view, status, severity, scooterId, assigneeId, blocking, page]);
   const remote = useRemote(load);
   const quickFilter = assigneeId
@@ -80,21 +129,43 @@ export function ProblemsWorkspace() {
         : "mine"
       : status === "open"
         ? "open"
-        : status === "resolved"
-          ? "resolved"
+        : status === "resolved" || status === "in_progress"
+          ? status
           : status
             ? "custom"
-            : "";
+            : view
+              ? "custom"
+              : "all";
   const mayReadMine = canAccess(user, "problems.read", "ASSIGNED");
+  const quickFilterLabel = (
+    key: "all" | "open" | "in_progress" | "mine" | "resolved",
+  ) => {
+    const Icon = quickFilterIcons[key];
+    return (
+      <>
+        <Icon aria-hidden="true" className="size-4 shrink-0" />
+        {t(`problems.quickFilters.${key}`)}
+        {remote.data?.quickFilterCounts ? (
+          <>
+            {" "}
+            <span className="tabular-nums">
+              {remote.data.quickFilterCounts[key]}
+            </span>
+          </>
+        ) : null}
+      </>
+    );
+  };
 
   return (
-    <main className="flex min-w-0 flex-col gap-6 p-4 md:p-8">
+    <main
+      aria-busy={remote.loading}
+      className="flex w-full min-w-0 max-w-full flex-col gap-6 overflow-x-clip p-4 md:p-8"
+    >
       <PageTitleOverride title={t("problems.title")} />
       <ListLayout
         summary={
-          remote.data && (remote.loading || remote.error)
-            ? shared("list.staleResults")
-            : undefined
+          remote.data && remote.error ? shared("list.staleResults") : undefined
         }
         filters={
           <ListFilterSheet<ProblemFilters>
@@ -272,29 +343,52 @@ export function ProblemsWorkspace() {
       >
         <SegmentedRadioGroup
           appearance="pills"
+          containerClassName="relative -mx-4 overflow-x-auto overscroll-x-contain md:-mx-8"
+          className="w-max min-w-full flex-nowrap px-4 md:px-8"
+          optionClassName="shrink-0 whitespace-nowrap"
           name="problem-quick-filter"
           label={t("problems.quickFilters.label")}
           value={quickFilter}
           deselectValue=""
           options={[
             {
+              value: "all",
+              label: quickFilterLabel("all"),
+              tone: "secondary",
+              colorUnselected: true,
+              subtleUnselected: true,
+            },
+            {
               value: "open",
-              label: t("problems.quickFilters.open"),
-              tone: "primary",
+              label: quickFilterLabel("open"),
+              tone: "info",
+              colorUnselected: true,
+              subtleUnselected: true,
+            },
+            {
+              value: "in_progress",
+              label: quickFilterLabel("in_progress"),
+              tone: "warning",
+              colorUnselected: true,
+              subtleUnselected: true,
             },
             ...(mayReadMine
               ? [
                   {
                     value: "mine",
-                    label: t("problems.quickFilters.mine"),
-                    tone: "primary" as const,
+                    label: quickFilterLabel("mine"),
+                    tone: "personal" as const,
+                    colorUnselected: true,
+                    subtleUnselected: true,
                   },
                 ]
               : []),
             {
               value: "resolved",
-              label: t("problems.quickFilters.resolved"),
-              tone: "primary",
+              label: quickFilterLabel("resolved"),
+              tone: "success",
+              colorUnselected: true,
+              subtleUnselected: true,
             },
           ]}
           onValueChange={(next) => {
@@ -305,8 +399,8 @@ export function ProblemsWorkspace() {
               status:
                 next === "open"
                   ? "open"
-                  : next === "resolved"
-                    ? "resolved"
+                  : next === "resolved" || next === "in_progress"
+                    ? next
                     : "",
               assigneeId: "",
             });
@@ -316,7 +410,7 @@ export function ProblemsWorkspace() {
         />
         <ListStatus
           initial={!remote.data}
-          loading={remote.loading}
+          loading={remote.loading && !remote.data}
           error={remote.error}
           loadingLabel={shared(
             remote.data ? "status.refreshing" : "status.loading",

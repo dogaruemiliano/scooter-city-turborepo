@@ -51,6 +51,13 @@ beforeEach(() => {
     total: 1,
     page: 1,
     pageSize: 25,
+    quickFilterCounts: {
+      all: 60,
+      open: 20,
+      in_progress: 15,
+      mine: 7,
+      resolved: 25,
+    },
   });
 });
 describe("mechanic workspace", () => {
@@ -68,6 +75,13 @@ describe("mechanic workspace", () => {
       total: 2,
       page: 1,
       pageSize: 25,
+      quickFilterCounts: {
+        all: 60,
+        open: 20,
+        in_progress: 15,
+        mine: 7,
+        resolved: 25,
+      },
     });
     renderWorkspace();
     const open = await screen.findByRole("region", { name: "Open" });
@@ -163,6 +177,13 @@ describe("service list filters", () => {
       total: 60,
       page: 1,
       pageSize: 25,
+      quickFilterCounts: {
+        all: 60,
+        open: 20,
+        in_progress: 15,
+        mine: 7,
+        resolved: 25,
+      },
     });
     renderWorkspace();
     await screen.findByRole("button", {
@@ -359,6 +380,13 @@ it("keeps existing results visibly marked when the next page fails", async () =>
     total: 60,
     page: 1,
     pageSize: 25,
+    quickFilterCounts: {
+      all: 60,
+      open: 20,
+      in_progress: 15,
+      mine: 7,
+      resolved: 25,
+    },
   });
   mocks.fetch.mockRejectedValueOnce(new Error("Could not update service work"));
   renderWorkspace();
@@ -391,6 +419,13 @@ it("places the quick radios under the creation action and applies quick filters 
     total: 60,
     page: 1,
     pageSize: 25,
+    quickFilterCounts: {
+      all: 60,
+      open: 20,
+      in_progress: 15,
+      mine: 7,
+      resolved: 25,
+    },
   });
   renderWorkspace();
   await screen.findByRole("button", {
@@ -401,14 +436,22 @@ it("places the quick radios under the creation action and applies quick filters 
   expect(
     create.compareDocumentPosition(group) & Node.DOCUMENT_POSITION_FOLLOWING,
   ).toBeTruthy();
-  expect(within(group).queryByRole("radio", { name: "All" })).toBeNull();
   expect(
-    within(group)
-      .getAllByRole("radio")
-      .every((radio) => !(radio as HTMLInputElement).checked),
-  ).toBe(true);
+    within(group).getByRole("radio", { name: /^All( \d+)?$/ }),
+  ).toBeChecked();
+  await user.click(
+    within(group).getByRole("radio", { name: /^In progress( \d+)?$/ }),
+  );
+  await waitFor(() =>
+    expect(mocks.fetch).toHaveBeenLastCalledWith(
+      "/v1/problems?page=1&status=in_progress",
+      expect.anything(),
+      { cache: "no-store" },
+    ),
+  );
+  await user.click(within(group).getByRole("radio", { name: /^All( \d+)?$/ }));
   await user.click(screen.getByRole("button", { name: "Next" }));
-  await user.click(within(group).getByRole("radio", { name: "Open" }));
+  await user.click(within(group).getByRole("radio", { name: /^Open( \d+)?$/ }));
   await waitFor(() =>
     expect(mocks.fetch).toHaveBeenLastCalledWith(
       "/v1/problems?page=1&status=open",
@@ -416,7 +459,7 @@ it("places the quick radios under the creation action and applies quick filters 
       { cache: "no-store" },
     ),
   );
-  await user.click(within(group).getByRole("radio", { name: "Mine" }));
+  await user.click(within(group).getByRole("radio", { name: /^Mine( \d+)?$/ }));
   await waitFor(() =>
     expect(mocks.fetch).toHaveBeenLastCalledWith(
       "/v1/problems?view=assigned&page=1",
@@ -424,7 +467,7 @@ it("places the quick radios under the creation action and applies quick filters 
       { cache: "no-store" },
     ),
   );
-  await user.click(within(group).getByRole("radio", { name: "Mine" }));
+  await user.click(within(group).getByRole("radio", { name: /^Mine( \d+)?$/ }));
   await waitFor(() =>
     expect(mocks.fetch).toHaveBeenLastCalledWith(
       "/v1/problems?page=1",
@@ -432,7 +475,9 @@ it("places the quick radios under the creation action and applies quick filters 
       { cache: "no-store" },
     ),
   );
-  await user.click(within(group).getByRole("radio", { name: "Resolved" }));
+  await user.click(
+    within(group).getByRole("radio", { name: /^Resolved( \d+)?$/ }),
+  );
   await waitFor(() =>
     expect(mocks.fetch).toHaveBeenLastCalledWith(
       "/v1/problems?page=1&status=resolved",
@@ -440,7 +485,9 @@ it("places the quick radios under the creation action and applies quick filters 
       { cache: "no-store" },
     ),
   );
-  expect(within(group).getByRole("radio", { name: "Resolved" })).toBeChecked();
+  expect(
+    within(group).getByRole("radio", { name: /^Resolved( \d+)?$/ }),
+  ).toBeChecked();
 });
 
 it("uses short Romanian labels and hides Mine when assigned access is absent", async () => {
@@ -451,19 +498,24 @@ it("uses short Romanian labels and hides Mine when assigned access is absent", a
     </NextIntlClientProvider>,
   );
   const group = screen.getByRole("radiogroup", { name: "Filtre rapide" });
-  expect(within(group).queryByRole("radio", { name: "All" })).toBeNull();
   expect(
-    within(group)
-      .getAllByRole("radio")
-      .every((radio) => !(radio as HTMLInputElement).checked),
-  ).toBe(true);
+    within(group).getByRole("radio", { name: /^Toate( \d+)?$/ }),
+  ).toBeChecked();
   expect(
-    within(group).getByRole("radio", { name: "Rezolvate" }),
+    within(group).getByRole("radio", { name: /^În lucru( \d+)?$/ }),
+  ).toBeInTheDocument();
+  expect(
+    within(group).queryByRole("radio", { name: /^Open( \d+)?$/ }),
+  ).toBeNull();
+  expect(
+    within(group).getByRole("radio", { name: /^Rezolvate( \d+)?$/ }),
   ).toBeInTheDocument();
   expect(
     within(group).queryByRole("radio", { name: "Ale mele" }),
   ).not.toBeInTheDocument();
-  await user.click(within(group).getByRole("radio", { name: "Open" }));
+  await user.click(
+    within(group).getByRole("radio", { name: /^Deschise( \d+)?$/ }),
+  );
   await waitFor(() =>
     expect(mocks.fetch).toHaveBeenLastCalledWith(
       "/v1/problems?page=1&status=open",
@@ -471,4 +523,70 @@ it("uses short Romanian labels and hides Mine when assigned access is absent", a
       { cache: "no-store" },
     ),
   );
+});
+
+it("shows API totals inside every Romanian quick filter", async () => {
+  mocks.user.effectiveScopes = { "problems.read": ["ALL"] };
+  mocks.fetch.mockResolvedValue({
+    items: [problem],
+    total: 60,
+    page: 1,
+    pageSize: 25,
+    quickFilterCounts: {
+      all: 60,
+      open: 20,
+      in_progress: 15,
+      mine: 7,
+      resolved: 25,
+    },
+  });
+  render(
+    <NextIntlClientProvider locale="ro" messages={messages.ro}>
+      <ProblemsWorkspace />
+    </NextIntlClientProvider>,
+  );
+  const group = screen.getByRole("radiogroup", { name: "Filtre rapide" });
+  for (const name of [
+    "Toate 60",
+    "Deschise 20",
+    "În lucru 15",
+    "Ale mele 7",
+    "Rezolvate 25",
+  ]) {
+    expect(
+      await within(group).findByRole("radio", { name }),
+    ).toBeInTheDocument();
+  }
+});
+
+it("loads real totals from the list API when aggregate counts are absent", async () => {
+  mocks.user.effectiveScopes = { "problems.read": ["ALL"] };
+  mocks.fetch.mockImplementation(async (url: string) => {
+    const query = new URL(url, "http://localhost").searchParams;
+    const total =
+      query.get("view") === "assigned"
+        ? 7
+        : ({ open: 20, in_progress: 15, resolved: 25 }[
+            query.get("status") ?? ""
+          ] ?? 60);
+    return { items: [problem], total, page: 1, pageSize: 25 };
+  });
+  render(
+    <NextIntlClientProvider locale="ro" messages={messages.ro}>
+      <ProblemsWorkspace />
+    </NextIntlClientProvider>,
+  );
+  const group = screen.getByRole("radiogroup", { name: "Filtre rapide" });
+  expect(group).not.toHaveTextContent("—");
+  for (const name of [
+    "Toate 60",
+    "Deschise 20",
+    "În lucru 15",
+    "Ale mele 7",
+    "Rezolvate 25",
+  ]) {
+    expect(
+      await within(group).findByRole("radio", { name }),
+    ).toBeInTheDocument();
+  }
 });

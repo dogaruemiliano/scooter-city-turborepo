@@ -497,8 +497,8 @@ describe("dedicated creation screen", () => {
     const submit = screen.getByRole("button", { name: "Report problem" });
     expect(submit).toHaveClass("w-full");
     expect(submit.closest('[data-slot="problem-create-actions"]')).toHaveClass(
-      "sticky",
-      "bottom-0",
+      "static",
+      "bottom-auto",
     );
     expect(
       screen.queryByRole("heading", { name: "Report problem" }),
@@ -510,6 +510,20 @@ describe("dedicated creation screen", () => {
     );
     await user.click(screen.getByRole("radio", { name: "Critical" }));
     await user.click(screen.getByRole("radio", { name: "Usable" }));
+    expect(submit.closest('[data-slot="problem-create-actions"]')).toHaveClass(
+      "sticky",
+      "animate-in",
+      "motion-reduce:animate-none",
+    );
+    await user.clear(screen.getByRole("textbox", { name: "Title" }));
+    expect(submit.closest('[data-slot="problem-create-actions"]')).toHaveClass(
+      "static",
+    );
+    expect(submit).toBeDisabled();
+    await user.type(
+      screen.getByRole("textbox", { name: "Title" }),
+      "Broken belt",
+    );
     await user.click(screen.getByRole("button", { name: "Report problem" }));
     await waitFor(() =>
       expect(mocks.push).toHaveBeenCalledWith("/en/scooters/scooter"),

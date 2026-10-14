@@ -19,6 +19,7 @@ export function ScooterPhotos({
   panel = false,
   disabled = false,
   onBusyChange,
+  onSaved,
   number,
   onDraftsChange,
 }: {
@@ -26,6 +27,7 @@ export function ScooterPhotos({
   panel?: boolean;
   disabled?: boolean;
   onBusyChange?: (busy: boolean) => void;
+  onSaved?: () => void;
   number?: number;
   onDraftsChange?: (
     drafts: v1.scooters.ScooterPhotoDraft[],
@@ -47,6 +49,7 @@ export function ScooterPhotos({
         "ALL",
       )}
       onBusyChange={onBusyChange}
+      onSaved={onSaved}
       number={number}
       onDraftsChange={onDraftsChange}
     />
@@ -59,6 +62,7 @@ export function ScooterPhotoGallery({
   editable,
   disabled = false,
   onBusyChange,
+  onSaved,
   number,
   onDraftsChange,
 }: {
@@ -67,6 +71,7 @@ export function ScooterPhotoGallery({
   editable: boolean;
   disabled?: boolean;
   onBusyChange?: (busy: boolean) => void;
+  onSaved?: () => void;
   number?: number;
   onDraftsChange?: (
     drafts: v1.scooters.ScooterPhotoDraft[],
@@ -74,7 +79,7 @@ export function ScooterPhotoGallery({
   ) => void;
 }) {
   const t = useTranslations("scooters.photos");
-  const gallery = useScooterPhotos(scooterId);
+  const gallery = useScooterPhotos(scooterId, onSaved);
   const [sortingBusy, setSortingBusy] = useState(false);
   useEffect(() => {
     onBusyChange?.(gallery.busy || sortingBusy);

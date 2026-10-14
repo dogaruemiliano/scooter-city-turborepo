@@ -198,7 +198,7 @@ export function ScooterEditorFields({
     <>
       {showDocuments ? (
         <>
-          {!editing ? (
+          {!editing || combinedReview ? (
             <ScooterBatchDocuments
               documents={documents}
               disabled={disabled}
@@ -244,7 +244,7 @@ export function ScooterEditorFields({
               </div>
             </FormSection>
           )}
-          {editing ? jsonImport : null}
+          {editing && !combinedReview ? jsonImport : null}
         </>
       ) : null}
       {canReadDocuments &&

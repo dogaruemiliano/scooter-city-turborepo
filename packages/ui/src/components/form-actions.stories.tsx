@@ -71,3 +71,22 @@ export const StickyCard: Story = {
     </form>
   ),
 };
+
+/** Toggle readiness/pending in Controls to preview the shared page-form states. */
+export const RevealWhenReady: Story = {
+  parameters: { layout: "fullscreen" },
+  args: { ready: true, pending: false, status: "Ready to submit." },
+  render: (args) => (
+    <form className="flex min-h-dvh flex-col gap-6 p-4">
+      <p className="flex-1 text-sm text-muted-foreground">Form content</p>
+      <FormActions {...args}>
+        <Button type="button" variant="outline" disabled={args.pending}>
+          Cancel
+        </Button>
+        <Button type="button" disabled={!args.ready || args.pending}>
+          {args.pending ? "Saving…" : "Save"}
+        </Button>
+      </FormActions>
+    </form>
+  ),
+};

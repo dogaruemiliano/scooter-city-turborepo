@@ -16,11 +16,11 @@ The scooter display code is the strongest text. The registration plate always si
 
 The list uses one column, expanding to two at the theme's `xl` breakpoint. Cards fill their grid cells, with the footer anchored below the main content. The loading skeleton follows the same grid and card structure.
 
-A modest photo sits beside the identity and uses contain fitting to preserve the whole scooter. Rental and health information occupy two labeled columns. Footer content wraps when space is limited.
+Identity sits on the left with a compact reserved photo footprint on the right. The larger, right-aligned image extends beyond that footprint into the card padding, with contain fitting and no clipping, background, border, or rounded image crop. Transparent cutouts sit directly on the card surface. Identity text stays on a raised layer, wraps naturally, and retains more row space than the image reserves. The image remains inside the card silhouette and clear of operational metadata. The loading skeleton follows the same footprint and overflow. Rental and health information occupy two labeled columns. Unknown states are unfilled and muted; recorded states use compact semantic indicators. Recorded warnings use a localized warning surface. The muted footer separates renter, payment, mileage, and actions from the identity area. Footer content wraps when space is limited.
 
 ## Elevation & Depth
 
-Borders and separators establish hierarchy. Hover strengthens the card border; keyboard focus displays the shared focus ring around the details link.
+Borders and separators establish hierarchy. Hover strengthens the card border, with reduced motion respected; keyboard focus displays the shared focus ring around the details link.
 
 ## Components
 

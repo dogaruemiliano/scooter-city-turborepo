@@ -3,7 +3,7 @@ import {
   BottomSheetContent,
   BottomSheetTitle,
 } from "@repo/ui/components/bottom-sheet";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { describe, expect, it } from "vitest";
@@ -57,7 +57,9 @@ describe("shared bottom-sheet dismissal", () => {
   it("keeps ordinary sheets dismissible with Escape", async () => {
     render(<Example />);
     await userEvent.setup().keyboard("{Escape}");
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
   });
 
   it("locks required sheets but allows the caller to close after completion", async () => {
@@ -74,6 +76,8 @@ describe("shared bottom-sheet dismissal", () => {
       screen.getByRole("dialog", { name: "Required review" }),
     ).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Complete review" }));
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
   });
 });

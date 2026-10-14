@@ -13,9 +13,32 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ScooterEditForm } from "./ScooterEditForm";
 vi.mock("./ScooterPhotos", () => ({
-  ScooterPhotos: ({ number }: { number?: number }) => (
+  ScooterPhotos: ({
+    number,
+    onSaved,
+    onBusyChange,
+  }: {
+    number?: number;
+    onSaved?: () => void;
+    onBusyChange?: (busy: boolean) => void;
+  }) => (
     <section>
       <h2>{String(number).padStart(2, "0")}. Photos</h2>
+      <button type="button" onClick={() => onBusyChange?.(true)}>
+        Start photo upload
+      </button>
+      {["add", "remove", "reorder"].map((operation) => (
+        <button
+          key={operation}
+          type="button"
+          onClick={() => {
+            onSaved?.();
+            onBusyChange?.(false);
+          }}
+        >
+          {`Saved photo ${operation}`}
+        </button>
+      ))}
     </section>
   ),
 }));
@@ -323,9 +346,10 @@ describe("ScooterEditForm", () => {
     await browser.click(screen.getByRole("button", { name: "Fill fields" }));
     expect(mocks.apiFetch).not.toHaveBeenCalled();
     expect(screen.getByLabelText("Color")).toHaveValue("White");
-    expect(screen.getByRole("status")).toHaveTextContent(
+    expect(importStatus()).toHaveTextContent(
       "1 field could not be interpreted.",
     );
+    await closeTechnical(browser);
     await browser.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() =>
       expect(mocks.apiFetch).toHaveBeenCalledWith(
@@ -345,7 +369,7 @@ describe("ScooterEditForm", () => {
 
   it("lists unresolved fields and highlights them until their values change", async () => {
     const browser = userEvent.setup();
-    const { container } = render(
+    render(
       <NextIntlClientProvider locale="en" messages={messages.en}>
         <ScooterEditForm
           scooter={{ ...scooter, civVersion: "2024" }}
@@ -367,25 +391,27 @@ describe("ScooterEditForm", () => {
       },
     });
     await browser.click(screen.getByRole("button", { name: "Fill fields" }));
-    expect(screen.getByRole("status")).toHaveTextContent(
+    expect(importStatus()).toHaveTextContent(
       "2 fields could not be interpreted.",
     );
     expect(
-      within(screen.getByRole("status"))
+      within(importStatus())
         .getAllByRole("listitem")
         .map((item) => item.textContent),
     ).toEqual(expect.arrayContaining(["Power (kW) (P.2)", "Color"]));
-    for (const name of ["powerKw", "color"]) {
+    await openTechnical(browser);
+    for (const name of ["powerKw"]) {
       expect(
-        container.querySelector(`[data-field-name="${name}"]`),
+        document.querySelector(`[data-field-name="${name}"]`),
       ).toHaveAttribute("data-warning", "true");
     }
     expect(
-      container.querySelector('[data-field-name="maxTrainMassKg"]'),
+      document.querySelector('[data-field-name="maxTrainMassKg"]'),
     ).not.toHaveAttribute("data-warning");
     expect(screen.getByLabelText("Power (kW)")).toHaveAccessibleDescription(
       "Check these CIV rubrics against the document: P.2.",
     );
+    await closeTechnical(browser);
     expect(screen.getByLabelText("Color")).toHaveValue("White");
     expect(
       screen.queryByText(/Confirmed empty in the document/),
@@ -393,31 +419,34 @@ describe("ScooterEditForm", () => {
     expect(
       screen.queryByRole("button", { name: "I have checked these fields" }),
     ).not.toBeInTheDocument();
+    await openTechnical(browser);
     fireEvent.change(screen.getByLabelText("Power (kW)"), {
       target: { value: "9" },
     });
     expect(
-      container.querySelector('[data-field-name="powerKw"]'),
+      document.querySelector('[data-field-name="powerKw"]'),
     ).not.toHaveAttribute("data-warning");
-    expect(screen.getByRole("status")).toHaveTextContent(
+    await closeTechnical(browser);
+    expect(importStatus()).toHaveTextContent(
       "1 field could not be interpreted.",
     );
     expect(
-      within(screen.getByRole("status"))
+      within(importStatus())
         .getAllByRole("listitem")
         .map((item) => item.textContent),
     ).toEqual(["Color"]);
+    await closeTechnical(browser);
     fireEvent.change(screen.getByLabelText("Color"), {
       target: { value: "Blue" },
     });
+
     expect(
-      container.querySelector('[data-field-name="civMentions"]'),
+      screen.queryByText(/field.*could not be interpreted/),
     ).not.toBeInTheDocument();
-    expect(screen.queryByRole("status")).not.toBeInTheDocument();
     // A fresh import flags the freshly unresolved fields again.
     await browser.click(screen.getByRole("button", { name: "Import JSON" }));
     await browser.click(screen.getByRole("button", { name: "Fill fields" }));
-    expect(screen.getByRole("status")).toHaveTextContent(
+    expect(importStatus()).toHaveTextContent(
       "2 fields could not be interpreted.",
     );
     expect(mocks.apiFetch).not.toHaveBeenCalled();
@@ -453,7 +482,7 @@ describe("ScooterEditForm", () => {
     );
     expect(copy.mock.calls[0]?.[0]).toMatch(/"schemaVersion"\s*:\s*2/);
     expect(copy.mock.calls[0]?.[0]).toMatch(/"sourceId"\s*:\s*"civ-file"/);
-    expect(screen.getByRole("status")).toHaveTextContent("Prompt copied");
+    expect(screen.getByText("Prompt copied")).toBeInTheDocument();
     copy.mockRejectedValueOnce(new Error("Denied"));
     await browser.click(
       screen.getByRole("button", { name: "Copy extraction prompt" }),
@@ -631,6 +660,7 @@ describe("ScooterEditForm", () => {
         />
       </NextIntlClientProvider>,
     );
+    await openTechnical(browser);
     const engineField = screen
       .getByLabelText("Engine code")
       .closest("[data-field-name]") as HTMLElement;
@@ -667,10 +697,12 @@ describe("ScooterEditForm", () => {
     );
     const browser = userEvent.setup();
     renderEditForm();
+    await openTechnical(browser);
     await browser.type(
       screen.getByLabelText("Issuing RAR office"),
       "Office draft",
     );
+    await closeTechnical(browser);
     await browser.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() =>
       expect(screen.getByLabelText("Issuing RAR office")).toHaveAttribute(
@@ -693,6 +725,110 @@ describe("ScooterEditForm", () => {
     expect(screen.getByLabelText("Color")).toHaveValue("White");
   });
 
+  it("matches the create panels and preserves saved registration and licence values", async () => {
+    const browser = userEvent.setup();
+    mocks.apiFetch.mockResolvedValue(scooter);
+    render(
+      <NextIntlClientProvider locale="en" messages={messages.en}>
+        <ScooterEditForm
+          scooter={{
+            ...scooter,
+            registrationType: "local",
+            registrationNumber: "VL-BUJORENI-175",
+            requiredLicenseCategory: "A1",
+          }}
+          scooterHref="/en/scooters/scooter-1"
+          brands={brands}
+        />
+      </NextIntlClientProvider>,
+    );
+    expect(
+      screen.getByRole("heading", { name: /Scooter details/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("radiogroup", { name: "Propulsion system" }),
+    ).toBeInTheDocument();
+    await openTechnical(browser);
+    const sheet = screen.getByRole("dialog");
+    expect(sheet).toHaveClass("bg-popover", "text-popover-foreground");
+    expect(sheet.querySelector(".bg-background")).toBeNull();
+    expect(screen.getByLabelText("Power (kW)")).toHaveValue("8.5");
+    await closeTechnical(browser);
+    expect(screen.getByLabelText("VIN")).toHaveValue(scooter.vin);
+    expect(screen.getByLabelText("Model")).toHaveValue("NMAX");
+    expect(screen.getByLabelText("Plate number")).toHaveValue(
+      "VL-BUJORENI-175",
+    );
+    expect(
+      screen.getByRole("combobox", { name: /Required driver license/ }),
+    ).toHaveTextContent("A1");
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+    await browser.clear(screen.getByLabelText("Plate number"));
+    await browser.type(
+      screen.getByLabelText("Plate number"),
+      "VL-BUJORENI-176",
+    );
+    await browser.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() =>
+      expect(mocks.apiFetch).toHaveBeenCalledWith(
+        v1.scooters.ROUTES.update(scooter.id),
+        v1.scooters.scooterSchema,
+        {
+          method: "PATCH",
+          json: {
+            sessionId: "editor-session",
+            registrationNumber: "VL-BUJORENI-176",
+          },
+        },
+      ),
+    );
+  });
+
+  it.each(["add", "remove", "reorder"])(
+    "enables Save after a photo %s and returns without a redundant scooter write",
+    async (operation) => {
+      const browser = userEvent.setup();
+      renderEditForm();
+      const save = screen.getByRole("button", { name: "Save" });
+      expect(save).toBeDisabled();
+      await browser.click(
+        screen.getByRole("button", { name: "Start photo upload" }),
+      );
+      expect(save).toBeDisabled();
+      await browser.click(
+        screen.getByRole("button", { name: `Saved photo ${operation}` }),
+      );
+      expect(save).toBeEnabled();
+      await browser.click(save);
+      expect(mocks.push).toHaveBeenCalledWith("/en/scooters/scooter-1");
+      expect(mocks.refresh).toHaveBeenCalledOnce();
+      expect(mocks.apiFetch).not.toHaveBeenCalled();
+    },
+  );
+
+  it("still saves changed scooter fields after a gallery change", async () => {
+    const browser = userEvent.setup();
+    mocks.apiFetch.mockResolvedValue(scooter);
+    renderEditForm();
+    await browser.click(
+      screen.getByRole("button", { name: "Saved photo add" }),
+    );
+    await browser.clear(screen.getByLabelText("Color"));
+    await browser.type(screen.getByLabelText("Color"), "Blue");
+    await browser.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() =>
+      expect(mocks.apiFetch).toHaveBeenCalledWith(
+        v1.scooters.ROUTES.update(scooter.id),
+        v1.scooters.scooterSchema,
+        {
+          method: "PATCH",
+          json: { sessionId: "editor-session", color: "Blue" },
+        },
+      ),
+    );
+    expect(mocks.push).toHaveBeenCalledWith("/en/scooters/scooter-1");
+  });
+
   it("updates the scooter and returns to the detail page", async () => {
     mocks.apiFetch.mockResolvedValueOnce({ ...scooter, color: "Blue" });
     const browser = userEvent.setup();
@@ -702,6 +838,7 @@ describe("ScooterEditForm", () => {
     await browser.type(screen.getByLabelText("Color"), "Blue");
     await browser.clear(screen.getByLabelText("Current mileage (km)"));
     await browser.type(screen.getByLabelText("Current mileage (km)"), "1350");
+    await closeTechnical(browser);
     await browser.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() =>
@@ -727,6 +864,7 @@ describe("ScooterEditForm", () => {
 
     renderEditForm();
     await browser.clear(screen.getByLabelText("Color"));
+    await closeTechnical(browser);
     await browser.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => expect(mocks.apiFetch).toHaveBeenCalled());
@@ -734,12 +872,13 @@ describe("ScooterEditForm", () => {
     expect(options.json).toMatchObject({ color: null });
   });
 
-  it("never sends registration fields, which have their own sheet", async () => {
+  it("does not send unchanged registration fields", async () => {
     mocks.apiFetch.mockResolvedValueOnce(scooter);
     const browser = userEvent.setup();
 
     renderEditForm();
     await browser.type(screen.getByLabelText("Color"), " updated");
+    await closeTechnical(browser);
     await browser.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => expect(mocks.apiFetch).toHaveBeenCalledOnce());
@@ -759,8 +898,10 @@ describe("ScooterEditForm", () => {
     const browser = userEvent.setup();
     renderEditForm();
     expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+    await openTechnical(browser);
     await browser.type(screen.getByLabelText("Length (mm)"), "1900");
     await browser.type(screen.getByLabelText("Fuel tank capacity (L)"), "5.25");
+    await closeTechnical(browser);
     await browser.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(mocks.apiFetch).toHaveBeenCalledOnce());
     expect(mocks.apiFetch.mock.calls[0]![2].json).toEqual({
@@ -774,12 +915,8 @@ describe("ScooterEditForm", () => {
     mocks.apiFetch.mockResolvedValueOnce(scooter);
     const browser = userEvent.setup();
     renderEditForm();
-    await browser.click(
-      screen.getByRole("combobox", { name: "Propulsion system" }),
-    );
-    await browser.click(
-      await screen.findByRole("option", { name: "Electric" }),
-    );
+    await browser.click(screen.getByRole("radio", { name: "Electric" }));
+    await closeTechnical(browser);
     await browser.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(mocks.apiFetch).toHaveBeenCalledOnce());
     expect(mocks.apiFetch.mock.calls[0]![2].json).toEqual({
@@ -799,13 +936,16 @@ describe("ScooterEditForm", () => {
     mocks.apiFetch.mockRejectedValueOnce(new Error("offline"));
     const browser = userEvent.setup();
     renderEditForm();
+    await openTechnical(browser);
     await browser.type(screen.getByLabelText("Variant"), "Sport");
+    await closeTechnical(browser);
     await browser.click(screen.getByRole("button", { name: "Save" }));
     expect(
       await screen.findByText("Something went wrong. Try again."),
     ).toBeInTheDocument();
-    expect(screen.getByLabelText("Variant")).toHaveValue("Sport");
     expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
+    await openTechnical(browser);
+    expect(screen.getByLabelText("Variant")).toHaveValue("Sport");
     expect(mocks.push).not.toHaveBeenCalled();
   });
 });
@@ -875,7 +1015,9 @@ it("saves scooter fields without document writes or inline brand creation for a 
     }),
   ).not.toBeInTheDocument();
   expect(screen.getByLabelText("Insured name")).toBeDisabled();
+  await openTechnical(browser);
   await browser.type(screen.getByLabelText("Variant"), "Sport");
+  await closeTechnical(browser);
   await browser.click(screen.getByRole("button", { name: "Save" }));
   await waitFor(() => expect(mocks.apiFetch).toHaveBeenCalled());
   expect(mocks.apiFetch).toHaveBeenCalledWith(
@@ -887,3 +1029,23 @@ it("saves scooter fields without document writes or inline brand creation for a 
     },
   );
 });
+
+async function openTechnical(browser: ReturnType<typeof userEvent.setup>) {
+  await browser.click(screen.getByRole("button", { name: "Other fields" }));
+}
+async function closeTechnical(browser: ReturnType<typeof userEvent.setup>) {
+  const button = screen.queryByRole("button", { name: "Return to scooter" });
+  if (button) {
+    await browser.click(button);
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
+  }
+}
+function importStatus() {
+  return screen
+    .getAllByRole("status")
+    .find((element) =>
+      /field.*could not be interpreted/.test(element.textContent ?? ""),
+    )!;
+}

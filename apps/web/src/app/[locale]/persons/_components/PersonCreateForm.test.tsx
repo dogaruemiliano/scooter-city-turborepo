@@ -279,7 +279,11 @@ describe("PersonCreateForm wizard", () => {
     renderCreateForm();
     await enterDocuments(browser);
     const next = screen.getByRole("button", { name: "Review details" });
-    expect(next.parentElement).toHaveClass("md:flex-row", "md:items-center");
+    expect(next.parentElement).toHaveClass(
+      "flex",
+      "items-center",
+      "@form-columns/form-actions:w-auto",
+    );
     expect(
       within(next.parentElement!).getByRole("button", {
         name: "Back",

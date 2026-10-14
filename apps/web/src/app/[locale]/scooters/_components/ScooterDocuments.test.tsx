@@ -319,7 +319,9 @@ describe("Scooter documents", () => {
     const action = await screen.findByRole("button", {
       name: "Validate the documents",
     });
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
     expect(
       screen.getByText(/VIN differs between the scooter/),
     ).toHaveTextContent("CIV.pdf");
@@ -336,7 +338,9 @@ describe("Scooter documents", () => {
       screen.queryByRole("dialog", { name: t.title }),
     ).not.toBeInTheDocument();
     await browser.keyboard("{Escape}");
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
     expect(screen.getByRole("textbox", { name: "VIN" })).toHaveValue(
       enteredVin,
     );
@@ -424,7 +428,9 @@ describe("Scooter documents", () => {
       await browser.click(
         within(review).getByRole("button", { name: t.confirmAndFinish }),
       );
-      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      await waitFor(() =>
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+      );
       expect(
         screen.queryByRole("button", { name: "Validate the documents" }),
       ).not.toBeInTheDocument();
@@ -635,7 +641,9 @@ describe("Scooter documents", () => {
         },
       },
     );
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
     // Upload, classification, and form import span several renders. Poll the
     // existing input instead of recalculating every textbox's accessible name.
     await waitFor(() => expect(vinInput).toHaveValue(scooter.vin), {
@@ -725,11 +733,15 @@ describe("Scooter documents", () => {
     expect(
       screen.queryByRole("checkbox", { name: "I checked CIV.pdf" }),
     ).not.toBeInTheDocument();
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
     fireEvent.change(screen.getByRole("textbox", { name: "VIN" }), {
       target: { value: scooter.vin },
     });
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
     vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
     await browser.click(action);
     const t = messages.en.scooters.extraction.vinReview;
@@ -1045,6 +1057,9 @@ describe("Scooter documents", () => {
       within(screen.getByRole("dialog")).getByRole("button", { name: "Save" }),
     );
     await waitFor(() => expect(mocks.put).toHaveBeenCalledTimes(2));
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
     expect(screen.getByText("2 documents")).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Add Import documents" }),
@@ -1201,7 +1216,9 @@ describe("Scooter documents", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "You can attach up to 20 files per scooter.",
     );
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
     expect(mocks.api).not.toHaveBeenCalled();
   });
 
@@ -1267,7 +1284,9 @@ describe("Scooter documents", () => {
     );
     await browser.keyboard("{Escape}");
     await browser.click(screen.getByRole("button", { name: "Close preview" }));
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
   });
   it("shows local image previews and revokes the object URL on removal", async () => {
     const browser = userEvent.setup();
@@ -1419,10 +1438,16 @@ describe("Scooter documents", () => {
     ).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
     await removeFromViewer(user, "old.pdf");
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
     expect(mocks.api).not.toHaveBeenCalled();
     await user.click(screen.getByRole("button", { name: "Undo removal" }));
     expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
     await removeFromViewer(user, "old.pdf");
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
     await user.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() =>
       expect(mocks.api).toHaveBeenCalledWith(

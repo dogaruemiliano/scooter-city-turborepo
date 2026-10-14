@@ -1,7 +1,6 @@
 import { v1 } from "@repo/api-shared";
 import {
-  Avatar,
-  AvatarFallback,
+  UserAvatar,
   Badge,
   Button,
   Card,
@@ -12,7 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@repo/ui/components";
-import { Clock, Paperclip, UserRound } from "lucide-react";
+import { Clock, Paperclip } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
 import { memberName } from "./ProblemForms";
 
@@ -121,15 +120,7 @@ export function ProblemListItem({
       </CardContent>
       <CardFooter className="mx-(--card-spacing) flex-wrap justify-between gap-3 rounded-none px-0 text-xs text-muted-foreground">
         <div className="flex min-w-0 items-center gap-2">
-          <Avatar
-            aria-hidden="true"
-            size="default"
-            className="ring-2 ring-foreground"
-          >
-            <AvatarFallback>
-              <UserRound className="size-5" />
-            </AvatarFallback>
-          </Avatar>
+          <UserAvatar aria-hidden="true" />
           <span className="min-w-0 wrap-anywhere">
             {assignee || t("unassigned")}
           </span>

@@ -11,6 +11,10 @@ type SegmentedRadioOption<Value extends string> = {
   tone?:
     | "primary"
     | "neutral"
+    | "secondary"
+    | "info"
+    | "warning"
+    | "personal"
     | "destructive"
     | "success"
     | "destructiveSubtle"
@@ -19,6 +23,8 @@ type SegmentedRadioOption<Value extends string> = {
   severity?: "low" | "moderate" | "high" | "critical";
   /** Use the option tone for unselected text as well as its selected fill. */
   colorUnselected?: boolean;
+  /** Use a tinted surface for unselected options. */
+  subtleUnselected?: boolean;
   disabled?: boolean;
 };
 
@@ -46,6 +52,10 @@ type SegmentedRadioGroupProps<Value extends string> = Omit<
 };
 
 const selectedTone = {
+  secondary: "bg-secondary text-secondary-foreground",
+  info: "bg-info text-info-foreground",
+  warning: "bg-warning-strong text-warning-strong-foreground",
+  personal: "bg-personal text-personal-foreground",
   primary: "bg-primary text-primary-foreground",
   neutral: "bg-card text-card-foreground shadow-sm",
   destructive: "bg-destructive text-destructive-foreground",
@@ -69,12 +79,29 @@ const severityTextTone = {
 } as const;
 
 const unselectedTone = {
+  secondary: "text-muted-foreground",
+  info: "text-info",
+  warning: "text-warning-text",
+  personal: "text-personal",
   primary: "text-primary",
   neutral: "text-muted-foreground",
   destructive: "text-destructive",
   success: "text-success",
   destructiveSubtle: "text-destructive",
   successSubtle: "text-success",
+} as const;
+
+const unselectedSurface = {
+  primary: "bg-accent",
+  neutral: "bg-muted",
+  secondary: "bg-muted",
+  info: "bg-info-subtle",
+  warning: "bg-warning-subtle",
+  personal: "bg-personal-subtle",
+  success: "bg-success-subtle",
+  destructive: "bg-destructive-subtle",
+  destructiveSubtle: "bg-destructive-subtle",
+  successSubtle: "bg-success-subtle",
 } as const;
 
 /** Controlled selection with optional deselection and native radio keyboard behavior. */
@@ -186,6 +213,8 @@ function SegmentedRadioGroup<Value extends string>({
                         option.colorUnselected
                           ? unselectedTone[option.tone ?? "neutral"]
                           : "text-muted-foreground",
+                        option.subtleUnselected &&
+                          unselectedSurface[option.tone ?? "neutral"],
                         "hover:bg-muted peer-disabled:bg-disabled peer-disabled:text-disabled-foreground",
                       ),
                 optionClassName,

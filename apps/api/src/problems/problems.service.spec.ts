@@ -102,6 +102,43 @@ describe("ProblemsService authorization and write conflicts", () => {
     });
   });
 
+  it("counts every quick filter across pages using the same read permissions", async () => {
+    db.$transaction.mockImplementation((queries: Promise<unknown>[]) =>
+      Promise.all(queries),
+    );
+    db.scooterProblem.findMany.mockResolvedValue([]);
+    for (const count of [15, 60, 20, 15, 7, 25]) {
+      db.scooterProblem.count.mockResolvedValueOnce(count);
+    }
+    const result = await service.list("mechanic", {
+      page: 2,
+      pageSize: 25,
+      status: "in_progress",
+      view: "assigned",
+      severity: "high",
+    });
+    expect(result.quickFilterCounts).toEqual({
+      all: 60,
+      open: 20,
+      in_progress: 15,
+      mine: 7,
+      resolved: 25,
+    });
+    const countCalls = db.scooterProblem.count.mock.calls as [
+      { where: { AND: unknown[] } },
+    ][];
+    const findCalls = db.scooterProblem.findMany.mock.calls as [
+      { where: { AND: unknown[] } },
+    ][];
+    const base = countCalls[1][0].where;
+    expect(base.AND[1]).toEqual({ severity: "high" });
+    expect(base.AND[0]).toEqual(findCalls[0][0].where.AND[0]);
+    expect(countCalls[4][0].where).toEqual({
+      AND: [base, { assigneeId: "mechanic" }],
+    });
+    expect(result.total).toBe(15);
+  });
+
   it("saves and audits checklist changes for the assigned mechanic", async () => {
     const checklist = [
       { id: "pads", text: "Install brake pads", completed: true },

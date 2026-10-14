@@ -6,6 +6,7 @@ import {
   Button,
   Field,
   FieldLabel,
+  FormActions,
   Input,
   ImageGalleryEditor,
   PersonRow,
@@ -84,6 +85,15 @@ export function CreateProblem({
   const uploads = useRef(new Map<File, v1.problems.ProblemPhotoDraft>());
   const mayAssign = canAccess(user, "problems.assign", "ALL");
   const assignees = useProblemAssignees(mayAssign);
+
+  const readyToSubmit = Boolean(
+    scooterId &&
+    title.trim() &&
+    severity &&
+    blocksUsage &&
+    !fileError &&
+    !galleryBusy,
+  );
 
   async function uploadPhotos() {
     const photos: v1.problems.ProblemPhotoDraft[] = [];
@@ -410,29 +420,12 @@ export function CreateProblem({
         </p>
       </Field>
       <Feedback error={fileError ?? task.error} />
-      <div
+      <FormActions
         data-slot="problem-create-actions"
-        className={
-          stickyActions
-            ? "sticky bottom-0 z-sticky mt-auto flex flex-col gap-2 border-t border-border bg-background py-4 pb-[max(var(--spacing-4),env(safe-area-inset-bottom))]"
-            : "flex flex-wrap gap-3"
-        }
+        ready={stickyActions ? readyToSubmit : undefined}
+        pending={task.busy}
+        className={stickyActions ? "mt-auto w-full" : undefined}
       >
-        <Button
-          className={stickyActions ? "w-full" : undefined}
-          type="submit"
-          disabled={
-            task.busy ||
-            galleryBusy ||
-            !scooterId ||
-            !title.trim() ||
-            !severity ||
-            !blocksUsage ||
-            !!fileError
-          }
-        >
-          {task.busy ? t("problems.reporting") : t("problems.add")}
-        </Button>
         {onCancel ? (
           <Button
             variant="outline"
@@ -443,7 +436,14 @@ export function CreateProblem({
             {t("cancel")}
           </Button>
         ) : null}
-      </div>
+        <Button
+          className={stickyActions ? "w-full" : undefined}
+          type="submit"
+          disabled={task.busy || !readyToSubmit}
+        >
+          {task.busy ? t("problems.reporting") : t("problems.add")}
+        </Button>
+      </FormActions>
     </form>
   );
 }

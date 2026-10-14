@@ -1,6 +1,12 @@
 import { v1 } from "@repo/api-shared";
 import { messages, type SupportedLocale } from "@repo/i18n";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { describe, expect, it, vi } from "vitest";
@@ -168,7 +174,7 @@ describe("ScooterCard", () => {
       screen.getByRole("menuitem", { name: "Edit scooter" }),
     ).toHaveAttribute("href", "/en/scooters/scooter-1/edit");
     await user.keyboard("{Escape}");
-    expect(button).toHaveFocus();
+    await waitFor(() => expect(button).toHaveFocus());
   });
 
   it("does not offer detail or edit actions for deleted records", () => {
