@@ -1,9 +1,24 @@
 "use client";
 
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { v1 } from "@repo/api-shared";
 import {
   Button,
+  BottomSheet,
+  BottomSheetTrigger,
+  BottomSheetContent,
+  BottomSheetHeader,
+  BottomSheetTitle,
+  BottomSheetBody,
+  BottomSheetFooter,
+  BottomSheetClose,
   Field,
   FieldLabel,
   FormActions,
@@ -14,8 +29,9 @@ import {
   SheetSelect,
   Textarea,
 } from "@repo/ui/components";
-import { UserPlusIcon, UserMinusIcon } from "lucide-react";
+import { MoreVertical, UserPlusIcon, UserMinusIcon } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
+import { PageHeaderActions } from "@/components/PageHeaderActions";
 import { useSession } from "@/components/auth/SessionProvider";
 import { canAccess } from "@/lib/access";
 import { webApi } from "@/lib/api";
@@ -26,18 +42,24 @@ import {
   useTask,
 } from "@/components/WorkspaceForm";
 import { ProblemScooterPicker } from "./ProblemScooterPicker";
-import { ProblemChecklist } from "./ProblemChecklist";
+import { ProblemSections } from "./ProblemSections";
 import { ProblemPhotos } from "./ProblemPhotos";
 
 export function memberName(
   member?: {
     id: string;
+    email?: string;
     firstName: string | null;
     lastName: string | null;
   } | null,
 ) {
   return member
-    ? [member.firstName, member.lastName].filter(Boolean).join(" ") || member.id
+    ? [member.firstName, member.lastName]
+        .map((part) => part?.trim())
+        .filter(Boolean)
+        .join(" ") ||
+        member.email?.trim() ||
+        member.id
     : "";
 }
 
@@ -452,7 +474,9 @@ export function ProblemWork({
   problem,
   reload,
   onBusyChange,
+  compact = false,
 }: {
+  compact?: boolean;
   problem: v1.problems.Problem;
   reload: (problem?: v1.problems.Problem) => void;
   onBusyChange?: (busy: boolean) => void;
@@ -461,10 +485,9 @@ export function ProblemWork({
   const { user } = useSession();
   const task = useTask();
   const [photosBusy, setPhotosBusy] = useState(false);
+  const [sectionsBusy, setSectionsBusy] = useState(false);
   const [comment, setComment] = useState("");
   const [resolution, setResolution] = useState("");
-  const [assigning, setAssigning] = useState(false);
-  const [assignee, setAssignee] = useState(problem.assigneeId ?? "");
   const [clearHold, setClearHold] = useState("");
   const [confirm, setConfirm] = useState<"reopen" | "cancel" | null>(null);
   const [editing, setEditing] = useState(false);
@@ -478,7 +501,7 @@ export function ProblemWork({
     canAccess(user, action, own ? "ASSIGNED" : "ALL");
   const mayAssign = canAccess(user, "problems.assign", "ALL");
   const assignees = useProblemAssignees(mayAssign && editable);
-  const busy = task.busy || photosBusy;
+  const busy = task.busy || photosBusy || sectionsBusy;
   useEffect(() => {
     onBusyChange?.(busy);
     return () => onBusyChange?.(false);
@@ -495,61 +518,99 @@ export function ProblemWork({
     );
     reload(updated);
   }
-  return (
-    <div className="flex flex-col gap-6">
-      <Feedback error={task.error} success={task.success} />
-      {task.error ? (
-        <Button
-          variant="outline"
-          className="self-start"
-          disabled={busy}
-          onClick={() => {
-            assignees.reload();
-            void task.run(async () => {
-              const updated = await webApi.fetch(
-                `/v1/problems/${problem.id}`,
-                v1.problems.problemSchema,
-                { cache: "no-store" },
-              );
-              reload(updated);
-            });
-          }}
-        >
-          {t("retry")}
-        </Button>
+  const holdControls = problem.blocksUsage ? (
+    <div className="flex flex-col gap-2 rounded-lg border border-destructive p-4">
+      <p className="text-sm font-medium">{t("problems.holdHelp")}</p>
+      {editable &&
+      (can("problems.resolve") || canAccess(user, "problems.update", "ALL")) ? (
+        <Choice
+          label={t("problems.holdDecision")}
+          value={clearHold}
+          onChange={setClearHold}
+          options={[
+            { value: "", label: t("select") },
+            { value: "retain", label: t("problems.retainHold") },
+            { value: "clear", label: t("problems.clearThisHold") },
+          ]}
+        />
       ) : null}
+    </div>
+  ) : null;
+  const retryAction = task.error ? (
+    <Button
+      variant="outline"
+      className="self-start"
+      disabled={busy}
+      onClick={() => {
+        assignees.reload();
+        void task.run(async () => {
+          const updated = await webApi.fetch(
+            `/v1/problems/${problem.id}`,
+            v1.problems.problemSchema,
+            { cache: "no-store" },
+          );
+          reload(updated);
+        });
+      }}
+    >
+      {t("retry")}
+    </Button>
+  ) : null;
+  return (
+    <div className="flex flex-col gap-8">
+      <Feedback error={task.error} success={task.success} />
+      {retryAction}
       <section
         className="flex flex-col gap-3"
         aria-label={t("problems.assignee")}
       >
-        <h3 className="text-base font-semibold">{t("problems.assignee")}</h3>
-        <div className="rounded-2xl border border-border p-4">
-          <PersonRow
-            name={memberName(problem.assignee) || t("problems.unassigned")}
-            action={
-              mayAssign && editable ? (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label={t("problems.assign")}
-                  disabled={busy}
-                  onClick={() => setAssigning(!assigning)}
-                >
-                  <UserPlusIcon aria-hidden="true" />
-                </Button>
-              ) : undefined
-            }
-          />
-        </div>
-        {mayAssign && editable && assigning ? (
-          <div className="flex flex-col gap-3">
-            <Choice
-              label={t("problems.assignee")}
-              value={assignee}
-              onChange={setAssignee}
-              disabled={busy || assignees.loading}
+        <h3 className="text-sm font-semibold text-muted-foreground">
+          {t("problems.assignee")}
+        </h3>
+        {mayAssign && editable ? (
+          <>
+            {problem.assigneeId ? (
+              <div className="rounded-2xl border border-border bg-card p-4 text-card-foreground">
+                <PersonRow
+                  name={
+                    memberName(problem.assignee) || t("problems.unassigned")
+                  }
+                />
+              </div>
+            ) : null}
+            <SheetSelect
+              label={t("problems.addAssignee")}
+              value={problem.assigneeId}
+              disabled={busy}
+              onValueChange={(assigneeId) =>
+                void task.run(() => mutate("/assignee", "PUT", { assigneeId }))
+              }
+              onClear={() =>
+                void task.run(() =>
+                  mutate("/assignee", "PUT", { assigneeId: null }),
+                )
+              }
+              clearOptionLabel={t("problems.unassigned")}
+              searchPlaceholder={t("problems.searchAssignees")}
+              clearSearchLabel={t("problems.clearAssigneeSearch")}
+              closeLabel={t("cancel")}
+              emptyMessage={
+                assignees.loading
+                  ? t("loading")
+                  : (assignees.error ?? t("problems.noAssignees"))
+              }
+              className="justify-center rounded-dashed-surface border-(length:--dashed-surface-border-width) border-dashed bg-transparent text-muted-foreground"
+              optionClassName="h-auto min-h-20 rounded-xl p-4"
+              triggerContent={
+                <>
+                  <UserPlusIcon
+                    aria-hidden="true"
+                    className="size-5 text-muted-foreground"
+                  />
+                  <span>{t("problems.addAssignee")}</span>
+                </>
+              }
               options={[
-                { value: "", label: t("problems.unassigned") },
                 ...(problem.assignee &&
                 !assignees.data?.items.some(
                   (item) => item.id === problem.assigneeId,
@@ -566,22 +627,26 @@ export function ProblemWork({
                   label: memberName(item),
                 })) ?? []),
               ]}
-            />
-            <Feedback error={assignees.error} />
-            <Button
-              className="self-start"
-              variant="outline"
-              disabled={busy || assignees.loading || !!assignees.error}
-              onClick={() =>
-                void task.run(() =>
-                  mutate("/assignee", "PUT", { assigneeId: assignee || null }),
-                )
+              renderOption={(option) => <PersonRow name={option.label} />}
+              renderHeaderAction={
+                assignees.error
+                  ? () => (
+                      <Button variant="outline" onClick={assignees.reload}>
+                        {t("retry")}
+                      </Button>
+                    )
+                  : undefined
               }
-            >
-              {t("problems.assign")}
-            </Button>
+            />
+          </>
+        ) : (
+          <div className="rounded-2xl border border-border bg-card p-4 text-card-foreground">
+            <PersonRow
+              name={memberName(problem.assignee) || t("problems.unassigned")}
+            />
           </div>
-        ) : null}
+        )}
+        <Feedback error={assignees.error} />
       </section>
       {problem.status === "open" &&
       !problem.assigneeId &&
@@ -594,14 +659,13 @@ export function ProblemWork({
           {t("problems.claim")}
         </Button>
       ) : null}
-      <ProblemChecklist
-        key={JSON.stringify(problem.checklist)}
+      <ProblemSections
         problem={problem}
         editable={editable && can("problems.update")}
+        maySaveLocation={canAccess(user, "problems.update", "ALL")}
         busy={busy}
-        onSave={(checklist) =>
-          void task.run(() => mutate("", "PATCH", { checklist }))
-        }
+        onBusyChange={setSectionsBusy}
+        onSave={(input) => mutate("", "PATCH", input)}
       />
       <ProblemPhotos
         problem={problem}
@@ -618,278 +682,336 @@ export function ProblemWork({
         }}
         onSave={(photos) => mutate("", "PATCH", { photos })}
       />
-      {problem.blocksUsage ? (
-        <div className="flex flex-col gap-2 rounded-lg border border-destructive p-4">
-          <p className="text-sm font-medium">{t("problems.holdHelp")}</p>
-          {editable &&
-          (can("problems.resolve") ||
-            canAccess(user, "problems.update", "ALL")) ? (
-            <Choice
-              label={t("problems.holdDecision")}
-              value={clearHold}
-              onChange={setClearHold}
-              options={[
-                { value: "", label: t("select") },
-                { value: "retain", label: t("problems.retainHold") },
-                { value: "clear", label: t("problems.clearThisHold") },
-              ]}
-            />
-          ) : null}
-        </div>
-      ) : null}
-      {editable && can("problems.resolve") ? (
-        <form
-          className="flex flex-col gap-3"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void task.run(() =>
-              mutate("/resolve", "POST", {
-                resolutionNotes: resolution.trim(),
-                ...(problem.blocksUsage
-                  ? { clearMaintenanceHold: clearHold === "clear" }
-                  : {}),
-              }),
-            );
-          }}
+      {!compact || (editable && can("problems.resolve")) ? (
+        <ProblemWorkPanel
+          compact={compact}
+          title={t("problems.completeTask")}
+          primary={editable && can("problems.resolve")}
         >
-          <Field>
-            <FieldLabel htmlFor={`resolution-${problem.id}`}>
-              {t("problems.resolution")}
-            </FieldLabel>
-            <Textarea
-              id={`resolution-${problem.id}`}
-              placeholder={t("problems.resolutionPlaceholder")}
-              required
-              maxLength={4000}
-              value={resolution}
-              onChange={(event) => setResolution(event.target.value)}
-            />
-          </Field>
-          <Button
-            type="submit"
-            className="self-start"
-            disabled={
-              busy || !resolution.trim() || (problem.blocksUsage && !clearHold)
-            }
-          >
-            {t("problems.resolve")}
-          </Button>
-        </form>
-      ) : null}
-      {problem.resolutionNotes ? (
-        <div>
-          <p className="text-sm font-medium">
-            {t("problems.previousResolution")}
-          </p>
-          <p className="whitespace-pre-wrap text-sm">
-            {problem.resolutionNotes}
-          </p>
-        </div>
-      ) : null}
-      {editable && can("problems.update") ? (
-        <>
-          <div className="flex flex-wrap gap-3">
-            {problem.status === "open" ? (
-              <Button
-                disabled={busy || !problem.assigneeId}
-                onClick={() =>
-                  void task.run(() => mutate("", "PATCH", { startWork: true }))
-                }
-              >
-                {t("problems.start")}
-              </Button>
-            ) : null}
-            <Button
-              variant="outline"
-              disabled={busy}
-              onClick={() => setEditing(!editing)}
-            >
-              {t("problems.editReport")}
-            </Button>
-          </div>
-          {editing ? (
+          {compact ? (
+            <>
+              <Feedback error={task.error} />
+              {retryAction}
+            </>
+          ) : null}
+          {holdControls}
+          {editable && can("problems.resolve") ? (
             <form
               className="flex flex-col gap-3"
               onSubmit={(event) => {
                 event.preventDefault();
                 void task.run(() =>
-                  mutate(
-                    "",
-                    "PATCH",
-                    v1.problems.updateProblemInputSchema.parse({
-                      revision: problem.revision,
-                      title,
-                      description,
-                      ...(severity ? { severity } : {}),
-                    }),
-                  ),
+                  mutate("/resolve", "POST", {
+                    resolutionNotes: resolution.trim(),
+                    ...(problem.blocksUsage
+                      ? { clearMaintenanceHold: clearHold === "clear" }
+                      : {}),
+                  }),
                 );
               }}
             >
               <Field>
-                <FieldLabel htmlFor={`title-${problem.id}`}>
-                  {t("problems.reportTitle")}
-                </FieldLabel>
-                <Input
-                  id={`title-${problem.id}`}
-                  placeholder={t("problems.titlePlaceholder")}
-                  required
-                  value={title}
-                  maxLength={160}
-                  onChange={(e) => setTitle(e.target.value)}
-                />
-              </Field>
-              <Choice
-                label={t("problems.severity")}
-                value={severity}
-                onChange={setSeverity}
-                options={[
-                  { value: "", label: t("problems.unassessed") },
-                  ...v1.problems.problemSeveritySchema.options.map((value) => ({
-                    value,
-                    label: t(`problems.${value}`),
-                  })),
-                ]}
-              />
-              <Field>
-                <FieldLabel htmlFor={`description-${problem.id}`}>
-                  {t("problems.optionalDescription")}
+                <FieldLabel htmlFor={`resolution-${problem.id}`}>
+                  {t("problems.resolution")}
                 </FieldLabel>
                 <Textarea
-                  id={`description-${problem.id}`}
-                  placeholder={t("problems.descriptionPlaceholder")}
-                  value={description}
+                  id={`resolution-${problem.id}`}
+                  placeholder={t("problems.resolutionPlaceholder")}
+                  required
                   maxLength={4000}
-                  onChange={(e) => setDescription(e.target.value)}
+                  value={resolution}
+                  onChange={(event) => setResolution(event.target.value)}
                 />
               </Field>
-              <Button type="submit" disabled={busy}>
-                {t("save")}
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={
+                  busy ||
+                  !resolution.trim() ||
+                  (problem.blocksUsage && !clearHold)
+                }
+              >
+                {t("problems.resolve")}
               </Button>
             </form>
           ) : null}
-        </>
+        </ProblemWorkPanel>
       ) : null}
-      {problem.workNotes ? (
-        <div>
-          <p className="text-sm font-medium">{t("problems.workNotes")}</p>
-          <p className="whitespace-pre-wrap text-sm">{problem.workNotes}</p>
-        </div>
-      ) : null}
-      {can("problems.update") ? (
-        <Button
-          className="self-start"
-          variant="outline"
-          disabled={busy}
-          onClick={() =>
-            void task.run(() =>
-              mutate("/hold", "PUT", { blocksUsage: !problem.blocksUsage }),
-            )
-          }
-        >
-          {problem.blocksUsage
-            ? t("problems.clearHold")
-            : t("problems.setHold")}
-        </Button>
-      ) : null}
-      {problem.reporter ? (
-        <p className="text-sm text-muted-foreground">
-          {t("problems.reportedBy", { name: memberName(problem.reporter) })}
-        </p>
-      ) : null}
-      <div className="flex flex-wrap gap-3">
-        {(problem.status === "resolved" || problem.status === "cancelled") &&
-        canAccess(user, "problems.reopen") ? (
+      <ProblemWorkPanel compact={compact} title={t("problems.moreActions")}>
+        {compact ? (
+          <>
+            <Feedback error={task.error} />
+            {retryAction}
+          </>
+        ) : null}
+        {compact ? holdControls : null}
+        {problem.resolutionNotes ? (
+          <div>
+            <p className="text-sm font-medium">
+              {t("problems.previousResolution")}
+            </p>
+            <p className="whitespace-pre-wrap text-sm">
+              {problem.resolutionNotes}
+            </p>
+          </div>
+        ) : null}
+        {editable && can("problems.update") ? (
+          <>
+            <div className="flex flex-wrap gap-3">
+              {problem.status === "open" ? (
+                <Button
+                  disabled={busy || !problem.assigneeId}
+                  onClick={() =>
+                    void task.run(() =>
+                      mutate("", "PATCH", { startWork: true }),
+                    )
+                  }
+                >
+                  {t("problems.start")}
+                </Button>
+              ) : null}
+              <Button
+                variant="outline"
+                disabled={busy}
+                onClick={() => setEditing(!editing)}
+              >
+                {t("problems.editReport")}
+              </Button>
+            </div>
+            {editing ? (
+              <form
+                className="flex flex-col gap-3"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void task.run(() =>
+                    mutate(
+                      "",
+                      "PATCH",
+                      v1.problems.updateProblemInputSchema.parse({
+                        revision: problem.revision,
+                        title,
+                        description,
+                        ...(severity ? { severity } : {}),
+                      }),
+                    ),
+                  );
+                }}
+              >
+                <Field>
+                  <FieldLabel htmlFor={`title-${problem.id}`}>
+                    {t("problems.reportTitle")}
+                  </FieldLabel>
+                  <Input
+                    id={`title-${problem.id}`}
+                    placeholder={t("problems.titlePlaceholder")}
+                    required
+                    value={title}
+                    maxLength={160}
+                    onChange={(e) => setTitle(e.target.value)}
+                  />
+                </Field>
+                <Choice
+                  label={t("problems.severity")}
+                  value={severity}
+                  onChange={setSeverity}
+                  options={[
+                    { value: "", label: t("problems.unassessed") },
+                    ...v1.problems.problemSeveritySchema.options.map(
+                      (value) => ({
+                        value,
+                        label: t(`problems.${value}`),
+                      }),
+                    ),
+                  ]}
+                />
+                <Field>
+                  <FieldLabel htmlFor={`description-${problem.id}`}>
+                    {t("problems.optionalDescription")}
+                  </FieldLabel>
+                  <Textarea
+                    id={`description-${problem.id}`}
+                    placeholder={t("problems.descriptionPlaceholder")}
+                    value={description}
+                    maxLength={4000}
+                    onChange={(e) => setDescription(e.target.value)}
+                  />
+                </Field>
+                <Button type="submit" disabled={busy}>
+                  {t("save")}
+                </Button>
+              </form>
+            ) : null}
+          </>
+        ) : null}
+        {problem.workNotes ? (
+          <div>
+            <p className="text-sm font-medium">{t("problems.workNotes")}</p>
+            <p className="whitespace-pre-wrap text-sm">{problem.workNotes}</p>
+          </div>
+        ) : null}
+        {can("problems.update") ? (
           <Button
+            className="self-start"
             variant="outline"
             disabled={busy}
-            onClick={() => setConfirm("reopen")}
+            onClick={() =>
+              void task.run(() =>
+                mutate("/hold", "PUT", { blocksUsage: !problem.blocksUsage }),
+              )
+            }
           >
-            {t("problems.reopen")}
+            {problem.blocksUsage
+              ? t("problems.clearHold")
+              : t("problems.setHold")}
           </Button>
         ) : null}
-        {editable && canAccess(user, "problems.update", "ALL") ? (
-          <Button
-            variant="outline"
-            disabled={busy || (problem.blocksUsage && !clearHold)}
-            onClick={() => setConfirm("cancel")}
-          >
-            {t("problems.cancel")}
-          </Button>
-        ) : null}
-      </div>
-      {confirm ? (
-        <div className="flex flex-col gap-3">
-          <p className="text-sm">
-            {t(
-              confirm === "cancel"
-                ? "problems.dismissHelp"
-                : "problems.reopenHelp",
-            )}
+        {problem.reporter ? (
+          <p className="text-sm text-muted-foreground">
+            {t("problems.reportedBy", { name: memberName(problem.reporter) })}
           </p>
-          <div className="flex gap-3">
-            <Button
-              variant="destructive"
-              disabled={busy}
-              onClick={() =>
-                void task.run(() =>
-                  mutate(
-                    `/${confirm}`,
-                    "POST",
-                    confirm === "cancel" && problem.blocksUsage
-                      ? { clearMaintenanceHold: clearHold === "clear" }
-                      : {},
-                  ),
-                )
-              }
-            >
-              {t("access.confirm")}
-            </Button>
+        ) : null}
+        <div className="flex flex-wrap gap-3">
+          {(problem.status === "resolved" || problem.status === "cancelled") &&
+          canAccess(user, "problems.reopen") ? (
             <Button
               variant="outline"
               disabled={busy}
-              onClick={() => setConfirm(null)}
+              onClick={() => setConfirm("reopen")}
             >
-              {t("cancel")}
+              {t("problems.reopen")}
             </Button>
-          </div>
+          ) : null}
+          {editable && canAccess(user, "problems.update", "ALL") ? (
+            <Button
+              variant="outline"
+              disabled={busy || (problem.blocksUsage && !clearHold)}
+              onClick={() => setConfirm("cancel")}
+            >
+              {t("problems.cancel")}
+            </Button>
+          ) : null}
         </div>
-      ) : null}
-      {can("problems.update") ? (
-        <form
-          className="flex flex-col gap-3"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void task.run(async () => {
-              await mutate("/comments", "POST", { body: comment.trim() });
-              setComment("");
-            });
-          }}
-        >
-          <Field>
-            <FieldLabel htmlFor={`comment-${problem.id}`}>
-              {t("problems.comment")}
-            </FieldLabel>
-            <Textarea
-              id={`comment-${problem.id}`}
-              placeholder={t("problems.commentPlaceholder")}
-              required
-              maxLength={4000}
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-            />
-          </Field>
-          <Button
-            className="self-start"
-            type="submit"
-            disabled={busy || !comment.trim()}
+        {confirm ? (
+          <div className="flex flex-col gap-3">
+            <p className="text-sm">
+              {t(
+                confirm === "cancel"
+                  ? "problems.dismissHelp"
+                  : "problems.reopenHelp",
+              )}
+            </p>
+            <div className="flex gap-3">
+              <Button
+                variant="destructive"
+                disabled={busy}
+                onClick={() =>
+                  void task.run(() =>
+                    mutate(
+                      `/${confirm}`,
+                      "POST",
+                      confirm === "cancel" && problem.blocksUsage
+                        ? { clearMaintenanceHold: clearHold === "clear" }
+                        : {},
+                    ),
+                  )
+                }
+              >
+                {t("access.confirm")}
+              </Button>
+              <Button
+                variant="outline"
+                disabled={busy}
+                onClick={() => setConfirm(null)}
+              >
+                {t("cancel")}
+              </Button>
+            </div>
+          </div>
+        ) : null}
+        {can("problems.update") ? (
+          <form
+            className="flex flex-col gap-3"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void task.run(async () => {
+                await mutate("/comments", "POST", { body: comment.trim() });
+                setComment("");
+              });
+            }}
           >
-            {t("problems.addComment")}
-          </Button>
-        </form>
-      ) : null}
-      <ProblemActivity problemId={problem.id} />
+            <Field>
+              <FieldLabel htmlFor={`comment-${problem.id}`}>
+                {t("problems.comment")}
+              </FieldLabel>
+              <Textarea
+                id={`comment-${problem.id}`}
+                placeholder={t("problems.commentPlaceholder")}
+                required
+                maxLength={4000}
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+              />
+            </Field>
+            <Button
+              className="self-start"
+              type="submit"
+              disabled={busy || !comment.trim()}
+            >
+              {t("problems.addComment")}
+            </Button>
+          </form>
+        ) : null}
+        <ProblemActivity problemId={problem.id} />
+      </ProblemWorkPanel>
     </div>
+  );
+}
+
+function ProblemWorkPanel({
+  compact,
+  title,
+  primary = false,
+  children,
+}: {
+  compact: boolean;
+  title: string;
+  primary?: boolean;
+  children: ReactNode;
+}) {
+  const t = useTranslations("workspace");
+  if (!compact) return <>{children}</>;
+  return (
+    <BottomSheet>
+      {primary ? (
+        <BottomSheetTrigger
+          render={
+            <Button className="sticky bottom-4 z-sticky order-last w-full shadow-primary" />
+          }
+        >
+          {title}
+        </BottomSheetTrigger>
+      ) : (
+        <PageHeaderActions>
+          <BottomSheetTrigger
+            render={<Button variant="outline" size="icon" aria-label={title} />}
+          >
+            <MoreVertical aria-hidden="true" />
+          </BottomSheetTrigger>
+        </PageHeaderActions>
+      )}
+      <BottomSheetContent>
+        <BottomSheetHeader>
+          <BottomSheetTitle>{title}</BottomSheetTitle>
+        </BottomSheetHeader>
+        <BottomSheetBody className="gap-6">{children}</BottomSheetBody>
+        <BottomSheetFooter>
+          <BottomSheetClose render={<Button variant="outline" />}>
+            {t("cancel")}
+          </BottomSheetClose>
+        </BottomSheetFooter>
+      </BottomSheetContent>
+    </BottomSheet>
   );
 }
 

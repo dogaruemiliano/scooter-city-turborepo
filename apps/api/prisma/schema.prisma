@@ -1590,6 +1590,9 @@ model ScooterProblem {
   title           String
   description     String    @default("")
   checklist       Json      @default("[]")
+  sections        String[]  @default([])
+  buyList         Json      @default("[]")
+  location        Json?
   severity        String?
   blocksUsage     Boolean   @default(false)
   holdClearedAt   DateTime?
@@ -1613,6 +1616,15 @@ model ScooterProblem {
   @@index([scooterId, status])
   @@index([assigneeId, status])
   @@index([status, assigneeId])
+}
+
+model BusinessLocation {
+  id        String   @id @default(cuid())
+  name      String
+  address   String
+  createdAt DateTime @default(now())
+
+  @@unique([name, address])
 }
 
 model ScooterProblemPhoto {

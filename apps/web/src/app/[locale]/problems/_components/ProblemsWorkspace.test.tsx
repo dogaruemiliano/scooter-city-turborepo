@@ -87,22 +87,17 @@ describe("mechanic workspace", () => {
     const open = await screen.findByRole("region", { name: "Open" });
     const resolved = screen.getByRole("region", { name: "Resolved" });
     expect(
-      within(open).getByRole("button", {
+      within(open).getByRole("link", {
         name: "Inspect rear brake · Honda Vision · 007 HON",
       }),
     ).toBeInTheDocument();
-    const scooterIdentity = within(open).getByRole("button", {
+    const scooterIdentity = within(open).getByRole("link", {
       name: "Inspect rear brake · Honda Vision · 007 HON",
     });
     expect(within(open).getByText("007 HON")).toBeInTheDocument();
     expect(within(open).getByText("Honda Vision")).toBeInTheDocument();
-    expect(scooterIdentity).toHaveAttribute("aria-haspopup", "dialog");
-    expect(scooterIdentity).toHaveClass(
-      "absolute",
-      "inset-0",
-      "h-full",
-      "w-full",
-    );
+    expect(scooterIdentity).toHaveAttribute("href", "/en/problems/problem");
+    expect(scooterIdentity).toHaveClass("absolute", "inset-0");
     expect(scooterIdentity.querySelector("svg")).toBeNull();
     expect(within(resolved).getByText("Replace spring")).toBeInTheDocument();
     expect(document.querySelectorAll('article[data-slot="card"]')).toHaveLength(
@@ -115,49 +110,16 @@ describe("mechanic workspace", () => {
       document.querySelectorAll('[data-slot="avatar-fallback"]'),
     ).toHaveLength(2);
     expect(
-      screen.getAllByRole("button", { name: /Honda Vision · 007 HON/ }),
+      screen.getAllByRole("link", { name: /Honda Vision · 007 HON/ }),
     ).toHaveLength(2);
   });
-  it("claims with a revision and never sends another user as assignee", async () => {
-    const user = userEvent.setup();
-    mocks.fetch.mockImplementation(async (url: string) => {
-      if (url.endsWith("/claim"))
-        return { ...problem, assigneeId: "mechanic", revision: 5 };
-      if (url.includes("/activity"))
-        return { items: [], total: 0, page: 1, pageSize: 25 };
-      return { items: [problem], total: 1, page: 1, pageSize: 25 };
+  it("opens problem details as a full page", async () => {
+    renderWorkspace();
+    const link = await screen.findByRole("link", {
+      name: "Inspect rear brake · Honda Vision · 007 HON",
     });
-    render(
-      <NextIntlClientProvider locale="en" messages={messages.en}>
-        <ProblemsWorkspace />
-      </NextIntlClientProvider>,
-    );
-    await user.click(
-      await screen.findByRole("button", {
-        name: "Inspect rear brake · Honda Vision · 007 HON",
-      }),
-    );
-    const detail = screen.getByRole("dialog", { name: "Inspect rear brake" });
-    expect(
-      within(detail).getByRole("heading", { name: "Inspect rear brake" }),
-    ).toBeInTheDocument();
-    expect(within(detail).getByText("007 HON")).toBeInTheDocument();
-    expect(detail).toHaveClass("bg-popover", "text-popover-foreground");
-    expect(detail.querySelectorAll(".bg-background")).toHaveLength(0);
-    expect(
-      screen.queryByRole("textbox", { name: "Work notes" }),
-    ).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Claim problem" }));
-    await waitFor(() =>
-      expect(mocks.fetch).toHaveBeenCalledWith(
-        "/v1/problems/problem/claim",
-        expect.anything(),
-        { method: "POST", json: { revision: 4 } },
-      ),
-    );
-    expect(
-      screen.queryByRole("combobox", { name: "Assigned mechanic" }),
-    ).not.toBeInTheDocument();
+    expect(link).toHaveAttribute("href", "/en/problems/problem");
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 });
 
@@ -186,7 +148,7 @@ describe("service list filters", () => {
       },
     });
     renderWorkspace();
-    await screen.findByRole("button", {
+    await screen.findByRole("link", {
       name: "Inspect rear brake · Honda Vision · 007 HON",
     });
     await user.click(screen.getByRole("button", { name: "Next" }));
@@ -239,7 +201,7 @@ describe("service list filters", () => {
   it("only exposes readable service views and treats no selection as all accessible problems", async () => {
     const user = userEvent.setup();
     renderWorkspace();
-    await screen.findByRole("button", {
+    await screen.findByRole("link", {
       name: "Inspect rear brake · Honda Vision · 007 HON",
     });
     expect(
@@ -306,7 +268,7 @@ describe("service list filters", () => {
         <ProblemsWorkspace />
       </NextIntlClientProvider>,
     );
-    await screen.findByRole("button", {
+    await screen.findByRole("link", {
       name: "Inspect rear brake · Honda Vision · 007 HON",
     });
     const filterName = messages.ro.shared.list.filters;
@@ -366,7 +328,7 @@ describe("service list filters", () => {
     expect(screen.getByRole("button", { name: "Filters" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Reload" }));
     expect(
-      await screen.findByRole("button", {
+      await screen.findByRole("link", {
         name: "Inspect rear brake · Honda Vision · 007 HON",
       }),
     ).toBeInTheDocument();
@@ -390,7 +352,7 @@ it("keeps existing results visibly marked when the next page fails", async () =>
   });
   mocks.fetch.mockRejectedValueOnce(new Error("Could not update service work"));
   renderWorkspace();
-  await screen.findByRole("button", {
+  await screen.findByRole("link", {
     name: "Inspect rear brake · Honda Vision · 007 HON",
   });
   await user.click(screen.getByRole("button", { name: "Next" }));
@@ -401,7 +363,7 @@ it("keeps existing results visibly marked when the next page fails", async () =>
     screen.getByText(messages.en.shared.list.staleResults),
   ).toBeInTheDocument();
   expect(
-    screen.getByRole("button", {
+    screen.getByRole("link", {
       name: "Inspect rear brake · Honda Vision · 007 HON",
     }),
   ).toBeInTheDocument();
@@ -428,7 +390,7 @@ it("places the quick radios under the creation action and applies quick filters 
     },
   });
   renderWorkspace();
-  await screen.findByRole("button", {
+  await screen.findByRole("link", {
     name: "Inspect rear brake · Honda Vision · 007 HON",
   });
   const group = screen.getByRole("radiogroup", { name: "Quick filters" });

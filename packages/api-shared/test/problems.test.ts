@@ -2,6 +2,34 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { v1 } from "../src";
 
+test("task sections validate buy lists and saved or one-off locations", () => {
+  const valid = {
+    revision: 1,
+    sections: ["buyList", "location"],
+    buyList: [{ id: "tire", text: "Rear tire", completed: false }],
+    location: {
+      name: "Workshop",
+      address: "10 Main Street",
+      savedLocationId: null,
+    },
+  };
+  assert.equal(
+    v1.problems.updateProblemInputSchema.safeParse(valid).success,
+    true,
+  );
+  for (const input of [
+    { ...valid, sections: ["buyList", "buyList"] },
+    { ...valid, sections: ["unknown"] },
+    { ...valid, buyList: [...valid.buyList, ...valid.buyList] },
+    { ...valid, buyList: [{ id: "tire", text: " ", completed: false }] },
+    { ...valid, location: { name: "Workshop", address: " " } },
+  ])
+    assert.equal(
+      v1.problems.updateProblemInputSchema.safeParse(input).success,
+      false,
+    );
+});
+
 test("checklists reject duplicate IDs, empty text and excessive items", () => {
   const item = { id: "pads", text: "Install pads", completed: false };
   assert.equal(
