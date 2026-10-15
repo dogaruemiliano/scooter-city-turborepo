@@ -36,12 +36,10 @@ const SEARCH_KEYS: readonly FuzzySearchKey<SheetSelectOption>[] = [
   { name: "value", weight: 1, get: (option) => option.value },
 ];
 
-export interface SheetSelectProps {
+interface SheetSelectBaseProps {
   /** Sheet title, and the trigger's accessible name unless `labelledById` is set. */
   label: string;
-  value: string | null | undefined;
   options: readonly SheetSelectOption[];
-  onValueChange: (value: string) => void;
   triggerRef?: React.Ref<HTMLButtonElement>;
   onBlur?: () => void;
   /** Optional action inside the sheet; call `select` to select and close it. */
@@ -72,9 +70,28 @@ export interface SheetSelectProps {
   closeLabel?: string;
   className?: string;
   optionClassName?: string;
+  /** Rich option content; label remains the search and accessible name. */
+  renderOption?: (option: SheetSelectOption) => React.ReactNode;
+  /** Custom trigger content, for collection add/change actions. */
+  triggerContent?: React.ReactNode;
 }
 
+export type SheetSelectProps = SheetSelectBaseProps &
+  (
+    | {
+        multiple?: false;
+        value: string | null | undefined;
+        onValueChange: (value: string) => void;
+      }
+    | {
+        multiple: true;
+        value: readonly string[];
+        onValueChange: (value: string[]) => void;
+      }
+  );
+
 function SheetSelect({
+  multiple,
   label,
   value,
   options,
@@ -97,6 +114,8 @@ function SheetSelect({
   closeLabel = "Close",
   className,
   optionClassName,
+  renderOption,
+  triggerContent,
 }: SheetSelectProps) {
   const mobile = useIsMobile(breakpoints.lg);
   const [open, setOpen] = React.useState(false);
@@ -106,8 +125,15 @@ function SheetSelect({
     () => createFuzzyIndex(options, { keys: SEARCH_KEYS }),
     [options],
   );
-  const selectedValue = value;
-  const selectedOption = options.find((option) => option.value === value);
+  const selectedValues = multiple ? value : value ? [value] : [];
+  const selectedSet = new Set(selectedValues);
+  const hasSelection = selectedValues.length > 0;
+  const selectedLabel = selectedValues
+    .map(
+      (selected) =>
+        options.find((option) => option.value === selected)?.label ?? selected,
+    )
+    .join(", ");
   const filteredOptions = React.useMemo(
     () => searchFuzzyIndex(searchIndex, query, options),
     [options, query, searchIndex],
@@ -116,6 +142,14 @@ function SheetSelect({
   const showClearOption = Boolean(onClear && clearOptionLabel && !query.trim());
 
   function select(value: string) {
+    if (multiple) {
+      onValueChange(
+        selectedSet.has(value)
+          ? selectedValues.filter((selected) => selected !== value)
+          : [...selectedValues, value],
+      );
+      return;
+    }
     onValueChange(value);
     setOpen(false);
     setQuery("");
@@ -160,18 +194,22 @@ function SheetSelect({
               className,
             )}
           >
-            <span
-              className={cn(
-                "truncate",
-                selectedOption ? "text-foreground" : "text-muted-foreground",
-              )}
-            >
-              {selectedOption?.label ?? (value || placeholder)}
-            </span>
-            <ChevronDownIcon
-              aria-hidden="true"
-              className="size-4 shrink-0 text-muted-foreground"
-            />
+            {triggerContent ?? (
+              <>
+                <span
+                  className={cn(
+                    "truncate",
+                    hasSelection ? "text-foreground" : "text-muted-foreground",
+                  )}
+                >
+                  {selectedLabel || placeholder}
+                </span>
+                <ChevronDownIcon
+                  aria-hidden="true"
+                  className="size-4 shrink-0 text-muted-foreground"
+                />
+              </>
+            )}
           </button>
         }
       />
@@ -192,7 +230,7 @@ function SheetSelect({
           </div>
         </BottomSheetHeader>
 
-        <BottomSheetBody>
+        <BottomSheetBody className="overflow-hidden pb-0">
           <div className="flex h-10 shrink-0 items-center rounded-lg border border-input bg-control px-3 transition-colors duration-fast ease-standard focus-within:border-ring focus-within:ring-2 focus-within:ring-ring">
             <SearchIcon
               aria-hidden="true"
@@ -224,23 +262,23 @@ function SheetSelect({
               {emptyMessage}
             </div>
           ) : (
-            <ul className="flex min-h-0 flex-col gap-1 overflow-y-auto overscroll-contain">
+            <ul className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto overscroll-contain">
               {showClearOption ? (
                 <li>
                   <button
                     type="button"
                     onClick={clear}
-                    aria-current={selectedValue ? undefined : "true"}
+                    aria-current={hasSelection ? undefined : "true"}
                     className={cn(
                       "flex h-10 w-full items-center justify-between gap-2 rounded px-3 py-2 text-left text-sm outline-none transition-colors duration-fast ease-standard focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:text-disabled-foreground",
-                      selectedValue
+                      hasSelection
                         ? "bg-selectable-row text-muted-foreground hover:bg-accent/50"
                         : "bg-accent font-medium text-accent-foreground",
                       optionClassName,
                     )}
                   >
                     <span className="truncate">{clearOptionLabel}</span>
-                    {selectedValue ? null : (
+                    {hasSelection ? null : (
                       <CheckIcon
                         aria-hidden="true"
                         className="size-4 shrink-0"
@@ -255,19 +293,29 @@ function SheetSelect({
                     type="button"
                     onClick={() => select(option.value)}
                     disabled={option.disabled}
+                    aria-label={renderOption ? option.label : undefined}
+                    aria-pressed={
+                      multiple ? selectedSet.has(option.value) : undefined
+                    }
                     aria-current={
-                      option.value === selectedValue ? "true" : undefined
+                      !multiple && selectedSet.has(option.value)
+                        ? "true"
+                        : undefined
                     }
                     className={cn(
                       "flex h-10 w-full items-center justify-between gap-2 rounded px-3 py-2 text-left text-sm outline-none transition-colors duration-fast ease-standard focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:text-disabled-foreground",
-                      option.value === selectedValue
+                      selectedSet.has(option.value)
                         ? "bg-accent font-medium text-accent-foreground"
                         : "bg-selectable-row text-foreground hover:bg-accent/50",
                       optionClassName,
                     )}
                   >
-                    <span className="truncate">{option.label}</span>
-                    {option.value === selectedValue ? (
+                    {renderOption ? (
+                      renderOption(option)
+                    ) : (
+                      <span className="truncate">{option.label}</span>
+                    )}
+                    {selectedSet.has(option.value) ? (
                       <CheckIcon
                         aria-hidden="true"
                         className="size-4 shrink-0"

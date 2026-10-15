@@ -115,12 +115,13 @@ describe("Customer portal boundaries", () => {
         id: "scooter",
         fleetNumber: 1,
         model: null,
-        brand: { name: "Brand" },
+        brand: { name: "Brand", code: "BRD" },
         registrationNumber: null,
       },
     } as RentalRow;
     const result = toCustomerRental(row);
     expect(result.customerNotes).toBe("Return with keys");
+    expect(result.scooter.brandCode).toBe("BRD");
     expect(result).not.toHaveProperty("internalNotes");
     expect(result).not.toHaveProperty("person");
     expect(result).not.toHaveProperty("personId");

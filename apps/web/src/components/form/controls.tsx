@@ -98,7 +98,7 @@ export function FormSegmentedRadioGroup<Value extends string>(
     "name" | "value" | "onValueChange" | "label"
   >,
 ) {
-  const { controlProps, name, label } = useFormFieldControl();
+  const { controlProps, name, label, required } = useFormFieldControl();
   const { control } = useFormContext();
   return (
     <Controller
@@ -109,6 +109,7 @@ export function FormSegmentedRadioGroup<Value extends string>(
           {...props}
           {...controlProps}
           label={label}
+          required={props.required ?? required}
           name={field.name}
           value={field.value ?? ""}
           onValueChange={field.onChange}

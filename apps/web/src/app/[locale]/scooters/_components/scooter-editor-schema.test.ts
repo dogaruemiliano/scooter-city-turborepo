@@ -216,18 +216,17 @@ describe("scooter editor conversion", () => {
       color: "",
       powerKw: "8,5",
       registrationType: "temporary",
-      registrationNumber: "INVALID",
-      registrationDate: "2099-01-01",
+      registrationNumber: "CJ0123",
+      registrationDate: "2025-01-01",
     });
     expect(
       scooterChangedFields(input, {
         color: true,
         powerKw: true,
-        registrationType: true,
       }),
     ).toEqual({ color: null, powerKw: 8.5 });
-    expect(input).not.toHaveProperty("registrationType");
-    expect(input).not.toHaveProperty("registrationNumber");
+    expect(input.registrationType).toBe("temporary");
+    expect(input.registrationNumber).toBe("CJ0123");
   });
 
   it("excludes hidden drafts from validation and clears only on a propulsion change", () => {

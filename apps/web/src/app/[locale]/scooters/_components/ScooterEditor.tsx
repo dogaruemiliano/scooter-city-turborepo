@@ -161,6 +161,8 @@ export function ScooterEditor({
         analysis.entries[source.sourceId]?.status === "success"),
   );
   const [photosBusy, setPhotosBusy] = useState(false);
+  const [photosChanged, setPhotosChanged] = useState(false);
+  const onPhotosSaved = useCallback(() => setPhotosChanged(true), []);
   const [photoDrafts, setPhotoDrafts] = useState<
     v1.scooters.ScooterPhotoDraft[]
   >([]);
@@ -179,7 +181,6 @@ export function ScooterEditor({
   });
   const createValues = useWatch({
     control: form.control,
-    disabled: Boolean(scooter),
   });
   const clearedFields =
     scooter && scooter.powertrainType !== powertrain
@@ -233,6 +234,19 @@ export function ScooterEditor({
     submitting.current = true;
     setRequestError(null);
     try {
+      // Gallery writes have already persisted; a photo-only Save finishes editing.
+      if (
+        scooter &&
+        photosChanged &&
+        !isDirty &&
+        !documents.changed &&
+        !importedRawFields
+      ) {
+        setSaveCompleted(true);
+        router.push(returnHref);
+        router.refresh();
+        return;
+      }
       const sessionId = await documents.ensureSession();
       documents.beginSave();
       const json = scooter ? scooterChangedFields(input, dirtyFields) : input;
@@ -497,9 +511,7 @@ export function ScooterEditor({
   );
 
   return (
-    <div
-      className={`mx-auto flex w-full min-w-0 max-w-(--breakpoint-xl) flex-1 flex-col gap-6 px-4 pt-6 sm:px-8 sm:pt-8 ${scooter ? "pb-4" : "pb-[calc(var(--spacing-16)+env(safe-area-inset-bottom))] sm:pb-[calc(var(--spacing-24)+env(safe-area-inset-bottom))]"}`}
-    >
+    <div className="mx-auto flex w-full min-w-0 max-w-(--breakpoint-xl) flex-1 flex-col gap-6 px-4 pt-6 sm:px-8 sm:pt-8 pb-[calc(var(--spacing-16)+env(safe-area-inset-bottom))] sm:pb-[calc(var(--spacing-24)+env(safe-area-inset-bottom))]">
       {scooter && (
         <>
           <PageTitleOverride title={v1.scooters.scooterDisplayCode(scooter)} />
@@ -515,6 +527,17 @@ export function ScooterEditor({
             className="grid min-w-0 gap-8"
             noValidate
             onSubmit={(event) => {
+              if (
+                scooter &&
+                photosChanged &&
+                !isDirty &&
+                !documents.changed &&
+                !importedRawFields
+              ) {
+                event.preventDefault();
+                void submit({});
+                return;
+              }
               void form.handleSubmit(submit, (errors) => {
                 setRequestError(null);
                 focusErrors(errors);
@@ -541,17 +564,7 @@ export function ScooterEditor({
                   sources={extraction.sources}
                 >
                   <ScooterEditorFields
-                    photos={
-                      scooter ? (
-                        <ScooterPhotos
-                          scooterId={scooter.id}
-                          number={2}
-                          disabled={isSubmitting}
-                          onBusyChange={setPhotosBusy}
-                        />
-                      ) : undefined
-                    }
-                    step={scooter ? undefined : "documents"}
+                    step="documents"
                     combinedReview={!scooter}
                     onRetryAnalysis={(sourceId) => {
                       void analysis.run({ sourceId });
@@ -588,30 +601,31 @@ export function ScooterEditor({
                     editing={Boolean(scooter)}
                     disabled={isSubmitting}
                   />
-                  {!scooter ? (
-                    <section className="mt-8 grid min-w-0 gap-6 pt-8">
-                      <h2 className="text-xl font-semibold">
-                        {t("creation.scooterDetails")}
-                      </h2>
-                      <ScooterCreateFields
-                        photos={
-                          <ScooterPhotos
-                            panel
-                            number={2}
-                            disabled={isSubmitting}
-                            onBusyChange={setPhotosBusy}
-                            onDraftsChange={onPhotoDraftsChange}
-                          />
-                        }
-                        brands={availableBrands}
-                        onBrandCreated={(brand) =>
-                          setCreatedBrands((current) => [...current, brand])
-                        }
-                        disabled={isSubmitting}
-                        importResult={extraction.reviewResult}
-                      />
-                    </section>
-                  ) : null}
+                  <section className="mt-8 grid min-w-0 gap-6 pt-8">
+                    <h2 className="text-xl font-semibold">
+                      {t("creation.scooterDetails")}
+                    </h2>
+                    <ScooterCreateFields
+                      editing={Boolean(scooter)}
+                      photos={
+                        <ScooterPhotos
+                          scooterId={scooter?.id}
+                          panel
+                          number={2}
+                          disabled={isSubmitting}
+                          onBusyChange={setPhotosBusy}
+                          onSaved={onPhotosSaved}
+                          onDraftsChange={onPhotoDraftsChange}
+                        />
+                      }
+                      brands={availableBrands}
+                      onBrandCreated={(brand) =>
+                        setCreatedBrands((current) => [...current, brand])
+                      }
+                      disabled={isSubmitting}
+                      importResult={extraction.reviewResult}
+                    />
+                  </section>
                 </ScooterImportReviewProvider>
               </ScooterDocumentAnalysisContext>
               <div
@@ -725,9 +739,9 @@ export function ScooterEditor({
               </p>
             ) : null}
             <ScooterCreateActions
-              enabled={!scooter}
-              ready={scooterRequiredFieldsValid(createValues)}
+              ready={photosChanged || scooterRequiredFieldsValid(createValues)}
               pending={documentsProcessing}
+              submitting={isSubmitting}
               status={
                 scooter
                   ? undefined
@@ -818,6 +832,7 @@ export function ScooterEditor({
                   Boolean(
                     scooter &&
                     !isDirty &&
+                    !photosChanged &&
                     !documents.changed &&
                     !importedRawFields,
                   )

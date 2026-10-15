@@ -8,6 +8,7 @@ export function ScooterCreateActions({
   enabled = true,
   ready,
   pending = false,
+  submitting = false,
   status,
   review,
   children,
@@ -15,24 +16,20 @@ export function ScooterCreateActions({
   enabled?: boolean;
   ready: boolean;
   pending?: boolean;
+  submitting?: boolean;
   status: ReactNode;
   review?: { label: string; onClick: () => void; disabled?: boolean };
   children: ReactNode;
 }) {
   if (!enabled) return <FormActions status={status}>{children}</FormActions>;
-  const floating = !pending && (ready || Boolean(review));
+  const readyToAct = !pending && (ready || Boolean(review));
 
   return (
     <FormActions
-      sticky
+      ready={readyToAct}
+      pending={submitting}
       status={status}
-      className={
-        floating
-          ? `self-end bg-floating-action-surface backdrop-blur-floating-surface ${review ? "animate-in slide-in-from-bottom-4 duration-normal motion-reduce:animate-none" : ""}`
-          : "static bottom-auto sm:bottom-auto"
-      }
       data-slot="create-actions"
-      data-sticky={floating}
     >
       {review && !pending ? (
         <Button

@@ -262,6 +262,19 @@ export const scooterTechnicalDetailsSchema = z.object({
 export const scooterSchema = z
   .object({
     coverUrl: z.string().nullable().optional(),
+    problemSeverityCounts: z
+      .object({
+        low: z.number().int().nonnegative(),
+        moderate: z.number().int().nonnegative(),
+        high: z.number().int().nonnegative(),
+        critical: z.number().int().nonnegative(),
+        unknown: z.number().int().nonnegative(),
+      })
+      .optional()
+      .describe(
+        "Counts of open or in-progress problems and any remaining usage blockers, grouped by severity.",
+      ),
+    maintenanceHoldCount: z.number().int().nonnegative().optional(),
     documents: scooterDocumentListSchema.optional(),
     insurancePolicies: z.array(insurancePolicySchema).optional(),
     insuranceAttention: insuranceAttentionSchema.nullable().optional(),

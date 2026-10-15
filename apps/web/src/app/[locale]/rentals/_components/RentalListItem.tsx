@@ -1,4 +1,4 @@
-import type { v1 } from "@repo/api-shared";
+import { v1 } from "@repo/api-shared";
 import { Badge } from "@repo/ui/components/badge";
 import { useLocale, useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
@@ -20,7 +20,7 @@ export function RentalListItem({
           className="rounded-sm font-medium text-link underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
         >
           {rental.scooter.brandName} {rental.scooter.model} ·{" "}
-          {rental.scooter.fleetNumber}
+          {v1.scooters.scooterDisplayCode(rental.scooter)}
         </Link>
         <Badge variant="secondary">{t(rental.status)}</Badge>
       </div>

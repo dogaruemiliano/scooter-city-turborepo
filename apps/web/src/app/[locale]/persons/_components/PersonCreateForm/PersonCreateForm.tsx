@@ -130,6 +130,16 @@ function DocumentPersonCreateForm({ personsHref }: PersonCreateFormProps) {
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const showUnder18Warning = isUnder18Person(form);
   const uploadingPhotos = hasDocumentPhotoStatus(form, "uploading");
+  const submissionCandidate = createPersonInput(form, () => "");
+  const readyToSubmit =
+    step === "review" &&
+    !nameConfirmationRequired &&
+    !uploadingPhotos &&
+    !extraction.pending &&
+    !firstDocumentPhotoWithStatus(form, "failed") &&
+    !submissionCandidate.error &&
+    v1.persons.createPersonInputSchema.safeParse(submissionCandidate.input)
+      .success;
   const stepSummary = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     stepSummary.current?.focus();
@@ -542,6 +552,7 @@ function DocumentPersonCreateForm({ personsHref }: PersonCreateFormProps) {
           {feedback ? <CreateFormFeedback feedback={feedback} /> : null}
 
           <FormActions
+            ready={readyToSubmit}
             creating={creating}
             uploadingPhotos={uploadingPhotos}
             extracting={extraction.pending}

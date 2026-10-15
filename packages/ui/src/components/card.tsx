@@ -6,7 +6,7 @@ type CardElement = "div" | "article" | "section" | "form";
 
 type CardProps<Element extends CardElement = "div"> = {
   as?: Element;
-  size?: "default" | "sm";
+  size?: "default" | "sm" | "comfortable";
   surface?: "default" | "raised";
   border?: "transparent" | "default" | "primary";
 } & Omit<React.ComponentProps<Element>, "as">;
@@ -25,7 +25,7 @@ function Card<Element extends CardElement = "div">({
     "data-surface": surface,
     "data-border": border,
     className: cn(
-      "group/card flex min-w-0 flex-col gap-(--card-spacing) overflow-hidden rounded-xl border bg-card py-(--card-spacing-y) text-sm text-card-foreground [--card-spacing:--spacing(3)] [--card-spacing-y:--spacing(3)] md:[--card-spacing:--spacing(5)] md:[--card-spacing-y:var(--card-spacing)] has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl",
+      "group/card flex min-w-0 flex-col gap-(--card-spacing) overflow-hidden rounded-xl border bg-card py-(--card-spacing-y) text-sm text-card-foreground [--card-spacing:--spacing(3)] [--card-spacing-y:--spacing(3)] md:[--card-spacing:--spacing(5)] md:[--card-spacing-y:var(--card-spacing)] has-data-[slot=card-accent]:relative has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl",
       {
         transparent: "border-transparent",
         default: "border-border",
@@ -35,10 +35,27 @@ function Card<Element extends CardElement = "div">({
         "rounded-2xl bg-popover text-popover-foreground [--card-spacing:--spacing(3)] md:[--card-spacing:--spacing(6)]",
       size === "sm" &&
         "[--card-spacing:--spacing(3)] md:[--card-spacing:--spacing(3)]",
+      size === "comfortable" &&
+        "[--card-spacing:--spacing(5)] md:[--card-spacing:--spacing(5)]",
       className,
     ),
     ...props,
   });
+}
+
+/** A straight inset color strip, clipped by the card's outer silhouette. */
+function CardAccent({ className, ...props }: React.ComponentProps<"span">) {
+  return (
+    <span
+      {...props}
+      aria-hidden="true"
+      data-slot="card-accent"
+      className={cn(
+        "pointer-events-none absolute inset-y-0 left-0 w-1 bg-primary",
+        className,
+      )}
+    />
+  );
 }
 
 function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
@@ -118,6 +135,7 @@ function CardFooter({ className, ...props }: React.ComponentProps<"div">) {
 
 export {
   Card,
+  CardAccent,
   CardHeader,
   CardFooter,
   CardTitle,

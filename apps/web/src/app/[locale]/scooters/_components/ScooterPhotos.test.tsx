@@ -38,10 +38,18 @@ const photo = (
 });
 const routes = v1.scooters.ROUTES.photos;
 
-function renderGallery(editable = true, locale: "en" | "ro" = "en") {
+function renderGallery(
+  editable = true,
+  locale: "en" | "ro" = "en",
+  onSaved?: () => void,
+) {
   return render(
     <NextIntlClientProvider locale={locale} messages={messages[locale]}>
-      <ScooterPhotoGallery scooterId="scooter-1" editable={editable} />
+      <ScooterPhotoGallery
+        scooterId="scooter-1"
+        editable={editable}
+        onSaved={onSaved}
+      />
     </NextIntlClientProvider>,
   );
 }
@@ -133,7 +141,8 @@ describe("Scooter photo gallery", () => {
           height: index >= 0 ? 100 : 240,
         });
       });
-      renderGallery();
+      const onSaved = vi.fn();
+      renderGallery(true, "en", onSaved);
       const card = await screen.findByRole("button", {
         name: "Open photo: two.jpg",
       });
@@ -160,6 +169,7 @@ describe("Scooter photo gallery", () => {
         );
         expect(screen.getByAltText("two.jpg")).toBeInTheDocument();
       }
+      expect(onSaved).toHaveBeenCalledTimes(success ? 1 : 0);
       expect(screen.queryByRole("dialog")).toBeNull();
     },
   );
@@ -298,7 +308,8 @@ describe("Scooter photo gallery", () => {
         return [];
       },
     );
-    renderGallery();
+    const onSaved = vi.fn();
+    renderGallery(true, "en", onSaved);
     await screen.findByRole("button", { name: "Cover photo" });
     const file = new File(["image"], "upload.jpg", { type: "image/jpeg" });
     Object.defineProperty(file, "arrayBuffer", {
@@ -339,9 +350,11 @@ describe("Scooter photo gallery", () => {
     expect(await screen.findByText("Saving photo…")).toBeInTheDocument();
     expect(overlay).toContainElement(screen.getByText("Saving photo…"));
     expect(preview).toHaveStyle({ aspectRatio: aspectRatio.scooterPhoto });
+    expect(onSaved).not.toHaveBeenCalled();
     await act(async () => attach([photo("one")]));
     expect(await screen.findByAltText("one.jpg")).toBeInTheDocument();
     expect(screen.queryByRole("progressbar")).toBeNull();
+    expect(onSaved).toHaveBeenCalledOnce();
   });
 
   it("keeps failed upload previews and retries the attachment without reuploading bytes", async () => {
@@ -464,7 +477,12 @@ describe("Scooter photo gallery", () => {
     expect(
       screen.queryByRole("button", { name: "Add other photos" }),
     ).not.toBeInTheDocument();
-    expect(cover).toHaveClass("border-2", "border-dashed", "bg-transparent");
+    expect(cover).toHaveClass(
+      "rounded-dashed-surface",
+      "border-(length:--dashed-surface-border-width)",
+      "border-dashed",
+      "bg-transparent",
+    );
     expect(cover.parentElement?.children).toHaveLength(1);
     const picker = screen.getByLabelText("Upload photos", {
       selector: "input",

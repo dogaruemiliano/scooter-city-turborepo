@@ -957,7 +957,7 @@ export const scootersCatalog = {
       temporary: "Temporary",
     },
     requiredDriverLicenseTypes: {
-      none: "None",
+      none: "—",
       AM: "AM",
       A1: "A1",
       A2: "A2",
@@ -2062,7 +2062,7 @@ export const scootersCatalog = {
       temporary: "Provizorie",
     },
     requiredDriverLicenseTypes: {
-      none: "Fără permis",
+      none: "—",
       AM: "AM",
       A1: "A1",
       A2: "A2",

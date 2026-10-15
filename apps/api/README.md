@@ -67,13 +67,67 @@ pnpm gen:env
 | `pnpm --filter api db:generate` | Regenerate the Prisma client.                                  |
 | `pnpm --filter api spec`        | Print OpenAPI JSON from the compiled API.                      |
 
-E2E tests require `DATABASE_URL` to be explicitly set in the shell to a disposable
-test database. Migrate and seed that database before running `pnpm test:e2e` or
-`pnpm --filter api test:e2e`. The runner rejects a missing URL before loading
-`.env` or the unit-test defaults, and Turbo passes the supplied URL through.
-The finance-book setup suite additionally requires an empty, migrated database
-whose name starts with `finance_books_test`; run it without seeding using
-`pnpm --filter api test:e2e finance-books.e2e-spec.ts`.
+### E2E environment
+
+One-time local setup, from the repository root:
+
+```bash
+docker compose --profile test up -d postgres-test
+cp apps/api/.env.test.example apps/api/.env.test
+```
+
+The test profile runs PostgreSQL 16 (matching CI) on `localhost:55434`, separately
+from the development server on `localhost:5434`. Its data is temporary and is
+recreated by the runner after the container restarts. Normal `docker compose up`
+does not start the test profile.
+
+Edit the ignored `apps/api/.env.test` to select dedicated test databases. Keep
+application settings in `.env`; do not replace the application's `DATABASE_URL`.
+The committed `.env.test.example` documents the two test settings:
+
+- `E2E_DATABASE_URL`: reusable database for the general HTTP suites. The runner
+  builds shared packages, generates the Prisma client, applies pending migrations
+  (creating the database when missing), and runs the idempotent seed before Jest.
+- `E2E_FINANCE_DATABASE_URL`: connection template for the finance-book setup
+  suite. Its database name must start with `finance_books_test`. Each invocation
+  creates a new database with a random suffix, migrates it without seeding, and
+  removes only that generated database in cleanup. The configured template
+  database is never modified and need not exist. This suite requires empty tables
+  and leaves data behind, so reusing its database would break subsequent runs.
+
+Both database names must contain a separate `test` segment. The runner refuses
+production mode, identical test targets, and targets matching `DATABASE_URL` in
+the shell or application `.env`, including different credentials for the same
+database. PostgreSQL must permit database creation (the local Compose and CI
+service roles do). Do not use servers holding real data for E2E tests.
+
+Run all HTTP suites with automatic database preparation:
+
+```bash
+pnpm test:e2e
+```
+
+Run selected suites using filename regexes (advanced Jest flags are not accepted
+by the runner):
+
+```bash
+pnpm --filter api test:e2e persons
+pnpm --filter api test:e2e finance-books
+```
+
+Shell/CI variables take precedence over `.env.test`. The runner maps the selected
+test URL to `DATABASE_URL` for each child process, and always uses `NODE_ENV=test`.
+Turbo forwards both `E2E_*` variables. CI supplies them directly and invokes the
+same runner; no local `.env.test` or separate CI migration/seed step is needed.
+The finance suite runs even if general tests fail, and any test/preparation
+failure makes the command fail. No-match filters also fail instead of passing
+silently. Separate opt-in historical migration rehearsals still require their
+own `FIXED_ROLES_MIGRATION_DATABASE_URL` / `LEGACY_ACCESS_MIGRATION_DATABASE_URL`
+and specially prepared historical schemas; normal E2E runs skip them.
+
+Use separate general databases for concurrent runs. An ungraceful termination
+(for example `kill -9`) can leave a generated finance database behind; names
+start with `finance_books_test_` and end with the run's random suffix.
 
 Do not use destructive Prisma reset commands unless a human explicitly decides
 that data loss is acceptable.

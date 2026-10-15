@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
@@ -10,6 +11,7 @@ import { accessibleWhere } from "../access/access.ability";
 import { AuditService } from "../audit/audit.service";
 import { AuditEventType } from "../audit/audit.types";
 import { Prisma } from "../generated/prisma/client";
+import { ProblemPhotosService } from "./problem-photos.service";
 import { PrismaService } from "../prisma/prisma.service";
 
 export const maintenanceScooterSelect = {
@@ -17,7 +19,7 @@ export const maintenanceScooterSelect = {
   fleetNumber: true,
   model: true,
   registrationNumber: true,
-  brand: { select: { name: true } },
+  brand: { select: { name: true, code: true } },
 } satisfies Prisma.ScooterSelect;
 
 export function toMaintenanceScooter(
@@ -29,10 +31,18 @@ export function toMaintenanceScooter(
     model: row.model,
     registrationNumber: row.registrationNumber,
     brandName: row.brand.name,
+    brandCode: row.brand.code,
   };
 }
 
+const memberSelect = { id: true, firstName: true, lastName: true } as const;
 const problemInclude = {
+  reporter: { select: memberSelect },
+  assignee: { select: memberSelect },
+  photos: {
+    where: { asset: { deletedAt: null } },
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+  },
   scooter: { select: maintenanceScooterSelect },
 } satisfies Prisma.ScooterProblemInclude;
 type ProblemRow = Prisma.ScooterProblemGetPayload<{
@@ -56,6 +66,7 @@ export class ProblemsService {
     private readonly prisma: PrismaService,
     private readonly access: AccessService,
     private readonly audit: AuditService,
+    private readonly photos: ProblemPhotosService,
   ) {}
 
   private where(
@@ -80,7 +91,20 @@ export class ProblemsService {
       id: row.id,
       scooterId: row.scooterId,
       scooter: toMaintenanceScooter(row.scooter),
+      title: row.title,
       description: row.description,
+      checklist: row.checklist,
+      severity: row.severity,
+      blocksUsage: row.blocksUsage,
+      holdClearedAt: row.holdClearedAt?.toISOString() ?? null,
+      photos: row.photos.map((photo) => ({
+        id: photo.id,
+        fileName: photo.fileName,
+        contentUrl: `/v1/problems/${row.id}/photos/${photo.id}/content`,
+        createdAt: photo.createdAt.toISOString(),
+      })),
+      assignee: row.assignee,
+      ...(full ? { reporter: row.reporter } : {}),
       priority: row.priority,
       status: row.status,
       assigneeId: row.assigneeId,
@@ -143,25 +167,79 @@ export class ProblemsService {
         {
           ...(query.status ? { status: query.status } : {}),
           ...(query.scooterId ? { scooterId: query.scooterId } : {}),
+          ...(query.severity ? { severity: query.severity } : {}),
+          ...(query.assigneeId
+            ? { assigneeId: query.assigneeId }
+            : query.unassigned
+              ? { assigneeId: null }
+              : {}),
+          ...(query.blocking !== undefined
+            ? { blocksUsage: query.blocking }
+            : {}),
         },
       ],
     };
-    const [items, total] = await this.prisma.$transaction([
-      this.prisma.scooterProblem.findMany({
-        where,
-        include: problemInclude,
-        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-        skip: (query.page - 1) * query.pageSize,
-        take: query.pageSize,
-      }),
-      this.prisma.scooterProblem.count({ where }),
-    ]);
+    const countWhere: Prisma.ScooterProblemWhereInput = {
+      AND: [
+        this.where(snapshot, "problems.read"),
+        {
+          ...(query.scooterId ? { scooterId: query.scooterId } : {}),
+          ...(query.severity ? { severity: query.severity } : {}),
+          ...(query.blocking !== undefined
+            ? { blocksUsage: query.blocking }
+            : {}),
+        },
+      ],
+    };
+    const [items, total, all, open, inProgress, mine, resolved] =
+      await this.prisma.$transaction([
+        this.prisma.scooterProblem.findMany({
+          where,
+          include: problemInclude,
+          orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+          skip: (query.page - 1) * query.pageSize,
+          take: query.pageSize,
+        }),
+        this.prisma.scooterProblem.count({ where }),
+        this.prisma.scooterProblem.count({ where: countWhere }),
+        this.prisma.scooterProblem.count({
+          where: { AND: [countWhere, { status: "open" }] },
+        }),
+        this.prisma.scooterProblem.count({
+          where: { AND: [countWhere, { status: "in_progress" }] },
+        }),
+        this.prisma.scooterProblem.count({
+          where: { AND: [countWhere, { assigneeId: userId }] },
+        }),
+        this.prisma.scooterProblem.count({
+          where: { AND: [countWhere, { status: "resolved" }] },
+        }),
+      ]);
     return {
       items: await this.project(items, snapshot),
       total,
       page: query.page,
       pageSize: query.pageSize,
+      quickFilterCounts: { all, open, in_progress: inProgress, mine, resolved },
     };
+  }
+
+  async filterOptions(userId: string) {
+    const snapshot = await this.access.getSnapshot(userId);
+    const visible = this.where(snapshot, "problems.read");
+    const [scooters, assignees] = await Promise.all([
+      this.prisma.scooter.findMany({
+        where: { deletedAt: null, problems: { some: visible } },
+        select: maintenanceScooterSelect,
+        orderBy: { fleetNumber: "asc" },
+      }),
+      this.prisma.user.findMany({
+        where: { assignedProblems: { some: visible } },
+        select: memberSelect,
+        orderBy: [{ firstName: "asc" }, { id: "asc" }],
+      }),
+    ]);
+    return { scooters: scooters.map(toMaintenanceScooter), assignees };
   }
 
   async get(userId: string, id: string) {
@@ -190,16 +268,44 @@ export class ProblemsService {
   }
 
   async create(userId: string, input: v1.problems.CreateProblemInput) {
+    this.requireAll(await this.access.getSnapshot(userId), "problems.create");
+    const prepared = await this.photos.prepare(userId, input.photos);
     return this.prisma.$transaction(async (tx) => {
       const snapshot = await this.access.getSnapshot(userId, tx);
       this.requireAll(snapshot, "problems.create");
+      await tx.$queryRaw`SELECT id FROM "Scooter" WHERE id = ${input.scooterId} FOR UPDATE`;
       const scooter = await tx.scooter.findFirst({
-        where: { id: input.scooterId, deletedAt: null },
+        where: {
+          AND: [
+            { id: input.scooterId, deletedAt: null },
+            accessibleWhere(snapshot, "scooters.read", "Scooter"),
+          ],
+        },
         select: { id: true },
       });
       if (!scooter) throw new NotFoundException("Scooter not found");
-      const row = await tx.scooterProblem.create({
-        data: { ...input, reporterId: userId },
+      if (input.assigneeId) {
+        this.requireAll(snapshot, "problems.assign");
+        if (!(await this.eligible(input.assigneeId, tx)))
+          throw new ConflictException(
+            "Assignee is not eligible for problem work",
+          );
+      }
+      const data = {
+        scooterId: input.scooterId,
+        title: input.title,
+        description: input.description,
+        severity: input.severity,
+        blocksUsage: input.blocksUsage,
+        assigneeId: input.assigneeId,
+      };
+      const created = await tx.scooterProblem.create({
+        data: { ...data, reporterId: userId },
+        include: problemInclude,
+      });
+      await this.photos.attach(tx, created.id, userId, prepared);
+      const row = await tx.scooterProblem.findUniqueOrThrow({
+        where: { id: created.id },
         include: problemInclude,
       });
       await this.audit.recordRequired(tx, {
@@ -207,7 +313,17 @@ export class ProblemsService {
         userId,
         targetType: "ScooterProblem",
         targetId: row.id,
-        meta: { scooterId: row.scooterId, status: row.status },
+        meta: {
+          scooterId: row.scooterId,
+          after: {
+            title: row.title,
+            status: row.status,
+            severity: row.severity,
+            blocksUsage: row.blocksUsage,
+            assigneeId: row.assigneeId,
+            assignee: row.assignee,
+          },
+        },
       });
       return this.dto(row, snapshot);
     });
@@ -233,7 +349,11 @@ export class ProblemsService {
       snapshot.effectiveScopes[action]?.some(
         (scope) => scope === "ASSIGNED" || scope === "ALL",
       );
-    return permits("problems.read") && permits("problems.update") ? user : null;
+    return permits("problems.read") &&
+      permits("problems.update") &&
+      permits("problems.resolve")
+      ? user
+      : null;
   }
 
   async assignees(userId: string, search: string) {
@@ -280,6 +400,13 @@ export class ProblemsService {
       | Prisma.ScooterProblemUncheckedUpdateInput,
   ) {
     return this.prisma.$transaction(async (tx) => {
+      // Match rental writers: scooter first, then the problem. All hold changes share this lock.
+      const reference = await tx.scooterProblem.findUnique({
+        where: { id },
+        select: { scooterId: true },
+      });
+      if (!reference) throw new NotFoundException("Problem not found");
+      await tx.$queryRaw`SELECT id FROM "Scooter" WHERE id = ${reference.scooterId} FOR UPDATE`;
       await tx.$queryRaw`SELECT id FROM "ScooterProblem" WHERE id = ${id} FOR UPDATE`;
       const snapshot = await this.access.getSnapshot(userId, tx);
       const row = await tx.scooterProblem.findFirst({
@@ -315,14 +442,29 @@ export class ProblemsService {
           before: {
             status: row.status,
             assigneeId: row.assigneeId,
+            assignee: row.assignee,
             priority: row.priority,
             revision: row.revision,
+            title: row.title,
+            description: row.description,
+            checklist: row.checklist,
+            severity: row.severity,
+            blocksUsage: row.blocksUsage,
+            resolutionNotes: row.resolutionNotes,
           },
           after: {
             status: updated.status,
             assigneeId: updated.assigneeId,
+            assignee: updated.assignee,
             priority: updated.priority,
             revision: updated.revision,
+            title: updated.title,
+            description: updated.description,
+            checklist: updated.checklist,
+            severity: updated.severity,
+            blocksUsage: updated.blocksUsage,
+            resolutionNotes: updated.resolutionNotes,
+            workNotes: updated.workNotes,
           },
         },
       });
@@ -356,14 +498,40 @@ export class ProblemsService {
       input.revision,
       "problems.update",
       AuditEventType.PROBLEM_UPDATED,
-      (row) => {
+      async (row, snapshot, tx) => {
         if (!openStates.includes(row.status))
           throw new ConflictException("Only open work can be updated");
+        if (
+          input.checklist !== undefined &&
+          !snapshot.isSuperAdmin &&
+          !snapshot.effectiveScopes["problems.update"]?.includes("ALL") &&
+          row.assigneeId !== userId
+        )
+          throw new ForbiddenException(
+            "Only admins and the assignee can edit the checklist",
+          );
+        if (input.photos?.length) {
+          if (
+            row.photos.length + input.photos.length >
+            v1.problems.PROBLEM_PHOTO_MAX_FILES
+          )
+            throw new BadRequestException("Too many problem photos");
+          const photos = await this.photos.prepare(userId, input.photos);
+          await this.photos.attach(tx, id, userId, photos);
+        }
         if (input.startWork && !row.assigneeId)
           throw new ConflictException(
             "Assign the problem before starting work",
           );
         return {
+          ...(input.checklist !== undefined
+            ? { checklist: input.checklist }
+            : {}),
+          ...(input.title !== undefined ? { title: input.title } : {}),
+          ...(input.description !== undefined
+            ? { description: input.description }
+            : {}),
+          ...(input.severity !== undefined ? { severity: input.severity } : {}),
           ...(input.workNotes !== undefined
             ? { workNotes: input.workNotes }
             : {}),
@@ -371,6 +539,25 @@ export class ProblemsService {
         };
       },
     );
+  }
+
+  async createPhotoUpload(
+    userId: string,
+    id: string,
+    input: v1.scooters.CreateScooterPhotoUpload,
+  ) {
+    const snapshot = await this.access.getSnapshot(userId);
+    const row = await this.prisma.scooterProblem.findFirst({
+      where: { AND: [{ id }, this.where(snapshot, "problems.update")] },
+      select: { id: true, status: true },
+    });
+    if (!row)
+      throw new NotFoundException(
+        "Problem not found or no longer assigned to you",
+      );
+    if (!openStates.includes(row.status))
+      throw new ConflictException("Only open work can be updated");
+    return this.photos.createUpload(userId, input);
   }
 
   resolve(userId: string, id: string, input: v1.problems.ResolveProblemInput) {
@@ -384,6 +571,7 @@ export class ProblemsService {
         if (!openStates.includes(row.status))
           throw new ConflictException("Problem is already closed");
         return {
+          ...this.closeHold(row, userId, input.clearMaintenanceHold),
           status: "resolved",
           resolutionNotes: input.resolutionNotes,
           resolvedAt: new Date(),
@@ -407,7 +595,7 @@ export class ProblemsService {
           throw new ConflictException(
             "Assignee is not eligible for mechanic work",
           );
-        return { assigneeId: input.assigneeId, status: "open" };
+        return { assigneeId: input.assigneeId };
       },
     );
   }
@@ -439,19 +627,22 @@ export class ProblemsService {
       AuditEventType.PROBLEM_REOPENED,
       (row, snapshot) => {
         this.requireAll(snapshot, "problems.reopen");
-        if (row.status !== "resolved")
-          throw new ConflictException("Only resolved work can be reopened");
+        if (row.status !== "resolved" && row.status !== "cancelled")
+          throw new ConflictException("Only closed work can be reopened");
         return {
           status: "open",
-          assigneeId: null,
           resolvedAt: null,
-          resolutionNotes: null,
         };
       },
     );
   }
 
-  cancel(userId: string, id: string, revision: number) {
+  cancel(
+    userId: string,
+    id: string,
+    revision: number,
+    clearMaintenanceHold?: boolean,
+  ) {
     return this.mutate(
       userId,
       id,
@@ -462,8 +653,155 @@ export class ProblemsService {
         this.requireAll(snapshot, "problems.update");
         if (!openStates.includes(row.status))
           throw new ConflictException("Problem is already closed");
-        return { status: "cancelled" };
+        return {
+          ...this.closeHold(row, userId, clearMaintenanceHold),
+          status: "cancelled",
+        };
       },
     );
+  }
+
+  private closeHold(
+    row: ProblemRow,
+    userId: string,
+    clear?: boolean,
+  ): Prisma.ScooterProblemUncheckedUpdateInput {
+    if (row.blocksUsage && clear === undefined)
+      throw new ConflictException(
+        "Choose whether to clear or retain this problem's maintenance hold",
+      );
+    return row.blocksUsage && clear
+      ? {
+          blocksUsage: false,
+          holdClearedAt: new Date(),
+          holdClearedById: userId,
+        }
+      : {};
+  }
+
+  hold(userId: string, id: string, input: v1.problems.ProblemHoldInput) {
+    return this.mutate(
+      userId,
+      id,
+      input.revision,
+      "problems.update",
+      AuditEventType.PROBLEM_HOLD_CHANGED,
+      () => ({
+        blocksUsage: input.blocksUsage,
+        holdClearedAt: input.blocksUsage ? null : new Date(),
+        holdClearedById: input.blocksUsage ? null : userId,
+      }),
+    );
+  }
+
+  async maintenanceHold(userId: string, scooterId: string) {
+    await this.scooter(userId, scooterId);
+    // Holds are safety information: show every blocker, even when the member only works assigned reports.
+    const blockers = await this.prisma.scooterProblem.findMany({
+      where: { scooterId, blocksUsage: true },
+      select: { id: true, title: true, status: true, severity: true },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    });
+    return v1.problems.maintenanceHoldSchema.parse({
+      onHold: blockers.length > 0,
+      count: blockers.length,
+      blockers,
+    });
+  }
+
+  async comment(
+    userId: string,
+    id: string,
+    input: v1.problems.ProblemCommentInput,
+  ) {
+    return this.prisma
+      .$transaction(async (tx) => {
+        const snapshot = await this.access.getSnapshot(userId, tx);
+        const row = await tx.scooterProblem.findFirst({
+          where: {
+            AND: [
+              { id },
+              this.where(snapshot, "problems.update"),
+              this.where(snapshot, "problems.read"),
+            ],
+          },
+          select: { id: true, revision: true },
+        });
+        if (!row)
+          throw new NotFoundException(
+            "Problem not found or no longer assigned to you",
+          );
+        const written = await tx.scooterProblem.updateMany({
+          where: {
+            AND: [
+              { id, revision: input.revision },
+              this.where(snapshot, "problems.update"),
+            ],
+          },
+          data: { revision: { increment: 1 } },
+        });
+        if (written.count !== 1)
+          throw new ConflictException("Problem changed; reload before saving");
+        await this.audit.recordRequired(tx, {
+          type: AuditEventType.PROBLEM_COMMENTED,
+          userId,
+          targetType: "ScooterProblem",
+          targetId: id,
+          meta: { note: input.body },
+        });
+      })
+      .then(() => this.get(userId, id));
+  }
+
+  async activity(userId: string, id: string, query: v1.problems.ActivityQuery) {
+    const problem = await this.get(userId, id);
+    const full = problem.reporter !== undefined;
+    const where = {
+      targetType: "ScooterProblem",
+      targetId: id,
+      type: { in: [...v1.problems.problemActivityTypeSchema.options] },
+    };
+    const [rows, total] = await this.prisma.$transaction([
+      this.prisma.auditEvent.findMany({
+        where,
+        include: { user: { select: memberSelect } },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize,
+      }),
+      this.prisma.auditEvent.count({ where }),
+    ]);
+    return v1.problems.problemActivityListSchema.parse({
+      total,
+      ...query,
+      items: rows.map((row) => {
+        const meta =
+          row.meta && typeof row.meta === "object" && !Array.isArray(row.meta)
+            ? row.meta
+            : {};
+        const before = v1.problems.problemActivityStateSchema.safeParse(
+          meta.before,
+        );
+        const after = v1.problems.problemActivityStateSchema.safeParse(
+          meta.after,
+        );
+        const notes =
+          meta.note ??
+          (row.type === AuditEventType.PROBLEM_RESOLVED
+            ? (meta.after as Prisma.JsonObject | undefined)?.resolutionNotes
+            : row.type === AuditEventType.PROBLEM_UPDATED
+              ? (meta.after as Prisma.JsonObject | undefined)?.workNotes
+              : null);
+        return {
+          id: row.id,
+          type: row.type,
+          actor: full ? row.user : null,
+          createdAt: row.createdAt.toISOString(),
+          note: full && typeof notes === "string" ? notes : null,
+          before: before.success ? before.data : null,
+          after: after.success ? after.data : null,
+        };
+      }),
+    });
   }
 }

@@ -21,7 +21,7 @@ export function FileDropOverlay({
       role="status"
       data-slot="file-drop-overlay"
       className={cn(
-        "pointer-events-none absolute inset-0 z-raised flex items-center justify-center rounded-xl border-2 border-dashed border-primary bg-file-drop-overlay p-4 text-center backdrop-blur-file-drop",
+        "pointer-events-none absolute inset-0 z-raised flex items-center justify-center rounded-dashed-surface border-(length:--dashed-surface-border-width) border-dashed border-primary bg-file-drop-overlay p-4 text-center backdrop-blur-file-drop",
         compact && "p-1",
         className,
       )}

@@ -16,7 +16,12 @@ import { primitives } from "../src/tokens/primitives.js";
 import { radius, radiusBase } from "../src/tokens/radius.js";
 import { semanticColors, semanticBlur } from "../src/tokens/semantic.js";
 import { shadow } from "../src/tokens/shadow.js";
-import { spacing, viewportSizing, emailSizing } from "../src/tokens/spacing.js";
+import {
+  spacing,
+  viewportSizing,
+  emailSizing,
+  dashedSurface,
+} from "../src/tokens/spacing.js";
 import { typography } from "../src/tokens/typography.js";
 import { zIndex } from "../src/tokens/z-index.js";
 
@@ -91,6 +96,9 @@ export function buildCss(): string {
   const lines: string[] = [BANNER, "", ":root {"];
   lines.push("  color-scheme: light;");
   lines.push(`  --radius: ${pxToRem(radiusBase)};`);
+  lines.push(
+    `  --dashed-surface-border-width: ${pxToRem(dashedSurface.borderWidth)};`,
+  );
   lines.push(...cssColorLines(semanticColors.light, "  "));
   lines.push("}", "");
 
@@ -180,6 +188,9 @@ export function buildCss(): string {
   lines.push("  --radius-md: max(0px, calc(var(--radius) - 2px));");
   lines.push("  --radius-lg: var(--radius);");
   lines.push("  --radius-xl: calc(var(--radius) + 4px);");
+  lines.push(
+    `  --radius-dashed-surface: calc(var(--radius) + ${radius.dashedSurface - radiusBase}px);`,
+  );
   lines.push("  --radius-2xl: calc(var(--radius) + 8px);");
   lines.push("  --radius-3xl: calc(var(--radius) + 12px);");
   lines.push("  --radius-4xl: calc(var(--radius) + 16px);");
@@ -208,6 +219,7 @@ export function buildNative(): string {
       dark: nativeColorObject(semanticColors.dark),
     },
     spacing,
+    dashedSurface,
     radius,
     blur: semanticBlur,
     typography: {
@@ -253,6 +265,7 @@ export function buildEmailTokens() {
   return {
     color: nativeColorObject(semanticColors.light),
     spacing,
+    dashedSurface,
     radius,
     typography,
     sizing: emailSizing,

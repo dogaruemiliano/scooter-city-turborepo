@@ -61,7 +61,8 @@ describe("ScooterCreateActions", () => {
     const panel = actions(container);
     expect(panel.parentElement?.tagName).toBe("FORM");
     expect(panel).toHaveClass("sticky", "self-end");
-    expect(panel).not.toHaveClass("static", "fixed", "animate-in");
+    expect(panel).not.toHaveClass("static", "fixed");
+    expect(panel).toHaveClass("animate-in", "motion-reduce:animate-none");
     expect(panel).not.toHaveAttribute("style");
     expect(panel).toHaveAttribute("data-sticky", "true");
     rerender(<Fixture />);
@@ -108,4 +109,15 @@ describe("ScooterCreateActions", () => {
       screen.getByRole("button", { name: "Create scooter" }),
     ).toBeInTheDocument();
   });
+});
+
+it("keeps submission visible even if readiness changes while saving", () => {
+  const { container } = render(
+    <ScooterCreateActions ready={false} submitting status="Saving">
+      <button disabled>Creating scooter</button>
+    </ScooterCreateActions>,
+  );
+  expect(actions(container)).toHaveAttribute("data-sticky", "true");
+  expect(actions(container)).toHaveAttribute("aria-busy", "true");
+  expect(actions(container)).toHaveClass("sticky");
 });

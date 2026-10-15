@@ -84,6 +84,28 @@ afterEach(() => {
 });
 
 describe("shared ImageCapture", () => {
+  it("keeps the camera open for successive confirmed collection photos", async () => {
+    const onCapture = vi.fn();
+    render(
+      <CaptureHarness
+        onCapture={onCapture}
+        allowCrop={false}
+        keepOpenAfterCapture
+      />,
+    );
+    await cameraReady();
+    for (let index = 0; index < 2; index++) {
+      if (index > 0) await cameraReady();
+      await userEvent.click(screen.getByRole("button", { name: "Take photo" }));
+      await screen.findByRole("dialog", { name: "Review photo" });
+      await userEvent.click(screen.getByRole("button", { name: "Use photo" }));
+      await waitFor(() => expect(onCapture).toHaveBeenCalledTimes(index + 1));
+      expect(
+        await screen.findByRole("button", { name: "Take photo" }),
+      ).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Use photo" })).toBeNull();
+    }
+  });
   it("keeps the guide inside the full camera frame as the measured viewport changes", async () => {
     let viewport = { width: 390, height: 844 };
     const width = vi

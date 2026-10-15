@@ -343,6 +343,11 @@
         "name": "The Foreground Pair Rule",
         "body": "Keep semantic surface/foreground pairs together, especially cyan actions and media scrims.",
         "section": "colors"
+      },
+      {
+        "name": "The Repair Card Rule",
+        "body": "Compose comfortable repair cards and quick filters from shared UI primitives and theme tokens; preserve recorded statuses, current-page lane counts, straight severity strips, localized severity meaning, and actual assignee names beside shared avatar placeholders.",
+        "section": "components"
       }
     ],
     "dos": [

@@ -30,6 +30,7 @@ describe("Rental operational invariants", () => {
       update: jest.fn(),
     },
     scooter: { findFirst: jest.fn() },
+    scooterProblem: { findFirst: jest.fn() },
     person: { findFirst: jest.fn() },
     scooterDocument: { findFirst: jest.fn(), update: jest.fn() },
   };
@@ -130,5 +131,43 @@ describe("Rental operational invariants", () => {
         meta: { before: false, after: true },
       }),
     );
+  });
+
+  it("rejects rental creation for a retained hold even on a resolved problem", async () => {
+    db.scooterProblem.findFirst.mockResolvedValue({ id: "resolved-blocker" });
+    await expect(
+      service.create("agent", {
+        scooterId: "scooter",
+        personId: "person",
+        startsAt: now.toISOString(),
+        endsAt: new Date(now.getTime() + 60_000).toISOString(),
+      }),
+    ).rejects.toThrow("maintenance hold");
+    expect(db.scooterProblem.findFirst).toHaveBeenCalledWith({
+      where: { scooterId: "scooter", blocksUsage: true },
+      select: { id: true },
+    });
+    expect(db.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      db.scooterProblem.findFirst.mock.invocationCallOrder[0],
+    );
+    expect(db.rental.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects handover when a blocker was reported after reservation", async () => {
+    db.scooterProblem.findFirst.mockResolvedValue({ id: "blocker" });
+    db.rental.findUnique.mockResolvedValue({
+      id: "rental",
+      scooterId: "scooter",
+      revision: 1,
+      status: "reserved",
+      startsAt: new Date(now.getTime() - 60_000),
+      endsAt: new Date(now.getTime() + 60_000),
+      scooter: { deletedAt: null },
+      person: { deletedAt: null },
+    });
+    await expect(
+      service.transition("agent", "rental", 1, "handover"),
+    ).rejects.toThrow("maintenance hold");
+    expect(db.rental.update).not.toHaveBeenCalled();
   });
 });

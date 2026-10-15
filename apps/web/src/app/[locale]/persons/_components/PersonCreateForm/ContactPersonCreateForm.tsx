@@ -5,8 +5,9 @@ import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { v1 } from "@repo/api-shared";
-import { Button } from "@repo/ui/components";
+import { Button, FormActions } from "@repo/ui/components";
 import { Feedback, useTask, WorkspacePage } from "@/components/WorkspaceForm";
+import { buttonVariants } from "@repo/ui/components/button";
 import { webApi } from "@/lib/api";
 import { PersonalSection } from "./PersonalSection";
 import { ContactSection } from "./ContactSection";
@@ -36,6 +37,10 @@ export function ContactPersonCreateForm({
   const [fieldErrors, setFieldErrors] = useState<FormErrors>({});
   const setValue: SetPersonFormValue = (key, value) =>
     setForm((current) => ({ ...current, [key]: value }));
+  const candidate = createPersonInput(form, () => "");
+  const ready =
+    !candidate.error &&
+    v1.persons.createPersonInputSchema.safeParse(candidate.input).success;
   return (
     <WorkspacePage
       title={t("createPage.title")}
@@ -146,17 +151,22 @@ export function ContactPersonCreateForm({
           onChange={(value) => setValue("notes", value)}
         />
         <Feedback error={task.error} />
-        <div className="flex flex-wrap items-center gap-3">
-          <Button type="submit" disabled={task.busy}>
-            {t(task.busy ? "actions.creating" : "actions.create")}
-          </Button>
+        <FormActions ready={ready} pending={task.busy}>
           <Link
             href={personsHref}
-            className="text-sm underline underline-offset-4"
+            className={buttonVariants({ variant: "outline" })}
+            aria-disabled={task.busy || undefined}
+            tabIndex={task.busy ? -1 : undefined}
+            onClick={(event) => {
+              if (task.busy) event.preventDefault();
+            }}
           >
             {t("actions.cancel")}
           </Link>
-        </div>
+          <Button type="submit" disabled={task.busy}>
+            {t(task.busy ? "actions.creating" : "actions.create")}
+          </Button>
+        </FormActions>
       </form>
     </WorkspacePage>
   );

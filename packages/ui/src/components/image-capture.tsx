@@ -143,6 +143,8 @@ export interface ImageCaptureProps {
   maxFileSize?: number;
   labels?: Partial<ImageCaptureLabels>;
   cameraActions?: ReactNode;
+  /** Keep the camera available after confirming a photo for collection workflows. */
+  keepOpenAfterCapture?: boolean;
 }
 
 /** Fullscreen camera and image picker. No upload/API or app-specific dependencies. */
@@ -156,6 +158,7 @@ function ImageCaptureSession({
   captureMode = "photo",
   initialFile,
   allowGallery = true,
+  keepOpenAfterCapture = false,
   allowCrop = true,
   accept = "image/jpeg,image/png,image/webp",
   maxFileSize = 10 * 1024 * 1024,
@@ -222,12 +225,15 @@ function ImageCaptureSession({
     setImportOpen(false);
   }
 
-  function retakePhoto() {
-    if (busyRef.current) return;
+  function resetPhoto() {
     setSource(undefined);
     setPreview(undefined);
     setEditing(false);
     setError(undefined);
+  }
+
+  function retakePhoto() {
+    if (!busyRef.current) resetPhoto();
   }
 
   async function takePhoto() {
@@ -267,7 +273,10 @@ function ImageCaptureSession({
         return;
       }
       await onCapture(file, { originalFile: source });
-      if (mountedRef.current) onOpenChange(false);
+      if (mountedRef.current) {
+        if (keepOpenAfterCapture) resetPhoto();
+        else onOpenChange(false);
+      }
     } catch (caught) {
       if (mountedRef.current)
         setError(caught instanceof Error ? caught.message : labels.saveFailed);
@@ -284,7 +293,10 @@ function ImageCaptureSession({
         onCancel={retakePhoto}
         onSave={async (file, details) => {
           await onCapture(file, details);
-          if (mountedRef.current) onOpenChange(false);
+          if (mountedRef.current) {
+            if (keepOpenAfterCapture) resetPhoto();
+            else onOpenChange(false);
+          }
         }}
         maxEdge={captureMode === "identity-card" ? 4096 : 2048}
         quality={captureMode === "identity-card" ? 0.92 : 0.85}

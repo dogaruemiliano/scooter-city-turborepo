@@ -161,7 +161,7 @@ describe("VIN conflict review", () => {
     const { user, t, onApply } = setup();
     await user.keyboard("{Escape}");
     expect(screen.getByRole("dialog", { name: t.title })).toBeInTheDocument();
-    await user.click(
+    fireEvent.click(
       document.querySelector('[data-slot="bottom-sheet-overlay"]')!,
     );
     expect(screen.getByRole("dialog", { name: t.title })).toBeInTheDocument();
@@ -173,7 +173,7 @@ describe("VIN conflict review", () => {
       sheet.closest('[data-slot="bottom-sheet-viewport"]'),
     ).toHaveAttribute("data-base-ui-swipe-ignore");
     expect(sheet.querySelector('[data-slot="bottom-sheet-handle"]')).toBeNull();
-    await user.click(
+    fireEvent.click(
       document.querySelector('[data-slot="bottom-sheet-overlay"]')!,
     );
     expect(sheet).toBeInTheDocument();
@@ -187,9 +187,7 @@ describe("VIN conflict review", () => {
     tick(3000);
     await user.click(screen.getByRole("button", { name: t.confirmAndFinish }));
     expect(onApply).toHaveBeenCalledOnce();
-    expect(
-      screen.queryByRole("dialog", { name: t.documentsTitle }),
-    ).not.toBeInTheDocument();
+    expect(sheet).toHaveAttribute("data-closed");
   });
 
   it("keeps the distinct sheet surface throughout both steps", async () => {

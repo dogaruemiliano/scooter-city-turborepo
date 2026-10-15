@@ -28,6 +28,7 @@ export const spacing = {
   24: 96,
   32: 128,
   36: 144,
+  48: 192,
   64: 256,
   72: 288,
   96: 384,
@@ -50,3 +51,6 @@ export const viewportSizing = {
   accessDirectory: "60dvh",
   accessEditor: "80dvh",
 } as const;
+
+/** Border thickness for add buttons and drag-and-drop surfaces. */
+export const dashedSurface = { borderWidth: spacing[0.5] } as const;

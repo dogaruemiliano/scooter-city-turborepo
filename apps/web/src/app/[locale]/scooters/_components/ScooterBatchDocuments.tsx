@@ -196,7 +196,7 @@ export function ScooterBatchDocuments({
               <Button
                 type="button"
                 variant="outline"
-                className="relative w-full justify-center border-dashed bg-transparent text-center duration-normal enabled:hover:border-primary enabled:active:border-primary enabled:active:border-solid"
+                className="relative w-full justify-center rounded-dashed-surface border-(length:--dashed-surface-border-width) border-dashed bg-transparent text-center duration-normal enabled:hover:border-primary enabled:active:border-primary enabled:active:border-solid"
                 disabled={disabled}
                 aria-label={creation("importMore")}
                 onClick={() => setExpandedImport(importResult)}

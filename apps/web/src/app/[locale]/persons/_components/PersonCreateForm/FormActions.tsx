@@ -1,12 +1,13 @@
 "use client";
 
-import { Button } from "@repo/ui/components";
+import { Button, FormActions as SharedFormActions } from "@repo/ui/components";
 import { UserPlusIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { PersonWizardStep } from "./WizardProgress";
 
 export function FormActions({
   creating,
+  ready = false,
   uploadingPhotos,
   extracting,
   confirmationRequired = false,
@@ -16,6 +17,7 @@ export function FormActions({
   onNext,
 }: {
   creating: boolean;
+  ready?: boolean;
   uploadingPhotos: boolean;
   extracting: boolean;
   confirmationRequired?: boolean;
@@ -27,7 +29,11 @@ export function FormActions({
   const t = useTranslations("persons");
 
   return (
-    <div className="mt-auto flex flex-col gap-2 border-t border-border pt-4 md:flex-row md:items-center">
+    <SharedFormActions
+      ready={ready}
+      pending={creating}
+      className="mt-auto w-full"
+    >
       {canGoBack ? (
         <Button
           type="button"
@@ -66,6 +72,6 @@ export function FormActions({
           {creating ? t("actions.creating") : t("actions.create")}
         </Button>
       ) : null}
-    </div>
+    </SharedFormActions>
   );
 }

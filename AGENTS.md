@@ -1,3 +1,11 @@
+<!-- BEGIN:scooter-identity-rule -->
+
+# Scooter identification always includes the brand code
+
+Whenever an internal scooter ID is displayed to identify a scooter, display its brand code with it using `v1.scooters.scooterDisplayCode(scooter)` from `@repo/api-shared` (for example, `007 HON`). Brand and model are supporting information. API scooter summaries must include `brandCode` so clients can use this shared format.
+
+<!-- END:scooter-identity-rule -->
+
 <!-- BEGIN:auth-rule -->
 
 # Auth is custom-rolled — do not pull in NextAuth / Auth.js / Lucia

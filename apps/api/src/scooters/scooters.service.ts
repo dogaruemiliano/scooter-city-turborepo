@@ -23,7 +23,12 @@ const galleryCoverPhotos = {
   take: 1,
 } satisfies Prisma.Scooter$photosArgs;
 
+const maintenanceCount = {
+  select: { problems: { where: { blocksUsage: true } } },
+} as const;
+
 const scooterInclude = {
+  _count: maintenanceCount,
   photos: galleryCoverPhotos,
   brand: true,
   civDocument: true,
@@ -31,6 +36,13 @@ const scooterInclude = {
 } satisfies Prisma.ScooterInclude;
 
 const scooterListInclude = {
+  problems: {
+    where: {
+      OR: [{ status: { in: ["open", "in_progress"] } }, { blocksUsage: true }],
+    },
+    select: { severity: true },
+  },
+  _count: maintenanceCount,
   photos: galleryCoverPhotos,
   brand: true,
   insurancePolicies: { select: { validFrom: true, validUntil: true } },

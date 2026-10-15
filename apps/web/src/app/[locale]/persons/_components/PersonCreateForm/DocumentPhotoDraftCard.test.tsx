@@ -1,5 +1,11 @@
 import { messages } from "@repo/i18n";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -58,7 +64,9 @@ describe("person shared native document input", () => {
       screen.getByRole("button", { name: "Add Front photo" }),
     );
     expect(click).toHaveBeenCalledOnce();
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
     expect(input).toHaveAttribute("type", "file");
     expect(input).toHaveAttribute(
       "accept",
@@ -93,7 +101,9 @@ describe("person shared native document input", () => {
         "front",
         selected,
       );
-      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      await waitFor(() =>
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+      );
     },
   );
   it("discards a provisional selection when closed", async () => {
@@ -119,6 +129,9 @@ describe("person shared native document input", () => {
     });
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(onSet).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
     expect(
       screen.getByRole("img", { name: "Front document photo" }),
     ).toBeInTheDocument();
@@ -139,7 +152,9 @@ describe("person shared native document input", () => {
       },
     });
     expect(await screen.findByRole("alert")).toBeInTheDocument();
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
     expect(onSet).not.toHaveBeenCalled();
   });
   it("retries failed uploads and can remove a saved document", async () => {
@@ -180,12 +195,14 @@ describe("person shared native document input", () => {
     expect(viewport).toHaveAttribute("data-zoom", "1");
     expect(onSet).not.toHaveBeenCalled();
   });
-  it("ignores file drops while disabled", () => {
+  it("ignores file drops while disabled", async () => {
     const { container } = setup(undefined, true, true);
     fireEvent.drop(container.querySelector('[data-slot="document-input"]')!, {
       dataTransfer: { files: [file] },
     });
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
     expect(onSet).not.toHaveBeenCalled();
   });
 });

@@ -10,6 +10,8 @@ export const radius = {
   md: Math.max(0, radiusBase - 2),
   lg: radiusBase,
   xl: radiusBase + 4,
+  /** Add buttons and drag-and-drop surfaces share the card radius. */
+  dashedSurface: radiusBase + 4,
   "2xl": radiusBase + 8,
   "3xl": radiusBase + 12,
   "4xl": radiusBase + 16,

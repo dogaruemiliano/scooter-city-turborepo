@@ -35,11 +35,13 @@ import { ScooterSectionComplete } from "./ScooterSectionComplete";
 
 export function ScooterCreateFields({
   brands,
+  editing = false,
   onBrandCreated,
   disabled,
   importResult,
   photos,
 }: {
+  editing?: boolean;
   brands: v1.scooterBrands.ScooterBrand[];
   onBrandCreated: (brand: v1.scooterBrands.ScooterBrand) => void;
   disabled: boolean;
@@ -55,11 +57,9 @@ export function ScooterCreateFields({
   const registration = useWatch({ control, name: "registrationType" });
   const props = { brands, onBrandCreated, disabled, powertrain };
   const [technicalReviewOpen, setTechnicalReviewOpen] = useState(false);
-  const openedAttempt = useRef(0);
+  const technicalSheetRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (!submitCount || isSubmitting || openedAttempt.current === submitCount)
-      return;
-    openedAttempt.current = submitCount;
+    if (!submitCount || isSubmitting) return;
     const mainFields = new Set([
       "vin",
       "brandId",
@@ -83,7 +83,7 @@ export function ScooterCreateFields({
     });
     return () => cancelAnimationFrame(frame);
   }, [submitCount, isSubmitting, errors]);
-  const license = useScooterLicenseAutofill(false);
+  const license = useScooterLicenseAutofill(editing);
   const onImport = license.onImport;
   useEffect(() => {
     if (importResult) onImport(importResult);
@@ -216,11 +216,27 @@ export function ScooterCreateFields({
         )}
         <ScooterEditorFieldControl name="notes" {...props} />
       </FormSection>
+      <Button
+        type="button"
+        variant="outline"
+        disabled={disabled}
+        onClick={() => setTechnicalReviewOpen(true)}
+      >
+        {t("wizard.otherFields")}
+      </Button>
       <BottomSheet
         open={technicalReviewOpen}
         onOpenChange={setTechnicalReviewOpen}
       >
-        <BottomSheetContent fullScreen>
+        <BottomSheetContent
+          fullScreen
+          ref={technicalSheetRef}
+          initialFocus={() =>
+            technicalSheetRef.current?.querySelector<HTMLElement>(
+              'input[aria-invalid="true"], textarea[aria-invalid="true"], button[aria-invalid="true"]',
+            ) ?? true
+          }
+        >
           <BottomSheetHeader>
             <BottomSheetTitle>{t("documentImport.title")}</BottomSheetTitle>
             <BottomSheetDescription>
@@ -231,9 +247,13 @@ export function ScooterCreateFields({
             <ScooterTechnicalFields
               compact={false}
               excludeFields={[
-                "vehicleCategory",
-                "powerKw",
-                "electricMotorPowerKw",
+                "vin",
+                "brandId",
+                "model",
+                "manufactureYear",
+                "color",
+                "powertrainType",
+                "engineDisplacementCc",
               ]}
               {...props}
             />

@@ -226,7 +226,9 @@ export function RentalsWorkspace({
 }
 function CreateRental({ onSaved }: { onSaved: () => void }) {
   const t = useTranslations("workspace");
-  const task = useTask();
+  const task = useTask({
+    [v1.problems.MAINTENANCE_HOLD_ERROR_CODE]: t("rentals.maintenanceHold"),
+  });
   const router = useRouter();
   const [personId, setPerson] = useState("");
   const [scooterId, setScooter] = useState("");
@@ -340,7 +342,9 @@ function RentalDetail({
   const t = useTranslations("workspace");
   const locale = useLocale();
   const { user } = useSession();
-  const task = useTask();
+  const task = useTask({
+    [v1.problems.MAINTENANCE_HOLD_ERROR_CODE]: t("rentals.maintenanceHold"),
+  });
   const [confirm, setConfirm] = useState<string | null>(null);
   async function transition(action: string) {
     await webApi.fetch(
@@ -355,7 +359,7 @@ function RentalDetail({
       <header className="flex flex-wrap items-center gap-3">
         <h2 className="text-xl font-semibold">
           {rental.scooter.brandName} {rental.scooter.model} ·{" "}
-          {rental.scooter.fleetNumber}
+          {v1.scooters.scooterDisplayCode(rental.scooter)}
         </h2>
         <Badge variant="secondary">{t(`rentals.${rental.status}`)}</Badge>
       </header>

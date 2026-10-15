@@ -32,6 +32,12 @@ if (!Element.prototype.scrollIntoView) {
   Element.prototype.scrollIntoView = vi.fn();
 }
 
+// jsdom has no Web Animations API. Scroll areas inspect active animations
+// before measuring; there are no layout animations in the test environment.
+if (!Element.prototype.getAnimations) {
+  Element.prototype.getAnimations = () => [];
+}
+
 // Shared previews measure their viewport and filename to fit and scroll them.
 if (!globalThis.ResizeObserver) {
   globalThis.ResizeObserver = class {

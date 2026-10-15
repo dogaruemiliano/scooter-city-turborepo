@@ -110,6 +110,7 @@ integration("Live access service against PostgreSQL", () => {
       data: problemIds.map((id, index) => ({
         id,
         scooterId,
+        title: id,
         description: id,
         reporterId: adminA,
         assigneeId: index === 0 ? worker : index === 2 ? direct : null,

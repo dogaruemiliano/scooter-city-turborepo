@@ -3,6 +3,18 @@
  * platform outputs are generated from the semantic contract.
  */
 export const primitives = {
+  violet: {
+    50: "#f5f3ff",
+    400: "#a78bfa",
+    600: "#7c3aed",
+    950: "#2e1065",
+  },
+  repairSeverity: {
+    low: "#3B82F6",
+    medium: "#EAB308",
+    high: "#F97316",
+    critical: "#EF4444",
+  },
   // Neutral surfaces and action cyan from the approved UX Pilot screens.
   neutral: {
     50: "#fafafa",

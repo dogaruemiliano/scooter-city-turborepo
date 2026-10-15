@@ -48,7 +48,7 @@ function putPhoto(
   });
 }
 
-export function useScooterPhotos(scooterId?: string) {
+export function useScooterPhotos(scooterId?: string, onSaved?: () => void) {
   const [photos, setPhotos] = useState<
     (v1.scooters.ScooterPhoto & { uploadToken?: string })[]
   >([]);
@@ -182,6 +182,7 @@ export function useScooterPhotos(scooterId?: string) {
       if (!signal.aborted) {
         setPhotos(result);
         discard(item);
+        onSaved?.();
       }
     } catch (error) {
       patch({
@@ -264,7 +265,10 @@ export function useScooterPhotos(scooterId?: string) {
         v1.scooters.scooterPhotoListSchema,
         { method, json, signal: controller.current?.signal },
       );
-      if (!controller.current?.signal.aborted) setPhotos(result);
+      if (!controller.current?.signal.aborted) {
+        setPhotos(result);
+        onSaved?.();
+      }
       return true;
     } catch {
       if (!controller.current?.signal.aborted) setError("save");

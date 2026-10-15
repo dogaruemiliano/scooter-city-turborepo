@@ -3,6 +3,8 @@ import {
   ForbiddenException,
   NotFoundException,
 } from "@nestjs/common";
+import { readFileSync } from "node:fs";
+import { Client } from "pg";
 import { randomUUID } from "node:crypto";
 import { Readable } from "node:stream";
 import type { Logger } from "nestjs-pino";
@@ -15,6 +17,8 @@ import type { MailerService } from "../mailer/mailer.service";
 import { PortalService } from "../portal/portal.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { RentalsService } from "../rentals/rentals.service";
+import { v1 } from "@repo/api-shared";
+import { ProblemPhotosService } from "./problem-photos.service";
 import { ProblemsService } from "./problems.service";
 
 // Opt-in only: these tests create and remove their own fixtures in a disposable database.
@@ -34,8 +38,10 @@ integration("Access domains against PostgreSQL", () => {
     "mechanic-b",
     "renter-a",
     "renter-b",
+    "reporter",
   ].map((name) => `${prefix}-${name}`);
-  const [admin, mechanicA, mechanicB, renterA, renterB] = userIds as [
+  const [admin, mechanicA, mechanicB, renterA, renterB, reporter] = userIds as [
+    string,
     string,
     string,
     string,
@@ -48,6 +54,7 @@ integration("Access domains against PostgreSQL", () => {
   const documentId = `${prefix}-document`;
   let activeRentalId: string;
   const storage = {
+    completePresignedUpload: jest.fn(),
     readDocument: jest.fn().mockImplementation(() =>
       Promise.resolve({
         body: Readable.from(["test document"]),
@@ -75,7 +82,12 @@ integration("Access domains against PostgreSQL", () => {
       error: () => undefined,
     } as unknown as Logger);
     access = new AccessService(db, audit, {} as MailerService, {} as Env);
-    problems = new ProblemsService(db, access, audit);
+    problems = new ProblemsService(
+      db,
+      access,
+      audit,
+      new ProblemPhotosService(db, storage as unknown as ImageStorageService),
+    );
     rentals = new RentalsService(db, access, audit);
     portal = new PortalService(
       db,
@@ -88,6 +100,20 @@ integration("Access domains against PostgreSQL", () => {
         email: `${id}@example.test`,
         loginStatus: "ACTIVE" as const,
         isSuperAdmin: id === admin,
+      })),
+    });
+    await db.userPermissionOverride.createMany({
+      data: [
+        "problems.read",
+        "problems.create",
+        "problems.assign",
+        "problems.update",
+        "problems.reopen",
+        "scooters.read",
+      ].map((permissionKey) => ({
+        userId: reporter,
+        permissionKey,
+        scopes: ["ALL"],
       })),
     });
     await db.role.create({
@@ -179,6 +205,10 @@ integration("Access domains against PostgreSQL", () => {
     if (!db) return;
     await db.$transaction([
       db.auditEvent.deleteMany({ where: { userId: { in: userIds } } }),
+      db.scooterProblemPhoto.deleteMany({
+        where: { problem: { scooterId: { in: scooterIds } } },
+      }),
+      db.draftUpload.deleteMany({ where: { userId: { in: userIds } } }),
       db.scooterProblem.deleteMany({
         where: { scooterId: { in: scooterIds } },
       }),
@@ -186,7 +216,14 @@ integration("Access domains against PostgreSQL", () => {
       db.scooterDocument.deleteMany({
         where: { scooterId: { in: scooterIds } },
       }),
-      db.mediaAsset.deleteMany({ where: { id: `${prefix}-asset` } }),
+      db.mediaAsset.deleteMany({
+        where: {
+          OR: [
+            { id: `${prefix}-asset` },
+            { storageKey: { startsWith: prefix } },
+          ],
+        },
+      }),
       db.person.deleteMany({ where: { id: { in: personIds } } }),
       db.scooter.deleteMany({ where: { id: { in: scooterIds } } }),
       db.scooterBrand.deleteMany({ where: { id: `${prefix}-brand` } }),
@@ -202,10 +239,15 @@ integration("Access domains against PostgreSQL", () => {
   }, 30_000);
 
   it("allows exactly one concurrent claim and denies the former assignee after reassignment", async () => {
-    const created = await problems.create(admin, {
-      scooterId: scooterIds[0],
-      description: "Concurrent claim test",
-    });
+    const created = await problems.create(
+      admin,
+      v1.problems.createProblemInputSchema.parse({
+        scooterId: scooterIds[0],
+        description: "Concurrent claim test",
+        title: "Test report",
+        severity: "moderate",
+      }),
+    );
     const results = await Promise.allSettled([
       problems.claim(mechanicA, created.id, created.revision),
       problems.claim(mechanicB, created.id, created.revision),
@@ -246,14 +288,24 @@ integration("Access domains against PostgreSQL", () => {
   });
 
   it("applies identical CASL scopes in normal and transaction queries", async () => {
-    const own = await problems.create(admin, {
-      scooterId: scooterIds[0],
-      description: "Own",
-    });
-    const other = await problems.create(admin, {
-      scooterId: scooterIds[1],
-      description: "Other",
-    });
+    const own = await problems.create(
+      admin,
+      v1.problems.createProblemInputSchema.parse({
+        scooterId: scooterIds[0],
+        description: "Own",
+        title: "Test report",
+        severity: "moderate",
+      }),
+    );
+    const other = await problems.create(
+      admin,
+      v1.problems.createProblemInputSchema.parse({
+        scooterId: scooterIds[1],
+        description: "Other",
+        title: "Test report",
+        severity: "moderate",
+      }),
+    );
     await problems.assign(admin, own.id, {
       revision: 1,
       assigneeId: mechanicA,
@@ -379,5 +431,300 @@ integration("Access domains against PostgreSQL", () => {
     await expect(
       portal.content(renterA, activeRentalId, documentId),
     ).rejects.toThrow(NotFoundException);
+  });
+
+  it("reports, assigns, finds assigned work, comments, progresses and resolves without a maintenance event", async () => {
+    const created = await problems.create(
+      reporter,
+      v1.problems.createProblemInputSchema.parse({
+        scooterId: scooterIds[0],
+        title: "Broken belt",
+        severity: "critical",
+        blocksUsage: true,
+        assigneeId: mechanicA,
+      }),
+    );
+    expect(created.reporter?.id).toBe(reporter);
+    const assigned = await problems.list(
+      mechanicA,
+      v1.problems.listProblemsQuerySchema.parse({
+        view: "assigned",
+        severity: "critical",
+        scooterId: scooterIds[0],
+        assigneeId: mechanicA,
+      }),
+    );
+    expect(assigned.items.some((item) => item.id === created.id)).toBe(true);
+    const started = await problems.update(mechanicA, created.id, {
+      revision: created.revision,
+      startWork: true,
+    });
+    const commented = await problems.comment(mechanicA, created.id, {
+      revision: started.revision,
+      body: "Belt replaced; inspecting drivetrain",
+    });
+    const resolved = await problems.resolve(mechanicA, created.id, {
+      revision: commented.revision,
+      resolutionNotes: "Replacement belt tested successfully",
+      clearMaintenanceHold: true,
+    });
+    expect(resolved).toMatchObject({
+      status: "resolved",
+      blocksUsage: false,
+      resolutionNotes: "Replacement belt tested successfully",
+    });
+    const history = await problems.activity(mechanicA, created.id, {
+      page: 1,
+      pageSize: 25,
+    });
+    expect(history.items.map((entry) => entry.type)).toEqual([
+      "PROBLEM_RESOLVED",
+      "PROBLEM_COMMENTED",
+      "PROBLEM_UPDATED",
+      "PROBLEM_CREATED",
+    ]);
+    expect(
+      history.items.find((entry) => entry.type === "PROBLEM_COMMENTED"),
+    ).toMatchObject({
+      actor: { id: mechanicA },
+      note: "Belt replaced; inspecting drivetrain",
+    });
+    const reopened = await problems.reopen(
+      reporter,
+      created.id,
+      resolved.revision,
+    );
+    expect(reopened).toMatchObject({
+      status: "open",
+      blocksUsage: false,
+      assigneeId: mechanicA,
+      resolutionNotes: "Replacement belt tested successfully",
+    });
+    expect(
+      (
+        await problems.activity(mechanicA, created.id, {
+          page: 1,
+          pageSize: 25,
+        })
+      ).items.some(
+        (entry) => entry.note === "Replacement belt tested successfully",
+      ),
+    ).toBe(true);
+  });
+
+  it("keeps independent blockers through resolve, dismiss, reopen and explicit clearance", async () => {
+    const first = await problems.create(
+      reporter,
+      v1.problems.createProblemInputSchema.parse({
+        scooterId: scooterIds[0],
+        title: "Brake cable",
+        severity: "high",
+        blocksUsage: true,
+      }),
+    );
+    const second = await problems.create(
+      reporter,
+      v1.problems.createProblemInputSchema.parse({
+        scooterId: scooterIds[0],
+        title: "Tyre inspection",
+        severity: "moderate",
+        blocksUsage: true,
+      }),
+    );
+    const resolved = await problems.resolve(admin, first.id, {
+      revision: first.revision,
+      resolutionNotes: "Repaired, awaiting inspection",
+      clearMaintenanceHold: false,
+    });
+    expect(
+      (await problems.maintenanceHold(reporter, scooterIds[0])).count,
+    ).toBe(2);
+    await problems.cancel(reporter, second.id, second.revision, true);
+    expect(
+      (await problems.maintenanceHold(reporter, scooterIds[0])).blockers,
+    ).toEqual([expect.objectContaining({ id: first.id, status: "resolved" })]);
+    await expect(
+      rentals.create(admin, {
+        scooterId: scooterIds[0],
+        personId: personIds[0],
+        startsAt: new Date(Date.now() + 3_600_000).toISOString(),
+        endsAt: new Date(Date.now() + 7_200_000).toISOString(),
+      }),
+    ).rejects.toThrow("maintenance hold");
+    await problems.hold(reporter, first.id, {
+      revision: resolved.revision,
+      blocksUsage: false,
+    });
+    expect(
+      (await problems.maintenanceHold(reporter, scooterIds[0])).onHold,
+    ).toBe(false);
+  });
+
+  it("does not commit a problem update when required history recording fails", async () => {
+    const created = await problems.create(
+      reporter,
+      v1.problems.createProblemInputSchema.parse({
+        scooterId: scooterIds[0],
+        title: "Audit rollback",
+        severity: "low",
+      }),
+    );
+    const failing = new ProblemsService(
+      db,
+      access,
+      {
+        recordRequired: () => Promise.reject(new Error("history unavailable")),
+      } as unknown as AuditService,
+      new ProblemPhotosService(db, storage as unknown as ImageStorageService),
+    );
+    await expect(
+      failing.hold(reporter, created.id, {
+        revision: created.revision,
+        blocksUsage: true,
+      }),
+    ).rejects.toThrow("history unavailable");
+    expect(
+      await db.scooterProblem.findUnique({ where: { id: created.id } }),
+    ).toMatchObject({ revision: created.revision, blocksUsage: false });
+  });
+
+  it("checks a concurrent blocker after waiting for the scooter lock", async () => {
+    let release: () => void = () => undefined;
+    let locked: () => void = () => undefined;
+    const waitForLock = new Promise<void>((resolve) => {
+      locked = resolve;
+    });
+    const waitForRelease = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const blocker = db.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "Scooter" WHERE id = ${scooterIds[0]} FOR UPDATE`;
+      await tx.scooterProblem.create({
+        data: {
+          scooterId: scooterIds[0],
+          title: "Concurrent safety blocker",
+          severity: "critical",
+          reporterId: reporter,
+          blocksUsage: true,
+        },
+      });
+      locked();
+      await waitForRelease;
+    });
+    await waitForLock;
+    const attempt = rentals.create(admin, {
+      scooterId: scooterIds[0],
+      personId: personIds[0],
+      startsAt: new Date(Date.now() + 10_800_000).toISOString(),
+      endsAt: new Date(Date.now() + 14_400_000).toISOString(),
+    });
+    // Attach the rejection handler before releasing the transaction.
+    const assertion = expect(attempt).rejects.toThrow("maintenance hold");
+    release();
+    await blocker;
+    await assertion;
+    await db.scooterProblem.updateMany({
+      where: { scooterId: scooterIds[0], title: "Concurrent safety blocker" },
+      data: { blocksUsage: false },
+    });
+  });
+
+  it("claims a private photo atomically and cannot reuse or steal it", async () => {
+    const stored = {
+      provider: "s3",
+      bucket: "private",
+      storageKey: `${prefix}-photo`,
+      contentType: "image/jpeg",
+      byteSize: 30,
+      checksumSha256: "a".repeat(64),
+    };
+    storage.completePresignedUpload.mockResolvedValue(stored);
+    await db.draftUpload.create({
+      data: {
+        ...stored,
+        userId: reporter,
+        purpose: "problem-photo-draft",
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+    });
+    const input = v1.problems.createProblemInputSchema.parse({
+      scooterId: scooterIds[0],
+      title: "Photo evidence",
+      severity: "high",
+      photos: [{ fileName: "brake.jpg", uploadToken: "test-token" }],
+    });
+    const created = await problems.create(reporter, input);
+    expect(created.photos).toHaveLength(1);
+    expect(created.photos[0].contentUrl).toContain(
+      `/problems/${created.id}/photos/`,
+    );
+    const photo = await db.scooterProblemPhoto.findUniqueOrThrow({
+      where: { id: created.photos[0].id },
+      include: { asset: true },
+    });
+    expect(photo.asset.uploadedByUserId).toBe(reporter);
+    await expect(problems.create(reporter, input)).rejects.toThrow(
+      "already used",
+    );
+    const unclaimed = { ...stored, storageKey: `${prefix}-unclaimed-photo` };
+    storage.completePresignedUpload.mockResolvedValue(unclaimed);
+    await db.draftUpload.create({
+      data: {
+        ...unclaimed,
+        userId: mechanicB,
+        purpose: "problem-photo-draft",
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+    });
+    await expect(problems.create(reporter, input)).rejects.toThrow(
+      "already used",
+    );
+    expect(
+      await db.draftUpload.findUnique({
+        where: { storageKey: unclaimed.storageKey },
+      }),
+    ).toMatchObject({ claimedAt: null });
+  });
+
+  it("backfills legacy titles without inventing severity or losing description and resolution", async () => {
+    const client = new Client({ connectionString: databaseUrl });
+    await client.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query('CREATE SCHEMA "problem_release_migration_test"');
+      await client.query(
+        'SET LOCAL search_path TO "problem_release_migration_test"',
+      );
+      await client.query(
+        'CREATE TABLE "ScooterProblem" (id TEXT PRIMARY KEY, "scooterId" TEXT, description TEXT NOT NULL, priority TEXT, status TEXT, "resolutionNotes" TEXT); CREATE TABLE "MediaAsset" (id TEXT PRIMARY KEY)',
+      );
+      const description = "Legacy brake report ".repeat(20);
+      await client.query(
+        'INSERT INTO "ScooterProblem" (id, description, priority, status, "resolutionNotes") VALUES ($1, $2, $3, $4, $5)',
+        ["legacy", description, "urgent", "resolved", "Original resolution"],
+      );
+      await client.query(
+        readFileSync(
+          "prisma/migrations/20261014150000_problem_reporting_release/migration.sql",
+          "utf8",
+        ),
+      );
+      const migrated = await client.query(
+        'SELECT * FROM "ScooterProblem" WHERE id = $1',
+        ["legacy"],
+      );
+      expect(migrated.rows[0]).toMatchObject({
+        title: description.trim().slice(0, 160),
+        description,
+        priority: "urgent",
+        severity: null,
+        blocksUsage: false,
+        status: "resolved",
+        resolutionNotes: "Original resolution",
+      });
+    } finally {
+      await client.query("ROLLBACK");
+      await client.end();
+    }
   });
 });
