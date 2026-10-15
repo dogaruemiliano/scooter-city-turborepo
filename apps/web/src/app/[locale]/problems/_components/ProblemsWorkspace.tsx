@@ -29,7 +29,6 @@ import { canAccess } from "@/lib/access";
 import { webApi } from "@/lib/api";
 import { useRemote } from "@/components/WorkspaceForm";
 import { memberName } from "./ProblemForms";
-import { ProblemDetailSheet } from "./ProblemDetailSheet";
 import { PageTitleOverride } from "@/components/PageTitleOverride";
 import { ProblemListItem } from "./ProblemListItem";
 import { ProblemList } from "./ProblemList";
@@ -59,7 +58,6 @@ export function ProblemsWorkspace() {
   const defaultView = "";
   const [chosen, setChosen] = useState<ProblemFilters | null>(null);
   const [page, setPage] = useState(1);
-  const [selected, setSelected] = useState<v1.problems.Problem | null>(null);
   const filters: ProblemFilters = chosen ?? {
     view: defaultView,
     status: "",
@@ -181,7 +179,6 @@ export function ProblemsWorkspace() {
             onApply={(value) => {
               setChosen(value);
               setPage(1);
-              setSelected(null);
             }}
             appliedCount={
               Number(view !== defaultView) +
@@ -328,11 +325,9 @@ export function ProblemsWorkspace() {
               }
               onPrevious={() => {
                 setPage((value) => value - 1);
-                setSelected(null);
               }}
               onNext={() => {
                 setPage((value) => value + 1);
-                setSelected(null);
               }}
               label={shared("list.pagination")}
               previousLabel={t("previous")}
@@ -405,7 +400,6 @@ export function ProblemsWorkspace() {
               assigneeId: "",
             });
             setPage(1);
-            setSelected(null);
           }}
         />
         <ListStatus
@@ -432,21 +426,15 @@ export function ProblemsWorkspace() {
             renderItem={(problem) => (
               <ProblemListItem
                 problem={problem}
-                expanded={selected?.id === problem.id}
-                onToggle={() => setSelected(problem)}
+                href={localizePath(
+                  `/problems/${encodeURIComponent(problem.id)}`,
+                  locale,
+                )}
               />
             )}
           />
         ) : null}
       </ListLayout>
-      <ProblemDetailSheet
-        problem={selected}
-        onClose={() => setSelected(null)}
-        onChanged={(problem) => {
-          setSelected(problem);
-          remote.reload();
-        }}
-      />
     </main>
   );
 }

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { v1 } from "@repo/api-shared";
 import {
   UserAvatar,
@@ -32,10 +33,12 @@ export function ProblemListItem({
   problem,
   expanded,
   onToggle,
+  href,
 }: {
   problem: v1.problems.Problem;
-  expanded: boolean;
-  onToggle: () => void;
+  expanded?: boolean;
+  onToggle?: () => void;
+  href?: string;
 }) {
   const t = useTranslations("workspace.problems");
   const format = useFormatter();
@@ -63,14 +66,22 @@ export function ProblemListItem({
       {problem.severity ? (
         <CardAccent className={severityAccent[problem.severity]} />
       ) : null}
-      <Button
-        variant="ghost"
-        className="absolute inset-0 z-raised h-full w-full rounded-xl p-0 hover:bg-transparent aria-expanded:bg-transparent focus-visible:ring-inset"
-        aria-label={`${problem.title} · ${scooter}`}
-        aria-haspopup="dialog"
-        aria-expanded={expanded}
-        onClick={onToggle}
-      />
+      {href ? (
+        <Link
+          href={href}
+          className="absolute inset-0 z-raised rounded-xl focus-visible:outline-ring"
+          aria-label={`${problem.title} · ${scooter}`}
+        />
+      ) : (
+        <Button
+          variant="ghost"
+          className="absolute inset-0 z-raised h-full w-full rounded-xl p-0 hover:bg-transparent aria-expanded:bg-transparent focus-visible:ring-inset"
+          aria-label={`${problem.title} · ${scooter}`}
+          aria-haspopup="dialog"
+          aria-expanded={expanded}
+          onClick={onToggle}
+        />
+      )}
       <CardHeader className="gap-3">
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <span

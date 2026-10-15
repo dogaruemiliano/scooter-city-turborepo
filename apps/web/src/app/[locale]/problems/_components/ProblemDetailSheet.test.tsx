@@ -5,6 +5,8 @@ import { messages } from "@repo/i18n";
 import { v1 } from "@repo/api-shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ProblemDetailSheet } from "./ProblemDetailSheet";
+import { ProblemDetailScreen } from "./ProblemDetailScreen";
+import { ProblemWork } from "./ProblemForms";
 
 const mocks = vi.hoisted(() => ({
   fetch: vi.fn(),
@@ -29,6 +31,7 @@ const problem = v1.problems.problemSchema.parse({
     id: "scooter",
     fleetNumber: 7,
     brandCode: "HON",
+    coverUrl: "/v1/scooters/scooter/photos/cover/content",
     brandName: "Honda",
     model: "Vision",
     registrationNumber: null,
@@ -51,11 +54,9 @@ function renderDetail() {
   const onChanged = vi.fn();
   render(
     <NextIntlClientProvider locale="en" messages={messages.en}>
-      <ProblemDetailSheet
-        problem={problem}
-        onClose={vi.fn()}
-        onChanged={onChanged}
-      />
+      <main>
+        <ProblemWork problem={problem} reload={onChanged} />
+      </main>
     </NextIntlClientProvider>,
   );
   return onChanged;
@@ -85,24 +86,13 @@ beforeEach(() => {
       },
     );
 });
-describe("task detail sheet permissions", () => {
+describe("task detail workflow permissions", () => {
   it("lets the assigned mechanic change the checklist but not choose another assignee", async () => {
     const user = userEvent.setup();
     const changed = renderDetail();
-    const detail = screen.getByRole("dialog", { name: "Replace pads" });
-    expect(detail).toHaveClass("bg-popover");
-    // Small control surfaces may use their shared defaults; full-sheet containers must inherit popover.
-    for (const slot of [
-      "bottom-sheet-header",
-      "bottom-sheet-body",
-      "bottom-sheet-content",
-    ]) {
-      expect(detail.querySelector(`[data-slot="${slot}"]`)).not.toHaveClass(
-        "bg-background",
-      );
-    }
+    const detail = screen.getByRole("main");
     expect(
-      within(detail).queryByRole("button", { name: "Update assignment" }),
+      within(detail).queryByRole("button", { name: "Add assignee" }),
     ).toBeNull();
     expect(
       within(detail).queryByRole("combobox", { name: "Assignee" }),
@@ -150,15 +140,12 @@ describe("task detail sheet permissions", () => {
         "problems.assign": ["ALL"],
       };
       renderDetail();
+      await user.click(screen.getByRole("button", { name: "Add assignee" }));
+      const sheet = await screen.findByRole("dialog", {
+        name: "Add assignee",
+      });
       await user.click(
-        screen.getByRole("button", { name: "Update assignment" }),
-      );
-      await user.click(
-        await screen.findByRole("combobox", { name: "Assignee" }),
-      );
-      await user.click(await screen.findByRole("option", { name: "Taylor" }));
-      await user.click(
-        screen.getAllByRole("button", { name: "Update assignment" }).at(-1)!,
+        await within(sheet).findByRole("button", { name: "Taylor" }),
       );
       await waitFor(() =>
         expect(mocks.fetch).toHaveBeenCalledWith(
@@ -172,4 +159,102 @@ describe("task detail sheet permissions", () => {
       );
     },
   );
+});
+
+describe("problem preview", () => {
+  it("shows a read-only sheet with a link to the full page and a distinct surface", async () => {
+    const close = vi.fn();
+    render(
+      <NextIntlClientProvider locale="en" messages={messages.en}>
+        <ProblemDetailSheet problem={problem} onClose={close} />
+      </NextIntlClientProvider>,
+    );
+    const detail = screen.getByRole("dialog", { name: problem.title });
+    expect(detail).toHaveClass("bg-popover", "text-popover-foreground");
+    for (const slot of [
+      "bottom-sheet-header",
+      "bottom-sheet-body",
+      "bottom-sheet-content",
+    ]) {
+      expect(detail.querySelector(`[data-slot="${slot}"]`)).not.toHaveClass(
+        "bg-background",
+      );
+    }
+    expect(within(detail).getByText(problem.description)).toBeInTheDocument();
+    expect(
+      within(detail).getByRole("link", { name: "Open problem" }),
+    ).toHaveAttribute("href", "/en/problems/problem");
+    expect(within(detail).queryByRole("checkbox")).toBeNull();
+    expect(
+      within(detail).queryByRole("button", { name: "Add assignee" }),
+    ).toBeNull();
+    await userEvent
+      .setup()
+      .click(within(detail).getByRole("button", { name: "Close" }));
+    expect(close).toHaveBeenCalledOnce();
+  });
+});
+
+describe("problem details page", () => {
+  it("loads direct links and keeps checklist edits on the page", async () => {
+    mocks.fetch.mockImplementation(
+      async (
+        url: string,
+        _schema: unknown,
+        options?: { json?: Record<string, unknown> },
+      ) => {
+        if (url.includes("/activity"))
+          return { items: [], total: 0, page: 1, pageSize: 25 };
+        return {
+          ...problem,
+          ...options?.json,
+          revision: options?.json ? 4 : 3,
+        };
+      },
+    );
+    render(
+      <NextIntlClientProvider locale="en" messages={messages.en}>
+        <ProblemDetailScreen id="problem" />
+      </NextIntlClientProvider>,
+    );
+    expect(
+      await screen.findByRole("heading", { name: problem.title, level: 1 }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByRole("link", { name: /Honda Vision/ })).toHaveAttribute(
+      "href",
+      "/en/scooters/scooter",
+    );
+    expect(
+      screen.getByRole("link", { name: /Honda Vision/ }).querySelector("img"),
+    ).toHaveAttribute("src", "/v1/scooters/scooter/photos/cover/content");
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("checkbox", { name: "Install pads" }));
+    await user.click(screen.getByRole("button", { name: "Save checklist" }));
+    await waitFor(() =>
+      expect(mocks.fetch).toHaveBeenCalledWith(
+        "/v1/problems/problem",
+        expect.anything(),
+        {
+          method: "PATCH",
+          json: {
+            revision: 3,
+            checklist: [{ id: "pads", text: "Install pads", completed: true }],
+          },
+        },
+      ),
+    );
+  });
+  it("offers retry when a direct link fails to load", async () => {
+    mocks.fetch.mockRejectedValueOnce(new Error("Problem unavailable"));
+    render(
+      <NextIntlClientProvider locale="en" messages={messages.en}>
+        <ProblemDetailScreen id="problem" />
+      </NextIntlClientProvider>,
+    );
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Problem unavailable",
+    );
+    expect(screen.getByRole("button", { name: "Reload" })).toBeInTheDocument();
+  });
 });

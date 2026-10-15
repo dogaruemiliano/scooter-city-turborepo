@@ -1,13 +1,7 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
-import {
-  ImageIcon,
-  TriangleIcon,
-  PencilIcon,
-  PlusIcon,
-  XIcon,
-} from "lucide-react";
+import { useCallback, useMemo } from "react";
+import { TriangleIcon, PencilIcon, PlusIcon, XIcon } from "lucide-react";
 import { v1 } from "@repo/api-shared";
 import { Button, SheetSelect } from "@repo/ui/components";
 import { useTranslations } from "next-intl";
@@ -16,6 +10,8 @@ import { Feedback, useRemote } from "@/components/WorkspaceForm";
 import type { SheetSelectProps } from "@repo/ui/components/sheet-select";
 import { buttonVariants } from "@repo/ui/components/button";
 import { cn } from "@repo/ui/lib/utils";
+
+import { ScooterCover } from "./ScooterCover";
 
 const EMPTY_SCOOTERS: v1.scooters.Scooter[] = [];
 
@@ -26,30 +22,6 @@ const severityStyles = {
   critical: ["text-destructive", "text-destructive-foreground"],
   unknown: ["text-muted-foreground", "text-background"],
 } as const;
-
-function ScooterCover({ scooter }: { scooter: v1.scooters.Scooter }) {
-  const [failed, setFailed] = useState(false);
-  return (
-    <span className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted">
-      {scooter.coverUrl && !failed ? (
-        // Private cover URLs must retain session cookies.
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={webApi.url(scooter.coverUrl)}
-          alt=""
-          className="size-full object-contain"
-          loading="lazy"
-          onError={() => setFailed(true)}
-        />
-      ) : (
-        <ImageIcon
-          aria-hidden="true"
-          className="size-6 text-muted-foreground"
-        />
-      )}
-    </span>
-  );
-}
 
 /** The same content is used for sheet options and selected scooters. */
 export function ScooterSelectRow({

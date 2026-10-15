@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { messages } from "@repo/i18n";
@@ -76,6 +82,21 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("task attachment collection", () => {
+  it("opens the camera from the gallery add tile and keeps file selection available", async () => {
+    renderPhotos(vi.fn());
+    expect(screen.queryByRole("button", { name: "Take photos" })).toBeNull();
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "Choose photos" }));
+    const capture = await screen.findByRole("dialog", { name: "Take photos" });
+    const input = screen.getByLabelText("Choose photos", { selector: "input" });
+    const choose = vi.spyOn(input, "click");
+    await userEvent
+      .setup()
+      .click(within(capture).getByRole("button", { name: "Choose photos" }));
+    expect(choose).toHaveBeenCalledOnce();
+  });
+
   it("appends multiple selections and saves the whole batch", async () => {
     const user = userEvent.setup();
     const save = vi.fn().mockResolvedValue(undefined);
@@ -127,6 +148,8 @@ describe("task attachment collection", () => {
 
   it("rejects an oversized batch without replacing the selected photos", () => {
     renderPhotos(vi.fn());
+    expect(screen.queryByText(/Up to 10/)).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
     const input = screen.getByLabelText("Choose photos", { selector: "input" });
     fireEvent.change(input, { target: { files: [photo("keep.jpg")] } });
     fireEvent.change(input, {
@@ -137,5 +160,8 @@ describe("task attachment collection", () => {
     expect(screen.getByText("1 / 10 photos")).toBeInTheDocument();
     expect(screen.getByRole("alert")).toHaveTextContent("Up to 10");
     expect(mocks.fetch).not.toHaveBeenCalled();
+    fireEvent.change(input, { target: { files: [photo("valid.jpg")] } });
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.queryByText(/Up to 10/)).toBeNull();
   });
 });

@@ -10,7 +10,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@repo/ui/components";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { buttonVariants } from "@repo/ui/components/button";
 import { localizePath, resolveRouteLocale } from "@/i18n/paths";
@@ -26,7 +25,6 @@ export function ScooterProblems({ scooterId }: { scooterId: string }) {
   const t = useTranslations("workspace");
   const locale = resolveRouteLocale(useLocale());
   const { user } = useSession();
-  const router = useRouter();
   const [selected, setSelected] = useState<v1.problems.Problem | null>(null);
   const [page, setPage] = useState(1);
   const load = useCallback(
@@ -49,11 +47,6 @@ export function ScooterProblems({ scooterId }: { scooterId: string }) {
   );
   const remote = useRemote(load);
   const hold = useRemote(loadHold);
-  function reload() {
-    remote.reload();
-    hold.reload();
-    router.refresh();
-  }
   return (
     <Card>
       <CardHeader>
@@ -167,10 +160,6 @@ export function ScooterProblems({ scooterId }: { scooterId: string }) {
       <ProblemDetailSheet
         problem={selected}
         onClose={() => setSelected(null)}
-        onChanged={(problem) => {
-          setSelected(problem);
-          reload();
-        }}
       />
     </Card>
   );

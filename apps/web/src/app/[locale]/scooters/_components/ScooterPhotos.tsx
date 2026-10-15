@@ -193,7 +193,6 @@ export function ScooterPhotoGallery({
                 }}
                 title={t("details")}
                 items={gallery.photos}
-                className="grid min-w-0 grid-cols-2 gap-4 lg:grid-cols-3"
                 disabled={
                   !editable ||
                   gallery.busy ||

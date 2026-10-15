@@ -34,6 +34,9 @@ const row = {
   holdClearedAt: null,
   photos: [],
   checklist: [],
+  sections: [],
+  buyList: [],
+  location: null,
   assignee: { id: "mechanic", firstName: "Alex", lastName: null },
   reporter: { id: "manager", firstName: "Manager", lastName: null },
   priority: "high",
@@ -67,8 +70,13 @@ describe("ProblemsService authorization and write conflicts", () => {
       findMany: jest.fn(),
       count: jest.fn(),
     },
-    user: { findFirst: jest.fn() },
+    user: { findFirst: jest.fn(), findMany: jest.fn() },
     scooter: { findFirst: jest.fn() },
+    businessLocation: {
+      findUnique: jest.fn(),
+      findMany: jest.fn(),
+      upsert: jest.fn(),
+    },
     auditEvent: { findMany: jest.fn(), count: jest.fn() },
   };
   const access = { getSnapshot: jest.fn() },
@@ -100,6 +108,45 @@ describe("ProblemsService authorization and write conflicts", () => {
       firstName: "Alex",
       lastName: null,
     });
+  });
+
+  it("returns the scooter cover URL with problem details", async () => {
+    db.scooterProblem.findFirst.mockResolvedValue({
+      ...row,
+      scooter: { ...row.scooter, photos: [{ id: "cover" }] },
+    });
+    const result = await service.get("mechanic", "problem");
+    expect(result.scooter.coverUrl).toBe(
+      v1.scooters.ROUTES.photos.content("scooter", "cover"),
+    );
+    expect(result.scooter.brandCode).toBe("BRD");
+    const calls = db.scooterProblem.findFirst.mock.calls as unknown[][];
+    expect(calls[0]?.[0]).toMatchObject({
+      include: {
+        scooter: {
+          select: {
+            photos: {
+              where: {
+                deletedAt: null,
+                type: "GALLERY_COVER",
+                asset: { deletedAt: null },
+              },
+              take: 1,
+            },
+          },
+        },
+      },
+    });
+  });
+
+  it("returns no scooter cover URL when no cover is available", async () => {
+    db.scooterProblem.findFirst.mockResolvedValue({
+      ...row,
+      scooter: { ...row.scooter, photos: [] },
+    });
+    expect(
+      (await service.get("mechanic", "problem")).scooter.coverUrl,
+    ).toBeNull();
   });
 
   it("counts every quick filter across pages using the same read permissions", async () => {
@@ -139,6 +186,45 @@ describe("ProblemsService authorization and write conflicts", () => {
     expect(result.total).toBe(15);
   });
 
+  it("includes email in eligible assignees so nameless accounts have a readable fallback", async () => {
+    access.getSnapshot.mockResolvedValueOnce({
+      ...snapshot,
+      effectiveScopes: { "problems.assign": ["ALL"] },
+    });
+    db.user.findMany.mockResolvedValue([{ id: "mechanic" }]);
+    db.user.findFirst.mockResolvedValue({
+      id: "mechanic",
+      firstName: null,
+      lastName: null,
+      email: "mechanic@example.com",
+    });
+    const result = await service.assignees("admin", "mechanic@example.com");
+    expect(result.items).toEqual([
+      {
+        id: "mechanic",
+        firstName: null,
+        lastName: null,
+        email: "mechanic@example.com",
+      },
+    ]);
+    expect(db.user.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: expect.objectContaining({ email: true }) as unknown,
+      }),
+    );
+    expect(db.user.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          OR: expect.arrayContaining([
+            {
+              email: { contains: "mechanic@example.com", mode: "insensitive" },
+            },
+          ]) as unknown,
+        }) as unknown,
+      }),
+    );
+  });
+
   it("saves and audits checklist changes for the assigned mechanic", async () => {
     const checklist = [
       { id: "pads", text: "Install brake pads", completed: true },
@@ -171,14 +257,103 @@ describe("ProblemsService authorization and write conflicts", () => {
     );
   });
 
-  it("denies a checklist edit by a non-assignee without all-scope authority", async () => {
+  it.each([
+    { checklist: [] },
+    { buyList: [] },
+    { sections: ["buyList"] as ["buyList"] },
+    {
+      location: {
+        name: "Workshop",
+        address: "Main Street",
+        savedLocationId: null,
+      },
+    },
+  ])("denies task section edits by a non-assignee: %j", async (input) => {
     db.scooterProblem.findFirst.mockResolvedValue({
       ...row,
       assigneeId: "other",
     });
     await expect(
-      service.update("mechanic", "problem", { revision: 1, checklist: [] }),
+      service.update("mechanic", "problem", { revision: 1, ...input }),
     ).rejects.toThrow(ForbiddenException);
+    expect(db.scooterProblem.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("persists and audits buy lists, location and section selection", async () => {
+    const input = {
+      sections: ["buyList", "location"] as ["buyList", "location"],
+      buyList: [{ id: "tire", text: "Rear tire", completed: true }],
+      location: {
+        name: "Customer pickup",
+        address: "25 Park Road",
+        savedLocationId: null,
+      },
+    };
+    db.scooterProblem.findUniqueOrThrow.mockResolvedValue({
+      ...row,
+      ...input,
+      revision: 2,
+    });
+    const result = await service.update("mechanic", "problem", {
+      revision: 1,
+      ...input,
+    });
+    expect(result).toMatchObject(input);
+    expect(db.scooterProblem.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining(input) as unknown,
+      }),
+    );
+    expect(audit.recordRequired).toHaveBeenCalledWith(
+      db,
+      expect.objectContaining({
+        meta: expect.objectContaining({
+          after: expect.objectContaining(input) as unknown,
+        }) as unknown,
+      }),
+    );
+  });
+
+  it("uses the saved location's canonical address instead of client-supplied text", async () => {
+    const saved = {
+      id: "workshop",
+      name: "Workshop",
+      address: "10 Main Street",
+    };
+    db.businessLocation.findUnique.mockResolvedValue(saved);
+    await service.update("mechanic", "problem", {
+      revision: 1,
+      location: {
+        name: "Wrong",
+        address: "Wrong address",
+        savedLocationId: saved.id,
+      },
+    });
+    expect(db.scooterProblem.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          location: {
+            name: saved.name,
+            address: saved.address,
+            savedLocationId: saved.id,
+          },
+        }) as unknown,
+      }),
+    );
+  });
+
+  it("rejects missing saved locations before updating a task", async () => {
+    db.businessLocation.findUnique.mockResolvedValue(null);
+    await expect(
+      service.update("mechanic", "problem", {
+        revision: 1,
+        location: {
+          name: "Missing",
+          address: "Address",
+          savedLocationId: "missing",
+        },
+      }),
+    ).rejects.toThrow("Saved location not found");
     expect(db.scooterProblem.updateMany).not.toHaveBeenCalled();
   });
 

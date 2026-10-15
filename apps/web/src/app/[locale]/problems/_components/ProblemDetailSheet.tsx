@@ -1,6 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import Link from "next/link";
+import { useLocale } from "next-intl";
+import { localizePath, resolveRouteLocale } from "@/i18n/paths";
+import { buttonVariants } from "@repo/ui/components/button";
+import { ProblemPhotos } from "./ProblemPhotos";
 import { v1 } from "@repo/api-shared";
 import { useTranslations } from "next-intl";
 import { X } from "lucide-react";
@@ -14,23 +18,19 @@ import {
   BottomSheetDescription,
   BottomSheetBody,
 } from "@repo/ui/components";
-import { ProblemWork } from "./ProblemForms";
 
 export function ProblemDetailSheet({
   problem,
   onClose,
-  onChanged,
 }: {
   problem: v1.problems.Problem | null;
   onClose: () => void;
-  onChanged: (problem: v1.problems.Problem) => void;
 }) {
   const t = useTranslations("workspace");
   const shared = useTranslations("shared");
-  const [busy, setBusy] = useState(false);
+  const locale = resolveRouteLocale(useLocale());
   return (
     <BottomSheet
-      dismissible={!busy}
       open={problem !== null}
       onOpenChange={(open) => {
         if (!open) onClose();
@@ -48,7 +48,6 @@ export function ProblemDetailSheet({
                   variant="ghost"
                   size="icon"
                   aria-label={shared("actions.close")}
-                  disabled={busy}
                   onClick={onClose}
                 >
                   <X aria-hidden="true" />
@@ -79,13 +78,20 @@ export function ProblemDetailSheet({
                 </div>
                 <div className="flex flex-col items-end gap-2">
                   <dt className="text-sm font-medium text-muted-foreground">
-                    {t("problems.priority")}
+                    {t("problems.severity")}
                   </dt>
                   <dd className="font-semibold">
-                    {t(`problems.${problem.priority}`)}
+                    {t(`problems.${problem.severity}`)}
                   </dd>
                 </div>
               </dl>
+              {problem.blocksUsage &&
+              !problem.holdClearedAt &&
+              problem.status !== "resolved" ? (
+                <Badge variant="destructive" className="self-start">
+                  {t("problems.blocksUsage")}
+                </Badge>
+              ) : null}
               <section className="flex flex-col gap-3 rounded-2xl border border-border p-4">
                 <h3 className="text-base font-semibold">
                   {t("problems.detailDescription")}
@@ -94,14 +100,25 @@ export function ProblemDetailSheet({
                   {problem.description || t("problems.noDescription")}
                 </p>
               </section>
-              <ProblemWork
-                key={problem.id}
-                problem={problem}
-                onBusyChange={setBusy}
-                reload={(updated) => {
-                  if (updated) onChanged(updated);
-                }}
-              />
+              {problem.photos.length ? (
+                <ProblemPhotos
+                  key={problem.id}
+                  problem={problem}
+                  editable={false}
+                  disabled={false}
+                  onBusyChange={() => {}}
+                  onSave={async () => {}}
+                />
+              ) : null}
+              <Link
+                className={buttonVariants()}
+                href={localizePath(
+                  `/problems/${encodeURIComponent(problem.id)}`,
+                  locale,
+                )}
+              >
+                {t("problems.openProblem")}
+              </Link>
             </BottomSheetBody>
           </>
         ) : null}
