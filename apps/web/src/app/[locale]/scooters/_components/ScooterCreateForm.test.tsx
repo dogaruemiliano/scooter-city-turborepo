@@ -331,6 +331,7 @@ describe("ScooterCreateForm combined review", () => {
     expect(mocks.refresh).toHaveBeenCalledOnce();
   });
 
+  // This full-form interaction exceeds five seconds on the shared CI runner.
   it("saves operational values and identification together", async () => {
     mocks.apiFetch.mockResolvedValueOnce(createdScooter);
     const browser = userEvent.setup();
@@ -417,7 +418,7 @@ describe("ScooterCreateForm combined review", () => {
       actualMaxSpeedKmh: 0,
       notes: "Needs inspection",
     });
-  });
+  }, 15_000);
 });
 
 describe("Scooter creation follow-up and optional steps", () => {
