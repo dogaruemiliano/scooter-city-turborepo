@@ -72,6 +72,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/api", () => ({
   webApi: {
     fetch: async (path: string, ...args: unknown[]) => {
+      if (path === v1.scooters.ROUTES.nextFleetNumber)
+        return { fleetNumber: 7 };
       if (path === v1.scooters.ROUTES.documents.createEditorSession)
         return {
           id: "editor-session",
@@ -765,6 +767,68 @@ describe("Scooter create controls with the create resolver", () => {
           }),
         }),
       ),
+    );
+  });
+
+  it("previews the next number with the brand and submits a manual override", async () => {
+    mocks.apiFetch.mockResolvedValueOnce(createdScooter);
+    const browser = userEvent.setup();
+    renderWizard();
+    await fillWizardIdentity(browser);
+    const number = screen.getByRole("textbox", { name: "Internal number" });
+    expect(number).toHaveValue("7");
+    await browser.clear(number);
+    await browser.type(number, "42");
+    await chooseSelectOption(browser, "Registration type", "Unregistered");
+    await browser.click(screen.getByRole("button", { name: "Create scooter" }));
+    await waitFor(() => expect(mocks.apiFetch).toHaveBeenCalledOnce());
+    expect(mocks.apiFetch.mock.calls[0]![2].json.fleetNumber).toBe(42);
+  });
+
+  it("uses automatic allocation when the prefilled number is unchanged", async () => {
+    mocks.apiFetch.mockResolvedValueOnce(createdScooter);
+    const browser = userEvent.setup();
+    renderWizard();
+    await fillWizardIdentity(browser);
+    expect(
+      screen.getByRole("textbox", { name: "Internal number" }),
+    ).toHaveValue("7");
+    expect(screen.queryByRole("button", { name: "Change" })).toBeNull();
+    expect(
+      screen.queryByText(messages.en.scooters.numbering.automaticHelp),
+    ).toBeNull();
+    await chooseSelectOption(browser, "Registration type", "Unregistered");
+    await browser.click(screen.getByRole("button", { name: "Create scooter" }));
+    await waitFor(() => expect(mocks.apiFetch).toHaveBeenCalledOnce());
+    expect(mocks.apiFetch.mock.calls[0]![2].json).not.toHaveProperty(
+      "fleetNumber",
+    );
+  });
+
+  it("preserves the draft and focuses the internal number after a numbering conflict", async () => {
+    mocks.apiFetch.mockRejectedValueOnce(
+      new ApiError(409, "Number taken", "SCOOTER_FLEET_NUMBER_CONFLICT", {
+        field: "fleetNumber",
+      }),
+    );
+    const browser = userEvent.setup();
+    renderWizard();
+    await fillWizardIdentity(browser);
+    await browser.clear(
+      screen.getByRole("textbox", { name: "Internal number" }),
+    );
+    await browser.type(
+      screen.getByRole("textbox", { name: "Internal number" }),
+      "7",
+    );
+    await chooseSelectOption(browser, "Registration type", "Unregistered");
+    await browser.click(screen.getByRole("button", { name: "Create scooter" }));
+    const number = screen.getByRole("textbox", { name: "Internal number" });
+    await waitFor(() => expect(number).toHaveAttribute("aria-invalid", "true"));
+    await waitFor(() => expect(number).toHaveFocus());
+    expect(number).toHaveValue("7");
+    expect(screen.getByRole("textbox", { name: "VIN" })).toHaveValue(
+      "JYARN23E0RA123456",
     );
   });
 

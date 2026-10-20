@@ -35,7 +35,12 @@ export function toMaintenanceScooter(
   };
 }
 
-const memberSelect = { id: true, firstName: true, lastName: true } as const;
+const memberSelect = {
+  id: true,
+  email: true,
+  firstName: true,
+  lastName: true,
+} as const;
 const problemInclude = {
   reporter: { select: memberSelect },
   assignee: { select: memberSelect },
@@ -43,7 +48,20 @@ const problemInclude = {
     where: { asset: { deletedAt: null } },
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],
   },
-  scooter: { select: maintenanceScooterSelect },
+  scooter: {
+    select: {
+      ...maintenanceScooterSelect,
+      photos: {
+        where: {
+          deletedAt: null,
+          type: "GALLERY_COVER",
+          asset: { deletedAt: null },
+        },
+        select: { id: true },
+        take: 1,
+      },
+    },
+  },
 } satisfies Prisma.ScooterProblemInclude;
 type ProblemRow = Prisma.ScooterProblemGetPayload<{
   include: typeof problemInclude;
@@ -90,10 +108,21 @@ export class ProblemsService {
     return v1.problems.problemSchema.parse({
       id: row.id,
       scooterId: row.scooterId,
-      scooter: toMaintenanceScooter(row.scooter),
+      scooter: {
+        ...toMaintenanceScooter(row.scooter),
+        coverUrl: row.scooter.photos?.[0]
+          ? v1.scooters.ROUTES.photos.content(
+              row.scooterId,
+              row.scooter.photos[0].id,
+            )
+          : null,
+      },
       title: row.title,
       description: row.description,
       checklist: row.checklist,
+      sections: row.sections,
+      buyList: row.buyList,
+      location: row.location,
       severity: row.severity,
       blocksUsage: row.blocksUsage,
       holdClearedAt: row.holdClearedAt?.toISOString() ?? null,
@@ -291,7 +320,27 @@ export class ProblemsService {
             "Assignee is not eligible for problem work",
           );
       }
+      let location = input.location;
+      if (location?.savedLocationId) {
+        const saved = await tx.businessLocation.findUnique({
+          where: { id: location.savedLocationId },
+        });
+        if (!saved) throw new BadRequestException("Saved location not found");
+        location = {
+          name: saved.name,
+          address: saved.address,
+          savedLocationId: saved.id,
+        };
+      }
       const data = {
+        ...(input.checklist !== undefined
+          ? { checklist: input.checklist }
+          : {}),
+        ...(input.sections !== undefined ? { sections: input.sections } : {}),
+        ...(input.buyList !== undefined ? { buyList: input.buyList } : {}),
+        ...(location !== undefined
+          ? { location: location ?? Prisma.DbNull }
+          : {}),
         scooterId: input.scooterId,
         title: input.title,
         description: input.description,
@@ -316,6 +365,10 @@ export class ProblemsService {
         meta: {
           scooterId: row.scooterId,
           after: {
+            checklist: row.checklist,
+            sections: row.sections,
+            buyList: row.buyList,
+            location: row.location,
             title: row.title,
             status: row.status,
             severity: row.severity,
@@ -340,7 +393,7 @@ export class ProblemsService {
   private async eligible(userId: string, tx?: Prisma.TransactionClient) {
     const user = await (tx ?? this.prisma).user.findFirst({
       where: { id: userId, deletedAt: null, loginStatus: "ACTIVE" },
-      select: { id: true, firstName: true, lastName: true },
+      select: memberSelect,
     });
     if (!user) return null;
     const snapshot = await this.access.getSnapshot(userId, tx);
@@ -365,6 +418,7 @@ export class ProblemsService {
         ...(search
           ? {
               OR: [
+                { email: { contains: search, mode: "insensitive" as const } },
                 {
                   firstName: { contains: search, mode: "insensitive" as const },
                 },
@@ -382,7 +436,9 @@ export class ProblemsService {
     const eligible = await Promise.all(
       users.map((user) => this.eligible(user.id)),
     );
-    return { items: eligible.filter((user) => user !== null) };
+    return v1.problems.eligibleAssigneeListSchema.parse({
+      items: eligible.filter((user) => user !== null),
+    });
   }
 
   private async mutate(
@@ -448,6 +504,9 @@ export class ProblemsService {
             title: row.title,
             description: row.description,
             checklist: row.checklist,
+            sections: row.sections,
+            buyList: row.buyList,
+            location: row.location,
             severity: row.severity,
             blocksUsage: row.blocksUsage,
             resolutionNotes: row.resolutionNotes,
@@ -461,6 +520,9 @@ export class ProblemsService {
             title: updated.title,
             description: updated.description,
             checklist: updated.checklist,
+            sections: updated.sections,
+            buyList: updated.buyList,
+            location: updated.location,
             severity: updated.severity,
             blocksUsage: updated.blocksUsage,
             resolutionNotes: updated.resolutionNotes,
@@ -502,14 +564,29 @@ export class ProblemsService {
         if (!openStates.includes(row.status))
           throw new ConflictException("Only open work can be updated");
         if (
-          input.checklist !== undefined &&
+          (input.checklist !== undefined ||
+            input.sections !== undefined ||
+            input.buyList !== undefined ||
+            input.location !== undefined) &&
           !snapshot.isSuperAdmin &&
           !snapshot.effectiveScopes["problems.update"]?.includes("ALL") &&
           row.assigneeId !== userId
         )
           throw new ForbiddenException(
-            "Only admins and the assignee can edit the checklist",
+            "Only admins and the assignee can edit task sections",
           );
+        let location = input.location;
+        if (location?.savedLocationId) {
+          const saved = await tx.businessLocation.findUnique({
+            where: { id: location.savedLocationId },
+          });
+          if (!saved) throw new BadRequestException("Saved location not found");
+          location = {
+            name: saved.name,
+            address: saved.address,
+            savedLocationId: saved.id,
+          };
+        }
         if (input.photos?.length) {
           if (
             row.photos.length + input.photos.length >
@@ -524,6 +601,11 @@ export class ProblemsService {
             "Assign the problem before starting work",
           );
         return {
+          ...(input.sections !== undefined ? { sections: input.sections } : {}),
+          ...(input.buyList !== undefined ? { buyList: input.buyList } : {}),
+          ...(location !== undefined
+            ? { location: location ?? Prisma.DbNull }
+            : {}),
           ...(input.checklist !== undefined
             ? { checklist: input.checklist }
             : {}),
@@ -539,6 +621,22 @@ export class ProblemsService {
         };
       },
     );
+  }
+
+  async locations() {
+    return {
+      items: await this.prisma.businessLocation.findMany({
+        orderBy: [{ name: "asc" }, { id: "asc" }],
+      }),
+    };
+  }
+
+  async saveLocation(input: { name: string; address: string }) {
+    return this.prisma.businessLocation.upsert({
+      where: { name_address: input },
+      create: input,
+      update: {},
+    });
   }
 
   async createPhotoUpload(

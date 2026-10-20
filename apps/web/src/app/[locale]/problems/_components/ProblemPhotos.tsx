@@ -3,10 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import { v1 } from "@repo/api-shared";
 import { aspectRatio } from "@repo/theme";
-import { Button } from "@repo/ui/components";
+import { AddAction, Button } from "@repo/ui/components";
 import { ImageGallery } from "@repo/ui/components/image-gallery";
 import { ImageCapture } from "@repo/ui/components/image-capture";
-import { Camera, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { webApi } from "@/lib/api";
 import { Feedback, useTask } from "@/components/WorkspaceForm";
@@ -95,7 +95,9 @@ export function ProblemPhotos({
   return (
     <section className="flex flex-col gap-3" aria-label={t("attachments")}>
       <div className="flex items-center justify-between gap-3">
-        <h3 className="text-base font-semibold">{t("attachments")}</h3>
+        <h3 className="text-sm font-semibold text-muted-foreground">
+          {t("attachments")}
+        </h3>
         <span className="text-xs text-muted-foreground" aria-live="polite">
           {t("attachmentCount", { count })}
         </span>
@@ -125,7 +127,6 @@ export function ProblemPhotos({
         disabled
         instructions={galleryT("sortInstructions")}
         onOrderChange={async () => false}
-        className="grid min-w-0 grid-cols-2 gap-3 sm:grid-cols-3"
         getItemLabel={(photo) => galleryT("open", { name: photo.fileName })}
         renderItem={(photo) => (
           // Authenticated API images and local previews retain their original URLs.
@@ -154,28 +155,18 @@ export function ProblemPhotos({
         }}
       >
         {editable && count < v1.problems.PROBLEM_PHOTO_MAX_FILES ? (
-          <Button
-            variant="outline"
-            className="h-full min-h-24 flex-col rounded-dashed-surface border-(length:--dashed-surface-border-width) border-dashed"
+          <AddAction
+            text={t("choosePhotos")}
+            icon={<Plus />}
+            style={{ aspectRatio: aspectRatio.scooterPhoto }}
             disabled={busy}
-            onClick={() => input.current?.click()}
-          >
-            <Plus aria-hidden="true" />
-            {t("choosePhotos")}
-          </Button>
+            onClick={() => setCamera(true)}
+          />
         ) : null}
       </ImageGallery>
       {editable ? (
         <>
           <div className="flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              disabled={busy || count >= v1.problems.PROBLEM_PHOTO_MAX_FILES}
-              onClick={() => setCamera(true)}
-            >
-              <Camera aria-hidden="true" />
-              {t("takePhotos")}
-            </Button>
             {pending.length ? (
               <Button
                 disabled={busy}
@@ -260,7 +251,6 @@ export function ProblemPhotos({
               </Button>
             </div>
           ))}
-          <p className="text-xs text-muted-foreground">{t("photoLimits")}</p>
         </>
       ) : !count ? (
         <p className="text-sm text-muted-foreground">{galleryT("empty")}</p>

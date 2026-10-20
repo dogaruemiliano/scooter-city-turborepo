@@ -53,6 +53,32 @@ afterEach(() => {
 });
 
 describe("shared ImageEditor", () => {
+  it("starts with tools closed and toggles the selected ruler without losing adjustments", async () => {
+    await renderEditor();
+    expect(screen.queryByRole("slider")).not.toBeInTheDocument();
+    for (const name of [
+      "Straighten",
+      "Vertical perspective",
+      "Horizontal perspective",
+    ]) {
+      const button = screen.getByRole("button", { name });
+      expect(button).toHaveAttribute("aria-pressed", "false");
+      fireEvent.click(button);
+      expect(button).toHaveAttribute("aria-expanded", "true");
+      fireEvent.keyDown(screen.getByRole("slider"), { key: "End" });
+      const value = screen.getByRole("slider").getAttribute("aria-valuenow");
+      fireEvent.click(button);
+      expect(screen.queryByRole("slider")).not.toBeInTheDocument();
+      expect(button).toHaveAttribute("aria-pressed", "false");
+      fireEvent.click(button);
+      expect(screen.getByRole("slider")).toHaveAttribute(
+        "aria-valuenow",
+        value,
+      );
+      fireEvent.click(button);
+    }
+  });
+
   it("uses the entire viewport beneath floating controls and enlarges the default crop on mobile", async () => {
     let bottomControlsHeight = 180;
     const measure = HTMLElement.prototype.getBoundingClientRect;
@@ -289,11 +315,11 @@ describe("shared ImageEditor", () => {
     );
     expect(screen.getByRole("button", { name: "Straighten" })).toHaveAttribute(
       "aria-pressed",
-      "true",
+      "false",
     );
-    expect(
-      screen.getByRole("slider", { name: "Straighten photo" }),
-    ).toHaveAttribute("aria-valuenow", "0");
+    expect(screen.queryByRole("slider")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Straighten" }));
+    expect(screen.getByRole("slider")).toHaveAttribute("aria-valuenow", "0");
     for (const axis of ["Vertical perspective", "Horizontal perspective"]) {
       fireEvent.click(screen.getByRole("button", { name: axis }));
       expect(screen.getByRole("slider")).toHaveAttribute("aria-valuenow", "0");
@@ -342,6 +368,7 @@ describe("shared ImageEditor", () => {
       .mockReturnValueOnce(pending.promise)
       .mockResolvedValue(undefined);
     const { onCancel } = await renderEditor({ onSave });
+    fireEvent.click(screen.getByRole("button", { name: "Straighten" }));
     fireEvent.click(screen.getByRole("button", { name: "Done" }));
     await waitFor(() => expect(onSave).toHaveBeenCalledOnce());
     const dialog = screen.getByRole("dialog");
@@ -453,7 +480,8 @@ function loadImage() {
 }
 
 function adjustAxis(axis: string, key: string) {
-  fireEvent.click(screen.getByRole("button", { name: axis }));
+  const button = screen.getByRole("button", { name: axis });
+  if (button.getAttribute("aria-pressed") !== "true") fireEvent.click(button);
   fireEvent.keyDown(screen.getByRole("slider"), { key });
 }
 

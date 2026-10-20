@@ -294,6 +294,23 @@ export function ScooterEditor({
         setRequestError(t("feedback.sessionExpired"));
         return;
       }
+      if (
+        error instanceof ApiError &&
+        [
+          "SCOOTER_FLEET_NUMBER_CONFLICT",
+          "SCOOTER_FLEET_NUMBER_EXHAUSTED",
+        ].includes(error.code ?? "")
+      ) {
+        const message = t(
+          error.code === "SCOOTER_FLEET_NUMBER_CONFLICT"
+            ? "numbering.conflict"
+            : "numbering.exhausted",
+        );
+        form.setError("fleetNumber", { type: "server", message });
+        focusErrors({ fleetNumber: { type: "server", message } });
+        setRequestError(message);
+        return;
+      }
       const serverErrors = scooterServerFieldErrors(error, t);
       if (Object.keys(serverErrors).length) {
         const errors: FieldErrors<ScooterEditorValues> = {};

@@ -24,6 +24,13 @@ import { ProblemsService } from "./problems.service";
 class FilterOptions extends createZodDto(
   v1.problems.problemFilterOptionsSchema,
 ) {}
+class LocationInput extends createZodDto(
+  v1.problems.businessLocationInputSchema,
+) {}
+class Location extends createZodDto(v1.problems.businessLocationSchema) {}
+class LocationList extends createZodDto(
+  v1.problems.businessLocationListSchema,
+) {}
 class CloseInput extends createZodDto(v1.problems.closeProblemInputSchema) {}
 class HoldInput extends createZodDto(v1.problems.problemHoldInputSchema) {}
 class CommentInput extends createZodDto(
@@ -114,6 +121,20 @@ export class ProblemsController {
   @ZodResponse({ type: Hold })
   maintenanceHold(@CurrentUser() user: AuthPrincipal, @Param("id") id: string) {
     return this.problems.maintenanceHold(user.id, id);
+  }
+
+  @Get("locations")
+  @RequirePermissions("problems.read")
+  @ZodResponse({ type: LocationList })
+  locations() {
+    return this.problems.locations();
+  }
+
+  @Post("locations")
+  @RequireAllScope("problems.update")
+  @ZodResponse({ status: 201, type: Location })
+  saveLocation(@Body() input: LocationInput) {
+    return this.problems.saveLocation(input);
   }
 
   @Get(":id/activity")

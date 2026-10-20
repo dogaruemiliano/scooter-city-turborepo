@@ -38,6 +38,10 @@ if (!Element.prototype.getAnimations) {
   Element.prototype.getAnimations = () => [];
 }
 
+if (!document.getAnimations) {
+  document.getAnimations = () => [];
+}
+
 // Shared previews measure their viewport and filename to fit and scroll them.
 if (!globalThis.ResizeObserver) {
   globalThis.ResizeObserver = class {

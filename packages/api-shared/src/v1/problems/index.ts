@@ -26,6 +26,7 @@ export const problemPhotoSchema = z.object({
 });
 export const problemMemberSchema = z.object({
   id: z.string(),
+  email: z.string().optional(),
   firstName: z.string().nullable(),
   lastName: z.string().nullable(),
 });
@@ -47,6 +48,7 @@ export const revisionInputSchema = z
   .strict();
 export const maintenanceScooterSchema = z.object({
   id: z.string(),
+  coverUrl: z.string().nullable().optional(),
   fleetNumber: z.number().int(),
   model: z.string().nullable(),
   brandName: z.string(),
@@ -69,6 +71,32 @@ export const problemChecklistSchema = z
       message: "Checklist item IDs must be unique",
     },
   );
+export const problemSectionSchema = z.enum([
+  "checklist",
+  "buyList",
+  "location",
+]);
+export const problemSectionsSchema = z
+  .array(problemSectionSchema)
+  .max(3)
+  .refine((items) => new Set(items).size === items.length, {
+    message: "Task sections must be unique",
+  });
+export const businessLocationInputSchema = z
+  .object({
+    name: z.string().trim().min(1).max(160),
+    address: z.string().trim().min(1).max(500),
+  })
+  .strict();
+export const businessLocationSchema = businessLocationInputSchema.extend({
+  id: z.string(),
+});
+export const businessLocationListSchema = z.object({
+  items: z.array(businessLocationSchema),
+});
+export const problemLocationSchema = businessLocationInputSchema.extend({
+  savedLocationId: z.string().min(1).nullable().default(null),
+});
 export const problemSchema = z.object({
   id: z.string(),
   scooterId: z.string(),
@@ -76,6 +104,9 @@ export const problemSchema = z.object({
   title: z.string(),
   description: z.string(),
   checklist: problemChecklistSchema.default([]),
+  sections: problemSectionsSchema.default([]),
+  buyList: problemChecklistSchema.default([]),
+  location: problemLocationSchema.nullable().default(null),
   severity: problemSeveritySchema.nullable(),
   blocksUsage: z.boolean(),
   holdClearedAt: z.string().nullable(),
@@ -135,6 +166,10 @@ export const createProblemInputSchema = z
     description: z.string().trim().max(4000).default(""),
     blocksUsage: z.boolean().default(false),
     assigneeId: z.string().min(1).nullable().optional(),
+    checklist: problemChecklistSchema.optional(),
+    sections: problemSectionsSchema.optional(),
+    buyList: problemChecklistSchema.optional(),
+    location: problemLocationSchema.nullable().optional(),
     photos: z
       .array(problemPhotoDraftSchema)
       .max(PROBLEM_PHOTO_MAX_FILES)
@@ -143,6 +178,9 @@ export const createProblemInputSchema = z
   .strict();
 export const updateProblemInputSchema = revisionInputSchema.extend({
   checklist: problemChecklistSchema.optional(),
+  sections: problemSectionsSchema.optional(),
+  buyList: problemChecklistSchema.optional(),
+  location: problemLocationSchema.nullable().optional(),
   photos: z
     .array(problemPhotoDraftSchema)
     .max(PROBLEM_PHOTO_MAX_FILES)
@@ -163,11 +201,7 @@ export const assignProblemInputSchema = revisionInputSchema.extend({
 export const prioritizeProblemInputSchema = revisionInputSchema.extend({
   priority: problemPrioritySchema,
 });
-export const eligibleAssigneeSchema = z.object({
-  id: z.string(),
-  firstName: z.string().nullable(),
-  lastName: z.string().nullable(),
-});
+export const eligibleAssigneeSchema = problemMemberSchema;
 export const eligibleAssigneeListSchema = z.object({
   items: z.array(eligibleAssigneeSchema),
 });
@@ -209,6 +243,10 @@ export const problemActivityTypeSchema = z.enum([
   "PROBLEM_HOLD_CHANGED",
 ]);
 export const problemActivityStateSchema = z.object({
+  checklist: problemChecklistSchema.optional(),
+  sections: problemSectionsSchema.optional(),
+  buyList: problemChecklistSchema.optional(),
+  location: problemLocationSchema.nullable().optional(),
   status: problemStatusSchema.optional(),
   assigneeId: z.string().nullable().optional(),
   severity: problemSeveritySchema.nullable().optional(),

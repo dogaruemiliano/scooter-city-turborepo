@@ -13,6 +13,7 @@ export function PhotoGallery<Item extends { id: string }>({
   images,
   title,
   labels,
+  className = "grid min-w-0 grid-cols-2 gap-4 lg:grid-cols-3",
   ...grid
 }: Omit<ComponentProps<typeof SortableGrid<Item>>, "onItemPress"> & {
   images: readonly ViewerImage[];
@@ -22,7 +23,11 @@ export function PhotoGallery<Item extends { id: string }>({
   const [activeId, setActiveId] = useState<string | null>(null);
   return (
     <>
-      <SortableGrid {...grid} onItemPress={(item) => setActiveId(item.id)} />
+      <SortableGrid
+        {...grid}
+        className={className}
+        onItemPress={(item) => setActiveId(item.id)}
+      />
       <ImageViewer
         open={activeId !== null}
         onOpenChange={(open) => {

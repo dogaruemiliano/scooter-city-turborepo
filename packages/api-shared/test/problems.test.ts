@@ -2,6 +2,34 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { v1 } from "../src";
 
+test("task sections validate buy lists and saved or one-off locations", () => {
+  const valid = {
+    revision: 1,
+    sections: ["buyList", "location"],
+    buyList: [{ id: "tire", text: "Rear tire", completed: false }],
+    location: {
+      name: "Workshop",
+      address: "10 Main Street",
+      savedLocationId: null,
+    },
+  };
+  assert.equal(
+    v1.problems.updateProblemInputSchema.safeParse(valid).success,
+    true,
+  );
+  for (const input of [
+    { ...valid, sections: ["buyList", "buyList"] },
+    { ...valid, sections: ["unknown"] },
+    { ...valid, buyList: [...valid.buyList, ...valid.buyList] },
+    { ...valid, buyList: [{ id: "tire", text: " ", completed: false }] },
+    { ...valid, location: { name: "Workshop", address: " " } },
+  ])
+    assert.equal(
+      v1.problems.updateProblemInputSchema.safeParse(input).success,
+      false,
+    );
+});
+
 test("checklists reject duplicate IDs, empty text and excessive items", () => {
   const item = { id: "pads", text: "Install pads", completed: false };
   assert.equal(
@@ -88,4 +116,36 @@ test("hold filtering parses false accurately and supports all release filters", 
   assert.equal(filter.blocking, false);
   assert.equal(filter.unassigned, false);
   assert.equal(filter.severity, "critical");
+});
+
+test("creation accepts and validates optional task sections", () => {
+  const base = { scooterId: "scooter", title: "Service", severity: "low" };
+  const sections = {
+    sections: ["checklist", "buyList", "location"],
+    checklist: [{ id: "check", text: "Check brakes", completed: false }],
+    buyList: [{ id: "pads", text: "Brake pads", completed: false }],
+    location: {
+      name: "Pickup",
+      address: "10 Main Street",
+      savedLocationId: null,
+    },
+  };
+  const parsed = v1.problems.createProblemInputSchema.parse({
+    ...base,
+    ...sections,
+  });
+  for (const key of ["sections", "checklist", "buyList", "location"] as const)
+    assert.deepEqual(parsed[key], sections[key]);
+  for (const invalid of [
+    { sections: ["unknown"] },
+    { sections: ["location", "location"] },
+    { checklist: [{ id: "check", text: " ", completed: false }] },
+    { buyList: [...sections.buyList, ...sections.buyList] },
+    { location: { name: "Pickup", address: " " } },
+  ])
+    assert.equal(
+      v1.problems.createProblemInputSchema.safeParse({ ...base, ...invalid })
+        .success,
+      false,
+    );
 });

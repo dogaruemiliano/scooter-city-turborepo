@@ -32,6 +32,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/api", () => ({
   webApi: {
     fetch: async (path: string, ...args: unknown[]) => {
+      if (path === v1.scooters.ROUTES.nextFleetNumber)
+        return { fleetNumber: 7 };
       if (path === v1.scooters.ROUTES.documents.createEditorSession)
         return {
           id: "editor-session",

@@ -10,7 +10,15 @@ vi.mock("./ScooterPhotos", () => ({ ScooterPhotos: () => null }));
 import type { DocumentDraft } from "./useScooterDocuments";
 
 const apiFetch = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/api", () => ({ webApi: { fetch: apiFetch } }));
+vi.mock("@/lib/api", () => ({
+  webApi: {
+    fetch: async (path: string, ...args: unknown[]) => {
+      if (path === v1.scooters.ROUTES.nextFleetNumber)
+        return { fleetNumber: 7 };
+      return apiFetch(path, ...args);
+    },
+  },
+}));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }));

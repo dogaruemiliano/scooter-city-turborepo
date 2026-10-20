@@ -478,3 +478,71 @@ describe("sortable insertion", () => {
     expect(save).not.toHaveBeenCalled();
   });
 });
+
+describe("vertical sorting", () => {
+  function vertical() {
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(
+      function (this: HTMLElement) {
+        const cards = Array.from(
+          document.querySelectorAll("[data-sortable-id]"),
+        );
+        const index = cards.indexOf(this);
+        return DOMRect.fromRect({
+          x: 0,
+          y: index >= 0 ? index * 60 : 0,
+          width: 240,
+          height: index >= 0 ? 48 : 240,
+        });
+      },
+    );
+    const save = vi.fn().mockResolvedValue(true);
+    render(
+      <SortableGrid
+        items={items}
+        axis="vertical"
+        longPress
+        className="flex flex-col gap-2"
+        getItemLabel={(item) => `Move ${item.id}`}
+        instructions="Hold to move vertically"
+        onOrderChange={save}
+        renderItem={(item) => <span>{item.id}</span>}
+      />,
+    );
+    return save;
+  }
+
+  it("ignores horizontal keys and moves one row vertically, saving on drop", async () => {
+    const save = vertical();
+    const card = screen.getByRole("button", { name: "Move a" });
+    card.focus();
+    fireEvent.keyDown(card, { code: "Space", key: " " });
+    await waitFor(() => expect(card).toHaveAttribute("aria-pressed", "true"));
+    fireEvent.keyDown(card, { code: "ArrowRight", key: "ArrowRight" });
+    expect(ids()).toEqual(["a", "b", "c", "d"]);
+    fireEvent.keyDown(card, { code: "ArrowDown", key: "ArrowDown" });
+    await waitFor(() => expect(ids()).toEqual(["b", "a", "c", "d"]));
+    expect(save).not.toHaveBeenCalled();
+    await act(async () => {
+      fireEvent.keyDown(card, { code: "Space", key: " " });
+    });
+    await waitFor(() =>
+      expect(save).toHaveBeenCalledWith(["b", "a", "c", "d"]),
+    );
+  });
+
+  it("requires a long press with a mouse as well as touch", async () => {
+    const save = vertical();
+    const card = screen.getByRole("button", { name: "Move a" });
+    fireEvent.pointerDown(card, {
+      clientX: 40,
+      clientY: 24,
+      pointerType: "mouse",
+      buttons: 1,
+    });
+    expect(card).not.toHaveAttribute("aria-pressed", "true");
+    await waitFor(() => expect(card).toHaveAttribute("aria-pressed", "true"));
+    fireEvent.keyDown(card, { code: "Escape", key: "Escape" });
+    await waitFor(() => expect(card).toHaveAttribute("aria-pressed", "false"));
+    expect(save).not.toHaveBeenCalled();
+  });
+});
