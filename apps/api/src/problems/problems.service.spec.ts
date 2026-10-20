@@ -63,6 +63,7 @@ describe("ProblemsService authorization and write conflicts", () => {
     $transaction: jest.fn(),
     $queryRaw: jest.fn(),
     scooterProblem: {
+      create: jest.fn(),
       findFirst: jest.fn(),
       findUnique: jest.fn(),
       updateMany: jest.fn(),
@@ -108,6 +109,54 @@ describe("ProblemsService authorization and write conflicts", () => {
       firstName: "Alex",
       lastName: null,
     });
+  });
+
+  it("persists optional sections during creation and resolves saved locations", async () => {
+    access.getSnapshot.mockResolvedValue({ ...snapshot, isSuperAdmin: true });
+    db.scooter.findFirst.mockResolvedValue({ id: "scooter" });
+    db.scooterProblem.create.mockResolvedValue(row);
+    const saved = {
+      id: "workshop",
+      name: "Workshop",
+      address: "10 Main Street",
+    };
+    db.businessLocation.findUnique.mockResolvedValue(saved);
+    const sections = ["checklist", "buyList", "location"] as const;
+    const checklist = [
+      { id: "brakes", text: "Check brakes", completed: false },
+    ];
+    const buyList = [{ id: "pads", text: "Brake pads", completed: false }];
+    await service.create(
+      "admin",
+      v1.problems.createProblemInputSchema.parse({
+        scooterId: "scooter",
+        title: "Service",
+        severity: "low",
+        sections,
+        checklist,
+        buyList,
+        location: {
+          name: "Untrusted",
+          address: "Untrusted",
+          savedLocationId: saved.id,
+        },
+      }),
+    );
+    expect(db.scooterProblem.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          sections,
+          checklist,
+          buyList,
+          location: {
+            name: saved.name,
+            address: saved.address,
+            savedLocationId: saved.id,
+          },
+        }) as unknown,
+      }),
+    );
+    expect(audit.recordRequired).toHaveBeenCalled();
   });
 
   it("returns the scooter cover URL with problem details", async () => {

@@ -104,6 +104,7 @@ export type ScooterSelectProps = Omit<
   | "renderOption"
   | "renderHeaderAction"
   | "triggerContent"
+  | "addAction"
 > & {
   label?: string;
 } & (
@@ -212,12 +213,19 @@ export function ScooterSelect(props: ScooterSelectProps) {
         }
         {...controlProps}
         optionClassName="h-auto min-h-24 gap-3"
+        addAction={
+          !selectedScooter
+            ? {
+                text: props.multiple
+                  ? t("scooterSelect.addMore")
+                  : (props.placeholder ?? t("scooterSelect.select")),
+                icon: <PlusIcon />,
+              }
+            : undefined
+        }
         className={cn(
-          props.multiple
-            ? "h-auto min-h-12 justify-center rounded-dashed-surface border-(length:--dashed-surface-border-width) border-dashed md:h-auto md:min-h-11"
-            : selectedScooter
-              ? "h-auto min-h-24 border-0 bg-selectable-row md:h-auto"
-              : "h-auto min-h-24 justify-center rounded-dashed-surface border-(length:--dashed-surface-border-width) border-dashed md:h-auto",
+          selectedScooter &&
+            "h-auto min-h-24 border-0 bg-selectable-row md:h-auto",
           props.className,
         )}
         triggerContent={

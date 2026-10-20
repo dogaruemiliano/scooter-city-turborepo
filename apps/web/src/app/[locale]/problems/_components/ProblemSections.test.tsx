@@ -77,6 +77,9 @@ describe("optional task sections", () => {
     const user = userEvent.setup();
     const save = renderSections();
     expect(screen.queryByRole("heading", { name: "Checklist" })).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Add" }),
+    ).toHaveAccessibleDescription("Checklist · Buy list · Location");
     await user.click(screen.getByRole("button", { name: "Add" }));
     const sheet = await screen.findByRole("dialog", { name: "Add to task" });
     expect(sheet).toHaveClass("bg-popover", "text-popover-foreground");
@@ -98,13 +101,12 @@ describe("optional task sections", () => {
     await user.click(screen.getByRole("button", { name: "Add item" }));
     await user.type(
       screen.getByRole("textbox", { name: "Item to buy" }),
-      "2 rear tires",
+      "2 rear tires{Enter}",
     );
-    await user.click(
-      screen.getAllByRole("button", { name: "Add item" }).at(-1)!,
-    );
-    await user.click(screen.getByRole("checkbox", { name: "2 rear tires" }));
     await user.click(screen.getByRole("button", { name: "Save buy list" }));
+    await user.click(
+      await screen.findByRole("checkbox", { name: "2 rear tires" }),
+    );
     await waitFor(() =>
       expect(save).toHaveBeenLastCalledWith({
         buyList: [

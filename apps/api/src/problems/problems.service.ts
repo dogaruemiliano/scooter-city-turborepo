@@ -320,7 +320,27 @@ export class ProblemsService {
             "Assignee is not eligible for problem work",
           );
       }
+      let location = input.location;
+      if (location?.savedLocationId) {
+        const saved = await tx.businessLocation.findUnique({
+          where: { id: location.savedLocationId },
+        });
+        if (!saved) throw new BadRequestException("Saved location not found");
+        location = {
+          name: saved.name,
+          address: saved.address,
+          savedLocationId: saved.id,
+        };
+      }
       const data = {
+        ...(input.checklist !== undefined
+          ? { checklist: input.checklist }
+          : {}),
+        ...(input.sections !== undefined ? { sections: input.sections } : {}),
+        ...(input.buyList !== undefined ? { buyList: input.buyList } : {}),
+        ...(location !== undefined
+          ? { location: location ?? Prisma.DbNull }
+          : {}),
         scooterId: input.scooterId,
         title: input.title,
         description: input.description,
@@ -345,6 +365,10 @@ export class ProblemsService {
         meta: {
           scooterId: row.scooterId,
           after: {
+            checklist: row.checklist,
+            sections: row.sections,
+            buyList: row.buyList,
+            location: row.location,
             title: row.title,
             status: row.status,
             severity: row.severity,

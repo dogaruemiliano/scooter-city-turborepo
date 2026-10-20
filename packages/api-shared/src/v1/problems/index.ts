@@ -166,6 +166,10 @@ export const createProblemInputSchema = z
     description: z.string().trim().max(4000).default(""),
     blocksUsage: z.boolean().default(false),
     assigneeId: z.string().min(1).nullable().optional(),
+    checklist: problemChecklistSchema.optional(),
+    sections: problemSectionsSchema.optional(),
+    buyList: problemChecklistSchema.optional(),
+    location: problemLocationSchema.nullable().optional(),
     photos: z
       .array(problemPhotoDraftSchema)
       .max(PROBLEM_PHOTO_MAX_FILES)

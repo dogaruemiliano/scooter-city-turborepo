@@ -103,6 +103,7 @@ export function ImageEditor({
   const [crop, setCrop] = useState<CropRect>(DEFAULT_IMAGE_CROP);
   const [rotation, setRotation] = useState(ZERO_ROTATION);
   const [axis, setAxis] = useState<ImageRotationAxis>("z");
+  const [toolOpen, setToolOpen] = useState(false);
   const [viewResetKey, setViewResetKey] = useState(0);
   const [busy, setBusy] = useState(false);
   const [rotating, setRotating] = useState(false);
@@ -139,6 +140,7 @@ export function ImageEditor({
     setCrop(DEFAULT_IMAGE_CROP);
     setRotation(ZERO_ROTATION);
     setAxis("z");
+    setToolOpen(false);
     setViewResetKey((key) => key + 1);
     setError(undefined);
   }
@@ -307,12 +309,16 @@ export function ImageEditor({
                 size="icon"
                 aria-label={axisLabels[item]}
                 title={axisLabels[item]}
-                aria-pressed={axis === item}
+                aria-pressed={toolOpen && axis === item}
+                aria-expanded={toolOpen && axis === item}
                 disabled={busy}
-                onClick={() => setAxis(item)}
+                onClick={() => {
+                  setToolOpen(!toolOpen || axis !== item);
+                  setAxis(item);
+                }}
                 className={cn(
                   "rounded-full border bg-background hover:bg-muted",
-                  axis === item
+                  toolOpen && axis === item
                     ? "border-link text-link hover:text-link"
                     : "border-transparent text-foreground",
                 )}
@@ -321,18 +327,31 @@ export function ImageEditor({
               </Button>
             ))}
           </div>
-          <ImageTiltControl
-            key={axis}
-            value={rotation[axis]}
-            onValueChange={(value) =>
-              setRotation((current) => ({ ...current, [axis]: value }))
-            }
-            disabled={busy}
-            label={rulerLabels[axis]}
-            min={axis === "z" ? -15 : -45}
-            max={axis === "z" ? 15 : 45}
-            overlay
-          />
+          <div
+            inert={!toolOpen}
+            aria-hidden={!toolOpen}
+            className={cn(
+              "grid transition-[grid-template-rows,opacity] duration-normal ease-standard motion-reduce:transition-none",
+              toolOpen
+                ? "grid-rows-[1fr] opacity-100"
+                : "grid-rows-[0fr] opacity-0",
+            )}
+          >
+            <div className="min-h-0 overflow-hidden">
+              <ImageTiltControl
+                key={axis}
+                value={rotation[axis]}
+                onValueChange={(value) =>
+                  setRotation((current) => ({ ...current, [axis]: value }))
+                }
+                disabled={busy}
+                label={rulerLabels[axis]}
+                min={axis === "z" ? -15 : -45}
+                max={axis === "z" ? 15 : 45}
+                overlay
+              />
+            </div>
+          </div>
           {error ? (
             <p
               role="alert"

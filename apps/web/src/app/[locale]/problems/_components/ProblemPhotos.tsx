@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { v1 } from "@repo/api-shared";
 import { aspectRatio } from "@repo/theme";
-import { Button } from "@repo/ui/components";
+import { AddAction, Button } from "@repo/ui/components";
 import { ImageGallery } from "@repo/ui/components/image-gallery";
 import { ImageCapture } from "@repo/ui/components/image-capture";
 import { Plus } from "lucide-react";
@@ -155,16 +155,13 @@ export function ProblemPhotos({
         }}
       >
         {editable && count < v1.problems.PROBLEM_PHOTO_MAX_FILES ? (
-          <Button
-            variant="outline"
+          <AddAction
+            text={t("choosePhotos")}
+            icon={<Plus />}
             style={{ aspectRatio: aspectRatio.scooterPhoto }}
-            className="h-auto flex-col gap-3 rounded-dashed-surface border-(length:--dashed-surface-border-width) border-dashed bg-transparent p-4 text-muted-foreground"
             disabled={busy}
             onClick={() => setCamera(true)}
-          >
-            <Plus aria-hidden="true" />
-            <span>{t("choosePhotos")}</span>
-          </Button>
+          />
         ) : null}
       </ImageGallery>
       {editable ? (

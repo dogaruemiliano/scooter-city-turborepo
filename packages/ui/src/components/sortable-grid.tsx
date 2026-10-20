@@ -13,6 +13,7 @@ import {
   PointerActivationConstraints,
   Accessibility,
 } from "@dnd-kit/dom";
+import { RestrictToElement } from "@dnd-kit/dom/modifiers";
 import { OptimisticSortingPlugin } from "@dnd-kit/dom/sortable";
 import { Trash2Icon } from "lucide-react";
 import { motion, spacing, opacity } from "@repo/theme";
@@ -31,6 +32,8 @@ export function SortableGrid<Item extends { id: string }>({
   onItemPress,
   removal,
   className,
+  axis = "both",
+  longPress = false,
   children,
 }: {
   items: readonly Item[];
@@ -47,6 +50,8 @@ export function SortableGrid<Item extends { id: string }>({
     onRemove: (item: Item) => Promise<boolean>;
   };
   className?: string;
+  axis?: "both" | "vertical";
+  longPress?: boolean;
   children?: ReactNode;
 }) {
   const grid = useRef<HTMLDivElement>(null);
@@ -131,6 +136,11 @@ export function SortableGrid<Item extends { id: string }>({
       const columns =
         cards.filter((card) => layoutRect(card).top === firstTop).length || 1;
       const from = order.current.indexOf(String(source.id));
+      if (
+        axis === "vertical" &&
+        ["ArrowLeft", "ArrowRight"].includes(nativeEvent.code)
+      )
+        return;
       const delta = {
         ArrowLeft: -1,
         ArrowRight: 1,
@@ -185,7 +195,11 @@ export function SortableGrid<Item extends { id: string }>({
       });
       return;
     }
-    const point = event.to ?? event.operation.position.current;
+    const rawPoint = event.to ?? event.operation.position.current;
+    const point =
+      axis === "vertical"
+        ? { x: bounds.left + bounds.width / 2, y: rawPoint.y }
+        : rawPoint;
     const removeHit = Boolean(removal && isOverDelete(point.x, point.y));
     markDelete(removeHit);
     if (removeHit) {
@@ -213,8 +227,12 @@ export function SortableGrid<Item extends { id: string }>({
           order.current,
           String(source.id),
           card.dataset.sortableId!,
-          point.x >=
-            rect.right - rect.width * motion.gesture.sortableTrailingZone
+          (
+            axis === "vertical"
+              ? point.y >= rect.top + rect.height / 2
+              : point.x >=
+                rect.right - rect.width * motion.gesture.sortableTrailingZone
+          )
             ? "after"
             : "before",
         ),
@@ -229,6 +247,11 @@ export function SortableGrid<Item extends { id: string }>({
     : items;
   return (
     <DragDropProvider
+      modifiers={
+        axis === "vertical"
+          ? [RestrictToElement.configure({ element: () => grid.current })]
+          : undefined
+      }
       plugins={(defaults) => [
         ...defaults.filter((plugin) => plugin !== Accessibility),
         Accessibility.configure({
@@ -239,7 +262,7 @@ export function SortableGrid<Item extends { id: string }>({
         ...defaults.filter((sensor) => sensor !== PointerSensor),
         PointerSensor.configure({
           activationConstraints: (event) =>
-            event.pointerType === "touch"
+            longPress || event.pointerType === "touch"
               ? [
                   new PointerActivationConstraints.Delay({
                     value: motion.duration.normal,
@@ -297,8 +320,8 @@ export function SortableGrid<Item extends { id: string }>({
           const bounds = grid.current.getBoundingClientRect();
           const { clientX, clientY } = event.nativeEvent;
           inside.current =
-            clientX >= bounds.left &&
-            clientX <= bounds.right &&
+            (axis === "vertical" ||
+              (clientX >= bounds.left && clientX <= bounds.right)) &&
             clientY >= bounds.top &&
             clientY <= bounds.bottom;
         }
