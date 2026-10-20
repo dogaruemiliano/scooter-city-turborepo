@@ -349,6 +349,9 @@ describe("shared ImageCapture", () => {
       />,
     );
     loadCropPreview();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Straighten photo" }),
+    );
     const slider = screen.getByRole("slider", { name: "Straighten photo" });
     expect(slider).toHaveAttribute("aria-valuemin", "-15");
     expect(slider).toHaveAttribute("aria-valuemax", "15");
@@ -382,6 +385,9 @@ describe("shared ImageCapture", () => {
     });
     const onCapture = vi.fn();
     render(<CaptureHarness onCapture={onCapture} initialFile={original} />);
+    await userEvent.click(
+      screen.getByRole("button", { name: "Straighten photo" }),
+    );
     fireEvent.keyDown(
       screen.getByRole("slider", { name: "Straighten photo" }),
       { key: "ArrowRight" },
@@ -400,6 +406,9 @@ describe("shared ImageCapture", () => {
     expect(createImageBitmapMock).not.toHaveBeenCalled();
     expect(revokeObjectURL).toHaveBeenCalledWith("blob:captured-photo");
     await userEvent.upload(screen.getByLabelText("Files"), original);
+    await userEvent.click(
+      screen.getByRole("button", { name: "Straighten photo" }),
+    );
     expect(
       screen.getByRole("slider", { name: "Straighten photo" }),
     ).toHaveAttribute("aria-valuenow", "0");
@@ -429,6 +438,9 @@ describe("shared ImageCapture", () => {
 
     await userEvent.click(rotate);
     await waitFor(() => expect(rotate).toBeEnabled());
+    await userEvent.click(
+      screen.getByRole("button", { name: "Straighten photo" }),
+    );
     const slider = screen.getByRole("slider", { name: "Straighten photo" });
     const corner = screen.getByRole("button", {
       name: "Resize north-west corner",
@@ -443,6 +455,9 @@ describe("shared ImageCapture", () => {
     vi.mocked(HTMLCanvasElement.prototype.toBlob).mockClear();
 
     await userEvent.click(reset);
+    expect(
+      screen.queryByRole("slider", { name: "Straighten photo" }),
+    ).toBeNull();
     expect(slider).toHaveAttribute("aria-valuenow", "0");
     expect(
       screen.getByRole("button", { name: "Resize north-west corner" }).style
@@ -573,6 +588,9 @@ describe("shared ImageCapture", () => {
     });
     const onCapture = vi.fn();
     render(<CaptureHarness onCapture={onCapture} initialFile={original} />);
+    await userEvent.click(
+      screen.getByRole("button", { name: "Straighten photo" }),
+    );
     const slider = screen.getByRole("slider", { name: "Straighten photo" });
     fireEvent.keyDown(slider, { key: "ArrowRight" });
     const rotate = screen.getByRole("button", { name: "Rotate photo 90°" });
@@ -613,6 +631,12 @@ describe("shared ImageCapture", () => {
         }
       />,
     );
+    expect(
+      screen.queryByRole("slider", { name: "Straighten photo" }),
+    ).toBeNull();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Straighten photo" }),
+    );
     const firstSlider = screen.getByRole("slider", {
       name: "Straighten photo",
     });
@@ -627,6 +651,9 @@ describe("shared ImageCapture", () => {
         ],
       },
     });
+    await userEvent.click(
+      screen.getByRole("button", { name: "Straighten photo" }),
+    );
     const replacementSlider = screen.getByRole("slider", {
       name: "Straighten photo",
     });
@@ -637,6 +664,9 @@ describe("shared ImageCapture", () => {
     );
     await cameraReady();
     await userEvent.click(screen.getByRole("button", { name: "Take photo" }));
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Straighten photo" }),
+    );
     expect(
       await screen.findByRole("slider", { name: "Straighten photo" }),
     ).toHaveAttribute("aria-valuenow", "0");
