@@ -13,6 +13,7 @@ import {
   BottomSheetTitle,
   BottomSheetTrigger,
 } from "@repo/ui/components/bottom-sheet";
+import { AddAction, type AddActionProps } from "@repo/ui/components/add-action";
 import { Button } from "@repo/ui/components/button";
 import {
   createFuzzyIndex,
@@ -74,6 +75,8 @@ interface SheetSelectBaseProps {
   renderOption?: (option: SheetSelectOption) => React.ReactNode;
   /** Custom trigger content, for collection add/change actions. */
   triggerContent?: React.ReactNode;
+  /** Use the shared add surface as the picker trigger. */
+  addAction?: Pick<AddActionProps, "text" | "icon" | "subtext">;
 }
 
 export type SheetSelectProps = SheetSelectBaseProps &
@@ -116,6 +119,7 @@ function SheetSelect({
   optionClassName,
   renderOption,
   triggerContent,
+  addAction,
 }: SheetSelectProps) {
   const mobile = useIsMobile(breakpoints.lg);
   const [open, setOpen] = React.useState(false);
@@ -180,37 +184,53 @@ function SheetSelect({
         ref={triggerRef}
         onBlur={onBlur}
         render={
-          <button
-            type="button"
-            aria-label={labelledById ? undefined : label}
-            aria-labelledby={
-              labelledById && id ? `${labelledById} ${id}` : undefined
-            }
-            aria-required={required || undefined}
-            aria-describedby={describedById}
-            aria-invalid={invalid || undefined}
-            className={cn(
-              "flex h-12 w-full items-center justify-between gap-2 rounded-lg border border-input bg-control px-3 py-2 text-base text-left outline-none transition-colors duration-fast ease-standard focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:bg-disabled disabled:text-disabled-foreground aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive md:h-11 md:text-sm",
-              className,
-            )}
-          >
-            {triggerContent ?? (
-              <>
-                <span
-                  className={cn(
-                    "truncate",
-                    hasSelection ? "text-foreground" : "text-muted-foreground",
-                  )}
-                >
-                  {selectedLabel || placeholder}
-                </span>
-                <ChevronDownIcon
-                  aria-hidden="true"
-                  className="size-4 shrink-0 text-muted-foreground"
-                />
-              </>
-            )}
-          </button>
+          addAction ? (
+            <AddAction
+              {...addAction}
+              aria-label={labelledById ? undefined : label}
+              aria-labelledby={
+                labelledById && id ? `${labelledById} ${id}` : undefined
+              }
+              aria-required={required || undefined}
+              aria-describedby={describedById}
+              aria-invalid={invalid || undefined}
+              className={className}
+            />
+          ) : (
+            <button
+              type="button"
+              aria-label={labelledById ? undefined : label}
+              aria-labelledby={
+                labelledById && id ? `${labelledById} ${id}` : undefined
+              }
+              aria-required={required || undefined}
+              aria-describedby={describedById}
+              aria-invalid={invalid || undefined}
+              className={cn(
+                "flex h-12 w-full items-center justify-between gap-2 rounded-lg border border-input bg-control px-3 py-2 text-base text-left outline-none transition-colors duration-fast ease-standard focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:bg-disabled disabled:text-disabled-foreground aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive md:h-11 md:text-sm",
+                className,
+              )}
+            >
+              {triggerContent ?? (
+                <>
+                  <span
+                    className={cn(
+                      "truncate",
+                      hasSelection
+                        ? "text-foreground"
+                        : "text-muted-foreground",
+                    )}
+                  >
+                    {selectedLabel || placeholder}
+                  </span>
+                  <ChevronDownIcon
+                    aria-hidden="true"
+                    className="size-4 shrink-0 text-muted-foreground"
+                  />
+                </>
+              )}
+            </button>
+          )
         }
       />
 

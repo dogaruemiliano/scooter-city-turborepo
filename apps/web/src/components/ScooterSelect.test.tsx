@@ -59,8 +59,12 @@ function Harness({ multiple = false }: { multiple?: boolean }) {
 it("shows the display code, searches by VIN, selects one scooter and closes", async () => {
   const user = userEvent.setup();
   render(<Harness />);
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "Scooter" })).toHaveTextContent(
+      "007 HON",
+    ),
+  );
   const trigger = screen.getByRole("button", { name: "Scooter" });
-  await waitFor(() => expect(trigger).toHaveTextContent("007 HON"));
   expect(trigger).toHaveTextContent("Honda Vision");
   expect(trigger).toHaveTextContent("B123");
   expect(trigger).toHaveTextContent("Edit");

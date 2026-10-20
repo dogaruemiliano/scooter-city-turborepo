@@ -100,9 +100,6 @@ describe("task detail workflow permissions", () => {
     await user.click(
       within(detail).getByRole("checkbox", { name: "Install pads" }),
     );
-    await user.click(
-      within(detail).getByRole("button", { name: "Save checklist" }),
-    );
     await waitFor(() => expect(changed).toHaveBeenCalledOnce());
     expect(mocks.fetch).toHaveBeenCalledWith(
       "/v1/problems/problem",
@@ -230,7 +227,6 @@ describe("problem details page", () => {
     ).toHaveAttribute("src", "/v1/scooters/scooter/photos/cover/content");
     const user = userEvent.setup();
     await user.click(screen.getByRole("checkbox", { name: "Install pads" }));
-    await user.click(screen.getByRole("button", { name: "Save checklist" }));
     await waitFor(() =>
       expect(mocks.fetch).toHaveBeenCalledWith(
         "/v1/problems/problem",

@@ -11,6 +11,7 @@ import {
   BottomSheetDescription,
   BottomSheetBody,
   Button,
+  AddAction,
   Checkbox,
   Input,
   Label,
@@ -20,6 +21,11 @@ import { ClipboardList, MapPin, Plus, ShoppingCart } from "lucide-react";
 import { Feedback, useRemote, useTask } from "@/components/WorkspaceForm";
 import { webApi } from "@/lib/api";
 import { ProblemChecklist } from "./ProblemChecklist";
+
+export type ProblemSectionData = Pick<
+  v1.problems.Problem,
+  "sections" | "checklist" | "buyList" | "location"
+>;
 
 type Section = v1.problems.Problem["sections"][number];
 
@@ -31,7 +37,7 @@ export function ProblemSections({
   onSave,
   onBusyChange,
 }: {
-  problem: v1.problems.Problem;
+  problem: ProblemSectionData;
   editable: boolean;
   maySaveLocation: boolean;
   busy: boolean;
@@ -70,7 +76,15 @@ export function ProblemSections({
             problem={problem}
             editable={editable}
             busy={busy}
-            onSave={(items) => void task.run(() => onSave({ [kind]: items }))}
+            error={task.error}
+            onSave={async (items) => {
+              let saved = false;
+              await task.run(async () => {
+                await onSave({ [kind]: items });
+                saved = true;
+              });
+              return saved;
+            }}
           />
         ) : null,
       )}
@@ -93,27 +107,34 @@ export function ProblemSections({
             </div>
           ) : null}
           {editable ? (
-            <Button
-              variant="outline"
-              className="self-start"
-              disabled={busy}
-              onClick={() => setEditingLocation(true)}
-            >
-              {t(problem.location ? "editLocation" : "addLocation")}
-            </Button>
+            problem.location ? (
+              <Button
+                variant="outline"
+                className="self-start"
+                disabled={busy}
+                onClick={() => setEditingLocation(true)}
+              >
+                {t("editLocation")}
+              </Button>
+            ) : (
+              <AddAction
+                text={t("addLocation")}
+                icon={<MapPin />}
+                disabled={busy}
+                onClick={() => setEditingLocation(true)}
+              />
+            )
           ) : null}
         </section>
       ) : null}
       {editable && options.some(({ key }) => !has(key)) ? (
-        <Button
-          variant="outline"
-          className="self-start"
+        <AddAction
+          text={t("addSection")}
+          icon={<Plus />}
+          subtext={t("addSectionDescription")}
           disabled={busy}
           onClick={() => setOpen(true)}
-        >
-          <Plus aria-hidden="true" />
-          {t("addSection")}
-        </Button>
+        />
       ) : null}
       <BottomSheet open={open} onOpenChange={setOpen}>
         <BottomSheetContent>
@@ -186,7 +207,7 @@ function TaskLocationEditor({
   onSave,
   onBusyChange,
 }: {
-  problem: v1.problems.Problem;
+  problem: ProblemSectionData;
   maySaveLocation: boolean;
   busy: boolean;
   onClose: () => void;
@@ -271,6 +292,7 @@ function TaskLocationEditor({
             className="flex flex-col gap-4"
             onSubmit={(event) => {
               event.preventDefault();
+              event.stopPropagation();
               if (busy || !name.trim() || !address.trim()) return;
               void task.run(async () => {
                 const location = {

@@ -196,6 +196,7 @@ export const workspaceCatalog = {
       detailDescription: "Description",
       noDescription: "No description added.",
       addSection: "Add",
+      addSectionDescription: "Checklist · Buy list · Location",
       addToTask: "Add to task",
       addToTaskDescription: "Choose a section to add to this task.",
       buyList: "Buy list",
@@ -219,6 +220,13 @@ export const workspaceCatalog = {
       locationAddress: "Address",
       saveLocationForReuse: "Save as a business location for reuse",
       saveLocation: "Save location",
+      editChecklist: "Edit checklist",
+      editBuyList: "Edit buy list",
+      checklistEditorDescription:
+        "Add, reorder, or remove items, then save your changes.",
+      checklistSortInstructions:
+        "Long press an item to move it up or down. With a keyboard, press Space to pick up, use Up or Down to move, then Space to drop or Escape to cancel. Press Enter in the new-item input to add it.",
+      reorderChecklistItem: "Move item: {text}",
       checklist: "Checklist",
       checklistProgress: "{completed}/{total} done",
       checklistItem: "New checklist item",
@@ -595,6 +603,8 @@ export const workspaceCatalog = {
       detailDescription: "Descriere",
       noDescription: "Nu a fost adăugată o descriere.",
       addSection: "Adaugă",
+      addSectionDescription:
+        "Listă de verificare · Listă de cumpărături · Locație",
       addToTask: "Adaugă la sarcină",
       addToTaskDescription: "Alege o secțiune pentru această sarcină.",
       buyList: "Listă de cumpărături",
@@ -618,6 +628,13 @@ export const workspaceCatalog = {
       locationAddress: "Adresă",
       saveLocationForReuse: "Salvează ca locație a firmei pentru reutilizare",
       saveLocation: "Salvează locația",
+      editChecklist: "Editează lista de verificare",
+      editBuyList: "Editează lista de cumpărături",
+      checklistEditorDescription:
+        "Adaugă, reordonează sau elimină elemente, apoi salvează modificările.",
+      checklistSortInstructions:
+        "Ține apăsat un element pentru a-l muta în sus sau în jos. Cu tastatura, apasă Spațiu pentru a-l selecta, săgețile Sus sau Jos pentru a-l muta, apoi Spațiu pentru a-l plasa sau Escape pentru a anula. Apasă Enter în câmpul pentru elementul nou ca să-l adaugi.",
+      reorderChecklistItem: "Mută elementul: {text}",
       checklist: "Listă de verificare",
       checklistProgress: "{completed}/{total} finalizate",
       checklistItem: "Element nou",

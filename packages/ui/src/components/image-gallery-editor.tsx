@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { PencilIcon, PlusIcon, XIcon } from "lucide-react";
 import { aspectRatio } from "@repo/theme";
+import { AddAction } from "./add-action";
 import { Button } from "./button";
 import { ImageEditor, type ImageEditorLabels } from "./image-editor";
 import { ImageGallery } from "./image-gallery";
@@ -130,7 +131,7 @@ export function ImageGalleryEditor({
               style={{ aspectRatio: aspectRatio.scooterPhoto }}
               className="block w-full bg-muted object-cover"
             />
-            <div className="absolute inset-x-2 top-2 flex justify-end gap-2">
+            <div className="absolute inset-x-2 top-2 flex justify-between gap-2">
               <Button
                 type="button"
                 size="icon"
@@ -156,17 +157,13 @@ export function ImageGalleryEditor({
         )}
       >
         {files.length < maxFiles ? (
-          <Button
-            type="button"
-            variant="outline"
+          <AddAction
+            text={labels.add}
+            icon={<PlusIcon />}
             disabled={busy}
-            className="h-auto min-h-24 flex-col gap-3 rounded-dashed-surface border-(length:--dashed-surface-border-width) border-dashed"
             style={{ aspectRatio: aspectRatio.scooterPhoto }}
             onClick={() => input.current?.click()}
-          >
-            <PlusIcon aria-hidden="true" />
-            {labels.add}
-          </Button>
+          />
         ) : null}
       </ImageGallery>
       {editing ? (

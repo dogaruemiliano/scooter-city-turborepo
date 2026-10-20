@@ -42,7 +42,7 @@ import {
   useTask,
 } from "@/components/WorkspaceForm";
 import { ProblemScooterPicker } from "./ProblemScooterPicker";
-import { ProblemSections } from "./ProblemSections";
+import { ProblemSections, type ProblemSectionData } from "./ProblemSections";
 import { ProblemPhotos } from "./ProblemPhotos";
 
 export function memberName(
@@ -103,6 +103,13 @@ export function CreateProblem({
   const [assigneeId, setAssignee] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [galleryBusy, setGalleryBusy] = useState(false);
+  const [sectionsBusy, setSectionsBusy] = useState(false);
+  const [sectionData, setSectionData] = useState<ProblemSectionData>({
+    sections: [],
+    checklist: [],
+    buyList: [],
+    location: null,
+  });
   const [fileError, setFileError] = useState<string | null>(null);
   const uploads = useRef(new Map<File, v1.problems.ProblemPhotoDraft>());
   const mayAssign = canAccess(user, "problems.assign", "ALL");
@@ -114,7 +121,8 @@ export function CreateProblem({
     severity &&
     blocksUsage &&
     !fileError &&
-    !galleryBusy,
+    !galleryBusy &&
+    !sectionsBusy,
   );
 
   async function uploadPhotos() {
@@ -167,6 +175,7 @@ export function CreateProblem({
         if (!blocksUsage) return;
         void task.run(async () => {
           const input = v1.problems.createProblemInputSchema.parse({
+            ...sectionData,
             scooterId,
             title,
             severity,
@@ -305,20 +314,12 @@ export function CreateProblem({
             value={assigneeId}
             onValueChange={setAssignee}
             disabled={task.busy}
-            className="h-auto min-h-20 justify-center rounded-dashed-surface border-(length:--dashed-surface-border-width) border-dashed bg-transparent p-4"
-            triggerContent={
-              <>
-                <UserPlusIcon
-                  aria-hidden="true"
-                  className="size-5 text-muted-foreground"
-                />
-                <span>
-                  {assigneeId
-                    ? t("problems.changeAssignee")
-                    : t("problems.addAssignee")}
-                </span>
-              </>
-            }
+            addAction={{
+              text: assigneeId
+                ? t("problems.changeAssignee")
+                : t("problems.addAssignee"),
+              icon: <UserPlusIcon />,
+            }}
             searchPlaceholder={t("problems.searchAssignees")}
             clearSearchLabel={t("problems.clearAssigneeSearch")}
             closeLabel={t("cancel")}
@@ -441,6 +442,16 @@ export function CreateProblem({
           {t("problems.photoLimits")}
         </p>
       </Field>
+      <ProblemSections
+        problem={sectionData}
+        editable
+        maySaveLocation={canAccess(user, "problems.update", "ALL")}
+        busy={task.busy || sectionsBusy}
+        onBusyChange={setSectionsBusy}
+        onSave={async (input) => {
+          setSectionData((current) => ({ ...current, ...input }));
+        }}
+      />
       <Feedback error={fileError ?? task.error} />
       <FormActions
         data-slot="problem-create-actions"
@@ -599,17 +610,11 @@ export function ProblemWork({
                   ? t("loading")
                   : (assignees.error ?? t("problems.noAssignees"))
               }
-              className="justify-center rounded-dashed-surface border-(length:--dashed-surface-border-width) border-dashed bg-transparent text-muted-foreground"
+              addAction={{
+                text: t("problems.addAssignee"),
+                icon: <UserPlusIcon />,
+              }}
               optionClassName="h-auto min-h-20 rounded-xl p-4"
-              triggerContent={
-                <>
-                  <UserPlusIcon
-                    aria-hidden="true"
-                    className="size-5 text-muted-foreground"
-                  />
-                  <span>{t("problems.addAssignee")}</span>
-                </>
-              }
               options={[
                 ...(problem.assignee &&
                 !assignees.data?.items.some(

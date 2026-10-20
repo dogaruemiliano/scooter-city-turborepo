@@ -81,6 +81,7 @@ beforeEach(() => {
       return Promise.resolve({
         items: [{ id: "other", firstName: "Taylor", lastName: null }],
       });
+    if (url === "/v1/problems/locations") return Promise.resolve({ items: [] });
     if (url.includes("/activity"))
       return Promise.resolve({ items: [], total: 0, page: 1, pageSize: 25 });
     return Promise.resolve(problem);
@@ -88,6 +89,80 @@ beforeEach(() => {
 });
 
 describe("problem release forms", () => {
+  it("creates optional sections in one request without submitting while editing them", async () => {
+    const user = userEvent.setup();
+    const saved = vi.fn();
+    renderForm(<CreateProblem scooterId="scooter" onSaved={saved} />);
+    await user.type(screen.getByRole("textbox", { name: "Title" }), "Service");
+    await user.click(screen.getByRole("radio", { name: "Low" }));
+    await user.click(screen.getByRole("radio", { name: "Usable" }));
+    for (const [section, label, text] of [
+      ["Checklist", "New checklist item", "Check brakes"],
+      ["Buy list", "Item to buy", "Brake pads"],
+    ]) {
+      await user.click(screen.getByRole("button", { name: "Add" }));
+      await user.click(screen.getByRole("button", { name: section }));
+      const region = await screen.findByRole("region", { name: section });
+      await user.click(
+        within(region).getByRole("button", { name: "Add item" }),
+      );
+      await user.type(
+        screen.getByRole("textbox", { name: label }),
+        `${text}{Enter}`,
+      );
+      await user.click(
+        screen.getByRole("button", {
+          name: section === "Checklist" ? "Save checklist" : "Save buy list",
+        }),
+      );
+      expect(
+        await screen.findByRole("checkbox", { name: text }),
+      ).toBeInTheDocument();
+    }
+    await user.click(screen.getByRole("button", { name: "Add" }));
+    await user.click(screen.getByRole("button", { name: "Location" }));
+    await user.type(
+      screen.getByRole("textbox", { name: "Place name" }),
+      "Pickup",
+    );
+    await user.type(
+      screen.getByRole("textbox", { name: "Address" }),
+      "10 Main Street",
+    );
+    await user.click(screen.getByRole("button", { name: "Save location" }));
+    await screen.findByText("Pickup");
+    expect(saved).not.toHaveBeenCalled();
+    expect(
+      mocks.fetch.mock.calls.filter(
+        ([url, , options]) =>
+          url === "/v1/problems" && options?.method === "POST",
+      ),
+    ).toHaveLength(0);
+    await user.click(screen.getByRole("button", { name: "Report problem" }));
+    await waitFor(() => expect(saved).toHaveBeenCalledOnce());
+    expect(mocks.fetch).toHaveBeenCalledWith(
+      "/v1/problems",
+      expect.anything(),
+      expect.objectContaining({
+        method: "POST",
+        json: expect.objectContaining({
+          sections: ["checklist", "buyList", "location"],
+          checklist: [
+            { id: expect.any(String), text: "Check brakes", completed: false },
+          ],
+          buyList: [
+            { id: expect.any(String), text: "Brake pads", completed: false },
+          ],
+          location: {
+            name: "Pickup",
+            address: "10 Main Street",
+            savedLocationId: null,
+          },
+        }),
+      }),
+    );
+  });
+
   it("never produces a blank member label for older responses missing email", () => {
     expect(
       memberName({ id: "older-account", firstName: null, lastName: null }),
@@ -360,6 +435,10 @@ describe("problem release forms", () => {
           description: "",
           photos: [],
           assigneeId: "other",
+          sections: [],
+          checklist: [],
+          buyList: [],
+          location: null,
         },
       },
     );
@@ -403,7 +482,7 @@ describe("problem release forms", () => {
     );
   });
 
-  it("adds checklist items from the card footer and saves them", async () => {
+  it("adds checklist items in its editor and saves them", async () => {
     const user = userEvent.setup();
     renderForm(<ProblemWork compact problem={problem} reload={vi.fn()} />);
     const checklist = screen.getByRole("region", { name: "Checklist" });
@@ -411,18 +490,17 @@ describe("problem release forms", () => {
     await user.click(
       within(checklist).getByRole("button", { name: "Add item" }),
     );
-    await user.type(
-      within(checklist).getByRole("textbox", { name: "New checklist item" }),
-      "Install pads",
-    );
+    const sheet = await screen.findByRole("dialog", { name: "Edit checklist" });
+    expect(sheet).toHaveClass("bg-popover");
+    expect(sheet.querySelector(".bg-background")).toBeNull();
+    const input = within(sheet).getByRole("textbox", {
+      name: "New checklist item",
+    });
+    await waitFor(() => expect(input).toHaveFocus());
+    await user.type(input, "Install pads{Enter}");
+    expect(within(sheet).getByText("Install pads")).toBeInTheDocument();
     await user.click(
-      within(checklist).getAllByRole("button", { name: "Add item" }).at(-1)!,
-    );
-    expect(
-      within(checklist).getByRole("checkbox", { name: "Install pads" }),
-    ).toBeInTheDocument();
-    await user.click(
-      within(checklist).getByRole("button", { name: "Save checklist" }),
+      within(sheet).getByRole("button", { name: "Save checklist" }),
     );
     await waitFor(() =>
       expect(mocks.fetch).toHaveBeenCalledWith(
