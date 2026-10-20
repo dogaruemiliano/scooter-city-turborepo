@@ -1,5 +1,22 @@
 export const scootersCatalog = {
   en: {
+    numbering: {
+      automatic: "Automatic",
+      manual: "Manual",
+      change: "Change",
+      useAutomatic: "Use automatic numbering",
+      chooseBrand: "Choose a brand to preview the scooter code.",
+      automaticHelp:
+        "Suggested number. The next available number is assigned when you save.",
+      manualHelp: "This number will be checked for availability when you save.",
+      previewUnavailable:
+        "The suggested number could not be loaded. Automatic numbering still works when saving.",
+      exhausted:
+        "Automatic numbering is unavailable. Choose an unused internal number.",
+      invalid: "Enter a whole number between 1 and 2147483647.",
+      conflict:
+        "This internal number is already taken. Choose another number or use automatic numbering.",
+    },
     photos: {
       title: "Photos",
       count: "{count} / 20 photos",
@@ -754,6 +771,7 @@ export const scootersCatalog = {
       notes: "Notes",
     },
     fields: {
+      fleetNumber: "Internal number",
       hasGps: "GPS installed",
       odometerWorking: "Odometer working",
       speedometerWorking: "Speedometer working",
@@ -1073,6 +1091,23 @@ export const scootersCatalog = {
     },
   },
   ro: {
+    numbering: {
+      automatic: "Automat",
+      manual: "Manual",
+      change: "Schimbă",
+      useAutomatic: "Folosește numerotarea automată",
+      chooseBrand: "Alege marca pentru a previzualiza codul scuterului.",
+      automaticHelp:
+        "Număr sugerat. Următorul număr disponibil este atribuit la salvare.",
+      manualHelp: "Disponibilitatea acestui număr va fi verificată la salvare.",
+      previewUnavailable:
+        "Numărul sugerat nu a putut fi încărcat. Numerotarea automată funcționează în continuare la salvare.",
+      exhausted:
+        "Numerotarea automată nu este disponibilă. Alege un număr intern neutilizat.",
+      invalid: "Introdu un număr întreg între 1 și 2147483647.",
+      conflict:
+        "Acest număr intern este deja utilizat. Alege alt număr sau folosește numerotarea automată.",
+    },
     photos: {
       title: "Fotografii",
       count: "{count} / 20 fotografii",
@@ -1856,6 +1891,7 @@ export const scootersCatalog = {
       notes: "Notițe",
     },
     fields: {
+      fleetNumber: "Număr intern",
       hasGps: "Are GPS",
       odometerWorking: "Funcționează odometrul",
       speedometerWorking: "Funcționează vitezometrul",

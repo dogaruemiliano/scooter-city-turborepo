@@ -27,6 +27,7 @@ import {
 import { v1 } from "@repo/api-shared";
 import { ZodResponse } from "nestjs-zod";
 
+import { NextScooterFleetNumber } from "./dto/next-scooter-fleet-number";
 import { CreateScooterInput } from "./dto/create-scooter.input";
 import { ListScootersQuery } from "./dto/list-scooters.query";
 import { Scooter } from "./dto/scooter";
@@ -75,6 +76,17 @@ export class ScootersController {
       ...result,
       items: result.items.map(toScooter),
     };
+  }
+
+  @RequireAllScope("scooters.create")
+  @Get("next-fleet-number")
+  @ApiOperation({
+    operationId: "ScootersController_nextFleetNumber_v1",
+    summary: "Preview the next automatic fleet number; does not reserve it",
+  })
+  @ZodResponse({ type: NextScooterFleetNumber })
+  nextFleetNumber() {
+    return this.scooters.nextFleetNumber();
   }
 
   @RequireAllScope("scooters.read")

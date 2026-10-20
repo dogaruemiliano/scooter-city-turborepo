@@ -319,8 +319,18 @@ export const scooterSchema = z
 
 export type Scooter = z.infer<typeof scooterSchema>;
 
+export const scooterFleetNumberSchema = z
+  .number()
+  .int()
+  .positive()
+  .max(2_147_483_647);
+export const nextScooterFleetNumberSchema = z.object({
+  fleetNumber: scooterFleetNumberSchema.nullable(),
+});
+
 export const createScooterInputSchema = z
   .object({
+    fleetNumber: scooterFleetNumberSchema.optional(),
     photoDrafts: scooterPhotoDraftsSchema.optional(),
     sessionId: z.string().min(1).max(120).optional(),
     insurancePolicies: insurancePoliciesInputSchema.optional(),

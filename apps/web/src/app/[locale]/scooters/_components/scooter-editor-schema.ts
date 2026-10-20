@@ -135,6 +135,7 @@ export type InsuranceEditorValues = Record<
 };
 export type ScooterEditorValues = Record<ScooterEditorField, string> & {
   insurancePolicies?: InsuranceEditorValues[];
+  fleetNumber?: string | null;
 };
 
 export function insuranceEditorDefaults(
@@ -232,6 +233,7 @@ export function scooterEditorDefaults(
       scooter?.[field] == null ? "" : String(scooter[field]),
     ]),
   ) as Record<ScooterEditorField, string>;
+  if (!scooter) values.fleetNumber = null;
   values.civVersion = scooter?.civVersion ?? "unknown";
   values.powertrainType = scooter ? scooter.powertrainType : "combustion";
   if (!scooter) values.vehicleCategory = "L1e";
@@ -248,7 +250,9 @@ function convertValues(values: Partial<ScooterEditorValues>) {
   );
   return Object.fromEntries(
     Object.entries(values)
-      .filter(([field]) => field !== "insurancePolicies")
+      .filter(
+        ([field]) => field !== "insurancePolicies" && field !== "fleetNumber",
+      )
       .map(([field, raw = ""]) => {
         const value = raw as string;
         return [
@@ -320,15 +324,25 @@ const rawCreateSchema = z.object({
 
 export const scooterCreateFormSchema = rawCreateSchema
   .extend({
+    fleetNumber: z.string().nullable().optional(),
     insurancePolicies: z.array(insuranceEditorSchema).max(1).optional(),
   })
   .transform(
     (values) =>
-      convertForm({
-        ...values,
-        insurancePolicies: values.insurancePolicies?.filter(
-          insuranceEditorHasContent,
-        ),
+      ({
+        ...convertForm({
+          ...values,
+          insurancePolicies: values.insurancePolicies?.filter(
+            insuranceEditorHasContent,
+          ),
+        }),
+        ...(values.fleetNumber != null
+          ? {
+              fleetNumber: /^\d+$/.test(values.fleetNumber.trim())
+                ? Number(values.fleetNumber)
+                : Number.NaN,
+            }
+          : {}),
       }) as unknown as z.input<typeof v1.scooters.createScooterInputSchema>,
   )
   .pipe(v1.scooters.createScooterInputSchema)

@@ -98,6 +98,53 @@ export class ScootersService {
     private readonly photos: ScooterPhotosService,
   ) {}
 
+  async nextFleetNumber() {
+    const counter = await this.prisma.scooterFleetCounter.findUniqueOrThrow({
+      where: { id: 1 },
+    });
+    const next = counter.lastNumber + 1;
+    return { fleetNumber: next <= 2_147_483_647 ? next : null };
+  }
+
+  private async allocateFleetNumber(
+    tx: Prisma.TransactionClient,
+    requested?: number,
+  ) {
+    // Even a manual allocation locks the same counter row as automatic creation.
+    // Keep this lock until the scooter and its attachments have committed.
+    const counter = await tx.scooterFleetCounter.update({
+      where: { id: 1 },
+      data: { lastNumber: { increment: 0 } },
+    });
+    if (
+      requested !== undefined &&
+      (await tx.scooter.findUnique({
+        where: { fleetNumber: requested },
+        select: { id: true },
+      }))
+    ) {
+      throw new ConflictException({
+        code: "SCOOTER_FLEET_NUMBER_CONFLICT",
+        message: "Scooter internal number already exists",
+        details: { field: "fleetNumber" },
+      });
+    }
+    const fleetNumber = requested ?? counter.lastNumber + 1;
+    if (fleetNumber > 2_147_483_647)
+      throw new ConflictException({
+        code: "SCOOTER_FLEET_NUMBER_EXHAUSTED",
+        message:
+          "Automatic fleet numbering is exhausted; choose an unused internal number.",
+        details: { field: "fleetNumber" },
+      });
+    if (fleetNumber > counter.lastNumber)
+      await tx.scooterFleetCounter.update({
+        where: { id: 1 },
+        data: { lastNumber: fleetNumber },
+      });
+    return fleetNumber;
+  }
+
   async create(
     input: v1.scooters.CreateScooterInput,
     userId?: string,
@@ -119,14 +166,12 @@ export class ScootersService {
         userId,
       );
       return await this.prisma.$transaction(async (tx) => {
-        // Updating the singleton row serializes concurrent allocations. A failed
-        // scooter/document save rolls this increment back as part of the transaction.
-        const counter = await tx.scooterFleetCounter.update({
-          where: { id: 1 },
-          data: { lastNumber: { increment: 1 } },
-        });
+        const fleetNumber = await this.allocateFleetNumber(
+          tx,
+          input.fleetNumber,
+        );
         const scooter = await tx.scooter.create({
-          data: { ...data, fleetNumber: counter.lastNumber },
+          data: { ...data, fleetNumber },
           include: scooterInclude,
         });
         if (input.insurancePolicies?.length)
@@ -915,6 +960,17 @@ export class ScootersService {
         : typeof target === "string"
           ? [target]
           : [];
+
+      if (
+        fields.includes("fleetNumber") ||
+        fields.includes("Scooter_fleetNumber_key")
+      ) {
+        throw new ConflictException({
+          code: "SCOOTER_FLEET_NUMBER_CONFLICT",
+          message: "Scooter internal number already exists",
+          details: { field: "fleetNumber" },
+        });
+      }
 
       if (
         fields.includes("registrationNumberNormalized") ||

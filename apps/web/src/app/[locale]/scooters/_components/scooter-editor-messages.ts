@@ -14,6 +14,7 @@ export function scooterEditorMessage(
   path: string,
   t: ValidationTranslator,
 ): string | undefined {
+  if (path === "fleetNumber") return t("numbering.invalid");
   if (path.startsWith("insurancePolicies")) {
     if (issue.message === "insuranceVinMismatch")
       return t("insurance.vinMismatch");

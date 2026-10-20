@@ -21,6 +21,35 @@ const validValues = () => ({
 });
 
 describe("scooter editor conversion", () => {
+  it("omits automatic numbering and validates manual overrides", () => {
+    expect(scooterCreateFormSchema.parse(validValues())).not.toHaveProperty(
+      "fleetNumber",
+    );
+    expect(
+      scooterCreateFormSchema.parse({ ...validValues(), fleetNumber: "007" })
+        .fleetNumber,
+    ).toBe(7);
+    for (const fleetNumber of [
+      "",
+      " ",
+      "-1",
+      "0",
+      "1.2",
+      "2e2",
+      "2147483648",
+      "abc",
+    ]) {
+      const result = scooterCreateFormSchema.safeParse({
+        ...validValues(),
+        fleetNumber,
+      });
+      expect(result.success).toBe(false);
+      if (!result.success)
+        expect(
+          result.error.issues.some((issue) => issue.path[0] === "fleetNumber"),
+        ).toBe(true);
+    }
+  });
   it("defaults insurance currency to RON", () => {
     const policy: v1.scooters.InsurancePolicyInput = {
       id: "policy-1",
@@ -80,6 +109,7 @@ describe("scooter editor conversion", () => {
         .filter(
           (field) =>
             ![
+              "fleetNumber",
               "propulsionSystem",
               "documentDrafts",
               "photoDrafts",
