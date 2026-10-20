@@ -51,6 +51,7 @@ export const SCOOTER_LIST_SORTS = [
 export type ScooterListSort = (typeof SCOOTER_LIST_SORTS)[number];
 
 export const ROUTES = {
+  nextFleetNumber: "/v1/scooters/next-fleet-number",
   photos: {
     draftUpload: "/v1/scooters/photo-draft-upload-url",
     list: (id: string) => `/v1/scooters/${encodeURIComponent(id)}/photos`,

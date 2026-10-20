@@ -20,13 +20,13 @@ test("fleet labels use at least three digits and the current brand code", () => 
   }
 });
 
-test("fleet numbers are assigned by the server and cannot be supplied or edited", () => {
+test("fleet numbers allow a create override but cannot be edited", () => {
   assert.equal(
     v1.scooters.createScooterInputSchema.safeParse({
       ...baseScooterInput(),
       fleetNumber: 4,
     }).success,
-    false,
+    true,
   );
   assert.equal(
     v1.scooters.updateScooterInputSchema.safeParse({ fleetNumber: 4 }).success,
@@ -461,5 +461,24 @@ test("propulsion rules allow hybrid and reject incompatible technical fields", (
       nationalRegistryNumber: " ab-001/c ",
     }),
     { nationalRegistryNumber: "AB-001/C" },
+  );
+});
+
+test("manual fleet numbers must be positive PostgreSQL integers", () => {
+  for (const fleetNumber of [0, -1, 1.5, 2147483648, "12", null]) {
+    assert.equal(
+      v1.scooters.createScooterInputSchema.safeParse({
+        ...baseScooterInput(),
+        fleetNumber,
+      }).success,
+      false,
+    );
+  }
+  assert.equal(
+    v1.scooters.createScooterInputSchema.safeParse({
+      ...baseScooterInput(),
+      fleetNumber: 2147483647,
+    }).success,
+    true,
   );
 });

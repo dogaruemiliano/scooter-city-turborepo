@@ -1400,6 +1400,75 @@ describe("Scooters HTTP surface (e2e)", () => {
     );
   });
 
+  it("previews without reserving and safely handles concurrent manual overrides", async () => {
+    const admin = await freshSession(["ADMIN"]);
+    const cookie = [`access_token=${admin.accessToken}`];
+    const before = await prisma.scooterFleetCounter.findUniqueOrThrow({
+      where: { id: 1 },
+    });
+    for (let i = 0; i < 2; i++) {
+      const preview = await req()
+        .get(v1.scooters.ROUTES.nextFleetNumber)
+        .set("Cookie", cookie);
+      expect(preview.status).toBe(200);
+      expect(
+        v1.scooters.nextScooterFleetNumberSchema.parse(preview.body)
+          .fleetNumber,
+      ).toBe(before.lastNumber + 1);
+    }
+    expect(
+      (await prisma.scooterFleetCounter.findUniqueOrThrow({ where: { id: 1 } }))
+        .lastNumber,
+    ).toBe(before.lastNumber);
+    const chosen = before.lastNumber + 10;
+    const input = scooterInput();
+    const responses = await Promise.all(
+      [input, scooterInput()].map((body) =>
+        req()
+          .post(v1.scooters.ROUTES.create)
+          .set("Cookie", cookie)
+          .send({ ...body, fleetNumber: chosen }),
+      ),
+    );
+    expect(responses.map((response) => response.status).sort()).toEqual([
+      201, 409,
+    ]);
+    const duplicate = responses.find((response) => response.status === 409)!;
+    expect(duplicate.body).toMatchObject({
+      error: {
+        code: "SCOOTER_FLEET_NUMBER_CONFLICT",
+        details: { field: "fleetNumber" },
+      },
+    });
+    const created = v1.scooters.scooterSchema.parse(
+      responses.find((response) => response.status === 201)!.body,
+    );
+    expect(created.fleetNumber).toBe(chosen);
+    // Filling an unused lower number must never rewind the automatic counter.
+    const lower = await req()
+      .post(v1.scooters.ROUTES.create)
+      .set("Cookie", cookie)
+      .send({ ...scooterInput(), fleetNumber: chosen - 1 });
+    expect(lower.status).toBe(201);
+    const failed = await req()
+      .post(v1.scooters.ROUTES.create)
+      .set("Cookie", cookie)
+      .send({ ...scooterInput(), vin: created.vin, fleetNumber: chosen + 20 });
+    expect(failed.status).toBe(409);
+    expect(
+      (await prisma.scooterFleetCounter.findUniqueOrThrow({ where: { id: 1 } }))
+        .lastNumber,
+    ).toBe(chosen);
+    const automatic = await req()
+      .post(v1.scooters.ROUTES.create)
+      .set("Cookie", cookie)
+      .send(scooterInput());
+    expect(automatic.status).toBe(201);
+    expect(v1.scooters.scooterSchema.parse(automatic.body).fleetNumber).toBe(
+      chosen + 1,
+    );
+  });
+
   it("keeps fleet numbers through brand changes and deletion, and searches by fleet identity", async () => {
     const admin = await freshSession(["ADMIN"]);
     const cookie = [`access_token=${admin.accessToken}`];

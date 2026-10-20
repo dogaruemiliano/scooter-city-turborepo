@@ -31,6 +31,7 @@ import { OPERATIONAL_FIELDS } from "./scooter-wizard";
 import { useScooterLicenseAutofill } from "./useScooterLicenseAutofill";
 import type { DocumentImportResult } from "./scooter-document-import";
 import { useEffect } from "react";
+import { ScooterFleetNumberField } from "./ScooterFleetNumberField";
 import { ScooterSectionComplete } from "./ScooterSectionComplete";
 
 export function ScooterCreateFields({
@@ -61,6 +62,7 @@ export function ScooterCreateFields({
   useEffect(() => {
     if (!submitCount || isSubmitting) return;
     const mainFields = new Set([
+      "fleetNumber",
       "vin",
       "brandId",
       "model",
@@ -101,6 +103,9 @@ export function ScooterCreateFields({
           />
         }
       >
+        {!editing ? (
+          <ScooterFleetNumberField brands={brands} disabled={disabled} />
+        ) : null}
         {(["vin", "brandId", "model", "manufactureYear", "color"] as const).map(
           (name) => (
             <ScooterEditorFieldControl key={name} name={name} {...props} />
