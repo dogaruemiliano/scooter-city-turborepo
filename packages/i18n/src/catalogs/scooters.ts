@@ -842,6 +842,7 @@ export const scootersCatalog = {
       manufactureYear: "Manufacture year",
       powertrainType: "Propulsion system",
       engineCode: "Engine code",
+      fuelSystem: "Fuel system",
       engineDisplacementCc: "Engine capacity (cm³)",
       powerKw: "Power (kW)",
       currentMileageKm: "Current mileage (km)",
@@ -961,6 +962,11 @@ export const scootersCatalog = {
       createdAtAsc: "Oldest",
       updatedAtDesc: "Recently updated",
       updatedAtAsc: "Least recently updated",
+    },
+    fuelSystems: {
+      unknown: "Unknown",
+      injection: "Fuel injection",
+      carburetor: "Carburetor",
     },
     powertrainTypes: {
       unpowered: "Unpowered vehicle",
@@ -1964,6 +1970,7 @@ export const scootersCatalog = {
       manufactureYear: "An fabricație",
       powertrainType: "Sistem de propulsie",
       engineCode: "Cod motor",
+      fuelSystem: "Sistem de alimentare",
       engineDisplacementCc: "Capacitate cilindrică (cm³)",
       powerKw: "Putere (kW)",
       currentMileageKm: "Kilometraj curent (km)",
@@ -2084,6 +2091,11 @@ export const scootersCatalog = {
       createdAtAsc: "Cele mai vechi",
       updatedAtDesc: "Actualizate recent",
       updatedAtAsc: "Actualizate cel mai demult",
+    },
+    fuelSystems: {
+      unknown: "Necunoscut",
+      injection: "Injecție",
+      carburetor: "Carburator",
     },
     powertrainTypes: {
       unpowered: "Vehicul fără motor",

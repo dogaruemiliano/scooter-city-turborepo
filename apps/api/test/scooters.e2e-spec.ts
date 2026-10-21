@@ -1469,6 +1469,104 @@ describe("Scooters HTTP surface (e2e)", () => {
     );
   });
 
+  it("persists fuel systems and clears them when propulsion changes", async () => {
+    const admin = await freshSession(["ADMIN"]);
+    const cookie = [`access_token=${admin.accessToken}`];
+    const created = await req()
+      .post(v1.scooters.ROUTES.create)
+      .set("Cookie", cookie)
+      .send({ ...scooterInput(), fuelSystem: "injection" })
+      .expect(201);
+    const scooter = v1.scooters.scooterSchema.parse(created.body);
+    expect(scooter.fuelSystem).toBe("injection");
+    const path = v1.scooters.ROUTES.update(scooter.id);
+    const edited = await req()
+      .patch(path)
+      .set("Cookie", cookie)
+      .send({ fuelSystem: "carburetor" })
+      .expect(200);
+    expect(v1.scooters.scooterSchema.parse(edited.body).fuelSystem).toBe(
+      "carburetor",
+    );
+    await req()
+      .patch(path)
+      .set("Cookie", cookie)
+      .send({ powertrainType: "electric" })
+      .expect(400);
+    const electric = await req()
+      .patch(path)
+      .set("Cookie", cookie)
+      .send({
+        powertrainType: "electric",
+        fuelSystem: null,
+        engineDisplacementCc: null,
+      })
+      .expect(200);
+    expect(
+      v1.scooters.scooterSchema.parse(electric.body).fuelSystem,
+    ).toBeNull();
+    await req()
+      .patch(path)
+      .set("Cookie", cookie)
+      .send({ fuelSystem: "injection" })
+      .expect(400);
+  });
+
+  it("edits internal numbers, rejects duplicates, and advances automatic numbering", async () => {
+    const admin = await freshSession(["ADMIN"]);
+    const cookie = [`access_token=${admin.accessToken}`];
+    const create = async () => {
+      const response = await req()
+        .post(v1.scooters.ROUTES.create)
+        .set("Cookie", cookie)
+        .send(scooterInput())
+        .expect(201);
+      return v1.scooters.scooterSchema.parse(response.body);
+    };
+    const first = await create();
+    const second = await create();
+    const counter = await prisma.scooterFleetCounter.findUniqueOrThrow({
+      where: { id: 1 },
+    });
+    const chosen = counter.lastNumber + 10;
+    const path = v1.scooters.ROUTES.update(first.id);
+    const response = await req()
+      .patch(path)
+      .set("Cookie", cookie)
+      .send({ fleetNumber: chosen })
+      .expect(200);
+    expect(v1.scooters.scooterSchema.parse(response.body).fleetNumber).toBe(
+      chosen,
+    );
+    await req()
+      .patch(path)
+      .set("Cookie", cookie)
+      .send({ fleetNumber: chosen })
+      .expect(200);
+    const conflict = await req()
+      .patch(v1.scooters.ROUTES.update(second.id))
+      .set("Cookie", cookie)
+      .send({ fleetNumber: chosen })
+      .expect(409);
+    expect((conflict.body as { error: unknown }).error).toMatchObject({
+      code: "SCOOTER_FLEET_NUMBER_CONFLICT",
+      details: { field: "fleetNumber" },
+    });
+    expect((await create()).fleetNumber).toBe(chosen + 1);
+    await req()
+      .patch(path)
+      .set("Cookie", cookie)
+      .send({ fleetNumber: first.fleetNumber })
+      .expect(200);
+    expect((await create()).fleetNumber).toBe(chosen + 2);
+    for (const fleetNumber of [0, -1, 1.5, null])
+      await req()
+        .patch(path)
+        .set("Cookie", cookie)
+        .send({ fleetNumber })
+        .expect(400);
+  });
+
   it("keeps fleet numbers through brand changes and deletion, and searches by fleet identity", async () => {
     const admin = await freshSession(["ADMIN"]);
     const cookie = [`access_token=${admin.accessToken}`];
@@ -1529,9 +1627,9 @@ describe("Scooters HTTP surface (e2e)", () => {
         await req()
           .patch(v1.scooters.ROUTES.update(created.id))
           .set("Cookie", cookie)
-          .send({ fleetNumber: 999 })
+          .send({ fleetNumber: created.fleetNumber })
       ).status,
-    ).toBe(400);
+    ).toBe(200);
     expect(
       (
         await req()

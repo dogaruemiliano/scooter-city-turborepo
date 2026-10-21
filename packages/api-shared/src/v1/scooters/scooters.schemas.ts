@@ -34,6 +34,7 @@ import {
   SCOOTER_CIV_FIELDS,
   SCOOTER_LIST_SORTS,
   SCOOTER_POWERTRAIN_TYPES,
+  SCOOTER_FUEL_SYSTEMS,
   SCOOTER_REGISTRATION_TYPES,
   SCOOTER_REQUIRED_DRIVER_LICENSE_TYPES,
 } from "./scooters.constants";
@@ -132,6 +133,8 @@ const plateNumberInputSchema = z.preprocess(
     typeof value === "string" && value.trim().length === 0 ? null : value,
   z.string().trim().max(MAX_PLATE_INPUT_LENGTH).nullable(),
 );
+
+export const scooterFuelSystemSchema = z.enum(SCOOTER_FUEL_SYSTEMS);
 
 export const scooterPowertrainTypeSchema = z.enum(SCOOTER_POWERTRAIN_TYPES);
 export const scooterRegistrationTypeSchema = z.enum(SCOOTER_REGISTRATION_TYPES);
@@ -297,6 +300,7 @@ export const scooterSchema = z
     color: z.string().nullable(),
     manufactureYear: z.number().int().nullable(),
     powertrainType: scooterPowertrainTypeSchema,
+    fuelSystem: scooterFuelSystemSchema.nullable().optional(),
     engineCode: z.string().nullable(),
     engineDisplacementCc: z.number().int().positive().nullable(),
     powerKw: z.number().positive().nullable(),
@@ -349,6 +353,7 @@ export const createScooterInputSchema = z
       .nullable()
       .optional(),
     powertrainType: scooterPowertrainTypeSchema,
+    fuelSystem: scooterFuelSystemSchema.nullable().optional(),
     engineCode: nullableEngineTypeSchema.optional(),
     engineDisplacementCc: z
       .number()
@@ -383,6 +388,7 @@ export type CreateScooterInput = z.infer<typeof createScooterInputSchema>;
 
 export const updateScooterInputSchema = z
   .object({
+    fleetNumber: scooterFleetNumberSchema.optional(),
     sessionId: z.string().min(1).max(120).optional(),
     insurancePolicies: insurancePoliciesInputSchema.optional(),
     documentDrafts: scooterDocumentDraftsSchema.optional(),
@@ -413,6 +419,7 @@ export const updateScooterInputSchema = z
       .nullable()
       .optional(),
     powertrainType: scooterPowertrainTypeSchema.optional(),
+    fuelSystem: scooterFuelSystemSchema.nullable().optional(),
     engineCode: nullableEngineTypeSchema.optional(),
     engineDisplacementCc: z
       .number()

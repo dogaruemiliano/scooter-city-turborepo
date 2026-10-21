@@ -70,6 +70,7 @@ export function ScooterCreateFields({
       "color",
       "powertrainType",
       "engineDisplacementCc",
+      "fuelSystem",
       "registrationType",
       "registrationNumber",
       "registrationDate",
@@ -103,9 +104,11 @@ export function ScooterCreateFields({
           />
         }
       >
-        {!editing ? (
-          <ScooterFleetNumberField brands={brands} disabled={disabled} />
-        ) : null}
+        <ScooterFleetNumberField
+          brands={brands}
+          disabled={disabled}
+          editing={editing}
+        />
         {(["vin", "brandId", "model", "manufactureYear", "color"] as const).map(
           (name) => (
             <ScooterEditorFieldControl key={name} name={name} {...props} />
@@ -145,7 +148,10 @@ export function ScooterCreateFields({
           </FormField>
         </div>
         {powertrain !== "electric" && powertrain !== "unpowered" ? (
-          <ScooterEditorFieldControl name="engineDisplacementCc" {...props} />
+          <>
+            <ScooterEditorFieldControl name="engineDisplacementCc" {...props} />
+            <ScooterEditorFieldControl name="fuelSystem" {...props} />
+          </>
         ) : null}
       </FormSection>
       <ScooterInitialRegistrationFields
@@ -259,6 +265,7 @@ export function ScooterCreateFields({
                 "color",
                 "powertrainType",
                 "engineDisplacementCc",
+                "fuelSystem",
               ]}
               {...props}
             />

@@ -21,6 +21,42 @@ const validValues = () => ({
 });
 
 describe("scooter editor conversion", () => {
+  it("converts fuel systems and clears them when switching to electric", () => {
+    expect(
+      scooterCreateFormSchema.parse({
+        ...validValues(),
+        fuelSystem: "injection",
+      }).fuelSystem,
+    ).toBe("injection");
+    expect(scooterCreateFormSchema.parse(validValues()).fuelSystem).toBeNull();
+    const input = scooterEditFormSchema.parse({
+      ...validValues(),
+      fleetNumber: "7",
+      powertrainType: "electric",
+      fuelSystem: "carburetor",
+    });
+    expect(
+      scooterChangedFields(input, { powertrainType: true }).fuelSystem,
+    ).toBeNull();
+  });
+
+  it("validates edited internal numbers and only submits them when changed", () => {
+    const input = scooterEditFormSchema.parse({
+      ...validValues(),
+      fleetNumber: "042",
+    });
+    expect(input.fleetNumber).toBe(42);
+    expect(scooterChangedFields(input, { fleetNumber: true })).toEqual({
+      fleetNumber: 42,
+    });
+    expect(scooterChangedFields(input, {})).not.toHaveProperty("fleetNumber");
+    for (const fleetNumber of ["", "0", "-1", "1.5", "2147483648", null])
+      expect(
+        scooterEditFormSchema.safeParse({ ...validValues(), fleetNumber })
+          .success,
+      ).toBe(false);
+  });
+
   it("omits automatic numbering and validates manual overrides", () => {
     expect(scooterCreateFormSchema.parse(validValues())).not.toHaveProperty(
       "fleetNumber",
@@ -202,6 +238,7 @@ describe("scooter editor conversion", () => {
   it("edits operational checks without clearing technical speed or replacing no with unknown", () => {
     const input = scooterEditFormSchema.parse({
       ...validValues(),
+      fleetNumber: "7",
       hasGps: "false",
       odometerWorking: "",
       actualMaxSpeedKmh: "0",
@@ -243,6 +280,7 @@ describe("scooter editor conversion", () => {
   it("validates full edit values but sends only deliberate changes", () => {
     const input = scooterEditFormSchema.parse({
       ...validValues(),
+      fleetNumber: "7",
       color: "",
       powerKw: "8,5",
       registrationType: "temporary",
@@ -262,6 +300,7 @@ describe("scooter editor conversion", () => {
   it("excludes hidden drafts from validation and clears only on a propulsion change", () => {
     const input = scooterEditFormSchema.parse({
       ...validValues(),
+      fleetNumber: "7",
       powertrainType: "electric",
       engineDisplacementCc: "invalid hidden draft",
       fuelTankCapacityLiters: "5",

@@ -17,9 +17,11 @@ import type { ScooterEditorValues } from "./scooter-editor-schema";
 export function ScooterFleetNumberField({
   brands,
   disabled,
+  editing = false,
 }: {
   brands: v1.scooterBrands.ScooterBrand[];
   disabled: boolean;
+  editing?: boolean;
 }) {
   const t = useTranslations("scooters");
   const { control } = useFormContext<ScooterEditorValues>();
@@ -28,12 +30,14 @@ export function ScooterFleetNumberField({
   const suggestion = useRemote(
     useCallback(
       () =>
-        webApi.fetch(
-          v1.scooters.ROUTES.nextFleetNumber,
-          v1.scooters.nextScooterFleetNumberSchema,
-          { cache: "no-store" },
-        ),
-      [],
+        editing
+          ? Promise.resolve({ fleetNumber: null })
+          : webApi.fetch(
+              v1.scooters.ROUTES.nextFleetNumber,
+              v1.scooters.nextScooterFleetNumberSchema,
+              { cache: "no-store" },
+            ),
+      [editing],
     ),
   );
   return (

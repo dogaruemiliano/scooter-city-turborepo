@@ -131,6 +131,7 @@ export function toScooter(row: ScooterRowWithBrand): v1.scooters.Scooter {
     manufactureYear: row.manufactureYear,
     powertrainType: row.powertrainType,
     engineCode: row.engineCode,
+    fuelSystem: row.fuelSystem,
     engineDisplacementCc: row.engineDisplacementCc,
     powerKw: row.powerKw?.toNumber() ?? null,
     registrationType: row.registrationType,

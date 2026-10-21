@@ -829,6 +829,59 @@ describe("ScooterEditForm", () => {
     expect(mocks.push).toHaveBeenCalledWith("/en/scooters/scooter-1");
   });
 
+  it("edits the fuel system from the propulsion section", async () => {
+    mocks.apiFetch.mockResolvedValueOnce({
+      ...scooter,
+      fuelSystem: "carburetor",
+    });
+    const browser = userEvent.setup();
+    renderEditForm();
+    const group = screen.getByRole("radiogroup", { name: "Fuel system" });
+    expect(within(group).getAllByRole("radio")).toHaveLength(2);
+    expect(within(group).queryByRole("radio", { name: /Unknown$/ })).toBeNull();
+    expect(
+      within(group)
+        .getAllByRole("radio")
+        .some((radio) => (radio as HTMLInputElement).checked),
+    ).toBe(false);
+    await browser.click(
+      within(group).getByRole("radio", { name: "Carburetor" }),
+    );
+    await browser.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() =>
+      expect(mocks.apiFetch).toHaveBeenCalledWith(
+        v1.scooters.ROUTES.update(scooter.id),
+        v1.scooters.scooterSchema,
+        expect.objectContaining({
+          json: expect.objectContaining({ fuelSystem: "carburetor" }),
+        }),
+      ),
+    );
+  });
+
+  it("prefills and saves a changed internal number with the brand code", async () => {
+    mocks.apiFetch.mockResolvedValueOnce({ ...scooter, fleetNumber: 42 });
+    const browser = userEvent.setup();
+    renderEditForm();
+    const input = screen.getByRole("textbox", { name: "Internal number" });
+    expect(input).toHaveValue(String(scooter.fleetNumber));
+    expect(screen.getByText("YAM")).toBeInTheDocument();
+    expect(mocks.apiFetch).not.toHaveBeenCalled();
+    await browser.clear(input);
+    await browser.type(input, "42");
+    await browser.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() =>
+      expect(mocks.apiFetch).toHaveBeenCalledWith(
+        v1.scooters.ROUTES.update(scooter.id),
+        v1.scooters.scooterSchema,
+        expect.objectContaining({
+          method: "PATCH",
+          json: expect.objectContaining({ fleetNumber: 42 }),
+        }),
+      ),
+    );
+  });
+
   it("updates the scooter and returns to the detail page", async () => {
     mocks.apiFetch.mockResolvedValueOnce({ ...scooter, color: "Blue" });
     const browser = userEvent.setup();
@@ -922,6 +975,7 @@ describe("ScooterEditForm", () => {
     expect(mocks.apiFetch.mock.calls[0]![2].json).toEqual({
       sessionId: "editor-session",
       powertrainType: "electric",
+      fuelSystem: null,
       engineDisplacementCc: null,
       ratedEngineRpm: null,
       fuelTankCapacityLiters: null,
