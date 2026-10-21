@@ -11,6 +11,7 @@ export declare const tokens: {
     "card": "#FFFFFF",
     "cardForeground": "#12161B",
     "popover": "#FFFFFF",
+    "bottomSheetSurface": "#FFFFFFCC",
     "floatingActionSurface": "#FFFFFFB3",
     "popoverForeground": "#12161B",
     "selectableRow": "#F9FBFB",

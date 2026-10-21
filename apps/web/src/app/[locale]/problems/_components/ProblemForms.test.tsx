@@ -137,7 +137,7 @@ describe("problem release forms", () => {
           url === "/v1/problems" && options?.method === "POST",
       ),
     ).toHaveLength(0);
-    await user.click(screen.getByRole("button", { name: "Report problem" }));
+    await user.click(screen.getByRole("button", { name: "Report" }));
     await waitFor(() => expect(saved).toHaveBeenCalledOnce());
     expect(mocks.fetch).toHaveBeenCalledWith(
       "/v1/problems",
@@ -242,7 +242,7 @@ describe("problem release forms", () => {
       "Scratched panel",
     );
     await user.click(screen.getByRole("radio", { name: "Low" }));
-    const submit = screen.getByRole("button", { name: "Report problem" });
+    const submit = screen.getByRole("button", { name: "Report" });
     const group = screen.getByRole("radiogroup", {
       name: "Scooter condition",
     });
@@ -419,7 +419,7 @@ describe("problem release forms", () => {
     await user.click(screen.getByRole("radio", { name: "Unusable" }));
     await user.click(screen.getByRole("button", { name: "Add assignee" }));
     await user.click(await screen.findByRole("button", { name: "Taylor" }));
-    await user.click(screen.getByRole("button", { name: "Report problem" }));
+    await user.click(screen.getByRole("button", { name: "Report" }));
     await waitFor(() => expect(saved).toHaveBeenCalledOnce());
     expect(mocks.fetch).toHaveBeenCalledWith(
       "/v1/problems",
@@ -776,7 +776,7 @@ describe("dedicated creation screen", () => {
   it("saves a preselected scooter report and returns to its details", async () => {
     const user = userEvent.setup();
     renderForm(<ProblemCreateScreen scooterId="scooter" />);
-    const submit = screen.getByRole("button", { name: "Report problem" });
+    const submit = screen.getByRole("button", { name: "Report" });
     expect(submit).toHaveClass("w-full");
     expect(submit.closest('[data-slot="problem-create-actions"]')).toHaveClass(
       "static",
@@ -806,7 +806,7 @@ describe("dedicated creation screen", () => {
       screen.getByRole("textbox", { name: "Title" }),
       "Broken belt",
     );
-    await user.click(screen.getByRole("button", { name: "Report problem" }));
+    await user.click(screen.getByRole("button", { name: "Report" }));
     await waitFor(() =>
       expect(mocks.push).toHaveBeenCalledWith("/en/scooters/scooter"),
     );
