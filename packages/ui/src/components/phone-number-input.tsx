@@ -139,7 +139,10 @@ function PhoneNumberInput({
 
     commitParts({
       country: nextCountry,
-      nationalNumber: normalizeNationalNumber(parts.nationalNumber, nextCountry),
+      nationalNumber: normalizeNationalNumber(
+        parts.nationalNumber,
+        nextCountry,
+      ),
     });
   }
 
@@ -162,10 +165,12 @@ function PhoneNumberInput({
       if (inputType === "deleteContentBackward") {
         digitPosition = Math.max(0, digitPosition - 1);
         nextDigits =
-          nextDigits.slice(0, digitPosition) + nextDigits.slice(digitPosition + 1);
+          nextDigits.slice(0, digitPosition) +
+          nextDigits.slice(digitPosition + 1);
       } else if (inputType === "deleteContentForward") {
         nextDigits =
-          nextDigits.slice(0, digitPosition) + nextDigits.slice(digitPosition + 1);
+          nextDigits.slice(0, digitPosition) +
+          nextDigits.slice(digitPosition + 1);
       }
     }
 
@@ -177,7 +182,10 @@ function PhoneNumberInput({
         };
     const removedPrefixLength =
       nextDigits.length - nextParts.nationalNumber.length;
-    const nationalDigitPosition = Math.max(0, digitPosition - removedPrefixLength);
+    const nationalDigitPosition = Math.max(
+      0,
+      digitPosition - removedPrefixLength,
+    );
     pendingCaret.current = formatNationalNumber(
       nextParts.nationalNumber.slice(0, nationalDigitPosition),
     ).length;
@@ -199,7 +207,7 @@ function PhoneNumberInput({
       <div
         aria-invalid={isInvalid || undefined}
         className={cn(
-          "flex w-full rounded-lg border border-input bg-background transition-colors duration-fast ease-standard focus-within:border-ring focus-within:ring-2 focus-within:ring-ring aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive",
+          "flex w-full rounded-lg border border-input bg-background transition-colors duration-fast ease-standard focus-within:border-border focus-within:ring-2 focus-within:ring-border aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive",
           disabled ? "bg-disabled text-disabled-foreground" : undefined,
         )}
       >

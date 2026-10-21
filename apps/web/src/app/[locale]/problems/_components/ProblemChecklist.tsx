@@ -6,6 +6,8 @@ import { Button, ChecklistEditor, ChecklistList } from "@repo/ui/components";
 import { ClipboardList, Pencil, ShoppingCart } from "lucide-react";
 import { useTranslations } from "next-intl";
 
+import { SectionDeleteAction } from "./SectionDeleteAction";
+
 export function ProblemChecklist({
   problem,
   kind = "checklist",
@@ -76,7 +78,12 @@ export function ProblemChecklist({
             ? {
                 label: add,
                 disabled: busy || items.length >= 50,
-                onClick: () => setEditor("add"),
+                placeholder: add,
+                onAdd: async (text) =>
+                  onSave([
+                    ...items,
+                    { id: crypto.randomUUID(), text, completed: false },
+                  ]),
               }
             : undefined
         }
@@ -93,6 +100,20 @@ export function ProblemChecklist({
           items={items}
           initialAdding={editor === "add"}
           busy={busy}
+          headerAction={
+            !initialOpen ? (
+              <SectionDeleteAction
+                kind={kind}
+                busy={busy}
+                onDelete={async () => {
+                  if (!(await onSave([]))) return false;
+                  setEditor(null);
+                  onEditorClose?.();
+                  return true;
+                }}
+              />
+            ) : undefined
+          }
           error={error}
           onClose={() => {
             setEditor(null);

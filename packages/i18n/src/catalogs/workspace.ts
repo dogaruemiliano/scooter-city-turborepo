@@ -220,6 +220,14 @@ export const workspaceCatalog = {
       locationAddress: "Address",
       saveLocationForReuse: "Save as a business location for reuse",
       saveLocation: "Save location",
+      deleteChecklist: "Delete checklist",
+      deleteBuyList: "Delete buy list",
+      deleteLocation: "Delete location",
+      deleteListDescription:
+        "Delete this entire list and all its items? This cannot be undone.",
+      deleteLocationDescription:
+        "Remove this location from the problem? Saved business locations remain available.",
+      deleteSectionFailed: "Could not delete. Please try again.",
       createChecklist: "Create checklist",
       editChecklist: "Edit checklist",
       createBuyList: "Create buy list",
@@ -630,6 +638,14 @@ export const workspaceCatalog = {
       locationAddress: "Adresă",
       saveLocationForReuse: "Salvează ca locație a firmei pentru reutilizare",
       saveLocation: "Salvează locația",
+      deleteChecklist: "Șterge lista de verificare",
+      deleteBuyList: "Șterge lista de cumpărături",
+      deleteLocation: "Șterge locația",
+      deleteListDescription:
+        "Ștergi întreaga listă și toate elementele ei? Acțiunea nu poate fi anulată.",
+      deleteLocationDescription:
+        "Elimini locația din problemă? Locațiile firmei salvate rămân disponibile.",
+      deleteSectionFailed: "Ștergerea nu a reușit. Încearcă din nou.",
       createChecklist: "Creează lista de verificare",
       editChecklist: "Editează lista de verificare",
       createBuyList: "Creează lista de cumpărături",

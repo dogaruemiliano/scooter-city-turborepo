@@ -17,9 +17,16 @@ import {
   Label,
   SheetSelect,
 } from "@repo/ui/components";
-import { ClipboardList, MapPin, Plus, ShoppingCart } from "lucide-react";
+import {
+  ClipboardList,
+  MapPin,
+  Pencil,
+  Plus,
+  ShoppingCart,
+} from "lucide-react";
 import { Feedback, useRemote, useTask } from "@/components/WorkspaceForm";
 import { webApi } from "@/lib/api";
+import { SectionDeleteAction } from "./SectionDeleteAction";
 import { ProblemChecklist } from "./ProblemChecklist";
 
 export type ProblemSectionData = Pick<
@@ -74,7 +81,7 @@ export function ProblemSections({
       {(["checklist", "buyList"] as const).map((kind) =>
         has(kind) || creatingChecklist === kind ? (
           <ProblemChecklist
-            key={`${kind}-${JSON.stringify(problem[kind])}`}
+            key={kind}
             kind={kind}
             initialOpen={creatingChecklist === kind && !has(kind)}
             onEditorClose={() => setCreatingChecklist(null)}
@@ -107,13 +114,26 @@ export function ProblemSections({
       )}
       {has("location") ? (
         <section className="flex flex-col gap-3" aria-label={t("location")}>
-          <h3 className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
-            {t("location")}
-            <MapPin aria-hidden="true" className="size-4 shrink-0" />
-          </h3>
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
+              {t("location")}
+              <MapPin aria-hidden="true" className="size-4 shrink-0" />
+            </h3>
+            {editable && problem.location ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label={t("editLocation")}
+                disabled={busy}
+                onClick={() => setEditingLocation(true)}
+              >
+                <Pencil aria-hidden="true" />
+              </Button>
+            ) : null}
+          </div>
           {problem.location ? (
             <div className="flex items-start gap-3 rounded-2xl border border-border bg-card p-4 text-card-foreground">
-              <MapPin aria-hidden="true" className="size-5 shrink-0" />
               <div className="min-w-0 flex-1">
                 <p className="font-medium wrap-anywhere">
                   {problem.location.name}
@@ -124,24 +144,13 @@ export function ProblemSections({
               </div>
             </div>
           ) : null}
-          {editable ? (
-            problem.location ? (
-              <Button
-                variant="outline"
-                className="self-start"
-                disabled={busy}
-                onClick={() => setEditingLocation(true)}
-              >
-                {t("editLocation")}
-              </Button>
-            ) : (
-              <AddAction
-                text={t("addLocation")}
-                icon={<MapPin />}
-                disabled={busy}
-                onClick={() => setEditingLocation(true)}
-              />
-            )
+          {editable && !problem.location ? (
+            <AddAction
+              text={t("addLocation")}
+              icon={<MapPin />}
+              disabled={busy}
+              onClick={() => setEditingLocation(true)}
+            />
           ) : null}
         </section>
       ) : null}
@@ -200,6 +209,15 @@ export function ProblemSections({
           maySaveLocation={maySaveLocation}
           busy={busy}
           onClose={() => setEditingLocation(false)}
+          onDelete={async () => {
+            await onSave({
+              location: null,
+              sections: problem.sections.filter(
+                (section) => section !== "location",
+              ),
+            });
+            setEditingLocation(false);
+          }}
           onSave={async (location) => {
             await onSave({
               location,
@@ -222,12 +240,14 @@ function TaskLocationEditor({
   busy,
   onClose,
   onSave,
+  onDelete,
   onBusyChange,
 }: {
   problem: ProblemSectionData;
   maySaveLocation: boolean;
   busy: boolean;
   onClose: () => void;
+  onDelete: () => Promise<void>;
   onSave: (
     location: NonNullable<v1.problems.Problem["location"]>,
   ) => Promise<void>;
@@ -267,12 +287,23 @@ function TaskLocationEditor({
     >
       <BottomSheetContent>
         <BottomSheetHeader>
-          <BottomSheetTitle>
-            {t(problem.location ? "editLocation" : "addLocation")}
-          </BottomSheetTitle>
-          <BottomSheetDescription>
-            {t("locationDescription")}
-          </BottomSheetDescription>
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+              <BottomSheetTitle>
+                {t(problem.location ? "editLocation" : "addLocation")}
+              </BottomSheetTitle>
+              <BottomSheetDescription>
+                {t("locationDescription")}
+              </BottomSheetDescription>
+            </div>
+            {problem.location ? (
+              <SectionDeleteAction
+                kind="location"
+                busy={busy || task.busy}
+                onDelete={onDelete}
+              />
+            ) : null}
+          </div>
         </BottomSheetHeader>
         <BottomSheetBody className="gap-4">
           <Feedback error={locations.error} />

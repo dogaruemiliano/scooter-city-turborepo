@@ -91,9 +91,20 @@ describe("shared checklist", () => {
     expect(sheet.querySelector('[data-slot="add-action"]')).toBeNull();
     const input = within(sheet).getByRole("textbox", { name: "New item" });
     expect(input).toHaveAttribute("enterkeyhint", "next");
-    expect(input).toHaveAttribute("placeholder", labels.placeholder);
+    expect(input).toHaveAttribute("placeholder", labels.add);
     expect(within(sheet).getByText(labels.input)).toHaveClass("sr-only");
     expect(sheet).toHaveClass("lg:w-(--container-form-columns)");
+    const listSurface = sheet.querySelector(
+      '[data-slot="checklist-editor-list"]',
+    );
+    expect(listSurface).toHaveClass("rounded-2xl", "border", "bg-popover");
+    expect(listSurface).toContainElement(input);
+    const row = sheet.querySelector('[data-sortable-id="brakes"]');
+    expect(row).toHaveClass("border-b", "bg-popover");
+    expect(row).not.toHaveClass("rounded-xl", "bg-control");
+    expect(
+      row?.querySelector(".lucide-grip-vertical")?.previousElementSibling,
+    ).toHaveTextContent("Check brakes");
     await user.type(input, "Replace pads{Enter}");
     expect(within(sheet).getByText("Replace pads")).toBeInTheDocument();
     expect(input).toHaveValue("");

@@ -31,7 +31,16 @@ function Example() {
       <ChecklistList
         items={items}
         emptyMessage="No items yet"
-        addAction={{ label: "Add item", onClick: () => setEditor("add") }}
+        addAction={{
+          label: "Add item",
+          onAdd: async (text) => {
+            setItems((current) => [
+              ...current,
+              { id: crypto.randomUUID(), text, completed: false },
+            ]);
+            return true;
+          },
+        }}
         onCheckedChange={(id, completed) =>
           setItems((current) =>
             current.map((item) =>
