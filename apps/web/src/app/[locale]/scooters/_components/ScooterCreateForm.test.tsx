@@ -340,7 +340,7 @@ describe("ScooterCreateForm combined review", () => {
     await browser.click(
       within(screen.getByRole("radiogroup", { name: "Fuel system" })).getByRole(
         "radio",
-        { name: "Fuel injection" },
+        { name: /Fuel injection$/ },
       ),
     );
     await chooseSelectOption(browser, "Registration type", "Unregistered");
