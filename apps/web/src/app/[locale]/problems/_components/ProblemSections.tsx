@@ -51,11 +51,14 @@ export function ProblemSections({
   const task = useTask();
   const [open, setOpen] = useState(false);
   const [editingLocation, setEditingLocation] = useState(false);
+  const [creatingChecklist, setCreatingChecklist] = useState<
+    "checklist" | "buyList" | null
+  >(null);
   const has = (section: Section) =>
-    problem.sections.includes(section) ||
-    (section === "checklist" && problem.checklist.length > 0) ||
-    (section === "buyList" && problem.buyList.length > 0) ||
-    (section === "location" && problem.location !== null);
+    section === "checklist" || section === "buyList"
+      ? problem[section].length > 0
+      : problem.sections.includes(section) ||
+        (section === "location" && problem.location !== null);
   useEffect(() => {
     onBusyChange(task.busy);
     return () => onBusyChange(false);
@@ -69,10 +72,12 @@ export function ProblemSections({
     <>
       <Feedback error={task.error} />
       {(["checklist", "buyList"] as const).map((kind) =>
-        has(kind) ? (
+        has(kind) || creatingChecklist === kind ? (
           <ProblemChecklist
             key={`${kind}-${JSON.stringify(problem[kind])}`}
             kind={kind}
+            initialOpen={creatingChecklist === kind && !has(kind)}
+            onEditorClose={() => setCreatingChecklist(null)}
             problem={problem}
             editable={editable}
             busy={busy}
@@ -80,7 +85,19 @@ export function ProblemSections({
             onSave={async (items) => {
               let saved = false;
               await task.run(async () => {
-                await onSave({ [kind]: items });
+                await onSave({
+                  [kind]: items,
+                  ...(!items.length
+                    ? {
+                        sections: problem.sections.filter(
+                          (section) => section !== kind,
+                        ),
+                      }
+                    : !problem.sections.includes(kind)
+                      ? { sections: [...problem.sections, kind] }
+                      : {}),
+                });
+                setCreatingChecklist(null);
                 saved = true;
               });
               return saved;
@@ -90,8 +107,9 @@ export function ProblemSections({
       )}
       {has("location") ? (
         <section className="flex flex-col gap-3" aria-label={t("location")}>
-          <h3 className="text-sm font-semibold text-muted-foreground">
+          <h3 className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
             {t("location")}
+            <MapPin aria-hidden="true" className="size-4 shrink-0" />
           </h3>
           {problem.location ? (
             <div className="flex items-start gap-3 rounded-2xl border border-border bg-card p-4 text-card-foreground">
@@ -155,11 +173,10 @@ export function ProblemSections({
                   if (key === "location") {
                     setOpen(false);
                     setEditingLocation(true);
-                  } else
-                    void task.run(async () => {
-                      await onSave({ sections: [...problem.sections, key] });
-                      setOpen(false);
-                    });
+                  } else {
+                    setOpen(false);
+                    setCreatingChecklist(key);
+                  }
                 }}
               >
                 <Icon aria-hidden="true" />

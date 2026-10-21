@@ -1,12 +1,11 @@
 import { useState } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { Pencil, Plus } from "lucide-react";
+import { Pencil } from "lucide-react";
 import {
   ChecklistEditor,
   ChecklistList,
   type ChecklistItem,
 } from "./checklist";
-import { AddAction } from "./add-action";
 import { Button } from "./button";
 
 function Example() {
@@ -32,6 +31,7 @@ function Example() {
       <ChecklistList
         items={items}
         emptyMessage="No items yet"
+        addAction={{ label: "Add item", onClick: () => setEditor("add") }}
         onCheckedChange={(id, completed) =>
           setItems((current) =>
             current.map((item) =>
@@ -39,12 +39,6 @@ function Example() {
             ),
           )
         }
-      />
-      <AddAction
-        text="Add item"
-        icon={<Plus />}
-        size="compact"
-        onClick={() => setEditor("add")}
       />
       {editor ? (
         <ChecklistEditor

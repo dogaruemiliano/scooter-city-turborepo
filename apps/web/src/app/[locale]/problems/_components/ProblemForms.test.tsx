@@ -102,10 +102,9 @@ describe("problem release forms", () => {
     ]) {
       await user.click(screen.getByRole("button", { name: "Add" }));
       await user.click(screen.getByRole("button", { name: section }));
-      const region = await screen.findByRole("region", { name: section });
-      await user.click(
-        within(region).getByRole("button", { name: "Add item" }),
-      );
+      await screen.findByRole("dialog", {
+        name: section === "Checklist" ? "Create checklist" : "Create buy list",
+      });
       await user.type(
         screen.getByRole("textbox", { name: label }),
         `${text}{Enter}`,
@@ -485,12 +484,12 @@ describe("problem release forms", () => {
   it("adds checklist items in its editor and saves them", async () => {
     const user = userEvent.setup();
     renderForm(<ProblemWork compact problem={problem} reload={vi.fn()} />);
-    const checklist = screen.getByRole("region", { name: "Checklist" });
-    expect(within(checklist).queryByRole("textbox")).toBeNull();
-    await user.click(
-      within(checklist).getByRole("button", { name: "Add item" }),
-    );
-    const sheet = await screen.findByRole("dialog", { name: "Edit checklist" });
+    expect(screen.queryByRole("region", { name: "Checklist" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Add" }));
+    await user.click(screen.getByRole("button", { name: "Checklist" }));
+    const sheet = await screen.findByRole("dialog", {
+      name: "Create checklist",
+    });
     expect(sheet).toHaveClass("bg-popover");
     expect(sheet.querySelector(".bg-background")).toBeNull();
     const input = within(sheet).getByRole("textbox", {

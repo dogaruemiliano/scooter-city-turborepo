@@ -220,7 +220,9 @@ export const workspaceCatalog = {
       locationAddress: "Address",
       saveLocationForReuse: "Save as a business location for reuse",
       saveLocation: "Save location",
+      createChecklist: "Create checklist",
       editChecklist: "Edit checklist",
+      createBuyList: "Create buy list",
       editBuyList: "Edit buy list",
       checklistEditorDescription:
         "Add, reorder, or remove items, then save your changes.",
@@ -628,7 +630,9 @@ export const workspaceCatalog = {
       locationAddress: "Adresă",
       saveLocationForReuse: "Salvează ca locație a firmei pentru reutilizare",
       saveLocation: "Salvează locația",
+      createChecklist: "Creează lista de verificare",
       editChecklist: "Editează lista de verificare",
+      createBuyList: "Creează lista de cumpărături",
       editBuyList: "Editează lista de cumpărături",
       checklistEditorDescription:
         "Adaugă, reordonează sau elimină elemente, apoi salvează modificările.",

@@ -73,6 +73,118 @@ function renderSections(
 beforeEach(() => mocks.fetch.mockReset().mockResolvedValue({ items: [saved] }));
 
 describe("optional task sections", () => {
+  it.each(["checklist", "buyList"] as const)(
+    "places the add action in the last row of %s",
+    async (kind) => {
+      const user = userEvent.setup();
+      renderSections({
+        ...problem,
+        sections: [kind],
+        [kind]: [{ id: "brakes", text: "Check brakes", completed: false }],
+      });
+      const title = kind === "checklist" ? "Checklist" : "Buy list";
+      const section = screen.getByRole("region", { name: title });
+      const list = within(section).getByRole("list");
+      const add = within(list).getByRole("button", { name: "Add item" });
+      expect(add.closest("li")).toBe(list.lastElementChild);
+      expect(list.children).toHaveLength(2);
+      expect(section.querySelector('[data-slot="add-action"]')).toBeNull();
+      await user.click(add);
+      expect(
+        await screen.findByRole("dialog", {
+          name: kind === "checklist" ? "Edit checklist" : "Edit buy list",
+        }),
+      ).toBeInTheDocument();
+    },
+  );
+
+  it.each(["checklist", "buyList"] as const)(
+    "hides saved empty %s and keeps Add available",
+    async (kind) => {
+      const title = kind === "checklist" ? "Checklist" : "Buy list";
+      const user = userEvent.setup();
+      renderSections({ ...problem, sections: [kind], [kind]: [] });
+      expect(screen.queryByRole("heading", { name: title })).toBeNull();
+      await user.click(screen.getByRole("button", { name: "Add" }));
+      expect(screen.getByRole("button", { name: title })).toBeEnabled();
+    },
+  );
+
+  it.each(["checklist", "buyList"] as const)(
+    "hides new empty %s after saving",
+    async (kind) => {
+      const title = kind === "checklist" ? "Checklist" : "Buy list";
+      const editorTitle =
+        kind === "checklist" ? "Create checklist" : "Create buy list";
+      const saveTitle =
+        kind === "checklist" ? "Save checklist" : "Save buy list";
+      const user = userEvent.setup();
+      const save = renderSections();
+      await user.click(screen.getByRole("button", { name: "Add" }));
+      await user.click(screen.getByRole("button", { name: title }));
+      const editor = await screen.findByRole("dialog", { name: editorTitle });
+      await user.click(within(editor).getByRole("button", { name: saveTitle }));
+      await waitFor(() =>
+        expect(screen.queryByRole("dialog", { name: editorTitle })).toBeNull(),
+      );
+      expect(screen.queryByRole("heading", { name: title })).toBeNull();
+      expect(save).toHaveBeenCalledWith({ sections: [], [kind]: [] });
+    },
+  );
+
+  it.each(["checklist", "buyList"] as const)(
+    "removes %s when its last item is removed and saved",
+    async (kind) => {
+      const title = kind === "checklist" ? "Checklist" : "Buy list";
+      const editorTitle =
+        kind === "checklist" ? "Edit checklist" : "Edit buy list";
+      const saveTitle =
+        kind === "checklist" ? "Save checklist" : "Save buy list";
+      const user = userEvent.setup();
+      const save = renderSections({
+        ...problem,
+        sections: [kind, "location"],
+        [kind]: [{ id: "brakes", text: "Check brakes", completed: false }],
+      });
+      await user.click(screen.getByRole("button", { name: editorTitle }));
+      const editor = await screen.findByRole("dialog", { name: editorTitle });
+      await user.click(
+        within(editor).getByRole("button", {
+          name: "Remove item: Check brakes",
+        }),
+      );
+      await user.click(within(editor).getByRole("button", { name: saveTitle }));
+      await waitFor(() =>
+        expect(screen.queryByRole("heading", { name: title })).toBeNull(),
+      );
+      expect(save).toHaveBeenCalledWith({ sections: ["location"], [kind]: [] });
+    },
+  );
+
+  it("opens the checklist editor directly and discards a cancelled new section", async () => {
+    const user = userEvent.setup();
+    const save = renderSections();
+    await user.click(screen.getByRole("button", { name: "Add" }));
+    const picker = await screen.findByRole("dialog", { name: "Add to task" });
+    await user.click(within(picker).getByRole("button", { name: "Checklist" }));
+    const editor = await screen.findByRole("dialog", {
+      name: "Create checklist",
+    });
+    expect(
+      within(editor).getByRole("textbox", { name: "New checklist item" }),
+    ).toBeInTheDocument();
+    expect(within(editor).queryByText("No checklist items yet.")).toBeNull();
+    expect(save).not.toHaveBeenCalled();
+    await user.click(within(editor).getByRole("button", { name: "Cancel" }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "Create checklist" }),
+      ).toBeNull(),
+    );
+    expect(screen.queryByRole("heading", { name: "Checklist" })).toBeNull();
+    expect(save).not.toHaveBeenCalled();
+  });
+
   it("adds a buy list from a distinct sheet and saves purchases independently", async () => {
     const user = userEvent.setup();
     const save = renderSections();
@@ -96,9 +208,11 @@ describe("optional task sections", () => {
       within(sheet).getByRole("button", { name: "Location" }),
     ).toBeInTheDocument();
     await user.click(within(sheet).getByRole("button", { name: "Buy list" }));
-    await screen.findByRole("heading", { name: "Buy list" });
-    expect(save).toHaveBeenCalledWith({ sections: ["buyList"] });
-    await user.click(screen.getByRole("button", { name: "Add item" }));
+    expect(save).not.toHaveBeenCalled();
+    const editor = await screen.findByRole("dialog", {
+      name: "Create buy list",
+    });
+    expect(within(editor).queryByText("No items to buy yet.")).toBeNull();
     await user.type(
       screen.getByRole("textbox", { name: "Item to buy" }),
       "2 rear tires{Enter}",
@@ -240,15 +354,36 @@ describe("optional task sections", () => {
     save.mockRejectedValueOnce(new Error("Task changed; reload"));
     await user.click(screen.getByRole("button", { name: "Add" }));
     await user.click(screen.getByRole("button", { name: "Checklist" }));
-    expect(
-      await screen.findByRole("dialog", { name: "Add to task" }),
-    ).toBeInTheDocument();
+    const editor = await screen.findByRole("dialog", {
+      name: "Create checklist",
+    });
+    await user.type(
+      within(editor).getByRole("textbox", { name: "New checklist item" }),
+      "Check brakes{Enter}",
+    );
+    await user.click(
+      within(editor).getByRole("button", { name: "Save checklist" }),
+    );
     expect(
       (await screen.findAllByRole("alert")).some(
         (alert) => alert.textContent === "Task changed; reload",
       ),
     ).toBe(true);
-    expect(screen.queryByRole("heading", { name: "Checklist" })).toBeNull();
+    expect(within(editor).getByText("Check brakes")).toBeInTheDocument();
+    await user.click(
+      within(editor).getByRole("button", { name: "Save checklist" }),
+    );
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "Create checklist" }),
+      ).toBeNull(),
+    );
+    expect(save).toHaveBeenLastCalledWith({
+      sections: ["checklist"],
+      checklist: [
+        { id: expect.any(String), text: "Check brakes", completed: false },
+      ],
+    });
   });
 
   it("shows existing sections without add controls for read-only viewers", () => {

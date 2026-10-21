@@ -2,13 +2,11 @@
 
 import { useId, useRef, useState, type KeyboardEvent } from "react";
 import { GripVertical, Plus, Trash2 } from "lucide-react";
-import { AddAction } from "./add-action";
 import { Alert, AlertDescription } from "./alert";
 import {
   BottomSheet,
   BottomSheetBody,
   BottomSheetContent,
-  BottomSheetDescription,
   BottomSheetFooter,
   BottomSheetHeader,
   BottomSheetTitle,
@@ -27,11 +25,17 @@ export function ChecklistList({
   emptyMessage,
   disabled,
   onCheckedChange,
+  addAction,
 }: {
   items: readonly ChecklistItem[];
   emptyMessage: string;
   disabled?: boolean;
   onCheckedChange: (id: string, completed: boolean) => void;
+  addAction?: {
+    label: string;
+    disabled?: boolean;
+    onClick: () => void;
+  };
 }) {
   const id = useId();
   return (
@@ -53,8 +57,22 @@ export function ChecklistList({
           />
         </li>
       ))}
-      {!items.length ? (
+      {!items.length && !addAction ? (
         <li className="p-4 text-sm text-muted-foreground">{emptyMessage}</li>
+      ) : null}
+      {addAction ? (
+        <li>
+          <Button
+            type="button"
+            variant="ghost"
+            className="min-h-12 w-full justify-start gap-3 rounded-none p-4 text-muted-foreground"
+            disabled={disabled || addAction.disabled}
+            onClick={addAction.onClick}
+          >
+            <Plus aria-hidden="true" />
+            {addAction.label}
+          </Button>
+        </li>
       ) : null}
     </ul>
   );
@@ -94,12 +112,10 @@ export function ChecklistEditor({
 }) {
   const id = useId();
   const [items, setItems] = useState([...initialItems]);
-  const [adding, setAdding] = useState(initialAdding);
   const [text, setText] = useState("");
   const [sorting, setSorting] = useState(false);
   const [saving, setSaving] = useState(false);
   const input = useRef<HTMLInputElement>(null);
-  const add = useRef<HTMLButtonElement>(null);
   const blocked = busy || saving;
   const interacting = blocked || sorting;
   function addItem() {
@@ -125,13 +141,14 @@ export function ChecklistEditor({
         if (!open && !interacting) onClose();
       }}
     >
-      <BottomSheetContent initialFocus={initialAdding ? input : undefined}>
+      <BottomSheetContent
+        className="lg:w-(--container-form-columns)"
+        initialFocus={initialAdding ? input : undefined}
+      >
         <BottomSheetHeader>
           <BottomSheetTitle>{labels.title}</BottomSheetTitle>
-          <BottomSheetDescription>{labels.description}</BottomSheetDescription>
         </BottomSheetHeader>
         <BottomSheetBody className="gap-4">
-          <p className="text-sm text-muted-foreground">{labels.instructions}</p>
           <div data-base-ui-swipe-ignore="">
             <SortableGrid
               items={items}
@@ -176,17 +193,16 @@ export function ChecklistEditor({
               )}
             />
           </div>
-          {!items.length ? (
-            <p className="text-sm text-muted-foreground">{labels.empty}</p>
-          ) : null}
-          {adding ? (
-            <div id={`${id}-add`} className="flex flex-col gap-2">
-              <Label htmlFor={`${id}-input`}>{labels.input}</Label>
+          <div id={`${id}-add`} className="flex flex-col gap-2">
+            <Label className="sr-only" htmlFor={`${id}-input`}>
+              {labels.input}
+            </Label>
+            <div className="flex items-center gap-2">
               <Input
                 ref={input}
                 id={`${id}-input`}
-                autoFocus={!initialAdding}
-                enterKeyHint="enter"
+                className="min-w-0 flex-1"
+                enterKeyHint="next"
                 maxLength={300}
                 value={text}
                 placeholder={labels.placeholder}
@@ -197,27 +213,14 @@ export function ChecklistEditor({
               <Button
                 type="button"
                 variant="outline"
-                className="hidden self-start md:inline-flex"
+                className="hidden shrink-0 lg:inline-flex"
                 disabled={interacting || !text.trim() || items.length >= 50}
                 onClick={addItem}
               >
                 {labels.add}
               </Button>
             </div>
-          ) : null}
-          <AddAction
-            ref={add}
-            text={labels.add}
-            icon={<Plus />}
-            size="compact"
-            disabled={interacting || items.length >= 50}
-            aria-expanded={adding}
-            aria-controls={adding ? `${id}-add` : undefined}
-            onClick={() => {
-              setAdding(true);
-              input.current?.focus();
-            }}
-          />
+          </div>
           {error ? (
             <Alert variant="destructive" role="alert">
               <AlertDescription>{error}</AlertDescription>
