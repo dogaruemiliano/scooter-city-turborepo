@@ -548,6 +548,8 @@ export function ScooterEditorFieldControl({
         disabled={fieldDisabled}
       />
     );
+  if (name === "fuelSystem")
+    return <ScooterFuelSystemField disabled={fieldDisabled} />;
   if (name === "powertrainType")
     return <ScooterPowertrainField disabled={fieldDisabled} />;
   return <ScooterTextField name={name} disabled={fieldDisabled} />;
@@ -625,6 +627,26 @@ function ScooterTextField({
           ))}
         </datalist>
       ) : null}
+    </FormField>
+  );
+}
+
+function ScooterFuelSystemField({ disabled }: { disabled: boolean }) {
+  const t = useTranslations("scooters");
+  return (
+    <FormField
+      name="fuelSystem"
+      label={t("fields.fuelSystem")}
+      disabled={disabled}
+    >
+      <FormSegmentedRadioGroup
+        deselectValue=""
+        options={v1.scooters.SCOOTER_FUEL_SYSTEMS.map((value) => ({
+          value,
+          label: t(`fuelSystems.${value}`),
+          tone: "neutral" as const,
+        }))}
+      />
     </FormField>
   );
 }

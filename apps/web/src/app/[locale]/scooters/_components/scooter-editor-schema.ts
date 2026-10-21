@@ -34,6 +34,7 @@ export const SCOOTER_EDITOR_SECTIONS = [
     title: "powertrain",
     fields: [
       "powertrainType",
+      "fuelSystem",
       "engineCode",
       "engineDisplacementCc",
       "powerKw",
@@ -233,7 +234,7 @@ export function scooterEditorDefaults(
       scooter?.[field] == null ? "" : String(scooter[field]),
     ]),
   ) as Record<ScooterEditorField, string>;
-  if (!scooter) values.fleetNumber = null;
+  values.fleetNumber = scooter ? String(scooter.fleetNumber) : null;
   values.civVersion = scooter?.civVersion ?? "unknown";
   values.powertrainType = scooter ? scooter.powertrainType : "combustion";
   if (!scooter) values.vehicleCategory = "L1e";
@@ -356,20 +357,32 @@ export const scooterCreateFormSchema = rawCreateSchema
 
 // Create and edit share registration controls; updates still send only changed values.
 export const scooterEditFormSchema = rawCreateSchema
+  .extend({ fleetNumber: z.string().nullable().optional() })
   .transform(
     (values) =>
-      convertForm({
-        ...values,
-        insurancePolicies: values.insurancePolicies?.filter(
-          insuranceEditorHasContent,
-        ),
+      ({
+        ...convertForm({
+          ...values,
+          insurancePolicies: values.insurancePolicies?.filter(
+            insuranceEditorHasContent,
+          ),
+        }),
+        ...(values.fleetNumber !== undefined
+          ? {
+              fleetNumber:
+                values.fleetNumber != null &&
+                /^\d+$/.test(values.fleetNumber.trim())
+                  ? Number(values.fleetNumber)
+                  : Number.NaN,
+            }
+          : {}),
       }) as unknown as z.input<typeof v1.scooters.updateScooterInputSchema>,
   )
   .pipe(v1.scooters.updateScooterInputSchema);
 
 export function scooterChangedFields(
   input: v1.scooters.UpdateScooterInput,
-  dirty: Partial<Record<ScooterEditorField, boolean>>,
+  dirty: Partial<Record<ScooterEditorField | "fleetNumber", boolean>>,
 ): v1.scooters.UpdateScooterInput {
   const inactive = v1.scooters.inactivePowertrainFields(
     input.powertrainType ?? "",
@@ -380,6 +393,7 @@ export function scooterChangedFields(
         dirty[field] && !(inactive as readonly string[]).includes(field),
     ).map((field) => [field, input[field]]),
   );
+  if (dirty.fleetNumber) changes.fleetNumber = input.fleetNumber;
   if (dirty.powertrainType) {
     for (const field of inactive) changes[field] = null;
     if (input.powertrainType === "electric") {

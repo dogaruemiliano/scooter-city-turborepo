@@ -367,6 +367,11 @@ model ScooterBrand {
   scooters  Scooter[]
 }
 
+enum ScooterFuelSystem {
+  injection
+  carburetor
+}
+
 enum PowertrainType {
   unpowered
   electric
@@ -484,6 +489,7 @@ model Scooter {
   seatsCount             Int?
 
   // Powertrain / engine
+  fuelSystem             ScooterFuelSystem?
   powertrainType         PowertrainType
   engineCode             String?
   engineSerialNumber     String?

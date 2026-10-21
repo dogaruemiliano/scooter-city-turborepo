@@ -337,6 +337,12 @@ describe("ScooterCreateForm combined review", () => {
     const browser = userEvent.setup();
     renderWizard();
     await fillWizardIdentity(browser);
+    await browser.click(
+      within(screen.getByRole("radiogroup", { name: "Fuel system" })).getByRole(
+        "radio",
+        { name: /Fuel injection$/ },
+      ),
+    );
     await chooseSelectOption(browser, "Registration type", "Unregistered");
     await browser.click(
       within(
@@ -411,6 +417,7 @@ describe("ScooterCreateForm combined review", () => {
       vin: createdScooter.vin,
       brandId: "brand-1",
       powertrainType: "combustion",
+      fuelSystem: "injection",
       hasGps: false,
       odometerWorking: null,
       speedometerWorking: true,

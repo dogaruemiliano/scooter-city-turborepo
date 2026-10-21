@@ -257,6 +257,13 @@ export function ScooterDetailPage({
           label={t("fields.powertrainType")}
           value={t(`powertrainTypes.${scooter.powertrainType}`)}
         />
+        {scooter.powertrainType === "combustion" ||
+        scooter.powertrainType === "hybrid" ? (
+          <DetailField
+            label={t("fields.fuelSystem")}
+            value={t(`fuelSystems.${scooter.fuelSystem ?? "unknown"}`)}
+          />
+        ) : null}
         <DetailField
           label={t("fields.engineCode")}
           value={scooter.engineCode ?? t("detail.emptyValue")}

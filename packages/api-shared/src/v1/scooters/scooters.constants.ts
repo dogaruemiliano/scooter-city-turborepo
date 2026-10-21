@@ -2,6 +2,8 @@
  * Scooters-domain shared constants and route helpers.
  */
 
+export const SCOOTER_FUEL_SYSTEMS = ["injection", "carburetor"] as const;
+
 export const SCOOTER_POWERTRAIN_TYPES = [
   "electric",
   "combustion",
@@ -90,6 +92,7 @@ export const ROUTES = {
 export function inactivePowertrainFields(powertrain: string) {
   if (powertrain === "unpowered")
     return [
+      "fuelSystem",
       "engineCode",
       "engineSerialNumber",
       "engineDisplacementCc",
@@ -109,6 +112,7 @@ export function inactivePowertrainFields(powertrain: string) {
     ] as const;
   if (powertrain === "electric")
     return [
+      "fuelSystem",
       "engineDisplacementCc",
       "ratedEngineRpm",
       "fuelTankCapacityLiters",

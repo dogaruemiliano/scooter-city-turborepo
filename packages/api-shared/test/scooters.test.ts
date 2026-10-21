@@ -20,7 +20,7 @@ test("fleet labels use at least three digits and the current brand code", () => 
   }
 });
 
-test("fleet numbers allow a create override but cannot be edited", () => {
+test("fleet numbers allow create and update overrides", () => {
   assert.equal(
     v1.scooters.createScooterInputSchema.safeParse({
       ...baseScooterInput(),
@@ -30,7 +30,7 @@ test("fleet numbers allow a create override but cannot be edited", () => {
   );
   assert.equal(
     v1.scooters.updateScooterInputSchema.safeParse({ fleetNumber: 4 }).success,
-    false,
+    true,
   );
   for (const sort of ["fleetNumberAsc", "fleetNumberDesc"]) {
     assert.equal(
@@ -481,4 +481,33 @@ test("manual fleet numbers must be positive PostgreSQL integers", () => {
     }).success,
     true,
   );
+});
+
+test("fuel systems validate their values and propulsion compatibility", () => {
+  for (const fuelSystem of [null, "injection", "carburetor"]) {
+    assert.equal(
+      v1.scooters.createScooterInputSchema.safeParse({
+        ...baseScooterInput(),
+        fuelSystem,
+      }).success,
+      true,
+    );
+    assert.equal(
+      v1.scooters.updateScooterInputSchema.safeParse({ fuelSystem }).success,
+      true,
+    );
+  }
+  assert.equal(
+    v1.scooters.updateScooterInputSchema.safeParse({ fuelSystem: "diesel" })
+      .success,
+    false,
+  );
+  for (const powertrainType of ["electric", "unpowered"])
+    assert.equal(
+      v1.scooters.updateScooterInputSchema.safeParse({
+        powertrainType,
+        fuelSystem: "injection",
+      }).success,
+      false,
+    );
 });

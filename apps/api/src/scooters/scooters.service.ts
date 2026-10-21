@@ -344,6 +344,14 @@ export class ScootersService {
         userId,
       );
       return await this.prisma.$transaction(async (tx) => {
+        if (
+          input.fleetNumber !== undefined &&
+          input.fleetNumber !== existing.fleetNumber
+        )
+          data.fleetNumber = await this.allocateFleetNumber(
+            tx,
+            input.fleetNumber,
+          );
         const scooter = await tx.scooter.update({
           where: { id, deletedAt: null },
           data: { ...data, updatedAt: new Date() },
@@ -484,6 +492,7 @@ export class ScootersService {
       color: input.color,
       manufactureYear: input.manufactureYear,
       powertrainType: input.powertrainType,
+      fuelSystem: input.fuelSystem,
       engineCode: input.engineCode ?? null,
       engineDisplacementCc:
         input.powertrainType === "electric" ? null : input.engineDisplacementCc,
@@ -577,6 +586,7 @@ export class ScootersService {
       color: input.color,
       manufactureYear: input.manufactureYear,
       powertrainType: input.powertrainType,
+      fuelSystem: input.fuelSystem,
       engineCode: input.engineCode,
       engineDisplacementCc: input.engineDisplacementCc,
       powerKw: input.powerKw,
