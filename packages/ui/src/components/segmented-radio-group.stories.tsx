@@ -41,6 +41,11 @@ export const Default: Story = {
 
 export const Disabled: Story = { args: { disabled: true } };
 
+export const Unselected: Story = {
+  args: { value: "", deselectValue: "" },
+  render: Default.render,
+};
+
 export const Pills: Story = {
   args: {
     appearance: "pills",

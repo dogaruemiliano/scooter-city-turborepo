@@ -128,6 +128,13 @@ function SegmentedRadioGroup<Value extends string>({
     0,
     options.findIndex((option) => option.value === value),
   );
+  // Each shared edge belongs to the option after/below it. Keep the two
+  // responsive layouts in sync without measuring or observing the DOM.
+  const hasDivider = (
+    index: number,
+    columnCount: number,
+    axis: "row" | "column",
+  ) => (axis === "column" ? index % columnCount !== 0 : index >= columnCount);
   return (
     <div className={cn("@container/segmented min-w-0", containerClassName)}>
       <div
@@ -144,7 +151,7 @@ function SegmentedRadioGroup<Value extends string>({
         aria-disabled={disabled || undefined}
         aria-required={required || undefined}
         className={cn(
-          "grid min-h-12 min-w-0 grid-cols-2 rounded-xl border border-input bg-muted p-1 md:min-h-11 @form-controls/segmented:grid-cols-[repeat(var(--segmented-columns),minmax(0,1fr))]",
+          "grid min-h-12 min-w-0 grid-cols-2 rounded-xl border border-(--radio-border) [--radio-border:var(--control-border,var(--input))] bg-muted p-1 md:min-h-11 @form-controls/segmented:grid-cols-[repeat(var(--segmented-columns),minmax(0,1fr))]",
           columns !== undefined &&
             "grid-cols-[repeat(var(--segmented-columns),minmax(0,1fr))]",
           appearance === "pills" &&
@@ -156,7 +163,24 @@ function SegmentedRadioGroup<Value extends string>({
           <label
             key={option.value}
             className={cn(
-              "flex min-h-10 min-w-0 cursor-pointer md:min-h-9",
+              "relative flex min-h-10 min-w-0 cursor-pointer md:min-h-9",
+              appearance === "segmented" &&
+                cn(
+                  "p-0.5",
+                  "before:pointer-events-none before:absolute before:inset-y-2 before:left-0 before:rounded-full before:border-l before:border-(--radio-border) after:pointer-events-none after:absolute after:inset-x-3 after:top-0 after:rounded-full after:border-t after:border-(--radio-border)",
+                  hasDivider(index, columns ?? 2, "column")
+                    ? "before:block"
+                    : "before:hidden",
+                  hasDivider(index, columns ?? 2, "row")
+                    ? "after:block"
+                    : "after:hidden",
+                  hasDivider(index, columns ?? options.length, "column")
+                    ? "@form-controls/segmented:before:block"
+                    : "@form-controls/segmented:before:hidden",
+                  hasDivider(index, columns ?? options.length, "row")
+                    ? "@form-controls/segmented:after:block"
+                    : "@form-controls/segmented:after:hidden",
+                ),
               appearance === "pills" && "min-h-10 items-center md:min-h-10",
               optionClassName,
             )}
@@ -194,6 +218,10 @@ function SegmentedRadioGroup<Value extends string>({
                 "flex min-h-0 w-full min-w-0 items-center justify-center gap-1 rounded-md px-2 py-1 text-center text-sm font-medium wrap-anywhere outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-inset peer-focus-visible:ring-ring peer-disabled:cursor-not-allowed",
                 appearance === "pills" &&
                   "min-h-8 rounded-full border border-border px-4 py-1",
+                value !== option.value &&
+                  !disabled &&
+                  !option.disabled &&
+                  "hover:bg-secondary-hover active:bg-secondary-active peer-active:bg-secondary-active",
                 option.severity
                   ? cn(
                       value === option.value
@@ -201,10 +229,7 @@ function SegmentedRadioGroup<Value extends string>({
                             severityTone[option.severity],
                             "ring-2 ring-inset ring-severity-foreground",
                           )
-                        : cn(
-                            severityTextTone[option.severity],
-                            "hover:bg-muted",
-                          ),
+                        : severityTextTone[option.severity],
                       "peer-disabled:opacity-50",
                     )
                   : value === option.value
@@ -215,7 +240,7 @@ function SegmentedRadioGroup<Value extends string>({
                           : "text-muted-foreground",
                         option.subtleUnselected &&
                           unselectedSurface[option.tone ?? "neutral"],
-                        "hover:bg-muted peer-disabled:bg-disabled peer-disabled:text-disabled-foreground",
+                        "peer-disabled:bg-disabled peer-disabled:text-disabled-foreground",
                       ),
                 optionClassName,
               )}
@@ -230,6 +255,9 @@ function SegmentedRadioGroup<Value extends string>({
                 />
               ) : null}
               {option.label}
+              {showCheckmark ? (
+                <span aria-hidden="true" className="size-4 shrink-0" />
+              ) : null}
             </span>
           </label>
         ))}

@@ -25,7 +25,7 @@ function Card<Element extends CardElement = "div">({
     "data-surface": surface,
     "data-border": border,
     className: cn(
-      "group/card flex min-w-0 flex-col gap-(--card-spacing) overflow-hidden rounded-xl border bg-card py-(--card-spacing-y) text-sm text-card-foreground [--card-spacing:--spacing(3)] [--card-spacing-y:--spacing(3)] md:[--card-spacing:--spacing(5)] md:[--card-spacing-y:var(--card-spacing)] has-data-[slot=card-accent]:relative has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl",
+      "group/card [--control-border:var(--border-elevated)] flex min-w-0 flex-col gap-(--card-spacing) overflow-hidden rounded-xl border bg-card py-(--card-spacing-y) text-sm text-card-foreground [--card-spacing:--spacing(3)] [--card-spacing-y:--spacing(3)] md:[--card-spacing:--spacing(5)] md:[--card-spacing-y:var(--card-spacing)] has-data-[slot=card-accent]:relative has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl",
       {
         transparent: "border-transparent",
         default: "border-border",

@@ -82,6 +82,7 @@ export declare const tokens: {
     "link": "#14717F",
     "linkHover": "#105A67",
     "linkActive": "#114752",
+    "borderElevated": "#FFFFFF",
     "borderStrong": "#9CA8AB",
     "scrim": "#00000066",
     "scrimForeground": "#F9FBFB",
