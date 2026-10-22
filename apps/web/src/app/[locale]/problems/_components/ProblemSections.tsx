@@ -100,7 +100,7 @@ export function ProblemSections({
                           (section) => section !== kind,
                         ),
                       }
-                    : !problem.sections.includes(kind)
+                    : !has(kind) && !problem.sections.includes(kind)
                       ? { sections: [...problem.sections, kind] }
                       : {}),
                 });
