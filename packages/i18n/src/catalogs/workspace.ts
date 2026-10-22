@@ -220,7 +220,17 @@ export const workspaceCatalog = {
       locationAddress: "Address",
       saveLocationForReuse: "Save as a business location for reuse",
       saveLocation: "Save location",
+      deleteChecklist: "Delete checklist",
+      deleteBuyList: "Delete buy list",
+      deleteLocation: "Delete location",
+      deleteListDescription:
+        "Delete this entire list and all its items? This cannot be undone.",
+      deleteLocationDescription:
+        "Remove this location from the problem? Saved business locations remain available.",
+      deleteSectionFailed: "Could not delete. Please try again.",
+      createChecklist: "Create checklist",
       editChecklist: "Edit checklist",
+      createBuyList: "Create buy list",
       editBuyList: "Edit buy list",
       checklistEditorDescription:
         "Add, reorder, or remove items, then save your changes.",
@@ -336,6 +346,7 @@ export const workspaceCatalog = {
       all: "All problems",
       view: "Show",
       add: "Report problem",
+      reportSubmit: "Report",
       scooter: "Scooter",
       claim: "Claim problem",
       reassignRequired: "Reassignment required",
@@ -628,7 +639,17 @@ export const workspaceCatalog = {
       locationAddress: "Adresă",
       saveLocationForReuse: "Salvează ca locație a firmei pentru reutilizare",
       saveLocation: "Salvează locația",
+      deleteChecklist: "Șterge lista de verificare",
+      deleteBuyList: "Șterge lista de cumpărături",
+      deleteLocation: "Șterge locația",
+      deleteListDescription:
+        "Ștergi întreaga listă și toate elementele ei? Acțiunea nu poate fi anulată.",
+      deleteLocationDescription:
+        "Elimini locația din problemă? Locațiile firmei salvate rămân disponibile.",
+      deleteSectionFailed: "Ștergerea nu a reușit. Încearcă din nou.",
+      createChecklist: "Creează lista de verificare",
       editChecklist: "Editează lista de verificare",
+      createBuyList: "Creează lista de cumpărături",
       editBuyList: "Editează lista de cumpărături",
       checklistEditorDescription:
         "Adaugă, reordonează sau elimină elemente, apoi salvează modificările.",
@@ -748,6 +769,7 @@ export const workspaceCatalog = {
       all: "Toate problemele",
       view: "Afișează",
       add: "Raportează problemă",
+      reportSubmit: "Raportează",
       scooter: "Scuter",
       claim: "Preia problema",
       reassignRequired: "Necesită reatribuire",

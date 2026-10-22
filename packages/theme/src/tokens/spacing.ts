@@ -41,6 +41,7 @@ export const emailSizing = { content: 560 } as const;
 
 /** Web sizing for document editors and available-width form layouts. */
 export const viewportSizing = {
+  primaryFormActions: "minmax(0, 2fr) minmax(0, 3fr)",
   scooterPhotoPreview: "55dvh",
   scooterPhotoPreviewMobile: "35dvh",
   documentEditor: "80vw",

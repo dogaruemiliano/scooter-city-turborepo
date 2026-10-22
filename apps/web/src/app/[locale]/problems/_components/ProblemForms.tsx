@@ -455,6 +455,7 @@ export function CreateProblem({
       <Feedback error={fileError ?? task.error} />
       <FormActions
         data-slot="problem-create-actions"
+        buttonLayout={onCancel ? "primary" : "equal"}
         ready={stickyActions ? readyToSubmit : undefined}
         pending={task.busy}
         className={stickyActions ? "mt-auto w-full" : undefined}
@@ -474,7 +475,7 @@ export function CreateProblem({
           type="submit"
           disabled={task.busy || !readyToSubmit}
         >
-          {task.busy ? t("problems.reporting") : t("problems.add")}
+          {task.busy ? t("problems.reporting") : t("problems.reportSubmit")}
         </Button>
       </FormActions>
     </form>

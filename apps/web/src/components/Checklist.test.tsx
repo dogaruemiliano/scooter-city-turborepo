@@ -78,7 +78,7 @@ describe("shared checklist", () => {
     expect(control).not.toBeChecked();
   });
 
-  it("focuses the input above Add, stages Enter additions and removals, then saves", async () => {
+  it("always shows an input, stages Enter additions and removals, then saves", async () => {
     const save = vi.fn().mockResolvedValue(true);
     render(<Harness save={save} />);
     const user = userEvent.setup();
@@ -86,14 +86,25 @@ describe("shared checklist", () => {
     const sheet = await screen.findByRole("dialog", { name: "Edit checklist" });
     expect(sheet).toHaveClass("bg-popover", "text-popover-foreground");
     expect(sheet.querySelector(".bg-background")).toBeNull();
-    expect(within(sheet).queryByRole("textbox")).toBeNull();
-    await user.click(within(sheet).getByRole("button", { name: "Add item" }));
+    expect(within(sheet).queryByText(labels.description)).toBeNull();
+    expect(within(sheet).getByText(labels.instructions)).toHaveClass("sr-only");
+    expect(sheet.querySelector('[data-slot="add-action"]')).toBeNull();
     const input = within(sheet).getByRole("textbox", { name: "New item" });
-    await waitFor(() => expect(input).toHaveFocus());
-    expect(input.closest('[id$="-add"]')?.nextElementSibling).toHaveAttribute(
-      "data-slot",
-      "add-action",
+    expect(input).toHaveAttribute("enterkeyhint", "next");
+    expect(input).toHaveAttribute("placeholder", labels.add);
+    expect(within(sheet).getByText(labels.input)).toHaveClass("sr-only");
+    expect(sheet).toHaveClass("lg:w-(--container-form-columns)");
+    const listSurface = sheet.querySelector(
+      '[data-slot="checklist-editor-list"]',
     );
+    expect(listSurface).toHaveClass("rounded-2xl", "border", "bg-popover");
+    expect(listSurface).toContainElement(input);
+    const row = sheet.querySelector('[data-sortable-id="brakes"]');
+    expect(row).toHaveClass("border-b", "bg-popover");
+    expect(row).not.toHaveClass("rounded-xl", "bg-control");
+    expect(
+      row?.querySelector(".lucide-grip-vertical")?.previousElementSibling,
+    ).toHaveTextContent("Check brakes");
     await user.type(input, "Replace pads{Enter}");
     expect(within(sheet).getByText("Replace pads")).toBeInTheDocument();
     expect(input).toHaveValue("");
@@ -111,6 +122,32 @@ describe("shared checklist", () => {
       { id: expect.any(String), text: "Replace pads", completed: false },
     ]);
     expect(screen.queryByRole("checkbox", { name: "Check brakes" })).toBeNull();
+  });
+
+  it("adds from the desktop button and includes unfinished input on save", async () => {
+    const save = vi.fn().mockResolvedValue(true);
+    render(<Harness save={save} />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Edit" }));
+    const sheet = await screen.findByRole("dialog");
+    const input = within(sheet).getByRole("textbox", { name: labels.input });
+    const add = within(sheet).getByRole("button", { name: labels.add });
+    expect(add).toHaveClass("hidden", "lg:inline-flex");
+    expect(add).toBeDisabled();
+    await user.type(input, "First item");
+    await user.click(add);
+    expect(input).toHaveValue("");
+    expect(input).toHaveFocus();
+    await user.keyboard("{Enter}");
+    await user.type(input, "Pending item");
+    await user.click(within(sheet).getByRole("button", { name: labels.save }));
+    await waitFor(() =>
+      expect(save).toHaveBeenCalledWith([
+        ...initial,
+        { id: expect.any(String), text: "First item", completed: false },
+        { id: expect.any(String), text: "Pending item", completed: false },
+      ]),
+    );
   });
 
   it("discards edits on cancel and retains them when saving fails", async () => {

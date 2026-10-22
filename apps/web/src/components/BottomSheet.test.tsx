@@ -2,6 +2,7 @@ import {
   BottomSheet,
   BottomSheetContent,
   BottomSheetTitle,
+  BottomSheetFooter,
 } from "@repo/ui/components/bottom-sheet";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -21,6 +22,27 @@ function Example({ dismissible = true }: { dismissible?: boolean }) {
 }
 
 describe("shared bottom-sheet dismissal", () => {
+  it("uses the translucent blurred sheet surface and lets the footer inherit it", () => {
+    render(
+      <BottomSheet open>
+        <BottomSheetContent>
+          <BottomSheetTitle>Frosted sheet</BottomSheetTitle>
+          <BottomSheetFooter>Actions</BottomSheetFooter>
+        </BottomSheetContent>
+      </BottomSheet>,
+    );
+    const sheet = screen.getByRole("dialog", { name: "Frosted sheet" });
+    expect(sheet).toHaveClass(
+      "bg-popover",
+      "supports-[backdrop-filter:blur(0)]:bg-bottom-sheet-surface",
+      "supports-[backdrop-filter:blur(0)]:backdrop-blur-floating-surface",
+    );
+    expect(
+      sheet.querySelector('[data-slot="bottom-sheet-footer"]'),
+    ).toHaveClass("bg-transparent");
+    expect(sheet.querySelector(".bg-background")).toBeNull();
+  });
+
   it("keeps a scrolled list gesture separate from the next swipe at the top", () => {
     render(
       <BottomSheet open>

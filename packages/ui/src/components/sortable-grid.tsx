@@ -32,6 +32,7 @@ export function SortableGrid<Item extends { id: string }>({
   onItemPress,
   removal,
   className,
+  itemVariant = "card",
   axis = "both",
   longPress = false,
   children,
@@ -50,6 +51,7 @@ export function SortableGrid<Item extends { id: string }>({
     onRemove: (item: Item) => Promise<boolean>;
   };
   className?: string;
+  itemVariant?: "card" | "row";
   axis?: "both" | "vertical";
   longPress?: boolean;
   children?: ReactNode;
@@ -381,6 +383,7 @@ export function SortableGrid<Item extends { id: string }>({
                   }
                 : undefined
             }
+            variant={itemVariant}
             reducedMotion={reducedMotion}
           >
             {renderItem(item)}
@@ -431,6 +434,7 @@ export function SortableGrid<Item extends { id: string }>({
 
 function SortableGridItem({
   id,
+  variant,
   index,
   group,
   disabled,
@@ -441,6 +445,7 @@ function SortableGridItem({
   onPress,
 }: {
   id: string;
+  variant: "card" | "row";
   onPress?: () => void;
   index: number;
   group: string;
@@ -493,7 +498,10 @@ function SortableGridItem({
       aria-describedby={instructions}
       aria-disabled={disabled && !onPress}
       className={cn(
-        "relative min-w-0 overflow-hidden rounded-xl border border-border bg-control outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        "relative min-w-0 overflow-hidden outline-none focus-visible:ring-2",
+        variant === "row"
+          ? "border-b border-border bg-popover focus-visible:ring-inset focus-visible:ring-border"
+          : "rounded-xl border border-border bg-control focus-visible:ring-ring",
         !disabled && "cursor-grab active:cursor-grabbing",
         isDragSource &&
           "rounded-dashed-surface border-(length:--dashed-surface-border-width) border-dashed border-primary",
