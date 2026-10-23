@@ -232,7 +232,6 @@ export function AssigneeSelect(props: AssigneeSelectProps) {
               )
             : undefined
         }
-        optionClassName="h-auto min-h-20 rounded-2xl border border-border p-4"
         options={options}
         renderOption={(option) => (
           <AssigneeUserCard

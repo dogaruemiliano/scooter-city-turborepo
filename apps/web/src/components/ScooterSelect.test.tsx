@@ -102,6 +102,16 @@ it("toggles multiple scooters, preserves the open sheet, and uses the popover su
   await user.click(trigger);
   const yamaha = screen.getByRole("button", { name: /008 YAM/ });
   expect(yamaha).toHaveAttribute("aria-pressed", "false");
+  expect(yamaha).toHaveClass(
+    "p-4",
+    "rounded-2xl",
+    "border",
+    "border-border",
+    "bg-selectable-row",
+    "hover:bg-accent/50",
+  );
+  expect(yamaha.className).not.toMatch(/(?:^|\s)(?:min-)?h-/);
+
   await user.click(yamaha);
   expect(yamaha).toHaveAttribute("aria-pressed", "true");
   expect(screen.getByRole("dialog")).toBeInTheDocument();

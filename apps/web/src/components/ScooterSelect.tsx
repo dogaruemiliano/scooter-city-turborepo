@@ -3,6 +3,7 @@
 import { useCallback, useMemo } from "react";
 import { TriangleIcon, PencilIcon, PlusIcon, XIcon } from "lucide-react";
 import { v1 } from "@repo/api-shared";
+import { spacing } from "@repo/theme";
 import { Button, SheetSelect } from "@repo/ui/components";
 import { useTranslations } from "next-intl";
 import { webApi } from "@/lib/api";
@@ -24,18 +25,18 @@ export type ScooterSelectItem = Pick<
 const EMPTY_SCOOTERS: ScooterSelectItem[] = [];
 
 const severityStyles = {
-  low: ["text-info", "text-info-foreground"],
-  moderate: ["text-warning", "text-warning-foreground"],
-  high: ["text-warning-hover", "text-warning-foreground"],
-  critical: ["text-destructive", "text-destructive-foreground"],
-  unknown: ["text-muted-foreground", "text-background"],
+  low: "text-info",
+  moderate: "text-warning",
+  high: "text-warning-hover",
+  critical: "text-destructive",
+  unknown: "text-muted-foreground",
 } as const;
 
 /** The same content is used for sheet options and selected scooters. */
 export function ScooterSelectRow({ scooter }: { scooter: ScooterSelectItem }) {
   const t = useTranslations("workspace");
   return (
-    <span className="flex min-w-0 flex-1 items-center gap-3">
+    <span className="flex min-w-0 flex-1 items-center gap-4">
       <ScooterCover scooter={scooter} />
       <span className="flex min-w-0 flex-1 flex-col gap-1">
         <span className="text-base font-semibold">
@@ -48,41 +49,40 @@ export function ScooterSelectRow({ scooter }: { scooter: ScooterSelectItem }) {
           {scooter.brand} {scooter.model}
         </span>
         <span className="flex flex-wrap gap-1">
-          {Object.entries(severityStyles).map(
-            ([severity, [color, foreground]]) => {
-              const count =
-                scooter.problemSeverityCounts?.[
-                  severity as keyof typeof severityStyles
-                ] ?? 0;
-              if (!count) return null;
-              const label = t("problems.severityCount", {
-                severity: t(
-                  `problems.${severity === "unknown" ? "unassessed" : severity}`,
-                ),
-                count,
-              });
-              return (
+          {Object.entries(severityStyles).map(([severity, color]) => {
+            const count =
+              scooter.problemSeverityCounts?.[
+                severity as keyof typeof severityStyles
+              ] ?? 0;
+            if (!count) return null;
+            const label = t("problems.severityCount", {
+              severity: t(
+                `problems.${severity === "unknown" ? "unassessed" : severity}`,
+              ),
+              count,
+            });
+            return (
+              <span
+                key={severity}
+                role="img"
+                aria-label={label}
+                title={label}
+                className="relative flex size-8 shrink-0 items-center justify-center"
+              >
+                <TriangleIcon
+                  aria-hidden="true"
+                  strokeWidth={spacing.px}
+                  className={`absolute inset-0 size-full fill-none ${color}`}
+                />
                 <span
-                  key={severity}
-                  role="img"
-                  aria-label={label}
-                  title={label}
-                  className="relative flex size-8 shrink-0 items-center justify-center"
+                  aria-hidden="true"
+                  className={`relative pt-1 text-xs font-semibold ${color}`}
                 >
-                  <TriangleIcon
-                    aria-hidden="true"
-                    className={`absolute inset-0 size-full fill-current ${color}`}
-                  />
-                  <span
-                    aria-hidden="true"
-                    className={`relative pt-1 text-xs font-semibold ${foreground}`}
-                  >
-                    {count}
-                  </span>
+                  {count}
                 </span>
-              );
-            },
-          )}
+              </span>
+            );
+          })}
           {scooter.problemSeverityCounts &&
           Object.values(scooter.problemSeverityCounts).every(
             (count) => count === 0,
@@ -220,7 +220,6 @@ export function ScooterSelect(props: ScooterSelectProps) {
         }
         {...controlProps}
         triggerVariant="card"
-        optionClassName="h-auto min-h-24 gap-3"
         addAction={
           !selectedScooter
             ? {

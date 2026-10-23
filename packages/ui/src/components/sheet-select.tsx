@@ -296,7 +296,7 @@ function SheetSelect({
                     onClick={clear}
                     aria-current={hasSelection ? undefined : "true"}
                     className={cn(
-                      "flex h-10 w-full items-center justify-between gap-2 rounded px-3 py-2 text-left text-sm outline-none transition-colors duration-fast ease-standard focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:text-disabled-foreground",
+                      "flex w-full items-center justify-between gap-2 rounded-2xl border border-border p-4 text-left text-sm outline-none transition-colors duration-fast ease-standard focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:text-disabled-foreground",
                       hasSelection
                         ? "bg-selectable-row text-muted-foreground hover:bg-accent/50"
                         : "bg-accent font-medium text-accent-foreground",
@@ -329,7 +329,7 @@ function SheetSelect({
                         : undefined
                     }
                     className={cn(
-                      "flex h-10 w-full items-center justify-between gap-2 rounded px-3 py-2 text-left text-sm outline-none transition-colors duration-fast ease-standard focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:text-disabled-foreground",
+                      "flex w-full items-center justify-between gap-2 rounded-2xl border border-border p-4 text-left text-sm outline-none transition-colors duration-fast ease-standard focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:text-disabled-foreground",
                       selectedSet.has(option.value)
                         ? "bg-accent font-medium text-accent-foreground"
                         : "bg-selectable-row text-foreground hover:bg-accent/50",
