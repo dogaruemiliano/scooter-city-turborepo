@@ -1,6 +1,7 @@
 "use client";
 
 import { v1 } from "@repo/api-shared";
+import { spacing } from "@repo/theme";
 import { localeHeaderName } from "@repo/i18n";
 import { Button, Input, Label } from "@repo/ui/components";
 import { useLocale, useTranslations } from "next-intl";
@@ -103,9 +104,15 @@ export function EmailOtpSignInForm({ onChallenge }: EmailOtpSignInFormProps) {
           </p>
         ) : null}
       </div>
-      <Button type="submit" disabled={busy} className="mt-9">
-        {busy ? t("sendingCode") : t("sendCode")}
-      </Button>
+      <div
+        data-slot="email-submit-action"
+        className="shrink-0"
+        style={{ paddingTop: spacing[9] }}
+      >
+        <Button type="submit" disabled={busy} className="w-full">
+          {busy ? t("sendingCode") : t("sendCode")}
+        </Button>
+      </div>
       {error ? (
         <p role="alert" className="text-sm text-destructive">
           {formatAuthError(error.cause, locale)}

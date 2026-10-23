@@ -90,9 +90,10 @@ describe("task detail workflow permissions", () => {
   it("lets the assigned mechanic change the checklist but not choose another assignee", async () => {
     const user = userEvent.setup();
     const changed = renderDetail();
+    expect(screen.getByText("You")).toBeInTheDocument();
     const detail = screen.getByRole("main");
     expect(
-      within(detail).queryByRole("button", { name: "Add assignee" }),
+      within(detail).queryByRole("button", { name: "Manage assignment" }),
     ).toBeNull();
     expect(
       within(detail).queryByRole("combobox", { name: "Assignee" }),
@@ -137,13 +138,23 @@ describe("task detail workflow permissions", () => {
         "problems.assign": ["ALL"],
       };
       renderDetail();
-      await user.click(screen.getByRole("button", { name: "Add assignee" }));
+      await user.click(
+        screen.getByRole("button", { name: "Manage assignment" }),
+      );
       const sheet = await screen.findByRole("dialog", {
-        name: "Add assignee",
+        name: "Manage assignment",
       });
+      expect(sheet).toHaveClass("bg-popover");
+      expect(sheet.querySelector(".bg-background")).toBeNull();
       await user.click(
         await within(sheet).findByRole("button", { name: "Taylor" }),
       );
+      expect(
+        mocks.fetch.mock.calls.some(
+          ([url]) => url === "/v1/problems/problem/assignee",
+        ),
+      ).toBe(false);
+      await user.click(within(sheet).getByRole("button", { name: "Apply" }));
       await waitFor(() =>
         expect(mocks.fetch).toHaveBeenCalledWith(
           "/v1/problems/problem/assignee",
@@ -183,7 +194,7 @@ describe("problem preview", () => {
     ).toHaveAttribute("href", "/en/problems/problem");
     expect(within(detail).queryByRole("checkbox")).toBeNull();
     expect(
-      within(detail).queryByRole("button", { name: "Add assignee" }),
+      within(detail).queryByRole("button", { name: "Manage assignment" }),
     ).toBeNull();
     await userEvent
       .setup()

@@ -352,6 +352,17 @@ describe("SignInMethods", () => {
     expect(screen.getByRole("button", { name: "Verifying..." })).toBeDisabled();
   });
 
+  it("reserves padding between the email field and submit action", () => {
+    renderSignInMethods();
+    const action = screen.getByRole("button", {
+      name: "Continue with email",
+    }).parentElement!;
+    expect(action).toHaveAttribute("data-slot", "email-submit-action");
+    expect(action).toHaveStyle({ paddingTop: "36px" });
+    expect(action).toHaveClass("shrink-0");
+    expect(action).not.toContainElement(screen.getByLabelText("Email"));
+  });
+
   it("completes email OTP sign-in through the shared challenge form", async () => {
     const challenge = createChallenge("00000000-0000-4000-8000-000000000001");
     mocks.apiFetch.mockImplementation(async (route: string) => {
@@ -368,6 +379,12 @@ describe("SignInMethods", () => {
       screen.getByRole("button", { name: "Continue with email" }),
     );
 
+    const titleRow = screen.getByRole("heading", {
+      name: "Enter verification code",
+    }).parentElement!;
+    expect(titleRow).toHaveAttribute("data-slot", "otp-title-row");
+    expect(titleRow).toHaveClass("flex", "items-center");
+    expect(titleRow.querySelector("button")).not.toBeNull();
     expect(screen.queryByLabelText("Email")).not.toBeInTheDocument();
     expect(
       screen.getByRole("heading", { name: "Enter verification code" }),

@@ -24,13 +24,13 @@ import {
   FormActions,
   Input,
   ImageGalleryEditor,
-  PersonRow,
   SegmentedRadioGroup,
   Textarea,
 } from "@repo/ui/components";
 import { MoreVertical } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { PageHeaderActions } from "@/components/PageHeaderActions";
+import { ProblemAssignment } from "./ProblemAssignment";
 import { AssigneeSelect } from "./AssigneeSelect";
 import { memberName } from "../_lib/member-name";
 export { memberName } from "../_lib/member-name";
@@ -486,64 +486,27 @@ export function ProblemWork({
     <div className="flex flex-col gap-8">
       <Feedback error={task.error} success={task.success} />
       {retryAction}
-      <section
-        className="flex flex-col gap-3"
-        aria-label={t("problems.assignee")}
-      >
-        <h3 className="text-sm font-semibold text-muted-foreground">
-          {t("problems.assignee")}
-        </h3>
-        {mayAssign && editable ? (
-          <AssigneeSelect
-            multiple
-            value={assignedIds}
-            disabled={busy}
-            members={[
-              ...(assignees.data?.items ?? []),
-              ...assignedMembers.filter(
-                (member) =>
-                  !assignees.data?.items.some((item) => item.id === member.id),
-              ),
-            ]}
-            onValueChange={(assigneeIds) =>
-              void task.run(() => mutate("/assignee", "PUT", { assigneeIds }))
-            }
-            onClear={() =>
-              void task.run(() =>
-                mutate("/assignee", "PUT", { assigneeIds: [] }),
-              )
-            }
-            clearOptionLabel={t("problems.unassigned")}
-            loading={assignees.loading}
-            error={assignees.error}
-            onRetry={assignees.reload}
-          />
-        ) : assignedMembers.length ? (
-          assignedMembers.map((member) => (
-            <div
-              key={member.id}
-              className="rounded-2xl border border-border bg-card p-4 text-card-foreground"
-            >
-              <PersonRow name={memberName(member)} />
-            </div>
-          ))
-        ) : (
-          <div className="rounded-2xl border border-border bg-card p-4 text-card-foreground">
-            <PersonRow name={t("problems.unassigned")} />
-          </div>
-        )}
-      </section>
-      {problem.status === "open" &&
-      !assignedIds.length &&
-      canAccess(user, "problems.claim", "AVAILABLE") ? (
-        <Button
-          className="self-start"
-          disabled={busy}
-          onClick={() => void task.run(() => mutate("/claim", "POST", {}))}
-        >
-          {t("problems.claim")}
-        </Button>
-      ) : null}
+      <ProblemAssignment
+        problem={problem}
+        userId={user?.id}
+        mayAssign={mayAssign}
+        mayClaim={canAccess(user, "problems.claim", "AVAILABLE")}
+        busy={busy}
+        members={assignees.data?.items ?? []}
+        loading={assignees.loading}
+        error={assignees.error}
+        onRetry={assignees.reload}
+        saveError={task.error}
+        onAssign={async (assigneeIds) => {
+          let saved = false;
+          await task.run(async () => {
+            await mutate("/assignee", "PUT", { assigneeIds });
+            saved = true;
+          });
+          return saved;
+        }}
+        onClaim={() => void task.run(() => mutate("/claim", "POST", {}))}
+      />
       <ProblemSections
         problem={problem}
         editable={editable && can("problems.update")}

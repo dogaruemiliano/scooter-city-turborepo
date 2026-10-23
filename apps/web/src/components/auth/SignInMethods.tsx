@@ -125,24 +125,24 @@ export function SignInMethods({
 
     return (
       <div className="flex flex-col gap-2">
-        <header className="grid grid-cols-[var(--spacing-10)_minmax(0,1fr)_var(--spacing-10)] content-start items-center gap-x-2 gap-y-4">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            aria-label={tOtp("backToMethods")}
-            onClick={handleCancelChallenge}
-            className="shrink-0 rounded-full p-2"
-          >
-            <ArrowLeftIcon />
-          </Button>
-          <h1 className="min-w-0 text-center text-2xl font-semibold">
-            {tOtp("title")}
-          </h1>
-          <span aria-hidden="true" className="size-10" />
-          <p className="col-span-3 text-left text-sm text-muted-foreground">
-            {subtitle}
-          </p>
+        <header className="flex flex-col gap-4">
+          <div data-slot="otp-title-row" className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label={tOtp("backToMethods")}
+              onClick={handleCancelChallenge}
+              className="shrink-0 rounded-full p-2"
+            >
+              <ArrowLeftIcon />
+            </Button>
+            <h1 className="min-w-0 flex-1 text-center text-2xl font-semibold">
+              {tOtp("title")}
+            </h1>
+            <span aria-hidden="true" className="size-10 shrink-0" />
+          </div>
+          <p className="text-left text-sm text-muted-foreground">{subtitle}</p>
         </header>
 
         <OtpChallengeForm
