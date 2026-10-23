@@ -113,7 +113,7 @@ export function SignInMethods({
         ? tOtp.rich("subtitleEmail", {
             email: activeChallenge.email,
             emailRow: (chunks) => (
-              <span className="mt-1 flex flex-wrap items-baseline gap-x-1">
+              <span className="mt-1 flex flex-wrap items-baseline justify-center gap-x-1">
                 {chunks}
               </span>
             ),
@@ -133,16 +133,21 @@ export function SignInMethods({
               size="icon"
               aria-label={tOtp("backToMethods")}
               onClick={handleCancelChallenge}
-              className="shrink-0 rounded-full p-2"
+              className="absolute top-4 left-4 shrink-0 rounded-full p-2 sm:top-6 sm:left-6 md:static"
             >
               <ArrowLeftIcon />
             </Button>
             <h1 className="min-w-0 flex-1 text-center text-2xl font-semibold">
               {tOtp("title")}
             </h1>
-            <span aria-hidden="true" className="size-10 shrink-0" />
+            <span
+              aria-hidden="true"
+              className="hidden size-10 shrink-0 md:block"
+            />
           </div>
-          <p className="text-left text-sm text-muted-foreground">{subtitle}</p>
+          <p className="text-center text-sm text-muted-foreground">
+            {subtitle}
+          </p>
         </header>
 
         <OtpChallengeForm

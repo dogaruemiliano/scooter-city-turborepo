@@ -81,8 +81,8 @@
   --info-hover: oklch(0.488 0.243 264.376);
   --info-active: oklch(0.424 0.199 265.638);
   --info-subtle: oklch(0.97 0.014 254.604);
-  --disabled: oklch(0.963 0.002 197.1);
-  --disabled-foreground: oklch(0.723 0.014 214.4);
+  --disabled: oklch(0.872 0.007 219.6);
+  --disabled-foreground: oklch(0.45 0.017 213.2);
   --link: oklch(0.504949 0.082386 210.6267);
   --link-hover: oklch(0.431477 0.070178 212.8220);
   --link-active: oklch(0.368920 0.057156 214.4168);
