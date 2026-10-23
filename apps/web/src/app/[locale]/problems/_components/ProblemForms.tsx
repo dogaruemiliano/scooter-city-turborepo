@@ -403,8 +403,10 @@ export function ProblemWork({
   reload,
   onBusyChange,
   compact = false,
+  actionsTarget,
 }: {
   compact?: boolean;
+  actionsTarget?: HTMLElement | null;
   problem: v1.problems.Problem;
   reload: (problem?: v1.problems.Problem) => void;
   onBusyChange?: (busy: boolean) => void;
@@ -534,11 +536,27 @@ export function ProblemWork({
         }}
         onSave={(photos) => mutate("", "PATCH", { photos })}
       />
-      {!compact || (editable && can("problems.resolve")) ? (
+      {problem.status === "open" && can("problems.update") ? (
+        <Button
+          className={
+            compact
+              ? "sticky bottom-4 z-sticky order-last w-full shadow-primary"
+              : "self-start"
+          }
+          disabled={busy || !assignedIds.length}
+          onClick={() =>
+            void task.run(() => mutate("", "PATCH", { startWork: true }))
+          }
+        >
+          {t("problems.start")}
+        </Button>
+      ) : null}
+      {!compact ||
+      (problem.status === "in_progress" && can("problems.resolve")) ? (
         <ProblemWorkPanel
           compact={compact}
           title={t("problems.completeTask")}
-          primary={editable && can("problems.resolve")}
+          primary={problem.status === "in_progress" && can("problems.resolve")}
         >
           {compact ? (
             <>
@@ -547,7 +565,7 @@ export function ProblemWork({
             </>
           ) : null}
           {holdControls}
-          {editable && can("problems.resolve") ? (
+          {problem.status === "in_progress" && can("problems.resolve") ? (
             <form
               className="flex flex-col gap-3"
               onSubmit={(event) => {
@@ -590,12 +608,27 @@ export function ProblemWork({
           ) : null}
         </ProblemWorkPanel>
       ) : null}
-      <ProblemWorkPanel compact={compact} title={t("problems.moreActions")}>
+      <ProblemWorkPanel
+        compact={compact}
+        actionsTarget={actionsTarget}
+        title={t("problems.moreActions")}
+      >
         {compact ? (
           <>
             <Feedback error={task.error} />
             {retryAction}
           </>
+        ) : null}
+        {problem.status === "in_progress" && can("problems.update") ? (
+          <Button
+            variant="outline"
+            disabled={busy}
+            onClick={() =>
+              void task.run(() => mutate("", "PATCH", { pauseWork: true }))
+            }
+          >
+            {t("problems.pause")}
+          </Button>
         ) : null}
         {compact ? holdControls : null}
         {problem.resolutionNotes ? (
@@ -611,18 +644,6 @@ export function ProblemWork({
         {editable && can("problems.update") ? (
           <>
             <div className="flex flex-wrap gap-3">
-              {problem.status === "open" ? (
-                <Button
-                  disabled={busy || !assignedIds.length}
-                  onClick={() =>
-                    void task.run(() =>
-                      mutate("", "PATCH", { startWork: true }),
-                    )
-                  }
-                >
-                  {t("problems.start")}
-                </Button>
-              ) : null}
               <Button
                 variant="outline"
                 disabled={busy}
@@ -821,11 +842,13 @@ export function ProblemWork({
 }
 
 function ProblemWorkPanel({
+  actionsTarget,
   compact,
   title,
   primary = false,
   children,
 }: {
+  actionsTarget?: HTMLElement | null;
   compact: boolean;
   title: string;
   primary?: boolean;
@@ -844,7 +867,7 @@ function ProblemWorkPanel({
           {title}
         </BottomSheetTrigger>
       ) : (
-        <PageHeaderActions>
+        <PageHeaderActions desktopTarget={actionsTarget}>
           <BottomSheetTrigger
             render={<Button variant="outline" size="icon" aria-label={title} />}
           >

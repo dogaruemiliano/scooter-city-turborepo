@@ -80,7 +80,21 @@ export function ProblemAssignment({
       aria-label={t("problems.assignment")}
       className="flex flex-col gap-4"
     >
-      <h3 className="text-base font-semibold">{t("problems.assignment")}</h3>
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-base font-semibold">{t("problems.assignment")}</h3>
+        {assigned.length > 0 && mayAssign && editable ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            disabled={busy}
+            aria-label={t("problems.manageAssignment")}
+            onClick={openAssignment}
+          >
+            <PencilIcon aria-hidden="true" className="size-5" />
+          </Button>
+        ) : null}
+      </div>
       {assigned.length ? (
         <div className="flex flex-col gap-2">
           {assigned.map((member) => (
@@ -94,20 +108,6 @@ export function ProblemAssignment({
                     <span className="text-sm font-medium text-muted-foreground">
                       {t("problems.you")}
                     </span>
-                  ) : null}
-                  {mayAssign && editable ? (
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="icon"
-                      disabled={busy}
-                      aria-label={t("problems.editAssignee", {
-                        name: memberName(member),
-                      })}
-                      onClick={openAssignment}
-                    >
-                      <PencilIcon aria-hidden="true" className="size-5" />
-                    </Button>
                   ) : null}
                 </span>
               }

@@ -214,21 +214,26 @@ export const createProblemInputSchema = z
       message: "Use assigneeIds or assigneeId, not both",
     },
   );
-export const updateProblemInputSchema = revisionInputSchema.extend({
-  checklist: problemChecklistSchema.optional(),
-  sections: problemSectionsSchema.optional(),
-  buyList: problemChecklistSchema.optional(),
-  location: problemLocationSchema.nullable().optional(),
-  photos: z
-    .array(problemPhotoDraftSchema)
-    .max(PROBLEM_PHOTO_MAX_FILES)
-    .optional(),
-  workNotes: z.string().trim().max(10000).optional(),
-  startWork: z.boolean().optional(),
-  title: z.string().trim().min(1).max(160).optional(),
-  description: z.string().trim().max(4000).optional(),
-  difficulty: problemDifficultySchema.optional(),
-});
+export const updateProblemInputSchema = revisionInputSchema
+  .extend({
+    checklist: problemChecklistSchema.optional(),
+    sections: problemSectionsSchema.optional(),
+    buyList: problemChecklistSchema.optional(),
+    location: problemLocationSchema.nullable().optional(),
+    photos: z
+      .array(problemPhotoDraftSchema)
+      .max(PROBLEM_PHOTO_MAX_FILES)
+      .optional(),
+    workNotes: z.string().trim().max(10000).optional(),
+    startWork: z.boolean().optional(),
+    pauseWork: z.boolean().optional(),
+    title: z.string().trim().min(1).max(160).optional(),
+    description: z.string().trim().max(4000).optional(),
+    difficulty: problemDifficultySchema.optional(),
+  })
+  .refine((input) => !(input.startWork && input.pauseWork), {
+    message: "Cannot start and pause work together",
+  });
 export const resolveProblemInputSchema = revisionInputSchema.extend({
   resolutionNotes: z.string().trim().min(1).max(4000),
   clearMaintenanceHold: z.boolean().optional(),

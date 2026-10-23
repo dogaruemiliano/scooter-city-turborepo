@@ -51,6 +51,24 @@ Use shared components from `@repo/ui` and shared form components for consistent 
 
 <!-- END:shared-ui-consistency-rule -->
 
+<!-- BEGIN:shared-components-first-rule -->
+
+# Reuse shared components and form behavior before creating alternatives
+
+Before implementing or changing an interface, inspect the relevant shared package, its Storybook stories, and existing callers. Use `@repo/ui` for web, `@repo/ui-native` for native, and the existing shared form controls. Consistent behavior and appearance belong in shared defaults, not in page-specific copies.
+
+- Use the existing shared `SaveButton` as the canonical visible form submission control on the web, including create, update, authentication, and final confirmation actions. Extend that component when a required state or purposeful variant is missing; do not introduce a competing `SubmitButton` or copy its spinner, success icon, or state-label logic into pages. Existing forms are migrated incrementally; new or substantially changed forms must follow this rule.
+- Keep the button controlled by the form's actual submission state. Form/request logic owns validation, requests, and errors; the UI component owns presentation and accessibility. Disable duplicate submission while pending, including submission via Enter. Do not infer completion from a timer or show success before the operation succeeds.
+- Use action-specific, localized labels from `@repo/i18n`. A review or next-step action must not claim that data was saved. Field validation, request failures, and successful completion need distinct feedback; do not label every successful operation "Changes saved."
+- After a failed submission, keep the original action label (for example, "Save changes"), preserve the entered values, and explain the failure beside the form. Do not rename the button "Try again" or turn it destructive. Enable another submission only when the action is still permitted and its prerequisites are satisfied; conflicts, expired authentication, and uncertain request outcomes can require recovery first.
+- Use shared `FormActions` for grouped form actions, with the existing bottom-sheet footer where appropriate. Placement can vary by surface; ordinary buttons must keep shared typography, sizing, colors, focus, and state styling. Non-submit controls such as navigation, cancel, and menu triggers use shared `Button`.
+- If a shared component is insufficient, first add a small, intentional capability to it and document the capability in Storybook. Keep feature-specific business logic in its feature; extract shared behavior when its meaning and lifecycle are actually shared. Do not create a generic component with page-name switches or unrelated responsibilities.
+- Preserve meaningful warning/destructive variants, review steps, keyboard behavior, localization, responsive layouts, and accessibility. Never use a destructive action style merely to indicate that a request failed.
+- Add or update stories for new shared states and variants, and focused behavior tests when changing interactions. When migrating a form, remove superseded local state-display code instead of leaving two implementations in use.
+- All visual and motion values must continue to come from the shared theme tokens. Do not bypass this rule with local CSS overrides, descendant selectors, or duplicated markup.
+
+<!-- END:shared-components-first-rule -->
+
 <!-- BEGIN:bottom-sheet-surface-rule -->
 
 # Bottom sheets must be visually distinct from the page

@@ -10,6 +10,7 @@ export const motion = {
   },
   duration: {
     instant: 0,
+    toastDismiss: 5000,
     removalWindup: 80,
     fast: 150,
     normal: 250,

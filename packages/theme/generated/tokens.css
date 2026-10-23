@@ -474,6 +474,8 @@
 
   --duration-instant: 0ms;
   --transition-duration-instant: 0ms;
+  --duration-toast-dismiss: 5000ms;
+  --transition-duration-toast-dismiss: 5000ms;
   --duration-removal-windup: 80ms;
   --transition-duration-removal-windup: 80ms;
   --duration-fast: 150ms;

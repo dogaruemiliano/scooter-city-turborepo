@@ -1,4 +1,6 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
+import { useState } from "react";
+import { PageHeaderActionsContext } from "@/components/PageHeaderActions";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { messages } from "@repo/i18n";
@@ -93,7 +95,7 @@ describe("task detail workflow permissions", () => {
     expect(screen.getByText("You")).toBeInTheDocument();
     const detail = screen.getByRole("main");
     expect(
-      within(detail).queryByRole("button", { name: /Edit .* assignment/ }),
+      within(detail).queryByRole("button", { name: "Manage assignment" }),
     ).toBeNull();
     expect(
       within(detail).queryByRole("combobox", { name: "Assignee" }),
@@ -139,7 +141,7 @@ describe("task detail workflow permissions", () => {
       };
       renderDetail();
       await user.click(
-        screen.getByRole("button", { name: "Edit Alex’s assignment" }),
+        screen.getByRole("button", { name: "Manage assignment" }),
       );
       const sheet = await screen.findByRole("dialog", {
         name: "Manage assignment",
@@ -194,7 +196,7 @@ describe("problem preview", () => {
     ).toHaveAttribute("href", "/en/problems/problem");
     expect(within(detail).queryByRole("checkbox")).toBeNull();
     expect(
-      within(detail).queryByRole("button", { name: /Edit .* assignment/ }),
+      within(detail).queryByRole("button", { name: "Manage assignment" }),
     ).toBeNull();
     await userEvent
       .setup()
@@ -204,6 +206,108 @@ describe("problem preview", () => {
 });
 
 describe("problem details page", () => {
+  it.each(["open", "in_progress"] as const)(
+    "uses the primary action for %s work and keeps pause in more actions",
+    async (status) => {
+      mocks.user.effectiveScopes = {
+        "problems.read": ["ALL"],
+        "problems.update": ["ALL"],
+        "problems.resolve": ["ALL"],
+      };
+      mocks.fetch.mockImplementation(async (url: string) =>
+        url.includes("/activity")
+          ? { items: [], total: 0, page: 1, pageSize: 25 }
+          : { ...problem, status },
+      );
+      render(
+        <NextIntlClientProvider locale="en" messages={messages.en}>
+          <ProblemDetailScreen id="problem" />
+        </NextIntlClientProvider>,
+      );
+      await screen.findByRole("heading", { name: problem.title });
+      if (status === "open") {
+        await userEvent
+          .setup()
+          .click(screen.getByRole("button", { name: "Start work" }));
+        await waitFor(() =>
+          expect(mocks.fetch).toHaveBeenCalledWith(
+            "/v1/problems/problem",
+            expect.anything(),
+            { method: "PATCH", json: { revision: 3, startWork: true } },
+          ),
+        );
+        expect(
+          screen.queryByRole("button", { name: "Complete task" }),
+        ).toBeNull();
+      } else {
+        expect(
+          screen.getByRole("button", { name: /Complete/ }),
+        ).toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "Start work" })).toBeNull();
+        expect(screen.queryByRole("button", { name: "Pause work" })).toBeNull();
+        await userEvent
+          .setup()
+          .click(
+            screen.getByRole("button", { name: "More actions and activity" }),
+          );
+        await userEvent
+          .setup()
+          .click(await screen.findByRole("button", { name: "Pause work" }));
+        await waitFor(() =>
+          expect(mocks.fetch).toHaveBeenCalledWith(
+            "/v1/problems/problem",
+            expect.anything(),
+            { method: "PATCH", json: { revision: 3, pauseWork: true } },
+          ),
+        );
+      }
+    },
+  );
+
+  it.each([false, true])(
+    "places more actions above priority on desktop and in the mobile header (mobile=%s)",
+    async (isMobile) => {
+      function Page() {
+        const [target, setTarget] = useState<HTMLElement | null>(null);
+        return (
+          <PageHeaderActionsContext.Provider value={{ isMobile, target }}>
+            <header ref={setTarget} />
+            <ProblemDetailScreen id="problem" />
+          </PageHeaderActionsContext.Provider>
+        );
+      }
+      render(
+        <NextIntlClientProvider locale="en" messages={messages.en}>
+          <Page />
+        </NextIntlClientProvider>,
+      );
+      const trigger = await screen.findByRole("button", {
+        name: "More actions and activity",
+      });
+      const content = screen.getByRole("main");
+      const actions = content.querySelector('[data-slot="problem-actions"]')!;
+      await waitFor(() =>
+        expect(
+          (isMobile ? screen.getByRole("banner") : actions).contains(trigger),
+        ).toBe(true),
+      );
+      expect(
+        screen.getAllByRole("button", { name: "More actions and activity" }),
+      ).toHaveLength(1);
+      if (!isMobile) {
+        expect(actions).toHaveClass("justify-end", "md:flex");
+        expect(actions.nextElementSibling?.tagName).toBe("DL");
+        expect(actions.nextElementSibling).toHaveTextContent("Priority");
+      } else expect(actions).toBeEmptyDOMElement();
+      await userEvent.setup().click(trigger);
+      const sheet = await screen.findByRole("dialog", {
+        name: "More actions and activity",
+      });
+      expect(sheet).toHaveClass("bg-popover");
+      expect(sheet.querySelector(".bg-background")).toBeNull();
+    },
+  );
+
   it("loads direct links and keeps checklist edits on the page", async () => {
     mocks.fetch.mockImplementation(
       async (

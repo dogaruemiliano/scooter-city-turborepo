@@ -659,6 +659,10 @@ export class ProblemsService {
           const photos = await this.photos.prepare(userId, input.photos);
           await this.photos.attach(tx, id, userId, photos);
         }
+        if (input.pauseWork && row.status !== "in_progress")
+          throw new ConflictException("Only work in progress can be paused");
+        if (input.startWork && row.status !== "open")
+          throw new ConflictException("Only open problems can be started");
         if (input.startWork && !v1.problems.problemAssignees(row).length)
           throw new ConflictException(
             "Assign the problem before starting work",
@@ -683,6 +687,7 @@ export class ProblemsService {
             ? { workNotes: input.workNotes }
             : {}),
           ...(input.startWork ? { status: "in_progress" } : {}),
+          ...(input.pauseWork ? { status: "open" } : {}),
         };
       },
     );

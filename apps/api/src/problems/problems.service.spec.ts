@@ -354,6 +354,28 @@ describe("ProblemsService authorization and write conflicts", () => {
     );
   });
 
+  it("pauses work without overwriting assignment or saved progress", async () => {
+    db.scooterProblem.findFirst.mockResolvedValue({
+      ...row,
+      status: "in_progress",
+    });
+    await service.update("mechanic", "problem", {
+      revision: 1,
+      pauseWork: true,
+    });
+    expect(db.scooterProblem.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { status: "open", revision: { increment: 1 } },
+      }),
+    );
+    expect(audit.recordRequired).toHaveBeenCalled();
+  });
+  it("rejects pausing a problem that has not started", async () => {
+    await expect(
+      service.update("mechanic", "problem", { revision: 1, pauseWork: true }),
+    ).rejects.toThrow("Only work in progress can be paused");
+    expect(db.scooterProblem.updateMany).not.toHaveBeenCalled();
+  });
   it("saves and audits checklist changes for the assigned mechanic", async () => {
     const checklist = [
       { id: "pads", text: "Install brake pads", completed: true },

@@ -65,3 +65,5 @@ export * from "./image-gallery";
 export * from "./image-gallery-editor";
 
 export * from "./user-card";
+
+export * from "./toast";

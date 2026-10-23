@@ -329,7 +329,7 @@ describe("problem release forms", () => {
     renderForm(<ProblemWork problem={problem} reload={vi.fn()} />);
     await userEvent
       .setup()
-      .click(screen.getByRole("button", { name: "Edit Alex’s assignment" }));
+      .click(screen.getByRole("button", { name: "Manage assignment" }));
     const sheet = await screen.findByRole("dialog", {
       name: "Manage assignment",
     });
@@ -344,8 +344,7 @@ describe("problem release forms", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows each assigned user in the shared create-page row with their own edit action", async () => {
-    const user = userEvent.setup();
+  it("keeps a single assignment edit action beside the section title, outside the user rows", async () => {
     renderForm(
       <ProblemWork
         problem={{
@@ -359,35 +358,33 @@ describe("problem release forms", () => {
       />,
     );
     const assignment = screen.getByRole("region", { name: "Assignment" });
-    expect(
-      assignment.querySelectorAll('[data-slot="assignee-user-row"]'),
-    ).toHaveLength(2);
-    expect(
-      within(assignment).queryByRole("button", { name: "Manage assignment" }),
-    ).not.toBeInTheDocument();
-    for (const name of ["Alex", "Taylor"]) {
-      const edit = within(assignment).getByRole("button", {
-        name: `Edit ${name}’s assignment`,
-      });
-      const row = edit.closest('[data-slot="assignee-user-row"]');
+    const rows = assignment.querySelectorAll('[data-slot="assignee-user-row"]');
+    expect(rows).toHaveLength(2);
+    for (const row of rows) {
       expect(row).toHaveClass("rounded-2xl", "border", "bg-card", "p-4");
-      expect(within(row as HTMLElement).getByText(name)).toBeInTheDocument();
-      expect(edit.querySelector("svg")).toHaveClass("lucide-pencil");
-      await user.click(edit);
-      const sheet = await screen.findByRole("dialog", {
-        name: "Manage assignment",
-      });
-      expect(
-        within(sheet).getByRole("button", { name: "Alex" }),
-      ).toHaveAttribute("aria-pressed", "true");
-      expect(
-        within(sheet).getByRole("button", { name: "Taylor" }),
-      ).toHaveAttribute("aria-pressed", "true");
-      await user.click(within(sheet).getByRole("button", { name: "Cancel" }));
-      await waitFor(() =>
-        expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
-      );
+      expect(within(row as HTMLElement).queryByRole("button")).toBeNull();
     }
+    const edit = within(assignment).getByRole("button", {
+      name: "Manage assignment",
+    });
+    expect(edit.parentElement).toHaveClass(
+      "flex",
+      "items-center",
+      "justify-between",
+    );
+    expect(edit.parentElement).toContainElement(
+      within(assignment).getByRole("heading", { name: "Assignment" }),
+    );
+    expect(edit.querySelector("svg")).toHaveClass("lucide-pencil");
+    await userEvent.setup().click(edit);
+    const sheet = await screen.findByRole("dialog", {
+      name: "Manage assignment",
+    });
+    for (const name of ["Alex", "Taylor"])
+      expect(within(sheet).getByRole("button", { name })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
   });
 
   it.each([
@@ -427,7 +424,7 @@ describe("problem release forms", () => {
       />,
     );
     const edit = screen.queryByRole("button", {
-      name: "Edit Alex’s assignment",
+      name: "Manage assignment",
     });
     if (busy) expect(edit).toBeDisabled();
     else expect(edit).not.toBeInTheDocument();
@@ -438,9 +435,7 @@ describe("problem release forms", () => {
     const user = userEvent.setup();
     const reload = vi.fn();
     renderForm(<ProblemWork problem={problem} reload={reload} />);
-    await user.click(
-      screen.getByRole("button", { name: "Edit Alex’s assignment" }),
-    );
+    await user.click(screen.getByRole("button", { name: "Manage assignment" }));
     const sheet = await screen.findByRole("dialog", {
       name: "Manage assignment",
     });

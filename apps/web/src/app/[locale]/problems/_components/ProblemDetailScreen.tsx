@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
 import { v1 } from "@repo/api-shared";
@@ -44,6 +44,9 @@ export function ProblemDetailScreen({ id }: { id: string }) {
       ),
     [id],
   );
+  const [actionsTarget, setActionsTarget] = useState<HTMLDivElement | null>(
+    null,
+  );
   const remote = useRemote(load);
   const problem = remote.data;
   return (
@@ -66,34 +69,41 @@ export function ProblemDetailScreen({ id }: { id: string }) {
       {problem ? (
         <div className="mx-auto flex min-w-0 w-full max-w-(--container-form-columns) flex-col gap-8">
           <PageTitleOverride title={problem.title} />
-          <dl className="grid grid-cols-2 gap-3">
-            {[
-              {
-                label: t("status"),
-                value: t(`problems.${problem.status}`),
-                color: statusColors[problem.status],
-              },
-              {
-                label: t("problems.priority"),
-                value: t(`problems.${problem.priority}`),
-                color: priorityColors[problem.priority],
-              },
-            ].map(({ label, value, color }) => (
-              <div
-                key={label}
-                className="flex min-w-0 flex-col gap-1 first:items-start last:items-end"
-              >
-                <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  {label}
-                </dt>
-                <dd
-                  className={`text-sm font-bold uppercase wrap-anywhere ${color}`}
+          <div className="flex flex-col gap-3">
+            <div
+              ref={setActionsTarget}
+              data-slot="problem-actions"
+              className="hidden justify-end md:flex"
+            />
+            <dl className="grid grid-cols-2 gap-3">
+              {[
+                {
+                  label: t("status"),
+                  value: t(`problems.${problem.status}`),
+                  color: statusColors[problem.status],
+                },
+                {
+                  label: t("problems.priority"),
+                  value: t(`problems.${problem.priority}`),
+                  color: priorityColors[problem.priority],
+                },
+              ].map(({ label, value, color }) => (
+                <div
+                  key={label}
+                  className="flex min-w-0 flex-col gap-1 first:items-start last:items-end"
                 >
-                  {value}
-                </dd>
-              </div>
-            ))}
-          </dl>
+                  <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    {label}
+                  </dt>
+                  <dd
+                    className={`text-sm font-bold uppercase wrap-anywhere ${color}`}
+                  >
+                    {value}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </div>
           {problem.blocksUsage &&
           !problem.holdClearedAt &&
           problem.status !== "resolved" ? (
@@ -134,6 +144,7 @@ export function ProblemDetailScreen({ id }: { id: string }) {
             </span>
           </Link>
           <ProblemWork
+            actionsTarget={actionsTarget}
             compact
             key={problem.id}
             problem={problem}

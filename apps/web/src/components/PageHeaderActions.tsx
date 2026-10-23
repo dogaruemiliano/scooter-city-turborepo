@@ -11,11 +11,17 @@ export type PageHeaderActionsContextValue = {
 export const PageHeaderActionsContext =
   createContext<PageHeaderActionsContextValue | null>(null);
 
-export function PageHeaderActions({ children }: { children: ReactNode }) {
+export function PageHeaderActions({
+  children,
+  desktopTarget,
+}: {
+  children: ReactNode;
+  desktopTarget?: HTMLElement | null;
+}) {
   const context = useContext(PageHeaderActionsContext);
 
   if (!context?.isMobile) {
-    return children;
+    return desktopTarget ? createPortal(children, desktopTarget) : children;
   }
 
   return context.target ? createPortal(children, context.target) : null;

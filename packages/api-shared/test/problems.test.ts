@@ -273,3 +273,23 @@ test("difficulty has three levels and historical severity remains readable witho
     { difficulty: "easy" },
   );
 });
+
+test("work transitions accept start or pause and reject contradictory actions", () => {
+  for (const transition of [{ startWork: true }, { pauseWork: true }]) {
+    assert.equal(
+      v1.problems.updateProblemInputSchema.safeParse({
+        revision: 1,
+        ...transition,
+      }).success,
+      true,
+    );
+  }
+  assert.equal(
+    v1.problems.updateProblemInputSchema.safeParse({
+      revision: 1,
+      startWork: true,
+      pauseWork: true,
+    }).success,
+    false,
+  );
+});
