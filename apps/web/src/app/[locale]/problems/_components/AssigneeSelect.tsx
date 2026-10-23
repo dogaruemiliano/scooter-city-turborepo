@@ -9,12 +9,11 @@ import {
   type ReactNode,
 } from "react";
 import { motion } from "@repo/theme";
-import { Button, PersonRow, SheetSelect } from "@repo/ui/components";
+import { Button, SheetSelect } from "@repo/ui/components";
 import { useTranslations } from "next-intl";
 import { Feedback } from "@/components/WorkspaceForm";
-import { useSession } from "@/components/auth/SessionProvider";
 import { memberName } from "../_lib/member-name";
-import { roleColors } from "../../roles/_lib/role-colors";
+import { AssigneeUserCard } from "./AssigneeUserCard";
 
 function AssigneePresence({
   id,
@@ -103,34 +102,6 @@ type AssigneeSelectProps = {
 /** Shared assignee cards for problem creation and multi-select filters. */
 export function AssigneeSelect(props: AssigneeSelectProps) {
   const t = useTranslations("workspace");
-  const { user } = useSession();
-  const roleDescription = (id: string) => {
-    const member = props.members.find((member) => member.id === id);
-    const designation = id === user?.id ? "superAdmin" : "admin";
-    const roles = member?.isSuperAdmin
-      ? [
-          {
-            label: t(`access.member.roleNames.${designation}`),
-            slug: designation,
-          },
-        ]
-      : (member?.roles ?? []).map((role) => ({
-          label: role,
-          slug: role.trim().toLowerCase(),
-        }));
-    return roles.length ? (
-      <span className="flex flex-wrap gap-x-2 gap-y-1">
-        {roles.map((role) => (
-          <span
-            key={role.slug}
-            className={`font-medium ${(roleColors[role.slug] ?? roleColors.none).title}`}
-          >
-            {role.label}
-          </span>
-        ))}
-      </span>
-    ) : undefined;
-  };
   const selected = props.multiple
     ? props.value
     : props.value
@@ -195,7 +166,8 @@ export function AssigneeSelect(props: AssigneeSelectProps) {
             onExited={finishExit}
           >
             <div className="flex items-center rounded-2xl border border-border bg-card p-4 text-card-foreground">
-              <PersonRow
+              <AssigneeUserCard
+                member={props.members.find((member) => member.id === id)}
                 name={label}
                 action={
                   <Button
@@ -263,9 +235,10 @@ export function AssigneeSelect(props: AssigneeSelectProps) {
         optionClassName="h-auto min-h-20 rounded-2xl border border-border p-4"
         options={options}
         renderOption={(option) => (
-          <PersonRow
+          <AssigneeUserCard
+            showEmail={false}
+            member={props.members.find((member) => member.id === option.value)}
             name={option.label}
-            description={roleDescription(option.value)}
           />
         )}
       />

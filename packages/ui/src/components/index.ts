@@ -63,3 +63,5 @@ export * from "./file-drop-overlay";
 export * from "./person-row";
 export * from "./image-gallery";
 export * from "./image-gallery-editor";
+
+export * from "./user-card";

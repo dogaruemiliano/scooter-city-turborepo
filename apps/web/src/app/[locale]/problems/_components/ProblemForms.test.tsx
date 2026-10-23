@@ -154,6 +154,39 @@ describe("problem release forms", () => {
     );
   });
 
+  it("shows name and role without email in the assignee selection sheet", async () => {
+    renderForm(
+      <AssigneeSelect
+        value=""
+        onValueChange={vi.fn()}
+        members={[
+          {
+            id: "mechanic",
+            email: "alex@example.com",
+            firstName: "Alex",
+            lastName: "Smith",
+            roles: ["Mechanic"],
+          },
+        ]}
+      />,
+    );
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "Add assignee" }));
+    const sheet = await screen.findByRole("dialog", { name: "Add assignee" });
+    const option = within(sheet).getByRole("button", { name: "Alex Smith" });
+    expect(
+      within(option).queryByText("alex@example.com"),
+    ).not.toBeInTheDocument();
+    const name = within(option).getByText("Alex Smith");
+    const role = within(option).getByText("Mechanic");
+    expect(name.parentElement).toHaveClass("items-start", "text-left");
+    expect(
+      name.compareDocumentPosition(role) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(role).toHaveClass("text-warning-text");
+  });
+
   it.each([
     ["member", "Super Admin", "text-personal"],
     ["another-admin", "Admin", "text-info"],
@@ -295,8 +328,10 @@ describe("problem release forms", () => {
     renderForm(<ProblemWork problem={problem} reload={vi.fn()} />);
     await userEvent
       .setup()
-      .click(screen.getByRole("button", { name: "Add assignee" }));
-    const sheet = await screen.findByRole("dialog", { name: "Add assignee" });
+      .click(screen.getByRole("button", { name: "Manage assignment" }));
+    const sheet = await screen.findByRole("dialog", {
+      name: "Manage assignment",
+    });
     expect(
       await within(sheet).findByRole("button", {
         name: "mechanic@example.com",
@@ -312,13 +347,14 @@ describe("problem release forms", () => {
     const user = userEvent.setup();
     const reload = vi.fn();
     renderForm(<ProblemWork problem={problem} reload={reload} />);
-    await user.click(screen.getByRole("button", { name: "Add assignee" }));
+    await user.click(screen.getByRole("button", { name: "Manage assignment" }));
     const sheet = await screen.findByRole("dialog", {
-      name: "Add assignee",
+      name: "Manage assignment",
     });
     await user.click(
       await within(sheet).findByRole("button", { name: "Taylor" }),
     );
+    await user.click(within(sheet).getByRole("button", { name: "Apply" }));
     await waitFor(() =>
       expect(mocks.fetch).toHaveBeenCalledWith(
         "/v1/problems/report/assignee",

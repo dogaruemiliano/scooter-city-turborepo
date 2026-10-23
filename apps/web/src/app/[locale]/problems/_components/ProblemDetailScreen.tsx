@@ -65,7 +65,7 @@ export function ProblemDetailScreen({ id }: { id: string }) {
         </p>
       ) : null}
       {problem ? (
-        <div className="flex min-w-0 w-full max-w-(--container-form-columns) flex-col gap-8">
+        <div className="mx-auto flex min-w-0 w-full max-w-(--container-form-columns) flex-col gap-8">
           <PageTitleOverride title={problem.title} />
           <dl className="grid grid-cols-2 gap-3">
             {[

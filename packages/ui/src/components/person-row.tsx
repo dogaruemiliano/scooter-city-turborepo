@@ -5,11 +5,13 @@ import { Avatar, AvatarFallback, AvatarImage } from "./avatar";
 export function PersonRow({
   name,
   description,
+  email,
   avatarUrl,
   action,
 }: {
   name: string;
   description?: ReactNode;
+  email?: string;
   avatarUrl?: string;
   action?: ReactNode;
 }) {
@@ -29,11 +31,16 @@ export function PersonRow({
             .join("")}
         </AvatarFallback>
       </Avatar>
-      <span className="flex min-w-0 flex-1 flex-col gap-1">
+      <span className="flex min-w-0 flex-1 flex-col items-start gap-1 text-left">
         <span className="wrap-anywhere text-base font-semibold">{name}</span>
         {description ? (
           <span className="wrap-anywhere text-sm text-muted-foreground">
             {description}
+          </span>
+        ) : null}
+        {email ? (
+          <span className="wrap-anywhere text-sm font-normal text-muted-foreground">
+            {email}
           </span>
         ) : null}
       </span>

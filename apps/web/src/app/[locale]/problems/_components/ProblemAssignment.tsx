@@ -6,7 +6,6 @@ import { v1 } from "@repo/api-shared";
 import {
   Button,
   Input,
-  PersonRow,
   BottomSheet,
   BottomSheetContent,
   BottomSheetHeader,
@@ -16,6 +15,7 @@ import {
 } from "@repo/ui/components";
 import { CheckIcon } from "lucide-react";
 import type { AssigneeOption } from "./AssigneeSelect";
+import { AssigneeUserCard } from "./AssigneeUserCard";
 import { memberName } from "../_lib/member-name";
 
 export function ProblemAssignment({
@@ -78,8 +78,9 @@ export function ProblemAssignment({
       <h3 className="text-base font-semibold">{t("problems.assignment")}</h3>
       {assigned.length ? (
         assigned.map((member) => (
-          <PersonRow
+          <AssigneeUserCard
             key={member.id}
+            member={options.find((option) => option.id === member.id)}
             name={memberName(member)}
             action={
               member.id === userId ? (
@@ -171,7 +172,9 @@ export function ProblemAssignment({
                   )
                 }
               >
-                <PersonRow
+                <AssigneeUserCard
+                  showEmail={false}
+                  member={options.find((option) => option.id === member.id)}
                   name={memberName(member)}
                   action={
                     draft.includes(member.id) ? (

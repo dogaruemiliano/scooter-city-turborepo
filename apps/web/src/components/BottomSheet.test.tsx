@@ -47,7 +47,7 @@ describe("shared bottom-sheet dismissal", () => {
     const sheet = screen.getByRole("dialog", { name: "Frosted sheet" });
     expect(sheet).toHaveClass(
       "bg-popover",
-      "supports-[backdrop-filter:blur(0)]:bg-bottom-sheet-surface",
+      "supports-[backdrop-filter:blur(0)]:bg-popover/70",
       "supports-[backdrop-filter:blur(0)]:backdrop-blur-floating-surface",
     );
     expect(
