@@ -24,8 +24,8 @@ interface LanguageSwitcherProps {
 }
 
 const localeFlags = {
-  ro: "🇷🇴",
-  en: "🇬🇧",
+  ro: "/icons/flag-romania.svg",
+  en: "/icons/flag-uk.svg",
 } as const satisfies Record<SupportedLocale, string>;
 
 export function LanguageSwitcher({ className }: LanguageSwitcherProps) {
@@ -50,9 +50,12 @@ export function LanguageSwitcher({ className }: LanguageSwitcherProps) {
       className={["flex justify-center", className].filter(Boolean).join(" ")}
     >
       <Select value={current.locale} onValueChange={handleLocaleChange}>
-        <SelectTrigger aria-label={t("label")}>
+        <SelectTrigger
+          aria-label={t("label")}
+          className="w-auto border-0 bg-transparent"
+        >
           <SelectValue>
-            <LanguageOptionContent option={current} />
+            <LanguageFlag locale={current.locale} />
           </SelectValue>
         </SelectTrigger>
         <SelectContent>
@@ -76,9 +79,21 @@ type LanguageOption = ReturnType<typeof useLanguageOptions>[number];
 function LanguageOptionContent({ option }: { option: LanguageOption }) {
   return (
     <>
-      <span aria-hidden="true">{localeFlags[option.locale]}</span>
+      <LanguageFlag locale={option.locale} />
       <span>{option.label}</span>
     </>
+  );
+}
+
+function LanguageFlag({ locale }: { locale: SupportedLocale }) {
+  return (
+    // Local SVG flags avoid platform-dependent emoji rendering.
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={localeFlags[locale]}
+      alt=""
+      className="h-4 w-6 shrink-0 rounded-xs object-cover"
+    />
   );
 }
 

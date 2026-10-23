@@ -26,6 +26,14 @@ const definition = <K extends string>(
   descriptionKey: `access.descriptions.${key}`,
 });
 export const permissionCatalog = [
+  definition("users.read"),
+  definition("users.invite", all, ["users.read"]),
+  definition("users.status.update", all, ["users.read"]),
+  definition("users.roles.update", all, ["users.read", "roles.read"]),
+  definition("users.permissions.update", all, ["users.read", "roles.read"]),
+  definition("roles.read"),
+  definition("roles.update", all, ["roles.read"]),
+
   definition("persons.read"),
   definition("persons.create", all, ["persons.read"]),
   definition("persons.update", all, ["persons.read"]),

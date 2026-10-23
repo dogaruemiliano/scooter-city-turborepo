@@ -460,6 +460,8 @@
 
   --duration-instant: 0ms;
   --transition-duration-instant: 0ms;
+  --duration-removal-windup: 80ms;
+  --transition-duration-removal-windup: 80ms;
   --duration-fast: 150ms;
   --transition-duration-fast: 150ms;
   --duration-normal: 250ms;
@@ -595,6 +597,7 @@
 
   --radius-none: 0;
   --radius-sm: max(0px, calc(var(--radius) - 4px));
+  --radius-xs: 0.125rem;
   --radius-md: max(0px, calc(var(--radius) - 2px));
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);

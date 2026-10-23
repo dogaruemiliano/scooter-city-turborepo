@@ -104,6 +104,33 @@ beforeEach(() => {
 });
 
 describe("AppShell", () => {
+  it("keeps the mobile header outside the isolated page scroll area", () => {
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: 390,
+    });
+    const { container } = renderAppShell(undefined, <div>Page body</div>);
+    const shell = container.querySelector("[data-app-shell]");
+    expect(shell).toHaveClass(
+      "fixed",
+      "h-dvh",
+      "overflow-hidden",
+      "md:relative",
+      "md:overflow-visible",
+    );
+    const content = container.querySelector('[data-slot="app-page-scroll"]');
+    expect(content).toHaveClass(
+      "min-h-0",
+      "overflow-y-auto",
+      "overscroll-y-contain",
+      "md:overflow-visible",
+    );
+    const header = screen.getByRole("banner");
+    expect(content).not.toContainElement(header);
+    expect(header.parentElement).toBe(content?.parentElement);
+    expect(header).toHaveClass("shrink-0", "bg-card", "md:sticky");
+  });
+
   it("renders the application navigation and current user menu", async () => {
     renderAppShell();
 
@@ -881,6 +908,29 @@ describe("AppShell", () => {
     expect(
       within(screen.getAllByRole("banner")[1]).getByText("Adaugă scuter"),
     ).toBeInTheDocument();
+  });
+
+  it("allows a page to hide the shared header title", async () => {
+    mocks.pathname = "/users/member";
+    renderAppShell(
+      {
+        id: "admin-1",
+        email: "admin@example.com",
+        roles: [],
+        isSuperAdmin: true,
+        effectiveScopes: staffScopes,
+      },
+      <>
+        <PageTitleOverride title="" />
+        <div>Editor content</div>
+      </>,
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByRole("banner").querySelector("span.truncate"),
+      ).toHaveTextContent(/^$/),
+    );
+    expect(screen.getByText("Editor content")).toBeInTheDocument();
   });
 
   it("renders a dynamic page title override", async () => {

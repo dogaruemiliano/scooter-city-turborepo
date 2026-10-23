@@ -1,6 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { canAccess, canVisit } from "./access";
 describe("current user capabilities", () => {
+  it("exposes delegated administration pages from their independent read grants", () => {
+    const manager = {
+      effectiveScopes: { "users.read": ["ALL"], "roles.read": ["ALL"] },
+    };
+    expect(canVisit(manager, "/users")).toBe(true);
+    expect(canVisit(manager, "/roles")).toBe(true);
+    expect(
+      canVisit({ effectiveScopes: { "users.read": ["ALL"] } }, "/roles"),
+    ).toBe(false);
+  });
+
   it("never uses legacy role names as authority", () => {
     expect(
       canAccess(

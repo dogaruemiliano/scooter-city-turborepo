@@ -51,7 +51,7 @@ export default async function SignInPage({
   const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
 
   return (
-    <main className="relative flex w-full flex-1 items-center justify-center px-4 pt-24 pb-12 sm:px-6 sm:pt-28">
+    <main className="relative flex w-full flex-1 items-start justify-center px-4 pt-24 pb-12 sm:px-6 sm:pt-28">
       <LanguageSwitcher className="absolute top-4 right-4 z-raised sm:top-6 sm:right-6" />
 
       <div className="flex w-full max-w-md flex-col gap-6">

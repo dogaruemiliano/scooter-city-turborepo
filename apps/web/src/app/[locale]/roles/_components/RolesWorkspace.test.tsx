@@ -7,7 +7,17 @@ import type { v1 } from "@repo/api-shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RolesWorkspace } from "./RolesWorkspace";
 
-const mocks = vi.hoisted(() => ({ fetch: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  actor: {
+    id: "super",
+    isSuperAdmin: true,
+    effectiveScopes: {} as Record<string, string[]>,
+  },
+  fetch: vi.fn(),
+}));
+vi.mock("@/components/auth/SessionProvider", () => ({
+  useSession: () => ({ user: mocks.actor }),
+}));
 vi.mock("@/lib/api", () => ({ webApi: { fetch: mocks.fetch } }));
 vi.mock("@/i18n/navigation", () => ({
   Link: (props: ComponentProps<"a">) => <a {...props} />,
@@ -92,6 +102,7 @@ function renderRoles(id?: string) {
   );
 }
 beforeEach(() => {
+  mocks.actor = { id: "super", isSuperAdmin: true, effectiveScopes: {} };
   mocks.fetch.mockReset();
   mocks.fetch.mockImplementation(
     async (path: string, _schema: unknown, options?: { method?: string }) => {
@@ -104,6 +115,40 @@ beforeEach(() => {
 });
 
 describe("fixed role library", () => {
+  it("lets an admin inspect the Admin role but disables its permissions", async () => {
+    mocks.actor = {
+      id: "ordinary-admin",
+      isSuperAdmin: false,
+      effectiveScopes: { "roles.read": ["ALL"], "roles.update": ["ALL"] },
+    };
+    renderRoles("admin");
+    expect(
+      await screen.findByRole("heading", { name: "Admin" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Only Super Admins can change the Admin role."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Read every problem" }),
+    ).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Review changes" })).toBeNull();
+    expect(mocks.fetch.mock.calls.some((call) => call[2]?.method)).toBe(false);
+  });
+
+  it("offers read-only role links to an admin without role-edit authority", async () => {
+    mocks.actor = {
+      id: "ordinary-admin",
+      isSuperAdmin: false,
+      effectiveScopes: { "roles.read": ["ALL"] },
+    };
+    renderRoles();
+    await screen.findByRole("heading", { name: "Admin" });
+    expect(
+      screen.getByRole("link", { name: "View permissions · Admin" }),
+    ).toHaveAttribute("href", "/roles/admin");
+    expect(screen.queryByRole("link", { name: /Edit permissions/ })).toBeNull();
+  });
+
   it("shows the four profiles without create, rename or archive controls", async () => {
     renderRoles();
     expect(
@@ -111,6 +156,10 @@ describe("fixed role library", () => {
     ).toBeInTheDocument();
     expect(screen.getAllByRole("article")).toHaveLength(4);
     expect(screen.getByRole("heading", { name: "Admin" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
+    expect(
+      screen.queryByText(messages.en.workspace.access.member.subtitle),
+    ).toBeNull();
     expect(screen.getByRole("heading", { name: "Client" })).toBeInTheDocument();
     expect(
       screen.getByRole("heading", { name: "Super Admin" }),

@@ -238,6 +238,83 @@ integration("Access domains against PostgreSQL", () => {
     await db.$disconnect();
   }, 30_000);
 
+  it("persists multiple assignees, grants each worker access, and revokes only the removed worker", async () => {
+    const created = await problems.create(
+      admin,
+      v1.problems.createProblemInputSchema.parse({
+        scooterId: scooterIds[0],
+        title: "Shared work",
+        severity: "low",
+        assigneeIds: [mechanicA, mechanicB],
+      }),
+    );
+    expect(created.assignees?.map((member) => member.id).sort()).toEqual(
+      [mechanicA, mechanicB].sort(),
+    );
+    const filtered = await problems.list(admin, {
+      page: 1,
+      pageSize: 100,
+      assigneeIds: [mechanicB],
+    });
+    expect(filtered.items.some((item) => item.id === created.id)).toBe(true);
+    await expect(
+      problems.assign(admin, created.id, {
+        revision: created.revision,
+        assigneeIds: [mechanicA, reporter],
+      }),
+    ).rejects.toThrow(ConflictException);
+    expect((await problems.get(admin, created.id)).revision).toBe(
+      created.revision,
+    );
+    for (const id of [mechanicA, mechanicB]) {
+      expect((await problems.get(id, created.id)).reporter).toBeDefined();
+      const mine = await problems.list(id, {
+        page: 1,
+        pageSize: 100,
+        view: "assigned",
+      });
+      expect(mine.items.some((item) => item.id === created.id)).toBe(true);
+      expect((await problems.scooter(id, scooterIds[0])).id).toBe(
+        scooterIds[0],
+      );
+    }
+    const updated = await problems.update(mechanicB, created.id, {
+      revision: created.revision,
+      checklist: [{ id: "check", text: "Check brakes", completed: true }],
+    });
+    const assigned = await problems.assign(admin, created.id, {
+      revision: updated.revision,
+      assigneeIds: [mechanicB],
+    });
+    await expect(problems.get(mechanicA, created.id)).rejects.toThrow(
+      NotFoundException,
+    );
+    expect(
+      (await problems.get(mechanicB, created.id)).assignees?.map(
+        (member) => member.id,
+      ),
+    ).toEqual([mechanicB]);
+    const activity = await problems.activity(admin, created.id, {
+      page: 1,
+      pageSize: 25,
+    });
+    expect(
+      activity.items.find((entry) => entry.type === "PROBLEM_ASSIGNED")?.before
+        ?.assignees,
+    ).toHaveLength(2);
+    const cleared = await problems.assign(admin, created.id, {
+      revision: assigned.revision,
+      assigneeIds: [],
+    });
+    expect(cleared.assignees).toEqual([]);
+    const claimed = await problems.claim(
+      mechanicA,
+      created.id,
+      cleared.revision,
+    );
+    expect(claimed.assignees?.map((member) => member.id)).toEqual([mechanicA]);
+  });
+
   it("allows exactly one concurrent claim and denies the former assignee after reassignment", async () => {
     const created = await problems.create(
       admin,
@@ -684,6 +761,36 @@ integration("Access domains against PostgreSQL", () => {
         where: { storageKey: unclaimed.storageKey },
       }),
     ).toMatchObject({ claimedAt: null });
+  });
+
+  it("backfills existing assignments into the multiple-assignee relation", async () => {
+    const client = new Client({ connectionString: databaseUrl });
+    await client.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query('CREATE SCHEMA "problem_assignees_migration_test"');
+      await client.query(
+        'SET LOCAL search_path TO "problem_assignees_migration_test"',
+      );
+      await client.query(
+        'CREATE TABLE "User" (id TEXT PRIMARY KEY); CREATE TABLE "ScooterProblem" (id TEXT PRIMARY KEY, "assigneeId" TEXT REFERENCES "User"(id))',
+      );
+      await client.query(
+        `INSERT INTO "User" (id) VALUES ('worker'); INSERT INTO "ScooterProblem" (id, "assigneeId") VALUES ('assigned', 'worker'), ('unassigned', NULL)`,
+      );
+      await client.query(
+        readFileSync(
+          "prisma/migrations/20261023020000_multiple_problem_assignees/migration.sql",
+          "utf8",
+        ),
+      );
+      expect(
+        (await client.query('SELECT * FROM "_ProblemAssignees"')).rows,
+      ).toEqual([{ A: "assigned", B: "worker" }]);
+    } finally {
+      await client.query("ROLLBACK");
+      await client.end();
+    }
   });
 
   it("backfills legacy titles without inventing severity or losing description and resolution", async () => {

@@ -42,7 +42,10 @@ export function ProblemListItem({
 }) {
   const t = useTranslations("workspace.problems");
   const format = useFormatter();
-  const assignee = memberName(problem.assignee);
+  const assignee = v1.problems
+    .problemAssignees(problem)
+    .map(memberName)
+    .join(", ");
   const internalId = v1.scooters.scooterDisplayCode(problem.scooter);
   const brandAndModel = [problem.scooter.brandName, problem.scooter.model]
     .filter(Boolean)

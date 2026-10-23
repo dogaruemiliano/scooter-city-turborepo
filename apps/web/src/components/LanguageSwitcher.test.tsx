@@ -44,8 +44,12 @@ describe("LanguageSwitcher", () => {
 
     expect(screen.getByRole("combobox", { name: "Limbă" })).toBeInTheDocument();
     expect(screen.queryByText("Limbă")).not.toBeInTheDocument();
-    expect(screen.getByRole("combobox", { name: "Limbă" })).toHaveTextContent(
-      "🇷🇴Română",
+    const trigger = screen.getByRole("combobox", { name: "Limbă" });
+    expect(trigger).not.toHaveTextContent("Română");
+    expect(trigger).toHaveClass("border-0", "bg-transparent");
+    expect(trigger.querySelector("img")).toHaveAttribute(
+      "src",
+      "/icons/flag-romania.svg",
     );
   });
 
@@ -57,6 +61,9 @@ describe("LanguageSwitcher", () => {
     renderLanguageSwitcher("en");
 
     await browser.click(screen.getByRole("combobox", { name: "Language" }));
+    expect(
+      await screen.findByRole("option", { name: "English" }),
+    ).toHaveTextContent("English");
     await browser.click(
       await screen.findByRole("option", { name: "Romanian" }),
     );

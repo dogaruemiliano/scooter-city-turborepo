@@ -185,6 +185,7 @@ export function buildCss(): string {
   lines.push("");
   lines.push("  --radius-none: 0;");
   lines.push("  --radius-sm: max(0px, calc(var(--radius) - 4px));");
+  lines.push(`  --radius-xs: ${pxToRem(radius.xs)};`);
   lines.push("  --radius-md: max(0px, calc(var(--radius) - 2px));");
   lines.push("  --radius-lg: var(--radius);");
   lines.push("  --radius-xl: calc(var(--radius) + 4px);");

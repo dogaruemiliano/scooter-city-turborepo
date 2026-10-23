@@ -103,7 +103,7 @@ export function EmailOtpSignInForm({ onChallenge }: EmailOtpSignInFormProps) {
           </p>
         ) : null}
       </div>
-      <Button type="submit" disabled={busy}>
+      <Button type="submit" disabled={busy} className="mt-9">
         {busy ? t("sendingCode") : t("sendCode")}
       </Button>
       {error ? (

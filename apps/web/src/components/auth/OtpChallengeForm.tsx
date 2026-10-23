@@ -3,7 +3,7 @@
 import { v1 } from "@repo/api-shared";
 import { localeHeaderName } from "@repo/i18n";
 import { tokens } from "@repo/theme/runtime";
-import { Button } from "@repo/ui/components";
+import { Button, Label } from "@repo/ui/components";
 import { OTPField } from "@repo/ui/components/otp-field";
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useState, type FormEvent } from "react";
@@ -21,7 +21,6 @@ export interface OtpChallengeFormProps {
   onChallengeChange: (challenge: v1.auth.OtpChallengeMetadata) => void;
   onVerified: () => Promise<void>;
   onRequestAnother: () => Promise<void>;
-  onCancel: () => void;
 }
 
 export function OtpChallengeForm({
@@ -31,11 +30,9 @@ export function OtpChallengeForm({
   onChallengeChange,
   onVerified,
   onRequestAnother,
-  onCancel,
 }: OtpChallengeFormProps) {
   const t = useTranslations("auth.otp");
   const locale = useLocale();
-  const tSharedActions = useTranslations("shared.actions");
   const [code, setCode] = useState("");
   const [error, setError] = useState<AuthErrorState | null>(null);
   const [busy, setBusy] = useState(false);
@@ -144,17 +141,15 @@ export function OtpChallengeForm({
   }
 
   return (
-    <form onSubmit={verifyCode} className="flex flex-col gap-5">
+    <form onSubmit={verifyCode} className="flex flex-col gap-4">
       {description ? (
         <p className="text-center text-sm text-muted-foreground">
           {description}
         </p>
       ) : null}
 
-      <div className="flex flex-col items-center gap-3 text-center">
-        <label htmlFor="otp-code" className="text-sm font-semibold">
-          {t("codeLabel")}
-        </label>
+      <div className="flex flex-col items-center gap-1 text-center">
+        <Label htmlFor="otp-code">{t("codeLabel")}</Label>
         <OTPField
           id="otp-code"
           name="code"
@@ -165,15 +160,18 @@ export function OtpChallengeForm({
           autoFocus
           invalid={Boolean(error)}
           className="justify-center gap-2"
-          inputClassName="size-12 text-xl font-semibold"
+          inputClassName="text-xl font-semibold"
         />
 
         {expired ? (
-          <p role="status" className="text-sm font-medium text-destructive">
+          <p
+            role="status"
+            className="mt-2 text-sm font-medium text-destructive"
+          >
             {t("expired")}
           </p>
         ) : (
-          <p role="status" className="text-sm text-muted-foreground">
+          <p role="status" className="mt-2 text-sm text-muted-foreground">
             {t("expiresIn", { time: formattedExpiration })}
           </p>
         )}
@@ -190,7 +188,6 @@ export function OtpChallengeForm({
           type="button"
           onClick={requestAnotherCode}
           disabled={busy}
-          size="lg"
           className="w-full"
         >
           {busy ? t("requestingAnotherCode") : t("requestAnotherCode")}
@@ -200,7 +197,6 @@ export function OtpChallengeForm({
           <Button
             type="submit"
             disabled={busy || code.length !== 6}
-            size="lg"
             className="w-full"
           >
             {busy ? t("verifying") : t("verify")}
@@ -219,16 +215,6 @@ export function OtpChallengeForm({
           </Button>
         </div>
       )}
-
-      <Button
-        type="button"
-        variant="link"
-        onClick={onCancel}
-        className="self-center"
-        disabled={busy}
-      >
-        {tSharedActions("cancel")}
-      </Button>
     </form>
   );
 }

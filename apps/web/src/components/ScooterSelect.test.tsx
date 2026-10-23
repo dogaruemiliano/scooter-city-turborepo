@@ -69,6 +69,7 @@ it("shows the display code, searches by VIN, selects one scooter and closes", as
   expect(trigger).toHaveTextContent("B123");
   expect(trigger).toHaveTextContent("Edit");
   expect(trigger).toHaveClass("min-h-24");
+  expect(trigger).not.toHaveClass("border-dashed");
   await user.click(trigger);
   const search = screen.getByRole("textbox");
   await user.type(search, "VINYAM");
@@ -90,6 +91,12 @@ it("toggles multiple scooters, preserves the open sheet, and uses the popover su
       screen.getByRole("button", { name: "Remove 007 HON" }),
     ).toBeInTheDocument(),
   );
+  for (const card of document.querySelectorAll(
+    '[data-slot="selected-scooter"]',
+  )) {
+    expect(card).toHaveClass("border", "border-border");
+    expect(card).not.toHaveClass("border-dashed");
+  }
   expect(trigger).toHaveTextContent("Add more scooters");
   expect(trigger).toHaveClass("border-dashed");
   await user.click(trigger);

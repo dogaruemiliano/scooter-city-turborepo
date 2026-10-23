@@ -20,6 +20,7 @@ import {
   searchFuzzyIndex,
   type FuzzySearchKey,
 } from "@repo/ui/lib/fuzzy-search";
+import { pickerCardBorder } from "@repo/ui/lib/picker-styles";
 import { cn } from "@repo/ui/lib/utils";
 import { bottomSheet, breakpoints } from "@repo/theme";
 import { useIsMobile } from "@repo/ui/hooks/use-mobile";
@@ -70,6 +71,8 @@ interface SheetSelectBaseProps {
   emptyMessage?: string;
   closeLabel?: string;
   className?: string;
+  /** Empty card triggers use the shared dashed picker border. */
+  triggerVariant?: "field" | "card";
   optionClassName?: string;
   /** Rich option content; label remains the search and accessible name. */
   renderOption?: (option: SheetSelectOption) => React.ReactNode;
@@ -119,6 +122,7 @@ function SheetSelect({
   optionClassName,
   renderOption,
   triggerContent,
+  triggerVariant = "field",
   addAction,
 }: SheetSelectProps) {
   const mobile = useIsMobile(breakpoints.lg);
@@ -180,6 +184,7 @@ function SheetSelect({
     >
       <BottomSheetTrigger
         id={id}
+        data-trigger-variant={triggerVariant}
         disabled={disabled}
         ref={triggerRef}
         onBlur={onBlur}
@@ -209,6 +214,7 @@ function SheetSelect({
               className={cn(
                 "flex h-12 w-full items-center justify-between gap-2 rounded-lg border border-input bg-control px-3 py-2 text-base text-left outline-none transition-colors duration-fast ease-standard focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:bg-disabled disabled:text-disabled-foreground aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive md:h-11 md:text-sm",
                 className,
+                triggerVariant === "card" && !hasSelection && pickerCardBorder,
               )}
             >
               {triggerContent ?? (

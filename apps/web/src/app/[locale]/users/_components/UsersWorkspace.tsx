@@ -13,6 +13,12 @@ import {
   Avatar,
   AvatarFallback,
   Badge,
+  BottomSheet,
+  BottomSheetTrigger,
+  BottomSheetContent,
+  BottomSheetBody,
+  BottomSheetFooter,
+  BottomSheetClose,
   buttonVariants,
   ListLayout,
   ListItems,
@@ -22,7 +28,6 @@ import {
   Button,
   Card,
   CardContent,
-  CardHeader,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -30,18 +35,11 @@ import {
   Field,
   FieldLabel,
   Input,
+  SheetSelect,
 } from "@repo/ui/components";
 import { SearchField } from "@repo/ui/components/search-field";
-import { NativeSelect } from "@repo/ui/components/native-select";
 import { FormActions } from "@repo/ui/components/form-actions";
-import {
-  ChevronDown,
-  Settings2,
-  ShieldCheck,
-  UserPlus,
-  Users,
-  X,
-} from "lucide-react";
+import { ChevronDown, ShieldCheck, UserPlus } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { Link, useRouter } from "@/i18n/navigation";
 import { webApi } from "@/lib/api";
@@ -51,6 +49,7 @@ import {
   useRemote,
   useTask,
 } from "@/components/WorkspaceForm";
+import { RoleCard, roleCardSurface } from "../../roles/_components/RoleCard";
 import { AccessWorkspace } from "../../roles/_components/AccessWorkspace";
 import { AccessHistory } from "../../roles/_components/AccessHistory";
 import {
@@ -59,6 +58,8 @@ import {
   PermissionEditor,
   type Grant,
 } from "../../roles/_components/permission-editor";
+import { useSession } from "@/components/auth/SessionProvider";
+import { canAccess, canManageUser } from "@/lib/access";
 import { MemberAccountControls } from "./MemberAccountControls";
 
 const baseSlugs = v1.access.BASE_ROLE_SLUGS;
@@ -87,12 +88,12 @@ function MemberAvatar({
 export function UsersWorkspace({ id }: { id?: string }) {
   const t = useTranslations("workspace");
   const shared = useTranslations("shared");
+  const { user: actor } = useSession();
   const locale = useLocale();
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [offset, setOffset] = useState(0);
   const [dirty, setDirty] = useState(false);
-  const [mobileDirectory, setMobileDirectory] = useState(false);
   const [pendingHref, setPendingHref] = useState<string | null>(null);
   const [draftVersion, setDraftVersion] = useState(0);
   const deferredSearch = useDeferredValue(search);
@@ -101,11 +102,13 @@ export function UsersWorkspace({ id }: { id?: string }) {
       webApi.fetch("/v1/access/roles", v1.access.roleListSchema, {
         cache: "no-store",
       }),
-      webApi.fetch(
-        `/v1/users?${new URLSearchParams({ search: deferredSearch, offset: String(offset) })}`,
-        v1.access.accessUserListSchema,
-        { cache: "no-store" },
-      ),
+      id
+        ? Promise.resolve({ items: [], total: 0 })
+        : webApi.fetch(
+            `/v1/users?${new URLSearchParams({ search: deferredSearch, offset: String(offset) })}`,
+            v1.access.accessUserListSchema,
+            { cache: "no-store" },
+          ),
       id && id !== "new"
         ? webApi.fetch(`/v1/users/${id}`, v1.access.accessUserSchema, {
             cache: "no-store",
@@ -131,7 +134,6 @@ export function UsersWorkspace({ id }: { id?: string }) {
       event.shiftKey ||
       event.altKey
     ) {
-      setMobileDirectory(false);
       return;
     }
     event.preventDefault();
@@ -154,156 +156,152 @@ export function UsersWorkspace({ id }: { id?: string }) {
     setDraftVersion((version) => version + 1);
   };
   return (
-    <AccessWorkspace current="directory" onNavigate={navigate}>
+    <AccessWorkspace
+      current="directory"
+      onNavigate={navigate}
+      editor={!!id}
+      hideTitle
+      hideTabs
+    >
       {!remote.data ? (
         <RemoteState error={remote.error} retry={remote.reload} />
       ) : (
-        <div className="grid min-w-0 items-start gap-6 lg:grid-cols-3 xl:grid-cols-4">
-          <aside
-            aria-label={t("access.member.directory")}
-            className="flex min-w-0 flex-col gap-4 lg:col-span-1"
-          >
-            {id ? (
-              <Button
-                variant="outline"
-                className="justify-between lg:hidden"
-                aria-expanded={mobileDirectory}
-                aria-controls="member-directory-list"
-                onClick={() => setMobileDirectory((value) => !value)}
-              >
-                {t(
-                  mobileDirectory
-                    ? "access.member.hideDirectory"
-                    : "access.member.changeMember",
-                )}
-                <ChevronDown
-                  className={`size-4 ${mobileDirectory ? "rotate-180" : ""}`}
-                  aria-hidden="true"
-                />
-              </Button>
-            ) : null}
-            <div
-              id="member-directory-list"
-              className={`${id && !mobileDirectory ? "hidden lg:flex" : "flex"} min-w-0 flex-col gap-4`}
+        <div
+          data-slot="users-workspace-layout"
+          className="flex min-w-0 flex-col gap-6"
+        >
+          {!id ? (
+            <aside
+              aria-label={t("access.member.directory")}
+              className="flex min-w-0 flex-col gap-4"
             >
-              <ListLayout
-                action={
-                  <Link
-                    href="/users/new"
-                    onClick={(event) => navigate(event, "/users/new")}
-                    className={buttonVariants()}
-                  >
-                    <UserPlus aria-hidden="true" data-icon="inline-start" />
-                    {t("access.member.add")}
-                  </Link>
-                }
-                search={
-                  <SearchField
-                    id="member-search"
-                    name="memberSearch"
-                    label={t("access.member.searchMembers")}
-                    placeholder={t("access.member.searchPlaceholder")}
-                    value={search}
-                    clearLabel={shared("list.selectClearSearch")}
-                    onClear={() => {
-                      setSearch("");
-                      setOffset(0);
-                    }}
-                    onChange={(event) => {
-                      setSearch(event.target.value);
-                      setOffset(0);
-                    }}
-                  />
-                }
-                summary={
-                  <h2 className="font-sans text-sm font-semibold">
-                    {t("access.member.teamMembers", {
-                      count: new Intl.NumberFormat(locale).format(
-                        remote.data.users.total,
-                      ),
-                    })}
-                  </h2>
-                }
-                footer={
-                  remote.data.users.total > 100 ? (
-                    <ListPagination
-                      canPrevious={offset > 0 && !remote.loading}
-                      canNext={
-                        offset + 100 < remote.data.users.total &&
-                        !remote.loading
-                      }
-                      onPrevious={() =>
-                        setOffset((value) => Math.max(0, value - 100))
-                      }
-                      onNext={() => setOffset((value) => value + 100)}
-                      previousLabel={t("previous")}
-                      nextLabel={t("next")}
-                      label={shared("list.pagination")}
-                    />
-                  ) : null
-                }
+              <div
+                id="member-directory-list"
+                className="flex min-w-0 flex-col gap-4"
               >
-                <ListStatus
-                  loading={remote.loading}
-                  error={remote.error}
-                  loadingLabel={shared("status.refreshing")}
-                  retryLabel={shared("actions.retry")}
-                  onRetry={remote.reload}
-                />
-                <ListItems
-                  items={remote.data.users.items}
-                  getItemKey={(user) => user.id}
-                  className="lg:max-h-(--container-access-directory) lg:overflow-y-auto lg:pr-1"
-                  empty={<ListEmpty>{t("access.member.noMembers")}</ListEmpty>}
-                  renderItem={(user) => (
-                    <Link
-                      href={`/users/${user.id}`}
-                      aria-current={id === user.id ? "page" : undefined}
-                      onClick={(event) => navigate(event, `/users/${user.id}`)}
-                      className="group block min-w-0 rounded-xl [content-visibility:auto] outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                      <Card
-                        size="sm"
-                        border={id === user.id ? "primary" : undefined}
-                        className={`transition-colors duration-fast group-hover:border-primary ${id === user.id ? "bg-popover" : ""}`}
+                <ListLayout
+                  action={
+                    canAccess(actor, "users.invite") ? (
+                      <Link
+                        href="/users/new"
+                        onClick={(event) => navigate(event, "/users/new")}
+                        className={buttonVariants()}
                       >
-                        <CardContent className="flex min-w-0 items-center gap-3">
-                          <MemberAvatar user={user} />
-                          <span className="flex min-w-0 flex-1 flex-col gap-1">
-                            <span
-                              className={`truncate text-sm font-semibold ${id === user.id ? "text-link" : "text-foreground"}`}
-                            >
-                              {memberName(user)}
-                            </span>
-                            <span className="truncate text-xs text-muted-foreground">
-                              {user.email}
-                            </span>
-                            <span className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                              <span className="font-medium text-foreground">
-                                {labelFor(user)}
+                        <UserPlus aria-hidden="true" data-icon="inline-start" />
+                        {t("access.member.add")}
+                      </Link>
+                    ) : undefined
+                  }
+                  search={
+                    <SearchField
+                      id="member-search"
+                      name="memberSearch"
+                      label={t("access.member.searchMembers")}
+                      placeholder={t("access.member.searchPlaceholder")}
+                      value={search}
+                      clearLabel={shared("list.selectClearSearch")}
+                      onClear={() => {
+                        setSearch("");
+                        setOffset(0);
+                      }}
+                      onChange={(event) => {
+                        setSearch(event.target.value);
+                        setOffset(0);
+                      }}
+                    />
+                  }
+                  summary={
+                    <h2 className="font-sans text-sm font-semibold">
+                      {t("access.member.teamMembers", {
+                        count: new Intl.NumberFormat(locale).format(
+                          remote.data.users.total,
+                        ),
+                      })}
+                    </h2>
+                  }
+                  footer={
+                    remote.data.users.total > 100 ? (
+                      <ListPagination
+                        canPrevious={offset > 0 && !remote.loading}
+                        canNext={
+                          offset + 100 < remote.data.users.total &&
+                          !remote.loading
+                        }
+                        onPrevious={() =>
+                          setOffset((value) => Math.max(0, value - 100))
+                        }
+                        onNext={() => setOffset((value) => value + 100)}
+                        previousLabel={t("previous")}
+                        nextLabel={t("next")}
+                        label={shared("list.pagination")}
+                      />
+                    ) : null
+                  }
+                >
+                  <ListStatus
+                    loading={remote.loading}
+                    error={remote.error}
+                    loadingLabel={shared("status.refreshing")}
+                    retryLabel={shared("actions.retry")}
+                    onRetry={remote.reload}
+                  />
+                  <ListItems
+                    items={remote.data.users.items}
+                    getItemKey={(user) => user.id}
+                    empty={
+                      <ListEmpty>{t("access.member.noMembers")}</ListEmpty>
+                    }
+                    renderItem={(user) => (
+                      <Link
+                        href={`/users/${user.id}`}
+                        aria-current={id === user.id ? "page" : undefined}
+                        onClick={(event) =>
+                          navigate(event, `/users/${user.id}`)
+                        }
+                        className="group block min-w-0 rounded-xl [content-visibility:auto] outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        <Card
+                          size="sm"
+                          border={id === user.id ? "primary" : undefined}
+                          className={`transition-colors duration-fast group-hover:border-primary ${id === user.id ? "bg-popover" : ""}`}
+                        >
+                          <CardContent className="flex min-w-0 items-center gap-3">
+                            <MemberAvatar user={user} />
+                            <span className="flex min-w-0 flex-1 flex-col gap-1">
+                              <span
+                                className={`truncate text-sm font-semibold ${id === user.id ? "text-link" : "text-foreground"}`}
+                              >
+                                {memberName(user)}
                               </span>
-                              <span aria-hidden="true">·</span>
-                              {t(`access.${user.loginStatus.toLowerCase()}`)}
+                              <span className="truncate text-xs text-muted-foreground">
+                                {user.email}
+                              </span>
+                              <span className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                                <span className="font-medium text-foreground">
+                                  {labelFor(user)}
+                                </span>
+                                <span aria-hidden="true">·</span>
+                                {t(`access.${user.loginStatus.toLowerCase()}`)}
+                              </span>
                             </span>
-                          </span>
-                        </CardContent>
-                      </Card>
-                    </Link>
-                  )}
-                />
-              </ListLayout>
-            </div>
-          </aside>
-          <div className="min-w-0 lg:col-span-2 xl:col-span-3">
-            {id ? (
-              remote.data.requestedId === id ? (
+                          </CardContent>
+                        </Card>
+                      </Link>
+                    )}
+                  />
+                </ListLayout>
+              </div>
+            </aside>
+          ) : null}
+          {id ? (
+            <div className="flex min-w-0 flex-col gap-4">
+              {remote.data.requestedId === id ? (
                 <UserForm
                   key={`${id}-${remote.data.user?.accessRevision}-${draftVersion}`}
                   user={remote.data.user}
                   roles={remote.data.roles}
                   onDirtyChange={setDirty}
                   onCancel={reset}
-                  onNavigate={navigate}
                   reload={() => {
                     setDirty(false);
                     remote.reload();
@@ -311,24 +309,9 @@ export function UsersWorkspace({ id }: { id?: string }) {
                 />
               ) : (
                 <RemoteState error={remote.error} retry={remote.reload} />
-              )
-            ) : (
-              <Card as="section" surface="raised" className="py-16 text-center">
-                <CardContent className="flex flex-col items-center gap-4">
-                  <Users
-                    className="size-10 text-muted-foreground"
-                    aria-hidden="true"
-                  />
-                  <h2 className="font-sans text-xl font-semibold">
-                    {t("access.member.selectMember")}
-                  </h2>
-                  <p className="max-w-(--breakpoint-sm) text-sm text-muted-foreground">
-                    {t("access.member.selectMemberHelp")}
-                  </p>
-                </CardContent>
-              </Card>
-            )}
-          </div>
+              )}
+            </div>
+          ) : null}
         </div>
       )}
       <Dialog
@@ -355,7 +338,6 @@ export function UsersWorkspace({ id }: { id?: string }) {
                 const destination = pendingHref!;
                 setPendingHref(null);
                 setDirty(false);
-                setMobileDirectory(false);
                 router.push(destination);
               }}
             >
@@ -374,16 +356,23 @@ function UserForm({
   reload,
   onDirtyChange,
   onCancel,
-  onNavigate,
 }: {
   user: v1.access.AccessUser | null;
   roles: v1.access.Role[];
   reload: () => void;
   onDirtyChange: (dirty: boolean) => void;
   onCancel: () => void;
-  onNavigate: (event: MouseEvent<HTMLAnchorElement>, href: string) => void;
 }) {
   const t = useTranslations("workspace");
+  const { user: actor } = useSession();
+  const manageable = canManageUser(actor, user);
+  const canAssign = manageable && canAccess(actor, "users.roles.update");
+  const canCustomize =
+    manageable && canAccess(actor, "users.permissions.update");
+  const canSubmit = user
+    ? canAssign || canCustomize
+    : canAccess(actor, "users.invite");
+
   const labels = useTranslations("access.permissions");
   const router = useRouter();
   const task = useTask();
@@ -394,6 +383,8 @@ function UserForm({
     user?.roles.map((role) => role.id) ?? [],
   );
   const [overrides, setOverrides] = useState<Grant[]>(user?.overrides ?? []);
+  const [showPermissions, setShowPermissions] = useState(false);
+  const permissionText = useTranslations("access.editor");
   const [preview, setPreview] = useState<{
     before: v1.access.EffectiveScopes;
     after: v1.access.EffectiveScopes;
@@ -404,6 +395,36 @@ function UserForm({
   const [showHistory, setShowHistory] = useState(false);
   const reviewRef = useRef<HTMLElement>(null);
   const selectedRoles = roles.filter((role) => roleIds.includes(role.id));
+  const roleOptions = [
+    {
+      value: "none",
+      slug: "none",
+      label: t("access.member.noRole"),
+      description: t("access.member.noRoleHelp"),
+    },
+    ...roles
+      .filter(
+        (role) =>
+          actor?.isSuperAdmin ||
+          role.slug !== "admin" ||
+          user?.roles.some((r) => r.id === role.id),
+      )
+      .map((role) => ({
+        value: role.id,
+        slug: role.slug,
+        label: t(`access.member.roleNames.${role.slug}`),
+        description: t(`access.member.roleDescriptions.${role.slug}`),
+      })),
+  ];
+  const selectedRole = user?.isSuperAdmin
+    ? {
+        value: "super-admin",
+        slug: "superAdmin",
+        label: t("access.member.roleNames.superAdmin"),
+        description: t("access.member.superRoleHelp"),
+      }
+    : (roleOptions.find((role) => role.value === roleIds[0]) ?? roleOptions[0]);
+
   const grants = {
     roles: selectedRoles.map(({ id, revision }) => ({ id, revision })),
     overrides,
@@ -436,34 +457,14 @@ function UserForm({
     <Card
       as="section"
       surface="raised"
-      className={`gap-0 py-0 ${showAccount || showHistory ? "" : "lg:max-h-(--container-access-editor)"}`}
-      aria-labelledby="member-editor-title"
+      className="gap-0 py-0"
+      aria-label={t(user ? "access.member.editPermissions" : "access.addUser")}
     >
-      <CardHeader className="flex shrink-0 items-center gap-3 py-(--card-spacing)">
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-secondary">
-          <Settings2 className="size-5" aria-hidden="true" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <h2 id="member-editor-title" className="font-sans text-lg font-bold">
-            {t(user ? "access.member.editPermissions" : "access.addUser")}
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {t("access.member.editorHelp")}
-          </p>
-        </div>
-        <Link
-          href="/users"
-          onClick={(event) => onNavigate(event, "/users")}
-          aria-label={t("access.member.closeEditor")}
-          className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-background text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          <X className="size-4" aria-hidden="true" />
-        </Link>
-      </CardHeader>
       <form
         className="flex min-h-0 flex-1 flex-col"
         onSubmit={(event) => {
           event.preventDefault();
+          if (!canSubmit) return;
           void task.run(async () => {
             if (!previewCurrent) {
               if (user)
@@ -525,7 +526,7 @@ function UserForm({
           });
         }}
       >
-        <CardContent className="flex min-h-0 flex-col gap-6 pb-(--card-spacing) lg:overflow-y-auto">
+        <CardContent className="flex min-h-0 flex-col gap-6 py-(--card-spacing)">
           <div className="grid min-w-0 gap-5 border-b pb-6 md:grid-cols-2">
             {user ? (
               <div className="flex min-w-0 items-center gap-3">
@@ -587,39 +588,53 @@ function UserForm({
               </div>
             )}
             <Field>
-              <FieldLabel htmlFor="base-role">
+              <FieldLabel className="sr-only" htmlFor="base-role">
                 {t("access.member.baseRole")}
               </FieldLabel>
-              <NativeSelect
+              <SheetSelect
+                triggerVariant="card"
                 id="base-role"
-                name="baseRole"
-                value={user?.isSuperAdmin ? "super-admin" : (roleIds[0] ?? "")}
-                disabled={task.busy || user?.isSuperAdmin}
-                onChange={(event) =>
-                  setRoleIds(event.target.value ? [event.target.value] : [])
+                label={t("access.member.baseRole")}
+                value={selectedRole.value}
+                disabled={task.busy || !canAssign || user?.isSuperAdmin}
+                options={roleOptions}
+                onValueChange={(value) =>
+                  setRoleIds(value === "none" ? [] : [value])
                 }
-              >
-                {user?.isSuperAdmin ? (
-                  <option value="super-admin">
-                    {t("access.member.roleNames.superAdmin")}
-                  </option>
-                ) : null}
-                <option value="">{t("access.member.noRole")}</option>
-                {roles.map((role) => (
-                  <option key={role.id} value={role.id}>
-                    {t(`access.member.roleNames.${role.slug}`)}
-                  </option>
-                ))}
-              </NativeSelect>
-              <p className="text-xs text-muted-foreground">
-                {user?.isSuperAdmin
-                  ? t("access.member.superRoleHelp")
-                  : selectedRoles[0]
-                    ? t(
-                        `access.member.roleDescriptions.${selectedRoles[0].slug}`,
-                      )
-                    : t("access.member.noRoleHelp")}
-              </p>
+                className={roleCardSurface}
+                optionClassName={roleCardSurface}
+                closeLabel={t("cancel")}
+                searchPlaceholder={t("access.member.searchRoles")}
+                clearSearchLabel={t("access.member.clearRoleSearch")}
+                emptyMessage={t("access.member.noMatchingRoles")}
+                triggerContent={
+                  <>
+                    <RoleCard
+                      contentOnly
+                      title={selectedRole.label}
+                      description={selectedRole.description}
+                      slug={selectedRole.slug}
+                    />
+                    <ChevronDown
+                      aria-hidden="true"
+                      className="size-4 shrink-0 text-muted-foreground"
+                    />
+                  </>
+                }
+                renderOption={(option) => {
+                  const role = roleOptions.find(
+                    (role) => role.value === option.value,
+                  )!;
+                  return (
+                    <RoleCard
+                      contentOnly
+                      title={role.label}
+                      description={role.description}
+                      slug={role.slug}
+                    />
+                  );
+                }}
+              />
             </Field>
           </div>
           {user?.isSuperAdmin ? (
@@ -633,12 +648,73 @@ function UserForm({
               </p>
             </div>
           ) : (
-            <PermissionEditor
-              value={overrides}
-              onChange={setOverrides}
-              roles={selectedRoles}
-              disabled={task.busy}
-            />
+            <BottomSheet
+              open={showPermissions}
+              onOpenChange={setShowPermissions}
+            >
+              {overrides.length > 0 ? (
+                <Card size="sm">
+                  <CardContent className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex min-w-0 flex-col gap-1">
+                      <p className="text-sm font-semibold">
+                        {permissionText("personalizedPermissions")}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {permissionText("customCount", {
+                          count: overrides.length,
+                        })}
+                      </p>
+                    </div>
+                    <BottomSheetTrigger
+                      render={<Button type="button" variant="outline" />}
+                    >
+                      {permissionText("customizePermissions")}
+                    </BottomSheetTrigger>
+                  </CardContent>
+                </Card>
+              ) : (
+                <BottomSheetTrigger
+                  render={
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="self-start"
+                    />
+                  }
+                >
+                  {permissionText("customizePermissions")}
+                </BottomSheetTrigger>
+              )}
+              <BottomSheetContent
+                aria-label={permissionText("customizePermissions")}
+              >
+                <BottomSheetBody className="pt-0">
+                  <PermissionEditor
+                    stickyTabs
+                    value={overrides}
+                    onChange={setOverrides}
+                    roles={selectedRoles}
+                    disabled={task.busy || !canCustomize}
+                    canEditPermission={(key) =>
+                      !!actor?.isSuperAdmin ||
+                      (!key.startsWith("users.") &&
+                        !key.startsWith("roles.") &&
+                        canAccess(actor, key))
+                    }
+                  />
+                </BottomSheetBody>
+                <BottomSheetFooter>
+                  <p className="text-sm text-muted-foreground">
+                    {permissionText("sheetSaveHelp")}
+                  </p>
+                  <BottomSheetClose
+                    render={<Button type="button" variant="outline" />}
+                  >
+                    {t("done")}
+                  </BottomSheetClose>
+                </BottomSheetFooter>
+              </BottomSheetContent>
+            </BottomSheet>
           )}
           {preview && previewCurrent ? (
             <section
@@ -662,7 +738,7 @@ function UserForm({
           ) : null}
           <Feedback error={task.error} success={task.success} />
         </CardContent>
-        {!user?.isSuperAdmin ? (
+        {!user?.isSuperAdmin && canSubmit ? (
           <FormActions
             status={
               dirty ? t("access.member.unsaved") : t("access.member.upToDate")
@@ -744,7 +820,10 @@ function UserForm({
                 <MemberAccountControls
                   user={user}
                   reload={reload}
-                  disabled={dirty}
+                  disabled={dirty || !manageable}
+                  canInvite={canAccess(actor, "users.invite")}
+                  canManageStatus={canAccess(actor, "users.status.update")}
+                  superAdmin={!!actor?.isSuperAdmin}
                 />
               </>
             ) : null}

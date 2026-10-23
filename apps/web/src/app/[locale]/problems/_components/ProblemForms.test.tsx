@@ -1,4 +1,5 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
+import { useState } from "react";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { messages } from "@repo/i18n";
@@ -6,6 +7,7 @@ import { ApiError, v1 } from "@repo/api-shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CreateProblem, ProblemWork, memberName } from "./ProblemForms";
 import { ProblemCreateScreen } from "./ProblemCreateScreen";
+import { AssigneeSelect } from "./AssigneeSelect";
 
 const mocks = vi.hoisted(() => ({
   fetch: vi.fn(),
@@ -79,7 +81,20 @@ beforeEach(() => {
   mocks.fetch.mockImplementation((url: string) => {
     if (url.includes("eligible-assignees"))
       return Promise.resolve({
-        items: [{ id: "other", firstName: "Taylor", lastName: null }],
+        items: [
+          {
+            id: "other",
+            firstName: "Taylor",
+            lastName: null,
+            roles: ["Mechanic"],
+          },
+          {
+            id: "second",
+            firstName: "Jordan",
+            lastName: null,
+            roles: ["Mechanic"],
+          },
+        ],
       });
     if (url === "/v1/problems/locations") return Promise.resolve({ items: [] });
     if (url.includes("/activity"))
@@ -89,6 +104,89 @@ beforeEach(() => {
 });
 
 describe("problem release forms", () => {
+  it("collapses a removed assignee and keeps keyboard focus in the list", async () => {
+    function Picker() {
+      const [value, setValue] = useState(["a", "b"]);
+      return (
+        <AssigneeSelect
+          multiple
+          value={value}
+          onValueChange={setValue}
+          members={[
+            { id: "a", firstName: "Alex", lastName: null },
+            { id: "b", firstName: "Sam", lastName: null },
+          ]}
+        />
+      );
+    }
+    renderForm(<Picker />);
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "Remove Alex" }));
+    const exiting = screen
+      .getByText("Alex")
+      .closest('[data-slot="assignee-presence"]');
+    expect(exiting).toHaveAttribute("aria-hidden", "true");
+    expect(exiting).toHaveClass(
+      "grid-rows-[1fr]",
+      "motion-reduce:transition-none",
+    );
+    expect(exiting).toHaveAttribute("data-removal-phase", "windup");
+    expect(exiting?.querySelector(".translate-x-1\\.5")).toHaveClass(
+      "opacity-100",
+    );
+    expect(exiting?.firstElementChild).toHaveClass("overflow-visible");
+    expect(screen.getByRole("button", { name: "Remove Sam" })).toHaveFocus();
+    await waitFor(() =>
+      expect(exiting).toHaveAttribute("data-removal-phase", "leaving"),
+    );
+    expect(exiting).toHaveClass("grid-rows-[0fr]");
+    expect(exiting?.querySelector(".opacity-0")).toHaveClass("-translate-x-12");
+    await waitFor(() =>
+      expect(screen.queryByText("Alex")).not.toBeInTheDocument(),
+    );
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "Remove Sam" }));
+    expect(screen.getByRole("button", { name: "Add assignee" })).toHaveFocus();
+    await waitFor(() =>
+      expect(screen.queryByText("Sam")).not.toBeInTheDocument(),
+    );
+  });
+
+  it.each([
+    ["member", "Super Admin", "text-personal"],
+    ["another-admin", "Admin", "text-info"],
+  ])(
+    "shows the viewer-appropriate designation for %s",
+    async (id, label, color) => {
+      renderForm(
+        <AssigneeSelect
+          multiple
+          value={[]}
+          onValueChange={vi.fn()}
+          members={[
+            {
+              id,
+              firstName: "Alex",
+              lastName: null,
+              isSuperAdmin: true,
+              roles: ["Admin"],
+            },
+          ]}
+        />,
+      );
+      await userEvent
+        .setup()
+        .click(screen.getByRole("button", { name: "Add assignee" }));
+      const sheet = await screen.findByRole("dialog", { name: "Add assignee" });
+      expect(within(sheet).getByText(label)).toHaveClass(color);
+      expect(
+        within(sheet).queryByText(label === "Admin" ? "Super Admin" : "Admin"),
+      ).toBeNull();
+    },
+  );
+
   it("creates optional sections in one request without submitting while editing them", async () => {
     const user = userEvent.setup();
     const saved = vi.fn();
@@ -226,7 +324,10 @@ describe("problem release forms", () => {
       expect(mocks.fetch).toHaveBeenCalledWith(
         "/v1/problems/report/assignee",
         v1.problems.problemSchema,
-        { method: "PUT", json: { revision: 3, assigneeId: "other" } },
+        {
+          method: "PUT",
+          json: { revision: 3, assigneeIds: ["member", "other"] },
+        },
       ),
     );
     await waitFor(() => expect(reload).toHaveBeenCalledWith(problem));
@@ -308,18 +409,29 @@ describe("problem release forms", () => {
       within(sheet).getByRole("textbox", { name: "Search assignees" }),
     );
     const option = await within(sheet).findByRole("button", { name: "Taylor" });
+    expect(within(option).getByText("Mechanic")).toBeInTheDocument();
+    expect(option.querySelector(".lucide-user-plus")).toBeNull();
     expect(
       option.querySelector('[data-slot="person-row"]'),
     ).toBeInTheDocument();
     await user.click(option);
+    expect(option).toHaveAttribute("aria-pressed", "true");
+    expect(option.querySelectorAll("svg.lucide-check")).toHaveLength(1);
+    expect(option.querySelector(".lucide-user-plus")).toBeNull();
+    const reopened = sheet;
+    const secondOption = within(sheet).getByRole("button", { name: "Jordan" });
+    await user.click(secondOption);
+    expect(option).toHaveAttribute("aria-pressed", "true");
+    expect(secondOption).toHaveAttribute("aria-pressed", "true");
+    await user.click(within(reopened).getByRole("button", { name: "Done" }));
     await waitFor(() =>
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
     );
-    expect(
-      screen.getByText("Taylor").closest('[data-slot="person-row"]'),
-    ).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Remove Taylor" }));
-    expect(screen.queryByText("Taylor")).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByText("Taylor")).not.toBeInTheDocument(),
+    );
+    expect(screen.getByText("Jordan")).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Add assignee" }),
     ).toBeInTheDocument();
@@ -420,6 +532,15 @@ describe("problem release forms", () => {
     await user.click(screen.getByRole("radio", { name: "Unusable" }));
     await user.click(screen.getByRole("button", { name: "Add assignee" }));
     await user.click(await screen.findByRole("button", { name: "Taylor" }));
+    await user.click(screen.getByRole("button", { name: "Jordan" }));
+    await user.click(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: "Done",
+      }),
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
     await user.click(screen.getByRole("button", { name: "Report problem" }));
     await waitFor(() => expect(saved).toHaveBeenCalledOnce());
     expect(mocks.fetch).toHaveBeenCalledWith(
@@ -434,7 +555,7 @@ describe("problem release forms", () => {
           blocksUsage: true,
           description: "",
           photos: [],
-          assigneeId: "other",
+          assigneeIds: ["other", "second"],
           sections: [],
           checklist: [],
           buyList: [],
@@ -778,7 +899,7 @@ describe("dedicated creation screen", () => {
     const user = userEvent.setup();
     renderForm(<ProblemCreateScreen scooterId="scooter" />);
     const submit = screen.getByRole("button", { name: "Report problem" });
-    expect(submit).toHaveClass("w-full");
+    expect(submit.parentElement?.firstElementChild).toBe(submit);
     expect(submit.closest('[data-slot="problem-create-actions"]')).toHaveClass(
       "static",
       "bottom-auto",

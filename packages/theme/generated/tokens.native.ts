@@ -213,6 +213,7 @@ export const tokens = {
   },
   radius: {
     none: 0,
+    xs: 2,
     sm: 8,
     md: 10,
     lg: 12,
@@ -357,6 +358,7 @@ export const tokens = {
     },
     duration: {
       instant: 0,
+      removalWindup: 80,
       fast: 150,
       normal: 250,
       slow: 400,

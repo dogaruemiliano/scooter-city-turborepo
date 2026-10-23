@@ -11,6 +11,8 @@ type FormActionsProps = ComponentProps<"div"> & {
   ready?: boolean;
   /** Keeps ready actions visible while submission is in progress. */
   pending?: boolean;
+  /** Confirm first on mobile; cancel left and confirm right on desktop. Put confirm first in children. */
+  arrangement?: "default" | "split";
 };
 
 function FormActions({
@@ -19,6 +21,7 @@ function FormActions({
   sticky = false,
   ready,
   pending = false,
+  arrangement = "default",
   children,
   ...props
 }: FormActionsProps) {
@@ -34,7 +37,13 @@ function FormActions({
           {status}
         </div>
       ) : null}
-      <div className="flex w-full min-w-0 flex-wrap items-center justify-end gap-3 *:min-w-0 *:max-w-full *:flex-1 @form-columns/form-actions:w-auto @form-columns/form-actions:*:flex-none">
+      <div
+        className={cn(
+          arrangement === "split"
+            ? "flex w-full min-w-0 flex-col gap-6 *:min-w-0 *:max-w-full md:flex-row-reverse md:items-center md:justify-between"
+            : "flex w-full min-w-0 flex-wrap items-center justify-end gap-3 *:min-w-0 *:max-w-full *:flex-1 @form-columns/form-actions:w-auto @form-columns/form-actions:*:flex-none",
+        )}
+      >
         {children}
       </div>
     </>

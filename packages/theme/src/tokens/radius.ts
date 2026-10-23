@@ -6,6 +6,8 @@ export const radiusBase = 12;
 
 export const radius = {
   none: 0,
+  /** Small decorative assets such as compact language flags. */
+  xs: radiusBase / 6,
   sm: Math.max(0, radiusBase - 4),
   md: Math.max(0, radiusBase - 2),
   lg: radiusBase,

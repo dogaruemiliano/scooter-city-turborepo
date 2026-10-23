@@ -122,6 +122,7 @@ export declare const tokens: {
   },
   "radius": {
     "none": 0,
+    "xs": 2,
     "sm": 8,
     "md": 10,
     "lg": 12,

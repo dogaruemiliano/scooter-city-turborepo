@@ -13,7 +13,15 @@ import { cn } from "@repo/ui/lib/utils";
 
 import { ScooterCover } from "./ScooterCover";
 
-const EMPTY_SCOOTERS: v1.scooters.Scooter[] = [];
+export type ScooterSelectItem = Pick<
+  v1.scooters.Scooter,
+  "id" | "fleetNumber" | "brandCode" | "brand" | "model" | "registrationNumber"
+> &
+  Partial<
+    Pick<v1.scooters.Scooter, "coverUrl" | "vin" | "problemSeverityCounts">
+  >;
+
+const EMPTY_SCOOTERS: ScooterSelectItem[] = [];
 
 const severityStyles = {
   low: ["text-info", "text-info-foreground"],
@@ -24,11 +32,7 @@ const severityStyles = {
 } as const;
 
 /** The same content is used for sheet options and selected scooters. */
-export function ScooterSelectRow({
-  scooter,
-}: {
-  scooter: v1.scooters.Scooter;
-}) {
+export function ScooterSelectRow({ scooter }: { scooter: ScooterSelectItem }) {
   const t = useTranslations("workspace");
   return (
     <span className="flex min-w-0 flex-1 items-center gap-3">
@@ -107,6 +111,8 @@ export type ScooterSelectProps = Omit<
   | "addAction"
 > & {
   label?: string;
+  /** Already-authorized summaries, e.g. scooters visible in problem filters. */
+  scooters?: readonly ScooterSelectItem[];
 } & (
     | {
         multiple?: false;
@@ -121,9 +127,10 @@ export type ScooterSelectProps = Omit<
   );
 
 export function ScooterSelect(props: ScooterSelectProps) {
-  const { label, ...controlProps } = props;
+  const { label, scooters: suppliedScooters, ...controlProps } = props;
   const t = useTranslations("workspace");
   const load = useCallback(async () => {
+    if (suppliedScooters !== undefined) return suppliedScooters;
     const items: v1.scooters.Scooter[] = [];
     for (let page = 1; ; page++) {
       const list = await webApi.fetch(
@@ -135,7 +142,7 @@ export function ScooterSelect(props: ScooterSelectProps) {
       if (page * list.pageSize >= list.total || !list.items.length) break;
     }
     return items.sort((a, b) => a.fleetNumber - b.fleetNumber);
-  }, []);
+  }, [suppliedScooters]);
   const remote = useRemote(load);
   const scooters = remote.data ?? EMPTY_SCOOTERS;
   const byId = useMemo(
@@ -158,7 +165,7 @@ export function ScooterSelect(props: ScooterSelectProps) {
               <div
                 key={id}
                 data-slot="selected-scooter"
-                className="flex min-h-24 items-center gap-3 rounded-lg bg-selectable-row px-3 py-2"
+                className="flex min-h-24 items-center gap-3 rounded-lg border border-border bg-selectable-row px-3 py-2"
               >
                 {scooter ? (
                   <ScooterSelectRow scooter={scooter} />
@@ -212,6 +219,7 @@ export function ScooterSelect(props: ScooterSelectProps) {
             : undefined
         }
         {...controlProps}
+        triggerVariant="card"
         optionClassName="h-auto min-h-24 gap-3"
         addAction={
           !selectedScooter
@@ -224,8 +232,7 @@ export function ScooterSelect(props: ScooterSelectProps) {
             : undefined
         }
         className={cn(
-          selectedScooter &&
-            "h-auto min-h-24 border-0 bg-selectable-row md:h-auto",
+          selectedScooter && "h-auto min-h-24 bg-selectable-row md:h-auto",
           props.className,
         )}
         triggerContent={
@@ -254,7 +261,7 @@ export function ScooterSelect(props: ScooterSelectProps) {
         options={scooters.map((scooter) => ({
           value: scooter.id,
           label: `${v1.scooters.scooterDisplayCode(scooter)} · ${scooter.registrationNumber || t("problems.noPlate")} · ${scooter.brand} ${scooter.model ?? ""}`,
-          keywords: [scooter.vin, scooter.id],
+          keywords: [scooter.vin ?? "", scooter.id],
         }))}
         renderOption={(option) => {
           const scooter = byId.get(option.value)!;

@@ -2,12 +2,19 @@ export const accessCatalog = {
   en: {
     editor: {
       title: "Permissions",
+      customizePermissions: "Customize permissions",
+      personalizedPermissions: "Personalized permissions",
+      sheetSaveHelp: "Review and save changes on the user page.",
       search: "Search permissions",
       searchPlaceholder: "Search permissions…",
       onlyCustom: "Only custom",
+      customOverride: "Custom override",
+      customCount:
+        "{count, plural, one {# custom override} other {# custom overrides}}",
       results: "{count} permissions found",
       categories: "Permission categories",
       groups: {
+        administration: "Administration",
         fleet: "Fleet",
         service: "Service",
         rentals: "Rentals",
@@ -17,6 +24,25 @@ export const accessCatalog = {
       },
       modes: { allow: "Allow", default: "Default", deny: "Deny" },
       modeFor: "Access for {permission}",
+      scopeClose: "Done",
+      scopeSearch: "Search access scopes…",
+      scopeClearSearch: "Clear search",
+      scopeNoResults: "No scopes match your search.",
+      scopeDescriptions: {
+        OWN: "Only records belonging to this user, where this permission applies.",
+        ASSIGNED: "Only records linked to work assigned to this user.",
+        AVAILABLE: "Unassigned service work available to claim.",
+        ALL: "All records this action permits, subject to management restrictions.",
+        COMBINED:
+          "Assigned service work and unassigned work available to claim.",
+        NONE: "This user cannot perform this action.",
+      },
+      scopeBadges: {
+        OWN: "Own only",
+        ASSIGNED: "Assigned only",
+        AVAILABLE: "Available work",
+        ALL: "All records",
+      },
       scope: "Scope",
       scopeFor: "Scope for {permission}",
       scopes: {
@@ -48,6 +74,21 @@ export const accessCatalog = {
       clearFilters: "Show all permissions",
     },
     descriptions: {
+      users: {
+        read: "View users, roles, and effective permissions.",
+        invite: "Create accounts and manage invitations for non-admin users.",
+        status: { update: "Activate, suspend, or disable non-admin accounts." },
+        roles: { update: "Assign permitted roles to non-admin users." },
+        permissions: {
+          update:
+            "Customize non-admin users' permissions within your own access.",
+        },
+      },
+      roles: {
+        read: "Inspect role definitions and inherited permissions.",
+        update:
+          "Edit non-admin roles within your own access. Only Super Admins can edit Admin.",
+      },
       persons: {
         read: "View people and their contact details.",
         create: "Add a person to the customer records.",
@@ -139,6 +180,14 @@ export const accessCatalog = {
       },
     },
     permissions: {
+      users: {
+        read: "Users · View",
+        invite: "Users · Invite",
+        status: { update: "Users · Manage account access" },
+        roles: { update: "Users · Assign roles" },
+        permissions: { update: "Users · Customize permissions" },
+      },
+      roles: { read: "Roles · View", update: "Roles · Edit permissions" },
       persons: {
         read: "People · View",
         create: "People · Create",
@@ -232,12 +281,20 @@ export const accessCatalog = {
   ro: {
     editor: {
       title: "Permisiuni",
+      customizePermissions: "Personalizează permisiunile",
+      personalizedPermissions: "Permisiuni personalizate",
+      sheetSaveHelp:
+        "Verifică și salvează modificările pe pagina utilizatorului.",
       search: "Caută permisiuni",
       searchPlaceholder: "Caută permisiuni…",
       onlyCustom: "Doar personalizate",
+      customOverride: "Excepție personalizată",
+      customCount:
+        "{count, plural, one {# excepție personalizată} few {# excepții personalizate} other {# de excepții personalizate}}",
       results: "{count} permisiuni găsite",
       categories: "Categorii de permisiuni",
       groups: {
+        administration: "Administrare",
         fleet: "Flotă",
         service: "Service",
         rentals: "Închirieri",
@@ -247,6 +304,27 @@ export const accessCatalog = {
       },
       modes: { allow: "Permite", default: "Implicit", deny: "Refuză" },
       modeFor: "Acces pentru {permission}",
+      scopeClose: "Gata",
+      scopeSearch: "Caută un domeniu de acces…",
+      scopeClearSearch: "Șterge căutarea",
+      scopeNoResults: "Niciun domeniu nu corespunde căutării.",
+      scopeDescriptions: {
+        OWN: "Doar înregistrările acestui utilizator, pentru care se aplică permisiunea.",
+        ASSIGNED:
+          "Doar înregistrările legate de lucrările atribuite acestui utilizator.",
+        AVAILABLE:
+          "Lucrări de service neatribuite, disponibile pentru preluare.",
+        ALL: "Toate înregistrările permise pentru această acțiune, cu restricțiile de administrare aplicabile.",
+        COMBINED:
+          "Lucrările atribuite și cele neatribuite, disponibile pentru preluare.",
+        NONE: "Utilizatorul nu poate efectua această acțiune.",
+      },
+      scopeBadges: {
+        OWN: "Doar proprii",
+        ASSIGNED: "Doar atribuite",
+        AVAILABLE: "Lucrări disponibile",
+        ALL: "Toate înregistrările",
+      },
       scope: "Domeniu",
       scopeFor: "Domeniu pentru {permission}",
       scopes: {
@@ -278,6 +356,28 @@ export const accessCatalog = {
       clearFilters: "Arată toate permisiunile",
     },
     descriptions: {
+      users: {
+        read: "Vezi utilizatorii, rolurile și permisiunile efective.",
+        invite:
+          "Creează conturi și gestionează invitațiile utilizatorilor fără rol de administrator.",
+        status: {
+          update:
+            "Activează, suspendă sau dezactivează conturi fără rol de administrator.",
+        },
+        roles: {
+          update:
+            "Atribuie roluri permise utilizatorilor fără rol de administrator.",
+        },
+        permissions: {
+          update:
+            "Personalizează permisiunile utilizatorilor în limitele propriului acces.",
+        },
+      },
+      roles: {
+        read: "Vezi definițiile rolurilor și permisiunile moștenite.",
+        update:
+          "Editează rolurile fără privilegii de administrator în limitele propriului acces.",
+      },
       persons: {
         read: "Vizualizează persoanele și datele lor de contact.",
         create: "Adaugă o persoană în evidența clienților.",
@@ -372,6 +472,17 @@ export const accessCatalog = {
       },
     },
     permissions: {
+      users: {
+        read: "Utilizatori · Vizualizare",
+        invite: "Utilizatori · Invitare",
+        status: { update: "Utilizatori · Gestionare acces la cont" },
+        roles: { update: "Utilizatori · Atribuire roluri" },
+        permissions: { update: "Utilizatori · Personalizare permisiuni" },
+      },
+      roles: {
+        read: "Roluri · Vizualizare",
+        update: "Roluri · Editare permisiuni",
+      },
       persons: {
         read: "Persoane · Vizualizare",
         create: "Persoane · Creare",

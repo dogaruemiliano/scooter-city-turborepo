@@ -7,7 +7,11 @@ import {
 } from "@nestjs/common";
 import { v1 } from "@repo/api-shared";
 import { AccessService } from "../access/access.service";
-import { accessibleWhere } from "../access/access.ability";
+import {
+  accessibleWhere,
+  assignedProblemWhere,
+  unassignedProblemWhere,
+} from "../access/access.ability";
 import { AuditService } from "../audit/audit.service";
 import { AuditEventType } from "../audit/audit.types";
 import { Prisma } from "../generated/prisma/client";
@@ -41,9 +45,28 @@ const memberSelect = {
   firstName: true,
   lastName: true,
 } as const;
+const assigneeSelect = {
+  ...memberSelect,
+  isSuperAdmin: true,
+  roleMemberships: {
+    where: { role: { archivedAt: null } },
+    select: { role: { select: { name: true } } },
+  },
+} as const satisfies Prisma.UserSelect;
+
+function assigneeSummary(
+  user: Prisma.UserGetPayload<{ select: typeof assigneeSelect }>,
+) {
+  const { roleMemberships, ...member } = user;
+  return {
+    ...member,
+    roles: roleMemberships.map(({ role }) => role.name).sort(),
+  };
+}
 const problemInclude = {
   reporter: { select: memberSelect },
   assignee: { select: memberSelect },
+  assignees: { select: memberSelect, orderBy: { id: "asc" } },
   photos: {
     where: { asset: { deletedAt: null } },
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],
@@ -103,7 +126,9 @@ export class ProblemsService {
     const full =
       snapshot.isSuperAdmin ||
       snapshot.effectiveScopes["problems.read"]?.includes("ALL") ||
-      (row.assigneeId === snapshot.userId &&
+      (v1.problems
+        .problemAssignees(row)
+        .some((member) => member.id === snapshot.userId) &&
         snapshot.effectiveScopes["problems.read"]?.includes("ASSIGNED"));
     return v1.problems.problemSchema.parse({
       id: row.id,
@@ -133,6 +158,7 @@ export class ProblemsService {
         createdAt: photo.createdAt.toISOString(),
       })),
       assignee: row.assignee,
+      assignees: v1.problems.problemAssignees(row),
       ...(full ? { reporter: row.reporter } : {}),
       priority: row.priority,
       status: row.status,
@@ -157,8 +183,10 @@ export class ProblemsService {
     const ids = [
       ...new Set(
         rows
-          .filter((row) => openStates.includes(row.status) && row.assigneeId)
-          .map((row) => row.assigneeId!),
+          .filter((row) => openStates.includes(row.status))
+          .flatMap((row) =>
+            v1.problems.problemAssignees(row).map((member) => member.id),
+          ),
       ),
     ];
     const eligible = new Map(
@@ -169,9 +197,10 @@ export class ProblemsService {
     return results.map((row) => ({
       ...row,
       assigneeNeedsReassignment:
-        !!row.assigneeId &&
         openStates.includes(row.status) &&
-        !eligible.get(row.assigneeId),
+        v1.problems
+          .problemAssignees(row)
+          .some((member) => !eligible.get(member.id)),
     }));
   }
 
@@ -181,9 +210,9 @@ export class ProblemsService {
       AND: [
         this.where(snapshot, "problems.read"),
         query.view === "assigned"
-          ? { assigneeId: userId }
+          ? assignedProblemWhere(userId)
           : query.view === "available"
-            ? { assigneeId: null, status: "open" }
+            ? { ...unassignedProblemWhere, status: "open" }
             : {},
         ...(query.view === "all"
           ? [
@@ -197,11 +226,19 @@ export class ProblemsService {
           ...(query.status ? { status: query.status } : {}),
           ...(query.scooterId ? { scooterId: query.scooterId } : {}),
           ...(query.severity ? { severity: query.severity } : {}),
-          ...(query.assigneeId
-            ? { assigneeId: query.assigneeId }
-            : query.unassigned
-              ? { assigneeId: null }
-              : {}),
+          ...(query.assigneeIds?.length
+            ? {
+                OR: [
+                  { assigneeId: { in: query.assigneeIds } },
+                  { assignees: { some: { id: { in: query.assigneeIds } } } },
+                  ...(query.unassigned ? [unassignedProblemWhere] : []),
+                ],
+              }
+            : query.assigneeId
+              ? assignedProblemWhere(query.assigneeId)
+              : query.unassigned
+                ? unassignedProblemWhere
+                : {}),
           ...(query.blocking !== undefined
             ? { blocksUsage: query.blocking }
             : {}),
@@ -238,7 +275,7 @@ export class ProblemsService {
           where: { AND: [countWhere, { status: "in_progress" }] },
         }),
         this.prisma.scooterProblem.count({
-          where: { AND: [countWhere, { assigneeId: userId }] },
+          where: { AND: [countWhere, assignedProblemWhere(userId)] },
         }),
         this.prisma.scooterProblem.count({
           where: { AND: [countWhere, { status: "resolved" }] },
@@ -263,12 +300,20 @@ export class ProblemsService {
         orderBy: { fleetNumber: "asc" },
       }),
       this.prisma.user.findMany({
-        where: { assignedProblems: { some: visible } },
-        select: memberSelect,
+        where: {
+          OR: [
+            { assignedProblems: { some: visible } },
+            { problemAssignments: { some: visible } },
+          ],
+        },
+        select: assigneeSelect,
         orderBy: [{ firstName: "asc" }, { id: "asc" }],
       }),
     ]);
-    return { scooters: scooters.map(toMaintenanceScooter), assignees };
+    return {
+      scooters: scooters.map(toMaintenanceScooter),
+      assignees: assignees.map(assigneeSummary),
+    };
   }
 
   async get(userId: string, id: string) {
@@ -313,12 +358,16 @@ export class ProblemsService {
         select: { id: true },
       });
       if (!scooter) throw new NotFoundException("Scooter not found");
-      if (input.assigneeId) {
+      const assigneeIds =
+        input.assigneeIds ?? (input.assigneeId ? [input.assigneeId] : []);
+      if (assigneeIds.length) {
         this.requireAll(snapshot, "problems.assign");
-        if (!(await this.eligible(input.assigneeId, tx)))
-          throw new ConflictException(
-            "Assignee is not eligible for problem work",
-          );
+        for (const assigneeId of assigneeIds) {
+          if (!(await this.eligible(assigneeId, tx)))
+            throw new ConflictException(
+              "Assignee is not eligible for problem work",
+            );
+        }
       }
       let location = input.location;
       if (location?.savedLocationId) {
@@ -346,7 +395,8 @@ export class ProblemsService {
         description: input.description,
         severity: input.severity,
         blocksUsage: input.blocksUsage,
-        assigneeId: input.assigneeId,
+        assigneeId: assigneeIds[0] ?? null,
+        assignees: { connect: assigneeIds.map((id) => ({ id })) },
       };
       const created = await tx.scooterProblem.create({
         data: { ...data, reporterId: userId },
@@ -375,6 +425,7 @@ export class ProblemsService {
             blocksUsage: row.blocksUsage,
             assigneeId: row.assigneeId,
             assignee: row.assignee,
+            assignees: v1.problems.problemAssignees(row),
           },
         },
       });
@@ -393,7 +444,7 @@ export class ProblemsService {
   private async eligible(userId: string, tx?: Prisma.TransactionClient) {
     const user = await (tx ?? this.prisma).user.findFirst({
       where: { id: userId, deletedAt: null, loginStatus: "ACTIVE" },
-      select: memberSelect,
+      select: assigneeSelect,
     });
     if (!user) return null;
     const snapshot = await this.access.getSnapshot(userId, tx);
@@ -405,7 +456,7 @@ export class ProblemsService {
     return permits("problems.read") &&
       permits("problems.update") &&
       permits("problems.resolve")
-      ? user
+      ? assigneeSummary(user)
       : null;
   }
 
@@ -478,13 +529,16 @@ export class ProblemsService {
       }
       if (row.revision !== revision)
         throw new ConflictException("Problem changed; reload before saving");
-      const data = await change(row, snapshot, tx);
+      const { assignees, ...data } = await change(row, snapshot, tx);
       const result = await tx.scooterProblem.updateMany({
         where: { id, revision, assigneeId: row.assigneeId, status: row.status },
         data: { ...data, revision: { increment: 1 } },
       });
       if (result.count !== 1)
         throw new ConflictException("Problem changed; reload before saving");
+      if (assignees) {
+        await tx.scooterProblem.update({ where: { id }, data: { assignees } });
+      }
       const updated = await tx.scooterProblem.findUniqueOrThrow({
         where: { id },
         include: problemInclude,
@@ -499,6 +553,7 @@ export class ProblemsService {
             status: row.status,
             assigneeId: row.assigneeId,
             assignee: row.assignee,
+            assignees: v1.problems.problemAssignees(row),
             priority: row.priority,
             revision: row.revision,
             title: row.title,
@@ -515,6 +570,7 @@ export class ProblemsService {
             status: updated.status,
             assigneeId: updated.assigneeId,
             assignee: updated.assignee,
+            assignees: v1.problems.problemAssignees(updated),
             priority: updated.priority,
             revision: updated.revision,
             title: updated.title,
@@ -542,13 +598,17 @@ export class ProblemsService {
       "problems.claim",
       AuditEventType.PROBLEM_CLAIMED,
       async (row, _snapshot, tx) => {
-        if (row.status !== "open" || row.assigneeId !== null)
+        if (
+          row.status !== "open" ||
+          v1.problems.problemAssignees(row).length ||
+          row.assigneeId !== null
+        )
           throw new ConflictException("Problem is no longer available");
         if (!(await this.eligible(userId, tx)))
           throw new ForbiddenException(
             "Assigned-work permissions are required to claim work",
           );
-        return { assigneeId: userId };
+        return { assigneeId: userId, assignees: { set: [{ id: userId }] } };
       },
     );
   }
@@ -570,7 +630,9 @@ export class ProblemsService {
             input.location !== undefined) &&
           !snapshot.isSuperAdmin &&
           !snapshot.effectiveScopes["problems.update"]?.includes("ALL") &&
-          row.assigneeId !== userId
+          !v1.problems
+            .problemAssignees(row)
+            .some((member) => member.id === userId)
         )
           throw new ForbiddenException(
             "Only admins and the assignee can edit task sections",
@@ -596,7 +658,7 @@ export class ProblemsService {
           const photos = await this.photos.prepare(userId, input.photos);
           await this.photos.attach(tx, id, userId, photos);
         }
-        if (input.startWork && !row.assigneeId)
+        if (input.startWork && !v1.problems.problemAssignees(row).length)
           throw new ConflictException(
             "Assign the problem before starting work",
           );
@@ -689,11 +751,18 @@ export class ProblemsService {
         this.requireAll(snapshot, "problems.assign");
         if (!openStates.includes(row.status))
           throw new ConflictException("Only open work can be assigned");
-        if (input.assigneeId && !(await this.eligible(input.assigneeId, tx)))
-          throw new ConflictException(
-            "Assignee is not eligible for mechanic work",
-          );
-        return { assigneeId: input.assigneeId };
+        const assigneeIds =
+          input.assigneeIds ?? (input.assigneeId ? [input.assigneeId] : []);
+        for (const assigneeId of assigneeIds) {
+          if (!(await this.eligible(assigneeId, tx)))
+            throw new ConflictException(
+              "Assignee is not eligible for mechanic work",
+            );
+        }
+        return {
+          assigneeId: assigneeIds[0] ?? null,
+          assignees: { set: assigneeIds.map((id) => ({ id })) },
+        };
       },
     );
   }

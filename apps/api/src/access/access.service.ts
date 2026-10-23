@@ -26,6 +26,12 @@ import {
   type GrantRow,
 } from "./access.resolver";
 
+import {
+  assertDelegable,
+  assertManageableUser,
+  requireManagementPermission,
+} from "./management-policy";
+
 const roleInclude = {
   permissions: true,
   _count: { select: { members: true } },
@@ -37,6 +43,7 @@ const userInclude = {
   invitations: { orderBy: { generation: "desc" as const }, take: 1 },
 } as const;
 type RoleRow = Prisma.RoleGetPayload<{ include: typeof roleInclude }>;
+type SnapshotForManagement = AccessSnapshot;
 type UserRow = Prisma.UserGetPayload<{ include: typeof userInclude }>;
 const roleDto = (r: RoleRow): v1.access.Role =>
   v1.access.roleSchema.parse({
@@ -120,16 +127,62 @@ export class AccessService {
         : null,
     });
   }
-  private async lock(tx: Prisma.TransactionClient, actorId: string) {
+  private async lock(
+    tx: Prisma.TransactionClient,
+    actorId: string,
+    permission?: string,
+  ) {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(726001)`;
-    const actor = await tx.user.findUnique({ where: { id: actorId } });
-    if (
-      !actor ||
-      actor.deletedAt ||
-      actor.loginStatus !== "ACTIVE" ||
-      !actor.isSuperAdmin
-    )
+    const actor = await this.getSnapshot(actorId, tx);
+    if (permission) requireManagementPermission(actor, permission);
+    else if (!actor.isSuperAdmin)
       throw new ForbiddenException("Super admin required");
+    return actor;
+  }
+  private async checkUserChange(
+    tx: Prisma.TransactionClient,
+    actor: SnapshotForManagement,
+    user: UserRow | null,
+    input: Pick<v1.access.UserAccessInput, "roles" | "overrides">,
+  ) {
+    if (actor.isSuperAdmin) return;
+    if (user) assertManageableUser(actor, user);
+    const ids = (roles: { id?: string; roleId?: string }[]) =>
+      roles
+        .map((r) => r.id ?? r.roleId)
+        .sort()
+        .join(",");
+    if (ids(input.roles) !== ids(user?.roleMemberships ?? []))
+      requireManagementPermission(actor, "users.roles.update");
+    const normalize = (rows: readonly GrantRow[]) =>
+      JSON.stringify(
+        rows
+          .map((r) => ({
+            permissionKey: r.permissionKey,
+            scopes: normalizeScopes(r.scopes),
+            reason: (r as GrantRow & { reason?: string | null }).reason ?? null,
+          }))
+          .sort((a, b) => a.permissionKey.localeCompare(b.permissionKey)),
+      );
+    if (
+      normalize(input.overrides) !== normalize(user?.permissionOverrides ?? [])
+    )
+      requireManagementPermission(actor, "users.permissions.update");
+    const proposed = await this.proposed(tx, input);
+    assertDelegable(
+      actor,
+      proposed.scopes,
+      proposed.roles.map((role) => role.slug),
+    );
+    // Overrides cannot hide a broader role grant that would reappear after a role edit.
+    assertDelegable(
+      actor,
+      resolveScopes(
+        proposed.roles.flatMap((role) => role.permissions),
+        [],
+      ),
+      proposed.roles.map((role) => role.slug),
+    );
   }
   private async user(
     tx: Prisma.TransactionClient,
@@ -284,8 +337,9 @@ export class AccessService {
     input: v1.access.UserAccessInput,
   ) {
     return this.prisma.$transaction(async (tx) => {
-      await this.lock(tx, actorId);
+      const actor = await this.lock(tx, actorId, "users.read");
       const user = await this.user(tx, id, input.expectedRevision);
+      await this.checkUserChange(tx, actor, user, input);
       const proposed = await this.proposed(tx, input);
       return {
         before: resolveScopes(grantsFor(user), user.permissionOverrides),
@@ -300,8 +354,9 @@ export class AccessService {
     input: v1.access.UserAccessInput,
   ) {
     await this.prisma.$transaction(async (tx) => {
-      await this.lock(tx, actorId);
+      const actor = await this.lock(tx, actorId, "users.read");
       const user = await this.user(tx, id, input.expectedRevision);
+      await this.checkUserChange(tx, actor, user, input);
       if (user.deletedAt) throw new ConflictException("Deactivated user");
       await this.replaceAccess(tx, id, input);
       await this.event(
@@ -319,12 +374,14 @@ export class AccessService {
   async createUser(actorId: string, input: v1.access.CreateUserInput) {
     this.checkActivationMethod();
     const id = await this.prisma.$transaction(async (tx) => {
-      await this.lock(tx, actorId);
+      const actor = await this.lock(tx, actorId, "users.invite");
       let user = await tx.user.findUnique({ where: { email: input.email } });
       if (user && (user.deletedAt || user.loginStatus !== "DISABLED"))
         throw new ConflictException(
           "User already exists. Edit their access explicitly.",
         );
+      const existing = user ? await this.user(tx, user.id) : null;
+      await this.checkUserChange(tx, actor, existing, input);
       if (!user)
         user = await tx.user.create({
           data: {
@@ -411,8 +468,9 @@ export class AccessService {
   async invite(actorId: string, id: string, revision: number) {
     this.checkActivationMethod();
     await this.prisma.$transaction(async (tx) => {
-      await this.lock(tx, actorId);
+      const actor = await this.lock(tx, actorId, "users.invite");
       const user = await this.user(tx, id, revision);
+      assertManageableUser(actor, user);
       if (user.deletedAt || !["DISABLED", "INVITED"].includes(user.loginStatus))
         throw new ConflictException(
           "Only disabled or invited users can be invited",
@@ -446,8 +504,9 @@ export class AccessService {
   }
   async cancelInvitation(actorId: string, id: string, revision: number) {
     await this.prisma.$transaction(async (tx) => {
-      await this.lock(tx, actorId);
+      const actor = await this.lock(tx, actorId, "users.invite");
       const user = await this.user(tx, id, revision);
+      assertManageableUser(actor, user);
       if (user.loginStatus !== "INVITED")
         throw new ConflictException("No pending invitation");
       await tx.userInvitation.updateMany({
@@ -497,8 +556,9 @@ export class AccessService {
     },
   ) {
     await this.prisma.$transaction(async (tx) => {
-      await this.lock(tx, actorId);
+      const actor = await this.lock(tx, actorId, "users.status.update");
       const user = await this.user(tx, id, input.expectedRevision);
+      assertManageableUser(actor, user);
       if (user.deletedAt) throw new ConflictException("Deactivated user");
       if (
         input.status === "ACTIVE" &&
@@ -741,8 +801,22 @@ export class AccessService {
     input: v1.access.UpdateRoleInput,
   ) {
     return this.prisma.$transaction(async (tx) => {
-      await this.lock(tx, actorId);
+      const actor = await this.lock(tx, actorId, "roles.update");
+      if (!actor.isSuperAdmin) {
+        const role = await this.getRole(id);
+        if (role.slug === "admin")
+          throw new ForbiddenException(
+            "Only Super Admins can change the Admin role",
+          );
+        assertDelegable(actor, resolveScopes(input.permissions, []));
+      }
       const impact = await this.roleImpact(tx, id, input);
+      if (!actor.isSuperAdmin) {
+        for (const member of impact.affectedMembers) {
+          assertManageableUser(actor, await this.user(tx, member.id));
+          assertDelegable(actor, member.after);
+        }
+      }
       return {
         memberCount: impact.memberCount,
         affectedMembers: impact.affectedMembers,
@@ -755,8 +829,22 @@ export class AccessService {
     input: v1.access.UpdateRoleInput,
   ) {
     await this.prisma.$transaction(async (tx) => {
-      await this.lock(tx, actorId);
+      const actor = await this.lock(tx, actorId, "roles.update");
+      if (!actor.isSuperAdmin) {
+        const role = await this.getRole(id);
+        if (role.slug === "admin")
+          throw new ForbiddenException(
+            "Only Super Admins can change the Admin role",
+          );
+        assertDelegable(actor, resolveScopes(input.permissions, []));
+      }
       const impact = await this.roleImpact(tx, id, input);
+      if (!actor.isSuperAdmin) {
+        for (const member of impact.affectedMembers) {
+          assertManageableUser(actor, await this.user(tx, member.id));
+          assertDelegable(actor, member.after);
+        }
+      }
       if (impact.affectedMembers.some((m) => m.missingPrerequisites.length))
         throw new BadRequestException(
           "Role edit leaves a member without required permissions. Review impact first.",

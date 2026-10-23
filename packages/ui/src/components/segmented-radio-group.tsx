@@ -225,10 +225,7 @@ function SegmentedRadioGroup<Value extends string>({
                 option.severity
                   ? cn(
                       value === option.value
-                        ? cn(
-                            severityTone[option.severity],
-                            "ring-2 ring-inset ring-severity-foreground",
-                          )
+                        ? severityTone[option.severity]
                         : severityTextTone[option.severity],
                       "peer-disabled:opacity-50",
                     )

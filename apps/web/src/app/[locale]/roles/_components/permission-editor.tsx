@@ -4,18 +4,20 @@ import { useId, useState } from "react";
 import {
   Banknote,
   CalendarDays,
-  ChevronRight,
+  ChevronDown,
   Info,
   Monitor,
+  ShieldCheck,
   Truck,
   Users,
   Wrench,
 } from "lucide-react";
 import { v1 } from "@repo/api-shared";
+import { Badge } from "@repo/ui/components/badge";
 import { Button } from "@repo/ui/components/button";
 import { Input } from "@repo/ui/components/input";
 import { Label } from "@repo/ui/components/label";
-import { NativeSelect } from "@repo/ui/components/native-select";
+import { ScopePicker } from "./ScopePicker";
 import { SearchField } from "@repo/ui/components/search-field";
 import { SegmentedRadioGroup } from "@repo/ui/components/segmented-radio-group";
 import {
@@ -26,7 +28,13 @@ import {
 } from "@repo/ui/components/tabs";
 import { useTranslations } from "next-intl";
 
+import {
+  permissionActions,
+  permissionActionKeys,
+} from "../_lib/permission-presentation";
+
 const permissionGroups = [
+  { key: "administration", icon: ShieldCheck, prefixes: ["users.", "roles."] },
   {
     key: "fleet",
     icon: Truck,
@@ -106,11 +114,15 @@ export function PermissionEditor({
   onChange,
   roles,
   disabled,
+  canEditPermission,
+  stickyTabs = false,
 }: {
   value: Grant[];
   onChange: (value: Grant[]) => void;
   roles?: v1.access.Role[];
   disabled?: boolean;
+  canEditPermission?: (key: string) => boolean;
+  stickyTabs?: boolean;
 }) {
   const t = useTranslations("access.editor");
   const labels = useTranslations("access.permissions");
@@ -125,18 +137,12 @@ export function PermissionEditor({
   const query = searchable(search.trim());
   const isUser = roles !== undefined;
   const grants = new Map(value.map((grant) => [grant.permissionKey, grant]));
-  const displayScopes = (scopes: readonly v1.access.PermissionScope[]) =>
-    !scopes.length
-      ? t("noAccess")
-      : scopes.includes("ASSIGNED") && scopes.includes("AVAILABLE")
-        ? t("assignedAndAvailable")
-        : scopes.map((scope) => t(`scopes.${scope}`)).join(" + ");
   const replace = (
     key: v1.access.PermissionKey,
     scopes: v1.access.PermissionScope[] | null,
     reason?: string | null,
   ) => {
-    if (disabled) return;
+    if (disabled || canEditPermission?.(key) === false) return;
     const rest = value.filter((grant) => grant.permissionKey !== key);
     onChange(
       scopes === null || (!isUser && !scopes.length)
@@ -189,9 +195,25 @@ export function PermissionEditor({
       className="flex min-w-0 flex-col gap-4 font-body"
       aria-labelledby={`${id}-title`}
     >
-      <h3 id={`${id}-title`} className="sr-only">
-        {t("title")}
-      </h3>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-col gap-1">
+          <h3 id={`${id}-title`} className="text-base font-semibold">
+            {t("title")}
+          </h3>
+          <p className="text-sm text-muted-foreground">
+            {isUser
+              ? roleNames
+                ? t("inheritedFrom", { roles: roleNames })
+                : t("noBaseRole")
+              : t("roleHelp")}
+          </p>
+        </div>
+        {isUser && value.length > 0 ? (
+          <Badge variant="secondary">
+            {t("customCount", { count: value.length })}
+          </Badge>
+        ) : null}
+      </div>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <SearchField
           id={`${id}-search`}
@@ -224,94 +246,180 @@ export function PermissionEditor({
         onValueChange={(key) => setActiveGroup(String(key))}
         className="min-w-0 gap-0"
       >
-        <TabsList
-          variant="line"
-          aria-label={t("categories")}
-          className="w-full shrink-0 gap-0 overflow-x-auto rounded-none border-y border-border p-0"
+        <div
+          className={
+            stickyTabs
+              ? "sticky top-0 z-raised bg-popover text-popover-foreground"
+              : undefined
+          }
         >
-          {groups.map((group) => (
-            <TabsTrigger
-              key={group.key}
-              value={group.key}
-              disabled={!group.visible.length}
-              className="min-h-11 min-w-fit flex-none gap-2 rounded-none px-3 font-body text-sm data-active:text-link dark:data-active:text-link after:bg-primary group-data-horizontal/tabs:after:bottom-0 md:min-w-fit md:px-3"
-            >
-              <group.icon aria-hidden="true" className="size-4" />
-              {t(`groups.${group.key}`)}
-              {query || onlyCustom ? (
-                <span className="text-xs tabular-nums">
-                  {group.visible.length}
-                </span>
-              ) : null}
-            </TabsTrigger>
-          ))}
-        </TabsList>
+          <TabsList
+            variant="line"
+            aria-label={t("categories")}
+            className="w-full shrink-0 gap-0 overflow-x-auto rounded-none border-y border-border p-0"
+          >
+            {groups.map((group) => (
+              <TabsTrigger
+                key={group.key}
+                value={group.key}
+                disabled={!group.visible.length}
+                className="min-h-11 min-w-fit flex-none gap-2 rounded-none px-3 font-body text-sm data-active:text-link dark:data-active:text-link after:bg-primary group-data-horizontal/tabs:after:bottom-0 md:min-w-fit md:px-3"
+              >
+                <group.icon aria-hidden="true" className="size-4" />
+                {t(`groups.${group.key}`)}
+                {query || onlyCustom ? (
+                  <span className="text-xs tabular-nums">
+                    {group.visible.length}
+                  </span>
+                ) : null}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </div>
         {groups.map((group) => (
           <TabsContent
             key={group.key}
             value={group.key}
-            className="min-w-0 divide-y divide-border"
+            className="min-w-0 pt-4"
           >
-            {group.visible.map((permission) => {
-              const grant = grants.get(permission.key);
-              const inherited = inheritedScopes(roles ?? [], permission.key);
-              const selected = normalizeScopes(grant?.scopes ?? inherited);
-              const mode: PermissionMode = grant
-                ? grant.scopes.length
-                  ? "allow"
-                  : "deny"
-                : isUser
-                  ? "default"
-                  : "deny";
-              const choices = scopeOptions(permission.scopes);
-              const modes: PermissionMode[] = isUser
-                ? ["allow", "default", "deny"]
-                : ["allow", "deny"];
-              const sources = (roles ?? [])
-                .filter((role) =>
-                  role.permissions.some(
-                    (row) =>
-                      row.permissionKey === permission.key && row.scopes.length,
-                  ),
-                )
-                .map((role) => role.name)
-                .join(", ");
-              const rowId = `${id}-${permission.key}`;
-              const label = labels(permission.key);
-              const hasDetails = isUser || permission.prerequisites.length > 0;
-              const detailsOpen = expandedDetails.includes(permission.key);
-              const changeMode = (next: PermissionMode) => {
-                if (next === "default") replace(permission.key, null);
-                else if (next === "deny")
-                  replace(permission.key, [], grant?.reason);
-                else {
-                  const base = normalizeScopes(
-                    inherited.filter((scope) =>
-                      permission.scopes.some((allowed) => allowed === scope),
+            <div className="flex flex-col gap-3">
+              {group.visible.map((permission) => {
+                const grant = grants.get(permission.key);
+                const inherited = inheritedScopes(roles ?? [], permission.key);
+                const selected = normalizeScopes(grant?.scopes ?? inherited);
+                const mode: PermissionMode = grant
+                  ? grant.scopes.length
+                    ? "allow"
+                    : "deny"
+                  : isUser
+                    ? "default"
+                    : "deny";
+                const action =
+                  permissionActions[permissionActionKeys[permission.key]];
+                const ActionIcon = action.icon;
+                const choices = scopeOptions(permission.scopes);
+                const modes: PermissionMode[] = isUser
+                  ? ["allow", "default", "deny"]
+                  : ["allow", "deny"];
+                const sources = (roles ?? [])
+                  .filter((role) =>
+                    role.permissions.some(
+                      (row) =>
+                        row.permissionKey === permission.key &&
+                        row.scopes.length,
                     ),
-                  );
-                  replace(
-                    permission.key,
-                    base.length ? base : choices[0]!,
-                    grant?.reason,
-                  );
-                }
-              };
-              return (
-                <div
-                  key={permission.key}
-                  role="group"
-                  aria-labelledby={`${rowId}-label`}
-                  className="grid min-w-0 grid-cols-12 items-center gap-x-2 gap-y-2 py-3 lg:gap-x-4 lg:gap-y-3 lg:py-4"
-                >
-                  <div className="col-span-12 min-w-0 lg:col-span-5">
-                    <div className="flex items-center justify-between gap-1 lg:gap-2">
-                      <h4
-                        id={`${rowId}-label`}
-                        className="font-body text-sm font-semibold"
+                  )
+                  .map((role) => role.name)
+                  .join(", ");
+                const rowDisabled =
+                  disabled || canEditPermission?.(permission.key) === false;
+                const rowId = `${id}-${permission.key}`;
+                const label = labels(permission.key);
+                const hasDetails =
+                  isUser || permission.prerequisites.length > 0;
+                const detailsOpen = expandedDetails.includes(permission.key);
+                const changeMode = (next: PermissionMode) => {
+                  if (next === "default") replace(permission.key, null);
+                  else if (next === "deny")
+                    replace(permission.key, [], grant?.reason);
+                  else {
+                    const base = normalizeScopes(
+                      inherited.filter((scope) =>
+                        permission.scopes.some((allowed) => allowed === scope),
+                      ),
+                    );
+                    replace(
+                      permission.key,
+                      base.length ? base : choices[0]!,
+                      grant?.reason,
+                    );
+                  }
+                };
+                return (
+                  <div
+                    key={permission.key}
+                    role="group"
+                    aria-labelledby={`${rowId}-label`}
+                    className={`grid min-w-0 grid-cols-12 items-center gap-x-2 gap-y-3 rounded-lg border bg-card px-4 pt-4 pb-0 text-card-foreground lg:gap-x-4 lg:px-5 lg:pt-5 ${isUser && grant ? "border-primary" : "border-border"}`}
+                  >
+                    <div className="col-span-12 min-w-0 self-start lg:col-span-5">
+                      <div className="flex items-start justify-between gap-1 lg:gap-2">
+                        <div className="flex min-w-0 flex-col gap-2">
+                          <div className="flex min-w-0 flex-col gap-2">
+                            <h4
+                              id={`${rowId}-label`}
+                              className="font-body text-sm font-semibold"
+                            >
+                              {label}
+                            </h4>
+                          </div>
+                        </div>
+                        <span
+                          aria-hidden="true"
+                          className={`flex size-9 shrink-0 items-center justify-center rounded-md ${action.tone}`}
+                        >
+                          <ActionIcon className="size-4" />
+                        </span>
+                      </div>
+                      {isUser ? (
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          {grant ? (
+                            <span className="text-xs text-muted-foreground">
+                              {t("customOverride")}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">
+                              {sources
+                                ? t("inheritedFrom", { roles: sources })
+                                : t("notInRole")}
+                            </span>
+                          )}
+                        </div>
+                      ) : null}
+                    </div>
+                    <div className="col-span-12 min-w-0 lg:col-span-3">
+                      <Label
+                        id={`${rowId}-scope-label`}
+                        htmlFor={
+                          mode === "default" ? undefined : `${rowId}-scope`
+                        }
+                        className="mb-1"
                       >
-                        {label}
-                      </h4>
+                        {t("scope")}
+                      </Label>
+                      <ScopePicker
+                        id={`${rowId}-scope`}
+                        label={t("scopeFor", { permission: label })}
+                        scopes={selected}
+                        choices={choices}
+                        disabled={rowDisabled}
+                        readOnly={mode === "default"}
+                        denied={mode === "deny"}
+                        onChange={(next) =>
+                          replace(permission.key, next, grant?.reason)
+                        }
+                      />
+                    </div>
+                    <SegmentedRadioGroup
+                      label={t("modeFor", { permission: label })}
+                      name={`${rowId}-mode`}
+                      value={mode}
+                      onValueChange={changeMode}
+                      disabled={rowDisabled}
+                      containerClassName="col-span-12 min-w-0 self-end lg:col-span-4"
+                      columns={isUser ? 3 : 2}
+                      options={modes.map((option) => ({
+                        value: option,
+                        label: t(`modes.${option}`),
+                        tone:
+                          option === "allow"
+                            ? "primary"
+                            : option === "deny"
+                              ? "destructive"
+                              : "neutral",
+                      }))}
+                    />
+                    <div className="col-span-12 flex min-w-0 flex-col">
                       <button
                         type="button"
                         aria-expanded={detailsOpen}
@@ -323,155 +431,86 @@ export function PermissionEditor({
                               : [...current, permission.key],
                           )
                         }
-                        className={`flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1 rounded-md text-xs text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring lg:min-w-0 ${hasDetails ? "" : "hidden"}`}
+                        className={`flex h-10 min-h-10 w-full shrink-0 items-center justify-center gap-2 rounded-md text-xs text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring ${hasDetails ? "" : "hidden"}`}
                       >
-                        <span className="sr-only lg:not-sr-only">
-                          {t("details")}
-                        </span>
-                        <ChevronRight
+                        <span className="sr-only">{t("details")}</span>
+                        <ChevronDown
                           aria-hidden="true"
-                          className={`size-3 transition-transform duration-fast ease-standard ${detailsOpen ? "rotate-90" : ""}`}
+                          className={`size-4 transition-transform duration-normal ease-standard motion-reduce:transition-none ${detailsOpen ? "rotate-180" : "rotate-0"}`}
                         />
                       </button>
-                    </div>
-                    <p className="text-sm leading-relaxed text-muted-foreground">
-                      {descriptions(permission.key)}
-                    </p>
-                  </div>
-                  <div className="col-span-12 min-w-0 lg:col-span-3">
-                    <Label
-                      id={`${rowId}-scope-label`}
-                      htmlFor={
-                        mode === "default" ? undefined : `${rowId}-scope`
-                      }
-                      className="mb-1"
-                    >
-                      {t("scope")}
-                    </Label>
-                    {mode === "default" ? (
-                      <p
-                        aria-labelledby={`${rowId}-label ${rowId}-scope-label`}
-                        className="flex min-h-12 items-center text-sm md:min-h-11"
+                      <div
+                        id={`${rowId}-details`}
+                        inert={!detailsOpen}
+                        aria-hidden={!detailsOpen}
+                        className={`col-span-12 grid min-w-0 transition-[grid-template-rows,opacity] duration-normal ease-standard motion-reduce:transition-none ${detailsOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"} ${hasDetails ? "" : "lg:hidden"}`}
                       >
-                        {displayScopes(selected)}
-                      </p>
-                    ) : (
-                      <NativeSelect
-                        id={`${rowId}-scope`}
-                        aria-label={t("scopeFor", { permission: label })}
-                        value={mode === "deny" ? "" : selected.join(",")}
-                        disabled={disabled || mode !== "allow"}
-                        onChange={(event) => {
-                          const next = choices.find(
-                            (scopes) => scopes.join(",") === event.target.value,
-                          );
-                          if (next)
-                            replace(permission.key, next, grant?.reason);
-                        }}
-                        className="font-body"
-                      >
-                        {mode === "deny" ? (
-                          <option value="">{t("noAccess")}</option>
-                        ) : (
-                          choices.map((scopes) => (
-                            <option
-                              key={scopes.join(",")}
-                              value={scopes.join(",")}
-                            >
-                              {displayScopes(scopes)}
-                            </option>
-                          ))
-                        )}
-                      </NativeSelect>
-                    )}
-                  </div>
-                  <SegmentedRadioGroup
-                    label={t("modeFor", { permission: label })}
-                    name={`${rowId}-mode`}
-                    value={mode}
-                    onValueChange={changeMode}
-                    disabled={disabled}
-                    containerClassName="col-span-12 min-w-0 self-end lg:col-span-4"
-                    className={isUser ? "grid-cols-3" : "grid-cols-2"}
-                    options={modes.map((option) => ({
-                      value: option,
-                      label: t(`modes.${option}`),
-                      tone:
-                        option === "allow"
-                          ? "primary"
-                          : option === "deny"
-                            ? "destructive"
-                            : "neutral",
-                    }))}
-                  />
-                  <div
-                    id={`${rowId}-details`}
-                    hidden={!detailsOpen}
-                    className={`col-span-12 min-w-0 ${hasDetails ? "" : "lg:hidden"}`}
-                  >
-                    <div className="flex flex-col gap-3 pb-2 pl-4 text-xs text-muted-foreground">
-                      {isUser ? (
-                        <p>
-                          {sources
-                            ? t("inheritedFrom", { roles: sources })
-                            : t("notInRole")}
-                          {grant ? ` ${t("overrideHelp")}` : ""}
-                        </p>
-                      ) : null}
-                      {permission.prerequisites.length ? (
-                        <div className="flex flex-col gap-1">
-                          <p className="font-semibold text-foreground">
-                            {t("dependencies")}
-                          </p>
-                          <ul className="flex list-disc flex-col gap-1 pl-4">
-                            {permission.prerequisites.map((key) => {
-                              const requirements =
-                                permission.scopePrerequisites.filter(
-                                  (item) => item.key === key,
-                                );
-                              return (
-                                <li key={key}>
-                                  {labels(key)}
-                                  {requirements.length
-                                    ? ` (${requirements.map((item) => item.anyOf.map((scope) => t(`scopes.${scope}`)).join(" / ")).join("; ")})`
-                                    : ""}
-                                </li>
-                              );
-                            })}
-                          </ul>
+                        <div className="min-h-0 overflow-hidden">
+                          <div className="flex flex-col gap-3 pb-4 text-xs text-muted-foreground lg:pb-5">
+                            {isUser ? (
+                              <p>
+                                {sources
+                                  ? t("inheritedFrom", { roles: sources })
+                                  : t("notInRole")}
+                                {grant ? ` ${t("overrideHelp")}` : ""}
+                              </p>
+                            ) : null}
+                            {permission.prerequisites.length ? (
+                              <div className="flex flex-col gap-1">
+                                <p className="font-semibold text-foreground">
+                                  {t("dependencies")}
+                                </p>
+                                <ul className="flex list-disc flex-col gap-1 pl-4">
+                                  {permission.prerequisites.map((key) => {
+                                    const requirements =
+                                      permission.scopePrerequisites.filter(
+                                        (item) => item.key === key,
+                                      );
+                                    return (
+                                      <li key={key}>
+                                        {labels(key)}
+                                        {requirements.length
+                                          ? ` (${requirements.map((item) => item.anyOf.map((scope) => t(`scopes.${scope}`)).join(" / ")).join("; ")})`
+                                          : ""}
+                                      </li>
+                                    );
+                                  })}
+                                </ul>
+                              </div>
+                            ) : null}
+                            {isUser && grant ? (
+                              <div className="flex max-w-(--breakpoint-sm) flex-col gap-2">
+                                <Label htmlFor={`${rowId}-reason`}>
+                                  {t("reason")}
+                                </Label>
+                                <Input
+                                  id={`${rowId}-reason`}
+                                  aria-label={t("reasonFor", {
+                                    permission: label,
+                                  })}
+                                  className="h-11 font-body md:h-11"
+                                  maxLength={500}
+                                  value={grant.reason ?? ""}
+                                  disabled={rowDisabled}
+                                  placeholder={t("reasonPlaceholder")}
+                                  onChange={(event) =>
+                                    replace(
+                                      permission.key,
+                                      grant.scopes,
+                                      event.target.value,
+                                    )
+                                  }
+                                />
+                              </div>
+                            ) : null}
+                          </div>
                         </div>
-                      ) : null}
-                      {isUser && grant ? (
-                        <div className="flex max-w-(--breakpoint-sm) flex-col gap-2">
-                          <label
-                            htmlFor={`${rowId}-reason`}
-                            className="text-xs font-semibold text-foreground"
-                          >
-                            {t("reason")}
-                          </label>
-                          <Input
-                            id={`${rowId}-reason`}
-                            aria-label={t("reasonFor", { permission: label })}
-                            className="h-11 font-body md:h-11"
-                            maxLength={500}
-                            value={grant.reason ?? ""}
-                            disabled={disabled}
-                            placeholder={t("reasonPlaceholder")}
-                            onChange={(event) =>
-                              replace(
-                                permission.key,
-                                grant.scopes,
-                                event.target.value,
-                              )
-                            }
-                          />
-                        </div>
-                      ) : null}
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </TabsContent>
         ))}
       </Tabs>

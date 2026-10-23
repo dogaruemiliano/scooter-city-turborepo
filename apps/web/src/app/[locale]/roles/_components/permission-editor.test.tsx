@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, within, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { messages } from "@repo/i18n";
@@ -57,11 +57,97 @@ const resolveRow = () => permissionRow("Service work · Resolve");
 const mode = (row: HTMLElement, name: "Allow" | "Default" | "Deny") =>
   within(row).getByRole("radio", { name });
 
+const scopeTrigger = (row: HTMLElement) =>
+  within(row).getByRole("button", { name: /^Scope for/ });
+async function selectScope(
+  user: ReturnType<typeof userEvent.setup>,
+  row: HTMLElement,
+  name: string,
+) {
+  await user.click(scopeTrigger(row));
+  const sheet = await screen.findByRole("dialog");
+  await user.click(within(sheet).getByRole("button", { name }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+}
+
 async function serviceTab(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole("tab", { name: "Service" }));
 }
 
 describe("permission replacement editor", () => {
+  it("animates expansion and a half-turn arrow while keeping collapsed details inert", async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+    const toggle = within(resolveRow()).getByRole("button", {
+      name: "Details",
+    });
+    const panel = document.getElementById(
+      toggle.getAttribute("aria-controls")!,
+    )!;
+    const arrow = toggle.querySelector("svg")!;
+    expect(toggle).toHaveClass("h-10", "min-h-10");
+    expect(panel.querySelector(".pb-4")).not.toBeNull();
+    expect(panel).toHaveAttribute("inert");
+    expect(panel).toHaveClass(
+      "grid-rows-[0fr]",
+      "duration-normal",
+      "motion-reduce:transition-none",
+    );
+    expect(arrow).toHaveClass("rotate-0");
+    await user.click(toggle);
+    expect(panel).not.toHaveAttribute("inert");
+    expect(panel).toHaveClass("grid-rows-[1fr]");
+    expect(arrow).toHaveClass("rotate-180");
+    await user.click(toggle);
+    expect(panel).toHaveAttribute("aria-hidden", "true");
+    expect(panel).toHaveClass("grid-rows-[0fr]");
+    expect(arrow).toHaveClass("rotate-0");
+  });
+
+  it("shows inherited scope without badges and explains editable scopes in a sheet", async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+    expect(within(resolveRow()).getByText("All records")).toBeVisible();
+    expect(resolveRow().querySelector('[data-slot="badge"]')).toBeNull();
+    await user.click(mode(resolveRow(), "Allow"));
+    await user.click(scopeTrigger(resolveRow()));
+    const sheet = await screen.findByRole("dialog", {
+      name: "Scope for Service work · Resolve",
+    });
+    expect(sheet).toHaveClass("bg-popover");
+    expect(sheet).not.toHaveClass("bg-background");
+    expect(
+      within(sheet).getByText(
+        "Only records linked to work assigned to this user.",
+      ),
+    ).toBeVisible();
+    expect(
+      within(sheet).getByText(
+        "All records this action permits, subject to management restrictions.",
+      ),
+    ).toBeVisible();
+    await user.click(within(sheet).getByRole("button", { name: "Assigned" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(scopeTrigger(resolveRow())).toHaveTextContent("Assigned");
+    expect(scopeTrigger(resolveRow()).querySelector("svg")).not.toBeNull();
+    expect(stored()[0]?.scopes).toEqual(["ASSIGNED"]);
+  });
+
+  it("shows a visible hierarchy and marks custom overrides beside inherited access", () => {
+    render(
+      <Harness initial={[{ permissionKey: "problems.resolve", scopes: [] }]} />,
+    );
+    expect(screen.getByRole("heading", { name: "Permissions" })).toBeVisible();
+    expect(screen.queryByRole("heading", { name: "Service" })).toBeNull();
+    expect(screen.getByText("1 custom override")).toBeVisible();
+    expect(within(resolveRow()).getByText("Custom override")).toBeVisible();
+    expect(
+      within(permissionRow("Service work · View"))
+        .getAllByText("From Mechanic")
+        .some((element) => !element.closest("[hidden]")),
+    ).toBe(true);
+  });
+
   it("places the mode control in the row grid and keeps Romanian choices together", () => {
     render(
       <Harness
@@ -73,17 +159,24 @@ describe("permission replacement editor", () => {
     const row = permissionRow("Scutere · Vizualizare");
     const modes = within(row).getByRole("radiogroup");
     expect(modes.parentElement).toHaveClass("col-span-12", "lg:col-span-4");
-    expect(modes).toHaveClass("grid-cols-3");
+    expect(modes).toHaveStyle({ "--segmented-columns": "3" });
+    expect(modes).toHaveClass(
+      "grid-cols-[repeat(var(--segmented-columns),minmax(0,1fr))]",
+    );
+    for (const radio of within(modes).getAllByRole("radio")) {
+      expect(radio.parentElement).toHaveClass("after:hidden");
+    }
     expect(modes).not.toHaveClass("col-span-12", "lg:col-span-4");
     expect(within(modes).getAllByRole("radio")).toHaveLength(3);
     expect(
-      within(row).getByRole("combobox").parentElement?.parentElement,
+      within(row).getByRole("button", { name: /Domeniu/ }).parentElement,
     ).toHaveClass("col-span-12");
   });
 
   it("opens Service for a mechanic and shows inherited scopes as readouts", () => {
     render(<Harness />);
     expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
+      "Administration",
       "Fleet",
       "Service",
       "Rentals",
@@ -98,7 +191,7 @@ describe("permission replacement editor", () => {
     expect(mode(resolveRow(), "Default")).toBeChecked();
     expect(within(resolveRow()).getByText("All records")).toBeInTheDocument();
     expect(
-      within(resolveRow()).queryByRole("combobox"),
+      within(resolveRow()).queryByRole("button", { name: /^Scope for/ }),
     ).not.toBeInTheDocument();
     expect(
       within(permissionRow("Service work · View")).getByText(
@@ -126,19 +219,14 @@ describe("permission replacement editor", () => {
     expect(stored()).toEqual([
       { permissionKey: "problems.resolve", scopes: ["ALL"] },
     ]);
-    await user.selectOptions(
-      within(resolveRow()).getByRole("combobox"),
-      "ASSIGNED",
-    );
+    await selectScope(user, resolveRow(), "Assigned");
     expect(stored()[0]?.scopes).toEqual(["ASSIGNED"]);
     await user.click(mode(resolveRow(), "Deny"));
     expect(stored()).toEqual([
       { permissionKey: "problems.resolve", scopes: [] },
     ]);
-    expect(within(resolveRow()).getByRole("combobox")).toBeDisabled();
-    expect(
-      within(resolveRow()).getByRole("option", { name: "No access" }),
-    ).toBeInTheDocument();
+    expect(scopeTrigger(resolveRow())).toBeDisabled();
+    expect(within(resolveRow()).getByText("No access")).toBeInTheDocument();
     await user.click(mode(resolveRow(), "Default"));
     expect(stored()).toEqual([]);
     expect(within(resolveRow()).getByText("All records")).toBeInTheDocument();
@@ -175,20 +263,30 @@ describe("permission replacement editor", () => {
       />,
     );
     await serviceTab(user);
-    const scope = within(permissionRow("Service work · View")).getByRole(
-      "combobox",
-    );
-    await user.selectOptions(scope, "ASSIGNED,AVAILABLE");
+    const row = permissionRow("Service work · View");
+    await selectScope(user, row, "Assigned + available");
     expect(stored()[0]?.scopes).toEqual(["ASSIGNED", "AVAILABLE"]);
-    await user.selectOptions(scope, "ALL");
+    await selectScope(user, row, "All records");
     expect(stored()[0]?.scopes).toEqual(["ALL"]);
-    await user.selectOptions(scope, "AVAILABLE");
+    await selectScope(user, row, "Available");
     expect(stored()[0]?.scopes).toEqual(["AVAILABLE"]);
+    await user.click(scopeTrigger(row));
+    const sheet = await screen.findByRole("dialog");
     expect(
-      within(scope)
-        .getAllByRole("option")
-        .map((option) => (option as HTMLOptionElement).value),
-    ).toEqual(["ASSIGNED", "AVAILABLE", "ASSIGNED,AVAILABLE", "ALL"]);
+      within(sheet).getByRole("button", { name: "Assigned" }),
+    ).toBeVisible();
+    expect(
+      within(sheet).getByRole("button", { name: "Available" }),
+    ).toBeVisible();
+    expect(
+      within(sheet).getByRole("button", {
+        name: "Assigned + available",
+      }),
+    ).toBeVisible();
+    expect(
+      within(sheet).getByRole("button", { name: "All records" }),
+    ).toBeVisible();
+    await user.click(within(sheet).getByRole("button", { name: "Done" }));
   });
 
   it("updates Default from live role props while keeping explicit replacement access", async () => {
@@ -209,7 +307,7 @@ describe("permission replacement editor", () => {
     await user.click(mode(resolveRow(), "Allow"));
     view.rerender(<Harness roles={[role]} />);
     expect(mode(resolveRow(), "Allow")).toBeChecked();
-    expect(within(resolveRow()).getByRole("combobox")).toHaveValue("ASSIGNED");
+    expect(scopeTrigger(resolveRow())).toHaveTextContent("Assigned");
     await user.click(mode(resolveRow(), "Default"));
     expect(within(resolveRow()).getByText("All records")).toBeInTheDocument();
   });
@@ -236,10 +334,7 @@ describe("permission replacement editor", () => {
       within(resolveRow()).getByRole("textbox"),
       "Temporary cover",
     );
-    await user.selectOptions(
-      within(resolveRow()).getByRole("combobox"),
-      "ASSIGNED",
-    );
+    await selectScope(user, resolveRow(), "Assigned");
     expect(stored()[0]).toEqual({
       permissionKey: "problems.resolve",
       scopes: ["ASSIGNED"],
@@ -355,7 +450,7 @@ describe("permission replacement editor", () => {
     await user.type(screen.getByRole("searchbox"), "Resolve");
     for (const radio of within(resolveRow()).getAllByRole("radio"))
       expect(radio).toBeDisabled();
-    expect(within(resolveRow()).getByRole("combobox")).toBeDisabled();
+    expect(scopeTrigger(resolveRow())).toBeDisabled();
     await user.click(
       within(resolveRow()).getByRole("button", { name: "Details" }),
     );
@@ -414,7 +509,9 @@ describe("permission replacement editor", () => {
         await user.click(tab);
         count += within(
           screen.getByRole("tabpanel", { name: tab.textContent! }),
-        ).getAllByRole("group").length;
+        )
+          .getAllByRole("group")
+          .filter((element) => element.hasAttribute("aria-labelledby")).length;
       }
       expect(count).toBe(v1.access.permissionCatalog.length);
       expect(view.container.textContent).not.toContain("access.descriptions.");

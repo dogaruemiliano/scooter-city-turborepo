@@ -272,6 +272,125 @@ describe("Access management HTTP contracts (e2e)", () => {
     return v1.auth.otpChallengeMetadataSchema.parse(response.body);
   }
 
+  it("delegates user management while protecting Admin grants and definitions", async () => {
+    const role = await createRole("Delegated administrator", [
+      { permissionKey: "users.read", scopes: ["ALL"] },
+      { permissionKey: "users.invite", scopes: ["ALL"] },
+      { permissionKey: "users.roles.update", scopes: ["ALL"] },
+      { permissionKey: "users.permissions.update", scopes: ["ALL"] },
+      { permissionKey: "roles.read", scopes: ["ALL"] },
+      { permissionKey: "roles.update", scopes: ["ALL"] },
+      { permissionKey: "problems.read", scopes: ["ASSIGNED"] },
+    ]);
+    const administrator = await activeUser();
+    await replaceAccess(administrator.user.id, [role]);
+    const token = administrator.tokens.accessToken;
+    const target = await activeUser();
+    await authed("get", "/v1/users", token).expect(200);
+    await authed("get", "/v1/access/roles", token).expect(200);
+    await authed("get", `/v1/access/roles/${role.id}`, token).expect(200);
+    const roleEdit = {
+      expectedRevision: role.revision,
+      name: role.name,
+      description: role.description,
+      permissions: [],
+    };
+    await authed("post", `/v1/access/roles/${role.id}/preview`, token)
+      .send(roleEdit)
+      .expect(403);
+    await authed("put", `/v1/access/roles/${role.id}`, token)
+      .send(roleEdit)
+      .expect(403);
+
+    const payload = {
+      expectedRevision: (await getUser(target.user.id)).accessRevision,
+      roles: [],
+      overrides: [{ permissionKey: "problems.read", scopes: ["ASSIGNED"] }],
+    };
+    await authed("post", `/v1/users/${target.user.id}/access/preview`, token)
+      .send(payload)
+      .expect(201);
+    await authed("put", `/v1/users/${target.user.id}/access`, token)
+      .send(payload)
+      .expect(200);
+    const revision = (await getUser(target.user.id)).accessRevision;
+    const denied = async (
+      roles: { id: string; revision: number }[],
+      overrides: unknown[],
+    ) =>
+      authed("put", `/v1/users/${target.user.id}/access`, token)
+        .send({ expectedRevision: revision, roles, overrides })
+        .expect(403);
+    await denied([{ id: role.id, revision: role.revision }], []);
+    await denied([], [{ permissionKey: "problems.read", scopes: ["ALL"] }]);
+    await denied([], [{ permissionKey: "users.read", scopes: ["ALL"] }]);
+    await authed("put", `/v1/users/${administrator.user.id}/access`, token)
+      .send({
+        expectedRevision: (await getUser(administrator.user.id)).accessRevision,
+        roles: [],
+        overrides: [],
+      })
+      .expect(403);
+    await authed("put", `/v1/users/${superId}/access`, token)
+      .send({
+        expectedRevision: (await getUser(superId)).accessRevision,
+        roles: [],
+        overrides: [],
+      })
+      .expect(403);
+    const otherAdmin = await activeUser();
+    await replaceAccess(otherAdmin.user.id, [role]);
+    await authed("put", `/v1/users/${otherAdmin.user.id}/access`, token)
+      .send({
+        expectedRevision: (await getUser(otherAdmin.user.id)).accessRevision,
+        roles: [],
+        overrides: [],
+      })
+      .expect(403);
+    await authed("put", `/v1/users/${target.user.id}/super-admin`, token)
+      .send({
+        expectedRevision: revision,
+        isSuperAdmin: true,
+      })
+      .expect(403);
+  });
+
+  it("keeps role assignment and custom permission writes independently authorized", async () => {
+    const actor = await activeUser();
+    await replaceAccess(
+      actor.user.id,
+      [],
+      [
+        { permissionKey: "users.read", scopes: ["ALL"] },
+        { permissionKey: "roles.read", scopes: ["ALL"] },
+        { permissionKey: "users.roles.update", scopes: ["ALL"] },
+        { permissionKey: "problems.read", scopes: ["ASSIGNED"] },
+      ],
+    );
+    const target = await activeUser();
+    const payload = {
+      expectedRevision: (await getUser(target.user.id)).accessRevision,
+      roles: [],
+      overrides: [{ permissionKey: "problems.read", scopes: ["ASSIGNED"] }],
+    };
+    await authed(
+      "put",
+      `/v1/users/${target.user.id}/access`,
+      actor.tokens.accessToken,
+    )
+      .send(payload)
+      .expect(403);
+    await authed("post", "/v1/users", actor.tokens.accessToken)
+      .send({
+        email: email(),
+        firstName: "",
+        lastName: "",
+        roles: [],
+        overrides: [],
+      })
+      .expect(403);
+  });
+
   it("invites a user with serialized permissions, delivery state, and audit history", async () => {
     const role = await createRole();
     const user = await inviteUser([role]);

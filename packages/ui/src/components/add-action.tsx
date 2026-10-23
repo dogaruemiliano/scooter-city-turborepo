@@ -2,6 +2,7 @@
 
 import { useId, type ComponentProps, type ReactNode } from "react";
 import { Button } from "@repo/ui/components/button";
+import { pickerCardBorder } from "@repo/ui/lib/picker-styles";
 import { cn } from "@repo/ui/lib/utils";
 
 export type AddActionProps = Omit<
@@ -41,7 +42,8 @@ export function AddAction({
           .join(" ") || undefined
       }
       className={cn(
-        "w-full rounded-dashed-surface border-(length:--dashed-surface-border-width) border-dashed border-input bg-control px-4 text-center",
+        "w-full rounded-dashed-surface bg-control px-4 text-center",
+        pickerCardBorder,
         size === "compact" ? "min-h-12 py-2 md:min-h-11" : "min-h-20 py-4",
         subtext
           ? "grid grid-rows-3 place-items-center gap-1"

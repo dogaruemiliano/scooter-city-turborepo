@@ -9,7 +9,7 @@ export function PersonRow({
   action,
 }: {
   name: string;
-  description?: string;
+  description?: ReactNode;
   avatarUrl?: string;
   action?: ReactNode;
 }) {
