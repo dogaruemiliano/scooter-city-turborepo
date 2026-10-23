@@ -765,6 +765,31 @@ describe("PersonDetailPage", () => {
     expect(mocks.replace).toHaveBeenCalledWith("/en/persons");
   });
 
+  it.each(["image/jpeg", "application/pdf"])(
+    "opens a large preview for a saved %s document",
+    async (contentType) => {
+      const browser = userEvent.setup();
+      renderDetail(readyPerson, undefined, {
+        ...documentPhotos,
+        [identityDocument.id]: [{ ...identityFrontPhoto, contentType }],
+      });
+      await browser.click(
+        screen.getByRole("button", { name: "View National ID" }),
+      );
+      await browser.click(
+        screen.getByRole("button", { name: "View Front document photo" }),
+      );
+      const preview = await screen.findByRole("dialog", {
+        name: "Front document photo",
+      });
+      expect(
+        within(preview).getByRole("button", { name: "Zoom in" }),
+      ).toBeInTheDocument();
+      await browser.keyboard("{Escape}");
+      expect(preview).toHaveAttribute("data-closed");
+    },
+  );
+
   it("uploads and deletes document photos through the API", async () => {
     const backPhoto: v1.persons.PersonDocumentPhoto = {
       ...identityFrontPhoto,
