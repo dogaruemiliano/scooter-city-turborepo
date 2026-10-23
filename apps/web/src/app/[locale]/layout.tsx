@@ -7,6 +7,7 @@ import { TooltipProvider } from "@repo/ui/components/tooltip";
 import { NextIntlClientProvider } from "next-intl";
 import { setRequestLocale } from "next-intl/server";
 
+import { WorkspaceNotifications } from "../../components/WorkspaceNotifications";
 import { AppShell } from "../../components/AppShell";
 import { SessionProvider } from "../../components/auth/SessionProvider";
 import { meFromApi } from "../../lib/auth-server";
@@ -82,13 +83,15 @@ export default async function RootLayout({
       <body suppressHydrationWarning className="relative min-h-full">
         <div className="isolate flex min-h-full flex-col">
           <NextIntlClientProvider>
-            <TooltipProvider>
-              <SessionProvider initialUser={initialUser}>
-                <AppShell initialThemePreference={initialThemePreference}>
-                  {children}
-                </AppShell>
-              </SessionProvider>
-            </TooltipProvider>
+            <WorkspaceNotifications>
+              <TooltipProvider>
+                <SessionProvider initialUser={initialUser}>
+                  <AppShell initialThemePreference={initialThemePreference}>
+                    {children}
+                  </AppShell>
+                </SessionProvider>
+              </TooltipProvider>
+            </WorkspaceNotifications>
           </NextIntlClientProvider>
         </div>
       </body>

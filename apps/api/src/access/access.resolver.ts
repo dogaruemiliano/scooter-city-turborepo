@@ -7,6 +7,7 @@ export interface GrantRow {
 export interface AccessSnapshot {
   userId: string;
   isSuperAdmin: boolean;
+  isAdmin?: boolean;
   effectiveScopes: v1.access.EffectiveScopes;
   accessRevision: number;
   portalEligible: boolean;

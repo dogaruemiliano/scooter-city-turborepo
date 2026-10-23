@@ -1,6 +1,7 @@
 /** UI hints only. The API independently authorizes every action and record. */
 export interface AccessIdentity {
   isSuperAdmin?: boolean;
+  isAdmin?: boolean;
   effectiveScopes?: Readonly<Record<string, readonly string[] | undefined>>;
   portalEligible?: boolean;
 }

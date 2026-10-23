@@ -149,6 +149,7 @@ export class AuthIdentityController {
       lastName: row.lastName,
       roles: row.roles,
       isSuperAdmin: access.isSuperAdmin,
+      isAdmin: access.isAdmin === true,
       effectiveScopes: access.effectiveScopes,
       accessRevision: access.accessRevision,
       portalEligible: access.portalEligible,

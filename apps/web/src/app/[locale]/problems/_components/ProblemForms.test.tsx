@@ -269,7 +269,7 @@ describe("problem release forms", () => {
           url === "/v1/problems" && options?.method === "POST",
       ),
     ).toHaveLength(0);
-    await user.click(screen.getByRole("button", { name: "Report" }));
+    await user.click(screen.getByRole("button", { name: "Report problem" }));
     await waitFor(() => expect(saved).toHaveBeenCalledOnce());
     expect(mocks.fetch).toHaveBeenCalledWith(
       "/v1/problems",
@@ -442,7 +442,9 @@ describe("problem release forms", () => {
     await user.click(
       await within(sheet).findByRole("button", { name: "Taylor" }),
     );
-    await user.click(within(sheet).getByRole("button", { name: "Apply" }));
+    await user.click(
+      within(sheet).getByRole("button", { name: "Save assignees" }),
+    );
     await waitFor(() =>
       expect(mocks.fetch).toHaveBeenCalledWith(
         "/v1/problems/report/assignee",
@@ -467,7 +469,7 @@ describe("problem release forms", () => {
       "Scratched panel",
     );
     await user.click(screen.getByRole("radio", { name: "Easy" }));
-    const submit = screen.getByRole("button", { name: "Report" });
+    const submit = screen.getByRole("button", { name: "Report problem" });
     const group = screen.getByRole("radiogroup", {
       name: "Scooter condition",
     });
@@ -668,7 +670,7 @@ describe("problem release forms", () => {
     await waitFor(() =>
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
     );
-    await user.click(screen.getByRole("button", { name: "Report" }));
+    await user.click(screen.getByRole("button", { name: "Report problem" }));
     await waitFor(() => expect(saved).toHaveBeenCalledOnce());
     expect(mocks.fetch).toHaveBeenCalledWith(
       "/v1/problems",
@@ -710,7 +712,7 @@ describe("problem release forms", () => {
     expect(sheet).toHaveClass("bg-popover", "text-popover-foreground");
     expect(sheet.querySelector(".bg-background")).toBeNull();
     const submit = within(sheet).getByRole("button", {
-      name: "Resolve problem",
+      name: "Complete task",
     });
     expect(submit).toBeDisabled();
     await user.type(
@@ -780,11 +782,9 @@ describe("problem release forms", () => {
       expect(
         screen.queryByRole("button", { name: "Complete task" }),
       ).toBeNull();
-      await user.click(
-        screen.getByRole("button", { name: "More actions and activity" }),
-      );
+      await user.click(screen.getByRole("button", { name: "More actions" }));
       const sheet = await screen.findByRole("dialog", {
-        name: "More actions and activity",
+        name: "More actions",
       });
       expect(sheet).toHaveClass("bg-popover", "text-popover-foreground");
       // Controls inherit the temporary surface; no full-sheet page override.
@@ -822,11 +822,44 @@ describe("problem release forms", () => {
     }
   });
 
+  it("requires a reopening reason and includes it in the request", async () => {
+    const user = userEvent.setup();
+    const reload = vi.fn();
+    renderForm(
+      <ProblemWork
+        problem={{ ...problem, status: "resolved" }}
+        reload={reload}
+      />,
+    );
+    await user.click(
+      screen.getByRole("button", {
+        name: messages.en.workspace.problems.reopen,
+      }),
+    );
+    const confirm = screen
+      .getAllByRole("button", { name: messages.en.workspace.problems.reopen })
+      .at(-1)!;
+    expect(confirm).toBeDisabled();
+    await user.type(
+      screen.getByRole("textbox", { name: "Reason for reopening" }),
+      "Noise returned after road test",
+    );
+    await user.click(confirm);
+    await waitFor(() => expect(reload).toHaveBeenCalledOnce());
+    expect(mocks.fetch).toHaveBeenCalledWith(
+      "/v1/problems/report/reopen",
+      expect.anything(),
+      {
+        method: "POST",
+        json: { revision: 3, message: "Noise returned after road test" },
+      },
+    );
+  });
   it("requires a resolution note and an explicit hold decision, then retains the hold", async () => {
     const user = userEvent.setup();
     const reload = vi.fn();
     renderForm(<ProblemWork problem={problem} reload={reload} />);
-    const resolve = screen.getByRole("button", { name: "Resolve problem" });
+    const resolve = screen.getByRole("button", { name: "Complete task" });
     expect(resolve).toBeDisabled();
     await user.type(
       screen.getByRole("textbox", { name: "Resolution notes" }),
@@ -887,7 +920,7 @@ describe("problem release forms", () => {
     );
     expect(screen.getByText("Belt replaced")).toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "Resolve problem" }),
+      screen.queryByRole("button", { name: "Complete task" }),
     ).not.toBeInTheDocument();
     await user.click(
       screen.getByRole("button", { name: "Clear this problem’s hold" }),
@@ -920,6 +953,10 @@ describe("problem release forms", () => {
       await screen.findByText(messages.en.workspace.conflict),
     ).toBeInTheDocument();
     expect(reload).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Add comment" })).toBeDisabled();
+    expect(screen.getByRole("textbox", { name: "Comment" })).toHaveValue(
+      "Stale update",
+    );
     await user.click(screen.getByRole("button", { name: "Reload" }));
     expect(reload).toHaveBeenCalledOnce();
   });
@@ -1023,7 +1060,7 @@ describe("dedicated creation screen", () => {
   it("saves a preselected scooter report and returns to its details", async () => {
     const user = userEvent.setup();
     renderForm(<ProblemCreateScreen scooterId="scooter" />);
-    const submit = screen.getByRole("button", { name: "Report" });
+    const submit = screen.getByRole("button", { name: "Report problem" });
     expect(submit.parentElement?.firstElementChild).toBe(submit);
     expect(submit.closest('[data-slot="problem-create-actions"]')).toHaveClass(
       "static",
@@ -1053,7 +1090,7 @@ describe("dedicated creation screen", () => {
       screen.getByRole("textbox", { name: "Title" }),
       "Broken belt",
     );
-    await user.click(screen.getByRole("button", { name: "Report" }));
+    await user.click(screen.getByRole("button", { name: "Report problem" }));
     await waitFor(() =>
       expect(mocks.push).toHaveBeenCalledWith("/en/scooters/scooter"),
     );

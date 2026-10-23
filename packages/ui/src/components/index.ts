@@ -67,3 +67,5 @@ export * from "./image-gallery-editor";
 export * from "./user-card";
 
 export * from "./toast";
+export * from "./comments";
+export * from "./activity-timeline";

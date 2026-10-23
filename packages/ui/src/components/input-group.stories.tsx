@@ -3,6 +3,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import {
   InputGroup,
   InputGroupInput,
+  InputGroupTextarea,
   InputGroupSelectTrigger,
 } from "@repo/ui/components/input-group";
 import { Label } from "@repo/ui/components/label";
@@ -86,6 +87,20 @@ export const Disabled: Story = {
           <SelectValue />
         </InputGroupSelectTrigger>
       </Select>
+    </InputGroup>
+  ),
+};
+
+export const GrowingTextarea: Story = {
+  render: () => (
+    <InputGroup className="h-auto p-1 md:h-auto">
+      <InputGroupTextarea
+        rows={1}
+        autoResize
+        aria-label="Message"
+        placeholder="Write a message"
+        className="min-h-10 max-h-36 resize-none overflow-y-auto py-2 leading-6 md:min-h-10 md:py-2"
+      />
     </InputGroup>
   ),
 };

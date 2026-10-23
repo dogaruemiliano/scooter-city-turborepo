@@ -270,6 +270,17 @@ export type PrioritizeProblemInput = z.infer<
   typeof prioritizeProblemInputSchema
 >;
 
+export const reopenProblemInputSchema = revisionInputSchema.extend({
+  message: z.string().trim().min(1).max(4000),
+});
+export type ReopenProblemInput = z.infer<typeof reopenProblemInputSchema>;
+/** Conversation entries include messages attached to task transitions. */
+export const problemConversationTypes = [
+  "PROBLEM_COMMENTED",
+  "PROBLEM_RESOLVED",
+  "PROBLEM_REOPENED",
+] as const;
+
 export const closeProblemInputSchema = revisionInputSchema.extend({
   clearMaintenanceHold: z.boolean().optional(),
 });
@@ -281,6 +292,7 @@ export const problemCommentInputSchema = revisionInputSchema.extend({
 });
 export const activityQuerySchema = z
   .object({
+    kind: z.enum(["comments", "activity"]).optional(),
     page: z.coerce.number().int().min(1).default(1),
     pageSize: z.coerce.number().int().min(1).max(100).default(25),
   })

@@ -94,6 +94,7 @@ export const sessionUserSchema = userSchema
   .extend({
     linkedProviders: z.array(z.enum(OAUTH_PROVIDERS)),
     isSuperAdmin: z.boolean().default(false),
+    isAdmin: z.boolean().optional(),
     effectiveScopes: effectiveScopesSchema.default({}),
     accessRevision: z.number().int().default(1),
     portalEligible: z.boolean().default(false),

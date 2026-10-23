@@ -566,11 +566,10 @@ integration("Access domains against PostgreSQL", () => {
       actor: { id: mechanicA },
       note: "Belt replaced; inspecting drivetrain",
     });
-    const reopened = await problems.reopen(
-      reporter,
-      created.id,
-      resolved.revision,
-    );
+    const reopened = await problems.reopen(reporter, created.id, {
+      revision: resolved.revision,
+      message: "Further inspection needed",
+    });
     expect(reopened).toMatchObject({
       status: "open",
       blocksUsage: false,

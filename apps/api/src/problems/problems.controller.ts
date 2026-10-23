@@ -54,6 +54,7 @@ class AssignInput extends createZodDto(v1.problems.assignProblemInputSchema) {}
 class PriorityInput extends createZodDto(
   v1.problems.prioritizeProblemInputSchema,
 ) {}
+class ReopenInput extends createZodDto(v1.problems.reopenProblemInputSchema) {}
 class RevisionInput extends createZodDto(v1.problems.revisionInputSchema) {}
 class ListQuery extends createZodDto(v1.problems.listProblemsQuerySchema) {}
 class Problem extends createZodDto(v1.problems.problemSchema) {}
@@ -277,9 +278,9 @@ export class ProblemsController {
   reopen(
     @CurrentUser() user: AuthPrincipal,
     @Param("id") id: string,
-    @Body() input: RevisionInput,
+    @Body() input: ReopenInput,
   ) {
-    return this.problems.reopen(user.id, id, input.revision);
+    return this.problems.reopen(user.id, id, input);
   }
 
   @Post(":id/cancel")

@@ -1,4 +1,6 @@
 "use client";
+import { useFormAction } from "@/lib/form/use-form-action";
+import { SaveButton } from "@repo/ui/components/save-button";
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
@@ -45,6 +47,8 @@ export function ProblemAssignment({
   saveError: string | null;
   onClaim: () => void;
 }) {
+  const formAction = useFormAction();
+
   const t = useTranslations("workspace");
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<string[]>([]);
@@ -209,14 +213,13 @@ export function ProblemAssignment({
                 {saveError}
               </p>
             ) : null}
-            <Button
+            <SaveButton
               disabled={busy || loading || Boolean(error)}
               onClick={async () => {
                 if (await onAssign(draft)) setOpen(false);
               }}
-            >
-              {t("problems.applyAssignment")}
-            </Button>
+              {...formAction("assign", { pending: busy, error: saveError })}
+            />
             <Button
               variant="outline"
               disabled={busy}

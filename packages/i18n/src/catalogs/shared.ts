@@ -1,5 +1,69 @@
 export const sharedCatalog = {
   en: {
+    notifications: {
+      label: "Notifications",
+      dismiss: "Dismiss notification",
+      sessionRevoked: "Session revoked",
+      providerUnlinked: "{provider} unlinked",
+    },
+    formActions: {
+      save: { idle: "Save changes", pending: "Saving…", success: "Saved" },
+      create: { idle: "Create", pending: "Creating…", success: "Created" },
+      report: {
+        idle: "Report problem",
+        pending: "Reporting…",
+        success: "Reported",
+      },
+      complete: {
+        idle: "Complete task",
+        pending: "Completing…",
+        success: "Completed",
+      },
+      comment: { idle: "Add comment", pending: "Adding…", success: "Added" },
+      assign: { idle: "Save assignees", pending: "Saving…", success: "Saved" },
+      recordExpense: {
+        idle: "Record expense",
+        pending: "Recording…",
+        success: "Recorded",
+      },
+      recordMoney: {
+        idle: "Record money",
+        pending: "Recording…",
+        success: "Recorded",
+      },
+      confirm: {
+        idle: "Confirm changes",
+        pending: "Saving…",
+        success: "Saved",
+      },
+      review: {
+        idle: "Review changes",
+        pending: "Reviewing…",
+        success: "Review ready",
+      },
+      invite: {
+        idle: "Send invitation",
+        pending: "Sending…",
+        success: "Invitation sent",
+      },
+      sendCode: {
+        idle: "Send code",
+        pending: "Sending…",
+        success: "Code sent",
+      },
+      verify: {
+        idle: "Verify code",
+        pending: "Verifying…",
+        success: "Verified",
+      },
+      apply: {
+        idle: "Apply filters",
+        pending: "Applying…",
+        success: "Applied",
+      },
+      delete: { idle: "Delete", pending: "Deleting…", success: "Deleted" },
+      update: { idle: "Update", pending: "Updating…", success: "Updated" },
+    },
     actions: {
       cancel: "Cancel",
       close: "Close",
@@ -27,6 +91,7 @@ export const sharedCatalog = {
     list: {
       filters: "Filters",
       apply: "Apply filters",
+      applying: "Applying…",
       reset: "Reset filters",
       applyError: "Could not apply filters. Please try again.",
       pagination: "List pages",
@@ -54,6 +119,86 @@ export const sharedCatalog = {
     },
   },
   ro: {
+    notifications: {
+      label: "Notificări",
+      dismiss: "Închide notificarea",
+      sessionRevoked: "Sesiune revocată",
+      providerUnlinked: "{provider} deconectat",
+    },
+    formActions: {
+      save: {
+        idle: "Salvează modificările",
+        pending: "Se salvează…",
+        success: "Salvat",
+      },
+      create: { idle: "Creează", pending: "Se creează…", success: "Creat" },
+      report: {
+        idle: "Raportează problema",
+        pending: "Se raportează…",
+        success: "Raportat",
+      },
+      complete: {
+        idle: "Finalizează sarcina",
+        pending: "Se finalizează…",
+        success: "Finalizat",
+      },
+      comment: {
+        idle: "Adaugă comentariu",
+        pending: "Se adaugă…",
+        success: "Adăugat",
+      },
+      assign: {
+        idle: "Salvează responsabilii",
+        pending: "Se salvează…",
+        success: "Salvat",
+      },
+      recordExpense: {
+        idle: "Înregistrează cheltuiala",
+        pending: "Se înregistrează…",
+        success: "Înregistrat",
+      },
+      recordMoney: {
+        idle: "Înregistrează banii",
+        pending: "Se înregistrează…",
+        success: "Înregistrat",
+      },
+      confirm: {
+        idle: "Confirmă modificările",
+        pending: "Se salvează…",
+        success: "Salvat",
+      },
+      review: {
+        idle: "Verifică modificările",
+        pending: "Se verifică…",
+        success: "Verificare pregătită",
+      },
+      invite: {
+        idle: "Trimite invitație",
+        pending: "Se trimite…",
+        success: "Invitație trimisă",
+      },
+      sendCode: {
+        idle: "Trimite codul",
+        pending: "Se trimite…",
+        success: "Cod trimis",
+      },
+      verify: {
+        idle: "Verifică codul",
+        pending: "Se verifică…",
+        success: "Verificat",
+      },
+      apply: {
+        idle: "Aplică filtrele",
+        pending: "Se aplică…",
+        success: "Aplicat",
+      },
+      delete: { idle: "Șterge", pending: "Se șterge…", success: "Șters" },
+      update: {
+        idle: "Actualizează",
+        pending: "Se actualizează…",
+        success: "Actualizat",
+      },
+    },
     actions: {
       cancel: "Anulează",
       close: "Închide",
@@ -81,6 +226,7 @@ export const sharedCatalog = {
     list: {
       filters: "Filtre",
       apply: "Aplică filtrele",
+      applying: "Se aplică…",
       reset: "Resetează filtrele",
       applyError: "Filtrele nu au putut fi aplicate. Încearcă din nou.",
       pagination: "Paginile listei",

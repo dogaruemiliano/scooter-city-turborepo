@@ -749,6 +749,48 @@ describe("ProblemsService authorization and write conflicts", () => {
     );
   });
 
+  it("requires a nonblank reopening message before writing", () => {
+    expect(() =>
+      service.reopen("manager", "problem", { revision: 1, message: "   " }),
+    ).toThrow();
+    expect(db.scooterProblem.updateMany).not.toHaveBeenCalled();
+  });
+  it("returns completion and reopening messages to a scoped reader", async () => {
+    db.$transaction.mockImplementation((queries: Promise<unknown>[]) =>
+      Promise.all(queries),
+    );
+    db.auditEvent.findMany.mockResolvedValue([
+      {
+        id: "complete",
+        type: "PROBLEM_RESOLVED",
+        user: row.assignee,
+        createdAt: row.createdAt,
+        meta: {
+          after: { status: "resolved", resolutionNotes: "Brakes replaced" },
+        },
+      },
+      {
+        id: "reopen",
+        type: "PROBLEM_REOPENED",
+        user: row.assignee,
+        createdAt: row.createdAt,
+        meta: { note: "Noise returned", after: { status: "open" } },
+      },
+    ]);
+    db.auditEvent.count.mockResolvedValue(2);
+    const result = await service.activity("mechanic", "problem", {
+      kind: "comments",
+      page: 1,
+      pageSize: 25,
+    });
+    expect(result.items.map(({ note }) => note)).toEqual([
+      "Brakes replaced",
+      "Noise returned",
+    ]);
+    expect(
+      result.items.every(({ actor }) => actor?.id === row.assignee?.id),
+    ).toBe(true);
+  });
   it("keeps the previous resolution, assignee and hold when reopening", async () => {
     access.getSnapshot.mockResolvedValue({ ...snapshot, isSuperAdmin: true });
     db.scooterProblem.findFirst.mockResolvedValue({
@@ -757,7 +799,17 @@ describe("ProblemsService authorization and write conflicts", () => {
       resolutionNotes: "Belt replaced",
       blocksUsage: true,
     });
-    await service.reopen("manager", "problem", 1);
+    await service.reopen("manager", "problem", {
+      revision: 1,
+      message: "Noise returned",
+    });
+    expect(audit.recordRequired).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        type: "PROBLEM_REOPENED",
+        meta: expect.objectContaining({ note: "Noise returned" }),
+      }),
+    );
     expect(db.scooterProblem.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: { status: "open", resolvedAt: null, revision: { increment: 1 } },
@@ -776,7 +828,87 @@ describe("ProblemsService authorization and write conflicts", () => {
     expect(audit.recordRequired).not.toHaveBeenCalled();
   });
 
+  it.each(["comments", "activity"] as const)(
+    "filters %s before counting and paginating",
+    async (kind) => {
+      access.getSnapshot.mockResolvedValue({ ...snapshot, isAdmin: true });
+      db.$transaction.mockImplementation((queries: Promise<unknown>[]) =>
+        Promise.all(queries),
+      );
+      db.auditEvent.findMany.mockResolvedValue([]);
+      db.auditEvent.count.mockResolvedValue(0);
+      await service.activity("mechanic", "problem", {
+        kind,
+        page: 2,
+        pageSize: 10,
+      });
+      const expected = v1.problems.problemActivityTypeSchema.options.filter(
+        (type) =>
+          kind === "comments"
+            ? (
+                v1.problems.problemConversationTypes as readonly string[]
+              ).includes(type)
+            : type !== "PROBLEM_COMMENTED",
+      );
+      expect(db.auditEvent.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ type: { in: expected } }),
+          skip: 10,
+          take: 10,
+        }),
+      );
+      expect(db.auditEvent.count).toHaveBeenCalledWith({
+        where: expect.objectContaining({ type: { in: expected } }),
+      });
+    },
+  );
+
+  it.each([{ isSuperAdmin: true }, { isAdmin: true }])(
+    "allows administrative activity access %j",
+    async (admin) => {
+      access.getSnapshot.mockResolvedValue({ ...snapshot, ...admin });
+      db.$transaction.mockImplementation((queries: Promise<unknown>[]) =>
+        Promise.all(queries),
+      );
+      db.auditEvent.findMany.mockResolvedValue([]);
+      db.auditEvent.count.mockResolvedValue(0);
+      await expect(
+        service.activity("mechanic", "problem", {
+          kind: "activity",
+          page: 1,
+          pageSize: 25,
+        }),
+      ).resolves.toMatchObject({ total: 0 });
+    },
+  );
+  it("limits legacy unfiltered history to comments for non-admins", async () => {
+    db.$transaction.mockImplementation((queries: Promise<unknown>[]) =>
+      Promise.all(queries),
+    );
+    db.auditEvent.findMany.mockResolvedValue([]);
+    db.auditEvent.count.mockResolvedValue(0);
+    await service.activity("mechanic", "problem", { page: 1, pageSize: 25 });
+    expect(db.auditEvent.count).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        type: {
+          in: expect.arrayContaining([...v1.problems.problemConversationTypes]),
+        },
+      }),
+    });
+  });
+  it("denies explicit activity to non-admins", async () => {
+    await expect(
+      service.activity("mechanic", "problem", {
+        kind: "activity",
+        page: 1,
+        pageSize: 25,
+      }),
+    ).rejects.toThrow(ForbiddenException);
+    expect(db.auditEvent.findMany).not.toHaveBeenCalled();
+  });
+
   it("only returns allowlisted history and preserves resolution notes", async () => {
+    access.getSnapshot.mockResolvedValue({ ...snapshot, isAdmin: true });
     db.$transaction.mockImplementation((queries: Promise<unknown>[]) =>
       Promise.all(queries),
     );

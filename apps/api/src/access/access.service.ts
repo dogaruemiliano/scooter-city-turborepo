@@ -90,6 +90,9 @@ export class AccessService {
     return {
       userId: user.id,
       isSuperAdmin: user.isSuperAdmin,
+      isAdmin: user.roleMemberships.some(
+        ({ role }) => role.slug === "admin" && !role.archivedAt,
+      ),
       effectiveScopes: enforcePrerequisites(
         resolveScopes(grantsFor(user), user.permissionOverrides),
       ),
