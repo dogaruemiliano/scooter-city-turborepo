@@ -52,3 +52,43 @@ it("keeps snapPoint controlled across initial viewport detection, filtering, and
     .join(" ");
   expect(warnings).not.toMatch(/snapPoint|uncontrolled|controlled/i);
 });
+
+it("uses dashed borders only for empty card triggers", () => {
+  render(
+    <>
+      <SheetSelect
+        label="Card picker"
+        triggerVariant="card"
+        value="honda"
+        options={[{ value: "honda", label: "Honda" }]}
+        onValueChange={vi.fn()}
+        className="border border-border"
+        triggerContent={<span>Honda card</span>}
+      />
+      <SheetSelect
+        label="Empty card picker"
+        triggerVariant="card"
+        value=""
+        options={[]}
+        onValueChange={vi.fn()}
+      />
+      <SheetSelect
+        label="Text picker"
+        value="honda"
+        options={[{ value: "honda", label: "Honda" }]}
+        onValueChange={vi.fn()}
+      />
+    </>,
+  );
+  const card = screen.getByRole("button", { name: "Card picker" });
+  expect(card).not.toHaveClass("border-dashed");
+  expect(screen.getByRole("button", { name: "Empty card picker" })).toHaveClass(
+    "border-dashed",
+    "border-(length:--dashed-surface-border-width)",
+    "border-input",
+  );
+  expect(card).toHaveTextContent("Honda card");
+  expect(screen.getByRole("button", { name: "Text picker" })).not.toHaveClass(
+    "border-dashed",
+  );
+});

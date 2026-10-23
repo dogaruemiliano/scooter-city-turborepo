@@ -69,22 +69,14 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
 
   return (
     <div className="flex min-w-0 flex-col gap-8 p-4 md:p-8">
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex flex-col gap-2">
-          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-            {t.title}
-          </h1>
-          <p className="text-sm leading-relaxed text-muted-foreground">
-            {t.description}
-          </p>
-        </div>
-        {canAccess(user, "finance.expenses.create") ? (
+      {canAccess(user, "finance.expenses.create") ? (
+        <div className="flex justify-end">
           <Link href={FINANCE_PATHS.newExpense} className={buttonVariants()}>
             <PlusIcon aria-hidden="true" data-icon="inline-start" />
             {t.newExpense}
           </Link>
-        ) : null}
-      </header>
+        </div>
+      ) : null}
 
       <nav
         aria-label={t.shortcuts}

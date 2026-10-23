@@ -5,7 +5,7 @@ import { localeHeaderName } from "@repo/i18n";
 import { Button } from "@repo/ui/components";
 import { ArrowLeftIcon } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { webApi } from "../../lib/api";
 import { EmailOtpSignInForm } from "./EmailOtpSignInForm";
@@ -42,9 +42,27 @@ export function SignInMethods({
   const completeSignIn = useCompleteSignIn();
   const [activeChallenge, setActiveChallenge] =
     useState<ActiveChallenge | null>(null);
+  const challengeHistoryEntry = useRef(false);
   const [methodError, setMethodError] = useState<
     AuthErrorState | "failed" | "expired" | null
   >(null);
+
+  useEffect(() => {
+    function handleBrowserBack() {
+      challengeHistoryEntry.current = false;
+      setActiveChallenge(null);
+      setMethodError(null);
+    }
+    window.addEventListener("popstate", handleBrowserBack);
+    return () => window.removeEventListener("popstate", handleBrowserBack);
+  }, []);
+
+  const beginChallenge = useCallback((challenge: ActiveChallenge) => {
+    // Store only the navigation step, never OTP metadata or credentials.
+    window.history.pushState(null, "", window.location.href);
+    challengeHistoryEntry.current = true;
+    setActiveChallenge(challenge);
+  }, []);
 
   const handleGoogleCredential = useCallback(
     async (idToken: string) => {
@@ -52,7 +70,7 @@ export function SignInMethods({
       const result = await exchangeGoogleIdToken(idToken, locale);
 
       if (isChallenge(result)) {
-        setActiveChallenge({
+        beginChallenge({
           kind: "google",
           challenge: result,
           idToken,
@@ -62,7 +80,7 @@ export function SignInMethods({
 
       await completeSignIn();
     },
-    [completeSignIn, locale],
+    [beginChallenge, completeSignIn, locale],
   );
 
   const handleGoogleError = useCallback((error?: unknown) => {
@@ -77,6 +95,10 @@ export function SignInMethods({
   }, []);
 
   const handleCancelChallenge = useCallback(() => {
+    if (challengeHistoryEntry.current) {
+      challengeHistoryEntry.current = false;
+      window.history.back();
+    }
     setActiveChallenge(null);
     setMethodError(null);
   }, []);
@@ -88,26 +110,39 @@ export function SignInMethods({
         : v1.auth.ROUTES.oauthEmailVerification.verify;
     const subtitle =
       activeChallenge.kind === "email"
-        ? tOtp("subtitleEmail", { email: activeChallenge.email })
+        ? tOtp.rich("subtitleEmail", {
+            email: activeChallenge.email,
+            emailRow: (chunks) => (
+              <span className="mt-1 flex flex-wrap items-baseline gap-x-1">
+                {chunks}
+              </span>
+            ),
+            strong: (chunks) => (
+              <strong className="font-bold text-foreground">{chunks}</strong>
+            ),
+          })
         : tOtp("subtitleProvider");
 
     return (
-      <div className="flex flex-col gap-6">
-        <header className="flex items-start gap-2 relative">
+      <div className="flex flex-col gap-2">
+        <header className="grid grid-cols-[var(--spacing-10)_minmax(0,1fr)_var(--spacing-10)] content-start items-center gap-x-2 gap-y-4">
           <Button
             type="button"
             variant="ghost"
             size="icon"
             aria-label={tOtp("backToMethods")}
             onClick={handleCancelChallenge}
-            className="absolute left-0 top-0 z-raised rounded-full p-2 sm:static"
+            className="shrink-0 rounded-full p-2"
           >
             <ArrowLeftIcon />
           </Button>
-          <div className="min-w-0 flex-1 text-center">
-            <h1 className="text-2xl font-semibold">{tOtp("title")}</h1>
-            <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
-          </div>
+          <h1 className="min-w-0 text-center text-2xl font-semibold">
+            {tOtp("title")}
+          </h1>
+          <span aria-hidden="true" className="size-10" />
+          <p className="col-span-3 text-left text-sm text-muted-foreground">
+            {subtitle}
+          </p>
         </header>
 
         <OtpChallengeForm
@@ -154,7 +189,6 @@ export function SignInMethods({
               throw error;
             }
           }}
-          onCancel={handleCancelChallenge}
         />
       </div>
     );
@@ -165,10 +199,12 @@ export function SignInMethods({
     enabledMethods.includes("google") && Boolean(googleClientId);
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-2">
       <header className="text-center">
         <h1 className="text-2xl font-semibold">{tSignIn("title")}</h1>
-        <p className="text-sm text-muted-foreground">{tSignIn("subtitle")}</p>
+        {emailOtpEnabled && googleAvailable ? (
+          <p className="text-sm text-muted-foreground">{tSignIn("subtitle")}</p>
+        ) : null}
       </header>
 
       <div className="flex flex-col gap-6">
@@ -176,7 +212,7 @@ export function SignInMethods({
           <EmailOtpSignInForm
             onChallenge={(challenge, email) => {
               setMethodError(null);
-              setActiveChallenge({ kind: "email", challenge, email });
+              beginChallenge({ kind: "email", challenge, email });
             }}
           />
         ) : null}

@@ -26,12 +26,14 @@ import {
   ImageGalleryEditor,
   PersonRow,
   SegmentedRadioGroup,
-  SheetSelect,
   Textarea,
 } from "@repo/ui/components";
-import { MoreVertical, UserPlusIcon, UserMinusIcon } from "lucide-react";
+import { MoreVertical } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { PageHeaderActions } from "@/components/PageHeaderActions";
+import { AssigneeSelect } from "./AssigneeSelect";
+import { memberName } from "../_lib/member-name";
+export { memberName } from "../_lib/member-name";
 import { useSession } from "@/components/auth/SessionProvider";
 import { canAccess } from "@/lib/access";
 import { webApi } from "@/lib/api";
@@ -44,24 +46,6 @@ import {
 import { ProblemScooterPicker } from "./ProblemScooterPicker";
 import { ProblemSections, type ProblemSectionData } from "./ProblemSections";
 import { ProblemPhotos } from "./ProblemPhotos";
-
-export function memberName(
-  member?: {
-    id: string;
-    email?: string;
-    firstName: string | null;
-    lastName: string | null;
-  } | null,
-) {
-  return member
-    ? [member.firstName, member.lastName]
-        .map((part) => part?.trim())
-        .filter(Boolean)
-        .join(" ") ||
-        member.email?.trim() ||
-        member.id
-    : "";
-}
 
 export function useProblemAssignees(enabled: boolean) {
   const load = useCallback(
@@ -100,7 +84,7 @@ export function CreateProblem({
   const [description, setDescription] = useState("");
   const [severity, setSeverity] = useState("");
   const [blocksUsage, setBlocks] = useState("");
-  const [assigneeId, setAssignee] = useState("");
+  const [assigneeIds, setAssignees] = useState<string[]>([]);
   const [files, setFiles] = useState<File[]>([]);
   const [galleryBusy, setGalleryBusy] = useState(false);
   const [sectionsBusy, setSectionsBusy] = useState(false);
@@ -181,7 +165,7 @@ export function CreateProblem({
             severity,
             description,
             blocksUsage: blocksUsage === "defective",
-            ...(mayAssign ? { assigneeId: assigneeId || null } : {}),
+            ...(mayAssign ? { assigneeIds } : {}),
           });
           const photos = await uploadPhotos();
           const created = await webApi.fetch(
@@ -279,88 +263,16 @@ export function CreateProblem({
       {mayAssign ? (
         <Field>
           <FieldLabel>{t("problems.assignee")}</FieldLabel>
-          {assignees.data?.items
-            .filter((member) => member.id === assigneeId)
-            .map((member) => (
-              <div
-                key={member.id}
-                className="flex items-center rounded-2xl border border-border bg-card p-4 text-card-foreground"
-              >
-                <PersonRow
-                  name={memberName(member)}
-                  action={
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="icon"
-                      disabled={task.busy}
-                      aria-label={t("problems.removeAssignee", {
-                        name: memberName(member),
-                      })}
-                      onClick={() => setAssignee("")}
-                    >
-                      <UserMinusIcon aria-hidden="true" />
-                    </Button>
-                  }
-                />
-              </div>
-            ))}
-          <SheetSelect
-            label={
-              assigneeId
-                ? t("problems.changeAssignee")
-                : t("problems.addAssignee")
-            }
-            value={assigneeId}
-            onValueChange={setAssignee}
+          <AssigneeSelect
+            multiple
+            value={assigneeIds}
+            onValueChange={setAssignees}
+            members={assignees.data?.items ?? []}
             disabled={task.busy}
-            addAction={{
-              text: assigneeId
-                ? t("problems.changeAssignee")
-                : t("problems.addAssignee"),
-              icon: <UserPlusIcon />,
-            }}
-            searchPlaceholder={t("problems.searchAssignees")}
-            clearSearchLabel={t("problems.clearAssigneeSearch")}
-            closeLabel={t("cancel")}
-            emptyMessage={
-              assignees.loading
-                ? t("loading")
-                : (assignees.error ?? t("problems.noAssignees"))
-            }
-            renderHeaderAction={
-              assignees.error
-                ? () => (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={assignees.reload}
-                    >
-                      {t("retry")}
-                    </Button>
-                  )
-                : undefined
-            }
-            optionClassName="h-auto min-h-20 rounded-2xl border border-border p-4"
-            options={
-              assignees.data?.items.map((member) => ({
-                value: member.id,
-                label: memberName(member),
-              })) ?? []
-            }
-            renderOption={(option) => (
-              <PersonRow
-                name={option.label}
-                action={
-                  <UserPlusIcon
-                    aria-hidden="true"
-                    className="size-5 text-muted-foreground"
-                  />
-                }
-              />
-            )}
+            loading={assignees.loading}
+            error={assignees.error}
+            onRetry={assignees.reload}
           />
-          <Feedback error={assignees.error} />
         </Field>
       ) : null}
       <Field>
@@ -455,11 +367,18 @@ export function CreateProblem({
       <Feedback error={fileError ?? task.error} />
       <FormActions
         data-slot="problem-create-actions"
-        buttonLayout={onCancel ? "primary" : "equal"}
+        arrangement="split"
         ready={stickyActions ? readyToSubmit : undefined}
         pending={task.busy}
         className={stickyActions ? "mt-auto w-full" : undefined}
       >
+        <Button
+          className={stickyActions ? "w-full" : undefined}
+          type="submit"
+          disabled={task.busy || !readyToSubmit}
+        >
+          {task.busy ? t("problems.reporting") : t("problems.reportSubmit")}
+        </Button>
         {onCancel ? (
           <Button
             variant="outline"
@@ -470,13 +389,6 @@ export function CreateProblem({
             {t("cancel")}
           </Button>
         ) : null}
-        <Button
-          className={stickyActions ? "w-full" : undefined}
-          type="submit"
-          disabled={task.busy || !readyToSubmit}
-        >
-          {task.busy ? t("problems.reporting") : t("problems.reportSubmit")}
-        </Button>
       </FormActions>
     </form>
   );
@@ -508,7 +420,9 @@ export function ProblemWork({
   const [severity, setSeverity] = useState(problem.severity ?? "");
   const editable =
     problem.status === "open" || problem.status === "in_progress";
-  const own = problem.assigneeId === user?.id;
+  const assignedMembers = v1.problems.problemAssignees(problem);
+  const assignedIds = assignedMembers.map((member) => member.id);
+  const own = assignedIds.includes(user?.id ?? "");
   const can = (action: string) =>
     canAccess(user, action, own ? "ASSIGNED" : "ALL");
   const mayAssign = canAccess(user, "problems.assign", "ALL");
@@ -580,82 +494,47 @@ export function ProblemWork({
           {t("problems.assignee")}
         </h3>
         {mayAssign && editable ? (
-          <>
-            {problem.assigneeId ? (
-              <div className="rounded-2xl border border-border bg-card p-4 text-card-foreground">
-                <PersonRow
-                  name={
-                    memberName(problem.assignee) || t("problems.unassigned")
-                  }
-                />
-              </div>
-            ) : null}
-            <SheetSelect
-              label={t("problems.addAssignee")}
-              value={problem.assigneeId}
-              disabled={busy}
-              onValueChange={(assigneeId) =>
-                void task.run(() => mutate("/assignee", "PUT", { assigneeId }))
-              }
-              onClear={() =>
-                void task.run(() =>
-                  mutate("/assignee", "PUT", { assigneeId: null }),
-                )
-              }
-              clearOptionLabel={t("problems.unassigned")}
-              searchPlaceholder={t("problems.searchAssignees")}
-              clearSearchLabel={t("problems.clearAssigneeSearch")}
-              closeLabel={t("cancel")}
-              emptyMessage={
-                assignees.loading
-                  ? t("loading")
-                  : (assignees.error ?? t("problems.noAssignees"))
-              }
-              addAction={{
-                text: t("problems.addAssignee"),
-                icon: <UserPlusIcon />,
-              }}
-              optionClassName="h-auto min-h-20 rounded-xl p-4"
-              options={[
-                ...(problem.assignee &&
-                !assignees.data?.items.some(
-                  (item) => item.id === problem.assigneeId,
-                )
-                  ? [
-                      {
-                        value: problem.assignee.id,
-                        label: memberName(problem.assignee),
-                      },
-                    ]
-                  : []),
-                ...(assignees.data?.items.map((item) => ({
-                  value: item.id,
-                  label: memberName(item),
-                })) ?? []),
-              ]}
-              renderOption={(option) => <PersonRow name={option.label} />}
-              renderHeaderAction={
-                assignees.error
-                  ? () => (
-                      <Button variant="outline" onClick={assignees.reload}>
-                        {t("retry")}
-                      </Button>
-                    )
-                  : undefined
-              }
-            />
-          </>
+          <AssigneeSelect
+            multiple
+            value={assignedIds}
+            disabled={busy}
+            members={[
+              ...(assignees.data?.items ?? []),
+              ...assignedMembers.filter(
+                (member) =>
+                  !assignees.data?.items.some((item) => item.id === member.id),
+              ),
+            ]}
+            onValueChange={(assigneeIds) =>
+              void task.run(() => mutate("/assignee", "PUT", { assigneeIds }))
+            }
+            onClear={() =>
+              void task.run(() =>
+                mutate("/assignee", "PUT", { assigneeIds: [] }),
+              )
+            }
+            clearOptionLabel={t("problems.unassigned")}
+            loading={assignees.loading}
+            error={assignees.error}
+            onRetry={assignees.reload}
+          />
+        ) : assignedMembers.length ? (
+          assignedMembers.map((member) => (
+            <div
+              key={member.id}
+              className="rounded-2xl border border-border bg-card p-4 text-card-foreground"
+            >
+              <PersonRow name={memberName(member)} />
+            </div>
+          ))
         ) : (
           <div className="rounded-2xl border border-border bg-card p-4 text-card-foreground">
-            <PersonRow
-              name={memberName(problem.assignee) || t("problems.unassigned")}
-            />
+            <PersonRow name={t("problems.unassigned")} />
           </div>
         )}
-        <Feedback error={assignees.error} />
       </section>
       {problem.status === "open" &&
-      !problem.assigneeId &&
+      !assignedIds.length &&
       canAccess(user, "problems.claim", "AVAILABLE") ? (
         <Button
           className="self-start"
@@ -767,7 +646,7 @@ export function ProblemWork({
             <div className="flex flex-wrap gap-3">
               {problem.status === "open" ? (
                 <Button
-                  disabled={busy || !problem.assigneeId}
+                  disabled={busy || !assignedIds.length}
                   onClick={() =>
                     void task.run(() =>
                       mutate("", "PATCH", { startWork: true }),
@@ -1092,11 +971,26 @@ function ProblemActivity({ problemId }: { problemId: string }) {
                   {t(`problems.${entry.after.severity}`)}
                 </p>
               ) : null}
-              {entry.before?.assigneeId !== entry.after?.assigneeId &&
-              entry.after?.assigneeId !== undefined ? (
+              {(entry.after?.assignees !== undefined ||
+                entry.after?.assigneeId !== undefined) &&
+              JSON.stringify(
+                v1.problems
+                  .problemAssignees(entry.before ?? {})
+                  .map((member) => member.id)
+                  .sort(),
+              ) !==
+                JSON.stringify(
+                  v1.problems
+                    .problemAssignees(entry.after ?? {})
+                    .map((member) => member.id)
+                    .sort(),
+                ) ? (
                 <p className="text-sm">
                   {t("problems.assignee")}:{" "}
-                  {memberName(entry.after.assignee) || t("problems.unassigned")}
+                  {v1.problems
+                    .problemAssignees(entry.after ?? {})
+                    .map(memberName)
+                    .join(", ") || t("problems.unassigned")}
                 </p>
               ) : null}
               {entry.note ? (

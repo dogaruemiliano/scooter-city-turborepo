@@ -15,7 +15,11 @@ import { createZodDto, ZodResponse } from "nestjs-zod";
 import { z } from "zod";
 import type { AuthPrincipal } from "../auth/auth.types";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
-import { RequireSuperAdmin } from "./access.decorators";
+import {
+  RequireSuperAdmin,
+  RequireAllScope,
+  RequireAnyAllScope,
+} from "./access.decorators";
 import { AccessService } from "./access.service";
 class CreateUserInput extends createZodDto(v1.access.createUserInputSchema) {}
 class UserAccessInput extends createZodDto(v1.access.userAccessInputSchema) {}
@@ -46,14 +50,17 @@ class AuditList extends createZodDto(v1.access.accessAuditListSchema) {}
 @ApiTags("users")
 @ApiCookieAuth(v1.auth.ACCESS_TOKEN_COOKIE)
 @ApiBearerAuth("bearer")
-@RequireSuperAdmin()
+@RequireAllScope("users.read")
 @Controller({ path: "users", version: "1" })
 export class AccessUsersController {
   constructor(private readonly access: AccessService) {}
   @Get() @ZodResponse({ type: UserList }) list(@Query() query: UserQuery) {
     return this.access.listUsers(query.search, query.offset);
   }
-  @Post() @ZodResponse({ type: AccessUser, status: 201 }) async create(
+  @RequireAllScope("users.invite")
+  @Post()
+  @ZodResponse({ type: AccessUser, status: 201 })
+  async create(
     @CurrentUser() u: AuthPrincipal,
     @Body() input: CreateUserInput,
   ) {
@@ -68,6 +75,7 @@ export class AccessUsersController {
   ) {
     return this.access.history("User", id);
   }
+  @RequireAnyAllScope("users.roles.update", "users.permissions.update")
   @Post(":id/access/preview")
   @ZodResponse({ type: AccessPreview })
   async preview(
@@ -78,7 +86,10 @@ export class AccessUsersController {
     await this.access.assertBaseRoles(input.roles);
     return this.access.previewAccess(u.id, id, input);
   }
-  @Put(":id/access") @ZodResponse({ type: AccessUser }) async update(
+  @RequireAnyAllScope("users.roles.update", "users.permissions.update")
+  @Put(":id/access")
+  @ZodResponse({ type: AccessUser })
+  async update(
     @CurrentUser() u: AuthPrincipal,
     @Param("id") id: string,
     @Body() input: UserAccessInput,
@@ -86,28 +97,40 @@ export class AccessUsersController {
     await this.access.assertBaseRoles(input.roles);
     return this.access.updateAccess(u.id, id, input);
   }
-  @Post(":id/invitations") @ZodResponse({ type: AccessUser }) invite(
+  @RequireAllScope("users.invite")
+  @Post(":id/invitations")
+  @ZodResponse({ type: AccessUser })
+  invite(
     @CurrentUser() u: AuthPrincipal,
     @Param("id") id: string,
     @Body() input: RevisionInput,
   ) {
     return this.access.invite(u.id, id, input.expectedRevision);
   }
-  @Delete(":id/invitations/current") @ZodResponse({ type: AccessUser }) cancel(
+  @RequireAllScope("users.invite")
+  @Delete(":id/invitations/current")
+  @ZodResponse({ type: AccessUser })
+  cancel(
     @CurrentUser() u: AuthPrincipal,
     @Param("id") id: string,
     @Body() input: RevisionInput,
   ) {
     return this.access.cancelInvitation(u.id, id, input.expectedRevision);
   }
-  @Put(":id/status") @ZodResponse({ type: AccessUser }) status(
+  @RequireAllScope("users.status.update")
+  @Put(":id/status")
+  @ZodResponse({ type: AccessUser })
+  status(
     @CurrentUser() u: AuthPrincipal,
     @Param("id") id: string,
     @Body() input: StatusInput,
   ) {
     return this.access.setStatus(u.id, id, input);
   }
-  @Put(":id/super-admin") @ZodResponse({ type: AccessUser }) designation(
+  @RequireSuperAdmin()
+  @Put(":id/super-admin")
+  @ZodResponse({ type: AccessUser })
+  designation(
     @CurrentUser() u: AuthPrincipal,
     @Param("id") id: string,
     @Body() input: SuperAdminInput,
@@ -118,14 +141,17 @@ export class AccessUsersController {
 @ApiTags("access")
 @ApiCookieAuth(v1.auth.ACCESS_TOKEN_COOKIE)
 @ApiBearerAuth("bearer")
-@RequireSuperAdmin()
+@RequireAllScope("roles.read")
 @Controller({ path: "access", version: "1" })
 export class AccessRolesController {
   constructor(private readonly access: AccessService) {}
   @Get("permissions") catalog() {
     return { items: v1.access.permissionCatalog };
   }
-  @Get("roles") @ZodResponse({ type: RoleList }) async list() {
+  @RequireAnyAllScope("roles.read", "users.read")
+  @Get("roles")
+  @ZodResponse({ type: RoleList })
+  async list() {
     const result = await this.access.listRoles();
     return {
       items: result.items.filter(
@@ -135,9 +161,10 @@ export class AccessRolesController {
       ),
     };
   }
-  @Post("roles") @ZodResponse({ type: AccessRole, status: 201 }) create(
-    @Body() input: CreateRoleInput,
-  ): never {
+  @RequireSuperAdmin()
+  @Post("roles")
+  @ZodResponse({ type: AccessRole, status: 201 })
+  create(@Body() input: CreateRoleInput): never {
     void input;
     throw new BadRequestException(
       "The available roles are Admin, Mechanic, and Client. Customize a member's permissions instead.",
@@ -153,7 +180,10 @@ export class AccessRolesController {
   ) {
     return this.access.history("Role", id);
   }
-  @Post("roles/:id/preview") @ZodResponse({ type: RolePreview }) async preview(
+  @RequireAllScope("roles.update")
+  @Post("roles/:id/preview")
+  @ZodResponse({ type: RolePreview })
+  async preview(
     @CurrentUser() u: AuthPrincipal,
     @Param("id") id: string,
     @Body() input: UpdateRoleInput,
@@ -161,7 +191,10 @@ export class AccessRolesController {
     await this.access.assertBuiltInRole(id);
     return this.access.previewRole(u.id, id, input);
   }
-  @Put("roles/:id") @ZodResponse({ type: AccessRole }) async update(
+  @RequireAllScope("roles.update")
+  @Put("roles/:id")
+  @ZodResponse({ type: AccessRole })
+  async update(
     @CurrentUser() u: AuthPrincipal,
     @Param("id") id: string,
     @Body() input: UpdateRoleInput,
@@ -169,7 +202,10 @@ export class AccessRolesController {
     await this.access.assertBuiltInRole(id);
     return this.access.updateRole(u.id, id, input);
   }
-  @Post("roles/:id/archive") @ZodResponse({ type: AccessRole }) archive(
+  @RequireSuperAdmin()
+  @Post("roles/:id/archive")
+  @ZodResponse({ type: AccessRole })
+  archive(
     @CurrentUser() u: AuthPrincipal,
     @Param("id") id: string,
     @Body() input: RevisionInput,

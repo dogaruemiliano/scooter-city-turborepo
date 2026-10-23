@@ -124,6 +124,7 @@ model User {
   invitationsSent     UserInvitation[]         @relation("InvitationSender")
   reportedProblems    ScooterProblem[]         @relation("ProblemReporter")
   assignedProblems    ScooterProblem[]         @relation("ProblemAssignee")
+  problemAssignments  ScooterProblem[]         @relation("ProblemAssignees")
   createdRentals      Rental[]                 @relation("RentalCreator")
   createdAt           DateTime                 @default(now())
   updatedAt           DateTime                 @updatedAt
@@ -1610,6 +1611,7 @@ model ScooterProblem {
   reporter        User      @relation("ProblemReporter", fields: [reporterId], references: [id], onDelete: Restrict)
   assigneeId      String?
   assignee        User?     @relation("ProblemAssignee", fields: [assigneeId], references: [id], onDelete: Restrict)
+  assignees       User[]    @relation("ProblemAssignees")
   workNotes       String    @default("")
   resolutionNotes String?
   revision        Int       @default(1)

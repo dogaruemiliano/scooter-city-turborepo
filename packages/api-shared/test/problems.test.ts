@@ -149,3 +149,87 @@ test("creation accepts and validates optional task sections", () => {
       false,
     );
 });
+
+test("problem filters accept multiple assignees with optional unassigned work", () => {
+  const parsed = v1.problems.listProblemsQuerySchema.parse({
+    assigneeIds: "mechanic-a,mechanic-b",
+    unassigned: "true",
+  });
+  assert.deepEqual(parsed.assigneeIds, ["mechanic-a", "mechanic-b"]);
+  assert.equal(parsed.unassigned, true);
+  assert.equal(
+    v1.problems.listProblemsQuerySchema.safeParse({ assigneeIds: "" }).success,
+    false,
+  );
+  assert.equal(
+    v1.problems.listProblemsQuerySchema.safeParse({ assigneeIds: "a,,b" })
+      .success,
+    false,
+  );
+  assert.equal(
+    v1.problems.listProblemsQuerySchema.safeParse({
+      assigneeIds: Array.from({ length: 101 }, (_, i) => String(i)).join(","),
+    }).success,
+    false,
+  );
+  assert.equal(
+    v1.problems.listProblemsQuerySchema.parse({ assigneeId: "legacy" })
+      .assigneeId,
+    "legacy",
+  );
+});
+
+test("assignments accept multiple unique users, clearing, and legacy requests", () => {
+  const create = {
+    scooterId: "scooter",
+    title: "Shared work",
+    severity: "low",
+  };
+  assert.deepEqual(
+    v1.problems.createProblemInputSchema.parse({
+      ...create,
+      assigneeIds: ["a", "b"],
+    }).assigneeIds,
+    ["a", "b"],
+  );
+  assert.deepEqual(
+    v1.problems.assignProblemInputSchema.parse({ revision: 1, assigneeIds: [] })
+      .assigneeIds,
+    [],
+  );
+  assert.equal(
+    v1.problems.assignProblemInputSchema.parse({ revision: 1, assigneeId: "a" })
+      .assigneeId,
+    "a",
+  );
+  for (const invalid of [
+    { assigneeIds: ["a", "a"] },
+    { assigneeIds: [""] },
+    { assigneeIds: ["a"], assigneeId: "b" },
+    { assigneeIds: Array.from({ length: 101 }, (_, i) => String(i)) },
+  ]) {
+    assert.equal(
+      v1.problems.createProblemInputSchema.safeParse({ ...create, ...invalid })
+        .success,
+      false,
+    );
+    assert.equal(
+      v1.problems.assignProblemInputSchema.safeParse({
+        revision: 1,
+        ...invalid,
+      }).success,
+      false,
+    );
+  }
+  assert.equal(
+    v1.problems.assignProblemInputSchema.safeParse({ revision: 1 }).success,
+    false,
+  );
+  assert.equal(
+    v1.problems.updateProblemInputSchema.safeParse({
+      revision: 1,
+      assigneeIds: ["a"],
+    }).success,
+    false,
+  );
+});

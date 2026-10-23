@@ -54,34 +54,7 @@ export function resolveScopes(
 export function missingPrerequisites(
   scopes: v1.access.EffectiveScopes,
 ): string[] {
-  const missing = new Set<string>();
-  for (const entry of v1.access.permissionCatalog) {
-    const granted = scopes[entry.key];
-    if (!granted?.length) continue;
-    for (const dependency of entry.prerequisites) {
-      const required = scopes[dependency] ?? [];
-      if (
-        !required.length ||
-        (granted.includes("ALL") && !required.includes("ALL"))
-      )
-        missing.add(`${entry.key}: ${dependency}`);
-      if (
-        entry.key.startsWith("problems.") &&
-        granted.includes("ASSIGNED") &&
-        !required.includes("ASSIGNED") &&
-        !required.includes("ALL")
-      )
-        missing.add(`${entry.key}: ${dependency}:ASSIGNED`);
-    }
-    for (const dependency of entry.scopePrerequisites) {
-      const required = scopes[dependency.key] ?? [];
-      if (!dependency.anyOf.some((scope) => required.includes(scope)))
-        missing.add(
-          `${entry.key}: ${dependency.key}:${dependency.anyOf.join("|")}`,
-        );
-    }
-  }
-  return [...missing].sort();
+  return v1.access.missingPermissionPrerequisites(scopes);
 }
 /** Remove invalid dependency chains at runtime, never add implied grants. */
 export function enforcePrerequisites(

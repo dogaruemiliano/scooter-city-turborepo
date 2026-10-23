@@ -4,7 +4,6 @@ import { useCallback, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
-  Shield,
   ShieldCheck,
   UserRound,
   Wrench,
@@ -29,7 +28,10 @@ import {
   useRemote,
   useTask,
 } from "@/components/WorkspaceForm";
+import { useSession } from "@/components/auth/SessionProvider";
+import { canAccess } from "@/lib/access";
 import { AccessHistory } from "./AccessHistory";
+import { RoleCard } from "./RoleCard";
 import { AccessWorkspace } from "./AccessWorkspace";
 import {
   PermissionDiff,
@@ -50,6 +52,7 @@ function isBaseRole(role: v1.access.Role) {
 export function RolesWorkspace({ id }: { id?: string }) {
   const t = useTranslations("workspace");
   const shared = useTranslations("shared");
+  const { user: actor } = useSession();
   const load = useCallback(
     () =>
       webApi.fetch("/v1/access/roles", v1.access.roleListSchema, {
@@ -63,7 +66,7 @@ export function RolesWorkspace({ id }: { id?: string }) {
     (item) => item.id === id && !item.archivedAt && isBaseRole(item),
   );
   return (
-    <AccessWorkspace current="roles">
+    <AccessWorkspace current="roles" hideTitle>
       {!remote.data ? (
         <RemoteState error={remote.error} retry={remote.reload} />
       ) : id && id !== "new" ? (
@@ -97,9 +100,6 @@ export function RolesWorkspace({ id }: { id?: string }) {
             >
               {t("access.member.roles")}
             </h2>
-            <p className="max-w-(--breakpoint-md) text-sm text-muted-foreground">
-              {t("access.member.roleLibraryHelp")}
-            </p>
           </div>
           <ListStatus
             loading={remote.loading}
@@ -114,70 +114,57 @@ export function RolesWorkspace({ id }: { id?: string }) {
             renderItem={(slug) => {
               if (slug === "superAdmin")
                 return (
-                  <Card as="article">
-                    <CardHeader>
-                      <Shield
-                        className="size-6 text-primary"
-                        aria-hidden="true"
-                      />
-                    </CardHeader>
-                    <CardContent className="flex flex-col gap-2">
-                      <h3 className="font-sans text-base font-semibold">
-                        {t("access.member.roleNames.superAdmin")}
-                      </h3>
-                      <p className="text-sm text-muted-foreground">
-                        {t("access.member.roleDescriptions.superAdmin")}
-                      </p>
-                    </CardContent>
-                    <CardContent className="mt-auto">
-                      <p className="border-t pt-4 text-xs leading-relaxed text-muted-foreground">
+                  <RoleCard
+                    slug={slug}
+                    title={t("access.member.roleNames.superAdmin")}
+                    description={t("access.member.roleDescriptions.superAdmin")}
+                    footer={
+                      <p className="text-xs leading-relaxed text-muted-foreground">
                         {t("access.member.superRoleHelp")}
                       </p>
-                    </CardContent>
-                  </Card>
+                    }
+                  />
                 );
               const profile = roles.find(
                 (item) => item.slug === slug && !item.archivedAt,
               );
-              const Icon = profileIcons[slug];
               return (
-                <Card as="article" key={slug}>
-                  <CardHeader className="flex items-center justify-between gap-3">
-                    <Icon className="size-6 text-primary" aria-hidden="true" />
-                    {profile ? (
+                <RoleCard
+                  slug={slug}
+                  title={t(`access.member.roleNames.${slug}`)}
+                  description={t(`access.member.roleDescriptions.${slug}`)}
+                  trailing={
+                    profile ? (
                       <Badge variant="secondary">
                         {t("access.members")}: {profile.memberCount}
                       </Badge>
-                    ) : null}
-                  </CardHeader>
-                  <CardContent className="flex flex-col gap-2">
-                    <h3 className="font-sans text-base font-semibold">
-                      {t(`access.member.roleNames.${slug}`)}
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                      {t(`access.member.roleDescriptions.${slug}`)}
-                    </p>
-                  </CardContent>
-                  <CardContent className="mt-auto">
-                    {profile ? (
+                    ) : undefined
+                  }
+                  footer={
+                    profile ? (
                       <Link
                         href={`/roles/${profile.id}`}
-                        aria-label={`${t("access.member.editPermissions")} · ${t(`access.member.roleNames.${slug}`)}`}
+                        aria-label={`${t(canAccess(actor, "roles.update") && (slug !== "admin" || actor?.isSuperAdmin) ? "access.member.editPermissions" : "access.member.viewPermissions")} · ${t(`access.member.roleNames.${slug}`)}`}
                         className={buttonVariants({
                           variant: "secondary",
                           className: "min-h-11 w-full justify-between",
                         })}
                       >
-                        {t("access.member.editPermissions")}
+                        {t(
+                          canAccess(actor, "roles.update") &&
+                            (slug !== "admin" || actor?.isSuperAdmin)
+                            ? "access.member.editPermissions"
+                            : "access.member.viewPermissions",
+                        )}
                         <ArrowRight className="size-4" aria-hidden="true" />
                       </Link>
                     ) : (
                       <p className="text-sm text-muted-foreground">
                         {t("access.member.roleUnavailable")}
                       </p>
-                    )}
-                  </CardContent>
-                </Card>
+                    )
+                  }
+                />
               );
             }}
           />
@@ -196,6 +183,10 @@ function RoleForm({
 }) {
   const t = useTranslations("workspace");
   const task = useTask();
+  const { user: actor } = useSession();
+  const readOnly =
+    !canAccess(actor, "roles.update") ||
+    (role.slug === "admin" && !actor?.isSuperAdmin);
   const [permissions, setPermissions] = useState<Grant[]>(role.permissions);
   const [preview, setPreview] = useState<Awaited<
     ReturnType<typeof previewRole>
@@ -229,6 +220,7 @@ function RoleForm({
       className="w-full max-w-(--breakpoint-lg) gap-6 overflow-visible"
       onSubmit={(event) => {
         event.preventDefault();
+        if (readOnly) return;
         void task.run(async () => {
           if (!previewCurrent) {
             setPreview(await previewRole());
@@ -264,10 +256,29 @@ function RoleForm({
         </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-6">
+        {readOnly ? (
+          <p className="text-sm text-muted-foreground">
+            {t(
+              role.slug === "admin"
+                ? "access.member.adminRoleReadOnly"
+                : "access.member.roleReadOnly",
+            )}
+          </p>
+        ) : null}
         <PermissionEditor
           value={permissions}
           onChange={setPermissions}
-          disabled={task.busy}
+          disabled={task.busy || readOnly}
+          canGrantPermission={(key, scopes) =>
+            !!actor?.isSuperAdmin ||
+            scopes.every((scope) => canAccess(actor, key, scope))
+          }
+          canEditPermission={(key) =>
+            !!actor?.isSuperAdmin ||
+            (!key.startsWith("users.") &&
+              !key.startsWith("roles.") &&
+              canAccess(actor, key))
+          }
         />
         {preview && previewCurrent ? (
           <Card as="section" aria-label={t("access.review")}>
@@ -296,35 +307,37 @@ function RoleForm({
         ) : null}
         <Feedback error={task.error} success={task.success} />
       </CardContent>
-      <FormActions className="sticky bottom-0 z-raised bg-popover">
-        <Button
-          type="button"
-          variant="secondary"
-          className="min-h-11"
-          disabled={task.busy || !hasChanges}
-          onClick={() => {
-            setPermissions(role.permissions);
-            setPreview(null);
-            setReviewedPayload(null);
-          }}
-        >
-          {t("cancel")}
-        </Button>
-        <Button
-          type="submit"
-          className="min-h-11"
-          disabled={
-            task.busy ||
-            !hasChanges ||
-            (previewCurrent &&
-              !!preview?.affectedMembers.some(
-                (member) => member.missingPrerequisites.length,
-              ))
-          }
-        >
-          {previewCurrent ? t("access.confirm") : t("access.preview")}
-        </Button>
-      </FormActions>
+      {!readOnly ? (
+        <FormActions className="sticky bottom-0 z-raised bg-popover">
+          <Button
+            type="button"
+            variant="secondary"
+            className="min-h-11"
+            disabled={task.busy || !hasChanges}
+            onClick={() => {
+              setPermissions(role.permissions);
+              setPreview(null);
+              setReviewedPayload(null);
+            }}
+          >
+            {t("cancel")}
+          </Button>
+          <Button
+            type="submit"
+            className="min-h-11"
+            disabled={
+              task.busy ||
+              !hasChanges ||
+              (previewCurrent &&
+                !!preview?.affectedMembers.some(
+                  (member) => member.missingPrerequisites.length,
+                ))
+            }
+          >
+            {previewCurrent ? t("access.confirm") : t("access.preview")}
+          </Button>
+        </FormActions>
+      ) : null}
       <CardContent>
         <details className="border-t pt-4">
           <summary className="cursor-pointer text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring">

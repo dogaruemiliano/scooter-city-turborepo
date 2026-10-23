@@ -4,11 +4,11 @@ The API owns authentication and authorization. CASL 7.0.1 with `@casl/prisma` 2.
 
 ## Access behavior
 
-An identity record does not grant login. New users, people, and finance associates default to `DISABLED`. A super admin provisions an email, assigns live roles and individual overrides, and sends an invitation. An invitation lasts seven days and links to ordinary sign-in; the link is not a credential. Existing OTP or verified OAuth proof activates the current invitation atomically. Unknown, disabled, expired, cancelled, and suspended identities cannot obtain sessions.
+An identity record does not grant login. New users, people, and finance associates default to `DISABLED`. A Super Admin or a delegated user manager provisions an email, assigns permitted live roles and individual overrides, and sends an invitation. An invitation lasts seven days and links to ordinary sign-in; the link is not a credential. Existing OTP or verified OAuth proof activates the current invitation atomically. Unknown, disabled, expired, cancelled, and suspended identities cannot obtain sessions.
 
-The editor and HTTP contracts allow one base role: Admin, Mechanic, or Client (the compatible stored slug is `customer`). Super Admin remains a separate protected designation. Admin grants all staff business actions, including finance, but does not grant access management or customer portal access. The underlying resolver retains support for unions of historical memberships. An override replaces all inherited scopes for one action: an empty array denies it; removing the override restores inheritance. Role edits apply to subsequent requests using current database authority. Legacy `roles` in JWTs and User rows remain compatibility data only. Super-admin authority comes from `isSuperAdmin`, never from a role name.
+The editor and HTTP contracts allow one base role: Admin, Mechanic, or Client (the compatible stored slug is `customer`). Super Admin remains a separate protected designation. Admin grants all staff business actions, including finance, and delegates user management and role inspection, but does not grant shared-role editing, account suspension, or customer portal access by default. The underlying resolver retains support for unions of historical memberships. An override replaces all inherited scopes for one action: an empty array denies it; removing the override restores inheritance. Role edits apply to subsequent requests using current database authority. Legacy `roles` in JWTs and User rows remain compatibility data only. Super-admin authority comes from `isSuperAdmin`, never from a role name.
 
-Only super admins manage access. Public role creation is closed; customize the three built-in presets or an individual member’s exceptions. Built-in roles cannot be archived. Role and user edits require the revisions the editor reviewed. Assigned roles cannot be archived. Access changes and required audit records share a transaction. Lifecycle writers and admission use advisory lock 726001, including the last-active-super-admin safeguard; OTP reservations and refreshes use its shared variant without changing refresh-chain row locking or grace/replay behavior. Admission row locks also detect stale SERIALIZABLE snapshots after a concurrent suspension; the existing bounded retries recognize PostgreSQL serialization conflicts through Prisma 7's adapter errors.
+Access management uses explicit Users and Roles permissions. Only Super Admins assign the Admin designation or edit the Admin role. Public role creation is closed; customize the three built-in presets or an individual member’s exceptions. Built-in roles cannot be archived. Role and user edits require the revisions the editor reviewed. Assigned roles cannot be archived. Access changes and required audit records share a transaction. Lifecycle writers and admission use advisory lock 726001, including the last-active-super-admin safeguard; OTP reservations and refreshes use its shared variant without changing refresh-chain row locking or grace/replay behavior. Admission row locks also detect stale SERIALIZABLE snapshots after a concurrent suspension; the existing bounded retries recognize PostgreSQL serialization conflicts through Prisma 7's adapter errors.
 
 Every handler explicitly declares public, self-service, permission, or super-admin policy. Missing policy denies access even to super admins. An admitted account with no effective business grants retains only account/session self-service. Disabled and suspended accounts cannot authenticate. Scoped resources apply CASL conditions before counts, pagination, direct reads, and mutation checks. Nested document writes and embedded document fields require separate document grants.
 
@@ -89,3 +89,42 @@ Private storage and outgoing mail were mocked for integration/HTTP tests. No int
 - Member/role UI: 26 focused component tests passed, alongside 16 locale tests, 15 theme tests, the web typecheck, and changed-file lint.
 - Playwright CLI verified the actual member/role components with fixture API responses at desktop and mobile sizes. Checks covered light/dark/minimal themes, live primary/background token changes, distinct editor and dialog surfaces, permission search and custom filters, keyboard radio/tab interaction, one-base-role save payloads, review-before-save, unsaved-change protection, and Romanian mobile member navigation. The final browser run reported no runtime errors or horizontal page overflow. This was a component preview, not an authenticated full-app browser session.
 - The workspace inherits the active semantic theme without a local color palette. Primary remains unchanged; Open Sans body typography and Montserrat headings use shared theme tokens.
+
+## Delegated administration
+
+The Administration category contains independent grants:
+
+| Permission                 | Capability                                                   | Default Admin |
+| -------------------------- | ------------------------------------------------------------ | ------------- |
+| `users.read`               | Read the user directory, details, and access history         | Yes           |
+| `users.invite`             | Create accounts, send/resend invitations, cancel invitations | Yes           |
+| `users.roles.update`       | Assign or remove permitted base roles                        | Yes           |
+| `users.permissions.update` | Change individual permission overrides                       | Yes           |
+| `users.status.update`      | Suspend, reactivate, or disable eligible accounts            | No            |
+| `roles.read`               | Read role definitions and their history                      | Yes           |
+| `roles.update`             | Preview and update eligible shared role definitions          | No            |
+
+Mutation authority is reloaded inside the access advisory-lock transaction.
+Role assignment and permission changes are checked independently, including on
+invitation creation. A delegate cannot change their own access or any current
+Admin or Super Admin account, assign Admin (even with overrides denying all of
+its grants), edit the Admin role, or grant administration permissions through a
+role or an individual override. Super Admin designation and Person portal
+activation remain Super Admin-only.
+
+Delegated grants must be subsets of the actor's effective scopes. Both the
+proposed role's inherited grants and the resulting effective permissions are
+checked, so a restrictive override cannot conceal a broader assignment.
+This also means assigning the Client role requires authority over its OWN portal
+permissions; the ordinary Admin preset does not include portal permissions.
+Shared-role edits also check every affected member to prevent indirect changes
+to protected administrators or the actor.
+
+Admins may open the Admin card and inspect disabled permission controls. Read-only
+role pages have no save actions. Non-admin role editing and account lifecycle
+management can be granted separately by a Super Admin.
+
+Migration `20261023010000_delegated_access_management` adds the five default
+delegation grants to active Admin roles, increments access revisions, and records
+the change in the audit log. Existing individual overrides are preserved. It does
+not grant `roles.update` or `users.status.update`.

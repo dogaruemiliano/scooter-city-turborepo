@@ -86,6 +86,7 @@
   --link: oklch(0.504949 0.082386 210.6267);
   --link-hover: oklch(0.431477 0.070178 212.8220);
   --link-active: oklch(0.368920 0.057156 214.4168);
+  --border-elevated: oklch(1 0 0);
   --border-strong: oklch(0.723 0.014 214.4);
   --scrim: oklch(0 0 0 / 40%);
   --scrim-foreground: oklch(0.987 0.002 197.1);
@@ -177,6 +178,7 @@
     --link: oklch(0.732628 0.106093 207.7501);
     --link-hover: oklch(0.837801 0.078745 205.9768);
     --link-active: oklch(0.898236 0.051870 205.3585);
+    --border-elevated: #3f3f46b3;
     --border-strong: oklch(0.45 0.017 213.2);
     --scrim: oklch(0 0 0 / 65%);
     --scrim-foreground: oklch(0.987 0.002 197.1);
@@ -268,6 +270,7 @@
   --link: oklch(0.732628 0.106093 207.7501);
   --link-hover: oklch(0.837801 0.078745 205.9768);
   --link-active: oklch(0.898236 0.051870 205.3585);
+  --border-elevated: #3f3f46b3;
   --border-strong: oklch(0.45 0.017 213.2);
   --scrim: oklch(0 0 0 / 65%);
   --scrim-foreground: oklch(0.987 0.002 197.1);
@@ -461,6 +464,8 @@
 
   --duration-instant: 0ms;
   --transition-duration-instant: 0ms;
+  --duration-removal-windup: 80ms;
+  --transition-duration-removal-windup: 80ms;
   --duration-fast: 150ms;
   --transition-duration-fast: 150ms;
   --duration-normal: 250ms;
@@ -589,6 +594,7 @@
   --color-link: var(--link);
   --color-link-hover: var(--link-hover);
   --color-link-active: var(--link-active);
+  --color-border-elevated: var(--border-elevated);
   --color-border-strong: var(--border-strong);
   --color-scrim: var(--scrim);
   --color-scrim-foreground: var(--scrim-foreground);
@@ -596,6 +602,7 @@
 
   --radius-none: 0;
   --radius-sm: max(0px, calc(var(--radius) - 4px));
+  --radius-xs: 0.125rem;
   --radius-md: max(0px, calc(var(--radius) - 2px));
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);

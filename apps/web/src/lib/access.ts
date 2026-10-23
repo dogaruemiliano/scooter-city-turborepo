@@ -23,13 +23,12 @@ export function canVisit(
   user: AccessIdentity | null | undefined,
   path: string,
 ): boolean {
-  if (
-    path.startsWith("/users") ||
-    path.startsWith("/roles") ||
-    path.startsWith("/company") ||
-    path === "/finance/settings"
-  )
+  if (path.startsWith("/company") || path === "/finance/settings")
     return user?.isSuperAdmin === true;
+  if (path === "/users" || path.startsWith("/users/"))
+    return canAccess(user, "users.read");
+  if (path === "/roles" || path.startsWith("/roles/"))
+    return canAccess(user, "roles.read");
   const actions: Record<string, string> = {
     "/persons": "persons.read",
     "/scooters": "scooters.read",
@@ -46,4 +45,22 @@ export function canVisit(
   if (path === "/scooters") return canAccess(user, "scooters.read", "ALL");
   const action = actions[path];
   return action ? canAccess(user, action) : false;
+}
+
+export function canManageUser(
+  actor: (AccessIdentity & { id?: string }) | null | undefined,
+  target: {
+    id: string;
+    isSuperAdmin: boolean;
+    roles: { slug: string }[];
+  } | null,
+) {
+  return (
+    !!actor &&
+    (actor.isSuperAdmin ||
+      !target ||
+      (actor.id !== target.id &&
+        !target.isSuperAdmin &&
+        !target.roles.some((role) => role.slug === "admin")))
+  );
 }

@@ -43,3 +43,10 @@
     display: block;
   }
 }
+
+/* Confine mobile bounce to page content; standalone routes keep native scrolling. */
+@variant max-md {
+  html:has([data-app-shell]) {
+    overscroll-behavior-y: none;
+  }
+}

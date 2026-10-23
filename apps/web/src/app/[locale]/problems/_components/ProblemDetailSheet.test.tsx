@@ -150,7 +150,7 @@ describe("task detail workflow permissions", () => {
           expect.anything(),
           {
             method: "PUT",
-            json: { revision: 3, assigneeId: "other" },
+            json: { revision: 3, assigneeIds: ["mechanic", "other"] },
           },
         ),
       );

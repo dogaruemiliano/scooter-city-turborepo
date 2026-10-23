@@ -1,5 +1,7 @@
 "use client";
-import { useCallback, useState } from "react";
+
+import { ScooterSelect } from "@/components/ScooterSelect";
+import { useMemo, useCallback, useState } from "react";
 import {
   CheckCheck,
   CircleDot,
@@ -17,7 +19,6 @@ import {
   ListLayout,
   ListPagination,
   ListStatus,
-  SheetSelect,
   SegmentedRadioGroup,
 } from "@repo/ui/components";
 import Link from "next/link";
@@ -28,7 +29,7 @@ import { useSession } from "@/components/auth/SessionProvider";
 import { canAccess } from "@/lib/access";
 import { webApi } from "@/lib/api";
 import { useRemote } from "@/components/WorkspaceForm";
-import { memberName } from "./ProblemForms";
+import { AssigneeSelect } from "./AssigneeSelect";
 import { PageTitleOverride } from "@/components/PageTitleOverride";
 import { ProblemListItem } from "./ProblemListItem";
 import { ProblemList } from "./ProblemList";
@@ -38,9 +39,11 @@ type ProblemFilters = {
   status: v1.problems.Problem["status"] | "";
   severity: v1.problems.Problem["severity"] | "";
   scooterId: string;
-  assigneeId: string;
+  assigneeIds: string[];
   blocking: "" | "true" | "false";
 };
+
+const EMPTY_ASSIGNEE_IDS: string[] = [];
 
 const quickFilterIcons = {
   all: List,
@@ -63,10 +66,10 @@ export function ProblemsWorkspace() {
     status: "",
     severity: "",
     scooterId: "",
-    assigneeId: "",
+    assigneeIds: EMPTY_ASSIGNEE_IDS,
     blocking: "",
   };
-  const { view, status, severity, scooterId, assigneeId, blocking } = filters;
+  const { view, status, severity, scooterId, assigneeIds, blocking } = filters;
   const load = useCallback(async () => {
     const query = new URLSearchParams({
       ...(view ? { view } : {}),
@@ -75,8 +78,9 @@ export function ProblemsWorkspace() {
     if (status) query.set("status", status);
     if (severity) query.set("severity", severity);
     if (scooterId) query.set("scooterId", scooterId);
-    if (assigneeId === "unassigned") query.set("unassigned", "true");
-    else if (assigneeId) query.set("assigneeId", assigneeId);
+    const assignedIds = assigneeIds.filter((id) => id !== "unassigned");
+    if (assignedIds.length) query.set("assigneeIds", assignedIds.join(","));
+    if (assigneeIds.includes("unassigned")) query.set("unassigned", "true");
     if (blocking) query.set("blocking", blocking);
     const result = await webApi.fetch(
       `/v1/problems?${query}`,
@@ -117,9 +121,9 @@ export function ProblemsWorkspace() {
         resolved: totals[4]!,
       },
     };
-  }, [view, status, severity, scooterId, assigneeId, blocking, page]);
+  }, [view, status, severity, scooterId, assigneeIds, blocking, page]);
   const remote = useRemote(load);
-  const quickFilter = assigneeId
+  const quickFilter = assigneeIds.length
     ? "custom"
     : view === "assigned"
       ? status
@@ -173,7 +177,7 @@ export function ProblemsWorkspace() {
               status: "",
               severity: "",
               scooterId: "",
-              assigneeId: "",
+              assigneeIds: [],
               blocking: "",
             }}
             onApply={(value) => {
@@ -182,9 +186,13 @@ export function ProblemsWorkspace() {
             }}
             appliedCount={
               Number(view !== defaultView) +
-              [status, severity, scooterId, assigneeId, blocking].filter(
-                Boolean,
-              ).length
+              [
+                status,
+                severity,
+                scooterId,
+                assigneeIds.length,
+                blocking,
+              ].filter(Boolean).length
             }
             title={shared("list.filters")}
             applyLabel={shared("list.apply")}
@@ -397,7 +405,7 @@ export function ProblemsWorkspace() {
                   : next === "resolved" || next === "in_progress"
                     ? next
                     : "",
-              assigneeId: "",
+              assigneeIds: [],
             });
             setPage(1);
           }}
@@ -457,6 +465,14 @@ function ProblemFilterOptions({
     [],
   );
   const remote = useRemote(load);
+  const scooters = useMemo(
+    () =>
+      (remote.data?.scooters ?? []).map((scooter) => ({
+        ...scooter,
+        brand: scooter.brandName,
+      })),
+    [remote.data],
+  );
   const common = {
     placeholder: shared("list.all"),
     clearOptionLabel: shared("list.all"),
@@ -477,35 +493,27 @@ function ProblemFilterOptions({
       />
       <Field>
         <FieldLabel>{t("problems.scooter")}</FieldLabel>
-        <SheetSelect
+        <ScooterSelect
           {...common}
           label={t("problems.scooter")}
           value={value.scooterId}
           onValueChange={(scooterId) => onChange({ ...value, scooterId })}
           onClear={() => onChange({ ...value, scooterId: "" })}
-          options={
-            remote.data?.scooters?.map((scooter) => ({
-              value: scooter.id,
-              label: `${scooter.brandName} ${scooter.model ?? ""} · ${v1.scooters.scooterDisplayCode(scooter)}`,
-            })) ?? []
-          }
+          scooters={scooters}
         />
       </Field>
       <Field>
         <FieldLabel>{t("problems.assignee")}</FieldLabel>
-        <SheetSelect
-          {...common}
+        <AssigneeSelect
+          multiple
           label={t("problems.assignee")}
-          value={value.assigneeId}
-          onValueChange={(assigneeId) => onChange({ ...value, assigneeId })}
-          onClear={() => onChange({ ...value, assigneeId: "" })}
-          options={[
-            { value: "unassigned", label: t("problems.unassigned") },
-            ...(remote.data?.assignees?.map((member) => ({
-              value: member.id,
-              label: memberName(member),
-            })) ?? []),
-          ]}
+          value={value.assigneeIds}
+          onValueChange={(assigneeIds) => onChange({ ...value, assigneeIds })}
+          onClear={() => onChange({ ...value, assigneeIds: [] })}
+          clearOptionLabel={shared("list.all")}
+          members={remote.data?.assignees ?? []}
+          includeUnassigned
+          loading={remote.loading}
         />
       </Field>
     </>

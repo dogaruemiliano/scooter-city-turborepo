@@ -61,6 +61,143 @@ beforeEach(() => {
   });
 });
 describe("mechanic workspace", () => {
+  it("selects multiple assignee cards, including unassigned, and applies them together", async () => {
+    const user = userEvent.setup();
+    mocks.fetch.mockImplementation(async (path: string) => {
+      if (path === "/v1/problems/filter-options")
+        return {
+          scooters: [],
+          assignees: [
+            {
+              id: "alex",
+              firstName: "Alex",
+              lastName: "Ionescu",
+              email: "alex@example.test",
+              roles: ["Mechanic"],
+            },
+            {
+              id: "mara",
+              firstName: "Mara",
+              lastName: "Popescu",
+              email: "mara@example.test",
+              roles: [],
+              isSuperAdmin: true,
+            },
+          ],
+        };
+      return { items: [problem], total: 1, page: 1, pageSize: 25 };
+    });
+    renderWorkspace();
+    await user.click(screen.getByRole("button", { name: "Filters" }));
+    const filters = await screen.findByRole("dialog", { name: "Filters" });
+    await user.click(
+      within(filters).getByRole("button", { name: "Assignees" }),
+    );
+    const picker = await screen.findByRole("dialog", { name: "Assignees" });
+    const alex = await within(picker).findByRole("button", {
+      name: "Alex Ionescu",
+    });
+    expect(alex).toHaveClass("rounded-2xl", "min-h-20");
+    expect(within(alex).getByText("Mechanic")).toBeInTheDocument();
+    expect(within(picker).getByText("Admin")).toHaveClass("text-info");
+    expect(within(picker).queryByText("Super Admin")).toBeNull();
+    await user.click(alex);
+    expect(alex).toHaveAttribute("aria-pressed", "true");
+    await user.click(
+      within(picker).getByRole("button", { name: "Mara Popescu" }),
+    );
+    await user.click(
+      within(picker).getByRole("button", { name: "No assignee" }),
+    );
+    expect(picker).toBeInTheDocument();
+    await user.click(within(picker).getByRole("button", { name: "Done" }));
+    expect(
+      within(filters).getByRole("button", {
+        name: messages.en.workspace.problems.removeAssignee.replace(
+          "{name}",
+          "Alex Ionescu",
+        ),
+      }),
+    ).toBeInTheDocument();
+    await user.click(
+      within(filters).getByRole("button", { name: "Apply filters" }),
+    );
+    await waitFor(() =>
+      expect(
+        mocks.fetch.mock.calls.some(([url]) => {
+          const query = new URL(String(url), "https://example.test")
+            .searchParams;
+          return (
+            query.get("assigneeIds") === "alex,mara" &&
+            query.get("unassigned") === "true"
+          );
+        }),
+      ).toBe(true),
+    );
+  });
+
+  it("uses the shared scooter cards and only authorized filter summaries", async () => {
+    const user = userEvent.setup();
+    mocks.fetch.mockImplementation(async (path: string) => {
+      if (path === "/v1/problems/filter-options")
+        return {
+          scooters: [
+            {
+              id: "visible-scooter",
+              fleetNumber: 7,
+              brandCode: "HON",
+              brandName: "Honda",
+              model: "Vision",
+              registrationNumber: "B123",
+            },
+          ],
+          assignees: [],
+        };
+      return { items: [problem], total: 1, page: 1, pageSize: 25 };
+    });
+    renderWorkspace();
+    await user.click(screen.getByRole("button", { name: "Filters" }));
+    const filters = await screen.findByRole("dialog", { name: "Filters" });
+    await user.click(within(filters).getByRole("button", { name: "Scooter" }));
+    const picker = await screen.findByRole("dialog", { name: "Scooter" });
+    const option = await within(picker).findByRole("button", {
+      name: /007 HON/,
+    });
+    expect(option).toHaveTextContent("B123");
+    expect(option).toHaveTextContent("Honda Vision");
+    expect(option).toHaveClass("min-h-24");
+    await user.click(option);
+    expect(
+      within(filters).getByRole("button", { name: "Scooter" }),
+    ).toHaveTextContent("007 HON");
+    await user.click(
+      within(filters).getByRole("button", { name: "Apply filters" }),
+    );
+    await waitFor(() =>
+      expect(
+        mocks.fetch.mock.calls.some(([url]) =>
+          String(url).includes("scooterId=visible-scooter"),
+        ),
+      ).toBe(true),
+    );
+    expect(
+      mocks.fetch.mock.calls.some(([url]) =>
+        String(url).startsWith("/v1/scooters"),
+      ),
+    ).toBe(false);
+
+    await user.click(screen.getByRole("button", { name: /Filters/ }));
+    const nextFilters = await screen.findByRole("dialog", { name: "Filters" });
+    await user.click(
+      within(nextFilters).getByRole("button", { name: "Scooter" }),
+    );
+    const nextPicker = await screen.findByRole("dialog", { name: "Scooter" });
+    await user.click(within(nextPicker).getByRole("button", { name: "All" }));
+    expect(
+      within(nextFilters).getByRole("button", { name: "Scooter" }),
+    ).not.toHaveTextContent("007 HON");
+  });
+
   it("uses shared cards in status lanes without duplicating the mobile collection", async () => {
     mocks.fetch.mockResolvedValue({
       items: [
@@ -250,7 +387,7 @@ describe("service list filters", () => {
       within(sheet).getByRole("button", { name: "Scooter" }),
     ).toBeInTheDocument();
     expect(
-      within(sheet).getByRole("button", { name: "Assignee" }),
+      within(sheet).getByRole("button", { name: "Assignees" }),
     ).toBeInTheDocument();
     const high = within(
       within(sheet).getByRole("radiogroup", { name: "Severity" }),

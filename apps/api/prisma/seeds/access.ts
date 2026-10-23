@@ -8,7 +8,11 @@ type Grants = {
 const all = (keys: readonly v1.access.PermissionKey[]): Grants =>
   keys.map((permissionKey) => ({ permissionKey, scopes: ["ALL"] }));
 const staffKeys = v1.access.permissionKeys.filter(
-  (k) => !k.startsWith("portal.") && k !== "problems.claim",
+  (k) =>
+    !k.startsWith("portal.") &&
+    k !== "problems.claim" &&
+    k !== "roles.update" &&
+    k !== "users.status.update",
 );
 export const initialRoles: {
   slug: string;

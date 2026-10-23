@@ -32,6 +32,17 @@ export type AppAbility = Ability<
   [v1.access.PermissionKey, AppSubjects],
   PrismaQuery
 >;
+
+// Keep the legacy single-assignee field readable during the rollout.
+export const assignedProblemWhere = (
+  userId: string,
+): Prisma.ScooterProblemWhereInput => ({
+  OR: [{ assigneeId: userId }, { assignees: { some: { id: userId } } }],
+});
+export const unassignedProblemWhere: Prisma.ScooterProblemWhereInput = {
+  assigneeId: null,
+  assignees: { none: {} },
+};
 export function subjectFor(
   key: v1.access.PermissionKey,
 ):
@@ -63,14 +74,14 @@ export function createAbility(
     for (const scope of scopes) {
       let conditions: PrismaQuery | undefined;
       if (scope === "ASSIGNED" && subject === "ScooterProblem")
-        conditions = { assigneeId: snapshot.userId };
+        conditions = assignedProblemWhere(snapshot.userId);
       else if (scope === "AVAILABLE" && subject === "ScooterProblem")
-        conditions = { assigneeId: null, status: "open" };
+        conditions = { ...unassignedProblemWhere, status: "open" };
       else if (scope === "ASSIGNED" && subject === "Scooter")
         conditions = {
           problems: {
             some: {
-              assigneeId: snapshot.userId,
+              ...assignedProblemWhere(snapshot.userId),
               status: { in: ["open", "in_progress"] },
             },
           },

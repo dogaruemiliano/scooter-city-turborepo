@@ -7,7 +7,6 @@ import { useLocale, useTranslations } from "next-intl";
 import { useId, useRef, useState, type FormEvent } from "react";
 
 import { webApi } from "../../lib/api";
-import { EmailDomainSuggestions } from "../form/EmailDomainSuggestions";
 import { formatAuthError, type AuthErrorState } from "./auth-errors";
 
 const DEVELOPMENT_EMAIL =
@@ -94,12 +93,6 @@ export function EmailOtpSignInForm({ onChallenge }: EmailOtpSignInFormProps) {
           onChange={(event) => updateEmail(event.target.value)}
           disabled={busy}
         />
-        <EmailDomainSuggestions
-          email={email}
-          onChange={updateEmail}
-          inputRef={emailInputRef}
-          disabled={busy}
-        />
         {emailError ? (
           <p
             id={emailErrorId}
@@ -110,7 +103,7 @@ export function EmailOtpSignInForm({ onChallenge }: EmailOtpSignInFormProps) {
           </p>
         ) : null}
       </div>
-      <Button type="submit" disabled={busy}>
+      <Button type="submit" disabled={busy} className="mt-9">
         {busy ? t("sendingCode") : t("sendCode")}
       </Button>
       {error ? (

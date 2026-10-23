@@ -7,6 +7,10 @@ export default async function Page({
   params: Promise<{ locale: string; id: string }>;
 }) {
   const values = await params;
-  await requireAccess(resolveRouteLocale(values.locale), "/users");
+  await requireAccess(
+    resolveRouteLocale(values.locale),
+    "/users",
+    values.id === "new" ? "users.invite" : "users.read",
+  );
   return <UsersWorkspace id={values.id} />;
 }

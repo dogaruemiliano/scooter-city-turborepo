@@ -31,6 +31,25 @@ export const problemMemberSchema = z.object({
   lastName: z.string().nullable(),
 });
 
+export const problemAssigneeIdsSchema = z
+  .array(z.string().min(1).max(100))
+  .max(100)
+  .refine((ids) => new Set(ids).size === ids.length, {
+    message: "Assignee IDs must be unique",
+  });
+
+/** Also reads responses and audit entries written before multiple assignments. */
+export function problemAssignees<T extends { id: string }>(problem: {
+  assignees?: T[];
+  assignee?: T | null;
+}): T[] {
+  const members = problem.assignees ?? [];
+  const legacy = problem.assignee;
+  return legacy && !members.some((member) => member.id === legacy.id)
+    ? [legacy, ...members]
+    : members;
+}
+
 export const problemStatusSchema = z.enum([
   "open",
   "in_progress",
@@ -113,6 +132,7 @@ export const problemSchema = z.object({
   photos: z.array(problemPhotoSchema),
   reporter: problemMemberSchema.optional(),
   assignee: problemMemberSchema.nullable(),
+  assignees: z.array(problemMemberSchema).optional(),
   priority: problemPrioritySchema,
   status: problemStatusSchema,
   assigneeId: z.string().nullable(),
@@ -148,6 +168,12 @@ export const listProblemsQuerySchema = z
     scooterId: z.string().min(1).optional(),
     severity: problemSeveritySchema.optional(),
     assigneeId: z.string().min(1).optional(),
+    assigneeIds: z
+      .string()
+      .max(10_000)
+      .transform((value) => value.split(","))
+      .pipe(z.array(z.string().trim().min(1).max(100)).min(1).max(100))
+      .optional(),
     unassigned: z
       .enum(["true", "false"])
       .transform((v) => v === "true")
@@ -166,6 +192,7 @@ export const createProblemInputSchema = z
     description: z.string().trim().max(4000).default(""),
     blocksUsage: z.boolean().default(false),
     assigneeId: z.string().min(1).nullable().optional(),
+    assigneeIds: problemAssigneeIdsSchema.optional(),
     checklist: problemChecklistSchema.optional(),
     sections: problemSectionsSchema.optional(),
     buyList: problemChecklistSchema.optional(),
@@ -175,7 +202,14 @@ export const createProblemInputSchema = z
       .max(PROBLEM_PHOTO_MAX_FILES)
       .default([]),
   })
-  .strict();
+  .strict()
+  .refine(
+    (input) =>
+      input.assigneeIds === undefined || input.assigneeId === undefined,
+    {
+      message: "Use assigneeIds or assigneeId, not both",
+    },
+  );
 export const updateProblemInputSchema = revisionInputSchema.extend({
   checklist: problemChecklistSchema.optional(),
   sections: problemSectionsSchema.optional(),
@@ -195,13 +229,25 @@ export const resolveProblemInputSchema = revisionInputSchema.extend({
   resolutionNotes: z.string().trim().min(1).max(4000),
   clearMaintenanceHold: z.boolean().optional(),
 });
-export const assignProblemInputSchema = revisionInputSchema.extend({
-  assigneeId: z.string().min(1).nullable(),
-});
+export const assignProblemInputSchema = revisionInputSchema
+  .extend({
+    assigneeId: z.string().min(1).nullable().optional(),
+    assigneeIds: problemAssigneeIdsSchema.optional(),
+  })
+  .refine(
+    (input) =>
+      (input.assigneeIds !== undefined) !== (input.assigneeId !== undefined),
+    {
+      message: "Provide either assigneeIds or assigneeId",
+    },
+  );
 export const prioritizeProblemInputSchema = revisionInputSchema.extend({
   priority: problemPrioritySchema,
 });
-export const eligibleAssigneeSchema = problemMemberSchema;
+export const eligibleAssigneeSchema = problemMemberSchema.extend({
+  roles: z.array(z.string()).default([]),
+  isSuperAdmin: z.boolean().optional(),
+});
 export const eligibleAssigneeListSchema = z.object({
   items: z.array(eligibleAssigneeSchema),
 });
@@ -254,6 +300,7 @@ export const problemActivityStateSchema = z.object({
   title: z.string().optional(),
   description: z.string().optional(),
   assignee: problemMemberSchema.nullable().optional(),
+  assignees: z.array(problemMemberSchema).optional(),
 });
 export const problemActivitySchema = z.object({
   id: z.string(),
@@ -291,5 +338,5 @@ export type ActivityQuery = z.infer<typeof activityQuerySchema>;
 
 export const problemFilterOptionsSchema = z.object({
   scooters: z.array(maintenanceScooterSchema),
-  assignees: z.array(problemMemberSchema),
+  assignees: z.array(eligibleAssigneeSchema),
 });

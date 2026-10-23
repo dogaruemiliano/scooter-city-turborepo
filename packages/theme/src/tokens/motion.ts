@@ -10,6 +10,7 @@ export const motion = {
   },
   duration: {
     instant: 0,
+    removalWindup: 80,
     fast: 150,
     normal: 250,
     slow: 400,

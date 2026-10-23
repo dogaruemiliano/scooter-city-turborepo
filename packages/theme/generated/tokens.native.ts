@@ -85,6 +85,7 @@ export const tokens = {
       link: "#14717F",
       linkHover: "#105A67",
       linkActive: "#114752",
+      borderElevated: "#FFFFFF",
       borderStrong: "#9CA8AB",
       scrim: "#00000066",
       scrimForeground: "#F9FBFB",
@@ -173,6 +174,7 @@ export const tokens = {
       link: "#44BBCB",
       linkHover: "#8AD9E3",
       linkActive: "#B6E8EE",
+      borderElevated: "#3F3F46B3",
       borderStrong: "#4B585B",
       scrim: "#000000A6",
       scrimForeground: "#F9FBFB",
@@ -213,6 +215,7 @@ export const tokens = {
   },
   radius: {
     none: 0,
+    xs: 2,
     sm: 8,
     md: 10,
     lg: 12,
@@ -357,6 +360,7 @@ export const tokens = {
     },
     duration: {
       instant: 0,
+      removalWindup: 80,
       fast: 150,
       normal: 250,
       slow: 400,

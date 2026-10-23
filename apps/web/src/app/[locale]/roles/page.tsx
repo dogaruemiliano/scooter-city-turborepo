@@ -7,6 +7,10 @@ export default async function Page({
   params: Promise<{ locale: string }>;
 }) {
   const values = await params;
-  await requireAccess(resolveRouteLocale(values.locale), "/roles");
+  await requireAccess(
+    resolveRouteLocale(values.locale),
+    "/roles",
+    "roles.read",
+  );
   return <RolesWorkspace />;
 }

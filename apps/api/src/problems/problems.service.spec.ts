@@ -64,6 +64,7 @@ describe("ProblemsService authorization and write conflicts", () => {
     $queryRaw: jest.fn(),
     scooterProblem: {
       create: jest.fn(),
+      update: jest.fn(),
       findFirst: jest.fn(),
       findUnique: jest.fn(),
       updateMany: jest.fn(),
@@ -72,7 +73,7 @@ describe("ProblemsService authorization and write conflicts", () => {
       count: jest.fn(),
     },
     user: { findFirst: jest.fn(), findMany: jest.fn() },
-    scooter: { findFirst: jest.fn() },
+    scooter: { findFirst: jest.fn(), findMany: jest.fn() },
     businessLocation: {
       findUnique: jest.fn(),
       findMany: jest.fn(),
@@ -108,6 +109,7 @@ describe("ProblemsService authorization and write conflicts", () => {
       id: "mechanic",
       firstName: "Alex",
       lastName: null,
+      roleMemberships: [],
     });
   });
 
@@ -198,6 +200,44 @@ describe("ProblemsService authorization and write conflicts", () => {
     ).toBeNull();
   });
 
+  it.each([false, true])(
+    "combines multiple assignees and unassigned=%s within the visible problem scope",
+    async (unassigned) => {
+      db.$transaction.mockImplementation((queries: Promise<unknown>[]) =>
+        Promise.all(queries),
+      );
+      db.scooterProblem.findMany.mockResolvedValue([]);
+      db.scooterProblem.count.mockResolvedValue(0);
+      await service.list("mechanic", {
+        page: 1,
+        pageSize: 25,
+        assigneeIds: ["mechanic", "other"],
+        unassigned,
+      });
+      expect(db.scooterProblem.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            AND: [
+              expect.anything(),
+              {},
+              expect.objectContaining({
+                OR: [
+                  { assigneeId: { in: ["mechanic", "other"] } },
+                  {
+                    assignees: { some: { id: { in: ["mechanic", "other"] } } },
+                  },
+                  ...(unassigned
+                    ? [{ assigneeId: null, assignees: { none: {} } }]
+                    : []),
+                ],
+              }),
+            ],
+          },
+        }),
+      );
+    },
+  );
+
   it("counts every quick filter across pages using the same read permissions", async () => {
     db.$transaction.mockImplementation((queries: Promise<unknown>[]) =>
       Promise.all(queries),
@@ -230,9 +270,37 @@ describe("ProblemsService authorization and write conflicts", () => {
     expect(base.AND[1]).toEqual({ severity: "high" });
     expect(base.AND[0]).toEqual(findCalls[0][0].where.AND[0]);
     expect(countCalls[4][0].where).toEqual({
-      AND: [base, { assigneeId: "mechanic" }],
+      AND: [
+        base,
+        {
+          OR: [
+            { assigneeId: "mechanic" },
+            { assignees: { some: { id: "mechanic" } } },
+          ],
+        },
+      ],
     });
     expect(result.total).toBe(15);
+  });
+
+  it("includes roles and the Super Admin designation in assignee filter options", async () => {
+    db.scooter.findMany.mockResolvedValue([]);
+    db.user.findMany.mockResolvedValue([
+      {
+        id: "admin",
+        firstName: "Alex",
+        lastName: null,
+        isSuperAdmin: true,
+        roleMemberships: [{ role: { name: "Mechanic" } }],
+      },
+    ]);
+    const result = v1.problems.problemFilterOptionsSchema.parse(
+      await service.filterOptions("mechanic"),
+    );
+    expect(result.assignees[0]).toMatchObject({
+      roles: ["Mechanic"],
+      isSuperAdmin: true,
+    });
   });
 
   it("includes email in eligible assignees so nameless accounts have a readable fallback", async () => {
@@ -246,6 +314,7 @@ describe("ProblemsService authorization and write conflicts", () => {
       firstName: null,
       lastName: null,
       email: "mechanic@example.com",
+      roleMemberships: [{ role: { name: "Mechanic" } }],
     });
     const result = await service.assignees("admin", "mechanic@example.com");
     expect(result.items).toEqual([
@@ -254,6 +323,7 @@ describe("ProblemsService authorization and write conflicts", () => {
         firstName: null,
         lastName: null,
         email: "mechanic@example.com",
+        roles: ["Mechanic"],
       },
     ]);
     expect(db.user.findFirst).toHaveBeenCalledWith(
@@ -321,6 +391,8 @@ describe("ProblemsService authorization and write conflicts", () => {
     db.scooterProblem.findFirst.mockResolvedValue({
       ...row,
       assigneeId: "other",
+      assignee: { id: "other", firstName: "Other", lastName: null },
+      assignees: [],
     });
     await expect(
       service.update("mechanic", "problem", { revision: 1, ...input }),
@@ -470,7 +542,12 @@ describe("ProblemsService authorization and write conflicts", () => {
   });
 
   it("turns a lost conditional claim into conflict with no success audit", async () => {
-    db.scooterProblem.findFirst.mockResolvedValue({ ...row, assigneeId: null });
+    db.scooterProblem.findFirst.mockResolvedValue({
+      ...row,
+      assigneeId: null,
+      assignee: null,
+      assignees: [],
+    });
     db.scooterProblem.updateMany.mockResolvedValue({ count: 0 });
     await expect(service.claim("mechanic", "problem", 1)).rejects.toThrow(
       ConflictException,
@@ -519,7 +596,12 @@ describe("ProblemsService authorization and write conflicts", () => {
   });
 
   it("removes work notes from the available queue projection", async () => {
-    db.scooterProblem.findFirst.mockResolvedValue({ ...row, assigneeId: null });
+    db.scooterProblem.findFirst.mockResolvedValue({
+      ...row,
+      assigneeId: null,
+      assignee: null,
+      assignees: [],
+    });
     const result = await service.get("mechanic", "problem");
     expect(result).not.toHaveProperty("workNotes");
     expect(result).not.toHaveProperty("resolutionNotes");

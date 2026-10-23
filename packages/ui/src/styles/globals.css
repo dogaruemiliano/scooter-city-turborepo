@@ -11,6 +11,10 @@
     @apply border-border outline-ring/50;
   }
 
+  html {
+    @apply bg-background;
+  }
+
   body {
     @apply relative bg-background text-foreground;
     font-family: var(--font-sans);

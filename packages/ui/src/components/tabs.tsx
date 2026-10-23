@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useImperativeHandle, useRef, useState } from "react";
 import { Tabs as TabsPrimitive } from "@base-ui/react/tabs";
 import { cva, type VariantProps } from "class-variance-authority";
 
@@ -24,7 +25,7 @@ function Tabs({
 }
 
 const tabsListVariants = cva(
-  "group/tabs-list inline-flex max-w-full w-fit items-center justify-start overflow-x-auto rounded-lg p-1 text-muted-foreground group-data-horizontal/tabs:h-12 group-data-vertical/tabs:h-fit group-data-vertical/tabs:flex-col group-data-vertical/tabs:overflow-x-visible md:group-data-horizontal/tabs:h-11 data-[variant=line]:rounded-none",
+  "group/tabs-list inline-flex max-w-full w-fit items-center justify-start overflow-x-auto max-md:[scrollbar-width:none] max-md:[&::-webkit-scrollbar]:hidden rounded-lg p-1 text-muted-foreground group-data-horizontal/tabs:h-12 group-data-vertical/tabs:h-fit group-data-vertical/tabs:flex-col group-data-vertical/tabs:overflow-x-visible md:group-data-horizontal/tabs:h-11 data-[variant=line]:rounded-none",
   {
     variants: {
       variant: {
@@ -41,10 +42,68 @@ const tabsListVariants = cva(
 function TabsList({
   className,
   variant = "default",
+  ref,
+  style,
   ...props
 }: TabsPrimitive.List.Props & VariantProps<typeof tabsListVariants>) {
+  const listRef = useRef<HTMLDivElement>(null);
+  const [edges, setEdges] = useState({ left: false, right: false });
+  useImperativeHandle(ref, () => listRef.current!);
+
+  useEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    const update = () => {
+      const horizontal =
+        list.closest('[data-slot="tabs"]')?.getAttribute("data-orientation") !==
+        "vertical";
+      // RTL browsers use negative scrollLeft; convert it to physical edges.
+      const rtl = getComputedStyle(list).direction === "rtl";
+      const remaining = Math.max(0, list.scrollWidth - list.clientWidth);
+      const left = rtl ? remaining + list.scrollLeft : list.scrollLeft;
+      const next = {
+        left: horizontal && left > 1,
+        right: horizontal && remaining - left > 1,
+      };
+      setEdges((current) =>
+        current.left === next.left && current.right === next.right
+          ? current
+          : next,
+      );
+    };
+    update();
+    list.addEventListener("scroll", update, { passive: true });
+    const resize = new ResizeObserver(update);
+    resize.observe(list);
+    const observeChildren = () => {
+      resize.disconnect();
+      resize.observe(list);
+      for (const child of list.children) resize.observe(child);
+      update();
+    };
+    observeChildren();
+    const mutation = new MutationObserver(observeChildren);
+    mutation.observe(list, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+    });
+    return () => {
+      list.removeEventListener("scroll", update);
+      resize.disconnect();
+      mutation.disconnect();
+    };
+  }, []);
+
+  const edgeMask =
+    edges.left || edges.right
+      ? `linear-gradient(to right, ${edges.left ? "transparent" : "currentColor"}, currentColor var(--spacing-6), currentColor calc(100% - var(--spacing-6)), ${edges.right ? "transparent" : "currentColor"})`
+      : undefined;
+
   return (
     <TabsPrimitive.List
+      ref={listRef}
+      style={{ maskImage: edgeMask, WebkitMaskImage: edgeMask, ...style }}
       data-slot="tabs-list"
       data-variant={variant}
       className={cn(tabsListVariants({ variant }), className)}

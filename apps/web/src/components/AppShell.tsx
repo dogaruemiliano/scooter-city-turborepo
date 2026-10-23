@@ -68,6 +68,7 @@ import {
   PageHeaderActionsContext,
   type PageHeaderActionsContextValue,
 } from "./PageHeaderActions";
+import { useMobilePageScroll } from "./useMobilePageScroll";
 import { PageTitleOverrideContext } from "./PageTitleOverride";
 import {
   PageHeaderNavigationContext,
@@ -203,6 +204,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/company/associates": "companyAssociates",
   "/persons": "persons",
   "/persons/new": "newPerson",
+  "/users/new": "newUser",
   "/scooters": "scooters",
   "/scooters/new": "newScooter",
   "/scooters/brands": "scooterBrands",
@@ -227,17 +229,29 @@ export function AppShell({
   const pageTitle =
     pageTitleOverride ?? (pageTitleKey ? tPages(pageTitleKey) : "Scooter City");
 
-  if (isSignInPathname(pathname) || IMMERSIVE_ROUTES.has(routePathname)) {
+  const standalone =
+    isSignInPathname(pathname) || IMMERSIVE_ROUTES.has(routePathname);
+  const [pageScrollRef, onPageScroll] = useMobilePageScroll(
+    pathname,
+    !standalone,
+  );
+
+  if (standalone) {
     return children;
   }
 
   return (
     <PageTitleOverrideContext.Provider value={setPageTitleOverride}>
-      <SidebarProvider>
+      <SidebarProvider
+        data-app-shell=""
+        className="fixed inset-0 h-dvh min-h-0 overflow-hidden overscroll-none md:relative md:inset-auto md:h-auto md:min-h-svh md:overflow-visible"
+      >
         <AppShellContent
           locale={locale}
           pathname={routePathname}
           pageTitle={pageTitle}
+          pageScrollRef={pageScrollRef}
+          onPageScroll={onPageScroll}
           initialThemePreference={initialThemePreference}
         >
           {children}
@@ -252,12 +266,16 @@ function AppShellContent({
   locale,
   pathname,
   pageTitle,
+  pageScrollRef,
+  onPageScroll,
   initialThemePreference,
 }: {
   children: ReactNode;
   locale: SupportedLocale;
   pathname: string;
   pageTitle: string;
+  pageScrollRef: ReturnType<typeof useMobilePageScroll>[0];
+  onPageScroll: ReturnType<typeof useMobilePageScroll>[1];
   initialThemePreference: ThemePreference;
 }) {
   const { isMobile } = useSidebar();
@@ -295,8 +313,8 @@ function AppShellContent({
           pathname={pathname}
           initialThemePreference={initialThemePreference}
         />
-        <SidebarInset className="min-w-0">
-          <header className="sticky top-0 z-sticky flex h-16 shrink-0 items-center gap-3 border-b border-border bg-card px-4 md:px-8">
+        <SidebarInset className="min-h-0 min-w-0 overflow-hidden md:overflow-visible">
+          <header className="relative z-sticky flex h-[calc(var(--spacing-16)+env(safe-area-inset-top))] shrink-0 items-center gap-3 border-b border-border bg-card px-4 pt-[env(safe-area-inset-top)] md:sticky md:top-0 md:h-16 md:px-8 md:pt-0">
             <HeaderNavigationButton
               pathname={pathname}
               navigation={navigation}
@@ -322,7 +340,14 @@ function AppShellContent({
               ) : null}
             </div>
           </header>
-          <div className="flex min-w-0 flex-1 flex-col">{children}</div>
+          <div
+            ref={pageScrollRef}
+            data-slot="app-page-scroll"
+            onScroll={onPageScroll}
+            className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overscroll-y-contain pb-[env(safe-area-inset-bottom)] md:overflow-visible md:overscroll-auto md:pb-0"
+          >
+            {children}
+          </div>
         </SidebarInset>
       </PageHeaderActionsContext.Provider>
     </PageHeaderNavigationContext.Provider>

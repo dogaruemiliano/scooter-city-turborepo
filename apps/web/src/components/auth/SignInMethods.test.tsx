@@ -108,6 +108,55 @@ afterEach(() => {
 
 describe("SignInMethods", () => {
   it.each([
+    ["en", "(not you?)"],
+    ["ro", "(nu ești tu?)"],
+  ] as const)(
+    "shows the OTP email without a change-email link in %s",
+    async (locale, label) => {
+      const browser = userEvent.setup();
+      mocks.apiFetch.mockResolvedValueOnce(
+        createChallenge("00000000-0000-4000-8000-000000000001"),
+      );
+      renderSignInMethods({ enabledMethods: ["emailOtp"], locale });
+      await browser.type(screen.getByLabelText("Email"), user.email);
+      await browser.click(
+        screen.getByRole("button", {
+          name: messages[locale].auth.signIn.emailOtp.sendCode,
+        }),
+      );
+      expect(
+        await screen.findByText(user.email, { selector: "strong" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: label }),
+      ).not.toBeInTheDocument();
+      expect(mocks.apiFetch).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it("returns to email sign-in when the browser goes back from OTP", async () => {
+    const browser = userEvent.setup();
+    mocks.apiFetch.mockResolvedValueOnce(
+      createChallenge("00000000-0000-4000-8000-000000000001"),
+    );
+    renderSignInMethods({ enabledMethods: ["emailOtp"] });
+    await browser.type(screen.getByLabelText("Email"), user.email);
+    await browser.click(
+      screen.getByRole("button", { name: "Continue with email" }),
+    );
+    expect(
+      await screen.findByRole("heading", { name: "Enter verification code" }),
+    ).toBeInTheDocument();
+
+    act(() => window.history.back());
+
+    expect(await screen.findByLabelText("Email")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Enter verification code" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it.each([
     {
       name: "email only",
       enabledMethods: ["emailOtp"] as const,
@@ -177,6 +226,9 @@ describe("SignInMethods", () => {
       expect(Boolean(screen.queryByLabelText("Email"))).toBe(emailVisible);
       expect(renderGoogleButton.mock.calls.length > 0).toBe(googleVisible);
       expect(Boolean(screen.queryByText("or"))).toBe(separatorVisible);
+      expect(Boolean(screen.queryByText("Choose a method to continue."))).toBe(
+        emailVisible && googleVisible,
+      );
       expect(
         Boolean(
           screen.queryByText(
@@ -321,7 +373,7 @@ describe("SignInMethods", () => {
       screen.getByRole("heading", { name: "Enter verification code" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(`We sent a 6-digit code to ${user.email}.`),
+      screen.getByText(user.email, { selector: "strong" }),
     ).toBeInTheDocument();
 
     await browser.type(getOtpInput(), "000000");
@@ -459,7 +511,7 @@ describe("SignInMethods", () => {
       );
     });
     expect(
-      screen.getByText(`We sent a 6-digit code to ${user.email}.`),
+      screen.getByText(user.email, { selector: "strong" }),
     ).toBeInTheDocument();
 
     await act(async () => {
@@ -579,7 +631,7 @@ describe("SignInMethods", () => {
     expect(mocks.apiFetch).toHaveBeenCalledOnce();
   });
 
-  it("supports cancellation and reports invalid codes", async () => {
+  it("supports returning to login and reports invalid codes without a cancel button", async () => {
     const first = createChallenge("00000000-0000-4000-8000-000000000009");
     const second = createChallenge("00000000-0000-4000-8000-000000000010");
     mocks.apiFetch
@@ -595,7 +647,12 @@ describe("SignInMethods", () => {
     await browser.click(
       screen.getByRole("button", { name: "Continue with email" }),
     );
-    await browser.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(
+      screen.queryByRole("button", { name: "Cancel" }),
+    ).not.toBeInTheDocument();
+    await browser.click(
+      screen.getByRole("button", { name: messages.en.auth.otp.backToMethods }),
+    );
 
     expect(screen.getByLabelText("Email")).toHaveValue("");
 

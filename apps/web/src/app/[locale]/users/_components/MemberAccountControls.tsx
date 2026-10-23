@@ -10,10 +10,16 @@ export function MemberAccountControls({
   user,
   reload,
   disabled = false,
+  canInvite = false,
+  canManageStatus = false,
+  superAdmin = false,
 }: {
   user: v1.access.AccessUser;
   reload: () => void;
   disabled?: boolean;
+  canInvite?: boolean;
+  canManageStatus?: boolean;
+  superAdmin?: boolean;
 }) {
   const t = useTranslations("workspace");
   const locale = useLocale();
@@ -67,6 +73,7 @@ export function MemberAccountControls({
           <Button
             variant="outline"
             disabled={
+              !canInvite ||
               task.busy ||
               disabled ||
               user.loginStatus === "ACTIVE" ||
@@ -76,7 +83,7 @@ export function MemberAccountControls({
           >
             {user.invitation ? t("access.resend") : t("access.invite")}
           </Button>
-          {user.loginStatus === "INVITED" ? (
+          {canInvite && user.loginStatus === "INVITED" ? (
             <Button
               variant="outline"
               disabled={task.busy || disabled}
@@ -85,7 +92,7 @@ export function MemberAccountControls({
               {t("access.cancelInvite")}
             </Button>
           ) : null}
-          {user.loginStatus === "ACTIVE" ? (
+          {canManageStatus && user.loginStatus === "ACTIVE" ? (
             <Button
               variant="outline"
               onClick={() => setConfirmAction("SUSPENDED")}
@@ -93,7 +100,7 @@ export function MemberAccountControls({
               {t("access.suspend")}
             </Button>
           ) : null}
-          {user.loginStatus === "SUSPENDED" ? (
+          {canManageStatus && user.loginStatus === "SUSPENDED" ? (
             <Button
               variant="outline"
               onClick={() => setConfirmAction("ACTIVE")}
@@ -101,7 +108,7 @@ export function MemberAccountControls({
               {t("access.activate")}
             </Button>
           ) : null}
-          {user.loginStatus !== "DISABLED" ? (
+          {canManageStatus && user.loginStatus !== "DISABLED" ? (
             <Button
               variant="outline"
               onClick={() => setConfirmAction("DISABLED")}
@@ -110,17 +117,19 @@ export function MemberAccountControls({
             </Button>
           ) : null}
         </div>
-        <div className="flex flex-col items-start gap-3">
-          <p className="text-sm text-muted-foreground">
-            {t("access.designationWarning")}
-          </p>
-          <Button variant="outline" onClick={() => setConfirmAction("super")}>
-            {user.isSuperAdmin
-              ? t("access.revokeSuper")
-              : t("access.grantSuper")}
-          </Button>
-        </div>
-        {user.personId ? (
+        {superAdmin ? (
+          <div className="flex flex-col items-start gap-3">
+            <p className="text-sm text-muted-foreground">
+              {t("access.designationWarning")}
+            </p>
+            <Button variant="outline" onClick={() => setConfirmAction("super")}>
+              {user.isSuperAdmin
+                ? t("access.revokeSuper")
+                : t("access.grantSuper")}
+            </Button>
+          </div>
+        ) : null}
+        {superAdmin && user.personId ? (
           <div className="flex flex-col items-start gap-3">
             <p className="text-sm text-muted-foreground">
               {t("access.customerHelp")}
