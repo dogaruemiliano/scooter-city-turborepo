@@ -82,7 +82,7 @@ export function CreateProblem({
   const [scooterId, setScooter] = useState(preselected ?? "");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [severity, setSeverity] = useState("");
+  const [difficulty, setDifficulty] = useState("");
   const [blocksUsage, setBlocks] = useState("");
   const [assigneeIds, setAssignees] = useState<string[]>([]);
   const [files, setFiles] = useState<File[]>([]);
@@ -102,7 +102,7 @@ export function CreateProblem({
   const readyToSubmit = Boolean(
     scooterId &&
     title.trim() &&
-    severity &&
+    difficulty &&
     blocksUsage &&
     !fileError &&
     !galleryBusy &&
@@ -162,7 +162,7 @@ export function CreateProblem({
             ...sectionData,
             scooterId,
             title,
-            severity,
+            difficulty,
             description,
             blocksUsage: blocksUsage === "defective",
             ...(mayAssign ? { assigneeIds } : {}),
@@ -202,23 +202,27 @@ export function CreateProblem({
         />
       </Field>
       <Field>
-        <FieldLabel>{t("problems.severity")}</FieldLabel>
+        <FieldLabel>{t("problems.difficulty")}</FieldLabel>
         <SegmentedRadioGroup
-          label={t("problems.severity")}
-          name={`${id}-severity`}
-          value={severity}
-          onValueChange={setSeverity}
+          label={t("problems.difficulty")}
+          name={`${id}-difficulty`}
+          columns={3}
+          value={difficulty}
+          onValueChange={setDifficulty}
           disabled={task.busy}
           showCheckmark
-          aria-describedby={`${id}-severity-help`}
-          options={v1.problems.problemSeveritySchema.options.map((value) => ({
+          aria-describedby={`${id}-difficulty-help`}
+          options={v1.problems.problemDifficultySchema.options.map((value) => ({
             value,
             label: t(`problems.${value}`),
-            severity: value,
+            difficulty: value,
           }))}
         />
-        <p id={`${id}-severity-help`} className="text-sm text-muted-foreground">
-          {t("problems.severityHelp")}
+        <p
+          id={`${id}-difficulty-help`}
+          className="text-sm text-muted-foreground"
+        >
+          {t("problems.difficultyHelp")}
         </p>
       </Field>
       <Field>
@@ -417,7 +421,7 @@ export function ProblemWork({
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(problem.title);
   const [description, setDescription] = useState(problem.description);
-  const [severity, setSeverity] = useState(problem.severity ?? "");
+  const [difficulty, setDifficulty] = useState(problem.difficulty ?? "");
   const editable =
     problem.status === "open" || problem.status === "in_progress";
   const assignedMembers = v1.problems.problemAssignees(problem);
@@ -640,7 +644,7 @@ export function ProblemWork({
                         revision: problem.revision,
                         title,
                         description,
-                        ...(severity ? { severity } : {}),
+                        ...(difficulty ? { difficulty } : {}),
                       }),
                     ),
                   );
@@ -660,12 +664,12 @@ export function ProblemWork({
                   />
                 </Field>
                 <Choice
-                  label={t("problems.severity")}
-                  value={severity}
-                  onChange={setSeverity}
+                  label={t("problems.difficulty")}
+                  value={difficulty}
+                  onChange={setDifficulty}
                   options={[
                     { value: "", label: t("problems.unassessed") },
-                    ...v1.problems.problemSeveritySchema.options.map(
+                    ...v1.problems.problemDifficultySchema.options.map(
                       (value) => ({
                         value,
                         label: t(`problems.${value}`),
@@ -925,6 +929,13 @@ function ProblemActivity({ problemId }: { problemId: string }) {
                       ? "problems.blocksUsage"
                       : "problems.holdCleared",
                   )}
+                </p>
+              ) : null}
+              {entry.before?.difficulty !== entry.after?.difficulty &&
+              entry.after?.difficulty ? (
+                <p className="text-sm">
+                  {t("problems.difficulty")}:{" "}
+                  {t(`problems.${entry.after.difficulty}`)}
                 </p>
               ) : null}
               {entry.before?.severity !== entry.after?.severity &&

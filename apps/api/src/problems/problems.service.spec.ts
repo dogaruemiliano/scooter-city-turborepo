@@ -29,7 +29,8 @@ const row = {
   scooterId: "scooter",
   title: "Brake issue",
   description: "Brake issue",
-  severity: "high",
+  difficulty: "hard",
+  severity: "critical",
   blocksUsage: false,
   holdClearedAt: null,
   photos: [],
@@ -133,7 +134,7 @@ describe("ProblemsService authorization and write conflicts", () => {
       v1.problems.createProblemInputSchema.parse({
         scooterId: "scooter",
         title: "Service",
-        severity: "low",
+        difficulty: "easy",
         sections,
         checklist,
         buyList,
@@ -159,6 +160,15 @@ describe("ProblemsService authorization and write conflicts", () => {
       }),
     );
     expect(audit.recordRequired).toHaveBeenCalled();
+  });
+
+  it("returns difficulty alongside the unchanged original severity", async () => {
+    db.scooterProblem.findFirst.mockResolvedValue(row);
+    const result = await service.get("mechanic", "problem");
+    expect(result).toMatchObject({
+      difficulty: "hard",
+      legacySeverity: "critical",
+    });
   });
 
   it("returns the scooter cover URL with problem details", async () => {
@@ -251,7 +261,7 @@ describe("ProblemsService authorization and write conflicts", () => {
       pageSize: 25,
       status: "in_progress",
       view: "assigned",
-      severity: "high",
+      difficulty: "hard",
     });
     expect(result.quickFilterCounts).toEqual({
       all: 60,
@@ -267,7 +277,7 @@ describe("ProblemsService authorization and write conflicts", () => {
       { where: { AND: unknown[] } },
     ][];
     const base = countCalls[1][0].where;
-    expect(base.AND[1]).toEqual({ severity: "high" });
+    expect(base.AND[1]).toEqual({ difficulty: "hard" });
     expect(base.AND[0]).toEqual(findCalls[0][0].where.AND[0]);
     expect(countCalls[4][0].where).toEqual({
       AND: [

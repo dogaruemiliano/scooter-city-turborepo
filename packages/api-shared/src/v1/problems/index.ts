@@ -7,12 +7,15 @@ import {
 
 export const MAINTENANCE_HOLD_ERROR_CODE = "SCOOTER_MAINTENANCE_HOLD";
 
-export const problemSeveritySchema = z.enum([
+/** Historical impact values, retained in audit entries and legacySeverity only. */
+export const legacyProblemSeveritySchema = z.enum([
   "low",
   "moderate",
   "high",
   "critical",
 ]);
+
+export const problemDifficultySchema = z.enum(["easy", "medium", "hard"]);
 export const PROBLEM_PHOTO_MAX_FILES = 10;
 export const createProblemPhotoUploadSchema =
   createScooterPhotoUploadSchema.strict();
@@ -126,7 +129,8 @@ export const problemSchema = z.object({
   sections: problemSectionsSchema.default([]),
   buyList: problemChecklistSchema.default([]),
   location: problemLocationSchema.nullable().default(null),
-  severity: problemSeveritySchema.nullable(),
+  difficulty: problemDifficultySchema.nullable(),
+  legacySeverity: legacyProblemSeveritySchema.nullable().optional(),
   blocksUsage: z.boolean(),
   holdClearedAt: z.string().nullable(),
   photos: z.array(problemPhotoSchema),
@@ -166,7 +170,7 @@ export const listProblemsQuerySchema = z
     view: z.enum(["assigned", "available", "all"]).optional(),
     status: problemStatusSchema.optional(),
     scooterId: z.string().min(1).optional(),
-    severity: problemSeveritySchema.optional(),
+    difficulty: problemDifficultySchema.optional(),
     assigneeId: z.string().min(1).optional(),
     assigneeIds: z
       .string()
@@ -188,7 +192,7 @@ export const createProblemInputSchema = z
   .object({
     scooterId: z.string().min(1),
     title: z.string().trim().min(1).max(160),
-    severity: problemSeveritySchema,
+    difficulty: problemDifficultySchema,
     description: z.string().trim().max(4000).default(""),
     blocksUsage: z.boolean().default(false),
     assigneeId: z.string().min(1).nullable().optional(),
@@ -223,7 +227,7 @@ export const updateProblemInputSchema = revisionInputSchema.extend({
   startWork: z.boolean().optional(),
   title: z.string().trim().min(1).max(160).optional(),
   description: z.string().trim().max(4000).optional(),
-  severity: problemSeveritySchema.optional(),
+  difficulty: problemDifficultySchema.optional(),
 });
 export const resolveProblemInputSchema = revisionInputSchema.extend({
   resolutionNotes: z.string().trim().min(1).max(4000),
@@ -295,7 +299,8 @@ export const problemActivityStateSchema = z.object({
   location: problemLocationSchema.nullable().optional(),
   status: problemStatusSchema.optional(),
   assigneeId: z.string().nullable().optional(),
-  severity: problemSeveritySchema.nullable().optional(),
+  difficulty: problemDifficultySchema.nullable().optional(),
+  severity: legacyProblemSeveritySchema.nullable().optional(),
   blocksUsage: z.boolean().optional(),
   title: z.string().optional(),
   description: z.string().optional(),
@@ -325,7 +330,7 @@ export const maintenanceHoldSchema = z.object({
       id: z.string(),
       title: z.string(),
       status: problemStatusSchema,
-      severity: problemSeveritySchema.nullable(),
+      difficulty: problemDifficultySchema.nullable(),
     }),
   ),
 });

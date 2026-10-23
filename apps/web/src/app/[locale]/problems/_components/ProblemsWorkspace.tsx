@@ -37,7 +37,7 @@ import { ProblemList } from "./ProblemList";
 type ProblemFilters = {
   view: "assigned" | "available" | "";
   status: v1.problems.Problem["status"] | "";
-  severity: v1.problems.Problem["severity"] | "";
+  difficulty: v1.problems.Problem["difficulty"] | "";
   scooterId: string;
   assigneeIds: string[];
   blocking: "" | "true" | "false";
@@ -64,19 +64,20 @@ export function ProblemsWorkspace() {
   const filters: ProblemFilters = chosen ?? {
     view: defaultView,
     status: "",
-    severity: "",
+    difficulty: "",
     scooterId: "",
     assigneeIds: EMPTY_ASSIGNEE_IDS,
     blocking: "",
   };
-  const { view, status, severity, scooterId, assigneeIds, blocking } = filters;
+  const { view, status, difficulty, scooterId, assigneeIds, blocking } =
+    filters;
   const load = useCallback(async () => {
     const query = new URLSearchParams({
       ...(view ? { view } : {}),
       page: String(page),
     });
     if (status) query.set("status", status);
-    if (severity) query.set("severity", severity);
+    if (difficulty) query.set("difficulty", difficulty);
     if (scooterId) query.set("scooterId", scooterId);
     const assignedIds = assigneeIds.filter((id) => id !== "unassigned");
     if (assignedIds.length) query.set("assigneeIds", assignedIds.join(","));
@@ -98,7 +99,7 @@ export function ProblemsWorkspace() {
     const totals = await Promise.all(
       countKeys.map(async (key) => {
         const countQuery = new URLSearchParams({ page: "1", pageSize: "1" });
-        if (severity) countQuery.set("severity", severity);
+        if (difficulty) countQuery.set("difficulty", difficulty);
         if (scooterId) countQuery.set("scooterId", scooterId);
         if (blocking) countQuery.set("blocking", blocking);
         if (key === "mine") countQuery.set("view", "assigned");
@@ -121,7 +122,7 @@ export function ProblemsWorkspace() {
         resolved: totals[4]!,
       },
     };
-  }, [view, status, severity, scooterId, assigneeIds, blocking, page]);
+  }, [view, status, difficulty, scooterId, assigneeIds, blocking, page]);
   const remote = useRemote(load);
   const quickFilter = assigneeIds.length
     ? "custom"
@@ -175,7 +176,7 @@ export function ProblemsWorkspace() {
             defaultValue={{
               view: defaultView,
               status: "",
-              severity: "",
+              difficulty: "",
               scooterId: "",
               assigneeIds: [],
               blocking: "",
@@ -188,7 +189,7 @@ export function ProblemsWorkspace() {
               Number(view !== defaultView) +
               [
                 status,
-                severity,
+                difficulty,
                 scooterId,
                 assigneeIds.length,
                 blocking,
@@ -258,23 +259,23 @@ export function ProblemsWorkspace() {
                   />
                 </Field>
                 <Field>
-                  <FieldLabel>{t("problems.severity")}</FieldLabel>
+                  <FieldLabel>{t("problems.difficulty")}</FieldLabel>
                   <SegmentedRadioGroup
-                    id="service-severity-filter"
-                    name="service-severity-filter"
-                    label={t("problems.severity")}
-                    value={value.severity ?? ""}
+                    id="service-difficulty-filter"
+                    name="service-difficulty-filter"
+                    label={t("problems.difficulty")}
+                    value={value.difficulty ?? ""}
                     deselectValue=""
-                    columns={2}
+                    columns={3}
                     showCheckmark
-                    onValueChange={(severity) =>
-                      setValue({ ...value, severity })
+                    onValueChange={(difficulty) =>
+                      setValue({ ...value, difficulty })
                     }
-                    options={v1.problems.problemSeveritySchema.options.map(
-                      (severity) => ({
-                        value: severity,
-                        label: t(`problems.${severity}`),
-                        severity,
+                    options={v1.problems.problemDifficultySchema.options.map(
+                      (difficulty) => ({
+                        value: difficulty,
+                        label: t(`problems.${difficulty}`),
+                        difficulty,
                       }),
                     )}
                   />

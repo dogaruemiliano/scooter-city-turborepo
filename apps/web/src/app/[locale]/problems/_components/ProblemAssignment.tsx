@@ -13,9 +13,9 @@ import {
   BottomSheetBody,
   BottomSheetFooter,
 } from "@repo/ui/components";
-import { CheckIcon } from "lucide-react";
+import { CheckIcon, PencilIcon } from "lucide-react";
 import type { AssigneeOption } from "./AssigneeSelect";
-import { AssigneeUserCard } from "./AssigneeUserCard";
+import { AssigneeUserCard, AssigneeUserRow } from "./AssigneeUserCard";
 import { memberName } from "../_lib/member-name";
 
 export function ProblemAssignment({
@@ -70,27 +70,50 @@ export function ProblemAssignment({
   const action = t(
     assigned.length ? "problems.manageAssignment" : "problems.assignSomeone",
   );
+  function openAssignment() {
+    setDraft(assigned.map((member) => member.id));
+    setQuery("");
+    setOpen(true);
+  }
   return (
     <section
       aria-label={t("problems.assignment")}
-      className="flex flex-col gap-4 rounded-xl border border-border p-4"
+      className="flex flex-col gap-4"
     >
       <h3 className="text-base font-semibold">{t("problems.assignment")}</h3>
       {assigned.length ? (
-        assigned.map((member) => (
-          <AssigneeUserCard
-            key={member.id}
-            member={options.find((option) => option.id === member.id)}
-            name={memberName(member)}
-            action={
-              member.id === userId ? (
-                <span className="text-sm font-medium text-muted-foreground">
-                  {t("problems.you")}
+        <div className="flex flex-col gap-2">
+          {assigned.map((member) => (
+            <AssigneeUserRow
+              key={member.id}
+              member={options.find((option) => option.id === member.id)}
+              name={memberName(member)}
+              action={
+                <span className="flex shrink-0 items-center gap-2">
+                  {member.id === userId ? (
+                    <span className="text-sm font-medium text-muted-foreground">
+                      {t("problems.you")}
+                    </span>
+                  ) : null}
+                  {mayAssign && editable ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="icon"
+                      disabled={busy}
+                      aria-label={t("problems.editAssignee", {
+                        name: memberName(member),
+                      })}
+                      onClick={openAssignment}
+                    >
+                      <PencilIcon aria-hidden="true" className="size-5" />
+                    </Button>
+                  ) : null}
                 </span>
-              ) : undefined
-            }
-          />
-        ))
+              }
+            />
+          ))}
+        </div>
       ) : (
         <p className="text-sm text-muted-foreground">
           {t("problems.nobodyAssigned")}
@@ -101,30 +124,25 @@ export function ProblemAssignment({
           {t("problems.reassignRequired")}
         </p>
       ) : null}
-      <div className="flex flex-col gap-2 sm:flex-row">
-        {mayAssign && editable ? (
-          <Button
-            disabled={busy}
-            variant={assigned.length ? "outline" : "default"}
-            onClick={() => {
-              setDraft(assigned.map((member) => member.id));
-              setQuery("");
-              setOpen(true);
-            }}
-          >
-            {action}
-          </Button>
-        ) : null}
-        {mayClaim && problem.status === "open" && !assigned.length ? (
-          <Button
-            disabled={busy}
-            variant={mayAssign ? "outline" : "default"}
-            onClick={onClaim}
-          >
-            {t(mayAssign ? "problems.assignToMe" : "problems.takeProblem")}
-          </Button>
-        ) : null}
-      </div>
+      {!assigned.length &&
+      ((mayAssign && editable) || (mayClaim && problem.status === "open")) ? (
+        <div className="flex flex-col gap-2 sm:flex-row">
+          {mayAssign && editable && !assigned.length ? (
+            <Button disabled={busy} variant="default" onClick={openAssignment}>
+              {action}
+            </Button>
+          ) : null}
+          {mayClaim && problem.status === "open" && !assigned.length ? (
+            <Button
+              disabled={busy}
+              variant={mayAssign ? "outline" : "default"}
+              onClick={onClaim}
+            >
+              {t(mayAssign ? "problems.assignToMe" : "problems.takeProblem")}
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
       <BottomSheet
         open={open}
         onOpenChange={(next) => {

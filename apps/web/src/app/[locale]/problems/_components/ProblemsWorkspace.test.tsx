@@ -35,7 +35,7 @@ const problem = {
   status: "open",
   priority: "normal",
   title: "Inspect rear brake",
-  severity: "high",
+  difficulty: "hard",
   photos: [],
   createdAt: "2026-10-14T08:00:00Z",
 };
@@ -366,16 +366,20 @@ describe("service list filters", () => {
     );
   });
 
-  it("uses fixed 2×2 status and severity groups, keeping the scooter and assignee pickers", async () => {
+  it("uses four status and three difficulty choices, keeping the scooter and assignee pickers", async () => {
     const user = userEvent.setup();
     mocks.user.effectiveScopes = { "problems.read": ["ALL"] };
     renderWorkspace();
     await user.click(screen.getByRole("button", { name: "Filters" }));
     const sheet = screen.getByRole("dialog", { name: "Filters" });
-    for (const name of ["Status", "Severity"]) {
+    for (const name of ["Status", "Difficulty"]) {
       const group = within(sheet).getByRole("radiogroup", { name });
-      expect(within(group).getAllByRole("radio")).toHaveLength(4);
-      expect(group).toHaveStyle({ "--segmented-columns": "2" });
+      expect(within(group).getAllByRole("radio")).toHaveLength(
+        name === "Status" ? 4 : 3,
+      );
+      expect(group).toHaveStyle({
+        "--segmented-columns": name === "Status" ? "2" : "3",
+      });
       expect(within(group).queryByRole("radio", { name: /All/ })).toBeNull();
       expect(
         within(group)
@@ -390,8 +394,8 @@ describe("service list filters", () => {
       within(sheet).getByRole("button", { name: "Assignees" }),
     ).toBeInTheDocument();
     const high = within(
-      within(sheet).getByRole("radiogroup", { name: "Severity" }),
-    ).getByRole("radio", { name: "High" });
+      within(sheet).getByRole("radiogroup", { name: "Difficulty" }),
+    ).getByRole("radio", { name: "Hard" });
     await user.click(high);
     expect(high).toBeChecked();
     await user.keyboard(" ");

@@ -37,7 +37,7 @@ const problem = v1.problems.problemSchema.parse({
     registrationNumber: null,
   },
   status: "in_progress",
-  severity: "high",
+  difficulty: "hard",
   priority: "high",
   blocksUsage: false,
   holdClearedAt: null,
@@ -93,7 +93,7 @@ describe("task detail workflow permissions", () => {
     expect(screen.getByText("You")).toBeInTheDocument();
     const detail = screen.getByRole("main");
     expect(
-      within(detail).queryByRole("button", { name: "Manage assignment" }),
+      within(detail).queryByRole("button", { name: /Edit .* assignment/ }),
     ).toBeNull();
     expect(
       within(detail).queryByRole("combobox", { name: "Assignee" }),
@@ -139,7 +139,7 @@ describe("task detail workflow permissions", () => {
       };
       renderDetail();
       await user.click(
-        screen.getByRole("button", { name: "Manage assignment" }),
+        screen.getByRole("button", { name: "Edit Alex’s assignment" }),
       );
       const sheet = await screen.findByRole("dialog", {
         name: "Manage assignment",
@@ -194,7 +194,7 @@ describe("problem preview", () => {
     ).toHaveAttribute("href", "/en/problems/problem");
     expect(within(detail).queryByRole("checkbox")).toBeNull();
     expect(
-      within(detail).queryByRole("button", { name: "Manage assignment" }),
+      within(detail).queryByRole("button", { name: /Edit .* assignment/ }),
     ).toBeNull();
     await userEvent
       .setup()

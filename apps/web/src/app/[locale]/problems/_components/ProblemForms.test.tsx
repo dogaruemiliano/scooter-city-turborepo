@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CreateProblem, ProblemWork, memberName } from "./ProblemForms";
 import { ProblemCreateScreen } from "./ProblemCreateScreen";
 import { AssigneeSelect } from "./AssigneeSelect";
+import { ProblemAssignment } from "./ProblemAssignment";
 
 const mocks = vi.hoisted(() => ({
   fetch: vi.fn(),
@@ -39,7 +40,7 @@ const problem: v1.problems.Problem = {
   scooterId: "scooter",
   title: "Broken belt",
   description: "",
-  severity: "critical",
+  difficulty: "hard",
   blocksUsage: true,
   holdClearedAt: null,
   photos: [],
@@ -225,7 +226,7 @@ describe("problem release forms", () => {
     const saved = vi.fn();
     renderForm(<CreateProblem scooterId="scooter" onSaved={saved} />);
     await user.type(screen.getByRole("textbox", { name: "Title" }), "Service");
-    await user.click(screen.getByRole("radio", { name: "Low" }));
+    await user.click(screen.getByRole("radio", { name: "Easy" }));
     await user.click(screen.getByRole("radio", { name: "Usable" }));
     for (const [section, label, text] of [
       ["Checklist", "New checklist item", "Check brakes"],
@@ -328,7 +329,7 @@ describe("problem release forms", () => {
     renderForm(<ProblemWork problem={problem} reload={vi.fn()} />);
     await userEvent
       .setup()
-      .click(screen.getByRole("button", { name: "Manage assignment" }));
+      .click(screen.getByRole("button", { name: "Edit Alex’s assignment" }));
     const sheet = await screen.findByRole("dialog", {
       name: "Manage assignment",
     });
@@ -343,11 +344,103 @@ describe("problem release forms", () => {
     ).toBeInTheDocument();
   });
 
+  it("shows each assigned user in the shared create-page row with their own edit action", async () => {
+    const user = userEvent.setup();
+    renderForm(
+      <ProblemWork
+        problem={{
+          ...problem,
+          assignees: [
+            problem.assignee!,
+            { id: "other", firstName: "Taylor", lastName: null },
+          ],
+        }}
+        reload={vi.fn()}
+      />,
+    );
+    const assignment = screen.getByRole("region", { name: "Assignment" });
+    expect(
+      assignment.querySelectorAll('[data-slot="assignee-user-row"]'),
+    ).toHaveLength(2);
+    expect(
+      within(assignment).queryByRole("button", { name: "Manage assignment" }),
+    ).not.toBeInTheDocument();
+    for (const name of ["Alex", "Taylor"]) {
+      const edit = within(assignment).getByRole("button", {
+        name: `Edit ${name}’s assignment`,
+      });
+      const row = edit.closest('[data-slot="assignee-user-row"]');
+      expect(row).toHaveClass("rounded-2xl", "border", "bg-card", "p-4");
+      expect(within(row as HTMLElement).getByText(name)).toBeInTheDocument();
+      expect(edit.querySelector("svg")).toHaveClass("lucide-pencil");
+      await user.click(edit);
+      const sheet = await screen.findByRole("dialog", {
+        name: "Manage assignment",
+      });
+      expect(
+        within(sheet).getByRole("button", { name: "Alex" }),
+      ).toHaveAttribute("aria-pressed", "true");
+      expect(
+        within(sheet).getByRole("button", { name: "Taylor" }),
+      ).toHaveAttribute("aria-pressed", "true");
+      await user.click(within(sheet).getByRole("button", { name: "Cancel" }));
+      await waitFor(() =>
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+      );
+    }
+  });
+
+  it.each([
+    {
+      label: "read-only",
+      mayAssign: false,
+      busy: false,
+      status: "in_progress" as const,
+    },
+    {
+      label: "closed",
+      mayAssign: true,
+      busy: false,
+      status: "resolved" as const,
+    },
+    {
+      label: "busy",
+      mayAssign: true,
+      busy: true,
+      status: "in_progress" as const,
+    },
+  ])("protects assignment edits when $label", ({ mayAssign, busy, status }) => {
+    renderForm(
+      <ProblemAssignment
+        problem={{ ...problem, status }}
+        userId="member"
+        mayAssign={mayAssign}
+        mayClaim={false}
+        busy={busy}
+        members={[]}
+        loading={false}
+        error={null}
+        saveError={null}
+        onRetry={vi.fn()}
+        onAssign={vi.fn()}
+        onClaim={vi.fn()}
+      />,
+    );
+    const edit = screen.queryByRole("button", {
+      name: "Edit Alex’s assignment",
+    });
+    if (busy) expect(edit).toBeDisabled();
+    else expect(edit).not.toBeInTheDocument();
+    expect(screen.getByText("Alex")).toBeInTheDocument();
+  });
+
   it("assigns an existing problem from the assignee bottom sheet", async () => {
     const user = userEvent.setup();
     const reload = vi.fn();
     renderForm(<ProblemWork problem={problem} reload={reload} />);
-    await user.click(screen.getByRole("button", { name: "Manage assignment" }));
+    await user.click(
+      screen.getByRole("button", { name: "Edit Alex’s assignment" }),
+    );
     const sheet = await screen.findByRole("dialog", {
       name: "Manage assignment",
     });
@@ -378,7 +471,7 @@ describe("problem release forms", () => {
       screen.getByRole("textbox", { name: "Title" }),
       "Scratched panel",
     );
-    await user.click(screen.getByRole("radio", { name: "Low" }));
+    await user.click(screen.getByRole("radio", { name: "Easy" }));
     const submit = screen.getByRole("button", { name: "Report" });
     const group = screen.getByRole("radiogroup", {
       name: "Scooter condition",
@@ -386,7 +479,7 @@ describe("problem release forms", () => {
     expect(group).toHaveAttribute("aria-required", "true");
     expect(
       group.closest('[data-slot="field"]')?.previousElementSibling,
-    ).toContainElement(screen.getByRole("radiogroup", { name: "Severity" }));
+    ).toContainElement(screen.getByRole("radiogroup", { name: "Difficulty" }));
     const functional = within(group).getByRole("radio", { name: "Usable" });
     const defective = within(group).getByRole("radio", { name: "Unusable" });
     expect(functional.nextElementSibling).toHaveClass("text-success");
@@ -524,7 +617,7 @@ describe("problem release forms", () => {
     expect(screen.getByRole("img", { name: "brake.png" })).toBeInTheDocument();
   });
 
-  it("reports from a preselected scooter with severity and an assignee, without requiring description or photos", async () => {
+  it("reports from a preselected scooter with difficulty and an assignee, without requiring description or photos", async () => {
     const user = userEvent.setup();
     const saved = vi.fn();
     renderForm(<CreateProblem scooterId="scooter" onSaved={saved} />);
@@ -535,35 +628,39 @@ describe("problem release forms", () => {
       screen.getByRole("textbox", { name: "Title" }),
       "Broken belt",
     );
-    await user.click(screen.getByRole("radio", { name: "Critical" }));
-    expect(screen.getByRole("radio", { name: "Critical" })).toBeChecked();
+    await user.click(screen.getByRole("radio", { name: "Hard" }));
+    expect(screen.getByRole("radio", { name: "Hard" })).toBeChecked();
+    expect(
+      within(
+        screen.getByRole("radiogroup", { name: "Difficulty" }),
+      ).getAllByRole("radio"),
+    ).toHaveLength(3);
     for (const [label, color] of [
-      ["Low", "low"],
+      ["Easy", "easy"],
       ["Medium", "medium"],
-      ["High", "high"],
-      ["Critical", "critical"],
+      ["Hard", "hard"],
     ]) {
       const segment = screen.getByRole("radio", {
         name: label,
       }).nextElementSibling;
-      if (label === "Critical") {
-        expect(segment).toHaveClass(`bg-severity-${color}`);
+      if (label === "Hard") {
+        expect(segment).toHaveClass(`bg-difficulty-${color}`);
       } else {
-        expect(segment).toHaveClass(`text-severity-${color}`);
-        expect(segment).not.toHaveClass(`bg-severity-${color}`);
+        expect(segment).toHaveClass(`text-difficulty-${color}`);
+        expect(segment).not.toHaveClass(`bg-difficulty-${color}`);
       }
     }
-    await user.click(screen.getByRole("radio", { name: "Low" }));
+    await user.click(screen.getByRole("radio", { name: "Easy" }));
     expect(
-      screen.getByRole("radio", { name: "Low" }).nextElementSibling,
-    ).toHaveClass("bg-severity-low");
+      screen.getByRole("radio", { name: "Easy" }).nextElementSibling,
+    ).toHaveClass("bg-difficulty-easy");
     expect(
-      screen.getByRole("radio", { name: "Critical" }).nextElementSibling,
-    ).toHaveClass("text-severity-critical");
+      screen.getByRole("radio", { name: "Hard" }).nextElementSibling,
+    ).toHaveClass("text-difficulty-hard");
     expect(
-      screen.getByRole("radio", { name: "Critical" }).nextElementSibling,
-    ).not.toHaveClass("bg-severity-critical");
-    await user.click(screen.getByRole("radio", { name: "Critical" }));
+      screen.getByRole("radio", { name: "Hard" }).nextElementSibling,
+    ).not.toHaveClass("bg-difficulty-hard");
+    await user.click(screen.getByRole("radio", { name: "Hard" }));
     await user.click(screen.getByRole("radio", { name: "Unusable" }));
     await user.click(screen.getByRole("button", { name: "Add assignee" }));
     await user.click(await screen.findByRole("button", { name: "Taylor" }));
@@ -586,7 +683,7 @@ describe("problem release forms", () => {
         json: {
           scooterId: "scooter",
           title: "Broken belt",
-          severity: "critical",
+          difficulty: "hard",
           blocksUsage: true,
           description: "",
           photos: [],
@@ -849,11 +946,10 @@ describe("problem creation screen picker", () => {
               registrationNumber: "B 123 ABC",
               vin: "VIN7",
               coverUrl: "/cover.jpg",
-              problemSeverityCounts: {
-                low: 2,
-                moderate: 0,
-                high: 1,
-                critical: 3,
+              problemDifficultyCounts: {
+                easy: 2,
+                medium: 0,
+                hard: 4,
                 unknown: 0,
               },
             },
@@ -866,11 +962,10 @@ describe("problem creation screen picker", () => {
               registrationNumber: null,
               vin: "VIN8",
               coverUrl: null,
-              problemSeverityCounts: {
-                low: 0,
-                moderate: 0,
-                high: 0,
-                critical: 0,
+              problemDifficultyCounts: {
+                easy: 0,
+                medium: 0,
+                hard: 0,
                 unknown: 0,
               },
             },
@@ -898,10 +993,10 @@ describe("problem creation screen picker", () => {
       }
     }
     expect(
-      within(picker).getByRole("img", { name: "Critical: 3 problems" }),
+      within(picker).getByRole("img", { name: "Hard: 4 problems" }),
     ).toBeInTheDocument();
     expect(
-      within(picker).getByRole("img", { name: "Low: 2 problems" }),
+      within(picker).getByRole("img", { name: "Easy: 2 problems" }),
     ).toBeInTheDocument();
     expect(within(picker).getByText("—")).toBeInTheDocument();
     expect(within(picker).getByText("No active problems")).toBeInTheDocument();
@@ -947,7 +1042,7 @@ describe("dedicated creation screen", () => {
       screen.getByRole("textbox", { name: "Title" }),
       "Broken belt",
     );
-    await user.click(screen.getByRole("radio", { name: "Critical" }));
+    await user.click(screen.getByRole("radio", { name: "Hard" }));
     await user.click(screen.getByRole("radio", { name: "Usable" }));
     expect(submit.closest('[data-slot="problem-create-actions"]')).toHaveClass(
       "sticky",

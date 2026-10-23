@@ -16,17 +16,15 @@ import { Clock, Paperclip } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
 import { memberName } from "./ProblemForms";
 
-const severityAccent = {
-  low: "bg-severity-low",
-  moderate: "bg-severity-medium",
-  high: "bg-severity-high",
-  critical: "bg-severity-critical",
+const difficultyAccent = {
+  easy: "bg-difficulty-easy",
+  medium: "bg-difficulty-medium",
+  hard: "bg-difficulty-hard",
 } as const;
-const severityText = {
-  low: "dark:text-severity-low",
-  moderate: "dark:text-severity-medium",
-  high: "dark:text-severity-high",
-  critical: "dark:text-severity-critical",
+const difficultyText = {
+  easy: "dark:text-difficulty-easy",
+  medium: "dark:text-difficulty-medium",
+  hard: "dark:text-difficulty-hard",
 } as const;
 
 export function ProblemListItem({
@@ -66,8 +64,8 @@ export function ProblemListItem({
       size="comfortable"
       className="relative isolate transition-colors duration-fast hover:border-border-strong"
     >
-      {problem.severity ? (
-        <CardAccent className={severityAccent[problem.severity]} />
+      {problem.difficulty ? (
+        <CardAccent className={difficultyAccent[problem.difficulty]} />
       ) : null}
       {href ? (
         <Link
@@ -88,14 +86,14 @@ export function ProblemListItem({
       <CardHeader className="gap-3">
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <span
-            className={`font-semibold uppercase ${problem.severity ? severityText[problem.severity] : "text-muted-foreground"}`}
+            className={`font-semibold uppercase ${problem.difficulty ? difficultyText[problem.difficulty] : "text-muted-foreground"}`}
             title={
-              problem.severity
-                ? t(`severityDescriptions.${problem.severity}`)
+              problem.difficulty
+                ? t(`difficultyDescriptions.${problem.difficulty}`)
                 : undefined
             }
           >
-            {problem.severity ? t(problem.severity) : t("unassessed")}
+            {problem.difficulty ? t(problem.difficulty) : t("unassessed")}
           </span>
         </div>
         <CardTitle role="heading" aria-level={3}>

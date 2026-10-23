@@ -1600,7 +1600,9 @@ model ScooterProblem {
   sections        String[]  @default([])
   buyList         Json      @default("[]")
   location        Json?
+  /// Original impact severity, retained for historical reference. New writes use difficulty.
   severity        String?
+  difficulty      String?
   blocksUsage     Boolean   @default(false)
   holdClearedAt   DateTime?
   holdClearedById String?
@@ -1621,6 +1623,7 @@ model ScooterProblem {
 
   @@index([scooterId, blocksUsage])
   @@index([severity, status])
+  @@index([difficulty, status])
   @@index([scooterId, status])
   @@index([assigneeId, status])
   @@index([status, assigneeId])

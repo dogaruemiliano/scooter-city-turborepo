@@ -265,17 +265,16 @@ export const scooterTechnicalDetailsSchema = z.object({
 export const scooterSchema = z
   .object({
     coverUrl: z.string().nullable().optional(),
-    problemSeverityCounts: z
+    problemDifficultyCounts: z
       .object({
-        low: z.number().int().nonnegative(),
-        moderate: z.number().int().nonnegative(),
-        high: z.number().int().nonnegative(),
-        critical: z.number().int().nonnegative(),
+        easy: z.number().int().nonnegative(),
+        medium: z.number().int().nonnegative(),
+        hard: z.number().int().nonnegative(),
         unknown: z.number().int().nonnegative(),
       })
       .optional()
       .describe(
-        "Counts of open or in-progress problems and any remaining usage blockers, grouped by severity.",
+        "Counts of open or in-progress problems and any remaining usage blockers, grouped by difficulty.",
       ),
     maintenanceHoldCount: z.number().int().nonnegative().optional(),
     documents: scooterDocumentListSchema.optional(),

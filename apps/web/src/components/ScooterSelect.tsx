@@ -19,16 +19,15 @@ export type ScooterSelectItem = Pick<
   "id" | "fleetNumber" | "brandCode" | "brand" | "model" | "registrationNumber"
 > &
   Partial<
-    Pick<v1.scooters.Scooter, "coverUrl" | "vin" | "problemSeverityCounts">
+    Pick<v1.scooters.Scooter, "coverUrl" | "vin" | "problemDifficultyCounts">
   >;
 
 const EMPTY_SCOOTERS: ScooterSelectItem[] = [];
 
-const severityStyles = {
-  low: "text-info",
-  moderate: "text-warning",
-  high: "text-warning-hover",
-  critical: "text-destructive",
+const difficultyStyles = {
+  easy: "text-info",
+  medium: "text-warning",
+  hard: "text-warning-hover",
   unknown: "text-muted-foreground",
 } as const;
 
@@ -49,21 +48,21 @@ export function ScooterSelectRow({ scooter }: { scooter: ScooterSelectItem }) {
           {scooter.brand} {scooter.model}
         </span>
         <span className="flex flex-wrap gap-1">
-          {Object.entries(severityStyles).map(([severity, color]) => {
+          {Object.entries(difficultyStyles).map(([difficulty, color]) => {
             const count =
-              scooter.problemSeverityCounts?.[
-                severity as keyof typeof severityStyles
+              scooter.problemDifficultyCounts?.[
+                difficulty as keyof typeof difficultyStyles
               ] ?? 0;
             if (!count) return null;
-            const label = t("problems.severityCount", {
-              severity: t(
-                `problems.${severity === "unknown" ? "unassessed" : severity}`,
+            const label = t("problems.difficultyCount", {
+              difficulty: t(
+                `problems.${difficulty === "unknown" ? "unassessed" : difficulty}`,
               ),
               count,
             });
             return (
               <span
-                key={severity}
+                key={difficulty}
                 role="img"
                 aria-label={label}
                 title={label}
@@ -83,8 +82,8 @@ export function ScooterSelectRow({ scooter }: { scooter: ScooterSelectItem }) {
               </span>
             );
           })}
-          {scooter.problemSeverityCounts &&
-          Object.values(scooter.problemSeverityCounts).every(
+          {scooter.problemDifficultyCounts &&
+          Object.values(scooter.problemDifficultyCounts).every(
             (count) => count === 0,
           ) ? (
             <span className="text-xs text-muted-foreground">

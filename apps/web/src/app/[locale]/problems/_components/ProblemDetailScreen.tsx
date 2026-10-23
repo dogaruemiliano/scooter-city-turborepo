@@ -19,12 +19,11 @@ const statusColors = {
   cancelled: "text-muted-foreground",
 } satisfies Record<v1.problems.Problem["status"], string>;
 
-const severityColors = {
-  low: "bg-severity-low",
-  moderate: "bg-severity-medium",
-  high: "bg-severity-high",
-  critical: "bg-severity-critical",
-} satisfies Record<NonNullable<v1.problems.Problem["severity"]>, string>;
+const difficultyColors = {
+  easy: "bg-difficulty-easy",
+  medium: "bg-difficulty-medium",
+  hard: "bg-difficulty-hard",
+} satisfies Record<NonNullable<v1.problems.Problem["difficulty"]>, string>;
 
 const priorityColors = {
   low: "text-info",
@@ -103,12 +102,12 @@ export function ProblemDetailScreen({ id }: { id: string }) {
             </Badge>
           ) : null}
           <section className="relative flex flex-col gap-4 overflow-hidden rounded-2xl border border-border bg-card p-5 text-card-foreground">
-            {problem.severity ? (
-              <CardAccent className={severityColors[problem.severity]} />
+            {problem.difficulty ? (
+              <CardAccent className={difficultyColors[problem.difficulty]} />
             ) : null}
             <span className="sr-only">
-              {t("problems.severity")}:{" "}
-              {t(`problems.${problem.severity ?? "unassessed"}`)}
+              {t("problems.difficulty")}:{" "}
+              {t(`problems.${problem.difficulty ?? "unassessed"}`)}
             </span>
             <h1 className="text-xl font-semibold wrap-anywhere">
               {problem.title}

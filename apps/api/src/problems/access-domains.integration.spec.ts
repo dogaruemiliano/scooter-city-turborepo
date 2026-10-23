@@ -244,7 +244,7 @@ integration("Access domains against PostgreSQL", () => {
       v1.problems.createProblemInputSchema.parse({
         scooterId: scooterIds[0],
         title: "Shared work",
-        severity: "low",
+        difficulty: "easy",
         assigneeIds: [mechanicA, mechanicB],
       }),
     );
@@ -322,7 +322,7 @@ integration("Access domains against PostgreSQL", () => {
         scooterId: scooterIds[0],
         description: "Concurrent claim test",
         title: "Test report",
-        severity: "moderate",
+        difficulty: "medium",
       }),
     );
     const results = await Promise.allSettled([
@@ -371,7 +371,7 @@ integration("Access domains against PostgreSQL", () => {
         scooterId: scooterIds[0],
         description: "Own",
         title: "Test report",
-        severity: "moderate",
+        difficulty: "medium",
       }),
     );
     const other = await problems.create(
@@ -380,7 +380,7 @@ integration("Access domains against PostgreSQL", () => {
         scooterId: scooterIds[1],
         description: "Other",
         title: "Test report",
-        severity: "moderate",
+        difficulty: "medium",
       }),
     );
     await problems.assign(admin, own.id, {
@@ -516,7 +516,7 @@ integration("Access domains against PostgreSQL", () => {
       v1.problems.createProblemInputSchema.parse({
         scooterId: scooterIds[0],
         title: "Broken belt",
-        severity: "critical",
+        difficulty: "hard",
         blocksUsage: true,
         assigneeId: mechanicA,
       }),
@@ -526,7 +526,7 @@ integration("Access domains against PostgreSQL", () => {
       mechanicA,
       v1.problems.listProblemsQuerySchema.parse({
         view: "assigned",
-        severity: "critical",
+        difficulty: "hard",
         scooterId: scooterIds[0],
         assigneeId: mechanicA,
       }),
@@ -595,7 +595,7 @@ integration("Access domains against PostgreSQL", () => {
       v1.problems.createProblemInputSchema.parse({
         scooterId: scooterIds[0],
         title: "Brake cable",
-        severity: "high",
+        difficulty: "hard",
         blocksUsage: true,
       }),
     );
@@ -604,7 +604,7 @@ integration("Access domains against PostgreSQL", () => {
       v1.problems.createProblemInputSchema.parse({
         scooterId: scooterIds[0],
         title: "Tyre inspection",
-        severity: "moderate",
+        difficulty: "medium",
         blocksUsage: true,
       }),
     );
@@ -643,7 +643,7 @@ integration("Access domains against PostgreSQL", () => {
       v1.problems.createProblemInputSchema.parse({
         scooterId: scooterIds[0],
         title: "Audit rollback",
-        severity: "low",
+        difficulty: "easy",
       }),
     );
     const failing = new ProblemsService(
@@ -680,7 +680,7 @@ integration("Access domains against PostgreSQL", () => {
         data: {
           scooterId: scooterIds[0],
           title: "Concurrent safety blocker",
-          severity: "critical",
+          difficulty: "hard",
           reporterId: reporter,
           blocksUsage: true,
         },
@@ -727,7 +727,7 @@ integration("Access domains against PostgreSQL", () => {
     const input = v1.problems.createProblemInputSchema.parse({
       scooterId: scooterIds[0],
       title: "Photo evidence",
-      severity: "high",
+      difficulty: "hard",
       photos: [{ fileName: "brake.jpg", uploadToken: "test-token" }],
     });
     const created = await problems.create(reporter, input);

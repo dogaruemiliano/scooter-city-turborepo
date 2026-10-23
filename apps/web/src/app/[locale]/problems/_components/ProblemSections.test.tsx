@@ -22,7 +22,7 @@ const problem = v1.problems.problemSchema.parse({
     model: "Vision",
     registrationNumber: null,
   },
-  severity: "high",
+  difficulty: "hard",
   priority: "normal",
   status: "open",
   blocksUsage: false,

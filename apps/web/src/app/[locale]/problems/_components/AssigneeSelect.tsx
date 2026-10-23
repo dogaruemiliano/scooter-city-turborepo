@@ -13,7 +13,7 @@ import { Button, SheetSelect } from "@repo/ui/components";
 import { useTranslations } from "next-intl";
 import { Feedback } from "@/components/WorkspaceForm";
 import { memberName } from "../_lib/member-name";
-import { AssigneeUserCard } from "./AssigneeUserCard";
+import { AssigneeUserCard, AssigneeUserRow } from "./AssigneeUserCard";
 
 function AssigneePresence({
   id,
@@ -165,46 +165,44 @@ export function AssigneeSelect(props: AssigneeSelectProps) {
             present={present}
             onExited={finishExit}
           >
-            <div className="flex items-center rounded-2xl border border-border bg-card p-4 text-card-foreground">
-              <AssigneeUserCard
-                member={props.members.find((member) => member.id === id)}
-                name={label}
-                action={
-                  <Button
-                    type="button"
-                    variant="secondary-destructive"
-                    size="icon"
-                    disabled={props.disabled}
-                    data-assignee-remove=""
-                    aria-label={t("problems.removeAssignee", {
-                      name: label,
-                    })}
-                    onClick={(event) => {
-                      const buttons = Array.from(
-                        container.current?.querySelectorAll<HTMLButtonElement>(
-                          "[data-assignee-remove]",
-                        ) ?? [],
-                      ).filter((button) => !button.closest("[inert]"));
-                      const index = buttons.indexOf(event.currentTarget);
-                      const next =
-                        buttons[index + 1] ??
-                        buttons[index - 1] ??
-                        container.current?.querySelector<HTMLButtonElement>(
-                          "[data-slot='add-action']",
-                        );
-                      next?.focus();
-                      if (props.multiple)
-                        props.onValueChange(
-                          props.value.filter((value) => value !== id),
-                        );
-                      else props.onValueChange("");
-                    }}
-                  >
-                    <XIcon aria-hidden="true" className="size-5" />
-                  </Button>
-                }
-              />
-            </div>
+            <AssigneeUserRow
+              member={props.members.find((member) => member.id === id)}
+              name={label}
+              action={
+                <Button
+                  type="button"
+                  variant="secondary-destructive"
+                  size="icon"
+                  disabled={props.disabled}
+                  data-assignee-remove=""
+                  aria-label={t("problems.removeAssignee", {
+                    name: label,
+                  })}
+                  onClick={(event) => {
+                    const buttons = Array.from(
+                      container.current?.querySelectorAll<HTMLButtonElement>(
+                        "[data-assignee-remove]",
+                      ) ?? [],
+                    ).filter((button) => !button.closest("[inert]"));
+                    const index = buttons.indexOf(event.currentTarget);
+                    const next =
+                      buttons[index + 1] ??
+                      buttons[index - 1] ??
+                      container.current?.querySelector<HTMLButtonElement>(
+                        "[data-slot='add-action']",
+                      );
+                    next?.focus();
+                    if (props.multiple)
+                      props.onValueChange(
+                        props.value.filter((value) => value !== id),
+                      );
+                    else props.onValueChange("");
+                  }}
+                >
+                  <XIcon aria-hidden="true" className="size-5" />
+                </Button>
+              }
+            />
           </AssigneePresence>
         );
       })}

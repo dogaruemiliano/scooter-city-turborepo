@@ -52,11 +52,11 @@ test("checklists reject duplicate IDs, empty text and excessive items", () => {
   }
 });
 
-test("report requires title and impact severity, with optional description and photos", () => {
+test("report requires title and repair difficulty, with optional description and photos", () => {
   const valid = {
     scooterId: "scooter",
     title: "Broken belt",
-    severity: "critical",
+    difficulty: "hard",
   };
   assert.deepEqual(v1.problems.createProblemInputSchema.parse(valid), {
     ...valid,
@@ -66,7 +66,7 @@ test("report requires title and impact severity, with optional description and p
   });
   for (const bad of [
     { ...valid, title: " " },
-    { ...valid, severity: "urgent" },
+    { ...valid, difficulty: "urgent" },
     { scooterId: "scooter", description: "Broken belt" },
   ])
     assert.equal(
@@ -108,18 +108,18 @@ test("hold filtering parses false accurately and supports all release filters", 
   const filter = v1.problems.listProblemsQuerySchema.parse({
     blocking: "false",
     unassigned: "false",
-    severity: "critical",
+    difficulty: "hard",
     status: "resolved",
     scooterId: "scooter",
     assigneeId: "member",
   });
   assert.equal(filter.blocking, false);
   assert.equal(filter.unassigned, false);
-  assert.equal(filter.severity, "critical");
+  assert.equal(filter.difficulty, "hard");
 });
 
 test("creation accepts and validates optional task sections", () => {
-  const base = { scooterId: "scooter", title: "Service", severity: "low" };
+  const base = { scooterId: "scooter", title: "Service", difficulty: "easy" };
   const sections = {
     sections: ["checklist", "buyList", "location"],
     checklist: [{ id: "check", text: "Check brakes", completed: false }],
@@ -183,7 +183,7 @@ test("assignments accept multiple unique users, clearing, and legacy requests", 
   const create = {
     scooterId: "scooter",
     title: "Shared work",
-    severity: "low",
+    difficulty: "easy",
   };
   assert.deepEqual(
     v1.problems.createProblemInputSchema.parse({
@@ -231,5 +231,45 @@ test("assignments accept multiple unique users, clearing, and legacy requests", 
       assigneeIds: ["a"],
     }).success,
     false,
+  );
+});
+
+test("difficulty has three levels and historical severity remains readable without conversion", () => {
+  assert.deepEqual(v1.problems.problemDifficultySchema.options, [
+    "easy",
+    "medium",
+    "hard",
+  ]);
+  for (const difficulty of ["easy", "medium", "hard"]) {
+    assert.equal(
+      v1.problems.createProblemInputSchema.safeParse({
+        scooterId: "scooter",
+        title: "Repair",
+        difficulty,
+      }).success,
+      true,
+    );
+  }
+  for (const difficulty of [
+    "low",
+    "moderate",
+    "high",
+    "critical",
+    "unknown",
+    null,
+  ]) {
+    assert.equal(
+      v1.problems.problemDifficultySchema.safeParse(difficulty).success,
+      false,
+    );
+  }
+  const state = v1.problems.problemActivityStateSchema.parse({
+    severity: "critical",
+  });
+  assert.equal(state.severity, "critical");
+  assert.equal(state.difficulty, undefined);
+  assert.deepEqual(
+    v1.problems.problemActivityStateSchema.parse({ difficulty: "easy" }),
+    { difficulty: "easy" },
   );
 });

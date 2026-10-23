@@ -3,6 +3,10 @@
 export const tokens = {
   color: {
     light: {
+      difficultyEasy: "#3B82F6",
+      difficultyMedium: "#EAB308",
+      difficultyHard: "#F97316",
+      difficultyForeground: "#12161B",
       severityLow: "#3B82F6",
       severityMedium: "#EAB308",
       severityHigh: "#F97316",
@@ -91,6 +95,10 @@ export const tokens = {
       mediaScrim: "#000000A6",
     },
     dark: {
+      difficultyEasy: "#3B82F6",
+      difficultyMedium: "#EAB308",
+      difficultyHard: "#F97316",
+      difficultyForeground: "#12161B",
       severityLow: "#3B82F6",
       severityMedium: "#EAB308",
       severityHigh: "#F97316",

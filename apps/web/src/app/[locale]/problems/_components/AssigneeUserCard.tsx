@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import type { ComponentProps, ReactNode } from "react";
 import { UserCard } from "@repo/ui/components";
 import { useTranslations } from "next-intl";
 import { useSession } from "@/components/auth/SessionProvider";
@@ -42,5 +42,19 @@ export function AssigneeUserCard({
       }))}
       action={action}
     />
+  );
+}
+
+/** The selected-user surface shared by create and problem detail screens. */
+export function AssigneeUserRow(
+  props: ComponentProps<typeof AssigneeUserCard>,
+) {
+  return (
+    <div
+      data-slot="assignee-user-row"
+      className="flex items-center rounded-2xl border border-border bg-card p-4 text-card-foreground"
+    >
+      <AssigneeUserCard {...props} />
+    </div>
   );
 }

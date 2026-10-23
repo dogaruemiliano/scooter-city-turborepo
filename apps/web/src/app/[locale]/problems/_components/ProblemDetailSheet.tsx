@@ -78,10 +78,10 @@ export function ProblemDetailSheet({
                 </div>
                 <div className="flex flex-col items-end gap-2">
                   <dt className="text-sm font-medium text-muted-foreground">
-                    {t("problems.severity")}
+                    {t("problems.difficulty")}
                   </dt>
                   <dd className="font-semibold">
-                    {t(`problems.${problem.severity}`)}
+                    {t(`problems.${problem.difficulty ?? "unassessed"}`)}
                   </dd>
                 </div>
               </dl>

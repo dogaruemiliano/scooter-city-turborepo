@@ -40,7 +40,7 @@ const scooterListInclude = {
     where: {
       OR: [{ status: { in: ["open", "in_progress"] } }, { blocksUsage: true }],
     },
-    select: { severity: true },
+    select: { difficulty: true },
   },
   _count: maintenanceCount,
   photos: galleryCoverPhotos,

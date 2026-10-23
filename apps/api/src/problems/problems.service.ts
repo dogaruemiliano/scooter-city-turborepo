@@ -148,7 +148,8 @@ export class ProblemsService {
       sections: row.sections,
       buyList: row.buyList,
       location: row.location,
-      severity: row.severity,
+      difficulty: row.difficulty,
+      legacySeverity: row.severity,
       blocksUsage: row.blocksUsage,
       holdClearedAt: row.holdClearedAt?.toISOString() ?? null,
       photos: row.photos.map((photo) => ({
@@ -225,7 +226,7 @@ export class ProblemsService {
         {
           ...(query.status ? { status: query.status } : {}),
           ...(query.scooterId ? { scooterId: query.scooterId } : {}),
-          ...(query.severity ? { severity: query.severity } : {}),
+          ...(query.difficulty ? { difficulty: query.difficulty } : {}),
           ...(query.assigneeIds?.length
             ? {
                 OR: [
@@ -250,7 +251,7 @@ export class ProblemsService {
         this.where(snapshot, "problems.read"),
         {
           ...(query.scooterId ? { scooterId: query.scooterId } : {}),
-          ...(query.severity ? { severity: query.severity } : {}),
+          ...(query.difficulty ? { difficulty: query.difficulty } : {}),
           ...(query.blocking !== undefined
             ? { blocksUsage: query.blocking }
             : {}),
@@ -393,7 +394,7 @@ export class ProblemsService {
         scooterId: input.scooterId,
         title: input.title,
         description: input.description,
-        severity: input.severity,
+        difficulty: input.difficulty,
         blocksUsage: input.blocksUsage,
         assigneeId: assigneeIds[0] ?? null,
         assignees: { connect: assigneeIds.map((id) => ({ id })) },
@@ -421,7 +422,7 @@ export class ProblemsService {
             location: row.location,
             title: row.title,
             status: row.status,
-            severity: row.severity,
+            difficulty: row.difficulty,
             blocksUsage: row.blocksUsage,
             assigneeId: row.assigneeId,
             assignee: row.assignee,
@@ -562,7 +563,7 @@ export class ProblemsService {
             sections: row.sections,
             buyList: row.buyList,
             location: row.location,
-            severity: row.severity,
+            difficulty: row.difficulty,
             blocksUsage: row.blocksUsage,
             resolutionNotes: row.resolutionNotes,
           },
@@ -579,7 +580,7 @@ export class ProblemsService {
             sections: updated.sections,
             buyList: updated.buyList,
             location: updated.location,
-            severity: updated.severity,
+            difficulty: updated.difficulty,
             blocksUsage: updated.blocksUsage,
             resolutionNotes: updated.resolutionNotes,
             workNotes: updated.workNotes,
@@ -675,7 +676,9 @@ export class ProblemsService {
           ...(input.description !== undefined
             ? { description: input.description }
             : {}),
-          ...(input.severity !== undefined ? { severity: input.severity } : {}),
+          ...(input.difficulty !== undefined
+            ? { difficulty: input.difficulty }
+            : {}),
           ...(input.workNotes !== undefined
             ? { workNotes: input.workNotes }
             : {}),
@@ -866,7 +869,7 @@ export class ProblemsService {
     // Holds are safety information: show every blocker, even when the member only works assigned reports.
     const blockers = await this.prisma.scooterProblem.findMany({
       where: { scooterId, blocksUsage: true },
-      select: { id: true, title: true, status: true, severity: true },
+      select: { id: true, title: true, status: true, difficulty: true },
       orderBy: [{ createdAt: "asc" }, { id: "asc" }],
     });
     return v1.problems.maintenanceHoldSchema.parse({

@@ -46,7 +46,7 @@ type ReportSeed = {
   key: string;
   title: string;
   description: string;
-  severity: v1.problems.Problem["severity"];
+  difficulty: v1.problems.Problem["difficulty"];
   blocking: boolean;
   state: "open" | "in_progress" | "resolved" | "cancelled" | "reopened";
   assigned?: boolean;
@@ -61,7 +61,7 @@ const reports: ReportSeed[] = [
     title: "Frâna spate nu mai ține eficient",
     description:
       "Maneta frânei spate ajunge aproape de ghidon, iar distanța de oprire a crescut. Problema a fost observată la verificarea de dimineață. Scuterul nu trebuie predat până la verificarea frânei.",
-    severity: "critical",
+    difficulty: "hard",
     blocking: true,
     state: "open",
     assigned: true,
@@ -72,7 +72,7 @@ const reports: ReportSeed[] = [
     title: "Farul se stinge pe denivelări",
     description:
       "Faza scurtă se întrerupe când scuterul trece peste denivelări. Faza lungă funcționează, dar iluminarea nu este fiabilă pentru circulație.",
-    severity: "high",
+    difficulty: "hard",
     blocking: true,
     state: "in_progress",
     assigned: true,
@@ -85,7 +85,7 @@ const reports: ReportSeed[] = [
     title: "Semnalizatorul dreapta spate nu funcționează",
     description:
       "Semnalizatorul față dreapta clipește accelerat, iar cel din spate nu se aprinde. Este necesară verificarea becului și a soclului înainte de predare.",
-    severity: "high",
+    difficulty: "hard",
     blocking: true,
     state: "open",
   },
@@ -95,7 +95,7 @@ const reports: ReportSeed[] = [
     title: "Pierdere de ulei sub motor",
     description:
       "După staționarea peste noapte au apărut câteva picături de ulei sub motor. Carcasa este umedă în zona garniturii. Trebuie identificată sursa înainte de utilizare.",
-    severity: "high",
+    difficulty: "hard",
     blocking: true,
     state: "open",
   },
@@ -105,7 +105,7 @@ const reports: ReportSeed[] = [
     title: "Cureaua de transmisie s-a rupt",
     description:
       "Motorul pornește și se turează, dar scuterul nu se mai deplasează. În carcasa transmisiei au fost găsite fragmente de curea. Reparația poate fi simplă, dar scuterul este complet inutilizabil.",
-    severity: "critical",
+    difficulty: "hard",
     blocking: true,
     state: "in_progress",
     assigned: true,
@@ -118,7 +118,7 @@ const reports: ReportSeed[] = [
     title: "Oglinda stângă își schimbă poziția în mers",
     description:
       "Oglinda se rotește ușor în articulație și necesită reglaje repetate. Sticla este întreagă, iar suportul nu prezintă fisuri.",
-    severity: "moderate",
+    difficulty: "medium",
     blocking: false,
     state: "open",
   },
@@ -128,7 +128,7 @@ const reports: ReportSeed[] = [
     title: "Pornire dificilă la rece",
     description:
       "După o noapte de staționare, motorul pornește abia la a doua sau a treia încercare. După încălzire funcționează normal. Verificarea trebuie făcută înainte de prima pornire a zilei.",
-    severity: "moderate",
+    difficulty: "medium",
     blocking: false,
     state: "in_progress",
     assigned: true,
@@ -141,7 +141,7 @@ const reports: ReportSeed[] = [
     title: "Anvelopa spate pierde presiune",
     description:
       "Presiunea a scăzut de la verificarea precedentă, iar în banda de rulare a fost găsit un șurub. Scuterul a fost retras temporar din utilizare.",
-    severity: "high",
+    difficulty: "hard",
     blocking: true,
     state: "resolved",
     assigned: true,
@@ -156,7 +156,7 @@ const reports: ReportSeed[] = [
     title: "Semnalizatorul stânga față funcționează intermitent",
     description:
       "Semnalizatorul se aprinde numai în anumite poziții ale ghidonului. Verificarea becului singur nu este suficientă; trebuie controlat și cablajul.",
-    severity: "high",
+    difficulty: "hard",
     blocking: true,
     state: "resolved",
     assigned: true,
@@ -172,7 +172,7 @@ const reports: ReportSeed[] = [
     title: "Zgârieturi pe carena laterală dreapta",
     description:
       "Carena are zgârieturi superficiale în zona de lângă șa. Nu există fisuri, muchii ascuțite sau elemente desprinse. Se poate programa o remediere cosmetică.",
-    severity: "low",
+    difficulty: "easy",
     blocking: false,
     state: "open",
   },
@@ -182,7 +182,7 @@ const reports: ReportSeed[] = [
     title: "Claxonul nu funcționează",
     description:
       "La apăsarea butonului nu se aude niciun sunet. Iluminarea și pornirea funcționează normal. Trebuie verificată siguranța, conexiunea și comanda claxonului.",
-    severity: "high",
+    difficulty: "hard",
     blocking: true,
     state: "open",
     assigned: true,
@@ -193,7 +193,7 @@ const reports: ReportSeed[] = [
     title: "Încuietoarea șeii se închide greu",
     description:
       "Șaua trebuie apăsată de mai multe ori pentru a se fixa. Cablul de deschidere revine lent. Nu au fost observate probleme la închiderea rezervorului.",
-    severity: "moderate",
+    difficulty: "medium",
     blocking: false,
     state: "open",
   },
@@ -203,7 +203,7 @@ const reports: ReportSeed[] = [
     title: "Indicatorul de combustibil afișează incorect",
     description:
       "Indicatorul arată rezervorul aproape gol imediat după alimentare, apoi revine după câteva minute. Este necesară verificarea plutitorului și a conexiunilor.",
-    severity: "moderate",
+    difficulty: "medium",
     blocking: false,
     state: "in_progress",
     assigned: true,
@@ -216,7 +216,7 @@ const reports: ReportSeed[] = [
     title: "Plăcuțele frânei față sunt uzate",
     description:
       "La verificarea vizuală, materialul de fricțiune este aproape de limita de uzură. La frânare se aude un zgomot metalic ușor. Scuterul rămâne blocat până la înlocuire și verificare.",
-    severity: "high",
+    difficulty: "hard",
     blocking: true,
     state: "open",
   },
@@ -226,7 +226,7 @@ const reports: ReportSeed[] = [
     title: "Vibrațiile la accelerare au reapărut",
     description:
       "Vibrațiile apar la plecarea de pe loc și între aproximativ 20 și 30 km/h. Problema a reapărut după intervenția la variator și trebuie verificată din nou.",
-    severity: "high",
+    difficulty: "hard",
     blocking: true,
     state: "reopened",
     assigned: true,
@@ -241,7 +241,7 @@ const reports: ReportSeed[] = [
     title: "Raport de vitezometru nefuncțional",
     description:
       "A fost raportată lipsa afișării vitezei în timpul unei deplasări. Scuterul a fost oprit pentru verificare înainte de a fi utilizat din nou.",
-    severity: "high",
+    difficulty: "hard",
     blocking: true,
     state: "cancelled",
     assigned: true,
@@ -254,7 +254,7 @@ const reports: ReportSeed[] = [
     title: "Suportul telefonului are joc",
     description:
       "Suportul de pe ghidon se mișcă pe denivelări, deși telefonul rămâne fixat. Trebuie strânsă prinderea sau înlocuit suportul dacă filetul este uzat.",
-    severity: "low",
+    difficulty: "easy",
     blocking: false,
     state: "open",
   },
@@ -426,7 +426,7 @@ async function seed(tx: Prisma.TransactionClient, dryRun: boolean) {
       status: "open",
       assigneeId: null as string | null,
       assignee: null as ReturnType<typeof member> | null,
-      severity: plan.severity,
+      difficulty: plan.difficulty,
       blocksUsage: plan.blocking,
       title: plan.title,
     };
@@ -524,7 +524,7 @@ async function seed(tx: Prisma.TransactionClient, dryRun: boolean) {
       scooterId: scooter.id,
       title: plan.title,
       description: plan.description,
-      severity: plan.severity,
+      difficulty: plan.difficulty,
       blocksUsage: plan.blocking,
     });
     await tx.scooterProblem.create({
@@ -533,7 +533,7 @@ async function seed(tx: Prisma.TransactionClient, dryRun: boolean) {
         scooterId: scooter.id,
         title: input.title,
         description: input.description,
-        severity: input.severity,
+        difficulty: input.difficulty,
         status: state.status,
         blocksUsage: state.blocksUsage,
         reporterId: reporter.id,

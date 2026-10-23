@@ -4,6 +4,10 @@
   color-scheme: light;
   --radius: 0.75rem;
   --dashed-surface-border-width: 0.125rem;
+  --difficulty-easy: #3B82F6;
+  --difficulty-medium: #EAB308;
+  --difficulty-hard: #F97316;
+  --difficulty-foreground: oklch(0.198264 0.011840 254.1076);
   --severity-low: #3B82F6;
   --severity-medium: #EAB308;
   --severity-high: #F97316;
@@ -95,6 +99,10 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
     color-scheme: dark;
+    --difficulty-easy: #3B82F6;
+    --difficulty-medium: #EAB308;
+    --difficulty-hard: #F97316;
+    --difficulty-foreground: oklch(0.198264 0.011840 254.1076);
     --severity-low: #3B82F6;
     --severity-medium: #EAB308;
     --severity-high: #F97316;
@@ -186,6 +194,10 @@
 
 :root[data-theme='dark'], .dark {
   color-scheme: dark;
+  --difficulty-easy: #3B82F6;
+  --difficulty-medium: #EAB308;
+  --difficulty-hard: #F97316;
+  --difficulty-foreground: oklch(0.198264 0.011840 254.1076);
   --severity-low: #3B82F6;
   --severity-medium: #EAB308;
   --severity-high: #F97316;
@@ -510,6 +522,10 @@
 }
 
 @theme inline {
+  --color-difficulty-easy: var(--difficulty-easy);
+  --color-difficulty-medium: var(--difficulty-medium);
+  --color-difficulty-hard: var(--difficulty-hard);
+  --color-difficulty-foreground: var(--difficulty-foreground);
   --color-severity-low: var(--severity-low);
   --color-severity-medium: var(--severity-medium);
   --color-severity-high: var(--severity-high);
