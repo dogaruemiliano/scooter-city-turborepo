@@ -120,28 +120,19 @@ export function SignInMethods({
             strong: (chunks) => (
               <strong className="font-bold text-foreground">{chunks}</strong>
             ),
-            changeEmail: (chunks) => (
-              <button
-                type="button"
-                onClick={handleCancelChallenge}
-                className="cursor-pointer rounded-xs font-semibold text-primary underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-              >
-                {chunks}
-              </button>
-            ),
           })
         : tOtp("subtitleProvider");
 
     return (
       <div className="flex flex-col gap-2">
-        <header className="grid grid-cols-[var(--spacing-10)_minmax(0,1fr)_var(--spacing-10)] content-start items-start gap-x-2 gap-y-4">
+        <header className="grid grid-cols-[var(--spacing-10)_minmax(0,1fr)_var(--spacing-10)] content-start items-center gap-x-2 gap-y-4">
           <Button
             type="button"
             variant="ghost"
             size="icon"
             aria-label={tOtp("backToMethods")}
             onClick={handleCancelChallenge}
-            className="self-center shrink-0 rounded-full p-2"
+            className="shrink-0 rounded-full p-2"
           >
             <ArrowLeftIcon />
           </Button>

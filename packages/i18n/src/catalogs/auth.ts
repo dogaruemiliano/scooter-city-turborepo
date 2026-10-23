@@ -17,7 +17,7 @@ export const authCatalog = {
     otp: {
       title: "Enter verification code",
       subtitleEmail:
-        "We sent a 6-digit code to <emailRow><strong>{email}</strong> <changeEmail>(not you?)</changeEmail></emailRow>",
+        "We sent a 6-digit code to <emailRow><strong>{email}</strong></emailRow>",
       subtitleProvider:
         "We sent a 6-digit code to the email on your Google account.",
       backToMethods: "Back to sign-in methods",
@@ -70,7 +70,7 @@ export const authCatalog = {
     otp: {
       title: "Introdu codul de verificare",
       subtitleEmail:
-        "Am trimis un cod din 6 cifre la <emailRow><strong>{email}</strong> <changeEmail>(nu ești tu?)</changeEmail></emailRow>",
+        "Am trimis un cod din 6 cifre la <emailRow><strong>{email}</strong></emailRow>",
       subtitleProvider:
         "Am trimis un cod din 6 cifre la emailul contului Google.",
       backToMethods: "Înapoi la metodele de autentificare",

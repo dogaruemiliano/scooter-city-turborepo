@@ -111,7 +111,7 @@ describe("SignInMethods", () => {
     ["en", "(not you?)"],
     ["ro", "(nu ești tu?)"],
   ] as const)(
-    "lets users change the OTP email in %s",
+    "shows the OTP email without a change-email link in %s",
     async (locale, label) => {
       const browser = userEvent.setup();
       mocks.apiFetch.mockResolvedValueOnce(
@@ -127,8 +127,9 @@ describe("SignInMethods", () => {
       expect(
         await screen.findByText(user.email, { selector: "strong" }),
       ).toBeInTheDocument();
-      await browser.click(screen.getByRole("button", { name: label }));
-      expect(screen.getByLabelText("Email")).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: label }),
+      ).not.toBeInTheDocument();
       expect(mocks.apiFetch).toHaveBeenCalledTimes(1);
     },
   );
