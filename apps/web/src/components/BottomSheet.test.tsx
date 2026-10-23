@@ -21,6 +21,19 @@ function Example({ dismissible = true }: { dismissible?: boolean }) {
 }
 
 describe("shared bottom-sheet dismissal", () => {
+  it("leaves space below the handle and preserves the distinct sheet surface", () => {
+    render(<Example />);
+    const popup = screen.getByRole("dialog", { name: "Required review" });
+    expect(popup).toHaveClass("bg-popover", "text-popover-foreground");
+    expect(popup).not.toHaveClass("bg-background");
+    expect(
+      popup.querySelector('[data-slot="bottom-sheet-content"]'),
+    ).not.toHaveClass("bg-background");
+    expect(
+      popup.querySelector('[data-slot="bottom-sheet-handle"]'),
+    ).toHaveClass("mb-2");
+  });
+
   it("keeps a scrolled list gesture separate from the next swipe at the top", () => {
     render(
       <BottomSheet open>

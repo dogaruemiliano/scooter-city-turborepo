@@ -115,7 +115,7 @@ function BottomSheetHandle({
       data-slot="bottom-sheet-handle"
       aria-hidden="true"
       className={cn(
-        "relative z-raised flex h-5 w-full shrink-0 cursor-grab touch-none items-end justify-center active:cursor-grabbing after:block after:h-1 after:w-16 after:rounded-full after:bg-muted-foreground/40 lg:hidden",
+        "relative z-raised mb-2 flex h-5 w-full shrink-0 cursor-grab touch-none items-end justify-center active:cursor-grabbing after:block after:h-1 after:w-16 after:rounded-full after:bg-muted-foreground/40 lg:hidden",
         className,
       )}
       {...props}
