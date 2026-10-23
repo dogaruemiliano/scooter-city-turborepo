@@ -10,6 +10,7 @@ import { setRequestLocale } from "next-intl/server";
 import { AppShell } from "../../components/AppShell";
 import { SessionProvider } from "../../components/auth/SessionProvider";
 import { meFromApi } from "../../lib/auth-server";
+import { pwaMetadata } from "../../lib/pwa";
 import {
   resolveDataTheme,
   resolveThemePreference,
@@ -28,13 +29,16 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: "ScooterCity",
-  description: "Web workspace",
-  appleWebApp: {
+export async function generateMetadata(): Promise<Metadata> {
+  const cookieStore = await cookies();
+  return {
+    ...pwaMetadata(
+      resolveThemePreference(cookieStore.get(THEME_COOKIE_NAME)?.value),
+    ),
     title: "ScooterCity",
-  },
-};
+    description: "Web workspace",
+  };
+}
 
 export const viewport: Viewport = {
   width: "device-width",
