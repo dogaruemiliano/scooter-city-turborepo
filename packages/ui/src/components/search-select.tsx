@@ -181,7 +181,7 @@ function SearchSelect({
       <ComboboxPrimitive.InputGroup
         data-slot="search-select-control"
         className={cn(
-          "flex h-12 w-full items-center rounded-lg border border-input bg-control transition-colors duration-fast ease-standard focus-within:border-ring focus-within:ring-2 focus-within:ring-ring has-aria-invalid:border-destructive has-aria-invalid:ring-2 has-aria-invalid:ring-destructive data-disabled:cursor-not-allowed data-disabled:bg-disabled data-disabled:text-disabled-foreground md:h-11",
+          "flex h-12 w-full items-center rounded-lg border border-input bg-control transition-colors duration-fast ease-standard focus-within:border-border focus-within:ring-2 focus-within:ring-border has-aria-invalid:border-destructive has-aria-invalid:ring-2 has-aria-invalid:ring-destructive data-disabled:cursor-not-allowed data-disabled:bg-disabled data-disabled:text-disabled-foreground md:h-11",
           className,
         )}
       >

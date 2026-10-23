@@ -6,6 +6,7 @@ import { Card, CardContent } from "./card";
 type FormActionsProps = ComponentProps<"div"> & {
   /** Context for the actions, such as validation feedback or a draft status. */
   status?: ReactNode;
+  buttonLayout?: "equal" | "primary";
   sticky?: boolean;
   /** Page forms: reveal the floating actions when submission is valid. */
   ready?: boolean;
@@ -18,6 +19,7 @@ type FormActionsProps = ComponentProps<"div"> & {
 function FormActions({
   className,
   status,
+  buttonLayout = "equal",
   sticky = false,
   ready,
   pending = false,
@@ -41,7 +43,9 @@ function FormActions({
         className={cn(
           arrangement === "split"
             ? "flex w-full min-w-0 flex-col gap-6 *:min-w-0 *:max-w-full md:flex-row-reverse md:items-center md:justify-between"
-            : "flex w-full min-w-0 flex-wrap items-center justify-end gap-3 *:min-w-0 *:max-w-full *:flex-1 @form-columns/form-actions:w-auto @form-columns/form-actions:*:flex-none",
+            : buttonLayout === "primary"
+              ? "grid w-full min-w-0 grid-cols-(--container-primary-form-actions) items-center gap-3 *:min-w-0 *:max-w-full *:w-full"
+              : "flex w-full min-w-0 flex-wrap items-center justify-end gap-3 *:min-w-0 *:max-w-full *:flex-1 @form-columns/form-actions:w-auto @form-columns/form-actions:*:flex-none",
         )}
       >
         {children}

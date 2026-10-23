@@ -372,8 +372,12 @@ export function CreateProblem({
         pending={task.busy}
         className={stickyActions ? "mt-auto w-full" : undefined}
       >
-        <Button type="submit" disabled={task.busy || !readyToSubmit}>
-          {task.busy ? t("problems.reporting") : t("problems.add")}
+        <Button
+          className={stickyActions ? "w-full" : undefined}
+          type="submit"
+          disabled={task.busy || !readyToSubmit}
+        >
+          {task.busy ? t("problems.reporting") : t("problems.reportSubmit")}
         </Button>
         {onCancel ? (
           <Button
