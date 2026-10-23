@@ -6,6 +6,7 @@ import {
   CalendarDays,
   ChevronDown,
   Info,
+  ListFilter,
   Monitor,
   ShieldCheck,
   Truck,
@@ -18,6 +19,14 @@ import { Button } from "@repo/ui/components/button";
 import { Input } from "@repo/ui/components/input";
 import { Label } from "@repo/ui/components/label";
 import { ScopePicker } from "./ScopePicker";
+import {
+  PermissionDependencyNotice,
+  PermissionDependencyDialog,
+} from "./PermissionDependencyFeedback";
+import {
+  planRequiredPermissions,
+  planDependentDisables,
+} from "../_lib/permission-dependencies";
 import { SearchField } from "@repo/ui/components/search-field";
 import { SegmentedRadioGroup } from "@repo/ui/components/segmented-radio-group";
 import {
@@ -115,6 +124,7 @@ export function PermissionEditor({
   roles,
   disabled,
   canEditPermission,
+  canGrantPermission,
   stickyTabs = false,
 }: {
   value: Grant[];
@@ -122,6 +132,10 @@ export function PermissionEditor({
   roles?: v1.access.Role[];
   disabled?: boolean;
   canEditPermission?: (key: string) => boolean;
+  canGrantPermission?: (
+    key: string,
+    scopes: v1.access.PermissionScope[],
+  ) => boolean;
   stickyTabs?: boolean;
 }) {
   const t = useTranslations("access.editor");
@@ -129,7 +143,8 @@ export function PermissionEditor({
   const descriptions = useTranslations("access.descriptions");
   const id = useId();
   const [search, setSearch] = useState("");
-  const [onlyCustom, setOnlyCustom] = useState(false);
+  const [customFilter, setOnlyCustom] = useState(false);
+  const onlyCustom = customFilter && value.length > 0;
   const [activeGroup, setActiveGroup] = useState<string>(() =>
     roles?.some((role) => role.slug === "mechanic") ? "service" : "fleet",
   );
@@ -137,25 +152,111 @@ export function PermissionEditor({
   const query = searchable(search.trim());
   const isUser = roles !== undefined;
   const grants = new Map(value.map((grant) => [grant.permissionKey, grant]));
+  const [pendingChange, setPendingChange] = useState<{
+    permissionKey: v1.access.PermissionKey;
+    scopes: v1.access.PermissionScope[] | null;
+    reason?: string | null;
+  } | null>(null);
+  const [dependencyFeedback, setDependencyFeedback] = useState("");
+  const currentScopes = effectiveScopes(roles ?? [], value);
+  const editable = (key: v1.access.PermissionKey) =>
+    !disabled && canEditPermission?.(key) !== false;
+  const canApplyGrant = (change: {
+    permissionKey: v1.access.PermissionKey;
+    scopes: v1.access.PermissionScope[];
+  }) =>
+    editable(change.permissionKey) &&
+    (!change.scopes.length ||
+      canGrantPermission?.(change.permissionKey, change.scopes) !== false);
+  const applyChanges = (
+    changes: {
+      permissionKey: v1.access.PermissionKey;
+      scopes: v1.access.PermissionScope[] | null;
+      reason?: string | null;
+    }[],
+  ) => {
+    const result = new Map(value.map((grant) => [grant.permissionKey, grant]));
+    for (const change of changes) {
+      if (change.scopes === null || (!isUser && !change.scopes.length))
+        result.delete(change.permissionKey);
+      else
+        result.set(change.permissionKey, {
+          permissionKey: change.permissionKey,
+          scopes: normalizeScopes(change.scopes),
+          reason:
+            change.reason !== undefined
+              ? change.reason
+              : result.get(change.permissionKey)?.reason,
+        });
+    }
+    return [...result.values()];
+  };
+  const impactFor = (change: NonNullable<typeof pendingChange>) => {
+    const next = applyChanges([change]);
+    const after = effectiveScopes(roles ?? [], next);
+    return {
+      after,
+      dependents: planDependentDisables(
+        change.permissionKey,
+        currentScopes,
+        after,
+      ),
+    };
+  };
   const replace = (
     key: v1.access.PermissionKey,
     scopes: v1.access.PermissionScope[] | null,
     reason?: string | null,
   ) => {
-    if (disabled || canEditPermission?.(key) === false) return;
-    const rest = value.filter((grant) => grant.permissionKey !== key);
-    onChange(
-      scopes === null || (!isUser && !scopes.length)
-        ? rest
-        : [
-            ...rest,
-            {
-              permissionKey: key,
-              scopes: normalizeScopes(scopes),
-              ...(reason ? { reason } : {}),
-            },
-          ],
+    if (!editable(key)) return;
+    const change = { permissionKey: key, scopes, reason };
+    const impact = impactFor(change);
+    if (impact.dependents.length) {
+      setPendingChange(change);
+      return;
+    }
+    setDependencyFeedback("");
+    onChange(applyChanges([change]));
+  };
+  const enableRequirements = (key: v1.access.PermissionKey) => {
+    const plan = planRequiredPermissions(key, currentScopes);
+    if (
+      !editable(key) ||
+      plan.unresolved.length ||
+      plan.changes.some((change) => !canApplyGrant(change))
+    )
+      return;
+    onChange(applyChanges(plan.changes));
+    setDependencyFeedback(
+      t("dependenciesUi.enabled", {
+        permissions: plan.changes
+          .map((change) => labels(change.permissionKey))
+          .join(", "),
+      }),
     );
+  };
+  const pendingImpact = pendingChange ? impactFor(pendingChange) : null;
+  const pendingBlocked = pendingChange
+    ? [
+        pendingChange.permissionKey,
+        ...(pendingImpact?.dependents.map((change) => change.permissionKey) ??
+          []),
+      ].filter((key) => !editable(key))
+    : [];
+  const confirmChange = () => {
+    if (!pendingChange || !pendingImpact || pendingBlocked.length) return;
+    onChange(applyChanges([pendingChange, ...pendingImpact.dependents]));
+    setDependencyFeedback(
+      t("dependenciesUi.disabled", {
+        permissions: [
+          pendingChange.permissionKey,
+          ...pendingImpact.dependents.map((change) => change.permissionKey),
+        ]
+          .map((key) => labels(key))
+          .join(", "),
+      }),
+    );
+    setPendingChange(null);
   };
   const groups = permissionGroups.map((group) => ({
     ...group,
@@ -195,7 +296,7 @@ export function PermissionEditor({
       className="flex min-w-0 flex-col gap-4 font-body"
       aria-labelledby={`${id}-title`}
     >
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-1">
           <h3 id={`${id}-title`} className="text-base font-semibold">
             {t("title")}
@@ -208,10 +309,24 @@ export function PermissionEditor({
               : t("roleHelp")}
           </p>
         </div>
-        {isUser && value.length > 0 ? (
-          <Badge variant="secondary">
-            {t("customCount", { count: value.length })}
-          </Badge>
+        {isUser && value.length === 0 ? (
+          <p className="self-start text-sm text-muted-foreground">
+            {t("noCustom")}
+          </p>
+        ) : isUser ? (
+          <Button
+            type="button"
+            variant="outline"
+            className={`h-11 shrink-0 gap-2 self-start font-body md:h-11 ${onlyCustom ? "border-personal bg-personal-subtle text-personal hover:bg-personal-subtle hover:text-personal" : "border-border bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground"}`}
+            aria-pressed={onlyCustom}
+            onClick={() => setOnlyCustom((current) => !current)}
+          >
+            <ListFilter aria-hidden="true" className="size-4" />
+            {t("onlyCustom")}
+            {value.length ? (
+              <span className="text-xs tabular-nums">{value.length}</span>
+            ) : null}
+          </Button>
         ) : null}
       </div>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -223,21 +338,28 @@ export function PermissionEditor({
           value={search}
           onChange={(event) => setSearch(event.target.value)}
         />
-        {isUser ? (
-          <Button
-            type="button"
-            variant={onlyCustom ? "secondary" : "ghost"}
-            className="h-11 gap-2 self-start font-body md:h-11"
-            aria-pressed={onlyCustom}
-            onClick={() => setOnlyCustom((current) => !current)}
-          >
-            {t("onlyCustom")}
-            {value.length ? (
-              <span className="text-xs tabular-nums">{value.length}</span>
-            ) : null}
-          </Button>
-        ) : null}
       </div>
+      {dependencyFeedback ? (
+        <p role="status" className="text-sm text-muted-foreground">
+          {dependencyFeedback}
+        </p>
+      ) : null}
+      <PermissionDependencyDialog
+        change={
+          pendingChange && pendingImpact
+            ? {
+                permissionKey: pendingChange.permissionKey,
+                scopes: pendingImpact.after[pendingChange.permissionKey] ?? [],
+              }
+            : null
+        }
+        dependents={pendingImpact?.dependents ?? []}
+        blocked={pendingBlocked}
+        disabled={!!disabled}
+        userOverrides={isUser}
+        onConfirm={confirmChange}
+        onCancel={() => setPendingChange(null)}
+      />
       <p className="sr-only" role="status">
         {t("results", { count: resultCount })}
       </p>
@@ -256,7 +378,7 @@ export function PermissionEditor({
           <TabsList
             variant="line"
             aria-label={t("categories")}
-            className="w-full shrink-0 gap-0 overflow-x-auto rounded-none border-y border-border p-0"
+            className="w-full shrink-0 gap-0 overflow-x-auto rounded-none border-b border-border p-0"
           >
             {groups.map((group) => (
               <TabsTrigger
@@ -313,11 +435,31 @@ export function PermissionEditor({
                   .join(", ");
                 const rowDisabled =
                   disabled || canEditPermission?.(permission.key) === false;
+                const requiredPlan = planRequiredPermissions(
+                  permission.key,
+                  currentScopes,
+                );
+                const blockedRequirements = [
+                  ...new Set([
+                    ...requiredPlan.unresolved,
+                    ...requiredPlan.changes
+                      .filter((change) => !canApplyGrant(change))
+                      .map((change) => change.permissionKey),
+                  ]),
+                ];
+                const deniedRequirements = requiredPlan.changes
+                  .filter(
+                    (change) =>
+                      grants.has(change.permissionKey) &&
+                      !grants.get(change.permissionKey)?.scopes.length,
+                  )
+                  .map((change) => change.permissionKey);
                 const rowId = `${id}-${permission.key}`;
                 const label = labels(permission.key);
                 const hasDetails =
-                  isUser || permission.prerequisites.length > 0;
-                const detailsOpen = expandedDetails.includes(permission.key);
+                  (isUser && !!grant) || permission.prerequisites.length > 0;
+                const detailsOpen =
+                  hasDetails && expandedDetails.includes(permission.key);
                 const changeMode = (next: PermissionMode) => {
                   if (next === "default") replace(permission.key, null);
                   else if (next === "deny")
@@ -340,19 +482,25 @@ export function PermissionEditor({
                     key={permission.key}
                     role="group"
                     aria-labelledby={`${rowId}-label`}
-                    className={`grid min-w-0 grid-cols-12 items-center gap-x-2 gap-y-3 rounded-lg border bg-card px-4 pt-4 pb-0 text-card-foreground lg:gap-x-4 lg:px-5 lg:pt-5 ${isUser && grant ? "border-primary" : "border-border"}`}
+                    className={`grid min-w-0 grid-cols-12 items-center gap-x-2 gap-y-3 rounded-lg border bg-card px-4 pt-4 text-card-foreground lg:gap-x-4 lg:px-5 lg:pt-5 ${isUser && grant ? "border-primary" : "border-border"} ${hasDetails ? "pb-0" : "pb-4 lg:pb-5"}`}
                   >
                     <div className="col-span-12 min-w-0 self-start lg:col-span-5">
                       <div className="flex items-start justify-between gap-1 lg:gap-2">
-                        <div className="flex min-w-0 flex-col gap-2">
-                          <div className="flex min-w-0 flex-col gap-2">
-                            <h4
-                              id={`${rowId}-label`}
-                              className="font-body text-sm font-semibold"
+                        <div className="flex min-w-0 items-start gap-2">
+                          <h4
+                            id={`${rowId}-label`}
+                            className="font-body text-sm font-semibold"
+                          >
+                            {label}
+                          </h4>
+                          {isUser && grant ? (
+                            <Badge
+                              variant="secondary"
+                              className="bg-personal-subtle text-personal"
                             >
-                              {label}
-                            </h4>
-                          </div>
+                              {t("customOverride")}
+                            </Badge>
+                          ) : null}
                         </div>
                         <span
                           aria-hidden="true"
@@ -361,21 +509,6 @@ export function PermissionEditor({
                           <ActionIcon className="size-4" />
                         </span>
                       </div>
-                      {isUser ? (
-                        <div className="mt-2 flex flex-wrap items-center gap-2">
-                          {grant ? (
-                            <span className="text-xs text-muted-foreground">
-                              {t("customOverride")}
-                            </span>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">
-                              {sources
-                                ? t("inheritedFrom", { roles: sources })
-                                : t("notInRole")}
-                            </span>
-                          )}
-                        </div>
-                      ) : null}
                     </div>
                     <div className="col-span-12 min-w-0 lg:col-span-3">
                       <Label
@@ -400,26 +533,51 @@ export function PermissionEditor({
                         }
                       />
                     </div>
-                    <SegmentedRadioGroup
-                      label={t("modeFor", { permission: label })}
-                      name={`${rowId}-mode`}
-                      value={mode}
-                      onValueChange={changeMode}
-                      disabled={rowDisabled}
-                      containerClassName="col-span-12 min-w-0 self-end lg:col-span-4"
-                      columns={isUser ? 3 : 2}
-                      options={modes.map((option) => ({
-                        value: option,
-                        label: t(`modes.${option}`),
-                        tone:
-                          option === "allow"
-                            ? "primary"
-                            : option === "deny"
-                              ? "destructive"
-                              : "neutral",
-                      }))}
-                    />
-                    <div className="col-span-12 flex min-w-0 flex-col">
+                    <div className="col-span-12 flex min-w-0 flex-col gap-2 self-end lg:col-span-4">
+                      <SegmentedRadioGroup
+                        label={t("modeFor", { permission: label })}
+                        name={`${rowId}-mode`}
+                        value={mode}
+                        onValueChange={changeMode}
+                        disabled={rowDisabled}
+                        containerClassName="min-w-0"
+                        columns={isUser ? 3 : 2}
+                        options={modes.map((option) => ({
+                          value: option,
+                          label: t(`modes.${option}`),
+                          tone:
+                            option === "allow"
+                              ? "primary"
+                              : option === "deny"
+                                ? "destructive"
+                                : "neutral",
+                        }))}
+                      />
+                      {isUser ? (
+                        <p className="text-xs leading-relaxed text-muted-foreground">
+                          {sources
+                            ? t("inheritedFrom", { roles: sources })
+                            : t("notInRole")}
+                          {grant ? ` ${t("overrideHelp")}` : ""}
+                        </p>
+                      ) : null}
+                    </div>
+                    {requiredPlan.changes.length ||
+                    requiredPlan.unresolved.length ? (
+                      <div className="col-span-12">
+                        <PermissionDependencyNotice
+                          changes={requiredPlan.changes}
+                          blocked={blockedRequirements}
+                          denied={deniedRequirements}
+                          disabled={rowDisabled}
+                          onEnable={() => enableRequirements(permission.key)}
+                        />
+                      </div>
+                    ) : null}
+                    <div
+                      hidden={!hasDetails}
+                      className="col-span-12 flex min-w-0 flex-col"
+                    >
                       <button
                         type="button"
                         aria-expanded={detailsOpen}
@@ -447,14 +605,6 @@ export function PermissionEditor({
                       >
                         <div className="min-h-0 overflow-hidden">
                           <div className="flex flex-col gap-3 pb-4 text-xs text-muted-foreground lg:pb-5">
-                            {isUser ? (
-                              <p>
-                                {sources
-                                  ? t("inheritedFrom", { roles: sources })
-                                  : t("notInRole")}
-                                {grant ? ` ${t("overrideHelp")}` : ""}
-                              </p>
-                            ) : null}
                             {permission.prerequisites.length ? (
                               <div className="flex flex-col gap-1">
                                 <p className="font-semibold text-foreground">

@@ -13,12 +13,14 @@ export function AccessWorkspace({
   editor = false,
   hideTitle = false,
   hideTabs = false,
+  headerTitle,
 }: {
   children: ReactNode;
   current: "directory" | "roles";
   editor?: boolean;
   hideTitle?: boolean;
   hideTabs?: boolean;
+  headerTitle?: string;
   onNavigate?: (event: MouseEvent<HTMLAnchorElement>, href: string) => void;
 }) {
   const t = useTranslations("workspace.access.member");
@@ -26,7 +28,8 @@ export function AccessWorkspace({
     <main className="access-workspace flex min-h-full min-w-0 flex-1 flex-col gap-6 bg-background p-4 font-body text-foreground md:p-8">
       <PageTitleOverride
         title={
-          editor ? "" : t(current === "roles" ? "rolesPageTitle" : "title")
+          headerTitle ??
+          (editor ? "" : t(current === "roles" ? "rolesPageTitle" : "title"))
         }
       />
       {!editor ? (

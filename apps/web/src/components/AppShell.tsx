@@ -204,6 +204,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/company/associates": "companyAssociates",
   "/persons": "persons",
   "/persons/new": "newPerson",
+  "/users/new": "newUser",
   "/scooters": "scooters",
   "/scooters/new": "newScooter",
   "/scooters/brands": "scooterBrands",

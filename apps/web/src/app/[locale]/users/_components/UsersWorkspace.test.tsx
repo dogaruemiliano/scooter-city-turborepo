@@ -109,11 +109,159 @@ async function pickRole(
 }
 
 describe("member access workspace", () => {
-  it("customizes permissions in a sheet and summarizes retained changes in a card", async () => {
+  it("confirms dependency changes inside the permissions sheet without closing it", async () => {
+    const user = userEvent.setup();
+    const dependentRole = {
+      ...mechanic,
+      permissions: [
+        { permissionKey: "problems.read", scopes: ["ALL"] },
+        { permissionKey: "problems.update", scopes: ["ASSIGNED"] },
+      ],
+    };
+    mocks.fetch.mockImplementation(async (path: string) =>
+      path === "/v1/access/roles"
+        ? { items: [dependentRole, admin] }
+        : { ...member, roles: [dependentRole] },
+    );
+    mount("member");
+    await user.click(
+      await screen.findByRole("button", { name: /^Customize permissions/ }),
+    );
+    const sheet = await screen.findByRole("dialog", {
+      name: "Customize permissions",
+    });
+    const row = within(sheet).getByRole("group", {
+      name: "Service work · View",
+    });
+    await user.click(within(row).getByRole("radio", { name: "Deny" }));
+    const confirmation = await screen.findByRole("dialog", {
+      name: "Update dependent permissions?",
+    });
+    await user.click(
+      within(confirmation).getByRole("button", {
+        name: "Disable all 2 permissions",
+      }),
+    );
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "Update dependent permissions?" }),
+      ).toBeNull(),
+    );
+    expect(sheet).toBeVisible();
+    const edit = within(sheet).getByRole("group", {
+      name: "Service work · Edit",
+    });
+    expect(within(edit).getByRole("radio", { name: "Deny" })).toBeChecked();
+    expect(within(row).getByRole("radio", { name: "Deny" })).toBeChecked();
+  });
+
+  it("reviews and confirms permission changes in a nested sheet, preserving drafts when going back", async () => {
+    const user = userEvent.setup();
+    const fetchNormally = mocks.fetch.getMockImplementation()!;
+    mocks.fetch.mockImplementation(async (path, ...args) =>
+      path.endsWith("/preview")
+        ? {
+            before: member.effectiveScopes,
+            after: {},
+            missingPrerequisites: [],
+          }
+        : fetchNormally(path, ...args),
+    );
+    mount("member");
+    await user.click(
+      await screen.findByRole("button", { name: /Customize permissions/ }),
+    );
+    const sheet = await screen.findByRole("dialog", {
+      name: "Customize permissions",
+    });
+    const row = within(sheet).getByRole("group", {
+      name: "Service work · View",
+    });
+    await user.click(within(row).getByRole("radio", { name: "Deny" }));
+    await user.click(
+      within(sheet).getByRole("button", { name: "Review changes" }),
+    );
+    const review = await screen.findByRole("dialog", {
+      name: "Review effective access",
+    });
+    expect(review).toHaveClass("bg-popover");
+    expect(review).not.toHaveClass("bg-background");
+    expect(sheet).toHaveAttribute("data-nested-drawer-open");
+    expect(within(review).getByText("Removed")).toHaveClass("text-destructive");
+    expect(
+      within(review).getByRole("button", { name: "Confirm changes" }),
+    ).toHaveClass("bg-destructive");
+    expect(
+      mocks.fetch.mock.calls.filter((call) => call[2]?.method === "PUT"),
+    ).toHaveLength(0);
+    await user.click(
+      within(review).getByRole("button", { name: "Keep editing" }),
+    );
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "Review effective access" }),
+      ).toBeNull(),
+    );
+    expect(within(row).getByRole("radio", { name: "Deny" })).toBeChecked();
+    await user.click(
+      within(sheet).getByRole("button", { name: "Review changes" }),
+    );
+    const reopened = await screen.findByRole("dialog", {
+      name: "Review effective access",
+    });
+    await user.click(
+      within(reopened).getByRole("button", { name: "Confirm changes" }),
+    );
+    await waitFor(() =>
+      expect(mocks.fetch).toHaveBeenCalledWith(
+        "/v1/users/member/access",
+        expect.anything(),
+        {
+          method: "PUT",
+          json: {
+            expectedRevision: 4,
+            roles: [{ id: "mechanic", revision: 2 }],
+            overrides: [{ permissionKey: "problems.read", scopes: [] }],
+          },
+        },
+      ),
+    );
+  });
+
+  it("blocks confirmation in the review sheet when the preview reports missing prerequisites", async () => {
+    const user = userEvent.setup();
+    const fetchNormally = mocks.fetch.getMockImplementation()!;
+    mocks.fetch.mockImplementation(async (path, ...args) =>
+      path.endsWith("/preview")
+        ? {
+            before: member.effectiveScopes,
+            after: { "problems.resolve": ["ALL"] },
+            missingPrerequisites: ["problems.read"],
+          }
+        : fetchNormally(path, ...args),
+    );
+    mount("member");
+    await pickRole(user, "Admin");
+    await user.click(screen.getByRole("button", { name: "Review changes" }));
+    const review = await screen.findByRole("dialog", {
+      name: "Review effective access",
+    });
+    expect(
+      within(review).getByRole("button", { name: "Confirm changes" }),
+    ).toBeDisabled();
+    expect(within(review).getByRole("alert")).toHaveTextContent(
+      "Required permissions",
+    );
+    expect(
+      mocks.fetch.mock.calls.filter((call) => call[2]?.method === "PUT"),
+    ).toHaveLength(0);
+  });
+
+  it("customizes permissions in a sheet and summarizes retained changes beside the role", async () => {
     const user = userEvent.setup();
     mount("member");
     await user.click(
-      await screen.findByRole("button", { name: "Customize permissions" }),
+      await screen.findByRole("button", { name: /Customize permissions/ }),
     );
     const sheet = await screen.findByRole("dialog", {
       name: "Customize permissions",
@@ -167,19 +315,19 @@ describe("member access workspace", () => {
     await user.click(within(sheet).getByRole("button", { name: "Done" }));
     await waitFor(() =>
       expect(
-        screen.queryByRole("dialog", { name: "Customize permissions" }),
+        screen.queryByRole("dialog", { name: /Customize permissions/ }),
       ).toBeNull(),
     );
-    const summary = screen
-      .getByText("Personalized permissions")
-      .closest('[data-slot="card"]')!;
-    expect(summary).toBeVisible();
-    expect(
-      within(summary as HTMLElement).getByText("1 custom override"),
-    ).toBeVisible();
-    await user.click(
-      screen.getByRole("button", { name: "Customize permissions" }),
+    const permissionButton = screen.getByRole("button", {
+      name: /Customize permissions.*Custom changes/,
+    });
+    expect(permissionButton).toHaveTextContent(
+      "Custom changes · 0 allowed, 1 denied",
     );
+    expect(permissionButton.closest('[data-slot="field"]')).toContainElement(
+      screen.getByRole("button", { name: /Base role/ }),
+    );
+    await user.click(permissionButton);
     const reopened = await screen.findByRole("dialog", {
       name: "Customize permissions",
     });
@@ -351,7 +499,10 @@ describe("member access workspace", () => {
     mount("member");
     await screen.findByRole("button", { name: "Base role" });
     await pickRole(user, "Admin");
-    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    await user.click(
+      screen.getByRole("button", { name: /Customize permissions/ }),
+    );
+    await user.click(screen.getByRole("button", { name: "Discard changes" }));
     expect(screen.getByRole("button", { name: "Base role" })).toHaveTextContent(
       "Mechanic",
     );

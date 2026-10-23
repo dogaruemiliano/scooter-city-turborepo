@@ -31,11 +31,18 @@ function Harness({
   roles = [role],
   locale = "en",
   disabled = false,
+  canEditPermission,
+  canGrantPermission,
 }: {
   initial?: Grant[];
   roles?: v1.access.Role[] | null;
   locale?: "en" | "ro";
   disabled?: boolean;
+  canEditPermission?: (key: string) => boolean;
+  canGrantPermission?: (
+    key: string,
+    scopes: v1.access.PermissionScope[],
+  ) => boolean;
 }) {
   const [value, setValue] = useState<Grant[]>(initial);
   return (
@@ -45,6 +52,8 @@ function Harness({
         onChange={setValue}
         roles={roles ?? undefined}
         disabled={disabled}
+        canEditPermission={canEditPermission}
+        canGrantPermission={canGrantPermission}
       />
       <output aria-label="stored overrides">{JSON.stringify(value)}</output>
     </NextIntlClientProvider>
@@ -75,6 +84,43 @@ async function serviceTab(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe("permission replacement editor", () => {
+  it.each(["en", "ro"] as const)(
+    "shows an informational label instead of a custom filter when empty in %s",
+    (locale) => {
+      render(<Harness locale={locale} />);
+      expect(
+        screen.getByText(messages[locale].access.editor.noCustom),
+      ).toBeVisible();
+      expect(
+        screen.queryByRole("button", {
+          name: messages[locale].access.editor.onlyCustom,
+        }),
+      ).not.toBeInTheDocument();
+    },
+  );
+
+  it("keeps the base role explanation under the radios and only offers useful expansion", async () => {
+    const user = userEvent.setup();
+    render(<Harness roles={[]} />);
+    await serviceTab(user);
+    const row = permissionRow("Service work · View");
+    const radios = within(row).getByRole("radiogroup");
+    const explanation = within(row).getByText(
+      "The base role does not allow this permission.",
+    );
+    expect(explanation).toBeVisible();
+    expect(radios.parentElement?.parentElement).toContainElement(explanation);
+    expect(within(row).queryByRole("button", { name: "Details" })).toBeNull();
+    await user.click(mode(row, "Allow"));
+    const toggle = within(row).getByRole("button", { name: "Details" });
+    await user.click(toggle);
+    expect(within(row).getByRole("textbox")).toBeVisible();
+    await user.click(mode(row, "Default"));
+    expect(within(row).queryByRole("button", { name: "Details" })).toBeNull();
+    expect(within(row).queryByRole("textbox")).toBeNull();
+    expect(explanation).toBeVisible();
+  });
+
   it("animates expansion and a half-turn arrow while keeping collapsed details inert", async () => {
     const user = userEvent.setup();
     render(<Harness />);
@@ -139,8 +185,19 @@ describe("permission replacement editor", () => {
     );
     expect(screen.getByRole("heading", { name: "Permissions" })).toBeVisible();
     expect(screen.queryByRole("heading", { name: "Service" })).toBeNull();
-    expect(screen.getByText("1 custom override")).toBeVisible();
-    expect(within(resolveRow()).getByText("Custom override")).toBeVisible();
+    expect(screen.queryByText("1 custom override")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Only custom/ }),
+    ).toHaveTextContent("1");
+    const custom = within(resolveRow()).getByText("Custom");
+    expect(custom).toBeVisible();
+    expect(custom).toHaveAttribute("data-slot", "badge");
+    expect(custom).toHaveClass("bg-personal-subtle", "text-personal");
+    expect(custom.parentElement).toContainElement(
+      within(resolveRow()).getByRole("heading", {
+        name: "Service work · Resolve",
+      }),
+    );
     expect(
       within(permissionRow("Service work · View"))
         .getAllByText("From Mechanic")
@@ -158,7 +215,10 @@ describe("permission replacement editor", () => {
     );
     const row = permissionRow("Scutere · Vizualizare");
     const modes = within(row).getByRole("radiogroup");
-    expect(modes.parentElement).toHaveClass("col-span-12", "lg:col-span-4");
+    expect(modes.parentElement?.parentElement).toHaveClass(
+      "col-span-12",
+      "lg:col-span-4",
+    );
     expect(modes).toHaveStyle({ "--segmented-columns": "3" });
     expect(modes).toHaveClass(
       "grid-cols-[repeat(var(--segmented-columns),minmax(0,1fr))]",
@@ -259,6 +319,7 @@ describe("permission replacement editor", () => {
     const user = userEvent.setup();
     render(
       <Harness
+        roles={[]}
         initial={[{ permissionKey: "problems.read", scopes: ["ASSIGNED"] }]}
       />,
     );
@@ -328,7 +389,7 @@ describe("permission replacement editor", () => {
       within(resolveRow()).getByText("Required permissions"),
     ).toBeInTheDocument();
     expect(
-      within(resolveRow()).getByText("Service work · View"),
+      within(resolveRow()).getByText("Service work · View", { selector: "li" }),
     ).toBeInTheDocument();
     await user.type(
       within(resolveRow()).getByRole("textbox"),
@@ -362,7 +423,16 @@ describe("permission replacement editor", () => {
     render(
       <Harness initial={[{ permissionKey: "problems.resolve", scopes: [] }]} />,
     );
-    await user.click(screen.getByRole("button", { name: /Only custom/ }));
+    const filter = screen.getByRole("button", { name: /Only custom/ });
+    expect(filter).toHaveAttribute("aria-pressed", "false");
+    expect(filter).toHaveClass("bg-muted");
+    expect(filter.querySelector("svg")).not.toBeNull();
+    expect(filter.parentElement).toContainElement(
+      screen.getByRole("heading", { name: "Permissions" }),
+    );
+    await user.click(filter);
+    expect(filter).toHaveAttribute("aria-pressed", "true");
+    expect(filter).toHaveClass("bg-personal-subtle", "text-personal");
     expect(screen.getByRole("tab", { name: /^Service/ })).toHaveAttribute(
       "aria-selected",
       "true",
@@ -379,9 +449,10 @@ describe("permission replacement editor", () => {
     await user.clear(screen.getByRole("searchbox"));
     await user.click(mode(resolveRow(), "Default"));
     expect(screen.getByText("No custom permissions")).toBeInTheDocument();
-    await user.click(
-      screen.getByRole("button", { name: "Show all permissions" }),
-    );
+    expect(
+      screen.queryByRole("button", { name: /Only custom/ }),
+    ).not.toBeInTheDocument();
+    expect(mode(resolveRow(), "Default")).toBeChecked();
     expect(screen.getByRole("tab", { name: "Service" })).toHaveAttribute(
       "aria-selected",
       "true",
@@ -517,5 +588,238 @@ describe("permission replacement editor", () => {
       expect(view.container.textContent).not.toContain("access.descriptions.");
       expect(view.container.textContent).not.toContain("access.editor.");
     }
+  });
+});
+
+describe("dependency assistance", () => {
+  it("enables scoped requirements in one update and preserves an overridden reason", async () => {
+    const user = userEvent.setup();
+    render(
+      <Harness
+        roles={[]}
+        initial={[
+          { permissionKey: "problems.resolve", scopes: ["ASSIGNED"] },
+          {
+            permissionKey: "problems.read",
+            scopes: [],
+            reason: "Review access",
+          },
+        ]}
+      />,
+    );
+    await serviceTab(user);
+    const row = resolveRow();
+    expect(within(row).getByText(/Replaces an explicit denial/)).toBeVisible();
+    await user.click(
+      within(row).getByRole("button", { name: "Enable required permissions" }),
+    );
+    expect(stored()).toContainEqual({
+      permissionKey: "problems.read",
+      scopes: ["ASSIGNED"],
+      reason: "Review access",
+    });
+    expect(
+      within(row).queryByRole("button", {
+        name: "Enable required permissions",
+      }),
+    ).toBeNull();
+    expect(screen.getByText(/Updated required permissions/)).toBeVisible();
+  });
+
+  it("does not create unnecessary overrides for sufficient inherited access", async () => {
+    const user = userEvent.setup();
+    render(
+      <Harness
+        roles={[
+          {
+            ...role,
+            permissions: [{ permissionKey: "problems.read", scopes: ["ALL"] }],
+          },
+        ]}
+      />,
+    );
+    await user.click(mode(resolveRow(), "Allow"));
+    expect(stored()).toEqual([
+      { permissionKey: "problems.resolve", scopes: ["ASSIGNED"] },
+    ]);
+    expect(
+      within(resolveRow()).queryByRole("button", {
+        name: "Enable required permissions",
+      }),
+    ).toBeNull();
+  });
+
+  it("cancels dependent changes without applying anything, then applies inherited denials together", async () => {
+    const user = userEvent.setup();
+    render(
+      <Harness
+        roles={[
+          {
+            ...role,
+            permissions: [
+              { permissionKey: "problems.read", scopes: ["ALL"] },
+              { permissionKey: "problems.update", scopes: ["ALL"] },
+              { permissionKey: "problems.resolve", scopes: ["ASSIGNED"] },
+            ],
+          },
+        ]}
+      />,
+    );
+    const row = permissionRow("Service work · View");
+    await user.click(mode(row, "Deny"));
+    const dialog = await screen.findByRole("dialog", {
+      name: "Update dependent permissions?",
+    });
+    expect(within(dialog).getByText("Service work · Edit")).toBeVisible();
+    expect(within(dialog).getByText("Service work · Resolve")).toBeVisible();
+    expect(stored()).toEqual([]);
+    await user.click(
+      within(dialog).getByRole("button", { name: "Keep unchanged" }),
+    );
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(mode(row, "Default")).toBeChecked();
+    await user.click(mode(row, "Deny"));
+    await user.click(
+      within(await screen.findByRole("dialog")).getByRole("button", {
+        name: "Disable all 3 permissions",
+      }),
+    );
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(stored()).toEqual(
+      expect.arrayContaining([
+        { permissionKey: "problems.read", scopes: [] },
+        { permissionKey: "problems.update", scopes: [] },
+        { permissionKey: "problems.resolve", scopes: [] },
+      ]),
+    );
+    expect(stored()).toHaveLength(3);
+  });
+
+  it("confirms scope narrowing and keeps dependents covered by assigned access", async () => {
+    const user = userEvent.setup();
+    render(
+      <Harness
+        roles={[
+          {
+            ...role,
+            permissions: [
+              { permissionKey: "problems.read", scopes: ["ALL"] },
+              { permissionKey: "problems.update", scopes: ["ALL"] },
+              { permissionKey: "problems.resolve", scopes: ["ASSIGNED"] },
+            ],
+          },
+        ]}
+        initial={[{ permissionKey: "problems.read", scopes: ["ALL"] }]}
+      />,
+    );
+    const row = permissionRow("Service work · View");
+    await user.click(scopeTrigger(row));
+    const picker = await screen.findByRole("dialog");
+    await user.click(within(picker).getByRole("button", { name: "Assigned" }));
+    const dialog = await screen.findByRole("dialog", {
+      name: "Update dependent permissions?",
+    });
+    expect(within(dialog).getByText("Service work · Edit")).toBeVisible();
+    expect(within(dialog).queryByText("Service work · Resolve")).toBeNull();
+    expect(stored()).toEqual([
+      { permissionKey: "problems.read", scopes: ["ALL"] },
+    ]);
+    await user.click(
+      within(dialog).getByRole("button", { name: "Apply changes" }),
+    );
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(stored()).toContainEqual({
+      permissionKey: "problems.read",
+      scopes: ["ASSIGNED"],
+    });
+    expect(stored()).toContainEqual({
+      permissionKey: "problems.update",
+      scopes: [],
+    });
+    expect(mode(resolveRow(), "Default")).toBeChecked();
+  });
+
+  it("confirms returning to Default when it would remove access needed by a dependent", async () => {
+    const user = userEvent.setup();
+    render(
+      <Harness
+        roles={[]}
+        initial={[
+          { permissionKey: "problems.read", scopes: ["ASSIGNED"] },
+          { permissionKey: "problems.resolve", scopes: ["ASSIGNED"] },
+        ]}
+      />,
+    );
+    await serviceTab(user);
+    const row = permissionRow("Service work · View");
+    await user.click(mode(row, "Default"));
+    const dialog = await screen.findByRole("dialog");
+    await user.click(
+      within(dialog).getByRole("button", { name: "Disable all 2 permissions" }),
+    );
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(stored()).toEqual([
+      { permissionKey: "problems.resolve", scopes: [] },
+    ]);
+  });
+
+  it("blocks enabling requirements outside the operator's scopes without partial changes", async () => {
+    const user = userEvent.setup();
+    render(
+      <Harness
+        roles={[]}
+        initial={[{ permissionKey: "problems.resolve", scopes: ["ALL"] }]}
+        canGrantPermission={(key, scopes) =>
+          key !== "problems.read" || !scopes.includes("ALL")
+        }
+      />,
+    );
+    await serviceTab(user);
+    const button = within(resolveRow()).getByRole("button", {
+      name: "Enable required permissions",
+    });
+    expect(button).toBeDisabled();
+    expect(
+      within(resolveRow()).getByText(/You cannot change these permissions/),
+    ).toBeVisible();
+    await user.click(button);
+    expect(stored()).toEqual([
+      { permissionKey: "problems.resolve", scopes: ["ALL"] },
+    ]);
+  });
+
+  it("blocks cascading changes when one dependent is protected", async () => {
+    const user = userEvent.setup();
+    render(<Harness canEditPermission={(key) => key !== "problems.resolve"} />);
+    await user.click(mode(permissionRow("Service work · View"), "Deny"));
+    const dialog = await screen.findByRole("dialog");
+    expect(
+      within(dialog).getByRole("button", { name: "Disable all 2 permissions" }),
+    ).toBeDisabled();
+    expect(
+      within(dialog).getByText(/You cannot change these permissions/),
+    ).toBeVisible();
+    expect(stored()).toEqual([]);
+  });
+
+  it("removes dependent grants when editing a role instead of creating user overrides", async () => {
+    const user = userEvent.setup();
+    render(
+      <Harness
+        roles={null}
+        initial={[
+          { permissionKey: "problems.read", scopes: ["ALL"] },
+          { permissionKey: "problems.update", scopes: ["ALL"] },
+        ]}
+      />,
+    );
+    await serviceTab(user);
+    await user.click(mode(permissionRow("Service work · View"), "Deny"));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).queryByText(/Deny override/)).toBeNull();
+    await user.click(
+      within(dialog).getByRole("button", { name: "Disable all 2 permissions" }),
+    );
+    expect(stored()).toEqual([]);
   });
 });

@@ -4,7 +4,7 @@ import {
   useCallback,
   useDeferredValue,
   useEffect,
-  useRef,
+  useId,
   useState,
   type MouseEvent,
 } from "react";
@@ -18,7 +18,6 @@ import {
   BottomSheetContent,
   BottomSheetBody,
   BottomSheetFooter,
-  BottomSheetClose,
   buttonVariants,
   ListLayout,
   ListItems,
@@ -39,7 +38,7 @@ import {
 } from "@repo/ui/components";
 import { SearchField } from "@repo/ui/components/search-field";
 import { FormActions } from "@repo/ui/components/form-actions";
-import { ChevronDown, ShieldCheck, UserPlus } from "lucide-react";
+import { ChevronDown, ChevronRight, ShieldCheck, UserPlus } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { Link, useRouter } from "@/i18n/navigation";
 import { webApi } from "@/lib/api";
@@ -54,12 +53,12 @@ import { AccessWorkspace } from "../../roles/_components/AccessWorkspace";
 import { AccessHistory } from "../../roles/_components/AccessHistory";
 import {
   effectiveScopes,
-  PermissionDiff,
   PermissionEditor,
   type Grant,
 } from "../../roles/_components/permission-editor";
 import { useSession } from "@/components/auth/SessionProvider";
 import { canAccess, canManageUser } from "@/lib/access";
+import { AccessReviewSheet } from "./AccessReviewSheet";
 import { MemberAccountControls } from "./MemberAccountControls";
 
 const baseSlugs = v1.access.BASE_ROLE_SLUGS;
@@ -88,6 +87,7 @@ function MemberAvatar({
 export function UsersWorkspace({ id }: { id?: string }) {
   const t = useTranslations("workspace");
   const shared = useTranslations("shared");
+  const pageTitles = useTranslations("appShell.pages");
   const { user: actor } = useSession();
   const locale = useLocale();
   const router = useRouter();
@@ -157,6 +157,7 @@ export function UsersWorkspace({ id }: { id?: string }) {
   };
   return (
     <AccessWorkspace
+      headerTitle={id === "new" ? pageTitles("newUser") : undefined}
       current="directory"
       onNavigate={navigate}
       editor={!!id}
@@ -373,7 +374,6 @@ function UserForm({
     ? canAssign || canCustomize
     : canAccess(actor, "users.invite");
 
-  const labels = useTranslations("access.permissions");
   const router = useRouter();
   const task = useTask();
   const [email, setEmail] = useState(user?.email ?? "");
@@ -393,7 +393,8 @@ function UserForm({
   const [reviewed, setReviewed] = useState("");
   const [showAccount, setShowAccount] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
-  const reviewRef = useRef<HTMLElement>(null);
+  const formId = useId();
+  const [showReview, setShowReview] = useState(false);
   const selectedRoles = roles.filter((role) => roleIds.includes(role.id));
   const roleOptions = [
     {
@@ -433,9 +434,6 @@ function UserForm({
     ? { ...grants, expectedRevision: user.accessRevision }
     : { ...grants, email, firstName, lastName };
   const previewCurrent = reviewed === JSON.stringify(payload);
-  useEffect(() => {
-    if (previewCurrent && preview) reviewRef.current?.focus();
-  }, [previewCurrent, preview]);
   const dirty =
     JSON.stringify(roleIds) !==
       JSON.stringify(user?.roles.map((role) => role.id) ?? []) ||
@@ -453,6 +451,50 @@ function UserForm({
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty]);
+  const saveAccess = () => {
+    if (
+      !canSubmit ||
+      !previewCurrent ||
+      !preview ||
+      preview.missingPrerequisites.length
+    )
+      return;
+    void task.run(async () => {
+      const saved = await webApi.fetch(
+        user ? `/v1/users/${user.id}/access` : "/v1/users",
+        v1.access.accessUserSchema,
+        {
+          method: user ? "PUT" : "POST",
+          json: user
+            ? v1.access.userAccessInputSchema.parse(payload)
+            : v1.access.createUserInputSchema.parse(payload),
+        },
+      );
+      onDirtyChange(false);
+      if (!user) router.replace(`/users/${saved.id}`);
+      else reload();
+      setShowReview(false);
+      setShowPermissions(false);
+    });
+  };
+  const reviewSheet = (
+    <AccessReviewSheet
+      open={showReview}
+      onOpenChange={setShowReview}
+      before={preview?.before ?? {}}
+      after={preview?.after ?? {}}
+      beforeRoles={user?.roles ?? []}
+      afterRoles={selectedRoles}
+      beforeOverrides={user?.overrides ?? []}
+      afterOverrides={overrides}
+      member={user ? memberName(user) : email}
+      missing={preview?.missingPrerequisites ?? []}
+      busy={task.busy}
+      stale={!previewCurrent}
+      error={task.error}
+      onConfirm={saveAccess}
+    />
+  );
   return (
     <Card
       as="section"
@@ -461,6 +503,7 @@ function UserForm({
       aria-label={t(user ? "access.member.editPermissions" : "access.addUser")}
     >
       <form
+        id={formId}
         className="flex min-h-0 flex-1 flex-col"
         onSubmit={(event) => {
           event.preventDefault();
@@ -508,21 +551,11 @@ function UserForm({
                 });
               }
               setReviewed(JSON.stringify(payload));
+              setShowReview(true);
               return false;
             }
-            const saved = await webApi.fetch(
-              user ? `/v1/users/${user.id}/access` : "/v1/users",
-              v1.access.accessUserSchema,
-              {
-                method: user ? "PUT" : "POST",
-                json: user
-                  ? v1.access.userAccessInputSchema.parse(payload)
-                  : v1.access.createUserInputSchema.parse(payload),
-              },
-            );
-            onDirtyChange(false);
-            if (!user) router.replace(`/users/${saved.id}`);
-            else reload();
+            setShowReview(true);
+            return false;
           });
         }}
       >
@@ -635,139 +668,135 @@ function UserForm({
                   );
                 }}
               />
+              {user?.isSuperAdmin ? (
+                <div className="flex items-start gap-3 py-4">
+                  <ShieldCheck
+                    className="size-6 shrink-0 text-primary"
+                    aria-hidden="true"
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    {t("access.editor.superAdminHelp")}
+                  </p>
+                </div>
+              ) : (
+                <BottomSheet
+                  open={showPermissions}
+                  onOpenChange={setShowPermissions}
+                >
+                  <BottomSheetTrigger
+                    render={
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="h-auto w-full justify-between gap-3 text-left"
+                      />
+                    }
+                  >
+                    <span className="flex min-w-0 flex-col gap-1">
+                      <span>{permissionText("customizePermissions")}</span>
+                      <span className="text-xs font-normal text-muted-foreground">
+                        {overrides.length
+                          ? permissionText("userOverrideSummary", {
+                              allowed: overrides.filter(
+                                (grant) => grant.scopes.length > 0,
+                              ).length,
+                              denied: overrides.filter(
+                                (grant) => grant.scopes.length === 0,
+                              ).length,
+                            })
+                          : permissionText("roleDefaults")}
+                      </span>
+                    </span>
+                    <ChevronRight
+                      aria-hidden="true"
+                      className="size-4 shrink-0 text-muted-foreground"
+                    />
+                  </BottomSheetTrigger>
+                  <BottomSheetContent
+                    aria-label={permissionText("customizePermissions")}
+                  >
+                    <BottomSheetBody className="pt-0">
+                      <PermissionEditor
+                        stickyTabs
+                        value={overrides}
+                        onChange={setOverrides}
+                        roles={selectedRoles}
+                        disabled={task.busy || !canCustomize}
+                        canGrantPermission={(key, scopes) =>
+                          !!actor?.isSuperAdmin ||
+                          scopes.every((scope) => canAccess(actor, key, scope))
+                        }
+                        canEditPermission={(key) =>
+                          !!actor?.isSuperAdmin ||
+                          (!key.startsWith("users.") &&
+                            !key.startsWith("roles.") &&
+                            canAccess(actor, key))
+                        }
+                      />
+                    </BottomSheetBody>
+                    <BottomSheetFooter>
+                      <Feedback error={!showReview ? task.error : null} />
+                      <Button
+                        type="submit"
+                        form={formId}
+                        disabled={task.busy || !canSubmit || !dirty}
+                      >
+                        {task.busy
+                          ? t("access.member.saving")
+                          : t("access.preview")}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        disabled={task.busy}
+                        onClick={() => setShowPermissions(false)}
+                      >
+                        {t("done")}
+                      </Button>
+                      {dirty && user ? (
+                        <Button
+                          type="button"
+                          variant="text"
+                          disabled={task.busy}
+                          onClick={onCancel}
+                        >
+                          {t("access.member.discard")}
+                        </Button>
+                      ) : null}
+                    </BottomSheetFooter>
+                    {showPermissions ? reviewSheet : null}
+                  </BottomSheetContent>
+                </BottomSheet>
+              )}
             </Field>
           </div>
-          {user?.isSuperAdmin ? (
-            <div className="flex items-start gap-3 py-4">
-              <ShieldCheck
-                className="size-6 shrink-0 text-primary"
-                aria-hidden="true"
-              />
-              <p className="text-sm text-muted-foreground">
-                {t("access.editor.superAdminHelp")}
-              </p>
-            </div>
-          ) : (
-            <BottomSheet
-              open={showPermissions}
-              onOpenChange={setShowPermissions}
-            >
-              {overrides.length > 0 ? (
-                <Card size="sm">
-                  <CardContent className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex min-w-0 flex-col gap-1">
-                      <p className="text-sm font-semibold">
-                        {permissionText("personalizedPermissions")}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {permissionText("customCount", {
-                          count: overrides.length,
-                        })}
-                      </p>
-                    </div>
-                    <BottomSheetTrigger
-                      render={<Button type="button" variant="outline" />}
-                    >
-                      {permissionText("customizePermissions")}
-                    </BottomSheetTrigger>
-                  </CardContent>
-                </Card>
-              ) : (
-                <BottomSheetTrigger
-                  render={
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="self-start"
-                    />
-                  }
-                >
-                  {permissionText("customizePermissions")}
-                </BottomSheetTrigger>
-              )}
-              <BottomSheetContent
-                aria-label={permissionText("customizePermissions")}
-              >
-                <BottomSheetBody className="pt-0">
-                  <PermissionEditor
-                    stickyTabs
-                    value={overrides}
-                    onChange={setOverrides}
-                    roles={selectedRoles}
-                    disabled={task.busy || !canCustomize}
-                    canEditPermission={(key) =>
-                      !!actor?.isSuperAdmin ||
-                      (!key.startsWith("users.") &&
-                        !key.startsWith("roles.") &&
-                        canAccess(actor, key))
-                    }
-                  />
-                </BottomSheetBody>
-                <BottomSheetFooter>
-                  <p className="text-sm text-muted-foreground">
-                    {permissionText("sheetSaveHelp")}
-                  </p>
-                  <BottomSheetClose
-                    render={<Button type="button" variant="outline" />}
-                  >
-                    {t("done")}
-                  </BottomSheetClose>
-                </BottomSheetFooter>
-              </BottomSheetContent>
-            </BottomSheet>
-          )}
-          {preview && previewCurrent ? (
-            <section
-              ref={reviewRef}
-              tabIndex={-1}
-              aria-label={t("access.review")}
-              className="flex flex-col gap-3 border-t pt-4"
-            >
-              <h3 className="font-sans font-semibold">{t("access.review")}</h3>
-              <PermissionDiff before={preview.before} after={preview.after} />
-              {preview.missingPrerequisites.length ? (
-                <Feedback
-                  error={`${t("access.dependencies")}: ${preview.missingPrerequisites.map((key) => labels(key)).join(", ")}`}
-                />
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  {t("access.member.reviewHelp")}
-                </p>
-              )}
-            </section>
-          ) : null}
           <Feedback error={task.error} success={task.success} />
         </CardContent>
         {!user?.isSuperAdmin && canSubmit ? (
-          <FormActions
-            status={
-              dirty ? t("access.member.unsaved") : t("access.member.upToDate")
-            }
-          >
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={task.busy}
-              onClick={onCancel}
-            >
-              {t("cancel")}
-            </Button>
-            <Button
-              type="submit"
-              disabled={
-                task.busy ||
-                (previewCurrent && !!preview?.missingPrerequisites.length)
-              }
-            >
-              {task.busy
-                ? t("access.member.saving")
-                : previewCurrent
-                  ? t("access.confirm")
-                  : t("access.preview")}
-            </Button>
-          </FormActions>
+          user ? (
+            <CardContent className="pb-(--card-spacing)">
+              <Button type="submit" disabled={task.busy || !dirty}>
+                {task.busy ? t("access.member.saving") : t("access.preview")}
+              </Button>
+            </CardContent>
+          ) : (
+            <FormActions>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={task.busy}
+                onClick={onCancel}
+              >
+                {t("cancel")}
+              </Button>
+              <Button type="submit" disabled={task.busy || !dirty}>
+                {task.busy ? t("access.member.saving") : t("access.preview")}
+              </Button>
+            </FormActions>
+          )
         ) : null}
       </form>
+      {!showPermissions ? reviewSheet : null}
       {user ? (
         <CardContent className="flex shrink-0 flex-col gap-4 border-t py-(--card-spacing)">
           <div className="flex flex-wrap gap-3">

@@ -280,3 +280,9 @@ export const accessAuditListSchema = z
     ),
   })
   .meta({ id: "AccessAuditList" });
+
+export {
+  permissionRequirements,
+  requirementSatisfied,
+  missingPermissionPrerequisites,
+} from "./dependencies";

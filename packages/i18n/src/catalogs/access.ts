@@ -2,13 +2,48 @@ export const accessCatalog = {
   en: {
     editor: {
       title: "Permissions",
+      dependenciesUi: {
+        requiredTitle: "Required permissions need access",
+        enableRequired: "Enable required permissions",
+        replacesDeny: "Replaces an explicit denial",
+        blocked: "You cannot change these permissions: {permissions}.",
+        enabled: "Updated required permissions: {permissions}.",
+        disabled: "Applied access changes to: {permissions}.",
+        disableTitle: "Update dependent permissions?",
+        disableHelp:
+          "Changing {permission} also requires disabling these dependent permissions:",
+        inheritedDenials:
+          "Dependent permissions inherited from a role will receive a Deny override for this user.",
+        keepUnchanged: "Keep unchanged",
+        applyChanges: "Apply changes",
+        disableCount: "Disable all {count} permissions",
+      },
       customizePermissions: "Customize permissions",
       personalizedPermissions: "Personalized permissions",
+      roleDefaults: "Role permissions · No custom changes",
+      userOverrideSummary:
+        "Custom changes · {allowed} allowed, {denied} denied",
       sheetSaveHelp: "Review and save changes on the user page.",
+      review: {
+        before: "Before",
+        after: "After",
+        effective: "Effective access changes",
+        added: "Granted",
+        removed: "Removed",
+        changed: "Scope changed",
+        sensitive: "Sensitive access",
+        dangerHelp:
+          "These changes remove access or modify sensitive permissions. Check each change before saving.",
+        expandedHelp:
+          "These changes modify permission scopes or grant access to all records. Check the scope before saving.",
+        noChanges: "No effective access changes.",
+        stale:
+          "Permissions changed after this review. Go back and review them again.",
+      },
       search: "Search permissions",
       searchPlaceholder: "Search permissions…",
       onlyCustom: "Only custom",
-      customOverride: "Custom override",
+      customOverride: "Custom",
       customCount:
         "{count, plural, one {# custom override} other {# custom overrides}}",
       results: "{count} permissions found",
@@ -281,14 +316,49 @@ export const accessCatalog = {
   ro: {
     editor: {
       title: "Permisiuni",
+      dependenciesUi: {
+        requiredTitle: "Permisiunile necesare au nevoie de acces",
+        enableRequired: "Activează permisiunile necesare",
+        replacesDeny: "Înlocuiește un refuz explicit",
+        blocked: "Nu poți modifica aceste permisiuni: {permissions}.",
+        enabled: "Permisiuni necesare actualizate: {permissions}.",
+        disabled: "Modificări de acces aplicate pentru: {permissions}.",
+        disableTitle: "Modifici permisiunile dependente?",
+        disableHelp:
+          "Modificarea permisiunii {permission} necesită și dezactivarea acestor permisiuni dependente:",
+        inheritedDenials:
+          "Permisiunile dependente moștenite din rol vor primi un refuz explicit pentru acest utilizator.",
+        keepUnchanged: "Păstrează neschimbat",
+        applyChanges: "Aplică modificările",
+        disableCount: "Dezactivează toate cele {count} permisiuni",
+      },
       customizePermissions: "Personalizează permisiunile",
       personalizedPermissions: "Permisiuni personalizate",
+      roleDefaults: "Permisiunile rolului · Fără modificări personalizate",
+      userOverrideSummary:
+        "Modificări personalizate · {allowed} permise, {denied} refuzate",
       sheetSaveHelp:
         "Verifică și salvează modificările pe pagina utilizatorului.",
+      review: {
+        before: "Înainte",
+        after: "După",
+        effective: "Modificări ale accesului efectiv",
+        added: "Permis",
+        removed: "Eliminat",
+        changed: "Domeniu modificat",
+        sensitive: "Acces sensibil",
+        dangerHelp:
+          "Aceste modificări elimină accesul sau schimbă permisiuni sensibile. Verifică fiecare modificare înainte de salvare.",
+        expandedHelp:
+          "Aceste modificări schimbă domeniul permisiunilor sau permit accesul la toate înregistrările. Verifică domeniul înainte de salvare.",
+        noChanges: "Nicio modificare a accesului efectiv.",
+        stale:
+          "Permisiunile s-au schimbat după verificare. Revino și verifică-le din nou.",
+      },
       search: "Caută permisiuni",
       searchPlaceholder: "Caută permisiuni…",
       onlyCustom: "Doar personalizate",
-      customOverride: "Excepție personalizată",
+      customOverride: "Personalizată",
       customCount:
         "{count, plural, one {# excepție personalizată} few {# excepții personalizate} other {# de excepții personalizate}}",
       results: "{count} permisiuni găsite",

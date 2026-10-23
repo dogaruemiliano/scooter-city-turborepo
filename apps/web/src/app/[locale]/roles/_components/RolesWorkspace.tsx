@@ -269,6 +269,10 @@ function RoleForm({
           value={permissions}
           onChange={setPermissions}
           disabled={task.busy || readOnly}
+          canGrantPermission={(key, scopes) =>
+            !!actor?.isSuperAdmin ||
+            scopes.every((scope) => canAccess(actor, key, scope))
+          }
           canEditPermission={(key) =>
             !!actor?.isSuperAdmin ||
             (!key.startsWith("users.") &&
