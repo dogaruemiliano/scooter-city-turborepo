@@ -1,4 +1,6 @@
 "use client";
+import { useFormAction } from "@/lib/form/use-form-action";
+import { SaveButton } from "@repo/ui/components/save-button";
 
 import type { ReactNode } from "react";
 import { useState } from "react";
@@ -45,6 +47,8 @@ export function ConfirmationDialog({
   busy: boolean;
   onConfirm: () => Promise<boolean>;
 }) {
+  const formAction = useFormAction();
+
   const t = useTranslations("persons");
   const [internalOpen, setInternalOpen] = useState(false);
   const actualOpen = open ?? internalOpen;
@@ -90,14 +94,13 @@ export function ConfirmationDialog({
           >
             {t("actions.cancel")}
           </DialogClose>
-          <Button
+          <SaveButton
             type="button"
             variant="destructive"
             disabled={busy}
             onClick={() => void confirm()}
-          >
-            {busy ? t("actions.deleting") : confirmLabel}
-          </Button>
+            {...formAction("delete", { pending: busy }, confirmLabel)}
+          />
         </DialogFooter>
       </DialogContent>
     </Dialog>

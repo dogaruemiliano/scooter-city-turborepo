@@ -1,3 +1,5 @@
+import { NextIntlClientProvider } from "next-intl";
+import { messages } from "@repo/i18n";
 import { v1 } from "@repo/api-shared";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -7,6 +9,7 @@ import {
   SessionProvider,
   useSession,
 } from "../../../../components/auth/SessionProvider";
+import { WorkspaceNotifications } from "@/components/WorkspaceNotifications";
 import { AccountSettings } from "./AccountSettings";
 
 const mocks = vi.hoisted(() => ({
@@ -87,7 +90,7 @@ describe("AccountSettings", () => {
     await browser.clear(screen.getByLabelText("First name"));
     await browser.type(screen.getByLabelText("First name"), " Grace ");
     await browser.clear(screen.getByLabelText("Last name"));
-    await browser.click(screen.getByRole("button", { name: "Save profile" }));
+    await browser.click(screen.getByRole("button", { name: "Save changes" }));
 
     expect(mocks.apiFetch).toHaveBeenCalledWith(
       v1.auth.ROUTES.updateProfile,
@@ -97,7 +100,9 @@ describe("AccountSettings", () => {
         json: { firstName: "Grace", lastName: null },
       },
     );
-    expect(await screen.findByText("Profile saved")).toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: "Saved" }),
+    ).toBeInTheDocument();
     expect(screen.getByTestId("session-user-name")).toHaveTextContent("Grace");
     expect(mocks.refresh).toHaveBeenCalledOnce();
   });
@@ -192,20 +197,24 @@ describe("AccountSettings", () => {
 
 function renderSettings() {
   return render(
-    <SessionProvider
-      initialUser={{
-        id: user.id,
-        email: user.email,
-        roles: user.roles,
-      }}
-    >
-      <SessionUserProbe />
-      <AccountSettings
-        initialUser={user}
-        initialSessions={sessions}
-        enabledMethods={["emailOtp", "google"]}
-      />
-    </SessionProvider>,
+    <NextIntlClientProvider locale="en" messages={messages.en}>
+      <WorkspaceNotifications>
+        <SessionProvider
+          initialUser={{
+            id: user.id,
+            email: user.email,
+            roles: user.roles,
+          }}
+        >
+          <SessionUserProbe />
+          <AccountSettings
+            initialUser={user}
+            initialSessions={sessions}
+            enabledMethods={["emailOtp", "google"]}
+          />
+        </SessionProvider>
+      </WorkspaceNotifications>
+    </NextIntlClientProvider>,
   );
 }
 

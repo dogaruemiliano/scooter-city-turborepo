@@ -123,7 +123,8 @@ export function ProblemListItem({
       ) : null}
       <CardContent className="flex flex-wrap gap-2">
         <Badge variant={statusVariant}>{t(problem.status)}</Badge>
-        {problem.blocksUsage ? (
+        {problem.blocksUsage &&
+        (problem.status === "open" || problem.status === "in_progress") ? (
           <Badge variant="destructive">{t("maintenanceHold")}</Badge>
         ) : null}
         {problem.assigneeNeedsReassignment ? (

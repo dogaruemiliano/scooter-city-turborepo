@@ -69,3 +69,8 @@ export * from "./user-card";
 export * from "./toast";
 export * from "./comments";
 export * from "./activity-timeline";
+export * from "./vertical-line";
+
+export * from "./wizard-form";
+
+export * from "./person-card";

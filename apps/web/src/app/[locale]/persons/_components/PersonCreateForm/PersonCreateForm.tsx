@@ -6,6 +6,11 @@ import type {
   PhoneNumberInputChangeDetails,
 } from "@repo/ui/components";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import {
+  personCreateCancelHref,
+  personCreateDestination,
+} from "../../_lib/person-create-destination";
 import { useLocale, useTranslations } from "next-intl";
 import { useId, useState, useRef, useEffect, type FormEvent } from "react";
 import { usePersonLeaveGuard } from "./usePersonLeaveGuard";
@@ -86,7 +91,11 @@ export function PersonCreateForm(props: PersonCreateFormProps) {
   );
 }
 
-function DocumentPersonCreateForm({ personsHref }: PersonCreateFormProps) {
+function DocumentPersonCreateForm({
+  personsHref,
+  rentalDraftId,
+}: PersonCreateFormProps) {
+  const rentalT = useTranslations("workspace.rentals.wizard");
   const session = useOptionalSession();
   const t = useTranslations("persons");
   const locale = useLocale();
@@ -250,7 +259,14 @@ function DocumentPersonCreateForm({ personsHref }: PersonCreateFormProps) {
         title: t("feedback.createSuccessTitle"),
         messages: [t("feedback.createSuccessMessage")],
       });
-      router.push(`${personsHref}/${encodeURIComponent(person.id)}`);
+      router.push(
+        personCreateDestination(
+          personsHref,
+          person.id,
+          rentalDraftId,
+          session?.user?.id,
+        ),
+      );
       router.refresh();
     } catch (error) {
       const personConflict = personCreateConflict(error);
@@ -417,6 +433,11 @@ function DocumentPersonCreateForm({ personsHref }: PersonCreateFormProps) {
       }}
     >
       <div className="mx-auto flex w-full max-w-screen-lg flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
+        {rentalDraftId ? (
+          <Link href={personCreateCancelHref(personsHref, rentalDraftId)}>
+            {rentalT("backToRental")}
+          </Link>
+        ) : null}
         <PageHeaderNavigation
           onBack={canGoBack ? goBack : undefined}
           backDisabled={creating}

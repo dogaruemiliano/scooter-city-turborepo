@@ -110,7 +110,7 @@ describe("rental collection", () => {
     expect(screen.queryByText("Ada Lovelace")).not.toBeInTheDocument();
     expect(screen.queryByText("Staff only note")).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "Create rental" }),
+      screen.queryByRole("link", { name: "Create rental" }),
     ).not.toBeInTheDocument();
   });
 
@@ -119,7 +119,7 @@ describe("rental collection", () => {
     renderWorkspace();
     await screen.findByRole("link", { name: "Honda Vision · 007 HON" });
     expect(
-      screen.getByRole("button", { name: "Create rental" }),
+      screen.getByRole("link", { name: "Create rental" }),
     ).toBeInTheDocument();
   });
 
@@ -219,4 +219,93 @@ describe("rental detail document collections", () => {
       ),
     );
   });
+});
+
+it("loads person summaries once for a rental list and reuses them across rows", async () => {
+  mocks.user.effectiveScopes = { "persons.read": ["ALL"] };
+  mocks.fetch.mockImplementation((url: string) =>
+    Promise.resolve(
+      url.startsWith("/v1/persons")
+        ? {
+            items: [
+              {
+                ...rental.person,
+                email: "ada@example.com",
+                phone: "+40712345678",
+                documents: [],
+                deletedAt: null,
+              },
+            ],
+            total: 1,
+            page: 1,
+            pageSize: 100,
+          }
+        : {
+            items: [rental, { ...rental, id: "rental-2" }],
+            total: 2,
+            page: 1,
+            pageSize: 25,
+          },
+    ),
+  );
+  renderWorkspace();
+  await waitFor(() =>
+    expect(screen.getAllByText("ada@example.com")).toHaveLength(2),
+  );
+  expect(
+    screen.getAllByRole("img", { name: "Identity document: Not present" }),
+  ).toHaveLength(2);
+  expect(
+    mocks.fetch.mock.calls.filter(([url]) => url.startsWith("/v1/persons")),
+  ).toHaveLength(1);
+});
+
+it("shows the same person card and contact actions in rental details", async () => {
+  mocks.user.effectiveScopes = { "persons.read": ["ALL"] };
+  mocks.fetch.mockImplementation((url: string) =>
+    Promise.resolve(
+      url.startsWith("/v1/persons")
+        ? {
+            items: [
+              {
+                ...rental.person,
+                email: "ada@example.com",
+                phone: "+40712345678",
+                documents: [],
+                deletedAt: null,
+              },
+            ],
+            total: 1,
+            page: 1,
+            pageSize: 100,
+          }
+        : rental,
+    ),
+  );
+  renderWorkspace({ id: rental.id });
+  await screen.findByText("ada@example.com");
+  expect(
+    screen.queryByRole("link", { name: "Email Ada Lovelace" }),
+  ).not.toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: "Contact" }));
+  const sheet = await screen.findByRole("dialog", {
+    name: "Contact Ada Lovelace",
+  });
+  const email = within(sheet).getByRole("link", { name: "Email Ada Lovelace" });
+  expect(email).toHaveAttribute("href", "mailto:ada@example.com");
+  expect(
+    screen.getByRole("link", { name: "Call Ada Lovelace" }),
+  ).toHaveAttribute("href", "tel:+40712345678");
+  expect(
+    screen.getByRole("link", { name: "Message Ada Lovelace on WhatsApp" }),
+  ).toHaveAttribute("href", "https://wa.me/40712345678");
+  expect(email.closest('[data-slot="person-row"]')).toBeNull();
+});
+
+it("does not request the person directory without person-read permission", async () => {
+  renderWorkspace();
+  await screen.findByText("Ada Lovelace");
+  expect(
+    mocks.fetch.mock.calls.some(([url]) => url.startsWith("/v1/persons")),
+  ).toBe(false);
 });

@@ -106,7 +106,7 @@ export function ProblemDetailScreen({ id }: { id: string }) {
           </div>
           {problem.blocksUsage &&
           !problem.holdClearedAt &&
-          problem.status !== "resolved" ? (
+          (problem.status === "open" || problem.status === "in_progress") ? (
             <Badge variant="destructive" className="self-start">
               {t("problems.blocksUsage")}
             </Badge>

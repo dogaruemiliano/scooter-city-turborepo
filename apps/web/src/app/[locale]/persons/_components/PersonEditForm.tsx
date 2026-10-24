@@ -1,7 +1,9 @@
 "use client";
+import { useFormAction } from "@/lib/form/use-form-action";
+import { SaveButton } from "@repo/ui/components/save-button";
 
 import { ApiError, v1 } from "@repo/api-shared";
-import { Button, buttonVariants, FormSection } from "@repo/ui/components";
+import { buttonVariants, FormSection } from "@repo/ui/components";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
@@ -32,6 +34,8 @@ interface PersonEditFormProps {
 }
 
 export function PersonEditForm({ person, personHref }: PersonEditFormProps) {
+  const formAction = useFormAction();
+
   const t = useTranslations("persons");
   const locale = useLocale();
   const router = useRouter();
@@ -170,9 +174,11 @@ export function PersonEditForm({ person, personHref }: PersonEditFormProps) {
             >
               {t("actions.cancel")}
             </Link>
-            <Button type="submit" disabled={saving}>
-              {saving ? t("actions.saving") : t("actions.save")}
-            </Button>
+            <SaveButton
+              type="submit"
+              disabled={saving}
+              {...formAction("save", { pending: saving, error: requestError })}
+            />
           </div>
         </form>
       </FormProvider>

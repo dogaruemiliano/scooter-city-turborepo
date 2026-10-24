@@ -1,4 +1,5 @@
-import { useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { FormActions } from "./form-actions";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Button } from "./button";
 import {
@@ -7,7 +8,41 @@ import {
   type ToastPosition,
   type ToastVariant,
 } from "./toast";
+import { RefreshCwIcon } from "lucide-react";
 import { motion } from "@repo/theme";
+
+function RecoveryExample({ description }: { description?: string }) {
+  const toast = useToast();
+  return (
+    <Button
+      onClick={() =>
+        toast.add({
+          id: "recovery",
+          title: "Options could not be loaded",
+          description,
+          variant: "error",
+          dismissible: false,
+          actionPlacement: "trailing",
+          actionProps: {
+            children: <RefreshCwIcon aria-hidden="true" />,
+            "aria-label": "Reload options",
+            onClick: () => toast.dismiss("recovery"),
+          },
+        })
+      }
+    >
+      Show reload-only error
+    </Button>
+  );
+}
+
+export const RecoveryOnly = {
+  render: () => (
+    <ToastProvider>
+      <RecoveryExample />
+    </ToastProvider>
+  ),
+};
 
 type PlaygroundProps = {
   variant: ToastVariant;
@@ -218,3 +253,171 @@ export const AutoDismiss: Story = {
 };
 export const BottomEnd: Story = { args: { position: "bottom-end" } };
 export const Solid: Story = { args: { surface: "solid" } };
+
+function AnchoredRecoveryExample() {
+  const anchor = useRef<HTMLDivElement>(null);
+  const toast = useToast();
+  return (
+    <div className="flex min-h-dvh flex-col gap-6 pb-24">
+      <Button
+        onClick={() =>
+          toast.add({
+            id: "anchored-recovery",
+            title: "Options could not be loaded",
+            variant: "error",
+            dismissible: false,
+            actionPlacement: "trailing",
+            anchorRef: anchor,
+            actionProps: {
+              children: <RefreshCwIcon aria-hidden="true" />,
+              "aria-label": "Reload options",
+              onClick: () => toast.dismiss("anchored-recovery"),
+            },
+          })
+        }
+      >
+        Show error above actions
+      </Button>
+      <div className="min-h-dvh">
+        Scroll to see the notification follow the actions.
+      </div>
+      <FormActions sticky ref={anchor}>
+        <Button type="button">Continue</Button>
+      </FormActions>
+    </div>
+  );
+}
+export const AnchoredRecovery = {
+  render: () => (
+    <ToastProvider>
+      <AnchoredRecoveryExample />
+    </ToastProvider>
+  ),
+};
+
+const descriptionExamples = [
+  {
+    label: "Without description",
+    controlLabel: "title only",
+    description: undefined,
+  },
+  {
+    label: "With description",
+    controlLabel: "description",
+    description:
+      "Your rental draft is preserved. Reload to refresh the available people and scooters.",
+  },
+  {
+    label: "With long description",
+    controlLabel: "long text",
+    description:
+      "The available people and scooters could not be refreshed because the connection was interrupted. Your selected person, scooter, start date, and notes are still saved in this browser. Check your connection, then use the reload icon to fetch the latest options. You can continue reviewing the draft while the connection is restored.",
+  },
+];
+
+function DescriptionExamples() {
+  const toast = useToast();
+  const manager = useRef(toast);
+  const ids = useRef<string[]>([]);
+  const [open, setOpen] = useState([true, true, true]);
+  const [pending, setPending] = useState([false, false, false]);
+  const pendingRef = useRef([false, false, false]);
+  const changePending = useCallback((index: number, value: boolean) => {
+    pendingRef.current[index] = value;
+    manager.current.update(ids.current[index]!, {
+      actionPending: value,
+      dismissible: false,
+      actionPlacement: "trailing",
+    });
+    setPending((current) =>
+      current.map((item, i) => (i === index ? value : item)),
+    );
+  }, []);
+  const show = useCallback(
+    (index: number) => {
+      const example = descriptionExamples[index]!;
+      const id = manager.current.add({
+        title: "Options could not be loaded",
+        description: example.description,
+        variant: "error",
+        timeout: 0,
+        dismissible: false,
+        actionPlacement: "trailing",
+        actionPending: pendingRef.current[index],
+        actionProps: {
+          children: <RefreshCwIcon aria-hidden="true" />,
+          "aria-label": `Reload options: ${example.label.toLowerCase()}`,
+          onClick: (event) => {
+            event.preventDefault();
+            changePending(index, true);
+          },
+        },
+        onClose: () => {
+          if (ids.current[index] === id)
+            setOpen((current) =>
+              current.map((value, i) => (i === index ? false : value)),
+            );
+        },
+      });
+      ids.current[index] = id;
+    },
+    [changePending],
+  );
+  useEffect(() => {
+    descriptionExamples.forEach((_, index) => show(index));
+    const activeIds = [...ids.current];
+    const currentManager = manager.current;
+    return () => activeIds.forEach((id) => currentManager.dismiss(id));
+  }, [show]);
+  return (
+    <main className="min-h-dvh bg-background p-6 text-foreground">
+      <h1 className="text-xl font-semibold">Toast descriptions</h1>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Compare title-only, short-description, and long-description alignment.
+        Each example starts open. Reload starts the spinner; Finish loading
+        restores the reload icon.
+      </p>
+      <div className="mt-4 flex flex-wrap gap-3">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() =>
+            descriptionExamples.forEach((_, index) =>
+              changePending(index, !pending.some(Boolean)),
+            )
+          }
+        >
+          {pending.some(Boolean) ? "Finish loading" : "Show loading state"}
+        </Button>
+        {descriptionExamples.map((example, index) => (
+          <Button
+            key={example.label}
+            aria-label={`${open[index] ? "Close" : "Reopen"} ${example.label.toLowerCase()}`}
+            type="button"
+            variant="outline"
+            onClick={() => {
+              if (open[index]) manager.current.dismiss(ids.current[index]);
+              else {
+                show(index);
+                setOpen((current) =>
+                  current.map((value, i) => (i === index ? true : value)),
+                );
+              }
+            }}
+          >
+            {open[index] ? "Close" : "Reopen"} {example.controlLabel}
+          </Button>
+        ))}
+      </div>
+    </main>
+  );
+}
+
+/** All three examples start visible; each can be closed and reopened independently. */
+export const DescriptionVariants = {
+  render: () => (
+    <ToastProvider position="bottom-center" limit={3}>
+      <DescriptionExamples />
+    </ToastProvider>
+  ),
+};

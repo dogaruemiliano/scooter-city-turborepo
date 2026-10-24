@@ -641,48 +641,63 @@ describe("ProblemsService authorization and write conflicts", () => {
     expect(result.scooter).not.toHaveProperty("notes");
   });
 
-  it("requires an explicit clearance decision before resolving a blocker", async () => {
-    db.scooterProblem.findFirst.mockResolvedValue({
-      ...row,
-      blocksUsage: true,
-    });
-    await expect(
-      service.resolve("mechanic", "problem", {
+  it.each([undefined, false, true])(
+    "automatically clears this problem's hold on resolution (legacy decision: %s)",
+    async (clearMaintenanceHold) => {
+      db.scooterProblem.findFirst.mockResolvedValue({
+        ...row,
+        blocksUsage: true,
+      });
+      await service.resolve("mechanic", "problem", {
         revision: 1,
         resolutionNotes: "Belt replaced",
-      }),
-    ).rejects.toThrow(ConflictException);
-    expect(db.scooterProblem.updateMany).not.toHaveBeenCalled();
-  });
+        ...(clearMaintenanceHold === undefined ? {} : { clearMaintenanceHold }),
+      });
+      expect(db.scooterProblem.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            id: "problem",
+            revision: 1,
+          }) as unknown,
+          data: expect.objectContaining({
+            status: "resolved",
+            blocksUsage: false,
+            holdClearedAt: expect.any(Date) as unknown,
+            holdClearedById: "mechanic",
+          }) as unknown,
+        }),
+      );
+    },
+  );
 
-  it("can resolve while retaining a hold, without touching any other report", async () => {
+  it("automatically clears only the dismissed problem's hold", async () => {
+    access.getSnapshot.mockResolvedValue({ ...snapshot, isSuperAdmin: true });
     db.scooterProblem.findFirst.mockResolvedValue({
       ...row,
       blocksUsage: true,
     });
-    db.scooterProblem.findUniqueOrThrow.mockResolvedValue({
-      ...row,
-      blocksUsage: true,
-      status: "resolved",
-      revision: 2,
-    });
-    const resolved = await service.resolve("mechanic", "problem", {
-      revision: 1,
-      resolutionNotes: "Awaiting safety inspection",
-      clearMaintenanceHold: false,
-    });
-    expect(resolved.blocksUsage).toBe(true);
+    await service.cancel("manager", "problem", 1);
     expect(db.scooterProblem.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: {
-          id: "problem",
-          revision: 1,
-          assigneeId: "mechanic",
-          status: "open",
-        },
-        data: expect.not.objectContaining({ blocksUsage: false }) as unknown,
+        where: expect.objectContaining({ id: "problem" }) as unknown,
+        data: expect.objectContaining({
+          status: "cancelled",
+          blocksUsage: false,
+          holdClearedById: "manager",
+        }) as unknown,
       }),
     );
+  });
+
+  it("rejects adding a hold to closed work", async () => {
+    db.scooterProblem.findFirst.mockResolvedValue({
+      ...row,
+      status: "resolved",
+    });
+    await expect(
+      service.hold("mechanic", "problem", { revision: 1, blocksUsage: true }),
+    ).rejects.toThrow("Only open work");
+    expect(db.scooterProblem.updateMany).not.toHaveBeenCalled();
   });
 
   it("clears only this hold and records who cleared it", async () => {
@@ -807,7 +822,7 @@ describe("ProblemsService authorization and write conflicts", () => {
       expect.anything(),
       expect.objectContaining({
         type: "PROBLEM_REOPENED",
-        meta: expect.objectContaining({ note: "Noise returned" }),
+        meta: expect.objectContaining({ note: "Noise returned" }) as unknown,
       }),
     );
     expect(db.scooterProblem.updateMany).toHaveBeenCalledWith(
@@ -852,13 +867,13 @@ describe("ProblemsService authorization and write conflicts", () => {
       );
       expect(db.auditEvent.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: expect.objectContaining({ type: { in: expected } }),
+          where: expect.objectContaining({ type: { in: expected } }) as unknown,
           skip: 10,
           take: 10,
         }),
       );
       expect(db.auditEvent.count).toHaveBeenCalledWith({
-        where: expect.objectContaining({ type: { in: expected } }),
+        where: expect.objectContaining({ type: { in: expected } }) as unknown,
       });
     },
   );
@@ -891,9 +906,11 @@ describe("ProblemsService authorization and write conflicts", () => {
     expect(db.auditEvent.count).toHaveBeenCalledWith({
       where: expect.objectContaining({
         type: {
-          in: expect.arrayContaining([...v1.problems.problemConversationTypes]),
+          in: expect.arrayContaining([
+            ...v1.problems.problemConversationTypes,
+          ]) as unknown,
         },
-      }),
+      }) as unknown,
     });
   });
   it("denies explicit activity to non-admins", async () => {

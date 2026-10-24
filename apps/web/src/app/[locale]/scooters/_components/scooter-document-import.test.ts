@@ -318,7 +318,7 @@ describe("document JSON import", () => {
       if (noSuggestion.ok)
         expect(
           { ...current, ...noSuggestion.values }.requiredLicenseCategory,
-        ).toBe("");
+        ).toBe("none");
     }
     const edit = parse({ maxSpeedKmh: 25 }, true);
     expect(edit.ok && edit.values).not.toHaveProperty(

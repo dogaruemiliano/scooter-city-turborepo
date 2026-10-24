@@ -94,7 +94,7 @@ describe("CompanyAssociatesForm", () => {
       },
     );
     expect(
-      await screen.findByText("Asociații firmei au fost actualizați."),
+      await screen.findByRole("button", { name: "Salvat" }),
     ).toBeInTheDocument();
   });
 

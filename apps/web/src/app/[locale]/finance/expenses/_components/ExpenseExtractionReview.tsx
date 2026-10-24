@@ -1,4 +1,6 @@
 "use client";
+import { useFormAction } from "@/lib/form/use-form-action";
+import { SaveButton } from "@repo/ui/components/save-button";
 
 import { v1 } from "@repo/api-shared";
 import { aspectRatio } from "@repo/theme";
@@ -12,7 +14,6 @@ import {
   Button,
   CalendarPicker,
   Input,
-  Spinner,
   Textarea,
 } from "@repo/ui/components";
 import {
@@ -77,6 +78,8 @@ export function ExpenseExtractionReview({
   onSave,
   onEditManually,
 }: ExpenseExtractionReviewProps) {
+  const formAction = useFormAction();
+
   const t = useTranslations("finance.expense.captureSheet");
   const tExpense = useTranslations("finance.expense");
   const tCommon = useTranslations("finance.common");
@@ -723,16 +726,18 @@ export function ExpenseExtractionReview({
 
       <div className="border-t border-border bg-popover px-4 pt-4 pb-[max(var(--spacing-4),env(safe-area-inset-bottom))] sm:px-6">
         <div className="mx-auto flex w-full max-w-2xl flex-col gap-2">
-          <Button
+          <SaveButton
             type="button"
             size="lg"
             disabled={!canSave || saving}
             onClick={onSave}
             className="w-full"
-          >
-            {saving ? <Spinner /> : null}
-            {saving ? t("saving") : t("save")}
-          </Button>
+            {...formAction(
+              "save",
+              { pending: saving, error: error },
+              t("save"),
+            )}
+          />
           <Button
             type="button"
             variant="text"

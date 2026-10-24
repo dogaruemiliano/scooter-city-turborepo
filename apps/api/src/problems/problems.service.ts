@@ -16,6 +16,7 @@ import { AuditService } from "../audit/audit.service";
 import { AuditEventType } from "../audit/audit.types";
 import { Prisma } from "../generated/prisma/client";
 import { ProblemPhotosService } from "./problem-photos.service";
+import { activeMaintenanceHoldWhere } from "./maintenance-hold";
 import { PrismaService } from "../prisma/prisma.service";
 
 export const maintenanceScooterSelect = {
@@ -741,7 +742,7 @@ export class ProblemsService {
         if (!openStates.includes(row.status))
           throw new ConflictException("Problem is already closed");
         return {
-          ...this.closeHold(row, userId, input.clearMaintenanceHold),
+          ...this.closeHold(row, userId),
           status: "resolved",
           resolutionNotes: input.resolutionNotes,
           resolvedAt: new Date(),
@@ -820,12 +821,7 @@ export class ProblemsService {
     );
   }
 
-  cancel(
-    userId: string,
-    id: string,
-    revision: number,
-    clearMaintenanceHold?: boolean,
-  ) {
+  cancel(userId: string, id: string, revision: number) {
     return this.mutate(
       userId,
       id,
@@ -837,7 +833,7 @@ export class ProblemsService {
         if (!openStates.includes(row.status))
           throw new ConflictException("Problem is already closed");
         return {
-          ...this.closeHold(row, userId, clearMaintenanceHold),
+          ...this.closeHold(row, userId),
           status: "cancelled",
         };
       },
@@ -847,13 +843,8 @@ export class ProblemsService {
   private closeHold(
     row: ProblemRow,
     userId: string,
-    clear?: boolean,
   ): Prisma.ScooterProblemUncheckedUpdateInput {
-    if (row.blocksUsage && clear === undefined)
-      throw new ConflictException(
-        "Choose whether to clear or retain this problem's maintenance hold",
-      );
-    return row.blocksUsage && clear
+    return row.blocksUsage
       ? {
           blocksUsage: false,
           holdClearedAt: new Date(),
@@ -869,11 +860,17 @@ export class ProblemsService {
       input.revision,
       "problems.update",
       AuditEventType.PROBLEM_HOLD_CHANGED,
-      () => ({
-        blocksUsage: input.blocksUsage,
-        holdClearedAt: input.blocksUsage ? null : new Date(),
-        holdClearedById: input.blocksUsage ? null : userId,
-      }),
+      (row) => {
+        if (!openStates.includes(row.status))
+          throw new ConflictException(
+            "Only open work can change a maintenance hold",
+          );
+        return {
+          blocksUsage: input.blocksUsage,
+          holdClearedAt: input.blocksUsage ? null : new Date(),
+          holdClearedById: input.blocksUsage ? null : userId,
+        };
+      },
     );
   }
 
@@ -881,7 +878,7 @@ export class ProblemsService {
     await this.scooter(userId, scooterId);
     // Holds are safety information: show every blocker, even when the member only works assigned reports.
     const blockers = await this.prisma.scooterProblem.findMany({
-      where: { scooterId, blocksUsage: true },
+      where: { scooterId, ...activeMaintenanceHoldWhere },
       select: { id: true, title: true, status: true, difficulty: true },
       orderBy: [{ createdAt: "asc" }, { id: "asc" }],
     });

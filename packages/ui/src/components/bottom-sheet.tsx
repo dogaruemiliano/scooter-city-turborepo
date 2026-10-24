@@ -4,6 +4,7 @@ import * as React from "react";
 import { Drawer as BottomSheetPrimitive } from "@base-ui/react/drawer";
 
 import { cn } from "@repo/ui/lib/utils";
+import { VerticalLine } from "./vertical-line";
 
 type BottomSheetContextValue = {
   hasSnapPoints: boolean;
@@ -270,14 +271,21 @@ function BottomSheetFooter({
 
 function BottomSheetTitle({
   className,
+  children,
   ...props
 }: BottomSheetPrimitive.Title.Props) {
   return (
     <BottomSheetPrimitive.Title
       data-slot="bottom-sheet-title"
-      className={cn("text-base font-medium text-foreground", className)}
+      className={cn(
+        "flex min-w-0 items-center gap-3 text-base font-medium text-foreground",
+        className,
+      )}
       {...props}
-    />
+    >
+      <VerticalLine />
+      <span className="min-w-0 wrap-anywhere">{children}</span>
+    </BottomSheetPrimitive.Title>
   );
 }
 

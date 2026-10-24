@@ -16,6 +16,7 @@ const PERSONS_NEW_PATH = "/persons/new";
 
 interface NewPersonRoutePageProps {
   params: Promise<{ locale: string }>;
+  searchParams?: Promise<{ returnToRental?: string | string[] }>;
 }
 
 export async function generateMetadata({
@@ -31,6 +32,7 @@ export async function generateMetadata({
 
 export default async function NewPersonRoutePage({
   params,
+  searchParams,
 }: NewPersonRoutePageProps) {
   const { locale: rawLocale } = await params;
   const locale = resolveRouteLocale(rawLocale);
@@ -46,5 +48,17 @@ export default async function NewPersonRoutePage({
     notFound();
   }
 
-  return <PersonCreateForm personsHref={localizePath(PERSONS_PATH, locale)} />;
+  const { returnToRental } = searchParams
+    ? await searchParams
+    : { returnToRental: undefined };
+  return (
+    <PersonCreateForm
+      personsHref={localizePath(PERSONS_PATH, locale)}
+      rentalDraftId={
+        typeof returnToRental === "string" && returnToRental.length <= 100
+          ? returnToRental
+          : undefined
+      }
+    />
+  );
 }

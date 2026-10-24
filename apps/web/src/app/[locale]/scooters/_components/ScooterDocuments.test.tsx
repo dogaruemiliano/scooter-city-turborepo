@@ -1438,19 +1438,19 @@ describe("Scooter documents", () => {
     expect(
       screen.queryByRole("link", { name: "old.pdf" }),
     ).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
     await removeFromViewer(user, "old.pdf");
     await waitFor(() =>
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
     );
     expect(mocks.api).not.toHaveBeenCalled();
     await user.click(screen.getByRole("button", { name: "Undo removal" }));
-    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
     await removeFromViewer(user, "old.pdf");
     await waitFor(() =>
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
     );
-    await user.click(screen.getByRole("button", { name: "Save" }));
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
     await waitFor(() =>
       expect(mocks.api).toHaveBeenCalledWith(
         v1.scooters.ROUTES.update("s"),
@@ -1484,16 +1484,20 @@ describe("Scooter documents", () => {
     );
     await browserConfirmVin(user);
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Save" })).toBeEnabled(),
+      expect(
+        screen.getByRole("button", { name: "Save changes" }),
+      ).toBeEnabled(),
     );
     mocks.api.mockRejectedValueOnce(new Error("Offline"));
-    await user.click(screen.getByRole("button", { name: "Save" }));
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Save" })).toBeEnabled(),
+      expect(
+        screen.getByRole("button", { name: "Save changes" }),
+      ).toBeEnabled(),
     );
     expect(screen.queryByText("Ready to save")).not.toBeInTheDocument();
     expect(mocks.push).not.toHaveBeenCalled();
-    await user.click(screen.getByRole("button", { name: "Save" }));
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
     await waitFor(() => expect(mocks.push).toHaveBeenCalled());
     expect(mocks.api).toHaveBeenLastCalledWith(
       v1.scooters.ROUTES.update("s"),

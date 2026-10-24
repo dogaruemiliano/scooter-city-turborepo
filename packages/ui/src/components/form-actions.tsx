@@ -27,8 +27,12 @@ function FormActions({
   children,
   ...props
 }: FormActionsProps) {
+  // Split actions occupy the full row. Keep status above them so it cannot
+  // shrink to a column of single characters beside a full-width button group.
   const layout =
-    "flex min-w-0 flex-col gap-3 @form-columns/form-actions:flex-row @form-columns/form-actions:items-center @form-columns/form-actions:justify-end";
+    arrangement === "split"
+      ? "flex min-w-0 flex-col gap-3"
+      : "flex min-w-0 flex-col gap-3 @form-columns/form-actions:flex-row @form-columns/form-actions:items-center @form-columns/form-actions:justify-end";
   const content = (
     <>
       {status != null ? (

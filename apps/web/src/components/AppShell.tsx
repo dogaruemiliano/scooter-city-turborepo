@@ -1,6 +1,6 @@
 "use client";
 
-import { canVisit } from "@/lib/access";
+import { canVisit, usesServiceDashboard } from "@/lib/access";
 
 import Image from "next/image";
 import Link from "next/link";
@@ -204,6 +204,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/company/associates": "companyAssociates",
   "/persons": "persons",
   "/persons/new": "newPerson",
+  "/rentals/new": "newRental",
   "/users/new": "newUser",
   "/scooters": "scooters",
   "/scooters/new": "newScooter",
@@ -394,6 +395,7 @@ function AppSidebar({
 }) {
   const tNav = useTranslations("appShell.nav");
   const { user } = useSession();
+  const serviceDashboard = usesServiceDashboard(user);
   // The mobile drawer unmounts AccountMenu when closed; keep the preference here.
   const [themePreference, setThemePreference] = useState(
     initialThemePreference,
@@ -410,7 +412,9 @@ function AppSidebar({
 
   const navigationGroups = NAVIGATION_GROUPS.map((group) => ({
     ...group,
-    items: group.items.filter((item) => canVisit(user, item.href)),
+    items: group.items.filter((item) =>
+      serviceDashboard ? item.href === "/problems" : canVisit(user, item.href),
+    ),
   })).filter((group) => group.items.length > 0);
 
   return (
@@ -420,9 +424,16 @@ function AppSidebar({
           <SidebarMenuItem>
             <SidebarMenuButton
               size="lg"
-              aria-label={tNav("dashboard")}
+              aria-label={tNav(serviceDashboard ? "problems" : "dashboard")}
               className="justify-start duration-normal ease-linear"
-              render={<Link href={localizePath("/", locale)} />}
+              render={
+                <Link
+                  href={localizePath(
+                    serviceDashboard ? "/problems" : "/",
+                    locale,
+                  )}
+                />
+              }
             >
               <span className="flex min-w-0 flex-1 items-center justify-start gap-2 overflow-hidden">
                 <span
@@ -482,35 +493,37 @@ function AppSidebar({
       </SidebarHeader>
 
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  tooltip={tNav(DASHBOARD_NAVIGATION_ITEM.labelKey)}
-                  isActive={isActiveNavigationItem(
-                    pathname,
-                    DASHBOARD_NAVIGATION_ITEM.href,
-                    DASHBOARD_NAVIGATION_ITEM.exact,
-                  )}
-                  render={
-                    <Link
-                      href={localizePath(
-                        DASHBOARD_NAVIGATION_ITEM.href,
-                        locale,
-                      )}
-                    />
-                  }
-                >
-                  <LayoutDashboardIcon aria-hidden="true" />
-                  <span className="min-w-0 flex-1 overflow-hidden whitespace-nowrap">
-                    {tNav(DASHBOARD_NAVIGATION_ITEM.labelKey)}
-                  </span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {!serviceDashboard ? (
+          <SidebarGroup>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    tooltip={tNav(DASHBOARD_NAVIGATION_ITEM.labelKey)}
+                    isActive={isActiveNavigationItem(
+                      pathname,
+                      DASHBOARD_NAVIGATION_ITEM.href,
+                      DASHBOARD_NAVIGATION_ITEM.exact,
+                    )}
+                    render={
+                      <Link
+                        href={localizePath(
+                          DASHBOARD_NAVIGATION_ITEM.href,
+                          locale,
+                        )}
+                      />
+                    }
+                  >
+                    <LayoutDashboardIcon aria-hidden="true" />
+                    <span className="min-w-0 flex-1 overflow-hidden whitespace-nowrap">
+                      {tNav(DASHBOARD_NAVIGATION_ITEM.labelKey)}
+                    </span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ) : null}
 
         {navigationGroups.map((group) => (
           <SidebarGroup key={group.labelKey}>

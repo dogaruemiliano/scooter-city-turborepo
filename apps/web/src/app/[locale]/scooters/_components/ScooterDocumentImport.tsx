@@ -49,7 +49,7 @@ export function ScooterDocumentImport({
   editing: boolean;
   sources?: DocumentSource[];
   onApplyImport?: (result: Extract<DocumentImportResult, { ok: true }>) => void;
-  onImport: (result: Extract<DocumentImportResult, { ok: true }>) => void;
+  onImport?: (result: Extract<DocumentImportResult, { ok: true }>) => void;
   disabled: boolean;
   insuranceFiles?: { fileName: string; insurancePolicyId?: string | null }[];
   rawFields: Record<string, string>;
@@ -186,7 +186,7 @@ export function ScooterDocumentImport({
         vinReviewConfirmed:
           policy.vinReviewConfirmed || (vinReviewed && !policy.documentVin),
       }));
-    onImport(result);
+    onImport?.(result);
     if (onApplyImport) onApplyImport(result);
     else {
       if (result.insurancePolicies)

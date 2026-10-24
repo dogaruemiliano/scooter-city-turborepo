@@ -1,4 +1,6 @@
 "use client";
+import { useFormAction } from "@/lib/form/use-form-action";
+import { SaveButton } from "@repo/ui/components/save-button";
 
 import { useOptionalSession } from "@/components/auth/SessionProvider";
 import { canAccess } from "@/lib/access";
@@ -63,6 +65,8 @@ export function ScooterEditor({
   brands,
   vocabulary = [],
 }: ScooterEditorProps) {
+  const formAction = useFormAction();
+
   const t = useTranslations("scooters");
   const router = useRouter();
   const user = useOptionalSession()?.user;
@@ -640,7 +644,6 @@ export function ScooterEditor({
                         setCreatedBrands((current) => [...current, brand])
                       }
                       disabled={isSubmitting}
-                      importResult={extraction.reviewResult}
                     />
                   </section>
                 </ScooterImportReviewProvider>
@@ -834,7 +837,7 @@ export function ScooterEditor({
                   )}
                 </Button>
               ) : null}
-              <Button
+              <SaveButton
                 type="submit"
                 disabled={
                   saveCompleted ||
@@ -854,17 +857,16 @@ export function ScooterEditor({
                     !importedRawFields,
                   )
                 }
-              >
-                {t(
-                  scooter
-                    ? isSubmitting
-                      ? "actions.saving"
-                      : "actions.save"
-                    : isSubmitting
-                      ? "actions.creating"
-                      : "actions.create",
+                {...formAction(
+                  scooter ? "save" : "create",
+                  {
+                    pending: isSubmitting,
+                    error: requestError,
+                    success: saveCompleted,
+                  },
+                  t(scooter ? "actions.save" : "actions.create"),
                 )}
-              </Button>
+              />
             </ScooterCreateActions>
           </form>
         </FormProvider>

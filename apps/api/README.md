@@ -32,6 +32,14 @@ pnpm --filter api db:seed
 pnpm --filter api dev
 ```
 
+The API imports compiled workspace packages from their `dist` directories. After
+adding or changing runtime exports in `@repo/api-shared`, rebuild that package
+with `pnpm --filter @repo/api-shared build` and restart the API development
+process. Nest's source watcher does not reload an already-cached workspace
+module just because its compiled package changes. Type checking reads the
+shared source types, so it can pass while the running process still has old
+exports loaded.
+
 Local PostgreSQL runs on `localhost:5434` to avoid colliding with a host
 PostgreSQL instance on the default port.
 

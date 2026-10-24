@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { RotateCwSquareIcon, XIcon } from "lucide-react";
+import { SaveButton } from "./save-button";
 import { Button } from "@repo/ui/components/button";
 import {
   Dialog,
@@ -366,16 +367,15 @@ export function ImageEditor({
               inert={busy}
               className="size-12 shrink-0"
             />
-            <Button type="button" disabled={busy} onClick={() => void save()}>
-              {busy && !rotating ? (
-                <>
-                  <Spinner />
-                  {labels.saving}
-                </>
-              ) : (
-                labels.save
-              )}
-            </Button>
+            <SaveButton
+              type="button"
+              disabled={busy}
+              state={busy && !rotating ? "pending" : error ? "error" : "idle"}
+              idleLabel={labels.save}
+              pendingLabel={labels.saving}
+              successLabel={labels.save}
+              onClick={() => void save()}
+            />
           </footer>
         </div>
       </DialogContent>

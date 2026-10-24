@@ -355,6 +355,7 @@ function PersonsPageContent({
             }}
             appliedCount={operationalFilterCount(query)}
             applyLabel={t("actions.apply")}
+            applyingLabel={t("actions.applying")}
             cancelLabel={t("actions.cancel")}
             applyErrorLabel={tShared("list.applyError")}
             description={t("filters.description")}

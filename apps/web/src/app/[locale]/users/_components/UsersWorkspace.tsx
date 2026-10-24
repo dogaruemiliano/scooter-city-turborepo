@@ -1,4 +1,6 @@
 "use client";
+import { useFormAction } from "@/lib/form/use-form-action";
+import { SaveButton } from "@repo/ui/components/save-button";
 
 import {
   useCallback,
@@ -274,15 +276,15 @@ export function UsersWorkspace({ id }: { id?: string }) {
                               >
                                 {memberName(user)}
                               </span>
-                              <span className="truncate text-xs text-muted-foreground">
-                                {user.email}
-                              </span>
                               <span className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                                 <span className="font-medium text-foreground">
                                   {labelFor(user)}
                                 </span>
                                 <span aria-hidden="true">·</span>
                                 {t(`access.${user.loginStatus.toLowerCase()}`)}
+                              </span>
+                              <span className="truncate text-xs text-muted-foreground">
+                                {user.email}
                               </span>
                             </span>
                           </CardContent>
@@ -364,6 +366,8 @@ function UserForm({
   onDirtyChange: (dirty: boolean) => void;
   onCancel: () => void;
 }) {
+  const formAction = useFormAction();
+
   const t = useTranslations("workspace");
   const { user: actor } = useSession();
   const manageable = canManageUser(actor, user);
@@ -459,23 +463,26 @@ function UserForm({
       preview.missingPrerequisites.length
     )
       return;
-    void task.run(async () => {
-      const saved = await webApi.fetch(
-        user ? `/v1/users/${user.id}/access` : "/v1/users",
-        v1.access.accessUserSchema,
-        {
-          method: user ? "PUT" : "POST",
-          json: user
-            ? v1.access.userAccessInputSchema.parse(payload)
-            : v1.access.createUserInputSchema.parse(payload),
-        },
-      );
-      onDirtyChange(false);
-      if (!user) router.replace(`/users/${saved.id}`);
-      else reload();
-      setShowReview(false);
-      setShowPermissions(false);
-    });
+    void task.run(
+      async () => {
+        const saved = await webApi.fetch(
+          user ? `/v1/users/${user.id}/access` : "/v1/users",
+          v1.access.accessUserSchema,
+          {
+            method: user ? "PUT" : "POST",
+            json: user
+              ? v1.access.userAccessInputSchema.parse(payload)
+              : v1.access.createUserInputSchema.parse(payload),
+          },
+        );
+        onDirtyChange(false);
+        if (!user) router.replace(`/users/${saved.id}`);
+        else reload();
+        setShowReview(false);
+        setShowPermissions(false);
+      },
+      { successMessage: t("access.memberUpdated") },
+    );
   };
   const reviewSheet = (
     <AccessReviewSheet
@@ -736,15 +743,16 @@ function UserForm({
                     </BottomSheetBody>
                     <BottomSheetFooter>
                       <Feedback error={!showReview ? task.error : null} />
-                      <Button
+                      <SaveButton
                         type="submit"
                         form={formId}
                         disabled={task.busy || !canSubmit || !dirty}
-                      >
-                        {task.busy
-                          ? t("access.member.saving")
-                          : t("access.preview")}
-                      </Button>
+                        {...formAction(
+                          "review",
+                          { pending: task.busy, error: task.error },
+                          t("access.preview"),
+                        )}
+                      />
                       <Button
                         type="button"
                         variant="secondary"
@@ -770,14 +778,20 @@ function UserForm({
               )}
             </Field>
           </div>
-          <Feedback error={task.error} success={task.success} />
+          <Feedback error={task.error} />
         </CardContent>
         {!user?.isSuperAdmin && canSubmit ? (
           user ? (
             <CardContent className="pb-(--card-spacing)">
-              <Button type="submit" disabled={task.busy || !dirty}>
-                {task.busy ? t("access.member.saving") : t("access.preview")}
-              </Button>
+              <SaveButton
+                type="submit"
+                disabled={task.busy || !dirty}
+                {...formAction(
+                  "review",
+                  { pending: task.busy, error: task.error },
+                  t("access.preview"),
+                )}
+              />
             </CardContent>
           ) : (
             <FormActions>
@@ -789,9 +803,15 @@ function UserForm({
               >
                 {t("cancel")}
               </Button>
-              <Button type="submit" disabled={task.busy || !dirty}>
-                {task.busy ? t("access.member.saving") : t("access.preview")}
-              </Button>
+              <SaveButton
+                type="submit"
+                disabled={task.busy || !dirty}
+                {...formAction(
+                  "review",
+                  { pending: task.busy, error: task.error },
+                  t("access.preview"),
+                )}
+              />
             </FormActions>
           )
         ) : null}

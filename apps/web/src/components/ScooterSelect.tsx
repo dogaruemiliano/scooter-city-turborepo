@@ -19,7 +19,16 @@ export type ScooterSelectItem = Pick<
   "id" | "fleetNumber" | "brandCode" | "brand" | "model" | "registrationNumber"
 > &
   Partial<
-    Pick<v1.scooters.Scooter, "coverUrl" | "vin" | "problemDifficultyCounts">
+    Pick<
+      v1.scooters.Scooter,
+      | "coverUrl"
+      | "vin"
+      | "problemDifficultyCounts"
+      | "registrationType"
+      | "temporaryRegistrationExpiresAt"
+      | "maintenanceHoldCount"
+      | "rentalInsuranceStatus"
+    >
   >;
 
 const EMPTY_SCOOTERS: ScooterSelectItem[] = [];
@@ -110,6 +119,8 @@ export type ScooterSelectProps = Omit<
   | "addAction"
 > & {
   label?: string;
+  /** Rental-specific eligibility is supplied by the feature, not this picker. */
+  getUnavailableReasons?: (scooter: ScooterSelectItem) => readonly string[];
   /** Already-authorized summaries, e.g. scooters visible in problem filters. */
   scooters?: readonly ScooterSelectItem[];
 } & (
@@ -125,25 +136,36 @@ export type ScooterSelectProps = Omit<
       }
   );
 
+export async function loadScooterSelectItems() {
+  const items: v1.scooters.Scooter[] = [];
+  for (let page = 1; ; page++) {
+    const list = await webApi.fetch(
+      `/v1/scooters?pageSize=100&page=${page}`,
+      v1.scooters.scooterListSchema,
+      { cache: "no-store" },
+    );
+    items.push(...list.items);
+    if (page * list.pageSize >= list.total || !list.items.length) break;
+  }
+  return items
+    .filter((scooter) => !scooter.deletedAt)
+    .sort((a, b) => a.fleetNumber - b.fleetNumber);
+}
+
 export function ScooterSelect(props: ScooterSelectProps) {
-  const { label, scooters: suppliedScooters, ...controlProps } = props;
+  const {
+    label,
+    scooters: suppliedScooters,
+    getUnavailableReasons,
+    ...controlProps
+  } = props;
   const t = useTranslations("workspace");
   const load = useCallback(async () => {
     if (suppliedScooters !== undefined) return suppliedScooters;
-    const items: v1.scooters.Scooter[] = [];
-    for (let page = 1; ; page++) {
-      const list = await webApi.fetch(
-        `/v1/scooters?pageSize=100&page=${page}`,
-        v1.scooters.scooterListSchema,
-        { cache: "no-store" },
-      );
-      items.push(...list.items);
-      if (page * list.pageSize >= list.total || !list.items.length) break;
-    }
-    return items.sort((a, b) => a.fleetNumber - b.fleetNumber);
+    return loadScooterSelectItems();
   }, [suppliedScooters]);
   const remote = useRemote(load);
-  const scooters = remote.data ?? EMPTY_SCOOTERS;
+  const scooters = suppliedScooters ?? remote.data ?? EMPTY_SCOOTERS;
   const byId = useMemo(
     () => new Map(scooters.map((scooter) => [scooter.id, scooter])),
     [scooters],
@@ -257,13 +279,25 @@ export function ScooterSelect(props: ScooterSelectProps) {
           )
         }
         options={scooters.map((scooter) => ({
+          disabled: Boolean(getUnavailableReasons?.(scooter).length),
+          searchOnly: Boolean(getUnavailableReasons?.(scooter).length),
           value: scooter.id,
-          label: `${v1.scooters.scooterDisplayCode(scooter)} · ${scooter.registrationNumber || t("problems.noPlate")} · ${scooter.brand} ${scooter.model ?? ""}`,
+          label: `${v1.scooters.scooterDisplayCode(scooter)} · ${scooter.registrationNumber || t("problems.noPlate")} · ${scooter.brand} ${scooter.model ?? ""}${getUnavailableReasons?.(scooter).length ? ` · ${getUnavailableReasons(scooter).join(" · ")}` : ""}`,
           keywords: [scooter.vin ?? "", scooter.id],
         }))}
         renderOption={(option) => {
           const scooter = byId.get(option.value)!;
-          return <ScooterSelectRow scooter={scooter} />;
+          const reasons = getUnavailableReasons?.(scooter) ?? [];
+          return (
+            <span className="flex min-w-0 flex-1 flex-col gap-2">
+              <ScooterSelectRow scooter={scooter} />
+              {reasons.map((reason) => (
+                <span key={reason} className="text-sm text-warning">
+                  {reason}
+                </span>
+              ))}
+            </span>
+          );
         }}
       />
       <Feedback error={remote.error} />

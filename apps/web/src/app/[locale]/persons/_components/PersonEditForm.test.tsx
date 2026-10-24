@@ -76,7 +76,7 @@ describe("PersonEditForm", () => {
     await browser.type(screen.getByLabelText("First name"), "Grace");
     await browser.clear(screen.getByLabelText("Phone"));
     await browser.type(screen.getByLabelText("Phone"), "700111222");
-    await browser.click(screen.getByRole("button", { name: "Save" }));
+    await browser.click(screen.getByRole("button", { name: "Save changes" }));
 
     await waitFor(() =>
       expect(mocks.apiFetch).toHaveBeenCalledWith(
@@ -102,13 +102,13 @@ describe("PersonEditForm", () => {
     const cnp = screen.getByLabelText("CNP");
     await browser.clear(cnp);
     await browser.type(cnp, "123");
-    await browser.click(screen.getByRole("button", { name: "Save" }));
+    await browser.click(screen.getByRole("button", { name: "Save changes" }));
     expect(mocks.apiFetch).not.toHaveBeenCalled();
     expect(cnp).toHaveAttribute("aria-invalid", "true");
 
     await browser.clear(cnp);
     await browser.type(cnp, "1900228123469");
-    await browser.click(screen.getByRole("button", { name: "Save" }));
+    await browser.click(screen.getByRole("button", { name: "Save changes" }));
     await waitFor(() => expect(mocks.apiFetch).toHaveBeenCalledOnce());
     const payload = mocks.apiFetch.mock.calls[0]?.[2].json;
     expect(payload.cnp).toBe("1900228123469");
@@ -169,7 +169,7 @@ describe("PersonEditForm", () => {
 
     await browser.clear(screen.getByLabelText("First name"));
     await browser.clear(screen.getByLabelText("Last name"));
-    await browser.click(screen.getByRole("button", { name: "Save" }));
+    await browser.click(screen.getByRole("button", { name: "Save changes" }));
 
     expect(
       await screen.findByText("2 fields need attention."),

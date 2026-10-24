@@ -1,4 +1,5 @@
 "use client";
+import { useFormAction } from "@/lib/form/use-form-action";
 
 import { v1 } from "@repo/api-shared";
 import { tokens } from "@repo/theme";
@@ -87,6 +88,8 @@ export function DocumentFormDialog({
   onSubmit,
   onDelete,
 }: DocumentFormDialogProps) {
+  const formAction = useFormAction();
+
   const t = useTranslations("persons");
   const [internalOpen, setInternalOpen] = useState(false);
   const [form, setForm] = useState(() =>
@@ -189,6 +192,7 @@ export function DocumentFormDialog({
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (busy || deleteBusy || saveSucceeded) return;
     setError(null);
 
     if (
@@ -273,6 +277,7 @@ export function DocumentFormDialog({
     key: Key,
     value: DocumentFormState[Key],
   ) {
+    setSaveSucceeded(false);
     setForm((current) => ({ ...current, [key]: value }));
   }
 
@@ -444,17 +449,18 @@ export function DocumentFormDialog({
                       </BottomSheetDescription>
                     </BottomSheetHeader>
                     <BottomSheetFooter className="sm:flex-row-reverse sm:justify-start">
-                      <Button
+                      <SaveButton
                         type="button"
                         variant="destructive"
                         className="w-full sm:w-auto"
                         disabled={deleteBusy}
                         onClick={() => void deleteDocument()}
-                      >
-                        {deleteBusy
-                          ? t("actions.deleting")
-                          : t("actions.deleteDocument")}
-                      </Button>
+                        {...formAction(
+                          "delete",
+                          { pending: deleteBusy, error: error },
+                          t("actions.deleteDocument"),
+                        )}
+                      />
                       <BottomSheetClose
                         render={
                           <Button
@@ -479,7 +485,15 @@ export function DocumentFormDialog({
                 type="submit"
                 className="w-full sm:w-auto"
                 disabled={busy || deleteBusy || uploading || !hasChanges}
-                state={saveSucceeded ? "success" : busy ? "pending" : "idle"}
+                state={
+                  busy
+                    ? "pending"
+                    : error
+                      ? "error"
+                      : saveSucceeded
+                        ? "success"
+                        : "idle"
+                }
                 idleLabel={t("actions.save")}
                 pendingLabel={t("actions.saving")}
                 successLabel={t("actions.saved")}

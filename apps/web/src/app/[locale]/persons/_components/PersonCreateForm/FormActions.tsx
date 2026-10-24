@@ -1,4 +1,6 @@
 "use client";
+import { useFormAction } from "@/lib/form/use-form-action";
+import { SaveButton } from "@repo/ui/components/save-button";
 
 import { Button, FormActions as SharedFormActions } from "@repo/ui/components";
 import { UserPlusIcon } from "lucide-react";
@@ -26,6 +28,8 @@ export function FormActions({
   onBack: () => void;
   onNext: () => void;
 }) {
+  const formAction = useFormAction();
+
   const t = useTranslations("persons");
 
   return (
@@ -61,16 +65,15 @@ export function FormActions({
         </Button>
       ) : null}
       {step === "review" ? (
-        <Button
+        <SaveButton
           type="submit"
           className="w-full md:w-auto"
           disabled={
             creating || uploadingPhotos || extracting || confirmationRequired
           }
-        >
-          <UserPlusIcon data-icon="inline-start" />
-          {creating ? t("actions.creating") : t("actions.create")}
-        </Button>
+          {...formAction("create", { pending: creating }, t("actions.create"))}
+          icon={<UserPlusIcon />}
+        />
       ) : null}
     </SharedFormActions>
   );

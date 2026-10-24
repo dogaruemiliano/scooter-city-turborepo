@@ -696,13 +696,7 @@ describe("problem release forms", () => {
 
   it("opens completion in a distinct bottom sheet on the compact detail screen", async () => {
     const user = userEvent.setup();
-    renderForm(
-      <ProblemWork
-        compact
-        problem={{ ...problem, blocksUsage: false }}
-        reload={vi.fn()}
-      />,
-    );
+    renderForm(<ProblemWork compact problem={problem} reload={vi.fn()} />);
     expect(
       screen.queryByRole("textbox", { name: "Resolution notes" }),
     ).toBeNull();
@@ -711,6 +705,11 @@ describe("problem release forms", () => {
     const sheet = await screen.findByRole("dialog", { name: "Complete task" });
     expect(sheet).toHaveClass("bg-popover", "text-popover-foreground");
     expect(sheet.querySelector(".bg-background")).toBeNull();
+    expect(
+      within(sheet).queryByRole("combobox", {
+        name: "When closing this report",
+      }),
+    ).toBeNull();
     const submit = within(sheet).getByRole("button", {
       name: "Complete task",
     });
@@ -791,16 +790,11 @@ describe("problem release forms", () => {
       expect(
         sheet.querySelector('[data-slot="bottom-sheet-body"].bg-background'),
       ).toBeNull();
-      await user.click(
-        within(sheet).getByRole("combobox", {
+      expect(
+        within(sheet).queryByRole("combobox", {
           name: "When closing this report",
         }),
-      );
-      await user.click(
-        await screen.findByRole("option", {
-          name: "Keep the maintenance hold",
-        }),
-      );
+      ).toBeNull();
       await user.click(
         within(sheet).getByRole("button", { name: "Dismiss report" }),
       );
@@ -813,7 +807,7 @@ describe("problem release forms", () => {
           expect.anything(),
           {
             method: "POST",
-            json: { revision: 3, clearMaintenanceHold: false },
+            json: { revision: 3 },
           },
         ),
       );
@@ -855,7 +849,7 @@ describe("problem release forms", () => {
       },
     );
   });
-  it("requires a resolution note and an explicit hold decision, then retains the hold", async () => {
+  it("requires resolution notes and completes without a maintenance hold decision", async () => {
     const user = userEvent.setup();
     const reload = vi.fn();
     renderForm(<ProblemWork problem={problem} reload={reload} />);
@@ -865,13 +859,11 @@ describe("problem release forms", () => {
       screen.getByRole("textbox", { name: "Resolution notes" }),
       "Belt replaced; safety inspection pending",
     );
-    expect(resolve).toBeDisabled();
-    await user.click(
-      screen.getByRole("combobox", { name: "When closing this report" }),
-    );
-    await user.click(
-      await screen.findByRole("option", { name: "Keep the maintenance hold" }),
-    );
+    expect(resolve).toBeEnabled();
+    expect(
+      screen.queryByRole("combobox", { name: "When closing this report" }),
+    ).toBeNull();
+    expect(screen.queryByText("Keep the maintenance hold")).toBeNull();
     await user.click(resolve);
     await waitFor(() => expect(reload).toHaveBeenCalledOnce());
     expect(mocks.fetch).toHaveBeenCalledWith(
@@ -882,7 +874,6 @@ describe("problem release forms", () => {
         json: {
           revision: 3,
           resolutionNotes: "Belt replaced; safety inspection pending",
-          clearMaintenanceHold: false,
         },
       },
     );
@@ -905,8 +896,7 @@ describe("problem release forms", () => {
     );
   });
 
-  it("keeps an explicit clearance action and previous resolution visible on a closed blocker", async () => {
-    const user = userEvent.setup();
+  it("keeps the previous resolution without hold controls on closed work", () => {
     const reload = vi.fn();
     renderForm(
       <ProblemWork
@@ -922,15 +912,13 @@ describe("problem release forms", () => {
     expect(
       screen.queryByRole("button", { name: "Complete task" }),
     ).not.toBeInTheDocument();
-    await user.click(
-      screen.getByRole("button", { name: "Clear this problem’s hold" }),
-    );
-    await waitFor(() => expect(reload).toHaveBeenCalledOnce());
-    expect(mocks.fetch).toHaveBeenCalledWith(
-      "/v1/problems/report/hold",
-      expect.anything(),
-      { method: "PUT", json: { revision: 3, blocksUsage: false } },
-    );
+    expect(
+      screen.queryByRole("button", { name: "Clear this problem’s hold" }),
+    ).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Block scooter use" }),
+    ).toBeNull();
+    expect(reload).not.toHaveBeenCalled();
   });
 
   it("offers an explicit reload when a stale comment is rejected", async () => {

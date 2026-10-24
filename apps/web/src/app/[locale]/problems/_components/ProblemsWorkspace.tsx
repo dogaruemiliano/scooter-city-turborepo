@@ -197,6 +197,7 @@ export function ProblemsWorkspace() {
             }
             title={shared("list.filters")}
             applyLabel={shared("list.apply")}
+            applyingLabel={shared("list.applying")}
             resetLabel={shared("list.reset")}
             cancelLabel={shared("actions.cancel")}
             applyErrorLabel={shared("list.applyError")}

@@ -1,6 +1,7 @@
 import { v1 } from "@repo/api-shared";
 import { Badge } from "@repo/ui/components/badge";
 import { useLocale, useTranslations } from "next-intl";
+import { RentalPersonCard } from "./RentalPersonCard";
 import { Link } from "@/i18n/navigation";
 
 export function RentalListItem({
@@ -29,7 +30,7 @@ export function RentalListItem({
           <div className="sm:col-span-2">
             <dt className="text-sm text-muted-foreground">{t("person")}</dt>
             <dd className="text-sm">
-              {rental.person.firstName} {rental.person.lastName}
+              <RentalPersonCard person={rental.person} row />
             </dd>
           </div>
         ) : null}

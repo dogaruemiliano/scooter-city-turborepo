@@ -5,10 +5,16 @@ export function StepProgress({
   labels,
   activeIndex,
   label,
+  visualIndex = activeIndex,
+  tracking = false,
 }: {
   labels: string[];
   activeIndex: number;
   label: string;
+  /** Fractional position for a wizard gesture; accessible progress stays committed. */
+  visualIndex?: number;
+  /** Follow a gesture immediately instead of easing towards its latest position. */
+  tracking?: boolean;
 }) {
   return (
     <div
@@ -28,8 +34,12 @@ export function StepProgress({
           />
           <div
             aria-hidden="true"
-            className="absolute top-1/2 left-0 h-px -translate-y-1/2 bg-primary transition-[width] duration-normal ease-standard"
-            style={{ width: `${(activeIndex / (labels.length - 1)) * 100}%` }}
+            data-slot="step-progress-fill"
+            className="absolute inset-x-0 top-1/2 h-px origin-left -translate-y-1/2 bg-primary transition-transform duration-normal ease-decelerate motion-reduce:transition-none rtl:origin-right"
+            style={{
+              transform: `scaleX(${Math.max(0, Math.min(1, visualIndex / (labels.length - 1)))})`,
+              transitionProperty: tracking ? "none" : undefined,
+            }}
           />
         </>
       ) : null}

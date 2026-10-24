@@ -664,6 +664,32 @@ describe("AppShell", () => {
     );
   });
 
+  it.each(["/problems", "/en/problems"])(
+    "shows only service navigation for a mechanic (%s)",
+    (pathname) => {
+      mocks.pathname = pathname;
+      renderAppShell({
+        id: "mechanic-1",
+        email: "mechanic@example.com",
+        roles: [],
+        effectiveScopes: {
+          "problems.read": ["ASSIGNED", "AVAILABLE"],
+          "scooters.read": ["ASSIGNED"],
+        },
+      });
+
+      const content = document.querySelector('[data-slot="sidebar-content"]');
+      expect(content).not.toBeNull();
+      const links = within(content as HTMLElement).getAllByRole("link");
+      expect(links).toHaveLength(1);
+      expect(links[0]).toHaveAttribute("href", pathname);
+      expect(links[0]).toHaveAttribute("data-active");
+      expect(
+        screen.queryByRole("link", { name: "Dashboard" }),
+      ).not.toBeInTheDocument();
+    },
+  );
+
   it("renders company navigation for super admins", () => {
     mocks.pathname = "/persons";
 

@@ -1,4 +1,7 @@
 "use client";
+import { FormActions } from "@repo/ui/components/form-actions";
+import { useFormAction } from "@/lib/form/use-form-action";
+import { SaveButton } from "@repo/ui/components/save-button";
 
 /**
  * Records an expense.
@@ -93,6 +96,8 @@ export function ExpenseForm({
   extractionDraftId,
   initialFocusField,
 }: ExpenseFormProps) {
+  const formAction = useFormAction();
+
   const session = useOptionalSession();
   const canManageSuppliers = canAccess(
     session?.user,
@@ -891,10 +896,15 @@ export function ExpenseForm({
 
           <FormSummary title={t("newTitle")} message={submitError} />
 
-          <div className="flex flex-wrap gap-2">
-            <Button type="submit" disabled={submitting || receiptUploading}>
-              {submitting ? t("submitting") : t("submit")}
-            </Button>
+          <FormActions>
+            <SaveButton
+              type="submit"
+              disabled={submitting || receiptUploading}
+              {...formAction("recordExpense", {
+                pending: submitting,
+                error: submitError,
+              })}
+            />
             <Button
               type="button"
               variant="outline"
@@ -902,7 +912,7 @@ export function ExpenseForm({
             >
               {tCommon("cancel")}
             </Button>
-          </div>
+          </FormActions>
         </aside>
       </form>
     </FormProvider>

@@ -250,7 +250,9 @@ describe("PersonDetailPage", () => {
       within(editor).getByLabelText(messages.en.persons.license.category),
       "A1",
     );
-    await browser.click(within(editor).getByRole("button", { name: "Save" }));
+    await browser.click(
+      within(editor).getByRole("button", { name: "Save document" }),
+    );
     await waitFor(() =>
       expect(mocks.apiFetch).toHaveBeenCalledWith(
         v1.persons.ROUTES.documents.update(readyPerson.id, licence.id),
@@ -583,7 +585,9 @@ describe("PersonDetailPage", () => {
       name: "Document has expiry date?",
     });
     const expiryDay = within(editSheet).getByLabelText("Expires on");
-    const saveButton = within(editSheet).getByRole("button", { name: "Save" });
+    const saveButton = within(editSheet).getByRole("button", {
+      name: "Save document",
+    });
 
     expect(expirySwitch).toBeChecked();
     expect(saveButton).toBeDisabled();
@@ -617,7 +621,7 @@ describe("PersonDetailPage", () => {
       expiresOn: null,
     });
     await browser.click(
-      within(editSheet).getByRole("button", { name: "Save" }),
+      within(editSheet).getByRole("button", { name: "Save document" }),
     );
 
     await waitFor(() =>

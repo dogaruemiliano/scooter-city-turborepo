@@ -714,71 +714,78 @@ describe("PersonCreateForm wizard", () => {
     ).toHaveTextContent("Sector 3");
   });
 
-  it("submits reviewed data and opens the newly created person's detail page", async () => {
-    const browser = userEvent.setup();
-    await renderReviewForm(browser);
-    fillRequiredFields("0749096855");
-    showReviewStep("Address");
-    await selectAddressOption(browser, "County", "București");
-    changeField("Address line 1", "1 Rental Street");
-    changeField("Address line 2", "Apt 4");
-    await selectAddressOption(browser, "Locality", "Sector 3");
-    changeField("Notes", "Frequent rider");
-    changeField("CNP", "1900228123450");
-    const dialog = await openNationalIdSheet(browser);
-    changeDialogField(dialog, "Series", "rx");
-    changeDialogField(dialog, "Number", "123456");
-    fillDialogDateParts(dialog, "Expires on", {
-      day: "31",
-      month: "01",
-      year: "2030",
-    });
-    await saveDocumentSheet(browser, dialog);
-    const summary = within(
-      screen.getByRole("article", { name: "National ID" }),
-    );
-    expect(summary.getByText("RX 123456")).toBeVisible();
-    expect(summary.queryByText("Jan 15, 2024")).toBeNull();
-    expect(summary.getByText("Jan 31, 2030")).toBeVisible();
-    await submitPerson(browser);
-    await waitFor(() => expect(mocks.createPerson).toHaveBeenCalledOnce());
-    expect(mocks.createPerson).toHaveBeenCalledWith(
-      v1.persons.ROUTES.create,
-      v1.persons.personSchema,
-      {
-        method: "POST",
-        json: {
-          documentWorkflow: "romanianClassic",
-          cnp: "1900228123450",
-          email: "rider@example.com",
-          phone: "+40749096855",
-          firstName: "Grace",
-          lastName: "Hopper",
-          dateOfBirth: "1990-02-28",
-          addressLine1: "1 Rental Street",
-          addressLine2: "Apt 4",
-          city: "Sector 3",
-          region: "București",
-          countryCode: "RO",
-          notes: "Frequent rider",
-          documents: [
-            {
-              type: "nationalId",
-              nationalIdFormat: "classic",
-              series: "RX",
-              number: "123456",
-              issuingCountryCode: "RO",
-              expiresOn: "2030-01-31",
-              status: "verified",
-              photos: { front: "draft-front-token" },
-            },
-          ],
+  it.each([undefined, "rental-draft"])(
+    "submits reviewed data and uses the correct return destination (%s)",
+    async (rentalDraftId) => {
+      const browser = userEvent.setup();
+      await renderReviewForm(browser, rentalDraftId);
+      fillRequiredFields("0749096855");
+      showReviewStep("Address");
+      await selectAddressOption(browser, "County", "București");
+      changeField("Address line 1", "1 Rental Street");
+      changeField("Address line 2", "Apt 4");
+      await selectAddressOption(browser, "Locality", "Sector 3");
+      changeField("Notes", "Frequent rider");
+      changeField("CNP", "1900228123450");
+      const dialog = await openNationalIdSheet(browser);
+      changeDialogField(dialog, "Series", "rx");
+      changeDialogField(dialog, "Number", "123456");
+      fillDialogDateParts(dialog, "Expires on", {
+        day: "31",
+        month: "01",
+        year: "2030",
+      });
+      await saveDocumentSheet(browser, dialog);
+      const summary = within(
+        screen.getByRole("article", { name: "National ID" }),
+      );
+      expect(summary.getByText("RX 123456")).toBeVisible();
+      expect(summary.queryByText("Jan 15, 2024")).toBeNull();
+      expect(summary.getByText("Jan 31, 2030")).toBeVisible();
+      await submitPerson(browser);
+      await waitFor(() => expect(mocks.createPerson).toHaveBeenCalledOnce());
+      expect(mocks.createPerson).toHaveBeenCalledWith(
+        v1.persons.ROUTES.create,
+        v1.persons.personSchema,
+        {
+          method: "POST",
+          json: {
+            documentWorkflow: "romanianClassic",
+            cnp: "1900228123450",
+            email: "rider@example.com",
+            phone: "+40749096855",
+            firstName: "Grace",
+            lastName: "Hopper",
+            dateOfBirth: "1990-02-28",
+            addressLine1: "1 Rental Street",
+            addressLine2: "Apt 4",
+            city: "Sector 3",
+            region: "București",
+            countryCode: "RO",
+            notes: "Frequent rider",
+            documents: [
+              {
+                type: "nationalId",
+                nationalIdFormat: "classic",
+                series: "RX",
+                number: "123456",
+                issuingCountryCode: "RO",
+                expiresOn: "2030-01-31",
+                status: "verified",
+                photos: { front: "draft-front-token" },
+              },
+            ],
+          },
         },
-      },
-    );
-    expect(mocks.push).toHaveBeenCalledWith("/en/persons/person-2");
-    expect(mocks.refresh).toHaveBeenCalledOnce();
-  });
+      );
+      expect(mocks.push).toHaveBeenCalledWith(
+        rentalDraftId
+          ? "/en/rentals/new?draftId=rental-draft&personId=person-2"
+          : "/en/persons/person-2",
+      );
+      expect(mocks.refresh).toHaveBeenCalledOnce();
+    },
+  );
 
   it("requires only electronic ID front and proof of address, with a real PDF file preview", async () => {
     const browser = userEvent.setup();
@@ -1354,7 +1361,11 @@ describe("document extraction review", () => {
       expect(
         within(dialog).getByRole("button", { name: /Issuing country/ }),
       ).toHaveTextContent("United Kingdom");
-      await browser.click(within(dialog).getByRole("button", { name: action }));
+      await browser.click(
+        within(dialog).getByRole("button", {
+          name: action === "Save" ? "Save document" : action,
+        }),
+      );
       await waitFor(() => expect(dialog).not.toBeInTheDocument());
       showReviewStep("Personal details");
       expect(screen.getByLabelText("First name")).toHaveValue("Operator");
@@ -1556,10 +1567,15 @@ function extractedPassport(): v1.persons.PersonDocumentExtraction {
   };
 }
 
-function renderCreateForm(locale: SupportedLocale = "en", withShell = false) {
+function renderCreateForm(
+  locale: SupportedLocale = "en",
+  withShell = false,
+  rentalDraftId?: string,
+) {
   const form = (
     <PersonCreateForm
       personsHref={locale === "en" ? "/en/persons" : "/persons"}
+      rentalDraftId={rentalDraftId}
     />
   );
   return render(
@@ -1601,8 +1617,11 @@ async function enterDocuments(
     );
 }
 
-async function renderReviewForm(browser: ReturnType<typeof userEvent.setup>) {
-  renderCreateForm("en", false);
+async function renderReviewForm(
+  browser: ReturnType<typeof userEvent.setup>,
+  rentalDraftId?: string,
+) {
+  renderCreateForm("en", false, rentalDraftId);
   await enterDocuments(browser);
   await uploadPhoto(browser, "National ID");
   await browser.click(screen.getByRole("button", { name: "Review details" }));
@@ -1670,7 +1689,7 @@ async function saveDocumentSheet(
   browser: ReturnType<typeof userEvent.setup>,
   dialog: HTMLElement,
 ) {
-  const save = within(dialog).getByRole("button", { name: "Save" });
+  const save = within(dialog).getByRole("button", { name: "Save document" });
   await waitFor(() => expect(save).toBeEnabled());
   await browser.click(save);
   await waitFor(() => expect(dialog).not.toBeInTheDocument());

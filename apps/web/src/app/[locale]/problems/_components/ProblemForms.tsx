@@ -456,7 +456,6 @@ export function ProblemWork({
   } | null>(null);
   const [reopenMessage, setReopenMessage] = useState("");
   const [resolution, setResolution] = useState("");
-  const [clearHold, setClearHold] = useState("");
   const [confirm, setConfirm] = useState<"reopen" | "cancel" | null>(null);
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(problem.title);
@@ -503,24 +502,6 @@ export function ProblemWork({
     });
     reload(updated);
   }
-  const holdControls = problem.blocksUsage ? (
-    <div className="flex flex-col gap-2 rounded-lg border border-destructive p-4">
-      <p className="text-sm font-medium">{t("problems.holdHelp")}</p>
-      {editable &&
-      (can("problems.resolve") || canAccess(user, "problems.update", "ALL")) ? (
-        <Choice
-          label={t("problems.holdDecision")}
-          value={clearHold}
-          onChange={setClearHold}
-          options={[
-            { value: "", label: t("select") },
-            { value: "retain", label: t("problems.retainHold") },
-            { value: "clear", label: t("problems.clearThisHold") },
-          ]}
-        />
-      ) : null}
-    </div>
-  ) : null;
   const retryAction = task.error ? (
     <Button
       variant="outline"
@@ -617,7 +598,6 @@ export function ProblemWork({
               {retryAction}
             </>
           ) : null}
-          {holdControls}
           {problem.status === "in_progress" && can("problems.resolve") ? (
             <form
               className="flex flex-col gap-3"
@@ -626,9 +606,6 @@ export function ProblemWork({
                 void task.run(() =>
                   mutate("/resolve", "POST", {
                     resolutionNotes: resolution.trim(),
-                    ...(problem.blocksUsage
-                      ? { clearMaintenanceHold: clearHold === "clear" }
-                      : {}),
                   }),
                 );
               }}
@@ -649,11 +626,7 @@ export function ProblemWork({
               <SaveButton
                 type="submit"
                 className="w-full"
-                disabled={
-                  busy ||
-                  !resolution.trim() ||
-                  (problem.blocksUsage && !clearHold)
-                }
+                disabled={busy || !resolution.trim()}
                 {...formAction("complete", {
                   pending: busy,
                   error: task.error,
@@ -685,7 +658,6 @@ export function ProblemWork({
             {t("problems.pause")}
           </Button>
         ) : null}
-        {compact ? holdControls : null}
         {problem.resolutionNotes ? (
           <div>
             <p className="text-sm font-medium">
@@ -780,7 +752,7 @@ export function ProblemWork({
             <p className="whitespace-pre-wrap text-sm">{problem.workNotes}</p>
           </div>
         ) : null}
-        {can("problems.update") ? (
+        {editable && can("problems.update") ? (
           <Button
             className="self-start"
             variant="outline"
@@ -815,7 +787,7 @@ export function ProblemWork({
           {editable && canAccess(user, "problems.update", "ALL") ? (
             <Button
               variant="outline"
-              disabled={busy || (problem.blocksUsage && !clearHold)}
+              disabled={busy}
               onClick={() => setConfirm("cancel")}
             >
               {t("problems.cancel")}
@@ -860,9 +832,7 @@ export function ProblemWork({
                       "POST",
                       confirm === "reopen"
                         ? { message: reopenMessage.trim() }
-                        : confirm === "cancel" && problem.blocksUsage
-                          ? { clearMaintenanceHold: clearHold === "clear" }
-                          : {},
+                        : {},
                     );
                     setConfirm(null);
                     setReopenMessage("");

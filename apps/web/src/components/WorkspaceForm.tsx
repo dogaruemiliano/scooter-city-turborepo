@@ -22,6 +22,7 @@ import {
   SelectValue,
   Skeleton,
 } from "@repo/ui/components";
+import { useWorkspaceNotifications } from "./WorkspaceNotifications";
 import { PageTitleOverride } from "./PageTitleOverride";
 import { useTranslations } from "next-intl";
 
@@ -112,18 +113,25 @@ export function useTask(errorMessages: Readonly<Record<string, string>> = {}) {
   const t = useTranslations("workspace");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const notifications = useWorkspaceNotifications();
   const running = useRef(false);
-  async function run(task: () => Promise<void | false>) {
+  async function run(
+    task: () => Promise<void | false>,
+    feedback?: { successMessage: string },
+  ) {
     if (running.current) return;
     running.current = true;
     setBusy(true);
     setError(null);
-    setSuccess(null);
+
     try {
       const result = await task();
       if (result !== false) {
-        setSuccess(t("saved"));
+        if (feedback?.successMessage)
+          notifications?.add({
+            title: feedback.successMessage,
+            variant: "success",
+          });
         window.dispatchEvent(new Event("access-changed"));
       }
     } catch (cause) {
@@ -143,7 +151,7 @@ export function useTask(errorMessages: Readonly<Record<string, string>> = {}) {
       setBusy(false);
     }
   }
-  return { busy, error, success, run };
+  return { busy, error, run };
 }
 
 export function useRemote<T>(load: () => Promise<T>) {

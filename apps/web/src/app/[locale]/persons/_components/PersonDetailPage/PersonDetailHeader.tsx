@@ -11,7 +11,7 @@ import { MoreActionsMenu } from "@/components/MoreActionsMenu";
 
 import { ConfirmationDialog } from "./ConfirmationDialog";
 import { formatDate } from "./helpers";
-import { PersonContactSheet } from "./PersonContactSheet";
+import { PersonContactSheet } from "@/components/PersonContactSheet";
 
 export function PersonDetailHeader({
   person,

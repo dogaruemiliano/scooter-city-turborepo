@@ -296,6 +296,7 @@ export const financeCatalog = {
           cif: "CIF / VAT number",
           vatDetected:
             "A country prefix was detected, so this supplier will be marked as a VAT payer.",
+          create: "Create supplier",
           save: "Save supplier",
           saving: "Saving supplier…",
           saveFailed: "The supplier could not be saved.",
@@ -540,7 +541,7 @@ export const financeCatalog = {
       aliases: "Names also found on documents",
       aliasesHint: "One name per line. Do not repeat the legal name.",
       aliasesPlaceholder: "JUSEM HUB\nJUSEM HUB S.R.L.",
-      save: "Save identity",
+      save: "Save company details",
       saving: "Saving…",
       saved: "Company identity saved. New receipt scans will use it.",
       saveFailed: "The company identity could not be saved.",
@@ -929,6 +930,7 @@ export const financeCatalog = {
           cif: "CIF / cod TVA",
           vatDetected:
             "Am detectat un prefix de țară, deci furnizorul va fi marcat ca plătitor de TVA.",
+          create: "Creează furnizorul",
           save: "Salvează furnizorul",
           saving: "Salvăm furnizorul…",
           saveFailed: "Furnizorul nu a putut fi salvat.",
@@ -1171,7 +1173,7 @@ export const financeCatalog = {
       aliases: "Alte denumiri găsite pe documente",
       aliasesHint: "Câte o denumire pe linie. Nu repeta denumirea juridică.",
       aliasesPlaceholder: "JUSEM HUB\nJUSEM HUB S.R.L.",
-      save: "Salvează identitatea",
+      save: "Salvează datele firmei",
       saving: "Se salvează…",
       saved: "Identitatea firmei a fost salvată. Scanările noi o vor folosi.",
       saveFailed: "Identitatea firmei nu a putut fi salvată.",

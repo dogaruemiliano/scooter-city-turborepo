@@ -239,7 +239,7 @@ export function scooterEditorDefaults(
   values.powertrainType = scooter ? scooter.powertrainType : "combustion";
   if (!scooter) values.vehicleCategory = "L1e";
   values.registrationType = scooter?.registrationType ?? "";
-  values.requiredLicenseCategory = scooter?.requiredLicenseCategory ?? "";
+  values.requiredLicenseCategory = scooter?.requiredLicenseCategory ?? "none";
   values.insurancePolicies =
     scooter?.insurancePolicies?.map(insuranceEditorDefaults) ?? [];
   return values;

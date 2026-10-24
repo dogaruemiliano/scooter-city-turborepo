@@ -2,6 +2,7 @@ import * as React from "react";
 
 import { cn } from "@repo/ui/lib/utils";
 import { Card, CardHeader, CardContent } from "./card";
+import { VerticalLine } from "./vertical-line";
 
 /**
  * Groups related fields inside a full-page form.
@@ -36,10 +37,7 @@ function FormSection({
   );
   const heading = title ? (
     <h2 className="flex min-w-0 items-center gap-3 text-base font-semibold normal-case tracking-normal wrap-anywhere">
-      <span
-        aria-hidden="true"
-        className="h-5 w-1 shrink-0 rounded-full bg-foreground"
-      />
+      <VerticalLine />
       {number != null ? `${String(number).padStart(2, "0")}. ` : ""}
       {title}
     </h2>

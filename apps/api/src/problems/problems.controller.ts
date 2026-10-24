@@ -291,11 +291,6 @@ export class ProblemsController {
     @Param("id") id: string,
     @Body() input: CloseInput,
   ) {
-    return this.problems.cancel(
-      user.id,
-      id,
-      input.revision,
-      input.clearMaintenanceHold,
-    );
+    return this.problems.cancel(user.id, id, input.revision);
   }
 }

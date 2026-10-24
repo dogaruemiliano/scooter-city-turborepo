@@ -214,9 +214,7 @@ export function removeDocumentPhoto(
   };
 }
 
-export function whatsappHrefForPhone(phone: string): string {
-  return `https://wa.me/${phone.replace(/\D/g, "")}`;
-}
+export { whatsappHrefForPhone } from "@/lib/person-contact";
 
 export function blankToNull(value: string): string | null {
   const trimmed = value.trim();

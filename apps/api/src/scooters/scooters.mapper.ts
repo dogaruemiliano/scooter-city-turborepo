@@ -10,6 +10,7 @@ import type {
 
 type ScooterRowWithBrand = ScooterRow & {
   insuranceAttention?: v1.scooters.InsuranceAttention | null;
+  rentalInsuranceStatus?: v1.scooters.Scooter["rentalInsuranceStatus"];
   photos?: { id: string }[];
   problems?: { difficulty: v1.problems.Problem["difficulty"] }[];
   _count?: { problems: number };
@@ -32,6 +33,16 @@ export function toScooter(row: ScooterRowWithBrand): v1.scooters.Scooter {
         }
       : {}),
     maintenanceHoldCount: row._count?.problems ?? 0,
+    rentalInsuranceStatus:
+      row.rentalInsuranceStatus ??
+      (row.insurancePolicies
+        ? v1.scooters.rentalInsuranceStatus(
+            row.insurancePolicies.map((policy) => ({
+              validFrom: toDateOnlyString(policy.validFrom),
+              validUntil: toDateOnlyString(policy.validUntil),
+            })),
+          )
+        : undefined),
     ...(row.photos
       ? {
           coverUrl: row.photos[0]

@@ -4,6 +4,12 @@
  */
 export const motion = {
   gesture: {
+    wizard: {
+      axisLockDistance: 8,
+      commitFraction: 0.25,
+      // Navigation underlays travel half as far as the foreground screen.
+      underlayTravelRatio: 0.5,
+    },
     sortableTrailingZone: 0.3,
     // Horizontal board edge hover speed in pixels per second.
     horizontalEdgeScrollSpeed: 320,

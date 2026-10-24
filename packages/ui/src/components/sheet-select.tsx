@@ -30,6 +30,8 @@ export interface SheetSelectOption {
   label: string;
   keywords?: readonly string[];
   disabled?: boolean;
+  /** Unavailable choices can be revealed only when searching. */
+  searchOnly?: boolean;
 }
 
 const SEARCH_KEYS: readonly FuzzySearchKey<SheetSelectOption>[] = [
@@ -143,7 +145,10 @@ function SheetSelect({
     )
     .join(", ");
   const filteredOptions = React.useMemo(
-    () => searchFuzzyIndex(searchIndex, query, options),
+    () =>
+      searchFuzzyIndex(searchIndex, query, options).filter(
+        (option) => query.trim() || !option.searchOnly,
+      ),
     [options, query, searchIndex],
   );
 

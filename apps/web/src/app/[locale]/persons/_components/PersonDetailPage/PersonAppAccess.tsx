@@ -75,7 +75,7 @@ export function PersonAppAccess({ personId }: { personId: string }) {
           </div>
         </>
       )}
-      <Feedback error={task.error} success={task.success} />
+      <Feedback error={task.error} />
     </section>
   );
 }

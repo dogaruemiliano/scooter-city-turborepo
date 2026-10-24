@@ -48,6 +48,17 @@ export function canVisit(
   return action ? canAccess(user, action) : false;
 }
 
+/** Scoped service workers use the problems workspace as their home screen. */
+export function usesServiceDashboard(
+  user: AccessIdentity | null | undefined,
+): boolean {
+  return (
+    canAccess(user, "problems.read") &&
+    !canAccess(user, "problems.read", "ALL") &&
+    !canAccess(user, "scooters.read", "ALL")
+  );
+}
+
 export function canManageUser(
   actor: (AccessIdentity & { id?: string }) | null | undefined,
   target: {

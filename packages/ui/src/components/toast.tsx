@@ -1,6 +1,12 @@
 "use client";
 
-import type { ComponentProps, ReactNode } from "react";
+import {
+  useLayoutEffect,
+  useRef,
+  type ComponentProps,
+  type ReactNode,
+  type RefObject,
+} from "react";
 import { Toast as Primitive } from "@base-ui/react/toast";
 import type { ToastManagerAddOptions } from "@base-ui/react/toast";
 import {
@@ -27,6 +33,14 @@ export type ToastOptions = Omit<
   "type"
 > & {
   variant?: ToastVariant;
+  /** Recovery-only feedback stays visible until the feature resolves it. */
+  dismissible?: boolean;
+  /** Follow this surface above its current position, at the same width. */
+  anchorRef?: RefObject<HTMLElement | null>;
+  /** Icon actions can occupy the trailing close-control position. */
+  actionPlacement?: "trailing";
+  /** Replace the action content with a spinner and block repeat activation. */
+  actionPending?: boolean;
 };
 export type ToastPosition =
   | "top-start"
@@ -133,86 +147,269 @@ function ToastViewport({
           viewportClassName,
         )}
       >
-        {toasts.map((toast) => {
-          const variant: ToastVariant =
-            toast.type && toast.type in icons
-              ? (toast.type as ToastVariant)
-              : "neutral";
-          const Icon = icons[variant];
-          return (
-            <Primitive.Root
+        {toasts
+          .filter((toast) => !toast.data?.anchorRef)
+          .map((toast) => (
+            <ToastItem
               key={toast.id}
               toast={toast}
-              swipeDirection={position.startsWith("top") ? "up" : "down"}
-              data-slot="toast"
-              data-variant={variant}
-              className={cn(
-                "pointer-events-auto rounded-xl bg-card p-4 text-card-foreground shadow-lg transition-[opacity,transform] duration-normal ease-decelerate outline-none focus-visible:ring-2 focus-visible:ring-ring data-starting-style:-translate-y-2 data-starting-style:opacity-0 data-ending-style:opacity-0 data-limited:hidden motion-reduce:transition-none",
-                surface === "floating" &&
-                  "supports-[backdrop-filter:blur(0)]:bg-floating-action-surface supports-[backdrop-filter:blur(0)]:backdrop-blur-floating-surface",
-                toastClassName,
-              )}
-            >
-              <Primitive.Content className="flex items-start gap-3">
-                <span
-                  aria-hidden="true"
-                  className={cn(
-                    "flex size-5 shrink-0 items-center justify-center",
-                    tones[variant],
-                  )}
-                >
-                  {renderIcon ? (
-                    renderIcon(variant)
-                  ) : (
-                    <Icon
-                      className={cn(
-                        "size-5",
-                        variant === "loading" &&
-                          "animate-spin motion-reduce:animate-none",
-                      )}
-                    />
-                  )}
-                </span>
-                <div className="flex min-w-0 flex-1 flex-col gap-1">
-                  <Primitive.Title className="text-sm font-semibold wrap-anywhere" />
-                  <Primitive.Description className="text-sm text-muted-foreground wrap-anywhere" />
-                  {toast.actionProps ? (
-                    <Primitive.Action
-                      className={cn(
-                        buttonVariants({ variant: "text", size: "sm" }),
-                        "mt-2 self-start",
-                      )}
-                    />
-                  ) : null}
-                </div>
-                <Primitive.Close
-                  aria-hidden={false}
-                  aria-label={closeLabel}
-                  className={buttonVariants({
-                    variant: "ghost",
-                    size: "icon-xs",
-                  })}
-                >
-                  <XIcon aria-hidden="true" />
-                </Primitive.Close>
-              </Primitive.Content>
-            </Primitive.Root>
-          );
-        })}
+              position={position}
+              surface={surface}
+              closeLabel={closeLabel}
+              toastClassName={toastClassName}
+              renderIcon={renderIcon}
+            />
+          ))}
       </Primitive.Viewport>
+      {toasts
+        .filter((toast) => toast.data?.anchorRef)
+        .map((toast) => (
+          <AnchoredToastViewport
+            key={toast.id}
+            anchorRef={toast.data!.anchorRef as RefObject<HTMLElement | null>}
+            label={viewportLabel}
+          >
+            <ToastItem
+              toast={toast}
+              position={position}
+              surface={surface}
+              closeLabel={closeLabel}
+              toastClassName={toastClassName}
+              renderIcon={renderIcon}
+            />
+          </AnchoredToastViewport>
+        ))}
     </Primitive.Portal>
+  );
+}
+
+function AnchoredToastViewport({
+  anchorRef,
+  label,
+  children,
+}: {
+  anchorRef: RefObject<HTMLElement | null>;
+  label: string;
+  children: ReactNode;
+}) {
+  const viewport = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const anchor = anchorRef.current;
+    const popup = viewport.current;
+    if (!anchor || !popup) return;
+    let frame = 0;
+    const measure = () => {
+      frame = 0;
+      const rect = anchor.getBoundingClientRect();
+      popup.style.left = `${rect.left}px`;
+      popup.style.width = `${rect.width}px`;
+      popup.style.top = `calc(${rect.top}px - var(--spacing-3))`;
+      popup.style.visibility =
+        anchor.isConnected && rect.width > 0 ? "visible" : "hidden";
+      if (
+        anchor
+          .getAnimations()
+          .some((animation) => animation.playState === "running")
+      )
+        schedule();
+    };
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(measure);
+    };
+    measure();
+    const observer = new ResizeObserver(schedule);
+    observer.observe(anchor);
+    window.addEventListener("scroll", schedule, {
+      capture: true,
+      passive: true,
+    });
+    window.addEventListener("resize", schedule);
+    window.visualViewport?.addEventListener("resize", schedule);
+    window.visualViewport?.addEventListener("scroll", schedule);
+    anchor.addEventListener("animationstart", schedule);
+    anchor.addEventListener("transitionrun", schedule);
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+      window.removeEventListener("scroll", schedule, true);
+      window.removeEventListener("resize", schedule);
+      window.visualViewport?.removeEventListener("resize", schedule);
+      window.visualViewport?.removeEventListener("scroll", schedule);
+      anchor.removeEventListener("animationstart", schedule);
+      anchor.removeEventListener("transitionrun", schedule);
+    };
+  }, [anchorRef]);
+  return (
+    <Primitive.Viewport
+      ref={viewport}
+      aria-label={label}
+      data-slot="anchored-toast-viewport"
+      className="pointer-events-none fixed z-toast -translate-y-full outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      {children}
+    </Primitive.Viewport>
+  );
+}
+
+function ToastItem({
+  toast,
+  position,
+  surface,
+  closeLabel,
+  toastClassName,
+  renderIcon,
+}: {
+  toast: ComponentProps<typeof Primitive.Root>["toast"];
+} & Pick<ToastProviderProps, "toastClassName" | "renderIcon"> &
+  Required<Pick<ToastProviderProps, "position" | "surface" | "closeLabel">>) {
+  const variant: ToastVariant =
+    toast.type && toast.type in icons
+      ? (toast.type as ToastVariant)
+      : "neutral";
+  const Icon = icons[variant];
+  const displayedToast =
+    toast.data?.actionPending && toast.actionProps
+      ? {
+          ...toast,
+          actionProps: {
+            ...toast.actionProps,
+            children: (
+              <LoaderCircleIcon
+                aria-hidden="true"
+                className="animate-spin motion-reduce:animate-none"
+              />
+            ),
+            disabled: true,
+            "aria-busy": true as const,
+          },
+        }
+      : toast;
+  const hasDescription =
+    typeof toast.description === "string"
+      ? Boolean(toast.description.trim())
+      : Boolean(toast.description);
+  return (
+    <Primitive.Root
+      toast={displayedToast}
+      onKeyDownCapture={(event) => {
+        if (toast.data?.dismissible === false && event.key === "Escape") {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+      }}
+      swipeDirection={
+        toast.data?.dismissible === false
+          ? []
+          : position.startsWith("top")
+            ? "up"
+            : "down"
+      }
+      data-slot="toast"
+      data-variant={variant}
+      className={cn(
+        "pointer-events-auto rounded-xl bg-card p-4 text-card-foreground shadow-lg transition-[opacity,transform] duration-normal ease-decelerate outline-none focus-visible:ring-2 focus-visible:ring-ring data-starting-style:-translate-y-2 data-starting-style:opacity-0 data-ending-style:opacity-0 data-limited:hidden motion-reduce:transition-none",
+        surface === "floating" &&
+          "supports-[backdrop-filter:blur(0)]:bg-floating-action-surface supports-[backdrop-filter:blur(0)]:backdrop-blur-floating-surface",
+        toastClassName,
+      )}
+    >
+      <Primitive.Content
+        className={cn(
+          "flex gap-3",
+          hasDescription ? "items-start" : "items-center",
+        )}
+      >
+        <span
+          aria-hidden="true"
+          className={cn(
+            "flex size-5 shrink-0 items-center justify-center",
+            tones[variant],
+          )}
+        >
+          {renderIcon ? (
+            renderIcon(variant)
+          ) : (
+            <Icon
+              className={cn(
+                "size-5",
+                variant === "loading" &&
+                  "animate-spin motion-reduce:animate-none",
+              )}
+            />
+          )}
+        </span>
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <Primitive.Title className="text-sm font-semibold wrap-anywhere" />
+          {hasDescription ? (
+            <Primitive.Description className="text-sm text-muted-foreground wrap-anywhere" />
+          ) : null}
+          {toast.actionProps && toast.data?.actionPlacement !== "trailing" ? (
+            <Primitive.Action
+              disabled={
+                Boolean(toast.data?.actionPending) || toast.actionProps.disabled
+              }
+              aria-busy={toast.data?.actionPending ? true : undefined}
+              className={cn(
+                buttonVariants({ variant: "text", size: "sm" }),
+                "mt-2 self-start",
+              )}
+            />
+          ) : null}
+        </div>
+        {toast.actionProps && toast.data?.actionPlacement === "trailing" ? (
+          <Primitive.Action
+            disabled={
+              Boolean(toast.data?.actionPending) || toast.actionProps.disabled
+            }
+            aria-busy={toast.data?.actionPending ? true : undefined}
+            className={buttonVariants({ variant: "ghost", size: "icon-xs" })}
+          />
+        ) : null}
+        {toast.data?.dismissible !== false ? (
+          <Primitive.Close
+            aria-hidden={false}
+            aria-label={closeLabel}
+            className={buttonVariants({
+              variant: "ghost",
+              size: "icon-xs",
+            })}
+          >
+            <XIcon aria-hidden="true" />
+          </Primitive.Close>
+        ) : null}
+      </Primitive.Content>
+    </Primitive.Root>
   );
 }
 
 function options({
   variant,
+  dismissible,
+  anchorRef,
+  actionPlacement,
+  actionPending,
   ...rest
 }: ToastOptions): ToastManagerAddOptions<Record<string, unknown>> {
   return {
     ...rest,
     ...(variant ? { type: variant } : {}),
+    ...(dismissible !== undefined ||
+    anchorRef !== undefined ||
+    actionPlacement !== undefined ||
+    actionPending !== undefined
+      ? {
+          data: {
+            ...rest.data,
+            ...(dismissible !== undefined ? { dismissible } : {}),
+            ...(anchorRef ? { anchorRef } : {}),
+            ...(actionPlacement ? { actionPlacement } : {}),
+            ...(actionPending !== undefined ? { actionPending } : {}),
+          },
+        }
+      : {}),
+    ...(dismissible === false ? { timeout: 0 } : {}),
     ...(variant === "error" || variant === "loading"
-      ? { timeout: rest.timeout ?? 0 }
+      ? { timeout: dismissible === false ? 0 : (rest.timeout ?? 0) }
       : {}),
   };
 }

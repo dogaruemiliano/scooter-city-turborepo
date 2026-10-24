@@ -1,4 +1,6 @@
 "use client";
+import { useFormAction } from "@/lib/form/use-form-action";
+import { SaveButton } from "@repo/ui/components/save-button";
 
 import { useEffect, useRef, useState } from "react";
 import { v1 } from "@repo/api-shared";
@@ -28,6 +30,8 @@ export function ProblemPhotos({
   onBusyChange: (busy: boolean) => void;
   onReload?: () => Promise<void>;
 }) {
+  const formAction = useFormAction();
+
   const t = useTranslations("workspace.problems");
   const galleryT = useTranslations("scooters.photos");
   const task = useTask();
@@ -168,7 +172,7 @@ export function ProblemPhotos({
         <>
           <div className="flex flex-wrap gap-2">
             {pending.length ? (
-              <Button
+              <SaveButton
                 disabled={busy}
                 onClick={() =>
                   void task.run(async () => {
@@ -222,9 +226,12 @@ export function ProblemPhotos({
                     setPending([]);
                   })
                 }
-              >
-                {t("savePhotos")}
-              </Button>
+                {...formAction(
+                  "save",
+                  { pending: busy, error: task.error },
+                  t("savePhotos"),
+                )}
+              />
             ) : null}
           </div>
           {pending.map((photo) => (

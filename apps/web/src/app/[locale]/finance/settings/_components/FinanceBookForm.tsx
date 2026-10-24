@@ -1,13 +1,9 @@
 "use client";
+import { useFormAction } from "@/lib/form/use-form-action";
+import { SaveButton } from "@repo/ui/components/save-button";
 
 import { ApiError, v1 } from "@repo/api-shared";
-import {
-  Alert,
-  AlertDescription,
-  Button,
-  FieldGroup,
-  Spinner,
-} from "@repo/ui/components";
+import { Alert, AlertDescription, FieldGroup } from "@repo/ui/components";
 import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { useId, useState } from "react";
@@ -33,6 +29,8 @@ export function FinanceBookForm({
   disabled: boolean;
   onSaved: (book: v1.finance.FinanceBook) => void;
 }) {
+  const formAction = useFormAction();
+
   const t = useTranslations("finance.configuration");
   const bookLabels = useTranslations("finance.books");
   const locale = useLocale();
@@ -111,26 +109,27 @@ export function FinanceBookForm({
           {disabled ? (
             <p className="text-sm text-muted-foreground">{t("companyFirst")}</p>
           ) : null}
-          {saved && !form.formState.isDirty ? (
-            <p role="status" className="text-sm text-muted-foreground">
-              {t("saved")}
-            </p>
-          ) : null}
           {error ? (
             <Alert variant="destructive">
               <AlertDescription>{t(error)}</AlertDescription>
             </Alert>
           ) : null}
           <div className="flex justify-end">
-            <Button
+            <SaveButton
               type="submit"
               disabled={
                 disabled || saving || (!!book && !form.formState.isDirty)
               }
-            >
-              {saving ? <Spinner /> : null}
-              {saving ? t("saving") : book ? t("save") : t("create")}
-            </Button>
+              {...formAction(
+                book ? "save" : "create",
+                {
+                  pending: saving,
+                  error: error,
+                  success: saved && !form.formState.isDirty,
+                },
+                book ? t("save") : t("create"),
+              )}
+            />
           </div>
         </form>
       </FormProvider>

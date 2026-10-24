@@ -236,6 +236,7 @@ export const updateProblemInputSchema = revisionInputSchema
   });
 export const resolveProblemInputSchema = revisionInputSchema.extend({
   resolutionNotes: z.string().trim().min(1).max(4000),
+  /** @deprecated Accepted for older clients; closing always clears this problem’s hold. */
   clearMaintenanceHold: z.boolean().optional(),
 });
 export const assignProblemInputSchema = revisionInputSchema
@@ -282,6 +283,7 @@ export const problemConversationTypes = [
 ] as const;
 
 export const closeProblemInputSchema = revisionInputSchema.extend({
+  /** @deprecated Accepted for older clients; closing always clears this problem’s hold. */
   clearMaintenanceHold: z.boolean().optional(),
 });
 export const problemHoldInputSchema = revisionInputSchema.extend({

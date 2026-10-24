@@ -1,9 +1,10 @@
-import { act, renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { NextIntlClientProvider } from "next-intl";
 import { messages } from "@repo/i18n";
 import { ApiError } from "@repo/api-shared";
 import type { ReactNode } from "react";
+import { WorkspaceNotifications } from "./WorkspaceNotifications";
 import { useRemote, useTask } from "./WorkspaceForm";
 
 describe("useRemote list request state", () => {
@@ -80,4 +81,26 @@ it("shows a specific maintenance-hold error instead of suggesting a stale-record
   expect(result.current.error).toBe(
     "Clear all blocking problems before rental creation.",
   );
+});
+
+it("only announces explicitly labelled successful writes, never preview-only work", async () => {
+  const { result } = renderHook(() => useTask(), {
+    wrapper: ({ children }: { children: ReactNode }) => (
+      <NextIntlClientProvider locale="en" messages={messages.en}>
+        <WorkspaceNotifications>{children}</WorkspaceNotifications>
+      </NextIntlClientProvider>
+    ),
+  });
+  await act(async () =>
+    result.current.run(async () => false, {
+      successMessage: "Permissions saved",
+    }),
+  );
+  expect(screen.queryByText("Permissions saved")).toBeNull();
+  await act(async () => result.current.run(async () => {}));
+  expect(screen.queryByText("Changes saved.")).toBeNull();
+  await act(async () =>
+    result.current.run(async () => {}, { successMessage: "Permissions saved" }),
+  );
+  expect(await screen.findByText("Permissions saved")).toBeInTheDocument();
 });

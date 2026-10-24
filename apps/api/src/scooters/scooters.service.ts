@@ -1,3 +1,4 @@
+import { activeMaintenanceHoldWhere } from "../problems/maintenance-hold";
 import { writeInsurancePolicies } from "./scooter-insurance";
 import { CivVocabularyService } from "./civ-vocabulary.service";
 import { civMetadataWrite } from "./civ-metadata";
@@ -24,7 +25,7 @@ const galleryCoverPhotos = {
 } satisfies Prisma.Scooter$photosArgs;
 
 const maintenanceCount = {
-  select: { problems: { where: { blocksUsage: true } } },
+  select: { problems: { where: activeMaintenanceHoldWhere } },
 } as const;
 
 const scooterInclude = {
@@ -38,7 +39,7 @@ const scooterInclude = {
 const scooterListInclude = {
   problems: {
     where: {
-      OR: [{ status: { in: ["open", "in_progress"] } }, { blocksUsage: true }],
+      status: { in: ["open", "in_progress"] },
     },
     select: { difficulty: true },
   },
@@ -56,6 +57,13 @@ function toScooterListRow({
 }>): ScooterWithBrand {
   return {
     ...scooter,
+    // No warning can also mean no policy; rental readiness must distinguish it.
+    rentalInsuranceStatus: v1.scooters.rentalInsuranceStatus(
+      insurancePolicies.map((policy) => ({
+        validFrom: toDateOnlyString(policy.validFrom),
+        validUntil: toDateOnlyString(policy.validUntil),
+      })),
+    ),
     insuranceAttention: v1.scooters.insuranceAttention(
       insurancePolicies.map((policy) => ({
         validFrom: toDateOnlyString(policy.validFrom),
@@ -67,6 +75,7 @@ function toScooterListRow({
 
 type ScooterWithBrand = Scooter & {
   insuranceAttention?: v1.scooters.InsuranceAttention | null;
+  rentalInsuranceStatus?: v1.scooters.Scooter["rentalInsuranceStatus"];
   brand: { name: string; code: string };
 };
 

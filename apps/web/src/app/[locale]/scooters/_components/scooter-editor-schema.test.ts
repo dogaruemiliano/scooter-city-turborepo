@@ -223,7 +223,7 @@ describe("scooter editor conversion", () => {
     expect(defaults.powertrainType).toBe("combustion");
     expect(defaults.vehicleCategory).toBe("L1e");
     expect(defaults.registrationType).toBe("");
-    expect(defaults.requiredLicenseCategory).toBe("");
+    expect(defaults.requiredLicenseCategory).toBe("none");
     expect(defaults.hasGps).toBe("");
     expect(defaults.odometerWorking).toBe("");
     expect(defaults.speedometerWorking).toBe("");

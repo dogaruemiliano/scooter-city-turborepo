@@ -361,6 +361,11 @@ export const tokens = {
   },
   motion: {
     gesture: {
+      wizard: {
+        axisLockDistance: 8,
+        commitFraction: 0.25,
+        underlayTravelRatio: 0.5,
+      },
       sortableTrailingZone: 0.3,
       horizontalEdgeScrollSpeed: 320,
     },

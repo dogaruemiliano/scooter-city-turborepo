@@ -1,4 +1,6 @@
 "use client";
+import { useFormAction } from "@/lib/form/use-form-action";
+import { SaveButton } from "@repo/ui/components/save-button";
 
 import { TriangleAlert } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -90,6 +92,8 @@ export function PermissionDependencyDialog({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
+  const formAction = useFormAction();
+
   const t = useTranslations("access.editor.dependenciesUi");
   const labels = useTranslations("access.permissions");
   const editorText = useTranslations("access.editor");
@@ -142,16 +146,19 @@ export function PermissionDependencyDialog({
           <Button type="button" variant="outline" onClick={onCancel}>
             {t("keepUnchanged")}
           </Button>
-          <Button
+          <SaveButton
             type="button"
             variant="destructive"
             disabled={disabled || blocked.length > 0}
             onClick={onConfirm}
-          >
-            {change?.scopes.length
-              ? t("applyChanges")
-              : t("disableCount", { count: dependents.length + 1 })}
-          </Button>
+            {...formAction(
+              "confirm",
+              { pending: false },
+              change?.scopes.length
+                ? t("applyChanges")
+                : t("disableCount", { count: dependents.length + 1 }),
+            )}
+          />
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -38,17 +38,9 @@ import {
 } from "./ScooterDocumentUpload";
 import type { ScooterDocumentsEditor } from "./useScooterDocuments";
 import { CivMetadataFields } from "./CivMetadataFields";
-import { useScooterLicenseAutofill } from "./useScooterLicenseAutofill";
 import { useCivFieldHint } from "./useCivFieldHint";
 import { useCivVocabulary } from "./CivVocabularyContext";
-import {
-  Fragment,
-  useContext,
-  useEffect,
-  useId,
-  useState,
-  type ReactNode,
-} from "react";
+import { Fragment, useContext, useId, useState, type ReactNode } from "react";
 import type { DocumentImportResult } from "./scooter-document-import";
 import type { DocumentSource } from "./scooter-document-sources";
 import { OPERATIONAL_FIELDS, type ScooterWizardStep } from "./scooter-wizard";
@@ -121,14 +113,6 @@ export function ScooterEditorFields({
     keyName: "formKey",
   });
   const powertrain = useWatch({ control, name: "powertrainType" });
-  // Keep the manual/automatic license state alive while navigating the wizard.
-  const licenseAutofill = useScooterLicenseAutofill(
-    editing || step === "documents",
-  );
-  const onLicenseImport = licenseAutofill.onImport;
-  useEffect(() => {
-    if (importResult) onLicenseImport(importResult);
-  }, [importResult, onLicenseImport]);
   const { documentWarnings, clearDocumentWarnings } = useScooterImportReview();
   const fieldProps = { brands, onBrandCreated, disabled, powertrain };
   const showDocuments = canReadDocuments && (!step || step === "documents");
@@ -179,7 +163,6 @@ export function ScooterEditorFields({
       secondary
       sources={importSources}
       onApplyImport={onApplyImport}
-      onImport={licenseAutofill.onImport}
       insuranceFiles={[
         ...documents.existing,
         ...documents.drafts.map((doc) => ({
@@ -334,10 +317,7 @@ export function ScooterEditorFields({
         </FormSection>
       ) : null}
       {showRegistration && !editing ? (
-        <ScooterInitialRegistrationFields
-          disabled={disabled}
-          onManualLicenseChange={licenseAutofill.onManualLicenseChange}
-        />
+        <ScooterInitialRegistrationFields disabled={disabled} />
       ) : null}
       {!step || step === "insurance" ? (
         <ScooterInsuranceFields
@@ -691,13 +671,11 @@ const uppercaseIdentifier = (value: string) => value.toUpperCase();
 
 export function ScooterInitialRegistrationFields({
   disabled,
-  onManualLicenseChange,
   panel = false,
   number,
   status,
 }: {
   disabled: boolean;
-  onManualLicenseChange: () => void;
   panel?: boolean;
   number?: number;
   status?: import("react").ReactNode;
@@ -744,8 +722,6 @@ export function ScooterInitialRegistrationFields({
               });
               clearErrors("requiredLicenseCategory");
             } else {
-              if (!registered)
-                setValue("requiredLicenseCategory", "", { shouldDirty: true });
               if (value !== "temporary") {
                 setValue("temporaryRegistrationExpiresAt", "", {
                   shouldDirty: true,
@@ -781,6 +757,7 @@ export function ScooterInitialRegistrationFields({
           >
             <FormInput
               autoCapitalize="characters"
+              normalize={uppercaseIdentifier}
               placeholder={t(
                 `placeholders.registrationNumber.${registrationType}`,
               )}
@@ -794,7 +771,6 @@ export function ScooterInitialRegistrationFields({
           >
             <FormSelect
               placeholder={t("placeholders.requiredLicenseCategory")}
-              onValueChange={onManualLicenseChange}
               options={v1.scooters.SCOOTER_REQUIRED_DRIVER_LICENSE_TYPES.map(
                 (value) => ({
                   value,

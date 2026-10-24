@@ -1,4 +1,6 @@
 "use client";
+import { useFormAction } from "@/lib/form/use-form-action";
+import { SaveButton } from "@repo/ui/components/save-button";
 
 import { useState } from "react";
 import { Trash2 } from "lucide-react";
@@ -24,6 +26,8 @@ export function SectionDeleteAction({
   busy: boolean;
   onDelete: () => Promise<boolean | void>;
 }) {
+  const formAction = useFormAction();
+
   const t = useTranslations("workspace.problems");
   const shared = useTranslations("workspace");
   const [open, setOpen] = useState(false);
@@ -71,7 +75,7 @@ export function SectionDeleteAction({
             <Feedback error={task.error} />
           </BottomSheetBody>
           <BottomSheetFooter>
-            <Button
+            <SaveButton
               type="button"
               variant="destructive"
               disabled={blocked}
@@ -82,9 +86,12 @@ export function SectionDeleteAction({
                   setOpen(false);
                 });
               }}
-            >
-              {title}
-            </Button>
+              {...formAction(
+                "delete",
+                { pending: task.busy, error: task.error },
+                title,
+              )}
+            />
             <Button
               type="button"
               variant="ghost"

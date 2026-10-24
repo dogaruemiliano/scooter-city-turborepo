@@ -1,5 +1,15 @@
 export const workspaceCatalog = {
   en: {
+    personSelect: {
+      personSelect: "Select person",
+      personSearch: "Search by name, phone or email",
+      clearSearch: "Clear search",
+      close: "Close",
+      loading: "Loading people…",
+      noPersons: "No people found.",
+      addPerson: "Add person",
+      retry: "Reload options",
+    },
     scooterSelect: {
       select: "Select scooter",
       edit: "Edit",
@@ -163,6 +173,8 @@ export const workspaceCatalog = {
         "Removing a role keeps individual permission overrides. Review the effective access below.",
       preview: "Review changes",
       confirm: "Confirm changes",
+      memberUpdated: "Member access saved",
+      roleUpdated: "Role permissions saved",
       review: "Review effective access",
       members: "Members",
       archive: "Archive role",
@@ -333,11 +345,6 @@ export const workspaceCatalog = {
       maintenanceHold: "Maintenance hold",
       clearHold: "Clear this problem’s hold",
       setHold: "Block scooter use",
-      holdHelp:
-        "This problem blocks scooter use until its hold is explicitly cleared. Closing the report alone does not clear it.",
-      holdDecision: "When closing this report",
-      retainHold: "Keep the maintenance hold",
-      clearThisHold: "Clear this problem’s hold",
       holdCleared: "This problem’s hold was cleared",
       previousResolution: "Previous resolution note",
       editReport: "Edit report",
@@ -428,6 +435,71 @@ export const workspaceCatalog = {
       urgent: "Urgent",
     },
     rentals: {
+      wizard: {
+        eligibleScootersHint:
+          "Only registered, insured scooters without service holds are listed. Search to see unavailable scooters and their reasons.",
+        registrationMissing: "No registration",
+        registrationExpired: "Temporary registration expired",
+        insuranceMissing: "No insurance recorded",
+        insuranceExpired: "Insurance expired",
+        insuranceUpcoming: "Insurance is not active yet",
+        insuranceReview: "Insurance dates need review",
+        serviceHold: "Held for service",
+        eligibilityUnknown: "Rental eligibility could not be verified",
+        details: "Rental details",
+        review: "Review rental",
+        progress: "Create rental progress",
+        description:
+          "Rentals run in weekly periods. Choose a start date; the first week is calculated for you.",
+        personSelect: "Select person",
+        personSearch: "Search by name, phone or email",
+        clearSearch: "Clear search",
+        close: "Close",
+        loading: "Loading people and scooters…",
+        noPersons: "No people found.",
+        addPerson: "Add person",
+        retry: "Reload options",
+        resume: "Resume rental",
+        startDate: "Start date",
+        period: "First week: {start} – {end}",
+        dateHint: "The first period lasts one week from the start date.",
+        timeZone:
+          "Calendar days in {timeZone}; each period starts at midnight.",
+        personRequired: "Select a person.",
+        scooterRequired: "Select a scooter.",
+        dateRequired: "Enter a complete, valid start date.",
+        personUnavailable:
+          "This person is no longer available. Select another person.",
+        scooterUnavailable:
+          "This scooter is no longer available. Select another scooter.",
+        editDetails: "Edit rental details",
+        customerNotesHint: "The renter can see these notes.",
+        internalNotesHint: "Only staff can see these notes.",
+        validationError:
+          "Check the rental details and notes before creating it.",
+        storageError:
+          "Your latest changes could not be saved in this browser. Keep this page open and try saving again before leaving.",
+        uncertain:
+          "The creation result is unknown. Check the rentals list before starting another rental; this request may already have succeeded.",
+        checkRentals: "Check rentals",
+        confirmNotCreated: "I checked; no rental was created",
+        saved: "Draft saved in this browser.",
+        autosave: "Drafts save in this browser after you complete this step.",
+        unsaved: "Latest changes are not saved.",
+        discard: "Delete draft",
+        leaveTitle: "Leave rental creation?",
+        leaveDescription:
+          "Save this draft in this browser to continue later, or discard it. Any person you already created will remain saved.",
+        saveDraft: "Save draft",
+        keepEditing: "Keep editing",
+        back: "Back",
+        permissionLost:
+          "You no longer have permission to create rentals. Your saved draft has been kept.",
+        alreadyCreated: "This rental has already been created.",
+        openRental: "Open rental",
+        backToRental: "Back to rental",
+        continue: "Continue to review",
+      },
       maintenanceHold:
         "This scooter is on maintenance hold. Clear every blocking problem before creating a rental or handing it over.",
       title: "Rentals",
@@ -458,6 +530,16 @@ export const workspaceCatalog = {
     },
   },
   ro: {
+    personSelect: {
+      personSelect: "Selectează persoana",
+      personSearch: "Caută după nume, telefon sau e-mail",
+      clearSearch: "Șterge căutarea",
+      close: "Închide",
+      loading: "Se încarcă persoanele…",
+      noPersons: "Nu s-au găsit persoane.",
+      addPerson: "Adaugă persoană",
+      retry: "Reîncarcă opțiunile",
+    },
     scooterSelect: {
       select: "Selectează scuter",
       edit: "Editează",
@@ -629,6 +711,8 @@ export const workspaceCatalog = {
         "Eliminarea unui rol păstrează permisiunile individuale. Verifică accesul efectiv de mai jos.",
       preview: "Verifică modificările",
       confirm: "Confirmă modificările",
+      memberUpdated: "Accesul membrului a fost salvat",
+      roleUpdated: "Permisiunile rolului au fost salvate",
       review: "Verifică accesul efectiv",
       members: "Membri",
       archive: "Arhivează rolul",
@@ -803,11 +887,6 @@ export const workspaceCatalog = {
       maintenanceHold: "Blocaj pentru mentenanță",
       clearHold: "Elimină blocajul acestei probleme",
       setHold: "Blochează utilizarea scuterului",
-      holdHelp:
-        "Această problemă blochează utilizarea scuterului până la eliminarea explicită a blocajului. Închiderea raportului nu îl elimină automat.",
-      holdDecision: "La închiderea acestui raport",
-      retainHold: "Păstrează blocajul pentru mentenanță",
-      clearThisHold: "Elimină blocajul acestei probleme",
       holdCleared: "Blocajul acestei probleme a fost eliminat",
       previousResolution: "Nota rezolvării anterioare",
       editReport: "Editează raportul",
@@ -900,6 +979,73 @@ export const workspaceCatalog = {
       urgent: "Urgentă",
     },
     rentals: {
+      wizard: {
+        eligibleScootersHint:
+          "Sunt afișate doar scuterele înmatriculate, asigurate și fără blocaje de service. Caută pentru a vedea scuterele indisponibile și motivele.",
+        registrationMissing: "Fără înmatriculare",
+        registrationExpired: "Înmatricularea temporară a expirat",
+        insuranceMissing: "Fără asigurare înregistrată",
+        insuranceExpired: "Asigurare expirată",
+        insuranceUpcoming: "Asigurarea nu este încă activă",
+        insuranceReview: "Datele asigurării necesită verificare",
+        serviceHold: "Blocat pentru service",
+        eligibilityUnknown:
+          "Eligibilitatea pentru închiriere nu a putut fi verificată",
+        details: "Detalii închiriere",
+        review: "Verifică închirierea",
+        progress: "Progres creare închiriere",
+        description:
+          "Închirierile au perioade săptămânale. Alege data de început; prima săptămână se calculează automat.",
+        personSelect: "Selectează persoana",
+        personSearch: "Caută după nume, telefon sau e-mail",
+        clearSearch: "Șterge căutarea",
+        close: "Închide",
+        loading: "Se încarcă persoanele și scuterele…",
+        noPersons: "Nu s-au găsit persoane.",
+        addPerson: "Adaugă persoană",
+        retry: "Reîncarcă opțiunile",
+        resume: "Continuă închirierea",
+        startDate: "Data de început",
+        period: "Prima săptămână: {start} – {end}",
+        dateHint: "Prima perioadă durează o săptămână de la data de început.",
+        timeZone:
+          "Zile calendaristice în {timeZone}; fiecare perioadă începe la miezul nopții.",
+        personRequired: "Selectează o persoană.",
+        scooterRequired: "Selectează un scuter.",
+        dateRequired: "Introdu o dată de început completă și validă.",
+        personUnavailable:
+          "Această persoană nu mai este disponibilă. Selectează altă persoană.",
+        scooterUnavailable:
+          "Acest scuter nu mai este disponibil. Selectează alt scuter.",
+        editDetails: "Editează detaliile închirierii",
+        customerNotesHint: "Chiriașul poate vedea aceste note.",
+        internalNotesHint: "Doar personalul poate vedea aceste note.",
+        validationError:
+          "Verifică detaliile și notele înainte de a crea închirierea.",
+        storageError:
+          "Ultimele modificări nu au putut fi salvate în acest browser. Păstrează pagina deschisă și încearcă să salvezi din nou înainte de a pleca.",
+        uncertain:
+          "Rezultatul creării nu este cunoscut. Verifică lista de închirieri înainte de a începe alta; este posibil ca cererea să fi reușit deja.",
+        checkRentals: "Verifică închirierile",
+        confirmNotCreated: "Am verificat; închirierea nu a fost creată",
+        saved: "Ciorna este salvată în acest browser.",
+        autosave:
+          "Ciorna se salvează în acest browser după ce finalizezi acest pas.",
+        unsaved: "Ultimele modificări nu sunt salvate.",
+        discard: "Șterge ciorna",
+        leaveTitle: "Părăsești crearea închirierii?",
+        leaveDescription:
+          "Salvează ciorna în acest browser pentru a continua mai târziu sau șterge-o. Orice persoană deja creată va rămâne salvată.",
+        saveDraft: "Salvează ciorna",
+        keepEditing: "Continuă editarea",
+        back: "Înapoi",
+        permissionLost:
+          "Nu mai ai permisiunea de a crea închirieri. Ciorna salvată a fost păstrată.",
+        alreadyCreated: "Această închiriere a fost deja creată.",
+        openRental: "Deschide închirierea",
+        backToRental: "Înapoi la închiriere",
+        continue: "Continuă la verificare",
+      },
       maintenanceHold:
         "Acest scuter este blocat pentru mentenanță. Elimină toate problemele care îi blochează utilizarea înainte de închiriere sau predare.",
       title: "Închirieri",

@@ -3,6 +3,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Button } from "@repo/ui/components/button";
 import { Card, CardContent } from "@repo/ui/components/card";
 import { FormActions } from "@repo/ui/components/form-actions";
+import { SaveButton } from "@repo/ui/components/save-button";
 
 const meta = {
   title: "Forms/FormActions",
@@ -34,6 +35,28 @@ export const WithStatus: Story = {
     <FormActions status="You have unsaved changes.">
       <Button variant="secondary">Cancel</Button>
       <Button>Review changes</Button>
+    </FormActions>
+  ),
+};
+
+/** Status gets its own row; mobile puts the primary action above secondary actions. */
+export const SplitWithStatus: Story = {
+  args: {
+    arrangement: "split",
+    ready: true,
+    status: "Funding details are ready for review.",
+  },
+  render: (args) => (
+    <FormActions {...args}>
+      <SaveButton
+        type="button"
+        idleLabel="Record funding"
+        pendingLabel="Recording funding…"
+        successLabel="Funding recorded"
+      />
+      <Button type="button" variant="outline">
+        Cancel
+      </Button>
     </FormActions>
   ),
 };

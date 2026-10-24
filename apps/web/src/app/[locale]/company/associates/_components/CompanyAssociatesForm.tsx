@@ -1,4 +1,6 @@
 "use client";
+import { useFormAction } from "@/lib/form/use-form-action";
+import { SaveButton } from "@repo/ui/components/save-button";
 
 import { v1 } from "@repo/api-shared";
 import {
@@ -12,10 +14,9 @@ import {
   CardTitle,
   FieldGroup,
   Separator,
-  Spinner,
 } from "@repo/ui/components";
 import { cn } from "@repo/ui/lib/utils";
-import { CheckCircle2Icon, PlusIcon, Trash2Icon } from "lucide-react";
+import { PlusIcon, Trash2Icon } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useState } from "react";
 import { FormProvider, useFieldArray, useWatch } from "react-hook-form";
@@ -66,6 +67,8 @@ export function CompanyAssociatesForm({
 }: {
   initialAssociates: v1.finance.CompanyAssociates;
 }) {
+  const formAction = useFormAction();
+
   const t = useTranslations("finance.associates");
   const locale = useLocale();
   const [associates, setAssociates] = useState(initialAssociates);
@@ -244,21 +247,21 @@ export function CompanyAssociatesForm({
                 <p className="text-sm text-destructive">{t("totalHint")}</p>
               ) : null}
             </div>
-            <Button
+            <SaveButton
               type="submit"
               disabled={saving || !form.formState.isDirty || !totalIsValid}
-            >
-              {saving ? <Spinner /> : null}
-              {saving ? t("saving") : t("save")}
-            </Button>
+              {...formAction(
+                "save",
+                {
+                  pending: saving,
+                  error: saveError,
+                  success: saved && !form.formState.isDirty,
+                },
+                t("save"),
+              )}
+            />
           </div>
 
-          {saved ? (
-            <Alert>
-              <CheckCircle2Icon aria-hidden="true" />
-              <AlertDescription>{t("saved")}</AlertDescription>
-            </Alert>
-          ) : null}
           {saveError ? (
             <Alert variant="destructive">
               <AlertDescription>{t("saveFailed")}</AlertDescription>

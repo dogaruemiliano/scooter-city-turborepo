@@ -1,4 +1,6 @@
 "use client";
+import { useFormAction } from "@/lib/form/use-form-action";
+import { SaveButton } from "@repo/ui/components/save-button";
 
 import { useOptionalSession } from "@/components/auth/SessionProvider";
 import { canAccess } from "@/lib/access";
@@ -15,7 +17,6 @@ import {
   Button,
   Input,
   Label,
-  Spinner,
 } from "@repo/ui/components";
 import { ArrowLeftIcon, CheckIcon, PlusIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -42,6 +43,8 @@ export function ExpenseSupplierPicker({
   detectedTaxIdentifier,
   onSupplierChange,
 }: ExpenseSupplierPickerProps) {
+  const formAction = useFormAction();
+
   const session = useOptionalSession();
   const canManageSuppliers = canAccess(
     session?.user,
@@ -97,7 +100,7 @@ export function ExpenseSupplierPicker({
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!canManageSuppliers) return;
+    if (busy || !canManageSuppliers) return;
     setBusy(true);
     setError(undefined);
     try {
@@ -262,10 +265,15 @@ export function ExpenseSupplierPicker({
               ) : null}
             </BottomSheetBody>
             <BottomSheetFooter>
-              <Button type="submit" disabled={busy || !name || !taxIdentifier}>
-                {busy ? <Spinner /> : null}
-                {busy ? t("saving") : t("save")}
-              </Button>
+              <SaveButton
+                type="submit"
+                disabled={busy || !name || !taxIdentifier}
+                {...formAction(
+                  "create",
+                  { pending: busy, error: error },
+                  editingId ? t("save") : t("create"),
+                )}
+              />
             </BottomSheetFooter>
           </form>
         )}

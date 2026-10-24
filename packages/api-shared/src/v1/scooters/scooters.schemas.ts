@@ -280,6 +280,9 @@ export const scooterSchema = z
     documents: scooterDocumentListSchema.optional(),
     insurancePolicies: z.array(insurancePolicySchema).optional(),
     insuranceAttention: insuranceAttentionSchema.nullable().optional(),
+    rentalInsuranceStatus: z
+      .enum(["missing", "active", "expired", "upcoming", "review"])
+      .optional(),
     ...civMetadataSchema.shape,
     ...scooterTechnicalDetailsSchema.shape,
     id: z.string(),

@@ -17,6 +17,7 @@ import {
 import { Button } from "@repo/ui/components/button";
 import { Input } from "@repo/ui/components/input";
 import { Label } from "@repo/ui/components/label";
+import { FormSection } from "@repo/ui/components/form-section";
 
 const meta = {
   title: "Shadcn/BottomSheet",
@@ -26,6 +27,45 @@ const meta = {
 
 export default meta;
 type Story = StoryObj<typeof meta>;
+
+function TitleExample({ title }: { title: string }) {
+  return (
+    <BottomSheet defaultOpen>
+      <BottomSheetTrigger render={<Button variant="outline" />}>
+        Open title example
+      </BottomSheetTrigger>
+      <BottomSheetContent>
+        <BottomSheetHeader>
+          <BottomSheetTitle>{title}</BottomSheetTitle>
+        </BottomSheetHeader>
+        <BottomSheetBody>
+          <FormSection title="Vehicle details" columns={1}>
+            <div className="grid gap-2">
+              <Label htmlFor="title-example-plate">Plate number</Label>
+              <Input id="title-example-plate" defaultValue="VL 18 188" />
+            </div>
+          </FormSection>
+        </BottomSheetBody>
+        <BottomSheetFooter>
+          <BottomSheetClose render={<Button variant="outline" />}>
+            Close
+          </BottomSheetClose>
+        </BottomSheetFooter>
+      </BottomSheetContent>
+    </BottomSheet>
+  );
+}
+
+/** Sheet and section headings share the same decorative vertical line. */
+export const TitleOnly: Story = {
+  render: () => <TitleExample title="Adaugă înmatriculare" />,
+};
+
+export const LongTitle: Story = {
+  render: () => (
+    <TitleExample title="Edit registration and verify the scooter’s registration details before saving" />
+  ),
+};
 
 export const Default: Story = {
   render: () => (

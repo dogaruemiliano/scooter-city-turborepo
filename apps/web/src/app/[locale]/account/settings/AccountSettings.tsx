@@ -1,5 +1,9 @@
 "use client";
+import { useWorkspaceNotifications } from "@/components/WorkspaceNotifications";
+import { useFormAction } from "@/lib/form/use-form-action";
+import { SaveButton } from "@repo/ui/components/save-button";
 
+import { useTranslations } from "next-intl";
 import { ApiError, v1 } from "@repo/api-shared";
 import {
   Alert,
@@ -60,6 +64,10 @@ export function AccountSettings({
   initialSessions,
   enabledMethods,
 }: AccountSettingsProps) {
+  const formAction = useFormAction();
+  const notifications = useWorkspaceNotifications();
+  const notificationText = useTranslations("shared.notifications");
+
   const router = useRouter();
   const pathname = usePathname();
   const { setUser: setSessionUser } = useSession();
@@ -72,6 +80,7 @@ export function AccountSettings({
 
   async function saveProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (savingProfile) return;
     setFeedback(null);
 
     const input = v1.auth.updateProfileInputSchema.safeParse({
@@ -125,6 +134,10 @@ export function AccountSettings({
       setSessions((current) =>
         current.filter((session) => session.id !== sessionId),
       );
+      notifications?.add({
+        title: notificationText("sessionRevoked"),
+        variant: "success",
+      });
       setFeedback({
         kind: "success",
         title: "Session revoked",
@@ -169,6 +182,12 @@ export function AccountSettings({
           (linked) => linked !== provider,
         ),
       }));
+      notifications?.add({
+        title: notificationText("providerUnlinked", {
+          provider: PROVIDER_LABELS[provider],
+        }),
+        variant: "success",
+      });
       setFeedback({
         kind: "success",
         title: `${PROVIDER_LABELS[provider]} unlinked`,
@@ -204,7 +223,7 @@ export function AccountSettings({
 
   return (
     <div className="mx-auto flex w-full max-w-screen-lg flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
-      {feedback ? (
+      {feedback && feedback.kind === "error" ? (
         <Alert variant={feedback.kind === "error" ? "destructive" : "default"}>
           <AlertTitle>{feedback.title}</AlertTitle>
           <AlertDescription>{feedback.message}</AlertDescription>
@@ -271,9 +290,18 @@ export function AccountSettings({
             </div>
           </CardContent>
           <CardFooter className="mt-4 justify-end">
-            <Button type="submit" disabled={savingProfile}>
-              {savingProfile ? "Saving..." : "Save profile"}
-            </Button>
+            <SaveButton
+              type="submit"
+              disabled={savingProfile}
+              {...formAction("save", {
+                pending: savingProfile,
+                error: feedback?.kind === "error",
+                success:
+                  feedback?.title === "Profile saved" &&
+                  firstName === (user.firstName ?? "") &&
+                  lastName === (user.lastName ?? ""),
+              })}
+            />
           </CardFooter>
         </form>
       </Card>
@@ -460,6 +488,8 @@ function ConfirmationDialog({
   disabled?: boolean;
   onConfirm: () => Promise<boolean>;
 }) {
+  const formAction = useFormAction();
+
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [typedConfirmation, setTypedConfirmation] = useState("");
@@ -521,14 +551,13 @@ function ConfirmationDialog({
           >
             Cancel
           </DialogClose>
-          <Button
+          <SaveButton
             type="button"
             variant="destructive"
             disabled={busy || !confirmationMatches}
             onClick={() => void confirm()}
-          >
-            {busy ? "Working..." : confirmLabel}
-          </Button>
+            {...formAction("confirm", { pending: busy }, confirmLabel)}
+          />
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -1,14 +1,13 @@
 "use client";
+import { useFormAction } from "@/lib/form/use-form-action";
+import { SaveButton } from "@repo/ui/components/save-button";
 import { useCallback, useState } from "react";
 import { v1 } from "@repo/api-shared";
 import {
   Badge,
   Button,
   Field,
-  FieldGroup,
   FieldLabel,
-  Input,
-  Textarea,
   ListEmpty,
   ListFilterSheet,
   ListItems,
@@ -19,7 +18,7 @@ import {
 } from "@repo/ui/components";
 import { useLocale, useTranslations } from "next-intl";
 import { z } from "zod";
-import { Link, useRouter } from "@/i18n/navigation";
+import { Link } from "@/i18n/navigation";
 import { useSession } from "@/components/auth/SessionProvider";
 import { canAccess } from "@/lib/access";
 import { webApi } from "@/lib/api";
@@ -30,7 +29,8 @@ import {
   useTask,
   WorkspacePage,
 } from "@/components/WorkspaceForm";
-import { EntityPicker } from "@/components/EntityPicker";
+import { RentalCreateAction } from "./RentalCreateAction";
+import { RentalPersonCard, RentalPersonsProvider } from "./RentalPersonCard";
 import { RentalListItem } from "./RentalListItem";
 
 type Rental = v1.rentals.Rental | v1.rentals.CustomerRental;
@@ -40,7 +40,14 @@ type RentalList = {
   page: number;
   pageSize: number;
 };
-export function RentalsWorkspace({
+export function RentalsWorkspace(props: { portal?: boolean; id?: string }) {
+  return (
+    <RentalPersonsProvider enabled={!props.portal}>
+      <RentalsWorkspaceContent {...props} />
+    </RentalPersonsProvider>
+  );
+}
+function RentalsWorkspaceContent({
   portal = false,
   id,
 }: {
@@ -52,7 +59,6 @@ export function RentalsWorkspace({
   const { user } = useSession();
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState<Rental["status"] | "">("");
-  const [creating, setCreating] = useState(false);
   const endpoint = portal ? "/v1/portal/rentals" : "/v1/rentals";
   const load = useCallback(async (): Promise<RentalList> => {
     if (id) {
@@ -127,6 +133,7 @@ export function RentalsWorkspace({
               appliedCount={Number(Boolean(status))}
               title={shared("list.filters")}
               applyLabel={shared("list.apply")}
+              applyingLabel={shared("list.applying")}
               resetLabel={shared("list.reset")}
               cancelLabel={shared("actions.cancel")}
               applyErrorLabel={shared("list.applyError")}
@@ -165,9 +172,7 @@ export function RentalsWorkspace({
           }
           action={
             !portal && canAccess(user, "rentals.create") ? (
-              <Button onClick={() => setCreating(!creating)}>
-                {creating ? t("cancel") : t("rentals.add")}
-              </Button>
+              <RentalCreateAction userId={user!.id} />
             ) : undefined
           }
           footer={
@@ -187,14 +192,6 @@ export function RentalsWorkspace({
             ) : undefined
           }
         >
-          {creating ? (
-            <CreateRental
-              onSaved={() => {
-                setCreating(false);
-                remote.reload();
-              }}
-            />
-          ) : null}
           <ListStatus
             initial={!remote.data}
             loading={remote.loading}
@@ -224,112 +221,6 @@ export function RentalsWorkspace({
     </WorkspacePage>
   );
 }
-function CreateRental({ onSaved }: { onSaved: () => void }) {
-  const t = useTranslations("workspace");
-  const task = useTask({
-    [v1.problems.MAINTENANCE_HOLD_ERROR_CODE]: t("rentals.maintenanceHold"),
-  });
-  const router = useRouter();
-  const [personId, setPerson] = useState("");
-  const [scooterId, setScooter] = useState("");
-  const [startsAt, setStarts] = useState("");
-  const [endsAt, setEnds] = useState("");
-  const [customerNotes, setCustomerNotes] = useState("");
-  const [internalNotes, setInternalNotes] = useState("");
-  return (
-    <form
-      className="flex flex-col gap-4 rounded-lg border p-4"
-      onSubmit={(event) => {
-        event.preventDefault();
-        void task.run(async () => {
-          const json = v1.rentals.createRentalInputSchema.parse({
-            personId,
-            scooterId,
-            startsAt: new Date(startsAt).toISOString(),
-            endsAt: new Date(endsAt).toISOString(),
-            customerNotes,
-            internalNotes,
-          });
-          const rental = await webApi.fetch(
-            "/v1/rentals",
-            v1.rentals.rentalSchema,
-            { method: "POST", json },
-          );
-          onSaved();
-          router.push(`/rentals/${rental.id}`);
-        });
-      }}
-    >
-      <EntityPicker
-        kind="persons"
-        label={t("rentals.person")}
-        value={personId}
-        onChange={setPerson}
-      />
-      <EntityPicker
-        kind="scooters"
-        label={t("rentals.scooter")}
-        value={scooterId}
-        onChange={setScooter}
-      />
-      <FieldGroup>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field>
-            <FieldLabel htmlFor="rental-start">
-              {t("rentals.startsAt")}
-            </FieldLabel>
-            <Input
-              id="rental-start"
-              type="datetime-local"
-              required
-              value={startsAt}
-              onChange={(event) => setStarts(event.target.value)}
-            />
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="rental-end">{t("rentals.endsAt")}</FieldLabel>
-            <Input
-              id="rental-end"
-              type="datetime-local"
-              min={startsAt}
-              required
-              value={endsAt}
-              onChange={(event) => setEnds(event.target.value)}
-            />
-          </Field>
-        </div>
-        <Field>
-          <FieldLabel htmlFor="customer-notes">
-            {t("rentals.customerNotes")}
-          </FieldLabel>
-          <Textarea
-            id="customer-notes"
-            value={customerNotes}
-            onChange={(event) => setCustomerNotes(event.target.value)}
-          />
-        </Field>
-        <Field>
-          <FieldLabel htmlFor="internal-notes">
-            {t("rentals.internalNotes")}
-          </FieldLabel>
-          <Textarea
-            id="internal-notes"
-            value={internalNotes}
-            onChange={(event) => setInternalNotes(event.target.value)}
-          />
-        </Field>
-      </FieldGroup>
-      <Feedback error={task.error} />
-      <Button
-        type="submit"
-        className="self-start"
-        disabled={task.busy || !personId || !scooterId}
-      >
-        {t("rentals.add")}
-      </Button>
-    </form>
-  );
-}
 function RentalDetail({
   rental,
   portal,
@@ -339,6 +230,8 @@ function RentalDetail({
   portal: boolean;
   reload: () => void;
 }) {
+  const formAction = useFormAction();
+
   const t = useTranslations("workspace");
   const locale = useLocale();
   const { user } = useSession();
@@ -370,7 +263,7 @@ function RentalDetail({
               {t("rentals.person")}
             </dt>
             <dd>
-              {rental.person.firstName} {rental.person.lastName}
+              <RentalPersonCard person={rental.person} contacts />
             </dd>
           </div>
         ) : null}
@@ -426,18 +319,21 @@ function RentalDetail({
           </div>
           {confirm ? (
             <div className="flex gap-3">
-              <Button
+              <SaveButton
                 disabled={task.busy}
                 onClick={() => void task.run(() => transition(confirm))}
-              >
-                {t("access.confirm")}
-              </Button>
+                {...formAction(
+                  "confirm",
+                  { pending: task.busy, error: task.error },
+                  t("access.confirm"),
+                )}
+              />
               <Button variant="outline" onClick={() => setConfirm(null)}>
                 {t("cancel")}
               </Button>
             </div>
           ) : null}
-          <Feedback error={task.error} success={task.success} />
+          <Feedback error={task.error} />
         </>
       ) : null}
       {portal &&
@@ -588,7 +484,7 @@ function PublicationDocuments({ scooterId }: { scooterId: string }) {
           )}
         />
       )}
-      <Feedback error={task.error} success={task.success} />
+      <Feedback error={task.error} />
     </section>
   );
 }

@@ -1,4 +1,6 @@
 "use client";
+import { useFormAction } from "@/lib/form/use-form-action";
+import { SaveButton } from "@repo/ui/components/save-button";
 
 import { v1 } from "@repo/api-shared";
 import {
@@ -64,6 +66,8 @@ export function AccessReviewSheet({
   error: string | null;
   onConfirm: () => void;
 }) {
+  const formAction = useFormAction();
+
   const t = useTranslations("access.editor.review");
   const workspace = useTranslations("workspace");
   const editor = useTranslations("access.editor");
@@ -263,18 +267,19 @@ export function AccessReviewSheet({
           ) : null}
         </BottomSheetBody>
         <BottomSheetFooter>
-          <Button
+          <SaveButton
             type="button"
             variant={
               destructive ? "destructive" : warning ? "warning" : "default"
             }
             disabled={busy || stale || !!missing.length}
             onClick={onConfirm}
-          >
-            {busy
-              ? workspace("access.member.saving")
-              : workspace("access.confirm")}
-          </Button>
+            {...formAction(
+              "confirm",
+              { pending: busy, error: error },
+              workspace("access.confirm"),
+            )}
+          />
           <Button
             type="button"
             variant="secondary"

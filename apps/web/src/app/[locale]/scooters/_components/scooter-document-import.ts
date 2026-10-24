@@ -7,7 +7,7 @@ import {
   type SourceImportIssue,
 } from "./scooter-document-sources";
 import { parseInsuranceImport } from "./scooter-insurance-import";
-import { documentedLicenseSuggestion } from "./useScooterLicenseAutofill";
+import { documentedLicenseSuggestion } from "./scooter-license-suggestion";
 import { v1 } from "@repo/api-shared";
 import {
   CREATE_FIELDS,
@@ -263,11 +263,6 @@ export function parseDocumentImport(
       values.requiredLicenseCategory = "none";
     } else {
       if (
-        current.registrationType === "unregistered" &&
-        !values.requiredLicenseCategory
-      )
-        values.requiredLicenseCategory = "";
-      if (
         values.registrationType !== "temporary" &&
         !values.temporaryRegistrationExpiresAt
       )
@@ -278,7 +273,8 @@ export function parseDocumentImport(
   const autoFilledLicenseCategory =
     !editing &&
     merged.registrationType !== "unregistered" &&
-    !merged.requiredLicenseCategory &&
+    (!merged.requiredLicenseCategory ||
+      merged.requiredLicenseCategory === "none") &&
     documentedLicenseSuggestion(merged.maxSpeedKmh) === "none";
   if (autoFilledLicenseCategory) {
     values.requiredLicenseCategory = "none";

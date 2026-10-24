@@ -588,7 +588,7 @@ integration("Access domains against PostgreSQL", () => {
     ).toBe(true);
   });
 
-  it("keeps independent blockers through resolve, dismiss, reopen and explicit clearance", async () => {
+  it("keeps other open blockers until each is resolved or dismissed", async () => {
     const first = await problems.create(
       reporter,
       v1.problems.createProblemInputSchema.parse({
@@ -614,11 +614,10 @@ integration("Access domains against PostgreSQL", () => {
     });
     expect(
       (await problems.maintenanceHold(reporter, scooterIds[0])).count,
-    ).toBe(2);
-    await problems.cancel(reporter, second.id, second.revision, true);
+    ).toBe(1);
     expect(
       (await problems.maintenanceHold(reporter, scooterIds[0])).blockers,
-    ).toEqual([expect.objectContaining({ id: first.id, status: "resolved" })]);
+    ).toEqual([expect.objectContaining({ id: second.id, status: "open" })]);
     await expect(
       rentals.create(admin, {
         scooterId: scooterIds[0],
@@ -627,10 +626,8 @@ integration("Access domains against PostgreSQL", () => {
         endsAt: new Date(Date.now() + 7_200_000).toISOString(),
       }),
     ).rejects.toThrow("maintenance hold");
-    await problems.hold(reporter, first.id, {
-      revision: resolved.revision,
-      blocksUsage: false,
-    });
+    expect(resolved.blocksUsage).toBe(false);
+    await problems.cancel(reporter, second.id, second.revision);
     expect(
       (await problems.maintenanceHold(reporter, scooterIds[0])).onHold,
     ).toBe(false);

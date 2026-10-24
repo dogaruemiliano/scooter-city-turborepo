@@ -121,7 +121,7 @@ describe("SignInMethods", () => {
       await browser.type(screen.getByLabelText("Email"), user.email);
       await browser.click(
         screen.getByRole("button", {
-          name: messages[locale].auth.signIn.emailOtp.sendCode,
+          name: messages[locale].shared.formActions.sendCode.idle,
         }),
       );
       expect(
@@ -141,9 +141,7 @@ describe("SignInMethods", () => {
     );
     renderSignInMethods({ enabledMethods: ["emailOtp"] });
     await browser.type(screen.getByLabelText("Email"), user.email);
-    await browser.click(
-      screen.getByRole("button", { name: "Continue with email" }),
-    );
+    await browser.click(screen.getByRole("button", { name: "Send code" }));
     expect(
       await screen.findByRole("heading", { name: "Enter verification code" }),
     ).toBeInTheDocument();
@@ -247,7 +245,7 @@ describe("SignInMethods", () => {
 
     expect(screen.getByLabelText("Email")).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Continuă cu email" }),
+      screen.getByRole("button", { name: "Trimite codul" }),
     ).toBeInTheDocument();
   });
 
@@ -257,9 +255,7 @@ describe("SignInMethods", () => {
     renderSignInMethods();
     const emailInput = screen.getByLabelText("Email");
 
-    await browser.click(
-      screen.getByRole("button", { name: "Continue with email" }),
-    );
+    await browser.click(screen.getByRole("button", { name: "Send code" }));
 
     expect(mocks.apiFetch).not.toHaveBeenCalled();
     expect(emailInput).toHaveFocus();
@@ -279,9 +275,7 @@ describe("SignInMethods", () => {
     const emailInput = screen.getByLabelText("Email");
 
     await browser.type(emailInput, "not-an-email");
-    await browser.click(
-      screen.getByRole("button", { name: "Continue with email" }),
-    );
+    await browser.click(screen.getByRole("button", { name: "Send code" }));
 
     expect(mocks.apiFetch).not.toHaveBeenCalled();
     expect(emailInput).toHaveAttribute("aria-invalid", "true");
@@ -297,9 +291,7 @@ describe("SignInMethods", () => {
       screen.queryByText("Enter a valid email address."),
     ).not.toBeInTheDocument();
 
-    await browser.click(
-      screen.getByRole("button", { name: "Continue with email" }),
-    );
+    await browser.click(screen.getByRole("button", { name: "Send code" }));
 
     expect(
       await screen.findByRole("heading", { name: "Enter verification code" }),
@@ -335,27 +327,25 @@ describe("SignInMethods", () => {
     const browser = userEvent.setup();
     renderSignInMethods();
     await browser.type(screen.getByLabelText("Email"), user.email);
-    await browser.click(
-      screen.getByRole("button", { name: "Continue with email" }),
-    );
+    await browser.click(screen.getByRole("button", { name: "Send code" }));
     await browser.type(getOtpInput(), "000000");
     await browser.click(screen.getByRole("button", { name: "Verify code" }));
-    expect(screen.getByRole("button", { name: "Verifying..." })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Verifying…" })).toBeDisabled();
     await act(async () => {
       resolveVerify(tokenPair);
     });
-    expect(screen.getByRole("button", { name: "Verifying..." })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Verifying…" })).toBeDisabled();
     await act(async () => {
       resolveSession(user);
     });
     expect(mocks.replace).toHaveBeenCalledWith("/dashboard");
-    expect(screen.getByRole("button", { name: "Verifying..." })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Verifying…" })).toBeDisabled();
   });
 
   it("reserves padding between the email field and submit action", () => {
     renderSignInMethods();
     const action = screen.getByRole("button", {
-      name: "Continue with email",
+      name: "Send code",
     }).parentElement!;
     expect(action).toHaveAttribute("data-slot", "email-submit-action");
     expect(action).toHaveStyle({ paddingTop: "36px" });
@@ -375,9 +365,7 @@ describe("SignInMethods", () => {
 
     renderSignInMethods();
     await browser.type(screen.getByLabelText("Email"), user.email);
-    await browser.click(
-      screen.getByRole("button", { name: "Continue with email" }),
-    );
+    await browser.click(screen.getByRole("button", { name: "Send code" }));
 
     const titleRow = screen.getByRole("heading", {
       name: "Enter verification code",
@@ -488,9 +476,7 @@ describe("SignInMethods", () => {
 
     renderSignInMethods();
     await browser.type(screen.getByLabelText("Email"), user.email);
-    await browser.click(
-      screen.getByRole("button", { name: "Continue with email" }),
-    );
+    await browser.click(screen.getByRole("button", { name: "Send code" }));
     await browser.click(screen.getByRole("button", { name: "Resend code" }));
 
     expect(mocks.apiFetch).toHaveBeenCalledWith(
@@ -523,9 +509,7 @@ describe("SignInMethods", () => {
       target: { value: user.email },
     });
     await act(async () => {
-      fireEvent.click(
-        screen.getByRole("button", { name: "Continue with email" }),
-      );
+      fireEvent.click(screen.getByRole("button", { name: "Send code" }));
     });
     expect(
       screen.getByText(user.email, { selector: "strong" }),
@@ -661,9 +645,7 @@ describe("SignInMethods", () => {
 
     renderSignInMethods();
     await browser.type(screen.getByLabelText("Email"), user.email);
-    await browser.click(
-      screen.getByRole("button", { name: "Continue with email" }),
-    );
+    await browser.click(screen.getByRole("button", { name: "Send code" }));
     expect(
       screen.queryByRole("button", { name: "Cancel" }),
     ).not.toBeInTheDocument();
@@ -674,9 +656,7 @@ describe("SignInMethods", () => {
     expect(screen.getByLabelText("Email")).toHaveValue("");
 
     await browser.type(screen.getByLabelText("Email"), user.email);
-    await browser.click(
-      screen.getByRole("button", { name: "Continue with email" }),
-    );
+    await browser.click(screen.getByRole("button", { name: "Send code" }));
     await browser.type(getOtpInput(), "111111");
     await browser.click(screen.getByRole("button", { name: "Verify code" }));
 
@@ -692,9 +672,7 @@ describe("SignInMethods", () => {
 
     renderSignInMethods();
     await browser.type(screen.getByLabelText("Email"), user.email);
-    await browser.click(
-      screen.getByRole("button", { name: "Continue with email" }),
-    );
+    await browser.click(screen.getByRole("button", { name: "Send code" }));
     await browser.click(
       screen.getByRole("button", { name: "Back to sign-in methods" }),
     );
@@ -720,7 +698,7 @@ describe.each(["ro", "en"] as const)(
       await act(async () => {
         fireEvent.click(
           screen.getByRole("button", {
-            name: copy.auth.signIn.emailOtp.sendCode,
+            name: copy.shared.formActions.sendCode.idle,
           }),
         );
       });
@@ -763,7 +741,7 @@ describe.each(["ro", "en"] as const)(
         );
         expect(
           screen.getByRole("button", {
-            name: copy.auth.signIn.emailOtp.sendCode,
+            name: copy.shared.formActions.sendCode.idle,
           }),
         ).toBeEnabled();
       },
@@ -912,9 +890,7 @@ it("updates a visible server error when the selected language changes", async ()
     target: { value: user.email },
   });
   await act(async () => {
-    fireEvent.click(
-      screen.getByRole("button", { name: "Continue with email" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Send code" }));
   });
   expect(screen.getByRole("alert")).toHaveTextContent(
     messages.en.api.errors.internalServer,

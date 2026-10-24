@@ -1,24 +1,17 @@
 "use client";
 
-import { useRef, useState, type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import { useTranslations } from "next-intl";
 import { v1 } from "@repo/api-shared";
-import {
-  Badge,
-  Button,
-  FormSection,
-  BottomSheet,
-  BottomSheetContent,
-  BottomSheetHeader,
-  BottomSheetTitle,
-  BottomSheetDescription,
-  BottomSheetBody,
-  BottomSheetFooter,
-} from "@repo/ui/components";
+import { Badge, Button, FormSection } from "@repo/ui/components";
 import { FormField } from "@/components/form/FormField";
 import { FormBooleanRow } from "@/components/form/FormBooleanRow";
-import { FormSegmentedRadioGroup } from "@/components/form/controls";
+import {
+  FormDateField,
+  FormInput,
+  FormSegmentedRadioGroup,
+} from "@/components/form/controls";
 import {
   ScooterEditorFieldControl,
   ScooterInitialRegistrationFields,
@@ -28,8 +21,6 @@ import { CivMetadataFields } from "./CivMetadataFields";
 import { ScooterCreateInsuranceFields } from "./ScooterCreateInsuranceFields";
 import type { ScooterEditorValues } from "./scooter-editor-schema";
 import { OPERATIONAL_FIELDS } from "./scooter-wizard";
-import { useScooterLicenseAutofill } from "./useScooterLicenseAutofill";
-import type { DocumentImportResult } from "./scooter-document-import";
 import { useEffect } from "react";
 import { ScooterFleetNumberField } from "./ScooterFleetNumberField";
 import { ScooterSectionComplete } from "./ScooterSectionComplete";
@@ -39,7 +30,6 @@ export function ScooterCreateFields({
   editing = false,
   onBrandCreated,
   disabled,
-  importResult,
   photos,
 }: {
   editing?: boolean;
@@ -47,7 +37,6 @@ export function ScooterCreateFields({
   onBrandCreated: (brand: v1.scooterBrands.ScooterBrand) => void;
   disabled: boolean;
   photos?: ReactNode;
-  importResult?: Extract<DocumentImportResult, { ok: true }>;
 }) {
   const t = useTranslations("scooters");
   const {
@@ -57,8 +46,8 @@ export function ScooterCreateFields({
   const powertrain = useWatch({ control, name: "powertrainType" });
   const registration = useWatch({ control, name: "registrationType" });
   const props = { brands, onBrandCreated, disabled, powertrain };
-  const [technicalReviewOpen, setTechnicalReviewOpen] = useState(false);
-  const technicalSheetRef = useRef<HTMLDivElement>(null);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const advancedId = useId();
   useEffect(() => {
     if (!submitCount || isSubmitting) return;
     const mainFields = new Set([
@@ -73,8 +62,6 @@ export function ScooterCreateFields({
       "fuelSystem",
       "registrationType",
       "registrationNumber",
-      "registrationDate",
-      "registrationCertificateNumber",
       "temporaryRegistrationExpiresAt",
       "requiredLicenseCategory",
       "insurancePolicies",
@@ -82,15 +69,10 @@ export function ScooterCreateFields({
     ]);
     const frame = requestAnimationFrame(() => {
       if (Object.keys(errors).some((name) => !mainFields.has(name)))
-        setTechnicalReviewOpen(true);
+        setAdvancedOpen(true);
     });
     return () => cancelAnimationFrame(frame);
   }, [submitCount, isSubmitting, errors]);
-  const license = useScooterLicenseAutofill(editing);
-  const onImport = license.onImport;
-  useEffect(() => {
-    if (importResult) onImport(importResult);
-  }, [importResult, onImport]);
 
   return (
     <div className="grid min-w-0 gap-10">
@@ -174,7 +156,6 @@ export function ScooterCreateFields({
           />
         }
         disabled={disabled}
-        onManualLicenseChange={license.onManualLicenseChange}
       />
       <ScooterCreateInsuranceFields
         disabled={disabled}
@@ -231,53 +212,55 @@ export function ScooterCreateFields({
         type="button"
         variant="outline"
         disabled={disabled}
-        onClick={() => setTechnicalReviewOpen(true)}
+        aria-expanded={advancedOpen}
+        aria-controls={advancedId}
+        onClick={() => setAdvancedOpen((open) => !open)}
       >
-        {t("wizard.otherFields")}
+        {t("creation.advancedDetails")}
       </Button>
-      <BottomSheet
-        open={technicalReviewOpen}
-        onOpenChange={setTechnicalReviewOpen}
-      >
-        <BottomSheetContent
-          fullScreen
-          ref={technicalSheetRef}
-          initialFocus={() =>
-            technicalSheetRef.current?.querySelector<HTMLElement>(
-              'input[aria-invalid="true"], textarea[aria-invalid="true"], button[aria-invalid="true"]',
-            ) ?? true
-          }
-        >
-          <BottomSheetHeader>
-            <BottomSheetTitle>{t("documentImport.title")}</BottomSheetTitle>
-            <BottomSheetDescription>
-              {t("documentImport.help")}
-            </BottomSheetDescription>
-          </BottomSheetHeader>
-          <BottomSheetBody>
-            <ScooterTechnicalFields
-              compact={false}
-              excludeFields={[
-                "vin",
-                "brandId",
-                "model",
-                "manufactureYear",
-                "color",
-                "powertrainType",
-                "engineDisplacementCc",
-                "fuelSystem",
-              ]}
-              {...props}
-            />
-            <CivMetadataFields disabled={disabled} />
-          </BottomSheetBody>
-          <BottomSheetFooter>
-            <Button type="button" onClick={() => setTechnicalReviewOpen(false)}>
-              {t("creation.conditionDone")}
-            </Button>
-          </BottomSheetFooter>
-        </BottomSheetContent>
-      </BottomSheet>
+      <div id={advancedId} hidden={!advancedOpen}>
+        <div className="grid min-w-0 gap-8">
+          <p className="text-sm text-muted-foreground">
+            {t("creation.advancedHelp")}
+          </p>
+          {registration && registration !== "unregistered" ? (
+            <FormSection title={t("creation.registrationDetails")}>
+              <FormField
+                name="registrationDate"
+                label={t("fields.registrationDate")}
+                labelSuffix="day"
+                disabled={disabled}
+              >
+                <FormDateField maxDate={v1.common.dateOnlyToday()} />
+              </FormField>
+              <FormField
+                name="registrationCertificateNumber"
+                label={t("fields.registrationCertificateNumber")}
+                disabled={disabled}
+              >
+                <FormInput
+                  placeholder={t("placeholders.registrationCertificateNumber")}
+                />
+              </FormField>
+            </FormSection>
+          ) : null}
+          <ScooterTechnicalFields
+            compact={false}
+            excludeFields={[
+              "vin",
+              "brandId",
+              "model",
+              "manufactureYear",
+              "color",
+              "powertrainType",
+              "engineDisplacementCc",
+              "fuelSystem",
+            ]}
+            {...props}
+          />
+          <CivMetadataFields disabled={disabled} />
+        </div>
+      </div>
     </div>
   );
 }

@@ -465,7 +465,7 @@ describe("Scooter creation follow-up and optional steps", () => {
         `/en/scooters/${createdScooter.id}`,
       ),
     );
-    const create = screen.getByRole("button", { name: "Create scooter" });
+    const create = screen.getByRole("button", { name: "Created" });
     expect(create).toBeDisabled();
     await browser.click(create);
     expect(mocks.apiFetch).toHaveBeenCalledOnce();
@@ -778,6 +778,67 @@ describe("Scooter create controls with the create resolver", () => {
     );
   });
 
+  it("keeps optional registration details collapsed and preserves them when hidden", async () => {
+    mocks.apiFetch.mockResolvedValueOnce(createdScooter);
+    const browser = userEvent.setup();
+    renderWizard();
+    await fillWizardIdentity(browser);
+    await chooseSelectOption(browser, "Registration type", "Local");
+    await browser.type(
+      screen.getByRole("textbox", { name: "Plate number" }),
+      "vl 18 188",
+    );
+    expect(
+      screen.queryByRole("textbox", { name: /^Registered on/ }),
+    ).toBeNull();
+    const toggle = screen.getByRole("button", { name: "Advanced details" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await browser.click(toggle);
+    const day = screen.getByRole("textbox", { name: "Registered on" });
+    expect(day).not.toHaveAttribute("aria-required", "true");
+    expect(
+      screen.getByRole("heading", { name: "Registration document details" }),
+    ).toBeVisible();
+    await browser.type(day, "16");
+    await browser.type(
+      screen.getByRole("textbox", { name: "Registered on MM" }),
+      "01",
+    );
+    await browser.type(
+      screen.getByRole("textbox", { name: "Registered on YYYY" }),
+      "2026",
+    );
+    await browser.type(
+      screen.getByRole("textbox", { name: "Registration certificate number" }),
+      "CERT-123",
+    );
+    await browser.click(toggle);
+    expect(
+      screen.queryByRole("textbox", { name: /^Registered on/ }),
+    ).toBeNull();
+    await browser.click(toggle);
+    expect(screen.getByRole("textbox", { name: "Registered on" })).toHaveValue(
+      "16",
+    );
+    expect(
+      screen.getByRole("textbox", { name: "Registration certificate number" }),
+    ).toHaveValue("CERT-123");
+    await browser.click(toggle);
+    await browser.click(screen.getByRole("button", { name: "Create scooter" }));
+    await waitFor(() =>
+      expect(mocks.apiFetch).toHaveBeenCalledWith(
+        v1.scooters.ROUTES.create,
+        v1.scooters.scooterSchema,
+        expect.objectContaining({
+          json: expect.objectContaining({
+            registrationDate: "2026-01-16",
+            registrationCertificateNumber: "CERT-123",
+          }),
+        }),
+      ),
+    );
+  });
+
   it("previews the next number with the brand and submits a manual override", async () => {
     mocks.apiFetch.mockResolvedValueOnce(createdScooter);
     const browser = userEvent.setup();
@@ -881,7 +942,7 @@ describe("Scooter create controls with the create resolver", () => {
             registrationNumber: null,
             registrationDate: null,
             temporaryRegistrationExpiresAt: null,
-            requiredLicenseCategory: undefined,
+            requiredLicenseCategory: "none",
             notes: "Maker papers received",
           }),
         },
@@ -953,6 +1014,32 @@ describe("Scooter create controls with the create resolver", () => {
       screen.getByRole("combobox", { name: /Required driver license/ }),
     ).toHaveTextContent("A1");
   });
+
+  it.each(["National", "Local", "Temporary"])(
+    "defaults %s registration to no driving license and keeps it when speed changes",
+    async (registration) => {
+      const browser = userEvent.setup();
+      renderControls();
+      await chooseSelectOption(browser, "Registration type", registration);
+      const license = () =>
+        screen.getByRole("combobox", { name: /Required driver license/ });
+      expect(license()).toHaveTextContent(
+        messages.en.scooters.requiredDriverLicenseTypes.none,
+      );
+      fireEvent.change(
+        screen.getByRole("textbox", { name: "Maximum speed (km/h)" }),
+        { target: { value: "45" } },
+      );
+      expect(license()).toHaveTextContent(
+        messages.en.scooters.requiredDriverLicenseTypes.none,
+      );
+      await chooseSelectOption(browser, "Registration type", "Unregistered");
+      await chooseSelectOption(browser, "Registration type", registration);
+      expect(license()).toHaveTextContent(
+        messages.en.scooters.requiredDriverLicenseTypes.none,
+      );
+    },
+  );
 
   it.each([true, false])(
     "auto-fills no license regardless of input order (speed first: %s)",
@@ -1058,6 +1145,9 @@ describe("Scooter create controls with the create resolver", () => {
     await browser.type(
       screen.getByRole("textbox", { name: "Plate number" }),
       "cj12abc",
+    );
+    expect(screen.getByRole("textbox", { name: "Plate number" })).toHaveValue(
+      "CJ12ABC",
     );
     await chooseSelectOption(browser, "Required driver license", "A1");
     await browser.click(screen.getByRole("button", { name: "Create scooter" }));

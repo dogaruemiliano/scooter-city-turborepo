@@ -8,7 +8,11 @@ import { redirect } from "next/navigation";
 import { getLocalizedSignInPath, localizePath } from "@/i18n/paths";
 import { webApi } from "@/lib/api";
 import { meFromApi } from "@/lib/auth-server";
-import { canAccess, type AccessIdentity } from "@/lib/access";
+import {
+  canAccess,
+  usesServiceDashboard,
+  type AccessIdentity,
+} from "@/lib/access";
 
 const CASH_ROLES: readonly v1.finance.LedgerAccountRole[] = [
   "BANK",
@@ -36,6 +40,10 @@ export async function loadDashboard(locale: SupportedLocale) {
 
   if (!user) {
     redirect(getLocalizedSignInPath(locale, localizePath("/", locale)));
+  }
+
+  if (usesServiceDashboard(user)) {
+    redirect(localizePath("/problems", locale));
   }
 
   if (
