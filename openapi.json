@@ -5652,6 +5652,187 @@
         "summary": "Complete an OAuth sign-in by proving ownership of an email the provider did not mark as verified.",
         "tags": ["auth"]
       }
+    },
+    "/v1/auth/me/avatar": {
+      "post": {
+        "operationId": "CoreAuthController_uploadAvatar_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["file"],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionUser_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Replace the current user's profile picture",
+        "tags": ["auth"]
+      },
+      "delete": {
+        "operationId": "CoreAuthController_removeAvatar_v1",
+        "parameters": [],
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionUser_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Remove the current user's profile picture",
+        "tags": ["auth"]
+      }
+    },
+    "/v1/auth/avatars/{assetId}": {
+      "get": {
+        "operationId": "CoreAuthController_avatarContent_v1",
+        "parameters": [
+          {
+            "name": "assetId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Read an attached user avatar (authentication required)",
+        "tags": ["auth"]
+      }
+    },
+    "/v1/persons/{id}/avatar": {
+      "post": {
+        "operationId": "PersonsController_uploadAvatar_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["file"],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Person_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Update the linked user's profile picture",
+        "tags": ["persons"]
+      },
+      "delete": {
+        "operationId": "PersonsController_removeAvatar_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Person_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Remove the linked user's profile picture",
+        "tags": ["persons"]
+      }
     }
   },
   "info": {
@@ -6234,6 +6415,10 @@
             ],
             "additionalProperties": false,
             "nullable": true
+          },
+          "avatarAssetId": {
+            "type": "string",
+            "nullable": true
           }
         },
         "required": [
@@ -6695,6 +6880,10 @@
                   "nullable": true
                 },
                 "lastName": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "avatarAssetId": {
                   "type": "string",
                   "nullable": true
                 }
@@ -10757,6 +10946,10 @@
           "deletedAt": {
             "type": "string",
             "nullable": true
+          },
+          "avatarAssetId": {
+            "type": "string",
+            "nullable": true
           }
         },
         "required": [
@@ -14246,6 +14439,10 @@
               "required": ["id", "revision"],
               "additionalProperties": false
             }
+          },
+          "avatarAssetId": {
+            "type": "string",
+            "nullable": true
           }
         },
         "required": [

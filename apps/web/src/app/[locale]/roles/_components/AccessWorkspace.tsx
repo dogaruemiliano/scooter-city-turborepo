@@ -25,7 +25,7 @@ export function AccessWorkspace({
 }) {
   const t = useTranslations("workspace.access.member");
   return (
-    <main className="access-workspace flex min-h-full min-w-0 flex-1 flex-col gap-6 bg-background p-4 font-body text-foreground md:p-8">
+    <main className="access-workspace flex min-h-full min-w-0 flex-1 flex-col gap-6 bg-background px-4 pt-4 font-body text-foreground md:px-8 md:pt-8">
       <PageTitleOverride
         title={
           headerTitle ??

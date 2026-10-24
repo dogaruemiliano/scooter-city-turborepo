@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { cn } from "@repo/ui/lib/utils";
-import { Avatar, AvatarFallback } from "./avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "./avatar";
 import { Label } from "./label";
 import { InputGroup, InputGroupTextarea } from "./input-group";
 import { CircleCheck, RotateCcw, Send } from "lucide-react";
@@ -54,6 +54,7 @@ function CommentItem({
   context,
   animateEntrance = false,
   author,
+  avatarUrl,
   dateTime,
   timestamp,
   children,
@@ -65,6 +66,7 @@ function CommentItem({
   /** Animate only a newly posted item; existing history stays still. */
   animateEntrance?: boolean;
   author: string;
+  avatarUrl?: string;
   dateTime: string;
   timestamp: string;
 }) {
@@ -87,6 +89,7 @@ function CommentItem({
     >
       {marker ?? (
         <Avatar aria-hidden="true">
+          {avatarUrl ? <AvatarImage src={avatarUrl} alt="" /> : null}
           <AvatarFallback>{initials}</AvatarFallback>
         </Avatar>
       )}

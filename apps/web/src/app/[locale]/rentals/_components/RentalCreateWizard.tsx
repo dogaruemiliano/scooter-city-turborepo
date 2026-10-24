@@ -282,7 +282,7 @@ export function RentalCreateWizard({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-screen-lg flex-1 flex-col gap-6 py-6 sm:py-10">
+    <div className="mx-auto flex w-full max-w-screen-lg flex-1 flex-col gap-6 pt-6 sm:pt-10">
       <PageHeaderNavigation
         onBack={() => {
           if (task.busy || submitting.current) return;

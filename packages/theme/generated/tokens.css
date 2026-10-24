@@ -420,12 +420,14 @@
   --spacing-36: 9rem;
   --spacing-48: 12rem;
   --spacing-64: 16rem;
+  --spacing-70: 17.5rem;
   --spacing-72: 18rem;
   --spacing-96: 24rem;
   --spacing-px: 0.0625rem;
   --spacing-0-5: 0.125rem;
   --spacing-1-5: 0.375rem;
   --spacing-2-5: 0.625rem;
+  --spacing-screen-bottom: 2rem;
   --container-primary-form-actions: minmax(0, 2fr) minmax(0, 3fr);
   --container-scooter-photo-preview: 55dvh;
   --container-scooter-photo-preview-mobile: 35dvh;

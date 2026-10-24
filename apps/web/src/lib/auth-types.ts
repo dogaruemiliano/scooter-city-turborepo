@@ -8,6 +8,7 @@ export type SessionIdentity = Pick<
   AccessIdentity & {
     accessRevision?: number;
     roleVersions?: { id: string; revision: number }[];
+    avatarAssetId?: string | null;
     firstName?: v1.auth.SessionUser["firstName"];
     lastName?: v1.auth.SessionUser["lastName"];
   };

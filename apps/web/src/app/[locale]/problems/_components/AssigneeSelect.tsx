@@ -76,6 +76,7 @@ function AssigneePresence({
 }
 
 export type AssigneeOption = {
+  avatarAssetId?: string | null;
   id: string;
   email?: string;
   firstName: string | null;

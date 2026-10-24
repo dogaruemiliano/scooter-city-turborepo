@@ -238,3 +238,28 @@ export const TaskTransitions: Story = {
     </CommentThread>
   ),
 };
+
+export const AuthorPicture: Story = {
+  render: () => (
+    <CommentThread title="Comments">
+      <ol className="flex flex-col gap-6">
+        <CommentItem
+          author="Ada Lovelace"
+          avatarUrl="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII="
+          dateTime="2026-10-24T12:00:00Z"
+          timestamp="Today"
+        >
+          Profile pictures appear beside the author’s name.
+        </CommentItem>
+        <CommentItem
+          author="Alex Morgan"
+          avatarUrl="/missing-avatar.png"
+          dateTime="2026-10-24T12:05:00Z"
+          timestamp="Today"
+        >
+          Missing images fall back to initials.
+        </CommentItem>
+      </ol>
+    </CommentThread>
+  ),
+};

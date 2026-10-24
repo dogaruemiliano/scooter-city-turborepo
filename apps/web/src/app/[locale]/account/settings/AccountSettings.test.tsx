@@ -3,7 +3,7 @@ import { messages } from "@repo/i18n";
 import { v1 } from "@repo/api-shared";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   SessionProvider,
@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("../../../../lib/api", () => ({
   webApi: {
     fetch: mocks.apiFetch,
+    url: (path: string) => `https://api.example.test${path}`,
   },
 }));
 
@@ -69,7 +70,16 @@ const sessions: v1.auth.SessionSummary[] = [
   },
 ];
 
+afterEach(() => vi.unstubAllGlobals());
+
 beforeEach(() => {
+  vi.stubGlobal(
+    "URL",
+    class extends URL {
+      static createObjectURL = vi.fn(() => "blob:portrait");
+      static revokeObjectURL = vi.fn();
+    },
+  );
   mocks.apiFetch.mockReset();
   mocks.refresh.mockReset();
   mocks.replace.mockReset();
@@ -81,6 +91,84 @@ beforeEach(() => {
 });
 
 describe("AccountSettings", () => {
+  it("uploads a profile image, updates the session, and removes it", async () => {
+    const browser = userEvent.setup();
+    const withAvatar = { ...user, avatarAssetId: "avatar-1" };
+    mocks.apiFetch.mockImplementation(
+      (path: string, _schema: unknown, options?: { method?: string }) =>
+        Promise.resolve(
+          path === v1.auth.ROUTES.avatar && options?.method === "POST"
+            ? withAvatar
+            : user,
+        ),
+    );
+    renderSettings();
+    const file = new File(["png bytes"], "avatar.png", { type: "image/png" });
+    await browser.upload(screen.getByLabelText("Choose a picture"), file);
+    await browser.click(
+      within(screen.getByRole("form", { name: "Profile picture" })).getByRole(
+        "button",
+        { name: "Save changes" },
+      ),
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Remove picture" }),
+      ).toBeVisible(),
+    );
+    const call = mocks.apiFetch.mock.calls.find(
+      (args) => args[0] === v1.auth.ROUTES.avatar && args[2]?.method === "POST",
+    );
+    expect(call?.[2].body.get("file")).toBe(file);
+    expect(screen.getByTestId("session-user-avatar")).toHaveTextContent(
+      "avatar-1",
+    );
+    await browser.click(screen.getByRole("button", { name: "Remove picture" }));
+    await browser.click(
+      within(screen.getByRole("form", { name: "Profile picture" })).getByRole(
+        "button",
+        { name: "Save changes" },
+      ),
+    );
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("button", { name: "Remove picture" }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(screen.getByTestId("session-user-avatar")).toHaveTextContent("none");
+  });
+  it("preserves the selected picture and action after an upload fails", async () => {
+    const browser = userEvent.setup();
+    mocks.apiFetch.mockImplementation((path: string) =>
+      path === v1.auth.ROUTES.avatar
+        ? Promise.reject(new Error("failed"))
+        : Promise.resolve(user),
+    );
+    renderSettings();
+    const field = screen.getByLabelText("Choose a picture") as HTMLInputElement;
+    const file = new File(["bytes"], "avatar.png", { type: "image/png" });
+    await browser.upload(field, file);
+    await browser.click(
+      within(screen.getByRole("form", { name: "Profile picture" })).getByRole(
+        "button",
+        { name: "Save changes" },
+      ),
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "Could not update your picture",
+      ),
+    );
+    expect(
+      screen.getByRole("button", { name: "Remove picture" }),
+    ).toBeVisible();
+    expect(
+      within(screen.getByRole("form", { name: "Profile picture" })).getByRole(
+        "button",
+        { name: "Save changes" },
+      ),
+    ).toBeEnabled();
+  });
   it("updates the editable profile", async () => {
     const updated = { ...user, firstName: "Grace", lastName: null };
     mocks.apiFetch.mockResolvedValue(updated);
@@ -221,5 +309,12 @@ function renderSettings() {
 function SessionUserProbe() {
   const { user } = useSession();
   const name = [user?.firstName, user?.lastName].filter(Boolean).join(" ");
-  return <span data-testid="session-user-name">{name}</span>;
+  return (
+    <>
+      <span data-testid="session-user-name">{name}</span>
+      <span data-testid="session-user-avatar">
+        {user?.avatarAssetId ?? "none"}
+      </span>
+    </>
+  );
 }

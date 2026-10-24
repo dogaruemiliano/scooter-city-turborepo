@@ -1923,6 +1923,7 @@ export class PersonsService {
 
   private personInclude() {
     return {
+      user: { select: { avatarAssetId: true } },
       documents: {
         where: { deletedAt: null },
         orderBy: this.documentOrderBy(),

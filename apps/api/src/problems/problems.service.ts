@@ -41,6 +41,7 @@ export function toMaintenanceScooter(
 }
 
 const memberSelect = {
+  avatarAssetId: true,
   id: true,
   email: true,
   firstName: true,

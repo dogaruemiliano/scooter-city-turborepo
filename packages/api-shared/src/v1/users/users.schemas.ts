@@ -63,6 +63,7 @@ export const userSchema = z
       .describe(
         "ISO timestamp of phone verification, or `null` if unverified.",
       ),
+    avatarAssetId: z.string().nullable().optional(),
     firstName: z.string().nullable(),
     lastName: z.string().nullable(),
     roles: z

@@ -532,7 +532,7 @@ export function ScooterEditor({
   );
 
   return (
-    <div className="mx-auto flex w-full min-w-0 max-w-(--breakpoint-xl) flex-1 flex-col gap-6 px-4 pt-6 sm:px-8 sm:pt-8 pb-[calc(var(--spacing-16)+env(safe-area-inset-bottom))] sm:pb-[calc(var(--spacing-24)+env(safe-area-inset-bottom))]">
+    <div className="mx-auto flex w-full min-w-0 max-w-(--breakpoint-xl) flex-1 flex-col gap-6 px-4 pt-6 sm:px-8 sm:pt-8">
       {scooter && (
         <>
           <PageTitleOverride title={v1.scooters.scooterDisplayCode(scooter)} />

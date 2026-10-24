@@ -57,6 +57,10 @@ export const ROUTES = {
   logout: "/v1/auth/logout",
   logoutAll: "/v1/auth/logout-all",
   me: "/v1/auth/me",
+  avatar: "/v1/auth/me/avatar",
+  avatarContent: (assetId: string) =>
+    `/v1/auth/avatars/${encodeURIComponent(assetId)}`,
+
   /** Profile mutation: `PATCH /v1/auth/me`. Shares path with `me`. */
   updateProfile: "/v1/auth/me",
   /** Account deletion: `DELETE /v1/auth/me`. Shares path with `me`. */

@@ -4,7 +4,7 @@ import { breakpoints } from "./breakpoints";
  * Spacing scale in px (4px base unit).
  * Web emits as rem (px / 16); native consumes as dp (numbers).
  */
-export const spacing = {
+const spacingScale = {
   0: 0,
   px: 1,
   0.5: 2,
@@ -30,8 +30,15 @@ export const spacing = {
   36: 144,
   48: 192,
   64: 256,
+  70: 280,
   72: 288,
   96: 384,
+} as const;
+
+/** Screen content breathing room; device safe-area insets are added by the shell. */
+export const spacing = {
+  ...spacingScale,
+  screenBottom: spacingScale[8],
 } as const;
 
 export type Spacing = typeof spacing;

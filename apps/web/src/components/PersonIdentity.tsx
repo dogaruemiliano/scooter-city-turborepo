@@ -1,5 +1,6 @@
 "use client";
 
+import { userAvatarSrc } from "@/lib/user-avatar";
 import type { ComponentProps } from "react";
 import { v1 } from "@repo/api-shared";
 import {
@@ -17,6 +18,7 @@ export type PersonSummary = Pick<
 > &
   Partial<Pick<v1.persons.Person, "phone" | "email" | "documents">> & {
     avatarUrl?: string;
+    avatarAssetId?: string | null;
   };
 
 function usePersonPresentation(person: PersonSummary) {
@@ -67,7 +69,7 @@ function usePersonPresentation(person: PersonSummary) {
     name: `${person.firstName} ${person.lastName}`,
     description: person.phone,
     email: person.email,
-    avatarUrl: person.avatarUrl,
+    avatarUrl: userAvatarSrc(person.avatarAssetId) ?? person.avatarUrl,
     details: indicators ? (
       <PersonDocuments documents={indicators} />
     ) : undefined,

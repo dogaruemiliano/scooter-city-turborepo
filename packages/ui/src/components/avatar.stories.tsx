@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { UserAvatar } from "./user-avatar";
 import { PlusIcon } from "lucide-react";
 
 import {
@@ -84,5 +85,32 @@ export const Group: Story = {
         <span className="sr-only">3 more clinicians</span>
       </AvatarGroupCount>
     </AvatarGroup>
+  ),
+};
+
+/** Embedded fixture keeps the image and fallback examples independent of network availability. */
+const avatarFixture =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=";
+export const UserPicture: Story = {
+  render: () => (
+    <UserAvatar name="Ada Lovelace" src={avatarFixture} size="xl" />
+  ),
+};
+export const UserInitials: Story = {
+  render: () => <UserAvatar name="Ada Lovelace" size="xl" />,
+};
+export const FailedUserPicture: Story = {
+  render: () => (
+    <UserAvatar name="Ada Lovelace" src="/missing-avatar.png" size="xl" />
+  ),
+};
+
+/** Large profile portrait for detail headers, using the theme spacing and type scales. */
+export const ProfilePortrait: Story = {
+  render: () => (
+    <div className="flex items-center gap-6">
+      <UserAvatar size="profile" name="Ada Lovelace" src={avatarFixture} />
+      <UserAvatar size="profile" name="Ada Lovelace" />
+    </div>
   ),
 };

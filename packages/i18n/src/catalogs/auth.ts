@@ -1,5 +1,20 @@
 export const authCatalog = {
   en: {
+    avatar: {
+      title: "Profile picture",
+      choose: "Choose a picture",
+      add: "Add picture",
+      change: "Change picture",
+      help: "JPEG, PNG or WebP, up to 5 MB and 4096 pixels per side.",
+      save: "Save picture",
+      saving: "Saving picture…",
+      saved: "Picture saved",
+      remove: "Remove picture",
+      removing: "Removing picture…",
+      removed: "Picture removed",
+      invalid: "Choose a JPEG, PNG or WebP image up to 5 MB.",
+      failed: "Could not update your picture. Please try again.",
+    },
     signIn: {
       title: "Sign in",
       subtitle: "Choose a method to continue.",
@@ -53,6 +68,21 @@ export const authCatalog = {
     },
   },
   ro: {
+    avatar: {
+      title: "Fotografie de profil",
+      choose: "Alege o fotografie",
+      add: "Adaugă o fotografie",
+      change: "Schimbă fotografia",
+      help: "JPEG, PNG sau WebP, maximum 5 MB și 4096 pixeli pe latură.",
+      save: "Salvează fotografia",
+      saving: "Se salvează fotografia…",
+      saved: "Fotografie salvată",
+      remove: "Elimină fotografia",
+      removing: "Se elimină fotografia…",
+      removed: "Fotografie eliminată",
+      invalid: "Alege o imagine JPEG, PNG sau WebP de maximum 5 MB.",
+      failed: "Fotografia nu a putut fi actualizată. Încearcă din nou.",
+    },
     signIn: {
       title: "Autentificare",
       subtitle: "Alege o metodă pentru a continua.",

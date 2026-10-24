@@ -86,6 +86,7 @@ export const sessionUserSchema = userSchema
     emailVerified: true,
     phone: true,
     phoneVerified: true,
+    avatarAssetId: true,
     firstName: true,
     lastName: true,
     roles: true,

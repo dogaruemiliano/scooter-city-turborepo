@@ -172,7 +172,7 @@ export function PersonDetailPage({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-screen-xl flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
+    <div className="mx-auto flex w-full max-w-screen-xl flex-1 flex-col gap-6 px-4 pt-6 sm:px-6 sm:pt-10">
       <PageTitleOverride title={title} />
       <PersonDetailHeader
         person={person}

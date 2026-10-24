@@ -81,6 +81,11 @@ export const personsCatalog = {
       description: "Update contact, address and notes for this person.",
     },
     leaveForm: {
+      title: "Discard unsaved changes?",
+      editDescription:
+        "Your changes to this person and their picture will be lost.",
+      keepEditing: "Keep editing",
+      discard: "Discard changes",
       confirm:
         "Leave this form? All entered details and uploaded documents will be lost.",
     },
@@ -587,6 +592,11 @@ export const personsCatalog = {
         "Actualizează datele de contact, adresa și notițele acestei persoane.",
     },
     leaveForm: {
+      title: "Renunți la modificările nesalvate?",
+      editDescription:
+        "Modificările persoanei și ale fotografiei se vor pierde.",
+      keepEditing: "Continuă editarea",
+      discard: "Renunță la modificări",
       confirm:
         "Părăsești formularul? Toate datele completate și documentele încărcate se vor pierde.",
     },

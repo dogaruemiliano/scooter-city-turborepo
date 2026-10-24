@@ -163,7 +163,7 @@ export function ProblemsWorkspace() {
   return (
     <main
       aria-busy={remote.loading}
-      className="flex w-full min-w-0 max-w-full flex-col gap-6 overflow-x-clip p-4 md:p-8"
+      className="flex w-full min-w-0 max-w-full flex-col gap-6 overflow-x-clip px-4 pt-4 md:px-8 md:pt-8"
     >
       <PageTitleOverride title={t("problems.title")} />
       <ListLayout

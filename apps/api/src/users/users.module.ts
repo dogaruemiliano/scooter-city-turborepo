@@ -4,10 +4,13 @@
  */
 import { Module } from "@nestjs/common";
 
+import { UserAvatarService } from "./user-avatar.service";
+import { ImageStorageModule } from "../image-storage/image-storage.module";
 import { UsersService } from "./users.service";
 
 @Module({
-  providers: [UsersService],
-  exports: [UsersService],
+  imports: [ImageStorageModule],
+  providers: [UsersService, UserAvatarService],
+  exports: [UsersService, UserAvatarService],
 })
 export class UsersModule {}

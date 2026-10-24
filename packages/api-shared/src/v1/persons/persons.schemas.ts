@@ -302,6 +302,7 @@ export const personSchema = z
     id: z.string(),
     email: z.string(),
     phone: z.string(),
+    avatarAssetId: z.string().nullable().optional(),
     firstName: z.string(),
     lastName: z.string(),
     cnp: z.string().nullable().optional(),

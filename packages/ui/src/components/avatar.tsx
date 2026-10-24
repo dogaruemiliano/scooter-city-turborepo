@@ -11,7 +11,7 @@ function Avatar({
   shape = "circle",
   ...props
 }: AvatarPrimitive.Root.Props & {
-  size?: "default" | "sm" | "md" | "lg" | "xl";
+  size?: "default" | "sm" | "md" | "lg" | "xl" | "profile";
   shape?: "circle" | "square";
 }) {
   return (
@@ -20,7 +20,7 @@ function Avatar({
       data-size={size}
       data-shape={shape}
       className={cn(
-        "group/avatar relative flex size-8 shrink-0 rounded-full select-none after:pointer-events-none after:absolute after:inset-0 after:rounded-[inherit] after:border after:border-border data-[size=lg]:size-10 data-[size=sm]:size-6 data-[size=xl]:size-12 data-[shape=square]:rounded-xl",
+        "group/avatar relative flex size-8 shrink-0 rounded-full select-none after:pointer-events-none after:absolute after:inset-0 after:rounded-[inherit] after:border after:border-border data-[size=lg]:size-10 data-[size=sm]:size-6 data-[size=xl]:size-12 data-[size=profile]:size-32 data-[shape=square]:rounded-xl",
         className,
       )}
       {...props}
@@ -49,7 +49,7 @@ function AvatarFallback({
     <AvatarPrimitive.Fallback
       data-slot="avatar-fallback"
       className={cn(
-        "flex size-full items-center justify-center rounded-[inherit] bg-muted text-sm text-muted-foreground group-data-[size=sm]/avatar:text-xs group-data-[size=xl]/avatar:text-lg group-data-[shape=square]/avatar:bg-secondary group-data-[shape=square]/avatar:font-sans group-data-[shape=square]/avatar:font-semibold group-data-[shape=square]/avatar:text-secondary-foreground",
+        "flex size-full items-center justify-center rounded-[inherit] bg-muted text-sm text-muted-foreground group-data-[size=sm]/avatar:text-xs group-data-[size=xl]/avatar:text-lg group-data-[size=profile]/avatar:text-4xl group-data-[shape=square]/avatar:bg-secondary group-data-[shape=square]/avatar:font-sans group-data-[shape=square]/avatar:font-semibold group-data-[shape=square]/avatar:text-secondary-foreground",
         className,
       )}
       {...props}

@@ -205,7 +205,7 @@ export function ExpenseReceiptCapture({
                 className="max-h-full max-w-full object-contain"
               />
             </div>
-            <div className="grid shrink-0 grid-cols-2 gap-3 px-4 pt-4 pb-[calc(var(--spacing-8)+env(safe-area-inset-bottom))] sm:px-6">
+            <div className="grid shrink-0 grid-cols-2 gap-3 px-4 pt-4 pb-[calc(var(--spacing-screen-bottom)+env(safe-area-inset-bottom))] sm:px-6">
               <Button
                 type="button"
                 variant="ghost"

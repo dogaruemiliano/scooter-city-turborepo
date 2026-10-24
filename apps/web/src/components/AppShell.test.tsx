@@ -104,32 +104,37 @@ beforeEach(() => {
 });
 
 describe("AppShell", () => {
-  it("keeps the mobile header outside the isolated page scroll area", () => {
-    Object.defineProperty(window, "innerWidth", {
-      configurable: true,
-      value: 390,
-    });
-    const { container } = renderAppShell(undefined, <div>Page body</div>);
-    const shell = container.querySelector("[data-app-shell]");
-    expect(shell).toHaveClass(
-      "fixed",
-      "h-dvh",
-      "overflow-hidden",
-      "md:relative",
-      "md:overflow-visible",
-    );
-    const content = container.querySelector('[data-slot="app-page-scroll"]');
-    expect(content).toHaveClass(
-      "min-h-0",
-      "overflow-y-auto",
-      "overscroll-y-contain",
-      "md:overflow-visible",
-    );
-    const header = screen.getByRole("banner");
-    expect(content).not.toContainElement(header);
-    expect(header.parentElement).toBe(content?.parentElement);
-    expect(header).toHaveClass("shrink-0", "bg-card", "md:sticky");
-  });
+  it.each([390, 1280])(
+    "keeps the header outside the padded page scroll area at %ipx",
+    (width) => {
+      Object.defineProperty(window, "innerWidth", {
+        configurable: true,
+        value: width,
+      });
+      const { container } = renderAppShell(undefined, <div>Page body</div>);
+      const shell = container.querySelector("[data-app-shell]");
+      expect(shell).toHaveClass(
+        "fixed",
+        "h-dvh",
+        "overflow-hidden",
+        "md:relative",
+        "md:overflow-visible",
+      );
+      const content = container.querySelector('[data-slot="app-page-scroll"]');
+      expect(content).toHaveClass(
+        "min-h-0",
+        "overflow-y-auto",
+        "overscroll-y-contain",
+        "md:overflow-visible",
+        "pb-[calc(var(--spacing-screen-bottom)+env(safe-area-inset-bottom))]",
+      );
+      expect(content).not.toHaveClass("md:pb-0");
+      const header = screen.getByRole("banner");
+      expect(content).not.toContainElement(header);
+      expect(header.parentElement).toBe(content?.parentElement);
+      expect(header).toHaveClass("shrink-0", "bg-card", "md:sticky");
+    },
+  );
 
   it("renders the application navigation and current user menu", async () => {
     renderAppShell();
@@ -690,6 +695,32 @@ describe("AppShell", () => {
     },
   );
 
+  it("orders primary pages before the four administrative groups", () => {
+    mocks.pathname = "/en";
+    renderAppShell({
+      id: "admin-1",
+      email: "admin@example.com",
+      roles: [],
+      isSuperAdmin: true,
+      effectiveScopes: staffScopes,
+    });
+    const content = document.querySelector(
+      '[data-slot="sidebar-content"]',
+    ) as HTMLElement;
+    const links = within(content).getAllByRole("link");
+    expect(links.slice(0, 4).map((link) => link.textContent)).toEqual([
+      "Dashboard",
+      "Rentals",
+      "Persons",
+      "Service",
+    ]);
+    expect(
+      Array.from(
+        content.querySelectorAll('[data-slot="sidebar-group-label"]'),
+      ).map((label) => label.textContent?.trim()),
+    ).toEqual(["Scooters", "Finance", "Company", "Users & roles"]);
+  });
+
   it("renders company navigation for super admins", () => {
     mocks.pathname = "/persons";
 
@@ -712,14 +743,16 @@ describe("AppShell", () => {
       "href",
       "/scooters",
     );
-    expect(
-      screen.queryByRole("link", { name: "Service" }),
-    ).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Service" })).toHaveAttribute(
+      "href",
+      "/problems",
+    );
     expect(
       screen.getByRole("link", { name: "Prezentare generală" }),
     ).toHaveAttribute("href", "/finance");
     expect(screen.queryByText("General")).not.toBeInTheDocument();
-    expect(screen.getByText("Entități")).toBeInTheDocument();
+    expect(screen.queryByText("Entități")).not.toBeInTheDocument();
+    expect(screen.getByText("Utilizatori și roluri")).toBeInTheDocument();
     expect(screen.getAllByText("Scutere").length).toBeGreaterThan(0);
     expect(screen.getByText("Finanțe")).toBeInTheDocument();
     expect(screen.getByText("Firmă")).toBeInTheDocument();

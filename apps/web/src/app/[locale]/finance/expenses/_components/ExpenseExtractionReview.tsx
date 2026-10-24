@@ -724,7 +724,7 @@ export function ExpenseExtractionReview({
         </div>
       </div>
 
-      <div className="border-t border-border bg-popover px-4 pt-4 pb-[max(var(--spacing-4),env(safe-area-inset-bottom))] sm:px-6">
+      <div className="border-t border-border bg-popover px-4 pt-4 pb-[calc(var(--spacing-screen-bottom)+env(safe-area-inset-bottom))] sm:px-6">
         <div className="mx-auto flex w-full max-w-2xl flex-col gap-2">
           <SaveButton
             type="button"

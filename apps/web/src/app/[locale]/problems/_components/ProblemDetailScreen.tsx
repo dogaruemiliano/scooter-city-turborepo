@@ -50,7 +50,7 @@ export function ProblemDetailScreen({ id }: { id: string }) {
   const remote = useRemote(load);
   const problem = remote.data;
   return (
-    <main className="flex min-w-0 flex-1 flex-col gap-6 p-4 md:p-8">
+    <main className="flex min-w-0 flex-1 flex-col gap-6 px-4 pt-4 md:px-8 md:pt-8">
       <Feedback error={remote.error} />
       {remote.error ? (
         <Button

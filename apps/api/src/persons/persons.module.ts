@@ -1,3 +1,4 @@
+import { UsersModule } from "../users/users.module";
 import { Module } from "@nestjs/common";
 import { ScheduleModule } from "@nestjs/schedule";
 
@@ -11,6 +12,7 @@ import { PersonDocumentExtractionModule } from "../person-document-extraction/pe
 @Module({
   imports: [
     ImageStorageModule,
+    UsersModule,
     PersonDocumentExtractionModule,
     ScheduleModule.forRoot(),
   ],

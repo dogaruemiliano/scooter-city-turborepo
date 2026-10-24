@@ -137,6 +137,8 @@ model User {
   otpChallenges           OtpChallenge[]
   authAccounts            AuthAccount[]
   auditEvents             AuditEvent[]
+  avatarAssetId           String?                  @unique
+  avatar                  MediaAsset?              @relation("UserAvatar", fields: [avatarAssetId], references: [id], onDelete: SetNull)
   mediaAssets             MediaAsset[]
   draftUploads            DraftUpload[]
   expenseExtractionDrafts ExpenseExtractionDraft[] @relation("ExpenseExtractionDraftOwner")
@@ -171,6 +173,7 @@ model User {
 /// the server-only storage key and public-safe metadata that API responses can
 /// expose through domain-specific resources such as PersonDocumentPhoto.
 model MediaAsset {
+  avatarUser       User?                 @relation("UserAvatar")
   id               String                @id @default(cuid())
   provider         String
   bucket           String

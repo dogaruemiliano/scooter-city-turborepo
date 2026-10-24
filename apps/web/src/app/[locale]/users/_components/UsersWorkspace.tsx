@@ -1,4 +1,5 @@
 "use client";
+import { userAvatarSrc } from "@/lib/user-avatar";
 import { useFormAction } from "@/lib/form/use-form-action";
 import { SaveButton } from "@repo/ui/components/save-button";
 
@@ -14,6 +15,7 @@ import { v1 } from "@repo/api-shared";
 import {
   Avatar,
   AvatarFallback,
+  AvatarImage,
   Badge,
   BottomSheet,
   BottomSheetTrigger,
@@ -51,6 +53,7 @@ import {
   useTask,
 } from "@/components/WorkspaceForm";
 import { RoleCard, roleCardSurface } from "../../roles/_components/RoleCard";
+import { roleColors } from "../../roles/_lib/role-colors";
 import { AccessWorkspace } from "../../roles/_components/AccessWorkspace";
 import { AccessHistory } from "../../roles/_components/AccessHistory";
 import {
@@ -81,6 +84,7 @@ function MemberAvatar({
     user.email.slice(0, 2);
   return (
     <Avatar aria-hidden="true" shape="square" size={large ? "xl" : "lg"}>
+      <AvatarImage src={userAvatarSrc(user.avatarAssetId)} alt="" />
       <AvatarFallback>{initials.toLocaleUpperCase()}</AvatarFallback>
     </Avatar>
   );
@@ -277,15 +281,53 @@ export function UsersWorkspace({ id }: { id?: string }) {
                                 {memberName(user)}
                               </span>
                               <span className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                                <span className="font-medium text-foreground">
-                                  {labelFor(user)}
-                                </span>
-                                <span aria-hidden="true">·</span>
-                                {t(`access.${user.loginStatus.toLowerCase()}`)}
+                                {user.isSuperAdmin ? (
+                                  <span
+                                    className={`font-medium ${roleColors.superAdmin.title}`}
+                                  >
+                                    {labelFor(user)}
+                                  </span>
+                                ) : user.roles.length ? (
+                                  [...user.roles]
+                                    .sort(
+                                      (a, b) =>
+                                        [
+                                          "admin",
+                                          "mechanic",
+                                          "customer",
+                                        ].indexOf(a.slug) -
+                                        [
+                                          "admin",
+                                          "mechanic",
+                                          "customer",
+                                        ].indexOf(b.slug),
+                                    )
+                                    .map((role) => (
+                                      <span
+                                        key={role.id}
+                                        className={`font-medium ${(roleColors[role.slug] ?? roleColors.none).title}`}
+                                      >
+                                        {baseSlugs.some(
+                                          (slug) => slug === role.slug,
+                                        )
+                                          ? t(
+                                              `access.member.roleNames.${role.slug}`,
+                                            )
+                                          : role.name}
+                                      </span>
+                                    ))
+                                ) : (
+                                  <span className="font-medium text-foreground">
+                                    {labelFor(user)}
+                                  </span>
+                                )}
                               </span>
                               <span className="truncate text-xs text-muted-foreground">
                                 {user.email}
                               </span>
+                            </span>
+                            <span className="shrink-0 text-right text-xs text-muted-foreground">
+                              {t(`access.${user.loginStatus.toLowerCase()}`)}
                             </span>
                           </CardContent>
                         </Card>

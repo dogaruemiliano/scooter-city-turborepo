@@ -50,7 +50,7 @@ export default async function BrandsPage({ params }: BrandsPageProps) {
   const t = await getTranslations({ locale, namespace: "scooters" });
 
   return (
-    <main className="mx-auto flex w-full max-w-screen-xl flex-1 flex-col gap-8 px-4 py-6 sm:px-6 lg:px-8">
+    <main className="mx-auto flex w-full max-w-screen-xl flex-1 flex-col gap-8 px-4 pt-6 sm:px-6 lg:px-8">
       <ListLayout
         action={
           canAccess(user, "scooter_brands.manage") ? (

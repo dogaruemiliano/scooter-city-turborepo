@@ -1,5 +1,8 @@
 import {
   Controller,
+  Post,
+  UploadedFile,
+  UseInterceptors,
   Delete,
   Get,
   HttpCode,
@@ -14,6 +17,8 @@ import {
 } from "@nestjs/common";
 import {
   ApiCookieAuth,
+  ApiConsumes,
+  ApiBody,
   ApiNoContentResponse,
   ApiOperation,
   ApiTags,
@@ -21,6 +26,13 @@ import {
 import { v1 } from "@repo/api-shared";
 import type { Request, Response } from "express";
 import { ZodResponse } from "nestjs-zod";
+
+import { pipeline } from "node:stream/promises";
+import { FileInterceptor } from "@nestjs/platform-express";
+import {
+  UserAvatarService,
+  AVATAR_MAX_BYTES,
+} from "../../../users/user-avatar.service";
 
 import { AccessService } from "../../../access/access.service";
 import { SelfService } from "../../../access/access.decorators";
@@ -48,6 +60,7 @@ export class AuthIdentityController {
     private readonly linkedAccounts: LinkedAccountService,
     private readonly audit: AuditService,
     @Inject(ENV) private readonly env: Env,
+    private readonly avatars: UserAvatarService,
   ) {}
 
   @Get("me")
@@ -80,6 +93,59 @@ export class AuthIdentityController {
       throw new UnauthorizedException();
     }
     return this.toSessionUser(row, user);
+  }
+
+  @Post("me/avatar")
+  @ApiConsumes("multipart/form-data")
+  @ApiBody({
+    schema: {
+      type: "object",
+      required: ["file"],
+      properties: { file: { type: "string", format: "binary" } },
+    },
+  })
+  @ApiOperation({
+    operationId: "CoreAuthController_uploadAvatar_v1",
+    summary: "Replace the current user's profile picture",
+  })
+  @UseInterceptors(
+    FileInterceptor("file", {
+      limits: { fileSize: AVATAR_MAX_BYTES, files: 1 },
+    }),
+  )
+  @ZodResponse({ type: SessionUser })
+  async uploadAvatar(
+    @CurrentUser() user: AuthPrincipal,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    await this.avatars.upload(user.id, file);
+    return this.me(user);
+  }
+
+  @Delete("me/avatar")
+  @ApiOperation({
+    operationId: "CoreAuthController_removeAvatar_v1",
+    summary: "Remove the current user's profile picture",
+  })
+  @ZodResponse({ type: SessionUser })
+  async removeAvatar(@CurrentUser() user: AuthPrincipal) {
+    await this.avatars.replace(user.id, null);
+    return this.me(user);
+  }
+
+  @Get("avatars/:assetId")
+  @ApiOperation({
+    operationId: "CoreAuthController_avatarContent_v1",
+    summary: "Read an attached user avatar (authentication required)",
+  })
+  async avatarContent(@Param("assetId") assetId: string, @Res() res: Response) {
+    const content = await this.avatars.read(assetId);
+    res.setHeader("Content-Type", "image/png");
+    res.setHeader("Cache-Control", "private, no-store");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    if (content.contentLength !== null)
+      res.setHeader("Content-Length", String(content.contentLength));
+    await pipeline(content.body, res);
   }
 
   @Delete("me")
@@ -145,6 +211,7 @@ export class AuthIdentityController {
       emailVerified: row.emailVerified?.toISOString() ?? null,
       phone: row.phone,
       phoneVerified: row.phoneVerified?.toISOString() ?? null,
+      avatarAssetId: row.avatarAssetId,
       firstName: row.firstName,
       lastName: row.lastName,
       roles: row.roles,

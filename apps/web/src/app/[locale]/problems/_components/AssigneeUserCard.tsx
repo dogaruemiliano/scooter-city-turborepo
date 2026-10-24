@@ -1,5 +1,6 @@
 "use client";
 
+import { userAvatarSrc } from "@/lib/user-avatar";
 import type { ComponentProps, ReactNode } from "react";
 import { UserCard } from "@repo/ui/components";
 import { useTranslations } from "next-intl";
@@ -35,6 +36,7 @@ export function AssigneeUserCard({
   return (
     <UserCard
       name={name}
+      avatarUrl={userAvatarSrc(member?.avatarAssetId)}
       email={showEmail ? member?.email : undefined}
       roles={roles.map((role) => ({
         label: role.label,

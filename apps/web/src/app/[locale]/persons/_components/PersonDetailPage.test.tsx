@@ -338,7 +338,7 @@ describe("PersonDetailPage", () => {
     expect(moreActionsButton.querySelector("svg")).toHaveClass(
       "lucide-ellipsis-vertical",
     );
-    expect(moreActionsButton.parentElement).toContainElement(
+    expect(moreActionsButton.parentElement?.parentElement).toContainElement(
       screen.getByRole("heading", { name: "Ada Lovelace" }),
     );
     expect(

@@ -8,6 +8,8 @@ type FormActionsProps = ComponentProps<"div"> & {
   status?: ReactNode;
   buttonLayout?: "equal" | "primary";
   sticky?: boolean;
+  /** Compact padding and action spacing for short floating save bars. */
+  density?: "default" | "compact";
   /** Page forms: reveal the floating actions when submission is valid. */
   ready?: boolean;
   /** Keeps ready actions visible while submission is in progress. */
@@ -21,6 +23,7 @@ function FormActions({
   status,
   buttonLayout = "equal",
   sticky = false,
+  density = "default",
   ready,
   pending = false,
   arrangement = "default",
@@ -46,10 +49,12 @@ function FormActions({
       <div
         className={cn(
           arrangement === "split"
-            ? "flex w-full min-w-0 flex-col gap-6 *:min-w-0 *:max-w-full md:flex-row-reverse md:items-center md:justify-between"
+            ? "flex w-full min-w-0 flex-col *:min-w-0 *:max-w-full md:flex-row-reverse md:items-center md:justify-between"
             : buttonLayout === "primary"
               ? "grid w-full min-w-0 grid-cols-(--container-primary-form-actions) items-center gap-3 *:min-w-0 *:max-w-full *:w-full"
               : "flex w-full min-w-0 flex-wrap items-center justify-end gap-3 *:min-w-0 *:max-w-full *:flex-1 @form-columns/form-actions:w-auto @form-columns/form-actions:*:flex-none",
+          arrangement === "split" &&
+            (density === "compact" ? "gap-2" : "gap-6"),
         )}
       >
         {children}
@@ -74,7 +79,12 @@ function FormActions({
         )}
         {...props}
       >
-        <CardContent className={cn(layout, "p-4 sm:p-6")}>
+        <CardContent
+          className={cn(
+            layout,
+            density === "compact" ? "p-3 sm:p-4" : "p-4 sm:p-6",
+          )}
+        >
           {content}
         </CardContent>
       </Card>

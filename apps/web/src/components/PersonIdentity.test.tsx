@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import { messages } from "@repo/i18n";
 import type { v1 } from "@repo/api-shared";
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import {
   PersonIdentityCard,
   PersonIdentityRow,
@@ -10,6 +10,10 @@ import {
 } from "./PersonIdentity";
 import { PersonContactActions } from "./PersonContactActions";
 import type { ReactNode } from "react";
+
+vi.mock("@/lib/api", () => ({
+  webApi: { url: (path: string) => `https://api.example.test${path}` },
+}));
 
 const person: PersonSummary = {
   id: "p1",

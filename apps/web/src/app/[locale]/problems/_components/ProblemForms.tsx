@@ -1,4 +1,5 @@
 "use client";
+import { userAvatarSrc } from "@/lib/user-avatar";
 import { useFormAction } from "@/lib/form/use-form-action";
 import { SaveButton } from "@repo/ui/components/save-button";
 
@@ -1140,6 +1141,7 @@ function ProblemActivity({
                       ? "problems.taskCompletedComment"
                       : "problems.taskReopenedComment",
                   )}
+                  avatarUrl={userAvatarSrc(entry.actor?.avatarAssetId)}
                   author={
                     entry.actor
                       ? memberName(entry.actor)
@@ -1159,6 +1161,7 @@ function ProblemActivity({
                       current === entry.id ? null : current,
                     )
                   }
+                  avatarUrl={userAvatarSrc(entry.actor?.avatarAssetId)}
                   author={
                     entry.actor
                       ? memberName(entry.actor)

@@ -30,6 +30,7 @@ export const problemPhotoSchema = z.object({
 export const problemMemberSchema = z.object({
   id: z.string(),
   email: z.string().optional(),
+  avatarAssetId: z.string().nullable().optional(),
   firstName: z.string().nullable(),
   lastName: z.string().nullable(),
 });

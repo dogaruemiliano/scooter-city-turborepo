@@ -113,3 +113,20 @@ export const RevealWhenReady: Story = {
     </form>
   ),
 };
+
+/** Compact action bars retain touch targets while reducing padding and gaps. */
+export const CompactSaveBar: Story = {
+  render: () => (
+    <FormActions arrangement="split" density="compact" ready>
+      <SaveButton
+        type="button"
+        idleLabel="Save changes"
+        pendingLabel="Saving…"
+        successLabel="Changes saved"
+      />
+      <Button type="button" variant="text">
+        Cancel
+      </Button>
+    </FormActions>
+  ),
+};

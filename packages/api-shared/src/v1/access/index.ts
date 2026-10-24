@@ -201,6 +201,7 @@ export const accessUserSchema = z
   .object({
     id: z.string(),
     email: z.string(),
+    avatarAssetId: z.string().nullable().optional(),
     firstName: z.string().nullable(),
     lastName: z.string().nullable(),
     loginStatus: z.enum(["DISABLED", "INVITED", "ACTIVE", "SUSPENDED"]),
