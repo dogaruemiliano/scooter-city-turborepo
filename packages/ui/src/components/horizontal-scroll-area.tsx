@@ -13,6 +13,8 @@ type HorizontalScrollAreaProps = Omit<
 > & {
   className?: string;
   label: string;
+  /** Fade only the edges with horizontally clipped content, using the shared tab fade width. */
+  fadeEdges?: boolean;
   /** Enables a right-edge arrow and mouse-hover scrolling across the full viewport height. */
   scrollRightLabel?: string;
 };
@@ -22,6 +24,7 @@ export function HorizontalScrollArea({
   children,
   className,
   label,
+  fadeEdges = false,
   scrollRightLabel,
   onPointerMove,
   onPointerLeave,
@@ -112,7 +115,11 @@ export function HorizontalScrollArea({
         aria-label={label}
         role="region"
         tabIndex={0}
-        className="w-full min-w-0 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+        className={cn(
+          "w-full min-w-0 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+          fadeEdges &&
+            "[--scroll-fade-start:currentColor] [--scroll-fade-end:currentColor] data-[overflow-x-start]:[--scroll-fade-start:transparent] data-[overflow-x-end]:[--scroll-fade-end:transparent] [mask-image:linear-gradient(to_right,var(--scroll-fade-start),currentColor_var(--spacing-6),currentColor_calc(100%_-_var(--spacing-6)),var(--scroll-fade-end))]",
+        )}
       >
         <ScrollAreaPrimitive.Content>{children}</ScrollAreaPrimitive.Content>
       </ScrollAreaPrimitive.Viewport>

@@ -18,7 +18,10 @@ const purpose = (type: v1.scooters.ScooterDocumentUploadType) =>
   `scooter-document:${type}`;
 const scope = (userId: string, type: v1.scooters.ScooterDocumentUploadType) =>
   `${purpose(type)}:${userId}`;
-type Prepared = v1.scooters.ScooterDocumentDraft & { stored: StoredDocument };
+type Prepared = v1.scooters.ScooterDocumentDraft & {
+  stored: StoredDocument;
+  clientCopyStored?: StoredDocument;
+};
 
 @Injectable()
 export class ScooterDocumentsService {
@@ -114,7 +117,18 @@ export class ScooterDocumentsService {
       if (keys.has(stored.storageKey))
         throw new BadRequestException("Duplicate document upload");
       keys.add(stored.storageKey);
-      prepared.push({ ...draft, stored });
+      const clientCopyStored = draft.clientCopy
+        ? await this.storage.completePresignedDocumentUpload(
+            draft.clientCopy.uploadToken,
+            scope(userId!, draft.clientCopy.uploadType),
+          )
+        : undefined;
+      if (clientCopyStored) {
+        if (keys.has(clientCopyStored.storageKey))
+          throw new BadRequestException("Duplicate document version upload");
+        keys.add(clientCopyStored.storageKey);
+      }
+      prepared.push({ ...draft, stored, clientCopyStored });
     }
     return prepared;
   }
@@ -204,10 +218,55 @@ export class ScooterDocumentsService {
     extractions: v1.scooters.ScooterDocumentExtractionUpdate[] = [],
     sessionId?: string,
     saveFingerprint?: string,
+    scooterVin?: string,
   ) {
+    if (scooterVin) {
+      for (const { evidence, type } of [
+        ...prepared.map((document) => ({
+          evidence: document.extractedData,
+          type: document.type,
+        })),
+        ...extractions.map((document) => ({
+          evidence: document.extractedData,
+          type: "unknown",
+        })),
+      ]) {
+        const vins = evidence?.documents?.length
+          ? evidence.documents
+              .filter((document) =>
+                v1.scooters.scooterDocumentReadsVin(document.documentType),
+              )
+              .map((document) => document.vin)
+          : v1.scooters.scooterDocumentReadsVin(type)
+            ? [evidence?.vin]
+            : [];
+        if (vins.some((vin) => vin && vin !== scooterVin))
+          throw new BadRequestException({
+            code: "DOCUMENT_VIN_MISMATCH",
+            message:
+              "Review document VINs before attaching them to this scooter.",
+          });
+      }
+    }
     await saveEditorSession(tx, sessionId, userId, scooterId, saveFingerprint);
     const ids = [...new Set(removedIds)];
     if (ids.length) {
+      const inspection = await tx.scooterItpInspection.findFirst({
+        where: {
+          scooterId,
+          OR: [
+            { cardDocumentId: { in: ids } },
+            { certificateDocumentId: { in: ids } },
+          ],
+        },
+        select: { id: true },
+      });
+      if (inspection)
+        throw new BadRequestException({
+          code: "ITP_EVIDENCE_IN_USE",
+          message:
+            "Keep documents supporting a confirmed inspection. Add renewal scans without removing the historical evidence.",
+        });
       const removed = await tx.scooterDocument.updateMany({
         where: { id: { in: ids }, scooterId, deletedAt: null },
         data: { deletedAt: new Date() },
@@ -245,8 +304,15 @@ export class ScooterDocumentsService {
       insurancePolicyId,
       extractedData,
       uploadType,
+      clientCopy,
+      clientCopyStored,
     } of prepared) {
-      if (type === "insurance") {
+      const hasInsurance = extractedData?.documents?.length
+        ? extractedData.documents.some(
+            (document) => document.documentType === "insurance",
+          )
+        : type === "insurance";
+      if (hasInsurance && extractedData?.currentInsuranceDocumentId !== null) {
         if (
           !insurancePolicyId ||
           !(await tx.scooterInsurancePolicy.findFirst({
@@ -259,30 +325,38 @@ export class ScooterDocumentsService {
           );
       } else if (insurancePolicyId)
         throw new BadRequestException(
-          "Only insurance documents can belong to a policy",
+          "Only documents containing insurance evidence can belong to a policy",
         );
       const now = new Date();
-      const claimed = await tx.draftUpload.updateMany({
-        where: {
-          storageKey: stored.storageKey,
-          userId,
-          purpose: purpose(uploadType ?? type),
-          claimedAt: null,
-          cleanupStartedAt: null,
-          editorSessionId: sessionId ?? null,
-          expiresAt: { gt: now },
-          provider: stored.provider,
-          bucket: stored.bucket,
-          contentType: stored.contentType,
-          byteSize: stored.byteSize,
-          checksumSha256: stored.checksumSha256,
-        },
-        data: { claimedAt: now },
-      });
-      if (claimed.count !== 1)
-        throw new BadRequestException(
-          "Document upload expired or was already used. Upload it again.",
-        );
+      const versions = [
+        { stored, uploadType: uploadType ?? type },
+        ...(clientCopyStored && clientCopy
+          ? [{ stored: clientCopyStored, uploadType: clientCopy.uploadType }]
+          : []),
+      ];
+      for (const version of versions) {
+        const claimed = await tx.draftUpload.updateMany({
+          where: {
+            storageKey: version.stored.storageKey,
+            userId,
+            purpose: purpose(version.uploadType),
+            claimedAt: null,
+            cleanupStartedAt: null,
+            editorSessionId: sessionId ?? null,
+            expiresAt: { gt: now },
+            provider: version.stored.provider,
+            bucket: version.stored.bucket,
+            contentType: version.stored.contentType,
+            byteSize: version.stored.byteSize,
+            checksumSha256: version.stored.checksumSha256,
+          },
+          data: { claimedAt: now },
+        });
+        if (claimed.count !== 1)
+          throw new BadRequestException(
+            "Document upload expired or was already used. Upload it again.",
+          );
+      }
       const document = await tx.scooterDocument.create({
         data: {
           scooter: { connect: { id: scooterId } },
@@ -291,6 +365,22 @@ export class ScooterDocumentsService {
             ? { insurancePolicy: { connect: { id: insurancePolicyId } } }
             : {}),
           fileName,
+          ...(clientCopyStored && clientCopy
+            ? {
+                clientCopyFileName: clientCopy.fileName,
+                clientCopyAsset: {
+                  create: {
+                    provider: clientCopyStored.provider,
+                    bucket: clientCopyStored.bucket,
+                    storageKey: clientCopyStored.storageKey,
+                    contentType: clientCopyStored.contentType,
+                    byteSize: clientCopyStored.byteSize,
+                    checksumSha256: clientCopyStored.checksumSha256,
+                    uploadedByUserId: userId,
+                  },
+                },
+              }
+            : {}),
           extractedData: extractedData === null ? Prisma.DbNull : extractedData,
           asset: {
             create: {
@@ -314,7 +404,13 @@ export class ScooterDocumentsService {
           data: { documentId: document.id, scooterId, draftUploadId: null },
         });
         await tx.scooterDocumentResource.updateMany({
-          where: { sessionId, storageKey: stored.storageKey, kind: "original" },
+          where: {
+            sessionId,
+            storageKey: {
+              in: versions.map((version) => version.stored.storageKey),
+            },
+            kind: "original",
+          },
           data: { status: "retained" },
         });
       }
@@ -331,7 +427,7 @@ export class ScooterDocumentsService {
       throw new NotFoundException("Scooter not found");
     const documents = await this.prisma.scooterDocument.findMany({
       where: { scooterId, deletedAt: null, asset: { deletedAt: null } },
-      include: { asset: true },
+      include: { asset: true, clientCopyAsset: true },
       orderBy: [{ createdAt: "asc" }, { id: "asc" }],
     });
     return documents.map((doc) =>
@@ -345,11 +441,22 @@ export class ScooterDocumentsService {
         byteSize: doc.asset.byteSize,
         createdAt: doc.createdAt.toISOString(),
         contentUrl: v1.scooters.ROUTES.documents.content(scooterId, doc.id),
+        clientCopy:
+          doc.clientCopyAsset && !doc.clientCopyAsset.deletedAt
+            ? {
+                fileName: doc.clientCopyFileName,
+                contentType: doc.clientCopyAsset.contentType,
+                byteSize: doc.clientCopyAsset.byteSize,
+                contentUrl:
+                  v1.scooters.ROUTES.documents.content(scooterId, doc.id) +
+                  "?version=client_copy",
+              }
+            : null,
       }),
     );
   }
 
-  async content(scooterId: string, documentId: string) {
+  async content(scooterId: string, documentId: string, version?: string) {
     const document = await this.prisma.scooterDocument.findFirst({
       where: {
         id: documentId,
@@ -358,12 +465,18 @@ export class ScooterDocumentsService {
         scooter: { deletedAt: null },
         asset: { deletedAt: null },
       },
-      include: { asset: true },
+      include: { asset: true, clientCopyAsset: true },
     });
     if (!document) throw new NotFoundException("Document not found");
+    if (version && version !== "client_copy")
+      throw new BadRequestException("Unknown document version");
+    const asset =
+      version === "client_copy" ? document.clientCopyAsset : document.asset;
+    if (!asset || asset.deletedAt)
+      throw new NotFoundException("Document version not found");
     return {
-      ...(await this.storage.readDocument(document.asset.storageKey)),
-      contentType: document.asset.contentType,
+      ...(await this.storage.readDocument(asset.storageKey)),
+      contentType: asset.contentType,
     };
   }
 }

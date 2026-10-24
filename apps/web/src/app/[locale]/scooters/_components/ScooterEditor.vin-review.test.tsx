@@ -1,7 +1,6 @@
 import { v1 } from "@repo/api-shared";
 import { messages } from "@repo/i18n";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { render, screen, waitFor } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import { useState } from "react";
 import { expect, it, vi } from "vitest";
@@ -71,7 +70,7 @@ vi.mock("./useScooterDocuments", () => ({
   },
 }));
 
-it("unblocks the combined review after verified VIN correction without re-extraction", async () => {
+it("fills the CIV VIN once and ignores a legacy Romanian registration VIN without asking again", async () => {
   const correct = "LXYTCZP05P0000001";
   const misread = "LXYTC2P05P0000001";
   apiFetch.mockImplementation((_route, _schema, { json }) => {
@@ -79,7 +78,25 @@ it("unblocks the combined review after verified VIN correction without re-extrac
     const result = {
       sourceId: json.sourceId,
       documentType: json.source.type,
-      extractedData: { vin, fields: { vin }, rawFields: { E: vin } },
+      extractedData: {
+        vin,
+        fields: { vin },
+        rawFields: { E: vin },
+        ...(json.sourceId === "civ"
+          ? {
+              documents: [
+                {
+                  id: "civ-child",
+                  documentType: "civ",
+                  pages: [1],
+                  vin,
+                  fields: { vin },
+                  rawFields: {},
+                },
+              ],
+            }
+          : {}),
+      },
       issues: [],
       reviewRequired: true,
     };
@@ -92,7 +109,6 @@ it("unblocks the combined review after verified VIN correction without re-extrac
       expiresAt: new Date(Date.now() + 300_000).toISOString(),
     });
   });
-  const user = userEvent.setup();
   render(
     <NextIntlClientProvider locale="en" messages={messages.en}>
       <ScooterEditor brands={[]} returnHref="/en/scooters" />
@@ -101,55 +117,24 @@ it("unblocks the combined review after verified VIN correction without re-extrac
   expect(
     screen.queryByRole("dialog", { name: "Verify the scooter VIN" }),
   ).not.toBeInTheDocument();
-  const validate = await screen.findByRole("button", {
-    name: messages.en.scooters.creation.validateDocuments,
-  });
-  await waitFor(() => expect(validate).toBeEnabled());
-  await user.click(validate);
-  expect(
-    await screen.findByRole("heading", { name: "Verify the scooter VIN" }),
-  ).toBeInTheDocument();
-  expect(apiFetch).toHaveBeenCalledTimes(2);
-  await user.keyboard("{Escape}");
   await waitFor(() =>
-    expect(
-      screen.queryByRole("dialog", { name: "Verify the scooter VIN" }),
-    ).not.toBeInTheDocument(),
+    expect(screen.getByLabelText("VIN")).toHaveValue(correct),
   );
-  expect(persisted.registration?.vinReview).toBeUndefined();
-  expect(apiFetch).toHaveBeenCalledTimes(2);
-  await user.click(
-    screen.getByRole("button", {
+  expect(
+    screen.queryByRole("button", {
       name: messages.en.scooters.creation.validateDocuments,
     }),
-  );
+  ).not.toBeInTheDocument();
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  await waitFor(() => expect(persisted.registration?.vin).toBeNull());
+  expect(apiFetch).toHaveBeenCalledTimes(2);
   expect(
-    screen.getByRole("dialog", { name: "Verify the scooter VIN" }),
-  ).toBeInTheDocument();
-  fireEvent.change(screen.getByLabelText("Verified scooter VIN"), {
-    target: { value: correct },
-  });
-  await user.click(
-    screen.getByRole("button", { name: "Continue to document review" }),
-  );
-  const finish = screen.getByRole("button", { name: /Confirm & finish/ });
-  expect(finish).toBeDisabled();
-  await waitFor(() => expect(finish).toBeEnabled(), { timeout: 4000 });
-  await user.click(finish);
-  await waitFor(() =>
-    expect(
-      screen.queryByRole("heading", { name: "Verify mismatched documents" }),
-    ).not.toBeInTheDocument(),
-  );
-  expect(persisted.registration).toMatchObject({
-    vin: correct,
-    rawFields: { E: misread },
-    vinReview: { method: "manual", originalVin: misread },
-  });
-  expect(apiFetch).toHaveBeenCalledTimes(2);
-  expect(screen.getByLabelText("VIN")).toHaveValue(correct);
+    screen.queryByRole("region", { name: "Review identified documents" }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByText("I reviewed this document and its pages."),
+  ).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Create scooter" })).toBeEnabled();
-  expect(apiFetch).toHaveBeenCalledTimes(2);
 });
 
 vi.mock("@/components/auth/SessionProvider", () => ({

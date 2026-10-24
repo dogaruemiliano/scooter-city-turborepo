@@ -1,5 +1,102 @@
+import { scooterItpMessages } from "./scooter-itp";
+
 export const scootersCatalog = {
   en: {
+    workspace: {
+      title: "Add scooters",
+      description:
+        "Upload, analyse and review up to {max} scooters at once. Drafts are kept for 24 hours.",
+      back: "Back to scooters",
+      addAnother: "Add another scooter",
+      drafts: "Scooter drafts",
+      draft: "Draft {number}",
+      loading: "Loading your drafts…",
+      loadFailed: "Could not load or add drafts. Reload the page to reconnect.",
+      limitReached:
+        "You already have 20 active scooter drafts. Create or discard one before adding another.",
+      saveFailed:
+        "Draft changes could not be saved. Keep this page open and reconnect before leaving.",
+      restoreFailed:
+        "This saved draft could not be restored. Keep it for recovery, or discard it and upload the documents again.",
+      revisionConflict:
+        "This draft was changed in another tab. Copy your latest changes before reloading to recover the saved draft.",
+      discardFailed:
+        "Could not discard this draft. Your draft is still available.",
+      savingDraft:
+        "The draft is being saved. Wait for it to finish before discarding.",
+      savingDrafts: "Saving draft changes…",
+      savedDrafts: "Draft changes saved",
+      saveDrafts: "Save draft changes",
+      discard: "Discard draft",
+      empty: "Add a scooter to upload documents or enter its details.",
+      pdfHint:
+        "Each PDF belongs to this scooter and may contain several document types. You can add more PDFs or images.",
+      createNext: "Create and review next",
+      reviewDocuments: "Review identified documents",
+      reviewDocumentsHint:
+        "Check every identified document against the original, including both sides. Correct the scooter fields below before creating.",
+      documentType: "Document type",
+      vinConflictReading:
+        "This document reads {vin}; the scooter VIN is {selected}. Verify the original before confirming a correction.",
+      useScooterVin: "Confirm this document belongs to the scooter VIN",
+      detected: "Scooter identified. Its fields are being filled below.",
+      review: "Review",
+      uploadDocuments: "Drop scooter documents",
+      browse: "Browse files",
+      invalidUpload:
+        "Select up to 20 non-empty PDF or image files, at most 15 MB each, with valid filenames.",
+      uploadHint:
+        "Each PDF belongs to one scooter. Matching VINs are grouped automatically. Drop image sides for one scooter together, or choose an existing draft to add documents.",
+      newScooter: "New scooter",
+      groupingNeedsReview:
+        "Two drafts identify the same scooter. Keep your edits and resolve the grouping before creating both. Documents without a readable VIN can be added using the upload target selector.",
+      groupingFailed:
+        "The matching scooter drafts could not be grouped. Your documents and edits are preserved. Reload to retry.",
+      assignmentNeeded:
+        "Analysis could not identify the scooter. Assign these documents.",
+      chooseScooter: "Choose a scooter",
+      original: "Original",
+      clientCopy: "Client copy with branded overlay",
+      version: "Document version",
+      originalForCopy: "Original document for this client copy",
+      chooseOriginal: "Choose the matching original",
+      versionHint:
+        "Client copies are attached to their originals and are not analysed separately.",
+      pageNumbers: "Page numbers (comma separated)",
+      invalidPages:
+        "Enter distinct page numbers between 1 and {max}, separated by commas.",
+      pages: "Pages {pages}",
+      extractedValues: "Original readings and inspection dates",
+      unreadable: "Unreadable or missing",
+      inspectionDate: "Inspection → valid until",
+      logicalVinMismatch:
+        "Document VIN readings differ. Use the edit button on the affected document card to check its reading against the scooter VIN.",
+      currentInsurance: "Current insurance policy",
+      chooseInsurance: "Choose the policy to attach",
+      noCurrentInsurance: "Keep all insurance documents as history",
+      currentInsuranceHint:
+        "Only the chosen policy fills the insurance fields. All original insurance documents and readings are retained as evidence.",
+      chooseInsuranceRequired:
+        "Several policies were identified. Choose the current policy, or keep them all as history.",
+      multipleInsurance:
+        "More than one insurance policy was identified. Upload a bundle containing the current policy; previous policies can be added after creating the scooter. All original readings remain available for review.",
+      confirmDocument: "I reviewed this document and its pages.",
+      invalidVin:
+        "Enter the 17-character VIN shown on this document, or leave it blank if unreadable.",
+      previewLoading: "Loading private preview…",
+      interruptedUpload:
+        "Upload interrupted. Remove this item and select the original file again.",
+      status: {
+        empty: "Awaiting documents",
+        uploading: "Uploading",
+        queued: "Queued",
+        analysing: "Analysing",
+        review: "Analysis done. Needs review",
+        attention: "Needs attention",
+        ready: "Ready to create",
+        created: "Created",
+      },
+    },
     numbering: {
       automatic: "Automatic",
       manual: "Manual",
@@ -74,6 +171,9 @@ export const scootersCatalog = {
         "Drag photos in the All view to reorder, or open a photo and use Move earlier / Move later.",
       uploading: "Uploading… {progress}%",
       processing: "Saving photo…",
+      uploadInterrupted:
+        "Upload interrupted. Remove this photo and select the original file again.",
+      previewRestoring: "Restoring private photo preview…",
       uploadFailed: "Photo wasn’t saved. Retry the upload or remove it.",
       imageFailed: "Photo couldn’t be loaded.",
       retry: "Retry",
@@ -85,6 +185,8 @@ export const scootersCatalog = {
         "Delete this photo from the scooter gallery? If it is the cover, the next photo becomes the cover.",
       cancel: "Cancel",
       errors: {
+        preview:
+          "Some photo previews could not be restored. Uploaded photos and their settings are preserved. Retry to view them.",
         load: "Photos couldn’t be loaded. Try again.",
         save: "The change couldn’t be saved. Try again; reload the gallery if its photo order has changed.",
         files:
@@ -239,6 +341,11 @@ export const scootersCatalog = {
       progress: "{current} / {total} · {step}",
       steps: {
         documents: "Documents",
+        foreign_registration: "Foreign registration (both sides)",
+        export_certificate: "Export document",
+        itp_card: "ITP yellow card",
+        itp_certificate: "ITP inspection certificate",
+        ownership_proof: "Purchase / ownership proof",
         import_document: "Import documents",
         civ: "CIV",
         registration_certificate: "Registration certificate",
@@ -269,6 +376,7 @@ export const scootersCatalog = {
       yes: "Yes",
       no: "No",
     },
+    itp: scooterItpMessages.en,
     insurance: {
       title: "Insurance",
       policy: "Insurance policy {number}",
@@ -347,6 +455,7 @@ export const scootersCatalog = {
         copy: "Copy the prompt below.",
         extract: "Send it to ChatGPT and attach:",
         documents: {
+          clientCopy: "Client copy with branded overlay",
           import: "Import papers (all pages)",
           civ: "Vehicle identity card (CIV)",
           registration: "Registration certificate",
@@ -409,6 +518,7 @@ export const scootersCatalog = {
         hint: "CIV · Import · Registration · Insurance",
         requirements: "PDF, JPG, PNG or WebP, up to 15 MB each.",
         unknown: "Choose document type",
+        editType: "Edit document type for {name}",
         typeLabel: "Document type for {name}",
         duplicate: "This file is already attached.",
         read: "Details extracted",
@@ -418,6 +528,11 @@ export const scootersCatalog = {
       },
       title: "Documents",
       compact: {
+        foreign_registration: "Foreign registration",
+        export_certificate: "Export document",
+        itp_card: "ITP card",
+        itp_certificate: "ITP certificate",
+        ownership_proof: "Purchase / ownership proof",
         import_document: "Import",
         civ: "CIV",
         registration_certificate: "Registration",
@@ -449,6 +564,11 @@ export const scootersCatalog = {
       documentPosition: "Document {index} of {total}",
 
       civ: "Vehicle identity card (CIV)",
+      foreign_registration: "Foreign registration (both sides)",
+      export_certificate: "Export document",
+      itp_card: "ITP yellow card",
+      itp_certificate: "ITP inspection certificate",
+      ownership_proof: "Purchase / ownership proof",
       import_document: "Import documents",
       registration_certificate: "Registration certificate",
       add: "Add {document}",
@@ -457,6 +577,8 @@ export const scootersCatalog = {
       invalidName:
         "Rename the file without slashes or special control characters (maximum 255 characters).",
       tooMany: "You can attach up to 20 files per scooter.",
+      interruptedUpload:
+        "Upload interrupted. Remove this item and select the original file again.",
       uploading: "Uploading…",
       ready: "Ready to save",
       failed: "Upload failed",
@@ -738,6 +860,15 @@ export const scootersCatalog = {
       },
     },
     civ: {
+      availability: {
+        unknown: "Unknown",
+        not_issued: "Not issued yet",
+        issued: "Issued",
+      },
+      availabilityHint:
+        "A scooter can be created before RAR issues its CIV. Choose Issued even if you do not have its scan yet.",
+      availabilityEvidence:
+        "CIV details or a CIV document confirm it has been issued. The scan may be added later.",
       unknownVersion: "Unknown model",
       unknownVersionHint:
         "Choose the model printed on the CIV to see its field codes. The model is not the manufacturing year.",
@@ -776,6 +907,21 @@ export const scootersCatalog = {
       notes: "Notes",
     },
     fields: {
+      civAvailability: "CIV availability",
+      registrationCounty: "Registration county",
+      registrationLocality: "Registration locality",
+      registrationLocalityCode: "Locality code",
+      registrationHolder: "Registration holder",
+      foreignRegistrationNumber: "Foreign registration number",
+      foreignRegistrationCountry: "Foreign registration country",
+      foreignRegistrationCertificateNumber: "Foreign certificate number",
+      foreignFirstRegistrationDate: "First foreign registration date",
+      foreignRegistrationDate: "Current foreign registration date",
+      foreignRegistrationHolder: "Foreign registration holder",
+      exportCertificateNumber: "Export document number",
+      exportDate: "Export date",
+      exporterName: "Exporter",
+      exportRecipientName: "Export recipient",
       fleetNumber: "Internal number",
       hasGps: "GPS installed",
       odometerWorking: "Odometer working",
@@ -1102,6 +1248,103 @@ export const scootersCatalog = {
     },
   },
   ro: {
+    workspace: {
+      title: "Adaugă scutere",
+      description:
+        "Încarcă, analizează și verifică până la {max} de scutere simultan. Ciornele se păstrează 24 de ore.",
+      back: "Înapoi la scutere",
+      addAnother: "Adaugă alt scuter",
+      drafts: "Ciorne scutere",
+      draft: "Ciornă {number}",
+      loading: "Se încarcă ciornele…",
+      loadFailed:
+        "Ciornele nu au putut fi încărcate sau adăugate. Reîncarcă pagina pentru reconectare.",
+      limitReached:
+        "Ai deja 20 de ciorne active. Creează un scuter sau renunță la o ciornă înainte să adaugi alta.",
+      saveFailed:
+        "Modificările ciornei nu au putut fi salvate. Păstrează pagina deschisă și reconectează-te înainte să pleci.",
+      restoreFailed:
+        "Ciorna salvată nu a putut fi restaurată. Păstreaz-o pentru recuperare sau renunță la ea și încarcă din nou documentele.",
+      revisionConflict:
+        "Ciorna a fost modificată în altă filă. Copiază ultimele modificări înainte să reîncarci ciorna salvată.",
+      discardFailed:
+        "Ciorna nu a putut fi eliminată. Este în continuare disponibilă.",
+      savingDraft:
+        "Ciorna se salvează. Așteaptă finalizarea înainte să renunți la ea.",
+      savingDrafts: "Se salvează modificările ciornelor…",
+      savedDrafts: "Modificările ciornelor au fost salvate",
+      saveDrafts: "Salvează modificările ciornelor",
+      discard: "Renunță la ciornă",
+      empty:
+        "Adaugă un scuter pentru a încărca documente sau a completa detaliile.",
+      pdfHint:
+        "Fiecare PDF aparține acestui scuter și poate conține mai multe tipuri de documente. Poți adăuga alte PDF-uri sau imagini.",
+      createNext: "Creează și verifică următorul",
+      reviewDocuments: "Verifică documentele identificate",
+      reviewDocumentsHint:
+        "Verifică fiecare document față de original, inclusiv ambele fețe. Corectează câmpurile scuterului de mai jos înainte de creare.",
+      documentType: "Tip document",
+      vinConflictReading:
+        "Documentul indică {vin}; seria scuterului este {selected}. Verifică originalul înainte de corectare.",
+      useScooterVin: "Confirmă că documentul aparține seriei VIN a scuterului",
+      detected: "Scuter identificat. Câmpurile sale se completează mai jos.",
+      review: "Verifică",
+      uploadDocuments: "Adaugă documentele scuterului",
+      browse: "Alege fișiere",
+      invalidUpload:
+        "Alege până la 20 de fișiere PDF sau imagini, nevidate, de cel mult 15 MB fiecare, cu nume valide.",
+      uploadHint:
+        "Fiecare PDF aparține unui scuter. Seriile VIN identice se grupează automat. Adaugă împreună fețele fotografiate ale unui scuter sau alege o ciornă pentru documente suplimentare.",
+      newScooter: "Scuter nou",
+      groupingNeedsReview:
+        "Două ciorne identifică același scuter. Păstrează modificările și verifică gruparea înainte de a le crea pe ambele. Documentele fără VIN lizibil pot fi adăugate alegând ciorna la încărcare.",
+      groupingFailed:
+        "Ciornele aceluiași scuter nu au putut fi grupate. Documentele și modificările sunt păstrate. Reîncarcă pentru a reîncerca.",
+      assignmentNeeded:
+        "Analiza nu a identificat scuterul. Atribuie documentele.",
+      chooseScooter: "Alege un scuter",
+      original: "Original",
+      clientCopy: "Copie pentru client cu model de protecție",
+      version: "Versiune document",
+      originalForCopy: "Documentul original pentru această copie",
+      chooseOriginal: "Alege originalul corespunzător",
+      versionHint:
+        "Copiile pentru client se atașează originalelor și nu se analizează separat.",
+      pageNumbers: "Numerele paginilor (separate prin virgulă)",
+      invalidPages:
+        "Introdu pagini distincte între 1 și {max}, separate prin virgulă.",
+      pages: "Pagini {pages}",
+      extractedValues: "Citiri originale și date ITP",
+      unreadable: "Ilizibil sau lipsă",
+      inspectionDate: "Inspecție → valabil până la",
+      logicalVinMismatch:
+        "Seriile VIN citite diferă. Folosește butonul de editare de pe document pentru a verifica seria citită față de seria scuterului.",
+      currentInsurance: "Polița de asigurare curentă",
+      chooseInsurance: "Alege polița de atașat",
+      noCurrentInsurance: "Păstrează toate documentele de asigurare ca istoric",
+      currentInsuranceHint:
+        "Doar polița aleasă completează câmpurile asigurării. Toate documentele și citirile originale sunt păstrate ca dovezi.",
+      chooseInsuranceRequired:
+        "Au fost identificate mai multe polițe. Alege polița curentă sau păstrează-le pe toate ca istoric.",
+      multipleInsurance:
+        "Au fost identificate mai multe polițe. Încarcă un set care conține polița curentă; polițele anterioare pot fi adăugate după crearea scuterului. Citirile originale rămân disponibile pentru verificare.",
+      confirmDocument: "Am verificat documentul și paginile sale.",
+      invalidVin:
+        "Introdu seria VIN de 17 caractere din acest document sau lasă gol dacă este ilizibilă.",
+      previewLoading: "Se încarcă previzualizarea privată…",
+      interruptedUpload:
+        "Încărcare întreruptă. Elimină acest element și selectează din nou fișierul original.",
+      status: {
+        empty: "Așteaptă documente",
+        uploading: "Se încarcă",
+        queued: "În așteptare",
+        analysing: "Se analizează",
+        review: "Analiză finalizată. Necesită verificare",
+        attention: "Necesită atenție",
+        ready: "Pregătit pentru creare",
+        created: "Creat",
+      },
+    },
     numbering: {
       automatic: "Automat",
       manual: "Manual",
@@ -1177,6 +1420,9 @@ export const scootersCatalog = {
         "Trage fotografiile în vizualizarea Toate pentru a schimba ordinea, sau deschide o fotografie și folosește Mută mai devreme / Mută mai târziu.",
       uploading: "Se încarcă… {progress}%",
       processing: "Se salvează fotografia…",
+      uploadInterrupted:
+        "Încărcare întreruptă. Elimină fotografia și selectează din nou fișierul original.",
+      previewRestoring: "Se restaurează previzualizarea privată…",
       uploadFailed:
         "Fotografia nu a fost salvată. Reîncearcă încărcarea sau elimin-o.",
       imageFailed: "Fotografia nu a putut fi încărcată.",
@@ -1189,6 +1435,8 @@ export const scootersCatalog = {
         "Ștergi această fotografie din galeria scuterului? Selecțiile ei ca fotografie de copertă vor fi eliminate.",
       cancel: "Anulează",
       errors: {
+        preview:
+          "Unele previzualizări nu au putut fi restaurate. Fotografiile încărcate și setările sunt păstrate. Reîncearcă pentru a le vedea.",
         load: "Fotografiile nu au putut fi încărcate. Încearcă din nou.",
         save: "Modificarea nu a putut fi salvată. Încearcă din nou; reîncarcă galeria dacă ordinea fotografiilor s-a schimbat.",
         files:
@@ -1348,6 +1596,11 @@ export const scootersCatalog = {
       progress: "{current} / {total} · {step}",
       steps: {
         documents: "Documente",
+        foreign_registration: "Înmatriculare străină (ambele fețe)",
+        export_certificate: "Document de export",
+        itp_card: "Carton galben ITP",
+        itp_certificate: "Certificat de inspecție ITP",
+        ownership_proof: "Dovadă de cumpărare / proprietate",
         import_document: "Documente de import",
         civ: "CIV",
         registration_certificate: "Certificat de înmatriculare",
@@ -1378,6 +1631,7 @@ export const scootersCatalog = {
       yes: "Da",
       no: "Nu",
     },
+    itp: scooterItpMessages.ro,
     insurance: {
       title: "Asigurări",
       policy: "Polița de asigurare {number}",
@@ -1460,6 +1714,7 @@ export const scootersCatalog = {
         copy: "Copiază promptul de mai jos.",
         extract: "Trimite-l lui ChatGPT și atașează:",
         documents: {
+          clientCopy: "Copie pentru client cu model de protecție",
           import: "Documentele de import (toate paginile)",
           civ: "Cartea de identitate a vehiculului (CIV)",
           registration: "Certificatul de înmatriculare / înregistrare",
@@ -1524,6 +1779,7 @@ export const scootersCatalog = {
         hint: "CIV · Import · Înmatriculare · Asigurare",
         requirements: "PDF, JPG, PNG sau WebP, maximum 15 MB fiecare.",
         unknown: "Alege tipul documentului",
+        editType: "Modifică tipul documentului {name}",
         typeLabel: "Tipul documentului {name}",
         duplicate: "Acest fișier este deja atașat.",
         read: "Date extrase",
@@ -1534,6 +1790,11 @@ export const scootersCatalog = {
       },
       title: "Documente",
       compact: {
+        foreign_registration: "Înmatriculare străină",
+        export_certificate: "Document export",
+        itp_card: "Carton ITP",
+        itp_certificate: "Certificat ITP",
+        ownership_proof: "Dovadă de cumpărare / proprietate",
         import_document: "Import",
         civ: "CIV",
         registration_certificate: "Certificat",
@@ -1567,6 +1828,11 @@ export const scootersCatalog = {
       documentPosition: "Documentul {index} din {total}",
 
       civ: "Cartea de identitate a vehiculului (CIV)",
+      foreign_registration: "Înmatriculare străină (ambele fețe)",
+      export_certificate: "Document de export",
+      itp_card: "Carton galben ITP",
+      itp_certificate: "Certificat de inspecție ITP",
+      ownership_proof: "Dovadă de cumpărare / proprietate",
       import_document: "Documente de import",
       registration_certificate: "Certificat de înmatriculare",
       add: "Adaugă {document}",
@@ -1576,6 +1842,8 @@ export const scootersCatalog = {
       invalidName:
         "Redenumește fișierul fără bare oblice sau caractere de control (maximum 255 de caractere).",
       tooMany: "Poți atașa maximum 20 de fișiere per scuter.",
+      interruptedUpload:
+        "Încărcare întreruptă. Elimină acest element și selectează din nou fișierul original.",
       uploading: "Se încarcă…",
       ready: "Pregătit pentru salvare",
       failed: "Încărcarea a eșuat",
@@ -1868,6 +2136,15 @@ export const scootersCatalog = {
       },
     },
     civ: {
+      availability: {
+        unknown: "Necunoscut",
+        not_issued: "Încă nu a fost emisă",
+        issued: "Emisă",
+      },
+      availabilityHint:
+        "Scuterul poate fi creat înainte ca RAR să emită CIV. Alege Emisă chiar dacă nu ai încă scanul.",
+      availabilityEvidence:
+        "Detaliile CIV sau documentul CIV confirmă emiterea. Scanul poate fi adăugat ulterior.",
       unknownVersion: "Model necunoscut",
       unknownVersionHint:
         "Alege modelul CIV pentru a vedea codurile rubricilor. Modelul CIV nu este anul fabricației.",
@@ -1907,6 +2184,21 @@ export const scootersCatalog = {
       notes: "Notițe",
     },
     fields: {
+      civAvailability: "Situație CIV",
+      registrationCounty: "Județul înregistrării",
+      registrationLocality: "Localitatea înregistrării",
+      registrationLocalityCode: "Codul localității",
+      registrationHolder: "Titularul înregistrării",
+      foreignRegistrationNumber: "Număr de înmatriculare străin",
+      foreignRegistrationCountry: "Țara înmatriculării străine",
+      foreignRegistrationCertificateNumber: "Număr certificat străin",
+      foreignFirstRegistrationDate: "Prima înmatriculare în străinătate",
+      foreignRegistrationDate: "Înmatricularea străină curentă",
+      foreignRegistrationHolder: "Titularul înmatriculării străine",
+      exportCertificateNumber: "Număr document export",
+      exportDate: "Data exportului",
+      exporterName: "Exportator",
+      exportRecipientName: "Destinatar export",
       fleetNumber: "Număr intern",
       hasGps: "Are GPS",
       odometerWorking: "Funcționează odometrul",

@@ -182,7 +182,7 @@ describe("source-aware extraction", () => {
     });
   });
 
-  it("excludes superseded import VINs while retaining strict per-file assertions", () => {
+  it("checks import VINs alongside CIV while retaining strict per-file assertions", () => {
     const attached = sources.slice(0, 2);
     expect(
       parse(
@@ -192,7 +192,7 @@ describe("source-aware extraction", () => {
         ],
         attached,
       ),
-    ).toMatchObject({ ok: true, values: { vin } });
+    ).toMatchObject({ ok: false, reason: "vinMismatch" });
     const result = parse(
       [
         document(attached[0]!, {}, {}, null),
@@ -201,7 +201,7 @@ describe("source-aware extraction", () => {
       attached,
     );
     expect(result.ok).toBe(true);
-    if (result.ok) expect(result.needsVinReview).not.toBe(true);
+    if (result.ok) expect(result.needsVinReview).toBeUndefined();
     expect(
       parse(
         [document(attached[0]!, { vin: "LXYTCKP05P0000002" })],
@@ -263,7 +263,6 @@ describe("source-aware extraction", () => {
       ),
     ).toMatchObject({
       ok: true,
-      needsVinReview: true,
       insurancePolicies: [
         { id: "policy-1", insuredName: "Example SRL", documentVin: vin },
       ],
@@ -401,7 +400,7 @@ describe("source-aware extraction", () => {
 
   it("keeps document evidence separate without operational extraction fields or obsolete envelopes", () => {
     const prompt = documentExtractionPrompt(false, (field) => field, sources);
-    expect(prompt).toContain("VIN-ul pe fiecare document separat");
+    expect(prompt).toContain("VIN-ul pe celelalte documente separat");
     expect(prompt).toContain("nu copia VIN-ul între documente");
     expect(prompt).toContain("VIN necitibil = null");
     expect(prompt).toContain(

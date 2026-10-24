@@ -17,6 +17,19 @@ import {
   type ScooterVinCorrection,
 } from "./scooter-vin-review";
 
+export interface ScooterAnalysisSnapshot {
+  entries: Record<string, DocumentAnalysisState>;
+  attempts: {
+    key: string;
+    input: DocumentAnalysisAttempt["input"];
+    job?: DocumentAnalysisAttempt["job"];
+    cancelled: boolean;
+    terminal: boolean;
+    deadline: number;
+  }[];
+  cache: [string, string][];
+}
+
 export type AnalysisError =
   | "unknownType"
   | "disabled"
@@ -68,24 +81,44 @@ function analysisError(error: unknown): AnalysisError {
 export function useScooterDocumentAnalysis(
   documents: ScooterDocumentsEditor,
   scooterId?: string,
+  options: { persistent?: boolean; snapshot?: ScooterAnalysisSnapshot } = {},
 ) {
+  const persistent = Boolean(options.persistent);
   const canExtract = canAccess(
     useOptionalSession()?.user,
     "scooter_documents.extract",
   );
   const [entries, setEntries] = useState<Record<string, DocumentAnalysisState>>(
-    {},
+    options.snapshot?.entries ?? {},
   );
   const [running, setRunning] = useState(false);
-  const cache = useRef(new Map<string, DocumentAnalysisState>());
+  const cache = useRef(
+    new Map<string, DocumentAnalysisState>(
+      options.snapshot?.cache.flatMap(([key, id]) =>
+        options.snapshot?.entries[id]
+          ? [[key, options.snapshot.entries[id]]]
+          : [],
+      ),
+    ),
+  );
   const controllers = useRef(new Map<string, AbortController>());
-  const attempts = useRef(new Map<string, DocumentAnalysisAttempt>());
+  const [initialAttempts] = useState(
+    () =>
+      new Map<string, DocumentAnalysisAttempt>(
+        options.snapshot?.attempts.map((attempt) => [
+          attempt.key,
+          {
+            ...attempt,
+            deadline: Math.max(attempt.deadline, Date.now() + 5 * 60_000),
+          },
+        ]),
+      ),
+  );
+  const attempts = useRef(initialAttempts);
+  const scheduled = useRef(new Set<string>());
   const generation = useRef(0);
   const activeRun = useRef(false);
   const mounted = useRef(true);
-  const hasCiv = [...documents.existing, ...documents.drafts].some(
-    (document) => document.type === "civ",
-  );
   const sources = [
     ...documents.existing.map((doc) => ({
       id: doc.id,
@@ -98,25 +131,27 @@ export function useScooterDocumentAnalysis(
       },
       ready: Boolean(scooterId),
     })),
-    ...documents.drafts.map((doc) => ({
-      id: doc.id,
-      documentType: doc.requestedType ?? doc.uploadType ?? doc.type!,
-      key: JSON.stringify([
-        doc.id,
-        doc.requestedType ?? doc.uploadType ?? doc.type,
-        doc.file.name,
-        doc.file.size,
-        doc.file.lastModified,
-      ]),
-      source: {
-        kind: "draft" as const,
-        type: doc.requestedType ?? doc.uploadType ?? doc.type!,
-        ...(doc.uploadType ? { uploadType: doc.uploadType } : {}),
-        uploadToken: doc.uploadToken!,
-      },
-      ready: doc.status === "ready" && Boolean(doc.uploadToken),
-    })),
-  ].filter((source) => !hasCiv || source.documentType !== "import_document");
+    ...documents.drafts
+      .filter((doc) => doc.version !== "client_copy")
+      .map((doc) => ({
+        id: doc.id,
+        documentType: doc.requestedType ?? doc.uploadType ?? doc.type!,
+        key: JSON.stringify([
+          doc.id,
+          doc.requestedType ?? doc.uploadType ?? doc.type,
+          doc.file.name,
+          doc.file.size,
+          doc.file.lastModified,
+        ]),
+        source: {
+          kind: "draft" as const,
+          type: doc.requestedType ?? doc.uploadType ?? doc.type!,
+          ...(doc.uploadType ? { uploadType: doc.uploadType } : {}),
+          uploadToken: doc.uploadToken!,
+        },
+        ready: doc.status === "ready" && Boolean(doc.uploadToken),
+      })),
+  ];
   const signature = JSON.stringify(sources.map(({ key }) => key));
   const latest = useRef(sources);
   const ensureSession = documents.ensureSession;
@@ -166,24 +201,38 @@ export function useScooterDocumentAnalysis(
       mounted.current = false;
       generation.current += 1;
       pendingControllers.forEach((controller) => controller.abort());
-      for (const attempt of pendingAttempts.values())
-        cancelDocumentAnalysisAttempt(attempt);
+      if (!options.persistent)
+        for (const attempt of pendingAttempts.values())
+          cancelDocumentAnalysisAttempt(attempt);
     };
-  }, []);
+  }, [options.persistent]);
 
   const run = useCallback(
     async (options: { automatic?: boolean; sourceId?: string } = {}) => {
-      if (!canExtract || activeRun.current) return null;
-      activeRun.current = true;
-      setRunning(true);
+      if (!canExtract) return null;
       const version = generation.current;
       const pending = latest.current.filter(
         (source) =>
           source.ready &&
           (!options.sourceId || source.id === options.sourceId) &&
           cache.current.get(source.key)?.status !== "success" &&
-          (!options.automatic || !cache.current.has(source.key)),
+          !scheduled.current.has(source.key) &&
+          (!options.automatic ||
+            !cache.current.has(source.key) ||
+            cache.current.get(source.key)?.status === "processing"),
       );
+      const capacity = Math.max(
+        0,
+        v1.scooters.SCOOTER_DOCUMENT_EXTRACTION_CLIENT_CONCURRENCY -
+          controllers.current.size,
+      );
+      if (!pending.length)
+        return latest.current.map((source) => cache.current.get(source.key));
+      if (!capacity) return null;
+      // Reserve source identities, so later uploads can join free workers without duplicate requests.
+      for (const source of pending) scheduled.current.add(source.key);
+      activeRun.current = true;
+      setRunning(true);
       const current = () => mounted.current && generation.current === version;
       const publish = (
         source: (typeof pending)[number],
@@ -201,9 +250,16 @@ export function useScooterDocumentAnalysis(
       async function worker() {
         while (current() && index < pending.length) {
           const source = pending[index++]!;
+          if (
+            controllers.current.size >=
+            v1.scooters.SCOOTER_DOCUMENT_EXTRACTION_CLIENT_CONCURRENCY
+          )
+            break;
           const controller = new AbortController();
           if (!latest.current.some((item) => item.key === source.key)) continue;
           controllers.current.set(source.key, controller);
+          activeRun.current = true;
+          setRunning(true);
           publish(source, { status: "processing" });
           try {
             const sessionId = await ensureSession();
@@ -216,7 +272,9 @@ export function useScooterDocumentAnalysis(
                 sessionId,
                 attemptId: crypto.randomUUID(),
               });
+              if (persistent) attempt.deadline = Date.now() + 24 * 60 * 60_000;
               attempts.current.set(source.key, attempt);
+              publish(source, { status: "processing", phase: "queued" });
             }
             const analysis = await runDocumentAnalysisAttempt(
               attempt,
@@ -240,23 +298,29 @@ export function useScooterDocumentAnalysis(
               });
           } finally {
             controllers.current.delete(source.key);
+            scheduled.current.delete(source.key);
+            if (current()) {
+              activeRun.current = controllers.current.size > 0;
+              setRunning(activeRun.current);
+            }
           }
         }
       }
       await Promise.all(
         Array.from(
           {
-            length: v1.scooters.SCOOTER_DOCUMENT_EXTRACTION_CLIENT_CONCURRENCY,
+            length: capacity,
           },
           () => worker(),
         ),
       );
+      for (const source of pending) scheduled.current.delete(source.key);
       if (!current()) {
         if (mounted.current && !activeRun.current) setRunning(false);
         return null;
       }
-      activeRun.current = false;
-      setRunning(false);
+      activeRun.current = controllers.current.size > 0;
+      setRunning(activeRun.current);
       if (
         pending.some(
           (source) => !latest.current.some((item) => item.key === source.key),
@@ -265,7 +329,7 @@ export function useScooterDocumentAnalysis(
         return null;
       return latest.current.map((source) => cache.current.get(source.key));
     },
-    [canExtract, ensureSession, handleSessionError],
+    [canExtract, ensureSession, handleSessionError, persistent],
   );
 
   const cancel = useCallback(() => {
@@ -273,6 +337,7 @@ export function useScooterDocumentAnalysis(
     activeRun.current = false;
     controllers.current.forEach((controller) => controller.abort());
     controllers.current.clear();
+    scheduled.current.clear();
     for (const [key, attempt] of attempts.current) {
       if (!attempt.terminal) {
         cancelDocumentAnalysisAttempt(attempt);
@@ -335,8 +400,121 @@ export function useScooterDocumentAnalysis(
     return Object.values(nextEntries);
   }, []);
 
+  const updateLogicalDocument = useCallback(
+    (
+      sourceId: string,
+      documentId: string,
+      patch: Partial<
+        Pick<
+          v1.scooters.LogicalDocumentExtraction,
+          "vin" | "documentType" | "pages"
+        >
+      >,
+    ) => {
+      const source = latest.current.find((item) => item.id === sourceId);
+      if (!source || controllers.current.has(source.key)) return;
+      const previous = cache.current.get(source.key);
+      if (previous?.status !== "success") return;
+      let documents = previous.analysis.extractedData.documents?.map(
+        (document) =>
+          document.id === documentId
+            ? {
+                ...document,
+                ...patch,
+                ...(Object.hasOwn(patch, "vin")
+                  ? {
+                      fields: {
+                        ...document.fields,
+                        ...(Object.hasOwn(document.fields, "vin")
+                          ? { vin: patch.vin ?? null }
+                          : {}),
+                        ...(Object.hasOwn(document.fields, "documentVin")
+                          ? { documentVin: patch.vin ?? null }
+                          : {}),
+                      },
+                      vinReview: {
+                        method: "manual" as const,
+                        originalVin: document.vinReview
+                          ? document.vinReview.originalVin
+                          : document.vin,
+                      },
+                    }
+                  : {}),
+              }
+            : document,
+      );
+      documents = documents?.map((document) =>
+        v1.scooters.scooterDocumentReadsVin(document.documentType)
+          ? document
+          : {
+              ...document,
+              vin: null,
+              fields: Object.fromEntries(
+                Object.entries(document.fields).filter(
+                  ([field]) => !["vin", "documentVin"].includes(field),
+                ),
+              ),
+              issues: document.issues?.filter(
+                (issue) => !["vin", "documentVin"].includes(issue.field),
+              ),
+            },
+      );
+      const vins = [
+        ...new Set(
+          documents
+            ?.map((document) => document.vin)
+            .filter((value): value is string => Boolean(value)),
+        ),
+      ];
+      const next: DocumentAnalysisState = {
+        status: "success",
+        analysis: {
+          ...previous.analysis,
+          extractedData: {
+            ...previous.analysis.extractedData,
+            documents,
+            vin: vins.length === 1 ? vins[0]! : null,
+            fields: {
+              ...previous.analysis.extractedData.fields,
+              ...(Object.hasOwn(previous.analysis.extractedData.fields, "vin")
+                ? { vin: vins.length === 1 ? vins[0]! : null }
+                : {}),
+            },
+          },
+        },
+      };
+      cache.current.set(source.key, next);
+      setEntries((current) => ({ ...current, [sourceId]: next }));
+    },
+    [],
+  );
+
   return {
+    updateLogicalDocument,
     entries,
+    getSnapshot: () =>
+      ({
+        entries,
+        cache: [...cache.current].flatMap(([key]) => {
+          const source = latest.current.find((item) => item.key === key);
+          return source ? [[key, source.id] as [string, string]] : [];
+        }),
+        attempts: [...attempts.current]
+          .filter(([, attempt]) => !attempt.terminal)
+          .map(([key, attempt]) => {
+            const job = attempt.job
+              ? { ...attempt.job, result: undefined }
+              : undefined;
+            return {
+              key,
+              input: attempt.input,
+              job,
+              cancelled: attempt.cancelled,
+              terminal: attempt.terminal,
+              deadline: attempt.deadline,
+            };
+          }),
+      }) satisfies ScooterAnalysisSnapshot,
     running: canExtract && running,
     run,
     cancel,

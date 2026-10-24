@@ -5,6 +5,7 @@ import { useFormAction } from "@/lib/form/use-form-action";
 import { SaveButton } from "@repo/ui/components/save-button";
 import { ScooterProblems } from "./ScooterProblems";
 import { ScooterInsuranceList } from "./ScooterInsuranceFields";
+import { ScooterItpPanel } from "./ScooterItpPanel";
 
 import { v1 } from "@repo/api-shared";
 import {
@@ -293,6 +294,10 @@ export function ScooterDetailPage({
 
       <DetailSection title={t("sections.registration")}>
         <DetailField
+          label={t("fields.civAvailability")}
+          value={t(`civ.availability.${scooter.civAvailability ?? "unknown"}`)}
+        />
+        <DetailField
           label={t("fields.registrationType")}
           value={t(`registrationTypes.${scooter.registrationType}`)}
         />
@@ -380,6 +385,7 @@ export function ScooterDetailPage({
         <ScooterDocumentList documents={scooter.documents ?? []} />
       ) : null}
       <ScooterInsuranceList scooter={scooter} />
+      <ScooterItpPanel scooter={scooter} />
       <ScooterRegistrationDialog
         key={`edit-scooter-registration-${registrationDialogKey}`}
         scooter={scooter}

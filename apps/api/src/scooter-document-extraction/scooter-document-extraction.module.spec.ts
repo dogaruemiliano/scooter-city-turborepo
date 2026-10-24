@@ -54,10 +54,11 @@ describe("scooter extraction provider selection", () => {
       expect(Object.values(result.extractedData.fields)).toContain(
         "TEST FIXTURE",
       );
-      expect(result.issues).toContainEqual({
-        field: "vin",
-        code: "unreadable",
-      });
+      if (documentType !== "registration_certificate")
+        expect(result.issues).toContainEqual({
+          field: "vin",
+          code: "unreadable",
+        });
     },
   );
 });

@@ -1,22 +1,31 @@
 import {
   BadRequestException,
+  ConflictException,
   Inject,
   Injectable,
   NotFoundException,
   ServiceUnavailableException,
   HttpException,
   HttpStatus,
+  Optional,
 } from "@nestjs/common";
 import { v1 } from "@repo/api-shared";
 import { createHash } from "node:crypto";
 import { ENV } from "../config/config.module";
 import type { Env } from "../config/env";
-import { Prisma, type ScooterDocumentJob } from "../generated/prisma/client";
+import {
+  Prisma,
+  type ScooterDocumentJob,
+  type ScooterDocumentEditorSession,
+} from "../generated/prisma/client";
+import { ImageStorageService } from "../image-storage/image-storage.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { ScooterDocumentsService } from "../scooters/scooter-documents.service";
+import { SCOOTER_DOCUMENT_EXTRACTION_PROMPT_VERSION } from "../scooter-document-extraction/scooter-document-extraction.prompt";
 import {
   ACTIVE_JOB_STATES,
-  JOB_LIFETIME_MS,
+  MAX_GLOBAL_PENDING_JOBS,
+  MAX_USER_PENDING_JOBS,
   SESSION_LIFETIME_MS,
   jsonValue,
   lockEditorSession,
@@ -29,6 +38,7 @@ export class ScooterDocumentJobsService {
     private readonly prisma: PrismaService,
     private readonly documents: ScooterDocumentsService,
     @Inject(ENV) private readonly env: Env,
+    @Optional() private readonly storage?: ImageStorageService,
   ) {}
 
   async createSession(userId: string) {
@@ -36,6 +46,264 @@ export class ScooterDocumentJobsService {
       data: { userId, expiresAt: new Date(Date.now() + SESSION_LIFETIME_MS) },
     });
     return { id: session.id, expiresAt: session.expiresAt.toISOString() };
+  }
+
+  async createImportDraft(userId: string) {
+    const draft = await this.prisma.$transaction(async (tx) => {
+      // A user-scoped mutex makes the 20-draft cap reliable across API instances.
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext('scooter-import-drafts'), hashtext(${userId}))::text`;
+      const count = await tx.scooterDocumentEditorSession.count({
+        where: {
+          userId,
+          isImportDraft: true,
+          status: "open",
+          expiresAt: { gt: new Date() },
+        },
+      });
+      if (count >= v1.scooters.SCOOTER_IMPORT_MAX_DRAFTS)
+        throw new ConflictException({
+          code: "IMPORT_DRAFT_LIMIT_REACHED",
+          message: "Create or discard a scooter before starting another draft.",
+        });
+      return tx.scooterDocumentEditorSession.create({
+        data: {
+          userId,
+          isImportDraft: true,
+          expiresAt: new Date(Date.now() + SESSION_LIFETIME_MS),
+        },
+      });
+    });
+    return this.presentImportDraft(draft);
+  }
+
+  async listImportDrafts(userId: string) {
+    const drafts = await this.prisma.scooterDocumentEditorSession.findMany({
+      where: {
+        userId,
+        isImportDraft: true,
+        status: "open",
+        expiresAt: { gt: new Date() },
+      },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      take: v1.scooters.SCOOTER_IMPORT_MAX_DRAFTS,
+    });
+    return { items: drafts.map((draft) => this.presentImportDraft(draft)) };
+  }
+
+  async getImportDraft(id: string, userId: string) {
+    const draft = await this.prisma.scooterDocumentEditorSession.findFirst({
+      where: {
+        id,
+        userId,
+        isImportDraft: true,
+        status: "open",
+        expiresAt: { gt: new Date() },
+      },
+    });
+    if (!draft) throw new NotFoundException("Scooter import draft not found.");
+    return this.presentImportDraft(draft);
+  }
+
+  async updateImportDraft(
+    id: string,
+    input: v1.scooters.UpdateScooterImportDraftInput,
+    userId: string,
+  ) {
+    // Validate snapshots here as well as at the HTTP boundary for internal callers.
+    const update = v1.scooters.updateScooterImportDraftSchema.parse(input);
+    const draft = await this.prisma.$transaction(async (tx) => {
+      const current = await requireOpenEditorSession(tx, id, userId);
+      if (!current.isImportDraft)
+        throw new NotFoundException("Scooter import draft not found.");
+      if (current.revision !== update.revision)
+        throw new ConflictException({
+          code: "IMPORT_DRAFT_REVISION_CONFLICT",
+          message:
+            "This draft changed in another window. Reload it before editing.",
+        });
+      return tx.scooterDocumentEditorSession.update({
+        where: { id },
+        data: {
+          editorState: jsonValue(update.state),
+          revision: { increment: 1 },
+        },
+      });
+    });
+    return this.presentImportDraft(draft);
+  }
+
+  /** Consolidate completed files for one vehicle without re-uploading or paying for analysis again. */
+  async mergeImportDraft(
+    id: string,
+    input: v1.scooters.MergeScooterImportDraftInput,
+    userId: string,
+  ) {
+    const merge = v1.scooters.mergeScooterImportDraftSchema.parse(input);
+    if (id === merge.sourceId)
+      throw new BadRequestException("Choose different drafts.");
+    const draft = await this.prisma.$transaction(async (tx) => {
+      // Stable lock order prevents concurrent opposite-direction merges deadlocking.
+      const sessions = new Map<string, ScooterDocumentEditorSession>();
+      for (const sessionId of [id, merge.sourceId].sort())
+        sessions.set(
+          sessionId,
+          await requireOpenEditorSession(tx, sessionId, userId),
+        );
+      const target = sessions.get(id)!;
+      const source = sessions.get(merge.sourceId)!;
+      if (!target.isImportDraft || !source.isImportDraft)
+        throw new NotFoundException("Scooter import draft not found.");
+      if (
+        target.revision !== merge.revision ||
+        source.revision !== merge.sourceRevision
+      )
+        throw new ConflictException({
+          code: "IMPORT_DRAFT_REVISION_CONFLICT",
+          message: "A draft changed before grouping. Reload before continuing.",
+        });
+      if (
+        await tx.scooterDocumentJob.count({
+          where: {
+            sessionId: { in: [id, merge.sourceId] },
+            OR: [
+              { status: { in: ACTIVE_JOB_STATES } },
+              { submissionUncertainAt: { not: null } },
+            ],
+          },
+        })
+      )
+        throw new ConflictException({
+          code: "IMPORT_DRAFT_BUSY",
+          message: "Wait for both drafts to finish analysis before grouping.",
+        });
+      await tx.draftUpload.updateMany({
+        where: {
+          editorSessionId: source.id,
+          userId,
+          claimedAt: null,
+          cleanupStartedAt: null,
+        },
+        data: { editorSessionId: id },
+      });
+      await tx.scooterDocumentResource.updateMany({
+        where: { sessionId: source.id },
+        data: { sessionId: id },
+      });
+      await tx.scooterDocumentJob.updateMany({
+        where: { sessionId: source.id },
+        data: { sessionId: id },
+      });
+      await tx.scooterDocumentEditorSession.update({
+        where: { id: source.id },
+        data: {
+          status: "discarded",
+          editorState: {},
+          revision: { increment: 1 },
+        },
+      });
+      return tx.scooterDocumentEditorSession.update({
+        where: { id },
+        data: {
+          editorState: jsonValue(merge.state),
+          revision: { increment: 1 },
+        },
+      });
+    });
+    return this.presentImportDraft(draft);
+  }
+
+  async discardImportDraft(id: string, userId: string) {
+    // Refuse ordinary editor sessions on this import-specific endpoint.
+    await this.getImportDraft(id, userId);
+    return this.discardSession(id, userId);
+  }
+
+  async importDraftDocumentContent(
+    id: string,
+    input: v1.scooters.AnalyzeScooterDocumentInput,
+    userId: string,
+  ) {
+    if (input.source.kind !== "draft")
+      throw new BadRequestException("An uploaded draft document is required.");
+    const source = await this.documents.resolveAnalysisSource(
+      input.source,
+      userId,
+    );
+    await this.prisma.$transaction(async (tx) => {
+      const draft = await requireOpenEditorSession(tx, id, userId);
+      if (
+        !draft.isImportDraft ||
+        !source.draftUploadId ||
+        !(await tx.draftUpload.findFirst({
+          where: {
+            id: source.draftUploadId,
+            editorSessionId: id,
+            userId,
+            claimedAt: null,
+            cleanupStartedAt: null,
+            expiresAt: { gt: new Date() },
+          },
+          select: { id: true },
+        }))
+      )
+        throw new NotFoundException("Scooter import document not found.");
+    });
+    if (!this.storage) throw new ServiceUnavailableException();
+    return {
+      ...(await this.storage.readDocument(source.stored.storageKey)),
+      contentType: source.stored.contentType,
+    };
+  }
+
+  private presentImportDraft(draft: ScooterDocumentEditorSession) {
+    return v1.scooters.scooterImportDraftSchema.parse({
+      id: draft.id,
+      expiresAt: draft.expiresAt.toISOString(),
+      updatedAt: draft.updatedAt.toISOString(),
+      revision: draft.revision,
+      state: draft.editorState,
+    });
+  }
+
+  async importDraftPhotoContent(
+    id: string,
+    uploadToken: string,
+    userId: string,
+  ) {
+    await this.getImportDraft(id, userId);
+    if (!this.storage) throw new ServiceUnavailableException();
+    // Use exactly the same signed scope and metadata validation as photo attachment.
+    const source = await this.storage.completePresignedUpload(
+      uploadToken,
+      `scooter-photo-draft:${userId}`,
+    );
+    await this.prisma.$transaction(async (tx) => {
+      const draft = await requireOpenEditorSession(tx, id, userId);
+      if (
+        !draft.isImportDraft ||
+        !(await tx.draftUpload.findFirst({
+          where: {
+            userId,
+            purpose: "scooter-photo-draft",
+            storageKey: source.storageKey,
+            provider: source.provider,
+            bucket: source.bucket,
+            contentType: source.contentType,
+            byteSize: source.byteSize,
+            checksumSha256: source.checksumSha256,
+            claimedAt: null,
+            cleanupStartedAt: null,
+            expiresAt: { gt: new Date() },
+          },
+          select: { id: true },
+        }))
+      )
+        throw new NotFoundException("Scooter import photo not found.");
+    });
+    return {
+      ...(await this.storage.readImage(source.storageKey)),
+      contentType: source.contentType,
+    };
   }
 
   async start(
@@ -72,7 +340,7 @@ export class ScooterDocumentJobsService {
         input.sessionId,
         userId,
       );
-      // One lock serializes global/per-owner admission, including multiple API dynos.
+      // Admission bounds stored waiting work; execution limits are leased at dispatch.
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext('scooter-document-job-admission'))::text`;
       const existing = await tx.scooterDocumentJob.findUnique({
         where: { userId_attemptId: { userId, attemptId: input.attemptId } },
@@ -90,11 +358,7 @@ export class ScooterDocumentJobsService {
         return existing;
       }
       const now = new Date();
-      const expiresAt = new Date(now.getTime() + JOB_LIFETIME_MS);
-      if (session.expiresAt <= expiresAt)
-        throw new BadRequestException(
-          "Document editor session is about to expire.",
-        );
+      const expiresAt = session.expiresAt;
       if (source.draftUploadId) {
         const available = await tx.draftUpload.updateMany({
           where: {
@@ -103,7 +367,7 @@ export class ScooterDocumentJobsService {
             editorSessionId: session.id,
             claimedAt: null,
             cleanupStartedAt: null,
-            expiresAt: { gt: expiresAt },
+            expiresAt: { gte: expiresAt },
           },
           data: { processingUntil: expiresAt },
         });
@@ -123,11 +387,14 @@ export class ScooterDocumentJobsService {
         tx.scooterDocumentJob.count({ where }),
         tx.scooterDocumentJob.count({ where: { ...where, userId } }),
       ]);
-      if (globalCount >= 4 || userCount >= 2)
+      if (
+        globalCount >= MAX_GLOBAL_PENDING_JOBS ||
+        userCount >= MAX_USER_PENDING_JOBS
+      )
         throw new HttpException(
           {
             code: "DOCUMENT_EXTRACTION_THROTTLED",
-            message: "Too many active document extractions.",
+            message: "The document analysis queue is full. Try again shortly.",
           },
           HttpStatus.TOO_MANY_REQUESTS,
         );
@@ -146,7 +413,7 @@ export class ScooterDocumentJobsService {
           requestBinding,
           source: jsonValue(source.stored),
           model: this.env.SCOOTER_DOCUMENT_EXTRACTION_MODEL,
-          promptVersion: "scooter-v2-auto-type",
+          promptVersion: SCOOTER_DOCUMENT_EXTRACTION_PROMPT_VERSION,
           expiresAt,
         },
       });
@@ -227,7 +494,7 @@ export class ScooterDocumentJobsService {
           status: state === "discarded" ? "open" : { in: ["open", "saved"] },
           ...(state === "expired" ? { expiresAt: { lte: new Date() } } : {}),
         },
-        data: { status: state },
+        data: { status: state, editorState: {} },
       });
       if (!changed.count) return;
       const now = new Date();
@@ -247,7 +514,7 @@ export class ScooterDocumentJobsService {
       // Exclude abandoned uploads from attachment immediately, even before a cleanup worker runs.
       await tx.draftUpload.updateMany({
         where: { editorSessionId: id, claimedAt: null, cleanupStartedAt: null },
-        data: { cleanupStartedAt: now },
+        data: { cleanupStartedAt: now, processingUntil: null },
       });
     });
   }

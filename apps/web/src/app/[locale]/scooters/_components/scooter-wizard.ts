@@ -14,6 +14,7 @@ export type ScooterWizardStep =
   | "operational";
 
 export const CIV_METADATA_FIELDS = [
+  "civAvailability",
   "civNumber",
   "civVersion",
   "civIssuedAt",

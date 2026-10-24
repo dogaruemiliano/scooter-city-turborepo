@@ -411,3 +411,25 @@ describe("required fields for create actions", () => {
     ).toBe(true);
   });
 });
+
+it("creates unregistered scooters before CIV issue and supports issued CIV without a scan", () => {
+  expect(
+    scooterCreateFormSchema.parse({
+      ...validValues(),
+      civAvailability: "not_issued",
+    }).civAvailability,
+  ).toBe("not_issued");
+  expect(
+    scooterCreateFormSchema.parse({
+      ...validValues(),
+      civAvailability: "issued",
+    }).civAvailability,
+  ).toBe("issued");
+  expect(
+    scooterCreateFormSchema.safeParse({
+      ...validValues(),
+      civAvailability: "not_issued",
+      civNumber: "CIV-123",
+    }).success,
+  ).toBe(false);
+});

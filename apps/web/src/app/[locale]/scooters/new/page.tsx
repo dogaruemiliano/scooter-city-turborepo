@@ -12,7 +12,7 @@ import {
 } from "../../../../i18n/paths";
 import { webApi } from "../../../../lib/api";
 import { meFromApi } from "../../../../lib/auth-server";
-import { ScooterCreateForm } from "../_components/ScooterCreateForm";
+import { ScooterImportWorkspace } from "../_components/ScooterImportWorkspace";
 
 const SCOOTERS_PATH = "/scooters";
 const SCOOTERS_NEW_PATH = "/scooters/new";
@@ -64,7 +64,7 @@ export default async function NewScooterRoutePage({
   ]);
 
   return (
-    <ScooterCreateForm
+    <ScooterImportWorkspace
       scootersHref={localizePath(SCOOTERS_PATH, locale)}
       vocabulary={vocabulary}
       brands={brands.items}

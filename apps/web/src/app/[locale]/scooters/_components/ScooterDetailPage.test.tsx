@@ -8,6 +8,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ScooterDetailPage } from "./ScooterDetailPage";
 // Gallery API interactions are covered independently in ScooterPhotos.test.tsx.
 vi.mock("./ScooterPhotos", () => ({ ScooterPhotos: () => null }));
+// Inspection requests and confirmation are covered in ScooterItpPanel.test.tsx.
+vi.mock("./ScooterItpPanel", () => ({ ScooterItpPanel: () => null }));
 
 const mocks = vi.hoisted(() => ({
   apiFetch: vi.fn(),

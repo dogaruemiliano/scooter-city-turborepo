@@ -1,7 +1,10 @@
 import { ApiError, v1 } from "@repo/api-shared";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { useScooterDocumentAnalysis } from "./useScooterDocumentAnalysis";
+import {
+  useScooterDocumentAnalysis,
+  type ScooterAnalysisSnapshot,
+} from "./useScooterDocumentAnalysis";
 import type {
   ScooterDocumentsEditor,
   DocumentDraft,
@@ -183,7 +186,7 @@ describe("direct document analysis", () => {
   );
 
   it.each([false, true])(
-    "skips all import attachments when a CIV exists (saved CIV: %s)",
+    "analyzes all import attachments alongside a CIV (saved CIV: %s)",
     async (saved) => {
       const civ = draft("civ");
       const attached = [
@@ -216,18 +219,24 @@ describe("direct document analysis", () => {
       await act(async () => {
         await hook.result.current.run();
       });
-      expect(apiFetch).toHaveBeenCalledTimes(3);
+      expect(apiFetch).toHaveBeenCalledTimes(5);
       expect(
         apiFetch.mock.calls
           .map(([, , options]) => options.json.sourceId)
           .sort(),
-      ).toEqual(["civ", "insurance", "registration"]);
-      expect(hook.result.current.entries).not.toHaveProperty("import-one");
-      expect(hook.result.current.entries).not.toHaveProperty("import-two");
+      ).toEqual([
+        "civ",
+        "import-one",
+        "import-two",
+        "insurance",
+        "registration",
+      ]);
+      expect(hook.result.current.entries["import-one"]?.status).toBe("success");
+      expect(hook.result.current.entries["import-two"]?.status).toBe("success");
     },
   );
 
-  it("analyzes every import attachment when the CIV is removed", async () => {
+  it("reuses import attachment analyses when the CIV is removed", async () => {
     const civ = draft("civ");
     const imports = [
       draft("import-one", "import_document"),
@@ -243,7 +252,7 @@ describe("direct document analysis", () => {
     await act(async () => {
       await hook.result.current.run();
     });
-    expect(apiFetch).toHaveBeenCalledTimes(1);
+    expect(apiFetch).toHaveBeenCalledTimes(3);
     hook.rerender({ files: imports });
     await act(async () => {
       await hook.result.current.run();
@@ -255,7 +264,7 @@ describe("direct document analysis", () => {
     ]);
   });
 
-  it("cancels a running import and discards its late response when CIV is added", async () => {
+  it("preserves a running import when a CIV is added", async () => {
     const request = deferred<v1.scooters.ScooterDocumentAnalysis>();
     const importer = draft("import", "import_document");
     apiFetch.mockReturnValueOnce(request.promise);
@@ -272,15 +281,15 @@ describe("direct document analysis", () => {
     expect(signal.aborted).toBe(false); // The start POST can still reveal a job to cancel.
     await act(async () => {
       request.resolve(response("import", "import_document"));
-      expect(await run).toBeNull();
+      expect(await run).not.toBeNull();
     });
-    expect(hook.result.current.entries).toEqual({});
+    expect(hook.result.current.entries.import?.status).toBe("success");
     apiFetch.mockResolvedValueOnce(response("civ"));
     await act(async () => {
       await hook.result.current.run();
     });
     expect(hook.result.current.entries.civ?.status).toBe("success");
-    expect(hook.result.current.entries).not.toHaveProperty("import");
+    expect(hook.result.current.entries.import?.status).toBe("success");
   });
 
   it("rejects a response associated with the wrong document type", async () => {
@@ -300,7 +309,7 @@ describe("direct document analysis", () => {
       error: "failed",
     });
   });
-  it("runs only two requests concurrently and reuses successes when returning to documents", async () => {
+  it("starts all available requests concurrently and reuses successes when returning to documents", async () => {
     const attached = [draft("one"), draft("two"), draft("three")];
     const requests = attached.map(() =>
       deferred<v1.scooters.ScooterDocumentAnalysis>(),
@@ -315,7 +324,7 @@ describe("direct document analysis", () => {
     await act(async () => {
       run = hook.result.current.run();
     });
-    expect(apiFetch).toHaveBeenCalledTimes(2);
+    expect(apiFetch).toHaveBeenCalledTimes(3);
     await act(async () => {
       requests[0]!.resolve(response("one"));
     });
@@ -439,6 +448,111 @@ describe("direct document analysis", () => {
     expect(hook.result.current.entries.second?.status).toBe("success");
   });
 
+  it("starts a newly uploaded document in a free slot while another document is still analysing", async () => {
+    const firstRequest = deferred<v1.scooters.ScooterDocumentAnalysis>();
+    apiFetch
+      .mockReturnValueOnce(firstRequest.promise)
+      .mockResolvedValueOnce(response("second"));
+    const first = draft("first");
+    const hook = renderHook(
+      ({ files }) => useScooterDocumentAnalysis(documents(files)),
+      { initialProps: { files: [first] } },
+    );
+    let initial!: ReturnType<typeof hook.result.current.run>;
+    await act(async () => {
+      initial = hook.result.current.run({ automatic: true });
+    });
+    hook.rerender({ files: [first, draft("second")] });
+    await act(async () => {
+      await hook.result.current.run({ automatic: true });
+    });
+    expect(apiFetch).toHaveBeenCalledTimes(2);
+    expect(hook.result.current.entries.first?.status).toBe("processing");
+    expect(hook.result.current.entries.second?.status).toBe("success");
+    await act(async () => {
+      firstRequest.resolve(response("first"));
+      await initial;
+    });
+  });
+
+  it("resumes a persisted job by ID after refresh without submitting another paid request", async () => {
+    const file = draft("one");
+    const key = JSON.stringify([
+      file.id,
+      file.type,
+      file.file.name,
+      file.file.size,
+      file.file.lastModified,
+    ]);
+    const snapshot: ScooterAnalysisSnapshot = {
+      entries: { one: { status: "processing", phase: "queued" } },
+      cache: [[key, "one"]],
+      attempts: [
+        {
+          key,
+          input: {
+            sourceId: "one",
+            sessionId: "session",
+            attemptId: crypto.randomUUID(),
+            source: {
+              kind: "draft",
+              type: "civ",
+              uploadToken: file.uploadToken!,
+            },
+          },
+          job: {
+            id: "job-one",
+            sourceId: "one",
+            documentType: "civ",
+            status: "queued",
+            expiresAt: new Date(Date.now() + 300_000).toISOString(),
+          },
+          cancelled: false,
+          terminal: false,
+          deadline: Date.now() + 300_000,
+        },
+      ],
+    };
+    apiFetch.mockResolvedValue(response("one"));
+    const hook = renderHook(() =>
+      useScooterDocumentAnalysis(documents([file]), undefined, {
+        persistent: true,
+        snapshot,
+      }),
+    );
+    await act(async () => {
+      await hook.result.current.run({ automatic: true });
+    });
+    expect(apiFetch).toHaveBeenCalledOnce();
+    expect(apiFetch.mock.calls[0]?.[0]).toBe(
+      v1.scooters.ROUTES.documents.extractionJob("job-one"),
+    );
+    expect(hook.result.current.entries.one?.status).toBe("success");
+  });
+
+  it("does not cancel a workspace-owned server job when its editor unmounts", async () => {
+    const file = draft("one");
+    apiFetch.mockResolvedValue({
+      id: "job-one",
+      sourceId: "one",
+      documentType: "civ",
+      status: "queued",
+      expiresAt: new Date(Date.now() + 300_000).toISOString(),
+    });
+    const hook = renderHook(() =>
+      useScooterDocumentAnalysis(documents([file]), undefined, {
+        persistent: true,
+      }),
+    );
+    let pending!: ReturnType<typeof hook.result.current.run>;
+    await act(async () => {
+      pending = hook.result.current.run();
+    });
+    hook.unmount();
+    await pending;
+    expect(apiFetch).toHaveBeenCalledOnce();
+  });
+
   it("cancels queued files as well as active files without automatic restart", async () => {
     const pending = deferred<v1.scooters.ScooterDocumentAnalysis>();
     apiFetch.mockReturnValue(pending.promise);
@@ -535,4 +649,94 @@ it("does not request extraction without the extraction capability", async () => 
   });
   expect(apiFetch).not.toHaveBeenCalled();
   expect(hook.result.current.running).toBe(false);
+});
+
+it("uses all 20 client slots and starts queued files as soon as one finishes", async () => {
+  const attached = Array.from({ length: 21 }, (_, index) =>
+    draft(`parallel-${index}`),
+  );
+  const requests = attached.map(() =>
+    deferred<v1.scooters.ScooterDocumentAnalysis>(),
+  );
+  requests.forEach((request) => apiFetch.mockReturnValueOnce(request.promise));
+  const hook = renderHook(() =>
+    useScooterDocumentAnalysis(documents(attached)),
+  );
+  let run!: ReturnType<typeof hook.result.current.run>;
+  await act(async () => {
+    run = hook.result.current.run();
+  });
+  expect(apiFetch).toHaveBeenCalledTimes(20);
+  await act(async () => {
+    requests[0].resolve(response(attached[0].id));
+  });
+  expect(apiFetch).toHaveBeenCalledTimes(21);
+  await act(async () => {
+    requests
+      .slice(1)
+      .forEach((request, index) =>
+        request.resolve(response(attached[index + 1].id)),
+      );
+    await run;
+  });
+  expect(
+    Object.values(hook.result.current.entries).filter(
+      (entry) => entry.status === "success",
+    ),
+  ).toHaveLength(21);
+});
+
+it("never starts an analysis job for a client copy paired with an original", async () => {
+  const original = draft("original");
+  const copy = {
+    ...draft("client"),
+    version: "client_copy" as const,
+    originalId: original.id,
+  };
+  apiFetch.mockResolvedValue(response(original.id));
+  const hook = renderHook(() =>
+    useScooterDocumentAnalysis(documents([original, copy])),
+  );
+  await act(async () => {
+    await hook.result.current.run();
+  });
+  expect(apiFetch).toHaveBeenCalledTimes(1);
+  expect(hook.result.current.entries.client).toBeUndefined();
+});
+
+it("corrects a detected document type locally without another analysis request", async () => {
+  const result = response("one");
+  result.extractedData.documents = [
+    {
+      id: "logical",
+      documentType: "civ",
+      pages: [1],
+      vin: result.extractedData.vin,
+      fields: {},
+      rawFields: {},
+    },
+  ];
+  apiFetch.mockResolvedValue(result);
+  const attached = [draft("one")];
+  const hook = renderHook(() =>
+    useScooterDocumentAnalysis(documents(attached)),
+  );
+  await act(async () => {
+    await hook.result.current.run();
+  });
+  act(() =>
+    hook.result.current.updateLogicalDocument("one", "logical", {
+      documentType: "ownership_proof",
+    }),
+  );
+  expect(hook.result.current.entries.one).toMatchObject({
+    status: "success",
+    analysis: {
+      extractedData: { documents: [{ documentType: "ownership_proof" }] },
+    },
+  });
+  await act(async () => {
+    await hook.result.current.run();
+  });
+  expect(apiFetch).toHaveBeenCalledTimes(1);
 });

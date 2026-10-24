@@ -14,6 +14,7 @@ import {
 } from "./scooter-documents.schemas";
 import { scooterDocumentExtractionUpdateSchema } from "./scooter-document-extraction.schemas";
 import { scooterPhotoDraftsSchema } from "./scooter-photos.schemas";
+import { scooterItpStatusSchema } from "./scooter-itp.schemas";
 /**
  * Scooters-domain Zod schemas.
  */
@@ -40,6 +41,64 @@ import {
 } from "./scooters.constants";
 
 const MAX_VIN_LENGTH = 17;
+
+/** A mixed PDF can contain a CIV even when another logical document is its primary type. */
+export function hasScooterCivDocumentEvidence(document: {
+  type?: string;
+  extractedData?: unknown;
+}): boolean {
+  const data = document.extractedData;
+  if (
+    data &&
+    typeof data === "object" &&
+    "documents" in data &&
+    Array.isArray(data.documents) &&
+    data.documents.length
+  )
+    return data.documents.some(
+      (child: unknown) =>
+        child &&
+        typeof child === "object" &&
+        "documentType" in child &&
+        child.documentType === "civ",
+    );
+  return document.type === "civ";
+}
+
+export function hasScooterCivEvidence(input: {
+  civNumber?: string | null;
+  civVersion?: string;
+  civIssuedAt?: string | null;
+  civIssuingAuthority?: string | null;
+  civRawFields?: Record<string, string> | null;
+  documentDrafts?: readonly { type: string; extractedData?: unknown }[];
+  documentExtractions?: readonly { extractedData?: unknown }[];
+}): boolean {
+  return Boolean(
+    input.civNumber?.trim() ||
+    (input.civVersion && input.civVersion !== "unknown") ||
+    input.civIssuedAt ||
+    input.civIssuingAuthority?.trim() ||
+    Object.values(input.civRawFields ?? {}).some((value) => value.trim()) ||
+    input.documentDrafts?.some(hasScooterCivDocumentEvidence) ||
+    input.documentExtractions?.some(hasScooterCivDocumentEvidence),
+  );
+}
+
+function validateScooterCivAvailability(
+  input: Parameters<typeof hasScooterCivEvidence>[0] & {
+    civAvailability?: "unknown" | "not_issued" | "issued";
+  },
+  context: z.RefinementCtx,
+) {
+  if (input.civAvailability === "not_issued" && hasScooterCivEvidence(input))
+    context.addIssue({
+      code: "custom",
+      path: ["civAvailability"],
+      message:
+        "A scooter with CIV evidence cannot be marked as CIV not issued.",
+    });
+}
 const MAX_TEXT_LENGTH = 120;
 const MAX_COLOR_LENGTH = 50;
 const MAX_ENGINE_TYPE_LENGTH = 100;
@@ -138,6 +197,15 @@ export const scooterFuelSystemSchema = z.enum(SCOOTER_FUEL_SYSTEMS);
 
 export const scooterPowertrainTypeSchema = z.enum(SCOOTER_POWERTRAIN_TYPES);
 export const scooterRegistrationTypeSchema = z.enum(SCOOTER_REGISTRATION_TYPES);
+export const SCOOTER_CIV_AVAILABILITIES = [
+  "unknown",
+  "not_issued",
+  "issued",
+] as const;
+export const scooterCivAvailabilitySchema = z.enum(SCOOTER_CIV_AVAILABILITIES);
+export type ScooterCivAvailability = z.infer<
+  typeof scooterCivAvailabilitySchema
+>;
 export const scooterRequiredDriverLicenseTypeSchema = z.enum(
   SCOOTER_REQUIRED_DRIVER_LICENSE_TYPES,
 );
@@ -307,8 +375,11 @@ export const scooterSchema = z
     engineDisplacementCc: z.number().int().positive().nullable(),
     powerKw: z.number().positive().nullable(),
     registrationType: scooterRegistrationTypeSchema,
+    civAvailability: scooterCivAvailabilitySchema.optional(),
     registrationNumber: z.string().nullable(),
     registrationDate: z.string().nullable(),
+    itpStatus: scooterItpStatusSchema.optional(),
+    itpValidUntil: dateOnlySchema.nullable().optional(),
     temporaryRegistrationExpiresAt: z.string().nullable(),
     requiredLicenseCategory: scooterRequiredDriverLicenseTypeSchema,
     currentMileageKm: mileageKmSchema.nullable(),
@@ -337,6 +408,7 @@ export const nextScooterFleetNumberSchema = z.object({
 export const createScooterInputSchema = z
   .object({
     fleetNumber: scooterFleetNumberSchema.optional(),
+    civAvailability: scooterCivAvailabilitySchema.optional(),
     photoDrafts: scooterPhotoDraftsSchema.optional(),
     sessionId: z.string().min(1).max(120).optional(),
     insurancePolicies: insurancePoliciesInputSchema.optional(),
@@ -382,6 +454,7 @@ export const createScooterInputSchema = z
     validateInsuranceVins(input, ctx);
     validateScooterPowertrainForCreate(input, ctx);
     validateScooterCivOptions(input, ctx);
+    validateScooterCivAvailability(input, ctx);
     validateScooterRegistrationForCreate(input, ctx);
   })
   .meta({ id: "CreateScooterInput" });
@@ -391,6 +464,7 @@ export type CreateScooterInput = z.infer<typeof createScooterInputSchema>;
 export const updateScooterInputSchema = z
   .object({
     fleetNumber: scooterFleetNumberSchema.optional(),
+    civAvailability: scooterCivAvailabilitySchema.optional(),
     sessionId: z.string().min(1).max(120).optional(),
     insurancePolicies: insurancePoliciesInputSchema.optional(),
     documentDrafts: scooterDocumentDraftsSchema.optional(),
@@ -448,6 +522,7 @@ export const updateScooterInputSchema = z
     validateInsuranceVins(input, ctx);
     validateScooterPowertrainForUpdate(input, ctx);
     validateScooterCivOptions(input, ctx, true);
+    validateScooterCivAvailability(input, ctx);
     validateScooterRegistrationForUpdate(input, ctx);
   })
   .meta({ id: "UpdateScooterInput" });
@@ -561,19 +636,23 @@ function normalizeLocalPlate(
 ): ScooterPlateValidationResult | null {
   const displayValue = registrationNumber
     .trim()
+    .normalize("NFC")
     .toUpperCase()
     .replace(/\s+/g, " ")
     .replace(/\s*-\s*/g, "-")
     .replace(/-+/g, "-");
 
-  if (!/^[A-Z0-9 -]{1,32}$/.test(displayValue)) return null;
+  if (!/^[\p{L}0-9 /-]{1,32}$/u.test(displayValue)) return null;
   if (!/\d/.test(displayValue)) return null;
-  if (/^[ -]|[ -]$/.test(displayValue)) return null;
+  if (/^[ /-]|[ /-]$/.test(displayValue)) return null;
 
   return {
     registrationType: "local",
     displayValue,
-    compactValue: displayValue.replace(/[ -]+/g, ""),
+    compactValue: displayValue
+      .normalize("NFD")
+      .replace(/\p{M}/gu, "")
+      .replace(/[ /-]+/g, ""),
   };
 }
 

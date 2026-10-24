@@ -129,6 +129,9 @@ export function ScooterCard({
     .filter(Boolean)
     .join(" ");
   const attention = [
+    ...(scooter.itpStatus && scooter.itpStatus !== "active"
+      ? [t(`itp.status.${scooter.itpStatus}`)]
+      : []),
     ...(scooter.insuranceAttention
       ? [t(`list.attention.insurance.${scooter.insuranceAttention}`)]
       : []),

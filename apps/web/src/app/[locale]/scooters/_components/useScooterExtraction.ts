@@ -11,9 +11,10 @@ import type {
   DocumentSource,
   ExtractedDocumentData,
 } from "./scooter-document-sources";
-import type {
-  ScooterEditorField,
-  ScooterEditorValues,
+import {
+  insuranceEditorDefaults,
+  type ScooterEditorField,
+  type ScooterEditorValues,
 } from "./scooter-editor-schema";
 import type { ScooterDocumentsEditor } from "./useScooterDocuments";
 
@@ -31,6 +32,14 @@ interface Origin {
   lastAuto: string;
   sourceIds: string[];
 }
+export interface ScooterExtractionSnapshot {
+  reviewResult?: Success;
+  confirmedSources: string[];
+  origins: [string, Origin][];
+  manual: string[];
+  automaticBaselines: [string, string][];
+  rawBySource: [string, Record<string, string>][];
+}
 interface Options {
   form: Form;
   documents: ScooterDocumentsEditor;
@@ -38,6 +47,7 @@ interface Options {
   editing: boolean;
   onRawFields: (raw: Record<string, string>) => void;
   initialRawFields?: Record<string, string>;
+  snapshot?: ScooterExtractionSnapshot;
 }
 function originKey(field: string, policyId?: string) {
   return policyId ? `policy:${policyId}:${field}` : field;
@@ -94,7 +104,7 @@ export function useScooterExtraction(options: Options) {
       insurancePolicyId: doc.insurancePolicyId,
     })),
     ...documents.drafts
-      .filter((doc) => doc.type !== null)
+      .filter((doc) => doc.type !== null && doc.version !== "client_copy")
       .map((doc) => ({
         sourceId: doc.id,
         type: doc.type,
@@ -117,17 +127,27 @@ export function useScooterExtraction(options: Options) {
       ),
     ),
   }));
-  const [reviewResult, setReviewResult] = useState<Success>();
+  const [reviewResult, setReviewResult] = useState<Success | undefined>(
+    options.snapshot?.reviewResult,
+  );
   const [confirmedSources, setConfirmedSources] = useState<Set<string>>(
-    () => new Set(documents.existing.map((doc) => doc.id)),
+    () =>
+      new Set(
+        options.snapshot?.confirmedSources ??
+          documents.existing.map((doc) => doc.id),
+      ),
   );
   const store = useRef(evidence);
-  const origins = useRef(new Map<string, Origin>());
-  const manual = useRef(new Set<string>());
-  const automaticBaselines = useRef(new Map<string, string>());
+  const origins = useRef(new Map<string, Origin>(options.snapshot?.origins));
+  const manual = useRef(new Set<string>(options.snapshot?.manual));
+  const automaticBaselines = useRef(
+    new Map<string, string>(options.snapshot?.automaticBaselines),
+  );
   const publishedRaw = useRef(options.initialRawFields ?? {});
   const previousSources = useRef<DocumentSource[] | null>(null);
-  const rawBySource = useRef(new Map<string, Record<string, string>>());
+  const rawBySource = useRef(
+    new Map<string, Record<string, string>>(options.snapshot?.rawBySource),
+  );
   const latest = useRef({ ...options, sources });
 
   useEffect(() => {
@@ -239,27 +259,50 @@ export function useScooterExtraction(options: Options) {
       }
       if (incoming.extractedDocuments) {
         for (const [id, data] of Object.entries(incoming.extractedDocuments)) {
+          const raw = data.documents?.length
+            ? (Object.assign(
+                {},
+                ...data.documents
+                  .filter((document) => document.documentType === "civ")
+                  .map((document) => document.rawFields),
+              ) as Record<string, string | null>)
+            : data.rawFields;
           const known = Object.fromEntries(
-            Object.entries(data.rawFields).filter(
+            Object.entries(raw).filter(
               (entry): entry is [string, string] =>
                 typeof entry[1] === "string" && Boolean(entry[1].trim()),
             ),
           );
-          rawBySource.current.set(id, {
-            ...rawBySource.current.get(id),
-            ...known,
-          });
+          rawBySource.current.set(
+            id,
+            data.documents?.length
+              ? known
+              : {
+                  ...rawBySource.current.get(id),
+                  ...known,
+                },
+          );
         }
       }
-      if (sources.some((entry) => entry.type === "civ")) {
+      const civSources = sources.filter((entry) => {
+        const data =
+          incoming.extractedDocuments?.[entry.sourceId] ??
+          store.current[entry.sourceId];
+        return data?.documents?.length
+          ? data.documents.some((document) => document.documentType === "civ")
+          : entry.type === "civ";
+      });
+      if (civSources.length) {
         const civRaw = Object.assign(
           {},
-          ...sources
-            .filter((entry) => entry.type === "civ")
-            .map((entry) => rawBySource.current.get(entry.sourceId) ?? {}),
+          ...civSources.map(
+            (entry) => rawBySource.current.get(entry.sourceId) ?? {},
+          ),
         ) as Record<string, string>;
         publishRawFields(civRaw);
       } else if (incoming.rawFields) publishRawFields(incoming.rawFields);
+      else if (sources.some((entry) => entry.type === "civ"))
+        publishRawFields({});
       const reviewPolicies = (form.getValues("insurancePolicies") ?? []).map(
         (policy) => {
           const fields = policyConflicts.get(policy.id);
@@ -328,11 +371,20 @@ export function useScooterExtraction(options: Options) {
     previousSources.current = sources;
     const activeIds = new Set(sources.map((entry) => entry.sourceId));
     const hasCiv = sources.some((entry) => entry.type === "civ");
-    const authorizedIds = new Set(
+    const supersededTechnicalIds = new Set(
       sources
-        .filter((entry) => !hasCiv || entry.type !== "import_document")
+        .filter(
+          (entry) =>
+            hasCiv &&
+            [
+              "import_document",
+              "foreign_registration",
+              "export_certificate",
+            ].includes(entry.type),
+        )
         .map((entry) => entry.sourceId),
     );
+    const authorizedIds = new Set(sources.map((entry) => entry.sourceId));
     if (previous === null) {
       const civ = sources.find((entry) => entry.type === "civ");
       if (civ && initialRawFields)
@@ -384,7 +436,12 @@ export function useScooterExtraction(options: Options) {
     for (const [key, origin] of origins.current) {
       if (
         !origin.sourceIds.some(
-          (id) => !authorizedIds.has(id) || changedIds.has(id),
+          (id) =>
+            !authorizedIds.has(id) ||
+            changedIds.has(id) ||
+            (origin.field !== "vin" &&
+              !origin.policyId &&
+              supersededTechnicalIds.has(id)),
         )
       )
         continue;
@@ -454,13 +511,18 @@ export function useScooterExtraction(options: Options) {
     synchronizeSources();
   }, [signature, synchronizeSources]);
 
-  const hasCiv = sources.some((source) => source.type === "civ");
-  const reviewedSources = sources.filter(
-    (source) => !hasCiv || source.type !== "import_document",
-  );
+  const reviewedSources = sources;
   const knownVins = [
     liveVin,
-    ...reviewedSources.map((source) => evidence[source.sourceId]?.vin),
+    ...reviewedSources
+      .filter(
+        (source) =>
+          v1.scooters.scooterDocumentReadsVin(source.type) ||
+          evidence[source.sourceId]?.documents?.some((document) =>
+            v1.scooters.scooterDocumentReadsVin(document.documentType),
+          ),
+      )
+      .map((source) => evidence[source.sourceId]?.vin),
   ]
     .filter(
       (vin): vin is string => typeof vin === "string" && Boolean(vin.trim()),
@@ -469,7 +531,10 @@ export function useScooterExtraction(options: Options) {
   const vinMismatch = new Set(knownVins).size > 1;
   const unverifiedSources = reviewedSources.filter(
     (source) =>
-      !evidence[source.sourceId]?.vin && !confirmedSources.has(source.sourceId),
+      !liveVin &&
+      v1.scooters.scooterDocumentReadsVin(source.type) &&
+      !evidence[source.sourceId]?.vin &&
+      !confirmedSources.has(source.sourceId),
   );
   const confirmVin = useCallback((sourceId: string) => {
     setConfirmedSources((previous) => new Set([...previous, sourceId]));
@@ -486,7 +551,53 @@ export function useScooterExtraction(options: Options) {
         });
     }
   }, []);
+  const resetAutomaticSource = useCallback((sourceId: string) => {
+    const { form } = latest.current;
+    const values = form.getValues();
+    for (const [key, origin] of origins.current) {
+      if (!origin.sourceIds.includes(sourceId)) continue;
+      const current = readField(origin, values);
+      const path = pathFor(origin, values);
+      if (current === origin.lastAuto && !manual.current.has(key) && path) {
+        form.setValue(path, origin.baseline, { shouldDirty: true });
+        automaticBaselines.current.set(key, origin.baseline);
+      } else manual.current.add(key);
+      origins.current.delete(key);
+    }
+    rawBySource.current.delete(sourceId);
+  }, []);
+  const resetInsuranceSelection = useCallback((policyId?: string) => {
+    for (const [key, origin] of origins.current)
+      if (origin.policyId) origins.current.delete(key);
+    for (const key of manual.current)
+      if (key.startsWith("policy:")) manual.current.delete(key);
+    for (const key of automaticBaselines.current.keys())
+      if (key.startsWith("policy:")) automaticBaselines.current.delete(key);
+    if (!policyId) {
+      latest.current.form.setValue("insurancePolicies", [], {
+        shouldDirty: true,
+      });
+      return;
+    }
+    const policy = { ...insuranceEditorDefaults(), id: policyId };
+    for (const field of v1.scooters.INSURANCE_FIELDS)
+      automaticBaselines.current.set(originKey(field, policyId), policy[field]);
+    latest.current.form.setValue("insurancePolicies", [policy], {
+      shouldDirty: true,
+    });
+  }, []);
   return {
+    resetInsuranceSelection,
+    resetAutomaticSource,
+    getSnapshot: () =>
+      ({
+        reviewResult,
+        confirmedSources: [...confirmedSources],
+        origins: [...origins.current],
+        manual: [...manual.current],
+        automaticBaselines: [...automaticBaselines.current],
+        rawBySource: [...rawBySource.current],
+      }) satisfies ScooterExtractionSnapshot,
     sources,
     applyImport,
     reviewResult,

@@ -32,3 +32,27 @@ export const StatusLanes: Story = {
     </div>
   ),
 };
+
+export const FadedDraftRail: Story = {
+  args: { label: "Scooter drafts", fadeEdges: true },
+  render: (args) => (
+    <div className="w-full max-w-sm">
+      <HorizontalScrollArea {...args}>
+        <div className="flex w-max gap-2 p-2">
+          {[
+            "Awaiting documents",
+            "Analysing",
+            "Needs review",
+            "Ready to create",
+          ].map((status) => (
+            <Card key={status} className="w-48 shrink-0">
+              <CardHeader>
+                <CardTitle>{status}</CardTitle>
+              </CardHeader>
+            </Card>
+          ))}
+        </div>
+      </HorizontalScrollArea>
+    </div>
+  ),
+};

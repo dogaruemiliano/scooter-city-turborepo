@@ -85,10 +85,10 @@ describe("analysis suggestions through the shared import pipeline", () => {
     expect(result.values.color).toBeUndefined();
     expect(result.values.registrationCertificateNumber).toBe("CERT-42");
     expect(result.extractedDocuments).not.toHaveProperty(civ.sourceId);
-    expect(result.needsVinReview).toBe(true);
+    expect(result.needsVinReview).toBeUndefined();
   });
 
-  it("uses CIV evidence without reviewing a superseded import document", () => {
+  it("selects the CIV VIN and preserves conflicting source readings for review", () => {
     const result = prepareScooterAnalysisImport(
       [
         analysis(civ, { color: "White" }),
@@ -99,13 +99,14 @@ describe("analysis suggestions through the shared import pipeline", () => {
       scooterEditorDefaults(),
       false,
     );
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(result.values.color).toBe("White");
-    expect(result.needsVinReview).not.toBe(true);
+    expect(result).toMatchObject({ ok: true, values: { vin } });
+    if (result.ok)
+      expect(result.extractedDocuments?.[importer.sourceId].vin).toBe(
+        "LXYTCKP05P0000002",
+      );
   });
 
-  it("does not ask for VIN confirmation of an import skipped by AI", () => {
+  it("does not request another VIN when the CIV already supplies it", () => {
     const result = prepareScooterAnalysisImport(
       [analysis(civ, { color: "White" })],
       [importer, civ],
@@ -115,7 +116,7 @@ describe("analysis suggestions through the shared import pipeline", () => {
     );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.needsVinReview).not.toBe(true);
+    expect(result.needsVinReview).toBeUndefined();
     expect(result.extractedDocuments).not.toHaveProperty(importer.sourceId);
   });
 
@@ -169,4 +170,202 @@ describe("analysis suggestions through the shared import pipeline", () => {
       policy: ["premiumAmount"],
     });
   });
+});
+
+it("imports CIV and insurance children from one PDF while retaining one physical source", () => {
+  const source = { ...civ, insurancePolicyId: "policy-one" };
+  const mixed = analysis(source, { color: "White" });
+  mixed.extractedData.documents = [
+    {
+      id: "civ",
+      documentType: "civ",
+      pages: [1],
+      vin,
+      fields: { color: "White", civIssuedAt: "2026-10-01" },
+      rawFields: { "Data eliberării": "01.10.2026" },
+    },
+    {
+      id: "insurance",
+      documentType: "insurance",
+      pages: [2],
+      vin,
+      fields: {
+        insuredName: "Example SRL",
+        validFrom: "2026-01-01",
+        validUntil: "2026-12-31",
+        premiumAmount: 200,
+        currency: "RON",
+        documentVin: vin,
+      },
+      rawFields: {},
+    },
+    {
+      id: "foreign",
+      documentType: "foreign_registration",
+      pages: [3, 4],
+      vin,
+      fields: { foreignRegistrationNumber: "AB-123-C" },
+      rawFields: { kenteken: "AB-123-C" },
+    },
+  ];
+  const result = prepareScooterAnalysisImport(
+    [mixed],
+    [source],
+    [],
+    scooterEditorDefaults(),
+    false,
+  );
+  expect(result.ok).toBe(true);
+  if (!result.ok) return;
+  expect(result.values).toMatchObject({
+    color: "White",
+    civIssuedAt: "2026-10-01",
+  });
+  expect(result.insurancePolicies?.[0]).toMatchObject({
+    id: "policy-one",
+    insuredName: "Example SRL",
+    premiumAmount: "200",
+  });
+  expect(Object.keys(result.extractedDocuments ?? {})).toEqual([
+    source.sourceId,
+  ]);
+  expect(result.extractedDocuments?.[source.sourceId]?.documents).toHaveLength(
+    3,
+  );
+  expect(
+    result.extractedDocuments?.[source.sourceId]?.documents?.[2]?.fields
+      .foreignRegistrationNumber,
+  ).toBe("AB-123-C");
+});
+
+it("fills the priority VIN while retaining mismatched logical readings within one PDF", () => {
+  const mixed = analysis(civ, {});
+  mixed.extractedData.documents = [
+    {
+      id: "civ",
+      documentType: "civ",
+      pages: [1],
+      vin,
+      fields: {},
+      rawFields: {},
+    },
+    {
+      id: "foreign",
+      documentType: "foreign_registration",
+      pages: [2],
+      vin: "LXYTCKP05P0000002",
+      fields: {},
+      rawFields: {},
+    },
+  ];
+  expect(
+    prepareScooterAnalysisImport(
+      [mixed],
+      [civ],
+      [],
+      scooterEditorDefaults(),
+      false,
+    ),
+  ).toMatchObject({
+    ok: true,
+    values: { vin },
+    extractedDocuments: { civ: { documents: mixed.extractedData.documents } },
+  });
+});
+
+it("imports the selected current policy and preserves historical insurance readings in the same PDF", () => {
+  const source = { ...civ, insurancePolicyId: "current-policy" };
+  const mixed = analysis(source, {});
+  mixed.extractedData.documents = [
+    {
+      id: "old",
+      documentType: "insurance",
+      pages: [1],
+      vin,
+      fields: { insuredName: "Old holder", premiumAmount: 100 },
+      rawFields: { policyNumber: "OLD" },
+    },
+    {
+      id: "current",
+      documentType: "insurance",
+      pages: [2],
+      vin,
+      fields: { insuredName: "Current holder", premiumAmount: 200 },
+      rawFields: { policyNumber: "CURRENT" },
+    },
+  ];
+  const result = prepareScooterAnalysisImport(
+    [mixed],
+    [source],
+    [],
+    scooterEditorDefaults(),
+    false,
+    { currentInsuranceSourceId: `${source.sourceId}:current` },
+  );
+  expect(result.ok).toBe(true);
+  if (!result.ok) return;
+  expect(result.insurancePolicies).toHaveLength(1);
+  expect(result.insurancePolicies?.[0]).toMatchObject({
+    insuredName: "Current holder",
+    premiumAmount: "200",
+  });
+  expect(result.extractedDocuments?.[source.sourceId]).toMatchObject({
+    currentInsuranceDocumentId: "current",
+    documents: [
+      { id: "old", rawFields: { policyNumber: "OLD" } },
+      { id: "current" },
+    ],
+  });
+  const history = prepareScooterAnalysisImport(
+    [mixed],
+    [source],
+    [],
+    scooterEditorDefaults(),
+    false,
+    { currentInsuranceSourceId: null },
+  );
+  expect(history.ok).toBe(true);
+  if (history.ok) {
+    expect(history.insurancePolicies).toBeUndefined();
+    expect(
+      history.extractedDocuments?.[source.sourceId]?.currentInsuranceDocumentId,
+    ).toBeNull();
+    expect(
+      history.extractedDocuments?.[source.sourceId]?.documents,
+    ).toHaveLength(2);
+  }
+});
+
+it("does not reapply CIV-only values after a document type is corrected to ownership proof", () => {
+  const mixed = analysis(civ, {});
+  mixed.extractedData.documents = [
+    {
+      id: "corrected",
+      documentType: "ownership_proof",
+      pages: [1],
+      vin,
+      fields: {
+        model: "Printed model",
+        civNumber: "C123",
+        civIssuedAt: "2026-10-01",
+      },
+      rawFields: {},
+      issues: [{ field: "civIssuedAt", code: "unreadable" }],
+    },
+  ];
+  const result = prepareScooterAnalysisImport(
+    [mixed],
+    [civ],
+    [],
+    scooterEditorDefaults(),
+    false,
+  );
+  expect(result).toMatchObject({
+    ok: true,
+    values: { model: "Printed model" },
+  });
+  if (result.ok) {
+    expect(result.values).not.toHaveProperty("civNumber");
+    expect(result.unresolved).not.toContain("civIssuedAt");
+  }
 });

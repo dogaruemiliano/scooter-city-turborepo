@@ -3,6 +3,7 @@ import { ScooterDocumentExtractionService } from "./scooter-document-extraction.
 import {
   extractionFieldsForType,
   scooterDocumentModelJsonSchema,
+  scooterDocumentModelOutputSchema,
 } from "./scooter-document-extraction.schema";
 import type {
   AnalyzeScooterDocumentInput,
@@ -112,7 +113,7 @@ describe("scooter document extraction normalization", () => {
       },
       rawFields: { "P.2": "1,8" },
     });
-    expect(result.extractedData.rawFields).not.toHaveProperty("Mențiuni");
+    expect(result.extractedData.rawFields.Mențiuni).toBe("retired field");
     expect(result.issues).toContainEqual({
       field: "actualWeightKg",
       code: "unreadable",
@@ -315,10 +316,12 @@ describe("scooter document extraction normalization", () => {
       vin: VIN,
       brandName: null,
       powertrainType: null,
+      civIssuedAt: null,
     });
     expect(result.issues).toEqual([
       { field: "brandName", code: "unreadable" },
       { field: "powertrainType", code: "unreadable" },
+      { field: "civIssuedAt", code: "unreadable" },
     ]);
     expect(result.extractedData.fields).not.toHaveProperty(
       "electricMotorPowerKw",
@@ -352,7 +355,9 @@ describe("scooter document extraction normalization", () => {
       },
     );
     const result = await service.analyze(input);
-    expect(result.issues).toEqual([]);
+    expect(result.issues).toEqual([
+      { field: "civIssuedAt", code: "unreadable" },
+    ]);
     expect(result.extractedData.fields).toMatchObject({
       color: "Negru",
       seatsCount: 2,
@@ -385,7 +390,7 @@ describe("scooter document extraction normalization", () => {
     });
   });
 
-  it.each(["civ", "registration_certificate", "insurance"] as const)(
+  it.each(["civ", "insurance"] as const)(
     "does not silently change Z/2 between the raw and normalized %s VIN",
     async (documentType) => {
       const key = documentType === "insurance" ? "documentVin" : "vin";
@@ -605,3 +610,258 @@ describe("scooter document extraction normalization", () => {
     ]);
   });
 });
+
+describe("mixed document PDFs", () => {
+  const document = (
+    documentType: v1.scooters.ScooterDocumentType,
+    fields: ReturnType<typeof field>[],
+    pages = [1],
+    vin: string | null = VIN,
+  ) => ({
+    documentType,
+    fields,
+    pages,
+    vin,
+    rawFields: [],
+    regions: [],
+    inspections: [],
+  });
+  function normalize(documents: unknown[]) {
+    const { service } = setup();
+    const output = {
+      detectedDocumentType: null,
+      vin: null,
+      fields: [],
+      rawFields: [],
+      documents,
+    };
+    return {
+      type: service.detectType(output),
+      ...service.normalize(service.detectType(output), output),
+    };
+  }
+  it("retains both Dutch card sides and separate export evidence alongside authoritative CIV facts", () => {
+    const result = normalize([
+      document(
+        "foreign_registration",
+        [
+          field("powerKw", 3),
+          field("foreignRegistrationNumber", "D-123-AB"),
+          field("foreignFirstRegistrationDate", "12.03.2018"),
+        ],
+        [1, 2],
+      ),
+      document(
+        "export_certificate",
+        [
+          field("exportDate", "20.08.2024"),
+          field("exportCertificateNumber", "00042"),
+        ],
+        [3],
+      ),
+      document(
+        "civ",
+        [field("powerKw", 4), field("civIssuedAt", "01.09.2024")],
+        [4],
+      ),
+    ]);
+    expect(result.type).toBe("civ");
+    expect(result.extractedData.fields).toMatchObject({
+      powerKw: 4,
+      foreignRegistrationNumber: "D-123-AB",
+      foreignFirstRegistrationDate: "2018-03-12",
+      exportDate: "2024-08-20",
+    });
+    expect(result.extractedData.fields).not.toHaveProperty(
+      "registrationNumber",
+    );
+    expect(result.extractedData.documents).toHaveLength(3);
+    expect(result.extractedData.documents?.[0]).toMatchObject({
+      pages: [1, 2],
+      fields: { powerKw: 3 },
+    });
+    expect(result.issues).toContainEqual({
+      field: "powerKw",
+      code: "conflictingValues",
+    });
+  });
+  it("keeps conflicting facts separate while selecting the CIV VIN over foreign readings", () => {
+    const conflicted = normalize([
+      document("civ", [field("powerKw", 4)]),
+      document(
+        "foreign_registration",
+        [field("brandName", "OTHER")],
+        [2],
+        OTHER_VIN,
+      ),
+    ]);
+    expect(conflicted.extractedData.vin).toBe(VIN);
+    expect(conflicted.extractedData.fields).toEqual({ vin: VIN });
+    expect(conflicted.issues).toContainEqual({
+      field: "vin",
+      code: "conflictingValues",
+    });
+    const uncertain = normalize([
+      document("civ", [field("powerKw", 4)]),
+      document(
+        "foreign_registration",
+        [field("brandName", "OTHER")],
+        [2],
+        null,
+      ),
+    ]);
+    expect(uncertain.extractedData.vin).toBe(VIN);
+    expect(uncertain.extractedData.documents?.[0].vin).toBe(VIN);
+  });
+  it("keeps same-page logical records and requires the CIV authority issue date", () => {
+    const result = normalize([
+      {
+        ...document("civ", []),
+        regions: [{ page: 1, x: 0, y: 0, width: 1, height: 0.5 }],
+      },
+      {
+        ...document("registration_certificate", [
+          field("registrationLocalityCode", "18"),
+          field("registrationCounty", "VL"),
+          field("registrationNumber", "VL 18 167"),
+        ]),
+        regions: [{ page: 1, x: 0, y: 0.5, width: 1, height: 0.5 }],
+      },
+    ]);
+    expect(result.issues).toContainEqual({
+      field: "civIssuedAt",
+      code: "unreadable",
+    });
+    expect(result.extractedData.documents?.[1].fields).toMatchObject({
+      registrationLocalityCode: "18",
+      registrationCounty: "VL",
+      registrationNumber: "VL 18 167",
+    });
+    expect(result.extractedData.documents?.[0].regions?.[0].height).toBe(0.5);
+  });
+  it("supports twenty complete logical records and rejects a twenty-first", () => {
+    const output = {
+      detectedDocumentType: "civ",
+      vin: null,
+      fields: [],
+      rawFields: [],
+      documents: Array.from({ length: 20 }, () => document("civ", [])),
+    };
+    expect(scooterDocumentModelOutputSchema.safeParse(output).success).toBe(
+      true,
+    );
+    output.documents.push(document("civ", []));
+    expect(scooterDocumentModelOutputSchema.safeParse(output).success).toBe(
+      false,
+    );
+  });
+  it("rejects mappings beyond the original page count while preserving legacy jobs", () => {
+    const { service } = setup();
+    const output = {
+      detectedDocumentType: "civ",
+      vin: null,
+      fields: [],
+      rawFields: [],
+      documents: [document("civ", [], [2])],
+    };
+    expect(() => service.normalize("civ", output, 1)).toThrow();
+    expect(() => service.normalize("civ", output, 0)).toThrow();
+    expect(() => service.normalize("civ", output, 2)).not.toThrow();
+    expect(() => service.normalize("civ", output)).not.toThrow();
+    const regionsOutput = {
+      ...output,
+      documents: [
+        {
+          ...document("civ", [], [1]),
+          regions: [{ page: 2, x: 0, y: 0, width: 1, height: 1 }],
+        },
+      ],
+    };
+    expect(() => service.normalize("civ", regionsOutput, 1)).toThrow();
+  });
+  it("retains malformed child VIN warnings while selecting the readable CIV VIN", () => {
+    const { service } = setup();
+    for (const malformed of [
+      "INVALID",
+      "L5YAUCZB9H114898I",
+      "L5YAUCZB9H1148984?",
+    ]) {
+      const output = {
+        detectedDocumentType: "civ",
+        vin: VIN,
+        fields: [field("vin", VIN)],
+        rawFields: [],
+        documents: [
+          document("civ", [field("vin", VIN)]),
+          document("foreign_registration", [], [1], malformed),
+        ],
+      };
+      const result = service.normalize("civ", output, 1);
+      expect(result.extractedData.vin).toBe(VIN);
+      expect(result.issues).toContainEqual({
+        field: "vin",
+        code: "invalidValue",
+      });
+    }
+  });
+  it("normalizes each ITP row independently, preserves raw dates and never infers a missing expiry", () => {
+    const result = normalize([
+      {
+        ...document("itp_card", []),
+        inspections: [
+          {
+            inspectionDate: "12.03.2024",
+            validUntil: "12.03.2026",
+            result: "passed",
+            certificateNumber: "000123",
+            odometerKm: 42,
+            rawFields: [{ key: "valabil", value: "12.03.2026" }],
+          },
+          {
+            inspectionDate: "15.03.2026",
+            validUntil: null,
+            result: null,
+            certificateNumber: null,
+            odometerKm: null,
+            rawFields: [],
+          },
+        ],
+      },
+    ]);
+    expect(result.extractedData.documents?.[0].inspections?.[0]).toMatchObject({
+      inspectionDate: "2024-03-12",
+      validUntil: "2026-03-12",
+      result: "passed",
+      rawFields: { valabil: "12.03.2026" },
+    });
+    expect(
+      result.extractedData.documents?.[0].inspections?.[1].validUntil,
+    ).toBeNull();
+    expect(result.issues).toContainEqual({
+      field: "inspections.1.validUntil",
+      code: "unreadable",
+    });
+  });
+});
+
+it.each(["registration_certificate", "itp_card"] as const)(
+  "discards all attempted VIN extraction from %s",
+  (type) => {
+    const { service } = setup();
+    const result = service.normalize(type, {
+      detectedDocumentType: type,
+      vin: VIN,
+      fields: [field("vin", VIN)],
+      rawFields: [
+        { key: "vin", value: VIN },
+        { key: "E", value: VIN },
+        { key: "Număr de identificare", value: VIN },
+      ],
+      documents: null,
+    });
+    expect(result.extractedData.vin).toBeNull();
+    expect(result.extractedData.fields).not.toHaveProperty("vin");
+    expect(result.extractedData.rawFields).not.toHaveProperty("vin");
+    expect(result.issues.some((issue) => issue.field === "vin")).toBe(false);
+  },
+);

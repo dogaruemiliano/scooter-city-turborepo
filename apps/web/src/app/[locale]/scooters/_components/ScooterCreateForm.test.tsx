@@ -24,6 +24,8 @@ import { scooterEditorMessage } from "./scooter-editor-messages";
 import { useScooterDocuments } from "./useScooterDocuments";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { ScooterEditor } from "./ScooterEditor";
+import type { ScooterImportSnapshot } from "./scooter-import-workspace";
 import { ScooterCreateForm } from "./ScooterCreateForm";
 vi.mock("./ScooterPhotos", () => ({
   ScooterPhotos: ({
@@ -1685,3 +1687,94 @@ function requiredLabel(text: string) {
 vi.mock("@/components/auth/SessionProvider", () => ({
   useOptionalSession: () => ({ user: { isSuperAdmin: true } }),
 }));
+
+it("restores manual field corrections from a persistent workspace draft after navigation", async () => {
+  const draft = {
+    id: "workspace-draft",
+    expiresAt: "2099-01-01T00:00:00.000Z",
+    updatedAt: "2026-10-24T00:00:00.000Z",
+    revision: 0,
+    state: {},
+  };
+  let snapshot: ScooterImportSnapshot | undefined;
+  const view = render(
+    <NextIntlClientProvider locale="en" messages={messages.en}>
+      <ScooterEditor
+        embedded
+        importDraft={draft}
+        onSnapshot={(value) => {
+          snapshot = value;
+        }}
+        returnHref="/en/scooters"
+        brands={brands}
+      />
+    </NextIntlClientProvider>,
+  );
+  const browser = userEvent.setup();
+  await browser.type(
+    screen.getByRole("textbox", { name: "VIN" }),
+    "JYARN23E0RA123456",
+  );
+  await browser.type(
+    screen.getByRole("textbox", { name: "Model" }),
+    "Manual correction",
+  );
+  await waitFor(() => expect(snapshot?.values.model).toBe("Manual correction"));
+  const persisted = JSON.parse(
+    JSON.stringify(snapshot),
+  ) as ScooterImportSnapshot;
+  view.unmount();
+  render(
+    <NextIntlClientProvider locale="en" messages={messages.en}>
+      <ScooterEditor
+        embedded
+        importDraft={draft}
+        initialSnapshot={persisted}
+        returnHref="/en/scooters"
+        brands={brands}
+      />
+    </NextIntlClientProvider>,
+  );
+  expect(screen.getByRole("textbox", { name: "VIN" })).toHaveValue(
+    "JYARN23E0RA123456",
+  );
+  expect(screen.getByRole("textbox", { name: "Model" })).toHaveValue(
+    "Manual correction",
+  );
+  expect(
+    mocks.apiFetch.mock.calls.some(
+      ([path]) =>
+        path === v1.scooters.ROUTES.documents.discardEditorSession(draft.id),
+    ),
+  ).toBe(false);
+});
+
+it("shows explicit CIV availability and marks it issued when CIV evidence is entered", async () => {
+  renderWizard();
+  const browser = userEvent.setup();
+  const availability = screen.getByRole("radiogroup", {
+    name: "CIV availability",
+  });
+  expect(
+    within(availability).getByRole("radio", { name: /Unknown$/ }),
+  ).toBeChecked();
+  await browser.click(
+    within(availability).getByRole("radio", { name: /Not issued yet$/ }),
+  );
+  expect(
+    within(availability).getByRole("radio", { name: /Not issued yet$/ }),
+  ).toBeChecked();
+  await browser.click(screen.getByRole("button", { name: "Advanced details" }));
+  await browser.type(
+    screen.getByRole("textbox", { name: "Vehicle identity card number" }),
+    "CIV-123",
+  );
+  await waitFor(() =>
+    expect(
+      within(availability).getByRole("radio", { name: /(?:^| )Issued$/ }),
+    ).toBeChecked(),
+  );
+  expect(
+    within(availability).getByRole("radio", { name: /Not issued yet$/ }),
+  ).toBeDisabled();
+});

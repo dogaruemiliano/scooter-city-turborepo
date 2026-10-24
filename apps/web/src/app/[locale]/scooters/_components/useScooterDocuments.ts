@@ -10,11 +10,15 @@ import {
 
 export interface DocumentDraft {
   id: string;
+  version?: "original" | "client_copy";
+  originalId?: string;
   type: v1.scooters.ScooterDocumentType | null;
   uploadType?: "unclassified";
   requestedType?: v1.scooters.ScooterDocumentType;
   insurancePolicyId?: string;
   file: File;
+  /** Restored uploads keep metadata until a private preview is requested. */
+  fileUnavailable?: boolean;
   status: "uploading" | "ready" | "failed";
   uploadToken?: string;
   uploadError?:
@@ -53,19 +57,52 @@ function uploadFailure(
   return {};
 }
 
+export interface ScooterDocumentsSnapshot {
+  drafts: (Omit<DocumentDraft, "file"> & {
+    file: { name: string; type: string; size: number; lastModified: number };
+  })[];
+  extractions: Record<string, v1.scooters.ScooterDocumentExtractedData | null>;
+  removedIds: string[];
+}
+
+function restoreDraft(
+  draft: ScooterDocumentsSnapshot["drafts"][number],
+): DocumentDraft {
+  const file = new File([], draft.file.name, {
+    type: draft.file.type,
+    lastModified: draft.file.lastModified,
+  });
+  Object.defineProperty(file, "size", { value: draft.file.size });
+  return {
+    ...draft,
+    file,
+    fileUnavailable: true,
+    status: draft.uploadToken ? "ready" : "failed",
+    ...(!draft.uploadToken ? { uploadError: "connectionFailed" as const } : {}),
+  };
+}
+
 export function useScooterDocuments(
   existing: v1.scooters.ScooterDocument[] = [],
+  options: {
+    session?: v1.scooters.ScooterDocumentEditorSession;
+    snapshot?: ScooterDocumentsSnapshot;
+  } = {},
 ) {
-  const editorSession = useScooterEditorSession();
-  const [drafts, setDrafts] = useState<DocumentDraft[]>([]);
+  const editorSession = useScooterEditorSession(options.session);
+  const [drafts, setDrafts] = useState<DocumentDraft[]>(
+    () => options.snapshot?.drafts.map(restoreDraft) ?? [],
+  );
   const [extractions, setExtractions] = useState<
     Record<string, v1.scooters.ScooterDocumentExtractedData | null>
-  >({});
-  const [removedIds, setRemovedIds] = useState<string[]>([]);
+  >(() => options.snapshot?.extractions ?? {});
+  const [removedIds, setRemovedIds] = useState<string[]>(
+    () => options.snapshot?.removedIds ?? [],
+  );
   const uploading = useRef(new Set<string>());
 
   async function upload(draft: DocumentDraft) {
-    if (uploading.current.has(draft.id)) return;
+    if (draft.fileUnavailable || uploading.current.has(draft.id)) return;
     uploading.current.add(draft.id);
     setDrafts((current) =>
       current.map((item) =>
@@ -148,9 +185,13 @@ export function useScooterDocuments(
     type: v1.scooters.ScooterDocumentType | null,
     files: File[],
     insurancePolicyId?: string,
+    version: "original" | "client_copy" = "original",
+    originalId?: string,
   ) {
     const items: DocumentDraft[] = files.map((file) => ({
       id: crypto.randomUUID(),
+      version,
+      originalId,
       type,
       ...(type === null ? { uploadType: "unclassified" as const } : {}),
       insurancePolicyId,
@@ -194,6 +235,71 @@ export function useScooterDocuments(
   return {
     ...editorSession,
     classify,
+    assignInsurance: useCallback((id: string) => {
+      setDrafts((current) => {
+        const draft = current.find((item) => item.id === id);
+        if (!draft || draft.insurancePolicyId) return current;
+        const policyId =
+          current.find((item) => item.insurancePolicyId)?.insurancePolicyId ??
+          crypto.randomUUID();
+        return current.map((item) =>
+          item.id === id ? { ...item, insurancePolicyId: policyId } : item,
+        );
+      });
+    }, []),
+    snapshot: {
+      drafts: drafts.map(({ file, ...draft }) => ({
+        ...draft,
+        file: {
+          name: file.name,
+          type: file.type,
+          size: file.size,
+          lastModified: file.lastModified,
+        },
+      })),
+      extractions,
+      removedIds,
+    } satisfies ScooterDocumentsSnapshot,
+    async preview(draft: DocumentDraft): Promise<File> {
+      if (!draft.fileUnavailable) return draft.file;
+      if (!options.session || !draft.uploadToken)
+        throw new Error("Upload unavailable");
+      const response = await fetch(
+        webApi.url(
+          `/v1/scooters/import-drafts/${encodeURIComponent(options.session.id)}/document-content`,
+        ),
+        {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Requested-With": "fetch",
+          },
+          body: JSON.stringify({
+            sourceId: draft.id,
+            source: {
+              kind: "draft",
+              type: draft.requestedType ?? draft.uploadType ?? draft.type,
+              ...(draft.uploadType ? { uploadType: draft.uploadType } : {}),
+              uploadToken: draft.uploadToken,
+            },
+          }),
+        },
+      );
+      if (!response.ok) throw new Error("Preview unavailable");
+      const file = new File([await response.blob()], draft.file.name, {
+        type: draft.file.type,
+        lastModified: draft.file.lastModified,
+      });
+      setDrafts((current) =>
+        current.map((item) =>
+          item.id === draft.id
+            ? { ...item, file, fileUnavailable: false }
+            : item,
+        ),
+      );
+      return file;
+    },
     drafts,
     extractions,
     setExtractions,
@@ -205,13 +311,28 @@ export function useScooterDocuments(
       void upload(draft);
     },
     removeDraft: (id: string) =>
-      setDrafts((current) => current.filter((item) => item.id !== id)),
+      setDrafts((current) =>
+        current.filter((item) => item.id !== id && item.originalId !== id),
+      ),
     removeExisting: (id: string) =>
       setRemovedIds((current) => [...current, id]),
     undoRemove: (id: string) =>
       setRemovedIds((current) => current.filter((item) => item !== id)),
     blocked: drafts.some(
-      (item) => item.status !== "ready" || item.type === null,
+      (item) =>
+        item.status !== "ready" ||
+        (item.version === "client_copy"
+          ? !drafts.some(
+              (original) =>
+                original.id === item.originalId &&
+                original.version !== "client_copy",
+            ) ||
+            drafts.filter(
+              (copy) =>
+                copy.originalId === item.originalId &&
+                copy.version === "client_copy",
+            ).length !== 1
+          : item.type === null),
     ),
     changed:
       drafts.length > 0 ||
@@ -229,13 +350,45 @@ export function useScooterDocuments(
                   item,
                 ): item is DocumentDraft & {
                   type: v1.scooters.ScooterDocumentType;
-                } => item.status === "ready" && item.type !== null,
+                } =>
+                  item.status === "ready" &&
+                  item.type !== null &&
+                  item.version !== "client_copy",
               )
               .map((item) => ({
-                type: item.type,
+                type:
+                  item.uploadType === "unclassified" &&
+                  extractions[item.id]?.documents?.length
+                    ? (extractions[item.id]!.documents!.find(
+                        (document) => document.documentType === "civ",
+                      )?.documentType ??
+                      extractions[item.id]!.documents![0]!.documentType)
+                    : item.type,
                 ...(item.uploadType ? { uploadType: item.uploadType } : {}),
-                ...(item.insurancePolicyId
+                ...(item.insurancePolicyId &&
+                extractions[item.id]?.currentInsuranceDocumentId !== null
                   ? { insurancePolicyId: item.insurancePolicyId }
+                  : {}),
+                ...(drafts.find(
+                  (copy) =>
+                    copy.originalId === item.id &&
+                    copy.version === "client_copy" &&
+                    copy.status === "ready",
+                )
+                  ? {
+                      clientCopy: (() => {
+                        const copy = drafts.find(
+                          (copy) =>
+                            copy.originalId === item.id &&
+                            copy.version === "client_copy",
+                        )!;
+                        return {
+                          fileName: copy.file.name,
+                          uploadToken: copy.uploadToken!,
+                          uploadType: copy.uploadType ?? copy.type!,
+                        };
+                      })(),
+                    }
                   : {}),
                 fileName: item.file.name,
                 uploadToken: item.uploadToken!,

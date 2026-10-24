@@ -1,12 +1,8 @@
 import { z } from "zod";
 import { scooterDocumentExtractedDataSchema } from "./scooter-document-extraction.schemas";
 
-export const SCOOTER_DOCUMENT_TYPES = [
-  "import_document",
-  "civ",
-  "registration_certificate",
-  "insurance",
-] as const;
+import { SCOOTER_DOCUMENT_TYPES } from "./scooter-document-types";
+export { SCOOTER_DOCUMENT_TYPES } from "./scooter-document-types";
 export const SCOOTER_DOCUMENT_CONTENT_TYPES = [
   "application/pdf",
   "image/jpeg",
@@ -35,6 +31,14 @@ const fileNameSchema = z
   .regex(/^[^\x00-\x1f\x7f/\\]+$/);
 export const scooterDocumentDraftSchema = z
   .object({
+    clientCopy: z
+      .object({
+        fileName: fileNameSchema,
+        uploadToken: z.string().min(1).max(8192),
+        uploadType: scooterDocumentUploadTypeSchema,
+      })
+      .strict()
+      .optional(),
     insurancePolicyId: z.string().min(1).max(120).optional(),
     extractedData: scooterDocumentExtractedDataSchema.nullable().optional(),
     type: scooterDocumentTypeSchema,
@@ -81,6 +85,15 @@ export const scooterDocumentSchema = z
     byteSize: z.number(),
     createdAt: z.string(),
     contentUrl: z.string(),
+    clientCopy: z
+      .object({
+        fileName: z.string(),
+        contentType: z.enum(SCOOTER_DOCUMENT_CONTENT_TYPES),
+        byteSize: z.number(),
+        contentUrl: z.string(),
+      })
+      .nullable()
+      .optional(),
   })
   .meta({ id: "ScooterDocument" });
 export const scooterDocumentListSchema = z

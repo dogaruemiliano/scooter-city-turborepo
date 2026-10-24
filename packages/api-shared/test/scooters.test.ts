@@ -333,6 +333,20 @@ test("temporary plate validation accepts Romanian provisional plates", () => {
 test("local plate validation allows constrained local identifiers", () => {
   assertPlate("local", "cluj-123", "CLUJ-123", "CLUJ123");
   assertPlate("local", "Sector 1 45", "SECTOR 1 45", "SECTOR145");
+  assertPlate("local", "VL-Bujoreni 166", "VL-BUJORENI 166", "VLBUJORENI166");
+  assertPlate("local", "VL 18 167", "VL 18 167", "VL18167");
+  assertPlate(
+    "local",
+    "VL Băile Olănești 166",
+    "VL BĂILE OLĂNEȘTI 166",
+    "VLBAILEOLANESTI166",
+  );
+  assertPlate(
+    "local",
+    "BUJORENI-VL-176/18",
+    "BUJORENI-VL-176/18",
+    "BUJORENIVL17618",
+  );
 
   assertInvalidPlate("local", "LOCAL");
   assertInvalidPlate("local", "-LOCAL123");

@@ -173,22 +173,23 @@ model User {
 /// the server-only storage key and public-safe metadata that API responses can
 /// expose through domain-specific resources such as PersonDocumentPhoto.
 model MediaAsset {
-  avatarUser       User?                 @relation("UserAvatar")
-  id               String                @id @default(cuid())
-  provider         String
-  bucket           String
-  storageKey       String                @unique
-  contentType      String
-  byteSize         Int
-  checksumSha256   String
-  uploadedByUserId String?
-  uploadedByUser   User?                 @relation(fields: [uploadedByUserId], references: [id], onDelete: SetNull)
-  createdAt        DateTime              @default(now())
-  deletedAt        DateTime?
-  documentPhotos   PersonDocumentPhoto[]
-  scooterDocuments ScooterDocument[]
-  scooterPhotos    ScooterPhoto[]
-  problemPhotos    ScooterProblemPhoto[]
+  avatarUser          User?                 @relation("UserAvatar")
+  id                  String                @id @default(cuid())
+  provider            String
+  bucket              String
+  storageKey          String                @unique
+  contentType         String
+  byteSize            Int
+  checksumSha256      String
+  uploadedByUserId    String?
+  uploadedByUser      User?                 @relation(fields: [uploadedByUserId], references: [id], onDelete: SetNull)
+  createdAt           DateTime              @default(now())
+  deletedAt           DateTime?
+  documentPhotos      PersonDocumentPhoto[]
+  scooterDocuments    ScooterDocument[]     @relation("ScooterOriginalAsset")
+  scooterClientCopies ScooterDocument[]     @relation("ScooterClientCopyAsset")
+  scooterPhotos       ScooterPhoto[]
+  problemPhotos       ScooterProblemPhoto[]
 
   @@index([provider, bucket])
   @@index([uploadedByUserId])
@@ -242,6 +243,9 @@ model ScooterDocumentEditorSession {
   status          String                    @default("open")
   scooterId       String?
   saveFingerprint String?
+  isImportDraft   Boolean                   @default(false)
+  revision        Int                       @default(0)
+  editorState     Json                      @default("{}")
   expiresAt       DateTime
   createdAt       DateTime                  @default(now())
   updatedAt       DateTime                  @updatedAt
@@ -251,6 +255,7 @@ model ScooterDocumentEditorSession {
 
   @@index([status, expiresAt])
   @@index([userId, createdAt])
+  @@index([userId, isImportDraft, status, expiresAt])
 }
 
 model ScooterDocumentJob {
@@ -273,6 +278,7 @@ model ScooterDocumentJob {
   status                String                       @default("queued")
   providerResponseId    String?                      @unique
   submissionUncertainAt DateTime?
+  slotReservedAt        DateTime?
   cancellationAt        DateTime?
   result                Json?
   errorCode             String?
@@ -289,6 +295,7 @@ model ScooterDocumentJob {
   @@index([sessionId, status])
   @@index([draftUploadId])
   @@index([expiresAt])
+  @@index([slotReservedAt, status, nextRunAt])
 }
 
 /// A non-content ledger, retained through partial cleanup and late writers.
@@ -470,10 +477,11 @@ model Scooter {
   civDocument           VehicleCivDocument?
 
   // Identity
-  vin             String  @unique
+  vin             String                 @unique
   brandId         String
   vehicleType     String?
   civNumber       String?
+  civAvailability ScooterCivAvailability @default(unknown)
   model           String?
   variant         String?
   version         String?
@@ -556,6 +564,7 @@ model Scooter {
   brand             ScooterBrand             @relation(fields: [brandId], references: [id], onDelete: Restrict)
   documents         ScooterDocument[]
   insurancePolicies ScooterInsurancePolicy[]
+  inspections       ScooterItpInspection[]
 
   // Metadata
   createdAt DateTime  @default(now())
@@ -1408,6 +1417,36 @@ enum ScooterDocumentType {
   civ
   registration_certificate
   insurance
+  foreign_registration
+  export_certificate
+  itp_card
+  itp_certificate
+  ownership_proof
+}
+
+enum ScooterCivAvailability {
+  unknown
+  not_issued
+  issued
+}
+
+/// Confirmed inspections retain both pieces of supporting document evidence.
+model ScooterItpInspection {
+  id                    String    @id @default(cuid())
+  scooterId             String
+  scooter               Scooter   @relation(fields: [scooterId], references: [id], onDelete: Cascade)
+  inspectionDate        DateTime  @db.Date
+  validUntil            DateTime? @db.Date
+  result                String
+  certificateNumber     String?
+  odometerKm            Int?
+  cardDocumentId        String
+  certificateDocumentId String
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@unique([scooterId, cardDocumentId, certificateDocumentId, inspectionDate])
+  @@index([scooterId, inspectionDate])
 }
 
 enum ScooterPhotoType {
@@ -1441,19 +1480,22 @@ model ScooterPhoto {
 
 /// One PDF or image; multiple files can describe the pages of a document.
 model ScooterDocument {
-  customerVisible   Boolean                 @default(false)
-  id                String                  @id @default(cuid())
-  scooterId         String
-  scooter           Scooter                 @relation(fields: [scooterId], references: [id], onDelete: Cascade)
-  insurancePolicyId String?
-  insurancePolicy   ScooterInsurancePolicy? @relation(fields: [insurancePolicyId, scooterId], references: [id, scooterId], onDelete: Restrict)
-  type              ScooterDocumentType
-  fileName          String
-  extractedData     Json?
-  assetId           String                  @unique
-  asset             MediaAsset              @relation(fields: [assetId], references: [id], onDelete: Restrict)
-  createdAt         DateTime                @default(now())
-  deletedAt         DateTime?
+  customerVisible    Boolean                 @default(false)
+  id                 String                  @id @default(cuid())
+  scooterId          String
+  scooter            Scooter                 @relation(fields: [scooterId], references: [id], onDelete: Cascade)
+  insurancePolicyId  String?
+  insurancePolicy    ScooterInsurancePolicy? @relation(fields: [insurancePolicyId, scooterId], references: [id, scooterId], onDelete: Restrict)
+  type               ScooterDocumentType
+  fileName           String
+  extractedData      Json?
+  assetId            String                  @unique
+  asset              MediaAsset              @relation("ScooterOriginalAsset", fields: [assetId], references: [id], onDelete: Restrict)
+  clientCopyAssetId  String?                 @unique
+  clientCopyAsset    MediaAsset?             @relation("ScooterClientCopyAsset", fields: [clientCopyAssetId], references: [id], onDelete: Restrict)
+  clientCopyFileName String?
+  createdAt          DateTime                @default(now())
+  deletedAt          DateTime?
 
   @@index([scooterId, type, deletedAt])
 }
@@ -1594,34 +1636,34 @@ model UserInvitation {
 }
 
 model ScooterProblem {
-  id              String    @id @default(cuid())
+  id              String                @id @default(cuid())
   scooterId       String
-  scooter         Scooter   @relation(fields: [scooterId], references: [id], onDelete: Restrict)
+  scooter         Scooter               @relation(fields: [scooterId], references: [id], onDelete: Restrict)
   title           String
-  description     String    @default("")
-  checklist       Json      @default("[]")
-  sections        String[]  @default([])
-  buyList         Json      @default("[]")
+  description     String                @default("")
+  checklist       Json                  @default("[]")
+  sections        String[]              @default([])
+  buyList         Json                  @default("[]")
   location        Json?
   /// Original impact severity, retained for historical reference. New writes use difficulty.
   severity        String?
   difficulty      String?
-  blocksUsage     Boolean   @default(false)
+  blocksUsage     Boolean               @default(false)
   holdClearedAt   DateTime?
   holdClearedById String?
   photos          ScooterProblemPhoto[]
-  priority        String    @default("normal")
-  status          String    @default("open")
+  priority        String                @default("normal")
+  status          String                @default("open")
   reporterId      String
-  reporter        User      @relation("ProblemReporter", fields: [reporterId], references: [id], onDelete: Restrict)
+  reporter        User                  @relation("ProblemReporter", fields: [reporterId], references: [id], onDelete: Restrict)
   assigneeId      String?
-  assignee        User?     @relation("ProblemAssignee", fields: [assigneeId], references: [id], onDelete: Restrict)
-  assignees       User[]    @relation("ProblemAssignees")
-  workNotes       String    @default("")
+  assignee        User?                 @relation("ProblemAssignee", fields: [assigneeId], references: [id], onDelete: Restrict)
+  assignees       User[]                @relation("ProblemAssignees")
+  workNotes       String                @default("")
   resolutionNotes String?
-  revision        Int       @default(1)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  revision        Int                   @default(1)
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
   resolvedAt      DateTime?
 
   @@index([scooterId, blocksUsage])

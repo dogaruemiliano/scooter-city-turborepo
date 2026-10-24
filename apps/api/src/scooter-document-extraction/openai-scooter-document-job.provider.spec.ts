@@ -40,7 +40,7 @@ describe("OpenAI background scooter extraction", () => {
       instructions: string;
       max_output_tokens: number;
     };
-    expect(body.max_output_tokens).toBe(12_000);
+    expect(body.max_output_tokens).toBe(20_000);
     expect(body.instructions).toContain("First identify the document type");
     expect(body.instructions).toContain("several distinct document types");
     expect(body.instructions).toContain("ASIGURAT");
@@ -79,7 +79,7 @@ describe("OpenAI background scooter extraction", () => {
         store: false,
         metadata: { jobId: "job-1" },
         model: env.SCOOTER_DOCUMENT_EXTRACTION_MODEL,
-        max_output_tokens: 12_000,
+        max_output_tokens: 20_000,
         input: [
           {
             content: [
@@ -174,9 +174,9 @@ describe("OpenAI background scooter extraction", () => {
     async (declared) => {
       const { provider } = setup(
         new Response(
-          "x".repeat(256 * 1024 + 1),
+          "x".repeat(512 * 1024 + 1),
           declared
-            ? { headers: { "content-length": String(256 * 1024 + 1) } }
+            ? { headers: { "content-length": String(512 * 1024 + 1) } }
             : undefined,
         ),
       );

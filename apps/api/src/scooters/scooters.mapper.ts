@@ -6,6 +6,7 @@ import type {
   Scooter as ScooterRow,
   VehicleCivDocument,
   ScooterInsurancePolicy,
+  ScooterItpInspection,
 } from "../generated/prisma/client";
 
 type ScooterRowWithBrand = ScooterRow & {
@@ -17,10 +18,21 @@ type ScooterRowWithBrand = ScooterRow & {
   brand: { name: string; code: string };
   civDocument?: VehicleCivDocument | null;
   insurancePolicies?: ScooterInsurancePolicy[];
+  inspections?: ScooterItpInspection[];
 };
 
 export function toScooter(row: ScooterRowWithBrand): v1.scooters.Scooter {
+  const itp = row.inspections
+    ? v1.scooters.scooterItpSummary(
+        row.inspections.map((entry) => ({
+          inspectionDate: toDateOnlyString(entry.inspectionDate)!,
+          validUntil: toDateOnlyString(entry.validUntil),
+          result: v1.scooters.scooterItpResultSchema.parse(entry.result),
+        })),
+      )
+    : undefined;
   return {
+    ...(itp ? { itpStatus: itp.status, itpValidUntil: itp.validUntil } : {}),
     ...(row.problems
       ? {
           problemDifficultyCounts: {
@@ -96,6 +108,7 @@ export function toScooter(row: ScooterRowWithBrand): v1.scooters.Scooter {
     brandCode: row.brand.code,
     vehicleType: row.vehicleType,
     civNumber: row.civNumber,
+    civAvailability: row.civAvailability ?? "unknown",
     nationalEmissionsCode: row.nationalEmissionsCode,
     variant: row.variant,
     version: row.version,

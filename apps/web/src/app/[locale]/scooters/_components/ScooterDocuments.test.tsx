@@ -382,6 +382,11 @@ describe("Scooter documents", () => {
       );
       if (status === "failed") {
         await browser.click(
+          await screen.findByRole("button", {
+            name: "Edit document type for CIV.pdf",
+          }),
+        );
+        await browser.click(
           await screen.findByRole("combobox", {
             name: "Document type for CIV.pdf",
           }),
@@ -661,12 +666,19 @@ describe("Scooter documents", () => {
     await browser.click(
       screen.getByRole("button", { name: "Import more documents" }),
     );
-    for (const [index, type] of types.entries())
+    for (const [index, type] of types.entries()) {
+      await browser.click(
+        screen.getByRole("button", {
+          name: `Edit document type for scan-${index}.pdf`,
+        }),
+      );
       expect(
         screen.getByRole("combobox", {
           name: `Document type for scan-${index}.pdf`,
         }),
       ).toHaveTextContent(messages.en.scooters.documents[type]);
+      await browser.keyboard("{Escape}");
+    }
     expect(
       screen.queryByRole("button", { name: "Continue" }),
     ).not.toBeInTheDocument();
@@ -708,7 +720,7 @@ describe("Scooter documents", () => {
     ).toHaveLength(4);
   }, 15_000);
 
-  it("requires explicit verification when direct AI cannot read a VIN", async () => {
+  it("uses the shared manually entered VIN without opening a second VIN review", async () => {
     const defaultRequest = mocks.api.getMockImplementation()!;
     mocks.api.mockImplementation(async (path, schema, options) => {
       if (path !== v1.scooters.ROUTES.documents.startExtractionJob)
@@ -729,7 +741,7 @@ describe("Scooter documents", () => {
       screen.getByLabelText("Browse files", { selector: "input" }),
       pdf(),
     );
-    const action = await screen.findByRole("button", {
+    await screen.findByRole("button", {
       name: "Validate the documents",
     });
     expect(
@@ -744,19 +756,12 @@ describe("Scooter documents", () => {
     await waitFor(() =>
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
     );
-    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
-    await browser.click(action);
-    const t = messages.en.scooters.extraction.vinReview;
-    const review = await screen.findByRole("dialog", {
-      name: t.documentsTitle,
-    });
-    expect(
-      screen.queryByRole("dialog", { name: t.title }),
-    ).not.toBeInTheDocument();
-    act(() => vi.advanceTimersByTime(3000));
-    await browser.click(
-      within(review).getByRole("button", { name: t.confirmAndFinish }),
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("button", { name: "Validate the documents" }),
+      ).not.toBeInTheDocument(),
     );
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "VIN" })).toHaveValue(
       scooter.vin,
     );
@@ -811,6 +816,11 @@ describe("Scooter documents", () => {
         name: "Import more documents",
       });
       if (expand) await browser.click(expand);
+      await browser.click(
+        screen.getByRole("button", {
+          name: `Edit document type for ${document.fileName}`,
+        }),
+      );
       await browser.click(
         screen.getByRole("combobox", {
           name: `Document type for ${document.fileName}`,
@@ -943,6 +953,9 @@ describe("Scooter documents", () => {
     expect(
       screen.getByRole("button", { name: "Create scooter" }),
     ).toBeDisabled();
+    await browser.click(
+      screen.getByRole("button", { name: "Edit document type for scan.pdf" }),
+    );
     await browser.click(
       screen.getByRole("combobox", { name: "Document type for scan.pdf" }),
     );
@@ -1482,7 +1495,7 @@ describe("Scooter documents", () => {
         name: "Save",
       }),
     );
-    await browserConfirmVin(user);
+    expect(screen.queryByText("I checked CIV.pdf")).not.toBeInTheDocument();
     await waitFor(() =>
       expect(
         screen.getByRole("button", { name: "Save changes" }),
@@ -1506,6 +1519,7 @@ describe("Scooter documents", () => {
         method: "PATCH",
         json: {
           sessionId: "editor-session",
+          civAvailability: "issued",
           documentDrafts: [
             { type: "civ", fileName: "CIV.pdf", uploadToken: "token" },
           ],
@@ -1573,11 +1587,6 @@ async function removeFromViewer(
   await user.click(screen.getByRole("button", { name: `Preview ${name}` }));
   await user.click(screen.getByRole("button", { name: "Document actions" }));
   await user.click(await screen.findByRole("menuitem", { name: "Remove" }));
-}
-
-async function browserConfirmVin(user: ReturnType<typeof userEvent.setup>) {
-  const label = await screen.findByText("I checked CIV.pdf");
-  await user.click(label);
 }
 
 const access = vi.hoisted(() => ({

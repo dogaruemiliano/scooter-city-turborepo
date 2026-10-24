@@ -144,3 +144,14 @@ it("keeps a suspended back-forward page open and discards a real page close", as
     v1.scooters.ROUTES.documents.discardEditorSession("session"),
   );
 });
+
+it("resumes a workspace-owned session without creating or discarding it on navigation", async () => {
+  const hook = renderHook(() => useScooterEditorSession(session));
+  expect(await hook.result.current.ensureSession()).toBe(session.id);
+  window.dispatchEvent(
+    new PageTransitionEvent("pagehide", { persisted: false }),
+  );
+  hook.unmount();
+  await act(async () => {});
+  expect(fetch).not.toHaveBeenCalled();
+});

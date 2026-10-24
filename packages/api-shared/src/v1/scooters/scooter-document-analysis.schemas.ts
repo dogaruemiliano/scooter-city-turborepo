@@ -6,7 +6,7 @@ import {
 import { scooterDocumentExtractedDataSchema } from "./scooter-document-extraction.schemas";
 
 export const SCOOTER_DOCUMENT_EXTRACTION_MAX_PAGES = 10;
-export const SCOOTER_DOCUMENT_EXTRACTION_CLIENT_CONCURRENCY = 2;
+export const SCOOTER_DOCUMENT_EXTRACTION_CLIENT_CONCURRENCY = 20;
 
 const identifier = z.string().min(1).max(120);
 
@@ -61,7 +61,7 @@ export const scooterDocumentAnalysisSchema = z
     sourceId: identifier,
     documentType: scooterDocumentTypeSchema,
     extractedData: scooterDocumentExtractedDataSchema,
-    issues: z.array(scooterDocumentExtractionIssueSchema).max(200),
+    issues: z.array(scooterDocumentExtractionIssueSchema).max(1000),
     reviewRequired: z.literal(true),
   })
   .strict()

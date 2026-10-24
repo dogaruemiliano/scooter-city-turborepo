@@ -220,6 +220,11 @@ export const envSchema = z
       .describe(
         "Enable direct-S3 background scooter extraction. Production requires validation Lambda and an OpenAI webhook. Development can use isolated local validation and provider polling. Cleanup continues when disabled.",
       ),
+    DOCUMENT_VALIDATION_DETAIL_VIEWS: boolFromString
+      .default(false)
+      .describe(
+        "Development validator only: append labelled native PDF detail views. Production configures this on the validation Lambda.",
+      ),
     SCOOTER_DOCUMENT_VALIDATION_DRIVER: z
       .enum(["lambda", "local"])
       .default("lambda")

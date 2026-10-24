@@ -589,3 +589,95 @@ describe("Scooter photo gallery", () => {
     ).not.toBeInTheDocument();
   });
 });
+
+it("restores private photo previews and preserves completed upload tokens and settings", async () => {
+  const preview = vi
+    .fn()
+    .mockResolvedValue(
+      new Response(new Blob(["image"], { type: "image/jpeg" })),
+    );
+  vi.stubGlobal("fetch", preview);
+  vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:restored-photo");
+  const drafts = vi.fn();
+  const snapshots = vi.fn();
+  const { contentUrl: _contentUrl, ...metadata } = photo("one", {
+    caption: "Restored cover",
+    isPublic: true,
+  });
+  render(
+    <NextIntlClientProvider locale="en" messages={messages.en}>
+      <ScooterPhotoGallery
+        editable
+        importDraftId="draft-one"
+        initialSnapshot={{
+          photos: [{ ...metadata, uploadToken: "existing-token" }],
+          uploads: [],
+        }}
+        onDraftsChange={drafts}
+        onSnapshot={snapshots}
+      />
+    </NextIntlClientProvider>,
+  );
+  await waitFor(() =>
+    expect(screen.getByAltText("Restored cover")).toHaveAttribute(
+      "src",
+      "blob:restored-photo",
+    ),
+  );
+  expect(preview).toHaveBeenCalledWith(
+    "http://localhost:3000/v1/scooters/import-drafts/draft-one/photo-content",
+    expect.objectContaining({
+      method: "POST",
+      headers: expect.objectContaining({ "X-Requested-With": "fetch" }),
+      body: JSON.stringify({ uploadToken: "existing-token" }),
+    }),
+  );
+  expect(drafts).toHaveBeenLastCalledWith(
+    [
+      {
+        uploadToken: "existing-token",
+        fileName: "one.jpg",
+        caption: "Restored cover",
+        isPublic: true,
+        type: "GALLERY_COVER",
+      },
+    ],
+    false,
+  );
+  expect(JSON.stringify(snapshots.mock.calls.at(-1)?.[0])).not.toContain(
+    "blob:",
+  );
+  expect(mocks.fetch).not.toHaveBeenCalled();
+});
+
+it("keeps interrupted photo uploads visible and blocks create until they are reselected or removed", async () => {
+  const drafts = vi.fn();
+  render(
+    <NextIntlClientProvider locale="en" messages={messages.en}>
+      <ScooterPhotoGallery
+        editable
+        importDraftId="draft-one"
+        initialSnapshot={{
+          photos: [],
+          uploads: [
+            {
+              id: "interrupted",
+              file: {
+                name: "unfinished.jpg",
+                type: "image/jpeg",
+                size: 42,
+                lastModified: 1,
+              },
+              status: "uploading",
+              progress: 20,
+            },
+          ],
+        }}
+        onDraftsChange={drafts}
+      />
+    </NextIntlClientProvider>,
+  );
+  await screen.findByText(/Upload interrupted/);
+  expect(screen.getByRole("button", { name: "Retry" })).toBeDisabled();
+  expect(drafts).toHaveBeenLastCalledWith([], true);
+});

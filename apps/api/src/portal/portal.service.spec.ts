@@ -95,6 +95,62 @@ describe("Customer portal boundaries", () => {
     expect(storage.readDocument).not.toHaveBeenCalled();
   });
 
+  it("serves the branded copy to customers when available, with original fallback", async () => {
+    db.rental.findFirst.mockResolvedValue({ scooterId: "scooter" });
+    const original = {
+      storageKey: "original.pdf",
+      contentType: "application/pdf",
+    };
+    const copy = {
+      storageKey: "branded.png",
+      contentType: "image/png",
+      deletedAt: null,
+    };
+    db.scooterDocument.findFirst.mockResolvedValue({
+      asset: original,
+      clientCopyAsset: copy,
+    });
+    storage.readDocument.mockResolvedValue({
+      body: "fixture",
+      contentLength: 100,
+    });
+    expect(
+      (await service.content("customer-a", "rental", "document")).contentType,
+    ).toBe("image/png");
+    expect(storage.readDocument).toHaveBeenLastCalledWith("branded.png");
+    db.scooterDocument.findFirst.mockResolvedValue({
+      asset: original,
+      clientCopyAsset: null,
+    });
+    await service.content("customer-a", "rental", "document");
+    expect(storage.readDocument).toHaveBeenLastCalledWith("original.pdf");
+  });
+
+  it("lists the same branded file that customer download delivers", async () => {
+    db.rental.findFirst.mockResolvedValue({ scooterId: "scooter" });
+    db.scooterDocument.findMany.mockResolvedValue([
+      {
+        id: "doc",
+        type: "registration_certificate",
+        fileName: "original.pdf",
+        createdAt: new Date(),
+        asset: { contentType: "application/pdf", byteSize: 100 },
+        clientCopyFileName: "branded.png",
+        clientCopyAsset: {
+          contentType: "image/png",
+          byteSize: 200,
+          deletedAt: null,
+        },
+      },
+    ]);
+    const result = await service.documents("customer-a", "rental");
+    expect(result.items[0]).toMatchObject({
+      fileName: "branded.png",
+      contentType: "image/png",
+      byteSize: 200,
+    });
+  });
+
   it("customer DTO excludes internal Person and rental data", () => {
     const now = new Date();
     const row = {

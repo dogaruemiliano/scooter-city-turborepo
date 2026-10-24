@@ -67,7 +67,7 @@ test("direct extraction retains unresolved VINs, dashes, zeroes and field issues
     { documentType: "unknown" },
     { issues: [{ field: "vin", code: "looksGood" }] },
     { issues: [{ field: "", code: "unreadable" }] },
-    { issues: Array.from({ length: 201 }, () => analysis.issues[0]) },
+    { issues: Array.from({ length: 1001 }, () => analysis.issues[0]) },
     { extractedData: { ...analysis.extractedData, fields: { hasGps: true } } },
   ])
     assert.equal(

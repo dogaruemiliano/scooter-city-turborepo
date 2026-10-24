@@ -76,6 +76,10 @@ async function bootstrap(): Promise<void> {
     cors: false, // configured below with explicit origin list
   });
 
+  // Draft snapshots allow 512 KiB plus their revision/envelope. Nest's parser
+  // retains rawBody for webhook signature verification with this bounded limit.
+  app.useBodyParser("json", { limit: 1024 * 1024 });
+
   // Replace the default Nest logger with pino — every log line then carries
   // the reqId attached by RequestIdMiddleware.
   app.useLogger(app.get(PinoLogger));

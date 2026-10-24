@@ -5,7 +5,6 @@ import { OpenAiScooterDocumentJobProvider } from "../scooter-document-extraction
 import { ScooterDocumentExtractionModule } from "../scooter-document-extraction/scooter-document-extraction.module";
 import { ScooterDocumentWebhookController } from "../scooter-document-extraction/scooter-document-webhook.controller";
 import { ScooterDocumentsService } from "../scooters/scooter-documents.service";
-import { ScooterDocumentJobsController } from "./scooter-document-jobs.controller";
 import { ScooterDocumentJobsService } from "./scooter-document-jobs.service";
 import { ScooterDocumentDispatcherService } from "./scooter-document-dispatcher.service";
 import { ScooterDocumentCleanupService } from "./scooter-document-cleanup.service";
@@ -16,10 +15,7 @@ import { ScooterDocumentCleanupService } from "./scooter-document-cleanup.servic
     DocumentValidationModule,
     ScooterDocumentExtractionModule,
   ],
-  controllers: [
-    ScooterDocumentJobsController,
-    ScooterDocumentWebhookController,
-  ],
+  controllers: [ScooterDocumentWebhookController],
   providers: [
     ScooterDocumentsService,
     ScooterDocumentJobsService,

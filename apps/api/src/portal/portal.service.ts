@@ -183,20 +183,31 @@ export class PortalService {
         fileName: true,
         createdAt: true,
         asset: { select: { contentType: true, byteSize: true } },
+        clientCopyFileName: true,
+        clientCopyAsset: {
+          select: { contentType: true, byteSize: true, deletedAt: true },
+        },
       },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     });
     return {
-      items: documents.map((document) =>
-        v1.rentals.customerDocumentSchema.parse({
+      items: documents.map((document) => {
+        const copy =
+          document.clientCopyAsset && !document.clientCopyAsset.deletedAt
+            ? document.clientCopyAsset
+            : null;
+        const asset = copy ?? document.asset;
+        return v1.rentals.customerDocumentSchema.parse({
           id: document.id,
           type: document.type,
-          fileName: document.fileName,
+          fileName: copy
+            ? (document.clientCopyFileName ?? document.fileName)
+            : document.fileName,
           createdAt: document.createdAt.toISOString(),
-          contentType: document.asset.contentType,
-          byteSize: document.asset.byteSize,
-        }),
-      ),
+          contentType: asset.contentType,
+          byteSize: asset.byteSize,
+        });
+      }),
     };
   }
 
@@ -204,12 +215,21 @@ export class PortalService {
     const where = await this.documentWhere(userId, rentalId);
     const document = await this.prisma.scooterDocument.findFirst({
       where: { AND: [{ id: documentId }, where] },
-      select: { asset: { select: { storageKey: true, contentType: true } } },
+      select: {
+        asset: { select: { storageKey: true, contentType: true } },
+        clientCopyAsset: {
+          select: { storageKey: true, contentType: true, deletedAt: true },
+        },
+      },
     });
     if (!document) throw new NotFoundException("Document not found");
+    const asset =
+      document.clientCopyAsset && !document.clientCopyAsset.deletedAt
+        ? document.clientCopyAsset
+        : document.asset;
     return {
-      ...(await this.storage.readDocument(document.asset.storageKey)),
-      contentType: document.asset.contentType,
+      ...(await this.storage.readDocument(asset.storageKey)),
+      contentType: asset.contentType,
     };
   }
 }

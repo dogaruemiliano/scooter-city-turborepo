@@ -30,6 +30,7 @@ import {
   FormSegmentedRadioGroup,
   FormTextarea,
 } from "@/components/form/controls";
+import type { LogicalDocumentUpdate } from "./ScooterDocumentTypeEditor";
 import { ScooterBatchDocuments } from "./ScooterBatchDocuments";
 import { ScooterDocumentImport } from "./ScooterDocumentImport";
 import {
@@ -68,6 +69,8 @@ export function ScooterEditorFields({
   brands,
   combinedReview = false,
   onRetryAnalysis,
+  onLogicalDocument,
+  scooterVin,
   onCancelAnalysis,
   analyzing = false,
   persistedPolicyIds,
@@ -86,6 +89,8 @@ export function ScooterEditorFields({
 }: {
   combinedReview?: boolean;
   onRetryAnalysis?: (sourceId: string) => void;
+  onLogicalDocument?: LogicalDocumentUpdate;
+  scooterVin?: string;
   onCancelAnalysis?: () => void;
   analyzing?: boolean;
   persistedPolicyIds: string[];
@@ -183,6 +188,8 @@ export function ScooterEditorFields({
         <>
           {!editing || combinedReview ? (
             <ScooterBatchDocuments
+              onLogicalDocument={onLogicalDocument}
+              scooterVin={scooterVin}
               documents={documents}
               disabled={disabled}
               analyzing={analyzing}
@@ -670,6 +677,7 @@ function ScooterPowertrainField({ disabled }: { disabled: boolean }) {
 const uppercaseIdentifier = (value: string) => value.toUpperCase();
 
 export function ScooterInitialRegistrationFields({
+  children,
   disabled,
   panel = false,
   number,
@@ -679,6 +687,7 @@ export function ScooterInitialRegistrationFields({
   panel?: boolean;
   number?: number;
   status?: import("react").ReactNode;
+  children?: import("react").ReactNode;
 }) {
   const t = useTranslations("scooters");
   const { control, getValues, setValue, clearErrors, setError } =
@@ -791,6 +800,7 @@ export function ScooterInitialRegistrationFields({
           ) : null}
         </>
       ) : null}
+      {children}
     </FormSection>
   );
 }

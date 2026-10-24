@@ -60,10 +60,10 @@ describe("OpenAI scooter-document extraction", () => {
     metadata.mockRestore();
   });
   it.each([
-    ["civ", 12_000],
-    ["import_document", 12_000],
-    ["registration_certificate", 4_000],
-    ["insurance", 4_000],
+    ["civ", 20_000],
+    ["import_document", 20_000],
+    ["registration_certificate", 20_000],
+    ["insurance", 20_000],
   ] as const)(
     "sends original %s PDF bytes with high detail and %i output tokens",
     async (documentType, maxOutputTokens) => {
@@ -119,12 +119,14 @@ describe("OpenAI scooter-document extraction", () => {
     });
     const body = requestBody(fetcher.mock.calls[0][1]);
     expect(body).toMatchObject({
-      max_output_tokens: 4_000,
+      max_output_tokens: 20_000,
       input: [{ content: [{ type: "input_image", detail: "original" }] }],
     });
     expect(body.instructions).toContain("ASIGURAT");
     expect(body.instructions).toContain("TOTAL premium");
-    expect(body.instructions).not.toContain("Reference mapping");
+    expect(body.instructions).toContain(
+      "Follow each logical document's own rules",
+    );
     expect(body.instructions).not.toContain("TEST FIXTURE");
   });
 
@@ -322,9 +324,9 @@ describe("OpenAI scooter-document extraction", () => {
     "bounds provider responses with declared content length=%s",
     async (declared) => {
       const response = new Response(
-        "x".repeat(256 * 1024 + 1),
+        "x".repeat(512 * 1024 + 1),
         declared
-          ? { headers: { "content-length": String(256 * 1024 + 1) } }
+          ? { headers: { "content-length": String(512 * 1024 + 1) } }
           : undefined,
       );
       const { provider } = setup(response);

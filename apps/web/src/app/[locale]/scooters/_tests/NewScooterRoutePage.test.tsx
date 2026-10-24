@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { SessionIdentity } from "@/lib/auth-types";
 import NewScooterRoutePage from "../new/page";
-import { ScooterCreateForm } from "../_components/ScooterCreateForm";
+import { ScooterImportWorkspace } from "../_components/ScooterImportWorkspace";
 
 const mocks = vi.hoisted(() => ({
   apiFetch: vi.fn(),
@@ -20,8 +20,8 @@ vi.mock("next/navigation", () => ({
   notFound: mocks.notFound,
   redirect: mocks.redirect,
 }));
-vi.mock("../_components/ScooterCreateForm", () => ({
-  ScooterCreateForm: () => null,
+vi.mock("../_components/ScooterImportWorkspace", () => ({
+  ScooterImportWorkspace: () => null,
 }));
 
 const identity: SessionIdentity = {
@@ -80,7 +80,7 @@ describe("NewScooterRoutePage authorization", () => {
       params: Promise.resolve({ locale: "en" }),
     });
 
-    expect(page.type).toBe(ScooterCreateForm);
+    expect(page.type).toBe(ScooterImportWorkspace);
     expect(page.props).toEqual({
       scootersHref: "/en/scooters",
       brands: [brand],

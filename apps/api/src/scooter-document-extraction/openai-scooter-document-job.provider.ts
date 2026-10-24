@@ -11,7 +11,7 @@ import { scooterDocumentModelJsonSchema } from "./scooter-document-extraction.sc
 export const SCOOTER_JOB_FETCH = Symbol("SCOOTER_JOB_FETCH");
 const API = "https://api.openai.com/v1/responses";
 const HTTP_TIMEOUT_MS = 15_000;
-const MAX_RESPONSE_BYTES = 256 * 1024;
+const MAX_RESPONSE_BYTES = 512 * 1024;
 const responseId = z
   .string()
   .regex(/^resp_[A-Za-z0-9_-]+$/)
@@ -106,11 +106,7 @@ export class OpenAiScooterDocumentJobProvider {
         store: false,
         metadata: { jobId: input.jobId },
         ...(original ? { reasoning: { effort: "low" } } : {}),
-        max_output_tokens: ["civ", "import_document", "unclassified"].includes(
-          input.documentType,
-        )
-          ? 12_000
-          : 4_000,
+        max_output_tokens: 20_000,
         instructions: scooterDocumentExtractionPrompt(input.documentType),
         input: [{ role: "user", content: [source] }],
         text: {

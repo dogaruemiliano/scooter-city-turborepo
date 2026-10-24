@@ -15,8 +15,13 @@ import {
   type ScooterProviderJob,
 } from "../scooter-document-extraction/openai-scooter-document-job.provider";
 import { ScooterDocumentExtractionService } from "../scooter-document-extraction/scooter-document-extraction.service";
+import { SCOOTER_DOCUMENT_EXTRACTION_PROMPT_VERSION } from "../scooter-document-extraction/scooter-document-extraction.prompt";
 import {
   ACTIVE_JOB_STATES,
+  JOB_LIFETIME_MS,
+  MAX_GLOBAL_PENDING_JOBS,
+  MAX_GLOBAL_PROCESSING_JOBS,
+  MAX_USER_PROCESSING_JOBS,
   VALIDATION_WRITE_GRACE_MS,
   WORKER_LEASE_MS,
   jsonValue,
@@ -24,8 +29,75 @@ import {
   safeErrorCode,
 } from "./document-job-lifecycle";
 
+/** Unknown paid submissions keep their slot even after local cancellation/expiry. */
+export function processingReservationWhere(
+  now: Date,
+): Prisma.ScooterDocumentJobWhereInput {
+  return {
+    OR: [
+      {
+        slotReservedAt: { not: null },
+        status: { in: ACTIVE_JOB_STATES },
+        expiresAt: { gt: now },
+      },
+      { submissionUncertainAt: { not: null } },
+    ],
+  };
+}
+
+/** Oldest untouched scooter first, rotating owners so one bulk import cannot monopolize slots. */
+export function selectWaitingJobs(
+  waiting: ScooterDocumentJob[],
+  reservations: { userId: string }[],
+  lastDispatched: Map<string, Date | null>,
+  available: number,
+  ownerLastDispatched: Map<string, Date | null> = new Map(),
+) {
+  const counts = new Map<string, number>();
+  for (const item of reservations)
+    counts.set(item.userId, (counts.get(item.userId) ?? 0) + 1);
+  const owners = new Map<string, ScooterDocumentJob[]>();
+  for (const job of [...waiting].sort(
+    (a, b) =>
+      (lastDispatched.get(a.sessionId)?.getTime() ?? 0) -
+        (lastDispatched.get(b.sessionId)?.getTime() ?? 0) ||
+      a.createdAt.getTime() - b.createdAt.getTime(),
+  )) {
+    const queue = owners.get(job.userId) ?? [];
+    queue.push(job);
+    owners.set(job.userId, queue);
+  }
+  const selected: ScooterDocumentJob[] = [];
+  const orderedOwners = [...owners].sort(
+    ([a], [b]) =>
+      (ownerLastDispatched.get(a)?.getTime() ?? 0) -
+      (ownerLastDispatched.get(b)?.getTime() ?? 0),
+  );
+  while (selected.length < available) {
+    let progress = false;
+    for (const [owner, queue] of orderedOwners) {
+      if (selected.length >= available) break;
+      if ((counts.get(owner) ?? 0) >= MAX_USER_PROCESSING_JOBS) continue;
+      const next = queue.shift();
+      if (!next) continue;
+      selected.push(next);
+      counts.set(owner, (counts.get(owner) ?? 0) + 1);
+      // A second slot for this owner should serve another scooter when possible.
+      const anotherSession = queue.findIndex(
+        (job) => job.sessionId !== next.sessionId,
+      );
+      if (anotherSession > 0) queue.unshift(...queue.splice(anotherSession, 1));
+      progress = true;
+    }
+    if (!progress) break;
+  }
+  return selected;
+}
+
 @Injectable()
 export class ScooterDocumentDispatcherService {
+  private readonly inFlight = new Map<string, Promise<void>>();
+  private eventsInFlight?: Promise<void>;
   private readonly logger = new Logger(ScooterDocumentDispatcherService.name);
   constructor(
     private readonly prisma: PrismaService,
@@ -36,13 +108,13 @@ export class ScooterDocumentDispatcherService {
     @Inject(ENV) private readonly env: Env,
   ) {}
 
-  @Cron("*/5 * * * * *", {
+  @Cron("* * * * * *", {
     name: "scooter-document-dispatch",
     waitForCompletion: true,
   })
   async tick() {
     try {
-      await this.runOnce();
+      await this.runOnce(false);
     } catch {
       this.logger.warn(
         "Document dispatcher failed; durable work remains queued.",
@@ -50,26 +122,108 @@ export class ScooterDocumentDispatcherService {
     }
   }
 
-  async runOnce() {
+  async runOnce(waitForWorkers = true) {
     const now = new Date();
     await this.prisma.scooterDocumentJob.updateMany({
       where: { status: { in: ACTIVE_JOB_STATES }, expiresAt: { lte: now } },
       data: { status: "expired", cancellationAt: now, result: Prisma.DbNull },
     });
-    const jobs = await this.prisma.scooterDocumentJob.findMany({
+    const reserved = await this.prisma.scooterDocumentJob.findMany({
       where: {
         status: { in: ["queued", "validating", "submitting", "running"] },
+        slotReservedAt: { not: null },
         nextRunAt: { lte: now },
         OR: [{ leaseUntil: null }, { leaseUntil: { lt: now } }],
       },
       orderBy: { createdAt: "asc" },
-      take: 4,
+      take: MAX_GLOBAL_PROCESSING_JOBS,
     });
-    // Globally admitted work is bounded in start(); each operation also needs a DB lease.
-    await Promise.all([
-      this.processEvents(),
-      ...jobs.map((job) => this.process(job)),
-    ]);
+    const reservations = await this.prisma.scooterDocumentJob.findMany({
+      where: processingReservationWhere(now),
+      select: { userId: true },
+    });
+    const available = Math.max(
+      0,
+      MAX_GLOBAL_PROCESSING_JOBS - reservations.length,
+    );
+    const waiting = available
+      ? await this.prisma.scooterDocumentJob.findMany({
+          where: {
+            status: "queued",
+            slotReservedAt: null,
+            cancellationAt: null,
+            expiresAt: { gt: now },
+            nextRunAt: { lte: now },
+          },
+          orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+          take: MAX_GLOBAL_PENDING_JOBS,
+        })
+      : [];
+    const [history, ownerHistory] = waiting.length
+      ? await Promise.all([
+          this.prisma.scooterDocumentJob.groupBy({
+            by: ["sessionId"],
+            where: {
+              sessionId: {
+                in: [...new Set(waiting.map((job) => job.sessionId))],
+              },
+              slotReservedAt: { not: null },
+            },
+            _max: { slotReservedAt: true },
+          }),
+          this.prisma.scooterDocumentJob.groupBy({
+            by: ["userId"],
+            where: {
+              userId: { in: [...new Set(waiting.map((job) => job.userId))] },
+              slotReservedAt: { not: null },
+            },
+            _max: { slotReservedAt: true },
+          }),
+        ])
+      : [[], []];
+    const next = selectWaitingJobs(
+      waiting,
+      reservations,
+      new Map(
+        history.map((item) => [item.sessionId, item._max.slotReservedAt]),
+      ),
+      available,
+      new Map(
+        ownerHistory.map((item) => [item.userId, item._max.slotReservedAt]),
+      ),
+    );
+    // Snapshot selection improves fairness; claim() enforces quotas atomically across dynos.
+    // Dispatch must remain available while another file is being validated.
+    // Database reservations and leases still enforce the shared capacity across instances.
+    if (!this.eventsInFlight) {
+      this.eventsInFlight = this.processEvents()
+        .catch(() => {
+          this.logger.warn(
+            "Document event processing failed; durable events remain queued.",
+          );
+        })
+        .finally(() => {
+          this.eventsInFlight = undefined;
+        });
+    }
+    const work = [this.eventsInFlight];
+    for (const job of [...reserved, ...next]) {
+      let task = this.inFlight.get(job.id);
+      if (!task) {
+        task = this.process(job)
+          .catch(() => {
+            this.logger.warn(
+              "Document worker failed; durable work remains queued.",
+            );
+          })
+          .finally(() => {
+            this.inFlight.delete(job.id);
+          });
+        this.inFlight.set(job.id, task);
+      }
+      work.push(task);
+    }
+    if (waitForWorkers) await Promise.all(work);
   }
 
   private async claim(candidate: ScooterDocumentJob) {
@@ -101,6 +255,22 @@ export class ScooterDocumentDispatcherService {
           },
         });
         return null;
+      }
+      if (!job.slotReservedAt) {
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext('scooter-document-job-dispatch'))::text`;
+        const [globalCount, userCount] = await Promise.all([
+          tx.scooterDocumentJob.count({
+            where: processingReservationWhere(now),
+          }),
+          tx.scooterDocumentJob.count({
+            where: { ...processingReservationWhere(now), userId: job.userId },
+          }),
+        ]);
+        if (
+          globalCount >= MAX_GLOBAL_PROCESSING_JOBS ||
+          userCount >= MAX_USER_PROCESSING_JOBS
+        )
+          return null;
       }
       if (
         job.documentId &&
@@ -185,6 +355,18 @@ export class ScooterDocumentDispatcherService {
         where: { id: job.id },
         data: {
           status,
+          ...(!job.slotReservedAt
+            ? {
+                slotReservedAt: now,
+                // Waiting time does not consume the remote-processing deadline.
+                expiresAt: new Date(
+                  Math.min(
+                    job.session.expiresAt.getTime(),
+                    now.getTime() + JOB_LIFETIME_MS,
+                  ),
+                ),
+              }
+            : {}),
           leaseId: randomUUID(),
           leaseUntil: new Date(now.getTime() + WORKER_LEASE_MS),
         },
@@ -237,7 +419,12 @@ export class ScooterDocumentDispatcherService {
             expiresAt: { gt: new Date() },
             providerResponseId: null,
           },
-          data: { submissionUncertainAt: new Date() },
+          data: {
+            submissionUncertainAt: new Date(),
+            // Waiting work may survive a deployment or model configuration change.
+            model: this.env.SCOOTER_DOCUMENT_EXTRACTION_MODEL,
+            promptVersion: SCOOTER_DOCUMENT_EXTRACTION_PROMPT_VERSION,
+          },
         });
         if (!submitting.count) return;
         attemptedProviderSubmission = true;
@@ -359,9 +546,28 @@ export class ScooterDocumentDispatcherService {
       try {
         const documentType =
           job.documentType ?? this.extraction.detectType(response.output);
+        const prepared = job.validatedSource;
+        const originalPageCount =
+          prepared && typeof prepared === "object" && !Array.isArray(prepared)
+            ? prepared.originalPageCount
+            : undefined;
+        if (
+          originalPageCount !== undefined &&
+          (typeof originalPageCount !== "number" ||
+            !Number.isInteger(originalPageCount) ||
+            originalPageCount < 1 ||
+            originalPageCount >
+              v1.scooters.SCOOTER_DOCUMENT_EXTRACTION_MAX_PAGES)
+        )
+          throw new DocumentExtractionError(
+            "DOCUMENT_EXTRACTION_INVALID_SOURCE",
+            "The stored original-page count is invalid.",
+            false,
+          );
         const normalized = this.extraction.normalize(
           documentType,
           response.output,
+          originalPageCount,
         );
         result = jsonValue(
           v1.scooters.scooterDocumentAnalysisSchema.parse({

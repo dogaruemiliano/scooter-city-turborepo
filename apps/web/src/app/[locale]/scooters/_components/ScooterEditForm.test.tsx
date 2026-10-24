@@ -264,7 +264,7 @@ describe("ScooterEditForm", () => {
     );
   });
 
-  it("requires manual confirmation for unreadable VINs and never imports mismatched documents", async () => {
+  it("uses the known scooter VIN for unreadable sources and never imports mismatched documents", async () => {
     const browser = userEvent.setup();
     render(
       <NextIntlClientProvider locale="en" messages={messages.en}>
@@ -308,13 +308,11 @@ describe("ScooterEditForm", () => {
       },
     });
     await browser.click(screen.getByRole("button", { name: "Fill fields" }));
-    expect(screen.getByLabelText("Color")).toHaveValue("White");
-    await browser.click(
-      screen.getByRole("checkbox", {
+    expect(
+      screen.queryByRole("checkbox", {
         name: "I checked that all documents refer to this scooter",
       }),
-    );
-    await browser.click(screen.getByRole("button", { name: "Fill fields" }));
+    ).not.toBeInTheDocument();
     expect(screen.getByLabelText("Color")).toHaveValue("Red");
     expect(mocks.apiFetch).not.toHaveBeenCalled();
   });

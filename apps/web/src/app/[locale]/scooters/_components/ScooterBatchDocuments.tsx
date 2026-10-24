@@ -12,6 +12,7 @@ import {
   CardContent,
   Badge,
   FileDropZone,
+  Label,
   Select,
   SelectContent,
   SelectItem,
@@ -26,6 +27,10 @@ import { useObjectUrl } from "@repo/ui/hooks/use-object-url";
 import { CheckIcon, FileTextIcon, SparklesIcon, XIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useContext, useState, type ReactNode } from "react";
+import {
+  ScooterDocumentTypeEditor,
+  type LogicalDocumentUpdate,
+} from "./ScooterDocumentTypeEditor";
 import type { DocumentImportResult } from "./scooter-document-import";
 import { ScooterDocumentAnalysisContext } from "./ScooterDocumentAnalysisStatus";
 import type {
@@ -41,6 +46,8 @@ export function ScooterBatchDocuments({
   onCancelAnalysis,
   children,
   importResult,
+  onLogicalDocument,
+  scooterVin,
 }: {
   documents: ScooterDocumentsEditor;
   disabled: boolean;
@@ -49,6 +56,8 @@ export function ScooterBatchDocuments({
   onCancelAnalysis?: () => void;
   children?: ReactNode;
   importResult?: Extract<DocumentImportResult, { ok: true }>;
+  onLogicalDocument?: LogicalDocumentUpdate;
+  scooterVin?: string;
 }) {
   const t = useTranslations("scooters.documents");
   const user = useOptionalSession()?.user;
@@ -56,6 +65,15 @@ export function ScooterBatchDocuments({
   const canExtract = canAccess(user, "scooter_documents.extract");
   const creation = useTranslations("scooters.creation");
   const extraction = useTranslations("scooters.extraction");
+  const workspace = useTranslations("scooters.workspace");
+  const [version, setVersion] = useState<"original" | "client_copy">(
+    "original",
+  );
+  const [originalId, setOriginalId] = useState<string>();
+  const originals = documents.drafts.filter(
+    (draft) => draft.version !== "client_copy",
+  );
+  const selectedOriginal = originals.find((draft) => draft.id === originalId);
   const [errors, setErrors] = useState<string[]>([]);
   const [expandedImport, setExpandedImport] = useState<typeof importResult>();
   const analysisEntries = useContext(ScooterDocumentAnalysisContext);
@@ -71,6 +89,13 @@ export function ScooterBatchDocuments({
         draft.status === "uploading" ||
         analysisEntries[draft.id]?.status === "failed",
     );
+  const logicalDocumentsFor = (sourceId: string) => {
+    const entry = analysisEntries[sourceId];
+    return entry?.status === "success"
+      ? entry.analysis.extractedData.documents
+      : documents.existing.find((item) => item.id === sourceId)?.extractedData
+          ?.documents;
+  };
   const attachedDocuments = [
     ...documents.existing.map((document) => ({
       id: document.id,
@@ -103,11 +128,17 @@ export function ScooterBatchDocuments({
   if (!canWrite) return null;
 
   function add(files: File[]) {
-    if (disabled) return;
+    if (disabled || (version === "client_copy" && !selectedOriginal)) return;
     const available =
-      v1.scooters.SCOOTER_DOCUMENT_MAX_FILES -
-      documents.drafts.length -
-      documents.existing.length;
+      version === "client_copy"
+        ? documents.drafts.some(
+            (copy) => copy.originalId === selectedOriginal?.id,
+          )
+          ? 0
+          : 1
+        : v1.scooters.SCOOTER_DOCUMENT_MAX_FILES -
+          documents.drafts.length -
+          documents.existing.length;
     const accepted: File[] = [];
     const problems: string[] = [];
     for (const file of files) {
@@ -143,7 +174,17 @@ export function ScooterBatchDocuments({
       else accepted.push(file);
     }
     setErrors(problems);
-    if (accepted.length) documents.add(null, accepted);
+    if (accepted.length) {
+      if (version === "original") documents.add(null, accepted);
+      else
+        documents.add(
+          selectedOriginal?.type ?? null,
+          accepted,
+          undefined,
+          version,
+          selectedOriginal?.id,
+        );
+    }
   }
 
   return (
@@ -177,11 +218,28 @@ export function ScooterBatchDocuments({
                   >
                     {document.name}
                   </p>
-                  <p className="text-xs text-muted-foreground">
-                    {document.type
-                      ? t(`compact.${document.type}`)
-                      : t("batch.unknown")}
-                  </p>
+                  <ScooterDocumentTypeEditor
+                    sourceId={document.id}
+                    fileName={document.name}
+                    type={document.type}
+                    documents={logicalDocumentsFor(document.id)}
+                    disabled={disabled || analyzing}
+                    scooterVin={scooterVin}
+                    onType={
+                      documents.drafts.some(
+                        (draft) =>
+                          draft.id === document.id &&
+                          draft.version !== "client_copy",
+                      )
+                        ? (type) => documents.classify(document.id, type, true)
+                        : undefined
+                    }
+                    onDocument={
+                      analysisEntries[document.id]?.status === "success"
+                        ? onLogicalDocument
+                        : undefined
+                    }
+                  />
                 </div>
                 <Badge variant={document.analyzed ? "success" : "secondary"}>
                   {t(
@@ -219,13 +277,65 @@ export function ScooterBatchDocuments({
         hidden={compact}
         className={compact ? "hidden" : "grid gap-4"}
       >
+        <div className="grid gap-2">
+          <Label>{workspace("version")}</Label>
+          <Select
+            value={version}
+            disabled={disabled}
+            onValueChange={(value) =>
+              setVersion(value as "original" | "client_copy")
+            }
+          >
+            <SelectTrigger aria-label={workspace("version")}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="original">{workspace("original")}</SelectItem>
+              <SelectItem value="client_copy">
+                {workspace("clientCopy")}
+              </SelectItem>
+            </SelectContent>
+          </Select>
+          {version === "client_copy" ? (
+            <>
+              <Select
+                value={originalId ?? ""}
+                disabled={disabled}
+                onValueChange={(value) => setOriginalId(value ?? undefined)}
+              >
+                <SelectTrigger aria-label={workspace("originalForCopy")}>
+                  <SelectValue placeholder={workspace("chooseOriginal")} />
+                </SelectTrigger>
+                <SelectContent>
+                  {originals
+                    .filter(
+                      (original) =>
+                        !documents.drafts.some(
+                          (copy) => copy.originalId === original.id,
+                        ),
+                    )
+                    .map((original) => (
+                      <SelectItem key={original.id} value={original.id}>
+                        {original.file.name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+              <p className="text-sm text-muted-foreground">
+                {workspace("versionHint")}
+              </p>
+            </>
+          ) : null}
+        </div>
         <FileDropZone
           label={t("batch.drop")}
           browseLabel={t("batch.browse")}
           hint={t("batch.hint")}
           requirements={t("batch.requirements")}
           accept={v1.scooters.SCOOTER_DOCUMENT_CONTENT_TYPES.join(",")}
-          disabled={disabled}
+          disabled={
+            disabled || (version === "client_copy" && !selectedOriginal)
+          }
           onFiles={add}
         />
         {!canExtract ? (
@@ -264,8 +374,10 @@ export function ScooterBatchDocuments({
                   key={draft.id}
                   draft={draft}
                   disabled={disabled}
-                  analyzing={analyzing}
                   canExtract={canExtract}
+                  onLogicalDocument={onLogicalDocument}
+                  scooterVin={scooterVin}
+                  onPreview={() => documents.preview(draft)}
                   onType={(type) => documents.classify(draft.id, type, true)}
                   onRemove={() => documents.removeDraft(draft.id)}
                   onRetry={() =>
@@ -297,24 +409,46 @@ export function ScooterBatchDocuments({
 function BatchDocumentRow({
   draft,
   disabled,
-  analyzing,
   canExtract,
   onType,
   onRemove,
   onRetry,
+  onPreview,
+  onLogicalDocument,
+  scooterVin,
 }: {
   draft: DocumentDraft;
   disabled: boolean;
-  analyzing: boolean;
   canExtract: boolean;
   onType: (type: v1.scooters.ScooterDocumentType) => void;
   onRemove: () => void;
   onRetry: () => void;
+  onPreview: () => Promise<File>;
+  onLogicalDocument?: LogicalDocumentUpdate;
+  scooterVin?: string;
 }) {
   const t = useTranslations("scooters.documents");
   const extractionT = useTranslations("scooters.extraction");
   const state = useContext(ScooterDocumentAnalysisContext)[draft.id];
-  const src = useObjectUrl(draft.file);
+  const src = useObjectUrl(draft.fileUnavailable ? null : draft.file);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState(false);
+  async function openPreview() {
+    setPreviewError(false);
+    if (!draft.fileUnavailable) {
+      setOpen(true);
+      return;
+    }
+    setPreviewLoading(true);
+    try {
+      await onPreview();
+      setOpen(true);
+    } catch {
+      setPreviewError(true);
+    } finally {
+      setPreviewLoading(false);
+    }
+  }
   const [open, setOpen] = useState(false);
   const busy = draft.status === "uploading" || state?.status === "processing";
   const failed = draft.status === "failed" || state?.status === "failed";
@@ -329,11 +463,13 @@ function BatchDocumentRow({
           ? extractionT(`errors.${state.error}`)
           : state?.status === "processing"
             ? extractionT("analyzing")
-            : state?.status === "success"
-              ? t("batch.read")
-              : canExtract
-                ? extractionT("queued")
-                : t("batch.manualTypes");
+            : draft.version === "client_copy"
+              ? t("batch.uploaded")
+              : state?.status === "success"
+                ? t("batch.read")
+                : canExtract
+                  ? extractionT("queued")
+                  : t("batch.manualTypes");
   const labels = {
     error: t("pdfPreviewError"),
     previousPage: t("previousPage"),
@@ -350,7 +486,10 @@ function BatchDocumentRow({
         size="icon"
         className="shrink-0"
         aria-label={t("preview", { name: draft.file.name })}
-        onClick={() => setOpen(true)}
+        disabled={previewLoading}
+        onClick={() => {
+          void openPreview();
+        }}
       >
         <FileTextIcon className="size-5" aria-hidden="true" />
       </Button>
@@ -359,7 +498,10 @@ function BatchDocumentRow({
           type="button"
           className="truncate text-left text-sm font-medium underline-offset-4 hover:underline focus-visible:outline-ring"
           title={draft.file.name}
-          onClick={() => setOpen(true)}
+          disabled={previewLoading}
+          onClick={() => {
+            void openPreview();
+          }}
         >
           {draft.file.name}
         </button>
@@ -377,6 +519,16 @@ function BatchDocumentRow({
           ) : null}
           {status}
         </p>
+        {previewError ? (
+          <p role="alert" className="text-sm text-destructive">
+            {t("pdfPreviewError")}
+          </p>
+        ) : null}
+        {draft.fileUnavailable && draft.status === "failed" ? (
+          <p role="alert" className="text-sm text-destructive">
+            {t("interruptedUpload")}
+          </p>
+        ) : null}
         {failed &&
         draft.uploadError !== "sessionExpired" &&
         state?.status !== "processing" &&
@@ -388,7 +540,10 @@ function BatchDocumentRow({
             type="button"
             variant="text"
             className="justify-self-start"
-            disabled={disabled || analyzing}
+            disabled={
+              disabled ||
+              Boolean(draft.fileUnavailable && draft.status === "failed")
+            }
             onClick={onRetry}
           >
             {draft.status === "failed" ? t("retry") : extractionT("retry")}
@@ -396,28 +551,24 @@ function BatchDocumentRow({
         ) : null}
       </div>
       <div className="col-span-full row-start-2 min-w-0">
-        <Select
-          value={draft.type ?? ""}
-          disabled={disabled}
-          onValueChange={(value) => {
-            if (v1.scooters.scooterDocumentTypeSchema.safeParse(value).success)
-              onType(value as v1.scooters.ScooterDocumentType);
-          }}
-        >
-          <SelectTrigger
-            className="w-full"
-            aria-label={t("batch.typeLabel", { name: draft.file.name })}
-          >
-            <SelectValue placeholder={t("batch.unknown")} />
-          </SelectTrigger>
-          <SelectContent>
-            {v1.scooters.SCOOTER_DOCUMENT_TYPES.map((type) => (
-              <SelectItem key={type} value={type}>
-                {t(type)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {draft.version === "client_copy" ? (
+          <Badge variant="outline">{t("clientCopy")}</Badge>
+        ) : (
+          <ScooterDocumentTypeEditor
+            sourceId={draft.id}
+            fileName={draft.file.name}
+            type={draft.type}
+            documents={
+              state?.status === "success"
+                ? state.analysis.extractedData.documents
+                : undefined
+            }
+            disabled={disabled || busy}
+            onType={onType}
+            onDocument={onLogicalDocument}
+            scooterVin={scooterVin}
+          />
+        )}
       </div>
       <Button
         type="button"

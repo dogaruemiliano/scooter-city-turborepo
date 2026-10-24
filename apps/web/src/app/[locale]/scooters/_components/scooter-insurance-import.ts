@@ -119,7 +119,7 @@ export function parseInsuranceImport(
     .filter((vin) => Boolean(vin) && vin !== "-");
   const mismatch = new Set(known).size > 1;
   const policies = current.map((policy) => ({ ...policy }));
-  let needsVinReview = evidence.some((doc) => !doc.vin);
+  let needsVinReview = !known.length && evidence.some((doc) => !doc.vin);
   const groups = new Map<
     string,
     {

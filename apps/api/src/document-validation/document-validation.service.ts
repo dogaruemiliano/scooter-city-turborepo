@@ -122,7 +122,15 @@ export class DocumentValidationService {
         document.byteSize <= 0 ||
         document.byteSize > limit ||
         typeof document.checksumSha256 !== "string" ||
-        !/^[a-f0-9]{64}$/.test(document.checksumSha256)
+        !/^[a-f0-9]{64}$/.test(document.checksumSha256) ||
+        (document.originalPageCount !== undefined &&
+          (typeof document.originalPageCount !== "number" ||
+            !Number.isInteger(document.originalPageCount) ||
+            document.originalPageCount < 1 ||
+            document.originalPageCount >
+              v1.scooters.SCOOTER_DOCUMENT_EXTRACTION_MAX_PAGES ||
+            (source.contentType !== "application/pdf" &&
+              document.originalPageCount !== 1)))
       )
         throw failure("DOCUMENT_EXTRACTION_FAILED", false);
       return {
@@ -130,6 +138,9 @@ export class DocumentValidationService {
         contentType: source.contentType,
         byteSize: document.byteSize,
         checksumSha256: document.checksumSha256,
+        ...(typeof document.originalPageCount === "number"
+          ? { originalPageCount: document.originalPageCount }
+          : {}),
       };
     } catch (error) {
       if (error instanceof DocumentExtractionError) throw error;
