@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLayout } from "@repo/ui/components/page-layout";
+
 import {
   useCallback,
   useEffect,
@@ -36,7 +38,7 @@ export function WorkspacePage({
   children: ReactNode;
 }) {
   return (
-    <main className="flex min-w-0 flex-col gap-6 px-4 pt-4 md:px-8 md:pt-8">
+    <PageLayout>
       <PageTitleOverride title={title} />
       <header className="flex flex-col gap-2">
         <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
@@ -47,7 +49,7 @@ export function WorkspacePage({
         ) : null}
       </header>
       {children}
-    </main>
+    </PageLayout>
   );
 }
 

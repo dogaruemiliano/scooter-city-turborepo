@@ -5,7 +5,7 @@ import { v1 } from "@repo/api-shared";
 import { Button, SheetSelect } from "@repo/ui/components";
 import { buttonVariants } from "@repo/ui/components/button";
 import type { SheetSelectProps } from "@repo/ui/components/sheet-select";
-import { PencilIcon, PlusIcon } from "lucide-react";
+import { CheckIcon, PencilIcon, PlusIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { cn } from "@repo/ui/lib/utils";
 import { PersonIdentityRow } from "./PersonIdentity";
@@ -45,8 +45,14 @@ export async function loadPersonSelectItems(): Promise<PersonSelectItem[]> {
   return items;
 }
 
-export function PersonSelectRow({ person }: { person: PersonSelectItem }) {
-  return <PersonIdentityRow person={person} />;
+export function PersonSelectRow({
+  person,
+  action,
+}: {
+  person: PersonSelectItem;
+  action?: React.ReactNode;
+}) {
+  return <PersonIdentityRow person={person} action={action} />;
 }
 
 type Props = Omit<
@@ -114,26 +120,36 @@ export function PersonSelect({
         }
         triggerContent={
           selected ? (
-            <>
-              <PersonSelectRow person={selected} />
-              <span
-                aria-hidden="true"
-                className={buttonVariants({
-                  variant: "outline",
-                  size: "icon-sm",
-                })}
-              >
-                <PencilIcon className="size-4" />
-              </span>
-            </>
+            <PersonSelectRow
+              person={selected}
+              action={
+                <span
+                  aria-hidden="true"
+                  className={buttonVariants({
+                    variant: "outline",
+                    size: "icon-sm",
+                  })}
+                >
+                  <PencilIcon className="size-4" />
+                </span>
+              }
+            />
           ) : undefined
         }
         options={persons.map((person) => ({
           value: person.id,
           label: `${person.firstName} ${person.lastName} · ${person.phone} · ${person.email}`,
         }))}
-        renderOption={(option) => (
-          <PersonSelectRow person={byId.get(option.value)!} />
+        hideOptionIndicator
+        renderOption={(option, selected) => (
+          <PersonSelectRow
+            person={byId.get(option.value)!}
+            action={
+              selected ? (
+                <CheckIcon aria-hidden="true" className="size-4" />
+              ) : undefined
+            }
+          />
         )}
         renderHeaderAction={
           onAddPerson

@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { UserAvatar } from "./user-avatar";
 import { PlusIcon } from "lucide-react";
+import { primitives } from "@repo/theme";
 
 import {
   Avatar,
@@ -98,6 +99,32 @@ export const UserPicture: Story = {
 };
 export const UserInitials: Story = {
   render: () => <UserAvatar name="Ada Lovelace" size="xl" />,
+};
+
+/** Non-square uploads fill the fixed avatar bounds with a centered crop. */
+export const NonSquarePictures: Story = {
+  render: () => (
+    <div className="flex items-center gap-4">
+      {["80 160", "160 80"].map((dimensions) => {
+        const [width, height] = dimensions.split(" ");
+        const src = `data:image/svg+xml,${encodeURIComponent(
+          `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 80 80" preserveAspectRatio="none"><path fill="${primitives.neutral[300]}" d="M0 0h80v80H0z"/><circle fill="${primitives.neutral[700]}" cx="40" cy="30" r="16"/><path fill="${primitives.neutral[700]}" d="M8 80a32 32 0 0 1 64 0"/></svg>`,
+        )}`;
+        return (
+          <div key={dimensions} className="flex flex-col items-center gap-4">
+            <UserAvatar name="Ada Lovelace" src={src} size="xl" />
+            <UserAvatar name="Ada Lovelace" src={src} size="profile" />
+            <UserAvatar
+              name="Ada Lovelace"
+              src={src}
+              size="xl"
+              shape="square"
+            />
+          </div>
+        );
+      })}
+    </div>
+  ),
 };
 export const FailedUserPicture: Story = {
   render: () => (

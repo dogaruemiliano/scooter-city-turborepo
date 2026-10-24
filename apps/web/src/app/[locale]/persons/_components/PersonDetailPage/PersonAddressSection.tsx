@@ -12,7 +12,10 @@ import { formatCountryName } from "./helpers";
 export function PersonAddressSection({
   person,
 }: {
-  person: v1.persons.Person;
+  person: Pick<
+    v1.persons.Person,
+    "countryCode" | "region" | "city" | "addressLine1" | "addressLine2"
+  >;
 }) {
   const t = useTranslations("persons");
   const locale = useLocale();

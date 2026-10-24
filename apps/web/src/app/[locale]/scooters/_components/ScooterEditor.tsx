@@ -1,4 +1,6 @@
 "use client";
+
+import { PageLayout } from "@repo/ui/components/page-layout";
 import { useFormAction } from "@/lib/form/use-form-action";
 import { SaveButton } from "@repo/ui/components/save-button";
 
@@ -532,7 +534,7 @@ export function ScooterEditor({
   );
 
   return (
-    <div className="mx-auto flex w-full min-w-0 max-w-(--breakpoint-xl) flex-1 flex-col gap-6 px-4 pt-6 sm:px-8 sm:pt-8">
+    <PageLayout>
       {scooter && (
         <>
           <PageTitleOverride title={v1.scooters.scooterDisplayCode(scooter)} />
@@ -871,6 +873,6 @@ export function ScooterEditor({
           </form>
         </FormProvider>
       </CivVocabularyContext>
-    </div>
+    </PageLayout>
   );
 }

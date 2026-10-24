@@ -77,7 +77,12 @@ interface SheetSelectBaseProps {
   triggerVariant?: "field" | "card";
   optionClassName?: string;
   /** Rich option content; label remains the search and accessible name. */
-  renderOption?: (option: SheetSelectOption) => React.ReactNode;
+  renderOption?: (
+    option: SheetSelectOption,
+    selected: boolean,
+  ) => React.ReactNode;
+  /** Rich options can place the selection indicator in their own action slot. */
+  hideOptionIndicator?: boolean;
   /** Custom trigger content, for collection add/change actions. */
   triggerContent?: React.ReactNode;
   /** Use the shared add surface as the picker trigger. */
@@ -123,6 +128,7 @@ function SheetSelect({
   className,
   optionClassName,
   renderOption,
+  hideOptionIndicator = false,
   triggerContent,
   triggerVariant = "field",
   addAction,
@@ -342,11 +348,11 @@ function SheetSelect({
                     )}
                   >
                     {renderOption ? (
-                      renderOption(option)
+                      renderOption(option, selectedSet.has(option.value))
                     ) : (
                       <span className="truncate">{option.label}</span>
                     )}
-                    {selectedSet.has(option.value) ? (
+                    {selectedSet.has(option.value) && !hideOptionIndicator ? (
                       <CheckIcon
                         aria-hidden="true"
                         className="size-4 shrink-0"

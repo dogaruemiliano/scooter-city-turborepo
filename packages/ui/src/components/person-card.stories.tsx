@@ -21,7 +21,7 @@ const meta = {
 } satisfies Meta<typeof PersonCard>;
 export default meta;
 type Story = StoryObj<typeof meta>;
-/** Document badges sit beneath the avatar, alongside the identity text. */
+/** Document badges align bottom-right, with a separate top-right action slot. */
 export const VerifiedDocuments: Story = {
   args: {
     details: (
@@ -91,4 +91,20 @@ export const LongIdentity: Story = {
     name: "Alexandru Constantin Popescu Ionescu",
     email: "alexandru.constantin.popescu.ionescu@example.com",
   },
+};
+
+/** Registration date and documents share the trailing column at every width. */
+export const NarrowListMetadata: Story = {
+  args: {
+    ...ListMetadata.args,
+    ...LongIdentity.args,
+    metadata: "Oct 24, 2026",
+  },
+  decorators: [
+    (Story) => (
+      <div className="w-72">
+        <Story />
+      </div>
+    ),
+  ],
 };

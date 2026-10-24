@@ -90,9 +90,9 @@ function setup(props: Parameters<typeof Harness>[0] = {}) {
   return {
     ...result,
     viewport,
-    fill: result.container.querySelector<HTMLElement>(
+    fill: result.container.querySelectorAll<HTMLElement>(
       '[data-slot="step-progress-fill"]',
-    )!,
+    )[1]!,
     panels: () => [
       ...result.container.querySelectorAll<HTMLElement>(
         '[data-slot="wizard-step"]',
@@ -137,7 +137,7 @@ it("tracks content and fractional progress together, commits once on release, an
   });
   expect(panels()[1]).toHaveStyle({ transform: "translateX(50%)" });
   expect(fill).toHaveStyle({
-    transform: "scaleX(0.25)",
+    transform: "scaleX(0.5)",
     transitionProperty: "none",
   });
   expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "1");
@@ -153,7 +153,7 @@ it("tracks content and fractional progress together, commits once on release, an
   expect(requested).toHaveBeenCalledExactlyOnceWith(1);
   expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "2");
   expect(screen.getByRole("heading", { name: "Notes" })).toHaveFocus();
-  expect(fill).toHaveStyle({ transform: "scaleX(0.5)" });
+  expect(fill).toHaveStyle({ transform: "scaleX(1)" });
   expect(submitted).not.toHaveBeenCalled();
   expect(viewport).not.toContainElement(screen.getByTestId("footer"));
 });
@@ -163,7 +163,7 @@ it("empties progress while tracking backwards and commits only the previous step
   expect(panels()[0]).toHaveStyle({ transform: "translateX(-50%)" });
   pointer(viewport, "pointerdown", 100);
   pointer(viewport, "pointermove", 300);
-  expect(fill).toHaveStyle({ transform: "scaleX(0.25)" });
+  expect(fill).toHaveStyle({ transform: "scaleX(0.5)" });
   expect(panels()[1]).toHaveStyle({ transform: "translateX(50%)" });
   expect(panels()[0]).toHaveStyle({ transform: "translateX(-25%)" });
   expect(Number(panels()[1]!.style.zIndex)).toBeGreaterThan(
@@ -274,7 +274,7 @@ it("keeps tracking when touch capture transfers from a child to the viewport", (
   pointer(viewport, "pointermove", 200);
   pointer(heading, "lostpointercapture", 200);
   pointer(viewport, "pointermove", 100);
-  expect(fill).toHaveStyle({ transform: "scaleX(0.25)" });
+  expect(fill).toHaveStyle({ transform: "scaleX(0.5)" });
   pointer(viewport, "pointerup", 100);
   expect(requested).toHaveBeenCalledExactlyOnceWith(1);
 });
@@ -321,8 +321,8 @@ it("extends the sliding viewport through its own gutter while keeping panel cont
   const form = container.querySelector("form")!;
   expect(form).toHaveClass(
     "px-(--wizard-gutter)",
-    "[--wizard-gutter:var(--spacing-4)]",
-    "sm:[--wizard-gutter:var(--spacing-6)]",
+    "[--wizard-gutter:var(--page-gutter,var(--spacing-4))]",
+    "sm:[--wizard-gutter:var(--page-gutter,var(--spacing-6))]",
   );
   expect(viewport).toHaveClass("-mx-(--wizard-gutter)");
   for (const panel of panels())
@@ -440,4 +440,21 @@ it("can visually hide mobile headings while retaining focus and desktop headings
   const heading = screen.getByRole("heading", { name: "Notes" });
   expect(heading).toHaveClass("sr-only", "md:not-sr-only");
   expect(heading).toHaveFocus();
+});
+
+it("keeps progress sticky outside the moving content and the decorated title inside it", () => {
+  const { container, viewport } = setup();
+  const progress = container.querySelector('[data-slot="wizard-progress"]')!;
+  expect(progress).toHaveClass("sticky", "bg-inherit");
+  expect(progress).not.toContainElement(
+    screen.getByRole("heading", { name: "Details" }),
+  );
+  expect(viewport).toContainElement(
+    screen.getByRole("heading", { name: "Details" }),
+  );
+  expect(
+    screen
+      .getByRole("heading", { name: "Details" })
+      .querySelector('[data-slot="vertical-line"]'),
+  ).toHaveAttribute("aria-hidden", "true");
 });

@@ -70,7 +70,7 @@ export function ScooterImportDialog({
   );
   return (
     <Root open={open} onOpenChange={onOpenChange}>
-      <Trigger render={trigger}>{trigger.props.children}</Trigger>
+      <Trigger render={trigger} />
       {mobile ? (
         <BottomSheetContent initialFocus={initialFocus}>
           <BottomSheetHeader className="flex-row items-center justify-between gap-3">

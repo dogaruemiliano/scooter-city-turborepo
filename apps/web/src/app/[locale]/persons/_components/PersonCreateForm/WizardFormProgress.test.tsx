@@ -1,3 +1,4 @@
+import { WizardForm } from "@repo/ui/components/wizard-form";
 import { messages, type SupportedLocale } from "@repo/i18n";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -5,10 +6,11 @@ import { NextIntlClientProvider } from "next-intl";
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  WizardProgress,
+  STEPS,
+  isReviewStep,
   type PersonProgressStep,
   type PersonWizardStep,
-} from "./WizardProgress";
+} from "./wizard-steps";
 
 const stepLabels = [
   "Citizenship",
@@ -17,10 +19,10 @@ const stepLabels = [
   "Address",
   "Driving license",
   "Contact details",
-  "Document details",
+  "Review person",
 ];
 
-describe("WizardProgress", () => {
+describe("Person wizard progress", () => {
   it.each<{
     step: PersonWizardStep;
     current: number;
@@ -167,7 +169,22 @@ function renderProgress({
   const onSelect = vi.fn<(step: PersonProgressStep) => void>();
   render(
     <NextIntlClientProvider locale={locale} messages={messages[locale]}>
-      <WizardProgress step={step} disabled={disabled} onSelect={onSelect} />
+      <WizardForm
+        activeIndex={STEPS.indexOf(step)}
+        progressLabel={messages[locale].persons.wizard.progress}
+        disabled={disabled}
+        steps={STEPS.map((id) => ({
+          id,
+          label: messages[locale].persons.wizard.steps[id],
+          content: null,
+        }))}
+        onStepChange={() => {}}
+        canSelectStep={(index) =>
+          index < STEPS.indexOf(step) ||
+          (isReviewStep(step) && isReviewStep(STEPS[index]!))
+        }
+        onStepSelect={(index) => onSelect(STEPS[index]!)}
+      />
     </NextIntlClientProvider>,
   );
   return onSelect;

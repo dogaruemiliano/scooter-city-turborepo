@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLayout } from "@repo/ui/components/page-layout";
+
 import {
   useCallback,
   useId,
@@ -12,12 +14,6 @@ import { RefreshCwIcon } from "lucide-react";
 import { ApiError, v1 } from "@repo/api-shared";
 import {
   Button,
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
   Field,
   FieldDescription,
   FieldError,
@@ -47,6 +43,7 @@ import { useFormAction } from "@/lib/form/use-form-action";
 import { scooterRentalBlockers } from "../_lib/scooter-rental-blockers";
 import { canPersistRentalDraft, weeklyPeriod } from "../_lib/rental-draft";
 import { RentalPersonCard } from "./RentalPersonCard";
+import { useWizardLeaveGuard } from "@/components/useWizardLeaveGuard";
 import { useRentalDraft } from "./useRentalDraft";
 
 export function RentalCreateWizard({
@@ -67,17 +64,15 @@ export function RentalCreateWizard({
   const task = useTask({
     [v1.problems.MAINTENANCE_HOLD_ERROR_CODE]: rentalT("maintenanceHold"),
   });
-  const store = useRentalDraft(
-    userId,
-    {
-      draftId: returnedDraftId,
-      personId: returnedPersonId,
-    },
-    t("storageError"),
-  );
+  const store = useRentalDraft(userId, {
+    draftId: returnedDraftId,
+    personId: returnedPersonId,
+  });
   const { draft } = store;
   const [attempted, setAttempted] = useState(false);
-  const [leaveOpen, setLeaveOpen] = useState(false);
+  const leaveGuard = useWizardLeaveGuard(
+    Boolean(draft?.detailsCompleted && !draft.createdRentalId),
+  );
   const submitting = useRef(false);
   const mounted = useRef(true);
   const returnConsumed = useRef(false);
@@ -175,16 +170,26 @@ export function RentalCreateWizard({
     return () => window.removeEventListener("focus", refresh);
   }, [reloadOptions]);
 
-  if (!draft) return <p role="status">{t("loading")}</p>;
-  if (!authorized) return <Feedback error={t("permissionLost")} />;
+  if (!draft)
+    return (
+      <PageLayout>
+        <p role="status">{t("loading")}</p>
+      </PageLayout>
+    );
+  if (!authorized)
+    return (
+      <PageLayout>
+        <Feedback error={t("permissionLost")} />
+      </PageLayout>
+    );
   if (draft.createdRentalId)
     return (
-      <div className="flex flex-col gap-4 p-6">
+      <PageLayout>
         <p>{t("alreadyCreated")}</p>
         <Link href={`/rentals/${encodeURIComponent(draft.createdRentalId)}`}>
           {t("openRental")}
         </Link>
-      </div>
+      </PageLayout>
     );
 
   const ready = Boolean(
@@ -266,6 +271,7 @@ export function RentalCreateWizard({
       // Keep a completion receipt if removing browser storage fails.
       store.update({ createdRentalId: rental.id, submissionUncertain: false });
       store.discard();
+      leaveGuard.complete();
       if (mounted.current)
         router.replace(`/rentals/${encodeURIComponent(rental.id)}`);
     });
@@ -282,11 +288,12 @@ export function RentalCreateWizard({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-screen-lg flex-1 flex-col gap-6 pt-6 sm:pt-10">
+    <PageLayout paddingX="none" paddingTop="compact" className="gap-2 md:gap-6">
       <PageHeaderNavigation
         onBack={() => {
           if (task.busy || submitting.current) return;
-          if (canPersistRentalDraft(draft)) setLeaveOpen(true);
+          if (draft.detailsCompleted)
+            leaveGuard.requestLeave(() => router.replace("/rentals"));
           else if (store.discard()) router.replace("/rentals");
         }}
         backDisabled={task.busy}
@@ -297,8 +304,37 @@ export function RentalCreateWizard({
         className="pb-16 sm:pb-24"
         activeIndex={draft.step === "details" ? 0 : 1}
         progressLabel={t("progress")}
-        hideHeadingOnMobile
-        disabled={task.busy || leaveOpen}
+        exitConfirmation={{
+          open: leaveGuard.open,
+          onOpenChange: (open) => {
+            if (!open) leaveGuard.cancel();
+          },
+          title: t("leaveTitle"),
+          description: t("leaveDescription"),
+          children: store.storageError ? (
+            <Feedback error={t("storageError")} />
+          ) : null,
+          actions: (
+            <>
+              <SaveButton
+                type="button"
+                variant="destructive"
+                {...formAction("delete", { pending: false }, t("discard"))}
+                onClick={() => leaveGuard.leave(store.discard)}
+              />
+              <SaveButton
+                type="button"
+                {...formAction(
+                  "save",
+                  { pending: false, error: store.storageError },
+                  t("saveDraft"),
+                )}
+                onClick={() => leaveGuard.leave(() => store.update({}))}
+              />
+            </>
+          ),
+        }}
+        disabled={task.busy || leaveGuard.open}
         canGoNext={ready && !draft.submissionUncertain}
         onStepChange={(index) => {
           if (task.busy || submitting.current) return;
@@ -525,36 +561,6 @@ export function RentalCreateWizard({
           </div>
         ) : null}
       </WizardForm>
-      <Dialog open={leaveOpen} onOpenChange={setLeaveOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t("leaveTitle")}</DialogTitle>
-            <DialogDescription>{t("leaveDescription")}</DialogDescription>
-          </DialogHeader>
-          {store.storageError ? <Feedback error={t("storageError")} /> : null}
-          <DialogFooter className="flex-row justify-between sm:justify-between">
-            <SaveButton
-              type="button"
-              variant="destructive"
-              {...formAction("delete", { pending: false }, t("discard"))}
-              onClick={() => {
-                if (store.discard()) router.replace("/rentals");
-              }}
-            />
-            <SaveButton
-              type="button"
-              {...formAction(
-                "save",
-                { pending: false, error: store.storageError },
-                t("saveDraft"),
-              )}
-              onClick={() => {
-                if (store.update({})) router.replace("/rentals");
-              }}
-            />
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+    </PageLayout>
   );
 }

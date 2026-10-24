@@ -171,3 +171,37 @@ export const PickerGestures: Story = { render: () => <Example picker /> };
 export const MobileHeaderTitle: Story = {
   render: () => <Example hideHeadingOnMobile />,
 };
+
+/** The indicator stays at the scroll edge while the title travels with its fields. */
+export const ScrollingContent: Story = {
+  render: () => (
+    <div className="mx-auto flex w-full max-w-screen-sm flex-col py-6">
+      <WizardForm
+        activeIndex={0}
+        onStepChange={() => {}}
+        progressLabel="Booking progress"
+        steps={[
+          {
+            id: "details",
+            label: "Rental details",
+            content: (
+              <div className="grid gap-6">
+                {Array.from({ length: 24 }, (_, index) => (
+                  <p key={index}>
+                    Rental detail {index + 1}. The progress indicator remains
+                    visible while the title and fields scroll together.
+                  </p>
+                ))}
+              </div>
+            ),
+          },
+          {
+            id: "review",
+            label: "Review",
+            content: <p>Confirm the rental details.</p>,
+          },
+        ]}
+      />
+    </div>
+  ),
+};

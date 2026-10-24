@@ -8,6 +8,7 @@ import {
 import { v1 } from "@repo/api-shared";
 import { messages, type SupportedLocale } from "@repo/i18n";
 import { TooltipProvider } from "@repo/ui/components/tooltip";
+import { PageLayout } from "@repo/ui/components/page-layout";
 import { NextIntlClientProvider } from "next-intl";
 import { useState, type AnchorHTMLAttributes, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -104,6 +105,33 @@ beforeEach(() => {
 });
 
 describe("AppShell", () => {
+  it.each(["/en/persons/new", "/en/rentals/new"])(
+    "keeps app navigation and exactly one main landmark on wizard route %s",
+    (pathname) => {
+      mocks.pathname = pathname;
+      const { container } = renderAppShell(
+        {
+          id: "admin-1",
+          email: "admin@example.com",
+          roles: [],
+          isSuperAdmin: false,
+          effectiveScopes: staffScopes,
+        },
+        <PageLayout paddingX="none" paddingTop="compact">
+          Wizard
+        </PageLayout>,
+      );
+      expect(screen.getByRole("banner")).toBeInTheDocument();
+      expect(screen.getAllByRole("main")).toHaveLength(1);
+      expect(
+        screen.getByRole("link", { name: "Overview" }),
+      ).toBeInTheDocument();
+      expect(
+        container.querySelector('[data-slot="sidebar-inset"]')?.tagName,
+      ).toBe("DIV");
+    },
+  );
+
   it.each([390, 1280])(
     "keeps the header outside the padded page scroll area at %ipx",
     (width) => {
@@ -114,6 +142,8 @@ describe("AppShell", () => {
       const { container } = renderAppShell(undefined, <div>Page body</div>);
       const shell = container.querySelector("[data-app-shell]");
       expect(shell).toHaveClass(
+        "[--sticky-content-top:0]",
+        "md:[--sticky-content-top:var(--spacing-16)]",
         "fixed",
         "h-dvh",
         "overflow-hidden",

@@ -1,4 +1,4 @@
-import type { ComponentProps, ReactNode } from "react";
+import type { ComponentProps } from "react";
 import { CarFrontIcon, IdCardIcon } from "lucide-react";
 import { cn } from "@repo/ui/lib/utils";
 import { Card, CardContent } from "./card";
@@ -52,21 +52,14 @@ export function PersonDocuments({
 
 /** The same identity composition as picker rows, with a non-interactive surface. */
 export function PersonCard({
-  metadata,
   className,
   ...props
 }: ComponentProps<typeof PersonRow> & {
-  metadata?: ReactNode;
   className?: string;
 }) {
   return (
     <Card size="sm" className={className}>
-      <CardContent className="flex flex-col gap-3">
-        {metadata ? (
-          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-            {metadata}
-          </div>
-        ) : null}
+      <CardContent>
         <PersonRow {...props} />
       </CardContent>
     </Card>

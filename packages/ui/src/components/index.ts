@@ -73,5 +73,6 @@ export * from "./activity-timeline";
 export * from "./vertical-line";
 
 export * from "./wizard-form";
+export * from "./page-layout";
 
 export * from "./person-card";

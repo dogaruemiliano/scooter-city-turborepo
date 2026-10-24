@@ -62,9 +62,10 @@ it("shares contact details and verified/expired document indicators across cards
     screen.getByRole("img", { name: "Driver license: Expired" }),
   ).toBeVisible();
   const badge = screen.getByRole("img", { name: "Identity document: Valid" });
-  const avatarColumn = badge.closest('[data-slot="person-avatar-column"]');
-  expect(avatarColumn?.querySelector('[data-slot="avatar"]')).not.toBeNull();
-  expect(avatarColumn).not.toContainElement(screen.getByText("Ada Lovelace"));
+  const details = badge.closest('[data-slot="person-details"]');
+  expect(details).not.toBeNull();
+  expect(details).not.toContainElement(screen.getByText("Ada Lovelace"));
+  expect(badge.closest('[data-slot="person-avatar-column"]')).toBeNull();
   view.unmount();
   show(
     <button type="button">
@@ -142,4 +143,44 @@ it("disables unavailable contact methods instead of constructing empty destinati
   expect(screen.queryByRole("link")).not.toBeInTheDocument();
   for (const button of screen.getAllByRole("button"))
     expect(button).toBeDisabled();
+});
+
+it("keeps row actions separate from document indicators", () => {
+  show(
+    <PersonIdentityRow
+      person={{ ...person, documents: [] }}
+      action={<span aria-label="Selected person">Selected</span>}
+    />,
+  );
+  const action = screen.getByLabelText("Selected person");
+  const badge = screen.getByRole("img", {
+    name: "Identity document: Not present",
+  });
+  expect(action.closest('[data-slot="person-action"]')).not.toBeNull();
+  expect(badge.closest('[data-slot="person-details"]')).not.toBeNull();
+  expect(action.closest('[data-slot="person-trailing"]')).toContainElement(
+    badge,
+  );
+});
+
+it("keeps registration date above documents in the same trailing column", () => {
+  show(
+    <PersonIdentityCard
+      person={{ ...person, documents: [] }}
+      metadata="Oct 24, 2026"
+    />,
+  );
+  const date = screen.getByText("Oct 24, 2026");
+  const badge = screen.getByRole("img", {
+    name: "Identity document: Not present",
+  });
+  const trailing = date.closest('[data-slot="person-trailing"]');
+  expect(trailing).toContainElement(badge);
+  expect(trailing).toHaveClass("justify-between", "self-stretch", "shrink-0");
+  expect(date.closest('[data-slot="person-metadata"]')).toHaveClass(
+    "items-end",
+    "text-right",
+  );
+  expect(trailing?.parentElement).toHaveAttribute("data-slot", "person-row");
+  expect(trailing?.parentElement).not.toHaveClass("flex-wrap");
 });

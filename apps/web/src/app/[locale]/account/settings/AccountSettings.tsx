@@ -1,4 +1,6 @@
 "use client";
+
+import { PageLayout } from "@repo/ui/components/page-layout";
 import { AvatarSettings } from "./_components/AvatarSettings";
 import { useWorkspaceNotifications } from "@/components/WorkspaceNotifications";
 import { useFormAction } from "@/lib/form/use-form-action";
@@ -223,7 +225,7 @@ export function AccountSettings({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-screen-lg flex-1 flex-col gap-6 px-4 pt-6 sm:px-6 sm:pt-10">
+    <PageLayout>
       {feedback && feedback.kind === "error" ? (
         <Alert variant={feedback.kind === "error" ? "destructive" : "default"}>
           <AlertTitle>{feedback.title}</AlertTitle>
@@ -447,7 +449,7 @@ export function AccountSettings({
           />
         </CardFooter>
       </Card>
-    </div>
+    </PageLayout>
   );
 }
 

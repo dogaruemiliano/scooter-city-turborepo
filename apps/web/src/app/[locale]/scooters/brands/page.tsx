@@ -1,3 +1,4 @@
+import { PageLayout } from "@repo/ui/components/page-layout";
 import { canAccess } from "@/lib/access";
 import { ApiError, v1 } from "@repo/api-shared";
 import { messages } from "@repo/i18n";
@@ -50,7 +51,7 @@ export default async function BrandsPage({ params }: BrandsPageProps) {
   const t = await getTranslations({ locale, namespace: "scooters" });
 
   return (
-    <main className="mx-auto flex w-full max-w-screen-xl flex-1 flex-col gap-8 px-4 pt-6 sm:px-6 lg:px-8">
+    <PageLayout className="gap-8">
       <ListLayout
         action={
           canAccess(user, "scooter_brands.manage") ? (
@@ -67,7 +68,7 @@ export default async function BrandsPage({ params }: BrandsPageProps) {
       >
         <BrandTable brands={brands.items} />
       </ListLayout>
-    </main>
+    </PageLayout>
   );
 }
 

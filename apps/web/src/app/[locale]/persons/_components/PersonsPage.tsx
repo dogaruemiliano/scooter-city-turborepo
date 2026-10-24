@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLayout } from "@repo/ui/components/page-layout";
+
 import { useOptionalSession } from "@/components/auth/SessionProvider";
 import { canAccess } from "@/lib/access";
 
@@ -333,7 +335,7 @@ function PersonsPageContent({
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-screen-xl flex-1 flex-col gap-6 px-4 pt-6 sm:px-6 sm:pt-10">
+    <PageLayout>
       <ListLayout
         action={
           canAccess(session?.user, "persons.create") ? (
@@ -661,7 +663,7 @@ function PersonsPageContent({
           }
         />
       </ListLayout>
-    </div>
+    </PageLayout>
   );
 }
 

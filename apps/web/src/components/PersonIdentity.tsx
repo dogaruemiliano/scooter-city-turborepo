@@ -75,8 +75,14 @@ function usePersonPresentation(person: PersonSummary) {
     ) : undefined,
   };
 }
-export function PersonIdentityRow({ person }: { person: PersonSummary }) {
-  return <PersonRow {...usePersonPresentation(person)} />;
+export function PersonIdentityRow({
+  person,
+  action,
+}: {
+  person: PersonSummary;
+  action?: ComponentProps<typeof PersonRow>["action"];
+}) {
+  return <PersonRow {...usePersonPresentation(person)} action={action} />;
 }
 export function PersonIdentityCard({
   person,

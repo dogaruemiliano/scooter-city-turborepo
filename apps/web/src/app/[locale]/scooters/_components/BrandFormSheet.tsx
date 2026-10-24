@@ -156,9 +156,7 @@ export function BrandFormSheet({
         aria-label={
           isEdit ? `${t("brands.edit.trigger")}: ${brand.name}` : undefined
         }
-      >
-        {trigger.props.children}
-      </BottomSheetTrigger>
+      />
       <BottomSheetContent initialFocus={nameInputRef}>
         <form onSubmit={submit} className="contents">
           <BottomSheetHeader>

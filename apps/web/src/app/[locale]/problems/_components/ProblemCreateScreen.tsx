@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLayout } from "@repo/ui/components/page-layout";
+
 import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { localizePath, resolveRouteLocale } from "@/i18n/paths";
@@ -15,7 +17,7 @@ export function ProblemCreateScreen({ scooterId }: { scooterId?: string }) {
     locale,
   );
   return (
-    <main className="flex min-w-0 flex-1 flex-col gap-6 px-4 pt-4 md:px-8 md:pt-8">
+    <PageLayout>
       <PageTitleOverride title={t("problems.add")} />
       <div className="mx-auto flex w-full max-w-(--breakpoint-md) flex-1 flex-col">
         <CreateProblem
@@ -28,6 +30,6 @@ export function ProblemCreateScreen({ scooterId }: { scooterId?: string }) {
           }}
         />
       </div>
-    </main>
+    </PageLayout>
   );
 }

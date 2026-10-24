@@ -1,7 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { PencilIcon } from "lucide-react";
+import { CheckIcon, PencilIcon } from "lucide-react";
 import { Button } from "./button";
 import { PersonRow } from "./person-row";
+import { PersonDocuments } from "./person-card";
 
 const meta = {
   title: "Components/PersonRow",
@@ -54,4 +55,45 @@ export const LongIdentity: Story = {
       <PersonRow {...args} />
     </div>
   ),
+};
+
+/** Actions and selection stay above the bottom-right document indicators. */
+export const DocumentsWithAction: Story = {
+  args: {
+    details: (
+      <PersonDocuments
+        documents={[
+          {
+            type: "identity",
+            label: "Identity document: Valid",
+            state: "valid",
+          },
+          {
+            type: "driverLicense",
+            label: "Driver license: Valid",
+            state: "valid",
+          },
+        ]}
+      />
+    ),
+  },
+  render: SelectedPerson.render,
+};
+export const DocumentsWithSelection: Story = {
+  args: {
+    ...DocumentsWithAction.args,
+    action: <CheckIcon aria-hidden="true" className="size-4" />,
+  },
+  render: SelectOption.render,
+};
+export const NarrowDocumentsWithAction: Story = {
+  ...DocumentsWithAction,
+  decorators: [
+    (Story) => (
+      <div className="w-72">
+        <Story />
+      </div>
+    ),
+  ],
+  args: { ...DocumentsWithAction.args, ...LongIdentity.args },
 };

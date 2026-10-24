@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLayout } from "@repo/ui/components/page-layout";
+
 import { ScooterSelect } from "@/components/ScooterSelect";
 import { useMemo, useCallback, useState } from "react";
 import {
@@ -161,10 +163,7 @@ export function ProblemsWorkspace() {
   };
 
   return (
-    <main
-      aria-busy={remote.loading}
-      className="flex w-full min-w-0 max-w-full flex-col gap-6 overflow-x-clip px-4 pt-4 md:px-8 md:pt-8"
-    >
+    <PageLayout aria-busy={remote.loading} className="overflow-x-clip">
       <PageTitleOverride title={t("problems.title")} />
       <ListLayout
         summary={
@@ -445,7 +444,7 @@ export function ProblemsWorkspace() {
           />
         ) : null}
       </ListLayout>
-    </main>
+    </PageLayout>
   );
 }
 function ProblemFilterOptions({

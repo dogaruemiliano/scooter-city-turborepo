@@ -83,7 +83,9 @@ describe("VIN conflict review", () => {
       });
       expect(progress).toHaveAttribute("aria-valuenow", "1");
       expect(progress).toHaveAttribute("aria-valuemax", "2");
-      expect(progress.querySelectorAll("li")).toHaveLength(2);
+      expect(
+        progress.closest('[data-slot="step-progress"]')!.querySelectorAll("li"),
+      ).toHaveLength(2);
       const preview = within(sheet).getByRole("region", {
         name: messages[locale].scooters.documents.preview.replace(
           "{name}",

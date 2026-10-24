@@ -1,4 +1,6 @@
 "use client";
+
+import { PageLayout } from "@repo/ui/components/page-layout";
 import {
   ProfilePictureEditor,
   type ProfilePictureChange,
@@ -117,7 +119,7 @@ export function PersonEditForm({ person, personHref }: PersonEditFormProps) {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-screen-lg flex-1 flex-col gap-6 px-4 pt-6 pb-16 sm:px-6 sm:pt-10 sm:pb-24">
+    <PageLayout className="pb-16 sm:pb-24">
       <PageTitleOverride title={t("editPage.title")} />
       <PageHeaderNavigation
         backDisabled={busy}
@@ -273,6 +275,6 @@ export function PersonEditForm({ person, personHref }: PersonEditFormProps) {
           ) : null}
         </form>
       </FormProvider>
-    </div>
+    </PageLayout>
   );
 }

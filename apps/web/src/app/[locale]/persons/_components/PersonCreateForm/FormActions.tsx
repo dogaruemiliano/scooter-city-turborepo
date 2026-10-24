@@ -5,7 +5,7 @@ import { SaveButton } from "@repo/ui/components/save-button";
 import { Button, FormActions as SharedFormActions } from "@repo/ui/components";
 import { UserPlusIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
-import type { PersonWizardStep } from "./WizardProgress";
+import type { PersonWizardStep } from "./wizard-steps";
 
 export function FormActions({
   creating,

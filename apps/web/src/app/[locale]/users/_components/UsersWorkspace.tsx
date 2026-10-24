@@ -442,13 +442,13 @@ function UserForm({
   const formId = useId();
   const [showReview, setShowReview] = useState(false);
   const selectedRoles = roles.filter((role) => roleIds.includes(role.id));
+  const noRoleOption = {
+    value: "none",
+    slug: "none",
+    label: t("access.member.noRole"),
+    description: t("access.member.noRoleHelp"),
+  };
   const roleOptions = [
-    {
-      value: "none",
-      slug: "none",
-      label: t("access.member.noRole"),
-      description: t("access.member.noRoleHelp"),
-    },
     ...roles
       .filter(
         (role) =>
@@ -456,12 +456,18 @@ function UserForm({
           role.slug !== "admin" ||
           user?.roles.some((r) => r.id === role.id),
       )
+      .sort(
+        (a, b) =>
+          baseSlugs.findIndex((slug) => slug === a.slug) -
+          baseSlugs.findIndex((slug) => slug === b.slug),
+      )
       .map((role) => ({
         value: role.id,
         slug: role.slug,
         label: t(`access.member.roleNames.${role.slug}`),
         description: t(`access.member.roleDescriptions.${role.slug}`),
       })),
+    noRoleOption,
   ];
   const selectedRole = user?.isSuperAdmin
     ? {
@@ -470,7 +476,7 @@ function UserForm({
         label: t("access.member.roleNames.superAdmin"),
         description: t("access.member.superRoleHelp"),
       }
-    : (roleOptions.find((role) => role.value === roleIds[0]) ?? roleOptions[0]);
+    : (roleOptions.find((role) => role.value === roleIds[0]) ?? noRoleOption);
 
   const grants = {
     roles: selectedRoles.map(({ id, revision }) => ({ id, revision })),

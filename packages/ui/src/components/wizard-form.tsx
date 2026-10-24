@@ -11,6 +11,11 @@ import {
 } from "react";
 import { cn } from "@repo/ui/lib/utils";
 import { StepProgress } from "./step-progress";
+import {
+  WizardExitDialog,
+  type WizardExitDialogProps,
+} from "./wizard-exit-dialog";
+import { VerticalLine } from "./vertical-line";
 
 export type WizardFormStep = {
   id: string;
@@ -25,10 +30,14 @@ export type WizardFormProps = Omit<
   steps: readonly WizardFormStep[];
   activeIndex: number;
   progressLabel: string;
+  exitConfirmation?: WizardExitDialogProps;
   /** Keep step headings accessible while the mobile app header supplies the title. */
   hideHeadingOnMobile?: boolean;
   /** Requests an adjacent step. The owner validates and updates activeIndex. */
   onStepChange: (index: number) => void;
+  /** Optional progress navigation. The owner authorizes and handles destinations. */
+  canSelectStep?: (index: number) => boolean;
+  onStepSelect?: (index: number) => void;
   canGoNext?: boolean;
   canGoPrevious?: boolean;
   /** Blocks gestures during submission or while another surface is open. */
@@ -67,18 +76,23 @@ function releaseCapture(element: HTMLElement, pointerId: number) {
 /**
  * Controlled wizard shell. Own field values above it: inactive panels unmount
  * after the transition. Swipes request navigation, never submit the form.
- * Use buttons in footer for keyboard/assistive navigation; progress is read-only.
+ * Use buttons in footer for keyboard/assistive navigation; optional progress navigation is authorized by the owner.
  * Panels inherit the form's opaque page surface. Use bg-popover/bg-card on the
  * form when embedding it on another surface so overlapping screens stay opaque.
- * Owns horizontal gutters: give the form an unpadded container so the moving
+ * Owns horizontal gutters: give the form an unpadded PageLayout so the moving
  * surfaces reach its edges while fields, progress, and actions remain inset.
+ * Inherits --page-gutter when available; standalone and sheet callers keep
+ * the default gutters for their own surface.
  */
 export function WizardForm({
   steps,
   activeIndex,
   progressLabel,
+  exitConfirmation,
   hideHeadingOnMobile = false,
   onStepChange,
+  canSelectStep,
+  onStepSelect,
   canGoNext = true,
   canGoPrevious = true,
   disabled = false,
@@ -174,185 +188,197 @@ export function WizardForm({
   }
 
   return (
-    <form
-      {...props}
-      dir={dir}
-      data-slot="wizard-form"
-      className={cn(
-        "[--wizard-gutter:var(--spacing-4)] flex min-w-0 flex-1 flex-col gap-6 bg-background px-(--wizard-gutter) sm:[--wizard-gutter:var(--spacing-6)]",
-        className,
-      )}
-    >
-      <StepProgress
-        label={progressLabel}
-        labels={steps.map((step) => step.label)}
-        activeIndex={activeIndex}
-        visualIndex={activeIndex - offset}
-        tracking={view.dragging}
-      />
-      <div
-        data-slot="wizard-viewport"
-        data-dragging={view.dragging || undefined}
-        className="relative isolate -mx-(--wizard-gutter) -my-1 min-w-0 grow shrink-0 overflow-hidden bg-inherit"
-        style={{ touchAction: "pan-y pinch-zoom" }}
-        onPointerDown={(event) => {
-          if (gesture.current) {
-            const pointerId = gesture.current.pointerId;
-            gesture.current = null;
-            releaseCapture(event.currentTarget, pointerId);
-            setView((state) => ({ ...state, dragging: false, offset: 0 }));
-            return;
-          }
-          suppressClick.current = false;
-          if (
-            disabled ||
-            event.defaultPrevented ||
-            event.isPrimary === false ||
-            event.button !== 0 ||
-            !(event.target instanceof Element) ||
-            !event.currentTarget.contains(event.target) ||
-            event.target.closest(directManipulationTarget) ||
-            // Touch can start on a picker card, link, or label: capture only
-            // after horizontal intent, and suppress its click after a swipe.
-            // Mouse interactions retain ordinary selection/activation behavior.
-            (event.pointerType !== "touch" &&
-              event.pointerType !== "pen" &&
-              event.target.closest(clickableTarget))
-          )
-            return;
-          const width = event.currentTarget.getBoundingClientRect().width;
-          if (!width) return;
-          gesture.current = {
-            pointerId: event.pointerId,
-            index: activeIndex,
-            x: event.clientX,
-            y: event.clientY,
-            width,
-            horizontal: false,
-            offset: 0,
-          };
-        }}
-        onPointerMove={(event) => {
-          const current = gesture.current;
-          if (!current || current.pointerId !== event.pointerId) return;
-          if (disabled || current.index !== activeIndex) {
-            finish(event, true);
-            return;
-          }
-          const dx = event.clientX - current.x;
-          const dy = event.clientY - current.y;
-          if (!current.horizontal) {
-            if (
-              Math.max(Math.abs(dx), Math.abs(dy)) <
-              motion.gesture.wizard.axisLockDistance
-            )
-              return;
-            if (Math.abs(dy) >= Math.abs(dx)) {
+    <>
+      <form
+        {...props}
+        dir={dir}
+        data-slot="wizard-form"
+        className={cn(
+          "[--wizard-gutter:var(--page-gutter,var(--spacing-4))] flex min-w-0 flex-1 flex-col gap-6 bg-background px-(--wizard-gutter) sm:[--wizard-gutter:var(--page-gutter,var(--spacing-6))]",
+          className,
+        )}
+      >
+        <div
+          data-slot="wizard-progress"
+          className="sticky top-[var(--sticky-content-top,0)] z-raised bg-inherit pt-2"
+        >
+          <StepProgress
+            label={progressLabel}
+            labels={steps.map((step) => step.label)}
+            activeIndex={activeIndex}
+            visualIndex={activeIndex - offset}
+            tracking={view.dragging}
+            disabled={disabled}
+            canSelectStep={canSelectStep}
+            onStepSelect={onStepSelect}
+          />
+        </div>
+        <div
+          data-slot="wizard-viewport"
+          data-dragging={view.dragging || undefined}
+          className="relative isolate -mx-(--wizard-gutter) -my-1 min-w-0 grow shrink-0 overflow-hidden bg-inherit"
+          style={{ touchAction: "pan-y pinch-zoom" }}
+          onPointerDown={(event) => {
+            if (gesture.current) {
+              const pointerId = gesture.current.pointerId;
               gesture.current = null;
+              releaseCapture(event.currentTarget, pointerId);
+              setView((state) => ({ ...state, dragging: false, offset: 0 }));
               return;
             }
-            current.horizontal = true;
-            try {
-              event.currentTarget.setPointerCapture?.(event.pointerId);
-            } catch (error) {
-              if (
-                !(
-                  error instanceof DOMException &&
-                  error.name === "NotFoundError"
-                )
-              )
-                throw error;
+            suppressClick.current = false;
+            if (
+              disabled ||
+              event.defaultPrevented ||
+              event.isPrimary === false ||
+              event.button !== 0 ||
+              !(event.target instanceof Element) ||
+              !event.currentTarget.contains(event.target) ||
+              event.target.closest(directManipulationTarget) ||
+              // Touch can start on a picker card, link, or label: capture only
+              // after horizontal intent, and suppress its click after a swipe.
+              // Mouse interactions retain ordinary selection/activation behavior.
+              (event.pointerType !== "touch" &&
+                event.pointerType !== "pen" &&
+                event.target.closest(clickableTarget))
+            )
+              return;
+            const width = event.currentTarget.getBoundingClientRect().width;
+            if (!width) return;
+            gesture.current = {
+              pointerId: event.pointerId,
+              index: activeIndex,
+              x: event.clientX,
+              y: event.clientY,
+              width,
+              horizontal: false,
+              offset: 0,
+            };
+          }}
+          onPointerMove={(event) => {
+            const current = gesture.current;
+            if (!current || current.pointerId !== event.pointerId) return;
+            if (disabled || current.index !== activeIndex) {
               finish(event, true);
               return;
             }
-            suppressClick.current = true;
-          }
-          event.preventDefault();
-          const nextOffset = Math.max(
-            -1,
-            Math.min(1, (dx * direction) / current.width),
-          );
-          const next = activeIndex + (nextOffset < 0 ? 1 : -1);
-          current.offset = allowed(next) ? nextOffset : 0;
-          setView((state) => ({
-            ...state,
-            dragging: true,
-            offset: current.offset,
-            preview: allowed(next) ? next : state.preview,
-          }));
-        }}
-        onPointerUp={(event) => finish(event)}
-        onPointerCancel={(event) => finish(event, true)}
-        onLostPointerCapture={(event) => {
-          // Touch starts with implicit capture on the touched child. Its lost
-          // capture bubbles when we take over; only losing OUR capture cancels.
-          if (event.target === event.currentTarget) finish(event, true);
-        }}
-        onClickCapture={(event) => {
-          if (suppressClick.current && event.detail !== 0) {
+            const dx = event.clientX - current.x;
+            const dy = event.clientY - current.y;
+            if (!current.horizontal) {
+              if (
+                Math.max(Math.abs(dx), Math.abs(dy)) <
+                motion.gesture.wizard.axisLockDistance
+              )
+                return;
+              if (Math.abs(dy) >= Math.abs(dx)) {
+                gesture.current = null;
+                return;
+              }
+              current.horizontal = true;
+              try {
+                event.currentTarget.setPointerCapture?.(event.pointerId);
+              } catch (error) {
+                if (
+                  !(
+                    error instanceof DOMException &&
+                    error.name === "NotFoundError"
+                  )
+                )
+                  throw error;
+                finish(event, true);
+                return;
+              }
+              suppressClick.current = true;
+            }
             event.preventDefault();
-            event.stopPropagation();
-            suppressClick.current = false;
-          }
-        }}
-      >
-        {steps.map((step, index) => {
-          const active = index === activeIndex;
-          const visible =
-            active || index === view.previous || index === view.preview;
-          // Higher steps sit above earlier ones in a navigation stack. A
-          // screen to the left is underneath and travels at half speed; the
-          // foreground screen travels the full width. The same coordinates
-          // drive dragging, snap-back, and button-triggered CSS transitions.
-          const relativePosition = index - activeIndex + offset;
-          const travel =
-            relativePosition < 0
-              ? relativePosition * motion.gesture.wizard.underlayTravelRatio
-              : relativePosition;
-          return (
-            <section
-              key={step.id}
-              data-slot="wizard-step"
-              data-active={active}
-              aria-hidden={!active || undefined}
-              inert={!active || undefined}
-              className={cn(
-                "inset-x-0 top-0 min-h-full min-w-0 bg-inherit px-(--wizard-gutter) py-1 transition-transform duration-normal ease-decelerate motion-reduce:transition-none",
-                active ? "relative" : "pointer-events-none absolute",
-                view.dragging && "select-none",
-                transitioning && index === foregroundIndex && "shadow-md",
-              )}
-              style={{
-                transform: `translateX(${travel * direction * 100}%)`,
-                // Step order defines local stack order inside the isolated viewport.
-                zIndex: zIndex.base + index,
-                transitionProperty: view.dragging ? "none" : undefined,
-              }}
-            >
-              {visible ? (
-                <fieldset
-                  disabled={!active}
-                  className="flex min-w-0 flex-col gap-6 border-0 p-0"
-                >
-                  <h2
-                    ref={active ? heading : undefined}
-                    tabIndex={-1}
-                    className={cn(
-                      "text-xl font-semibold outline-none",
-                      hideHeadingOnMobile && "sr-only md:not-sr-only",
-                    )}
+            const nextOffset = Math.max(
+              -1,
+              Math.min(1, (dx * direction) / current.width),
+            );
+            const next = activeIndex + (nextOffset < 0 ? 1 : -1);
+            current.offset = allowed(next) ? nextOffset : 0;
+            setView((state) => ({
+              ...state,
+              dragging: true,
+              offset: current.offset,
+              preview: allowed(next) ? next : state.preview,
+            }));
+          }}
+          onPointerUp={(event) => finish(event)}
+          onPointerCancel={(event) => finish(event, true)}
+          onLostPointerCapture={(event) => {
+            // Touch starts with implicit capture on the touched child. Its lost
+            // capture bubbles when we take over; only losing OUR capture cancels.
+            if (event.target === event.currentTarget) finish(event, true);
+          }}
+          onClickCapture={(event) => {
+            if (suppressClick.current && event.detail !== 0) {
+              event.preventDefault();
+              event.stopPropagation();
+              suppressClick.current = false;
+            }
+          }}
+        >
+          {steps.map((step, index) => {
+            const active = index === activeIndex;
+            const visible =
+              active || index === view.previous || index === view.preview;
+            // Higher steps sit above earlier ones in a navigation stack. A
+            // screen to the left is underneath and travels at half speed; the
+            // foreground screen travels the full width. The same coordinates
+            // drive dragging, snap-back, and button-triggered CSS transitions.
+            const relativePosition = index - activeIndex + offset;
+            const travel =
+              relativePosition < 0
+                ? relativePosition * motion.gesture.wizard.underlayTravelRatio
+                : relativePosition;
+            return (
+              <section
+                key={step.id}
+                data-slot="wizard-step"
+                data-active={active}
+                aria-hidden={!active || undefined}
+                inert={!active || undefined}
+                className={cn(
+                  "inset-x-0 top-0 min-h-full min-w-0 bg-inherit px-(--wizard-gutter) py-1 transition-transform duration-normal ease-decelerate motion-reduce:transition-none",
+                  active ? "relative" : "pointer-events-none absolute",
+                  view.dragging && "select-none",
+                  transitioning && index === foregroundIndex && "shadow-md",
+                )}
+                style={{
+                  transform: `translateX(${travel * direction * 100}%)`,
+                  // Step order defines local stack order inside the isolated viewport.
+                  zIndex: zIndex.base + index,
+                  transitionProperty: view.dragging ? "none" : undefined,
+                }}
+              >
+                {visible ? (
+                  <fieldset
+                    disabled={!active}
+                    className="flex min-w-0 flex-col gap-6 border-0 p-0"
                   >
-                    {step.label}
-                  </h2>
-                  {step.content}
-                </fieldset>
-              ) : null}
-            </section>
-          );
-        })}
-      </div>
-      {children}
-      {footer}
-    </form>
+                    <h2
+                      ref={active ? heading : undefined}
+                      tabIndex={-1}
+                      className={cn(
+                        "flex min-w-0 items-center gap-3 text-xl font-semibold outline-none",
+                        hideHeadingOnMobile && "sr-only md:not-sr-only",
+                      )}
+                    >
+                      <VerticalLine />
+                      {step.label}
+                    </h2>
+                    {step.content}
+                  </fieldset>
+                ) : null}
+              </section>
+            );
+          })}
+        </div>
+        {children}
+        {footer}
+      </form>
+      {exitConfirmation ? <WizardExitDialog {...exitConfirmation} /> : null}
+    </>
   );
 }

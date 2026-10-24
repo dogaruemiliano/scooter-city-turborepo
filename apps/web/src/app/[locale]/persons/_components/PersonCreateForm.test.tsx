@@ -25,6 +25,7 @@ const mocks = vi.hoisted(() => ({
   s3Fetch: vi.fn(),
   push: vi.fn(),
   back: vi.fn(),
+  replace: vi.fn(),
   refresh: vi.fn(),
 }));
 
@@ -45,6 +46,7 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({
     push: mocks.push,
     back: mocks.back,
+    replace: mocks.replace,
     refresh: mocks.refresh,
   }),
 }));
@@ -238,7 +240,7 @@ describe("PersonCreateForm wizard", () => {
       showReviewStep("Personal details");
       expect(screen.getByLabelText("First name")).toHaveValue(identityName);
       expect(screen.getByLabelText("Last name")).toHaveValue("DOGARU");
-      showReviewStep("Document details");
+      showReviewStep("Review person");
       const submit = screen.getByRole("button", {
         name: messages.en.persons.actions.create,
       });
@@ -264,7 +266,7 @@ describe("PersonCreateForm wizard", () => {
       expect(submit).toBeEnabled();
       showReviewStep("Personal details");
       changeField("First name", "EMILIANO");
-      showReviewStep("Document details");
+      showReviewStep("Review person");
       expect(screen.getByRole("checkbox")).not.toBeChecked();
       expect(
         screen.getByRole("button", {
@@ -402,6 +404,91 @@ describe("PersonCreateForm wizard", () => {
     expect(mocks.back).not.toHaveBeenCalled();
   });
 
+  it("does not guard navigation or validation attempts before uploading a photo", async () => {
+    const browser = userEvent.setup();
+    renderCreateForm();
+    await enterDocuments(browser, "foreign");
+    await browser.click(screen.getByRole("button", { name: "Review details" }));
+    expect(
+      screen.getByRole("heading", { name: "Identification documents" }),
+    ).toBeVisible();
+    expect(
+      window.dispatchEvent(new Event("beforeunload", { cancelable: true })),
+    ).toBe(true);
+  });
+
+  it("guards exit after a photo upload even back at citizenship, and keeps values when cancelled", async () => {
+    const browser = userEvent.setup();
+    await renderReviewForm(browser);
+    changeField("First name", "Grace");
+    showReviewStep("Citizenship");
+    expect(
+      window.dispatchEvent(new Event("beforeunload", { cancelable: true })),
+    ).toBe(false);
+    const link = document.createElement("a");
+    link.href = "/en/persons";
+    document.body.append(link);
+    fireEvent.click(link);
+    link.remove();
+    const dialog = await screen.findByRole("dialog", {
+      name: "Discard unsaved changes?",
+    });
+    await browser.click(
+      within(dialog).getByRole("button", { name: "Keep editing" }),
+    );
+    await waitFor(() => expect(dialog).not.toBeInTheDocument());
+    await enterDocuments(browser);
+    await browser.click(screen.getByRole("button", { name: "Review details" }));
+    expect(screen.getByLabelText("First name")).toHaveValue("Grace");
+  });
+
+  it("uses shared swipe transitions, validates forward navigation, and keeps values when swiping back", async () => {
+    const browser = userEvent.setup();
+    await renderReviewForm(browser);
+    const viewport = document.querySelector<HTMLElement>(
+      '[data-slot="wizard-viewport"]',
+    )!;
+    vi.spyOn(viewport, "getBoundingClientRect").mockReturnValue({
+      width: 400,
+    } as DOMRect);
+    function swipe(from: number, to: number) {
+      for (const [type, x] of [
+        ["pointerdown", from],
+        ["pointermove", to],
+        ["pointerup", to],
+      ] as const) {
+        const event = new MouseEvent(type, {
+          bubbles: true,
+          cancelable: true,
+          clientX: x,
+          clientY: 100,
+          button: 0,
+        });
+        Object.defineProperty(event, "pointerId", { value: 1 });
+        fireEvent(viewport, event);
+      }
+    }
+    swipe(300, 100);
+    expect(
+      screen.getByRole("heading", { name: "Personal details" }),
+    ).toBeVisible();
+    expect(screen.getByLabelText("First name")).toHaveAttribute(
+      "aria-invalid",
+      "true",
+    );
+    changeField("First name", "Grace");
+    changeField("Last name", "Hopper");
+    changeField("CNP", "1900228123450");
+    swipe(300, 100);
+    expect(screen.getByRole("heading", { name: "Address" })).toHaveFocus();
+    swipe(100, 300);
+    expect(
+      screen.getByRole("heading", { name: "Personal details" }),
+    ).toHaveFocus();
+    expect(screen.getByLabelText("First name")).toHaveValue("Grace");
+    expect(mocks.createPerson).not.toHaveBeenCalled();
+  });
+
   it("revisits photos and citizenship from progress without losing entered details", async () => {
     const browser = userEvent.setup();
     await renderReviewForm(browser);
@@ -430,7 +517,7 @@ describe("PersonCreateForm wizard", () => {
     expect(mocks.createPerson).not.toHaveBeenCalled();
   });
 
-  it("separates personal, contact, address and document review with step validation", async () => {
+  it("reviews the whole person after validating each step and preserves edits before creating", async () => {
     const browser = userEvent.setup();
     await renderReviewForm(browser);
     expect(screen.getByLabelText("First name")).toBeVisible();
@@ -492,6 +579,35 @@ describe("PersonCreateForm wizard", () => {
     ).toBeVisible();
     expect(screen.getByRole("button", { name: "Create person" })).toBeVisible();
     expect(screen.queryByLabelText("CNP")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Review person" }),
+    ).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Profile" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Contact" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Address" })).toBeVisible();
+    expect(screen.getByText("Grace")).toBeVisible();
+    expect(screen.getByText("Hopper")).toBeVisible();
+    expect(screen.getByText("1900228123450")).toBeVisible();
+    expect(
+      screen.getByText(
+        new Intl.DateTimeFormat("en", {
+          dateStyle: "medium",
+          timeZone: "UTC",
+        }).format(new Date("1990-02-28")),
+      ),
+    ).toBeVisible();
+    expect(screen.getByText("rider@example.com")).toBeVisible();
+    expect(screen.getByText("1 Test Street")).toBeVisible();
+    changeField("Notes", "Review notes");
+    expect(
+      screen.queryByRole("button", { name: /^Return to/ }),
+    ).not.toBeInTheDocument();
+    showReviewStep("Personal details");
+    expect(screen.getByLabelText("First name")).toHaveValue("Grace");
+    changeField("First name", "Ada");
+    showReviewStep("Review person");
+    expect(screen.getByText("Ada")).toBeVisible();
+    expect(screen.getByLabelText("Notes")).toHaveValue("Review notes");
     expect(mocks.createPerson).not.toHaveBeenCalled();
   });
 
@@ -1102,7 +1218,7 @@ describe("PersonCreateForm wizard", () => {
     changeField("Nume", "Ionescu");
     changeField("Email", "ana@example.com");
     changeField("Telefon", "123");
-    showReviewStep("Date documente");
+    showReviewStep("Verifică persoana");
     await browser.click(
       screen.getByRole("button", { name: "Creează persoana" }),
     );
@@ -1263,7 +1379,7 @@ describe("document extraction review", () => {
     expect(
       screen.getByRole("button", { name: /^Locality(?: |$)/ }),
     ).toHaveTextContent("Drăgășani");
-    showReviewStep("Document details");
+    showReviewStep("Review person");
     await browser.click(
       screen.getByRole("button", { name: /^(Add|Edit) National ID$/ }),
     );
@@ -1332,7 +1448,7 @@ describe("document extraction review", () => {
           name: "Reading First name from document…",
         }),
       ).not.toBeInTheDocument();
-      showReviewStep("Document details");
+      showReviewStep("Review person");
       await browser.click(
         screen.getByRole("button", { name: /^(Add|Edit) Passport$/ }),
       );
@@ -1370,7 +1486,7 @@ describe("document extraction review", () => {
       showReviewStep("Personal details");
       expect(screen.getByLabelText("First name")).toHaveValue("Operator");
       expect(screen.getByLabelText("Last name")).toHaveValue("Popescu");
-      showReviewStep("Document details");
+      showReviewStep("Review person");
       await browser.click(
         screen.getByRole("button", { name: "Edit Passport" }),
       );
@@ -1475,7 +1591,7 @@ describe("document extraction review", () => {
     await browser.click(screen.getByRole("button", { name: "Continue" }));
     changeField("Email", "rider@example.com");
     changeField("Phone", "749096855");
-    showReviewStep("Document details");
+    showReviewStep("Review person");
     await act(async () =>
       resolve({
         ...extractedPassport(),
@@ -1504,7 +1620,7 @@ describe("document extraction review", () => {
     await uploadPhoto(browser, "Passport");
     await browser.click(screen.getByRole("button", { name: "Review details" }));
     fillRequiredFields();
-    showReviewStep("Document details");
+    showReviewStep("Review person");
     expect(
       screen.getByRole("button", { name: "Create person" }),
     ).toBeDisabled();
@@ -1667,7 +1783,7 @@ function fillRequiredFields(phone = "749096855") {
 async function openNationalIdSheet(
   browser: ReturnType<typeof userEvent.setup>,
 ) {
-  showReviewStep("Document details");
+  showReviewStep("Review person");
   await browser.click(
     screen.getByRole("button", { name: /^(Add|Edit) National ID$/ }),
   );
@@ -1750,7 +1866,7 @@ function showField(label: string) {
         ? "Date de contact"
         : "Contact details"
       : label === "Notes"
-        ? "Document details"
+        ? "Review person"
         : ro
           ? "Adresă"
           : "Address";
@@ -1769,7 +1885,7 @@ async function fillRequiredAddress(
 
 async function submitPerson(browser: ReturnType<typeof userEvent.setup>) {
   await fillRequiredAddress(browser);
-  showReviewStep("Document details");
+  showReviewStep("Review person");
   await browser.click(screen.getByRole("button", { name: "Create person" }));
 }
 

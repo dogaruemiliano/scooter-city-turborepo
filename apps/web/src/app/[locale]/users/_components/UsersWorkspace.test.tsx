@@ -67,6 +67,7 @@ beforeEach(() => {
           items: [
             mechanic,
             admin,
+            { ...mechanic, id: "customer", slug: "customer", name: "Client" },
             {
               ...mechanic,
               id: "old",
@@ -489,6 +490,14 @@ describe("member access workspace", () => {
     const sheet = await screen.findByRole("dialog", { name: "Base role" });
     expect(sheet).toHaveClass("bg-popover");
     expect(sheet.querySelector(".bg-background")).toBeNull();
+    expect(
+      within(sheet)
+        .getAllByRole("button")
+        .map((button) => button.getAttribute("aria-label"))
+        .filter((label) =>
+          ["Admin", "Mechanic", "Client", "No role"].includes(label ?? ""),
+        ),
+    ).toEqual(["Admin", "Mechanic", "Client", "No role"]);
     const mechanicCard = within(sheet).getByRole("button", {
       name: "Mechanic",
     });

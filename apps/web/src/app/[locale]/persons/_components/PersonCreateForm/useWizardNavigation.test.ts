@@ -1,6 +1,6 @@
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import type { PersonWizardStep } from "./WizardProgress";
+import type { PersonWizardStep } from "./wizard-steps";
 import { useWizardNavigation } from "./useWizardNavigation";
 
 function setup(steps: PersonWizardStep[] = []) {

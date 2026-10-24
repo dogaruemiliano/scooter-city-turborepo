@@ -44,6 +44,9 @@ const mocks = vi.hoisted(() => ({
     } as Record<string, string[]>,
   },
 }));
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: mocks.replace }),
+}));
 vi.mock("@/lib/api", () => ({ webApi: { fetch: mocks.fetch } }));
 vi.mock("@/components/auth/SessionProvider", () => ({
   useSession: () => ({ user: mocks.user }),
@@ -872,4 +875,24 @@ it("does not show contact actions on rental review", async () => {
   expect(
     screen.queryByRole("link", { name: "Email Ada Lovelace" }),
   ).not.toBeInTheDocument();
+});
+
+it("protects browser Back and navigation links once details have been passed", async () => {
+  writeRentalDraft("staff", completeDraft());
+  renderWizard();
+  await loaded();
+  const link = document.createElement("a");
+  link.href = "/en/scooters";
+  document.body.append(link);
+  fireEvent.click(link);
+  link.remove();
+  const dialog = await screen.findByRole("dialog", {
+    name: "Leave rental creation?",
+  });
+  fireEvent.click(within(dialog).getByRole("button", { name: "Close" }));
+  fireEvent.popState(window, { state: {} });
+  expect(
+    await screen.findByRole("dialog", { name: "Leave rental creation?" }),
+  ).toBeVisible();
+  expect(mocks.replace).not.toHaveBeenCalled();
 });

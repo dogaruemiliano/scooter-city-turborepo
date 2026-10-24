@@ -1,4 +1,6 @@
 "use client";
+
+import { PageLayout } from "@repo/ui/components/page-layout";
 import { useFormAction } from "@/lib/form/use-form-action";
 import { SaveButton } from "@repo/ui/components/save-button";
 import { ScooterProblems } from "./ScooterProblems";
@@ -148,7 +150,7 @@ export function ScooterDetailPage({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-screen-xl flex-1 flex-col gap-6 px-4 pt-6 sm:px-6 sm:pt-10">
+    <PageLayout>
       <PageTitleOverride title={title} />
       <div className="flex flex-col gap-4">
         <div className="flex min-w-0 items-start justify-between gap-3">
@@ -392,7 +394,7 @@ export function ScooterDetailPage({
         onOpenChange={setDeleteOpen}
         onConfirm={deleteScooter}
       />
-    </div>
+    </PageLayout>
   );
 }
 

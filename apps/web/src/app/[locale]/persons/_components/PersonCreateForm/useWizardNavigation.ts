@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import type { PersonWizardStep } from "./WizardProgress";
+import type { PersonWizardStep } from "./wizard-steps";
 
 export type NavigationState = {
   history: PersonWizardStep[];

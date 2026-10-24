@@ -9,6 +9,7 @@ export function PersonRow({
   avatarUrl,
   action,
   details,
+  metadata,
 }: {
   name: string;
   description?: ReactNode;
@@ -16,6 +17,7 @@ export function PersonRow({
   avatarUrl?: string;
   action?: ReactNode;
   details?: ReactNode;
+  metadata?: ReactNode;
 }) {
   return (
     <span
@@ -37,7 +39,6 @@ export function PersonRow({
               .join("")}
           </AvatarFallback>
         </Avatar>
-        {details}
       </span>
       <span className="flex min-w-0 flex-1 flex-col items-start gap-1 text-left">
         <span className="wrap-anywhere text-base font-semibold">{name}</span>
@@ -52,7 +53,38 @@ export function PersonRow({
           </span>
         ) : null}
       </span>
-      {action}
+      {action || details || metadata ? (
+        <span
+          data-slot="person-trailing"
+          className="flex shrink-0 flex-col items-end justify-between gap-2 self-stretch"
+        >
+          {metadata || action ? (
+            <span className="flex flex-col items-end gap-2">
+              {metadata ? (
+                <span
+                  data-slot="person-metadata"
+                  className="flex flex-col items-end gap-1 text-right text-xs text-muted-foreground"
+                >
+                  {metadata}
+                </span>
+              ) : null}
+              {action ? (
+                <span data-slot="person-action" className="flex justify-end">
+                  {action}
+                </span>
+              ) : null}
+            </span>
+          ) : null}
+          {details ? (
+            <span
+              data-slot="person-details"
+              className="mt-auto flex justify-end"
+            >
+              {details}
+            </span>
+          ) : null}
+        </span>
+      ) : null}
     </span>
   );
 }

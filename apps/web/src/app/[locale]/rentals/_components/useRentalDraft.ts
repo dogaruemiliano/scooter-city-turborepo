@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useSyncExternalStore } from "react";
+import { useMemo, useSyncExternalStore } from "react";
 import {
   emptyRentalDraft,
   canPersistRentalDraft,
@@ -103,7 +103,6 @@ function createStore(userId: string, draftId?: string, personId?: string) {
 export function useRentalDraft(
   userId: string,
   returned: { draftId?: string; personId?: string },
-  unsavedMessage: string,
 ) {
   const draftId = returned?.draftId;
   const personId = returned?.personId;
@@ -116,29 +115,6 @@ export function useRentalDraft(
     store.getSnapshot,
     serverSnapshot,
   );
-  useEffect(() => {
-    if (!state?.storageError) return;
-    const warn = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-      event.returnValue = "";
-    };
-    const warnNavigation = (event: MouseEvent) => {
-      const link =
-        event.target instanceof Element
-          ? event.target.closest("a[href]")
-          : null;
-      if (link && !window.confirm(unsavedMessage)) {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-      }
-    };
-    window.addEventListener("beforeunload", warn);
-    document.addEventListener("click", warnNavigation, true);
-    return () => {
-      window.removeEventListener("beforeunload", warn);
-      document.removeEventListener("click", warnNavigation, true);
-    };
-  }, [state?.storageError, unsavedMessage]);
   return {
     draft: state?.draft ?? null,
     storageError: state?.storageError ?? false,
