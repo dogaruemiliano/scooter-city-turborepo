@@ -24,6 +24,7 @@ import {
   Settings2Icon,
   TagIcon,
   UsersRoundIcon,
+  WrenchIcon,
   type LucideIcon,
 } from "lucide-react";
 import type { SupportedLocale } from "@repo/i18n";
@@ -101,7 +102,7 @@ const PRIMARY_NAVIGATION_ITEMS = [
   { href: "/rentals", labelKey: "rentals", icon: BikeIcon },
   { href: "/my-rentals", labelKey: "myRentals", icon: BikeIcon },
   { href: "/persons", labelKey: "persons", icon: UsersRoundIcon },
-  { href: "/problems", labelKey: "problems", icon: Settings2Icon },
+  { href: "/problems", labelKey: "problems", icon: WrenchIcon },
 ] as const;
 
 const NAVIGATION_GROUPS = [
