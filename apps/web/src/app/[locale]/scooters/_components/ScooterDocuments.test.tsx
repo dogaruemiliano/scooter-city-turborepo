@@ -235,37 +235,57 @@ describe("Scooter documents", () => {
       "true",
     );
   });
-  it("keeps a compact attached-document list with upload and analysis badges", async () => {
+  it("keeps preview cards and analysis feedback visible when import controls expand", async () => {
     function Fixture() {
       const documents = useScooterDocuments();
       return (
-        <ScooterBatchDocuments
-          documents={{
-            ...documents,
-            drafts: [
-              { id: "civ", type: "civ", file: pdf("CIV.pdf"), status: "ready" },
-              {
-                id: "insurance",
-                type: "insurance",
-                file: pdf("insurance.pdf"),
-                status: "ready",
+        <ScooterDocumentAnalysisContext
+          value={{
+            civ: {
+              status: "success",
+              analysis: {
+                sourceId: "civ",
+                documentType: "civ",
+                extractedData: { vin: scooter.vin, fields: {}, rawFields: {} },
+                issues: [],
+                reviewRequired: true,
               },
-            ],
-            extractions: {
-              civ: { vin: scooter.vin, fields: {}, rawFields: {} },
             },
           }}
-          disabled={false}
-          analyzing={false}
-          importResult={{
-            ok: true,
-            values: {},
-            confirmedEmpty: [],
-            unresolved: [],
-            unresolvedRawFields: [],
-            emptyConflicts: [],
-          }}
-        />
+        >
+          <ScooterBatchDocuments
+            documents={{
+              ...documents,
+              drafts: [
+                {
+                  id: "civ",
+                  type: "civ",
+                  file: pdf("CIV.pdf"),
+                  status: "ready",
+                },
+                {
+                  id: "insurance",
+                  type: "insurance",
+                  file: pdf("insurance.pdf"),
+                  status: "ready",
+                },
+              ],
+              extractions: {
+                civ: { vin: scooter.vin, fields: {}, rawFields: {} },
+              },
+            }}
+            disabled={false}
+            analyzing={false}
+            importResult={{
+              ok: true,
+              values: {},
+              confirmedEmpty: [],
+              unresolved: [],
+              unresolvedRawFields: [],
+              emptyConflicts: [],
+            }}
+          />
+        </ScooterDocumentAnalysisContext>
       );
     }
     const browser = userEvent.setup();
@@ -274,18 +294,35 @@ describe("Scooter documents", () => {
       screen.getByRole("list", { name: "Attached documents" }),
     );
     const rows = summary.getAllByRole("listitem");
-    expect(rows).toHaveLength(3);
+    expect(rows).toHaveLength(2);
+    const importMore = screen.getByRole("button", {
+      name: "Import more documents",
+    });
+    expect(importMore).toHaveClass(
+      "w-full",
+      "justify-center",
+      "text-center",
+      "border-dashed",
+    );
     expect(
-      within(rows[2]!).getByRole("button", { name: "Import more documents" }),
-    ).toHaveClass("w-full", "justify-center", "text-center", "border-dashed");
+      rows[1]!.compareDocumentPosition(importMore) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    rows.forEach((row) =>
+      expect(
+        row.querySelector('[data-slot="document-preview-card"]'),
+      ).toBeInTheDocument(),
+    );
     expect(within(rows[0]!).getByText("CIV.pdf")).toBeInTheDocument();
     expect(within(rows[0]!).getByText("CIV")).toBeInTheDocument();
-    expect(within(rows[0]!).getByText("Uploaded and analyzed")).toHaveClass(
-      "text-success",
+    expect(within(rows[0]!).getByRole("status")).toHaveTextContent(
+      messages.en.scooters.documents.batch.read,
     );
     expect(within(rows[1]!).getByText("insurance.pdf")).toBeInTheDocument();
     expect(within(rows[1]!).getByText("Insurance")).toBeInTheDocument();
-    expect(within(rows[1]!).getByText("Uploaded")).toBeInTheDocument();
+    expect(within(rows[1]!).getByRole("status")).toHaveTextContent(
+      messages.en.scooters.extraction.queued,
+    );
     expect(
       screen.queryByRole("button", { name: /Drop your scooter documents/ }),
     ).not.toBeInTheDocument();
@@ -293,8 +330,11 @@ describe("Scooter documents", () => {
       screen.getByRole("button", { name: "Import more documents" }),
     );
     expect(
-      screen.queryByRole("list", { name: "Attached documents" }),
-    ).not.toBeInTheDocument();
+      screen.getByRole("list", { name: "Attached documents" }),
+    ).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /^Preview / })).toHaveLength(
+      2,
+    );
     expect(
       screen.getByRole("button", { name: /Drop your scooter documents/ }),
     ).toBeInTheDocument();

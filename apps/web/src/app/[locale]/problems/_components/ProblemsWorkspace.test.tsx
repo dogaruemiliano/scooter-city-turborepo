@@ -97,7 +97,7 @@ describe("mechanic workspace", () => {
     const alex = await within(picker).findByRole("button", {
       name: "Alex Ionescu",
     });
-    expect(alex).toHaveClass("rounded-2xl", "min-h-20");
+    expect(alex).toHaveAttribute("aria-pressed", "false");
     expect(within(alex).getByText("Mechanic")).toBeInTheDocument();
     expect(within(picker).getByText("Admin")).toHaveClass("text-info");
     expect(within(picker).queryByText("Super Admin")).toBeNull();
@@ -165,7 +165,7 @@ describe("mechanic workspace", () => {
     });
     expect(option).toHaveTextContent("B123");
     expect(option).toHaveTextContent("Honda Vision");
-    expect(option).toHaveClass("min-h-24");
+    expect(option).toBeEnabled();
     await user.click(option);
     expect(
       within(filters).getByRole("button", { name: "Scooter" }),
