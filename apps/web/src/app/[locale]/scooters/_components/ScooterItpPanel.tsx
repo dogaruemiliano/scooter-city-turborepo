@@ -2,7 +2,6 @@
 
 import { ApiError, v1 } from "@repo/api-shared";
 import {
-  Badge,
   Button,
   Card,
   CardContent,
@@ -307,9 +306,9 @@ function ItpPanelContent({
       <CardContent className="grid gap-6">
         {data ? (
           <div className="flex flex-wrap items-center gap-3">
-            <Badge variant={data.status === "active" ? "success" : "warning"}>
+            <span className="text-sm font-medium">
               {t(`status.${data.status}`)}
-            </Badge>
+            </span>
             {data.validUntil ? (
               <time dateTime={data.validUntil}>
                 {new Intl.DateTimeFormat(locale, { timeZone: "UTC" }).format(

@@ -74,6 +74,24 @@ beforeEach(() => {
 });
 
 describe("ScooterDetailPage", () => {
+  it("shows invalid insurance and ITP as fixed danger areas", () => {
+    renderDetail("en", {
+      ...scooter,
+      hasCivDocument: true,
+      registrationType: "national",
+      registrationNumber: "B123ABC",
+      rentalInsuranceStatus: "expired",
+      itpStatus: "failed",
+    });
+    for (const label of ["Expired insurance", "Failed ITP"]) {
+      const area = screen.getByText(label).closest('[data-slot="alert"]');
+      expect(area).toHaveAttribute("role", "alert");
+      expect(area).toHaveClass("bg-destructive-subtle");
+      expect(screen.getByText(label).closest('[data-slot="badge"]')).toBeNull();
+    }
+    expect(screen.queryByText("Needs CIV")).not.toBeInTheDocument();
+  });
+
   it("renders scooter details and actions", () => {
     renderDetail();
 

@@ -287,6 +287,11 @@ describe("ScootersPage", () => {
       scooterList([
         scooterRecord({
           insuranceAttention: "expired",
+          hasCivDocument: true,
+          registrationType: "national",
+          registrationNumber: "B123ABC",
+          rentalInsuranceStatus: "expired",
+          itpStatus: "active",
           speedometerWorking: false,
           odometerWorking: false,
         }),
@@ -295,9 +300,69 @@ describe("ScootersPage", () => {
     );
     expect(
       screen.getByText(
-        "Asigurare expirată · Vitezometrul nu funcționează · Odometrul nu funcționează",
+        "Vitezometrul nu funcționează · Odometrul nu funcționează",
       ),
     ).toBeInTheDocument();
+  });
+
+  it("shows the CIV prerequisite before insurance or ITP errors", () => {
+    renderScooters(
+      scooterList([
+        scooterRecord({
+          hasCivDocument: false,
+          rentalInsuranceStatus: "expired",
+          itpStatus: "expired",
+        }),
+      ]),
+    );
+    expect(screen.getByText("Needs CIV")).toHaveAttribute(
+      "data-variant",
+      "warning",
+    );
+    expect(screen.queryByText("Expired insurance")).not.toBeInTheDocument();
+    expect(screen.queryByText("Expired ITP")).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["missing", "Needs insurance"],
+    ["expired", "Expired insurance"],
+  ] as const)(
+    "shows %s insurance separately from expired ITP",
+    (rentalInsuranceStatus, label) => {
+      renderScooters(
+        scooterList([
+          scooterRecord({
+            hasCivDocument: true,
+            registrationType: "national",
+            registrationNumber: "B123ABC",
+            rentalInsuranceStatus,
+            itpStatus: "expired",
+          }),
+        ]),
+      );
+      expect(screen.getByText(label)).toBeInTheDocument();
+      expect(screen.getByText("Expired ITP")).toBeInTheDocument();
+    },
+  );
+
+  it("uses the short unregistered badge", () => {
+    renderScooters(
+      scooterList([
+        scooterRecord({
+          hasCivDocument: true,
+          registrationType: "unregistered",
+          registrationNumber: null,
+        }),
+      ]),
+    );
+    expect(
+      screen
+        .getAllByText("Unregistered")
+        .some((element) => element.getAttribute("data-slot") === "badge"),
+    ).toBe(true);
+    expect(
+      screen.queryByText("Needs Romanian registration"),
+    ).not.toBeInTheDocument();
   });
 
   it("keeps unknown checks neutral and shows zero mileage", () => {
@@ -324,12 +389,17 @@ describe("ScootersPage", () => {
           powertrainType: "electric",
           engineDisplacementCc: null,
           insuranceAttention: "upcoming",
+          hasCivDocument: true,
+          registrationType: "national",
+          registrationNumber: "B123ABC",
+          rentalInsuranceStatus: "upcoming",
+          itpStatus: "active",
         }),
       ]),
     );
     expect(screen.getByText("Electric")).toBeInTheDocument();
     expect(screen.queryByText(/cc$/)).not.toBeInTheDocument();
-    expect(screen.getByText("Insurance not yet active")).toBeInTheDocument();
+    expect(screen.getByText("Insurance not active yet")).toBeInTheDocument();
     expect(screen.queryByLabelText(/Mileage:/)).not.toBeInTheDocument();
   });
 

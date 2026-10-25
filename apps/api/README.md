@@ -196,3 +196,7 @@ Every error response is normalized by `AllExceptionsFilter`:
   }
 }
 ```
+
+### Local readiness examples
+
+Run `pnpm --filter api db:seed-readiness` to create or refresh six labeled demo scooters: missing CIV, missing registration, expired insurance, expired ITP, both expired, and valid documents. The command only accepts a local development database and uses the configured private S3 storage for clearly marked demo CIV and ITP PDFs. It updates only its own `demo-readiness-*` records and preserves their fleet numbers on subsequent runs. No migration is needed: readiness is derived from live document and validity records.

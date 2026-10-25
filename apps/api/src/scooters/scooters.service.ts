@@ -36,6 +36,10 @@ const scooterInclude = {
   _count: maintenanceCount,
   photos: galleryCoverPhotos,
   brand: true,
+  documents: {
+    where: { deletedAt: null, asset: { deletedAt: null } },
+    select: { type: true, extractedData: true },
+  },
   civDocument: true,
   inspections: {
     orderBy: [{ inspectionDate: "desc" }, { createdAt: "desc" }],
@@ -54,6 +58,10 @@ const scooterListInclude = {
   _count: maintenanceCount,
   photos: galleryCoverPhotos,
   brand: true,
+  documents: {
+    where: { deletedAt: null, asset: { deletedAt: null } },
+    select: { type: true, extractedData: true },
+  },
   insurancePolicies: { select: { validFrom: true, validUntil: true } },
   inspections: {
     orderBy: [{ inspectionDate: "desc" }, { createdAt: "desc" }],

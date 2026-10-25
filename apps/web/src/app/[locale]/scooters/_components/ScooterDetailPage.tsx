@@ -10,6 +10,8 @@ import { ScooterItpPanel } from "./ScooterItpPanel";
 import { v1 } from "@repo/api-shared";
 import {
   Badge,
+  Alert,
+  AlertTitle,
   BottomSheet,
   BottomSheetBody,
   BottomSheetClose,
@@ -95,6 +97,7 @@ export function ScooterDetailPage({
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [photosBusy, setPhotosBusy] = useState(false);
+  const readiness = v1.scooters.scooterReadinessIssues(scooter);
   const [registrationOpen, setRegistrationOpen] = useState(false);
   const [registrationDialogKey, setRegistrationDialogKey] = useState(0);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -215,12 +218,25 @@ export function ScooterDetailPage({
             <Badge variant="destructive">{problemsT("maintenanceHold")}</Badge>
           ) : null}
           <PowertrainBadge scooter={scooter} />
-          <Badge variant="outline">
-            {t(`registrationTypes.${scooter.registrationType}`)}
-          </Badge>
         </div>
       </div>
 
+      {readiness.length ? (
+        <div className="grid gap-3">
+          {readiness.map((issue) => (
+            <Alert
+              key={issue}
+              variant={
+                issue === "needsCiv" || issue === "needsRegistration"
+                  ? "warning"
+                  : "destructive"
+              }
+            >
+              <AlertTitle>{t(`readiness.${issue}`)}</AlertTitle>
+            </Alert>
+          ))}
+        </div>
+      ) : null}
       {feedback ? <FeedbackAlert feedback={feedback} /> : null}
       {canAccess(session?.user, "problems.read") ? (
         <ScooterProblems scooterId={scooter.id} />
@@ -293,10 +309,6 @@ export function ScooterDetailPage({
       </DetailSection>
 
       <DetailSection title={t("sections.registration")}>
-        <DetailField
-          label={t("fields.civAvailability")}
-          value={t(`civ.availability.${scooter.civAvailability ?? "unknown"}`)}
-        />
         <DetailField
           label={t("fields.registrationType")}
           value={t(`registrationTypes.${scooter.registrationType}`)}

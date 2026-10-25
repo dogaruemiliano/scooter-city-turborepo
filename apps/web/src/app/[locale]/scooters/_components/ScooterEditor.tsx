@@ -1017,7 +1017,6 @@ export function ScooterEditor({
                     </h2>
                     <ScooterCreateFields
                       editing={Boolean(scooter)}
-                      hasCivEvidence={hasCivEvidence}
                       photos={
                         <ScooterPhotos
                           scooterId={scooter?.id}

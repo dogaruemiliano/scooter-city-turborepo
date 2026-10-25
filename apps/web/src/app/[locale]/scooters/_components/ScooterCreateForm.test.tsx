@@ -1766,34 +1766,16 @@ it("restores manual field corrections from a persistent workspace draft after na
   ).toBe(false);
 });
 
-it("shows explicit CIV availability and marks it issued when CIV evidence is entered", async () => {
+it("omits manual CIV availability from registration", () => {
   renderWizard();
-  const browser = userEvent.setup();
-  const availability = screen.getByRole("radiogroup", {
-    name: "CIV availability",
-  });
   expect(
-    within(availability).getByRole("radio", { name: /Unknown$/ }),
-  ).toBeChecked();
-  await browser.click(
-    within(availability).getByRole("radio", { name: /Not issued yet$/ }),
-  );
+    screen.queryByRole("radiogroup", { name: "CIV availability" }),
+  ).not.toBeInTheDocument();
   expect(
-    within(availability).getByRole("radio", { name: /Not issued yet$/ }),
-  ).toBeChecked();
-  await browser.click(screen.getByRole("button", { name: "Advanced details" }));
-  await browser.type(
-    screen.getByRole("textbox", { name: "Vehicle identity card number" }),
-    "CIV-123",
-  );
-  await waitFor(() =>
-    expect(
-      within(availability).getByRole("radio", { name: /(?:^| )Issued$/ }),
-    ).toBeChecked(),
-  );
-  expect(
-    within(availability).getByRole("radio", { name: /Not issued yet$/ }),
-  ).toBeDisabled();
+    screen.queryByText(
+      "CIV details or a CIV document confirm it has been issued. The scan may be added later.",
+    ),
+  ).not.toBeInTheDocument();
 });
 
 it("retains a visually detected client copy for assignment without importing its readings", async () => {
