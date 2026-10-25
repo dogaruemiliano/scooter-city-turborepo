@@ -319,8 +319,50 @@ describe("ScootersPage", () => {
       "data-variant",
       "warning",
     );
-    expect(screen.queryByText("No valid insurance")).not.toBeInTheDocument();
-    expect(screen.queryByText("No valid ITP")).not.toBeInTheDocument();
+    expect(screen.queryByText("Expired insurance")).not.toBeInTheDocument();
+    expect(screen.queryByText("Expired ITP")).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["missing", "Needs insurance"],
+    ["expired", "Expired insurance"],
+  ] as const)(
+    "shows %s insurance separately from expired ITP",
+    (rentalInsuranceStatus, label) => {
+      renderScooters(
+        scooterList([
+          scooterRecord({
+            hasCivDocument: true,
+            registrationType: "national",
+            registrationNumber: "B123ABC",
+            rentalInsuranceStatus,
+            itpStatus: "expired",
+          }),
+        ]),
+      );
+      expect(screen.getByText(label)).toBeInTheDocument();
+      expect(screen.getByText("Expired ITP")).toBeInTheDocument();
+    },
+  );
+
+  it("uses the short unregistered badge", () => {
+    renderScooters(
+      scooterList([
+        scooterRecord({
+          hasCivDocument: true,
+          registrationType: "unregistered",
+          registrationNumber: null,
+        }),
+      ]),
+    );
+    expect(
+      screen
+        .getAllByText("Unregistered")
+        .some((element) => element.getAttribute("data-slot") === "badge"),
+    ).toBe(true);
+    expect(
+      screen.queryByText("Needs Romanian registration"),
+    ).not.toBeInTheDocument();
   });
 
   it("keeps unknown checks neutral and shows zero mileage", () => {
@@ -357,7 +399,7 @@ describe("ScootersPage", () => {
     );
     expect(screen.getByText("Electric")).toBeInTheDocument();
     expect(screen.queryByText(/cc$/)).not.toBeInTheDocument();
-    expect(screen.getByText("No valid insurance")).toBeInTheDocument();
+    expect(screen.getByText("Insurance not active yet")).toBeInTheDocument();
     expect(screen.queryByLabelText(/Mileage:/)).not.toBeInTheDocument();
   });
 

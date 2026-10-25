@@ -83,7 +83,7 @@ describe("ScooterDetailPage", () => {
       rentalInsuranceStatus: "expired",
       itpStatus: "failed",
     });
-    for (const label of ["No valid insurance", "No valid ITP"]) {
+    for (const label of ["Expired insurance", "Failed ITP"]) {
       const area = screen.getByText(label).closest('[data-slot="alert"]');
       expect(area).toHaveAttribute("role", "alert");
       expect(area).toHaveClass("bg-destructive-subtle");

@@ -32,10 +32,10 @@ test("registered scooters report insurance and ITP independently", () => {
   assert.deepEqual(scooterReadinessIssues(ready), []);
   assert.deepEqual(
     scooterReadinessIssues({ ...ready, rentalInsuranceStatus: "missing" }),
-    ["invalidInsurance"],
+    ["needsInsurance"],
   );
   assert.deepEqual(scooterReadinessIssues({ ...ready, itpStatus: "expired" }), [
-    "invalidItp",
+    "expiredItp",
   ]);
   assert.deepEqual(
     scooterReadinessIssues({
@@ -43,7 +43,7 @@ test("registered scooters report insurance and ITP independently", () => {
       rentalInsuranceStatus: "upcoming",
       itpStatus: "failed",
     }),
-    ["invalidInsurance", "invalidItp"],
+    ["upcomingInsurance", "failedItp"],
   );
   assert.deepEqual(
     scooterReadinessIssues({ ...ready, itpStatus: "expiring" }),
@@ -74,4 +74,28 @@ test("expired or undated temporary registration requires registration", () => {
     ),
     [],
   );
+});
+
+test("missing, expired and unverified records keep distinct labels", () => {
+  for (const [status, expected] of [
+    ["missing", "needsInsurance"],
+    ["expired", "expiredInsurance"],
+    ["review", "invalidInsurance"],
+    ["upcoming", "upcomingInsurance"],
+  ] as const) {
+    assert.deepEqual(
+      scooterReadinessIssues({ ...ready, rentalInsuranceStatus: status }),
+      [expected],
+    );
+  }
+  for (const [status, expected] of [
+    ["missing", "needsItp"],
+    ["expired", "expiredItp"],
+    ["review", "invalidItp"],
+    ["failed", "failedItp"],
+  ] as const) {
+    assert.deepEqual(scooterReadinessIssues({ ...ready, itpStatus: status }), [
+      expected,
+    ]);
+  }
 });

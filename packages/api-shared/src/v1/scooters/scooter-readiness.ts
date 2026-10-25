@@ -4,6 +4,12 @@ import type { Scooter } from "./scooters.schemas";
 export type ScooterReadinessIssue =
   | "needsCiv"
   | "needsRegistration"
+  | "needsInsurance"
+  | "expiredInsurance"
+  | "upcomingInsurance"
+  | "needsItp"
+  | "expiredItp"
+  | "failedItp"
   | "invalidInsurance"
   | "invalidItp";
 
@@ -30,9 +36,36 @@ export function scooterReadinessIssues(
   )
     return ["needsRegistration"];
   const issues: ScooterReadinessIssue[] = [];
-  if (scooter.rentalInsuranceStatus !== "active")
-    issues.push("invalidInsurance");
-  if (scooter.itpStatus !== "active" && scooter.itpStatus !== "expiring")
-    issues.push("invalidItp");
+  switch (scooter.rentalInsuranceStatus) {
+    case "active":
+      break;
+    case "expired":
+      issues.push("expiredInsurance");
+      break;
+    case "upcoming":
+      issues.push("upcomingInsurance");
+      break;
+    case "review":
+      issues.push("invalidInsurance");
+      break;
+    default:
+      issues.push("needsInsurance");
+  }
+  switch (scooter.itpStatus) {
+    case "active":
+    case "expiring":
+      break;
+    case "expired":
+      issues.push("expiredItp");
+      break;
+    case "failed":
+      issues.push("failedItp");
+      break;
+    case "review":
+      issues.push("invalidItp");
+      break;
+    default:
+      issues.push("needsItp");
+  }
   return issues;
 }
