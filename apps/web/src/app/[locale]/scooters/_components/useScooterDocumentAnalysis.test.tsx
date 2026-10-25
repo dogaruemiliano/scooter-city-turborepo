@@ -72,6 +72,74 @@ beforeEach(() => {
 });
 
 describe("direct document analysis", () => {
+  it("reviews multiple sections in one file atomically and retains them in the cache", async () => {
+    const original = response("one");
+    const correct = original.extractedData.vin!;
+    const misread = "LXYTCKP05P0000002";
+    original.extractedData.documents = ["a", "b"].map((id, index) => ({
+      id,
+      documentType: "foreign_registration",
+      pages: [index + 1],
+      vin: misread,
+      fields: { vin: misread },
+      rawFields: { E: misread },
+    }));
+    apiFetch.mockResolvedValue(original);
+    const file = draft("one");
+    const hook = renderHook(() =>
+      useScooterDocumentAnalysis(documents([file])),
+    );
+    await act(async () => {
+      await hook.result.current.run();
+    });
+    const corrections = ["a", "b"].map((documentId) => ({
+      sourceId: "one",
+      documentId,
+      previousVin: misread,
+      vin: correct,
+    }));
+    const before = hook.result.current.entries;
+    act(() => {
+      expect(
+        hook.result.current.reviewVins([
+          corrections[0]!,
+          { ...corrections[1]!, previousVin: null },
+        ]),
+      ).toBeNull();
+    });
+    expect(hook.result.current.entries).toBe(before);
+    act(() => {
+      expect(hook.result.current.reviewVins(corrections)).not.toBeNull();
+    });
+    await act(async () => {
+      expect(await hook.result.current.run()).toMatchObject([
+        {
+          status: "success",
+          analysis: {
+            extractedData: {
+              vin: correct,
+              documents: [
+                {
+                  id: "a",
+                  vin: correct,
+                  rawFields: { E: misread },
+                  vinReview: { originalVin: misread },
+                },
+                {
+                  id: "b",
+                  vin: correct,
+                  rawFields: { E: misread },
+                  vinReview: { originalVin: misread },
+                },
+              ],
+            },
+          },
+        },
+      ]);
+    });
+    expect(apiFetch).toHaveBeenCalledOnce();
+  });
+
   it("reuses manual corrections without another request and discards them with the source", async () => {
     apiFetch.mockResolvedValueOnce(response("one"));
     const file = draft("one");

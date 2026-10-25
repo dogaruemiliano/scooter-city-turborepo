@@ -1,12 +1,21 @@
 import { v1 } from "@repo/api-shared";
 import { messages } from "@repo/i18n";
-import { render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import { useState } from "react";
-import { expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { ScooterEditor } from "./ScooterEditor";
 vi.mock("./ScooterPhotos", () => ({ ScooterPhotos: () => null }));
 import type { DocumentDraft } from "./useScooterDocuments";
+import { scooterEditorDefaults } from "./scooter-editor-schema";
+import type { ScooterImportSnapshot } from "./scooter-import-workspace";
 
 const apiFetch = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/api", () => ({
@@ -70,10 +79,208 @@ vi.mock("./useScooterDocuments", () => ({
   },
 }));
 
+beforeEach(() => {
+  apiFetch.mockReset();
+});
+afterEach(() => vi.useRealTimers());
+
+it.each(["en", "ro"] as const)(
+  "unblocks an already-reviewed draft with a conflicting section VIN in %s",
+  async (locale) => {
+    const correct = "LXYTCZP05P0000001";
+    const misread = "LXYTC2P05P0000001";
+    const t = messages[locale].scooters;
+    const brand = {
+      id: "brand-1",
+      name: "Honda",
+      code: "HON",
+      scooterCount: 0,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    };
+    const result: v1.scooters.ScooterDocumentAnalysis = {
+      sourceId: "civ",
+      documentType: "civ",
+      reviewRequired: true,
+      issues: [],
+      extractedData: {
+        vin: correct,
+        fields: { vin: correct },
+        rawFields: {},
+        vinReview: { method: "manual", originalVin: misread },
+        documents: [
+          {
+            id: "identity",
+            documentType: "civ",
+            pages: [1],
+            vin: correct,
+            fields: { vin: correct },
+            rawFields: {},
+          },
+          {
+            id: "foreign",
+            documentType: "foreign_registration",
+            pages: [2, 3],
+            vin: misread,
+            fields: { vin: misread },
+            rawFields: { E: misread },
+          },
+        ],
+      },
+    };
+    const registration = {
+      ...result,
+      sourceId: "registration",
+      documentType: "registration_certificate" as const,
+      extractedData: { vin: null, fields: {}, rawFields: {} },
+    };
+    const state: ScooterImportSnapshot = {
+      version: 1,
+      values: {
+        ...scooterEditorDefaults(),
+        vin: correct,
+        brandId: brand.id,
+        fleetNumber: "7",
+        registrationType: "unregistered",
+      },
+      documents: { drafts: [], removedIds: [], extractions: {} },
+      analysis: {
+        entries: {
+          civ: { status: "success", analysis: result },
+          registration: { status: "success", analysis: registration },
+        },
+        cache: files.map((file) => [
+          JSON.stringify([
+            file.id,
+            file.type,
+            file.file.name,
+            file.file.size,
+            file.file.lastModified,
+          ]),
+          file.id,
+        ]),
+        attempts: [],
+      },
+      extraction: {
+        confirmedSources: [],
+        origins: [],
+        manual: [],
+        automaticBaselines: [],
+        rawBySource: [],
+      },
+      importedRawFields: null,
+      importedSignature: null,
+      automaticImport: "",
+      reviewedDocuments: [],
+      createdBrands: [],
+      status: "attention",
+    };
+    const onCreated = vi.fn();
+    render(
+      <NextIntlClientProvider locale={locale} messages={messages[locale]}>
+        <ScooterEditor
+          brands={[brand]}
+          returnHref={`/${locale}/scooters`}
+          initialSnapshot={state}
+          onCreated={onCreated}
+        />
+      </NextIntlClientProvider>,
+    );
+    const alert = await screen.findByText(t.extraction.vinReview.conflictTitle);
+    const warning = alert.closest('[role="alert"]') as HTMLElement;
+    expect(within(warning).getByText("civ.pdf")).toBeInTheDocument();
+    expect(
+      within(warning).getByText(t.documents.foreign_registration, {
+        exact: false,
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(warning).getByText(t.workspace.pages.replace("{pages}", "2, 3"), {
+        exact: false,
+      }),
+    ).toBeInTheDocument();
+    expect(within(warning).getByText(misread)).toBeInTheDocument();
+    expect(within(warning).getByText(correct)).toBeInTheDocument();
+    expect(screen.queryByText(t.creation.ready)).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: t.actions.create }),
+    ).not.toBeInTheDocument();
+    const review = screen.getByRole("button", {
+      name: t.creation.validateDocuments,
+    });
+    expect(review).toBeEnabled();
+    fireEvent.submit(review.closest("form")!);
+    await act(async () => {});
+    expect(apiFetch).not.toHaveBeenCalled();
+    fireEvent.click(review);
+    let sheet = await screen.findByRole("dialog", {
+      name: t.extraction.vinReview.documentsTitle,
+    });
+    expect(within(sheet).getByText(misread)).toBeInTheDocument();
+    fireEvent.click(
+      within(sheet).getByRole("button", { name: t.extraction.vinReview.later }),
+    );
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", {
+          name: t.extraction.vinReview.documentsTitle,
+        }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(review).toBeEnabled();
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
+    fireEvent.click(review);
+    // Preview hydration yields before the sheet opens.
+    await act(async () => {});
+    sheet = screen.getByRole("dialog", {
+      name: t.extraction.vinReview.documentsTitle,
+    });
+    act(() => vi.advanceTimersByTime(3000));
+    fireEvent.click(
+      within(sheet).getByRole("button", {
+        name: t.extraction.vinReview.confirmAndFinish,
+      }),
+    );
+    vi.useRealTimers();
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("button", { name: t.creation.validateDocuments }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(
+      screen.getByRole("button", { name: t.actions.create }),
+    ).toBeEnabled();
+    expect(
+      screen.queryByText(t.extraction.vinReview.conflictTitle),
+    ).not.toBeInTheDocument();
+    expect(persisted.civ?.documents?.[1]).toMatchObject({
+      vin: correct,
+      rawFields: { E: misread },
+      vinReview: { method: "manual", originalVin: misread },
+    });
+    expect(apiFetch).not.toHaveBeenCalled();
+    apiFetch.mockResolvedValue({ id: "created-scooter" });
+    fireEvent.click(screen.getByRole("button", { name: t.actions.create }));
+    await waitFor(() =>
+      expect(onCreated).toHaveBeenCalledWith({ id: "created-scooter" }, false),
+    );
+    expect(apiFetch).toHaveBeenCalledExactlyOnceWith(
+      v1.scooters.ROUTES.create,
+      v1.scooters.scooterSchema,
+      expect.objectContaining({
+        method: "POST",
+        json: expect.objectContaining({ vin: correct }),
+      }),
+    );
+  },
+);
+
 it("fills the CIV VIN once and ignores a legacy Romanian registration VIN without asking again", async () => {
   const correct = "LXYTCZP05P0000001";
   const misread = "LXYTC2P05P0000001";
-  apiFetch.mockImplementation((_route, _schema, { json }) => {
+  apiFetch.mockImplementation((_route, _schema, options) => {
+    if (!options?.json) throw new Error(`Unexpected API request: ${_route}`);
+    const { json } = options;
     const vin = json.sourceId === "civ" ? correct : misread;
     const result = {
       sourceId: json.sourceId,
