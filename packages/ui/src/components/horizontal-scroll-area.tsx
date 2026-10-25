@@ -15,6 +15,8 @@ type HorizontalScrollAreaProps = Omit<
   label: string;
   /** Fade only the edges with horizontally clipped content, using the shared tab fade width. */
   fadeEdges?: boolean;
+  /** Keep touch scrolling, showing the scrollbar only at the lg breakpoint and above. */
+  scrollbarVisibility?: "always" | "desktop";
   /** Enables a right-edge arrow and mouse-hover scrolling across the full viewport height. */
   scrollRightLabel?: string;
 };
@@ -25,6 +27,7 @@ export function HorizontalScrollArea({
   className,
   label,
   fadeEdges = false,
+  scrollbarVisibility = "always",
   scrollRightLabel,
   onPointerMove,
   onPointerLeave,
@@ -105,7 +108,10 @@ export function HorizontalScrollArea({
         stopScrolling();
       }}
       className={cn(
-        "group/horizontal-scroll relative w-full min-w-0 overflow-hidden data-[has-overflow-x]:pb-5",
+        "group/horizontal-scroll relative w-full min-w-0 overflow-hidden",
+        scrollbarVisibility === "desktop"
+          ? "lg:data-[has-overflow-x]:pb-5"
+          : "data-[has-overflow-x]:pb-5",
         className,
       )}
     >
@@ -126,7 +132,12 @@ export function HorizontalScrollArea({
       {scrollRightLabel ? (
         <div
           data-slot="horizontal-scroll-edge"
-          className="pointer-events-none absolute top-0 right-0 bottom-5 hidden w-12 items-center justify-end bg-linear-to-r from-transparent to-background group-data-[overflow-x-end]/horizontal-scroll:flex"
+          className={cn(
+            "pointer-events-none absolute top-0 right-0 hidden w-12 items-center justify-end bg-linear-to-r from-transparent to-background group-data-[overflow-x-end]/horizontal-scroll:flex",
+            scrollbarVisibility === "desktop"
+              ? "bottom-0 lg:bottom-5"
+              : "bottom-5",
+          )}
         >
           <Button
             variant="secondary"
@@ -151,7 +162,10 @@ export function HorizontalScrollArea({
       <ScrollAreaPrimitive.Scrollbar
         data-slot="horizontal-scrollbar"
         orientation="horizontal"
-        className="flex h-3 rounded-full bg-muted p-0.5"
+        className={cn(
+          "h-3 rounded-full bg-muted p-0.5",
+          scrollbarVisibility === "desktop" ? "hidden lg:flex" : "flex",
+        )}
       >
         <ScrollAreaPrimitive.Thumb
           data-slot="horizontal-scroll-thumb"

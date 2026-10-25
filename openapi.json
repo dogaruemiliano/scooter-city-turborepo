@@ -12591,6 +12591,10 @@
           "extractedData": {
             "type": "object",
             "properties": {
+              "clientCopy": {
+                "type": "boolean",
+                "enum": [true]
+              },
               "vin": {
                 "type": "string",
                 "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
@@ -13101,6 +13105,10 @@
                 "extractedData": {
                   "type": "object",
                   "properties": {
+                    "clientCopy": {
+                      "type": "boolean",
+                      "enum": [true]
+                    },
                     "vin": {
                       "type": "string",
                       "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
@@ -14724,6 +14732,10 @@
                 "extractedData": {
                   "type": "object",
                   "properties": {
+                    "clientCopy": {
+                      "type": "boolean",
+                      "enum": [true]
+                    },
                     "vin": {
                       "type": "string",
                       "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
@@ -15037,6 +15049,10 @@
                 "extractedData": {
                   "type": "object",
                   "properties": {
+                    "clientCopy": {
+                      "type": "boolean",
+                      "enum": [true]
+                    },
                     "vin": {
                       "type": "string",
                       "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
@@ -15932,6 +15948,10 @@
           "extractedData": {
             "type": "object",
             "properties": {
+              "clientCopy": {
+                "type": "boolean",
+                "enum": [true]
+              },
               "vin": {
                 "type": "string",
                 "pattern": "^[A-HJ-NPR-Z0-9]{17}$",

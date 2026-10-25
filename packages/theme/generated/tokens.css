@@ -427,7 +427,7 @@
   --spacing-0-5: 0.125rem;
   --spacing-1-5: 0.375rem;
   --spacing-2-5: 0.625rem;
-  --spacing-screen-bottom: 2rem;
+  --spacing-screen-bottom: 0.5rem;
   --container-primary-form-actions: minmax(0, 2fr) minmax(0, 3fr);
   --container-scooter-photo-preview: 55dvh;
   --container-scooter-photo-preview-mobile: 35dvh;
@@ -441,6 +441,7 @@
 
   --aspect-scooter-photo: 1.3333333333333333;
   --aspect-document-landscape: 1.586;
+  --aspect-document-a-4portrait: 0.7070707070707071;
   --aspect-identity-card-portrait: 0.6305170239596469;
   --aspect-receipt-portrait: 0.3333333333333333;
 

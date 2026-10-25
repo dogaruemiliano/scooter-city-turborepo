@@ -38,7 +38,7 @@ const spacingScale = {
 /** Screen content breathing room; device safe-area insets are added by the shell. */
 export const spacing = {
   ...spacingScale,
-  screenBottom: spacingScale[8],
+  screenBottom: spacingScale[2],
 } as const;
 
 export type Spacing = typeof spacing;

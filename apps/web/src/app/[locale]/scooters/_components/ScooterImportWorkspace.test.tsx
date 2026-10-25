@@ -1,3 +1,4 @@
+import { PageHeaderActionsContext } from "@/components/PageHeaderActions";
 import { ApiError, v1 } from "@repo/api-shared";
 import { messages } from "@repo/i18n";
 import {
@@ -30,19 +31,24 @@ vi.mock("./ScooterEditor", () => ({
     onSnapshot,
     onCreated,
     initialSnapshot,
-    incomingFiles,
   }: ScooterEditorProps) => {
     const [text, setText] = useState(initialSnapshot?.values.notes ?? "");
     useEffect(() => () => mocks.unmount(importDraft?.id), [importDraft?.id]);
     return (
       <div>
-        {incomingFiles?.files.map((file) => (
-          <span key={file.name}>{file.name}</span>
-        ))}
         <button
           onClick={() => onSnapshot?.(identifiedSnapshot(importDraft!.id))}
         >
           Detect scooter
+        </button>
+        <button
+          onClick={() => {
+            const pending = identifiedSnapshot(importDraft!.id);
+            pending.documents.drafts[0]!.status = "uploading";
+            onSnapshot?.(pending);
+          }}
+        >
+          Start upload
         </button>
         <input
           aria-label="Draft note"
@@ -100,11 +106,15 @@ function snapshot(note = ""): ScooterImportSnapshot {
     status: "review",
   };
 }
-function mount() {
+function mount(header?: HTMLElement) {
   return render(
     <StrictMode>
       <NextIntlClientProvider locale="en" messages={messages.en}>
-        <ScooterImportWorkspace scootersHref="/en/scooters" brands={[]} />
+        <PageHeaderActionsContext
+          value={{ isMobile: Boolean(header), target: header ?? null }}
+        >
+          <ScooterImportWorkspace scootersHref="/en/scooters" brands={[]} />
+        </PageHeaderActionsContext>
       </NextIntlClientProvider>
     </StrictMode>,
   );
@@ -117,6 +127,115 @@ beforeEach(() => {
 });
 
 describe("persistent scooter import workspace", () => {
+  it("shows only the content for a single draft waiting for documents", async () => {
+    mocks.fetch.mockResolvedValue({ items: [draft("one")] });
+    mount();
+    await screen.findByRole("textbox", { name: "Draft note" });
+    expect(
+      screen.queryByRole("navigation", { name: "Scooter drafts" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: /Draft 1/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Discard draft" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Add more scooters in parallel" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("waits for a completed upload and keeps the single-draft view if creating another draft fails", async () => {
+    mocks.fetch.mockImplementation(async (_path, _schema, options) => {
+      if (options?.method === "POST") throw new Error("Disconnected");
+      if (options?.method === "PATCH")
+        return { ...draft("one"), revision: 1, state: options.json.state };
+      return { items: [draft("one")] };
+    });
+    mount();
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Start upload" }),
+    );
+    expect(
+      screen.queryByRole("button", { name: "Add more scooters in parallel" }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Detect scooter" }));
+    const add = await screen.findByRole("button", {
+      name: "Add more scooters in parallel",
+    });
+    expect(add.closest("nav")).toHaveAttribute("aria-label", "Scooter drafts");
+    fireEvent.click(add);
+    await screen.findByRole("alert");
+    expect(
+      screen.queryByRole("heading", { name: /Draft/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Discard draft" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("textbox", { name: "Draft note" }),
+    ).toBeInTheDocument();
+    expect(add).toBeEnabled();
+  });
+
+  it("reveals add in the mobile navigation header and introduces draft controls only after creation succeeds", async () => {
+    mocks.fetch.mockImplementation(async (_path, _schema, options) => {
+      if (options?.method === "PATCH")
+        return { ...draft("one"), revision: 1, state: options.json.state };
+      if (options?.method === "POST") return draft("two");
+      return { items: [draft("one")] };
+    });
+    const header = document.createElement("header");
+    document.body.append(header);
+    const view = mount(header);
+    try {
+      fireEvent.click(
+        await screen.findByRole("button", { name: "Detect scooter" }),
+      );
+      const add = await within(header).findByRole("button", {
+        name: "Add more scooters in parallel",
+      });
+      expect(add).toHaveClass("animate-in", "motion-reduce:animate-none");
+      expect(
+        screen.queryByRole("heading", { name: /Draft 1/ }),
+      ).not.toBeInTheDocument();
+      fireEvent.click(add);
+      const title = await screen.findByRole("heading", { name: /Draft 2/ });
+      expect(title.parentElement).toHaveClass("animate-in");
+      expect(title).toHaveFocus();
+      expect(
+        within(
+          screen.getByRole("navigation", { name: "Scooter drafts" }),
+        ).getByRole("button", { name: /Draft 1/ }),
+      ).toBeInTheDocument();
+      expect(within(header).queryByRole("button")).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: /Draft 1/ }));
+      expect(within(header).queryByRole("button")).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: /Draft 2/ }));
+      fireEvent.click(screen.getByRole("button", { name: "Detect scooter" }));
+      expect(
+        await within(header).findByRole("button", {
+          name: "Add more scooters in parallel",
+        }),
+      ).toBeInTheDocument();
+    } finally {
+      view.unmount();
+      header.remove();
+    }
+  });
+
+  it("keeps documents in their draft when analysis cannot identify a VIN", async () => {
+    const state = identifiedSnapshot("one");
+    const result = state.analysis.entries.one;
+    if (result.status === "success") result.analysis.extractedData.vin = null;
+    state.assignment = "obsolete-target";
+    mocks.fetch.mockResolvedValue({ items: [{ ...draft("one"), state }] });
+    mount();
+    await screen.findByRole("textbox", { name: "Draft note" });
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    expect(mocks.fetch).toHaveBeenCalledOnce();
+  });
+
   it("recovers edits after refresh while a failed autosave is still pending", async () => {
     mocks.fetch.mockImplementation(async (_path, _schema, options) => {
       if (options?.method === "PATCH") throw new TypeError("Disconnected");
@@ -195,7 +314,7 @@ describe("persistent scooter import workspace", () => {
     expect(sessionStorage.getItem("scooter-import:one:v1")).toBeNull();
   });
 
-  it("creates one initial draft under Strict Mode and leaves other editors mounted while switching", async () => {
+  it("creates one initial draft under Strict Mode", async () => {
     let index = 0;
     mocks.fetch.mockImplementation(async (_path, _schema, options) =>
       options?.method === "POST" ? draft(`draft-${++index}`) : { items: [] },
@@ -203,18 +322,23 @@ describe("persistent scooter import workspace", () => {
     mount();
     await screen.findByRole("textbox", { name: "Draft note" });
     expect(index).toBe(1);
-    fireEvent.change(screen.getByRole("textbox", { name: "Draft note" }), {
-      target: { value: "First scooter correction" },
+  });
+  it("leaves restored editors mounted while switching", async () => {
+    mocks.fetch.mockResolvedValue({
+      items: [draft("draft-1"), draft("draft-2")],
     });
-    mocks.unmount.mockClear();
-    fireEvent.click(
-      screen.getByRole("button", { name: "Add another scooter" }),
+    mount();
+    await screen.findByRole("button", { name: /Draft 2/ });
+    fireEvent.change(
+      screen.getAllByRole("textbox", { name: "Draft note" })[0],
+      {
+        target: { value: "First scooter correction" },
+      },
     );
+    mocks.unmount.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: /Draft 2/ }));
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: /Draft 2/ })).toHaveAttribute(
-        "aria-pressed",
-        "true",
-      ),
+      expect(screen.getByRole("heading", { name: /Draft 2/ })).toHaveFocus(),
     );
     expect(
       screen.getAllByRole("textbox", { name: "Draft note", hidden: true }),
@@ -225,20 +349,137 @@ describe("persistent scooter import workspace", () => {
       screen.getAllByRole("textbox", { name: "Draft note" })[0],
     ).toHaveValue("First scooter correction");
   });
+  it("keeps add parallel last, and moves the selected badge into the title row", async () => {
+    mocks.fetch.mockResolvedValue({
+      items: [
+        { ...draft("one"), state: identifiedSnapshot("one") },
+        { ...draft("two"), state: identifiedSnapshot("two") },
+        { ...draft("three"), state: identifiedSnapshot("three") },
+      ],
+    });
+    mount();
+    const nav = await screen.findByRole("navigation", {
+      name: "Scooter drafts",
+    });
+    await within(nav).findByRole("button", { name: /Draft 2/ });
+    expect(
+      within(nav).queryByRole("button", { name: /Draft 1/ }),
+    ).not.toBeInTheDocument();
+    expect(within(nav).getAllByRole("button").at(-1)).toHaveTextContent(
+      "Add more scooters in parallel",
+    );
+    fireEvent.click(within(nav).getByRole("button", { name: /Draft 2/ }));
+    expect(
+      within(nav).queryByRole("button", { name: /Draft 2/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(nav).getByRole("button", { name: /Draft 1/ }),
+    ).toBeInTheDocument();
+    const title = screen.getByRole("heading", { name: /Draft 2/ });
+    expect(within(nav).getByRole("button", { name: /Draft 1/ })).toHaveClass(
+      "rounded-full",
+    );
+    expect(
+      within(nav).getByRole("button", {
+        name: "Add more scooters in parallel",
+      }),
+    ).toHaveClass("rounded-full");
+    expect(title.querySelector('[data-draft-motion="two"]')).toHaveClass(
+      "rounded-lg",
+    );
+    expect(title).toHaveFocus();
+    expect(title.parentElement).toContainElement(
+      screen.getByRole("button", { name: "Discard draft" }),
+    );
+    expect(
+      screen.queryByText(messages.en.scooters.workspace.pdfHint),
+    ).not.toBeInTheDocument();
+    expect(screen.getAllByRole("textbox", { name: "Draft note" })).toHaveLength(
+      1,
+    );
+  });
+
+  it("creates and selects a parallel draft without losing the current form", async () => {
+    mocks.fetch.mockImplementation(async (_path, _schema, options) =>
+      options?.method === "POST"
+        ? draft("two")
+        : { items: [{ ...draft("one"), state: identifiedSnapshot("one") }] },
+    );
+    mount();
+    fireEvent.change(
+      await screen.findByRole("textbox", { name: "Draft note" }),
+      { target: { value: "Keep this edit" } },
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Add more scooters in parallel" }),
+    );
+    await screen.findByRole("heading", { name: /Draft 2/ });
+    expect(
+      screen.getAllByRole("textbox", { name: "Draft note", hidden: true }),
+    ).toHaveLength(2);
+    fireEvent.click(screen.getByRole("button", { name: /Draft 1/ }));
+    expect(screen.getByRole("textbox", { name: "Draft note" })).toHaveValue(
+      "Keep this edit",
+    );
+  });
+
+  it("hides add parallel for a new empty draft until documents are added, and hides it again when removed", async () => {
+    mocks.fetch.mockImplementation(async (_path, _schema, options) => {
+      if (options?.method === "PATCH")
+        return { ...draft("one"), revision: 1, state: options.json.state };
+      if (options?.method === "POST") return draft("two");
+      return { items: [draft("one")] };
+    });
+    mount();
+    await screen.findByRole("textbox", { name: "Draft note" });
+    expect(
+      screen.queryByRole("button", { name: "Add more scooters in parallel" }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Detect scooter" }));
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "Add more scooters in parallel",
+      }),
+    );
+    await screen.findByRole("heading", { name: /Draft 2/ });
+    expect(
+      screen.queryByRole("button", { name: "Add more scooters in parallel" }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Draft 1/ }));
+    expect(
+      screen.queryByRole("button", { name: "Add more scooters in parallel" }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Draft 2/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Detect scooter" }));
+    expect(
+      await screen.findByRole("button", {
+        name: "Add more scooters in parallel",
+      }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Finish analysis" }));
+    fireEvent.click(screen.getByRole("button", { name: /Draft 1/ }));
+    expect(
+      screen.queryByRole("button", { name: "Add more scooters in parallel" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("restores all 20 active drafts and prevents a twenty-first", async () => {
     mocks.fetch.mockResolvedValue({
-      items: Array.from({ length: 20 }, (_, index) => draft(`draft-${index}`)),
+      items: Array.from({ length: 20 }, (_, index) => ({
+        ...draft(`draft-${index}`),
+        state: identifiedSnapshot(`file-${index}`),
+      })),
     });
     mount();
     await screen.findByRole("navigation", { name: "Scooter drafts" });
-    expect(
-      screen.getByRole("button", { name: "Add another scooter" }),
-    ).toBeDisabled();
     expect(
       within(
         screen.getByRole("navigation", { name: "Scooter drafts" }),
       ).getAllByRole("button"),
     ).toHaveLength(20);
+    expect(
+      screen.getByRole("button", { name: "Add more scooters in parallel" }),
+    ).toBeDisabled();
     expect(mocks.fetch).toHaveBeenCalledOnce();
   });
   it("persists review state and discards only after the explicit action", async () => {
@@ -252,7 +493,7 @@ describe("persistent scooter import workspace", () => {
           }
         : options?.method === "POST"
           ? { ok: true }
-          : { items: [item] },
+          : { items: [item, draft("two")] },
     );
     const view = mount();
     fireEvent.click(
@@ -272,9 +513,40 @@ describe("persistent scooter import workspace", () => {
       ),
     );
     expect(
-      screen.getByRole("button", { name: /Draft 1.*Analysis done/ }),
+      screen.getByRole("heading", { name: /Draft 1.*Analysis done/ })
+        .firstElementChild,
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Discard draft" }));
+    fireEvent.click(
+      within(screen.getByRole("group", { name: "Draft 1" })).getByRole(
+        "button",
+        { name: "Discard draft" },
+      ),
+    );
+    const dialog = await screen.findByRole("dialog", {
+      name: "Discard this scooter draft?",
+    });
+    expect(
+      mocks.fetch.mock.calls.some(
+        ([path]) => path === v1.scooters.ROUTES.importDrafts.discard("one"),
+      ),
+    ).toBe(false);
+    fireEvent.click(within(dialog).getByRole("button", { name: "Keep draft" }));
+    expect(
+      screen.getByRole("textbox", { name: "Draft note" }),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      within(screen.getByRole("group", { name: "Draft 1" })).getByRole(
+        "button",
+        { name: "Discard draft" },
+      ),
+    );
+    fireEvent.click(
+      within(
+        await screen.findByRole("dialog", {
+          name: "Discard this scooter draft?",
+        }),
+      ).getByRole("button", { name: "Discard draft" }),
+    );
     await waitFor(() =>
       expect(mocks.fetch).toHaveBeenCalledWith(
         v1.scooters.ROUTES.importDrafts.discard("one"),
@@ -289,6 +561,32 @@ describe("persistent scooter import workspace", () => {
       ),
     ).toHaveLength(1);
   });
+  it("keeps the confirmation open with the original discard action after failure", async () => {
+    mocks.fetch.mockImplementation(async (path) => {
+      if (path === v1.scooters.ROUTES.importDrafts.discard("one"))
+        throw new Error("Disconnected");
+      return { items: [draft("one"), draft("two")] };
+    });
+    mount();
+    await screen.findByRole("textbox", { name: "Draft note" });
+    fireEvent.click(screen.getByRole("button", { name: "Discard draft" }));
+    const dialog = await screen.findByRole("dialog", {
+      name: "Discard this scooter draft?",
+    });
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "Discard draft" }),
+    );
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+      messages.en.scooters.workspace.discardFailed,
+    );
+    expect(
+      within(dialog).getByRole("button", { name: "Discard draft" }),
+    ).toBeEnabled();
+    expect(
+      screen.getAllByRole("textbox", { name: "Draft note", hidden: true })[0],
+    ).toBeInTheDocument();
+  });
+
   it("blocks conflicting revisions instead of overwriting another tab", async () => {
     mocks.fetch.mockImplementation(async (path, _schema, options) => {
       if (
@@ -321,15 +619,20 @@ describe("persistent scooter import workspace", () => {
       )[0]!,
     );
     await screen.findByRole("link", { name: "007 HON" });
+    expect(mocks.toast).toHaveBeenCalledExactlyOnceWith({
+      title: "Scooter created",
+      description: "007 HON",
+      variant: "success",
+    });
     expect(
-      within(
-        screen.getByRole("navigation", { name: "Scooter drafts" }),
-      ).getAllByRole("button"),
-    ).toHaveLength(1);
-    expect(screen.getByRole("button", { name: /Draft 1/ })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
+      screen.queryByRole("navigation", { name: "Scooter drafts" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: /Draft 1/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Discard draft" }),
+    ).not.toBeInTheDocument();
   });
 });
 
@@ -367,71 +670,54 @@ function identifiedSnapshot(id: string): ScooterImportSnapshot {
   return state;
 }
 
-it("accepts several one-scooter PDFs at the top and shows their forms below", async () => {
-  mocks.fetch.mockImplementation(async (_path, _schema, options) =>
-    options?.method === "POST" ? draft("two") : { items: [draft("one")] },
-  );
+it("never merges restored drafts with matching VINs or legacy assignments", async () => {
+  const first = identifiedSnapshot("one");
+  first.values.notes = "First draft edit";
+  const second = identifiedSnapshot("two");
+  second.values.notes = "Second draft edit";
+  second.assignment = "one";
+  mocks.fetch.mockResolvedValue({
+    items: [
+      { ...draft("one"), state: first },
+      { ...draft("two"), state: second },
+    ],
+  });
   mount();
   await screen.findByRole("textbox", { name: "Draft note" });
-  fireEvent.change(
-    screen.getByLabelText("Browse files", { selector: "input" }),
-    {
-      target: {
-        files: [
-          new File(["one"], "one.pdf", { type: "application/pdf" }),
-          new File(["two"], "two.pdf", { type: "application/pdf" }),
-        ],
-      },
-    },
+  expect(
+    screen.getAllByRole("textbox", { name: "Draft note", hidden: true }),
+  ).toHaveLength(2);
+  expect(screen.getByRole("textbox", { name: "Draft note" })).toHaveValue(
+    "First draft edit",
   );
-  await screen.findByText("two.pdf");
-  expect(screen.getByText("one.pdf")).toBeInTheDocument();
-  expect(screen.getAllByRole("textbox", { name: "Draft note" })).toHaveLength(
-    2,
+  fireEvent.click(screen.getByRole("button", { name: /Draft 2/ }));
+  expect(screen.getByRole("textbox", { name: "Draft note" })).toHaveValue(
+    "Second draft edit",
   );
+  expect(mocks.fetch).toHaveBeenCalledOnce();
 });
 
-it("groups completed PDFs for the same VIN and keeps the destination form edits", async () => {
-  const first = identifiedSnapshot("one");
-  first.values.notes = "Keep my correction";
-  const second = identifiedSnapshot("two");
-  mocks.fetch.mockImplementation(async (path, _schema, options) =>
-    path === v1.scooters.ROUTES.importDrafts.merge("one")
-      ? { ...draft("one"), revision: 1, state: options.json.state }
-      : {
-          items: [
-            { ...draft("one"), state: first },
-            { ...draft("two"), state: second },
-          ],
-        },
-  );
+it("does not create another draft when the last scooter is completed", async () => {
+  mocks.fetch.mockResolvedValue({ items: [draft("one")] });
   mount();
-  await waitFor(() =>
-    expect(mocks.fetch).toHaveBeenCalledWith(
-      v1.scooters.ROUTES.importDrafts.merge("one"),
-      expect.anything(),
-      expect.objectContaining({ method: "POST" }),
-    ),
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Create and review next" }),
   );
-  await waitFor(() =>
-    expect(screen.getAllByRole("textbox", { name: "Draft note" })).toHaveLength(
-      1,
-    ),
-  );
-  expect(screen.getByRole("textbox", { name: "Draft note" })).toHaveValue(
-    "Keep my correction",
-  );
-  const request = mocks.fetch.mock.calls.find(
-    ([path]) => path === v1.scooters.ROUTES.importDrafts.merge("one"),
-  )!;
-  expect(request[2].json.state.documents.drafts).toHaveLength(2);
+  await screen.findByRole("link", { name: "007 HON" });
+  expect(
+    screen.queryByRole("textbox", { name: "Draft note" }),
+  ).not.toBeInTheDocument();
+  expect(mocks.fetch).toHaveBeenCalledOnce();
+  expect(
+    screen.getByRole("button", { name: "Add more scooters in parallel" }),
+  ).toBeEnabled();
 });
 
 it("updates the draft state without a detection toast", async () => {
   mocks.fetch.mockImplementation(async (_path, _schema, options) =>
     options?.method === "PATCH"
       ? { ...draft("one"), revision: 1, state: options.json.state }
-      : { items: [draft("one")] },
+      : { items: [draft("one"), draft("two")] },
   );
   mount();
   const detect = await screen.findByRole("button", { name: "Detect scooter" });
@@ -439,7 +725,8 @@ it("updates the draft state without a detection toast", async () => {
   fireEvent.click(detect);
   expect(mocks.toast).not.toHaveBeenCalled();
   expect(
-    screen.getByRole("button", { name: /Draft 1.*Analysis done/ }),
+    screen.getByRole("heading", { name: /Draft 1.*Analysis done/ })
+      .firstElementChild,
   ).toHaveClass("bg-warning-subtle", "text-warning");
   const rail = screen.getByRole("region", { name: "Scooter drafts" });
   expect(rail).toHaveClass(
@@ -447,7 +734,7 @@ it("updates the draft state without a detection toast", async () => {
   );
   expect(
     screen.getByRole("navigation", { name: "Scooter drafts" }),
-  ).toHaveClass("w-max", "md:flex-wrap");
+  ).toHaveClass("w-max");
   expect(rail.closest('[data-slot="horizontal-scroll-area"]')).toHaveClass(
     "-mx-(--page-gutter)",
     "md:mx-0",
@@ -464,13 +751,14 @@ it.each([
   ["ready", "bg-success-subtle"],
 ] as const)("colors %s drafts by state", async (status, color) => {
   mocks.fetch.mockResolvedValue({
-    items: [{ ...draft("one"), state: { ...snapshot(), status } }],
+    items: [
+      { ...draft("one"), state: { ...snapshot(), status } },
+      draft("two"),
+    ],
   });
   mount();
   await screen.findByRole("navigation", { name: "Scooter drafts" });
   expect(
-    within(
-      screen.getByRole("navigation", { name: "Scooter drafts" }),
-    ).getByRole("button"),
+    screen.getByRole("heading", { name: /Draft 1/ }).firstElementChild,
   ).toHaveClass(color);
 });

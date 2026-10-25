@@ -84,6 +84,57 @@ describe("document versions", () => {
       uploadToken: "original-token",
     });
   });
+  it("automatically links a restored filename pair and submits only the original's readings", () => {
+    const state = snapshot();
+    state.drafts[0].file.name = "CIV 007.pdf";
+    state.drafts[1] = {
+      ...state.drafts[1],
+      version: undefined,
+      originalId: undefined,
+      file: { ...state.drafts[1].file, name: "CIV 007 client.pdf" },
+    };
+    const hook = renderHook(() => useScooterDocuments([], { snapshot: state }));
+    expect(hook.result.current.drafts[1]).toMatchObject({
+      version: "client_copy",
+      originalId: "original",
+    });
+    expect(hook.result.current.blocked).toBe(false);
+    expect(hook.result.current.payload.documentDrafts).toHaveLength(1);
+    expect(
+      hook.result.current.payload.documentDrafts![0].clientCopy?.uploadToken,
+    ).toBe("client-token");
+    act(() => hook.result.current.removeDraft("original"));
+    expect(hook.result.current.drafts).toHaveLength(0);
+  });
+  it("detects a visual overlay, preserves it across analysis cleanup, and allows manual recovery", () => {
+    const state = snapshot();
+    state.drafts[1] = {
+      ...state.drafts[1],
+      version: undefined,
+      originalId: undefined,
+      file: { ...state.drafts[1].file, name: "scan.pdf" },
+    };
+    const hook = renderHook(() => useScooterDocuments([], { snapshot: state }));
+    act(() =>
+      hook.result.current.setExtractions({
+        client: { clientCopy: true, vin: null, fields: {}, rawFields: {} },
+      }),
+    );
+    expect(hook.result.current.drafts[1]).toMatchObject({
+      version: "client_copy",
+      versionSource: "branded_overlay",
+    });
+    expect(hook.result.current.blocked).toBe(true);
+    act(() =>
+      hook.result.current.setVersion("client", "client_copy", "original"),
+    );
+    expect(hook.result.current.blocked).toBe(false);
+    expect(
+      hook.result.current.payload.documentDrafts![0].clientCopy?.fileName,
+    ).toBe("scan.pdf");
+    act(() => hook.result.current.setVersion("client", "original"));
+    expect(hook.result.current.drafts[1].version).toBe("original");
+  });
   it("blocks a client copy whose original is missing", () => {
     const state = snapshot();
     state.drafts.shift();

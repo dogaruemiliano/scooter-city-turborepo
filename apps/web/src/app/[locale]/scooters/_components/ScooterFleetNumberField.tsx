@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useContext, useEffect, useRef } from "react";
 import { Controller, useFormContext, useWatch } from "react-hook-form";
 import { useTranslations } from "next-intl";
 import { v1 } from "@repo/api-shared";
@@ -12,6 +12,7 @@ import {
 import { FormField, useFormFieldControl } from "@/components/form/FormField";
 import { useRemote } from "@/components/WorkspaceForm";
 import { webApi } from "@/lib/api";
+import { ScooterFleetNumberRefreshContext } from "./ScooterFleetNumberRefreshContext";
 import type { ScooterEditorValues } from "./scooter-editor-schema";
 
 export function ScooterFleetNumberField({
@@ -40,6 +41,14 @@ export function ScooterFleetNumberField({
       [editing],
     ),
   );
+  const revision = useContext(ScooterFleetNumberRefreshContext);
+  const lastRevision = useRef(revision);
+  const reload = suggestion.reload;
+  useEffect(() => {
+    if (lastRevision.current === revision) return;
+    lastRevision.current = revision;
+    if (!editing) reload();
+  }, [revision, editing, reload]);
   return (
     <FormField
       name="fleetNumber"

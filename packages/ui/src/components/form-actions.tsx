@@ -69,12 +69,12 @@ function FormActions({
         data-sticky={floating}
         aria-busy={pending || undefined}
         className={cn(
-          "@container/form-actions sticky bottom-[calc(var(--spacing-4)+env(safe-area-inset-bottom))] z-sticky gap-0 py-0 shadow-md sm:bottom-[calc(var(--spacing-8)+env(safe-area-inset-bottom))]",
+          "@container/form-actions sticky bottom-[calc(var(--spacing-4)+env(safe-area-inset-bottom))] z-sticky gap-0 py-0 shadow-md",
           ready !== undefined && "w-full",
           ready !== undefined &&
             (floating
               ? "self-end bg-floating-action-surface backdrop-blur-floating-surface animate-in slide-in-from-bottom-4 duration-normal ease-decelerate motion-reduce:animate-none"
-              : "static bottom-auto sm:bottom-auto"),
+              : "static bottom-auto"),
           className,
         )}
         {...props}

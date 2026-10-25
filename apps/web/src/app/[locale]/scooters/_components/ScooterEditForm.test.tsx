@@ -441,6 +441,15 @@ describe("ScooterEditForm", () => {
     expect(
       screen.queryByText(/field.*could not be interpreted/),
     ).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Color"), {
+      target: { value: "White" },
+    });
+    expect(
+      document.querySelector('[data-field-name="color"]'),
+    ).not.toHaveAttribute("data-warning");
+    expect(
+      screen.queryByText(/field.*could not be interpreted/),
+    ).not.toBeInTheDocument();
     // A fresh import flags the freshly unresolved fields again.
     await browser.click(screen.getByRole("button", { name: "Import JSON" }));
     await browser.click(screen.getByRole("button", { name: "Fill fields" }));

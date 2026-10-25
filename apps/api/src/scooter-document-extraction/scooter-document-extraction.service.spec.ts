@@ -63,6 +63,37 @@ describe("scooter document extraction normalization", () => {
         expect(normalized.extractedData.fields).not.toHaveProperty("powerKw");
     },
   );
+  it("preserves protective-overlay detection without discarding the underlying identifiers", () => {
+    const { service } = setup();
+    const output = {
+      clientCopy: true,
+      detectedDocumentType: "civ",
+      vin: VIN,
+      fields: [field("civNumber", "C12345")],
+      rawFields: [],
+    };
+    expect(service.normalize("civ", output).extractedData).toMatchObject({
+      clientCopy: true,
+      vin: VIN,
+      fields: { civNumber: "C12345" },
+    });
+    expect(
+      service.normalize("civ", { ...output, clientCopy: false }).extractedData,
+    ).not.toHaveProperty("clientCopy");
+    const legacy = {
+      detectedDocumentType: "civ",
+      vin: VIN,
+      fields: [],
+      rawFields: [],
+    };
+    expect(service.normalize("civ", legacy).extractedData).not.toHaveProperty(
+      "clientCopy",
+    );
+    expect(() =>
+      service.normalize("civ", { ...output, clientCopy: "true" }),
+    ).toThrow();
+  });
+
   it("leaves unrecognizable documents unresolved instead of inventing a category", async () => {
     const { service } = setup();
     await expect(
@@ -741,6 +772,7 @@ describe("mixed document PDFs", () => {
   });
   it("supports twenty complete logical records and rejects a twenty-first", () => {
     const output = {
+      clientCopy: false,
       detectedDocumentType: "civ",
       vin: null,
       fields: [],

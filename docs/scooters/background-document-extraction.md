@@ -8,11 +8,11 @@ The feature defaults to disabled. Deploy the validation infrastructure and confi
 
 The validator normalizes rotation in the temporary analysis copy of scanned PDFs. A portrait MediaBox with `/Rotate 90` becomes an explicitly landscape page with rotation zero, preserving the image streams and visible crop. PDFs with annotations retain their original appearances. The original download is untouched. Actual sideways image pixels are read in their visible orientation by the extraction prompt; metadata normalization is not a deskew or visual-orientation detector. Deploy the updated validation Lambda as well as the API. Existing completed results must be explicitly reanalyzed.
 
-`/scooters/new` is a persistent import workspace for **1–20 open scooter drafts per user**. Every draft is its own document editor session and can contain multiple files. One PDF belongs to one scooter and may contain multiple document types. Upload and analysis begin on selection. Users can add or review another scooter while existing jobs continue. English and Romanian labels are supported. Completed creations and explicit discards free a draft slot.
+`/scooters/new` is a persistent import workspace for **1–20 open scooter drafts per user**. Every draft is its own document editor session and can contain multiple files. The route opens an initial draft when none exists; users explicitly add every additional draft. Uploading files never creates drafts. All files dropped or selected inside a draft belong to that draft, including a batch of eight documents. One PDF may contain multiple document types. Upload and analysis begin on selection. AI classifies documents, extracts scooter fields and flags conflicting VINs; it never creates, splits, groups or moves scooter drafts. Users can add or review another scooter while existing jobs continue. English and Romanian labels are supported. Completed creations and explicit discards free a draft slot.
 
 Apply `20261024120000_scooter_import_workspace` (after the existing job migrations) before deploying the API, then deploy the web client. The additive migration adds revisioned draft snapshots, execution reservations, foreign-registration/export/ITP document kinds, CIV availability and inspection history. It does not remove existing documents or rename existing kinds.
 
-New batch uploads use `type: "unclassified"` and an editor session. Their signed token and draft ledger remain bound to the original `scooter-document:unclassified:<user>` scope through classification, manual reassignment, extraction and final save. Requests using those tokens include `uploadType: "unclassified"`; this never permits a token belonging to another user, session or upload purpose. Existing category-specific uploads retain their original scope.
+New batch uploads use `type: "unclassified"` and the receiving draft's editor session. Their signed token and draft ledger remain bound to the original `scooter-document:unclassified:<user>` scope through classification, document-type corrections, extraction and final save. Requests using those tokens include `uploadType: "unclassified"`; this never permits a token belonging to another user, session or upload purpose. Existing category-specific uploads retain their original scope.
 
 For an unclassified job, the provider identifies logical documents from contents and extracts them in the same request. Concrete kinds are `civ`, `registration_certificate` (Romanian), `foreign_registration`, `export_certificate`, `insurance`, `itp_card`, `itp_certificate`, `ownership_proof`, and legacy `import_document`. Each logical record retains its type, original one-based pages/regions, VIN, normalized fields, original readings and review issues in `extractedData.documents`. The physical original is attached once. Unsupported content still returns `DOCUMENT_EXTRACTION_TYPE_UNKNOWN`; a mixed PDF is supported.
 
@@ -20,9 +20,35 @@ Extracted values fill the scooter form progressively. Document cards show a smal
 
 Draft snapshots persist form values, document/photo metadata and tokens, attempts, job IDs, normalized evidence and review decisions. Reload resumes the same paid jobs rather than starting them again. Snapshots are bounded to 512,000 bytes and protected by optimistic revisions; a second tab cannot silently overwrite the first. Private previews are streamed only after owner/session checks. Draft sessions and unclaimed uploads expire after 24 hours, so this is a recoverable import workspace rather than permanent unsaved storage.
 
-Changing a draft's type reuses its original upload and starts a new extraction attempt. Removed or reassigned files invalidate their old evidence. Successful results are reused, failed files have individual retry controls, and cancellation includes queued files so they cannot restart automatically. Manual field edits remain protected. Missing categories are optional; required identity/registration fields and unresolved or conflicting VINs still require resolution. When CIV and import documents coexist, CIV retains technical authority.
+Changing a document's type reuses its original upload and starts a new extraction attempt. Removed files and document-type corrections invalidate their old evidence. Successful results are reused, failed files have individual retry controls, and cancellation includes queued files so they cannot restart automatically. Manual field edits remain protected. Missing categories are optional; required identity/registration fields and unresolved or conflicting VINs still require resolution. When CIV and import documents coexist, CIV retains technical authority.
 
 The fake provider deliberately cannot classify file contents: choose a type manually when using it. The automated tests use synthetic files and mocked provider output; evaluate classification accuracy on representative authorized documents before relying on it operationally.
+
+## Automatic client-copy assignment
+
+Uploads default to automatic version detection. Clear filename markers such as
+`client`, `client copy`, `copie client`, `pentru client`, `watermarked` and
+`cu logo` identify client copies. A plain download counter or the word `copy`
+alone does not establish client protection. Original/copy filename pairs are
+matched independently of upload order, only within the receiving draft. Originals
+in another draft never cause a copy to move or the drafts to merge.
+
+The extraction prompt also reports protective repeated branding or diagonal/X
+watermark overlays from the actual page images. Ordinary issuer logos, seals,
+security backgrounds and handwritten crosses are not client-copy evidence.
+Renamed protected scans are matched using independently read document identifiers;
+a scooter VIN alone never selects a matching original. Ambiguous matches and
+competing copies stay unassigned and block creation until an operator chooses
+an original, uploads it, removes the copy, or corrects the version. Mixed files
+containing both originals and protected copies are not classified wholly as copies.
+
+Only originals populate scooter fields. Copies with clear filenames skip their
+own extraction; copies discovered visually retain their matching evidence but
+are removed from the form importer. Existing private bytes and overlays remain
+untouched. Final submission attaches the client upload to its original using
+the existing document-version storage path. Manual assignments and version
+corrections persist across reloads. Results from jobs started with older prompts
+remain compatible and do not gain an invented overlay classification.
 
 ## Local development
 
@@ -116,9 +142,9 @@ The real database race suite is `apps/api/src/scooter-document-jobs/scooter-docu
 
 Production activation additionally requires deployed AWS resources, configured OpenAI events and a live staging check. Local unit tests cannot establish provider accuracy or production memory usage. No private sample document, signed URL, API credential or raw provider response should be logged or committed.
 
-## Progressive forms, grouping and document versions
+## Progressive forms and document versions
 
-The top drop zone accepts multiple one-scooter PDFs; each is analysed independently. Matching, unambiguous eligible VINs consolidate completed drafts through `POST /v1/scooters/import-drafts/:id/merge`. The transaction locks both sessions in ID order, checks ownership and revisions, refuses active or uncertain jobs, and moves staged uploads, resources and jobs without another paid request. The receiving form keeps its edits. Secondary drafts with manual values or photos remain intact for review rather than losing those changes. Files without reliable VINs can be added to an existing draft using the upload target selector. Draft state colors indicate progress without detection notifications. The draft rail scrolls horizontally on mobile and fades clipped items at the viewport edges; all forms remain mounted and visible below the uploader.
+Each draft has its own drop zone inside the Fill automatically card. Every selected PDF or image stays in that draft and is analysed independently; neither matching nor conflicting VINs change document ownership or draft count. Eligible VIN disagreements remain visible and block creation until reviewed. Files without readable VINs also stay in the receiving draft. Only the explicit add-draft control creates additional drafts. Draft state colors indicate progress without detection notifications. The draft rail scrolls horizontally on mobile, with the add-draft control last; the selected draft badge becomes the title below the rail, beside the discard action. Editors remain mounted to preserve in-progress work.
 
 `ownership_proof` covers purchase invoices, sale contracts and other ownership evidence. Export/ownership evidence can start scooter creation without CIV or Romanian registration; missing required scooter fields are completed manually. Neither document implies registration or CIV issuance.
 

@@ -1,3 +1,4 @@
+import { normalizeScooterBrandName } from "./scooter-brand-name";
 import { v1 } from "@repo/api-shared";
 
 export interface DocumentSource {
@@ -602,7 +603,13 @@ export function prepareDocumentSources(
   }
   for (const [field, values] of selectedValues) {
     const known = values.filter(({ value }) => !unknown(value));
-    const distinct = new Set(known.map(({ value }) => String(value).trim()));
+    const distinct = new Set(
+      known.map(({ value }) =>
+        field === "brandName"
+          ? normalizeScooterBrandName(String(value))
+          : String(value).trim(),
+      ),
+    );
     source[field] = distinct.size === 1 ? known[0]!.value : null;
     fieldSources[field === "brandName" ? "brandId" : field] = values.map(
       ({ id }) => id,

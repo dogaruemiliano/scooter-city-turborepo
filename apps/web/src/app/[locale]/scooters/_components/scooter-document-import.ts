@@ -1,3 +1,4 @@
+import { normalizeScooterBrandName } from "./scooter-brand-name";
 import {
   prepareDocumentSources,
   isRetiredCivRawLabel,
@@ -190,7 +191,8 @@ export function parseDocumentImport(
       }
       const matches = brands.filter(
         (brand) =>
-          brand.name.toLocaleLowerCase() === raw.trim().toLocaleLowerCase(),
+          normalizeScooterBrandName(brand.name) ===
+          normalizeScooterBrandName(raw),
       );
       if (matches.length === 1) values.brandId = matches[0]!.id;
       else unmatchedBrand = raw.trim();

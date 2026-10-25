@@ -56,3 +56,8 @@ export const FadedDraftRail: Story = {
     </div>
   ),
 };
+
+export const TouchDraftRail: Story = {
+  ...FadedDraftRail,
+  args: { ...FadedDraftRail.args, scrollbarVisibility: "desktop" },
+};

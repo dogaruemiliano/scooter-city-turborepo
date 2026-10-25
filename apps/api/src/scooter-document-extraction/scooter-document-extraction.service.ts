@@ -99,6 +99,7 @@ export class ScooterDocumentExtractionService {
         originalPageCount > v1.scooters.SCOOTER_DOCUMENT_EXTRACTION_MAX_PAGES)
     )
       throw unusableOutput();
+    let result: ScooterDocumentExtractionResult;
     if (parsed.data.documents?.length) {
       if (
         originalPageCount !== undefined &&
@@ -109,9 +110,10 @@ export class ScooterDocumentExtractionService {
         )
       )
         throw unusableOutput();
-      return this.normalizeDocuments(parsed.data);
-    }
-    return this.normalizeSingle(documentType, parsed.data);
+      result = this.normalizeDocuments(parsed.data);
+    } else result = this.normalizeSingle(documentType, parsed.data);
+    if (parsed.data.clientCopy) result.extractedData.clientCopy = true;
+    return result;
   }
 
   private normalizeDocuments(
@@ -121,6 +123,7 @@ export class ScooterDocumentExtractionService {
       const normalized = this.normalizeSingle(document.documentType, {
         ...document,
         detectedDocumentType: document.documentType,
+        clientCopy: false,
         documents: null,
       });
       const inspections = normalizeInspections(document, normalized.issues);
@@ -660,11 +663,14 @@ type ModelOutput = z.infer<typeof scooterDocumentModelOutputSchema>;
 function parseModelOutput(output: unknown) {
   // Jobs already submitted with the previous prompt may complete during rollout.
   const compatible =
-    output &&
-    typeof output === "object" &&
-    !Array.isArray(output) &&
-    !Object.hasOwn(output, "documents")
-      ? { ...output, documents: null }
+    output && typeof output === "object" && !Array.isArray(output)
+      ? {
+          ...(!Object.hasOwn(output, "documents") ? { documents: null } : {}),
+          ...(!Object.hasOwn(output, "clientCopy")
+            ? { clientCopy: false }
+            : {}),
+          ...output,
+        }
       : output;
   return scooterDocumentModelOutputSchema.safeParse(compatible);
 }

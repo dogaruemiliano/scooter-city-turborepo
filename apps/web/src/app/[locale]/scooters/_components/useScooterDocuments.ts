@@ -1,17 +1,20 @@
 "use client";
 
 import { ApiError, v1 } from "@repo/api-shared";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { webApi } from "@/lib/api";
 import {
   isScooterEditorSessionUnavailable,
   useScooterEditorSession,
 } from "./useScooterEditorSession";
 
+import { resolveDocumentVersions } from "./scooter-document-versions";
+
 export interface DocumentDraft {
   id: string;
   version?: "original" | "client_copy";
   originalId?: string;
+  versionSource?: "filename" | "branded_overlay" | "manual";
   type: v1.scooters.ScooterDocumentType | null;
   uploadType?: "unclassified";
   requestedType?: v1.scooters.ScooterDocumentType;
@@ -87,15 +90,24 @@ export function useScooterDocuments(
   options: {
     session?: v1.scooters.ScooterDocumentEditorSession;
     snapshot?: ScooterDocumentsSnapshot;
+    detectClientCopies?: boolean;
   } = {},
 ) {
   const editorSession = useScooterEditorSession(options.session);
-  const [drafts, setDrafts] = useState<DocumentDraft[]>(
+  const [uploadedDrafts, setDrafts] = useState<DocumentDraft[]>(
     () => options.snapshot?.drafts.map(restoreDraft) ?? [],
   );
   const [extractions, setExtractions] = useState<
     Record<string, v1.scooters.ScooterDocumentExtractedData | null>
   >(() => options.snapshot?.extractions ?? {});
+  const detectClientCopies = options.detectClientCopies ?? true;
+  const drafts = useMemo(
+    () =>
+      detectClientCopies
+        ? resolveDocumentVersions(uploadedDrafts, extractions)
+        : uploadedDrafts,
+    [uploadedDrafts, extractions, detectClientCopies],
+  );
   const [removedIds, setRemovedIds] = useState<string[]>(
     () => options.snapshot?.removedIds ?? [],
   );
@@ -185,12 +197,13 @@ export function useScooterDocuments(
     type: v1.scooters.ScooterDocumentType | null,
     files: File[],
     insurancePolicyId?: string,
-    version: "original" | "client_copy" = "original",
+    version?: "original" | "client_copy",
     originalId?: string,
   ) {
     const items: DocumentDraft[] = files.map((file) => ({
       id: crypto.randomUUID(),
       version,
+      ...(version ? { versionSource: "manual" as const } : {}),
       originalId,
       type,
       ...(type === null ? { uploadType: "unclassified" as const } : {}),
@@ -235,6 +248,22 @@ export function useScooterDocuments(
   return {
     ...editorSession,
     classify,
+    setVersion: useCallback(
+      (
+        id: string,
+        version: "original" | "client_copy",
+        originalId?: string,
+      ) => {
+        setDrafts((current) =>
+          current.map((draft) =>
+            draft.id === id
+              ? { ...draft, version, originalId, versionSource: "manual" }
+              : draft,
+          ),
+        );
+      },
+      [],
+    ),
     assignInsurance: useCallback((id: string) => {
       setDrafts((current) => {
         const draft = current.find((item) => item.id === id);
@@ -310,10 +339,14 @@ export function useScooterDocuments(
     retry: (draft: DocumentDraft) => {
       void upload(draft);
     },
-    removeDraft: (id: string) =>
-      setDrafts((current) =>
-        current.filter((item) => item.id !== id && item.originalId !== id),
-      ),
+    removeDraft: (id: string) => {
+      const removed = new Set(
+        drafts
+          .filter((item) => item.id === id || item.originalId === id)
+          .map((item) => item.id),
+      );
+      setDrafts((current) => current.filter((item) => !removed.has(item.id)));
+    },
     removeExisting: (id: string) =>
       setRemovedIds((current) => [...current, id]),
     undoRemove: (id: string) =>

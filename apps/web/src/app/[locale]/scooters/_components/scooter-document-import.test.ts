@@ -51,6 +51,44 @@ describe("document JSON import", () => {
       emptyConflicts: [],
     });
   });
+  it.each([
+    ["Y A M A H A", "Yamaha"],
+    ["yamaha", " Y A M A H A "],
+    ["ya\tma\nha", "Yamaha"],
+    ["ya\u00a0maha", "Yamaha"],
+  ])(
+    "matches brand %s against database name %s ignoring whitespace and case",
+    (reading, name) => {
+      const result = parseDocumentImport(
+        JSON.stringify({ brandName: reading }),
+        [{ id: "brand", name }],
+        current,
+        false,
+      );
+      expect(result).toMatchObject({
+        ok: true,
+        values: { brandId: "brand" },
+        unmatchedBrand: undefined,
+      });
+    },
+  );
+  it("requires a unique normalized brand match", () => {
+    const result = parseDocumentImport(
+      JSON.stringify({ brandName: "ya maha" }),
+      [
+        { id: "one", name: "YAMAHA" },
+        { id: "two", name: "Ya maha" },
+      ],
+      current,
+      false,
+    );
+    expect(result).toMatchObject({
+      ok: true,
+      values: {},
+      unmatchedBrand: "ya maha",
+    });
+  });
+
   it("distinguishes confirmed dashes, unresolved blanks and genuine zero without erasing data", () => {
     expect(
       parse({

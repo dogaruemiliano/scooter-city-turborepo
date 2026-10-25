@@ -19,6 +19,7 @@ import {
   importFieldReviews,
   insuranceFieldReviews,
   remainingCivDocumentWarnings,
+  remainingImportReviews,
   unresolvedDocumentRubrics,
   type ImportFieldReview,
 } from "./scooter-import-review";
@@ -110,7 +111,11 @@ export function ScooterImportReviewProvider({
   }
   const t = useTranslations("scooters.documentImport");
   const scooterT = useTranslations("scooters");
-  const active = activeImportReviews(reviews, values, editing);
+  const remaining = remainingImportReviews(reviews, values, editing);
+  if (result === previousResult && remaining.length !== reviews.length) {
+    setReviews(remaining);
+  }
+  const active = activeImportReviews(remaining, values, editing);
   function fieldLabel(field: string, insurance = false) {
     const key = insurance
       ? `insurance.fields.${field}`

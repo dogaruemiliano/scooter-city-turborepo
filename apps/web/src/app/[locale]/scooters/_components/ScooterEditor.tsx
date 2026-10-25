@@ -19,6 +19,7 @@ import { Button, Checkbox, buttonVariants } from "@repo/ui/components";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
+import { Trash2Icon } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FormProvider, get, type FieldErrors, useWatch } from "react-hook-form";
 
@@ -72,6 +73,11 @@ export interface ScooterEditorProps {
   embedded?: boolean;
   persistenceBlocked?: boolean;
   incomingFiles?: { id: string; files: File[] };
+  draftActions?: {
+    hasOtherDrafts: boolean;
+    onDiscard: () => void;
+    pending: boolean;
+  };
 }
 
 export function ScooterEditor({
@@ -86,6 +92,7 @@ export function ScooterEditor({
   embedded = false,
   persistenceBlocked = false,
   incomingFiles,
+  draftActions,
 }: ScooterEditorProps) {
   const formAction = useFormAction();
 
@@ -111,6 +118,7 @@ export function ScooterEditor({
       ? { session: { id: importDraft.id, expiresAt: importDraft.expiresAt } }
       : {}),
     snapshot: initialSnapshot?.documents,
+    detectClientCopies: !scooter,
   });
   const acceptedBatches = useRef(new Set<string>());
   useEffect(() => {
@@ -122,7 +130,6 @@ export function ScooterEditor({
     persistent: Boolean(importDraft),
     snapshot: initialSnapshot?.analysis,
   });
-  const createAndNext = useRef(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [vinReviewRequired, setVinReviewRequired] = useState(false);
   const [vinReviewRequested, setVinReviewRequested] = useState(false);
@@ -160,9 +167,24 @@ export function ScooterEditor({
   const [currentInsuranceSourceId, setCurrentInsuranceSourceId] = useState<
     string | null | undefined
   >(initialSnapshot?.currentInsuranceSourceId);
+  const isOriginalAnalysis = useCallback(
+    (result: v1.scooters.ScooterDocumentAnalysis): boolean => {
+      if (scooter) return true;
+      const draft = documents.drafts.find(
+        (item) => item.id === result.sourceId,
+      );
+      if (draft?.versionSource === "manual")
+        return draft.version !== "client_copy";
+      return (
+        draft?.version !== "client_copy" && !result.extractedData.clientCopy
+      );
+    },
+    [documents.drafts, scooter],
+  );
   const insuranceReadings = Object.entries(analysis.entries).flatMap(
     ([sourceId, entry]) => {
-      if (entry.status !== "success") return [];
+      if (entry.status !== "success" || !isOriginalAnalysis(entry.analysis))
+        return [];
       const source = extraction.sources.find(
         (item) => item.sourceId === sourceId,
       );
@@ -330,8 +352,17 @@ export function ScooterEditor({
       civRawFields: importedRawFields ?? scooter?.civRawFields,
       documentDrafts: [...documents.existing, ...documents.drafts].flatMap(
         (document) => {
-          if (!document.type) return [];
+          if (
+            !document.type ||
+            ("version" in document && document.version === "client_copy")
+          )
+            return [];
           const entry = analysis.entries[document.id];
+          if (
+            entry?.status === "success" &&
+            !isOriginalAnalysis(entry.analysis)
+          )
+            return [];
           return [
             {
               type: document.type,
@@ -465,7 +496,7 @@ export function ScooterEditor({
       documents.saved();
       setSaveCompleted(true);
       if (onCreated) {
-        onCreated(savedScooter, createAndNext.current);
+        onCreated(savedScooter, Boolean(draftActions?.hasOtherDrafts));
         return;
       }
       router.push(
@@ -545,7 +576,9 @@ export function ScooterEditor({
     confirmedSourceIds: string[] = [],
   ) {
     const successes = entries.flatMap((entry) =>
-      entry?.status === "success" ? [entry.analysis] : [],
+      entry?.status === "success" && isOriginalAnalysis(entry.analysis)
+        ? [entry.analysis]
+        : [],
     );
     if (successes.length) {
       const result = prepareScooterAnalysisImport(
@@ -665,13 +698,38 @@ export function ScooterEditor({
       const entry = analysis.entries[draft.id];
       if (
         entry?.status === "success" &&
+        isOriginalAnalysis(entry.analysis) &&
         entry.analysis.extractedData.documents?.some(
           (document) => document.documentType === "insurance",
         )
       )
         assignInsurance(draft.id);
     }
-  }, [documents.drafts, analysis.entries, assignInsurance]);
+  }, [documents.drafts, analysis.entries, assignInsurance, isOriginalAnalysis]);
+  const {
+    extractions: savedDocumentExtractions,
+    setExtractions: setDocumentExtractions,
+  } = documents;
+  // Retain visual copy evidence before the analysis hook drops copies from its
+  // active sources. Copies never become independent form-field authorities.
+  useEffect(() => {
+    if (scooter) return;
+    const copies = Object.values(analysis.entries).flatMap((entry) =>
+      entry.status === "success" && entry.analysis.extractedData.clientCopy
+        ? [[entry.analysis.sourceId, entry.analysis.extractedData] as const]
+        : [],
+    );
+    if (copies.some(([id, data]) => savedDocumentExtractions[id] !== data))
+      setDocumentExtractions((current) => ({
+        ...current,
+        ...Object.fromEntries(copies),
+      }));
+  }, [
+    analysis.entries,
+    savedDocumentExtractions,
+    setDocumentExtractions,
+    scooter,
+  ]);
   const classify = documents.classify;
   useEffect(() => {
     if (scooter || saveCompleted) return;
@@ -680,11 +738,19 @@ export function ScooterEditor({
       if (
         draft.version !== "client_copy" &&
         draft.type === null &&
-        entry?.status === "success"
+        entry?.status === "success" &&
+        isOriginalAnalysis(entry.analysis)
       )
         classify(draft.id, entry.analysis.documentType);
     }
-  }, [scooter, saveCompleted, documents.drafts, analysis.entries, classify]);
+  }, [
+    scooter,
+    saveCompleted,
+    documents.drafts,
+    analysis.entries,
+    classify,
+    isOriginalAnalysis,
+  ]);
 
   useEffect(() => {
     if (scooter || saveCompleted) return;
@@ -694,6 +760,7 @@ export function ScooterEditor({
         documents.drafts
           .filter(
             (draft) =>
+              draft.version !== "client_copy" &&
               draft.insurancePolicyId &&
               !policies.some((policy) => policy.id === draft.insurancePolicyId),
           )
@@ -714,6 +781,7 @@ export function ScooterEditor({
     const successes = Object.values(analysis.entries).filter(
       (entry) =>
         entry.status === "success" &&
+        isOriginalAnalysis(entry.analysis) &&
         extraction.sources.some(
           (source) =>
             source.sourceId === entry.analysis.sourceId &&
@@ -755,7 +823,7 @@ export function ScooterEditor({
   );
 
   const logicalVins = Object.values(analysis.entries).flatMap((entry) =>
-    entry.status === "success"
+    entry.status === "success" && isOriginalAnalysis(entry.analysis)
       ? (entry.analysis.extractedData.documents
           ?.filter((document) =>
             v1.scooters.scooterDocumentReadsVin(document.documentType),
@@ -781,6 +849,9 @@ export function ScooterEditor({
           ? "queued"
           : hasFailedAnalysis ||
               photosBlocked ||
+              documents.drafts.some(
+                (draft) => draft.version === "client_copy" && !draft.originalId,
+              ) ||
               documents.drafts.some((draft) => draft.status === "failed") ||
               logicalVinConflict ||
               insuranceSelectionRequired
@@ -1130,17 +1201,31 @@ export function ScooterEditor({
                   {t("extraction.cancel")}
                 </Button>
               ) : null}
-              <Link
-                href={returnHref}
-                className={buttonVariants({ variant: "outline" })}
-                aria-disabled={isSubmitting || photosBusy}
-                tabIndex={isSubmitting || photosBusy ? -1 : undefined}
-                onClick={(event) => {
-                  if (isSubmitting || photosBusy) event.preventDefault();
-                }}
-              >
-                {t("actions.cancel")}
-              </Link>
+              {draftActions?.hasOtherDrafts ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  aria-label={t("workspace.discard")}
+                  title={t("workspace.discard")}
+                  disabled={isSubmitting || photosBusy || draftActions.pending}
+                  onClick={draftActions.onDiscard}
+                >
+                  <Trash2Icon aria-hidden="true" />
+                </Button>
+              ) : (
+                <Link
+                  href={returnHref}
+                  className={buttonVariants({ variant: "outline" })}
+                  aria-disabled={isSubmitting || photosBusy}
+                  tabIndex={isSubmitting || photosBusy ? -1 : undefined}
+                  onClick={(event) => {
+                    if (isSubmitting || photosBusy) event.preventDefault();
+                  }}
+                >
+                  {t("actions.cancel")}
+                </Link>
+              )}
               {canExtract && scooter && extraction.sources.length ? (
                 <Button
                   type="button"
@@ -1164,40 +1249,7 @@ export function ScooterEditor({
                   )}
                 </Button>
               ) : null}
-              {onCreated ? (
-                <SaveButton
-                  type="submit"
-                  variant="outline"
-                  onClick={() => {
-                    createAndNext.current = true;
-                  }}
-                  disabled={
-                    persistenceBlocked ||
-                    saveCompleted ||
-                    photosBusy ||
-                    photosBlocked ||
-                    isSubmitting ||
-                    analysis.running ||
-                    documents.blocked ||
-                    needsDocumentReview ||
-                    logicalVinConflict ||
-                    insuranceSelectionRequired
-                  }
-                  {...formAction(
-                    "create",
-                    {
-                      pending: isSubmitting,
-                      error: requestError,
-                      success: saveCompleted,
-                    },
-                    t("workspace.createNext"),
-                  )}
-                />
-              ) : null}
               <SaveButton
-                onClick={() => {
-                  createAndNext.current = false;
-                }}
                 type="submit"
                 disabled={
                   persistenceBlocked ||
@@ -1227,7 +1279,13 @@ export function ScooterEditor({
                     error: requestError,
                     success: saveCompleted,
                   },
-                  t(scooter ? "actions.save" : "actions.create"),
+                  t(
+                    scooter
+                      ? "actions.save"
+                      : draftActions?.hasOtherDrafts
+                        ? "workspace.createNext"
+                        : "actions.create",
+                  ),
                 )}
               />
             </ScooterCreateActions>

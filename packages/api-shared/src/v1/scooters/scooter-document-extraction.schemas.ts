@@ -137,6 +137,8 @@ export type LogicalDocumentExtraction = z.infer<
 /** Per-file source evidence, independent of the current normalized scooter data. */
 export const scooterDocumentExtractedDataSchema = z
   .object({
+    /** Visually detected protective branding; never an ordinary issuer logo. */
+    clientCopy: z.literal(true).optional(),
     vin: documentVin.nullable(),
     fields,
     rawFields,

@@ -5,9 +5,10 @@ export const scootersCatalog = {
     workspace: {
       title: "Add scooters",
       description:
-        "Upload, analyse and review up to {max} scooters at once. Drafts are kept for 24 hours.",
+        "Add up to {max} scooter drafts and upload each scooter's documents inside its draft. Drafts are kept for 24 hours.",
       back: "Back to scooters",
       addAnother: "Add another scooter",
+      addParallel: "Add more scooters in parallel",
       drafts: "Scooter drafts",
       draft: "Draft {number}",
       loading: "Loading your drafts…",
@@ -28,6 +29,12 @@ export const scootersCatalog = {
       savedDrafts: "Draft changes saved",
       saveDrafts: "Save draft changes",
       discard: "Discard draft",
+      discardTitle: "Discard this scooter draft?",
+      discardDescription:
+        "The entered details and uploaded documents in this draft will be removed. Other drafts are kept.",
+      keepDraft: "Keep draft",
+      discarding: "Discarding draft…",
+      discarded: "Draft discarded",
       empty: "Add a scooter to upload documents or enter its details.",
       pdfHint:
         "Each PDF belongs to this scooter and may contain several document types. You can add more PDFs or images.",
@@ -46,22 +53,25 @@ export const scootersCatalog = {
       invalidUpload:
         "Select up to 20 non-empty PDF or image files, at most 15 MB each, with valid filenames.",
       uploadHint:
-        "Each PDF belongs to one scooter. Matching VINs are grouped automatically. Drop image sides for one scooter together, or choose an existing draft to add documents.",
-      newScooter: "New scooter",
-      groupingNeedsReview:
-        "Two drafts identify the same scooter. Keep your edits and resolve the grouping before creating both. Documents without a readable VIN can be added using the upload target selector.",
-      groupingFailed:
-        "The matching scooter drafts could not be grouped. Your documents and edits are preserved. Reload to retry.",
-      assignmentNeeded:
-        "Analysis could not identify the scooter. Assign these documents.",
-      chooseScooter: "Choose a scooter",
+        "All uploaded files stay in this draft. Document types and details are detected automatically, and conflicting VINs are flagged for review. Add another draft to upload documents for another scooter.",
+      automaticVersion: "Detect automatically",
+      copyDetailsTitle: "A protected copy for clients",
+      copyExplanation:
+        "This version is intended for sharing with clients. Its protective logo or watermark overlay is preserved. Link it to the original document, or correct the classification if this is the original.",
+      copyAssigned:
+        "Client copy matched to its original. The protective overlay is kept.",
+      copyNeedsOriginal:
+        "Client copy detected. Upload its original to this draft or choose the matching original in this draft before creating the scooter.",
+      matchedOriginal: "Client copy of {name}",
+      originalForCopyFile: "Original for {name}",
+      useAsOriginal: "Use as original",
       original: "Original",
       clientCopy: "Client copy with branded overlay",
       version: "Document version",
       originalForCopy: "Original document for this client copy",
       chooseOriginal: "Choose the matching original",
       versionHint:
-        "Client copies are attached to their originals and are not analysed separately.",
+        "Client copies are matched to originals in this draft. Only originals fill the scooter details.",
       pageNumbers: "Page numbers (comma separated)",
       invalidPages:
         "Enter distinct page numbers between 1 and {max}, separated by commas.",
@@ -455,7 +465,6 @@ export const scootersCatalog = {
         copy: "Copy the prompt below.",
         extract: "Send it to ChatGPT and attach:",
         documents: {
-          clientCopy: "Client copy with branded overlay",
           import: "Import papers (all pages)",
           civ: "Vehicle identity card (CIV)",
           registration: "Registration certificate",
@@ -509,13 +518,14 @@ export const scootersCatalog = {
         "No unique brand matches “{brand}”. Select it or add it using the brand field.",
     },
     documents: {
+      clientCopy: "For client",
       batch: {
         attached: "Attached documents",
         uploaded: "Uploaded",
         uploadedAndAnalyzed: "Uploaded and analyzed",
         drop: "Drop your scooter documents",
         browse: "Browse files",
-        hint: "CIV · Import · Registration · Insurance",
+        hint: "All files added here belong to this scooter draft.",
         requirements: "PDF, JPG, PNG or WebP, up to 15 MB each.",
         unknown: "Choose document type",
         editType: "Edit document type for {name}",
@@ -1251,9 +1261,10 @@ export const scootersCatalog = {
     workspace: {
       title: "Adaugă scutere",
       description:
-        "Încarcă, analizează și verifică până la {max} de scutere simultan. Ciornele se păstrează 24 de ore.",
+        "Adaugă până la {max} de ciorne și încarcă documentele fiecărui scuter în ciorna sa. Ciornele se păstrează 24 de ore.",
       back: "Înapoi la scutere",
       addAnother: "Adaugă alt scuter",
+      addParallel: "Adaugă mai multe scutere în paralel",
       drafts: "Ciorne scutere",
       draft: "Ciornă {number}",
       loading: "Se încarcă ciornele…",
@@ -1275,6 +1286,12 @@ export const scootersCatalog = {
       savedDrafts: "Modificările ciornelor au fost salvate",
       saveDrafts: "Salvează modificările ciornelor",
       discard: "Renunță la ciornă",
+      discardTitle: "Renunți la această ciornă de scuter?",
+      discardDescription:
+        "Datele completate și documentele încărcate în această ciornă vor fi eliminate. Celelalte ciorne se păstrează.",
+      keepDraft: "Păstrează ciorna",
+      discarding: "Se elimină ciorna…",
+      discarded: "Ciornă eliminată",
       empty:
         "Adaugă un scuter pentru a încărca documente sau a completa detaliile.",
       pdfHint:
@@ -1294,22 +1311,25 @@ export const scootersCatalog = {
       invalidUpload:
         "Alege până la 20 de fișiere PDF sau imagini, nevidate, de cel mult 15 MB fiecare, cu nume valide.",
       uploadHint:
-        "Fiecare PDF aparține unui scuter. Seriile VIN identice se grupează automat. Adaugă împreună fețele fotografiate ale unui scuter sau alege o ciornă pentru documente suplimentare.",
-      newScooter: "Scuter nou",
-      groupingNeedsReview:
-        "Două ciorne identifică același scuter. Păstrează modificările și verifică gruparea înainte de a le crea pe ambele. Documentele fără VIN lizibil pot fi adăugate alegând ciorna la încărcare.",
-      groupingFailed:
-        "Ciornele aceluiași scuter nu au putut fi grupate. Documentele și modificările sunt păstrate. Reîncarcă pentru a reîncerca.",
-      assignmentNeeded:
-        "Analiza nu a identificat scuterul. Atribuie documentele.",
-      chooseScooter: "Alege un scuter",
+        "Toate fișierele încărcate rămân în această ciornă. Tipurile și datele documentelor sunt detectate automat, iar seriile VIN diferite sunt semnalate pentru verificare. Adaugă altă ciornă pentru documentele altui scuter.",
+      automaticVersion: "Detectează automat",
+      copyDetailsTitle: "O copie protejată pentru clienți",
+      copyExplanation:
+        "Această versiune este destinată trimiterii către clienți. Logo-ul sau modelul de protecție aplicat pe document este păstrat. Asociază copia cu documentul original sau corectează clasificarea dacă acesta este originalul.",
+      copyAssigned:
+        "Copia pentru client a fost asociată originalului. Suprapunerea de protecție se păstrează.",
+      copyNeedsOriginal:
+        "Copie pentru client detectată. Încarcă originalul în această ciornă sau alege originalul corespunzător din această ciornă înainte de a crea scuterul.",
+      matchedOriginal: "Copie pentru client a documentului {name}",
+      originalForCopyFile: "Original pentru {name}",
+      useAsOriginal: "Folosește ca original",
       original: "Original",
       clientCopy: "Copie pentru client cu model de protecție",
       version: "Versiune document",
       originalForCopy: "Documentul original pentru această copie",
       chooseOriginal: "Alege originalul corespunzător",
       versionHint:
-        "Copiile pentru client se atașează originalelor și nu se analizează separat.",
+        "Copiile pentru client sunt asociate originalelor din această ciornă. Doar originalele completează datele scuterului.",
       pageNumbers: "Numerele paginilor (separate prin virgulă)",
       invalidPages:
         "Introdu pagini distincte între 1 și {max}, separate prin virgulă.",
@@ -1714,7 +1734,6 @@ export const scootersCatalog = {
         copy: "Copiază promptul de mai jos.",
         extract: "Trimite-l lui ChatGPT și atașează:",
         documents: {
-          clientCopy: "Copie pentru client cu model de protecție",
           import: "Documentele de import (toate paginile)",
           civ: "Cartea de identitate a vehiculului (CIV)",
           registration: "Certificatul de înmatriculare / înregistrare",
@@ -1770,13 +1789,14 @@ export const scootersCatalog = {
         "Marca „{brand}” nu are o potrivire unică. Selecteaz-o sau adaug-o din câmpul Marcă.",
     },
     documents: {
+      clientCopy: "Pentru client",
       batch: {
         attached: "Documente atașate",
         uploaded: "Încărcat",
         uploadedAndAnalyzed: "Încărcat și analizat",
         drop: "Trage documentele scuterului aici",
         browse: "Alege fișiere",
-        hint: "CIV · Import · Înmatriculare · Asigurare",
+        hint: "Toate fișierele adăugate aici aparțin acestei ciorne de scuter.",
         requirements: "PDF, JPG, PNG sau WebP, maximum 15 MB fiecare.",
         unknown: "Alege tipul documentului",
         editType: "Modifică tipul documentului {name}",

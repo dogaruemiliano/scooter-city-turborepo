@@ -1778,3 +1778,102 @@ it("shows explicit CIV availability and marks it issued when CIV evidence is ent
     within(availability).getByRole("radio", { name: /Not issued yet$/ }),
   ).toBeDisabled();
 });
+
+it("retains a visually detected client copy for assignment without importing its readings", async () => {
+  const copyData = {
+    clientCopy: true as const,
+    vin: "LXYTCKP05P0000001",
+    fields: { model: "Protected reading" },
+    rawFields: {},
+  };
+  const state: ScooterImportSnapshot = {
+    version: 1,
+    values: scooterEditorDefaults(),
+    documents: {
+      drafts: [
+        {
+          id: "copy",
+          type: "civ",
+          file: {
+            name: "scan.pdf",
+            type: "application/pdf",
+            size: 100,
+            lastModified: 1,
+          },
+          status: "ready",
+          uploadToken: "copy-token",
+        },
+      ],
+      extractions: {},
+      removedIds: [],
+    },
+    analysis: {
+      entries: {
+        copy: {
+          status: "success",
+          analysis: {
+            sourceId: "copy",
+            documentType: "civ",
+            extractedData: copyData,
+            issues: [],
+            reviewRequired: true,
+          },
+        },
+      },
+      cache: [[JSON.stringify(["copy", "civ", "scan.pdf", 100, 1]), "copy"]],
+      attempts: [],
+    },
+    extraction: {
+      origins: [],
+      manual: [],
+      confirmedSources: [],
+      automaticBaselines: [],
+      rawBySource: [],
+    },
+    importedRawFields: null,
+    importedSignature: null,
+    automaticImport: "",
+    reviewedDocuments: [],
+    createdBrands: [],
+    status: "review",
+  };
+  let persisted: ScooterImportSnapshot | undefined;
+  render(
+    <NextIntlClientProvider locale="en" messages={messages.en}>
+      <ScooterEditor
+        embedded
+        brands={brands}
+        returnHref="/en/scooters"
+        initialSnapshot={state}
+        importDraft={{
+          id: "session",
+          revision: 0,
+          state: {},
+          expiresAt: "2099-01-01T00:00:00.000Z",
+          updatedAt: "2026-10-24T00:00:00.000Z",
+        }}
+        onSnapshot={(snapshot) => {
+          persisted = snapshot;
+        }}
+      />
+    </NextIntlClientProvider>,
+  );
+  await screen.findByText(messages.en.scooters.documents.clientCopy);
+  expect(
+    screen.queryByRole("combobox", { name: "Original for scan.pdf" }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: "Use as original" }),
+  ).not.toBeInTheDocument();
+  await waitFor(() =>
+    expect(persisted?.documents.drafts[0].version).toBe("client_copy"),
+  );
+  expect(screen.getByRole("textbox", { name: "VIN" })).toHaveValue("");
+  expect(screen.getByRole("textbox", { name: "Model" })).toHaveValue("");
+  expect(persisted?.documents.extractions.copy).toMatchObject({
+    clientCopy: true,
+  });
+  expect(
+    screen.getByText(messages.en.scooters.workspace.copyNeedsOriginal),
+  ).toBeInTheDocument();
+});

@@ -3,6 +3,7 @@ import {
   activeImportReviews,
   importFieldReviews,
   remainingCivDocumentWarnings,
+  remainingImportReviews,
   unresolvedDocumentRubrics,
 } from "./scooter-import-review";
 import { parseDocumentImport } from "./scooter-document-import";
@@ -35,6 +36,22 @@ function review(source: unknown, snapshot = current) {
 }
 
 describe("import field review", () => {
+  it("resolves valid corrections independently and keeps invalid or empty edits unresolved", () => {
+    const reviews = review({ powerKw: null, color: null });
+    expect(
+      remainingImportReviews(reviews, { ...current, powerKw: "9" }, false).map(
+        (item) => item.field,
+      ),
+    ).toEqual(["color"]);
+    for (const powerKw of ["", "-", "unreadable", "-1"]) {
+      expect(
+        remainingImportReviews(reviews, { ...current, powerKw }, false).map(
+          (item) => item.field,
+        ),
+      ).toContain("powerKw");
+    }
+  });
+
   it("counts semantic CIV raw fields once while retaining independent document warnings", () => {
     const reviews = ["vin", "color", "brandId", "variant"].map((field) => ({
       field,

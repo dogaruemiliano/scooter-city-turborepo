@@ -39,7 +39,9 @@ export function ScooterDocumentTypeEditor({
   onType,
   onDocument,
   scooterVin,
+  surface = "default",
 }: {
+  surface?: "default" | "media";
   sourceId: string;
   fileName: string;
   type: v1.scooters.ScooterDocumentType | null;
@@ -61,7 +63,9 @@ export function ScooterDocumentTypeEditor({
       : [];
   return (
     <div className="flex min-w-0 items-center gap-2">
-      <span className="text-xs text-muted-foreground">
+      <span
+        className={`text-xs ${surface === "media" ? "text-scrim-foreground" : "text-muted-foreground"}`}
+      >
         {types.length
           ? types.map((value) => t(`compact.${value}`)).join(" · ")
           : t("batch.unknown")}
@@ -74,6 +78,11 @@ export function ScooterDocumentTypeEditor({
                 type="button"
                 variant="ghost"
                 size="icon-xs"
+                className={
+                  surface === "media"
+                    ? "text-scrim-foreground hover:bg-media-scrim hover:text-scrim-foreground"
+                    : undefined
+                }
                 disabled={disabled}
                 aria-label={t("batch.editType", { name: fileName })}
               />

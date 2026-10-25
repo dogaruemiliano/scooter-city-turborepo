@@ -6,6 +6,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "./button";
 
 export type DocumentPreviewHeaderProps = {
+  headerOverlay?: ReactNode;
   caption?: string;
   onClosePress?: () => void;
   closeLabel?: string;
@@ -15,10 +16,20 @@ export type DocumentPreviewHeaderProps = {
 /** Shared overlay for inline and fullscreen image/PDF previews. */
 export function DocumentPreviewHeader({
   caption,
+  headerOverlay,
   onClosePress,
   closeLabel,
   headerActions,
 }: DocumentPreviewHeaderProps) {
+  if (headerOverlay)
+    return (
+      <div
+        data-slot="document-preview-header"
+        className="pointer-events-none absolute inset-x-0 top-0 z-raised flex min-w-0 items-start justify-between gap-2 bg-linear-to-b from-media-scrim to-transparent px-3 pt-[max(var(--spacing-3),env(safe-area-inset-top))] pb-8 text-scrim-foreground *:pointer-events-auto"
+      >
+        {headerOverlay}
+      </div>
+    );
   if (!caption && !onClosePress && !headerActions) return null;
   return (
     <div

@@ -57,6 +57,31 @@ function parse(documents: unknown[], manifest = sources, values = current) {
 }
 
 describe("source-aware extraction", () => {
+  it("treats differently spaced brand readings as the same brand while preserving source text", () => {
+    const manifest: DocumentSource[] = [
+      { sourceId: "first", type: "civ", fileName: "first.pdf" },
+      { sourceId: "second", type: "civ", fileName: "second.pdf" },
+    ];
+    const result = parse(
+      [
+        document(manifest[0], { brandName: "K Y M C O" }),
+        document(manifest[1], { brandName: "kymco" }),
+      ],
+      manifest,
+    );
+    expect(result).toMatchObject({
+      ok: true,
+      values: { brandId: "brand-1" },
+      unmatchedBrand: undefined,
+    });
+    if (result.ok) {
+      expect(result.extractedDocuments?.first.fields.brandName).toBe(
+        "K Y M C O",
+      );
+      expect(result.extractedDocuments?.second.fields.brandName).toBe("kymco");
+    }
+  });
+
   it("uses CIV exclusively for technical data, certificate for registration, and links insurance by its source", () => {
     const result = parse([
       document(

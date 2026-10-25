@@ -100,6 +100,7 @@ const modelInspectionSchema = z
 export const scooterDocumentModelOutputSchema = z
   .object({
     detectedDocumentType: z.enum(v1.scooters.SCOOTER_DOCUMENT_TYPES).nullable(),
+    clientCopy: z.boolean(),
     vin: z.string().max(120).nullable(),
     fields: modelFieldsSchema,
     rawFields: modelRawFieldsSchema,

@@ -19,6 +19,18 @@ describe("horizontal overflow fades", () => {
     expect(viewport.className).toContain("var(--spacing-6)");
     expect(screen.getByRole("button", { name: "Draft one" })).toBeEnabled();
   });
+  it("reserves scrollbar spacing only on desktop without disabling the viewport", () => {
+    render(
+      <HorizontalScrollArea label="Drafts" scrollbarVisibility="desktop">
+        <button>Draft one</button>
+      </HorizontalScrollArea>,
+    );
+    const viewport = screen.getByRole("region", { name: "Drafts" });
+    const root = viewport.closest('[data-slot="horizontal-scroll-area"]')!;
+    expect(root).toHaveClass("lg:data-[has-overflow-x]:pb-5");
+    expect(root).not.toHaveClass("data-[has-overflow-x]:pb-5");
+    expect(viewport).toHaveAttribute("tabindex", "0");
+  });
   it("preserves the unfaded default for existing callers", () => {
     render(
       <HorizontalScrollArea label="Repairs">

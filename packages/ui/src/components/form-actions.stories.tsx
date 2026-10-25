@@ -75,14 +75,14 @@ export const RaisedSurface: Story = {
   ),
 };
 
-/** The page owns additional end-of-form clearance; the sticky card owns its inset. */
+/** The page end has less clearance than the floating inset, including device safe areas. */
 export const StickyCard: Story = {
   render: () => (
-    <form className="grid min-w-0 gap-8 px-4 pb-16 sm:px-8 sm:pb-24">
+    <form className="grid min-w-0 gap-8 px-4 pb-[calc(var(--spacing-screen-bottom)+env(safe-area-inset-bottom))] sm:px-8">
       <div className="min-h-dvh">
         <p className="text-sm text-muted-foreground">
           Scroll to see the action card float above the screen edge and settle
-          with extra space below it at the end of the form.
+          with a smaller gap below it at the end of the form.
         </p>
       </div>
       <FormActions sticky status="Review the required details before saving.">

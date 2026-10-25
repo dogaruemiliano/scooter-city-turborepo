@@ -323,7 +323,7 @@ test("dashed surfaces expose the shared card radius and border width to web and 
 });
 
 test("screen bottom padding is shared by web and native", () => {
-  assert.equal(spacing.screenBottom, spacing[8]);
+  assert.equal(spacing.screenBottom, spacing[2]);
   assert.ok(
     buildCss().includes(
       `--spacing-screen-bottom: ${spacing.screenBottom / 16}rem;`,

@@ -5,22 +5,26 @@ import {
   Badge,
   Button,
   Spinner,
-  FileDropZone,
   HorizontalScrollArea,
-  Label,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-  buttonVariants,
 } from "@repo/ui/components";
 import { SaveButton } from "@repo/ui/components/save-button";
+import { WizardExitDialog } from "@repo/ui/components/wizard-exit-dialog";
+import { PageHeaderActions } from "@/components/PageHeaderActions";
 import { PageLayout } from "@repo/ui/components/page-layout";
+import { motion, radius } from "@repo/theme";
+import { PlusIcon, Trash2Icon } from "lucide-react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { webApi } from "@/lib/api";
+import { useWorkspaceNotifications } from "@/components/WorkspaceNotifications";
+import { ScooterFleetNumberRefreshContext } from "./ScooterFleetNumberRefreshContext";
 import type { CivVocabulary } from "./CivVocabularyContext";
 import {
   readScooterImportBackup,
@@ -30,9 +34,6 @@ import {
 import { ScooterEditor } from "./ScooterEditor";
 import {
   compactScooterImportSnapshot,
-  mergeScooterImportSnapshots,
-  scooterImportIdentity,
-  scooterImportHasManualValues,
   scooterImportStateSignature,
   readScooterImportSnapshot,
   type ScooterImportSnapshot,
@@ -58,10 +59,8 @@ interface WorkspaceDraft {
   draft: v1.scooters.ScooterImportDraft;
   initialSnapshot?: ScooterImportSnapshot;
   restoreFailed?: boolean;
+  documentCount: number;
   status: ScooterImportStatus;
-  incomingFiles?: { id: string; files: File[] };
-  generation?: number;
-  identity?: string | null;
 }
 interface PendingSave {
   draft: v1.scooters.ScooterImportDraft;
@@ -84,17 +83,17 @@ export function ScooterImportWorkspace({
   vocabulary?: CivVocabulary;
 }) {
   const t = useTranslations("scooters.workspace");
-  const uploadBatchRunning = useRef(false);
-  const [assignments, setAssignments] = useState<Record<string, string>>({});
+  const feedback = useTranslations("scooters.feedback");
+  const notifications = useWorkspaceNotifications();
+  const [fleetNumberRevision, setFleetNumberRevision] = useState(0);
   const [workspaceOwner] = useState(() => crypto.randomUUID());
   const [drafts, setDrafts] = useState<WorkspaceDraft[]>([]);
-  const [merging, setMerging] = useState<string[]>([]);
-  const grouping = useRef(false);
-  const failedGroups = useRef(new Set<string>());
   const [selectedId, setSelectedId] = useState<string>();
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
   const [discarding, setDiscarding] = useState<string>();
+  const [discardTarget, setDiscardTarget] = useState<string>();
+  const [discardError, setDiscardError] = useState<string>();
   const [error, setError] = useState<string>();
   const [savingRecovery, setSavingRecovery] = useState(false);
   const [recoveryBlocked, setRecoveryBlocked] = useState(false);
@@ -105,45 +104,111 @@ export function ScooterImportWorkspace({
   const closed = useRef(new Set<string>());
   const mounted = useRef(true);
 
-  const add = useCallback(
-    async (files?: File[]) => {
-      setAdding(true);
-      setShowRecovery(false);
-      setError(undefined);
-      try {
-        const draft = await webApi.fetch(
-          v1.scooters.ROUTES.importDrafts.create,
-          v1.scooters.scooterImportDraftSchema,
-          { method: "POST", json: {} },
+  const add = useCallback(async () => {
+    setAdding(true);
+    setShowRecovery(false);
+    setError(undefined);
+    try {
+      const draft = await webApi.fetch(
+        v1.scooters.ROUTES.importDrafts.create,
+        v1.scooters.scooterImportDraftSchema,
+        { method: "POST", json: {} },
+      );
+      if (!mounted.current) return;
+      setDrafts((items) => [
+        ...items,
+        {
+          draft,
+          status: "empty",
+          documentCount: 0,
+        },
+      ]);
+      setSelectedId(draft.id);
+    } catch (cause) {
+      if (mounted.current)
+        setError(
+          t(
+            cause instanceof ApiError &&
+              cause.code === "IMPORT_DRAFT_LIMIT_REACHED"
+              ? "limitReached"
+              : "loadFailed",
+          ),
         );
-        if (!mounted.current) return;
-        setDrafts((items) => [
-          ...items,
-          {
-            draft,
-            status: "empty",
-            ...(files?.length
-              ? { incomingFiles: { id: crypto.randomUUID(), files } }
-              : {}),
-          },
-        ]);
-        setSelectedId(draft.id);
-      } catch (cause) {
-        if (mounted.current)
-          setError(
-            t(
-              cause instanceof ApiError &&
-                cause.code === "IMPORT_DRAFT_LIMIT_REACHED"
-                ? "limitReached"
-                : "loadFailed",
+    } finally {
+      if (mounted.current) setAdding(false);
+    }
+  }, [t]);
+  const workspaceRef = useRef<HTMLDivElement>(null);
+  const selectionBounds = useRef(
+    new Map<string, { bounds: DOMRect; borderRadius: number }>(),
+  );
+  const selectionAnimations = useRef<Animation[]>([]);
+
+  function selectDraft(id: string) {
+    if (id === selectedId) return;
+    // Capture the badge positions before the selected badge becomes the heading.
+    selectionBounds.current.clear();
+    workspaceRef.current
+      ?.querySelectorAll<HTMLElement>("[data-draft-motion]")
+      .forEach((node) => {
+        if (!node.closest("[hidden]")) {
+          const bounds = node.getBoundingClientRect();
+          selectionBounds.current.set(node.dataset.draftMotion!, {
+            bounds,
+            // Use the rendered pill radius so it interpolates throughout the move.
+            borderRadius: node.matches("button")
+              ? Math.min(bounds.width, bounds.height) / 2
+              : radius.lg,
+          });
+        }
+      });
+    setSelectedId(id);
+  }
+
+  useLayoutEffect(() => {
+    selectionAnimations.current.forEach((animation) => animation.cancel());
+    selectionAnimations.current = [];
+    if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      workspaceRef.current
+        ?.querySelectorAll<HTMLElement>("[data-draft-motion]")
+        .forEach((node) => {
+          if (node.closest("[hidden]") || !node.animate) return;
+          const before = selectionBounds.current.get(node.dataset.draftMotion!);
+          if (!before) return;
+          const after = node.getBoundingClientRect();
+          selectionAnimations.current.push(
+            node.animate(
+              [
+                {
+                  transform: `translate(${before.bounds.left - after.left}px, ${before.bounds.top - after.top}px)`,
+                  borderRadius: `${before.borderRadius}px`,
+                },
+                {
+                  transform: "none",
+                  borderRadius: `${node.matches("button") ? Math.min(after.width, after.height) / 2 : radius.lg}px`,
+                },
+              ],
+              {
+                duration: motion.duration.normal,
+                easing: motion.easing.decelerate,
+              },
             ),
           );
-      } finally {
-        if (mounted.current) setAdding(false);
-      }
+        });
+    }
+    selectionBounds.current.clear();
+    workspaceRef.current
+      ?.querySelector<HTMLElement>("[data-selected-draft-title]")
+      ?.focus({ preventScroll: true });
+  }, [selectedId]);
+
+  useEffect(
+    () => () => {
+      selectionAnimations.current.forEach((animation) => animation.cancel());
     },
-    [t],
+    [],
   );
+
   const initialized = useRef(false);
   useEffect(() => {
     mounted.current = true;
@@ -203,10 +268,11 @@ export function ScooterImportWorkspace({
 
               return {
                 draft,
-                identity: initialSnapshot
-                  ? scooterImportIdentity(initialSnapshot)
-                  : null,
                 initialSnapshot,
+                documentCount:
+                  initialSnapshot?.documents.drafts.filter(
+                    (document) => document.status === "ready",
+                  ).length ?? 0,
                 restoreFailed:
                   Object.keys(draft.state).length > 0 && !initialSnapshot,
                 status:
@@ -324,14 +390,7 @@ export function ScooterImportWorkspace({
   const snapshot = useCallback(
     (draft: v1.scooters.ScooterImportDraft, state: ScooterImportSnapshot) => {
       if (closed.current.has(draft.id)) return;
-      const identity = scooterImportIdentity(state);
-      state = compactScooterImportSnapshot({
-        ...state,
-        assignment:
-          assignments[draft.id] ??
-          pending.current.get(draft.id)?.state.assignment ??
-          readScooterImportSnapshot(draft.state)?.assignment,
-      });
+      state = compactScooterImportSnapshot(state);
       const signature = scooterImportStateSignature(state);
       const item = pending.current.get(draft.id);
       if (item?.signature === signature) {
@@ -361,11 +420,19 @@ export function ScooterImportWorkspace({
         signature,
         sentSignature: next.sentSignature,
       });
+      const documentCount = state.documents.drafts.filter(
+        (document) => document.status === "ready",
+      ).length;
       setDrafts((items) =>
         items.map((entry) =>
           entry.draft.id === draft.id &&
-          (entry.status !== state.status || entry.identity !== identity)
-            ? { ...entry, status: state.status, identity }
+          (entry.status !== state.status ||
+            entry.documentCount !== documentCount)
+            ? {
+                ...entry,
+                status: state.status,
+                documentCount,
+              }
             : entry,
         ),
       );
@@ -374,7 +441,7 @@ export function ScooterImportWorkspace({
         void persist(next);
       });
     },
-    [persist, workspaceOwner, assignments],
+    [persist, workspaceOwner],
   );
 
   useEffect(() => {
@@ -402,7 +469,9 @@ export function ScooterImportWorkspace({
   }
 
   async function discard(id: string) {
+    if (discarding) return;
     setDiscarding(id);
+    setDiscardError(undefined);
     setShowRecovery(false);
     setError(undefined);
     try {
@@ -420,20 +489,25 @@ export function ScooterImportWorkspace({
           ? drafts.find((entry) => entry.draft.id !== id)?.draft.id
           : selected,
       );
+      setDiscardTarget(undefined);
     } catch {
       closed.current.delete(id);
+      setDiscardError(t("discardFailed"));
       setError(t("discardFailed"));
     } finally {
       setDiscarding(undefined);
     }
   }
 
-  function complete(
-    id: string,
-    scooter: v1.scooters.Scooter,
-    reviewNext: boolean,
-  ) {
+  function complete(id: string, scooter: v1.scooters.Scooter) {
+    if (closed.current.has(id)) return;
     closed.current.add(id);
+    notifications?.add({
+      title: feedback("createSuccessTitle"),
+      description: v1.scooters.scooterDisplayCode(scooter),
+      variant: "success",
+    });
+    setFleetNumberRevision((revision) => revision + 1);
     pending.current.delete(id);
     clearScooterImportBackup(id);
     setCreated((items) => [scooter, ...items]);
@@ -444,478 +518,242 @@ export function ScooterImportWorkspace({
           entry.draft.id !== id && ["review", "ready"].includes(entry.status),
       ) ?? drafts.find((entry) => entry.draft.id !== id);
     setSelectedId(next?.draft.id);
-    if (reviewNext && !next) void add();
   }
 
-  useEffect(() => {
-    if (grouping.current || loading) return;
-    const complete = drafts.flatMap((entry) => {
-      const item = pending.current.get(entry.draft.id);
-      const state = item?.state ?? entry.initialSnapshot;
-      if (
-        !state ||
-        item?.blocked ||
-        !["review", "ready"].includes(entry.status) ||
-        state.photos?.photos.length ||
-        state.photos?.uploads.length
-      )
-        return [];
-      const vin = scooterImportIdentity(state);
-      return [{ entry, state, vin, item }];
-    });
-    const target = complete.find((candidate, index) =>
-      complete.some(
-        (other, otherIndex) =>
-          (otherIndex > index && candidate.vin && other.vin === candidate.vin) ||
-          (assignments[other.entry.draft.id] ?? other.state.assignment) === candidate.entry.draft.id,
-      ),
-    );
-    const source =
-      target &&
-      complete.find(
-        (candidate) =>
-          candidate.entry.draft.id !== target.entry.draft.id &&
-          ((target.vin && candidate.vin === target.vin) ||
-            (assignments[candidate.entry.draft.id] ?? candidate.state.assignment) === target.entry.draft.id),
-      );
-    if (!target || !source) return;
-    const pair = `${target.entry.draft.id}:${source.entry.draft.id}`;
-    if (failedGroups.current.has(pair)) return;
-    const combined = mergeScooterImportSnapshots(target.state, source.state);
-    if (
-      combined.documents.drafts.length >
-        v1.scooters.SCOOTER_DOCUMENT_MAX_FILES ||
-      scooterImportHasManualValues(source.state)
-    ) {
-      failedGroups.current.add(pair);
-      setError(t("groupingNeedsReview"));
-      return;
-    }
-    grouping.current = true;
-    const ids = [target.entry.draft.id, source.entry.draft.id];
-    setMerging(ids);
-    ids.forEach((id) => closed.current.add(id));
-    void (async () => {
-      try {
-        // Let any already-sent autosave update the revision before the atomic move.
-        while (target.item?.running || source.item?.running)
-          await new Promise((resolve) => setTimeout(resolve, 50));
-        const result = await webApi
-          .fetch(
-            v1.scooters.ROUTES.importDrafts.merge(target.entry.draft.id),
-            v1.scooters.scooterImportDraftSchema,
-            {
-              method: "POST",
-              json: {
-                sourceId: source.entry.draft.id,
-                sourceRevision: (source.item?.draft ?? source.entry.draft)
-                  .revision,
-                revision: (target.item?.draft ?? target.entry.draft).revision,
-                state: compactScooterImportSnapshot(combined),
-              },
-            },
-          )
-          .catch(async (cause: unknown) => {
-            // The merge can commit before its response is lost. Recover the saved
-            // destination rather than restoring a stale, pre-grouping backup.
-            const current = await webApi.fetch(
-              v1.scooters.ROUTES.importDrafts.get(target.entry.draft.id),
-              v1.scooters.scooterImportDraftSchema,
-              { cache: "no-store" },
-            );
-            if (
-              scooterImportStateSignature(current.state) !==
-              scooterImportStateSignature(
-                compactScooterImportSnapshot(combined),
-              )
-            )
-              throw cause;
-            return current;
-          });
-        if (!mounted.current) return;
-        ids.forEach((id) => {
-          pending.current.delete(id);
-          clearScooterImportBackup(id);
-        });
-        closed.current.delete(target.entry.draft.id);
-        setDrafts((items) =>
-          items
-            .filter((entry) => entry.draft.id !== source.entry.draft.id)
-            .map((entry) =>
-              entry.draft.id === target.entry.draft.id
-                ? {
-                    ...entry,
-                    draft: result,
-                    initialSnapshot: readScooterImportSnapshot(result.state),
-                    incomingFiles: undefined,
-                    generation: (entry.generation ?? 0) + 1,
-                    identity: scooterImportIdentity(combined),
-                    status: "review",
-                  }
-                : entry,
-            ),
-        );
-        setSelectedId(target.entry.draft.id);
-      } catch {
-        ids.forEach((id) => closed.current.delete(id));
-        failedGroups.current.add(pair);
-        for (const id of ids) {
-          const item = pending.current.get(id);
-          if (item) void persist(item);
-        }
-        if (mounted.current) setError(t("groupingFailed"));
-      } finally {
-        grouping.current = false;
-        if (mounted.current) setMerging([]);
-      }
-    })();
-  }, [drafts, loading, t, persist, assignments]);
-
-  function uploadFiles(files: File[]) {
-    if (loading || adding || uploadBatchRunning.current || !files.length)
-      return;
-    if (
-      files.some(
-        (file) =>
-          !v1.scooters.SCOOTER_DOCUMENT_CONTENT_TYPES.includes(
-            file.type as (typeof v1.scooters.SCOOTER_DOCUMENT_CONTENT_TYPES)[number],
-          ) ||
-          !file.size ||
-          file.size > v1.scooters.SCOOTER_DOCUMENT_MAX_BYTES ||
-          !v1.scooters.scooterDocumentDraftSchema.shape.fileName.safeParse(
-            file.name,
-          ).success,
-      ) ||
-      files.length > v1.scooters.SCOOTER_DOCUMENT_MAX_FILES
-    ) {
-      setError(t("invalidUpload"));
-      return;
-    }
-    const groups = files.map((file) => [file]);
-    const emptyDraft = drafts.find(
-      (entry) =>
-        entry.status === "empty" &&
-        !entry.incomingFiles &&
-        !pending.current.get(entry.draft.id)?.state.documents.drafts.length,
-    );
-    if (
-      drafts.length + groups.length - (emptyDraft ? 1 : 0) >
-      v1.scooters.SCOOTER_IMPORT_MAX_DRAFTS
-    ) {
-      setError(t("limitReached"));
-      return;
-    }
-    if (groups.length > 1) {
-      uploadBatchRunning.current = true;
-      void (async () => {
-        try {
-          for (const [index, group] of groups.entries()) {
-            if (index === 0 && emptyDraft)
-              setDrafts((items) =>
-                items.map((entry) =>
-                  entry.draft.id === emptyDraft.draft.id
-                    ? {
-                        ...entry,
-                        incomingFiles: {
-                          id: crypto.randomUUID(),
-                          files: group,
-                        },
-                        status: "uploading",
-                      }
-                    : entry,
-                ),
-              );
-            else await add(group);
-          }
-        } finally {
-          uploadBatchRunning.current = false;
-        }
-      })();
-      return;
-    }
-    const target = emptyDraft;
-    if (target) {
-      const count =
-        pending.current.get(target.draft.id)?.state.documents.drafts.length ??
-        target.initialSnapshot?.documents.drafts.length ??
-        0;
-      if (count + files.length > v1.scooters.SCOOTER_DOCUMENT_MAX_FILES) {
-        setError(t("invalidUpload"));
-        return;
-      }
-      setDrafts((items) =>
-        items.map((entry) =>
-          entry.draft.id === target.draft.id
-            ? {
-                ...entry,
-                incomingFiles: { id: crypto.randomUUID(), files },
-                status: "uploading",
-              }
-            : entry,
-        ),
-      );
-      setSelectedId(target.draft.id);
-    } else if (drafts.length < v1.scooters.SCOOTER_IMPORT_MAX_DRAFTS)
-      void add(files);
-    else setError(t("limitReached"));
-  }
-
-  function needsAssignment(id: string, status: ScooterImportStatus) {
-    const entry = drafts.find((candidate) => candidate.draft.id === id);
-    const state = pending.current.get(id)?.state ?? entry?.initialSnapshot;
-    return Boolean(
-      state?.documents.drafts.length &&
-      ["review", "ready", "attention"].includes(status) &&
-      !scooterImportIdentity(state) &&
-      (assignments[id] ?? state.assignment) !== "new",
-    );
-  }
-
-  function assign(id: string, value: string | null) {
-    if (!value) return;
-    failedGroups.current.clear();
-    setAssignments((current) => ({ ...current, [id]: value }));
-    const entry = drafts.find((candidate) => candidate.draft.id === id);
-    const state = pending.current.get(id)?.state ?? entry?.initialSnapshot;
-    if (entry && state) snapshot(entry.draft, { ...state, assignment: value });
-  }
+  const multipleDrafts = drafts.length > 1;
+  const canAddDraft =
+    !loading && drafts.every((entry) => entry.documentCount > 0);
 
   return (
     <PageLayout>
-      <div className="grid min-w-0 gap-6">
-        <div className="flex min-w-0 flex-wrap items-start justify-between gap-4">
-          <div className="grid gap-2">
-            <h1 className="text-2xl font-semibold">{t("title")}</h1>
-            <p className="text-sm text-muted-foreground">
-              {t("description", { max: v1.scooters.SCOOTER_IMPORT_MAX_DRAFTS })}
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <Link
-              href={scootersHref}
-              className={buttonVariants({ variant: "outline" })}
+      <ScooterFleetNumberRefreshContext value={fleetNumberRevision}>
+        <div ref={workspaceRef} className="grid min-w-0 gap-6">
+          {multipleDrafts || canAddDraft ? (
+            <HorizontalScrollArea
+              key={multipleDrafts ? "drafts" : "add"}
+              label={t("drafts")}
+              fadeEdges
+              scrollbarVisibility="desktop"
+              className={`-mx-(--page-gutter) w-auto md:mx-0 md:w-full animate-in fade-in-0 slide-in-from-top-2 duration-normal ease-decelerate motion-reduce:animate-none ${multipleDrafts ? "" : "hidden md:block"}`}
             >
-              {t("back")}
-            </Link>
+              <nav
+                aria-label={t("drafts")}
+                className="flex w-max min-w-full items-center gap-2 px-(--page-gutter) py-2 md:px-0"
+              >
+                {drafts.map(({ draft, status }, index) =>
+                  selectedId !== draft.id ? (
+                    <Button
+                      key={draft.id}
+                      data-draft-motion={draft.id}
+                      type="button"
+                      variant="outline"
+                      aria-controls={`scooter-draft-${draft.id}`}
+                      aria-expanded={false}
+                      onClick={() => selectDraft(draft.id)}
+                      className={`h-auto min-h-12 rounded-full flex-nowrap gap-2 py-3 whitespace-nowrap ${draftStatusColors[status]}`}
+                    >
+                      <span>{t("draft", { number: index + 1 })}</span>
+                      <span className="text-xs font-medium">
+                        {t(`status.${status}`)}
+                      </span>
+                    </Button>
+                  ) : null,
+                )}
+                {canAddDraft ? (
+                  <PageHeaderActions>
+                    <Button
+                      data-draft-motion="add"
+                      type="button"
+                      variant="outline"
+                      className="size-11 shrink-0 rounded-full p-0 whitespace-nowrap animate-in fade-in-0 zoom-in-95 duration-normal ease-decelerate motion-reduce:animate-none md:h-auto md:min-h-12 md:w-auto md:px-4"
+                      aria-label={t("addParallel")}
+                      title={t("addParallel")}
+                      disabled={
+                        loading ||
+                        adding ||
+                        drafts.length >= v1.scooters.SCOOTER_IMPORT_MAX_DRAFTS
+                      }
+                      onClick={() => {
+                        void add();
+                      }}
+                    >
+                      {adding ? <Spinner /> : <PlusIcon aria-hidden="true" />}
+                      <span className="sr-only md:not-sr-only">
+                        {t("addParallel")}
+                      </span>
+                    </Button>
+                  </PageHeaderActions>
+                ) : null}
+              </nav>
+            </HorizontalScrollArea>
+          ) : null}
+          {error ? (
+            <div role="alert" className="grid gap-2 text-sm text-destructive">
+              <p>{error}</p>
+              {showRecovery ? (
+                <SaveButton
+                  type="button"
+                  variant="outline"
+                  disabled={recoveryBlocked}
+                  state={savingRecovery ? "pending" : "error"}
+                  idleLabel={t("saveDrafts")}
+                  pendingLabel={t("savingDrafts")}
+                  successLabel={t("savedDrafts")}
+                  onClick={() => {
+                    void retrySaves();
+                  }}
+                />
+              ) : null}
+            </div>
+          ) : null}
+          {loading ? (
+            <p
+              role="status"
+              className="flex items-center gap-2 text-sm text-muted-foreground"
+            >
+              <Spinner />
+              {t("loading")}
+            </p>
+          ) : null}
+          {created.length ? (
+            <ul className="grid gap-2">
+              {created.map((scooter) => (
+                <li key={scooter.id} className="text-sm">
+                  <Link
+                    href={`${scootersHref}/${encodeURIComponent(scooter.id)}`}
+                    className="font-medium underline underline-offset-4"
+                  >
+                    {v1.scooters.scooterDisplayCode(scooter)}
+                  </Link>{" "}
+                  · {t("status.created")}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {drafts.map(
+            ({ draft, initialSnapshot, restoreFailed, status }, index) => (
+              <fieldset
+                key={draft.id}
+                id={`scooter-draft-${draft.id}`}
+                hidden={selectedId !== draft.id}
+                className={
+                  selectedId === draft.id ? "grid min-w-0 gap-4" : "hidden"
+                }
+                aria-label={t("draft", { number: index + 1 })}
+              >
+                {multipleDrafts ? (
+                  <div className="flex min-w-0 items-center justify-between gap-3 animate-in fade-in-0 slide-in-from-top-2 duration-normal ease-decelerate motion-reduce:animate-none">
+                    <h2
+                      tabIndex={-1}
+                      data-selected-draft-title={
+                        selectedId === draft.id ? "" : undefined
+                      }
+                      className="min-w-0 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <Badge
+                        data-draft-motion={draft.id}
+                        variant="outline"
+                        className={`min-h-12 gap-2 rounded-lg px-4 py-3 text-sm font-semibold ${draftStatusColors[status]}`}
+                      >
+                        <span>{t("draft", { number: index + 1 })}</span>
+                        <span className="text-xs font-medium">
+                          {t(`status.${status}`)}
+                        </span>
+                      </Badge>
+                    </h2>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      aria-label={t("discard")}
+                      title={t("discard")}
+                      disabled={discarding === draft.id}
+                      onClick={() => {
+                        setDiscardError(undefined);
+                        setDiscardTarget(draft.id);
+                      }}
+                    >
+                      <Trash2Icon aria-hidden="true" />
+                    </Button>
+                  </div>
+                ) : null}
+                {restoreFailed ? (
+                  <p role="alert" className="text-sm text-destructive">
+                    {t("restoreFailed")}
+                  </p>
+                ) : (
+                  <ScooterEditor
+                    persistenceBlocked={revisionConflicts.includes(draft.id)}
+                    draftActions={{
+                      hasOtherDrafts: drafts.length > 1,
+                      pending: discarding === draft.id,
+                      onDiscard: () => {
+                        setDiscardError(undefined);
+                        setDiscardTarget(draft.id);
+                      },
+                    }}
+                    embedded
+                    importDraft={draft}
+                    initialSnapshot={initialSnapshot}
+                    onSnapshot={(state) => snapshot(draft, state)}
+                    onCreated={(scooter) => complete(draft.id, scooter)}
+                    brands={brands}
+                    vocabulary={vocabulary}
+                    returnHref={scootersHref}
+                  />
+                )}
+              </fieldset>
+            ),
+          )}
+          {!loading && !drafts.length ? (
+            <p className="text-sm text-muted-foreground">{t("empty")}</p>
+          ) : null}
+        </div>
+      </ScooterFleetNumberRefreshContext>
+      <WizardExitDialog
+        open={Boolean(discardTarget)}
+        onOpenChange={(open) => {
+          if (!open && !discarding) {
+            setDiscardTarget(undefined);
+            setDiscardError(undefined);
+          }
+        }}
+        title={t("discardTitle")}
+        description={t("discardDescription")}
+        actions={
+          <>
             <Button
               type="button"
+              variant="outline"
+              disabled={Boolean(discarding)}
               onClick={() => {
-                void add();
+                setDiscardTarget(undefined);
+                setDiscardError(undefined);
               }}
-              disabled={
-                loading ||
-                adding ||
-                drafts.length >= v1.scooters.SCOOTER_IMPORT_MAX_DRAFTS
-              }
             >
-              {adding ? <Spinner /> : null}
-              {t("addAnother")}
+              {t("keepDraft")}
             </Button>
-          </div>
-        </div>
-        <div className="grid gap-3">
-          <FileDropZone
-            label={t("uploadDocuments")}
-            browseLabel={t("browse")}
-            hint={t("uploadHint")}
-            accept={v1.scooters.SCOOTER_DOCUMENT_CONTENT_TYPES.join(",")}
-            disabled={loading || adding}
-            onFiles={uploadFiles}
-          />
-        </div>
-        {error ? (
-          <div role="alert" className="grid gap-2 text-sm text-destructive">
-            <p>{error}</p>
-            {showRecovery ? (
-              <SaveButton
-                type="button"
-                variant="outline"
-                disabled={recoveryBlocked}
-                state={savingRecovery ? "pending" : "error"}
-                idleLabel={t("saveDrafts")}
-                pendingLabel={t("savingDrafts")}
-                successLabel={t("savedDrafts")}
-                onClick={() => {
-                  void retrySaves();
-                }}
-              />
-            ) : null}
-          </div>
-        ) : null}
-        {loading ? (
-          <p
-            role="status"
-            className="flex items-center gap-2 text-sm text-muted-foreground"
-          >
-            <Spinner />
-            {t("loading")}
+            <SaveButton
+              type="button"
+              variant="destructive"
+              disabled={Boolean(discarding)}
+              state={discarding ? "pending" : discardError ? "error" : "idle"}
+              idleLabel={t("discard")}
+              pendingLabel={t("discarding")}
+              successLabel={t("discarded")}
+              onClick={() => {
+                if (discardTarget) void discard(discardTarget);
+              }}
+            />
+          </>
+        }
+      >
+        {discardError ? (
+          <p role="alert" className="text-sm text-destructive">
+            {discardError}
           </p>
         ) : null}
-        {created.length ? (
-          <ul className="grid gap-2">
-            {created.map((scooter) => (
-              <li key={scooter.id} className="text-sm">
-                <Link
-                  href={`${scootersHref}/${encodeURIComponent(scooter.id)}`}
-                  className="font-medium underline underline-offset-4"
-                >
-                  {v1.scooters.scooterDisplayCode(scooter)}
-                </Link>{" "}
-                · {t("status.created")}
-              </li>
-            ))}
-          </ul>
-        ) : null}
-        {drafts.length ? (
-          <HorizontalScrollArea
-            label={t("drafts")}
-            fadeEdges
-            className="-mx-(--page-gutter) w-auto md:mx-0 md:w-full"
-          >
-            <nav
-              aria-label={t("drafts")}
-              className="flex w-max min-w-full gap-2 px-(--page-gutter) py-2 md:w-auto md:flex-wrap md:px-0"
-            >
-              {drafts.map(({ draft, status }, index) => (
-                <Button
-                  key={draft.id}
-                  type="button"
-                  variant="outline"
-                  aria-pressed={selectedId === draft.id}
-                  onClick={() => {
-                    setSelectedId(draft.id);
-                    document
-                      .getElementById(`scooter-draft-${draft.id}`)
-                      ?.scrollIntoView?.({ block: "start" });
-                  }}
-                  className={`h-auto min-h-12 flex-nowrap gap-2 py-3 whitespace-nowrap aria-pressed:border-current aria-pressed:ring-2 aria-pressed:ring-current aria-pressed:ring-inset ${draftStatusColors[status]}`}
-                >
-                  <span>{t("draft", { number: index + 1 })}</span>
-                  <span className="text-xs font-medium">
-                    {t(`status.${status}`)}
-                  </span>
-                </Button>
-              ))}
-            </nav>
-          </HorizontalScrollArea>
-        ) : null}
-        {drafts.map(
-          (
-            {
-              draft,
-              initialSnapshot,
-              restoreFailed,
-              incomingFiles,
-              status,
-              generation,
-            },
-            index,
-          ) => (
-            <fieldset
-              disabled={merging.includes(draft.id)}
-              key={`${draft.id}:${generation ?? 0}`}
-              id={`scooter-draft-${draft.id}`}
-              className="grid min-w-0 gap-4 border-t border-border pt-6 scroll-mt-8"
-              aria-label={t("draft", { number: index + 1 })}
-            >
-              <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-                <div className="grid gap-2">
-                  <h2 className="text-xl font-semibold">
-                    {t("draft", { number: index + 1 })}
-                  </h2>
-                  <Badge variant="outline">{t(`status.${status}`)}</Badge>
-                  <p className="text-sm text-muted-foreground">
-                    {t("pdfHint")}
-                  </p>
-                </div>
-                {["review", "ready", "attention"].includes(status) ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setSelectedId(draft.id);
-                      document
-                        .getElementById(`scooter-draft-${draft.id}`)
-                        ?.querySelector<HTMLInputElement>('input[name="vin"]')
-                        ?.focus();
-                    }}
-                  >
-                    {t("review")}
-                  </Button>
-                ) : null}
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={discarding === draft.id}
-                  onClick={() => {
-                    void discard(draft.id);
-                  }}
-                >
-                  {t("discard")}
-                </Button>
-              </div>
-              {needsAssignment(draft.id, status) ? (
-                <div className="grid gap-2">
-                  <Label htmlFor={`assign-${draft.id}`}>
-                    {t("assignmentNeeded")}
-                  </Label>
-                  <Select
-                    value={assignments[draft.id] ?? ""}
-                    onValueChange={(value) => assign(draft.id, value)}
-                  >
-                    <SelectTrigger
-                      id={`assign-${draft.id}`}
-                      aria-label={t("assignmentNeeded")}
-                    >
-                      <SelectValue placeholder={t("chooseScooter")} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="new">{t("newScooter")}</SelectItem>
-                      {drafts
-                        .filter((entry) => entry.draft.id !== draft.id)
-                        .map((entry) => (
-                          <SelectItem
-                            key={entry.draft.id}
-                            value={entry.draft.id}
-                          >
-                            {t("draft", { number: drafts.indexOf(entry) + 1 })}
-                            {entry.identity ? ` · ${entry.identity}` : ""}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              ) : null}
-              {restoreFailed ? (
-                <p role="alert" className="text-sm text-destructive">
-                  {t("restoreFailed")}
-                </p>
-              ) : (
-                <ScooterEditor
-                  incomingFiles={incomingFiles}
-                  persistenceBlocked={
-                    revisionConflicts.includes(draft.id) ||
-                    needsAssignment(draft.id, status)
-                  }
-                  embedded
-                  importDraft={draft}
-                  initialSnapshot={initialSnapshot}
-                  onSnapshot={(state) => snapshot(draft, state)}
-                  onCreated={(scooter, reviewNext) =>
-                    complete(draft.id, scooter, reviewNext)
-                  }
-                  brands={brands}
-                  vocabulary={vocabulary}
-                  returnHref={scootersHref}
-                />
-              )}
-            </fieldset>
-          ),
-        )}
-        {!loading && !drafts.length ? (
-          <p className="text-sm text-muted-foreground">{t("empty")}</p>
-        ) : null}
-      </div>
+      </WizardExitDialog>
     </PageLayout>
   );
 }

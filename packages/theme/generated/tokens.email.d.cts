@@ -121,7 +121,7 @@ export declare const tokens: {
     "0.5": 2,
     "1.5": 6,
     "2.5": 10,
-    "screenBottom": 32
+    "screenBottom": 8
   },
   "dashedSurface": {
     "borderWidth": 2

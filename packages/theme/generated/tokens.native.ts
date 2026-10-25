@@ -216,7 +216,7 @@ export const tokens = {
     "0.5": 2,
     "1.5": 6,
     "2.5": 10,
-    screenBottom: 32,
+    screenBottom: 8,
   },
   dashedSurface: {
     borderWidth: 2,
@@ -404,6 +404,7 @@ export const tokens = {
   aspectRatio: {
     scooterPhoto: 1.3333333333333333,
     documentLandscape: 1.586,
+    documentA4Portrait: 0.7070707070707071,
     identityCardPortrait: 0.6305170239596469,
     receiptPortrait: 0.3333333333333333,
   },
