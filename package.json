@@ -9,6 +9,7 @@
     "check-types": "turbo run check-types",
     "test": "turbo run test",
     "test:e2e": "turbo run test:e2e",
+    "verify": "node scripts/verify.mjs",
     "start": "pnpm --filter api start:prod",
     "heroku-postbuild": "pnpm --filter api build",
     "init:local": "tsx scripts/init-local.ts",

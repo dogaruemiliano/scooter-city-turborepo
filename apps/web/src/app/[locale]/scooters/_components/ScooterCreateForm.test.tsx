@@ -780,7 +780,6 @@ describe("Scooter create controls with the create resolver", () => {
     );
   });
 
-  // Covers expand/collapse, segmented dates, and submission; allow CI headroom.
   it("keeps optional registration details collapsed and preserves them when hidden", async () => {
     mocks.apiFetch.mockResolvedValueOnce(createdScooter);
     const browser = userEvent.setup();
@@ -845,7 +844,7 @@ describe("Scooter create controls with the create resolver", () => {
         }),
       ),
     );
-  }, 10_000);
+  });
 
   it("previews the next number with the brand and submits a manual override", async () => {
     mocks.apiFetch.mockResolvedValueOnce(createdScooter);

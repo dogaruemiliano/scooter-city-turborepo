@@ -406,25 +406,24 @@ describe("ScooterEditForm", () => {
     expect(
       document.querySelector('[data-field-name="maxTrainMassKg"]'),
     ).not.toHaveAttribute("data-warning");
-    expect(screen.getByLabelText("Power (kW)")).toHaveAccessibleDescription(
+    expect(
+      screen.getByRole("textbox", { name: "Power (kW)" }),
+    ).toHaveAccessibleDescription(
       "Check these CIV rubrics against the document: P.2.",
     );
-    await closeTechnical(browser);
-    expect(screen.getByLabelText("Color")).toHaveValue("White");
+    expect(screen.getByRole("textbox", { name: "Color" })).toHaveValue("White");
     expect(
       screen.queryByText(/Confirmed empty in the document/),
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "I have checked these fields" }),
     ).not.toBeInTheDocument();
-    await openTechnical(browser);
-    fireEvent.change(screen.getByLabelText("Power (kW)"), {
+    fireEvent.change(screen.getByRole("textbox", { name: "Power (kW)" }), {
       target: { value: "9" },
     });
     expect(
       document.querySelector('[data-field-name="powerKw"]'),
     ).not.toHaveAttribute("data-warning");
-    await closeTechnical(browser);
     expect(importStatus()).toHaveTextContent(
       "1 field could not be interpreted.",
     );
@@ -433,15 +432,14 @@ describe("ScooterEditForm", () => {
         .getAllByRole("listitem")
         .map((item) => item.textContent),
     ).toEqual(["Color"]);
-    await closeTechnical(browser);
-    fireEvent.change(screen.getByLabelText("Color"), {
+    fireEvent.change(screen.getByRole("textbox", { name: "Color" }), {
       target: { value: "Blue" },
     });
 
     expect(
       screen.queryByText(/field.*could not be interpreted/),
     ).not.toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText("Color"), {
+    fireEvent.change(screen.getByRole("textbox", { name: "Color" }), {
       target: { value: "White" },
     });
     expect(

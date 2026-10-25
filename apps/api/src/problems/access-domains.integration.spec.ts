@@ -550,7 +550,15 @@ integration("Access domains against PostgreSQL", () => {
       blocksUsage: false,
       resolutionNotes: "Replacement belt tested successfully",
     });
-    const history = await problems.activity(mechanicA, created.id, {
+    const conversation = await problems.activity(mechanicA, created.id, {
+      page: 1,
+      pageSize: 25,
+    });
+    expect(conversation.items.map((entry) => entry.type)).toEqual([
+      "PROBLEM_RESOLVED",
+      "PROBLEM_COMMENTED",
+    ]);
+    const history = await problems.activity(admin, created.id, {
       page: 1,
       pageSize: 25,
     });

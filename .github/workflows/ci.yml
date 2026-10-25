@@ -46,27 +46,13 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
-      - name: Lint
-        run: pnpm lint
-
-      - name: Typecheck
-        run: pnpm check-types
-
-      - name: Unit tests
-        run: pnpm test
-
-      - name: Web production build
+      - name: Verify (same command as local pre-push checks)
         env:
           NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL || 'https://api.ci.placeholder.invalid' }}
-        run: pnpm --filter web build
-
-      - name: Prepare databases and run E2E tests
-        env:
           E2E_DATABASE_URL: postgresql://app:app@localhost:5434/scooter_city_test
           E2E_FINANCE_DATABASE_URL: postgresql://app:app@localhost:5434/finance_books_test
           JWT_ACCESS_SECRET: ${{ secrets.JWT_ACCESS_SECRET || 'ci-test-access-secret-padded-to-32-chars' }}
           JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET || 'ci-test-refresh-secret-padded-to-32-chars' }}
           REFRESH_TOKEN_HMAC_SECRET: ${{ secrets.REFRESH_TOKEN_HMAC_SECRET || 'ci-test-refresh-hmac-padded-to-32-chars-x' }}
           OTP_HMAC_SECRET: ${{ secrets.OTP_HMAC_SECRET || 'ci-test-otp-hmac-padded-to-32-chars-pad-x' }}
-          NODE_ENV: test
-        run: pnpm test:e2e
+        run: pnpm verify

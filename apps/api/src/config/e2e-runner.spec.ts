@@ -166,6 +166,12 @@ describe("E2E runner lifecycle", () => {
         Parameters<RunnerDependencies["run"]>
       >()
       .mockResolvedValue(0),
+    ensureGeneral: jest
+      .fn<
+        ReturnType<RunnerDependencies["ensureGeneral"]>,
+        Parameters<RunnerDependencies["ensureGeneral"]>
+      >()
+      .mockResolvedValue(undefined),
     createFinance: jest
       .fn<
         ReturnType<RunnerDependencies["createFinance"]>,
@@ -208,6 +214,40 @@ describe("E2E runner lifecycle", () => {
     expect(deps.dropFinance).toHaveBeenCalledWith(
       deps.createFinance.mock.calls[0][0],
     );
+  });
+
+  it("provisions the general database before applying migrations", async () => {
+    const deps = dependencies();
+    deps.run.mockImplementation((args) => {
+      if (args.includes("db:deploy")) {
+        expect(deps.ensureGeneral).toHaveBeenCalledWith(config().general);
+      }
+      return Promise.resolve(0);
+    });
+    await expect(runE2e(config(), suites, deps)).resolves.toBe(0);
+    expect(deps.ensureGeneral).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not provision a general database for finance-only runs", async () => {
+    const deps = dependencies();
+    await expect(
+      runE2e(config(), { general: [], finance: suites.finance }, deps),
+    ).resolves.toBe(0);
+    expect(deps.ensureGeneral).not.toHaveBeenCalled();
+  });
+
+  it("stops before migration and Jest if database provisioning fails", async () => {
+    const deps = dependencies();
+    deps.ensureGeneral.mockRejectedValue(new Error("cannot provision"));
+    await expect(runE2e(config(), suites, deps)).rejects.toThrow(
+      "cannot provision",
+    );
+    expect(
+      deps.run.mock.calls.some(([args]) =>
+        args.some((arg) => ["db:deploy", "db:seed", "jest"].includes(arg)),
+      ),
+    ).toBe(false);
+    expect(deps.createFinance).not.toHaveBeenCalled();
   });
 
   it("still runs finance and returns failure if general Jest fails", async () => {

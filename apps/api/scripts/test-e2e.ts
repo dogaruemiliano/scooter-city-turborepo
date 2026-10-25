@@ -117,6 +117,7 @@ export function financeRunUrl(template: URL, suffix: string): URL {
 
 export type RunnerDependencies = {
   run: (args: string[], env: Env) => Promise<number>;
+  ensureGeneral: (url: URL) => Promise<void>;
   createFinance: (url: URL) => Promise<void>;
   dropFinance: (url: URL) => Promise<void>;
 };
@@ -159,6 +160,7 @@ export async function runE2e(
     );
   let status = 0;
   if (suites.general.length) {
+    await dependencies.ensureGeneral(config.general);
     await prepare(["run", "db:deploy"]);
     await prepare(["run", "db:seed"]);
     status = await jest(suites.general, generalEnv);
@@ -179,6 +181,41 @@ export async function runE2e(
     }
   }
   return status;
+}
+
+async function ensureGeneralDatabase(url: URL) {
+  const target = testDatabaseUrl("E2E_DATABASE_URL", url.href);
+  const name = decodeURIComponent(target.pathname.slice(1));
+  const admin = new URL(target);
+  admin.pathname = "/postgres";
+  const client = new Client({
+    connectionString: admin.href,
+    connectionTimeoutMillis: 5_000,
+  });
+  try {
+    await client.connect();
+    const existing = await client.query(
+      "SELECT 1 FROM pg_database WHERE datname = $1",
+      [name],
+    );
+    if (existing.rowCount) return;
+    console.log(`[e2e] Creating dedicated general test database ${name}`);
+    try {
+      // Identifier is restricted to letters, digits and underscores above.
+      await client.query(`CREATE DATABASE "${name}"`);
+    } catch (error: unknown) {
+      // Another runner may have created the same database after our lookup.
+      if (
+        typeof error !== "object" ||
+        error === null ||
+        !("code" in error) ||
+        error.code !== "42P04"
+      )
+        throw error;
+    }
+  } finally {
+    await client.end();
+  }
 }
 
 async function financeDatabase(url: URL, operation: "create" | "drop") {
@@ -235,6 +272,7 @@ export async function main() {
   process.on("SIGTERM", onTerminate);
   try {
     return await runE2e(config, suites, {
+      ensureGeneral: ensureGeneralDatabase,
       createFinance: (url) => financeDatabase(url, "create"),
       dropFinance: (url) => financeDatabase(url, "drop"),
       run: (args, env) =>

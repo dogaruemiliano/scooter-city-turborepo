@@ -94,8 +94,10 @@ application settings in `.env`; do not replace the application's `DATABASE_URL`.
 The committed `.env.test.example` documents the two test settings:
 
 - `E2E_DATABASE_URL`: reusable database for the general HTTP suites. The runner
-  builds shared packages, generates the Prisma client, applies pending migrations
-  (creating the database when missing), and runs the idempotent seed before Jest.
+  builds shared packages, generates the Prisma client, creates the database when
+  missing, applies pending migrations, and runs the idempotent seed before Jest.
+  Provisioning uses the server's `postgres` database and requires `CREATEDB`;
+  existing general test databases are reused without resetting them.
 - `E2E_FINANCE_DATABASE_URL`: connection template for the finance-book setup
   suite. Its database name must start with `finance_books_test`. Each invocation
   creates a new database with a random suffix, migrates it without seeding, and
