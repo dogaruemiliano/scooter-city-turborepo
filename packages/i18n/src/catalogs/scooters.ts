@@ -301,6 +301,9 @@ export const scootersCatalog = {
       analyzing: "Analyzing document…",
       cancel: "Cancel extraction",
       vinReview: {
+        conflictTitle: "Resolve document VIN checks",
+        conflictDescription:
+          "These readings need review before you can create or save this scooter. Compare each document with the scooter VIN, then confirm a correction or remove the wrong document.",
         title: "Verify the scooter VIN",
         description:
           "Enter the scooter VIN manually. You’ll review the documents in the next step.",
@@ -1573,6 +1576,9 @@ export const scootersCatalog = {
       analyzing: "Se analizează documentul…",
       cancel: "Anulează extragerea",
       vinReview: {
+        conflictTitle: "Rezolvă verificările VIN din documente",
+        conflictDescription:
+          "Aceste citiri trebuie verificate înainte de a crea sau salva scuterul. Compară fiecare document cu VIN-ul scuterului, apoi confirmă o corecție sau elimină documentul greșit.",
         title: "Verifică VIN-ul scuterului",
         description:
           "Introdu manual VIN-ul scuterului. Vei verifica documentele la pasul următor.",

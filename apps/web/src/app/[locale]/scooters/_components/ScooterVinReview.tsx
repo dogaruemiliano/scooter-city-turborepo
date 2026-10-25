@@ -29,10 +29,14 @@ import { useEffect, useId, useRef, useState } from "react";
 import { v1 } from "@repo/api-shared";
 import { motion } from "@repo/theme";
 import { StepProgress } from "@repo/ui/components/step-progress";
+import { SaveButton } from "@repo/ui/components/save-button";
 import type { ScooterVinCorrection } from "./scooter-vin-review";
 
 export interface VinReviewDocument {
   sourceId: string;
+  documentId?: string;
+  documentType?: v1.scooters.ScooterDocumentType;
+  pages?: number[];
   fileName: string;
   vin: string | null;
   originalVin: string | null;
@@ -82,6 +86,7 @@ export function ScooterVinReview({
   const mismatched = documents.filter((doc) => doc.vin !== vin);
   const corrections = mismatched.map((doc) => ({
     sourceId: doc.sourceId,
+    ...(doc.documentId !== undefined ? { documentId: doc.documentId } : {}),
     previousVin: doc.vin,
     vin: vin!,
   }));
@@ -162,6 +167,19 @@ export function ScooterVinReview({
             ) : null}
           </BottomSheetBody>
           <BottomSheetFooter>
+            {onClose ? (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={disabled}
+                onClick={() => {
+                  setOpen(false);
+                  onClose();
+                }}
+              >
+                {t("later")}
+              </Button>
+            ) : null}
             <Button
               type="button"
               disabled={disabled || !vin}
@@ -197,7 +215,7 @@ export function ScooterVinReview({
           </BottomSheetDescription>
           {mismatched[activeIndex] && vin ? (
             <DocumentConfirmation
-              key={`${vin}-${mismatched[activeIndex].sourceId}-${open}`}
+              key={`${vin}-${mismatched[activeIndex].sourceId}-${mismatched[activeIndex].documentId ?? ""}-${open}`}
               document={mismatched[activeIndex]}
               documents={mismatched}
               activeIndex={activeIndex}
@@ -205,6 +223,14 @@ export function ScooterVinReview({
               active={open && step === "documents"}
               disabled={disabled}
               error={error}
+              onClose={
+                onClose
+                  ? () => {
+                      setOpen(false);
+                      onClose();
+                    }
+                  : undefined
+              }
               onChangeVin={() => {
                 setStep("vin");
                 setActiveIndex(0);
@@ -233,6 +259,7 @@ function DocumentConfirmation({
   error,
   onChangeVin,
   onContinue,
+  onClose,
 }: {
   document: VinReviewDocument;
   documents: VinReviewDocument[];
@@ -243,8 +270,10 @@ function DocumentConfirmation({
   error: boolean;
   onChangeVin: () => void;
   onContinue: () => void;
+  onClose?: () => void;
 }) {
   const t = useTranslations("scooters.extraction.vinReview");
+  const scooterT = useTranslations("scooters");
   const [remaining, setRemaining] = useState(
     motion.duration.documentReviewPause / motion.duration.countdownTick,
   );
@@ -265,18 +294,31 @@ function DocumentConfirmation({
   const action = t(last ? "confirmAndFinish" : "confirmAndNext");
   return (
     <>
-      <div className="shrink-0 border-b border-border px-8 py-3">
-        <StepProgress
-          activeIndex={activeIndex}
-          label={t("progressLabel")}
-          labels={documents.map((doc, index) =>
-            t("documentStep", {
-              current: index + 1,
-              total: documents.length,
-              name: doc.fileName,
-            }),
-          )}
-        />
+      <div className="flex shrink-0 items-center gap-3 border-b border-border px-8 py-3">
+        <div className="min-w-0 flex-1">
+          <StepProgress
+            activeIndex={activeIndex}
+            label={t("progressLabel")}
+            labels={documents.map((doc, index) =>
+              t("documentStep", {
+                current: index + 1,
+                total: documents.length,
+                name: doc.fileName,
+              }),
+            )}
+          />
+        </div>
+        {onClose ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={disabled}
+            onClick={onClose}
+          >
+            {t("later")}
+          </Button>
+        ) : null}
       </div>
       <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-4 py-2 lg:justify-start lg:gap-4 lg:px-6">
         <div className="grid min-w-0 gap-1">
@@ -297,6 +339,24 @@ function DocumentConfirmation({
         </Button>
       </div>
       <BottomSheetBody className="flex min-h-0 flex-1 flex-col gap-0 overflow-hidden p-4 lg:p-4">
+        <div className="mb-3 grid shrink-0 gap-1 text-sm">
+          <p className="font-medium wrap-anywhere">{document.fileName}</p>
+          <p className="text-muted-foreground">
+            {document.documentType
+              ? scooterT(`documents.${document.documentType}`)
+              : null}
+            {document.pages?.length
+              ? ` · ${scooterT("workspace.pages", { pages: document.pages.join(", ") })}`
+              : null}
+          </p>
+          <p>
+            {t("extractedVin")}:{" "}
+            <span className="font-mono text-destructive">
+              {document.vin ?? t("unreadable")}
+            </span>
+          </p>
+          <p className="text-muted-foreground">{t("replaceHint")}</p>
+        </div>
         <VinDocumentPreview document={document} />
       </BottomSheetBody>
       <BottomSheetFooter className="gap-4 lg:flex-row lg:items-center lg:justify-between lg:px-6">
@@ -314,23 +374,28 @@ function DocumentConfirmation({
             ) : null}
           </div>
         </div>
-        <Button
+        <SaveButton
           type="button"
           className="w-full lg:w-auto lg:min-w-64"
+          idleLabel={
+            remaining > 0
+              ? t("waitToConfirm", { action, seconds: remaining })
+              : action
+          }
+          pendingLabel={t("apply")}
+          successLabel={t("confirmed")}
+          icon={
+            last ? (
+              <CheckIcon aria-hidden="true" />
+            ) : (
+              <ArrowRightIcon aria-hidden="true" />
+            )
+          }
           disabled={disabled || !active || remaining > 0}
           onClick={() => {
             if (!disabled && active && remaining === 0) onContinue();
           }}
-        >
-          {last ? (
-            <CheckIcon aria-hidden="true" />
-          ) : (
-            <ArrowRightIcon aria-hidden="true" />
-          )}
-          {remaining > 0
-            ? t("waitToConfirm", { action, seconds: remaining })
-            : action}
-        </Button>
+        />
       </BottomSheetFooter>
     </>
   );

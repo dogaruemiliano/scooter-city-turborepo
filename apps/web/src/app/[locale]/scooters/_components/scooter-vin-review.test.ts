@@ -1,6 +1,9 @@
 import { v1 } from "@repo/api-shared";
 import { describe, expect, it } from "vitest";
-import { reviewScooterDocumentVin } from "./scooter-vin-review";
+import {
+  reviewScooterDocumentVin,
+  scooterDocumentVinReadings,
+} from "./scooter-vin-review";
 import { prepareScooterAnalysisImport } from "./scooter-analysis-import";
 import { scooterEditorDefaults } from "./scooter-editor-schema";
 
@@ -22,6 +25,62 @@ const input: v1.scooters.ScooterDocumentAnalysis = {
 };
 
 describe("explicit document VIN corrections", () => {
+  it("corrects the selected section even when the file VIN was already reviewed", () => {
+    const bundle: typeof input = {
+      ...input,
+      extractedData: {
+        vin: correct,
+        fields: { vin: correct },
+        rawFields: { E: misread },
+        vinReview: { method: "manual", originalVin: misread },
+        documents: [
+          {
+            id: "civ",
+            documentType: "civ",
+            pages: [1],
+            vin: correct,
+            fields: { vin: correct },
+            rawFields: {},
+          },
+          {
+            id: "foreign",
+            documentType: "foreign_registration",
+            pages: [2, 3],
+            vin: misread,
+            fields: { vin: misread },
+            rawFields: { E: misread },
+          },
+          {
+            id: "card",
+            documentType: "itp_card",
+            pages: [4],
+            vin: null,
+            fields: {},
+            rawFields: {},
+          },
+        ],
+      },
+    };
+    expect(scooterDocumentVinReadings(bundle)).toMatchObject([
+      { documentId: "civ", vin: correct, pages: [1] },
+      { documentId: "foreign", vin: misread, pages: [2, 3] },
+    ]);
+    const reviewed = reviewScooterDocumentVin(bundle, correct, "foreign")!;
+    expect(reviewed.extractedData.documents?.[0]).toBe(
+      bundle.extractedData.documents?.[0],
+    );
+    expect(reviewed.extractedData.documents?.[1]).toMatchObject({
+      vin: correct,
+      fields: { vin: correct },
+      rawFields: { E: misread },
+      vinReview: { method: "manual", originalVin: misread },
+    });
+    expect(reviewed.extractedData.vin).toBe(correct);
+    expect(bundle.extractedData.documents?.[1]?.vin).toBe(misread);
+    expect(reviewScooterDocumentVin(bundle, correct, "missing")).toBeNull();
+    expect(reviewScooterDocumentVin(bundle, correct, "card")).toBeNull();
+  });
+
   it("preserves the AI reading and raw text while correcting the normalized VIN", () => {
     const result = reviewScooterDocumentVin(
       input,

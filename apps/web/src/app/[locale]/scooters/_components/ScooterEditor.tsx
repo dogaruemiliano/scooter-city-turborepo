@@ -37,6 +37,8 @@ import {
 import { prepareScooterAnalysisImport } from "./scooter-analysis-import";
 import { ScooterDocumentAnalysisContext } from "./ScooterDocumentAnalysisStatus";
 import { ScooterVinReview } from "./ScooterVinReview";
+import { ScooterVinConflictAlert } from "./ScooterVinConflictAlert";
+import { scooterDocumentVinReadings } from "./scooter-vin-review";
 import { ScooterVinReference } from "./ScooterVinReference";
 import {
   CivVocabularyContext,
@@ -266,36 +268,43 @@ export function ScooterEditor({
   const hasFailedAnalysis = Object.values(analysis.entries).some(
     (entry) => entry.status === "failed",
   );
-  const vinReviewDocuments = extraction.sources
-    .filter((source) => v1.scooters.scooterDocumentReadsVin(source.type))
-    .flatMap((source) => {
-      const entry = analysis.entries[source.sourceId];
-      const unverified = extraction.unverifiedSources.some(
-        (item) => item.sourceId === source.sourceId,
-      );
-      if (entry?.status !== "success" && !unverified) return [];
-      const data =
-        entry?.status === "success" ? entry.analysis.extractedData : undefined;
-      const draft = documents.drafts.find(
-        (item) => item.id === source.sourceId,
-      );
-      const saved = documents.existing.find(
-        (item) => item.id === source.sourceId,
-      );
-      return [
-        {
-          sourceId: source.sourceId,
-          fileName: source.fileName,
-          vin: data?.vin ?? null,
-          originalVin: data?.vinReview
-            ? data.vinReview.originalVin
-            : (data?.vin ?? null),
-          file: draft?.file,
-          src: saved ? webApi.url(saved.contentUrl) : undefined,
-          contentType: saved?.contentType,
-        },
-      ];
-    });
+  const vinReviewDocuments = extraction.sources.flatMap((source) => {
+    const entry = analysis.entries[source.sourceId];
+    const unverified = extraction.unverifiedSources.some(
+      (item) => item.sourceId === source.sourceId,
+    );
+    if (entry?.status !== "success" && !unverified) return [];
+    if (entry?.status === "success" && !isOriginalAnalysis(entry.analysis))
+      return [];
+    const data =
+      entry?.status === "success" ? entry.analysis.extractedData : undefined;
+    const draft = documents.drafts.find((item) => item.id === source.sourceId);
+    const saved = documents.existing.find(
+      (item) => item.id === source.sourceId,
+    );
+    const readings =
+      entry?.status === "success"
+        ? scooterDocumentVinReadings(entry.analysis)
+        : v1.scooters.scooterDocumentReadsVin(source.type)
+          ? [
+              {
+                documentId: undefined,
+                documentType: source.type,
+                pages: [],
+                vin: data?.vin ?? null,
+                originalVin: data?.vin ?? null,
+              },
+            ]
+          : [];
+    return readings.map((reading) => ({
+      sourceId: source.sourceId,
+      fileName: source.fileName,
+      ...reading,
+      file: draft?.file,
+      src: saved ? webApi.url(saved.contentUrl) : undefined,
+      contentType: saved?.contentType,
+    }));
+  });
   const [previousAnalysisSignature, setPreviousAnalysisSignature] =
     useState(sourceSignature);
   if (previousAnalysisSignature !== sourceSignature) {
@@ -801,10 +810,21 @@ export function ScooterEditor({
 
   const createFormValid =
     scooterCreateFormSchema.safeParse(createValues).success;
+  const logicalVinConflict =
+    new Set([
+      ...vinReviewDocuments.flatMap((document) =>
+        document.vin ? [document.vin] : [],
+      ),
+      ...(createValues.vin ? [createValues.vin] : []),
+    ]).size > 1;
+  const conflictingVinDocuments = vinReviewDocuments.filter(
+    (document) => !document.vin || document.vin !== createValues.vin,
+  );
   const needsDocumentReview = Boolean(
     vinReviewRequired ||
     extraction.vinMismatch ||
-    extraction.unverifiedSources.length,
+    extraction.unverifiedSources.length ||
+    logicalVinConflict,
   );
   const documentsProcessing =
     analysis.running ||
@@ -822,19 +842,6 @@ export function ScooterEditor({
           : "creation.incomplete",
   );
 
-  const logicalVins = Object.values(analysis.entries).flatMap((entry) =>
-    entry.status === "success" && isOriginalAnalysis(entry.analysis)
-      ? (entry.analysis.extractedData.documents
-          ?.filter((document) =>
-            v1.scooters.scooterDocumentReadsVin(document.documentType),
-          )
-          .map((document) => document.vin)
-          .filter(Boolean) ?? [])
-      : [],
-  );
-  const logicalVinConflict =
-    new Set([...logicalVins, ...(createValues.vin ? [createValues.vin] : [])])
-      .size > 1;
   const workspaceStatus: ScooterImportStatus = saveCompleted
     ? "created"
     : photosBusy ||
@@ -989,10 +996,17 @@ export function ScooterEditor({
                       {t("workspace.previewLoading")}
                     </p>
                   ) : null}
-                  {logicalVinConflict ? (
-                    <p role="alert" className="text-sm text-destructive">
-                      {t("workspace.logicalVinMismatch")}
-                    </p>
+                  {needsDocumentReview && !documentsProcessing ? (
+                    <ScooterVinConflictAlert
+                      documents={conflictingVinDocuments}
+                      vin={createValues.vin ?? ""}
+                      disabled={
+                        isSubmitting || documents.blocked || vinPreviewsLoading
+                      }
+                      onReview={() => {
+                        void openVinReview();
+                      }}
+                    />
                   ) : null}
                   {insuranceOptions.length ? (
                     <ScooterInsuranceSelection
@@ -1159,18 +1173,19 @@ export function ScooterEditor({
                   ? undefined
                   : needsDocumentReview && !documentsProcessing
                     ? t(
-                        extraction.vinMismatch || vinReviewRequired
+                        extraction.vinMismatch ||
+                          vinReviewRequired ||
+                          logicalVinConflict
                           ? "creation.documentVinMismatchCheck"
                           : "creation.documentVinUnknownCheck",
                         {
-                          documents: vinReviewDocuments
-                            .filter(
-                              (document) =>
-                                !document.vin ||
-                                document.vin !== createValues.vin,
-                            )
-                            .map((document) => document.fileName)
-                            .join(", "),
+                          documents: [
+                            ...new Set(
+                              conflictingVinDocuments.map(
+                                (document) => document.fileName,
+                              ),
+                            ),
+                          ].join(", "),
                         },
                       )
                     : createStatus

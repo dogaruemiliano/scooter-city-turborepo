@@ -374,18 +374,37 @@ export function useScooterDocumentAnalysis(
   const reviewVins = useCallback((corrections: ScooterVinCorrection[]) => {
     if (activeRun.current || !mounted.current) return null;
     const updates = new Map<string, DocumentAnalysisState>();
+    const reviewed = new Set<string>();
     for (const correction of corrections) {
       const source = latest.current.find(
         (item) => item.id === correction.sourceId,
       );
-      if (!source || updates.has(source.key)) return null;
-      const state = cache.current.get(source.key);
+      const readingKey = JSON.stringify([
+        correction.sourceId,
+        correction.documentId,
+      ]);
+      if (!source || reviewed.has(readingKey)) return null;
+      reviewed.add(readingKey);
+      const state = updates.get(source.key) ?? cache.current.get(source.key);
+      const reading =
+        state?.status === "success"
+          ? correction.documentId === undefined
+            ? state.analysis.extractedData
+            : state.analysis.extractedData.documents?.find(
+                (document) => document.id === correction.documentId,
+              )
+          : undefined;
       if (
         state?.status !== "success" ||
-        state.analysis.extractedData.vin !== correction.previousVin
+        !reading ||
+        reading.vin !== correction.previousVin
       )
         return null;
-      const analysis = reviewScooterDocumentVin(state.analysis, correction.vin);
+      const analysis = reviewScooterDocumentVin(
+        state.analysis,
+        correction.vin,
+        correction.documentId,
+      );
       if (!analysis) return null;
       updates.set(source.key, { status: "success", analysis });
     }
