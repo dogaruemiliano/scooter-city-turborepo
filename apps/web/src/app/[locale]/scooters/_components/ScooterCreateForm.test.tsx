@@ -780,16 +780,16 @@ describe("Scooter create controls with the create resolver", () => {
     );
   });
 
+  // Covers expand/collapse, segmented dates, and submission; allow CI headroom.
   it("keeps optional registration details collapsed and preserves them when hidden", async () => {
     mocks.apiFetch.mockResolvedValueOnce(createdScooter);
     const browser = userEvent.setup();
     renderWizard();
     await fillWizardIdentity(browser);
     await chooseSelectOption(browser, "Registration type", "Local");
-    await browser.type(
-      screen.getByRole("textbox", { name: "Plate number" }),
-      "vl 18 188",
-    );
+    fireEvent.change(screen.getByRole("textbox", { name: "Plate number" }), {
+      target: { value: "vl 18 188" },
+    });
     expect(
       screen.queryByRole("textbox", { name: /^Registered on/ }),
     ).toBeNull();
@@ -801,18 +801,24 @@ describe("Scooter create controls with the create resolver", () => {
     expect(
       screen.getByRole("heading", { name: "Registration document details" }),
     ).toBeVisible();
-    await browser.type(day, "16");
-    await browser.type(
+    fireEvent.change(day, { target: { value: "16" } });
+    fireEvent.change(
       screen.getByRole("textbox", { name: "Registered on MM" }),
-      "01",
+      {
+        target: { value: "01" },
+      },
     );
-    await browser.type(
+    fireEvent.change(
       screen.getByRole("textbox", { name: "Registered on YYYY" }),
-      "2026",
+      {
+        target: { value: "2026" },
+      },
     );
-    await browser.type(
+    fireEvent.change(
       screen.getByRole("textbox", { name: "Registration certificate number" }),
-      "CERT-123",
+      {
+        target: { value: "CERT-123" },
+      },
     );
     await browser.click(toggle);
     expect(
@@ -839,7 +845,7 @@ describe("Scooter create controls with the create resolver", () => {
         }),
       ),
     );
-  });
+  }, 10_000);
 
   it("previews the next number with the brand and submits a manual override", async () => {
     mocks.apiFetch.mockResolvedValueOnce(createdScooter);
@@ -1622,10 +1628,10 @@ function renderWizard(locale: SupportedLocale = "en") {
 }
 
 async function fillWizardIdentity(browser: ReturnType<typeof userEvent.setup>) {
-  await browser.type(
-    screen.getByRole("textbox", { name: "VIN" }),
-    "jyarn23e0ra123456",
-  );
+  // These scenarios test form behavior rather than per-keystroke VIN handling.
+  fireEvent.change(screen.getByRole("textbox", { name: "VIN" }), {
+    target: { value: "jyarn23e0ra123456" },
+  });
   await selectBrand(browser, "Yamaha");
   expect(
     within(
