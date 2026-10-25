@@ -31,14 +31,12 @@ export function ScooterCreateFields({
   onBrandCreated,
   disabled,
   photos,
-  hasCivEvidence = false,
 }: {
   editing?: boolean;
   brands: v1.scooterBrands.ScooterBrand[];
   onBrandCreated: (brand: v1.scooterBrands.ScooterBrand) => void;
   disabled: boolean;
   photos?: ReactNode;
-  hasCivEvidence?: boolean;
 }) {
   const t = useTranslations("scooters");
   const {
@@ -159,33 +157,7 @@ export function ScooterCreateFields({
           />
         }
         disabled={disabled}
-      >
-        <div className="grid gap-2 sm:col-span-2">
-          <FormField
-            name="civAvailability"
-            label={t("fields.civAvailability")}
-            disabled={disabled}
-          >
-            <FormSegmentedRadioGroup
-              options={(["unknown", "not_issued", "issued"] as const).map(
-                (value) => ({
-                  value,
-                  label: t(`civ.availability.${value}`),
-                  tone: "neutral" as const,
-                  disabled: value === "not_issued" && hasCivEvidence,
-                }),
-              )}
-            />
-          </FormField>
-          <p className="text-sm text-muted-foreground">
-            {t(
-              hasCivEvidence
-                ? "civ.availabilityEvidence"
-                : "civ.availabilityHint",
-            )}
-          </p>
-        </div>
-      </ScooterInitialRegistrationFields>
+      />
       <ScooterCreateInsuranceFields
         disabled={disabled}
         number={photos ? 5 : 4}

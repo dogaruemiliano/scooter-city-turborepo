@@ -128,13 +128,8 @@ export function ScooterCard({
   const model = [scooter.brand, scooter.model ?? scooter.commercialName]
     .filter(Boolean)
     .join(" ");
+  const readiness = v1.scooters.scooterReadinessIssues(scooter);
   const attention = [
-    ...(scooter.itpStatus && scooter.itpStatus !== "active"
-      ? [t(`itp.status.${scooter.itpStatus}`)]
-      : []),
-    ...(scooter.insuranceAttention
-      ? [t(`list.attention.insurance.${scooter.insuranceAttention}`)]
-      : []),
     ...(scooter.speedometerWorking === false
       ? [t("list.attention.speedometer")]
       : []),
@@ -234,6 +229,22 @@ export function ScooterCard({
             })}
           </span>
         </div>
+        {readiness.length ? (
+          <div className="flex flex-wrap gap-2">
+            {readiness.map((issue) => (
+              <Badge
+                key={issue}
+                variant={
+                  issue === "needsCiv" || issue === "needsRegistration"
+                    ? "warning"
+                    : "destructive"
+                }
+              >
+                {t(`readiness.${issue}`)}
+              </Badge>
+            ))}
+          </div>
+        ) : null}
         <dl className="grid grid-cols-2 gap-4 border-t border-border pt-5 sm:gap-6 sm:pt-6">
           <div className="min-w-0">
             <dt className="mb-2 text-xs font-medium text-muted-foreground">

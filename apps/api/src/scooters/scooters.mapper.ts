@@ -13,6 +13,7 @@ type ScooterRowWithBrand = ScooterRow & {
   insuranceAttention?: v1.scooters.InsuranceAttention | null;
   rentalInsuranceStatus?: v1.scooters.Scooter["rentalInsuranceStatus"];
   photos?: { id: string }[];
+  documents?: { type: string; extractedData: unknown }[];
   problems?: { difficulty: v1.problems.Problem["difficulty"] }[];
   _count?: { problems: number };
   brand: { name: string; code: string };
@@ -108,6 +109,8 @@ export function toScooter(row: ScooterRowWithBrand): v1.scooters.Scooter {
     brandCode: row.brand.code,
     vehicleType: row.vehicleType,
     civNumber: row.civNumber,
+    hasCivDocument:
+      row.documents?.some(v1.scooters.hasScooterCivDocumentEvidence) ?? false,
     civAvailability: row.civAvailability ?? "unknown",
     nationalEmissionsCode: row.nationalEmissionsCode,
     variant: row.variant,

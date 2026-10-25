@@ -28,6 +28,32 @@ describe("scooter picker summaries", () => {
     expect(result.maintenanceHoldCount).toBe(2);
     expect(result.coverUrl).toContain("cover");
   });
+  it.each([
+    [[], false],
+    [[{ type: "civ", extractedData: null }], true],
+    [[{ type: "registration_certificate", extractedData: null }], false],
+    [
+      [
+        {
+          type: "registration_certificate",
+          extractedData: { documents: [{ documentType: "civ" }] },
+        },
+      ],
+      true,
+    ],
+  ])(
+    "derives CIV presence from attached documents %j",
+    (documents, expected) => {
+      expect(
+        toScooter({
+          ...base,
+          civAvailability: "issued",
+          documents,
+        } as unknown as Parameters<typeof toScooter>[0]).hasCivDocument,
+      ).toBe(expected);
+    },
+  );
+
   it("distinguishes an empty summary from one that was not loaded", () => {
     expect(
       toScooter({ ...base, problems: [] } as unknown as Parameters<

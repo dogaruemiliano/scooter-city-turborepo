@@ -2,6 +2,12 @@ import { scooterItpMessages } from "./scooter-itp";
 
 export const scootersCatalog = {
   en: {
+    readiness: {
+      needsCiv: "Needs CIV",
+      needsRegistration: "Needs Romanian registration",
+      invalidInsurance: "No valid insurance",
+      invalidItp: "No valid ITP",
+    },
     workspace: {
       title: "Add scooters",
       description:
@@ -1259,6 +1265,12 @@ export const scootersCatalog = {
     },
   },
   ro: {
+    readiness: {
+      needsCiv: "Necesită CIV",
+      needsRegistration: "Necesită înmatriculare",
+      invalidInsurance: "Fără asigurare valabilă",
+      invalidItp: "Fără ITP valabil",
+    },
     workspace: {
       title: "Adaugă scutere",
       description:

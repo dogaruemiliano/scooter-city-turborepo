@@ -14,8 +14,8 @@
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/src/main",
     "spec": "node dist/src/main --spec-only",
-    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" scripts/test-e2e.ts --max-warnings 0",
-    "lint:fix": "eslint \"{src,apps,libs,test}/**/*.ts\" scripts/test-e2e.ts --max-warnings 0 --fix",
+    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" scripts/test-e2e.ts scripts/seed-readiness-examples.ts --max-warnings 0",
+    "lint:fix": "eslint \"{src,apps,libs,test}/**/*.ts\" scripts/test-e2e.ts scripts/seed-readiness-examples.ts --max-warnings 0 --fix",
     "check-types": "tsc --noEmit",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
@@ -29,7 +29,8 @@
     "test:cov": "NODE_OPTIONS='--experimental-vm-modules' jest --coverage",
     "test:debug": "node --experimental-vm-modules --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "node --import tsx scripts/test-e2e.ts",
-    "benchmark:textract": "tsx src/document-extraction/benchmark/analyze-private-receipts.ts"
+    "benchmark:textract": "tsx src/document-extraction/benchmark/analyze-private-receipts.ts",
+    "db:seed-readiness": "tsx scripts/seed-readiness-examples.ts"
   },
   "dependencies": {
     "@aws-sdk/client-lambda": "^3.1149.0",

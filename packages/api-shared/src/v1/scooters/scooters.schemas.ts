@@ -375,6 +375,7 @@ export const scooterSchema = z
     engineDisplacementCc: z.number().int().positive().nullable(),
     powerKw: z.number().positive().nullable(),
     registrationType: scooterRegistrationTypeSchema,
+    hasCivDocument: z.boolean().optional(),
     civAvailability: scooterCivAvailabilitySchema.optional(),
     registrationNumber: z.string().nullable(),
     registrationDate: z.string().nullable(),
