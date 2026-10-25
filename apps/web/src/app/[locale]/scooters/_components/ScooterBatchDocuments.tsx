@@ -10,7 +10,6 @@ import {
   Card,
   CardHeader,
   CardTitle,
-  CardDescription,
   CardContent,
   Badge,
   FileDropZone,
@@ -49,6 +48,7 @@ export function ScooterBatchDocuments({
   onRetryAnalysis,
   onCancelAnalysis,
   children,
+  headerActions,
   importResult,
   onLogicalDocument,
   scooterVin,
@@ -59,6 +59,7 @@ export function ScooterBatchDocuments({
   onRetryAnalysis?: (sourceId: string) => void;
   onCancelAnalysis?: () => void;
   children?: ReactNode;
+  headerActions?: ReactNode;
   importResult?: Extract<DocumentImportResult, { ok: true }>;
   onLogicalDocument?: LogicalDocumentUpdate;
   scooterVin?: string;
@@ -172,13 +173,13 @@ export function ScooterBatchDocuments({
             <SparklesIcon aria-hidden="true" className="size-5" />
             {creation("automaticFill")}
           </CardTitle>
-          {canExtract ? (
-            <Badge variant="outline">{creation("aiPowered")}</Badge>
-          ) : null}
+          <div className="flex shrink-0 items-center gap-2">
+            {canExtract ? (
+              <Badge variant="outline">{creation("aiPowered")}</Badge>
+            ) : null}
+            {headerActions}
+          </div>
         </div>
-        {!compact ? (
-          <CardDescription>{creation("importAlternatives")}</CardDescription>
-        ) : null}
       </CardHeader>
       {compact && attachedDocuments.length > 0 ? (
         <CardContent>
@@ -260,6 +261,7 @@ export function ScooterBatchDocuments({
       >
         <FileDropZone
           label={t("batch.drop")}
+          mobileLabel={t("batch.select")}
           browseLabel={t("batch.browse")}
           hint={t("batch.hint")}
           requirements={t("batch.requirements")}
@@ -351,18 +353,7 @@ export function ScooterBatchDocuments({
           </Button>
         </CardContent>
       ) : null}
-      <CardContent hidden={compact} className={compact ? "hidden" : undefined}>
-        {children ? (
-          <div className="grid gap-3">
-            <div className="flex items-center gap-3 text-sm text-muted-foreground">
-              <span className="h-px flex-1 bg-border" />
-              <span>{creation("or")}</span>
-              <span className="h-px flex-1 bg-border" />
-            </div>
-            {children}
-          </div>
-        ) : null}
-      </CardContent>
+      {children ? <CardContent>{children}</CardContent> : null}
     </Card>
   );
 }

@@ -101,10 +101,12 @@ describe("Scooter batch document states", () => {
         () => ({ cancel: vi.fn() }) as unknown as Animation,
       );
       HTMLElement.prototype.animate = animate;
-      const media = vi.spyOn(window, "matchMedia").mockReturnValue({
-        ...window.matchMedia("(prefers-reduced-motion: reduce)"),
-        matches: reducedMotion,
-      });
+      const previousMatchMedia = window.matchMedia;
+      window.matchMedia = vi.fn((query: string) => ({
+        ...previousMatchMedia(query),
+        matches:
+          query === "(prefers-reduced-motion: reduce)" ? reducedMotion : false,
+      }));
       const original = {
         id: "original",
         type: "civ" as const,
@@ -131,7 +133,7 @@ describe("Scooter batch document states", () => {
       } finally {
         fixture.unmount();
         HTMLElement.prototype.animate = previousAnimate;
-        media.mockRestore();
+        window.matchMedia = previousMatchMedia;
       }
     },
   );

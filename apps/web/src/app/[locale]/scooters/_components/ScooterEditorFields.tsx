@@ -11,10 +11,15 @@ import {
 import { v1 } from "@repo/api-shared";
 import {
   Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
   FormSection,
   InputGroup,
   InputGroupAddon,
 } from "@repo/ui/components";
+import { EllipsisVerticalIcon, FileJsonIcon } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { get, useFieldArray, useFormContext, useWatch } from "react-hook-form";
 
@@ -41,7 +46,14 @@ import type { ScooterDocumentsEditor } from "./useScooterDocuments";
 import { CivMetadataFields } from "./CivMetadataFields";
 import { useCivFieldHint } from "./useCivFieldHint";
 import { useCivVocabulary } from "./CivVocabularyContext";
-import { Fragment, useContext, useId, useState, type ReactNode } from "react";
+import {
+  Fragment,
+  useContext,
+  useId,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import type { DocumentImportResult } from "./scooter-document-import";
 import type { DocumentSource } from "./scooter-document-sources";
 import { OPERATIONAL_FIELDS, type ScooterWizardStep } from "./scooter-wizard";
@@ -163,9 +175,17 @@ export function ScooterEditorFields({
           field === "temporaryRegistrationExpiresAt" ||
           field === "requiredLicenseCategory",
       ));
+  const [jsonOpen, setJsonOpen] = useState(false);
+  const importMenuRef = useRef<HTMLButtonElement>(null);
+  const menuImport = !editing || combinedReview;
+  const canImport = canAccess(user, "scooter_documents.write");
   const jsonImport = (
     <ScooterDocumentImport
       secondary
+      hideTrigger={menuImport}
+      finalFocus={menuImport ? importMenuRef : undefined}
+      open={menuImport ? jsonOpen : undefined}
+      onOpenChange={menuImport ? setJsonOpen : undefined}
       sources={importSources}
       onApplyImport={onApplyImport}
       insuranceFiles={[
@@ -188,6 +208,32 @@ export function ScooterEditorFields({
         <>
           {!editing || combinedReview ? (
             <ScooterBatchDocuments
+              headerActions={
+                canImport ? (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger
+                      render={
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          ref={importMenuRef}
+                          aria-label={t("documents.actions")}
+                          disabled={disabled}
+                        />
+                      }
+                    >
+                      <EllipsisVerticalIcon aria-hidden="true" />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => setJsonOpen(true)}>
+                        <FileJsonIcon aria-hidden="true" />
+                        {t("documentImport.open")}
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                ) : null
+              }
               onLogicalDocument={onLogicalDocument}
               scooterVin={scooterVin}
               documents={documents}

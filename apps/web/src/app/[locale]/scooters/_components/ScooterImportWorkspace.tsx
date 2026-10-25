@@ -14,6 +14,7 @@ import { PageLayout } from "@repo/ui/components/page-layout";
 import { motion, radius } from "@repo/theme";
 import { PlusIcon, Trash2Icon } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
   useCallback,
@@ -85,6 +86,7 @@ export function ScooterImportWorkspace({
   const t = useTranslations("scooters.workspace");
   const feedback = useTranslations("scooters.feedback");
   const notifications = useWorkspaceNotifications();
+  const router = useRouter();
   const [fleetNumberRevision, setFleetNumberRevision] = useState(0);
   const [workspaceOwner] = useState(() => crypto.randomUUID());
   const [drafts, setDrafts] = useState<WorkspaceDraft[]>([]);
@@ -518,6 +520,12 @@ export function ScooterImportWorkspace({
           entry.draft.id !== id && ["review", "ready"].includes(entry.status),
       ) ?? drafts.find((entry) => entry.draft.id !== id);
     setSelectedId(next?.draft.id);
+    if (!next) {
+      router.push(
+        `${scootersHref.replace(/\/$/, "")}/${encodeURIComponent(scooter.id)}`,
+      );
+      router.refresh();
+    }
   }
 
   const multipleDrafts = drafts.length > 1;

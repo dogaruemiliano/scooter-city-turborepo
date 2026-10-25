@@ -878,7 +878,13 @@ describe("Scooter documents", () => {
       });
       if (expand) await browser.click(expand);
     }
-    await browser.click(screen.getByRole("button", { name: "Import JSON" }));
+    expect(
+      screen.queryByRole("button", { name: "Import JSON" }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Document actions" }));
+    await browser.click(
+      await screen.findByRole("menuitem", { name: "Import JSON" }),
+    );
     await browser.click(
       screen.getByRole("button", { name: "Copy extraction prompt" }),
     );

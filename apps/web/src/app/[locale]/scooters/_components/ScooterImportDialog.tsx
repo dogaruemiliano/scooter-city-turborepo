@@ -28,16 +28,18 @@ export function ScooterImportDialog({
   description,
   closeLabel,
   initialFocus,
+  finalFocus,
   children,
   footer,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  trigger: ReactElement<{ children?: ReactNode }>;
+  trigger?: ReactElement<{ children?: ReactNode }>;
   title: string;
   description: string;
   closeLabel: string;
   initialFocus: RefObject<HTMLButtonElement | null>;
+  finalFocus?: RefObject<HTMLButtonElement | null>;
   children: ReactNode;
   footer: ReactNode;
 }) {
@@ -70,9 +72,9 @@ export function ScooterImportDialog({
   );
   return (
     <Root open={open} onOpenChange={onOpenChange}>
-      <Trigger render={trigger} />
+      {trigger ? <Trigger render={trigger} /> : null}
       {mobile ? (
-        <BottomSheetContent initialFocus={initialFocus}>
+        <BottomSheetContent initialFocus={initialFocus} finalFocus={finalFocus}>
           <BottomSheetHeader className="flex-row items-center justify-between gap-3">
             {header}
           </BottomSheetHeader>
@@ -82,6 +84,7 @@ export function ScooterImportDialog({
       ) : (
         <DialogContent
           initialFocus={initialFocus}
+          finalFocus={finalFocus}
           showCloseButton={false}
           className="flex max-h-[calc(100dvh-var(--spacing-12))] flex-col sm:max-w-lg"
         >

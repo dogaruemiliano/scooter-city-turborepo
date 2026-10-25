@@ -1087,7 +1087,18 @@ describe("Scooter create controls with the create resolver", () => {
     mocks.apiFetch.mockResolvedValueOnce(createdScooter);
     const browser = userEvent.setup();
     renderControls();
-    await browser.click(screen.getByRole("button", { name: "Import JSON" }));
+    expect(
+      screen.queryByRole("button", { name: "Import JSON" }),
+    ).not.toBeInTheDocument();
+    const importMenu = screen.getByRole("button", { name: "Document actions" });
+    expect(
+      screen.getByText("AI powered").compareDocumentPosition(importMenu) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    fireEvent.click(importMenu);
+    await browser.click(
+      await screen.findByRole("menuitem", { name: "Import JSON" }),
+    );
     await browser.click(screen.getByRole("button", { name: "Edit JSON" }));
     fireEvent.change(
       screen.getByRole("textbox", { name: "Extracted data (JSON)" }),
@@ -1107,6 +1118,7 @@ describe("Scooter create controls with the create resolver", () => {
       },
     );
     await browser.click(screen.getByRole("button", { name: "Fill fields" }));
+    await waitFor(() => expect(importMenu).toHaveFocus());
     expect(
       screen.getByRole("combobox", { name: /Required driver license/ }),
     ).toHaveTextContent(messages.en.scooters.requiredDriverLicenseTypes.none);

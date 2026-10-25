@@ -20,6 +20,11 @@ const mocks = vi.hoisted(() => ({
   fetch: vi.fn(),
   unmount: vi.fn(),
   toast: vi.fn(),
+  push: vi.fn(),
+  refresh: vi.fn(),
+}));
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: mocks.push, refresh: mocks.refresh }),
 }));
 vi.mock("@/components/WorkspaceNotifications", () => ({
   useWorkspaceNotifications: () => ({ add: mocks.toast }),
@@ -124,6 +129,8 @@ beforeEach(() => {
   mocks.fetch.mockReset();
   mocks.unmount.mockReset();
   mocks.toast.mockReset();
+  mocks.push.mockReset();
+  mocks.refresh.mockReset();
 });
 
 describe("persistent scooter import workspace", () => {
@@ -633,6 +640,15 @@ describe("persistent scooter import workspace", () => {
     expect(
       screen.queryByRole("button", { name: "Discard draft" }),
     ).not.toBeInTheDocument();
+    expect(mocks.push).not.toHaveBeenCalled();
+    expect(mocks.refresh).not.toHaveBeenCalled();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Create and review next" }),
+    );
+    expect(mocks.push).toHaveBeenCalledExactlyOnceWith(
+      "/en/scooters/scooter-two",
+    );
+    expect(mocks.refresh).toHaveBeenCalledOnce();
   });
 });
 
@@ -697,7 +713,7 @@ it("never merges restored drafts with matching VINs or legacy assignments", asyn
   expect(mocks.fetch).toHaveBeenCalledOnce();
 });
 
-it("does not create another draft when the last scooter is completed", async () => {
+it("opens the created scooter details when the only draft is completed", async () => {
   mocks.fetch.mockResolvedValue({ items: [draft("one")] });
   mount();
   fireEvent.click(
@@ -708,9 +724,10 @@ it("does not create another draft when the last scooter is completed", async () 
     screen.queryByRole("textbox", { name: "Draft note" }),
   ).not.toBeInTheDocument();
   expect(mocks.fetch).toHaveBeenCalledOnce();
-  expect(
-    screen.getByRole("button", { name: "Add more scooters in parallel" }),
-  ).toBeEnabled();
+  expect(mocks.push).toHaveBeenCalledExactlyOnceWith(
+    "/en/scooters/scooter-one",
+  );
+  expect(mocks.refresh).toHaveBeenCalledOnce();
 });
 
 it("updates the draft state without a detection toast", async () => {
