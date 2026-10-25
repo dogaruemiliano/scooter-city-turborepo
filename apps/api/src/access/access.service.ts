@@ -334,7 +334,7 @@ export class AccessService {
     let remaining = 100;
     const pages: Promise<UserRow[]>[] = [];
     for (const [index, group] of groups.entries()) {
-      const count = counts[index]!;
+      const count = counts[index];
       if (skip >= count) {
         skip -= count;
         continue;
