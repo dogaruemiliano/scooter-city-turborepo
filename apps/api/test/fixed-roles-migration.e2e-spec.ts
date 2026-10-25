@@ -4,7 +4,6 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { Client } from "pg";
 import { v1 } from "@repo/api-shared";
-import { initialRoles } from "../prisma/seeds/access";
 import {
   enforcePrerequisites,
   resolveScopes,
@@ -15,6 +14,78 @@ const databaseUrl = process.env.FIXED_ROLES_MIGRATION_DATABASE_URL;
 const integration = databaseUrl ? describe : describe.skip;
 const migrationName = "20261012100000_simplify_access_roles";
 const marker = "migration-20261012100000-complete";
+
+// This rehearsal verifies the October 12 release. Later seed permissions (such
+// as delegated user management) must not change the historical SQL contract.
+const historicalRoles: { slug: string; permissions: GrantRow[] }[] = [
+  {
+    slug: "admin",
+    permissions: [
+      "persons.read",
+      "persons.create",
+      "persons.update",
+      "persons.archive",
+      "persons.audit.read",
+      "person_documents.read",
+      "person_documents.write",
+      "person_documents.delete",
+      "person_documents.extract",
+      "scooters.read",
+      "scooters.create",
+      "scooters.update",
+      "scooters.archive",
+      "scooter_documents.read",
+      "scooter_documents.write",
+      "scooter_documents.extract",
+      "scooter_brands.read",
+      "scooter_brands.manage",
+      "vehicle_civ.read",
+      "finance.books.read",
+      "finance.suppliers.read",
+      "finance.accounts.read",
+      "finance.operations.read",
+      "finance.reference.read",
+      "finance.suppliers.manage",
+      "finance.expenses.create",
+      "finance.funding.create",
+      "finance.operations.reverse",
+      "finance.settlements.preview",
+      "problems.read",
+      "problems.create",
+      "problems.update",
+      "problems.resolve",
+      "problems.claim",
+      "problems.assign",
+      "problems.prioritize",
+      "problems.reopen",
+      "rentals.read",
+      "rentals.create",
+      "rentals.handover",
+      "rentals.return",
+    ].map((permissionKey) => ({
+      permissionKey,
+      scopes: [permissionKey === "problems.claim" ? "AVAILABLE" : "ALL"],
+    })),
+  },
+  {
+    slug: "mechanic",
+    permissions: [
+      { permissionKey: "problems.read", scopes: ["ASSIGNED", "AVAILABLE"] },
+      { permissionKey: "problems.claim", scopes: ["AVAILABLE"] },
+      { permissionKey: "problems.update", scopes: ["ASSIGNED"] },
+      { permissionKey: "problems.resolve", scopes: ["ASSIGNED"] },
+      { permissionKey: "scooters.read", scopes: ["ASSIGNED"] },
+    ],
+  },
+  {
+    slug: "customer",
+    permissions: [
+      "portal.profile.read",
+      "portal.rentals.read",
+      "portal.scooter_documents.read",
+    ].map((permissionKey) => ({ permissionKey, scopes: ["OWN"] })),
+  },
+];
 
 integration("Fixed role migration preserves authority (PostgreSQL)", () => {
   let db: Client;
@@ -144,7 +215,7 @@ integration("Fixed role migration preserves authority (PostgreSQL)", () => {
       { slug: "customer", name: "Client" },
       { slug: "mechanic", name: "Mechanic" },
     ]);
-    for (const preset of initialRoles) {
+    for (const preset of historicalRoles) {
       const grants = await db.query<GrantRow>(
         'SELECT "permissionKey",scopes::text[] AS scopes FROM "RolePermission" p JOIN "Role" r ON r.id=p."roleId" WHERE r.slug=$1 ORDER BY "permissionKey"',
         [preset.slug],
@@ -245,8 +316,8 @@ integration("Fixed role migration preserves authority (PostgreSQL)", () => {
   );
 
   it("collapses mechanic plus Client into Mechanic and explicit portal exceptions", async () => {
-    const mechanic = initialRoles.find((r) => r.slug === "mechanic")!;
-    const customer = initialRoles.find((r) => r.slug === "customer")!;
+    const mechanic = historicalRoles.find((r) => r.slug === "mechanic")!;
+    const customer = historicalRoles.find((r) => r.slug === "customer")!;
     const id = await user([
       await role(mechanic.slug, mechanic.permissions),
       await role(customer.slug, customer.permissions),
@@ -357,7 +428,7 @@ integration("Fixed role migration preserves authority (PostgreSQL)", () => {
     const id = await user([
       await role(
         "mechanic",
-        initialRoles.find((r) => r.slug === "mechanic")!.permissions,
+        historicalRoles.find((r) => r.slug === "mechanic")!.permissions,
         true,
       ),
     ]);

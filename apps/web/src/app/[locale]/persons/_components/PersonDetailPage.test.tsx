@@ -250,7 +250,9 @@ describe("PersonDetailPage", () => {
       within(editor).getByLabelText(messages.en.persons.license.category),
       "A1",
     );
-    await browser.click(within(editor).getByRole("button", { name: "Save" }));
+    await browser.click(
+      within(editor).getByRole("button", { name: "Save document" }),
+    );
     await waitFor(() =>
       expect(mocks.apiFetch).toHaveBeenCalledWith(
         v1.persons.ROUTES.documents.update(readyPerson.id, licence.id),
@@ -336,7 +338,7 @@ describe("PersonDetailPage", () => {
     expect(moreActionsButton.querySelector("svg")).toHaveClass(
       "lucide-ellipsis-vertical",
     );
-    expect(moreActionsButton.parentElement).toContainElement(
+    expect(moreActionsButton.parentElement?.parentElement).toContainElement(
       screen.getByRole("heading", { name: "Ada Lovelace" }),
     );
     expect(
@@ -583,7 +585,9 @@ describe("PersonDetailPage", () => {
       name: "Document has expiry date?",
     });
     const expiryDay = within(editSheet).getByLabelText("Expires on");
-    const saveButton = within(editSheet).getByRole("button", { name: "Save" });
+    const saveButton = within(editSheet).getByRole("button", {
+      name: "Save document",
+    });
 
     expect(expirySwitch).toBeChecked();
     expect(saveButton).toBeDisabled();
@@ -617,7 +621,7 @@ describe("PersonDetailPage", () => {
       expiresOn: null,
     });
     await browser.click(
-      within(editSheet).getByRole("button", { name: "Save" }),
+      within(editSheet).getByRole("button", { name: "Save document" }),
     );
 
     await waitFor(() =>
@@ -764,6 +768,31 @@ describe("PersonDetailPage", () => {
     );
     expect(mocks.replace).toHaveBeenCalledWith("/en/persons");
   });
+
+  it.each(["image/jpeg", "application/pdf"])(
+    "opens a large preview for a saved %s document",
+    async (contentType) => {
+      const browser = userEvent.setup();
+      renderDetail(readyPerson, undefined, {
+        ...documentPhotos,
+        [identityDocument.id]: [{ ...identityFrontPhoto, contentType }],
+      });
+      await browser.click(
+        screen.getByRole("button", { name: "View National ID" }),
+      );
+      await browser.click(
+        screen.getByRole("button", { name: "View Front document photo" }),
+      );
+      const preview = await screen.findByRole("dialog", {
+        name: "Front document photo",
+      });
+      expect(
+        within(preview).getByRole("button", { name: "Zoom in" }),
+      ).toBeInTheDocument();
+      await browser.keyboard("{Escape}");
+      expect(preview).toHaveAttribute("data-closed");
+    },
+  );
 
   it("uploads and deletes document photos through the API", async () => {
     const backPhoto: v1.persons.PersonDocumentPhoto = {

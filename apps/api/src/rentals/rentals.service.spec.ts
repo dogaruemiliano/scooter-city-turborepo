@@ -133,8 +133,8 @@ describe("Rental operational invariants", () => {
     );
   });
 
-  it("rejects rental creation for a retained hold even on a resolved problem", async () => {
-    db.scooterProblem.findFirst.mockResolvedValue({ id: "resolved-blocker" });
+  it("rejects rental creation while an open problem holds the scooter", async () => {
+    db.scooterProblem.findFirst.mockResolvedValue({ id: "open-blocker" });
     await expect(
       service.create("agent", {
         scooterId: "scooter",
@@ -144,7 +144,11 @@ describe("Rental operational invariants", () => {
       }),
     ).rejects.toThrow("maintenance hold");
     expect(db.scooterProblem.findFirst).toHaveBeenCalledWith({
-      where: { scooterId: "scooter", blocksUsage: true },
+      where: {
+        scooterId: "scooter",
+        blocksUsage: true,
+        status: { in: ["open", "in_progress"] },
+      },
       select: { id: true },
     });
     expect(db.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(

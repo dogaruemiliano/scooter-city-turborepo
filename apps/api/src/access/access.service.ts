@@ -90,6 +90,9 @@ export class AccessService {
     return {
       userId: user.id,
       isSuperAdmin: user.isSuperAdmin,
+      isAdmin: user.roleMemberships.some(
+        ({ role }) => role.slug === "admin" && !role.archivedAt,
+      ),
       effectiveScopes: enforcePrerequisites(
         resolveScopes(grantsFor(user), user.permissionOverrides),
       ),
@@ -311,16 +314,47 @@ export class AccessService {
           ],
         }
       : {};
-    const [rows, total] = await Promise.all([
-      this.prisma.user.findMany({
-        where,
-        include: userInclude,
-        orderBy: { email: "asc" },
-        skip: offset,
-        take: 100,
-      }),
-      this.prisma.user.count({ where }),
-    ]);
+    const hasRole = (slug: string): Prisma.UserWhereInput => ({
+      roleMemberships: { some: { role: { slug, archivedAt: null } } },
+    });
+    // Disjoint groups keep the highest role first, including across pages.
+    const groups: Prisma.UserWhereInput[] = [
+      { isSuperAdmin: true },
+      { isSuperAdmin: false, AND: [hasRole("admin")] },
+      {
+        isSuperAdmin: false,
+        AND: [hasRole("mechanic")],
+        NOT: hasRole("admin"),
+      },
+    ].map((group) => ({ AND: [where, group] }));
+    const counts = await Promise.all(
+      groups.map((group) => this.prisma.user.count({ where: group })),
+    );
+    let skip = offset;
+    let remaining = 100;
+    const pages: Promise<UserRow[]>[] = [];
+    for (const [index, group] of groups.entries()) {
+      const count = counts[index];
+      if (skip >= count) {
+        skip -= count;
+        continue;
+      }
+      const take = Math.min(remaining, count - skip);
+      pages.push(
+        this.prisma.user.findMany({
+          where: group,
+          include: userInclude,
+          orderBy: { email: "asc" },
+          skip,
+          take,
+        }),
+      );
+      remaining -= take;
+      skip = 0;
+      if (!remaining) break;
+    }
+    const rows = (await Promise.all(pages)).flat();
+    const total = counts.reduce((sum, count) => sum + count, 0);
     return { items: rows.map((u) => this.userDto(u)), total };
   }
   async getUser(id: string) {

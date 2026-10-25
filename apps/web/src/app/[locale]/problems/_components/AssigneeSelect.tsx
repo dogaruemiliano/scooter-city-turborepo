@@ -9,12 +9,11 @@ import {
   type ReactNode,
 } from "react";
 import { motion } from "@repo/theme";
-import { Button, PersonRow, SheetSelect } from "@repo/ui/components";
+import { Button, SheetSelect } from "@repo/ui/components";
 import { useTranslations } from "next-intl";
 import { Feedback } from "@/components/WorkspaceForm";
-import { useSession } from "@/components/auth/SessionProvider";
 import { memberName } from "../_lib/member-name";
-import { roleColors } from "../../roles/_lib/role-colors";
+import { AssigneeUserCard, AssigneeUserRow } from "./AssigneeUserCard";
 
 function AssigneePresence({
   id,
@@ -77,6 +76,7 @@ function AssigneePresence({
 }
 
 export type AssigneeOption = {
+  avatarAssetId?: string | null;
   id: string;
   email?: string;
   firstName: string | null;
@@ -103,34 +103,6 @@ type AssigneeSelectProps = {
 /** Shared assignee cards for problem creation and multi-select filters. */
 export function AssigneeSelect(props: AssigneeSelectProps) {
   const t = useTranslations("workspace");
-  const { user } = useSession();
-  const roleDescription = (id: string) => {
-    const member = props.members.find((member) => member.id === id);
-    const designation = id === user?.id ? "superAdmin" : "admin";
-    const roles = member?.isSuperAdmin
-      ? [
-          {
-            label: t(`access.member.roleNames.${designation}`),
-            slug: designation,
-          },
-        ]
-      : (member?.roles ?? []).map((role) => ({
-          label: role,
-          slug: role.trim().toLowerCase(),
-        }));
-    return roles.length ? (
-      <span className="flex flex-wrap gap-x-2 gap-y-1">
-        {roles.map((role) => (
-          <span
-            key={role.slug}
-            className={`font-medium ${(roleColors[role.slug] ?? roleColors.none).title}`}
-          >
-            {role.label}
-          </span>
-        ))}
-      </span>
-    ) : undefined;
-  };
   const selected = props.multiple
     ? props.value
     : props.value
@@ -194,45 +166,44 @@ export function AssigneeSelect(props: AssigneeSelectProps) {
             present={present}
             onExited={finishExit}
           >
-            <div className="flex items-center rounded-2xl border border-border bg-card p-4 text-card-foreground">
-              <PersonRow
-                name={label}
-                action={
-                  <Button
-                    type="button"
-                    variant="secondary-destructive"
-                    size="icon"
-                    disabled={props.disabled}
-                    data-assignee-remove=""
-                    aria-label={t("problems.removeAssignee", {
-                      name: label,
-                    })}
-                    onClick={(event) => {
-                      const buttons = Array.from(
-                        container.current?.querySelectorAll<HTMLButtonElement>(
-                          "[data-assignee-remove]",
-                        ) ?? [],
-                      ).filter((button) => !button.closest("[inert]"));
-                      const index = buttons.indexOf(event.currentTarget);
-                      const next =
-                        buttons[index + 1] ??
-                        buttons[index - 1] ??
-                        container.current?.querySelector<HTMLButtonElement>(
-                          "[data-slot='add-action']",
-                        );
-                      next?.focus();
-                      if (props.multiple)
-                        props.onValueChange(
-                          props.value.filter((value) => value !== id),
-                        );
-                      else props.onValueChange("");
-                    }}
-                  >
-                    <XIcon aria-hidden="true" className="size-5" />
-                  </Button>
-                }
-              />
-            </div>
+            <AssigneeUserRow
+              member={props.members.find((member) => member.id === id)}
+              name={label}
+              action={
+                <Button
+                  type="button"
+                  variant="secondary-destructive"
+                  size="icon"
+                  disabled={props.disabled}
+                  data-assignee-remove=""
+                  aria-label={t("problems.removeAssignee", {
+                    name: label,
+                  })}
+                  onClick={(event) => {
+                    const buttons = Array.from(
+                      container.current?.querySelectorAll<HTMLButtonElement>(
+                        "[data-assignee-remove]",
+                      ) ?? [],
+                    ).filter((button) => !button.closest("[inert]"));
+                    const index = buttons.indexOf(event.currentTarget);
+                    const next =
+                      buttons[index + 1] ??
+                      buttons[index - 1] ??
+                      container.current?.querySelector<HTMLButtonElement>(
+                        "[data-slot='add-action']",
+                      );
+                    next?.focus();
+                    if (props.multiple)
+                      props.onValueChange(
+                        props.value.filter((value) => value !== id),
+                      );
+                    else props.onValueChange("");
+                  }}
+                >
+                  <XIcon aria-hidden="true" className="size-5" />
+                </Button>
+              }
+            />
           </AssigneePresence>
         );
       })}
@@ -260,12 +231,12 @@ export function AssigneeSelect(props: AssigneeSelectProps) {
               )
             : undefined
         }
-        optionClassName="h-auto min-h-20 rounded-2xl border border-border p-4"
         options={options}
         renderOption={(option) => (
-          <PersonRow
+          <AssigneeUserCard
+            showEmail={false}
+            member={props.members.find((member) => member.id === option.value)}
             name={option.label}
-            description={roleDescription(option.value)}
           />
         )}
       />

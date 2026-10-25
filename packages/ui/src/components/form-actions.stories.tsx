@@ -3,6 +3,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Button } from "@repo/ui/components/button";
 import { Card, CardContent } from "@repo/ui/components/card";
 import { FormActions } from "@repo/ui/components/form-actions";
+import { SaveButton } from "@repo/ui/components/save-button";
 
 const meta = {
   title: "Forms/FormActions",
@@ -38,6 +39,28 @@ export const WithStatus: Story = {
   ),
 };
 
+/** Status gets its own row; mobile puts the primary action above secondary actions. */
+export const SplitWithStatus: Story = {
+  args: {
+    arrangement: "split",
+    ready: true,
+    status: "Funding details are ready for review.",
+  },
+  render: (args) => (
+    <FormActions {...args}>
+      <SaveButton
+        type="button"
+        idleLabel="Record funding"
+        pendingLabel="Recording funding…"
+        successLabel="Funding recorded"
+      />
+      <Button type="button" variant="outline">
+        Cancel
+      </Button>
+    </FormActions>
+  ),
+};
+
 export const RaisedSurface: Story = {
   render: () => (
     <Card surface="raised" className="pb-0">
@@ -52,14 +75,14 @@ export const RaisedSurface: Story = {
   ),
 };
 
-/** The page owns additional end-of-form clearance; the sticky card owns its inset. */
+/** The page end has less clearance than the floating inset, including device safe areas. */
 export const StickyCard: Story = {
   render: () => (
-    <form className="grid min-w-0 gap-8 px-4 pb-16 sm:px-8 sm:pb-24">
+    <form className="grid min-w-0 gap-8 px-4 pb-[calc(var(--spacing-screen-bottom)+env(safe-area-inset-bottom))] sm:px-8">
       <div className="min-h-dvh">
         <p className="text-sm text-muted-foreground">
           Scroll to see the action card float above the screen edge and settle
-          with extra space below it at the end of the form.
+          with a smaller gap below it at the end of the form.
         </p>
       </div>
       <FormActions sticky status="Review the required details before saving.">
@@ -88,5 +111,22 @@ export const RevealWhenReady: Story = {
         </Button>
       </FormActions>
     </form>
+  ),
+};
+
+/** Compact action bars retain touch targets while reducing padding and gaps. */
+export const CompactSaveBar: Story = {
+  render: () => (
+    <FormActions arrangement="split" density="compact" ready>
+      <SaveButton
+        type="button"
+        idleLabel="Save changes"
+        pendingLabel="Saving…"
+        successLabel="Changes saved"
+      />
+      <Button type="button" variant="text">
+        Cancel
+      </Button>
+    </FormActions>
   ),
 };

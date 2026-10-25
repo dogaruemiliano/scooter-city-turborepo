@@ -31,7 +31,7 @@ const problem = v1.problems.problemSchema.parse({
     registrationNumber: null,
   },
   status: "in_progress",
-  severity: "high",
+  difficulty: "hard",
   priority: "high",
   blocksUsage: false,
   holdClearedAt: null,

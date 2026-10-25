@@ -5,6 +5,7 @@ import { canAccess } from "@/lib/access";
 
 import { v1 } from "@repo/api-shared";
 import { Button } from "@repo/ui/components";
+import { DocumentViewer } from "@repo/ui/components/document-viewer";
 import { FileTextIcon, Trash2Icon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
@@ -40,6 +41,7 @@ export function DocumentPhotoCard({
 }) {
   const session = useOptionalSession();
   const t = useTranslations("persons");
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [failedUpload, setFailedUpload] = useState<File | null>(null);
   const [deleteConfirmationOpen, setDeleteConfirmationOpen] = useState(false);
   const uploadLabel = t("detail.documents.photoUploadLabel", {
@@ -74,6 +76,8 @@ export function DocumentPhotoCard({
         uploadLabel={uploadLabel}
         slotLabel={slotLabel}
         imageUrl={imageUrl}
+        onPreview={photo && imageUrl ? () => setPreviewOpen(true) : undefined}
+        previewLabel={`${t("actions.view")} ${photoAlt}`}
         preview={
           photo?.contentType === "application/pdf" ? (
             <span className="flex h-full w-full flex-col items-center justify-center gap-2 text-muted-foreground">
@@ -125,6 +129,28 @@ export function DocumentPhotoCard({
         }
       />
 
+      <DocumentViewer
+        open={previewOpen}
+        onOpenChange={setPreviewOpen}
+        src={imageUrl}
+        contentType={photo?.contentType}
+        fileName={photoAlt}
+        title={photoAlt}
+        imageAlt={photoAlt}
+        closeLabel={t("actions.cancel")}
+        openFileLabel={t("documentForm.openFile")}
+        actionsLabel={t("documentForm.documentActions")}
+        pdfLabels={{
+          error: t("documentForm.pdfPreviewError"),
+          previousPage: t("documentForm.previousPage"),
+          nextPage: t("documentForm.nextPage"),
+        }}
+        zoomLabels={{
+          zoomIn: t("documentForm.zoomIn"),
+          zoomOut: t("documentForm.zoomOut"),
+          resetZoom: t("documentForm.resetZoom"),
+        }}
+      />
       {photo?.contentType === "application/pdf" && imageUrl ? (
         <a
           href={imageUrl}

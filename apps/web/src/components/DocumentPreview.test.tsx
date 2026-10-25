@@ -1,3 +1,4 @@
+import { aspectRatio } from "@repo/theme";
 import { DocumentPreview } from "@repo/ui/components/document-preview";
 import { loadPdf } from "@repo/ui/lib/pdf";
 import {
@@ -83,6 +84,46 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("shared PDF previews", () => {
+  it.each([
+    [1200, 600, 2],
+    [300, 1200, aspectRatio.documentA4Portrait],
+  ])(
+    "sizes paper image cards from %s × %s without exceeding A4 height",
+    (width, height, expected) => {
+      const view = render(
+        <DocumentPreview {...props} layout="paper" contentType="image/jpeg" />,
+      );
+      const image = screen.getByAltText("CIV");
+      Object.defineProperties(image, {
+        naturalWidth: { value: width },
+        naturalHeight: { value: height },
+      });
+      fireEvent.load(image);
+      expect(
+        view.container.querySelector('[data-slot="document-preview-card"]'),
+      ).toHaveStyle({ aspectRatio: String(expected) });
+      view.rerender(
+        <DocumentPreview
+          {...props}
+          src="blob:replacement"
+          layout="paper"
+          contentType="image/jpeg"
+        />,
+      );
+      expect(
+        view.container.querySelector('[data-slot="document-preview-card"]'),
+      ).toHaveStyle({ aspectRatio: String(aspectRatio.documentA4Portrait) });
+    },
+  );
+  it("sizes a paper PDF thumbnail using the page proportions", async () => {
+    const view = render(<DocumentPreview {...props} layout="paper" />);
+    await waitFor(() =>
+      expect(
+        view.container.querySelector('[data-slot="document-preview-card"]'),
+      ).toHaveStyle({ aspectRatio: String(600 / 800) }),
+    );
+  });
+
   it.each(["image/png", "application/pdf"])(
     "places the filename and working close button inside the %s preview overlay",
     (contentType) => {

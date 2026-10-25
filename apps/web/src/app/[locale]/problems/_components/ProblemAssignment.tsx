@@ -1,0 +1,235 @@
+"use client";
+import { useFormAction } from "@/lib/form/use-form-action";
+import { SaveButton } from "@repo/ui/components/save-button";
+
+import { useState } from "react";
+import { useTranslations } from "next-intl";
+import { v1 } from "@repo/api-shared";
+import {
+  Button,
+  Input,
+  BottomSheet,
+  BottomSheetContent,
+  BottomSheetHeader,
+  BottomSheetTitle,
+  BottomSheetBody,
+  BottomSheetFooter,
+} from "@repo/ui/components";
+import { CheckIcon, PencilIcon } from "lucide-react";
+import type { AssigneeOption } from "./AssigneeSelect";
+import { AssigneeUserCard, AssigneeUserRow } from "./AssigneeUserCard";
+import { memberName } from "../_lib/member-name";
+
+export function ProblemAssignment({
+  problem,
+  userId,
+  mayAssign,
+  mayClaim,
+  busy,
+  members,
+  loading,
+  error,
+  onRetry,
+  onAssign,
+  onClaim,
+  saveError,
+}: {
+  problem: v1.problems.Problem;
+  userId?: string;
+  mayAssign: boolean;
+  mayClaim: boolean;
+  busy: boolean;
+  members: readonly AssigneeOption[];
+  loading: boolean;
+  error: string | null;
+  onRetry: () => void;
+  onAssign: (ids: string[]) => Promise<boolean>;
+  saveError: string | null;
+  onClaim: () => void;
+}) {
+  const formAction = useFormAction();
+
+  const t = useTranslations("workspace");
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState<string[]>([]);
+  const [query, setQuery] = useState("");
+  const assigned = v1.problems.problemAssignees(problem);
+  const editable =
+    problem.status === "open" || problem.status === "in_progress";
+  const options = [
+    ...members,
+    ...assigned.filter(
+      (person) => !members.some((member) => member.id === person.id),
+    ),
+  ];
+  const filtered = options
+    .filter((member) =>
+      `${memberName(member)} ${member.email ?? ""}`
+        .toLocaleLowerCase()
+        .includes(query.trim().toLocaleLowerCase()),
+    )
+    .sort(
+      (a, b) => Number(draft.includes(b.id)) - Number(draft.includes(a.id)),
+    );
+  const action = t(
+    assigned.length ? "problems.manageAssignment" : "problems.assignSomeone",
+  );
+  function openAssignment() {
+    setDraft(assigned.map((member) => member.id));
+    setQuery("");
+    setOpen(true);
+  }
+  return (
+    <section
+      aria-label={t("problems.assignment")}
+      className="flex flex-col gap-4"
+    >
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-base font-semibold">{t("problems.assignment")}</h3>
+        {assigned.length > 0 && mayAssign && editable ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            disabled={busy}
+            aria-label={t("problems.manageAssignment")}
+            onClick={openAssignment}
+          >
+            <PencilIcon aria-hidden="true" className="size-5" />
+          </Button>
+        ) : null}
+      </div>
+      {assigned.length ? (
+        <div className="flex flex-col gap-2">
+          {assigned.map((member) => (
+            <AssigneeUserRow
+              key={member.id}
+              member={options.find((option) => option.id === member.id)}
+              name={memberName(member)}
+              action={
+                <span className="flex shrink-0 items-center gap-2">
+                  {member.id === userId ? (
+                    <span className="text-sm font-medium text-muted-foreground">
+                      {t("problems.you")}
+                    </span>
+                  ) : null}
+                </span>
+              }
+            />
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          {t("problems.nobodyAssigned")}
+        </p>
+      )}
+      {problem.assigneeNeedsReassignment ? (
+        <p role="status" className="text-sm font-medium text-destructive">
+          {t("problems.reassignRequired")}
+        </p>
+      ) : null}
+      {!assigned.length &&
+      ((mayAssign && editable) || (mayClaim && problem.status === "open")) ? (
+        <div className="flex flex-col gap-2 sm:flex-row">
+          {mayAssign && editable && !assigned.length ? (
+            <Button disabled={busy} variant="default" onClick={openAssignment}>
+              {action}
+            </Button>
+          ) : null}
+          {mayClaim && problem.status === "open" && !assigned.length ? (
+            <Button
+              disabled={busy}
+              variant={mayAssign ? "outline" : "default"}
+              onClick={onClaim}
+            >
+              {t(mayAssign ? "problems.assignToMe" : "problems.takeProblem")}
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
+      <BottomSheet
+        open={open}
+        onOpenChange={(next) => {
+          if (!busy) setOpen(next);
+        }}
+      >
+        <BottomSheetContent className="bg-popover text-popover-foreground">
+          <BottomSheetHeader>
+            <BottomSheetTitle>{action}</BottomSheetTitle>
+          </BottomSheetHeader>
+          <BottomSheetBody className="flex flex-col gap-3">
+            <Input
+              aria-label={t("problems.searchAssignees")}
+              placeholder={t("problems.searchAssignees")}
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+            {loading ? <p role="status">{t("loading")}</p> : null}
+            {error ? (
+              <div>
+                <p role="alert">{error}</p>
+                <Button variant="outline" onClick={onRetry}>
+                  {t("retry")}
+                </Button>
+              </div>
+            ) : null}
+            {!loading && !error && !filtered.length ? (
+              <p className="text-sm text-muted-foreground">
+                {t("problems.noAssignees")}
+              </p>
+            ) : null}
+            {filtered.map((member) => (
+              <Button
+                key={member.id}
+                variant="outline"
+                className="h-auto justify-start p-3"
+                aria-label={memberName(member)}
+                aria-pressed={draft.includes(member.id)}
+                disabled={busy}
+                onClick={() =>
+                  setDraft((ids) =>
+                    ids.includes(member.id)
+                      ? ids.filter((id) => id !== member.id)
+                      : [...ids, member.id],
+                  )
+                }
+              >
+                <AssigneeUserCard
+                  showEmail={false}
+                  member={options.find((option) => option.id === member.id)}
+                  name={memberName(member)}
+                  action={
+                    draft.includes(member.id) ? (
+                      <CheckIcon aria-hidden="true" />
+                    ) : undefined
+                  }
+                />
+              </Button>
+            ))}
+          </BottomSheetBody>
+          <BottomSheetFooter>
+            {saveError ? (
+              <p role="alert" className="text-sm text-destructive">
+                {saveError}
+              </p>
+            ) : null}
+            <SaveButton
+              disabled={busy || loading || Boolean(error)}
+              onClick={async () => {
+                if (await onAssign(draft)) setOpen(false);
+              }}
+              {...formAction("assign", { pending: busy, error: saveError })}
+            />
+            <Button
+              variant="outline"
+              disabled={busy}
+              onClick={() => setOpen(false)}
+            >
+              {t("cancel")}
+            </Button>
+          </BottomSheetFooter>
+        </BottomSheetContent>
+      </BottomSheet>
+    </section>
+  );
+}

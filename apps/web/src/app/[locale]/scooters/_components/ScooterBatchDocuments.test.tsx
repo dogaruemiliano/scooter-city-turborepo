@@ -1,9 +1,11 @@
 import { v1 } from "@repo/api-shared";
 import { messages } from "@repo/i18n";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ScooterDocumentAnalysisContext } from "./ScooterDocumentAnalysisStatus";
+import type { DocumentAnalysisState } from "./useScooterDocumentAnalysis";
 import { ScooterBatchDocuments } from "./ScooterBatchDocuments";
 import type { ScooterDocumentsEditor } from "./useScooterDocuments";
 
@@ -29,6 +31,7 @@ const importResult = {
   emptyConflicts: [],
 };
 const add = vi.fn();
+const setVersion = vi.fn();
 
 function view({
   attached = [existing],
@@ -46,6 +49,7 @@ function view({
     drafts,
     extractions: {},
     add,
+    setVersion,
   } as unknown as ScooterDocumentsEditor;
   return (
     <NextIntlClientProvider locale="en" messages={messages.en}>
@@ -63,9 +67,238 @@ function drop(target: HTMLElement, files: File[]) {
   fireEvent.drop(target, { dataTransfer: { files, types: ["Files"] } });
 }
 
-beforeEach(() => add.mockReset());
+beforeEach(() => {
+  add.mockReset();
+  setVersion.mockReset();
+});
 
 describe("Scooter batch document states", () => {
+  it("places import more after all document previews", () => {
+    const file = {
+      id: "one",
+      type: "civ" as const,
+      status: "ready" as const,
+      file: new File(["image"], "CIV.jpg", { type: "image/jpeg" }),
+    };
+    const viewResult = render(view({ attached: [], drafts: [file] }));
+    const preview = viewResult.container.querySelector(
+      '[data-slot="document-preview-card"]',
+    )!;
+    const addMore = screen.getByRole("button", {
+      name: "Import more documents",
+    });
+    expect(
+      preview.compareDocumentPosition(addMore) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it.each([false, true])(
+    "animates only newly added previews, respecting reduced motion (%s)",
+    (reducedMotion) => {
+      const previousAnimate = HTMLElement.prototype.animate;
+      const animate = vi.fn(
+        () => ({ cancel: vi.fn() }) as unknown as Animation,
+      );
+      HTMLElement.prototype.animate = animate;
+      const previousMatchMedia = window.matchMedia;
+      window.matchMedia = vi.fn((query: string) => ({
+        ...previousMatchMedia(query),
+        matches:
+          query === "(prefers-reduced-motion: reduce)" ? reducedMotion : false,
+      }));
+      const original = {
+        id: "original",
+        type: "civ" as const,
+        status: "ready" as const,
+        file: new File(["image"], "CIV.jpg", { type: "image/jpeg" }),
+      };
+      const added = {
+        ...original,
+        id: "added",
+        file: new File(["image"], "ITP.jpg", { type: "image/jpeg" }),
+      };
+      const fixture = render(view({ attached: [], drafts: [original] }));
+      try {
+        expect(animate).not.toHaveBeenCalled();
+        fixture.rerender(view({ attached: [], drafts: [original, added] }));
+        expect(animate).toHaveBeenCalledTimes(reducedMotion ? 0 : 1);
+        fixture.rerender(
+          view({
+            attached: [],
+            drafts: [original, { ...added, type: "itp_card" }],
+          }),
+        );
+        expect(animate).toHaveBeenCalledTimes(reducedMotion ? 0 : 1);
+      } finally {
+        fixture.unmount();
+        HTMLElement.prototype.animate = previousAnimate;
+        window.matchMedia = previousMatchMedia;
+      }
+    },
+  );
+
+  it.each(["uploading", "processing", "success"] as const)(
+    "puts the type and %s feedback at the bottom of an A4 preview card",
+    (phase) => {
+      const draft = {
+        id: "file",
+        type: "civ" as const,
+        file: new File(["pdf"], "CIV.pdf", { type: "application/pdf" }),
+        status:
+          phase === "uploading" ? ("uploading" as const) : ("ready" as const),
+      };
+      const entry: DocumentAnalysisState =
+        phase === "success"
+          ? {
+              status: "success",
+              analysis: {
+                sourceId: "file",
+                documentType: "civ",
+                extractedData: { vin: null, fields: {}, rawFields: {} },
+                issues: [],
+                reviewRequired: true,
+              },
+            }
+          : { status: "processing" };
+      render(
+        <ScooterDocumentAnalysisContext value={{ file: entry }}>
+          {view({ attached: [], drafts: [draft] })}
+        </ScooterDocumentAnalysisContext>,
+      );
+      const expand = screen.queryByRole("button", {
+        name: "Import more documents",
+      });
+      if (expand) fireEvent.click(expand);
+      const name = screen.getByRole("button", { name: "CIV.pdf" });
+      const row = name.closest("li")!;
+      expect(within(row).getByText("CIV", { exact: true })).toBeInTheDocument();
+      const status = within(row).getByRole("status");
+      expect(status.parentElement).toContainElement(
+        within(row).getByText("CIV", { exact: true }),
+      );
+      const card = row.querySelector('[data-slot="document-preview-card"]');
+      expect(card).toHaveStyle({ aspectRatio: String(210 / 297) });
+      expect(card).toContainElement(name);
+      expect(card).toContainElement(status);
+      expect(status.parentElement).toHaveClass("bottom-0");
+      expect(
+        within(row).getByRole("button", { name: /Remove.*CIV.pdf/ }),
+      ).toBeEnabled();
+      expect(status).toHaveClass("justify-end", "text-right");
+      if (phase === "success")
+        expect(status).toHaveTextContent(
+          messages.en.scooters.documents.batch.read,
+        );
+    },
+  );
+
+  it("identifies client copies below the filename with a colored badge and protective icon", () => {
+    render(
+      view({
+        attached: [],
+        drafts: [
+          {
+            id: "copy",
+            type: null,
+            version: "client_copy",
+            status: "ready",
+            file: new File(["pdf"], "client.pdf", { type: "application/pdf" }),
+          },
+        ],
+      }),
+    );
+    const name = screen.getByRole("button", {
+      name: "client.pdf",
+    });
+    const badge = within(name.closest("li")!).getByText(
+      messages.en.scooters.documents.clientCopy,
+    );
+    expect(badge).toHaveAttribute("data-variant", "default");
+    expect(badge).toHaveClass("bg-primary", "text-primary-foreground");
+    expect(badge.querySelector('svg[aria-hidden="true"]')).toBeInTheDocument();
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Use as original" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("opens client-copy details from the full-screen corners and keeps assignment controls inside the sheet", async () => {
+    render(
+      view({
+        attached: [],
+        drafts: [
+          {
+            id: "copy",
+            type: "civ",
+            version: "client_copy",
+            status: "ready",
+            file: new File(["image"], "client.jpg", { type: "image/jpeg" }),
+          },
+          {
+            id: "original",
+            type: "civ",
+            status: "ready",
+            file: new File(["image"], "original.jpg", { type: "image/jpeg" }),
+          },
+        ],
+      }),
+    );
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "client.jpg" }));
+    const viewer = await screen.findByRole("dialog", { name: "client.jpg" });
+    expect(
+      within(
+        viewer.querySelector<HTMLElement>(
+          '[data-slot="document-preview-header"]',
+        )!,
+      ).getByText("client.jpg"),
+    ).toBeInTheDocument();
+    expect(
+      within(viewer).getByRole("button", {
+        name: messages.en.scooters.documents.closePreview,
+      }),
+    ).toBeInTheDocument();
+    expect(within(viewer).getByRole("status")).toBeInTheDocument();
+    fireEvent.click(within(viewer).getByRole("button", { name: "For client" }));
+    const sheet = await screen.findByRole("dialog", {
+      name: "A protected copy for clients",
+    });
+    expect(within(sheet).getByText("For client")).toHaveAttribute(
+      "data-variant",
+      "default",
+    );
+    expect(
+      within(sheet).getByRole("combobox", { name: "Original for client.jpg" }),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      within(sheet).getByRole("combobox", { name: "Original for client.jpg" }),
+    );
+    fireEvent.click(
+      await screen.findByRole("option", { name: "original.jpg" }),
+    );
+    expect(setVersion).toHaveBeenCalledWith("copy", "client_copy", "original");
+    expect(sheet).toHaveClass("bg-popover");
+    expect(sheet).not.toHaveClass("bg-background");
+    fireEvent.click(
+      within(sheet).getByRole("button", { name: "Use as original" }),
+    );
+    expect(setVersion).toHaveBeenCalledWith("copy", "original");
+  });
+
+  it("uses automatic version detection without a document-version input", () => {
+    render(view({ attached: [] }));
+    expect(
+      screen.queryByRole("combobox", {
+        name: messages.en.scooters.workspace.version,
+      }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", {
+        name: messages.en.scooters.documents.batch.drop,
+      }),
+    ).toBeEnabled();
+  });
   it("keeps the full drop area when an import result exists without attached documents", () => {
     render(view({ attached: [] }));
     expect(

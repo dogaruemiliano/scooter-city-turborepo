@@ -1,4 +1,7 @@
 "use client";
+import { FormActions } from "@repo/ui/components/form-actions";
+import { useFormAction } from "@/lib/form/use-form-action";
+import { SaveButton } from "@repo/ui/components/save-button";
 
 import { v1 } from "@repo/api-shared";
 import type { SupportedLocale } from "@repo/i18n";
@@ -12,7 +15,6 @@ import {
   InputGroup,
   InputGroupAddon,
   Label,
-  Spinner,
 } from "@repo/ui/components";
 import { FileImageIcon, Trash2Icon } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -58,6 +60,8 @@ export function FundingForm({
   accounts: readonly v1.finance.LedgerAccount[];
   currentUserId: string;
 }) {
+  const formAction = useFormAction();
+
   const t = useTranslations("finance.funding");
   const tErrors = useTranslations("finance.errors");
   const locale = resolveRouteLocale(useLocale());
@@ -416,7 +420,16 @@ export function FundingForm({
               ) : null}
             </div>
 
-            <footer className="mt-4 flex flex-col-reverse gap-2 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between">
+            <FormActions arrangement="split">
+              <SaveButton
+                type="submit"
+                disabled={submitting || proofUploading || Boolean(proofError)}
+                {...formAction("recordMoney", {
+                  pending: submitting,
+                  error: submitError,
+                })}
+              />
+
               <Button
                 type="button"
                 variant="outline"
@@ -425,14 +438,7 @@ export function FundingForm({
               >
                 {t("cancel")}
               </Button>
-              <Button
-                type="submit"
-                disabled={submitting || proofUploading || Boolean(proofError)}
-              >
-                {submitting ? <Spinner /> : null}
-                {submitting ? t("submitting") : t("submit")}
-              </Button>
-            </footer>
+            </FormActions>
           </div>
 
           <div className="border-t border-border pt-8 lg:sticky lg:top-6 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-8">

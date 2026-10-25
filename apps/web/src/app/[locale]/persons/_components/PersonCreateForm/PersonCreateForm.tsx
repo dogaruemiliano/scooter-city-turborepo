@@ -1,14 +1,24 @@
 "use client";
 
+import { PageLayout } from "@repo/ui/components/page-layout";
+
+import { WizardForm } from "@repo/ui/components/wizard-form";
 import { ApiError, v1 } from "@repo/api-shared";
 import type {
   CountryCode,
   PhoneNumberInputChangeDetails,
 } from "@repo/ui/components";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import {
+  personCreateCancelHref,
+  personCreateDestination,
+} from "../../_lib/person-create-destination";
 import { useLocale, useTranslations } from "next-intl";
-import { useId, useState, useRef, useEffect, type FormEvent } from "react";
-import { usePersonLeaveGuard } from "./usePersonLeaveGuard";
+import { useId, useState, useEffect, type FormEvent } from "react";
+import { useWizardLeaveGuard } from "@/components/useWizardLeaveGuard";
+import { Button } from "@repo/ui/components/button";
+import { SaveButton } from "@repo/ui/components/save-button";
 import { licenseNameDifferences } from "./license-name-comparison";
 import { LicenseNameConfirmation } from "./LicenseNameConfirmation";
 
@@ -30,12 +40,12 @@ import { fieldHasPendingExtraction } from "./field-extraction-pending";
 import { AddressSection } from "./AddressSection";
 import { CitizenshipChoice } from "./CitizenshipChoice";
 import {
-  WizardProgress,
+  STEPS,
   REVIEW_STEPS,
   isReviewStep,
   type PersonProgressStep,
   type PersonWizardStep,
-} from "./WizardProgress";
+} from "./wizard-steps";
 import { PersonalSection } from "./PersonalSection";
 import { ContactSection } from "./ContactSection";
 import { CreateFormFeedback } from "./CreateFormFeedback";
@@ -61,6 +71,7 @@ import {
   documentPhotoSlots,
 } from "./form-state";
 import { createPersonInput } from "./input";
+import { PersonCreateReview } from "./PersonCreateReview";
 import { NotesField } from "./NotesField";
 import { NationalIdFormatSelect } from "./NationalIdFormatSelect";
 import { useWizardNavigation } from "./useWizardNavigation";
@@ -86,12 +97,24 @@ export function PersonCreateForm(props: PersonCreateFormProps) {
   );
 }
 
-function DocumentPersonCreateForm({ personsHref }: PersonCreateFormProps) {
+function DocumentPersonCreateForm({
+  personsHref,
+  rentalDraftId,
+}: PersonCreateFormProps) {
+  const rentalT = useTranslations("workspace.rentals.wizard");
   const session = useOptionalSession();
   const t = useTranslations("persons");
   const locale = useLocale();
   const router = useRouter();
   const formId = useId();
+  useEffect(() => {
+    try {
+      if (typeof indexedDB !== "undefined")
+        indexedDB.deleteDatabase("person-create-drafts");
+    } catch {
+      /* Storage may be disabled. */
+    }
+  }, []);
   const [creating, setCreating] = useState(false);
   const navigation = useWizardNavigation();
   const { step, navigate: setStep, canGoBack, forwardStep } = navigation;
@@ -109,10 +132,10 @@ function DocumentPersonCreateForm({ personsHref }: PersonCreateFormProps) {
   const [confirmedNames, setConfirmedNames] = useState<string | null>(null);
   const nameConfirmationRequired =
     nameDifferences.length > 0 && confirmedNames !== nameConfirmationKey;
-  const leaveGuard = usePersonLeaveGuard(
-    navigation.hasProgress,
-    t("leaveForm.confirm"),
-  );
+  const [hasSubmittedPhoto, setHasSubmittedPhoto] = useState(false);
+  const hasUploadedPhoto = hasDocumentPhotoStatus(form, "uploaded");
+  if (hasUploadedPhoto && !hasSubmittedPhoto) setHasSubmittedPhoto(true);
+  const leaveGuard = useWizardLeaveGuard(hasSubmittedPhoto || hasUploadedPhoto);
   const extraction = useDocumentExtraction(
     extractionState,
     setExtractionState,
@@ -140,10 +163,6 @@ function DocumentPersonCreateForm({ personsHref }: PersonCreateFormProps) {
     !submissionCandidate.error &&
     v1.persons.createPersonInputSchema.safeParse(submissionCandidate.input)
       .success;
-  const stepSummary = useRef<HTMLHeadingElement>(null);
-  useEffect(() => {
-    stepSummary.current?.focus();
-  }, [step]);
 
   async function createPerson(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -250,7 +269,14 @@ function DocumentPersonCreateForm({ personsHref }: PersonCreateFormProps) {
         title: t("feedback.createSuccessTitle"),
         messages: [t("feedback.createSuccessMessage")],
       });
-      router.push(`${personsHref}/${encodeURIComponent(person.id)}`);
+      router.push(
+        personCreateDestination(
+          personsHref,
+          person.id,
+          rentalDraftId,
+          session?.user?.id,
+        ),
+      );
       router.refresh();
     } catch (error) {
       const personConflict = personCreateConflict(error);
@@ -416,156 +442,223 @@ function DocumentPersonCreateForm({ personsHref }: PersonCreateFormProps) {
           ),
       }}
     >
-      <div className="mx-auto flex w-full max-w-screen-lg flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
-        <PageHeaderNavigation
-          onBack={canGoBack ? goBack : undefined}
-          backDisabled={creating}
-          forwardAction={
-            forwardStepLabel
-              ? {
-                  onClick: goForward,
-                  label: t("wizard.forwardTo", { step: forwardStepLabel }),
-                  disabled: creating,
-                }
-              : undefined
-          }
-        />
-        <form
-          className="flex flex-1 flex-col gap-6"
-          noValidate
-          onSubmit={(event) => void createPerson(event)}
-        >
-          <WizardProgress
-            step={step}
-            summaryRef={stepSummary}
-            disabled={creating}
-            onSelect={selectProgressStep}
-          />
-          {step === "citizenship" ? (
-            <CitizenshipChoice onChange={changeCitizenship} />
-          ) : null}
-          {step === "documents" && form.citizenship === "romanian" ? (
-            <NationalIdFormatSelect
-              value={chosenNationalIdFormat}
-              disabled={creating}
-              onChange={changeNationalIdFormat}
-            />
-          ) : null}
-          {(step === "documents" &&
-            (form.citizenship === "foreign" || chosenNationalIdFormat)) ||
-          step === "license" ? (
-            <DocumentPhotosSection
-              formId={formId}
-              form={{
-                ...form,
-                documents: form.documents.filter((document) =>
-                  step === "license"
-                    ? document.type === "driverLicense"
-                    : document.type !== "driverLicense",
-                ),
-              }}
-              disabled={creating}
-              onSetDocumentPhoto={setDocumentPhoto}
-              jobs={extraction.jobs}
-              onRetry={extraction.retry}
-              fieldErrors={fieldErrors}
-            />
-          ) : null}
-          {step === "personal" ? (
-            <PersonalSection
-              formId={formId}
-              form={form}
-              fieldErrors={fieldErrors}
-              locale={locale}
-              showUnder18Warning={showUnder18Warning}
-              onSetFormValue={setFormValue}
-            />
-          ) : null}
-          {step === "personal" || step === "license" ? (
-            <DocumentsSection
-              formId={formId}
-              form={{
-                ...form,
-                documents: form.documents.filter((document) =>
-                  step === "license"
-                    ? document.type === "driverLicense"
-                    : document.type !== "driverLicense",
-                ),
-              }}
-              fieldErrors={fieldErrors}
-              locale={locale}
-              showUnder18Warning={showUnder18Warning}
-              disabled={creating}
-              onSetDocument={setDocument}
-            />
-          ) : null}
-          {step === "contact" ? (
-            <ContactSection
-              formId={formId}
-              form={form}
-              fieldErrors={fieldErrors}
-              locale={locale}
-              onSetFormValue={setFormValue}
-              onChangePhone={changePhone}
-            />
-          ) : null}
-          {step === "address" ? (
-            <AddressSection
-              formId={formId}
-              form={form}
-              fieldErrors={fieldErrors}
-              locale={locale}
-              onSetFormValue={setFormValue}
-              onChangeCountry={changeCountry}
-            />
-          ) : null}
-          {step === "review" ? (
-            <>
-              {nameDifferences.length > 0 ? (
-                <LicenseNameConfirmation
-                  differences={nameDifferences}
-                  checked={!nameConfirmationRequired}
-                  disabled={creating || extraction.pending}
-                  onCheckedChange={(checked) =>
-                    setConfirmedNames(checked ? nameConfirmationKey : null)
+      <PageLayout
+        paddingX="none"
+        paddingTop="compact"
+        className="gap-2 md:gap-6"
+      >
+        {rentalDraftId ? (
+          <Link
+            className="px-(--page-gutter)"
+            href={personCreateCancelHref(personsHref, rentalDraftId)}
+          >
+            {rentalT("backToRental")}
+          </Link>
+        ) : null}
+        <div className="px-(--page-gutter)">
+          <PageHeaderNavigation
+            onBack={canGoBack ? goBack : undefined}
+            backDisabled={creating}
+            forwardAction={
+              forwardStepLabel
+                ? {
+                    onClick: goForward,
+                    label: t("wizard.forwardTo", { step: forwardStepLabel }),
+                    disabled: creating,
                   }
-                />
-              ) : null}
-              <DocumentsSection
-                formId={formId}
-                form={form}
-                fieldErrors={fieldErrors}
-                locale={locale}
-                showUnder18Warning={showUnder18Warning}
-                disabled={creating}
-                onSetDocument={setDocument}
-              />
-              <NotesField
-                formId={formId}
-                value={form.notes}
-                error={fieldErrors.notes}
-                onChange={(value) => setFormValue("notes", value)}
-              />
-            </>
-          ) : null}
-
-          {feedback ? <CreateFormFeedback feedback={feedback} /> : null}
-
-          <FormActions
-            ready={readyToSubmit}
-            creating={creating}
-            uploadingPhotos={uploadingPhotos}
-            extracting={extraction.pending}
-            confirmationRequired={nameConfirmationRequired}
-            step={step}
-            canGoBack={canGoBack}
-            onBack={goBack}
-            onNext={() => nextStep()}
+                : undefined
+            }
           />
-        </form>
-      </div>
+        </div>
+        <WizardForm
+          noValidate
+          activeIndex={STEPS.indexOf(step)}
+          progressLabel={t("wizard.progress")}
+          exitConfirmation={{
+            open: leaveGuard.open,
+            onOpenChange: (open) => {
+              if (!open) leaveGuard.cancel();
+            },
+            title: t("leaveForm.title"),
+            description: t("leaveForm.confirm"),
+            actions: (
+              <>
+                <Button variant="outline" onClick={leaveGuard.cancel}>
+                  {t("leaveForm.keepEditing")}
+                </Button>
+                <SaveButton
+                  type="button"
+                  variant="destructive"
+                  state="idle"
+                  idleLabel={t("leaveForm.discard")}
+                  pendingLabel={t("leaveForm.discard")}
+                  successLabel={t("leaveForm.discard")}
+                  onClick={() => leaveGuard.leave()}
+                />
+              </>
+            ),
+          }}
+          disabled={creating || leaveGuard.open}
+          canGoPrevious={STEPS.indexOf(step) > 0}
+          canGoNext={
+            step !== "citizenship" && step !== "review" && !uploadingPhotos
+          }
+          canSelectStep={(index) =>
+            index < STEPS.indexOf(step) ||
+            (isReviewStep(step) && isReviewStep(STEPS[index]!))
+          }
+          onStepSelect={(index) => selectProgressStep(STEPS[index]!)}
+          onStepChange={(index) => {
+            if (index < STEPS.indexOf(step)) selectProgressStep(STEPS[index]!);
+            else nextStep();
+          }}
+          steps={STEPS.map((id) => ({
+            id,
+            label: t(`wizard.steps.${id}`),
+            content: renderStep(id),
+          }))}
+          onSubmit={(event) => void createPerson(event)}
+          footer={
+            <FormActions
+              ready={readyToSubmit}
+              creating={creating}
+              uploadingPhotos={uploadingPhotos}
+              extracting={extraction.pending}
+              confirmationRequired={nameConfirmationRequired}
+              step={step}
+              canGoBack={canGoBack}
+              onBack={goBack}
+              onNext={() => nextStep()}
+            />
+          }
+        >
+          {feedback ? <CreateFormFeedback feedback={feedback} /> : null}
+        </WizardForm>
+      </PageLayout>
     </ExtractionReviewContext.Provider>
   );
+
+  function renderStep(contentStep: PersonWizardStep) {
+    return (
+      <>
+        {contentStep === "citizenship" ? (
+          <CitizenshipChoice onChange={changeCitizenship} />
+        ) : null}
+        {contentStep === "documents" && form.citizenship === "romanian" ? (
+          <NationalIdFormatSelect
+            value={chosenNationalIdFormat}
+            disabled={creating}
+            onChange={changeNationalIdFormat}
+          />
+        ) : null}
+        {(contentStep === "documents" &&
+          (form.citizenship === "foreign" || chosenNationalIdFormat)) ||
+        contentStep === "license" ? (
+          <DocumentPhotosSection
+            formId={`${formId}-${contentStep}`}
+            form={{
+              ...form,
+              documents: form.documents.filter((document) =>
+                contentStep === "license"
+                  ? document.type === "driverLicense"
+                  : document.type !== "driverLicense",
+              ),
+            }}
+            disabled={creating}
+            onSetDocumentPhoto={setDocumentPhoto}
+            jobs={extraction.jobs}
+            onRetry={extraction.retry}
+            fieldErrors={fieldErrors}
+          />
+        ) : null}
+        {contentStep === "personal" ? (
+          <PersonalSection
+            formId={`${formId}-${contentStep}`}
+            form={form}
+            fieldErrors={fieldErrors}
+            locale={locale}
+            showUnder18Warning={showUnder18Warning}
+            onSetFormValue={setFormValue}
+          />
+        ) : null}
+        {contentStep === "personal" || contentStep === "license" ? (
+          <DocumentsSection
+            formId={`${formId}-${contentStep}`}
+            form={{
+              ...form,
+              documents: form.documents.filter((document) =>
+                contentStep === "license"
+                  ? document.type === "driverLicense"
+                  : document.type !== "driverLicense",
+              ),
+            }}
+            fieldErrors={fieldErrors}
+            locale={locale}
+            showUnder18Warning={showUnder18Warning}
+            disabled={creating}
+            onSetDocument={setDocument}
+          />
+        ) : null}
+        {contentStep === "contact" ? (
+          <ContactSection
+            formId={`${formId}-${contentStep}`}
+            form={form}
+            fieldErrors={fieldErrors}
+            locale={locale}
+            onSetFormValue={setFormValue}
+            onChangePhone={changePhone}
+          />
+        ) : null}
+        {contentStep === "address" ? (
+          <AddressSection
+            formId={`${formId}-${contentStep}`}
+            form={form}
+            fieldErrors={fieldErrors}
+            locale={locale}
+            onSetFormValue={setFormValue}
+            onChangeCountry={changeCountry}
+          />
+        ) : null}
+        {contentStep === "review" ? (
+          <>
+            {nameDifferences.length > 0 ? (
+              <LicenseNameConfirmation
+                differences={nameDifferences}
+                checked={!nameConfirmationRequired}
+                disabled={creating || extraction.pending}
+                onCheckedChange={(checked) =>
+                  setConfirmedNames(checked ? nameConfirmationKey : null)
+                }
+              />
+            ) : null}
+            <PersonCreateReview
+              form={form}
+              locale={locale}
+              documents={
+                <DocumentsSection
+                  formId={`${formId}-${contentStep}`}
+                  form={form}
+                  fieldErrors={fieldErrors}
+                  locale={locale}
+                  showUnder18Warning={showUnder18Warning}
+                  disabled={creating}
+                  onSetDocument={setDocument}
+                />
+              }
+              notes={
+                <NotesField
+                  formId={`${formId}-${contentStep}`}
+                  value={form.notes}
+                  error={fieldErrors.notes}
+                  onChange={(value) => setFormValue("notes", value)}
+                />
+              }
+            />
+          </>
+        ) : null}
+      </>
+    );
+  }
 
   function selectProgressStep(next: PersonProgressStep) {
     if (creating) return;
@@ -1068,7 +1161,7 @@ function conflictField(details: unknown): unknown {
 
 function hasDocumentPhotoStatus(
   form: CreatePersonFormState,
-  status: "uploading" | "failed",
+  status: "uploading" | "failed" | "uploaded",
 ): boolean {
   return form.documents.some((document) =>
     v1.persons.PERSON_DOCUMENT_PHOTO_SLOTS.some(
@@ -1093,7 +1186,7 @@ function firstDocumentPhotoWithStatus(
 > | null;
 function firstDocumentPhotoWithStatus(
   form: CreatePersonFormState,
-  status: "uploading" | "failed",
+  status: "uploading" | "failed" | "uploaded",
 ):
   | CreatePersonDocumentFormState["photos"][v1.persons.PersonDocumentPhotoSlot]
   | null {

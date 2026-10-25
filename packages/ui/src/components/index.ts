@@ -4,6 +4,7 @@ export * from "./accordion";
 export * from "./alert";
 export * from "./avatar";
 export * from "./user-avatar";
+export * from "./profile-image";
 export * from "./badge";
 export * from "./bottom-sheet";
 export * from "./button";
@@ -63,3 +64,15 @@ export * from "./file-drop-overlay";
 export * from "./person-row";
 export * from "./image-gallery";
 export * from "./image-gallery-editor";
+
+export * from "./user-card";
+
+export * from "./toast";
+export * from "./comments";
+export * from "./activity-timeline";
+export * from "./vertical-line";
+
+export * from "./wizard-form";
+export * from "./page-layout";
+
+export * from "./person-card";

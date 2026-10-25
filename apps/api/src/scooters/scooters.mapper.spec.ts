@@ -7,23 +7,22 @@ describe("scooter picker summaries", () => {
     createdAt: new Date("2026-10-14"),
     updatedAt: new Date("2026-10-14"),
   };
-  it("keeps severity totals, cover and maintenance hold independent", () => {
+  it("keeps difficulty totals, cover and maintenance hold independent", () => {
     const result = toScooter({
       ...base,
       photos: [{ id: "cover" }],
       _count: { problems: 2 },
       problems: [
-        { severity: "critical" },
-        { severity: "critical" },
-        { severity: "low" },
-        { severity: null },
+        { difficulty: "hard" },
+        { difficulty: "hard" },
+        { difficulty: "easy" },
+        { difficulty: null },
       ],
     } as unknown as Parameters<typeof toScooter>[0]);
-    expect(result.problemSeverityCounts).toEqual({
-      low: 1,
-      moderate: 0,
-      high: 0,
-      critical: 2,
+    expect(result.problemDifficultyCounts).toEqual({
+      easy: 1,
+      medium: 0,
+      hard: 2,
       unknown: 1,
     });
     expect(result.maintenanceHoldCount).toBe(2);
@@ -33,11 +32,11 @@ describe("scooter picker summaries", () => {
     expect(
       toScooter({ ...base, problems: [] } as unknown as Parameters<
         typeof toScooter
-      >[0]).problemSeverityCounts,
-    ).toEqual({ low: 0, moderate: 0, high: 0, critical: 0, unknown: 0 });
+      >[0]).problemDifficultyCounts,
+    ).toEqual({ easy: 0, medium: 0, hard: 0, unknown: 0 });
     expect(
       toScooter(base as unknown as Parameters<typeof toScooter>[0])
-        .problemSeverityCounts,
+        .problemDifficultyCounts,
     ).toBeUndefined();
   });
 });

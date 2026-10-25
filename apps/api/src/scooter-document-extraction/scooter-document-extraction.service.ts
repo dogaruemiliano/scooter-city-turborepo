@@ -20,11 +20,32 @@ const dateFields = new Set([
   "temporaryRegistrationExpiresAt",
   "validFrom",
   "validUntil",
+  "foreignFirstRegistrationDate",
+  "foreignRegistrationDate",
+  "exportDate",
 ]);
 const fieldSchemas: Record<string, z.ZodType> = {
   ...v1.scooters.createScooterInputSchema.shape,
   ...v1.scooters.insurancePolicyInputSchema.shape,
   brandName: z.string().trim().min(1).max(120),
+  ...Object.fromEntries(
+    [
+      "registrationCounty",
+      "registrationLocality",
+      "registrationLocalityCode",
+      "registrationHolder",
+      "foreignRegistrationNumber",
+      "foreignRegistrationCountry",
+      "foreignRegistrationCertificateNumber",
+      "foreignRegistrationHolder",
+      "exportCertificateNumber",
+      "exporterName",
+      "exportRecipientName",
+    ].map((key) => [key, z.string().trim().min(1).max(200)]),
+  ),
+  foreignFirstRegistrationDate: z.iso.date(),
+  foreignRegistrationDate: z.iso.date(),
+  exportDate: z.iso.date(),
 };
 
 @Injectable()
@@ -41,41 +62,193 @@ export class ScooterDocumentExtractionService {
     return this.normalize(
       input.documentType,
       await this.provider.analyze(input),
+      input.contentType === "application/pdf" ? undefined : 1,
     );
   }
 
   detectType(output: unknown): v1.scooters.ScooterDocumentType {
-    const parsed = scooterDocumentModelOutputSchema.safeParse(output);
+    const parsed = parseModelOutput(output);
     if (!parsed.success)
       throw new DocumentExtractionError(
         "DOCUMENT_EXTRACTION_FAILED",
         "Document extraction returned unusable data.",
         true,
       );
-    if (!parsed.data.detectedDocumentType)
+    const detected = predominantType(parsed.data);
+    if (!detected)
       throw new DocumentExtractionError(
         "DOCUMENT_EXTRACTION_TYPE_UNKNOWN",
         "Choose the document type or replace this file.",
         false,
       );
-    return parsed.data.detectedDocumentType;
+    return detected;
   }
 
   /** Apply the same review rules to asynchronously retrieved provider output. */
   normalize(
     documentType: v1.scooters.ScooterDocumentType,
     output: unknown,
+    originalPageCount?: number,
   ): ScooterDocumentExtractionResult {
-    const input = { documentType };
-    const parsed = scooterDocumentModelOutputSchema.safeParse(output);
-    if (!parsed.success) {
-      throw new DocumentExtractionError(
-        "DOCUMENT_EXTRACTION_FAILED",
-        "Document extraction returned unusable data.",
-        true,
-      );
+    const parsed = parseModelOutput(output);
+    if (!parsed.success) throw unusableOutput();
+    if (
+      originalPageCount !== undefined &&
+      (!Number.isInteger(originalPageCount) ||
+        originalPageCount < 1 ||
+        originalPageCount > v1.scooters.SCOOTER_DOCUMENT_EXTRACTION_MAX_PAGES)
+    )
+      throw unusableOutput();
+    let result: ScooterDocumentExtractionResult;
+    if (parsed.data.documents?.length) {
+      if (
+        originalPageCount !== undefined &&
+        parsed.data.documents.some(
+          (document) =>
+            document.pages.some((page) => page > originalPageCount) ||
+            document.regions.some((region) => region.page > originalPageCount),
+        )
+      )
+        throw unusableOutput();
+      result = this.normalizeDocuments(parsed.data);
+    } else result = this.normalizeSingle(documentType, parsed.data);
+    if (parsed.data.clientCopy) result.extractedData.clientCopy = true;
+    return result;
+  }
+
+  private normalizeDocuments(
+    model: ModelOutput,
+  ): ScooterDocumentExtractionResult {
+    const documents = model.documents!.map((document, index) => {
+      const normalized = this.normalizeSingle(document.documentType, {
+        ...document,
+        detectedDocumentType: document.documentType,
+        clientCopy: false,
+        documents: null,
+      });
+      const inspections = normalizeInspections(document, normalized.issues);
+      if (
+        document.regions.some(
+          (region) =>
+            !document.pages.includes(region.page) ||
+            region.x + region.width > 1.000001 ||
+            region.y + region.height > 1.000001,
+        )
+      )
+        normalized.issues.push({ field: "regions", code: "invalidValue" });
+      return {
+        id: `document-${index + 1}`,
+        documentType: document.documentType,
+        pages: [...new Set(document.pages)].sort((a, b) => a - b),
+        regions: document.regions.filter(
+          (region) =>
+            document.pages.includes(region.page) &&
+            region.x + region.width <= 1.000001 &&
+            region.y + region.height <= 1.000001,
+        ),
+        ...normalized.extractedData,
+        issues: normalized.issues,
+        ...(inspections.length ? { inspections } : {}),
+      };
+    });
+    const issues: ScooterDocumentExtractionResult["issues"] = [];
+    const addIssue = (
+      field: string,
+      code: ScooterDocumentExtractionResult["issues"][number]["code"],
+    ) => {
+      if (!issues.some((item) => item.field === field && item.code === code))
+        issues.push({ field, code });
+    };
+    for (const document of documents)
+      for (const issue of document.issues) addIssue(issue.field, issue.code);
+    const vins = new Set(
+      documents.flatMap((document) => (document.vin ? [document.vin] : [])),
+    );
+    const vin = v1.scooters.preferredScooterDocumentVin(documents);
+    if (vins.size > 1) addIssue("vin", "conflictingValues");
+    const fields: v1.scooters.ScooterDocumentExtractedData["fields"] = {};
+    const rawFields: v1.scooters.ScooterDocumentExtractedData["rawFields"] = {};
+    const ranks = new Map<string, number>();
+    const conflicts = new Set<string>();
+    // Never merge records that may describe different vehicles. Full original
+    // readings remain visible in documents for manual separation/correction.
+    if (vins.size <= 1) {
+      for (const document of documents) {
+        if (
+          !document.vin &&
+          vins.size > 0 &&
+          v1.scooters.scooterDocumentReadsVin(document.documentType)
+        )
+          continue;
+        for (const [field, value] of Object.entries(document.fields)) {
+          const rank = fieldAuthority(document.documentType, field);
+          const previousRank = ranks.get(field) ?? -1;
+          if (value === null || value === "-") {
+            if (!Object.hasOwn(fields, field)) fields[field] = value;
+            continue;
+          }
+          if (
+            previousRank >= 0 &&
+            fields[field] !== null &&
+            fields[field] !== "-" &&
+            fields[field] !== value
+          )
+            addIssue(field, "conflictingValues");
+          if (rank > previousRank) {
+            fields[field] = value;
+            ranks.set(field, rank);
+            conflicts.delete(field);
+          } else if (rank === previousRank && fields[field] !== value) {
+            fields[field] = null;
+            conflicts.add(field);
+            addIssue(field, "conflictingValues");
+          }
+          if (conflicts.has(field)) fields[field] = null;
+        }
+      }
     }
-    const model = parsed.data;
+    fields.vin = vin;
+    if (Object.hasOwn(fields, "documentVin") && !vin) fields.documentVin = null;
+    // Parent raw fields are a bounded preview only. Logical records retain all
+    // readings without collisions between identical rubric labels.
+    for (const document of documents) {
+      for (const [key, value] of Object.entries(document.rawFields)) {
+        if (Object.keys(rawFields).length >= 100) break;
+        rawFields[`${document.id}:${key}`.slice(0, 120)] = value;
+      }
+    }
+    return {
+      extractedData: v1.scooters.scooterDocumentExtractedDataSchema.parse({
+        vin,
+        fields,
+        rawFields,
+        documents,
+      }),
+      issues,
+    };
+  }
+
+  private normalizeSingle(
+    documentType: v1.scooters.ScooterDocumentType,
+    model: ModelOutput,
+  ): ScooterDocumentExtractionResult {
+    // Defensive normalization also covers old provider responses and legacy jobs.
+    if (!v1.scooters.scooterDocumentReadsVin(documentType)) {
+      model = {
+        ...model,
+        vin: null,
+        fields: model.fields.filter(
+          (entry) => !["vin", "documentVin"].includes(entry.field),
+        ),
+        rawFields: model.rawFields.filter(
+          (entry) =>
+            !["vin", "documentVin"].includes(
+              rawFieldTarget(entry.key, documentType, "unknown") ?? "",
+            ) && !/vin|chassis|serie.*[șs]asiu/i.test(entry.key),
+        ),
+      };
+    }
+    const input = { documentType };
     const result: ScooterDocumentExtractionResult = {
       extractedData: { vin: null, fields: {}, rawFields: {} },
       issues: [],
@@ -117,14 +290,12 @@ export class ScooterDocumentExtractionService {
     let uncertainVin = false;
     const conflictingRawFields = new Set<string>();
     for (const entry of model.rawFields) {
-      const retired =
-        entry.key
-          .normalize("NFD")
-          .replace(/[\u0300-\u036f]/g, "")
-          .trim()
-          .toLowerCase() === "mentiuni";
-      if (unsafeKeys.has(entry.key) || retired) continue;
-      if (input.documentType === "insurance" && !allowed.has(entry.key))
+      if (unsafeKeys.has(entry.key)) continue;
+      if (
+        input.documentType === "insurance" &&
+        !allowed.has(entry.key) &&
+        !["paidAmount", "paymentDate", "paymentReference"].includes(entry.key)
+      )
         continue;
       if (
         input.documentType === "insurance" &&
@@ -137,6 +308,24 @@ export class ScooterDocumentExtractionService {
         Object.hasOwn(rawFields, entry.key) &&
         rawFields[entry.key] !== entry.value
       ) {
+        // Keep each original reading as separate evidence before marking the
+        // ambiguous semantic rubric unresolved.
+        const readings = [rawFields[entry.key], entry.value];
+        for (const reading of readings) {
+          if (reading === null || Object.keys(rawFields).length >= 100)
+            continue;
+          const prefix = entry.key.slice(0, 100);
+          const alreadyPreserved = Object.entries(rawFields).some(
+            ([key, value]) =>
+              key.startsWith(`${prefix} [reading `) && value === reading,
+          );
+          if (!alreadyPreserved) {
+            let index = 1;
+            while (Object.hasOwn(rawFields, `${prefix} [reading ${index}]`))
+              index++;
+            rawFields[`${prefix} [reading ${index}]`] = reading;
+          }
+        }
         conflictingRawFields.add(entry.key);
         const target = allowed.has(entry.key)
           ? entry.key
@@ -183,7 +372,7 @@ export class ScooterDocumentExtractionService {
         issue("vin", rawVin ? "conflictingValues" : "unreadable");
       }
     }
-    if (!rootVin)
+    if (!rootVin && v1.scooters.scooterDocumentReadsVin(documentType))
       issue(
         "vin",
         model.vin?.trim() && model.vin !== "-" ? "invalidValue" : "unreadable",
@@ -260,19 +449,31 @@ export class ScooterDocumentExtractionService {
         ? [...v1.scooters.INSURANCE_FIELDS]
         : input.documentType === "registration_certificate"
           ? [
-              "vin",
               "registrationType",
               "registrationNumber",
               "registrationDate",
               "registrationCertificateNumber",
             ]
-          : ["vin", "brandName", "powertrainType"];
+          : input.documentType === "civ"
+            ? ["vin", "brandName", "powertrainType", "civIssuedAt"]
+            : input.documentType === "itp_card"
+              ? []
+              : input.documentType === "itp_certificate" ||
+                  input.documentType === "export_certificate"
+                ? ["vin"]
+                : ["vin", "brandName", "powertrainType"];
     for (const field of criticalFields) {
       if (!Object.hasOwn(fields, field)) {
         fields[field] = null;
         issue(field, "unreadable");
       }
     }
+
+    if (
+      input.documentType === "civ" &&
+      (fields.civIssuedAt === null || fields.civIssuedAt === "-")
+    )
+      issue("civIssuedAt", "unreadable");
 
     const invalidate = (field: string) => {
       fields[field] = null;
@@ -341,7 +542,10 @@ export class ScooterDocumentExtractionService {
       !result.extractedData.vin &&
       !Object.values(fields).some((value) => value !== null && value !== "-")
     )
-      issue("vin", "noData");
+      issue(
+        v1.scooters.scooterDocumentReadsVin(documentType) ? "vin" : "document",
+        "noData",
+      );
     result.extractedData = v1.scooters.scooterDocumentExtractedDataSchema.parse(
       result.extractedData,
     );
@@ -453,4 +657,147 @@ function validateSource(input: AnalyzeScooterDocumentInput): void {
       "Use a PDF, JPEG, PNG or WebP document.",
       false,
     );
+}
+
+type ModelOutput = z.infer<typeof scooterDocumentModelOutputSchema>;
+function parseModelOutput(output: unknown) {
+  // Jobs already submitted with the previous prompt may complete during rollout.
+  const compatible =
+    output && typeof output === "object" && !Array.isArray(output)
+      ? {
+          ...(!Object.hasOwn(output, "documents") ? { documents: null } : {}),
+          ...(!Object.hasOwn(output, "clientCopy")
+            ? { clientCopy: false }
+            : {}),
+          ...output,
+        }
+      : output;
+  return scooterDocumentModelOutputSchema.safeParse(compatible);
+}
+function unusableOutput() {
+  return new DocumentExtractionError(
+    "DOCUMENT_EXTRACTION_FAILED",
+    "Document extraction returned unusable data.",
+    true,
+  );
+}
+function predominantType(
+  model: ModelOutput,
+): v1.scooters.ScooterDocumentType | null {
+  if (!model.documents?.length) return model.detectedDocumentType;
+  for (const type of [
+    "civ",
+    "registration_certificate",
+    "foreign_registration",
+    "export_certificate",
+    "import_document",
+    "insurance",
+    "itp_card",
+    "itp_certificate",
+  ] as const)
+    if (model.documents.some((document) => document.documentType === type))
+      return type;
+  return null;
+}
+function fieldAuthority(
+  type: v1.scooters.ScooterDocumentType,
+  field: string,
+): number {
+  if (field.startsWith("registration"))
+    return type === "registration_certificate" ? 100 : 0;
+  if (field.startsWith("foreign"))
+    return type === "foreign_registration" ? 100 : 50;
+  if (field.startsWith("export"))
+    return type === "export_certificate" ? 100 : 50;
+  if ((v1.scooters.INSURANCE_FIELDS as readonly string[]).includes(field))
+    return type === "insurance" ? 100 : 0;
+  return type === "civ" ? 100 : type === "foreign_registration" ? 80 : 50;
+}
+function normalizeInspections(
+  document: NonNullable<ModelOutput["documents"]>[number],
+  issues: ScooterDocumentExtractionResult["issues"],
+): v1.scooters.ScooterDocumentInspection[] {
+  if (
+    document.documentType !== "itp_card" &&
+    document.documentType !== "itp_certificate"
+  )
+    return [];
+  const issue = (field: string) => {
+    if (
+      !issues.some(
+        (item) => item.field === field && item.code === "invalidValue",
+      )
+    )
+      issues.push({ field, code: "invalidValue" });
+  };
+  const date = (value: string | null, field: string) => {
+    if (!value) return null;
+    const parts = /^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/.exec(value.trim());
+    const normalized = parts
+      ? `${parts[3]}-${parts[2].padStart(2, "0")}-${parts[1].padStart(2, "0")}`
+      : value.trim();
+    const parsed = z.iso.date().safeParse(normalized);
+    if (!parsed.success) {
+      issue(field);
+      return null;
+    }
+    return parsed.data;
+  };
+  if (!document.inspections.length)
+    issues.push({ field: "inspections", code: "unreadable" });
+  return document.inspections.map((entry, index) => {
+    const inspectionDate = date(
+      entry.inspectionDate,
+      `inspections.${index}.inspectionDate`,
+    );
+    let validUntil = date(entry.validUntil, `inspections.${index}.validUntil`);
+    if (inspectionDate && validUntil && validUntil < inspectionDate) {
+      issue(`inspections.${index}.validUntil`);
+      validUntil = null;
+    }
+    if (!inspectionDate)
+      issues.push({
+        field: `inspections.${index}.inspectionDate`,
+        code: "unreadable",
+      });
+    if (!validUntil)
+      issues.push({
+        field: `inspections.${index}.validUntil`,
+        code: "unreadable",
+      });
+    if (entry.result === null || entry.result === "unknown")
+      issues.push({ field: `inspections.${index}.result`, code: "unreadable" });
+    const rawFields: Record<string, string | null> = {};
+    for (const reading of entry.rawFields)
+      if (!unsafeKeys.has(reading.key)) rawFields[reading.key] = reading.value;
+    for (const key of [
+      "inspectionDate",
+      "validUntil",
+      "result",
+      "certificateNumber",
+      "odometerKm",
+    ] as const) {
+      const value = entry[key];
+      if (Object.hasOwn(rawFields, key)) continue;
+      if (Object.keys(rawFields).length < 100)
+        rawFields[key] = value === null ? null : String(value);
+    }
+    const odometerKm =
+      entry.odometerKm !== null &&
+      Number.isInteger(entry.odometerKm) &&
+      entry.odometerKm >= 0 &&
+      entry.odometerKm <= 2_147_483_647
+        ? entry.odometerKm
+        : null;
+    if (entry.odometerKm !== null && odometerKm === null)
+      issue(`inspections.${index}.odometerKm`);
+    return {
+      inspectionDate,
+      validUntil,
+      result: entry.result,
+      certificateNumber: entry.certificateNumber?.trim() || null,
+      odometerKm,
+      rawFields,
+    };
+  });
 }

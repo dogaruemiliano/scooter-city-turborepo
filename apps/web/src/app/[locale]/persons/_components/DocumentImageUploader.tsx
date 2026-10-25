@@ -19,6 +19,8 @@ type DocumentImageUploaderProps = {
   inputId: string;
   missingLabel: string;
   onFileSelected: (file: File | null) => void;
+  onPreview?: () => void;
+  previewLabel?: string;
   onRetry?: () => void;
   retryLabel?: string;
   slotLabel: string;
@@ -39,6 +41,8 @@ export function DocumentImageUploader({
   missingLabel,
   onFileSelected,
   onRetry,
+  onPreview,
+  previewLabel,
   retryLabel,
   slotLabel,
   uploadLabel,
@@ -47,6 +51,11 @@ export function DocumentImageUploader({
   const hasImage = Boolean(imageUrl);
 
   const handleKeyDown = (event: KeyboardEvent<HTMLLabelElement>) => {
+    if (hasImage && onPreview && (event.key === "Enter" || event.key === " ")) {
+      event.preventDefault();
+      onPreview();
+      return;
+    }
     if (disabled) {
       return;
     }
@@ -63,6 +72,7 @@ export function DocumentImageUploader({
         ref={inputRef}
         id={inputId}
         type="file"
+        aria-label={onPreview ? uploadLabel : undefined}
         accept={accept}
         className="hidden"
         disabled={disabled}
@@ -74,8 +84,14 @@ export function DocumentImageUploader({
       <Label
         htmlFor={inputId}
         role="button"
-        tabIndex={disabled ? -1 : 0}
-        aria-label={uploadLabel}
+        tabIndex={disabled && !onPreview ? -1 : 0}
+        aria-label={hasImage && onPreview ? previewLabel : uploadLabel}
+        onClick={(event) => {
+          if (hasImage && onPreview) {
+            event.preventDefault();
+            onPreview();
+          }
+        }}
         onKeyDown={handleKeyDown}
         onDragOver={(event) => {
           if (!disabled) {
@@ -95,7 +111,9 @@ export function DocumentImageUploader({
           !hasImage &&
             "rounded-dashed-surface border-(length:--dashed-surface-border-width) border-dashed bg-muted/40 hover:bg-muted",
           hasImage && "rounded-lg border hover:border-primary/60",
-          disabled && "pointer-events-none cursor-not-allowed opacity-60",
+          disabled &&
+            !onPreview &&
+            "pointer-events-none cursor-not-allowed opacity-60",
         )}
       >
         {hasImage && preview ? (
@@ -133,6 +151,16 @@ export function DocumentImageUploader({
           </Badge>
         </span>
       </Label>
+      {hasImage && onPreview && !disabled ? (
+        <Button
+          type="button"
+          variant="text"
+          size="sm"
+          onClick={() => inputRef.current?.click()}
+        >
+          {uploadLabel}
+        </Button>
+      ) : null}
       {errorMessage && onRetry && retryLabel ? (
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-lg bg-media-scrim">
           <span role="alert" className="sr-only">

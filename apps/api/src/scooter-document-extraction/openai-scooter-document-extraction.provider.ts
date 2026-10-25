@@ -9,7 +9,7 @@ import type {
   ScooterDocumentExtractionProvider,
 } from "./scooter-document-extraction.types";
 
-const MAX_RESPONSE_BYTES = 256 * 1024;
+const MAX_RESPONSE_BYTES = 512 * 1024;
 const responseSchema = z.object({
   status: z.literal("completed"),
   usage: z
@@ -38,6 +38,11 @@ export class OpenAiScooterDocumentExtractionProvider implements ScooterDocumentE
       apiKey: string;
       model: string;
       timeoutMs: number;
+      onUsage?: (usage: {
+        input_tokens: number;
+        output_tokens: number;
+        total_tokens: number;
+      }) => void;
     },
     private readonly fetcher: typeof fetch = fetch,
     private readonly renderPdfDetails = renderScooterPdfDetails,
@@ -110,11 +115,7 @@ export class OpenAiScooterDocumentExtractionProvider implements ScooterDocumentE
             model: this.options.model,
             store: false,
             ...(usesOriginalDetail ? { reasoning: { effort: "low" } } : {}),
-            max_output_tokens:
-              input.documentType === "civ" ||
-              input.documentType === "import_document"
-                ? 12_000
-                : 4_000,
+            max_output_tokens: 20_000,
             instructions: scooterDocumentExtractionPrompt(input.documentType),
             input: [{ role: "user", content }],
             text: {
@@ -144,6 +145,7 @@ export class OpenAiScooterDocumentExtractionProvider implements ScooterDocumentE
       const responseValue = responseSchema.safeParse(body);
       if (!responseValue.success) throw invalidResponse();
       usage = responseValue.data.usage;
+      if (usage) this.options.onUsage?.(usage);
       const parts = responseValue.data.output
         .filter((item) => item.type === "message")
         .flatMap((item) => item.content ?? []);

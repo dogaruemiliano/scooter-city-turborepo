@@ -1,6 +1,8 @@
 "use client";
 
-import { useCallback } from "react";
+import { PageLayout } from "@repo/ui/components/page-layout";
+
+import { useCallback, useState } from "react";
 import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
 import { v1 } from "@repo/api-shared";
@@ -19,12 +21,11 @@ const statusColors = {
   cancelled: "text-muted-foreground",
 } satisfies Record<v1.problems.Problem["status"], string>;
 
-const severityColors = {
-  low: "bg-severity-low",
-  moderate: "bg-severity-medium",
-  high: "bg-severity-high",
-  critical: "bg-severity-critical",
-} satisfies Record<NonNullable<v1.problems.Problem["severity"]>, string>;
+const difficultyColors = {
+  easy: "bg-difficulty-easy",
+  medium: "bg-difficulty-medium",
+  hard: "bg-difficulty-hard",
+} satisfies Record<NonNullable<v1.problems.Problem["difficulty"]>, string>;
 
 const priorityColors = {
   low: "text-info",
@@ -45,10 +46,13 @@ export function ProblemDetailScreen({ id }: { id: string }) {
       ),
     [id],
   );
+  const [actionsTarget, setActionsTarget] = useState<HTMLDivElement | null>(
+    null,
+  );
   const remote = useRemote(load);
   const problem = remote.data;
   return (
-    <main className="flex min-w-0 flex-1 flex-col gap-6 p-4 md:p-8">
+    <PageLayout>
       <Feedback error={remote.error} />
       {remote.error ? (
         <Button
@@ -65,50 +69,57 @@ export function ProblemDetailScreen({ id }: { id: string }) {
         </p>
       ) : null}
       {problem ? (
-        <div className="flex min-w-0 w-full max-w-(--container-form-columns) flex-col gap-8">
+        <div className="mx-auto flex min-w-0 w-full max-w-(--container-form-columns) flex-col gap-8">
           <PageTitleOverride title={problem.title} />
-          <dl className="grid grid-cols-2 gap-3">
-            {[
-              {
-                label: t("status"),
-                value: t(`problems.${problem.status}`),
-                color: statusColors[problem.status],
-              },
-              {
-                label: t("problems.priority"),
-                value: t(`problems.${problem.priority}`),
-                color: priorityColors[problem.priority],
-              },
-            ].map(({ label, value, color }) => (
-              <div
-                key={label}
-                className="flex min-w-0 flex-col gap-1 first:items-start last:items-end"
-              >
-                <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  {label}
-                </dt>
-                <dd
-                  className={`text-sm font-bold uppercase wrap-anywhere ${color}`}
+          <div className="flex flex-col gap-3">
+            <div
+              ref={setActionsTarget}
+              data-slot="problem-actions"
+              className="hidden justify-end md:flex"
+            />
+            <dl className="grid grid-cols-2 gap-3">
+              {[
+                {
+                  label: t("status"),
+                  value: t(`problems.${problem.status}`),
+                  color: statusColors[problem.status],
+                },
+                {
+                  label: t("problems.priority"),
+                  value: t(`problems.${problem.priority}`),
+                  color: priorityColors[problem.priority],
+                },
+              ].map(({ label, value, color }) => (
+                <div
+                  key={label}
+                  className="flex min-w-0 flex-col gap-1 first:items-start last:items-end"
                 >
-                  {value}
-                </dd>
-              </div>
-            ))}
-          </dl>
+                  <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    {label}
+                  </dt>
+                  <dd
+                    className={`text-sm font-bold uppercase wrap-anywhere ${color}`}
+                  >
+                    {value}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </div>
           {problem.blocksUsage &&
           !problem.holdClearedAt &&
-          problem.status !== "resolved" ? (
+          (problem.status === "open" || problem.status === "in_progress") ? (
             <Badge variant="destructive" className="self-start">
               {t("problems.blocksUsage")}
             </Badge>
           ) : null}
           <section className="relative flex flex-col gap-4 overflow-hidden rounded-2xl border border-border bg-card p-5 text-card-foreground">
-            {problem.severity ? (
-              <CardAccent className={severityColors[problem.severity]} />
+            {problem.difficulty ? (
+              <CardAccent className={difficultyColors[problem.difficulty]} />
             ) : null}
             <span className="sr-only">
-              {t("problems.severity")}:{" "}
-              {t(`problems.${problem.severity ?? "unassessed"}`)}
+              {t("problems.difficulty")}:{" "}
+              {t(`problems.${problem.difficulty ?? "unassessed"}`)}
             </span>
             <h1 className="text-xl font-semibold wrap-anywhere">
               {problem.title}
@@ -135,6 +146,7 @@ export function ProblemDetailScreen({ id }: { id: string }) {
             </span>
           </Link>
           <ProblemWork
+            actionsTarget={actionsTarget}
             compact
             key={problem.id}
             problem={problem}
@@ -145,6 +157,6 @@ export function ProblemDetailScreen({ id }: { id: string }) {
           />
         </div>
       ) : null}
-    </main>
+    </PageLayout>
   );
 }

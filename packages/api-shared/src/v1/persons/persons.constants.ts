@@ -124,6 +124,7 @@ export const ROUTES = {
   create: "/v1/persons",
   get: (id: string): string => `/v1/persons/${id}`,
   update: (id: string): string => `/v1/persons/${id}`,
+  avatar: (id: string): string => `/v1/persons/${id}/avatar`,
   delete: (id: string): string => `/v1/persons/${id}`,
   auditEvents: {
     list: (personId: string): string => `/v1/persons/${personId}/audit-events`,

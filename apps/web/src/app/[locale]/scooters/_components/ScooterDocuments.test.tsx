@@ -235,37 +235,57 @@ describe("Scooter documents", () => {
       "true",
     );
   });
-  it("keeps a compact attached-document list with upload and analysis badges", async () => {
+  it("keeps preview cards and analysis feedback visible when import controls expand", async () => {
     function Fixture() {
       const documents = useScooterDocuments();
       return (
-        <ScooterBatchDocuments
-          documents={{
-            ...documents,
-            drafts: [
-              { id: "civ", type: "civ", file: pdf("CIV.pdf"), status: "ready" },
-              {
-                id: "insurance",
-                type: "insurance",
-                file: pdf("insurance.pdf"),
-                status: "ready",
+        <ScooterDocumentAnalysisContext
+          value={{
+            civ: {
+              status: "success",
+              analysis: {
+                sourceId: "civ",
+                documentType: "civ",
+                extractedData: { vin: scooter.vin, fields: {}, rawFields: {} },
+                issues: [],
+                reviewRequired: true,
               },
-            ],
-            extractions: {
-              civ: { vin: scooter.vin, fields: {}, rawFields: {} },
             },
           }}
-          disabled={false}
-          analyzing={false}
-          importResult={{
-            ok: true,
-            values: {},
-            confirmedEmpty: [],
-            unresolved: [],
-            unresolvedRawFields: [],
-            emptyConflicts: [],
-          }}
-        />
+        >
+          <ScooterBatchDocuments
+            documents={{
+              ...documents,
+              drafts: [
+                {
+                  id: "civ",
+                  type: "civ",
+                  file: pdf("CIV.pdf"),
+                  status: "ready",
+                },
+                {
+                  id: "insurance",
+                  type: "insurance",
+                  file: pdf("insurance.pdf"),
+                  status: "ready",
+                },
+              ],
+              extractions: {
+                civ: { vin: scooter.vin, fields: {}, rawFields: {} },
+              },
+            }}
+            disabled={false}
+            analyzing={false}
+            importResult={{
+              ok: true,
+              values: {},
+              confirmedEmpty: [],
+              unresolved: [],
+              unresolvedRawFields: [],
+              emptyConflicts: [],
+            }}
+          />
+        </ScooterDocumentAnalysisContext>
       );
     }
     const browser = userEvent.setup();
@@ -274,18 +294,35 @@ describe("Scooter documents", () => {
       screen.getByRole("list", { name: "Attached documents" }),
     );
     const rows = summary.getAllByRole("listitem");
-    expect(rows).toHaveLength(3);
+    expect(rows).toHaveLength(2);
+    const importMore = screen.getByRole("button", {
+      name: "Import more documents",
+    });
+    expect(importMore).toHaveClass(
+      "w-full",
+      "justify-center",
+      "text-center",
+      "border-dashed",
+    );
     expect(
-      within(rows[2]!).getByRole("button", { name: "Import more documents" }),
-    ).toHaveClass("w-full", "justify-center", "text-center", "border-dashed");
+      rows[1]!.compareDocumentPosition(importMore) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    rows.forEach((row) =>
+      expect(
+        row.querySelector('[data-slot="document-preview-card"]'),
+      ).toBeInTheDocument(),
+    );
     expect(within(rows[0]!).getByText("CIV.pdf")).toBeInTheDocument();
     expect(within(rows[0]!).getByText("CIV")).toBeInTheDocument();
-    expect(within(rows[0]!).getByText("Uploaded and analyzed")).toHaveClass(
-      "text-success",
+    expect(within(rows[0]!).getByRole("status")).toHaveTextContent(
+      messages.en.scooters.documents.batch.read,
     );
     expect(within(rows[1]!).getByText("insurance.pdf")).toBeInTheDocument();
     expect(within(rows[1]!).getByText("Insurance")).toBeInTheDocument();
-    expect(within(rows[1]!).getByText("Uploaded")).toBeInTheDocument();
+    expect(within(rows[1]!).getByRole("status")).toHaveTextContent(
+      messages.en.scooters.extraction.queued,
+    );
     expect(
       screen.queryByRole("button", { name: /Drop your scooter documents/ }),
     ).not.toBeInTheDocument();
@@ -293,8 +330,11 @@ describe("Scooter documents", () => {
       screen.getByRole("button", { name: "Import more documents" }),
     );
     expect(
-      screen.queryByRole("list", { name: "Attached documents" }),
-    ).not.toBeInTheDocument();
+      screen.getByRole("list", { name: "Attached documents" }),
+    ).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /^Preview / })).toHaveLength(
+      2,
+    );
     expect(
       screen.getByRole("button", { name: /Drop your scooter documents/ }),
     ).toBeInTheDocument();
@@ -381,6 +421,11 @@ describe("Scooter documents", () => {
         pdf(),
       );
       if (status === "failed") {
+        await browser.click(
+          await screen.findByRole("button", {
+            name: "Edit document type for CIV.pdf",
+          }),
+        );
         await browser.click(
           await screen.findByRole("combobox", {
             name: "Document type for CIV.pdf",
@@ -661,12 +706,19 @@ describe("Scooter documents", () => {
     await browser.click(
       screen.getByRole("button", { name: "Import more documents" }),
     );
-    for (const [index, type] of types.entries())
+    for (const [index, type] of types.entries()) {
+      await browser.click(
+        screen.getByRole("button", {
+          name: `Edit document type for scan-${index}.pdf`,
+        }),
+      );
       expect(
         screen.getByRole("combobox", {
           name: `Document type for scan-${index}.pdf`,
         }),
       ).toHaveTextContent(messages.en.scooters.documents[type]);
+      await browser.keyboard("{Escape}");
+    }
     expect(
       screen.queryByRole("button", { name: "Continue" }),
     ).not.toBeInTheDocument();
@@ -708,7 +760,7 @@ describe("Scooter documents", () => {
     ).toHaveLength(4);
   }, 15_000);
 
-  it("requires explicit verification when direct AI cannot read a VIN", async () => {
+  it("uses the shared manually entered VIN without opening a second VIN review", async () => {
     const defaultRequest = mocks.api.getMockImplementation()!;
     mocks.api.mockImplementation(async (path, schema, options) => {
       if (path !== v1.scooters.ROUTES.documents.startExtractionJob)
@@ -729,7 +781,7 @@ describe("Scooter documents", () => {
       screen.getByLabelText("Browse files", { selector: "input" }),
       pdf(),
     );
-    const action = await screen.findByRole("button", {
+    await screen.findByRole("button", {
       name: "Validate the documents",
     });
     expect(
@@ -744,19 +796,12 @@ describe("Scooter documents", () => {
     await waitFor(() =>
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
     );
-    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
-    await browser.click(action);
-    const t = messages.en.scooters.extraction.vinReview;
-    const review = await screen.findByRole("dialog", {
-      name: t.documentsTitle,
-    });
-    expect(
-      screen.queryByRole("dialog", { name: t.title }),
-    ).not.toBeInTheDocument();
-    act(() => vi.advanceTimersByTime(3000));
-    await browser.click(
-      within(review).getByRole("button", { name: t.confirmAndFinish }),
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("button", { name: "Validate the documents" }),
+      ).not.toBeInTheDocument(),
     );
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "VIN" })).toHaveValue(
       scooter.vin,
     );
@@ -812,6 +857,11 @@ describe("Scooter documents", () => {
       });
       if (expand) await browser.click(expand);
       await browser.click(
+        screen.getByRole("button", {
+          name: `Edit document type for ${document.fileName}`,
+        }),
+      );
+      await browser.click(
         screen.getByRole("combobox", {
           name: `Document type for ${document.fileName}`,
         }),
@@ -828,7 +878,13 @@ describe("Scooter documents", () => {
       });
       if (expand) await browser.click(expand);
     }
-    await browser.click(screen.getByRole("button", { name: "Import JSON" }));
+    expect(
+      screen.queryByRole("button", { name: "Import JSON" }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Document actions" }));
+    await browser.click(
+      await screen.findByRole("menuitem", { name: "Import JSON" }),
+    );
     await browser.click(
       screen.getByRole("button", { name: "Copy extraction prompt" }),
     );
@@ -943,6 +999,9 @@ describe("Scooter documents", () => {
     expect(
       screen.getByRole("button", { name: "Create scooter" }),
     ).toBeDisabled();
+    await browser.click(
+      screen.getByRole("button", { name: "Edit document type for scan.pdf" }),
+    );
     await browser.click(
       screen.getByRole("combobox", { name: "Document type for scan.pdf" }),
     );
@@ -1438,19 +1497,19 @@ describe("Scooter documents", () => {
     expect(
       screen.queryByRole("link", { name: "old.pdf" }),
     ).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
     await removeFromViewer(user, "old.pdf");
     await waitFor(() =>
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
     );
     expect(mocks.api).not.toHaveBeenCalled();
     await user.click(screen.getByRole("button", { name: "Undo removal" }));
-    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
     await removeFromViewer(user, "old.pdf");
     await waitFor(() =>
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
     );
-    await user.click(screen.getByRole("button", { name: "Save" }));
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
     await waitFor(() =>
       expect(mocks.api).toHaveBeenCalledWith(
         v1.scooters.ROUTES.update("s"),
@@ -1482,18 +1541,22 @@ describe("Scooter documents", () => {
         name: "Save",
       }),
     );
-    await browserConfirmVin(user);
+    expect(screen.queryByText("I checked CIV.pdf")).not.toBeInTheDocument();
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Save" })).toBeEnabled(),
+      expect(
+        screen.getByRole("button", { name: "Save changes" }),
+      ).toBeEnabled(),
     );
     mocks.api.mockRejectedValueOnce(new Error("Offline"));
-    await user.click(screen.getByRole("button", { name: "Save" }));
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Save" })).toBeEnabled(),
+      expect(
+        screen.getByRole("button", { name: "Save changes" }),
+      ).toBeEnabled(),
     );
     expect(screen.queryByText("Ready to save")).not.toBeInTheDocument();
     expect(mocks.push).not.toHaveBeenCalled();
-    await user.click(screen.getByRole("button", { name: "Save" }));
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
     await waitFor(() => expect(mocks.push).toHaveBeenCalled());
     expect(mocks.api).toHaveBeenLastCalledWith(
       v1.scooters.ROUTES.update("s"),
@@ -1502,6 +1565,7 @@ describe("Scooter documents", () => {
         method: "PATCH",
         json: {
           sessionId: "editor-session",
+          civAvailability: "issued",
           documentDrafts: [
             { type: "civ", fileName: "CIV.pdf", uploadToken: "token" },
           ],
@@ -1569,11 +1633,6 @@ async function removeFromViewer(
   await user.click(screen.getByRole("button", { name: `Preview ${name}` }));
   await user.click(screen.getByRole("button", { name: "Document actions" }));
   await user.click(await screen.findByRole("menuitem", { name: "Remove" }));
-}
-
-async function browserConfirmVin(user: ReturnType<typeof userEvent.setup>) {
-  const label = await screen.findByText("I checked CIV.pdf");
-  await user.click(label);
 }
 
 const access = vi.hoisted(() => ({

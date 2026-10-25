@@ -1,3 +1,4 @@
+import { PageLayout } from "@repo/ui/components/page-layout";
 import { Card, CardContent, CardFooter, Skeleton } from "@repo/ui/components";
 import { useTranslations } from "next-intl";
 
@@ -7,11 +8,7 @@ export default function ScootersLoading() {
   const t = useTranslations("scooters");
 
   return (
-    <div
-      aria-busy="true"
-      aria-label={t("routeStates.loadingLabel")}
-      className="mx-auto flex w-full max-w-screen-xl flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10"
-    >
+    <PageLayout aria-busy="true" aria-label={t("routeStates.loadingLabel")}>
       <span className="sr-only">{t("routeStates.loadingLabel")}</span>
 
       <div className="flex justify-end">
@@ -51,6 +48,6 @@ export default function ScootersLoading() {
           ))}
         </div>
       </section>
-    </div>
+    </PageLayout>
   );
 }

@@ -41,6 +41,8 @@ export function DocumentViewer({
   disabled,
   error,
   footer,
+  headerOverlay,
+  bottomOverlay,
   navigation,
   review,
   reviewTitle,
@@ -51,6 +53,8 @@ export function DocumentViewer({
   rightActions,
   entryDirection: requestedEntryDirection,
 }: {
+  headerOverlay?: ReactNode;
+  bottomOverlay?: ReactNode;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   src?: string | null;
@@ -143,6 +147,8 @@ export function DocumentViewer({
     headerActions,
     leftActions,
     rightActions,
+    headerOverlay,
+    bottomOverlay,
     onPrevious: previous,
     onNext: next,
     entryDirection: requestedEntryDirection ?? entryDirection,

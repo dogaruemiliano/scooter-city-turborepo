@@ -1,3 +1,4 @@
+import { PageLayout } from "@repo/ui/components/page-layout";
 import { canAccess } from "@/lib/access";
 import type { Metadata } from "next";
 import { messages } from "@repo/i18n";
@@ -37,7 +38,7 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
 
   if (!overview) {
     return (
-      <div className="flex min-w-0 flex-col gap-8 p-4 md:p-8">
+      <PageLayout className="gap-8">
         <header className="flex flex-col gap-2">
           <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
             {t.account.title}
@@ -63,12 +64,12 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
             <ArrowRightIcon aria-hidden="true" data-icon="inline-end" />
           </Link>
         </Card>
-      </div>
+      </PageLayout>
     );
   }
 
   return (
-    <div className="flex min-w-0 flex-col gap-8 p-4 md:p-8">
+    <PageLayout className="gap-8">
       {canAccess(user, "finance.expenses.create") ? (
         <div className="flex justify-end">
           <Link href={FINANCE_PATHS.newExpense} className={buttonVariants()}>
@@ -147,6 +148,6 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
           <DashboardOverview data={overview} locale={locale} />
         </Suspense>
       ) : null}
-    </div>
+    </PageLayout>
   );
 }

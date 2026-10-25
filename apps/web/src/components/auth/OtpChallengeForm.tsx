@@ -1,9 +1,11 @@
 "use client";
+import { useFormAction } from "@/lib/form/use-form-action";
+import { SaveButton } from "@repo/ui/components/save-button";
 
 import { v1 } from "@repo/api-shared";
 import { localeHeaderName } from "@repo/i18n";
 import { tokens } from "@repo/theme/runtime";
-import { Button, Label } from "@repo/ui/components";
+import { Label } from "@repo/ui/components";
 import { OTPField } from "@repo/ui/components/otp-field";
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useState, type FormEvent } from "react";
@@ -31,11 +33,16 @@ export function OtpChallengeForm({
   onVerified,
   onRequestAnother,
 }: OtpChallengeFormProps) {
+  const formAction = useFormAction();
+
   const t = useTranslations("auth.otp");
   const locale = useLocale();
   const [code, setCode] = useState("");
   const [error, setError] = useState<AuthErrorState | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [pendingAction, setPendingAction] = useState<
+    "verify" | "resend" | "request" | null
+  >(null);
+  const busy = pendingAction !== null;
   const [now, setNow] = useState(() => Date.now());
   const [expiresAt, setExpiresAt] = useState(
     () => now + challenge.expiresInSec * SECOND_MS,
@@ -62,7 +69,7 @@ export function OtpChallengeForm({
     if (busy || expired) return;
 
     setError(null);
-    setBusy(true);
+    setPendingAction("verify");
 
     let verified = false;
     let completed = false;
@@ -84,15 +91,15 @@ export function OtpChallengeForm({
       });
     } finally {
       // Successful completion starts navigation; keep feedback until unmount.
-      if (!completed) setBusy(false);
+      if (!completed) setPendingAction(null);
     }
   }
 
   async function resendCode() {
-    if (expired || resendAfterSec > 0) return;
+    if (busy || expired || resendAfterSec > 0) return;
 
     setError(null);
-    setBusy(true);
+    setPendingAction("resend");
 
     try {
       const nextChallenge = await webApi.fetch(
@@ -115,13 +122,14 @@ export function OtpChallengeForm({
         unauthorizedMessage: "auth.otp.errors.invalidOrExpired",
       });
     } finally {
-      setBusy(false);
+      setPendingAction(null);
     }
   }
 
   async function requestAnotherCode() {
+    if (busy) return;
     setError(null);
-    setBusy(true);
+    setPendingAction("request");
 
     try {
       await onRequestAnother();
@@ -129,7 +137,7 @@ export function OtpChallengeForm({
     } catch (requestError) {
       setError({ cause: requestError });
     } finally {
-      setBusy(false);
+      setPendingAction(null);
     }
   }
 
@@ -184,35 +192,44 @@ export function OtpChallengeForm({
       ) : null}
 
       {expired ? (
-        <Button
+        <SaveButton
           type="button"
           onClick={requestAnotherCode}
           disabled={busy}
           className="w-full"
-        >
-          {busy ? t("requestingAnotherCode") : t("requestAnotherCode")}
-        </Button>
+          {...formAction(
+            "sendCode",
+            { pending: pendingAction === "request", error },
+            t("requestAnotherCode"),
+          )}
+        />
       ) : (
         <div className="flex flex-col gap-2">
-          <Button
+          <SaveButton
             type="submit"
             disabled={busy || code.length !== 6}
             className="w-full"
-          >
-            {busy ? t("verifying") : t("verify")}
-          </Button>
-          <Button
+            {...formAction("verify", {
+              pending: pendingAction === "verify",
+              error: error,
+            })}
+          />
+          <SaveButton
+            type="button"
             variant="link"
             onClick={resendCode}
             disabled={busy || resendAfterSec > 0}
             className="self-center"
-          >
-            {resendAfterSec > 0
-              ? t("resendIn", {
-                  time: formatSecondsAsMinutesAndSeconds(resendAfterSec),
-                })
-              : t("resendCode")}
-          </Button>
+            {...formAction(
+              "sendCode",
+              { pending: pendingAction === "resend", error },
+              resendAfterSec > 0
+                ? t("resendIn", {
+                    time: formatSecondsAsMinutesAndSeconds(resendAfterSec),
+                  })
+                : t("resendCode"),
+            )}
+          />
         </div>
       )}
     </form>

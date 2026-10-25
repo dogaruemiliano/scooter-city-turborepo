@@ -877,7 +877,7 @@ describe("Access management HTTP contracts (e2e)", () => {
     });
     expect(Object.values(user.effectiveScopes).flat()).toEqual([]);
     await authed("get", "/v1/auth/sessions", zeroToken).expect(200);
-    expect(existingRoutes).toHaveLength(63);
+    expect(existingRoutes).toHaveLength(65);
   });
 
   describe.each(["zero", "ordinary"] as const)(

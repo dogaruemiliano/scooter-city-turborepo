@@ -16,8 +16,14 @@ import {
 export function PersonProfileSection({
   person,
   locale,
+  revealCnp = false,
 }: {
-  person: v1.persons.Person;
+  person: Pick<
+    v1.persons.Person,
+    "firstName" | "lastName" | "cnp" | "dateOfBirth"
+  > &
+    Partial<Pick<v1.persons.Person, "deletedAt">>;
+  revealCnp?: boolean;
   locale: string;
 }) {
   const t = useTranslations("persons");
@@ -33,7 +39,11 @@ export function PersonProfileSection({
       <DetailField label={t("fields.lastName")} value={person.lastName} />
       <DetailField
         label={t("fields.documentCnp")}
-        value={maskSensitiveValue(person.cnp ?? null, t("detail.emptyValue"))}
+        value={
+          revealCnp
+            ? person.cnp || t("detail.emptyValue")
+            : maskSensitiveValue(person.cnp ?? null, t("detail.emptyValue"))
+        }
       />
       <DetailField
         label={t("fields.dateOfBirth")}

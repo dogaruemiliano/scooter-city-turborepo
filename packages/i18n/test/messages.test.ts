@@ -7,6 +7,11 @@ test("locale catalogs expose the same message keys", () => {
   assert.deepEqual(leafKeys(messages.ro), leafKeys(messages.en));
 });
 
+test("document client-copy badges resolve in both locales", () => {
+  assert.equal(messages.en.scooters.documents.clientCopy, "For client");
+  assert.equal(messages.ro.scooters.documents.clientCopy, "Pentru client");
+});
+
 function leafKeys(value: unknown, prefix = ""): string[] {
   if (typeof value === "string") {
     return [prefix];

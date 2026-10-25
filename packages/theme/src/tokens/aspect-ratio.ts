@@ -5,6 +5,7 @@
 export const aspectRatio = {
   scooterPhoto: 4 / 3,
   documentLandscape: 1.586,
+  documentA4Portrait: 210 / 297,
   identityCardPortrait: 1 / 1.586,
   receiptPortrait: 1 / 3,
 } as const;

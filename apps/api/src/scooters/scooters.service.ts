@@ -1,6 +1,11 @@
+import { activeMaintenanceHoldWhere } from "../problems/maintenance-hold";
 import { writeInsurancePolicies } from "./scooter-insurance";
 import { CivVocabularyService } from "./civ-vocabulary.service";
 import { civMetadataWrite } from "./civ-metadata";
+import {
+  civAvailabilityWrite,
+  hasAttachedCivEvidence,
+} from "./civ-availability";
 import { ScooterDocumentsService } from "./scooter-documents.service";
 import {
   BadRequestException,
@@ -24,7 +29,7 @@ const galleryCoverPhotos = {
 } satisfies Prisma.Scooter$photosArgs;
 
 const maintenanceCount = {
-  select: { problems: { where: { blocksUsage: true } } },
+  select: { problems: { where: activeMaintenanceHoldWhere } },
 } as const;
 
 const scooterInclude = {
@@ -32,20 +37,28 @@ const scooterInclude = {
   photos: galleryCoverPhotos,
   brand: true,
   civDocument: true,
+  inspections: {
+    orderBy: [{ inspectionDate: "desc" }, { createdAt: "desc" }],
+    take: 1,
+  },
   insurancePolicies: { orderBy: [{ validUntil: "desc" }, { id: "asc" }] },
 } satisfies Prisma.ScooterInclude;
 
 const scooterListInclude = {
   problems: {
     where: {
-      OR: [{ status: { in: ["open", "in_progress"] } }, { blocksUsage: true }],
+      status: { in: ["open", "in_progress"] },
     },
-    select: { severity: true },
+    select: { difficulty: true },
   },
   _count: maintenanceCount,
   photos: galleryCoverPhotos,
   brand: true,
   insurancePolicies: { select: { validFrom: true, validUntil: true } },
+  inspections: {
+    orderBy: [{ inspectionDate: "desc" }, { createdAt: "desc" }],
+    take: 1,
+  },
 } satisfies Prisma.ScooterInclude;
 
 function toScooterListRow({
@@ -56,6 +69,13 @@ function toScooterListRow({
 }>): ScooterWithBrand {
   return {
     ...scooter,
+    // No warning can also mean no policy; rental readiness must distinguish it.
+    rentalInsuranceStatus: v1.scooters.rentalInsuranceStatus(
+      insurancePolicies.map((policy) => ({
+        validFrom: toDateOnlyString(policy.validFrom),
+        validUntil: toDateOnlyString(policy.validUntil),
+      })),
+    ),
     insuranceAttention: v1.scooters.insuranceAttention(
       insurancePolicies.map((policy) => ({
         validFrom: toDateOnlyString(policy.validFrom),
@@ -67,6 +87,7 @@ function toScooterListRow({
 
 type ScooterWithBrand = Scooter & {
   insuranceAttention?: v1.scooters.InsuranceAttention | null;
+  rentalInsuranceStatus?: v1.scooters.Scooter["rentalInsuranceStatus"];
   brand: { name: string; code: string };
 };
 
@@ -190,6 +211,7 @@ export class ScootersService {
           [],
           input.sessionId,
           editorSaveFingerprint(input),
+          scooter.vin,
         );
         await this.civVocabulary.remember(tx, input);
         await this.photos.applyDrafts(tx, scooter.id, preparedPhotos, userId);
@@ -302,6 +324,7 @@ export class ScootersService {
       if (replay) return replay;
       const existing = await this.prisma.scooter.findFirst({
         where: { id, deletedAt: null },
+        include: { civDocument: true },
       });
       if (!existing) {
         throw new NotFoundException("Scooter not found");
@@ -357,6 +380,34 @@ export class ScootersService {
           data: { ...data, updatedAt: new Date() },
           include: scooterInclude,
         });
+        if (input.civAvailability === "not_issued") {
+          // Recheck after locking/updating the parent; concurrent document writes
+          // take this same lock before attachment.
+          civAvailabilityWrite(input, scooter);
+          const remainingDocuments = await tx.scooterDocument.findMany({
+            where: {
+              scooterId: id,
+              deletedAt: null,
+              asset: { deletedAt: null },
+              ...(input.removedDocumentIds?.length
+                ? { id: { notIn: input.removedDocumentIds } }
+                : {}),
+            },
+            select: { id: true, type: true, extractedData: true },
+          });
+          if (
+            hasAttachedCivEvidence(
+              remainingDocuments,
+              input.documentExtractions,
+            )
+          )
+            throw new BadRequestException({
+              code: "SCOOTER_CIV_AVAILABILITY_CONFLICT",
+              message:
+                "A scooter with an attached CIV cannot be marked as CIV not issued.",
+              details: { field: "civAvailability" },
+            });
+        }
         if (input.insurancePolicies?.length || input.vin !== undefined)
           await writeInsurancePolicies(
             tx,
@@ -373,6 +424,7 @@ export class ScootersService {
           input.documentExtractions,
           input.sessionId,
           editorSaveFingerprint(input),
+          scooter.vin,
         );
         await this.civVocabulary.remember(tx, input);
         return input.insurancePolicies?.length
@@ -449,6 +501,7 @@ export class ScootersService {
       brand: { connect: { id: input.brandId } },
       vehicleType: input.vehicleType,
       civNumber: input.civNumber,
+      civAvailability: civAvailabilityWrite(input),
       nationalEmissionsCode: input.nationalEmissionsCode,
       variant: input.variant,
       version: input.version,
@@ -516,7 +569,11 @@ export class ScootersService {
 
   private toUpdateData(
     input: v1.scooters.UpdateScooterInput,
-    existing: Scooter,
+    existing: Scooter & {
+      civDocument?:
+        | import("../generated/prisma/client").VehicleCivDocument
+        | null;
+    },
   ): Prisma.ScooterUpdateInput {
     const civData = civMetadataWrite(input);
     return {
@@ -543,6 +600,7 @@ export class ScootersService {
           : { connect: { id: input.brandId } },
       vehicleType: input.vehicleType,
       civNumber: input.civNumber,
+      civAvailability: civAvailabilityWrite(input, existing),
       nationalEmissionsCode: input.nationalEmissionsCode,
       variant: input.variant,
       version: input.version,

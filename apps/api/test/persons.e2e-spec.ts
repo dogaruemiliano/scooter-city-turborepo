@@ -7,6 +7,9 @@ import {
   HeadObjectCommand,
   PutObjectCommand,
 } from "@aws-sdk/client-s3";
+import { createCanvas } from "@napi-rs/canvas";
+import { ENV } from "../src/config/config.module";
+import type { Env } from "../src/config/env";
 import { INestApplication, VersioningType } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import { v1 } from "@repo/api-shared";
@@ -372,6 +375,75 @@ describe("Persons HTTP surface (e2e)", () => {
     } finally {
       await client.query("ROLLBACK");
       await client.end();
+    }
+  });
+
+  it("lets an operator manage the linked user's avatar through person edit permissions", async () => {
+    const admin = await freshSession(["ADMIN"]);
+    const viewer = await freshSession(["USER"]);
+    const created = await req()
+      .post("/v1/persons")
+      .set("Authorization", `Bearer ${admin.accessToken}`)
+      .send(personInput())
+      .expect(201);
+    const person = v1.persons.personSchema.parse(created.body);
+    const avatarPath = v1.persons.ROUTES.avatar(person.id);
+    const png = createCanvas(16, 16).toBuffer("image/png");
+    const env = app.get<Env>(ENV);
+    const limit = env.IMAGE_STORAGE_MAX_BYTES;
+    env.IMAGE_STORAGE_MAX_BYTES = 5 * 1024 * 1024;
+    try {
+      await req()
+        .post(avatarPath)
+        .attach("file", png, "avatar.png")
+        .expect(401);
+      await req()
+        .post(avatarPath)
+        .set("Authorization", `Bearer ${viewer.accessToken}`)
+        .attach("file", png, "avatar.png")
+        .expect(403);
+      await req()
+        .delete(avatarPath)
+        .set("Authorization", `Bearer ${viewer.accessToken}`)
+        .expect(403);
+      const uploaded = await req()
+        .post(avatarPath)
+        .set("Authorization", `Bearer ${admin.accessToken}`)
+        .attach("file", png, "avatar.png")
+        .expect(200);
+      const assetId = v1.persons.personSchema.parse(
+        uploaded.body,
+      ).avatarAssetId!;
+      expect(assetId).toBeTruthy();
+      const linked = await prisma.person.findUniqueOrThrow({
+        where: { id: person.id },
+        include: { user: true },
+      });
+      expect(linked.user.avatarAssetId).toBe(assetId);
+      expect((await users.findById(admin.userId))?.avatarAssetId).toBeNull();
+      const asset = await prisma.mediaAsset.findUniqueOrThrow({
+        where: { id: assetId },
+      });
+      expect(asset.uploadedByUserId).toBe(admin.userId);
+      const removed = await req()
+        .delete(avatarPath)
+        .set("Authorization", `Bearer ${admin.accessToken}`)
+        .expect(200);
+      expect(
+        v1.persons.personSchema.parse(removed.body).avatarAssetId,
+      ).toBeNull();
+      await req()
+        .get(v1.auth.ROUTES.avatarContent(assetId))
+        .set("Authorization", `Bearer ${admin.accessToken}`)
+        .expect(404);
+      await prisma.mediaAsset.delete({ where: { id: assetId } });
+      await req()
+        .post(v1.persons.ROUTES.avatar("missing-person"))
+        .set("Authorization", `Bearer ${admin.accessToken}`)
+        .attach("file", png, "avatar.png")
+        .expect(404);
+    } finally {
+      env.IMAGE_STORAGE_MAX_BYTES = limit;
     }
   });
 

@@ -49,6 +49,8 @@ export function DocumentZoom({
   navigation,
   resetKey,
   caption,
+  headerOverlay,
+  bottomOverlay,
   onClosePress,
   closeLabel,
   headerActions,
@@ -60,6 +62,7 @@ export function DocumentZoom({
   onSwipeDown,
   swipeDownTarget,
 }: {
+  bottomOverlay?: ReactNode;
   children: (scale: number) => ReactNode;
   labels: DocumentZoomLabels;
   navigation?: ReactNode;
@@ -243,11 +246,20 @@ export function DocumentZoom({
       data-slot="document-zoom"
     >
       <DocumentPreviewHeader
+        headerOverlay={headerOverlay}
         caption={caption}
         onClosePress={onClosePress}
         closeLabel={closeLabel}
         headerActions={headerActions}
       />
+      {bottomOverlay ? (
+        <div
+          data-slot="document-preview-bottom"
+          className="pointer-events-none absolute inset-x-0 bottom-0 z-raised flex min-w-0 items-center justify-between gap-2 bg-linear-to-t from-media-scrim to-transparent px-3 pt-8 pb-[max(var(--spacing-3),env(safe-area-inset-bottom))] text-scrim-foreground *:pointer-events-auto"
+        >
+          {bottomOverlay}
+        </div>
+      ) : null}
       <div
         ref={viewport}
         data-slot="document-zoom-viewport"
@@ -486,7 +498,7 @@ export function DocumentZoom({
       ) : null}
       <div
         data-slot="document-zoom-controls"
-        className="absolute bottom-3 left-1/2 z-raised flex w-max max-w-[calc(100%-var(--spacing-4))] -translate-x-1/2 flex-wrap items-center justify-center rounded-xl border border-document-overlay-border bg-document-overlay p-1 text-foreground shadow-md"
+        className={`absolute ${bottomOverlay ? "bottom-24" : "bottom-3"} left-1/2 z-raised flex w-max max-w-[calc(100%-var(--spacing-4))] -translate-x-1/2 flex-wrap items-center justify-center rounded-xl border border-document-overlay-border bg-document-overlay p-1 text-foreground shadow-md`}
       >
         {navigation}
         <Button

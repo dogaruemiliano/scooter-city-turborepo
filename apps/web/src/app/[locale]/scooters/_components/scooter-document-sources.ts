@@ -1,3 +1,4 @@
+import { normalizeScooterBrandName } from "./scooter-brand-name";
 import { v1 } from "@repo/api-shared";
 
 export interface DocumentSource {
@@ -39,6 +40,29 @@ const civMetadata = new Set([
   "civVersion",
   "civIssuedAt",
   "civIssuingAuthority",
+]);
+const extractionOnlyFields = new Set([
+  "registrationCounty",
+  "registrationLocality",
+  "registrationLocalityCode",
+  "registrationHolder",
+  "foreignRegistrationNumber",
+  "foreignRegistrationCountry",
+  "foreignRegistrationCertificateNumber",
+  "foreignFirstRegistrationDate",
+  "foreignRegistrationDate",
+  "foreignRegistrationHolder",
+  "exportCertificateNumber",
+  "exportDate",
+  "exporterName",
+  "exportRecipientName",
+]);
+const technicalTypes = new Set([
+  "ownership_proof",
+  "civ",
+  "import_document",
+  "foreign_registration",
+  "export_certificate",
 ]);
 const unsafeKeys = new Set(["__proto__", "constructor", "prototype"]);
 export function isRetiredCivRawLabel(label: string) {
@@ -271,7 +295,7 @@ export function prepareDocumentSources(
   ): SourceImportResult => ({ ok: false, reason, fields });
   if (
     !sources.length ||
-    sources.length > v1.scooters.SCOOTER_DOCUMENT_MAX_FILES ||
+    sources.length > v1.scooters.SCOOTER_DOCUMENT_MAX_FILES * 5 ||
     new Set(sources.map((source) => source.sourceId)).size !== sources.length ||
     sources.some((source) => !validKey(source.sourceId, 255))
   )
@@ -402,9 +426,7 @@ export function prepareDocumentSources(
   }[] = [];
   const policies: Record<string, unknown>[] = [];
   const hasCiv = sources.some((entry) => entry.type === "civ");
-  const hasTechnical = sources.some(
-    (entry) => entry.type === "civ" || entry.type === "import_document",
-  );
+  const hasTechnical = sources.some((entry) => technicalTypes.has(entry.type));
   const allowed = new Set(allowedFields);
   allowed.add("brandName");
   for (const entry of envelope.documents) {
@@ -419,6 +441,8 @@ export function prepareDocumentSources(
             "fields",
             "rawFields",
             "vinReview",
+            "documents",
+            "currentInsuranceDocumentId",
           ].includes(key),
       ) ||
       typeof entry.sourceId !== "string"
@@ -455,7 +479,8 @@ export function prepareDocumentSources(
       )
         return fail("invalidFields", `${attached.fileName}.${field}`);
       const valid =
-        attached.type === "insurance"
+        extractionOnlyFields.has(field) ||
+        (attached.type === "insurance"
           ? (v1.scooters.INSURANCE_FIELDS as readonly string[]).includes(field)
           : (allowed.has(field) ||
               registrationFields.has(field) ||
@@ -464,7 +489,7 @@ export function prepareDocumentSources(
               ? registrationFields.has(field) ||
                 ["vin", "brandName", "requiredLicenseCategory"].includes(field)
               : !registrationFields.has(field) &&
-                (attached.type === "civ" || !civMetadata.has(field)));
+                (attached.type === "civ" || !civMetadata.has(field))));
       if (!valid) return fail("invalidFields", `${attached.fileName}.${field}`);
       // A second VIN assertion inside fields must agree with the per-document evidence.
       if (
@@ -491,13 +516,28 @@ export function prepareDocumentSources(
       );
     if (!review.success)
       return fail("invalidFields", `${attached.fileName}.vinReview`);
+    const extra = v1.scooters.scooterDocumentExtractedDataSchema.safeParse({
+      vin,
+      fields,
+      rawFields,
+      ...(entry.documents ? { documents: entry.documents } : {}),
+      ...(Object.hasOwn(entry, "currentInsuranceDocumentId")
+        ? { currentInsuranceDocumentId: entry.currentInsuranceDocumentId }
+        : {}),
+    });
+    if (!extra.success)
+      return fail("invalidFields", `${attached.fileName}.documents`);
     extractedDocuments[attached.sourceId] = {
       vin,
       fields,
       rawFields,
       ...(review.data ? { vinReview: review.data } : {}),
+      ...(extra.data.documents ? { documents: extra.data.documents } : {}),
+      ...(extra.data.currentInsuranceDocumentId !== undefined
+        ? { currentInsuranceDocumentId: extra.data.currentInsuranceDocumentId }
+        : {}),
     };
-    const skipped = attached.type === "import_document" && hasCiv;
+    const skipped = false;
     if (!skipped) {
       evidence.push({
         fileName: attached.fileName,
@@ -511,6 +551,7 @@ export function prepareDocumentSources(
         unresolvedDocumentFields[attached.sourceId] = unknownRaw;
     }
     if (attached.type === "insurance") {
+      if (extra.data.currentInsuranceDocumentId === null) continue;
       const insuranceRaw = Object.fromEntries(
         Object.entries(rawFields).filter(([key]) =>
           (v1.scooters.INSURANCE_FIELDS as readonly string[]).includes(key),
@@ -533,6 +574,14 @@ export function prepareDocumentSources(
     if (!("vin" in selected) && vin) selected.vin = vin;
     for (const [field, value] of Object.entries(selected)) {
       if (!allowed.has(field)) continue;
+      // CIV remains authoritative for overlapping technical values, while every source retains evidence and VIN checks.
+      if (
+        hasCiv &&
+        technicalTypes.has(attached.type) &&
+        attached.type !== "civ" &&
+        field !== "vin"
+      )
+        continue;
       if (
         attached.type === "registration_certificate" &&
         hasTechnical &&
@@ -554,7 +603,13 @@ export function prepareDocumentSources(
   }
   for (const [field, values] of selectedValues) {
     const known = values.filter(({ value }) => !unknown(value));
-    const distinct = new Set(known.map(({ value }) => String(value).trim()));
+    const distinct = new Set(
+      known.map(({ value }) =>
+        field === "brandName"
+          ? normalizeScooterBrandName(String(value))
+          : String(value).trim(),
+      ),
+    );
     source[field] = distinct.size === 1 ? known[0]!.value : null;
     fieldSources[field === "brandName" ? "brandId" : field] = values.map(
       ({ id }) => id,
@@ -570,9 +625,7 @@ export function prepareDocumentSources(
   }
   if (!("vin" in source)) {
     const withVin = sources.filter(
-      (entry) =>
-        !(hasCiv && entry.type === "import_document") &&
-        extractedDocuments[entry.sourceId]?.vin,
+      (entry) => extractedDocuments[entry.sourceId]?.vin,
     );
     const vins = new Set(
       withVin.map((entry) => extractedDocuments[entry.sourceId]!.vin),

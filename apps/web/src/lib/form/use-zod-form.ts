@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslations } from "next-intl";
-import { useMemo } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import {
   useForm,
   type FieldErrors,
@@ -92,12 +92,40 @@ export function useZodForm<
     return localizingResolver;
   }, [labelFor, messageOverride, schema, t]);
 
-  return useForm<Values, unknown, Transformed>({
+  const submitting = useRef(false);
+  const form = useForm<Values, unknown, Transformed>({
     mode: "onTouched",
     reValidateMode: "onChange",
     resolver,
     ...formProps,
   });
+  const handleSubmit = useCallback<typeof form.handleSubmit>(
+    (onValid, onInvalid) => (event) => {
+      event?.preventDefault();
+      if (submitting.current) return Promise.resolve(undefined);
+      submitting.current = true;
+      return form
+        .handleSubmit(
+          onValid,
+          onInvalid,
+        )(event)
+        .finally(() => {
+          submitting.current = false;
+        });
+    },
+    [form],
+  );
+  // Preserve useForm's stable method identity; formState is refreshed by RHF.
+  return useMemo(
+    () => ({
+      ...form,
+      handleSubmit,
+      get formState() {
+        return form.formState;
+      },
+    }),
+    [form, handleSubmit],
+  );
 }
 
 /** Walks the react-hook-form error tree, translating schema-authored text. */

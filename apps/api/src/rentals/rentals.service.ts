@@ -19,7 +19,14 @@ import {
 
 export const rentalInclude = {
   scooter: { select: maintenanceScooterSelect },
-  person: { select: { id: true, firstName: true, lastName: true } },
+  person: {
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      user: { select: { avatarAssetId: true } },
+    },
+  },
 } satisfies Prisma.RentalInclude;
 export type RentalRow = Prisma.RentalGetPayload<{
   include: typeof rentalInclude;
@@ -30,7 +37,10 @@ export function toRental(row: RentalRow): v1.rentals.Rental {
     id: row.id,
     personId: row.personId,
     scooterId: row.scooterId,
-    person: row.person,
+    person: {
+      ...row.person,
+      avatarAssetId: row.person.user?.avatarAssetId ?? null,
+    },
     scooter: toMaintenanceScooter(row.scooter),
     startsAt: row.startsAt.toISOString(),
     endsAt: row.endsAt.toISOString(),
@@ -199,6 +209,7 @@ export class RentalsService {
           person: {
             select: {
               id: true,
+              user: { select: { avatarAssetId: true } },
               firstName: true,
               lastName: true,
               deletedAt: true,

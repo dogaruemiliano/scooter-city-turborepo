@@ -4,6 +4,7 @@ import type { DateParts } from "@repo/ui/lib/date-parts";
 
 export interface PersonCreateFormProps {
   personsHref: string;
+  rentalDraftId?: string;
 }
 
 export interface Feedback {

@@ -1,4 +1,7 @@
 "use client";
+import { userAvatarSrc } from "@/lib/user-avatar";
+import { useFormAction } from "@/lib/form/use-form-action";
+import { SaveButton } from "@repo/ui/components/save-button";
 
 import {
   useCallback,
@@ -11,6 +14,12 @@ import {
 import { v1 } from "@repo/api-shared";
 import {
   Button,
+  ActivityTimeline,
+  ActivityTimelineItem,
+  CommentThread,
+  CommentItem,
+  CommentEventItem,
+  CommentComposer,
   BottomSheet,
   BottomSheetTrigger,
   BottomSheetContent,
@@ -24,13 +33,28 @@ import {
   FormActions,
   Input,
   ImageGalleryEditor,
-  PersonRow,
   SegmentedRadioGroup,
   Textarea,
 } from "@repo/ui/components";
-import { MoreVertical } from "lucide-react";
+import {
+  FilePlus,
+  Pencil,
+  Users,
+  Play,
+  Pause,
+  CircleCheck,
+  RotateCcw,
+  ShieldAlert,
+  ShieldCheck,
+  CircleSlash,
+  Flag,
+  MoreVertical,
+  X,
+} from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
+import { useWorkspaceNotifications } from "@/components/WorkspaceNotifications";
 import { PageHeaderActions } from "@/components/PageHeaderActions";
+import { ProblemAssignment } from "./ProblemAssignment";
 import { AssigneeSelect } from "./AssigneeSelect";
 import { memberName } from "../_lib/member-name";
 export { memberName } from "../_lib/member-name";
@@ -73,6 +97,9 @@ export function CreateProblem({
   onCancel?: () => void;
   stickyActions?: boolean;
 }) {
+  const formAction = useFormAction();
+  const notifications = useWorkspaceNotifications();
+
   const t = useTranslations("workspace");
   const galleryT = useTranslations("scooters.photos");
   const editorT = useTranslations("persons.documentForm");
@@ -82,7 +109,7 @@ export function CreateProblem({
   const [scooterId, setScooter] = useState(preselected ?? "");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [severity, setSeverity] = useState("");
+  const [difficulty, setDifficulty] = useState("");
   const [blocksUsage, setBlocks] = useState("");
   const [assigneeIds, setAssignees] = useState<string[]>([]);
   const [files, setFiles] = useState<File[]>([]);
@@ -102,7 +129,7 @@ export function CreateProblem({
   const readyToSubmit = Boolean(
     scooterId &&
     title.trim() &&
-    severity &&
+    difficulty &&
     blocksUsage &&
     !fileError &&
     !galleryBusy &&
@@ -162,7 +189,7 @@ export function CreateProblem({
             ...sectionData,
             scooterId,
             title,
-            severity,
+            difficulty,
             description,
             blocksUsage: blocksUsage === "defective",
             ...(mayAssign ? { assigneeIds } : {}),
@@ -176,6 +203,10 @@ export function CreateProblem({
               json: { ...input, photos },
             },
           );
+          notifications?.add({
+            title: t("problems.reported"),
+            variant: "success",
+          });
           onSaved(created);
         });
       }}
@@ -202,23 +233,27 @@ export function CreateProblem({
         />
       </Field>
       <Field>
-        <FieldLabel>{t("problems.severity")}</FieldLabel>
+        <FieldLabel>{t("problems.difficulty")}</FieldLabel>
         <SegmentedRadioGroup
-          label={t("problems.severity")}
-          name={`${id}-severity`}
-          value={severity}
-          onValueChange={setSeverity}
+          label={t("problems.difficulty")}
+          name={`${id}-difficulty`}
+          columns={3}
+          value={difficulty}
+          onValueChange={setDifficulty}
           disabled={task.busy}
           showCheckmark
-          aria-describedby={`${id}-severity-help`}
-          options={v1.problems.problemSeveritySchema.options.map((value) => ({
+          aria-describedby={`${id}-difficulty-help`}
+          options={v1.problems.problemDifficultySchema.options.map((value) => ({
             value,
             label: t(`problems.${value}`),
-            severity: value,
+            difficulty: value,
           }))}
         />
-        <p id={`${id}-severity-help`} className="text-sm text-muted-foreground">
-          {t("problems.severityHelp")}
+        <p
+          id={`${id}-difficulty-help`}
+          className="text-sm text-muted-foreground"
+        >
+          {t("problems.difficultyHelp")}
         </p>
       </Field>
       <Field>
@@ -372,13 +407,12 @@ export function CreateProblem({
         pending={task.busy}
         className={stickyActions ? "mt-auto w-full" : undefined}
       >
-        <Button
+        <SaveButton
           className={stickyActions ? "w-full" : undefined}
           type="submit"
           disabled={task.busy || !readyToSubmit}
-        >
-          {task.busy ? t("problems.reporting") : t("problems.reportSubmit")}
-        </Button>
+          {...formAction("report", { pending: task.busy, error: task.error })}
+        />
         {onCancel ? (
           <Button
             variant="outline"
@@ -399,25 +433,35 @@ export function ProblemWork({
   reload,
   onBusyChange,
   compact = false,
+  actionsTarget,
 }: {
   compact?: boolean;
+  actionsTarget?: HTMLElement | null;
   problem: v1.problems.Problem;
   reload: (problem?: v1.problems.Problem) => void;
   onBusyChange?: (busy: boolean) => void;
 }) {
+  const formAction = useFormAction();
+  const notifications = useWorkspaceNotifications();
+
   const t = useTranslations("workspace");
   const { user } = useSession();
   const task = useTask();
+  const commentTask = useTask();
   const [photosBusy, setPhotosBusy] = useState(false);
   const [sectionsBusy, setSectionsBusy] = useState(false);
   const [comment, setComment] = useState("");
+  const [postedComment, setPostedComment] = useState<{
+    body: string;
+    actorId?: string;
+  } | null>(null);
+  const [reopenMessage, setReopenMessage] = useState("");
   const [resolution, setResolution] = useState("");
-  const [clearHold, setClearHold] = useState("");
   const [confirm, setConfirm] = useState<"reopen" | "cancel" | null>(null);
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(problem.title);
   const [description, setDescription] = useState(problem.description);
-  const [severity, setSeverity] = useState(problem.severity ?? "");
+  const [difficulty, setDifficulty] = useState(problem.difficulty ?? "");
   const editable =
     problem.status === "open" || problem.status === "in_progress";
   const assignedMembers = v1.problems.problemAssignees(problem);
@@ -427,7 +471,7 @@ export function ProblemWork({
     canAccess(user, action, own ? "ASSIGNED" : "ALL");
   const mayAssign = canAccess(user, "problems.assign", "ALL");
   const assignees = useProblemAssignees(mayAssign && editable);
-  const busy = task.busy || photosBusy || sectionsBusy;
+  const busy = task.busy || commentTask.busy || photosBusy || sectionsBusy;
   useEffect(() => {
     onBusyChange?.(busy);
     return () => onBusyChange?.(false);
@@ -442,26 +486,23 @@ export function ProblemWork({
       v1.problems.problemSchema,
       { method, json: { revision: problem.revision, ...input } },
     );
+    const message = input.startWork
+      ? "workStarted"
+      : input.pauseWork
+        ? "workPaused"
+        : path === "/resolve"
+          ? "taskCompleted"
+          : path === "/assignee"
+            ? "assigneesSaved"
+            : path === "/comments"
+              ? "commentAdded"
+              : "changesSaved";
+    notifications?.add({
+      title: t(`problems.notifications.${message}`),
+      variant: "success",
+    });
     reload(updated);
   }
-  const holdControls = problem.blocksUsage ? (
-    <div className="flex flex-col gap-2 rounded-lg border border-destructive p-4">
-      <p className="text-sm font-medium">{t("problems.holdHelp")}</p>
-      {editable &&
-      (can("problems.resolve") || canAccess(user, "problems.update", "ALL")) ? (
-        <Choice
-          label={t("problems.holdDecision")}
-          value={clearHold}
-          onChange={setClearHold}
-          options={[
-            { value: "", label: t("select") },
-            { value: "retain", label: t("problems.retainHold") },
-            { value: "clear", label: t("problems.clearThisHold") },
-          ]}
-        />
-      ) : null}
-    </div>
-  ) : null;
   const retryAction = task.error ? (
     <Button
       variant="outline"
@@ -484,66 +525,29 @@ export function ProblemWork({
   ) : null;
   return (
     <div className="flex flex-col gap-8">
-      <Feedback error={task.error} success={task.success} />
+      <Feedback error={task.error} />
       {retryAction}
-      <section
-        className="flex flex-col gap-3"
-        aria-label={t("problems.assignee")}
-      >
-        <h3 className="text-sm font-semibold text-muted-foreground">
-          {t("problems.assignee")}
-        </h3>
-        {mayAssign && editable ? (
-          <AssigneeSelect
-            multiple
-            value={assignedIds}
-            disabled={busy}
-            members={[
-              ...(assignees.data?.items ?? []),
-              ...assignedMembers.filter(
-                (member) =>
-                  !assignees.data?.items.some((item) => item.id === member.id),
-              ),
-            ]}
-            onValueChange={(assigneeIds) =>
-              void task.run(() => mutate("/assignee", "PUT", { assigneeIds }))
-            }
-            onClear={() =>
-              void task.run(() =>
-                mutate("/assignee", "PUT", { assigneeIds: [] }),
-              )
-            }
-            clearOptionLabel={t("problems.unassigned")}
-            loading={assignees.loading}
-            error={assignees.error}
-            onRetry={assignees.reload}
-          />
-        ) : assignedMembers.length ? (
-          assignedMembers.map((member) => (
-            <div
-              key={member.id}
-              className="rounded-2xl border border-border bg-card p-4 text-card-foreground"
-            >
-              <PersonRow name={memberName(member)} />
-            </div>
-          ))
-        ) : (
-          <div className="rounded-2xl border border-border bg-card p-4 text-card-foreground">
-            <PersonRow name={t("problems.unassigned")} />
-          </div>
-        )}
-      </section>
-      {problem.status === "open" &&
-      !assignedIds.length &&
-      canAccess(user, "problems.claim", "AVAILABLE") ? (
-        <Button
-          className="self-start"
-          disabled={busy}
-          onClick={() => void task.run(() => mutate("/claim", "POST", {}))}
-        >
-          {t("problems.claim")}
-        </Button>
-      ) : null}
+      <ProblemAssignment
+        problem={problem}
+        userId={user?.id}
+        mayAssign={mayAssign}
+        mayClaim={canAccess(user, "problems.claim", "AVAILABLE")}
+        busy={busy}
+        members={assignees.data?.items ?? []}
+        loading={assignees.loading}
+        error={assignees.error}
+        onRetry={assignees.reload}
+        saveError={task.error}
+        onAssign={async (assigneeIds) => {
+          let saved = false;
+          await task.run(async () => {
+            await mutate("/assignee", "PUT", { assigneeIds });
+            saved = true;
+          });
+          return saved;
+        }}
+        onClaim={() => void task.run(() => mutate("/claim", "POST", {}))}
+      />
       <ProblemSections
         problem={problem}
         editable={editable && can("problems.update")}
@@ -567,11 +571,27 @@ export function ProblemWork({
         }}
         onSave={(photos) => mutate("", "PATCH", { photos })}
       />
-      {!compact || (editable && can("problems.resolve")) ? (
+      {problem.status === "open" && can("problems.update") ? (
+        <Button
+          className={
+            compact
+              ? "sticky bottom-4 z-sticky order-last w-full shadow-primary"
+              : "self-start"
+          }
+          disabled={busy || !assignedIds.length}
+          onClick={() =>
+            void task.run(() => mutate("", "PATCH", { startWork: true }))
+          }
+        >
+          {t("problems.start")}
+        </Button>
+      ) : null}
+      {!compact ||
+      (problem.status === "in_progress" && can("problems.resolve")) ? (
         <ProblemWorkPanel
           compact={compact}
           title={t("problems.completeTask")}
-          primary={editable && can("problems.resolve")}
+          primary={problem.status === "in_progress" && can("problems.resolve")}
         >
           {compact ? (
             <>
@@ -579,8 +599,7 @@ export function ProblemWork({
               {retryAction}
             </>
           ) : null}
-          {holdControls}
-          {editable && can("problems.resolve") ? (
+          {problem.status === "in_progress" && can("problems.resolve") ? (
             <form
               className="flex flex-col gap-3"
               onSubmit={(event) => {
@@ -588,9 +607,6 @@ export function ProblemWork({
                 void task.run(() =>
                   mutate("/resolve", "POST", {
                     resolutionNotes: resolution.trim(),
-                    ...(problem.blocksUsage
-                      ? { clearMaintenanceHold: clearHold === "clear" }
-                      : {}),
                   }),
                 );
               }}
@@ -608,29 +624,41 @@ export function ProblemWork({
                   onChange={(event) => setResolution(event.target.value)}
                 />
               </Field>
-              <Button
+              <SaveButton
                 type="submit"
                 className="w-full"
-                disabled={
-                  busy ||
-                  !resolution.trim() ||
-                  (problem.blocksUsage && !clearHold)
-                }
-              >
-                {t("problems.resolve")}
-              </Button>
+                disabled={busy || !resolution.trim()}
+                {...formAction("complete", {
+                  pending: busy,
+                  error: task.error,
+                })}
+              />
             </form>
           ) : null}
         </ProblemWorkPanel>
       ) : null}
-      <ProblemWorkPanel compact={compact} title={t("problems.moreActions")}>
+      <ProblemWorkPanel
+        compact={compact}
+        actionsTarget={actionsTarget}
+        title={t("problems.moreActions")}
+      >
         {compact ? (
           <>
             <Feedback error={task.error} />
             {retryAction}
           </>
         ) : null}
-        {compact ? holdControls : null}
+        {problem.status === "in_progress" && can("problems.update") ? (
+          <Button
+            variant="outline"
+            disabled={busy}
+            onClick={() =>
+              void task.run(() => mutate("", "PATCH", { pauseWork: true }))
+            }
+          >
+            {t("problems.pause")}
+          </Button>
+        ) : null}
         {problem.resolutionNotes ? (
           <div>
             <p className="text-sm font-medium">
@@ -644,18 +672,6 @@ export function ProblemWork({
         {editable && can("problems.update") ? (
           <>
             <div className="flex flex-wrap gap-3">
-              {problem.status === "open" ? (
-                <Button
-                  disabled={busy || !assignedIds.length}
-                  onClick={() =>
-                    void task.run(() =>
-                      mutate("", "PATCH", { startWork: true }),
-                    )
-                  }
-                >
-                  {t("problems.start")}
-                </Button>
-              ) : null}
               <Button
                 variant="outline"
                 disabled={busy}
@@ -677,7 +693,7 @@ export function ProblemWork({
                         revision: problem.revision,
                         title,
                         description,
-                        ...(severity ? { severity } : {}),
+                        ...(difficulty ? { difficulty } : {}),
                       }),
                     ),
                   );
@@ -697,12 +713,12 @@ export function ProblemWork({
                   />
                 </Field>
                 <Choice
-                  label={t("problems.severity")}
-                  value={severity}
-                  onChange={setSeverity}
+                  label={t("problems.difficulty")}
+                  value={difficulty}
+                  onChange={setDifficulty}
                   options={[
                     { value: "", label: t("problems.unassessed") },
-                    ...v1.problems.problemSeveritySchema.options.map(
+                    ...v1.problems.problemDifficultySchema.options.map(
                       (value) => ({
                         value,
                         label: t(`problems.${value}`),
@@ -722,9 +738,11 @@ export function ProblemWork({
                     onChange={(e) => setDescription(e.target.value)}
                   />
                 </Field>
-                <Button type="submit" disabled={busy}>
-                  {t("save")}
-                </Button>
+                <SaveButton
+                  type="submit"
+                  disabled={busy}
+                  {...formAction("save", { pending: busy, error: task.error })}
+                />
               </form>
             ) : null}
           </>
@@ -735,7 +753,7 @@ export function ProblemWork({
             <p className="whitespace-pre-wrap text-sm">{problem.workNotes}</p>
           </div>
         ) : null}
-        {can("problems.update") ? (
+        {editable && can("problems.update") ? (
           <Button
             className="self-start"
             variant="outline"
@@ -770,7 +788,7 @@ export function ProblemWork({
           {editable && canAccess(user, "problems.update", "ALL") ? (
             <Button
               variant="outline"
-              disabled={busy || (problem.blocksUsage && !clearHold)}
+              disabled={busy}
               onClick={() => setConfirm("cancel")}
             >
               {t("problems.cancel")}
@@ -786,24 +804,49 @@ export function ProblemWork({
                   : "problems.reopenHelp",
               )}
             </p>
+            {confirm === "reopen" ? (
+              <Field>
+                <FieldLabel htmlFor={`reopen-${problem.id}`}>
+                  {t("problems.reopenMessage")}
+                </FieldLabel>
+                <Textarea
+                  id={`reopen-${problem.id}`}
+                  required
+                  maxLength={4000}
+                  value={reopenMessage}
+                  disabled={busy}
+                  onChange={(event) => setReopenMessage(event.target.value)}
+                  placeholder={t("problems.reopenMessagePlaceholder")}
+                />
+              </Field>
+            ) : null}
             <div className="flex gap-3">
-              <Button
-                variant="destructive"
-                disabled={busy}
+              <SaveButton
+                variant={confirm === "reopen" ? "warning" : "destructive"}
+                disabled={
+                  busy || (confirm === "reopen" && !reopenMessage.trim())
+                }
                 onClick={() =>
-                  void task.run(() =>
-                    mutate(
+                  void task.run(async () => {
+                    await mutate(
                       `/${confirm}`,
                       "POST",
-                      confirm === "cancel" && problem.blocksUsage
-                        ? { clearMaintenanceHold: clearHold === "clear" }
+                      confirm === "reopen"
+                        ? { message: reopenMessage.trim() }
                         : {},
-                    ),
-                  )
+                    );
+                    setConfirm(null);
+                    setReopenMessage("");
+                  })
                 }
-              >
-                {t("access.confirm")}
-              </Button>
+                {...formAction(
+                  "confirm",
+                  { pending: busy, error: task.error },
+                  t(
+                    confirm === "reopen" ? "problems.reopen" : "access.confirm",
+                  ),
+                )}
+              />
               <Button
                 variant="outline"
                 disabled={busy}
@@ -814,57 +857,79 @@ export function ProblemWork({
             </div>
           </div>
         ) : null}
-        {can("problems.update") ? (
-          <form
-            className="flex flex-col gap-3"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void task.run(async () => {
-                await mutate("/comments", "POST", { body: comment.trim() });
-                setComment("");
-              });
-            }}
-          >
-            <Field>
-              <FieldLabel htmlFor={`comment-${problem.id}`}>
-                {t("problems.comment")}
-              </FieldLabel>
-              <Textarea
-                id={`comment-${problem.id}`}
-                placeholder={t("problems.commentPlaceholder")}
-                required
-                maxLength={4000}
-                value={comment}
-                onChange={(e) => setComment(e.target.value)}
-              />
-            </Field>
-            <Button
-              className="self-start"
-              type="submit"
-              disabled={busy || !comment.trim()}
-            >
-              {t("problems.addComment")}
-            </Button>
-          </form>
-        ) : null}
-        <ProblemActivity problemId={problem.id} />
       </ProblemWorkPanel>
+      <ProblemActivity
+        problemId={problem.id}
+        revision={problem.revision}
+        postedComment={postedComment}
+        onCommentAnimated={() => setPostedComment(null)}
+        composer={
+          can("problems.update") ? (
+            <CommentComposer
+              label={t("problems.comment")}
+              placeholder={t("problems.commentPlaceholder")}
+              value={comment}
+              onValueChange={setComment}
+              maxLength={4000}
+              disabled={busy || commentTask.error === t("conflict")}
+              error={commentTask.error}
+              recovery={
+                commentTask.error ? (
+                  <Button
+                    variant="outline"
+                    className="self-start"
+                    disabled={busy}
+                    onClick={() =>
+                      void commentTask.run(async () => {
+                        const updated = await webApi.fetch(
+                          `/v1/problems/${problem.id}`,
+                          v1.problems.problemSchema,
+                          { cache: "no-store" },
+                        );
+                        reload(updated);
+                      })
+                    }
+                  >
+                    {t("retry")}
+                  </Button>
+                ) : undefined
+              }
+              submitButton={formAction("comment", {
+                pending: commentTask.busy,
+                error: commentTask.error,
+              })}
+              onSubmit={(event) => {
+                event.preventDefault();
+                void commentTask.run(async () => {
+                  const body = comment.trim();
+                  await mutate("/comments", "POST", { body });
+                  setPostedComment({ body, actorId: user?.id });
+                  setComment("");
+                });
+              }}
+            />
+          ) : undefined
+        }
+      />
     </div>
   );
 }
 
 function ProblemWorkPanel({
+  actionsTarget,
   compact,
   title,
   primary = false,
   children,
 }: {
+  actionsTarget?: HTMLElement | null;
   compact: boolean;
   title: string;
   primary?: boolean;
   children: ReactNode;
 }) {
   const t = useTranslations("workspace");
+  const shared = useTranslations("shared.actions");
   if (!compact) return <>{children}</>;
   return (
     <BottomSheet>
@@ -877,7 +942,7 @@ function ProblemWorkPanel({
           {title}
         </BottomSheetTrigger>
       ) : (
-        <PageHeaderActions>
+        <PageHeaderActions desktopTarget={actionsTarget}>
           <BottomSheetTrigger
             render={<Button variant="outline" size="icon" aria-label={title} />}
           >
@@ -886,37 +951,150 @@ function ProblemWorkPanel({
         </PageHeaderActions>
       )}
       <BottomSheetContent>
-        <BottomSheetHeader>
+        <BottomSheetHeader
+          className={
+            primary ? "flex-row items-center justify-between gap-3" : undefined
+          }
+        >
           <BottomSheetTitle>{title}</BottomSheetTitle>
+          {primary ? (
+            <BottomSheetClose
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="hidden shrink-0 lg:inline-flex"
+                />
+              }
+              aria-label={shared("close")}
+            >
+              <X aria-hidden="true" />
+            </BottomSheetClose>
+          ) : null}
         </BottomSheetHeader>
         <BottomSheetBody className="gap-6">{children}</BottomSheetBody>
-        <BottomSheetFooter>
-          <BottomSheetClose render={<Button variant="outline" />}>
-            {t("cancel")}
-          </BottomSheetClose>
-        </BottomSheetFooter>
+        {!primary ? (
+          <BottomSheetFooter>
+            <BottomSheetClose render={<Button variant="outline" />}>
+              {t("cancel")}
+            </BottomSheetClose>
+          </BottomSheetFooter>
+        ) : null}
       </BottomSheetContent>
     </BottomSheet>
   );
 }
 
-function ProblemActivity({ problemId }: { problemId: string }) {
+function activityAppearance(entry: v1.problems.ProblemActivity) {
+  if (entry.before?.status !== entry.after?.status) {
+    if (entry.after?.status === "in_progress")
+      return { icon: Play, tone: "info" as const, label: "workStarted" };
+    if (
+      entry.before?.status === "in_progress" &&
+      entry.after?.status === "open"
+    )
+      return { icon: Pause, tone: "warning" as const, label: "workPaused" };
+  }
+  if (
+    entry.type === "PROBLEM_HOLD_CHANGED" ||
+    (entry.after?.blocksUsage !== undefined &&
+      entry.before?.blocksUsage !== entry.after.blocksUsage)
+  )
+    return {
+      icon: entry.after?.blocksUsage ? ShieldAlert : ShieldCheck,
+      tone: entry.after?.blocksUsage
+        ? ("destructive" as const)
+        : ("success" as const),
+    };
+  const variants = {
+    PROBLEM_CREATED: { icon: FilePlus, tone: "neutral" },
+    PROBLEM_UPDATED: { icon: Pencil, tone: "neutral" },
+    PROBLEM_CLAIMED: { icon: Users, tone: "info" },
+    PROBLEM_ASSIGNED: { icon: Users, tone: "info" },
+    PROBLEM_RESOLVED: { icon: CircleCheck, tone: "success" },
+    PROBLEM_REOPENED: { icon: RotateCcw, tone: "warning" },
+    PROBLEM_PRIORITIZED: { icon: Flag, tone: "warning" },
+    PROBLEM_CANCELLED: { icon: CircleSlash, tone: "neutral" },
+    PROBLEM_COMMENTED: { icon: Pencil, tone: "neutral" },
+  } as const;
+  return (
+    variants[entry.type as keyof typeof variants] ?? {
+      icon: Pencil,
+      tone: "neutral" as const,
+    }
+  );
+}
+
+function ProblemActivity({
+  kind = "comments",
+  postedComment,
+  onCommentAnimated,
+  revision,
+  problemId,
+  composer,
+}: {
+  problemId: string;
+  kind?: "comments" | "activity";
+  revision?: number;
+  postedComment?: { body: string; actorId?: string } | null;
+  onCommentAnimated?: () => void;
+  composer?: ReactNode;
+}) {
   const t = useTranslations("workspace");
   const locale = useLocale();
+  const { user } = useSession();
   const [page, setPage] = useState(1);
   const load = useCallback(
     () =>
       webApi.fetch(
-        `/v1/problems/${problemId}/activity?page=${page}`,
+        `/v1/problems/${problemId}/activity?page=${page}&kind=${kind}`,
         v1.problems.problemActivityListSchema,
         { cache: "no-store" },
       ),
-    [problemId, page],
+    [problemId, page, kind],
   );
   const remote = useRemote(load);
-  return (
-    <section className="flex flex-col gap-3" aria-label={t("problems.history")}>
-      <h3 className="text-base font-semibold">{t("problems.history")}</h3>
+  const [latestPage, setLatestPage] = useState<typeof remote.data>(null);
+  if (
+    kind === "activity" &&
+    page === 1 &&
+    !remote.loading &&
+    remote.data !== latestPage
+  )
+    setLatestPage(remote.data);
+  const seenCommentIds = useRef(new Set<string>());
+  const [enteringCommentId, setEnteringCommentId] = useState<string | null>(
+    null,
+  );
+  useEffect(() => {
+    if (!remote.data || remote.loading) return;
+    const comments = remote.data.items.filter(
+      (entry) => entry.type === "PROBLEM_COMMENTED",
+    );
+    if (postedComment) {
+      const added = comments.find(
+        (entry) =>
+          !seenCommentIds.current.has(entry.id) &&
+          entry.note === postedComment.body &&
+          entry.actor?.id === postedComment.actorId,
+      );
+      if (added) {
+        setEnteringCommentId(added.id);
+        onCommentAnimated?.();
+      }
+    }
+    for (const entry of comments) seenCommentIds.current.add(entry.id);
+  }, [remote.data, remote.loading, postedComment, onCommentAnimated]);
+  const previousRevision = useRef(revision);
+  const reloadActivity = remote.reload;
+  useEffect(() => {
+    if (previousRevision.current === revision) return;
+    previousRevision.current = revision;
+    setPage(1);
+    reloadActivity();
+  }, [revision, reloadActivity]);
+  const content = (
+    <>
       <Feedback error={remote.error} />
       {remote.error ? (
         <Button
@@ -932,75 +1110,172 @@ function ProblemActivity({ problemId }: { problemId: string }) {
           {t("loading")}
         </p>
       ) : null}
-      {remote.data ? (
-        <ol className="flex flex-col gap-4">
-          {remote.data.items.map((entry) => (
-            <li key={entry.id} className="flex flex-col gap-1 border-l pl-4">
-              <p className="text-sm font-medium">
-                {t(`problems.events.${entry.type}`)}
-                {entry.actor ? ` · ${memberName(entry.actor)}` : ""}
-              </p>
-              <time
-                className="text-xs text-muted-foreground"
-                dateTime={entry.createdAt}
-              >
-                {new Date(entry.createdAt).toLocaleString(locale)}
-              </time>
-              {entry.before?.status &&
-              entry.after?.status &&
-              entry.before.status !== entry.after.status ? (
-                <p className="text-sm">
-                  {t(`problems.${entry.before.status}`)} →{" "}
-                  {t(`problems.${entry.after.status}`)}
-                </p>
-              ) : null}
-              {entry.after?.blocksUsage !== undefined &&
-              entry.before?.blocksUsage !== entry.after.blocksUsage ? (
-                <p className="text-sm">
-                  {t(
-                    entry.after.blocksUsage
-                      ? "problems.blocksUsage"
-                      : "problems.holdCleared",
-                  )}
-                </p>
-              ) : null}
-              {entry.before?.severity !== entry.after?.severity &&
-              entry.after?.severity ? (
-                <p className="text-sm">
-                  {t("problems.severity")}:{" "}
-                  {t(`problems.${entry.after.severity}`)}
-                </p>
-              ) : null}
-              {(entry.after?.assignees !== undefined ||
-                entry.after?.assigneeId !== undefined) &&
-              JSON.stringify(
-                v1.problems
-                  .problemAssignees(entry.before ?? {})
-                  .map((member) => member.id)
-                  .sort(),
-              ) !==
-                JSON.stringify(
-                  v1.problems
-                    .problemAssignees(entry.after ?? {})
-                    .map((member) => member.id)
-                    .sort(),
-                ) ? (
-                <p className="text-sm">
-                  {t("problems.assignee")}:{" "}
-                  {v1.problems
-                    .problemAssignees(entry.after ?? {})
-                    .map(memberName)
-                    .join(", ") || t("problems.unassigned")}
-                </p>
-              ) : null}
-              {entry.note ? (
-                <p className="whitespace-pre-wrap text-sm">{entry.note}</p>
-              ) : null}
-            </li>
-          ))}
-        </ol>
+      {remote.data && !remote.data.items.length ? (
+        <p className="text-sm text-muted-foreground">
+          {t(
+            kind === "comments"
+              ? "problems.noComments"
+              : "problems.noSystemActivity",
+          )}
+        </p>
       ) : null}
       {remote.data ? (
+        <ol className="flex flex-col gap-4">
+          {remote.data.items
+            .filter((entry) =>
+              kind === "comments"
+                ? (
+                    v1.problems.problemConversationTypes as readonly string[]
+                  ).includes(entry.type)
+                : entry.type !== "PROBLEM_COMMENTED",
+            )
+            .map((entry) =>
+              kind === "comments" && entry.type !== "PROBLEM_COMMENTED" ? (
+                <CommentEventItem
+                  key={entry.id}
+                  kind={
+                    entry.type === "PROBLEM_RESOLVED" ? "completed" : "reopened"
+                  }
+                  label={t(
+                    entry.type === "PROBLEM_RESOLVED"
+                      ? "problems.taskCompletedComment"
+                      : "problems.taskReopenedComment",
+                  )}
+                  avatarUrl={userAvatarSrc(entry.actor?.avatarAssetId)}
+                  author={
+                    entry.actor
+                      ? memberName(entry.actor)
+                      : t("problems.unknownAuthor")
+                  }
+                  dateTime={entry.createdAt}
+                  timestamp={new Date(entry.createdAt).toLocaleString(locale)}
+                >
+                  {entry.note || t("problems.noTransitionMessage")}
+                </CommentEventItem>
+              ) : entry.type === "PROBLEM_COMMENTED" ? (
+                <CommentItem
+                  key={entry.id}
+                  animateEntrance={entry.id === enteringCommentId}
+                  onAnimationEnd={() =>
+                    setEnteringCommentId((current) =>
+                      current === entry.id ? null : current,
+                    )
+                  }
+                  avatarUrl={userAvatarSrc(entry.actor?.avatarAssetId)}
+                  author={
+                    entry.actor
+                      ? memberName(entry.actor)
+                      : t("problems.unknownAuthor")
+                  }
+                  dateTime={entry.createdAt}
+                  timestamp={new Date(entry.createdAt).toLocaleString(locale)}
+                >
+                  {entry.note}
+                </CommentItem>
+              ) : (
+                <ActivityTimelineItem
+                  key={entry.id}
+                  icon={(() => {
+                    const Icon = activityAppearance(entry).icon;
+                    return <Icon />;
+                  })()}
+                  tone={activityAppearance(entry).tone}
+                  title={
+                    "label" in activityAppearance(entry)
+                      ? t(
+                          `problems.notifications.${entry.after?.status === "in_progress" ? "workStarted" : "workPaused"}`,
+                        )
+                      : t(`problems.events.${entry.type}`)
+                  }
+                  actor={entry.actor ? memberName(entry.actor) : undefined}
+                  timestamp={new Date(entry.createdAt).toLocaleString(locale)}
+                  dateTime={entry.createdAt}
+                  detailsLabel={t("problems.viewChanges")}
+                  details={
+                    entry.note ||
+                    (["title", "description"].some(
+                      (key) =>
+                        entry.before?.[key as "title" | "description"] !==
+                          entry.after?.[key as "title" | "description"] &&
+                        entry.after?.[key as "title" | "description"],
+                    ) ? (
+                      <div className="flex flex-col gap-2">
+                        {["title", "description"].map((key) => {
+                          const before =
+                            entry.before?.[key as "title" | "description"];
+                          const after =
+                            entry.after?.[key as "title" | "description"];
+                          return before !== after && after ? (
+                            <p key={key}>
+                              {before ? `${before} → ` : ""}
+                              {after}
+                            </p>
+                          ) : null;
+                        })}
+                      </div>
+                    ) : undefined)
+                  }
+                >
+                  {entry.before?.status &&
+                  entry.after?.status &&
+                  entry.before.status !== entry.after.status ? (
+                    <p className="text-sm">
+                      {t(`problems.${entry.before.status}`)} →{" "}
+                      {t(`problems.${entry.after.status}`)}
+                    </p>
+                  ) : null}
+                  {entry.after?.blocksUsage !== undefined &&
+                  entry.before?.blocksUsage !== entry.after.blocksUsage ? (
+                    <p className="text-sm">
+                      {t(
+                        entry.after.blocksUsage
+                          ? "problems.blocksUsage"
+                          : "problems.holdCleared",
+                      )}
+                    </p>
+                  ) : null}
+                  {entry.before?.difficulty !== entry.after?.difficulty &&
+                  entry.after?.difficulty ? (
+                    <p className="text-sm">
+                      {t("problems.difficulty")}:{" "}
+                      {t(`problems.${entry.after.difficulty}`)}
+                    </p>
+                  ) : null}
+                  {entry.before?.severity !== entry.after?.severity &&
+                  entry.after?.severity ? (
+                    <p className="text-sm">
+                      {t("problems.severity")}:{" "}
+                      {t(`problems.${entry.after.severity}`)}
+                    </p>
+                  ) : null}
+                  {(entry.after?.assignees !== undefined ||
+                    entry.after?.assigneeId !== undefined) &&
+                  JSON.stringify(
+                    v1.problems
+                      .problemAssignees(entry.before ?? {})
+                      .map((member) => member.id)
+                      .sort(),
+                  ) !==
+                    JSON.stringify(
+                      v1.problems
+                        .problemAssignees(entry.after ?? {})
+                        .map((member) => member.id)
+                        .sort(),
+                    ) ? (
+                    <p className="text-sm">
+                      {t("problems.assignee")}:{" "}
+                      {v1.problems
+                        .problemAssignees(entry.after ?? {})
+                        .map(memberName)
+                        .join(", ") || t("problems.unassigned")}
+                    </p>
+                  ) : null}
+                </ActivityTimelineItem>
+              ),
+            )}
+        </ol>
+      ) : null}
+      {remote.data && remote.data.total > remote.data.pageSize ? (
         <div className="flex gap-3">
           <Button
             variant="outline"
@@ -1020,6 +1295,35 @@ function ProblemActivity({ problemId }: { problemId: string }) {
           </Button>
         </div>
       ) : null}
-    </section>
+    </>
+  );
+  const latest = latestPage?.items.find(
+    (entry) => entry.type !== "PROBLEM_COMMENTED",
+  );
+  return kind === "activity" ? (
+    <ActivityTimeline
+      title={t("problems.activity")}
+      count={remote.data?.total}
+      summary={
+        latest
+          ? `${t(`problems.events.${latest.type}`)} · ${new Date(latest.createdAt).toLocaleString(locale)}`
+          : undefined
+      }
+    >
+      {content}
+    </ActivityTimeline>
+  ) : (
+    <>
+      <CommentThread title={t("problems.comments")} composer={composer}>
+        {content}
+      </CommentThread>
+      {user?.isAdmin || user?.isSuperAdmin ? (
+        <ProblemActivity
+          kind="activity"
+          problemId={problemId}
+          revision={revision}
+        />
+      ) : null}
+    </>
   );
 }

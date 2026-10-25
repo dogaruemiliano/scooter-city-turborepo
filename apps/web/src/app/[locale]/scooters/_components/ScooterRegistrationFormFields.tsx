@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@repo/ui/components";
+import { NormalizedInput } from "@repo/ui/components/normalized-input";
 import { useLocale, useTranslations } from "next-intl";
 import type { ComponentProps, ReactNode } from "react";
 
@@ -27,6 +28,8 @@ interface ScooterRegistrationFormFieldsProps {
     value: ScooterFormState[Key],
   ) => void;
 }
+
+const uppercasePlate = (value: string) => value.toUpperCase();
 
 export function ScooterRegistrationFormFields({
   formId,
@@ -59,7 +62,7 @@ export function ScooterRegistrationFormFields({
   const registered = form.registrationType !== "unregistered";
 
   return (
-    <FormSection title={t("sections.registration")}>
+    <FormSection>
       <Field
         id={`${formId}-registration-type`}
         label={t("fields.registrationType")}
@@ -93,6 +96,8 @@ export function ScooterRegistrationFormFields({
             label={t("fields.registrationNumber")}
             required
             value={form.registrationNumber}
+            normalize={uppercasePlate}
+            autoCapitalize="characters"
             error={errors.registrationNumber}
             placeholder={t(
               `placeholders.registrationNumber.${form.registrationType}`,
@@ -100,27 +105,6 @@ export function ScooterRegistrationFormFields({
             disabled={disabled}
             onChange={(value) => onSetValue("registrationNumber", value)}
           />
-          <Field
-            id={`${formId}-registered-on-day`}
-            label={t("fields.registrationDate")}
-            required
-            error={errors.registrationDate}
-          >
-            <DatePartsInput
-              baseId={`${formId}-registered-on`}
-              aria-describedby={
-                errors.registrationDate
-                  ? `${formId}-registered-on-day-error`
-                  : undefined
-              }
-              disabled={disabled}
-              invalid={Boolean(errors.registrationDate)}
-              label={t("fields.registrationDate")}
-              locale={locale}
-              value={form.registrationDate}
-              onChange={(value) => onSetValue("registrationDate", value)}
-            />
-          </Field>
           {form.registrationType === "temporary" ? (
             <Field
               id={`${formId}-registration-expires-on-day`}
@@ -195,6 +179,7 @@ function TextField({
   required,
   onChange,
   className,
+  normalize,
   ...props
 }: {
   id: string;
@@ -204,18 +189,32 @@ function TextField({
   required?: boolean;
   onChange: (value: string) => void;
   className?: string;
-} & Omit<ComponentProps<typeof Input>, "id" | "value" | "onChange">) {
+  normalize?: (value: string) => string;
+} & Omit<ComponentProps<typeof Input>, "id" | "value" | "onChange" | "type">) {
   return (
     <Field id={id} label={label} required={required} error={error}>
-      <Input
-        id={id}
-        value={value}
-        aria-invalid={error ? true : undefined}
-        aria-describedby={error ? `${id}-error` : undefined}
-        className={className}
-        onChange={(event) => onChange(event.target.value)}
-        {...props}
-      />
+      {normalize ? (
+        <NormalizedInput
+          {...props}
+          id={id}
+          value={value}
+          onValueChange={onChange}
+          normalize={normalize}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? `${id}-error` : undefined}
+          className={className}
+        />
+      ) : (
+        <Input
+          id={id}
+          value={value}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? `${id}-error` : undefined}
+          className={className}
+          onChange={(event) => onChange(event.target.value)}
+          {...props}
+        />
+      )}
     </Field>
   );
 }

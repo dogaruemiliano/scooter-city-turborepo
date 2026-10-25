@@ -8,6 +8,7 @@ const meta = {
   tags: ["autodocs"],
   args: {
     label: "Drop documents here",
+    mobileLabel: "Select documents",
     browseLabel: "Browse files",
     hint: "PDF or images. Upload limits are checked by the application.",
     accept: "application/pdf,image/*",
@@ -33,3 +34,9 @@ export const Default: Story = {
 };
 
 export const Disabled: Story = { args: { disabled: true } };
+
+/** Mobile uses a compact preview-style selection card; desktop retains drag-and-drop. */
+export const MobileSelection: Story = {
+  globals: { viewport: { value: "mobile1", isRotated: false } },
+  args: { requirements: "PDF, JPG, PNG or WebP, up to 15 MB each." },
+};

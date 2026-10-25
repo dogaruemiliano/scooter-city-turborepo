@@ -1,4 +1,6 @@
 "use client";
+import { useFormAction } from "@/lib/form/use-form-action";
+import { SaveButton } from "@repo/ui/components/save-button";
 import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { v1 } from "@repo/api-shared";
@@ -21,6 +23,8 @@ export function MemberAccountControls({
   canManageStatus?: boolean;
   superAdmin?: boolean;
 }) {
+  const formAction = useFormAction();
+
   const t = useTranslations("workspace");
   const locale = useLocale();
   const task = useTask();
@@ -70,7 +74,7 @@ export function MemberAccountControls({
           </p>
         ) : null}
         <div className="flex flex-wrap gap-3">
-          <Button
+          <SaveButton
             variant="outline"
             disabled={
               !canInvite ||
@@ -80,9 +84,12 @@ export function MemberAccountControls({
               user.loginStatus === "SUSPENDED"
             }
             onClick={() => void task.run(() => lifecycle("invite"))}
-          >
-            {user.invitation ? t("access.resend") : t("access.invite")}
-          </Button>
+            {...formAction(
+              "invite",
+              { pending: task.busy, error: task.error },
+              user.invitation ? t("access.resend") : t("access.invite"),
+            )}
+          />
           {canInvite && user.loginStatus === "INVITED" ? (
             <Button
               variant="outline"
@@ -166,20 +173,23 @@ export function MemberAccountControls({
               )}
               : {user.email}
             </span>
-            <Button
+            <SaveButton
               variant="destructive"
               disabled={task.busy || disabled}
               onClick={() => void task.run(() => lifecycle(confirmAction))}
-            >
-              {t("access.confirm")}
-            </Button>
+              {...formAction(
+                "confirm",
+                { pending: task.busy, error: task.error },
+                t("access.confirm"),
+              )}
+            />
             <Button variant="outline" onClick={() => setConfirmAction(null)}>
               {t("cancel")}
             </Button>
           </div>
         ) : null}
       </section>
-      <Feedback error={task.error} success={task.success} />
+      <Feedback error={task.error} />
     </fieldset>
   );
 }

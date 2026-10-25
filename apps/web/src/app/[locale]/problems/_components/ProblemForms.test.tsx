@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CreateProblem, ProblemWork, memberName } from "./ProblemForms";
 import { ProblemCreateScreen } from "./ProblemCreateScreen";
 import { AssigneeSelect } from "./AssigneeSelect";
+import { ProblemAssignment } from "./ProblemAssignment";
 
 const mocks = vi.hoisted(() => ({
   fetch: vi.fn(),
@@ -39,7 +40,7 @@ const problem: v1.problems.Problem = {
   scooterId: "scooter",
   title: "Broken belt",
   description: "",
-  severity: "critical",
+  difficulty: "hard",
   blocksUsage: true,
   holdClearedAt: null,
   photos: [],
@@ -154,6 +155,39 @@ describe("problem release forms", () => {
     );
   });
 
+  it("shows name and role without email in the assignee selection sheet", async () => {
+    renderForm(
+      <AssigneeSelect
+        value=""
+        onValueChange={vi.fn()}
+        members={[
+          {
+            id: "mechanic",
+            email: "alex@example.com",
+            firstName: "Alex",
+            lastName: "Smith",
+            roles: ["Mechanic"],
+          },
+        ]}
+      />,
+    );
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "Add assignee" }));
+    const sheet = await screen.findByRole("dialog", { name: "Add assignee" });
+    const option = within(sheet).getByRole("button", { name: "Alex Smith" });
+    expect(
+      within(option).queryByText("alex@example.com"),
+    ).not.toBeInTheDocument();
+    const name = within(option).getByText("Alex Smith");
+    const role = within(option).getByText("Mechanic");
+    expect(name.parentElement).toHaveClass("items-start", "text-left");
+    expect(
+      name.compareDocumentPosition(role) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(role).toHaveClass("text-warning-text");
+  });
+
   it.each([
     ["member", "Super Admin", "text-personal"],
     ["another-admin", "Admin", "text-info"],
@@ -192,7 +226,7 @@ describe("problem release forms", () => {
     const saved = vi.fn();
     renderForm(<CreateProblem scooterId="scooter" onSaved={saved} />);
     await user.type(screen.getByRole("textbox", { name: "Title" }), "Service");
-    await user.click(screen.getByRole("radio", { name: "Low" }));
+    await user.click(screen.getByRole("radio", { name: "Easy" }));
     await user.click(screen.getByRole("radio", { name: "Usable" }));
     for (const [section, label, text] of [
       ["Checklist", "New checklist item", "Check brakes"],
@@ -235,7 +269,7 @@ describe("problem release forms", () => {
           url === "/v1/problems" && options?.method === "POST",
       ),
     ).toHaveLength(0);
-    await user.click(screen.getByRole("button", { name: "Report" }));
+    await user.click(screen.getByRole("button", { name: "Report problem" }));
     await waitFor(() => expect(saved).toHaveBeenCalledOnce());
     expect(mocks.fetch).toHaveBeenCalledWith(
       "/v1/problems",
@@ -295,8 +329,10 @@ describe("problem release forms", () => {
     renderForm(<ProblemWork problem={problem} reload={vi.fn()} />);
     await userEvent
       .setup()
-      .click(screen.getByRole("button", { name: "Add assignee" }));
-    const sheet = await screen.findByRole("dialog", { name: "Add assignee" });
+      .click(screen.getByRole("button", { name: "Manage assignment" }));
+    const sheet = await screen.findByRole("dialog", {
+      name: "Manage assignment",
+    });
     expect(
       await within(sheet).findByRole("button", {
         name: "mechanic@example.com",
@@ -308,16 +344,106 @@ describe("problem release forms", () => {
     ).toBeInTheDocument();
   });
 
+  it("keeps a single assignment edit action beside the section title, outside the user rows", async () => {
+    renderForm(
+      <ProblemWork
+        problem={{
+          ...problem,
+          assignees: [
+            problem.assignee!,
+            { id: "other", firstName: "Taylor", lastName: null },
+          ],
+        }}
+        reload={vi.fn()}
+      />,
+    );
+    const assignment = screen.getByRole("region", { name: "Assignment" });
+    const rows = assignment.querySelectorAll('[data-slot="assignee-user-row"]');
+    expect(rows).toHaveLength(2);
+    for (const row of rows) {
+      expect(row).toHaveClass("rounded-2xl", "border", "bg-card", "p-4");
+      expect(within(row as HTMLElement).queryByRole("button")).toBeNull();
+    }
+    const edit = within(assignment).getByRole("button", {
+      name: "Manage assignment",
+    });
+    expect(edit.parentElement).toHaveClass(
+      "flex",
+      "items-center",
+      "justify-between",
+    );
+    expect(edit.parentElement).toContainElement(
+      within(assignment).getByRole("heading", { name: "Assignment" }),
+    );
+    expect(edit.querySelector("svg")).toHaveClass("lucide-pencil");
+    await userEvent.setup().click(edit);
+    const sheet = await screen.findByRole("dialog", {
+      name: "Manage assignment",
+    });
+    for (const name of ["Alex", "Taylor"])
+      expect(within(sheet).getByRole("button", { name })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+  });
+
+  it.each([
+    {
+      label: "read-only",
+      mayAssign: false,
+      busy: false,
+      status: "in_progress" as const,
+    },
+    {
+      label: "closed",
+      mayAssign: true,
+      busy: false,
+      status: "resolved" as const,
+    },
+    {
+      label: "busy",
+      mayAssign: true,
+      busy: true,
+      status: "in_progress" as const,
+    },
+  ])("protects assignment edits when $label", ({ mayAssign, busy, status }) => {
+    renderForm(
+      <ProblemAssignment
+        problem={{ ...problem, status }}
+        userId="member"
+        mayAssign={mayAssign}
+        mayClaim={false}
+        busy={busy}
+        members={[]}
+        loading={false}
+        error={null}
+        saveError={null}
+        onRetry={vi.fn()}
+        onAssign={vi.fn()}
+        onClaim={vi.fn()}
+      />,
+    );
+    const edit = screen.queryByRole("button", {
+      name: "Manage assignment",
+    });
+    if (busy) expect(edit).toBeDisabled();
+    else expect(edit).not.toBeInTheDocument();
+    expect(screen.getByText("Alex")).toBeInTheDocument();
+  });
+
   it("assigns an existing problem from the assignee bottom sheet", async () => {
     const user = userEvent.setup();
     const reload = vi.fn();
     renderForm(<ProblemWork problem={problem} reload={reload} />);
-    await user.click(screen.getByRole("button", { name: "Add assignee" }));
+    await user.click(screen.getByRole("button", { name: "Manage assignment" }));
     const sheet = await screen.findByRole("dialog", {
-      name: "Add assignee",
+      name: "Manage assignment",
     });
     await user.click(
       await within(sheet).findByRole("button", { name: "Taylor" }),
+    );
+    await user.click(
+      within(sheet).getByRole("button", { name: "Save assignees" }),
     );
     await waitFor(() =>
       expect(mocks.fetch).toHaveBeenCalledWith(
@@ -342,15 +468,15 @@ describe("problem release forms", () => {
       screen.getByRole("textbox", { name: "Title" }),
       "Scratched panel",
     );
-    await user.click(screen.getByRole("radio", { name: "Low" }));
-    const submit = screen.getByRole("button", { name: "Report" });
+    await user.click(screen.getByRole("radio", { name: "Easy" }));
+    const submit = screen.getByRole("button", { name: "Report problem" });
     const group = screen.getByRole("radiogroup", {
       name: "Scooter condition",
     });
     expect(group).toHaveAttribute("aria-required", "true");
     expect(
       group.closest('[data-slot="field"]')?.previousElementSibling,
-    ).toContainElement(screen.getByRole("radiogroup", { name: "Severity" }));
+    ).toContainElement(screen.getByRole("radiogroup", { name: "Difficulty" }));
     const functional = within(group).getByRole("radio", { name: "Usable" });
     const defective = within(group).getByRole("radio", { name: "Unusable" });
     expect(functional.nextElementSibling).toHaveClass("text-success");
@@ -488,7 +614,7 @@ describe("problem release forms", () => {
     expect(screen.getByRole("img", { name: "brake.png" })).toBeInTheDocument();
   });
 
-  it("reports from a preselected scooter with severity and an assignee, without requiring description or photos", async () => {
+  it("reports from a preselected scooter with difficulty and an assignee, without requiring description or photos", async () => {
     const user = userEvent.setup();
     const saved = vi.fn();
     renderForm(<CreateProblem scooterId="scooter" onSaved={saved} />);
@@ -499,35 +625,39 @@ describe("problem release forms", () => {
       screen.getByRole("textbox", { name: "Title" }),
       "Broken belt",
     );
-    await user.click(screen.getByRole("radio", { name: "Critical" }));
-    expect(screen.getByRole("radio", { name: "Critical" })).toBeChecked();
+    await user.click(screen.getByRole("radio", { name: "Hard" }));
+    expect(screen.getByRole("radio", { name: "Hard" })).toBeChecked();
+    expect(
+      within(
+        screen.getByRole("radiogroup", { name: "Difficulty" }),
+      ).getAllByRole("radio"),
+    ).toHaveLength(3);
     for (const [label, color] of [
-      ["Low", "low"],
+      ["Easy", "easy"],
       ["Medium", "medium"],
-      ["High", "high"],
-      ["Critical", "critical"],
+      ["Hard", "hard"],
     ]) {
       const segment = screen.getByRole("radio", {
         name: label,
       }).nextElementSibling;
-      if (label === "Critical") {
-        expect(segment).toHaveClass(`bg-severity-${color}`);
+      if (label === "Hard") {
+        expect(segment).toHaveClass(`bg-difficulty-${color}`);
       } else {
-        expect(segment).toHaveClass(`text-severity-${color}`);
-        expect(segment).not.toHaveClass(`bg-severity-${color}`);
+        expect(segment).toHaveClass(`text-difficulty-${color}`);
+        expect(segment).not.toHaveClass(`bg-difficulty-${color}`);
       }
     }
-    await user.click(screen.getByRole("radio", { name: "Low" }));
+    await user.click(screen.getByRole("radio", { name: "Easy" }));
     expect(
-      screen.getByRole("radio", { name: "Low" }).nextElementSibling,
-    ).toHaveClass("bg-severity-low");
+      screen.getByRole("radio", { name: "Easy" }).nextElementSibling,
+    ).toHaveClass("bg-difficulty-easy");
     expect(
-      screen.getByRole("radio", { name: "Critical" }).nextElementSibling,
-    ).toHaveClass("text-severity-critical");
+      screen.getByRole("radio", { name: "Hard" }).nextElementSibling,
+    ).toHaveClass("text-difficulty-hard");
     expect(
-      screen.getByRole("radio", { name: "Critical" }).nextElementSibling,
-    ).not.toHaveClass("bg-severity-critical");
-    await user.click(screen.getByRole("radio", { name: "Critical" }));
+      screen.getByRole("radio", { name: "Hard" }).nextElementSibling,
+    ).not.toHaveClass("bg-difficulty-hard");
+    await user.click(screen.getByRole("radio", { name: "Hard" }));
     await user.click(screen.getByRole("radio", { name: "Unusable" }));
     await user.click(screen.getByRole("button", { name: "Add assignee" }));
     await user.click(await screen.findByRole("button", { name: "Taylor" }));
@@ -540,7 +670,7 @@ describe("problem release forms", () => {
     await waitFor(() =>
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
     );
-    await user.click(screen.getByRole("button", { name: "Report" }));
+    await user.click(screen.getByRole("button", { name: "Report problem" }));
     await waitFor(() => expect(saved).toHaveBeenCalledOnce());
     expect(mocks.fetch).toHaveBeenCalledWith(
       "/v1/problems",
@@ -550,7 +680,7 @@ describe("problem release forms", () => {
         json: {
           scooterId: "scooter",
           title: "Broken belt",
-          severity: "critical",
+          difficulty: "hard",
           blocksUsage: true,
           description: "",
           photos: [],
@@ -566,13 +696,7 @@ describe("problem release forms", () => {
 
   it("opens completion in a distinct bottom sheet on the compact detail screen", async () => {
     const user = userEvent.setup();
-    renderForm(
-      <ProblemWork
-        compact
-        problem={{ ...problem, blocksUsage: false }}
-        reload={vi.fn()}
-      />,
-    );
+    renderForm(<ProblemWork compact problem={problem} reload={vi.fn()} />);
     expect(
       screen.queryByRole("textbox", { name: "Resolution notes" }),
     ).toBeNull();
@@ -581,8 +705,13 @@ describe("problem release forms", () => {
     const sheet = await screen.findByRole("dialog", { name: "Complete task" });
     expect(sheet).toHaveClass("bg-popover", "text-popover-foreground");
     expect(sheet.querySelector(".bg-background")).toBeNull();
+    expect(
+      within(sheet).queryByRole("combobox", {
+        name: "When closing this report",
+      }),
+    ).toBeNull();
     const submit = within(sheet).getByRole("button", {
-      name: "Resolve problem",
+      name: "Complete task",
     });
     expect(submit).toBeDisabled();
     await user.type(
@@ -652,27 +781,20 @@ describe("problem release forms", () => {
       expect(
         screen.queryByRole("button", { name: "Complete task" }),
       ).toBeNull();
-      await user.click(
-        screen.getByRole("button", { name: "More actions and activity" }),
-      );
+      await user.click(screen.getByRole("button", { name: "More actions" }));
       const sheet = await screen.findByRole("dialog", {
-        name: "More actions and activity",
+        name: "More actions",
       });
       expect(sheet).toHaveClass("bg-popover", "text-popover-foreground");
       // Controls inherit the temporary surface; no full-sheet page override.
       expect(
         sheet.querySelector('[data-slot="bottom-sheet-body"].bg-background'),
       ).toBeNull();
-      await user.click(
-        within(sheet).getByRole("combobox", {
+      expect(
+        within(sheet).queryByRole("combobox", {
           name: "When closing this report",
         }),
-      );
-      await user.click(
-        await screen.findByRole("option", {
-          name: "Keep the maintenance hold",
-        }),
-      );
+      ).toBeNull();
       await user.click(
         within(sheet).getByRole("button", { name: "Dismiss report" }),
       );
@@ -685,7 +807,7 @@ describe("problem release forms", () => {
           expect.anything(),
           {
             method: "POST",
-            json: { revision: 3, clearMaintenanceHold: false },
+            json: { revision: 3 },
           },
         ),
       );
@@ -694,23 +816,54 @@ describe("problem release forms", () => {
     }
   });
 
-  it("requires a resolution note and an explicit hold decision, then retains the hold", async () => {
+  it("requires a reopening reason and includes it in the request", async () => {
+    const user = userEvent.setup();
+    const reload = vi.fn();
+    renderForm(
+      <ProblemWork
+        problem={{ ...problem, status: "resolved" }}
+        reload={reload}
+      />,
+    );
+    await user.click(
+      screen.getByRole("button", {
+        name: messages.en.workspace.problems.reopen,
+      }),
+    );
+    const confirm = screen
+      .getAllByRole("button", { name: messages.en.workspace.problems.reopen })
+      .at(-1)!;
+    expect(confirm).toBeDisabled();
+    await user.type(
+      screen.getByRole("textbox", { name: "Reason for reopening" }),
+      "Noise returned after road test",
+    );
+    await user.click(confirm);
+    await waitFor(() => expect(reload).toHaveBeenCalledOnce());
+    expect(mocks.fetch).toHaveBeenCalledWith(
+      "/v1/problems/report/reopen",
+      expect.anything(),
+      {
+        method: "POST",
+        json: { revision: 3, message: "Noise returned after road test" },
+      },
+    );
+  });
+  it("requires resolution notes and completes without a maintenance hold decision", async () => {
     const user = userEvent.setup();
     const reload = vi.fn();
     renderForm(<ProblemWork problem={problem} reload={reload} />);
-    const resolve = screen.getByRole("button", { name: "Resolve problem" });
+    const resolve = screen.getByRole("button", { name: "Complete task" });
     expect(resolve).toBeDisabled();
     await user.type(
       screen.getByRole("textbox", { name: "Resolution notes" }),
       "Belt replaced; safety inspection pending",
     );
-    expect(resolve).toBeDisabled();
-    await user.click(
-      screen.getByRole("combobox", { name: "When closing this report" }),
-    );
-    await user.click(
-      await screen.findByRole("option", { name: "Keep the maintenance hold" }),
-    );
+    expect(resolve).toBeEnabled();
+    expect(
+      screen.queryByRole("combobox", { name: "When closing this report" }),
+    ).toBeNull();
+    expect(screen.queryByText("Keep the maintenance hold")).toBeNull();
     await user.click(resolve);
     await waitFor(() => expect(reload).toHaveBeenCalledOnce());
     expect(mocks.fetch).toHaveBeenCalledWith(
@@ -721,7 +874,6 @@ describe("problem release forms", () => {
         json: {
           revision: 3,
           resolutionNotes: "Belt replaced; safety inspection pending",
-          clearMaintenanceHold: false,
         },
       },
     );
@@ -744,8 +896,7 @@ describe("problem release forms", () => {
     );
   });
 
-  it("keeps an explicit clearance action and previous resolution visible on a closed blocker", async () => {
-    const user = userEvent.setup();
+  it("keeps the previous resolution without hold controls on closed work", () => {
     const reload = vi.fn();
     renderForm(
       <ProblemWork
@@ -759,17 +910,15 @@ describe("problem release forms", () => {
     );
     expect(screen.getByText("Belt replaced")).toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "Resolve problem" }),
+      screen.queryByRole("button", { name: "Complete task" }),
     ).not.toBeInTheDocument();
-    await user.click(
-      screen.getByRole("button", { name: "Clear this problem’s hold" }),
-    );
-    await waitFor(() => expect(reload).toHaveBeenCalledOnce());
-    expect(mocks.fetch).toHaveBeenCalledWith(
-      "/v1/problems/report/hold",
-      expect.anything(),
-      { method: "PUT", json: { revision: 3, blocksUsage: false } },
-    );
+    expect(
+      screen.queryByRole("button", { name: "Clear this problem’s hold" }),
+    ).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Block scooter use" }),
+    ).toBeNull();
+    expect(reload).not.toHaveBeenCalled();
   });
 
   it("offers an explicit reload when a stale comment is rejected", async () => {
@@ -792,6 +941,10 @@ describe("problem release forms", () => {
       await screen.findByText(messages.en.workspace.conflict),
     ).toBeInTheDocument();
     expect(reload).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Add comment" })).toBeDisabled();
+    expect(screen.getByRole("textbox", { name: "Comment" })).toHaveValue(
+      "Stale update",
+    );
     await user.click(screen.getByRole("button", { name: "Reload" }));
     expect(reload).toHaveBeenCalledOnce();
   });
@@ -813,11 +966,10 @@ describe("problem creation screen picker", () => {
               registrationNumber: "B 123 ABC",
               vin: "VIN7",
               coverUrl: "/cover.jpg",
-              problemSeverityCounts: {
-                low: 2,
-                moderate: 0,
-                high: 1,
-                critical: 3,
+              problemDifficultyCounts: {
+                easy: 2,
+                medium: 0,
+                hard: 4,
                 unknown: 0,
               },
             },
@@ -830,11 +982,10 @@ describe("problem creation screen picker", () => {
               registrationNumber: null,
               vin: "VIN8",
               coverUrl: null,
-              problemSeverityCounts: {
-                low: 0,
-                moderate: 0,
-                high: 0,
-                critical: 0,
+              problemDifficultyCounts: {
+                easy: 0,
+                medium: 0,
+                hard: 0,
                 unknown: 0,
               },
             },
@@ -862,10 +1013,10 @@ describe("problem creation screen picker", () => {
       }
     }
     expect(
-      within(picker).getByRole("img", { name: "Critical: 3 problems" }),
+      within(picker).getByRole("img", { name: "Hard: 4 problems" }),
     ).toBeInTheDocument();
     expect(
-      within(picker).getByRole("img", { name: "Low: 2 problems" }),
+      within(picker).getByRole("img", { name: "Easy: 2 problems" }),
     ).toBeInTheDocument();
     expect(within(picker).getByText("—")).toBeInTheDocument();
     expect(within(picker).getByText("No active problems")).toBeInTheDocument();
@@ -897,7 +1048,7 @@ describe("dedicated creation screen", () => {
   it("saves a preselected scooter report and returns to its details", async () => {
     const user = userEvent.setup();
     renderForm(<ProblemCreateScreen scooterId="scooter" />);
-    const submit = screen.getByRole("button", { name: "Report" });
+    const submit = screen.getByRole("button", { name: "Report problem" });
     expect(submit.parentElement?.firstElementChild).toBe(submit);
     expect(submit.closest('[data-slot="problem-create-actions"]')).toHaveClass(
       "static",
@@ -911,7 +1062,7 @@ describe("dedicated creation screen", () => {
       screen.getByRole("textbox", { name: "Title" }),
       "Broken belt",
     );
-    await user.click(screen.getByRole("radio", { name: "Critical" }));
+    await user.click(screen.getByRole("radio", { name: "Hard" }));
     await user.click(screen.getByRole("radio", { name: "Usable" }));
     expect(submit.closest('[data-slot="problem-create-actions"]')).toHaveClass(
       "sticky",
@@ -927,7 +1078,7 @@ describe("dedicated creation screen", () => {
       screen.getByRole("textbox", { name: "Title" }),
       "Broken belt",
     );
-    await user.click(screen.getByRole("button", { name: "Report" }));
+    await user.click(screen.getByRole("button", { name: "Report problem" }));
     await waitFor(() =>
       expect(mocks.push).toHaveBeenCalledWith("/en/scooters/scooter"),
     );

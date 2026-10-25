@@ -7,6 +7,7 @@ import {
   HttpStatus,
   Param,
   Post,
+  Query,
   Res,
   ServiceUnavailableException,
 } from "@nestjs/common";
@@ -96,8 +97,9 @@ export class ScooterDocumentsController {
     @Param("id") id: string,
     @Param("documentId") documentId: string,
     @Res() res: Response,
+    @Query("version") version?: string,
   ) {
-    const content = await this.documents.content(id, documentId);
+    const content = await this.documents.content(id, documentId, version);
     res.setHeader("Content-Type", content.contentType);
     res.setHeader("Cache-Control", "private, no-store");
     res.setHeader("X-Content-Type-Options", "nosniff");

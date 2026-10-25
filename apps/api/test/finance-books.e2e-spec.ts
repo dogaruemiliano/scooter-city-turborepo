@@ -35,7 +35,9 @@ describeIsolated("Finance book management (isolated PostgreSQL)", () => {
     app = moduleRef.createNestApplication();
     app.enableVersioning({ type: VersioningType.URI, defaultVersion: "1" });
     app.use(cookieParser());
-    await app.init();
+    // Keep one explicit loopback listener rather than rebinding an ephemeral
+    // server for every request in this stateful HTTP scenario.
+    await app.listen(0, "127.0.0.1");
     prisma = app.get(PrismaService);
     if (await prisma.financeBook.count())
       throw new Error("This suite requires a fresh disposable database.");

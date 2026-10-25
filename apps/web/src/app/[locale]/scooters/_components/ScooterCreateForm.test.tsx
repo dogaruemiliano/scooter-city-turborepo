@@ -24,6 +24,8 @@ import { scooterEditorMessage } from "./scooter-editor-messages";
 import { useScooterDocuments } from "./useScooterDocuments";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { ScooterEditor } from "./ScooterEditor";
+import type { ScooterImportSnapshot } from "./scooter-import-workspace";
 import { ScooterCreateForm } from "./ScooterCreateForm";
 vi.mock("./ScooterPhotos", () => ({
   ScooterPhotos: ({
@@ -465,7 +467,7 @@ describe("Scooter creation follow-up and optional steps", () => {
         `/en/scooters/${createdScooter.id}`,
       ),
     );
-    const create = screen.getByRole("button", { name: "Create scooter" });
+    const create = screen.getByRole("button", { name: "Created" });
     expect(create).toBeDisabled();
     await browser.click(create);
     expect(mocks.apiFetch).toHaveBeenCalledOnce();
@@ -778,6 +780,72 @@ describe("Scooter create controls with the create resolver", () => {
     );
   });
 
+  it("keeps optional registration details collapsed and preserves them when hidden", async () => {
+    mocks.apiFetch.mockResolvedValueOnce(createdScooter);
+    const browser = userEvent.setup();
+    renderWizard();
+    await fillWizardIdentity(browser);
+    await chooseSelectOption(browser, "Registration type", "Local");
+    fireEvent.change(screen.getByRole("textbox", { name: "Plate number" }), {
+      target: { value: "vl 18 188" },
+    });
+    expect(
+      screen.queryByRole("textbox", { name: /^Registered on/ }),
+    ).toBeNull();
+    const toggle = screen.getByRole("button", { name: "Advanced details" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await browser.click(toggle);
+    const day = screen.getByRole("textbox", { name: "Registered on" });
+    expect(day).not.toHaveAttribute("aria-required", "true");
+    expect(
+      screen.getByRole("heading", { name: "Registration document details" }),
+    ).toBeVisible();
+    fireEvent.change(day, { target: { value: "16" } });
+    fireEvent.change(
+      screen.getByRole("textbox", { name: "Registered on MM" }),
+      {
+        target: { value: "01" },
+      },
+    );
+    fireEvent.change(
+      screen.getByRole("textbox", { name: "Registered on YYYY" }),
+      {
+        target: { value: "2026" },
+      },
+    );
+    fireEvent.change(
+      screen.getByRole("textbox", { name: "Registration certificate number" }),
+      {
+        target: { value: "CERT-123" },
+      },
+    );
+    await browser.click(toggle);
+    expect(
+      screen.queryByRole("textbox", { name: /^Registered on/ }),
+    ).toBeNull();
+    await browser.click(toggle);
+    expect(screen.getByRole("textbox", { name: "Registered on" })).toHaveValue(
+      "16",
+    );
+    expect(
+      screen.getByRole("textbox", { name: "Registration certificate number" }),
+    ).toHaveValue("CERT-123");
+    await browser.click(toggle);
+    await browser.click(screen.getByRole("button", { name: "Create scooter" }));
+    await waitFor(() =>
+      expect(mocks.apiFetch).toHaveBeenCalledWith(
+        v1.scooters.ROUTES.create,
+        v1.scooters.scooterSchema,
+        expect.objectContaining({
+          json: expect.objectContaining({
+            registrationDate: "2026-01-16",
+            registrationCertificateNumber: "CERT-123",
+          }),
+        }),
+      ),
+    );
+  });
+
   it("previews the next number with the brand and submits a manual override", async () => {
     mocks.apiFetch.mockResolvedValueOnce(createdScooter);
     const browser = userEvent.setup();
@@ -881,7 +949,7 @@ describe("Scooter create controls with the create resolver", () => {
             registrationNumber: null,
             registrationDate: null,
             temporaryRegistrationExpiresAt: null,
-            requiredLicenseCategory: undefined,
+            requiredLicenseCategory: "none",
             notes: "Maker papers received",
           }),
         },
@@ -954,6 +1022,32 @@ describe("Scooter create controls with the create resolver", () => {
     ).toHaveTextContent("A1");
   });
 
+  it.each(["National", "Local", "Temporary"])(
+    "defaults %s registration to no driving license and keeps it when speed changes",
+    async (registration) => {
+      const browser = userEvent.setup();
+      renderControls();
+      await chooseSelectOption(browser, "Registration type", registration);
+      const license = () =>
+        screen.getByRole("combobox", { name: /Required driver license/ });
+      expect(license()).toHaveTextContent(
+        messages.en.scooters.requiredDriverLicenseTypes.none,
+      );
+      fireEvent.change(
+        screen.getByRole("textbox", { name: "Maximum speed (km/h)" }),
+        { target: { value: "45" } },
+      );
+      expect(license()).toHaveTextContent(
+        messages.en.scooters.requiredDriverLicenseTypes.none,
+      );
+      await chooseSelectOption(browser, "Registration type", "Unregistered");
+      await chooseSelectOption(browser, "Registration type", registration);
+      expect(license()).toHaveTextContent(
+        messages.en.scooters.requiredDriverLicenseTypes.none,
+      );
+    },
+  );
+
   it.each([true, false])(
     "auto-fills no license regardless of input order (speed first: %s)",
     async (speedFirst) => {
@@ -998,7 +1092,18 @@ describe("Scooter create controls with the create resolver", () => {
     mocks.apiFetch.mockResolvedValueOnce(createdScooter);
     const browser = userEvent.setup();
     renderControls();
-    await browser.click(screen.getByRole("button", { name: "Import JSON" }));
+    expect(
+      screen.queryByRole("button", { name: "Import JSON" }),
+    ).not.toBeInTheDocument();
+    const importMenu = screen.getByRole("button", { name: "Document actions" });
+    expect(
+      screen.getByText("AI powered").compareDocumentPosition(importMenu) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    fireEvent.click(importMenu);
+    await browser.click(
+      await screen.findByRole("menuitem", { name: "Import JSON" }),
+    );
     await browser.click(screen.getByRole("button", { name: "Edit JSON" }));
     fireEvent.change(
       screen.getByRole("textbox", { name: "Extracted data (JSON)" }),
@@ -1018,6 +1123,7 @@ describe("Scooter create controls with the create resolver", () => {
       },
     );
     await browser.click(screen.getByRole("button", { name: "Fill fields" }));
+    await waitFor(() => expect(importMenu).toHaveFocus());
     expect(
       screen.getByRole("combobox", { name: /Required driver license/ }),
     ).toHaveTextContent(messages.en.scooters.requiredDriverLicenseTypes.none);
@@ -1058,6 +1164,9 @@ describe("Scooter create controls with the create resolver", () => {
     await browser.type(
       screen.getByRole("textbox", { name: "Plate number" }),
       "cj12abc",
+    );
+    expect(screen.getByRole("textbox", { name: "Plate number" })).toHaveValue(
+      "CJ12ABC",
     );
     await chooseSelectOption(browser, "Required driver license", "A1");
     await browser.click(screen.getByRole("button", { name: "Create scooter" }));
@@ -1518,10 +1627,10 @@ function renderWizard(locale: SupportedLocale = "en") {
 }
 
 async function fillWizardIdentity(browser: ReturnType<typeof userEvent.setup>) {
-  await browser.type(
-    screen.getByRole("textbox", { name: "VIN" }),
-    "jyarn23e0ra123456",
-  );
+  // These scenarios test form behavior rather than per-keystroke VIN handling.
+  fireEvent.change(screen.getByRole("textbox", { name: "VIN" }), {
+    target: { value: "jyarn23e0ra123456" },
+  });
   await selectBrand(browser, "Yamaha");
   expect(
     within(
@@ -1595,3 +1704,193 @@ function requiredLabel(text: string) {
 vi.mock("@/components/auth/SessionProvider", () => ({
   useOptionalSession: () => ({ user: { isSuperAdmin: true } }),
 }));
+
+it("restores manual field corrections from a persistent workspace draft after navigation", async () => {
+  const draft = {
+    id: "workspace-draft",
+    expiresAt: "2099-01-01T00:00:00.000Z",
+    updatedAt: "2026-10-24T00:00:00.000Z",
+    revision: 0,
+    state: {},
+  };
+  let snapshot: ScooterImportSnapshot | undefined;
+  const view = render(
+    <NextIntlClientProvider locale="en" messages={messages.en}>
+      <ScooterEditor
+        embedded
+        importDraft={draft}
+        onSnapshot={(value) => {
+          snapshot = value;
+        }}
+        returnHref="/en/scooters"
+        brands={brands}
+      />
+    </NextIntlClientProvider>,
+  );
+  const browser = userEvent.setup();
+  await browser.type(
+    screen.getByRole("textbox", { name: "VIN" }),
+    "JYARN23E0RA123456",
+  );
+  await browser.type(
+    screen.getByRole("textbox", { name: "Model" }),
+    "Manual correction",
+  );
+  await waitFor(() => expect(snapshot?.values.model).toBe("Manual correction"));
+  const persisted = JSON.parse(
+    JSON.stringify(snapshot),
+  ) as ScooterImportSnapshot;
+  view.unmount();
+  render(
+    <NextIntlClientProvider locale="en" messages={messages.en}>
+      <ScooterEditor
+        embedded
+        importDraft={draft}
+        initialSnapshot={persisted}
+        returnHref="/en/scooters"
+        brands={brands}
+      />
+    </NextIntlClientProvider>,
+  );
+  expect(screen.getByRole("textbox", { name: "VIN" })).toHaveValue(
+    "JYARN23E0RA123456",
+  );
+  expect(screen.getByRole("textbox", { name: "Model" })).toHaveValue(
+    "Manual correction",
+  );
+  expect(
+    mocks.apiFetch.mock.calls.some(
+      ([path]) =>
+        path === v1.scooters.ROUTES.documents.discardEditorSession(draft.id),
+    ),
+  ).toBe(false);
+});
+
+it("shows explicit CIV availability and marks it issued when CIV evidence is entered", async () => {
+  renderWizard();
+  const browser = userEvent.setup();
+  const availability = screen.getByRole("radiogroup", {
+    name: "CIV availability",
+  });
+  expect(
+    within(availability).getByRole("radio", { name: /Unknown$/ }),
+  ).toBeChecked();
+  await browser.click(
+    within(availability).getByRole("radio", { name: /Not issued yet$/ }),
+  );
+  expect(
+    within(availability).getByRole("radio", { name: /Not issued yet$/ }),
+  ).toBeChecked();
+  await browser.click(screen.getByRole("button", { name: "Advanced details" }));
+  await browser.type(
+    screen.getByRole("textbox", { name: "Vehicle identity card number" }),
+    "CIV-123",
+  );
+  await waitFor(() =>
+    expect(
+      within(availability).getByRole("radio", { name: /(?:^| )Issued$/ }),
+    ).toBeChecked(),
+  );
+  expect(
+    within(availability).getByRole("radio", { name: /Not issued yet$/ }),
+  ).toBeDisabled();
+});
+
+it("retains a visually detected client copy for assignment without importing its readings", async () => {
+  const copyData = {
+    clientCopy: true as const,
+    vin: "LXYTCKP05P0000001",
+    fields: { model: "Protected reading" },
+    rawFields: {},
+  };
+  const state: ScooterImportSnapshot = {
+    version: 1,
+    values: scooterEditorDefaults(),
+    documents: {
+      drafts: [
+        {
+          id: "copy",
+          type: "civ",
+          file: {
+            name: "scan.pdf",
+            type: "application/pdf",
+            size: 100,
+            lastModified: 1,
+          },
+          status: "ready",
+          uploadToken: "copy-token",
+        },
+      ],
+      extractions: {},
+      removedIds: [],
+    },
+    analysis: {
+      entries: {
+        copy: {
+          status: "success",
+          analysis: {
+            sourceId: "copy",
+            documentType: "civ",
+            extractedData: copyData,
+            issues: [],
+            reviewRequired: true,
+          },
+        },
+      },
+      cache: [[JSON.stringify(["copy", "civ", "scan.pdf", 100, 1]), "copy"]],
+      attempts: [],
+    },
+    extraction: {
+      origins: [],
+      manual: [],
+      confirmedSources: [],
+      automaticBaselines: [],
+      rawBySource: [],
+    },
+    importedRawFields: null,
+    importedSignature: null,
+    automaticImport: "",
+    reviewedDocuments: [],
+    createdBrands: [],
+    status: "review",
+  };
+  let persisted: ScooterImportSnapshot | undefined;
+  render(
+    <NextIntlClientProvider locale="en" messages={messages.en}>
+      <ScooterEditor
+        embedded
+        brands={brands}
+        returnHref="/en/scooters"
+        initialSnapshot={state}
+        importDraft={{
+          id: "session",
+          revision: 0,
+          state: {},
+          expiresAt: "2099-01-01T00:00:00.000Z",
+          updatedAt: "2026-10-24T00:00:00.000Z",
+        }}
+        onSnapshot={(snapshot) => {
+          persisted = snapshot;
+        }}
+      />
+    </NextIntlClientProvider>,
+  );
+  await screen.findByText(messages.en.scooters.documents.clientCopy);
+  expect(
+    screen.queryByRole("combobox", { name: "Original for scan.pdf" }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: "Use as original" }),
+  ).not.toBeInTheDocument();
+  await waitFor(() =>
+    expect(persisted?.documents.drafts[0].version).toBe("client_copy"),
+  );
+  expect(screen.getByRole("textbox", { name: "VIN" })).toHaveValue("");
+  expect(screen.getByRole("textbox", { name: "Model" })).toHaveValue("");
+  expect(persisted?.documents.extractions.copy).toMatchObject({
+    clientCopy: true,
+  });
+  expect(
+    screen.getByText(messages.en.scooters.workspace.copyNeedsOriginal),
+  ).toBeInTheDocument();
+});

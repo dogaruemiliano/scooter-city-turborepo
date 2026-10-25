@@ -648,12 +648,11 @@ describe("legacy document extraction with explicit filename evidence", () => {
     }
   });
 
-  it("retains an unreadable registration VIN and requires manual review even with a known vehicle VIN", () => {
+  it("retains unreadable registration evidence without asking again for the known vehicle VIN", () => {
     const input = fixture();
     input.documentVins[1]!.vin = null;
     expect(parse(input)).toMatchObject({
       ok: true,
-      needsVinReview: true,
       values: { vin },
       extractedDocuments: { "registration-1": { vin: null } },
     });

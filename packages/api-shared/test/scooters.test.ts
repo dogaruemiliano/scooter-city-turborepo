@@ -194,6 +194,25 @@ test("scooter create schema accepts registered scooters", () => {
   );
 });
 
+test("registered scooters do not require a registration date", () => {
+  for (const [registrationType, registrationNumber] of [
+    ["national", "CJ 12 ABC"],
+    ["local", "VL 18 188"],
+    ["temporary", "B 012345"],
+  ] as const) {
+    const input = {
+      ...baseScooterInput(),
+      registrationType,
+      registrationNumber,
+      registrationDate: undefined,
+      temporaryRegistrationExpiresAt:
+        registrationType === "temporary" ? today : null,
+    };
+    assert.ok(v1.scooters.createScooterInputSchema.safeParse(input).success);
+    assert.ok(v1.scooters.updateScooterInputSchema.safeParse(input).success);
+  }
+});
+
 test("scooter registration schema enforces unregistered and date rules", () => {
   assert.equal(
     v1.scooters.createScooterInputSchema.safeParse({
@@ -270,6 +289,25 @@ test("scooter licence enum accepts expected categories", () => {
   }
 });
 
+test("plate display is uppercase and uniqueness values ignore case and spacing", () => {
+  const cases = [
+    ["national", ["vl 18 abc", "VL18ABC", "vl  18  abc"], "VL18ABC"],
+    ["temporary", ["vl 0123", "VL0123", "vl  0123"], "VL0123"],
+    ["local", ["vl 18 188", "VL18188", "vl  18  188"], "VL18188"],
+  ] as const;
+  for (const [registrationType, variants, compactValue] of cases) {
+    for (const plate of variants) {
+      const result = v1.scooters.validatePlateForRegistrationType(
+        registrationType,
+        plate,
+      );
+      assert.ok(result);
+      assert.equal(result.compactValue, compactValue);
+      assert.equal(result.displayValue, result.displayValue.toUpperCase());
+    }
+  }
+});
+
 test("national plate validation accepts and rejects Romanian permanent plates", () => {
   assertPlate("national", "CJ 12 ABC", "CJ 12 ABC", "CJ12ABC");
   assertPlate("national", "B 12 ABC", "B 12 ABC", "B12ABC");
@@ -295,6 +333,20 @@ test("temporary plate validation accepts Romanian provisional plates", () => {
 test("local plate validation allows constrained local identifiers", () => {
   assertPlate("local", "cluj-123", "CLUJ-123", "CLUJ123");
   assertPlate("local", "Sector 1 45", "SECTOR 1 45", "SECTOR145");
+  assertPlate("local", "VL-Bujoreni 166", "VL-BUJORENI 166", "VLBUJORENI166");
+  assertPlate("local", "VL 18 167", "VL 18 167", "VL18167");
+  assertPlate(
+    "local",
+    "VL Băile Olănești 166",
+    "VL BĂILE OLĂNEȘTI 166",
+    "VLBAILEOLANESTI166",
+  );
+  assertPlate(
+    "local",
+    "BUJORENI-VL-176/18",
+    "BUJORENI-VL-176/18",
+    "BUJORENIVL17618",
+  );
 
   assertInvalidPlate("local", "LOCAL");
   assertInvalidPlate("local", "-LOCAL123");

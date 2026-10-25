@@ -62,21 +62,31 @@ it("requires both licence sides in the existing person's manual document dialog"
   await user.click(
     within(dialog).getByRole("switch", { name: "Document has expiry date?" }),
   );
-  await user.click(within(dialog).getByRole("button", { name: "Save" }));
+  await user.click(
+    within(dialog).getByRole("button", { name: "Save document" }),
+  );
   expect(onSubmit).not.toHaveBeenCalled();
   await user.click(
     within(dialog).getByRole("button", { name: "Upload front" }),
   );
   await waitFor(() =>
-    expect(within(dialog).getByRole("button", { name: "Save" })).toBeEnabled(),
+    expect(
+      within(dialog).getByRole("button", { name: "Save document" }),
+    ).toBeEnabled(),
   );
-  await user.click(within(dialog).getByRole("button", { name: "Save" }));
+  await user.click(
+    within(dialog).getByRole("button", { name: "Save document" }),
+  );
   expect(onSubmit).not.toHaveBeenCalled();
   await user.click(within(dialog).getByRole("button", { name: "Upload back" }));
   await waitFor(() =>
-    expect(within(dialog).getByRole("button", { name: "Save" })).toBeEnabled(),
+    expect(
+      within(dialog).getByRole("button", { name: "Save document" }),
+    ).toBeEnabled(),
   );
-  await user.click(within(dialog).getByRole("button", { name: "Save" }));
+  await user.click(
+    within(dialog).getByRole("button", { name: "Save document" }),
+  );
   await waitFor(() =>
     expect(onSubmit).toHaveBeenCalledWith(
       expect.objectContaining({

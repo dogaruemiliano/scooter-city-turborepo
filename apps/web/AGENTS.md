@@ -40,3 +40,13 @@ Do not move route-specific UI into global `src/components/<feature>` folders by 
 Tests for route-private components should live with the private folder they exercise. Route-level tests can use a private `_tests/` folder under the route segment.
 
 <!-- END:app-router-organization-rule -->
+
+<!-- BEGIN:shared-page-layout-rule -->
+
+# Pages share one content boundary
+
+Use `PageLayout` from `@repo/ui/components/page-layout` for page width, horizontal gutters, and top spacing. Render it exactly once per route: finance and company already provide it in their section layouts; other screens provide it themselves. Loading and error views must share the same boundary as the content they replace.
+
+Use its explicit width/padding options for special surfaces rather than duplicating container classes. Wizards keep app navigation and use `paddingX="none" paddingTop="compact"`; shared `WizardForm` inherits the gutter and owns its internal padding. Keep feature-specific grids, narrower field groups, sticky actions, sheets, and full-screen capture behavior inside the boundary. Do not introduce a second scroll container or repeat page padding in child routes.
+
+<!-- END:shared-page-layout-rule -->

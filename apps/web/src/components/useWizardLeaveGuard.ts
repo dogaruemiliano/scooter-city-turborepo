@@ -1,42 +1,54 @@
-import { useEffect, useRef } from "react";
+"use client";
+
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
-const HISTORY_MARKER = "personCreateLeaveGuard";
+const HISTORY_MARKER = "wizardLeaveGuard";
+type LeaveAction = () => void;
 
-/** Protect in-memory progress; nothing from the form is persisted. */
-export function usePersonLeaveGuard(hasProgress: boolean, message: string) {
+/** Route protection shared by wizard flows. Owners decide when work needs protection. */
+export function useWizardLeaveGuard(enabled: boolean) {
   const router = useRouter();
   const completed = useRef(false);
+  const pending = useRef<LeaveAction | null>(null);
+  const [open, setOpen] = useState(false);
 
-  useEffect(() => {
-    // Retire drafts saved by previous versions, including their stored Files.
-    try {
-      if (typeof indexedDB !== "undefined")
-        indexedDB.deleteDatabase("person-create-drafts");
-    } catch {
-      // Storage can be disabled; it must not prevent using the in-memory form.
+  function requestLeave(action: LeaveAction) {
+    if (!enabled || completed.current) {
+      action();
+      return;
     }
-  }, []);
+    pending.current = action;
+    setOpen(true);
+  }
+
+  function cancel() {
+    pending.current = null;
+    setOpen(false);
+  }
+
+  function leave(beforeLeave?: () => boolean) {
+    if (!pending.current || beforeLeave?.() === false) return;
+    const action = pending.current;
+    pending.current = null;
+    completed.current = true;
+    setOpen(false);
+    action();
+  }
 
   useEffect(() => {
-    if (!hasProgress) return;
+    if (!enabled) return;
     const formUrl = window.location.href;
-    // A duplicate entry lets us handle browser Back before Next unmounts the form.
-    // Preserve Next's own history state and avoid duplicates in Strict Mode.
-    if (!window.history.state?.[HISTORY_MARKER]) {
-      window.history.pushState(
-        { ...window.history.state, [HISTORY_MARKER]: true },
-        "",
-        formUrl,
-      );
-    }
+    const guardState = { ...window.history.state, [HISTORY_MARKER]: formUrl };
+    if (window.history.state?.[HISTORY_MARKER] !== formUrl)
+      window.history.pushState(guardState, "", formUrl);
 
     const beforeUnload = (event: BeforeUnloadEvent) => {
       if (completed.current) return;
+      // Browsers require their native confirmation for refresh/tab close.
       event.preventDefault();
       event.returnValue = "";
     };
-
     const onClick = (event: MouseEvent) => {
       if (
         completed.current ||
@@ -69,26 +81,25 @@ export function usePersonLeaveGuard(hasProgress: boolean, message: string) {
         return;
       event.preventDefault();
       event.stopImmediatePropagation();
-      if (!window.confirm(message)) return;
-      completed.current = true;
-      // Replace our guard entry so a confirmed link does not add an extra Back step.
-      if (destination.origin === current.origin)
-        router.replace(
-          destination.pathname + destination.search + destination.hash,
-        );
-      else window.location.replace(destination.href);
+      pending.current = () => {
+        if (destination.origin === current.origin)
+          router.replace(
+            destination.pathname + destination.search + destination.hash,
+          );
+        else window.location.replace(destination.href);
+      };
+      setOpen(true);
     };
-
     const onPopState = (event: PopStateEvent) => {
       if (completed.current) return;
       event.stopImmediatePropagation();
-      if (event.state?.[HISTORY_MARKER]) return; // Return after cancelling Back.
-      if (window.confirm(message)) {
-        completed.current = true;
-        window.history.back();
-      } else window.history.forward();
+      if (event.state?.[HISTORY_MARKER] === formUrl) return;
+      // Restore the guarded URL synchronously, before Next handles this event.
+      // Re-arm the same sentinel, so cancelling never creates extra Back steps.
+      window.history.pushState(guardState, "", formUrl);
+      pending.current = () => window.history.go(-2);
+      setOpen(true);
     };
-
     window.addEventListener("beforeunload", beforeUnload);
     document.addEventListener("click", onClick, true);
     window.addEventListener("popstate", onPopState, true);
@@ -97,9 +108,13 @@ export function usePersonLeaveGuard(hasProgress: boolean, message: string) {
       document.removeEventListener("click", onClick, true);
       window.removeEventListener("popstate", onPopState, true);
     };
-  }, [hasProgress, message, router]);
+  }, [enabled, router]);
 
   return {
+    open,
+    requestLeave,
+    cancel,
+    leave,
     complete: () => {
       completed.current = true;
     },

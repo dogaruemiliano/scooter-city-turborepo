@@ -3,6 +3,7 @@
 import { useCallback, useMemo } from "react";
 import { TriangleIcon, PencilIcon, PlusIcon, XIcon } from "lucide-react";
 import { v1 } from "@repo/api-shared";
+import { spacing } from "@repo/theme";
 import { Button, SheetSelect } from "@repo/ui/components";
 import { useTranslations } from "next-intl";
 import { webApi } from "@/lib/api";
@@ -18,24 +19,32 @@ export type ScooterSelectItem = Pick<
   "id" | "fleetNumber" | "brandCode" | "brand" | "model" | "registrationNumber"
 > &
   Partial<
-    Pick<v1.scooters.Scooter, "coverUrl" | "vin" | "problemSeverityCounts">
+    Pick<
+      v1.scooters.Scooter,
+      | "coverUrl"
+      | "vin"
+      | "problemDifficultyCounts"
+      | "registrationType"
+      | "temporaryRegistrationExpiresAt"
+      | "maintenanceHoldCount"
+      | "rentalInsuranceStatus"
+    >
   >;
 
 const EMPTY_SCOOTERS: ScooterSelectItem[] = [];
 
-const severityStyles = {
-  low: ["text-info", "text-info-foreground"],
-  moderate: ["text-warning", "text-warning-foreground"],
-  high: ["text-warning-hover", "text-warning-foreground"],
-  critical: ["text-destructive", "text-destructive-foreground"],
-  unknown: ["text-muted-foreground", "text-background"],
+const difficultyStyles = {
+  easy: "text-info",
+  medium: "text-warning",
+  hard: "text-warning-hover",
+  unknown: "text-muted-foreground",
 } as const;
 
 /** The same content is used for sheet options and selected scooters. */
 export function ScooterSelectRow({ scooter }: { scooter: ScooterSelectItem }) {
   const t = useTranslations("workspace");
   return (
-    <span className="flex min-w-0 flex-1 items-center gap-3">
+    <span className="flex min-w-0 flex-1 items-center gap-4">
       <ScooterCover scooter={scooter} />
       <span className="flex min-w-0 flex-1 flex-col gap-1">
         <span className="text-base font-semibold">
@@ -48,43 +57,42 @@ export function ScooterSelectRow({ scooter }: { scooter: ScooterSelectItem }) {
           {scooter.brand} {scooter.model}
         </span>
         <span className="flex flex-wrap gap-1">
-          {Object.entries(severityStyles).map(
-            ([severity, [color, foreground]]) => {
-              const count =
-                scooter.problemSeverityCounts?.[
-                  severity as keyof typeof severityStyles
-                ] ?? 0;
-              if (!count) return null;
-              const label = t("problems.severityCount", {
-                severity: t(
-                  `problems.${severity === "unknown" ? "unassessed" : severity}`,
-                ),
-                count,
-              });
-              return (
+          {Object.entries(difficultyStyles).map(([difficulty, color]) => {
+            const count =
+              scooter.problemDifficultyCounts?.[
+                difficulty as keyof typeof difficultyStyles
+              ] ?? 0;
+            if (!count) return null;
+            const label = t("problems.difficultyCount", {
+              difficulty: t(
+                `problems.${difficulty === "unknown" ? "unassessed" : difficulty}`,
+              ),
+              count,
+            });
+            return (
+              <span
+                key={difficulty}
+                role="img"
+                aria-label={label}
+                title={label}
+                className="relative flex size-8 shrink-0 items-center justify-center"
+              >
+                <TriangleIcon
+                  aria-hidden="true"
+                  strokeWidth={spacing.px}
+                  className={`absolute inset-0 size-full fill-none ${color}`}
+                />
                 <span
-                  key={severity}
-                  role="img"
-                  aria-label={label}
-                  title={label}
-                  className="relative flex size-8 shrink-0 items-center justify-center"
+                  aria-hidden="true"
+                  className={`relative pt-1 text-xs font-semibold ${color}`}
                 >
-                  <TriangleIcon
-                    aria-hidden="true"
-                    className={`absolute inset-0 size-full fill-current ${color}`}
-                  />
-                  <span
-                    aria-hidden="true"
-                    className={`relative pt-1 text-xs font-semibold ${foreground}`}
-                  >
-                    {count}
-                  </span>
+                  {count}
                 </span>
-              );
-            },
-          )}
-          {scooter.problemSeverityCounts &&
-          Object.values(scooter.problemSeverityCounts).every(
+              </span>
+            );
+          })}
+          {scooter.problemDifficultyCounts &&
+          Object.values(scooter.problemDifficultyCounts).every(
             (count) => count === 0,
           ) ? (
             <span className="text-xs text-muted-foreground">
@@ -111,6 +119,8 @@ export type ScooterSelectProps = Omit<
   | "addAction"
 > & {
   label?: string;
+  /** Rental-specific eligibility is supplied by the feature, not this picker. */
+  getUnavailableReasons?: (scooter: ScooterSelectItem) => readonly string[];
   /** Already-authorized summaries, e.g. scooters visible in problem filters. */
   scooters?: readonly ScooterSelectItem[];
 } & (
@@ -126,25 +136,36 @@ export type ScooterSelectProps = Omit<
       }
   );
 
+export async function loadScooterSelectItems() {
+  const items: v1.scooters.Scooter[] = [];
+  for (let page = 1; ; page++) {
+    const list = await webApi.fetch(
+      `/v1/scooters?pageSize=100&page=${page}`,
+      v1.scooters.scooterListSchema,
+      { cache: "no-store" },
+    );
+    items.push(...list.items);
+    if (page * list.pageSize >= list.total || !list.items.length) break;
+  }
+  return items
+    .filter((scooter) => !scooter.deletedAt)
+    .sort((a, b) => a.fleetNumber - b.fleetNumber);
+}
+
 export function ScooterSelect(props: ScooterSelectProps) {
-  const { label, scooters: suppliedScooters, ...controlProps } = props;
+  const {
+    label,
+    scooters: suppliedScooters,
+    getUnavailableReasons,
+    ...controlProps
+  } = props;
   const t = useTranslations("workspace");
   const load = useCallback(async () => {
     if (suppliedScooters !== undefined) return suppliedScooters;
-    const items: v1.scooters.Scooter[] = [];
-    for (let page = 1; ; page++) {
-      const list = await webApi.fetch(
-        `/v1/scooters?pageSize=100&page=${page}`,
-        v1.scooters.scooterListSchema,
-        { cache: "no-store" },
-      );
-      items.push(...list.items);
-      if (page * list.pageSize >= list.total || !list.items.length) break;
-    }
-    return items.sort((a, b) => a.fleetNumber - b.fleetNumber);
+    return loadScooterSelectItems();
   }, [suppliedScooters]);
   const remote = useRemote(load);
-  const scooters = remote.data ?? EMPTY_SCOOTERS;
+  const scooters = suppliedScooters ?? remote.data ?? EMPTY_SCOOTERS;
   const byId = useMemo(
     () => new Map(scooters.map((scooter) => [scooter.id, scooter])),
     [scooters],
@@ -220,7 +241,6 @@ export function ScooterSelect(props: ScooterSelectProps) {
         }
         {...controlProps}
         triggerVariant="card"
-        optionClassName="h-auto min-h-24 gap-3"
         addAction={
           !selectedScooter
             ? {
@@ -259,13 +279,25 @@ export function ScooterSelect(props: ScooterSelectProps) {
           )
         }
         options={scooters.map((scooter) => ({
+          disabled: Boolean(getUnavailableReasons?.(scooter).length),
+          searchOnly: Boolean(getUnavailableReasons?.(scooter).length),
           value: scooter.id,
-          label: `${v1.scooters.scooterDisplayCode(scooter)} · ${scooter.registrationNumber || t("problems.noPlate")} · ${scooter.brand} ${scooter.model ?? ""}`,
+          label: `${v1.scooters.scooterDisplayCode(scooter)} · ${scooter.registrationNumber || t("problems.noPlate")} · ${scooter.brand} ${scooter.model ?? ""}${getUnavailableReasons?.(scooter).length ? ` · ${getUnavailableReasons(scooter).join(" · ")}` : ""}`,
           keywords: [scooter.vin ?? "", scooter.id],
         }))}
         renderOption={(option) => {
           const scooter = byId.get(option.value)!;
-          return <ScooterSelectRow scooter={scooter} />;
+          const reasons = getUnavailableReasons?.(scooter) ?? [];
+          return (
+            <span className="flex min-w-0 flex-1 flex-col gap-2">
+              <ScooterSelectRow scooter={scooter} />
+              {reasons.map((reason) => (
+                <span key={reason} className="text-sm text-warning">
+                  {reason}
+                </span>
+              ))}
+            </span>
+          );
         }}
       />
       <Feedback error={remote.error} />

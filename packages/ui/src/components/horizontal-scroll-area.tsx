@@ -13,6 +13,10 @@ type HorizontalScrollAreaProps = Omit<
 > & {
   className?: string;
   label: string;
+  /** Fade only the edges with horizontally clipped content, using the shared tab fade width. */
+  fadeEdges?: boolean;
+  /** Keep touch scrolling, showing the scrollbar only at the lg breakpoint and above. */
+  scrollbarVisibility?: "always" | "desktop";
   /** Enables a right-edge arrow and mouse-hover scrolling across the full viewport height. */
   scrollRightLabel?: string;
 };
@@ -22,6 +26,8 @@ export function HorizontalScrollArea({
   children,
   className,
   label,
+  fadeEdges = false,
+  scrollbarVisibility = "always",
   scrollRightLabel,
   onPointerMove,
   onPointerLeave,
@@ -102,7 +108,10 @@ export function HorizontalScrollArea({
         stopScrolling();
       }}
       className={cn(
-        "group/horizontal-scroll relative w-full min-w-0 overflow-hidden data-[has-overflow-x]:pb-5",
+        "group/horizontal-scroll relative w-full min-w-0 overflow-hidden",
+        scrollbarVisibility === "desktop"
+          ? "lg:data-[has-overflow-x]:pb-5"
+          : "data-[has-overflow-x]:pb-5",
         className,
       )}
     >
@@ -112,14 +121,23 @@ export function HorizontalScrollArea({
         aria-label={label}
         role="region"
         tabIndex={0}
-        className="w-full min-w-0 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+        className={cn(
+          "w-full min-w-0 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+          fadeEdges &&
+            "[--scroll-fade-start:currentColor] [--scroll-fade-end:currentColor] data-[overflow-x-start]:[--scroll-fade-start:transparent] data-[overflow-x-end]:[--scroll-fade-end:transparent] [mask-image:linear-gradient(to_right,var(--scroll-fade-start),currentColor_var(--spacing-6),currentColor_calc(100%_-_var(--spacing-6)),var(--scroll-fade-end))]",
+        )}
       >
         <ScrollAreaPrimitive.Content>{children}</ScrollAreaPrimitive.Content>
       </ScrollAreaPrimitive.Viewport>
       {scrollRightLabel ? (
         <div
           data-slot="horizontal-scroll-edge"
-          className="pointer-events-none absolute top-0 right-0 bottom-5 hidden w-12 items-center justify-end bg-linear-to-r from-transparent to-background group-data-[overflow-x-end]/horizontal-scroll:flex"
+          className={cn(
+            "pointer-events-none absolute top-0 right-0 hidden w-12 items-center justify-end bg-linear-to-r from-transparent to-background group-data-[overflow-x-end]/horizontal-scroll:flex",
+            scrollbarVisibility === "desktop"
+              ? "bottom-0 lg:bottom-5"
+              : "bottom-5",
+          )}
         >
           <Button
             variant="secondary"
@@ -144,7 +162,10 @@ export function HorizontalScrollArea({
       <ScrollAreaPrimitive.Scrollbar
         data-slot="horizontal-scrollbar"
         orientation="horizontal"
-        className="flex h-3 rounded-full bg-muted p-0.5"
+        className={cn(
+          "h-3 rounded-full bg-muted p-0.5",
+          scrollbarVisibility === "desktop" ? "hidden lg:flex" : "flex",
+        )}
       >
         <ScrollAreaPrimitive.Thumb
           data-slot="horizontal-scroll-thumb"

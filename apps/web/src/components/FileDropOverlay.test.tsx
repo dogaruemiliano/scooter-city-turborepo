@@ -80,6 +80,49 @@ const transfer = {
 };
 
 describe("shared file drop overlay", () => {
+  it("uses selection-focused mobile copy and opens the existing multiple-file picker", () => {
+    const previousWidth = window.innerWidth;
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      writable: true,
+      value: 390,
+    });
+    const files = vi.fn();
+    const fixture = render(
+      <FileDropZone
+        label="Drop documents"
+        mobileLabel="Select documents"
+        browseLabel="Browse files"
+        hint="Drop multiple files"
+        requirements="PDF or images, up to 15 MB"
+        accept="application/pdf,image/*"
+        onFiles={files}
+      />,
+    );
+    try {
+      const card = screen.getByRole("button", { name: "Select documents" });
+      expect(card).toHaveAccessibleDescription("PDF or images, up to 15 MB");
+      fireEvent.dragEnter(card, { dataTransfer: transfer });
+      const overlay = card.querySelector('[data-slot="file-drop-overlay"]')!;
+      expect(card).toHaveClass("overflow-hidden", "isolate");
+      expect(overlay).toHaveClass("rounded-[inherit]", "p-1");
+      expect(overlay.firstElementChild).toHaveClass("flex-row", "max-w-full");
+      fireEvent.dragLeave(card, { dataTransfer: transfer });
+      expect(card.querySelector('[data-slot="file-drop-overlay"]')).toBeNull();
+      const input = screen.getByLabelText("Browse files") as HTMLInputElement;
+      const click = vi.spyOn(input, "click");
+      fireEvent.click(card);
+      expect(click).toHaveBeenCalledOnce();
+      expect(input).toHaveAttribute("multiple");
+      fireEvent.change(input, { target: { files: transfer.files } });
+      expect(files).toHaveBeenCalledExactlyOnceWith(transfer.files);
+      expect(input.value).toBe("");
+    } finally {
+      fixture.unmount();
+      window.innerWidth = previousWidth;
+    }
+  });
+
   it.each(["zone", "single", "collection"] as const)(
     "shows the shared translucent overlay for %s and tracks nested file drags",
     (kind) => {

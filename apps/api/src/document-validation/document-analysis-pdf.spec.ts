@@ -1,7 +1,10 @@
 import { degrees, PDFDocument, rgb } from "pdf-lib";
 import { createCanvas, loadImage } from "@napi-rs/canvas";
 import { renderScooterPdfDetails } from "../scooter-document-extraction/scooter-document-pdf-details";
-import { normalizeDocumentAnalysisPdf } from "./document-analysis-pdf";
+import {
+  normalizeDocumentAnalysisPdf,
+  appendDocumentAnalysisDetails,
+} from "./document-analysis-pdf";
 
 const limit = 15 * 1024 * 1024;
 const signal = () => new AbortController().signal;
@@ -93,4 +96,61 @@ it("honors cancellation and checks the prepared file size", async () => {
   await expect(
     normalizeDocumentAnalysisPdf(Buffer.from(await pdf.save()), 1, signal()),
   ).rejects.toMatchObject({ code: "DOCUMENT_EXTRACTION_TOO_LARGE" });
+});
+
+it("appends labelled native detail views after the unchanged source page map without duplicating image streams", async () => {
+  const pdf = await PDFDocument.create();
+  const canvas = createCanvas(400, 600);
+  const context = canvas.getContext("2d");
+  context.fillStyle = "white";
+  context.fillRect(0, 0, 400, 600);
+  context.fillStyle = "black";
+  context.fillText("Synthetic vehicle document", 20, 30);
+  const image = await pdf.embedPng(await canvas.encode("png"));
+  pdf.addPage([200, 300]).drawImage(image, { width: 200, height: 300 });
+  pdf.addPage([200, 300]);
+  const bytes = Buffer.from(await pdf.save());
+  const original = Buffer.from(bytes);
+  const result = await appendDocumentAnalysisDetails(bytes, limit, signal());
+  expect(bytes).toEqual(original);
+  const prepared = await PDFDocument.load(result);
+  // Two original pages first, four views for the populated page only.
+  expect(prepared.getPageCount()).toBe(6);
+  const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const loading = getDocument({ data: Uint8Array.from(result) });
+  try {
+    const rendered = await loading.promise;
+    const content = await (await rendered.getPage(3)).getTextContent();
+    const text = content.items
+      .flatMap((item) => ("str" in item ? [item.str] : []))
+      .join(" ");
+    expect(text).toContain(
+      "ANALYSIS DETAIL - original source page 1, top left",
+    );
+  } finally {
+    await loading.destroy();
+  }
+  expect(
+    prepared
+      .getPages()
+      .slice(0, 2)
+      .map((page) => page.getSize()),
+  ).toEqual([
+    { width: 200, height: 300 },
+    { width: 200, height: 300 },
+  ]);
+  expect(
+    prepared
+      .getPages()
+      .slice(2)
+      .map((page) => page.getSize()),
+  ).toEqual(Array(4).fill({ width: 120, height: 204 }));
+  // Shared images are embedded once; additional views add small form references.
+  expect(result.length).toBeLessThan(bytes.length * 3);
+  await expect(
+    appendDocumentAnalysisDetails(bytes, 1, signal()),
+  ).rejects.toMatchObject({ code: "DOCUMENT_EXTRACTION_TOO_LARGE" });
+  await expect(
+    appendDocumentAnalysisDetails(bytes, limit, AbortSignal.abort()),
+  ).rejects.toMatchObject({ name: "AbortError" });
 });

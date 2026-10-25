@@ -20,8 +20,12 @@ function unavailableSession() {
 }
 
 /** Owns uploads/jobs even when an editor never produces a saved scooter. */
-export function useScooterEditorSession() {
-  const session = useRef<v1.scooters.ScooterDocumentEditorSession | null>(null);
+export function useScooterEditorSession(
+  persistentSession?: v1.scooters.ScooterDocumentEditorSession,
+) {
+  const session = useRef<v1.scooters.ScooterDocumentEditorSession | null>(
+    persistentSession ?? null,
+  );
   const pending = useRef<Promise<string> | null>(null);
   const lifecycle = useRef<"open" | "saving" | "saved" | "discarded">("open");
   const mounted = useRef(true);
@@ -91,7 +95,7 @@ export function useScooterEditorSession() {
     mounted.current = true;
     const onPageHide = (event: PageTransitionEvent) => {
       // A page in the back/forward cache is suspended, not abandoned.
-      if (!event.persisted) discardSession();
+      if (!event.persisted && !persistentSession) discardSession();
     };
     window.addEventListener("pagehide", onPageHide);
     return () => {
@@ -99,10 +103,10 @@ export function useScooterEditorSession() {
       window.removeEventListener("pagehide", onPageHide);
       // React's development effect probe remounts before this microtask.
       queueMicrotask(() => {
-        if (!mounted.current) discardSession();
+        if (!mounted.current && !persistentSession) discardSession();
       });
     };
-  }, [discardSession]);
+  }, [discardSession, persistentSession]);
 
   return {
     ensureSession,
@@ -118,7 +122,7 @@ export function useScooterEditorSession() {
     saveFailed: () => {
       if (lifecycle.current !== "saving") return;
       lifecycle.current = "open";
-      if (!mounted.current) discardSession();
+      if (!mounted.current && !persistentSession) discardSession();
     },
   };
 }

@@ -35,6 +35,7 @@ function setup(overrides: NodeJS.ProcessEnv = {}) {
     contentType: input.source.contentType,
     byteSize: 120,
     checksumSha256: "b".repeat(64),
+    originalPageCount: 2,
   };
   const send = jest.fn<Promise<unknown>, [unknown]>().mockResolvedValue({
     StatusCode: 200,
@@ -132,6 +133,10 @@ describe("DocumentValidationService", () => {
     { byteSize: 0 },
     { byteSize: 16 * 1024 * 1024 },
     { checksumSha256: "bad" },
+    { originalPageCount: 0 },
+    { originalPageCount: 11 },
+    { originalPageCount: 1.5 },
+    { originalPageCount: "2" },
   ])("rejects malformed or mismatched validation results", async (changes) => {
     const { service, send, document } = setup();
     send.mockResolvedValue({

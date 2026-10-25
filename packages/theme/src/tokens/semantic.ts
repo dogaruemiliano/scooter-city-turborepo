@@ -10,6 +10,10 @@ function withAlpha(color: string, opacity: number): string {
 }
 
 const light = {
+  difficultyEasy: p.repairSeverity.low,
+  difficultyMedium: p.repairSeverity.medium,
+  difficultyHard: p.repairSeverity.high,
+  difficultyForeground: p.charcoal[950],
   severityLow: p.repairSeverity.low,
   severityMedium: p.repairSeverity.medium,
   severityHigh: p.repairSeverity.high,
@@ -20,7 +24,6 @@ const light = {
   card: p.mist[0],
   cardForeground: p.charcoal[950],
   popover: p.mist[0],
-  bottomSheetSurface: withAlpha(p.mist[0], 0.8),
   floatingActionSurface: withAlpha(p.mist[0], 0.7),
   popoverForeground: p.charcoal[950],
   selectableRow: p.mist[50],
@@ -89,8 +92,8 @@ const light = {
   infoHover: p.blue[700],
   infoActive: p.blue[800],
   infoSubtle: p.blue[50],
-  disabled: p.mist[100],
-  disabledForeground: p.mist[400],
+  disabled: p.mist[300],
+  disabledForeground: p.mist[600],
   link: p.cyan[700],
   linkHover: p.cyan[800],
   linkActive: p.cyan[900],
@@ -102,6 +105,10 @@ const light = {
 } as const;
 
 const dark: Record<keyof typeof light, string> = {
+  difficultyEasy: p.repairSeverity.low,
+  difficultyMedium: p.repairSeverity.medium,
+  difficultyHard: p.repairSeverity.high,
+  difficultyForeground: p.charcoal[950],
   severityLow: p.repairSeverity.low,
   severityMedium: p.repairSeverity.medium,
   severityHigh: p.repairSeverity.high,
@@ -111,11 +118,10 @@ const dark: Record<keyof typeof light, string> = {
   foreground: p.mist[50],
   card: p.neutral[900],
   cardForeground: p.mist[50],
-  popover: p.neutral[850],
-  bottomSheetSurface: withAlpha(p.neutral[850], 0.8),
+  popover: p.neutral[875],
   floatingActionSurface: withAlpha(p.neutral[850], 0.7),
   popoverForeground: p.mist[50],
-  selectableRow: p.neutral[900],
+  selectableRow: p.neutral[1000],
   primary: p.cyan.action,
   primaryForeground: p.charcoal[950],
   secondary: p.neutral[850],

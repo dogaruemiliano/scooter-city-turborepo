@@ -28,7 +28,7 @@ export function FileDropOverlay({
     >
       <span
         className={cn(
-          "flex flex-col items-center gap-3 rounded-xl bg-document-overlay p-4 text-foreground",
+          "flex min-w-0 max-w-full flex-col items-center gap-3 rounded-xl bg-document-overlay p-4 text-foreground",
           compact && "flex-row gap-2 p-2",
         )}
       >
@@ -38,7 +38,12 @@ export function FileDropOverlay({
             className={compact ? "size-4" : "size-8"}
           />
         )}
-        <span className={cn("text-lg font-semibold", compact && "text-sm")}>
+        <span
+          className={cn(
+            "min-w-0 text-lg font-semibold wrap-anywhere",
+            compact && "text-sm",
+          )}
+        >
           {label}
         </span>
       </span>

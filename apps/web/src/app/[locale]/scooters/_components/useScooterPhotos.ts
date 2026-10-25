@@ -11,6 +11,7 @@ export interface PhotoUpload {
   status: "uploading" | "failed";
   progress: number;
   uploadToken?: string;
+  fileUnavailable?: boolean;
 }
 
 function putPhoto(
@@ -48,21 +49,102 @@ function putPhoto(
   });
 }
 
-export function useScooterPhotos(scooterId?: string, onSaved?: () => void) {
+export interface ScooterPhotosSnapshot {
+  photos: (Omit<v1.scooters.ScooterPhoto, "contentUrl"> & {
+    uploadToken: string;
+  })[];
+  uploads: (Omit<PhotoUpload, "file" | "preview"> & {
+    file: { name: string; type: string; size: number; lastModified: number };
+  })[];
+}
+
+function restorePhotoUpload(
+  upload: ScooterPhotosSnapshot["uploads"][number],
+): PhotoUpload {
+  const file = new File([], upload.file.name, {
+    type: upload.file.type,
+    lastModified: upload.file.lastModified,
+  });
+  Object.defineProperty(file, "size", { value: upload.file.size });
+  return {
+    ...upload,
+    file,
+    preview: "",
+    fileUnavailable: true,
+    status: "failed",
+  };
+}
+
+export function useScooterPhotos(
+  scooterId?: string,
+  onSaved?: () => void,
+  options: { snapshot?: ScooterPhotosSnapshot; importDraftId?: string } = {},
+) {
   const [photos, setPhotos] = useState<
     (v1.scooters.ScooterPhoto & { uploadToken?: string })[]
-  >([]);
-  const [uploads, setUploads] = useState<PhotoUpload[]>([]);
+  >(
+    () =>
+      options.snapshot?.photos.map((photo) => ({ ...photo, contentUrl: "" })) ??
+      [],
+  );
+  const [uploads, setUploads] = useState<PhotoUpload[]>(
+    () => options.snapshot?.uploads.map(restorePhotoUpload) ?? [],
+  );
   const [loading, setLoading] = useState(Boolean(scooterId));
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<"load" | "save" | "files" | null>(null);
+  const [error, setError] = useState<
+    "load" | "save" | "files" | "preview" | null
+  >(null);
   const operation = useRef(false);
   const controller = useRef<AbortController | null>(null);
   const previews = useRef(new Set<string>());
 
+  const importDraftId = options.importDraftId;
+  const restoredPhotos = useRef(options.snapshot?.photos ?? []);
+
   const load = useCallback(
     async (signal?: AbortSignal) => {
-      if (!scooterId) return;
+      if (!scooterId) {
+        if (!importDraftId) return;
+        const results = await Promise.allSettled(
+          restoredPhotos.current.map(async (photo) => {
+            const response = await fetch(
+              webApi.url(
+                `/v1/scooters/import-drafts/${encodeURIComponent(importDraftId)}/photo-content`,
+              ),
+              {
+                method: "POST",
+                credentials: "include",
+                headers: {
+                  "Content-Type": "application/json",
+                  "X-Requested-With": "fetch",
+                },
+                body: JSON.stringify({ uploadToken: photo.uploadToken }),
+                signal,
+              },
+            );
+            if (!response.ok) throw new Error("Photo preview unavailable");
+            const url = URL.createObjectURL(await response.blob());
+            if (signal?.aborted) {
+              URL.revokeObjectURL(url);
+              return;
+            }
+            previews.current.add(url);
+            setPhotos((items) =>
+              items.map((item) =>
+                item.id === photo.id ? { ...item, contentUrl: url } : item,
+              ),
+            );
+          }),
+        );
+        if (!signal?.aborted)
+          setError(
+            results.some((result) => result.status === "rejected")
+              ? "preview"
+              : null,
+          );
+        return;
+      }
       try {
         const result = await webApi.fetch(
           v1.scooters.ROUTES.photos.list(scooterId),
@@ -79,7 +161,7 @@ export function useScooterPhotos(scooterId?: string, onSaved?: () => void) {
         if (!signal?.aborted) setLoading(false);
       }
     },
-    [scooterId],
+    [scooterId, importDraftId],
   );
 
   useEffect(() => {
@@ -103,6 +185,7 @@ export function useScooterPhotos(scooterId?: string, onSaved?: () => void) {
   }
 
   async function uploadOne(item: PhotoUpload) {
+    if (item.fileUnavailable && !item.uploadToken) return;
     const signal = controller.current!.signal;
     const patch = (fields: Partial<PhotoUpload>) => {
       if (!signal.aborted)
@@ -164,6 +247,22 @@ export function useScooterPhotos(scooterId?: string, onSaved?: () => void) {
               createdAt: new Date().toISOString(),
             },
           ]);
+          if (item.fileUnavailable && uploadToken) {
+            restoredPhotos.current = [
+              ...restoredPhotos.current,
+              {
+                id: item.id,
+                uploadToken,
+                fileName: item.file.name,
+                caption: null,
+                isPublic: false,
+                type: "GALLERY",
+                position: photos.length,
+                createdAt: new Date().toISOString(),
+              },
+            ];
+            void load(signal);
+          }
           setUploads((current) =>
             current.filter((entry) => entry.id !== item.id),
           );
@@ -298,6 +397,37 @@ export function useScooterPhotos(scooterId?: string, onSaved?: () => void) {
   );
 
   return {
+    getSnapshot: (): ScooterPhotosSnapshot => ({
+      photos: photos.flatMap((photo) =>
+        photo.uploadToken
+          ? [
+              {
+                id: photo.id,
+                uploadToken: photo.uploadToken,
+                fileName: photo.fileName,
+                caption: photo.caption,
+                isPublic: photo.isPublic,
+                type: photo.type,
+                position: photo.position,
+                createdAt: photo.createdAt,
+              },
+            ]
+          : [],
+      ),
+      uploads: uploads.map(({ file, ...upload }) => ({
+        id: upload.id,
+        status: upload.status,
+        uploadToken: upload.uploadToken,
+        fileUnavailable: upload.fileUnavailable,
+        progress: 0,
+        file: {
+          name: file.name,
+          type: file.type,
+          size: file.size,
+          lastModified: file.lastModified,
+        },
+      })),
+    }),
     drafts,
     blocked: busy || uploads.length > 0,
     photos,
@@ -308,7 +438,7 @@ export function useScooterPhotos(scooterId?: string, onSaved?: () => void) {
     load: () => {
       setLoading(true);
       setError(null);
-      return load(controller.current?.signal);
+      return load(controller.current?.signal).finally(() => setLoading(false));
     },
     add,
     retry,

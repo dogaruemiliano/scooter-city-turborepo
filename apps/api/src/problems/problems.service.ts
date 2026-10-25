@@ -16,6 +16,7 @@ import { AuditService } from "../audit/audit.service";
 import { AuditEventType } from "../audit/audit.types";
 import { Prisma } from "../generated/prisma/client";
 import { ProblemPhotosService } from "./problem-photos.service";
+import { activeMaintenanceHoldWhere } from "./maintenance-hold";
 import { PrismaService } from "../prisma/prisma.service";
 
 export const maintenanceScooterSelect = {
@@ -40,6 +41,7 @@ export function toMaintenanceScooter(
 }
 
 const memberSelect = {
+  avatarAssetId: true,
   id: true,
   email: true,
   firstName: true,
@@ -148,7 +150,8 @@ export class ProblemsService {
       sections: row.sections,
       buyList: row.buyList,
       location: row.location,
-      severity: row.severity,
+      difficulty: row.difficulty,
+      legacySeverity: row.severity,
       blocksUsage: row.blocksUsage,
       holdClearedAt: row.holdClearedAt?.toISOString() ?? null,
       photos: row.photos.map((photo) => ({
@@ -225,7 +228,7 @@ export class ProblemsService {
         {
           ...(query.status ? { status: query.status } : {}),
           ...(query.scooterId ? { scooterId: query.scooterId } : {}),
-          ...(query.severity ? { severity: query.severity } : {}),
+          ...(query.difficulty ? { difficulty: query.difficulty } : {}),
           ...(query.assigneeIds?.length
             ? {
                 OR: [
@@ -250,7 +253,7 @@ export class ProblemsService {
         this.where(snapshot, "problems.read"),
         {
           ...(query.scooterId ? { scooterId: query.scooterId } : {}),
-          ...(query.severity ? { severity: query.severity } : {}),
+          ...(query.difficulty ? { difficulty: query.difficulty } : {}),
           ...(query.blocking !== undefined
             ? { blocksUsage: query.blocking }
             : {}),
@@ -393,7 +396,7 @@ export class ProblemsService {
         scooterId: input.scooterId,
         title: input.title,
         description: input.description,
-        severity: input.severity,
+        difficulty: input.difficulty,
         blocksUsage: input.blocksUsage,
         assigneeId: assigneeIds[0] ?? null,
         assignees: { connect: assigneeIds.map((id) => ({ id })) },
@@ -421,7 +424,7 @@ export class ProblemsService {
             location: row.location,
             title: row.title,
             status: row.status,
-            severity: row.severity,
+            difficulty: row.difficulty,
             blocksUsage: row.blocksUsage,
             assigneeId: row.assigneeId,
             assignee: row.assignee,
@@ -505,6 +508,7 @@ export class ProblemsService {
     ) =>
       | Promise<Prisma.ScooterProblemUncheckedUpdateInput>
       | Prisma.ScooterProblemUncheckedUpdateInput,
+    note?: string,
   ) {
     return this.prisma.$transaction(async (tx) => {
       // Match rental writers: scooter first, then the problem. All hold changes share this lock.
@@ -549,6 +553,7 @@ export class ProblemsService {
         targetType: "ScooterProblem",
         targetId: id,
         meta: {
+          ...(note ? { note } : {}),
           before: {
             status: row.status,
             assigneeId: row.assigneeId,
@@ -562,7 +567,7 @@ export class ProblemsService {
             sections: row.sections,
             buyList: row.buyList,
             location: row.location,
-            severity: row.severity,
+            difficulty: row.difficulty,
             blocksUsage: row.blocksUsage,
             resolutionNotes: row.resolutionNotes,
           },
@@ -579,7 +584,7 @@ export class ProblemsService {
             sections: updated.sections,
             buyList: updated.buyList,
             location: updated.location,
-            severity: updated.severity,
+            difficulty: updated.difficulty,
             blocksUsage: updated.blocksUsage,
             resolutionNotes: updated.resolutionNotes,
             workNotes: updated.workNotes,
@@ -658,6 +663,10 @@ export class ProblemsService {
           const photos = await this.photos.prepare(userId, input.photos);
           await this.photos.attach(tx, id, userId, photos);
         }
+        if (input.pauseWork && row.status !== "in_progress")
+          throw new ConflictException("Only work in progress can be paused");
+        if (input.startWork && row.status !== "open")
+          throw new ConflictException("Only open problems can be started");
         if (input.startWork && !v1.problems.problemAssignees(row).length)
           throw new ConflictException(
             "Assign the problem before starting work",
@@ -675,11 +684,14 @@ export class ProblemsService {
           ...(input.description !== undefined
             ? { description: input.description }
             : {}),
-          ...(input.severity !== undefined ? { severity: input.severity } : {}),
+          ...(input.difficulty !== undefined
+            ? { difficulty: input.difficulty }
+            : {}),
           ...(input.workNotes !== undefined
             ? { workNotes: input.workNotes }
             : {}),
           ...(input.startWork ? { status: "in_progress" } : {}),
+          ...(input.pauseWork ? { status: "open" } : {}),
         };
       },
     );
@@ -731,7 +743,7 @@ export class ProblemsService {
         if (!openStates.includes(row.status))
           throw new ConflictException("Problem is already closed");
         return {
-          ...this.closeHold(row, userId, input.clearMaintenanceHold),
+          ...this.closeHold(row, userId),
           status: "resolved",
           resolutionNotes: input.resolutionNotes,
           resolvedAt: new Date(),
@@ -785,11 +797,16 @@ export class ProblemsService {
     );
   }
 
-  reopen(userId: string, id: string, revision: number) {
+  reopen(
+    userId: string,
+    id: string,
+    candidate: v1.problems.ReopenProblemInput,
+  ) {
+    const input = v1.problems.reopenProblemInputSchema.parse(candidate);
     return this.mutate(
       userId,
       id,
-      revision,
+      input.revision,
       "problems.reopen",
       AuditEventType.PROBLEM_REOPENED,
       (row, snapshot) => {
@@ -801,15 +818,11 @@ export class ProblemsService {
           resolvedAt: null,
         };
       },
+      input.message,
     );
   }
 
-  cancel(
-    userId: string,
-    id: string,
-    revision: number,
-    clearMaintenanceHold?: boolean,
-  ) {
+  cancel(userId: string, id: string, revision: number) {
     return this.mutate(
       userId,
       id,
@@ -821,7 +834,7 @@ export class ProblemsService {
         if (!openStates.includes(row.status))
           throw new ConflictException("Problem is already closed");
         return {
-          ...this.closeHold(row, userId, clearMaintenanceHold),
+          ...this.closeHold(row, userId),
           status: "cancelled",
         };
       },
@@ -831,13 +844,8 @@ export class ProblemsService {
   private closeHold(
     row: ProblemRow,
     userId: string,
-    clear?: boolean,
   ): Prisma.ScooterProblemUncheckedUpdateInput {
-    if (row.blocksUsage && clear === undefined)
-      throw new ConflictException(
-        "Choose whether to clear or retain this problem's maintenance hold",
-      );
-    return row.blocksUsage && clear
+    return row.blocksUsage
       ? {
           blocksUsage: false,
           holdClearedAt: new Date(),
@@ -853,11 +861,17 @@ export class ProblemsService {
       input.revision,
       "problems.update",
       AuditEventType.PROBLEM_HOLD_CHANGED,
-      () => ({
-        blocksUsage: input.blocksUsage,
-        holdClearedAt: input.blocksUsage ? null : new Date(),
-        holdClearedById: input.blocksUsage ? null : userId,
-      }),
+      (row) => {
+        if (!openStates.includes(row.status))
+          throw new ConflictException(
+            "Only open work can change a maintenance hold",
+          );
+        return {
+          blocksUsage: input.blocksUsage,
+          holdClearedAt: input.blocksUsage ? null : new Date(),
+          holdClearedById: input.blocksUsage ? null : userId,
+        };
+      },
     );
   }
 
@@ -865,8 +879,8 @@ export class ProblemsService {
     await this.scooter(userId, scooterId);
     // Holds are safety information: show every blocker, even when the member only works assigned reports.
     const blockers = await this.prisma.scooterProblem.findMany({
-      where: { scooterId, blocksUsage: true },
-      select: { id: true, title: true, status: true, severity: true },
+      where: { scooterId, ...activeMaintenanceHoldWhere },
+      select: { id: true, title: true, status: true, difficulty: true },
       orderBy: [{ createdAt: "asc" }, { id: "asc" }],
     });
     return v1.problems.maintenanceHoldSchema.parse({
@@ -922,11 +936,25 @@ export class ProblemsService {
 
   async activity(userId: string, id: string, query: v1.problems.ActivityQuery) {
     const problem = await this.get(userId, id);
+    const snapshot = await this.access.getSnapshot(userId);
+    const mayViewActivity = snapshot.isSuperAdmin || snapshot.isAdmin === true;
+    if (query.kind === "activity" && !mayViewActivity)
+      throw new ForbiddenException();
     const full = problem.reporter !== undefined;
     const where = {
       targetType: "ScooterProblem",
       targetId: id,
-      type: { in: [...v1.problems.problemActivityTypeSchema.options] },
+      type: {
+        in: v1.problems.problemActivityTypeSchema.options.filter((type) =>
+          query.kind === "comments" || !mayViewActivity
+            ? (
+                v1.problems.problemConversationTypes as readonly string[]
+              ).includes(type)
+            : query.kind === "activity"
+              ? type !== "PROBLEM_COMMENTED"
+              : true,
+        ),
+      },
     };
     const [rows, total] = await this.prisma.$transaction([
       this.prisma.auditEvent.findMany({
@@ -962,9 +990,22 @@ export class ProblemsService {
         return {
           id: row.id,
           type: row.type,
-          actor: full ? row.user : null,
+          actor:
+            full ||
+            (
+              v1.problems.problemConversationTypes as readonly string[]
+            ).includes(row.type)
+              ? row.user
+              : null,
           createdAt: row.createdAt.toISOString(),
-          note: full && typeof notes === "string" ? notes : null,
+          note:
+            (full ||
+              (
+                v1.problems.problemConversationTypes as readonly string[]
+              ).includes(row.type)) &&
+            typeof notes === "string"
+              ? notes
+              : null,
           before: before.success ? before.data : null,
           after: after.success ? after.data : null,
         };

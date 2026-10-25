@@ -638,7 +638,7 @@ describe("ExpenseExtractionReview", () => {
       within(supplierSheet).getByText(/marked as a VAT payer/),
     ).toBeVisible();
     await browser.click(
-      within(supplierSheet).getByRole("button", { name: "Save supplier" }),
+      within(supplierSheet).getByRole("button", { name: "Create supplier" }),
     );
 
     await waitFor(() =>

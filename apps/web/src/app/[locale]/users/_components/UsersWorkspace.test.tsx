@@ -67,6 +67,7 @@ beforeEach(() => {
           items: [
             mechanic,
             admin,
+            { ...mechanic, id: "customer", slug: "customer", name: "Client" },
             {
               ...mechanic,
               id: "old",
@@ -109,6 +110,49 @@ async function pickRole(
 }
 
 describe("member access workspace", () => {
+  it("labels the directory action as adding a team member", async () => {
+    mount();
+    expect(
+      await screen.findByRole("link", { name: "Add team member" }),
+    ).toHaveAttribute("href", "/users/new");
+  });
+
+  it("uses the shared role colors in the directory", async () => {
+    const users = [
+      {
+        ...member,
+        id: "super",
+        email: "super@example.test",
+        isSuperAdmin: true,
+      },
+      { ...member, id: "admin", email: "admin@example.test", roles: [admin] },
+      member,
+      {
+        ...member,
+        id: "client",
+        email: "client@example.test",
+        roles: [
+          { ...mechanic, id: "customer", slug: "customer", name: "Client" },
+        ],
+      },
+    ];
+    const fetchNormally = mocks.fetch.getMockImplementation()!;
+    mocks.fetch.mockImplementation(async (path, ...args) =>
+      path.startsWith("/v1/users?")
+        ? { items: users, total: users.length }
+        : fetchNormally(path, ...args),
+    );
+    mount();
+    for (const [label, color] of [
+      ["Super Admin", "text-personal"],
+      ["Admin", "text-info"],
+      ["Mechanic", "text-warning-text"],
+      ["Client", "text-success"],
+    ]) {
+      expect(await screen.findByText(label!)).toHaveClass(color!);
+    }
+  });
+
   it("confirms dependency changes inside the permissions sheet without closing it", async () => {
     const user = userEvent.setup();
     const dependentRole = {
@@ -446,6 +490,14 @@ describe("member access workspace", () => {
     const sheet = await screen.findByRole("dialog", { name: "Base role" });
     expect(sheet).toHaveClass("bg-popover");
     expect(sheet.querySelector(".bg-background")).toBeNull();
+    expect(
+      within(sheet)
+        .getAllByRole("button")
+        .map((button) => button.getAttribute("aria-label"))
+        .filter((label) =>
+          ["Admin", "Mechanic", "Client", "No role"].includes(label ?? ""),
+        ),
+    ).toEqual(["Admin", "Mechanic", "Client", "No role"]);
     const mechanicCard = within(sheet).getByRole("button", {
       name: "Mechanic",
     });

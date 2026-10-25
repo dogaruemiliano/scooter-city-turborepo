@@ -7,3 +7,7 @@ export * from "./scooter-document-extraction.schemas";
 export * from "./scooter-document-analysis.schemas";
 
 export * from "./scooter-insurance.schemas";
+export * from "./scooter-import-drafts.schemas";
+export * from "./scooter-itp.schemas";
+
+export * from "./scooter-document-types";

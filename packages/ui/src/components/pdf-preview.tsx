@@ -7,7 +7,7 @@ import {
   LoaderCircleIcon,
 } from "lucide-react";
 import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   acquirePdf,
   getPdfThumbnail,
@@ -33,10 +33,13 @@ export function PdfPreview({
   label,
   labels,
   thumbnail = false,
+  onAspectRatio,
   zoomLabels,
   onClosePress,
   closeLabel,
   headerActions,
+  headerOverlay,
+  bottomOverlay,
   onPrevious,
   onNext,
   leftActions,
@@ -44,10 +47,13 @@ export function PdfPreview({
   initialPage = "first",
   entryDirection,
 }: {
+  bottomOverlay?: ReactNode;
   src: string;
   label: string;
   labels: PdfPreviewLabels;
   thumbnail?: boolean;
+  /** Reports the displayed PDF page proportions for adaptive thumbnail cards. */
+  onAspectRatio?: (ratio: number) => void;
   zoomLabels?: DocumentZoomLabels;
   initialPage?: "first" | "last";
 } & Omit<DocumentPreviewHeaderProps, "caption"> &
@@ -96,6 +102,7 @@ export function PdfPreview({
       thumbnail={thumbnail}
       errorLabel={labels.error}
       renderScale={scale}
+      onAspectRatio={onAspectRatio}
     />
   );
   const navigation = pdf ? (
@@ -176,6 +183,8 @@ export function PdfPreview({
           onClosePress={onClosePress}
           closeLabel={closeLabel}
           headerActions={headerActions}
+          headerOverlay={headerOverlay}
+          bottomOverlay={bottomOverlay}
         >
           {content}
         </DocumentZoom>
@@ -200,6 +209,7 @@ function PdfPage({
   thumbnail,
   errorLabel,
   renderScale,
+  onAspectRatio,
 }: {
   pdf: PDFDocumentProxy;
   pageNumber: number;
@@ -207,6 +217,7 @@ function PdfPage({
   thumbnail: boolean;
   errorLabel: string;
   renderScale: number;
+  onAspectRatio?: (ratio: number) => void;
 }) {
   const containerRef = useRef<HTMLSpanElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -236,6 +247,7 @@ function PdfPage({
       .then(async (page) => {
         if (disposed) return;
         const original = page.getViewport({ scale: 1 });
+        onAspectRatio?.(original.width / original.height);
         // Limit raster density for memory use; displayed dimensions follow the container.
         const density = Math.min(window.devicePixelRatio || 1, 2);
         const viewport = page.getViewport({
@@ -260,7 +272,7 @@ function PdfPage({
       disposed = true;
       task?.cancel();
     };
-  }, [pdf, pageNumber, width, renderScale, thumbnail]);
+  }, [pdf, pageNumber, width, renderScale, thumbnail, onAspectRatio]);
 
   return (
     <span

@@ -10,13 +10,16 @@ export function ScooterCover({
   scooter: { coverUrl?: string | null };
 }) {
   const [failed, setFailed] = useState(false);
+  const hasPhoto = Boolean(scooter.coverUrl) && !failed;
   return (
-    <span className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted">
-      {scooter.coverUrl && !failed ? (
+    <span
+      className={`flex size-16 shrink-0 items-center justify-center overflow-hidden ${hasPhoto ? "" : "rounded-lg border border-border bg-muted"}`}
+    >
+      {hasPhoto ? (
         // Private cover URLs must retain session cookies.
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={webApi.url(scooter.coverUrl)}
+          src={webApi.url(scooter.coverUrl!)}
           alt=""
           className="size-full object-contain"
           loading="lazy"

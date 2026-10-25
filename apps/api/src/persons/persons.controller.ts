@@ -1,3 +1,7 @@
+import {
+  UserAvatarService,
+  AVATAR_MAX_BYTES,
+} from "../users/user-avatar.service";
 import { AccessProjectionInterceptor } from "../access/access-projection.interceptor";
 import { RequireAllScope } from "../access/access.decorators";
 import {
@@ -75,6 +79,7 @@ export class PersonsController {
   constructor(
     private readonly persons: PersonsService,
     private readonly documentAnalysis: PersonDocumentAnalysisService,
+    private readonly avatars: UserAvatarService,
   ) {}
 
   @RequireAllScope("person_documents.extract")
@@ -148,6 +153,52 @@ export class PersonsController {
       throw new NotFoundException("Person not found");
     }
     return toPerson(row);
+  }
+
+  @RequireAllScope("persons.update")
+  @Post(":id/avatar")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    operationId: "PersonsController_uploadAvatar_v1",
+    summary: "Update the linked user's profile picture",
+  })
+  @ApiConsumes("multipart/form-data")
+  @ApiBody({
+    schema: {
+      type: "object",
+      required: ["file"],
+      properties: { file: { type: "string", format: "binary" } },
+    },
+  })
+  @UseInterceptors(
+    FileInterceptor("file", {
+      limits: { fileSize: AVATAR_MAX_BYTES, files: 1 },
+    }),
+  )
+  @ZodResponse({ status: HttpStatus.OK, type: Person })
+  async uploadAvatar(
+    @Param("id") id: string,
+    @CurrentUser() actor: AuthPrincipal,
+    @UploadedFile() file?: Express.Multer.File,
+  ): Promise<v1.persons.Person> {
+    const person = await this.persons.findActiveById(id);
+    if (!person) throw new NotFoundException("Person not found");
+    await this.avatars.upload(person.userId, file, actor.id);
+    return this.get(id);
+  }
+
+  @RequireAllScope("persons.update")
+  @Delete(":id/avatar")
+  @ApiOperation({
+    operationId: "PersonsController_removeAvatar_v1",
+    summary: "Remove the linked user's profile picture",
+  })
+  @ZodResponse({ status: HttpStatus.OK, type: Person })
+  async removeAvatar(@Param("id") id: string): Promise<v1.persons.Person> {
+    const person = await this.persons.findActiveById(id);
+    if (!person) throw new NotFoundException("Person not found");
+    await this.avatars.replace(person.userId, null);
+    return this.get(id);
   }
 
   @RequireAllScope("persons.audit.read")

@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLayout } from "@repo/ui/components/page-layout";
+
 import { useOptionalSession } from "@/components/auth/SessionProvider";
 import { canAccess } from "@/lib/access";
 
@@ -172,7 +174,7 @@ export function PersonDetailPage({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-screen-xl flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
+    <PageLayout>
       <PageTitleOverride title={title} />
       <PersonDetailHeader
         person={person}
@@ -211,6 +213,6 @@ export function PersonDetailPage({
       {canAccess(session?.user, "persons.audit.read") ? (
         <ActivitySection events={auditEvents} locale={locale} />
       ) : null}
-    </div>
+    </PageLayout>
   );
 }

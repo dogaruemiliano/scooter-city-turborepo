@@ -112,7 +112,7 @@ export function scooterFormFromScooter(
     temporaryRegistrationExpiresAt: dateOnlyToDateParts(
       scooter.temporaryRegistrationExpiresAt,
     ),
-    requiredLicenseCategory: scooter.requiredLicenseCategory,
+    requiredLicenseCategory: scooter.requiredLicenseCategory ?? "none",
     notes: scooter.notes ?? "",
   };
 }
@@ -296,8 +296,6 @@ function buildRegistrationInput(
 
   if (registrationDate.error) {
     errors.registrationDate = messages.invalidDate("registrationDate");
-  } else if (!registrationDate.value) {
-    errors.registrationDate = messages.required("registrationDate");
   }
 
   if (temporaryRegistrationExpiresAt.error) {
@@ -330,7 +328,7 @@ function buildRegistrationInput(
     input: {
       registrationType: form.registrationType,
       registrationNumber: normalizedPlate?.displayValue,
-      registrationDate: registrationDate.value,
+      registrationDate: registrationDate.value ?? null,
       temporaryRegistrationExpiresAt:
         temporaryRegistrationExpiresAt.value ?? null,
       requiredLicenseCategory: form.requiredLicenseCategory,

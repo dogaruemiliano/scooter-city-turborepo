@@ -13,6 +13,7 @@ import type { ValidateDocumentInput } from "./document-validation.types";
 function setup(
   bytes = Buffer.from("ffd8ffe00000", "hex"),
   contentType: "image/jpeg" | "application/pdf" = "image/jpeg",
+  detailViews = false,
 ) {
   const input: ValidateDocumentInput = {
     source: {
@@ -67,6 +68,7 @@ function setup(
       bucket: "private",
       prefix: "documents",
       maxBytes: 15 * 1024 * 1024,
+      detailViews,
     },
   );
   return { input, handler, send, saved: () => saved };
@@ -82,6 +84,7 @@ describe("isolated document validation Lambda", () => {
         contentType: input.source.contentType,
         byteSize: input.source.byteSize,
         checksumSha256: input.source.checksumSha256,
+        originalPageCount: 1,
       },
     });
     expect(saved()).toMatchObject({
@@ -90,7 +93,7 @@ describe("isolated document validation Lambda", () => {
       ChecksumSHA256: Buffer.from(input.source.checksumSha256, "hex").toString(
         "base64",
       ),
-      Metadata: { "validation-revision": "2" },
+      Metadata: { "validation-revision": "4" },
     });
     expect(
       send.mock.calls.filter(
@@ -98,6 +101,29 @@ describe("isolated document validation Lambda", () => {
       ),
     ).toHaveLength(1);
     expect(saved()?.Key).not.toEqual(input.source.storageKey);
+  });
+
+  it("keeps original page count separate from native detail pages and immutable snapshot replay", async () => {
+    const pdf = await PDFDocument.create();
+    pdf.addPage([200, 300]).drawText("Synthetic CIV source");
+    pdf.addPage([200, 300]);
+    const { handler, input, saved } = setup(
+      Buffer.from(await pdf.save()),
+      "application/pdf",
+      true,
+    );
+    const result = await handler(input);
+    expect(result).toMatchObject({
+      ok: true,
+      document: { originalPageCount: 2 },
+    });
+    expect(saved()?.Metadata).toMatchObject({
+      "original-page-count": "2",
+      "validation-revision": "4",
+    });
+    const prepared = await PDFDocument.load(saved()!.Body as Uint8Array);
+    expect(prepared.getPageCount()).toBe(6);
+    await expect(handler(input)).resolves.toEqual(result);
   });
 
   it("reuses a validated snapshot after a lost response without reading or writing document bytes again", async () => {

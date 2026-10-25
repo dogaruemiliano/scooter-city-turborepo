@@ -1,4 +1,6 @@
 "use client";
+import { useFormAction } from "@/lib/form/use-form-action";
+import { SaveButton } from "@repo/ui/components/save-button";
 
 import { useCallback, useState } from "react";
 import {
@@ -181,6 +183,8 @@ function RoleForm({
   role: v1.access.Role;
   reload: () => void;
 }) {
+  const formAction = useFormAction();
+
   const t = useTranslations("workspace");
   const task = useTask();
   const { user: actor } = useSession();
@@ -221,22 +225,25 @@ function RoleForm({
       onSubmit={(event) => {
         event.preventDefault();
         if (readOnly) return;
-        void task.run(async () => {
-          if (!previewCurrent) {
-            setPreview(await previewRole());
-            setReviewedPayload(JSON.stringify(payload));
-            return false;
-          }
-          await webApi.fetch(
-            `/v1/access/roles/${role.id}`,
-            v1.access.roleSchema,
-            {
-              method: "PUT",
-              json: v1.access.updateRoleInputSchema.parse(payload),
-            },
-          );
-          reload();
-        });
+        void task.run(
+          async () => {
+            if (!previewCurrent) {
+              setPreview(await previewRole());
+              setReviewedPayload(JSON.stringify(payload));
+              return false;
+            }
+            await webApi.fetch(
+              `/v1/access/roles/${role.id}`,
+              v1.access.roleSchema,
+              {
+                method: "PUT",
+                json: v1.access.updateRoleInputSchema.parse(payload),
+              },
+            );
+            reload();
+          },
+          { successMessage: t("access.roleUpdated") },
+        );
       }}
     >
       <CardHeader className="flex items-start gap-3">
@@ -305,14 +312,13 @@ function RoleForm({
             </CardContent>
           </Card>
         ) : null}
-        <Feedback error={task.error} success={task.success} />
+        <Feedback error={task.error} />
       </CardContent>
       {!readOnly ? (
         <FormActions className="sticky bottom-0 z-raised bg-popover">
           <Button
             type="button"
             variant="secondary"
-            className="min-h-11"
             disabled={task.busy || !hasChanges}
             onClick={() => {
               setPermissions(role.permissions);
@@ -322,9 +328,8 @@ function RoleForm({
           >
             {t("cancel")}
           </Button>
-          <Button
+          <SaveButton
             type="submit"
-            className="min-h-11"
             disabled={
               task.busy ||
               !hasChanges ||
@@ -333,9 +338,12 @@ function RoleForm({
                   (member) => member.missingPrerequisites.length,
                 ))
             }
-          >
-            {previewCurrent ? t("access.confirm") : t("access.preview")}
-          </Button>
+            {...formAction(
+              previewCurrent ? "confirm" : "review",
+              { pending: task.busy, error: task.error },
+              previewCurrent ? t("access.confirm") : t("access.preview"),
+            )}
+          />
         </FormActions>
       ) : null}
       <CardContent>

@@ -40,6 +40,8 @@ describe("ScooterDocumentsService", () => {
       findMany: jest.fn(),
     },
     scooter: { findFirst: jest.fn() },
+    scooterInsurancePolicy: { findFirst: jest.fn() },
+    scooterItpInspection: { findFirst: jest.fn() },
   };
   const storage = {
     createPresignedDocumentUpload: jest.fn(),
@@ -58,7 +60,83 @@ describe("ScooterDocumentsService", () => {
     storage.verifyDocumentUploadToken.mockReturnValue(stored);
     prisma.draftUpload.updateMany.mockResolvedValue({ count: 1 });
     prisma.scooterDocument.count.mockResolvedValue(0);
+    prisma.scooterInsurancePolicy.findFirst.mockResolvedValue({ id: "policy" });
   });
+  it("stores both versions as one document and claims both uploads", async () => {
+    const copy = { ...stored, storageKey: "scooter-documents/client.pdf" };
+    storage.completePresignedDocumentUpload
+      .mockResolvedValueOnce(stored)
+      .mockResolvedValueOnce(copy);
+    const prepared = await service.prepare(
+      [
+        {
+          ...draft,
+          clientCopy: {
+            fileName: "Client.pdf",
+            uploadToken: "copy",
+            uploadType: "unclassified",
+          },
+        },
+      ],
+      "admin",
+    );
+    await service.apply(tx, "scooter", prepared, [], "admin");
+    expect(prisma.scooterDocument.create).toHaveBeenCalledTimes(1);
+    expect(prisma.scooterDocument.create.mock.calls[0][0]).toMatchObject({
+      data: {
+        asset: { create: { storageKey: stored.storageKey } },
+        clientCopyAsset: { create: { storageKey: copy.storageKey } },
+        clientCopyFileName: "Client.pdf",
+      },
+    });
+    expect(prisma.draftUpload.updateMany).toHaveBeenCalledTimes(2);
+    expect(storage.completePresignedDocumentUpload).toHaveBeenLastCalledWith(
+      "copy",
+      "scooter-document:unclassified:admin",
+    );
+  });
+
+  it("rejects reusing the same upload as both versions", async () => {
+    await expect(
+      service.prepare(
+        [
+          {
+            ...draft,
+            clientCopy: {
+              fileName: "Copy.pdf",
+              uploadToken: "token",
+              uploadType: "civ",
+            },
+          },
+        ],
+        "admin",
+      ),
+    ).rejects.toThrow("Duplicate document version");
+  });
+
+  it("serves the requested client copy and rejects absent versions", async () => {
+    prisma.scooterDocument.findFirst.mockResolvedValue({
+      asset: stored,
+      clientCopyAsset: { ...stored, storageKey: "client.pdf" },
+    });
+    storage.readDocument.mockResolvedValue({
+      body: "fixture",
+      contentLength: 100,
+    });
+    await service.content("scooter", "doc", "client_copy");
+    expect(storage.readDocument).toHaveBeenLastCalledWith("client.pdf");
+    await expect(service.content("scooter", "doc", "invalid")).rejects.toThrow(
+      "Unknown document version",
+    );
+    prisma.scooterDocument.findFirst.mockResolvedValue({
+      asset: stored,
+      clientCopyAsset: null,
+    });
+    await expect(
+      service.content("scooter", "doc", "client_copy"),
+    ).rejects.toThrow("Document version not found");
+  });
+
   it("keeps unclassified uploads bound to their owner through detection, reassignment and save", async () => {
     prisma.draftUpload.findFirst.mockResolvedValue({ id: "draft" });
     const selected = {
@@ -194,6 +272,100 @@ describe("ScooterDocumentsService", () => {
       "Duplicate document",
     );
   });
+  it("retains the original paired evidence of confirmed inspections", async () => {
+    prisma.scooterItpInspection.findFirst.mockResolvedValueOnce({
+      id: "inspection",
+    });
+    await expect(
+      service.apply(tx, "scooter", [], ["card"], "admin"),
+    ).rejects.toThrow("supporting a confirmed inspection");
+    expect(prisma.scooterDocument.updateMany).not.toHaveBeenCalled();
+  });
+  it("links a mixed original containing insurance to its policy without duplicating the file", async () => {
+    const extractedData = {
+      vin: null,
+      fields: {},
+      rawFields: {},
+      documents: [
+        {
+          id: "policy-doc",
+          documentType: "insurance" as const,
+          pages: [2],
+          vin: null,
+          fields: {},
+          rawFields: {},
+        },
+      ],
+    };
+    await service.apply(
+      tx,
+      "scooter",
+      [{ ...draft, stored, extractedData, insurancePolicyId: "policy" }],
+      [],
+      "admin",
+    );
+    expect(prisma.scooterDocument.create).toHaveBeenCalledTimes(1);
+    expect(prisma.scooterDocument.create.mock.calls[0]?.[0].data).toMatchObject(
+      {
+        type: "civ",
+        insurancePolicy: { connect: { id: "policy" } },
+      },
+    );
+  });
+  it("retains explicitly historical insurance without claiming it is the current policy", async () => {
+    await service.apply(
+      tx,
+      "scooter",
+      [
+        {
+          ...draft,
+          stored,
+          type: "insurance",
+          extractedData: {
+            vin: null,
+            fields: {},
+            rawFields: {},
+            currentInsuranceDocumentId: null,
+          },
+        },
+      ],
+      [],
+      "admin",
+    );
+    expect(prisma.scooterInsurancePolicy.findFirst).not.toHaveBeenCalled();
+    expect(prisma.scooterDocument.create).toHaveBeenCalledTimes(1);
+  });
+  it("rejects mismatched logical VINs at the save boundary", async () => {
+    const extractedData = {
+      vin: "LXYTCKP05P0000001",
+      fields: {},
+      rawFields: {},
+      documents: [
+        {
+          id: "other",
+          documentType: "civ" as const,
+          pages: [1],
+          vin: "LXYTCKP05P0000002",
+          fields: {},
+          rawFields: {},
+        },
+      ],
+    };
+    await expect(
+      service.apply(
+        tx,
+        "scooter",
+        [{ ...draft, stored, extractedData }],
+        [],
+        "admin",
+        [],
+        undefined,
+        undefined,
+        "LXYTCKP05P0000001",
+      ),
+    ).rejects.toThrow("Review document VINs");
+    expect(prisma.scooterDocument.create).not.toHaveBeenCalled();
+  });
   it("records abandoned uploads for existing cleanup with the completion expiry", async () => {
     const expiresAt = new Date(Date.now() + 60000);
     const uploadTokenExpiresAt = new Date(Date.now() + 86400000);
@@ -274,7 +446,7 @@ describe("ScooterDocumentsService", () => {
         scooter: { deletedAt: null },
         asset: { deletedAt: null },
       },
-      include: { asset: true },
+      include: { asset: true, clientCopyAsset: true },
     });
     expect(storage.readDocument).not.toHaveBeenCalled();
   });

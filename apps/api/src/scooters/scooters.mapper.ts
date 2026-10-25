@@ -6,34 +6,55 @@ import type {
   Scooter as ScooterRow,
   VehicleCivDocument,
   ScooterInsurancePolicy,
+  ScooterItpInspection,
 } from "../generated/prisma/client";
 
 type ScooterRowWithBrand = ScooterRow & {
   insuranceAttention?: v1.scooters.InsuranceAttention | null;
+  rentalInsuranceStatus?: v1.scooters.Scooter["rentalInsuranceStatus"];
   photos?: { id: string }[];
-  problems?: { severity: v1.problems.Problem["severity"] }[];
+  problems?: { difficulty: v1.problems.Problem["difficulty"] }[];
   _count?: { problems: number };
   brand: { name: string; code: string };
   civDocument?: VehicleCivDocument | null;
   insurancePolicies?: ScooterInsurancePolicy[];
+  inspections?: ScooterItpInspection[];
 };
 
 export function toScooter(row: ScooterRowWithBrand): v1.scooters.Scooter {
+  const itp = row.inspections
+    ? v1.scooters.scooterItpSummary(
+        row.inspections.map((entry) => ({
+          inspectionDate: toDateOnlyString(entry.inspectionDate)!,
+          validUntil: toDateOnlyString(entry.validUntil),
+          result: v1.scooters.scooterItpResultSchema.parse(entry.result),
+        })),
+      )
+    : undefined;
   return {
+    ...(itp ? { itpStatus: itp.status, itpValidUntil: itp.validUntil } : {}),
     ...(row.problems
       ? {
-          problemSeverityCounts: {
-            low: row.problems.filter((p) => p.severity === "low").length,
-            moderate: row.problems.filter((p) => p.severity === "moderate")
+          problemDifficultyCounts: {
+            easy: row.problems.filter((p) => p.difficulty === "easy").length,
+            medium: row.problems.filter((p) => p.difficulty === "medium")
               .length,
-            high: row.problems.filter((p) => p.severity === "high").length,
-            critical: row.problems.filter((p) => p.severity === "critical")
-              .length,
-            unknown: row.problems.filter((p) => p.severity === null).length,
+            hard: row.problems.filter((p) => p.difficulty === "hard").length,
+            unknown: row.problems.filter((p) => p.difficulty === null).length,
           },
         }
       : {}),
     maintenanceHoldCount: row._count?.problems ?? 0,
+    rentalInsuranceStatus:
+      row.rentalInsuranceStatus ??
+      (row.insurancePolicies
+        ? v1.scooters.rentalInsuranceStatus(
+            row.insurancePolicies.map((policy) => ({
+              validFrom: toDateOnlyString(policy.validFrom),
+              validUntil: toDateOnlyString(policy.validUntil),
+            })),
+          )
+        : undefined),
     ...(row.photos
       ? {
           coverUrl: row.photos[0]
@@ -87,6 +108,7 @@ export function toScooter(row: ScooterRowWithBrand): v1.scooters.Scooter {
     brandCode: row.brand.code,
     vehicleType: row.vehicleType,
     civNumber: row.civNumber,
+    civAvailability: row.civAvailability ?? "unknown",
     nationalEmissionsCode: row.nationalEmissionsCode,
     variant: row.variant,
     version: row.version,

@@ -11,7 +11,7 @@ import { DetailSectionCard } from "./DetailSection";
 export function PersonContactSection({
   person,
 }: {
-  person: v1.persons.Person;
+  person: Pick<v1.persons.Person, "email" | "phone">;
 }) {
   const t = useTranslations("persons");
 

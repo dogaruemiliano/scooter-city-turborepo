@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLayout } from "@repo/ui/components/page-layout";
+
 import {
   Alert,
   AlertDescription,
@@ -18,7 +20,7 @@ export default function ScootersError({ reset }: ScootersErrorProps) {
   const t = useTranslations("scooters");
 
   return (
-    <div className="mx-auto flex w-full max-w-screen-xl flex-1 px-4 py-6 sm:px-6 sm:py-10">
+    <PageLayout>
       <Alert variant="destructive">
         <CircleAlertIcon aria-hidden="true" />
         <AlertTitle>{t("routeStates.errorTitle")}</AlertTitle>
@@ -30,6 +32,6 @@ export default function ScootersError({ reset }: ScootersErrorProps) {
           </Button>
         </AlertDescription>
       </Alert>
-    </div>
+    </PageLayout>
   );
 }

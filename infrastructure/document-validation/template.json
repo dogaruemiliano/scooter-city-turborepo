@@ -29,6 +29,12 @@
       "MinValue": 0,
       "Description": "Reserved executions. Set 0 to omit the reservation and use shared account capacity (does not disable the function)."
     },
+    "NativeDetailViews": {
+      "Type": "String",
+      "Default": "false",
+      "AllowedValues": ["false", "true"],
+      "Description": "Append labelled overlapping native PDF detail views. Enable after comparing private real-scan accuracy and cost."
+    },
     "MaxDocumentBytes": {
       "Type": "Number",
       "Default": 15728640,
@@ -162,6 +168,7 @@
             "DOCUMENT_VALIDATION_BUCKET": { "Ref": "StorageBucketName" },
             "DOCUMENT_VALIDATION_PREFIX": { "Ref": "StoragePrefix" },
             "DOCUMENT_VALIDATION_MAX_BYTES": { "Ref": "MaxDocumentBytes" },
+            "DOCUMENT_VALIDATION_DETAIL_VIEWS": { "Ref": "NativeDetailViews" },
             "DOCUMENT_VALIDATION_KMS_KEY_ID": { "Ref": "KmsKeyArn" }
           }
         }

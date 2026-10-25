@@ -55,6 +55,9 @@ export class LocalDocumentValidationClient implements DocumentValidationClient {
           DOCUMENT_VALIDATION_MAX_BYTES: String(
             this.env.IMAGE_STORAGE_MAX_BYTES,
           ),
+          DOCUMENT_VALIDATION_DETAIL_VIEWS: String(
+            this.env.DOCUMENT_VALIDATION_DETAIL_VIEWS ?? false,
+          ),
           DOCUMENT_VALIDATION_KMS_KEY_ID: this.env.IMAGE_STORAGE_S3_KMS_KEY_ID,
         },
       });

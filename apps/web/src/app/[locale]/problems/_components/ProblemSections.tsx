@@ -1,4 +1,6 @@
 "use client";
+import { useFormAction } from "@/lib/form/use-form-action";
+import { SaveButton } from "@repo/ui/components/save-button";
 
 import { useCallback, useEffect, useId, useState } from "react";
 import { useTranslations } from "next-intl";
@@ -253,6 +255,8 @@ function TaskLocationEditor({
   ) => Promise<void>;
   onBusyChange: (busy: boolean) => void;
 }) {
+  const formAction = useFormAction();
+
   const t = useTranslations("workspace.problems");
   const shared = useTranslations("workspace");
   const id = useId();
@@ -406,12 +410,15 @@ function TaskLocationEditor({
             ) : null}
             <Feedback error={task.error} />
             <div className="flex gap-2">
-              <Button
+              <SaveButton
                 type="submit"
                 disabled={busy || !name.trim() || !address.trim()}
-              >
-                {t("saveLocation")}
-              </Button>
+                {...formAction(
+                  "save",
+                  { pending: busy, error: task.error },
+                  t("saveLocation"),
+                )}
+              />
               <Button variant="ghost" disabled={busy} onClick={onClose}>
                 {shared("cancel")}
               </Button>

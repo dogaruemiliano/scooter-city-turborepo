@@ -54,6 +54,21 @@ export type ScooterListSort = (typeof SCOOTER_LIST_SORTS)[number];
 
 export const ROUTES = {
   nextFleetNumber: "/v1/scooters/next-fleet-number",
+  importDrafts: {
+    list: "/v1/scooters/import-drafts",
+    create: "/v1/scooters/import-drafts",
+    get: (id: string) => `/v1/scooters/import-drafts/${encodeURIComponent(id)}`,
+    update: (id: string) =>
+      `/v1/scooters/import-drafts/${encodeURIComponent(id)}`,
+    merge: (id: string) =>
+      `/v1/scooters/import-drafts/${encodeURIComponent(id)}/merge`,
+    discard: (id: string) =>
+      `/v1/scooters/import-drafts/${encodeURIComponent(id)}/discard`,
+  },
+  itp: {
+    list: (id: string) => `/v1/scooters/${encodeURIComponent(id)}/itp`,
+    create: (id: string) => `/v1/scooters/${encodeURIComponent(id)}/itp`,
+  },
   photos: {
     draftUpload: "/v1/scooters/photo-draft-upload-url",
     list: (id: string) => `/v1/scooters/${encodeURIComponent(id)}/photos`,

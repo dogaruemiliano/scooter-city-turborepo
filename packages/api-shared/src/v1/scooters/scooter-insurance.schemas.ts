@@ -123,3 +123,14 @@ export function insurancePeriodsOverlap(
         ),
   );
 }
+
+/** Readiness summary: unlike attention, missing insurance is explicit. */
+export function rentalInsuranceStatus(
+  policies: Pick<InsurancePolicyInput, "validFrom" | "validUntil">[],
+  today = dateOnlyToday(),
+): "missing" | "active" | InsuranceAttention {
+  if (!policies.length) return "missing";
+  const statuses = policies.map((policy) => insuranceStatus(policy, today));
+  if (statuses.includes("active")) return "active";
+  return insuranceAttention(policies, today) ?? "missing";
+}

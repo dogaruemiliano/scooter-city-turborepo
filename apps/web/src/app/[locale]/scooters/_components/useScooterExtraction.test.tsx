@@ -188,20 +188,23 @@ describe("document extraction lifecycle", () => {
     expect(hook.result.current.extraction.sources).toEqual([]);
     expect(hook.result.current.form.getValues("color")).toBe("Corrected");
   });
-  it("reviews import VINs only while there is no CIV", () => {
+  it("reviews every source VIN even when a CIV is present", () => {
     const hook = setup({ attached: [importer] });
     expect(hook.result.current.extraction.unverifiedSources).toEqual([
       importer,
     ]);
     hook.rerender({ attached: [importer, civ] });
-    expect(hook.result.current.extraction.unverifiedSources).toEqual([civ]);
+    expect(hook.result.current.extraction.unverifiedSources).toEqual([
+      importer,
+      civ,
+    ]);
     hook.rerender({ attached: [importer] });
     expect(hook.result.current.extraction.unverifiedSources).toEqual([
       importer,
     ]);
   });
 
-  it("does not let historical import VINs block reviewing the CIV", () => {
+  it("requires review when historical import and CIV VINs conflict", () => {
     const hook = setup({
       attached: [importer, civ],
       existing: true,
@@ -211,7 +214,7 @@ describe("document extraction lifecycle", () => {
         [civ.sourceId]: extracted({}, {}, vin),
       },
     });
-    expect(hook.result.current.extraction.vinMismatch).toBe(false);
+    expect(hook.result.current.extraction.vinMismatch).toBe(true);
   });
 
   it("does not dirty a persisted edit on mount or require reviewing historical files without extraction", () => {
@@ -424,7 +427,7 @@ describe("document extraction lifecycle", () => {
     expect(hook.result.current.form.getValues("insurancePolicies")).toEqual([]);
   });
 
-  it("requires new unknown sources to be confirmed and never permits confirmation to hide a VIN mismatch", () => {
+  it("uses an existing vehicle VIN without asking again and never hides a VIN mismatch", () => {
     const hook = setup({ attached: [civ] });
     expect(hook.result.current.extraction.unverifiedSources).toHaveLength(1);
     act(() => hook.result.current.extraction.confirmVin(civ.sourceId));
@@ -443,7 +446,7 @@ describe("document extraction lifecycle", () => {
       hook.result.current.extraction.unverifiedSources.map(
         (source) => source.sourceId,
       ),
-    ).toEqual(["civ-2"]);
+    ).toEqual([]);
   });
 
   it("accepts the import dialog's confirmation for unknown VINs without asking twice", () => {
@@ -466,4 +469,20 @@ describe("document extraction lifecycle", () => {
     act(() => hook.result.current.extraction.confirmVin(civ.sourceId));
     expect(hook.result.current.extraction.unverifiedSources).toEqual([]);
   });
+});
+
+it("clears automatic values from a reclassified source while preserving admin edits", () => {
+  const hook = setup({ attached: [civ] });
+  hook.apply({
+    [civ.sourceId]: extracted({ civNumber: "C123", color: "White" }),
+  });
+  expect(hook.result.current.form.getValues("civNumber")).toBe("C123");
+  act(() =>
+    hook.result.current.form.setValue("color", "Manual", { shouldDirty: true }),
+  );
+  act(() => hook.result.current.extraction.resetAutomaticSource(civ.sourceId));
+  expect(hook.result.current.form.getValues("civNumber")).toBe("");
+  expect(hook.result.current.form.getValues("color")).toBe("Manual");
+  hook.apply({ [civ.sourceId]: extracted({ color: "Blue" }) });
+  expect(hook.result.current.form.getValues("color")).toBe("Manual");
 });

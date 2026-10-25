@@ -9,6 +9,7 @@ import type {
 } from "../generated/prisma/client";
 
 export type PersonWithDocuments = PersonRow & {
+  user?: { avatarAssetId: string | null };
   documents: PersonDocumentRow[];
 };
 
@@ -21,6 +22,7 @@ export function toPerson(row: PersonWithDocuments): v1.persons.Person {
     id: row.id,
     email: row.email,
     phone: row.phone,
+    avatarAssetId: row.user?.avatarAssetId ?? null,
     firstName: row.firstName,
     lastName: row.lastName,
     cnp: row.cnp,

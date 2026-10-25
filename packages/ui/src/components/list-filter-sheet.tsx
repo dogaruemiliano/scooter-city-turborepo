@@ -8,6 +8,7 @@ import {
   type SetStateAction,
 } from "react";
 import { FilterIcon } from "lucide-react";
+import { SaveButton } from "./save-button";
 import { Badge } from "@repo/ui/components/badge";
 import { Button } from "@repo/ui/components/button";
 import { Alert, AlertDescription } from "@repo/ui/components/alert";
@@ -30,6 +31,7 @@ export interface ListFilterSheetProps<T> {
   title: string;
   description?: string;
   applyLabel: string;
+  applyingLabel?: string;
   resetLabel: string;
   cancelLabel: string;
   applyErrorLabel?: string;
@@ -49,6 +51,7 @@ export function ListFilterSheet<T>({
   title,
   description,
   applyLabel,
+  applyingLabel = applyLabel,
   resetLabel,
   cancelLabel,
   applyErrorLabel,
@@ -131,9 +134,14 @@ export function ListFilterSheet<T>({
             ) : null}
           </BottomSheetBody>
           <BottomSheetFooter>
-            <Button type="submit" disabled={busy || disabled}>
-              {applyLabel}
-            </Button>
+            <SaveButton
+              type="submit"
+              disabled={disabled}
+              state={busy ? "pending" : error ? "error" : "idle"}
+              idleLabel={applyLabel}
+              pendingLabel={applyingLabel}
+              successLabel={applyLabel}
+            />
             <div className="flex items-center justify-between gap-3">
               <Button
                 type="button"

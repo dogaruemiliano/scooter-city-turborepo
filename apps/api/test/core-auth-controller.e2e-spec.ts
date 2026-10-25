@@ -17,6 +17,11 @@ process.env.OTP_DELIVERY_QUOTA_PER_TARGET_PER_HOUR = "10000";
 process.env.OTP_DELIVERY_QUOTA_PER_TARGET_PER_DAY = "10000";
 process.env.OTP_DELIVERY_QUOTA_PER_IP_PER_HOUR = "10000";
 
+import { createCanvas } from "@napi-rs/canvas";
+import { createHash, randomUUID } from "node:crypto";
+import { Readable } from "node:stream";
+import { ImageStorageService } from "../src/image-storage/image-storage.service";
+import type { StoreImageInput } from "../src/image-storage/image-storage.types";
 import { INestApplication, VersioningType } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import { v1 } from "@repo/api-shared";
@@ -44,6 +49,33 @@ describe("Core auth HTTP surface (e2e)", () => {
 
   const createdUserIds: string[] = [];
   const createdPersonIds: string[] = [];
+
+  const storedImages = new Map<string, Buffer>();
+  const avatarStorage = {
+    storeImage: jest.fn((input: StoreImageInput) => {
+      const storageKey = `test-avatar/${randomUUID()}.png`;
+      storedImages.set(storageKey, input.buffer);
+      return Promise.resolve({
+        provider: "s3",
+        bucket: "test",
+        storageKey,
+        contentType: "image/png",
+        byteSize: input.buffer.length,
+        checksumSha256: createHash("sha256").update(input.buffer).digest("hex"),
+      });
+    }),
+    readImage: jest.fn((key: string) =>
+      Promise.resolve({
+        body: Readable.from(storedImages.get(key)!),
+        contentType: "image/png",
+        contentLength: storedImages.get(key)!.length,
+      }),
+    ),
+    deleteImage: jest.fn((key: string) => {
+      storedImages.delete(key);
+      return Promise.resolve();
+    }),
+  };
 
   const server = () => app.getHttpServer() as Server;
 
@@ -75,7 +107,10 @@ describe("Core auth HTTP surface (e2e)", () => {
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(ImageStorageService)
+      .useValue(avatarStorage)
+      .compile();
     app = moduleRef.createNestApplication();
     app.enableVersioning({ type: VersioningType.URI, defaultVersion: "1" });
     app.use(cookieParser());
@@ -96,6 +131,9 @@ describe("Core auth HTTP surface (e2e)", () => {
       });
     }
     if (createdUserIds.length > 0) {
+      await prisma.mediaAsset.deleteMany({
+        where: { uploadedByUserId: { in: createdUserIds } },
+      });
       await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
     }
     await app.close();
@@ -216,6 +254,77 @@ describe("Core auth HTTP surface (e2e)", () => {
     });
     expect(user?.firstName).toBe("Ada");
     expect(user?.lastName).toBe("Lovelace");
+  });
+
+  it("uploads, reads, replaces and removes only the current user's avatar", async () => {
+    const session = await freshSession();
+    const png = createCanvas(16, 16).toBuffer("image/png");
+    const uploaded = await req()
+      .post(v1.auth.ROUTES.avatar)
+      .set("Authorization", `Bearer ${session.accessToken}`)
+      .attach("file", png, "avatar.png")
+      .expect(201);
+    const profile = v1.auth.sessionUserSchema.parse(uploaded.body);
+    expect(profile.avatarAssetId).toBeTruthy();
+    const firstId = profile.avatarAssetId!;
+    await req().get(v1.auth.ROUTES.avatarContent(firstId)).expect(401);
+    await req()
+      .get(v1.auth.ROUTES.avatarContent(firstId))
+      .set("Authorization", `Bearer ${session.accessToken}`)
+      .expect(200)
+      .expect("Content-Type", /image\/png/);
+    const refreshed = await req()
+      .get(v1.auth.ROUTES.me)
+      .set("Authorization", `Bearer ${session.accessToken}`)
+      .expect(200);
+    expect(v1.auth.sessionUserSchema.parse(refreshed.body).avatarAssetId).toBe(
+      firstId,
+    );
+    const replacement = await req()
+      .post(v1.auth.ROUTES.avatar)
+      .set("Authorization", `Bearer ${session.accessToken}`)
+      .attach("file", png, "replacement.png")
+      .expect(201);
+    const nextId = v1.auth.sessionUserSchema.parse(
+      replacement.body,
+    ).avatarAssetId!;
+    expect(nextId).not.toBe(firstId);
+    await req()
+      .get(v1.auth.ROUTES.avatarContent(firstId))
+      .set("Authorization", `Bearer ${session.accessToken}`)
+      .expect(404);
+    const removed = await req()
+      .delete(v1.auth.ROUTES.avatar)
+      .set("Authorization", `Bearer ${session.accessToken}`)
+      .expect(200);
+    expect(
+      v1.auth.sessionUserSchema.parse(removed.body).avatarAssetId,
+    ).toBeNull();
+    await req()
+      .get(v1.auth.ROUTES.avatarContent(nextId))
+      .set("Authorization", `Bearer ${session.accessToken}`)
+      .expect(404);
+  });
+
+  it("rejects unauthenticated uploads, active content and cookie mutations without CSRF headers", async () => {
+    const session = await freshSession();
+    const png = createCanvas(8, 8).toBuffer("image/png");
+    await req()
+      .post(v1.auth.ROUTES.avatar)
+      .attach("file", png, "avatar.png")
+      .expect(401);
+    await request(server())
+      .post(v1.auth.ROUTES.avatar)
+      .set("Cookie", `access_token=${session.accessToken}`)
+      .attach("file", png, "avatar.png")
+      .expect(403);
+    await req()
+      .post(v1.auth.ROUTES.avatar)
+      .set("Authorization", `Bearer ${session.accessToken}`)
+      .attach("file", Buffer.from("<svg/>"), "avatar.svg")
+      .expect(400);
+    const row = await users.findById(session.userId);
+    expect(row?.avatarAssetId).toBeNull();
   });
 
   it("PATCH /v1/auth/me rejects blank profile names", async () => {

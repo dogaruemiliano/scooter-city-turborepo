@@ -678,6 +678,8 @@ export class ImageStorageService {
     const fileName = `${randomUUID()}.${extension}`;
 
     switch (category) {
+      case "user-avatar":
+        return `${this.prefix}/user-avatars/${year}/${fileName}`;
       case "personal-document":
         return `${this.prefix}/personal-documents/${year}/${fileName}`;
       case "expense-invoice":

@@ -8,6 +8,8 @@ type FormActionsProps = ComponentProps<"div"> & {
   status?: ReactNode;
   buttonLayout?: "equal" | "primary";
   sticky?: boolean;
+  /** Compact padding and action spacing for short floating save bars. */
+  density?: "default" | "compact";
   /** Page forms: reveal the floating actions when submission is valid. */
   ready?: boolean;
   /** Keeps ready actions visible while submission is in progress. */
@@ -21,14 +23,19 @@ function FormActions({
   status,
   buttonLayout = "equal",
   sticky = false,
+  density = "default",
   ready,
   pending = false,
   arrangement = "default",
   children,
   ...props
 }: FormActionsProps) {
+  // Split actions occupy the full row. Keep status above them so it cannot
+  // shrink to a column of single characters beside a full-width button group.
   const layout =
-    "flex min-w-0 flex-col gap-3 @form-columns/form-actions:flex-row @form-columns/form-actions:items-center @form-columns/form-actions:justify-end";
+    arrangement === "split"
+      ? "flex min-w-0 flex-col gap-3"
+      : "flex min-w-0 flex-col gap-3 @form-columns/form-actions:flex-row @form-columns/form-actions:items-center @form-columns/form-actions:justify-end";
   const content = (
     <>
       {status != null ? (
@@ -42,10 +49,12 @@ function FormActions({
       <div
         className={cn(
           arrangement === "split"
-            ? "flex w-full min-w-0 flex-col gap-6 *:min-w-0 *:max-w-full md:flex-row-reverse md:items-center md:justify-between"
+            ? "flex w-full min-w-0 flex-col *:min-w-0 *:max-w-full md:flex-row-reverse md:items-center md:justify-between"
             : buttonLayout === "primary"
               ? "grid w-full min-w-0 grid-cols-(--container-primary-form-actions) items-center gap-3 *:min-w-0 *:max-w-full *:w-full"
               : "flex w-full min-w-0 flex-wrap items-center justify-end gap-3 *:min-w-0 *:max-w-full *:flex-1 @form-columns/form-actions:w-auto @form-columns/form-actions:*:flex-none",
+          arrangement === "split" &&
+            (density === "compact" ? "gap-2" : "gap-6"),
         )}
       >
         {children}
@@ -60,17 +69,22 @@ function FormActions({
         data-sticky={floating}
         aria-busy={pending || undefined}
         className={cn(
-          "@container/form-actions sticky bottom-[calc(var(--spacing-4)+env(safe-area-inset-bottom))] z-sticky gap-0 py-0 shadow-md sm:bottom-[calc(var(--spacing-8)+env(safe-area-inset-bottom))]",
+          "@container/form-actions sticky bottom-[calc(var(--spacing-4)+env(safe-area-inset-bottom))] z-sticky gap-0 py-0 shadow-md",
           ready !== undefined && "w-full",
           ready !== undefined &&
             (floating
               ? "self-end bg-floating-action-surface backdrop-blur-floating-surface animate-in slide-in-from-bottom-4 duration-normal ease-decelerate motion-reduce:animate-none"
-              : "static bottom-auto sm:bottom-auto"),
+              : "static bottom-auto"),
           className,
         )}
         {...props}
       >
-        <CardContent className={cn(layout, "p-4 sm:p-6")}>
+        <CardContent
+          className={cn(
+            layout,
+            density === "compact" ? "p-3 sm:p-4" : "p-4 sm:p-6",
+          )}
+        >
           {content}
         </CardContent>
       </Card>

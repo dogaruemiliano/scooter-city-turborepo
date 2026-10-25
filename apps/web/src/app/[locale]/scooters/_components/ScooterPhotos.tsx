@@ -12,7 +12,10 @@ import { webApi } from "@/lib/api";
 import { FileDropOverlay } from "@repo/ui/components/file-drop-overlay";
 import { useFileDrop } from "@repo/ui/hooks/use-file-drop";
 import { ImageGallery } from "@repo/ui/components/image-gallery";
-import { useScooterPhotos } from "./useScooterPhotos";
+import {
+  type ScooterPhotosSnapshot,
+  useScooterPhotos,
+} from "./useScooterPhotos";
 
 export function ScooterPhotos({
   scooterId,
@@ -22,8 +25,14 @@ export function ScooterPhotos({
   onSaved,
   number,
   onDraftsChange,
+  initialSnapshot,
+  importDraftId,
+  onSnapshot,
 }: {
   scooterId?: string;
+  initialSnapshot?: ScooterPhotosSnapshot;
+  importDraftId?: string;
+  onSnapshot?: (snapshot: ScooterPhotosSnapshot) => void;
   panel?: boolean;
   disabled?: boolean;
   onBusyChange?: (busy: boolean) => void;
@@ -52,6 +61,9 @@ export function ScooterPhotos({
       onSaved={onSaved}
       number={number}
       onDraftsChange={onDraftsChange}
+      initialSnapshot={initialSnapshot}
+      importDraftId={importDraftId}
+      onSnapshot={onSnapshot}
     />
   );
 }
@@ -65,8 +77,14 @@ export function ScooterPhotoGallery({
   onSaved,
   number,
   onDraftsChange,
+  initialSnapshot,
+  importDraftId,
+  onSnapshot,
 }: {
   scooterId?: string;
+  initialSnapshot?: ScooterPhotosSnapshot;
+  importDraftId?: string;
+  onSnapshot?: (snapshot: ScooterPhotosSnapshot) => void;
   panel?: boolean;
   editable: boolean;
   disabled?: boolean;
@@ -79,7 +97,13 @@ export function ScooterPhotoGallery({
   ) => void;
 }) {
   const t = useTranslations("scooters.photos");
-  const gallery = useScooterPhotos(scooterId, onSaved);
+  const gallery = useScooterPhotos(scooterId, onSaved, {
+    snapshot: initialSnapshot,
+    importDraftId,
+  });
+  useEffect(() => {
+    onSnapshot?.(gallery.getSnapshot());
+  });
   const [sortingBusy, setSortingBusy] = useState(false);
   useEffect(() => {
     onBusyChange?.(gallery.busy || sortingBusy);
@@ -149,7 +173,9 @@ export function ScooterPhotoGallery({
             className="flex flex-wrap items-center gap-3 text-sm text-destructive"
           >
             <span>{t(`errors.${gallery.error}`)}</span>
-            {gallery.error === "load" || gallery.error === "save" ? (
+            {gallery.error === "load" ||
+            gallery.error === "save" ||
+            gallery.error === "preview" ? (
               <Button
                 type="button"
                 variant="outline"
@@ -275,14 +301,24 @@ export function ScooterPhotoGallery({
                               role="alert"
                               className="text-xs text-destructive"
                             >
-                              {t("uploadFailed")}
+                              {t(
+                                upload.fileUnavailable
+                                  ? "uploadInterrupted"
+                                  : "uploadFailed",
+                              )}
                             </p>
                             <div className="flex flex-wrap gap-2">
                               <Button
                                 type="button"
                                 size="sm"
                                 variant="outline"
-                                disabled={busy}
+                                disabled={
+                                  busy ||
+                                  Boolean(
+                                    upload.fileUnavailable &&
+                                    !upload.uploadToken,
+                                  )
+                                }
                                 onClick={() => void gallery.retry(upload)}
                               >
                                 {t("retry")}
@@ -353,6 +389,16 @@ function PhotoImage({ src, alt }: { src: string; alt: string }) {
   const t = useTranslations("scooters.photos");
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
   const style = { aspectRatio: aspectRatio.scooterPhoto };
+  if (!src)
+    return (
+      <div
+        style={style}
+        className="grid w-full place-content-center gap-2 bg-muted p-4 text-center text-sm text-muted-foreground"
+      >
+        <ImageIcon aria-hidden="true" className="mx-auto size-6" />
+        <span>{t("previewRestoring")}</span>
+      </div>
+    );
   if (failedSrc === src)
     return (
       <div

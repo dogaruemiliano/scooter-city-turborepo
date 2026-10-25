@@ -353,16 +353,29 @@ export function DocumentLink({
 }: {
   document: v1.scooters.ScooterDocument;
 }) {
+  const versionT = useTranslations("scooters.workspace");
   return (
-    <a
-      href={webApi.url(document.contentUrl)}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="flex min-w-0 flex-1 items-center gap-2 underline underline-offset-4"
-    >
-      <FileTextIcon aria-hidden="true" className="size-5 shrink-0" />
-      <span className="break-all">{document.fileName}</span>
-    </a>
+    <span className="grid min-w-0 gap-2">
+      <a
+        href={webApi.url(document.contentUrl)}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex min-w-0 flex-1 items-center gap-2 underline underline-offset-4"
+      >
+        <FileTextIcon aria-hidden="true" className="size-5 shrink-0" />
+        <span className="break-all">{document.fileName}</span>
+      </a>
+      {document.clientCopy ? (
+        <a
+          href={webApi.url(document.clientCopy.contentUrl)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-sm underline underline-offset-4"
+        >
+          {versionT("clientCopy")}
+        </a>
+      ) : null}
+    </span>
   );
 }
 
@@ -384,6 +397,15 @@ export function ScooterDocumentList({
               .map((document) => (
                 <li key={document.id}>
                   <ScooterFilePreview document={document} disabled={false} />
+                  {document.clientCopy ? (
+                    <DocumentLink
+                      document={{
+                        ...document,
+                        ...document.clientCopy,
+                        clientCopy: null,
+                      }}
+                    />
+                  ) : null}
                 </li>
               ))}
           </ul>

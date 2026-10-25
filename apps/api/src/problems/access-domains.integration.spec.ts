@@ -244,7 +244,7 @@ integration("Access domains against PostgreSQL", () => {
       v1.problems.createProblemInputSchema.parse({
         scooterId: scooterIds[0],
         title: "Shared work",
-        severity: "low",
+        difficulty: "easy",
         assigneeIds: [mechanicA, mechanicB],
       }),
     );
@@ -322,7 +322,7 @@ integration("Access domains against PostgreSQL", () => {
         scooterId: scooterIds[0],
         description: "Concurrent claim test",
         title: "Test report",
-        severity: "moderate",
+        difficulty: "medium",
       }),
     );
     const results = await Promise.allSettled([
@@ -371,7 +371,7 @@ integration("Access domains against PostgreSQL", () => {
         scooterId: scooterIds[0],
         description: "Own",
         title: "Test report",
-        severity: "moderate",
+        difficulty: "medium",
       }),
     );
     const other = await problems.create(
@@ -380,7 +380,7 @@ integration("Access domains against PostgreSQL", () => {
         scooterId: scooterIds[1],
         description: "Other",
         title: "Test report",
-        severity: "moderate",
+        difficulty: "medium",
       }),
     );
     await problems.assign(admin, own.id, {
@@ -516,7 +516,7 @@ integration("Access domains against PostgreSQL", () => {
       v1.problems.createProblemInputSchema.parse({
         scooterId: scooterIds[0],
         title: "Broken belt",
-        severity: "critical",
+        difficulty: "hard",
         blocksUsage: true,
         assigneeId: mechanicA,
       }),
@@ -526,7 +526,7 @@ integration("Access domains against PostgreSQL", () => {
       mechanicA,
       v1.problems.listProblemsQuerySchema.parse({
         view: "assigned",
-        severity: "critical",
+        difficulty: "hard",
         scooterId: scooterIds[0],
         assigneeId: mechanicA,
       }),
@@ -550,7 +550,15 @@ integration("Access domains against PostgreSQL", () => {
       blocksUsage: false,
       resolutionNotes: "Replacement belt tested successfully",
     });
-    const history = await problems.activity(mechanicA, created.id, {
+    const conversation = await problems.activity(mechanicA, created.id, {
+      page: 1,
+      pageSize: 25,
+    });
+    expect(conversation.items.map((entry) => entry.type)).toEqual([
+      "PROBLEM_RESOLVED",
+      "PROBLEM_COMMENTED",
+    ]);
+    const history = await problems.activity(admin, created.id, {
       page: 1,
       pageSize: 25,
     });
@@ -566,11 +574,10 @@ integration("Access domains against PostgreSQL", () => {
       actor: { id: mechanicA },
       note: "Belt replaced; inspecting drivetrain",
     });
-    const reopened = await problems.reopen(
-      reporter,
-      created.id,
-      resolved.revision,
-    );
+    const reopened = await problems.reopen(reporter, created.id, {
+      revision: resolved.revision,
+      message: "Further inspection needed",
+    });
     expect(reopened).toMatchObject({
       status: "open",
       blocksUsage: false,
@@ -589,13 +596,13 @@ integration("Access domains against PostgreSQL", () => {
     ).toBe(true);
   });
 
-  it("keeps independent blockers through resolve, dismiss, reopen and explicit clearance", async () => {
+  it("keeps other open blockers until each is resolved or dismissed", async () => {
     const first = await problems.create(
       reporter,
       v1.problems.createProblemInputSchema.parse({
         scooterId: scooterIds[0],
         title: "Brake cable",
-        severity: "high",
+        difficulty: "hard",
         blocksUsage: true,
       }),
     );
@@ -604,7 +611,7 @@ integration("Access domains against PostgreSQL", () => {
       v1.problems.createProblemInputSchema.parse({
         scooterId: scooterIds[0],
         title: "Tyre inspection",
-        severity: "moderate",
+        difficulty: "medium",
         blocksUsage: true,
       }),
     );
@@ -615,11 +622,10 @@ integration("Access domains against PostgreSQL", () => {
     });
     expect(
       (await problems.maintenanceHold(reporter, scooterIds[0])).count,
-    ).toBe(2);
-    await problems.cancel(reporter, second.id, second.revision, true);
+    ).toBe(1);
     expect(
       (await problems.maintenanceHold(reporter, scooterIds[0])).blockers,
-    ).toEqual([expect.objectContaining({ id: first.id, status: "resolved" })]);
+    ).toEqual([expect.objectContaining({ id: second.id, status: "open" })]);
     await expect(
       rentals.create(admin, {
         scooterId: scooterIds[0],
@@ -628,10 +634,8 @@ integration("Access domains against PostgreSQL", () => {
         endsAt: new Date(Date.now() + 7_200_000).toISOString(),
       }),
     ).rejects.toThrow("maintenance hold");
-    await problems.hold(reporter, first.id, {
-      revision: resolved.revision,
-      blocksUsage: false,
-    });
+    expect(resolved.blocksUsage).toBe(false);
+    await problems.cancel(reporter, second.id, second.revision);
     expect(
       (await problems.maintenanceHold(reporter, scooterIds[0])).onHold,
     ).toBe(false);
@@ -643,7 +647,7 @@ integration("Access domains against PostgreSQL", () => {
       v1.problems.createProblemInputSchema.parse({
         scooterId: scooterIds[0],
         title: "Audit rollback",
-        severity: "low",
+        difficulty: "easy",
       }),
     );
     const failing = new ProblemsService(
@@ -680,7 +684,7 @@ integration("Access domains against PostgreSQL", () => {
         data: {
           scooterId: scooterIds[0],
           title: "Concurrent safety blocker",
-          severity: "critical",
+          difficulty: "hard",
           reporterId: reporter,
           blocksUsage: true,
         },
@@ -727,7 +731,7 @@ integration("Access domains against PostgreSQL", () => {
     const input = v1.problems.createProblemInputSchema.parse({
       scooterId: scooterIds[0],
       title: "Photo evidence",
-      severity: "high",
+      difficulty: "hard",
       photos: [{ fileName: "brake.jpg", uploadToken: "test-token" }],
     });
     const created = await problems.create(reporter, input);

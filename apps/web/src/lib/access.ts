@@ -1,6 +1,7 @@
 /** UI hints only. The API independently authorizes every action and record. */
 export interface AccessIdentity {
   isSuperAdmin?: boolean;
+  isAdmin?: boolean;
   effectiveScopes?: Readonly<Record<string, readonly string[] | undefined>>;
   portalEligible?: boolean;
 }
@@ -45,6 +46,17 @@ export function canVisit(
   if (path === "/scooters") return canAccess(user, "scooters.read", "ALL");
   const action = actions[path];
   return action ? canAccess(user, action) : false;
+}
+
+/** Scoped service workers use the problems workspace as their home screen. */
+export function usesServiceDashboard(
+  user: AccessIdentity | null | undefined,
+): boolean {
+  return (
+    canAccess(user, "problems.read") &&
+    !canAccess(user, "problems.read", "ALL") &&
+    !canAccess(user, "scooters.read", "ALL")
+  );
 }
 
 export function canManageUser(

@@ -63,6 +63,26 @@ beforeEach(() => {
 });
 
 describe("dashboard data", () => {
+  it.each(["en", "ro"] as const)(
+    "opens the service workspace for mechanics before loading company data (%s)",
+    async (locale) => {
+      mocks.meFromApi.mockResolvedValue({
+        ...user,
+        effectiveScopes: {
+          "problems.read": ["ASSIGNED", "AVAILABLE"],
+          "scooters.read": ["ASSIGNED"],
+        },
+      });
+
+      await expect(loadDashboard(locale)).rejects.toThrow("redirect");
+      expect(mocks.redirect).toHaveBeenCalledWith(
+        locale === "en" ? "/en/problems" : "/problems",
+      );
+      expect(mocks.apiFetch).not.toHaveBeenCalled();
+      expect(mocks.cookies).not.toHaveBeenCalled();
+    },
+  );
+
   it("fetches only the summaries the current user can read", async () => {
     mocks.meFromApi.mockResolvedValue({
       ...user,

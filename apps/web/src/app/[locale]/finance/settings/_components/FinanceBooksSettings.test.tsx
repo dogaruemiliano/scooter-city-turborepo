@@ -44,9 +44,7 @@ describe("Finance book configuration", () => {
     );
     await user.click(company.getByRole("button", { name: "Create book" }));
     await waitFor(() =>
-      expect(
-        company.getByRole("button", { name: "Save names" }),
-      ).toBeDisabled(),
+      expect(company.getByRole("button", { name: "Saved" })).toBeDisabled(),
     );
     expect(mocks.fetch).toHaveBeenCalledWith(
       v1.finance.ROUTES.books,

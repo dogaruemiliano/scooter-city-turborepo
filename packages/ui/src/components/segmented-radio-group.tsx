@@ -19,8 +19,8 @@ type SegmentedRadioOption<Value extends string> = {
     | "success"
     | "destructiveSubtle"
     | "successSubtle";
-  /** Semantic severity colors remain visible before selection. */
-  severity?: "low" | "moderate" | "high" | "critical";
+  /** Semantic difficulty colors remain visible before selection. */
+  difficulty?: "easy" | "medium" | "hard";
   /** Use the option tone for unselected text as well as its selected fill. */
   colorUnselected?: boolean;
   /** Use a tinted surface for unselected options. */
@@ -64,18 +64,16 @@ const selectedTone = {
   successSubtle: "bg-success-subtle text-success",
 } as const;
 
-const severityTone = {
-  low: "bg-severity-low text-severity-foreground",
-  moderate: "bg-severity-medium text-severity-foreground",
-  high: "bg-severity-high text-severity-foreground",
-  critical: "bg-severity-critical text-severity-foreground",
+const difficultyTone = {
+  easy: "bg-difficulty-easy text-difficulty-foreground",
+  medium: "bg-difficulty-medium text-difficulty-foreground",
+  hard: "bg-difficulty-hard text-difficulty-foreground",
 } as const;
 
-const severityTextTone = {
-  low: "text-severity-low",
-  moderate: "text-severity-medium",
-  high: "text-severity-high",
-  critical: "text-severity-critical",
+const difficultyTextTone = {
+  easy: "text-difficulty-easy",
+  medium: "text-difficulty-medium",
+  hard: "text-difficulty-hard",
 } as const;
 
 const unselectedTone = {
@@ -222,11 +220,11 @@ function SegmentedRadioGroup<Value extends string>({
                   !disabled &&
                   !option.disabled &&
                   "hover:bg-secondary-hover active:bg-secondary-active peer-active:bg-secondary-active",
-                option.severity
+                option.difficulty
                   ? cn(
                       value === option.value
-                        ? severityTone[option.severity]
-                        : severityTextTone[option.severity],
+                        ? difficultyTone[option.difficulty]
+                        : difficultyTextTone[option.difficulty],
                       "peer-disabled:opacity-50",
                     )
                   : value === option.value

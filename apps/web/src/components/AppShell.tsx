@@ -1,6 +1,7 @@
 "use client";
 
-import { canVisit } from "@/lib/access";
+import { userAvatarSrc } from "@/lib/user-avatar";
+import { canVisit, usesServiceDashboard } from "@/lib/access";
 
 import Image from "next/image";
 import Link from "next/link";
@@ -23,12 +24,14 @@ import {
   Settings2Icon,
   TagIcon,
   UsersRoundIcon,
+  WrenchIcon,
   type LucideIcon,
 } from "lucide-react";
 import type { SupportedLocale } from "@repo/i18n";
 import {
   Avatar,
   AvatarFallback,
+  AvatarImage,
   Button,
   DropdownMenu,
   DropdownMenuContent,
@@ -94,26 +97,15 @@ const DASHBOARD_NAVIGATION_ITEM = {
   exact: true,
 } as const;
 
+const PRIMARY_NAVIGATION_ITEMS = [
+  DASHBOARD_NAVIGATION_ITEM,
+  { href: "/rentals", labelKey: "rentals", icon: BikeIcon },
+  { href: "/my-rentals", labelKey: "myRentals", icon: BikeIcon },
+  { href: "/persons", labelKey: "persons", icon: UsersRoundIcon },
+  { href: "/problems", labelKey: "problems", icon: WrenchIcon },
+] as const;
+
 const NAVIGATION_GROUPS = [
-  {
-    labelKey: "serviceGroup",
-    items: [
-      { href: "/problems", labelKey: "problems", icon: Settings2Icon },
-      { href: "/rentals", labelKey: "rentals", icon: BikeIcon },
-      { href: "/my-rentals", labelKey: "myRentals", icon: BikeIcon },
-    ],
-  },
-  {
-    labelKey: "accessGroup",
-    items: [
-      { href: "/users", labelKey: "users", icon: UsersRoundIcon },
-      { href: "/roles", labelKey: "roles", icon: Settings2Icon },
-    ],
-  },
-  {
-    labelKey: "entitiesGroup",
-    items: [{ href: "/persons", labelKey: "persons", icon: UsersRoundIcon }],
-  },
   {
     labelKey: "scootersGroup",
     items: [
@@ -172,10 +164,17 @@ const NAVIGATION_GROUPS = [
       },
     ],
   },
+  {
+    labelKey: "accessGroup",
+    items: [
+      { href: "/users", labelKey: "users", icon: UsersRoundIcon },
+      { href: "/roles", labelKey: "roles", icon: Settings2Icon },
+    ],
+  },
 ] as const;
 
 const SIDEBAR_ROOT_ROUTES: ReadonlySet<string> = new Set([
-  DASHBOARD_NAVIGATION_ITEM.href,
+  ...PRIMARY_NAVIGATION_ITEMS.map((item) => item.href),
   ...NAVIGATION_GROUPS.flatMap((group) => group.items.map((item) => item.href)),
 ]);
 
@@ -184,7 +183,7 @@ const IMMERSIVE_ROUTES: ReadonlySet<string> = new Set([
 ]);
 
 const ALL_NAVIGATION_HREFS: readonly string[] = [
-  DASHBOARD_NAVIGATION_ITEM.href,
+  ...PRIMARY_NAVIGATION_ITEMS.map((item) => item.href),
   ...NAVIGATION_GROUPS.flatMap((group) => group.items.map((item) => item.href)),
 ];
 
@@ -204,6 +203,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/company/associates": "companyAssociates",
   "/persons": "persons",
   "/persons/new": "newPerson",
+  "/rentals/new": "newRental",
   "/users/new": "newUser",
   "/scooters": "scooters",
   "/scooters/new": "newScooter",
@@ -244,7 +244,7 @@ export function AppShell({
     <PageTitleOverrideContext.Provider value={setPageTitleOverride}>
       <SidebarProvider
         data-app-shell=""
-        className="fixed inset-0 h-dvh min-h-0 overflow-hidden overscroll-none md:relative md:inset-auto md:h-auto md:min-h-svh md:overflow-visible"
+        className="[--sticky-content-top:0] md:[--sticky-content-top:var(--spacing-16)] fixed inset-0 h-dvh min-h-0 overflow-hidden overscroll-none md:relative md:inset-auto md:h-auto md:min-h-svh md:overflow-visible"
       >
         <AppShellContent
           locale={locale}
@@ -313,7 +313,10 @@ function AppShellContent({
           pathname={pathname}
           initialThemePreference={initialThemePreference}
         />
-        <SidebarInset className="min-h-0 min-w-0 overflow-hidden md:overflow-visible">
+        <SidebarInset
+          as="div"
+          className="min-h-0 min-w-0 overflow-hidden md:overflow-visible"
+        >
           <header className="relative z-sticky flex h-[calc(var(--spacing-16)+env(safe-area-inset-top))] shrink-0 items-center gap-3 border-b border-border bg-card px-4 pt-[env(safe-area-inset-top)] md:sticky md:top-0 md:h-16 md:px-8 md:pt-0">
             <HeaderNavigationButton
               pathname={pathname}
@@ -344,7 +347,7 @@ function AppShellContent({
             ref={pageScrollRef}
             data-slot="app-page-scroll"
             onScroll={onPageScroll}
-            className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overscroll-y-contain pb-[env(safe-area-inset-bottom)] md:overflow-visible md:overscroll-auto md:pb-0"
+            className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overscroll-y-contain pb-[calc(var(--spacing-screen-bottom)+env(safe-area-inset-bottom))] md:overflow-visible md:overscroll-auto"
           >
             {children}
           </div>
@@ -394,6 +397,7 @@ function AppSidebar({
 }) {
   const tNav = useTranslations("appShell.nav");
   const { user } = useSession();
+  const serviceDashboard = usesServiceDashboard(user);
   // The mobile drawer unmounts AccountMenu when closed; keep the preference here.
   const [themePreference, setThemePreference] = useState(
     initialThemePreference,
@@ -408,9 +412,17 @@ function AppSidebar({
     setThemePreference(nextPreference);
   }
 
+  const primaryItems = PRIMARY_NAVIGATION_ITEMS.filter((item) =>
+    serviceDashboard
+      ? item.href === "/problems"
+      : item.href === "/" || canVisit(user, item.href),
+  );
+
   const navigationGroups = NAVIGATION_GROUPS.map((group) => ({
     ...group,
-    items: group.items.filter((item) => canVisit(user, item.href)),
+    items: group.items.filter(
+      (item) => !serviceDashboard && canVisit(user, item.href),
+    ),
   })).filter((group) => group.items.length > 0);
 
   return (
@@ -420,9 +432,16 @@ function AppSidebar({
           <SidebarMenuItem>
             <SidebarMenuButton
               size="lg"
-              aria-label={tNav("dashboard")}
+              aria-label={tNav(serviceDashboard ? "problems" : "dashboard")}
               className="justify-start duration-normal ease-linear"
-              render={<Link href={localizePath("/", locale)} />}
+              render={
+                <Link
+                  href={localizePath(
+                    serviceDashboard ? "/problems" : "/",
+                    locale,
+                  )}
+                />
+              }
             >
               <span className="flex min-w-0 flex-1 items-center justify-start gap-2 overflow-hidden">
                 <span
@@ -485,29 +504,27 @@ function AppSidebar({
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  tooltip={tNav(DASHBOARD_NAVIGATION_ITEM.labelKey)}
-                  isActive={isActiveNavigationItem(
-                    pathname,
-                    DASHBOARD_NAVIGATION_ITEM.href,
-                    DASHBOARD_NAVIGATION_ITEM.exact,
-                  )}
-                  render={
-                    <Link
-                      href={localizePath(
-                        DASHBOARD_NAVIGATION_ITEM.href,
-                        locale,
+              {primaryItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <SidebarMenuItem key={item.href}>
+                    <SidebarMenuButton
+                      tooltip={tNav(item.labelKey)}
+                      isActive={isActiveNavigationItem(
+                        pathname,
+                        item.href,
+                        "exact" in item && item.exact,
                       )}
-                    />
-                  }
-                >
-                  <LayoutDashboardIcon aria-hidden="true" />
-                  <span className="min-w-0 flex-1 overflow-hidden whitespace-nowrap">
-                    {tNav(DASHBOARD_NAVIGATION_ITEM.labelKey)}
-                  </span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
+                      render={<Link href={localizePath(item.href, locale)} />}
+                    >
+                      <Icon aria-hidden="true" />
+                      <span className="min-w-0 flex-1 overflow-hidden whitespace-nowrap">
+                        {tNav(item.labelKey)}
+                      </span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -646,6 +663,7 @@ function AccountMenu({
               }
             >
               <Avatar size="md">
+                <AvatarImage src={userAvatarSrc(user?.avatarAssetId)} alt="" />
                 <AvatarFallback>{initials}</AvatarFallback>
               </Avatar>
               <span className="flex min-w-0 flex-1 flex-col md:w-[calc(var(--sidebar-width)-var(--spacing-24))] md:flex-none">

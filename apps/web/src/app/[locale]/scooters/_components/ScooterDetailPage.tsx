@@ -1,6 +1,11 @@
 "use client";
+
+import { PageLayout } from "@repo/ui/components/page-layout";
+import { useFormAction } from "@/lib/form/use-form-action";
+import { SaveButton } from "@repo/ui/components/save-button";
 import { ScooterProblems } from "./ScooterProblems";
 import { ScooterInsuranceList } from "./ScooterInsuranceFields";
+import { ScooterItpPanel } from "./ScooterItpPanel";
 
 import { v1 } from "@repo/api-shared";
 import {
@@ -35,14 +40,24 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
-import { useId, useState, type FormEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useId,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from "react";
 
 import { useOptionalSession } from "@/components/auth/SessionProvider";
 import { canAccess } from "@/lib/access";
 import { MoreActionsMenu } from "@/components/MoreActionsMenu";
 import { PageTitleOverride } from "@/components/PageTitleOverride";
 import { webApi } from "@/lib/api";
-import { FeedbackAlert, formErrorsFromIssues } from "./scooter-feedback";
+import {
+  FeedbackAlert,
+  formErrorsFromIssues,
+  scooterFieldConflict,
+} from "./scooter-feedback";
 import { CivDetails } from "./CivDetails";
 import { ScooterDocumentList } from "./ScooterDocumentUpload";
 import { ScooterPhotos } from "./ScooterPhotos";
@@ -85,10 +100,6 @@ export function ScooterDetailPage({
   const [deleteOpen, setDeleteOpen] = useState(false);
   const title = v1.scooters.scooterDisplayCode(scooter);
   const scooterEditHref = `${scootersHref}/${encodeURIComponent(scooter.id)}/edit`;
-  const registrationActionLabel =
-    scooter.registrationType === "unregistered"
-      ? t("actions.addRegistration")
-      : t("actions.editRegistration");
 
   async function updateScooter(
     input: v1.scooters.UpdateScooterInput,
@@ -108,15 +119,6 @@ export function ScooterDetailPage({
       });
       router.refresh();
       return true;
-    } catch (error) {
-      setFeedback({
-        kind: "error",
-        title: t("feedback.updateErrorTitle"),
-        messages: [
-          error instanceof Error ? error.message : t("feedback.genericError"),
-        ],
-      });
-      return false;
     } finally {
       setBusyAction(null);
     }
@@ -149,7 +151,7 @@ export function ScooterDetailPage({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-screen-xl flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
+    <PageLayout>
       <PageTitleOverride title={title} />
       <div className="flex flex-col gap-4">
         <div className="flex min-w-0 items-start justify-between gap-3">
@@ -166,17 +168,21 @@ export function ScooterDetailPage({
             ariaLabel={t("actions.moreActions")}
             groups={[
               [
-                {
-                  key: "registration",
-                  permission: "scooters.update",
-                  label: registrationActionLabel,
-                  icon: <PencilIcon data-icon="inline-start" />,
-                  disabled: busyAction !== null || photosBusy,
-                  onClick: () => {
-                    setRegistrationDialogKey((current) => current + 1);
-                    setRegistrationOpen(true);
-                  },
-                },
+                ...(scooter.registrationType === "unregistered"
+                  ? [
+                      {
+                        key: "registration",
+                        permission: "scooters.update",
+                        label: t("actions.addRegistration"),
+                        icon: <PencilIcon data-icon="inline-start" />,
+                        disabled: busyAction !== null || photosBusy,
+                        onClick: () => {
+                          setRegistrationDialogKey((current) => current + 1);
+                          setRegistrationOpen(true);
+                        },
+                      },
+                    ]
+                  : []),
                 {
                   key: "edit",
                   permission: "scooters.update",
@@ -288,6 +294,10 @@ export function ScooterDetailPage({
 
       <DetailSection title={t("sections.registration")}>
         <DetailField
+          label={t("fields.civAvailability")}
+          value={t(`civ.availability.${scooter.civAvailability ?? "unknown"}`)}
+        />
+        <DetailField
           label={t("fields.registrationType")}
           value={t(`registrationTypes.${scooter.registrationType}`)}
         />
@@ -375,6 +385,7 @@ export function ScooterDetailPage({
         <ScooterDocumentList documents={scooter.documents ?? []} />
       ) : null}
       <ScooterInsuranceList scooter={scooter} />
+      <ScooterItpPanel scooter={scooter} />
       <ScooterRegistrationDialog
         key={`edit-scooter-registration-${registrationDialogKey}`}
         scooter={scooter}
@@ -389,7 +400,7 @@ export function ScooterDetailPage({
         onOpenChange={setDeleteOpen}
         onConfirm={deleteScooter}
       />
-    </div>
+    </PageLayout>
   );
 }
 
@@ -406,11 +417,18 @@ function ScooterRegistrationDialog({
   onOpenChange: (open: boolean) => void;
   onSubmit: (input: v1.scooters.UpdateScooterInput) => Promise<boolean>;
 }) {
+  const formAction = useFormAction();
+
   const t = useTranslations("scooters");
   const formId = useId();
   const [form, setForm] = useState(() => scooterFormFromScooter(scooter));
   const [fieldErrors, setFieldErrors] = useState<ScooterFormErrors>({});
   const [error, setError] = useState<string | null>(null);
+  const plateError = fieldErrors.registrationNumber;
+  useEffect(() => {
+    if (open && !busy && plateError)
+      document.getElementById(`${formId}-plate-number`)?.focus();
+  }, [open, busy, plateError, formId]);
 
   function changeOpen(nextOpen: boolean) {
     if (busy) return;
@@ -424,6 +442,7 @@ function ScooterRegistrationDialog({
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (busy) return;
     setFieldErrors({});
     setError(null);
 
@@ -474,8 +493,23 @@ function ScooterRegistrationDialog({
       return;
     }
 
-    if (await onSubmit(input.data)) {
-      onOpenChange(false);
+    try {
+      if (await onSubmit(input.data)) onOpenChange(false);
+    } catch (error) {
+      const conflict = scooterFieldConflict(error);
+      const message = conflict
+        ? t(
+            conflict.field === "registrationNumber"
+              ? "feedback.plateConflict"
+              : "feedback.vinConflict",
+          )
+        : error instanceof Error
+          ? error.message
+          : t("feedback.genericError");
+      setError(message);
+      if (conflict) {
+        setFieldErrors({ [conflict.field]: message });
+      }
     }
   }
 
@@ -529,9 +563,11 @@ function ScooterRegistrationDialog({
             />
           </BottomSheetBody>
           <BottomSheetFooter className="sm:flex-row-reverse sm:justify-start">
-            <Button type="submit" disabled={busy}>
-              {busy ? t("actions.saving") : t("actions.save")}
-            </Button>
+            <SaveButton
+              type="submit"
+              disabled={busy}
+              {...formAction("save", { pending: busy }, t("actions.save"))}
+            />
             <BottomSheetClose
               render={
                 <Button type="button" variant="outline" disabled={busy} />
@@ -557,6 +593,8 @@ function DeleteScooterDialog({
   onOpenChange: (open: boolean) => void;
   onConfirm: () => Promise<boolean>;
 }) {
+  const formAction = useFormAction();
+
   const t = useTranslations("scooters");
 
   async function confirm() {
@@ -583,14 +621,17 @@ function DeleteScooterDialog({
           >
             {t("actions.cancel")}
           </DialogClose>
-          <Button
+          <SaveButton
             type="button"
             variant="destructive"
             disabled={busy}
             onClick={() => void confirm()}
-          >
-            {busy ? t("actions.deleting") : t("actions.deleteScooter")}
-          </Button>
+            {...formAction(
+              "delete",
+              { pending: busy },
+              t("actions.deleteScooter"),
+            )}
+          />
         </DialogFooter>
       </DialogContent>
     </Dialog>

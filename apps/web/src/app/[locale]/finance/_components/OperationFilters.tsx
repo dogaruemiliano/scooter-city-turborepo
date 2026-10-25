@@ -63,6 +63,7 @@ export function OperationFilters({
         title={shared("list.filters")}
         description={t("operations.filters.description")}
         applyLabel={shared("list.apply")}
+        applyingLabel={shared("list.applying")}
         resetLabel={shared("list.reset")}
         cancelLabel={shared("actions.cancel")}
         applyErrorLabel={t("operations.filters.invalidRange")}

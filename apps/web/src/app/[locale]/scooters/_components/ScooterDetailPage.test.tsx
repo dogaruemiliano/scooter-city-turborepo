@@ -1,4 +1,4 @@
-import { v1 } from "@repo/api-shared";
+import { ApiError, v1 } from "@repo/api-shared";
 import { messages, type SupportedLocale } from "@repo/i18n";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -8,6 +8,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ScooterDetailPage } from "./ScooterDetailPage";
 // Gallery API interactions are covered independently in ScooterPhotos.test.tsx.
 vi.mock("./ScooterPhotos", () => ({ ScooterPhotos: () => null }));
+// Inspection requests and confirmation are covered in ScooterItpPanel.test.tsx.
+vi.mock("./ScooterItpPanel", () => ({ ScooterItpPanel: () => null }));
 
 const mocks = vi.hoisted(() => ({
   apiFetch: vi.fn(),
@@ -135,9 +137,14 @@ describe("ScooterDetailPage", () => {
       within(dialog).getByLabelText("Plate number"),
       "cj12abc",
     );
-    await fillDateParts(browser, dialog, "Registered on", "2026-01-16");
+    expect(within(dialog).getByLabelText("Plate number")).toHaveValue(
+      "CJ12ABC",
+    );
+    expect(within(dialog).queryByLabelText("Registered on")).toBeNull();
     await chooseSelectOption(browser, "Required driver license", "A1");
-    await browser.click(within(dialog).getByRole("button", { name: "Save" }));
+    await browser.click(
+      within(dialog).getByRole("button", { name: "Save changes" }),
+    );
 
     await waitFor(() =>
       expect(mocks.apiFetch).toHaveBeenCalledWith(
@@ -148,7 +155,7 @@ describe("ScooterDetailPage", () => {
           json: {
             registrationType: "national",
             registrationNumber: "CJ 12 ABC",
-            registrationDate: "2026-01-16",
+            registrationDate: null,
             temporaryRegistrationExpiresAt: null,
             requiredLicenseCategory: "A1",
           },
@@ -158,26 +165,86 @@ describe("ScooterDetailPage", () => {
     expect(mocks.refresh).toHaveBeenCalledOnce();
   });
 
-  it("shows edit registration for registered scooters", async () => {
+  it("keeps a duplicate plate error inside the registration sheet and marks the input invalid", async () => {
     const browser = userEvent.setup();
-
-    renderDetail("en", {
-      ...scooter,
-      registrationType: "national",
-      registrationNumber: "CJ 12 ABC",
-      registrationDate: "2026-01-16",
-      requiredLicenseCategory: "A1",
+    mocks.apiFetch.mockImplementation((url: string) => {
+      if (url === v1.scooters.ROUTES.update(scooter.id)) {
+        return Promise.reject(
+          new ApiError(
+            409,
+            "The request conflicts with the current resource state.",
+            "SCOOTER_PLATE_CONFLICT",
+            { field: "registrationNumber" },
+          ),
+        );
+      }
+      return Promise.resolve({ items: [], total: 0, page: 1, pageSize: 25 });
     });
-
+    renderDetail();
     await browser.click(screen.getByRole("button", { name: "More actions" }));
-    expect(await screen.findByText("Edit registration")).toBeInTheDocument();
-    expect(screen.queryByText("Add registration")).not.toBeInTheDocument();
-    expect(screen.getAllByText("National")[0]).toBeInTheDocument();
-    expect(screen.getByText("CJ 12 ABC")).toBeInTheDocument();
-    expect(
-      screen.queryByText("Registration expires on"),
-    ).not.toBeInTheDocument();
+    await browser.click(await screen.findByText("Add registration"));
+    const dialog = await screen.findByRole("dialog", {
+      name: "Add registration",
+    });
+    await chooseSelectOption(browser, "Registration type", "Local");
+    expect(within(dialog).queryByLabelText("Registered on")).toBeNull();
+    const plate = within(dialog).getByRole("textbox", {
+      name: "Plate number",
+    });
+    await browser.clear(plate);
+    await browser.type(plate, "vl 18 188");
+    expect(plate).toHaveValue("VL 18 188");
+    await browser.click(
+      within(dialog).getByRole("button", { name: "Save changes" }),
+    );
+    const message = messages.en.scooters.feedback.plateConflict;
+    await waitFor(() =>
+      expect(within(dialog).getByText("Changes not saved")).toBeVisible(),
+    );
+    expect(within(dialog).getAllByText(message)).toHaveLength(2);
+    expect(screen.getAllByText("Changes not saved")).toHaveLength(1);
+    expect(plate).toHaveAttribute("aria-invalid", "true");
+    expect(plate).toHaveAccessibleDescription(message);
+    expect(plate).toHaveFocus();
+    expect(mocks.refresh).not.toHaveBeenCalled();
+    await browser.clear(plate);
+    await browser.type(plate, "vl 222");
+    expect(plate).toHaveValue("VL 222");
+    expect(plate).not.toHaveAttribute("aria-invalid", "true");
+    mocks.apiFetch.mockResolvedValue({
+      ...scooter,
+      registrationType: "local",
+      registrationNumber: "VL 222",
+    });
+    await browser.click(
+      within(dialog).getByRole("button", { name: "Save changes" }),
+    );
+    await waitFor(() => expect(mocks.refresh).toHaveBeenCalledOnce());
   });
+
+  it.each(["national", "local", "temporary"] as const)(
+    "edits %s registration through the scooter edit page",
+    async (registrationType) => {
+      const browser = userEvent.setup();
+
+      renderDetail("en", {
+        ...scooter,
+        registrationType,
+        registrationNumber: "CJ 12 ABC",
+        registrationDate: "2026-01-16",
+        requiredLicenseCategory: "A1",
+      });
+
+      await browser.click(screen.getByRole("button", { name: "More actions" }));
+      expect(screen.queryByText("Edit registration")).not.toBeInTheDocument();
+      expect(screen.queryByText("Add registration")).not.toBeInTheDocument();
+      expect(screen.getByText("CJ 12 ABC")).toBeInTheDocument();
+      await browser.click(await screen.findByText("Edit scooter"));
+      expect(mocks.push).toHaveBeenCalledWith(
+        `/en/scooters/${scooter.id}/edit`,
+      );
+    },
+  );
 
   it("navigates to the edit page from the actions menu", async () => {
     const browser = userEvent.setup();
@@ -235,22 +302,6 @@ async function chooseSelectOption(
 ) {
   await browser.click(screen.getByRole("combobox", { name: label }));
   await browser.click(await screen.findByRole("option", { name: option }));
-}
-
-async function fillDateParts(
-  browser: ReturnType<typeof userEvent.setup>,
-  dialog: HTMLElement,
-  label: string,
-  value: string,
-) {
-  const [year, month, day] = value.split("-");
-
-  await browser.type(within(dialog).getByLabelText(label), day ?? "");
-  await browser.type(within(dialog).getByLabelText(`${label} MM`), month ?? "");
-  await browser.type(
-    within(dialog).getByLabelText(`${label} YYYY`),
-    year ?? "",
-  );
 }
 
 vi.mock("@/components/auth/SessionProvider", () => ({

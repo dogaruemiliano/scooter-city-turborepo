@@ -1,4 +1,6 @@
 "use client";
+import { useFormAction } from "@/lib/form/use-form-action";
+import { SaveButton } from "@repo/ui/components/save-button";
 
 import { ApiError, v1 } from "@repo/api-shared";
 import {
@@ -48,6 +50,8 @@ export function BrandFormSheet({
   brand?: v1.scooterBrands.ScooterBrand;
   onSaved?: (brand: v1.scooterBrands.ScooterBrand) => void;
 }) {
+  const formAction = useFormAction();
+
   const t = useTranslations("scooters");
   const router = useRouter();
   const isEdit = brand !== undefined;
@@ -105,6 +109,7 @@ export function BrandFormSheet({
   }
 
   async function save() {
+    if (busy) return;
     const schema = isEdit
       ? v1.scooterBrands.updateScooterBrandInputSchema
       : v1.scooterBrands.createScooterBrandInputSchema;
@@ -151,9 +156,7 @@ export function BrandFormSheet({
         aria-label={
           isEdit ? `${t("brands.edit.trigger")}: ${brand.name}` : undefined
         }
-      >
-        {trigger.props.children}
-      </BottomSheetTrigger>
+      />
       <BottomSheetContent initialFocus={nameInputRef}>
         <form onSubmit={submit} className="contents">
           <BottomSheetHeader>
@@ -212,9 +215,15 @@ export function BrandFormSheet({
           </BottomSheetBody>
 
           <BottomSheetFooter className="sm:flex-row-reverse sm:justify-start">
-            <Button type="submit" disabled={busy}>
-              {isEdit ? t("brands.form.save") : t("brands.form.submit")}
-            </Button>
+            <SaveButton
+              type="submit"
+              disabled={busy}
+              {...formAction(
+                isEdit ? "save" : "create",
+                { pending: busy, error: feedback?.kind === "error" },
+                isEdit ? t("brands.form.save") : t("brands.form.submit"),
+              )}
+            />
             <BottomSheetClose
               render={
                 <Button type="button" variant="outline" disabled={busy} />
@@ -241,9 +250,16 @@ export function BrandFormSheet({
               </BottomSheetDescription>
             </BottomSheetHeader>
             <BottomSheetFooter className="sm:flex-row-reverse sm:justify-start">
-              <Button type="button" disabled={busy} onClick={() => void save()}>
-                {t("brands.confirm.confirm")}
-              </Button>
+              <SaveButton
+                type="button"
+                disabled={busy}
+                onClick={() => void save()}
+                {...formAction(
+                  "save",
+                  { pending: busy },
+                  t("brands.confirm.confirm"),
+                )}
+              />
               <Button
                 type="button"
                 variant="outline"

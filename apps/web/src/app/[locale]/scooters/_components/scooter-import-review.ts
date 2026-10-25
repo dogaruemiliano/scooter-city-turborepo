@@ -1,6 +1,11 @@
 import { v1 } from "@repo/api-shared";
 import type { DocumentImportResult } from "./scooter-document-import";
-import type { ScooterEditorValues } from "./scooter-editor-schema";
+import {
+  isNumericField,
+  scooterCreateFormSchema,
+  scooterEditFormSchema,
+  type ScooterEditorValues,
+} from "./scooter-editor-schema";
 
 export interface ImportFieldReview {
   field: string;
@@ -114,6 +119,52 @@ export function insuranceFieldReviews(
     }
   }
   return [...reviews.values()];
+}
+
+/** A correction resolves only its own review, using the same validation as the form. */
+export function remainingImportReviews(
+  reviews: ImportFieldReview[],
+  values: ScooterEditorValues,
+  editing: boolean,
+): ImportFieldReview[] {
+  if (!reviews.length) return reviews;
+  const validation = (
+    editing ? scooterEditFormSchema : scooterCreateFormSchema
+  ).safeParse(values);
+  const invalidPaths = validation.success
+    ? []
+    : validation.error.issues.map((issue) => issue.path.join("."));
+  return reviews.filter((review) => {
+    const index = review.policyId
+      ? (values.insurancePolicies?.findIndex(
+          (policy) => policy.id === review.policyId,
+        ) ?? -1)
+      : -1;
+    const value = review.policyId
+      ? values.insurancePolicies?.[index]?.[
+          review.field as (typeof v1.scooters.INSURANCE_FIELDS)[number]
+        ]
+      : values[review.field as keyof ScooterEditorValues];
+    const path = review.policyId
+      ? `insurancePolicies.${index}.${review.field}`
+      : review.field;
+    if (
+      value == null ||
+      String(value) === review.value ||
+      !String(value).trim() ||
+      String(value).trim() === "-" ||
+      ((isNumericField(review.field) || review.field === "premiumAmount") &&
+        v1.vehicleCiv.parseCivNumber(String(value)) == null)
+    )
+      return true;
+    return invalidPaths.some(
+      (invalid) =>
+        !invalid ||
+        path === invalid ||
+        path.startsWith(`${invalid}.`) ||
+        invalid.startsWith(`${path}.`),
+    );
+  });
 }
 
 /** Resolve array paths by policy identity; removing a policy must not move its warnings. */

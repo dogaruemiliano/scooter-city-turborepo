@@ -32,6 +32,14 @@ pnpm --filter api db:seed
 pnpm --filter api dev
 ```
 
+The API imports compiled workspace packages from their `dist` directories. After
+adding or changing runtime exports in `@repo/api-shared`, rebuild that package
+with `pnpm --filter @repo/api-shared build` and restart the API development
+process. Nest's source watcher does not reload an already-cached workspace
+module just because its compiled package changes. Type checking reads the
+shared source types, so it can pass while the running process still has old
+exports loaded.
+
 Local PostgreSQL runs on `localhost:5434` to avoid colliding with a host
 PostgreSQL instance on the default port.
 
@@ -86,8 +94,10 @@ application settings in `.env`; do not replace the application's `DATABASE_URL`.
 The committed `.env.test.example` documents the two test settings:
 
 - `E2E_DATABASE_URL`: reusable database for the general HTTP suites. The runner
-  builds shared packages, generates the Prisma client, applies pending migrations
-  (creating the database when missing), and runs the idempotent seed before Jest.
+  builds shared packages, generates the Prisma client, creates the database when
+  missing, applies pending migrations, and runs the idempotent seed before Jest.
+  Provisioning uses the server's `postgres` database and requires `CREATEDB`;
+  existing general test databases are reused without resetting them.
 - `E2E_FINANCE_DATABASE_URL`: connection template for the finance-book setup
   suite. Its database name must start with `finance_books_test`. Each invocation
   creates a new database with a random suffix, migrates it without seeding, and

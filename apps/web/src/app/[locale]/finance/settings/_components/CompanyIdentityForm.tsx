@@ -1,8 +1,10 @@
 "use client";
+import { useFormAction } from "@/lib/form/use-form-action";
+import { SaveButton } from "@repo/ui/components/save-button";
 
 import { v1 } from "@repo/api-shared";
-import { Alert, AlertDescription, Button, Spinner } from "@repo/ui/components";
-import { CheckCircle2Icon } from "lucide-react";
+import { Alert, AlertDescription } from "@repo/ui/components";
+
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { FormProvider } from "react-hook-form";
@@ -27,6 +29,8 @@ export function CompanyIdentityForm({
 }: {
   identity: v1.finance.FinanceLegalIdentity | null;
 }) {
+  const formAction = useFormAction();
+
   const t = useTranslations("finance.settings");
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState(false);
@@ -107,12 +111,6 @@ export function CompanyIdentityForm({
           <p className="text-sm text-muted-foreground">{t("aliasesHint")}</p>
         </section>
 
-        {saved ? (
-          <Alert className="mb-5">
-            <CheckCircle2Icon aria-hidden="true" />
-            <AlertDescription>{t("saved")}</AlertDescription>
-          </Alert>
-        ) : null}
         {saveError ? (
           <Alert variant="destructive" className="mb-5">
             <AlertDescription>{t("saveFailed")}</AlertDescription>
@@ -120,10 +118,19 @@ export function CompanyIdentityForm({
         ) : null}
 
         <footer className="flex justify-end">
-          <Button type="submit" disabled={saving || !form.formState.isDirty}>
-            {saving ? <Spinner /> : null}
-            {saving ? t("saving") : t("save")}
-          </Button>
+          <SaveButton
+            type="submit"
+            disabled={saving || !form.formState.isDirty}
+            {...formAction(
+              "save",
+              {
+                pending: saving,
+                error: saveError,
+                success: saved && !form.formState.isDirty,
+              },
+              t("save"),
+            )}
+          />
         </footer>
       </form>
     </FormProvider>

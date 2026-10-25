@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { Readable } from "node:stream";
+import { PDFDocument } from "pdf-lib";
 import {
   GetObjectCommand,
   HeadObjectCommand,
@@ -15,7 +16,10 @@ import {
   type StoredDocument,
 } from "../image-storage/image-storage.types";
 import { readScooterDocumentSource } from "../scooters/scooter-document-source-reader";
-import { normalizeDocumentAnalysisPdf } from "./document-analysis-pdf";
+import {
+  normalizeDocumentAnalysisPdf,
+  appendDocumentAnalysisDetails,
+} from "./document-analysis-pdf";
 import {
   DOCUMENT_VALIDATION_MAX_RUNTIME_MS,
   DOCUMENT_VALIDATION_REVISION,
@@ -31,6 +35,8 @@ export interface DocumentValidationConfiguration {
   prefix: string;
   maxBytes: number;
   kmsKeyId?: string;
+  /** Opt in only after the private rotated-scan accuracy benchmark. */
+  detailViews?: boolean;
 }
 
 interface LambdaContext {
@@ -59,7 +65,10 @@ export function createDocumentValidationHandler(
         ),
       );
       timer = setTimeout(() => controller.abort(), duration);
-      const sourceFingerprint = fingerprint(input.source);
+      const sourceFingerprint = fingerprint(
+        input.source,
+        config.detailViews ?? false,
+      );
       const existing = await existingSnapshot(
         s3,
         config,
@@ -94,7 +103,23 @@ export function createDocumentValidationHandler(
         controller.signal,
       );
       controller.signal.throwIfAborted();
-      const bytes =
+      const originalPageCount =
+        input.source.contentType === "application/pdf"
+          ? (
+              await PDFDocument.load(originalBytes, { updateMetadata: false })
+            ).getPageCount()
+          : 1;
+      if (
+        !Number.isInteger(originalPageCount) ||
+        originalPageCount < 1 ||
+        originalPageCount > v1.scooters.SCOOTER_DOCUMENT_EXTRACTION_MAX_PAGES
+      )
+        throw new DocumentExtractionError(
+          "DOCUMENT_EXTRACTION_TOO_MANY_PAGES",
+          "Document extraction accepts up to ten original pages.",
+          false,
+        );
+      const normalizedBytes =
         input.source.contentType === "application/pdf"
           ? await normalizeDocumentAnalysisPdf(
               originalBytes,
@@ -102,6 +127,14 @@ export function createDocumentValidationHandler(
               controller.signal,
             )
           : originalBytes;
+      const bytes =
+        config.detailViews && input.source.contentType === "application/pdf"
+          ? await appendDocumentAnalysisDetails(
+              normalizedBytes,
+              Math.min(config.maxBytes, v1.scooters.SCOOTER_DOCUMENT_MAX_BYTES),
+              controller.signal,
+            )
+          : normalizedBytes;
       const checksumSha256 = createHash("sha256").update(bytes).digest("hex");
       try {
         await s3.send(
@@ -118,6 +151,7 @@ export function createDocumentValidationHandler(
             Metadata: {
               "source-fingerprint": sourceFingerprint,
               "validation-revision": DOCUMENT_VALIDATION_REVISION,
+              "original-page-count": String(originalPageCount),
             },
             ...(config.kmsKeyId
               ? {
@@ -152,6 +186,7 @@ export function createDocumentValidationHandler(
           contentType: input.source.contentType,
           byteSize: bytes.length,
           checksumSha256,
+          originalPageCount,
         },
       };
     } catch (error) {
@@ -226,7 +261,7 @@ function validateInput(
   return { source, outputKey: input.outputKey };
 }
 
-function fingerprint(source: StoredDocument): string {
+function fingerprint(source: StoredDocument, detailViews: boolean): string {
   return createHash("sha256")
     .update(
       JSON.stringify([
@@ -236,6 +271,7 @@ function fingerprint(source: StoredDocument): string {
         source.byteSize,
         source.checksumSha256.toLowerCase(),
         DOCUMENT_VALIDATION_REVISION,
+        detailViews,
       ]),
     )
     .digest("hex");
@@ -283,7 +319,13 @@ async function existingSnapshot(
   const checksum = head.ChecksumSHA256
     ? Buffer.from(head.ChecksumSHA256, "base64")
     : null;
+  const originalPageCount = Number(head.Metadata?.["original-page-count"]);
   if (
+    !Number.isInteger(originalPageCount) ||
+    originalPageCount < 1 ||
+    originalPageCount > v1.scooters.SCOOTER_DOCUMENT_EXTRACTION_MAX_PAGES ||
+    (input.source.contentType !== "application/pdf" &&
+      originalPageCount !== 1) ||
     head.Metadata?.["source-fingerprint"] !== sourceFingerprint ||
     head.Metadata?.["validation-revision"] !== DOCUMENT_VALIDATION_REVISION ||
     head.ContentType !== input.source.contentType ||
@@ -305,6 +347,7 @@ async function existingSnapshot(
     contentType: input.source.contentType,
     byteSize: head.ContentLength,
     checksumSha256: checksum.toString("hex"),
+    originalPageCount,
   };
 }
 
@@ -343,4 +386,5 @@ export const handler = (event: unknown, context: LambdaContext) =>
         v1.scooters.SCOOTER_DOCUMENT_MAX_BYTES,
     ),
     kmsKeyId: process.env.DOCUMENT_VALIDATION_KMS_KEY_ID || undefined,
+    detailViews: process.env.DOCUMENT_VALIDATION_DETAIL_VIEWS === "true",
   })(event, context);

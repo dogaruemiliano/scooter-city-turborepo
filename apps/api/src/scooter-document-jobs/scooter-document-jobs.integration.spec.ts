@@ -245,6 +245,155 @@ integration("durable scooter document lifecycle (isolated PostgreSQL)", () => {
     return { session, source, token, upload, resource, input };
   }
 
+  it("atomically caps live import drafts at 20 without counting legacy sessions", async () => {
+    const legacy = await jobs.createSession(userId);
+    sessionIds.push(legacy.id);
+    const results = await Promise.allSettled(
+      Array.from({ length: 21 }, () => jobs.createImportDraft(userId)),
+    );
+    const created = results.flatMap((result) =>
+      result.status === "fulfilled" ? [result.value] : [],
+    );
+    sessionIds.push(...created.map((draft) => draft.id));
+    expect(created).toHaveLength(20);
+    expect(
+      results.filter((result) => result.status === "rejected"),
+    ).toHaveLength(1);
+    const current = created[0];
+    const changes = await Promise.allSettled([
+      jobs.updateImportDraft(
+        current.id,
+        { revision: 0, state: { vin: "first" } },
+        userId,
+      ),
+      jobs.updateImportDraft(
+        current.id,
+        { revision: 0, state: { vin: "second" } },
+        userId,
+      ),
+    ]);
+    expect(
+      changes.filter((result) => result.status === "fulfilled"),
+    ).toHaveLength(1);
+    expect((await jobs.getImportDraft(current.id, userId)).revision).toBe(1);
+    await Promise.all(
+      created.map((draft) => jobs.discardImportDraft(draft.id, userId)),
+    );
+    expect((await jobs.listImportDrafts(userId)).items).toHaveLength(0);
+    const replacement = await jobs.createImportDraft(userId);
+    sessionIds.push(replacement.id);
+    await jobs.discardImportDraft(replacement.id, userId);
+  });
+
+  it("atomically groups completed documents and refuses busy, stale or foreign-owner drafts", async () => {
+    const target = await fixture();
+    const source = await fixture();
+    await prisma.scooterDocumentEditorSession.updateMany({
+      where: { id: { in: [target.session.id, source.session.id] } },
+      data: { isImportDraft: true },
+    });
+    const input = {
+      sourceId: source.session.id,
+      sourceRevision: 0,
+      revision: 0,
+      state: { notes: "Keep manual destination values" },
+    };
+    await expect(
+      jobs.mergeImportDraft(target.session.id, input, "another-owner"),
+    ).rejects.toThrow();
+    await expect(
+      jobs.mergeImportDraft(
+        target.session.id,
+        { ...input, revision: 1 },
+        userId,
+      ),
+    ).rejects.toMatchObject({
+      response: { code: "IMPORT_DRAFT_REVISION_CONFLICT" },
+    });
+    const job = await jobs.start(source.input, userId);
+    await expect(
+      jobs.mergeImportDraft(target.session.id, input, userId),
+    ).rejects.toMatchObject({ response: { code: "IMPORT_DRAFT_BUSY" } });
+    expect(
+      (
+        await prisma.draftUpload.findUniqueOrThrow({
+          where: { id: source.upload.id },
+        })
+      ).editorSessionId,
+    ).toBe(source.session.id);
+    await prisma.scooterDocumentJob.update({
+      where: { id: job.id },
+      data: { status: "completed" },
+    });
+    const merged = await jobs.mergeImportDraft(
+      target.session.id,
+      input,
+      userId,
+    );
+    expect(merged).toMatchObject({
+      id: target.session.id,
+      revision: 1,
+      state: input.state,
+    });
+    expect(
+      (
+        await prisma.draftUpload.findUniqueOrThrow({
+          where: { id: source.upload.id },
+        })
+      ).editorSessionId,
+    ).toBe(target.session.id);
+    expect(
+      (
+        await prisma.scooterDocumentResource.findUniqueOrThrow({
+          where: { id: source.resource.id },
+        })
+      ).sessionId,
+    ).toBe(target.session.id);
+    expect(
+      (
+        await prisma.scooterDocumentJob.findUniqueOrThrow({
+          where: { id: job.id },
+        })
+      ).sessionId,
+    ).toBe(target.session.id);
+    await expect(
+      jobs.getImportDraft(source.session.id, userId),
+    ).rejects.toThrow();
+  });
+
+  it("allows one admin to fill all 20 processing slots and keeps overflow queued", async () => {
+    const fixtures = await Promise.all(
+      Array.from({ length: 21 }, () => fixture()),
+    );
+    const started = await Promise.all(
+      fixtures.map((f) => jobs.start(f.input, userId)),
+    );
+    for (const job of started) {
+      expect(job.status).toBe("queued");
+      // Waiting for another scooter must not consume a five-minute processing window.
+      expect(new Date(job.expiresAt).getTime() - Date.now()).toBeGreaterThan(
+        20 * 60_000,
+      );
+    }
+    await Promise.all(
+      started.map(async ({ id }) =>
+        dispatcher.process(
+          await prisma.scooterDocumentJob.findUniqueOrThrow({ where: { id } }),
+        ),
+      ),
+    );
+    const rows = await prisma.scooterDocumentJob.findMany({
+      where: { id: { in: started.map((job) => job.id) } },
+    });
+    expect(rows.filter((job) => job.slotReservedAt)).toHaveLength(20);
+    expect(validation.validate).toHaveBeenCalledTimes(20);
+    expect(
+      rows
+        .filter((job) => !job.slotReservedAt)
+        .every((job) => job.status === "queued"),
+    ).toBe(true);
+  });
+
   it("deduplicates concurrent starts globally and recovers a lost response after token expiry", async () => {
     const f = await fixture();
     const [first, second] = await Promise.all([

@@ -11,10 +11,15 @@ import {
 import { v1 } from "@repo/api-shared";
 import {
   Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
   FormSection,
   InputGroup,
   InputGroupAddon,
 } from "@repo/ui/components";
+import { EllipsisVerticalIcon, FileJsonIcon } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { get, useFieldArray, useFormContext, useWatch } from "react-hook-form";
 
@@ -30,6 +35,7 @@ import {
   FormSegmentedRadioGroup,
   FormTextarea,
 } from "@/components/form/controls";
+import type { LogicalDocumentUpdate } from "./ScooterDocumentTypeEditor";
 import { ScooterBatchDocuments } from "./ScooterBatchDocuments";
 import { ScooterDocumentImport } from "./ScooterDocumentImport";
 import {
@@ -38,14 +44,13 @@ import {
 } from "./ScooterDocumentUpload";
 import type { ScooterDocumentsEditor } from "./useScooterDocuments";
 import { CivMetadataFields } from "./CivMetadataFields";
-import { useScooterLicenseAutofill } from "./useScooterLicenseAutofill";
 import { useCivFieldHint } from "./useCivFieldHint";
 import { useCivVocabulary } from "./CivVocabularyContext";
 import {
   Fragment,
   useContext,
-  useEffect,
   useId,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -76,6 +81,8 @@ export function ScooterEditorFields({
   brands,
   combinedReview = false,
   onRetryAnalysis,
+  onLogicalDocument,
+  scooterVin,
   onCancelAnalysis,
   analyzing = false,
   persistedPolicyIds,
@@ -94,6 +101,8 @@ export function ScooterEditorFields({
 }: {
   combinedReview?: boolean;
   onRetryAnalysis?: (sourceId: string) => void;
+  onLogicalDocument?: LogicalDocumentUpdate;
+  scooterVin?: string;
   onCancelAnalysis?: () => void;
   analyzing?: boolean;
   persistedPolicyIds: string[];
@@ -121,14 +130,6 @@ export function ScooterEditorFields({
     keyName: "formKey",
   });
   const powertrain = useWatch({ control, name: "powertrainType" });
-  // Keep the manual/automatic license state alive while navigating the wizard.
-  const licenseAutofill = useScooterLicenseAutofill(
-    editing || step === "documents",
-  );
-  const onLicenseImport = licenseAutofill.onImport;
-  useEffect(() => {
-    if (importResult) onLicenseImport(importResult);
-  }, [importResult, onLicenseImport]);
   const { documentWarnings, clearDocumentWarnings } = useScooterImportReview();
   const fieldProps = { brands, onBrandCreated, disabled, powertrain };
   const showDocuments = canReadDocuments && (!step || step === "documents");
@@ -174,12 +175,19 @@ export function ScooterEditorFields({
           field === "temporaryRegistrationExpiresAt" ||
           field === "requiredLicenseCategory",
       ));
+  const [jsonOpen, setJsonOpen] = useState(false);
+  const importMenuRef = useRef<HTMLButtonElement>(null);
+  const menuImport = !editing || combinedReview;
+  const canImport = canAccess(user, "scooter_documents.write");
   const jsonImport = (
     <ScooterDocumentImport
       secondary
+      hideTrigger={menuImport}
+      finalFocus={menuImport ? importMenuRef : undefined}
+      open={menuImport ? jsonOpen : undefined}
+      onOpenChange={menuImport ? setJsonOpen : undefined}
       sources={importSources}
       onApplyImport={onApplyImport}
-      onImport={licenseAutofill.onImport}
       insuranceFiles={[
         ...documents.existing,
         ...documents.drafts.map((doc) => ({
@@ -200,6 +208,34 @@ export function ScooterEditorFields({
         <>
           {!editing || combinedReview ? (
             <ScooterBatchDocuments
+              headerActions={
+                canImport ? (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger
+                      render={
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          ref={importMenuRef}
+                          aria-label={t("documents.actions")}
+                          disabled={disabled}
+                        />
+                      }
+                    >
+                      <EllipsisVerticalIcon aria-hidden="true" />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => setJsonOpen(true)}>
+                        <FileJsonIcon aria-hidden="true" />
+                        {t("documentImport.open")}
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                ) : null
+              }
+              onLogicalDocument={onLogicalDocument}
+              scooterVin={scooterVin}
               documents={documents}
               disabled={disabled}
               analyzing={analyzing}
@@ -334,10 +370,7 @@ export function ScooterEditorFields({
         </FormSection>
       ) : null}
       {showRegistration && !editing ? (
-        <ScooterInitialRegistrationFields
-          disabled={disabled}
-          onManualLicenseChange={licenseAutofill.onManualLicenseChange}
-        />
+        <ScooterInitialRegistrationFields disabled={disabled} />
       ) : null}
       {!step || step === "insurance" ? (
         <ScooterInsuranceFields
@@ -690,17 +723,17 @@ function ScooterPowertrainField({ disabled }: { disabled: boolean }) {
 const uppercaseIdentifier = (value: string) => value.toUpperCase();
 
 export function ScooterInitialRegistrationFields({
+  children,
   disabled,
-  onManualLicenseChange,
   panel = false,
   number,
   status,
 }: {
   disabled: boolean;
-  onManualLicenseChange: () => void;
   panel?: boolean;
   number?: number;
   status?: import("react").ReactNode;
+  children?: import("react").ReactNode;
 }) {
   const t = useTranslations("scooters");
   const { control, getValues, setValue, clearErrors, setError } =
@@ -744,8 +777,6 @@ export function ScooterInitialRegistrationFields({
               });
               clearErrors("requiredLicenseCategory");
             } else {
-              if (!registered)
-                setValue("requiredLicenseCategory", "", { shouldDirty: true });
               if (value !== "temporary") {
                 setValue("temporaryRegistrationExpiresAt", "", {
                   shouldDirty: true,
@@ -781,6 +812,7 @@ export function ScooterInitialRegistrationFields({
           >
             <FormInput
               autoCapitalize="characters"
+              normalize={uppercaseIdentifier}
               placeholder={t(
                 `placeholders.registrationNumber.${registrationType}`,
               )}
@@ -794,7 +826,6 @@ export function ScooterInitialRegistrationFields({
           >
             <FormSelect
               placeholder={t("placeholders.requiredLicenseCategory")}
-              onValueChange={onManualLicenseChange}
               options={v1.scooters.SCOOTER_REQUIRED_DRIVER_LICENSE_TYPES.map(
                 (value) => ({
                   value,
@@ -815,6 +846,7 @@ export function ScooterInitialRegistrationFields({
           ) : null}
         </>
       ) : null}
+      {children}
     </FormSection>
   );
 }

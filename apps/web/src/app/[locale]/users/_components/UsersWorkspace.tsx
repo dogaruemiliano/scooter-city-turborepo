@@ -1,4 +1,7 @@
 "use client";
+import { userAvatarSrc } from "@/lib/user-avatar";
+import { useFormAction } from "@/lib/form/use-form-action";
+import { SaveButton } from "@repo/ui/components/save-button";
 
 import {
   useCallback,
@@ -12,6 +15,7 @@ import { v1 } from "@repo/api-shared";
 import {
   Avatar,
   AvatarFallback,
+  AvatarImage,
   Badge,
   BottomSheet,
   BottomSheetTrigger,
@@ -49,6 +53,7 @@ import {
   useTask,
 } from "@/components/WorkspaceForm";
 import { RoleCard, roleCardSurface } from "../../roles/_components/RoleCard";
+import { roleColors } from "../../roles/_lib/role-colors";
 import { AccessWorkspace } from "../../roles/_components/AccessWorkspace";
 import { AccessHistory } from "../../roles/_components/AccessHistory";
 import {
@@ -79,6 +84,7 @@ function MemberAvatar({
     user.email.slice(0, 2);
   return (
     <Avatar aria-hidden="true" shape="square" size={large ? "xl" : "lg"}>
+      <AvatarImage src={userAvatarSrc(user.avatarAssetId)} alt="" />
       <AvatarFallback>{initials.toLocaleUpperCase()}</AvatarFallback>
     </Avatar>
   );
@@ -274,16 +280,54 @@ export function UsersWorkspace({ id }: { id?: string }) {
                               >
                                 {memberName(user)}
                               </span>
+                              <span className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                                {user.isSuperAdmin ? (
+                                  <span
+                                    className={`font-medium ${roleColors.superAdmin.title}`}
+                                  >
+                                    {labelFor(user)}
+                                  </span>
+                                ) : user.roles.length ? (
+                                  [...user.roles]
+                                    .sort(
+                                      (a, b) =>
+                                        [
+                                          "admin",
+                                          "mechanic",
+                                          "customer",
+                                        ].indexOf(a.slug) -
+                                        [
+                                          "admin",
+                                          "mechanic",
+                                          "customer",
+                                        ].indexOf(b.slug),
+                                    )
+                                    .map((role) => (
+                                      <span
+                                        key={role.id}
+                                        className={`font-medium ${(roleColors[role.slug] ?? roleColors.none).title}`}
+                                      >
+                                        {baseSlugs.some(
+                                          (slug) => slug === role.slug,
+                                        )
+                                          ? t(
+                                              `access.member.roleNames.${role.slug}`,
+                                            )
+                                          : role.name}
+                                      </span>
+                                    ))
+                                ) : (
+                                  <span className="font-medium text-foreground">
+                                    {labelFor(user)}
+                                  </span>
+                                )}
+                              </span>
                               <span className="truncate text-xs text-muted-foreground">
                                 {user.email}
                               </span>
-                              <span className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                                <span className="font-medium text-foreground">
-                                  {labelFor(user)}
-                                </span>
-                                <span aria-hidden="true">·</span>
-                                {t(`access.${user.loginStatus.toLowerCase()}`)}
-                              </span>
+                            </span>
+                            <span className="shrink-0 text-right text-xs text-muted-foreground">
+                              {t(`access.${user.loginStatus.toLowerCase()}`)}
                             </span>
                           </CardContent>
                         </Card>
@@ -364,6 +408,8 @@ function UserForm({
   onDirtyChange: (dirty: boolean) => void;
   onCancel: () => void;
 }) {
+  const formAction = useFormAction();
+
   const t = useTranslations("workspace");
   const { user: actor } = useSession();
   const manageable = canManageUser(actor, user);
@@ -396,13 +442,13 @@ function UserForm({
   const formId = useId();
   const [showReview, setShowReview] = useState(false);
   const selectedRoles = roles.filter((role) => roleIds.includes(role.id));
+  const noRoleOption = {
+    value: "none",
+    slug: "none",
+    label: t("access.member.noRole"),
+    description: t("access.member.noRoleHelp"),
+  };
   const roleOptions = [
-    {
-      value: "none",
-      slug: "none",
-      label: t("access.member.noRole"),
-      description: t("access.member.noRoleHelp"),
-    },
     ...roles
       .filter(
         (role) =>
@@ -410,12 +456,18 @@ function UserForm({
           role.slug !== "admin" ||
           user?.roles.some((r) => r.id === role.id),
       )
+      .sort(
+        (a, b) =>
+          baseSlugs.findIndex((slug) => slug === a.slug) -
+          baseSlugs.findIndex((slug) => slug === b.slug),
+      )
       .map((role) => ({
         value: role.id,
         slug: role.slug,
         label: t(`access.member.roleNames.${role.slug}`),
         description: t(`access.member.roleDescriptions.${role.slug}`),
       })),
+    noRoleOption,
   ];
   const selectedRole = user?.isSuperAdmin
     ? {
@@ -424,7 +476,7 @@ function UserForm({
         label: t("access.member.roleNames.superAdmin"),
         description: t("access.member.superRoleHelp"),
       }
-    : (roleOptions.find((role) => role.value === roleIds[0]) ?? roleOptions[0]);
+    : (roleOptions.find((role) => role.value === roleIds[0]) ?? noRoleOption);
 
   const grants = {
     roles: selectedRoles.map(({ id, revision }) => ({ id, revision })),
@@ -459,23 +511,26 @@ function UserForm({
       preview.missingPrerequisites.length
     )
       return;
-    void task.run(async () => {
-      const saved = await webApi.fetch(
-        user ? `/v1/users/${user.id}/access` : "/v1/users",
-        v1.access.accessUserSchema,
-        {
-          method: user ? "PUT" : "POST",
-          json: user
-            ? v1.access.userAccessInputSchema.parse(payload)
-            : v1.access.createUserInputSchema.parse(payload),
-        },
-      );
-      onDirtyChange(false);
-      if (!user) router.replace(`/users/${saved.id}`);
-      else reload();
-      setShowReview(false);
-      setShowPermissions(false);
-    });
+    void task.run(
+      async () => {
+        const saved = await webApi.fetch(
+          user ? `/v1/users/${user.id}/access` : "/v1/users",
+          v1.access.accessUserSchema,
+          {
+            method: user ? "PUT" : "POST",
+            json: user
+              ? v1.access.userAccessInputSchema.parse(payload)
+              : v1.access.createUserInputSchema.parse(payload),
+          },
+        );
+        onDirtyChange(false);
+        if (!user) router.replace(`/users/${saved.id}`);
+        else reload();
+        setShowReview(false);
+        setShowPermissions(false);
+      },
+      { successMessage: t("access.memberUpdated") },
+    );
   };
   const reviewSheet = (
     <AccessReviewSheet
@@ -736,15 +791,16 @@ function UserForm({
                     </BottomSheetBody>
                     <BottomSheetFooter>
                       <Feedback error={!showReview ? task.error : null} />
-                      <Button
+                      <SaveButton
                         type="submit"
                         form={formId}
                         disabled={task.busy || !canSubmit || !dirty}
-                      >
-                        {task.busy
-                          ? t("access.member.saving")
-                          : t("access.preview")}
-                      </Button>
+                        {...formAction(
+                          "review",
+                          { pending: task.busy, error: task.error },
+                          t("access.preview"),
+                        )}
+                      />
                       <Button
                         type="button"
                         variant="secondary"
@@ -770,14 +826,20 @@ function UserForm({
               )}
             </Field>
           </div>
-          <Feedback error={task.error} success={task.success} />
+          <Feedback error={task.error} />
         </CardContent>
         {!user?.isSuperAdmin && canSubmit ? (
           user ? (
             <CardContent className="pb-(--card-spacing)">
-              <Button type="submit" disabled={task.busy || !dirty}>
-                {task.busy ? t("access.member.saving") : t("access.preview")}
-              </Button>
+              <SaveButton
+                type="submit"
+                disabled={task.busy || !dirty}
+                {...formAction(
+                  "review",
+                  { pending: task.busy, error: task.error },
+                  t("access.preview"),
+                )}
+              />
             </CardContent>
           ) : (
             <FormActions>
@@ -789,9 +851,15 @@ function UserForm({
               >
                 {t("cancel")}
               </Button>
-              <Button type="submit" disabled={task.busy || !dirty}>
-                {task.busy ? t("access.member.saving") : t("access.preview")}
-              </Button>
+              <SaveButton
+                type="submit"
+                disabled={task.busy || !dirty}
+                {...formAction(
+                  "review",
+                  { pending: task.busy, error: task.error },
+                  t("access.preview"),
+                )}
+              />
             </FormActions>
           )
         ) : null}

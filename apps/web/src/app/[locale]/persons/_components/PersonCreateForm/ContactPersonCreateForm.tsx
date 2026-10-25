@@ -1,11 +1,13 @@
 "use client";
+import { useFormAction } from "@/lib/form/use-form-action";
+import { SaveButton } from "@repo/ui/components/save-button";
 
 import { useId, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { v1 } from "@repo/api-shared";
-import { Button, FormActions } from "@repo/ui/components";
+import { FormActions } from "@repo/ui/components";
 import { Feedback, useTask, WorkspacePage } from "@/components/WorkspaceForm";
 import { buttonVariants } from "@repo/ui/components/button";
 import { webApi } from "@/lib/api";
@@ -20,11 +22,20 @@ import type {
   PersonCreateFormProps,
   SetPersonFormValue,
 } from "./types";
+import { useOptionalSession } from "@/components/auth/SessionProvider";
+import {
+  personCreateCancelHref,
+  personCreateDestination,
+} from "../../_lib/person-create-destination";
 
 /** Contact-only registration does not require or submit identity documents. */
 export function ContactPersonCreateForm({
   personsHref,
+  rentalDraftId,
 }: PersonCreateFormProps) {
+  const session = useOptionalSession();
+  const formAction = useFormAction();
+
   const t = useTranslations("persons");
   const locale = useLocale();
   const router = useRouter();
@@ -100,7 +111,14 @@ export function ContactPersonCreateForm({
               v1.persons.personSchema,
               { method: "POST", json: parsed.data },
             );
-            router.push(`${personsHref}/${encodeURIComponent(person.id)}`);
+            router.push(
+              personCreateDestination(
+                personsHref,
+                person.id,
+                rentalDraftId,
+                session?.user?.id,
+              ),
+            );
             router.refresh();
           });
         }}
@@ -153,7 +171,7 @@ export function ContactPersonCreateForm({
         <Feedback error={task.error} />
         <FormActions ready={ready} pending={task.busy}>
           <Link
-            href={personsHref}
+            href={personCreateCancelHref(personsHref, rentalDraftId)}
             className={buttonVariants({ variant: "outline" })}
             aria-disabled={task.busy || undefined}
             tabIndex={task.busy ? -1 : undefined}
@@ -163,9 +181,15 @@ export function ContactPersonCreateForm({
           >
             {t("actions.cancel")}
           </Link>
-          <Button type="submit" disabled={task.busy}>
-            {t(task.busy ? "actions.creating" : "actions.create")}
-          </Button>
+          <SaveButton
+            type="submit"
+            disabled={task.busy}
+            {...formAction(
+              "create",
+              { pending: task.busy, error: task.error },
+              t("actions.create"),
+            )}
+          />
         </FormActions>
       </form>
     </WorkspacePage>

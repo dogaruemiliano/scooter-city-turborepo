@@ -29,7 +29,8 @@ const row = {
   scooterId: "scooter",
   title: "Brake issue",
   description: "Brake issue",
-  severity: "high",
+  difficulty: "hard",
+  severity: "critical",
   blocksUsage: false,
   holdClearedAt: null,
   photos: [],
@@ -133,7 +134,7 @@ describe("ProblemsService authorization and write conflicts", () => {
       v1.problems.createProblemInputSchema.parse({
         scooterId: "scooter",
         title: "Service",
-        severity: "low",
+        difficulty: "easy",
         sections,
         checklist,
         buyList,
@@ -159,6 +160,15 @@ describe("ProblemsService authorization and write conflicts", () => {
       }),
     );
     expect(audit.recordRequired).toHaveBeenCalled();
+  });
+
+  it("returns difficulty alongside the unchanged original severity", async () => {
+    db.scooterProblem.findFirst.mockResolvedValue(row);
+    const result = await service.get("mechanic", "problem");
+    expect(result).toMatchObject({
+      difficulty: "hard",
+      legacySeverity: "critical",
+    });
   });
 
   it("returns the scooter cover URL with problem details", async () => {
@@ -251,7 +261,7 @@ describe("ProblemsService authorization and write conflicts", () => {
       pageSize: 25,
       status: "in_progress",
       view: "assigned",
-      severity: "high",
+      difficulty: "hard",
     });
     expect(result.quickFilterCounts).toEqual({
       all: 60,
@@ -267,7 +277,7 @@ describe("ProblemsService authorization and write conflicts", () => {
       { where: { AND: unknown[] } },
     ][];
     const base = countCalls[1][0].where;
-    expect(base.AND[1]).toEqual({ severity: "high" });
+    expect(base.AND[1]).toEqual({ difficulty: "hard" });
     expect(base.AND[0]).toEqual(findCalls[0][0].where.AND[0]);
     expect(countCalls[4][0].where).toEqual({
       AND: [
@@ -344,6 +354,28 @@ describe("ProblemsService authorization and write conflicts", () => {
     );
   });
 
+  it("pauses work without overwriting assignment or saved progress", async () => {
+    db.scooterProblem.findFirst.mockResolvedValue({
+      ...row,
+      status: "in_progress",
+    });
+    await service.update("mechanic", "problem", {
+      revision: 1,
+      pauseWork: true,
+    });
+    expect(db.scooterProblem.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { status: "open", revision: { increment: 1 } },
+      }),
+    );
+    expect(audit.recordRequired).toHaveBeenCalled();
+  });
+  it("rejects pausing a problem that has not started", async () => {
+    await expect(
+      service.update("mechanic", "problem", { revision: 1, pauseWork: true }),
+    ).rejects.toThrow("Only work in progress can be paused");
+    expect(db.scooterProblem.updateMany).not.toHaveBeenCalled();
+  });
   it("saves and audits checklist changes for the assigned mechanic", async () => {
     const checklist = [
       { id: "pads", text: "Install brake pads", completed: true },
@@ -609,48 +641,63 @@ describe("ProblemsService authorization and write conflicts", () => {
     expect(result.scooter).not.toHaveProperty("notes");
   });
 
-  it("requires an explicit clearance decision before resolving a blocker", async () => {
-    db.scooterProblem.findFirst.mockResolvedValue({
-      ...row,
-      blocksUsage: true,
-    });
-    await expect(
-      service.resolve("mechanic", "problem", {
+  it.each([undefined, false, true])(
+    "automatically clears this problem's hold on resolution (legacy decision: %s)",
+    async (clearMaintenanceHold) => {
+      db.scooterProblem.findFirst.mockResolvedValue({
+        ...row,
+        blocksUsage: true,
+      });
+      await service.resolve("mechanic", "problem", {
         revision: 1,
         resolutionNotes: "Belt replaced",
-      }),
-    ).rejects.toThrow(ConflictException);
-    expect(db.scooterProblem.updateMany).not.toHaveBeenCalled();
-  });
+        ...(clearMaintenanceHold === undefined ? {} : { clearMaintenanceHold }),
+      });
+      expect(db.scooterProblem.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            id: "problem",
+            revision: 1,
+          }) as unknown,
+          data: expect.objectContaining({
+            status: "resolved",
+            blocksUsage: false,
+            holdClearedAt: expect.any(Date) as unknown,
+            holdClearedById: "mechanic",
+          }) as unknown,
+        }),
+      );
+    },
+  );
 
-  it("can resolve while retaining a hold, without touching any other report", async () => {
+  it("automatically clears only the dismissed problem's hold", async () => {
+    access.getSnapshot.mockResolvedValue({ ...snapshot, isSuperAdmin: true });
     db.scooterProblem.findFirst.mockResolvedValue({
       ...row,
       blocksUsage: true,
     });
-    db.scooterProblem.findUniqueOrThrow.mockResolvedValue({
-      ...row,
-      blocksUsage: true,
-      status: "resolved",
-      revision: 2,
-    });
-    const resolved = await service.resolve("mechanic", "problem", {
-      revision: 1,
-      resolutionNotes: "Awaiting safety inspection",
-      clearMaintenanceHold: false,
-    });
-    expect(resolved.blocksUsage).toBe(true);
+    await service.cancel("manager", "problem", 1);
     expect(db.scooterProblem.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: {
-          id: "problem",
-          revision: 1,
-          assigneeId: "mechanic",
-          status: "open",
-        },
-        data: expect.not.objectContaining({ blocksUsage: false }) as unknown,
+        where: expect.objectContaining({ id: "problem" }) as unknown,
+        data: expect.objectContaining({
+          status: "cancelled",
+          blocksUsage: false,
+          holdClearedById: "manager",
+        }) as unknown,
       }),
     );
+  });
+
+  it("rejects adding a hold to closed work", async () => {
+    db.scooterProblem.findFirst.mockResolvedValue({
+      ...row,
+      status: "resolved",
+    });
+    await expect(
+      service.hold("mechanic", "problem", { revision: 1, blocksUsage: true }),
+    ).rejects.toThrow("Only open work");
+    expect(db.scooterProblem.updateMany).not.toHaveBeenCalled();
   });
 
   it("clears only this hold and records who cleared it", async () => {
@@ -717,6 +764,48 @@ describe("ProblemsService authorization and write conflicts", () => {
     );
   });
 
+  it("requires a nonblank reopening message before writing", () => {
+    expect(() =>
+      service.reopen("manager", "problem", { revision: 1, message: "   " }),
+    ).toThrow();
+    expect(db.scooterProblem.updateMany).not.toHaveBeenCalled();
+  });
+  it("returns completion and reopening messages to a scoped reader", async () => {
+    db.$transaction.mockImplementation((queries: Promise<unknown>[]) =>
+      Promise.all(queries),
+    );
+    db.auditEvent.findMany.mockResolvedValue([
+      {
+        id: "complete",
+        type: "PROBLEM_RESOLVED",
+        user: row.assignee,
+        createdAt: row.createdAt,
+        meta: {
+          after: { status: "resolved", resolutionNotes: "Brakes replaced" },
+        },
+      },
+      {
+        id: "reopen",
+        type: "PROBLEM_REOPENED",
+        user: row.assignee,
+        createdAt: row.createdAt,
+        meta: { note: "Noise returned", after: { status: "open" } },
+      },
+    ]);
+    db.auditEvent.count.mockResolvedValue(2);
+    const result = await service.activity("mechanic", "problem", {
+      kind: "comments",
+      page: 1,
+      pageSize: 25,
+    });
+    expect(result.items.map(({ note }) => note)).toEqual([
+      "Brakes replaced",
+      "Noise returned",
+    ]);
+    expect(
+      result.items.every(({ actor }) => actor?.id === row.assignee?.id),
+    ).toBe(true);
+  });
   it("keeps the previous resolution, assignee and hold when reopening", async () => {
     access.getSnapshot.mockResolvedValue({ ...snapshot, isSuperAdmin: true });
     db.scooterProblem.findFirst.mockResolvedValue({
@@ -725,7 +814,17 @@ describe("ProblemsService authorization and write conflicts", () => {
       resolutionNotes: "Belt replaced",
       blocksUsage: true,
     });
-    await service.reopen("manager", "problem", 1);
+    await service.reopen("manager", "problem", {
+      revision: 1,
+      message: "Noise returned",
+    });
+    expect(audit.recordRequired).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        type: "PROBLEM_REOPENED",
+        meta: expect.objectContaining({ note: "Noise returned" }) as unknown,
+      }),
+    );
     expect(db.scooterProblem.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: { status: "open", resolvedAt: null, revision: { increment: 1 } },
@@ -744,7 +843,89 @@ describe("ProblemsService authorization and write conflicts", () => {
     expect(audit.recordRequired).not.toHaveBeenCalled();
   });
 
+  it.each(["comments", "activity"] as const)(
+    "filters %s before counting and paginating",
+    async (kind) => {
+      access.getSnapshot.mockResolvedValue({ ...snapshot, isAdmin: true });
+      db.$transaction.mockImplementation((queries: Promise<unknown>[]) =>
+        Promise.all(queries),
+      );
+      db.auditEvent.findMany.mockResolvedValue([]);
+      db.auditEvent.count.mockResolvedValue(0);
+      await service.activity("mechanic", "problem", {
+        kind,
+        page: 2,
+        pageSize: 10,
+      });
+      const expected = v1.problems.problemActivityTypeSchema.options.filter(
+        (type) =>
+          kind === "comments"
+            ? (
+                v1.problems.problemConversationTypes as readonly string[]
+              ).includes(type)
+            : type !== "PROBLEM_COMMENTED",
+      );
+      expect(db.auditEvent.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ type: { in: expected } }) as unknown,
+          skip: 10,
+          take: 10,
+        }),
+      );
+      expect(db.auditEvent.count).toHaveBeenCalledWith({
+        where: expect.objectContaining({ type: { in: expected } }) as unknown,
+      });
+    },
+  );
+
+  it.each([{ isSuperAdmin: true }, { isAdmin: true }])(
+    "allows administrative activity access %j",
+    async (admin) => {
+      access.getSnapshot.mockResolvedValue({ ...snapshot, ...admin });
+      db.$transaction.mockImplementation((queries: Promise<unknown>[]) =>
+        Promise.all(queries),
+      );
+      db.auditEvent.findMany.mockResolvedValue([]);
+      db.auditEvent.count.mockResolvedValue(0);
+      await expect(
+        service.activity("mechanic", "problem", {
+          kind: "activity",
+          page: 1,
+          pageSize: 25,
+        }),
+      ).resolves.toMatchObject({ total: 0 });
+    },
+  );
+  it("limits legacy unfiltered history to comments for non-admins", async () => {
+    db.$transaction.mockImplementation((queries: Promise<unknown>[]) =>
+      Promise.all(queries),
+    );
+    db.auditEvent.findMany.mockResolvedValue([]);
+    db.auditEvent.count.mockResolvedValue(0);
+    await service.activity("mechanic", "problem", { page: 1, pageSize: 25 });
+    expect(db.auditEvent.count).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        type: {
+          in: expect.arrayContaining([
+            ...v1.problems.problemConversationTypes,
+          ]) as unknown,
+        },
+      }) as unknown,
+    });
+  });
+  it("denies explicit activity to non-admins", async () => {
+    await expect(
+      service.activity("mechanic", "problem", {
+        kind: "activity",
+        page: 1,
+        pageSize: 25,
+      }),
+    ).rejects.toThrow(ForbiddenException);
+    expect(db.auditEvent.findMany).not.toHaveBeenCalled();
+  });
+
   it("only returns allowlisted history and preserves resolution notes", async () => {
+    access.getSnapshot.mockResolvedValue({ ...snapshot, isAdmin: true });
     db.$transaction.mockImplementation((queries: Promise<unknown>[]) =>
       Promise.all(queries),
     );

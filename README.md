@@ -130,6 +130,31 @@ Non-production OTP codes are always `000000`.
 
 For a longer setup guide, see [docs/developer-guide.md](docs/developer-guide.md).
 
+## Before pushing
+
+Use Node 24.17.0 and the pinned pnpm version, then run:
+
+```bash
+pnpm install --frozen-lockfile
+# Start only the disposable test PostgreSQL server (not the application DB).
+docker compose --profile test up -d postgres-test
+# Configure apps/api/.env.test as described in the API E2E environment guide.
+pnpm verify
+```
+
+`pnpm verify` is also the GitHub CI command. It runs lint, typechecking, all unit
+tests, the production web build, and database E2E tests in that order. It forces
+fresh lint/type/unit execution, prints the source commit and runtime, and stops
+at the first failing stage. E2E tests require the dedicated test databases from
+[the API test environment guide](apps/api/README.md#e2e-environment). A passing
+`pnpm test` alone does not verify the production build or database E2E tests.
+
+Pull requests run on GitHub's temporary merge commit, which can differ from the
+branch tip. Compare that commit in the CI log when investigating discrepancies.
+Heroku's deployed source is separate again: `heroku releases --app <app-name>`
+shows the deployed commit in its `Deploy` entry. A successful local check does
+not update that release.
+
 ## Common Commands
 
 | Command                         | Purpose                                                                                                         |
@@ -138,6 +163,7 @@ For a longer setup guide, see [docs/developer-guide.md](docs/developer-guide.md)
 | `pnpm build`                    | Build the workspace.                                                                                            |
 | `pnpm lint`                     | Run ESLint.                                                                                                     |
 | `pnpm check-types`              | Run TypeScript checks.                                                                                          |
+| `pnpm verify`                   | Run the same complete verification pipeline as GitHub CI before pushing.                                        |
 | `pnpm test`                     | Run unit tests.                                                                                                 |
 | `pnpm test:e2e`                 | Prepare test databases and run API E2E tests; see [test environment setup](apps/api/README.md#e2e-environment). |
 | `pnpm init:local`               | Configure the local project name, env files, Docker Postgres, DB, seed, and shared builds after clone.          |

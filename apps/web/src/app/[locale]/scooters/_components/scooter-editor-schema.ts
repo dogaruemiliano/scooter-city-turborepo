@@ -110,6 +110,7 @@ export const REGISTRATION_FIELDS = [
   "requiredLicenseCategory",
 ] as const;
 export const EDITOR_FIELDS = [
+  "civAvailability",
   "civNumber",
   "civVersion",
   "civIssuedAt",
@@ -235,11 +236,23 @@ export function scooterEditorDefaults(
     ]),
   ) as Record<ScooterEditorField, string>;
   values.fleetNumber = scooter ? String(scooter.fleetNumber) : null;
+  const existingCivEvidence =
+    v1.scooters.hasScooterCivEvidence(scooter ?? {}) ||
+    scooter?.documents?.some(
+      (document) =>
+        document.type === "civ" ||
+        document.extractedData?.documents?.some(
+          (child) => child.documentType === "civ",
+        ),
+    );
+  values.civAvailability = existingCivEvidence
+    ? "issued"
+    : (scooter?.civAvailability ?? "unknown");
   values.civVersion = scooter?.civVersion ?? "unknown";
   values.powertrainType = scooter ? scooter.powertrainType : "combustion";
   if (!scooter) values.vehicleCategory = "L1e";
   values.registrationType = scooter?.registrationType ?? "";
-  values.requiredLicenseCategory = scooter?.requiredLicenseCategory ?? "";
+  values.requiredLicenseCategory = scooter?.requiredLicenseCategory ?? "none";
   values.insurancePolicies =
     scooter?.insurancePolicies?.map(insuranceEditorDefaults) ?? [];
   return values;
@@ -279,6 +292,7 @@ function convertValues(values: Partial<ScooterEditorValues>) {
                     : isNumericField(field)
                       ? v1.vehicleCiv.parseCivNumber(value)
                       : [
+                            "civAvailability",
                             "civVersion",
                             "vin",
                             "brandId",

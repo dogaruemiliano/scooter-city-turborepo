@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLayout } from "@repo/ui/components/page-layout";
+
 import type { MouseEvent, ReactNode } from "react";
 import { Users, ShieldCheck } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -25,7 +27,7 @@ export function AccessWorkspace({
 }) {
   const t = useTranslations("workspace.access.member");
   return (
-    <main className="access-workspace flex min-h-full min-w-0 flex-1 flex-col gap-6 bg-background p-4 font-body text-foreground md:p-8">
+    <PageLayout className="access-workspace min-h-full bg-background font-body text-foreground">
       <PageTitleOverride
         title={
           headerTitle ??
@@ -64,6 +66,6 @@ export function AccessWorkspace({
         </>
       ) : null}
       {children}
-    </main>
+    </PageLayout>
   );
 }

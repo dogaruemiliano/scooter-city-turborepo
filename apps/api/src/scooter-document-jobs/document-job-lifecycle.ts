@@ -3,6 +3,10 @@ import { Prisma } from "../generated/prisma/client";
 import { createHash } from "node:crypto";
 
 export const JOB_LIFETIME_MS = 5 * 60_000;
+export const MAX_GLOBAL_PENDING_JOBS = 2000;
+export const MAX_USER_PENDING_JOBS = 400;
+export const MAX_GLOBAL_PROCESSING_JOBS = 20;
+export const MAX_USER_PROCESSING_JOBS = MAX_GLOBAL_PROCESSING_JOBS;
 export const SESSION_LIFETIME_MS = 24 * 60 * 60_000;
 export const WORKER_LEASE_MS = 90_000;
 export const UPLOAD_WRITE_GRACE_MS = 60 * 60_000;
@@ -54,7 +58,7 @@ export async function saveEditorSession(
   await requireOpenEditorSession(tx, sessionId, userId);
   await tx.scooterDocumentEditorSession.update({
     where: { id: sessionId },
-    data: { status: "saved", scooterId, saveFingerprint },
+    data: { status: "saved", scooterId, saveFingerprint, editorState: {} },
   });
 }
 

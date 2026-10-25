@@ -14,6 +14,7 @@ export const rentalSchema = z.object({
   scooter: maintenanceScooterSchema,
   person: z.object({
     id: z.string(),
+    avatarAssetId: z.string().nullable().optional(),
     firstName: z.string(),
     lastName: z.string(),
   }),

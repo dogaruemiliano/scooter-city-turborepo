@@ -4579,6 +4579,14 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "version",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -5652,6 +5660,954 @@
         "summary": "Complete an OAuth sign-in by proving ownership of an email the provider did not mark as verified.",
         "tags": ["auth"]
       }
+    },
+    "/v1/auth/me/avatar": {
+      "post": {
+        "operationId": "CoreAuthController_uploadAvatar_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["file"],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionUser_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Replace the current user's profile picture",
+        "tags": ["auth"]
+      },
+      "delete": {
+        "operationId": "CoreAuthController_removeAvatar_v1",
+        "parameters": [],
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionUser_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Remove the current user's profile picture",
+        "tags": ["auth"]
+      }
+    },
+    "/v1/auth/avatars/{assetId}": {
+      "get": {
+        "operationId": "CoreAuthController_avatarContent_v1",
+        "parameters": [
+          {
+            "name": "assetId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Read an attached user avatar (authentication required)",
+        "tags": ["auth"]
+      }
+    },
+    "/v1/persons/{id}/avatar": {
+      "post": {
+        "operationId": "PersonsController_uploadAvatar_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["file"],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Person_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Update the linked user's profile picture",
+        "tags": ["persons"]
+      },
+      "delete": {
+        "operationId": "PersonsController_removeAvatar_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Person_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Remove the linked user's profile picture",
+        "tags": ["persons"]
+      }
+    },
+    "/v1/scooters/import-drafts": {
+      "post": {
+        "operationId": "ScooterDocumentJobsController_createImportDraft_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateScooterImportDraft"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScooterImportDraft_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["scooters"]
+      },
+      "get": {
+        "operationId": "ScooterDocumentJobsController_listImportDrafts_v1",
+        "parameters": [],
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScooterImportDraftList_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["scooters"]
+      }
+    },
+    "/v1/scooters/import-drafts/{id}": {
+      "get": {
+        "operationId": "ScooterDocumentJobsController_getImportDraft_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScooterImportDraft_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["scooters"]
+      },
+      "patch": {
+        "operationId": "ScooterDocumentJobsController_updateImportDraft_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateScooterImportDraft"
+              }
+            }
+          }
+        },
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScooterImportDraft_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["scooters"]
+      }
+    },
+    "/v1/scooters/import-drafts/{id}/discard": {
+      "post": {
+        "operationId": "ScooterDocumentJobsController_discardImportDraft_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscardScooterDocumentEditorSession_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["scooters"]
+      }
+    },
+    "/v1/scooters/import-drafts/{id}/document-content": {
+      "post": {
+        "operationId": "ScooterDocumentJobsController_importDraftDocumentContent_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportDraftDocumentContent"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["scooters"]
+      }
+    },
+    "/v1/scooters/import-drafts/{id}/photo-content": {
+      "post": {
+        "operationId": "ScooterDocumentJobsController_importDraftPhotoContent_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportDraftPhotoContent"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["scooters"]
+      }
+    },
+    "/v1/scooters/{id}/itp": {
+      "get": {
+        "operationId": "ScooterItpController_list_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScooterItpList_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["scooters"]
+      },
+      "post": {
+        "operationId": "ScooterItpController_create_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScooterItpInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScooterItpInspection_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["scooters"]
+      }
+    },
+    "/v1/scooters/next-fleet-number": {
+      "get": {
+        "operationId": "ScootersController_nextFleetNumber_v1",
+        "parameters": [],
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NextScooterFleetNumber_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Preview the next automatic fleet number; does not reserve it",
+        "tags": ["scooters"]
+      }
+    },
+    "/v1/scooters/{id}/photos": {
+      "get": {
+        "operationId": "ScooterPhotosController_list_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Photo_Output"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["scooters"]
+      },
+      "post": {
+        "operationId": "ScooterPhotosController_attach_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttachPhoto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Photo_Output"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["scooters"]
+      }
+    },
+    "/v1/scooters/{id}/photos/upload-url": {
+      "post": {
+        "operationId": "ScooterPhotosController_createUpload_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUpload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Upload_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["scooters"]
+      }
+    },
+    "/v1/scooters/{id}/photos/reorder": {
+      "patch": {
+        "operationId": "ScooterPhotosController_reorder_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReorderPhotos"
+              }
+            }
+          }
+        },
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Photo_Output"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["scooters"]
+      }
+    },
+    "/v1/scooters/{id}/photos/{photoId}": {
+      "patch": {
+        "operationId": "ScooterPhotosController_update_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "photoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePhoto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Photo_Output"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["scooters"]
+      },
+      "delete": {
+        "operationId": "ScooterPhotosController_remove_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "photoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Photo_Output"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["scooters"]
+      }
+    },
+    "/v1/scooters/{id}/photos/{photoId}/content": {
+      "get": {
+        "operationId": "ScooterPhotosController_content_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "photoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["scooters"]
+      }
+    },
+    "/v1/scooters/photo-draft-upload-url": {
+      "post": {
+        "operationId": "ScooterPhotoDraftsController_createUpload_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUpload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Upload_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["scooters"]
+      }
+    },
+    "/v1/scooters/import-drafts/{id}/merge": {
+      "post": {
+        "operationId": "ScooterDocumentJobsController_mergeImportDraft_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MergeScooterImportDraft"
+              }
+            }
+          }
+        },
+        "responses": {
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScooterImportDraft_Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "access_token": []
+          }
+        ],
+        "tags": ["scooters"]
+      }
     }
   },
   "info": {
@@ -6234,6 +7190,10 @@
             ],
             "additionalProperties": false,
             "nullable": true
+          },
+          "avatarAssetId": {
+            "type": "string",
+            "nullable": true
           }
         },
         "required": [
@@ -6695,6 +7655,10 @@
                   "nullable": true
                 },
                 "lastName": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "avatarAssetId": {
                   "type": "string",
                   "nullable": true
                 }
@@ -10757,6 +11721,10 @@
           "deletedAt": {
             "type": "string",
             "nullable": true
+          },
+          "avatarAssetId": {
+            "type": "string",
+            "nullable": true
           }
         },
         "required": [
@@ -11484,6 +12452,11 @@
                       "civ",
                       "registration_certificate",
                       "insurance",
+                      "foreign_registration",
+                      "export_certificate",
+                      "itp_card",
+                      "itp_certificate",
+                      "ownership_proof",
                       "unclassified"
                     ]
                   },
@@ -11542,6 +12515,11 @@
               "civ",
               "registration_certificate",
               "insurance",
+              "foreign_registration",
+              "export_certificate",
+              "itp_card",
+              "itp_certificate",
+              "ownership_proof",
               "unclassified"
             ]
           },
@@ -11613,6 +12591,10 @@
           "extractedData": {
             "type": "object",
             "properties": {
+              "clientCopy": {
+                "type": "boolean",
+                "enum": [true]
+              },
               "vin": {
                 "type": "string",
                 "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
@@ -11641,6 +12623,222 @@
                   "nullable": true
                 }
               },
+              "documents": {
+                "maxItems": 20,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 120
+                    },
+                    "documentType": {
+                      "type": "string",
+                      "enum": [
+                        "import_document",
+                        "civ",
+                        "registration_certificate",
+                        "insurance",
+                        "foreign_registration",
+                        "export_certificate",
+                        "itp_card",
+                        "itp_certificate",
+                        "ownership_proof"
+                      ]
+                    },
+                    "pages": {
+                      "minItems": 1,
+                      "maxItems": 10,
+                      "type": "array",
+                      "items": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 10
+                      }
+                    },
+                    "regions": {
+                      "maxItems": 40,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "page": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 10
+                          },
+                          "x": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                          },
+                          "y": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                          },
+                          "width": {
+                            "type": "number",
+                            "exclusiveMinimum": true,
+                            "maximum": 1,
+                            "minimum": 0
+                          },
+                          "height": {
+                            "type": "number",
+                            "exclusiveMinimum": true,
+                            "maximum": 1,
+                            "minimum": 0
+                          }
+                        },
+                        "required": ["page", "x", "y", "width", "height"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "vin": {
+                      "type": "string",
+                      "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
+                      "nullable": true
+                    },
+                    "vinReview": {
+                      "type": "object",
+                      "properties": {
+                        "method": {
+                          "type": "string",
+                          "enum": ["manual"]
+                        },
+                        "originalVin": {
+                          "type": "string",
+                          "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
+                          "nullable": true
+                        }
+                      },
+                      "required": ["method", "originalVin"],
+                      "additionalProperties": false
+                    },
+                    "fields": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "maxLength": 2000
+                          },
+                          {
+                            "type": "number"
+                          }
+                        ],
+                        "nullable": true
+                      }
+                    },
+                    "rawFields": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string",
+                        "maxLength": 2000,
+                        "nullable": true
+                      }
+                    },
+                    "issues": {
+                      "maxItems": 500,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "field": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 120
+                          },
+                          "code": {
+                            "type": "string",
+                            "enum": [
+                              "unreadable",
+                              "invalidValue",
+                              "conflictingValues",
+                              "typeMismatch",
+                              "noData"
+                            ]
+                          }
+                        },
+                        "required": ["field", "code"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "inspections": {
+                      "maxItems": 50,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "inspectionDate": {
+                            "type": "string",
+                            "format": "date",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+                            "nullable": true
+                          },
+                          "validUntil": {
+                            "type": "string",
+                            "format": "date",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+                            "nullable": true
+                          },
+                          "result": {
+                            "type": "string",
+                            "enum": ["passed", "failed", "unknown", null],
+                            "nullable": true
+                          },
+                          "certificateNumber": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 120,
+                            "nullable": true
+                          },
+                          "odometerKm": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 2147483647,
+                            "nullable": true
+                          },
+                          "rawFields": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "string",
+                              "maxLength": 2000,
+                              "nullable": true
+                            }
+                          }
+                        },
+                        "required": [
+                          "inspectionDate",
+                          "validUntil",
+                          "result",
+                          "certificateNumber",
+                          "odometerKm",
+                          "rawFields"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "documentType",
+                    "pages",
+                    "vin",
+                    "fields",
+                    "rawFields"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "currentInsuranceDocumentId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120,
+                "nullable": true
+              },
               "vinReview": {
                 "type": "object",
                 "properties": {
@@ -11668,7 +12866,12 @@
               "import_document",
               "civ",
               "registration_certificate",
-              "insurance"
+              "insurance",
+              "foreign_registration",
+              "export_certificate",
+              "itp_card",
+              "itp_certificate",
+              "ownership_proof"
             ]
           },
           "fileName": {
@@ -11686,6 +12889,32 @@
           },
           "contentUrl": {
             "type": "string"
+          },
+          "clientCopy": {
+            "type": "object",
+            "properties": {
+              "fileName": {
+                "type": "string"
+              },
+              "contentType": {
+                "type": "string",
+                "enum": [
+                  "application/pdf",
+                  "image/jpeg",
+                  "image/png",
+                  "image/webp"
+                ]
+              },
+              "byteSize": {
+                "type": "number"
+              },
+              "contentUrl": {
+                "type": "string"
+              }
+            },
+            "required": ["fileName", "contentType", "byteSize", "contentUrl"],
+            "additionalProperties": false,
+            "nullable": true
           }
         },
         "required": [
@@ -11708,6 +12937,53 @@
       "CreateScooterInput": {
         "type": "object",
         "properties": {
+          "fleetNumber": {
+            "type": "integer",
+            "exclusiveMinimum": true,
+            "maximum": 2147483647,
+            "minimum": 0
+          },
+          "civAvailability": {
+            "type": "string",
+            "enum": ["unknown", "not_issued", "issued"]
+          },
+          "photoDrafts": {
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "uploadToken": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "fileName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 255
+                },
+                "caption": {
+                  "type": "string",
+                  "maxLength": 500,
+                  "nullable": true
+                },
+                "isPublic": {
+                  "type": "boolean"
+                },
+                "type": {
+                  "type": "string",
+                  "enum": ["GALLERY", "GALLERY_COVER"]
+                }
+              },
+              "required": [
+                "uploadToken",
+                "fileName",
+                "caption",
+                "isPublic",
+                "type"
+              ]
+            }
+          },
           "sessionId": {
             "type": "string",
             "minLength": 1,
@@ -11788,6 +13064,39 @@
             "items": {
               "type": "object",
               "properties": {
+                "clientCopy": {
+                  "type": "object",
+                  "properties": {
+                    "fileName": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 255,
+                      "pattern": "^[^\\x00-\\x1f\\x7f/\\\\]+$"
+                    },
+                    "uploadToken": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 8192
+                    },
+                    "uploadType": {
+                      "type": "string",
+                      "enum": [
+                        "import_document",
+                        "civ",
+                        "registration_certificate",
+                        "insurance",
+                        "foreign_registration",
+                        "export_certificate",
+                        "itp_card",
+                        "itp_certificate",
+                        "ownership_proof",
+                        "unclassified"
+                      ]
+                    }
+                  },
+                  "required": ["fileName", "uploadToken", "uploadType"],
+                  "additionalProperties": false
+                },
                 "insurancePolicyId": {
                   "type": "string",
                   "minLength": 1,
@@ -11796,6 +13105,10 @@
                 "extractedData": {
                   "type": "object",
                   "properties": {
+                    "clientCopy": {
+                      "type": "boolean",
+                      "enum": [true]
+                    },
                     "vin": {
                       "type": "string",
                       "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
@@ -11824,6 +13137,222 @@
                         "nullable": true
                       }
                     },
+                    "documents": {
+                      "maxItems": 20,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 120
+                          },
+                          "documentType": {
+                            "type": "string",
+                            "enum": [
+                              "import_document",
+                              "civ",
+                              "registration_certificate",
+                              "insurance",
+                              "foreign_registration",
+                              "export_certificate",
+                              "itp_card",
+                              "itp_certificate",
+                              "ownership_proof"
+                            ]
+                          },
+                          "pages": {
+                            "minItems": 1,
+                            "maxItems": 10,
+                            "type": "array",
+                            "items": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 10
+                            }
+                          },
+                          "regions": {
+                            "maxItems": 40,
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "page": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 10
+                                },
+                                "x": {
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 1
+                                },
+                                "y": {
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 1
+                                },
+                                "width": {
+                                  "type": "number",
+                                  "exclusiveMinimum": true,
+                                  "maximum": 1,
+                                  "minimum": 0
+                                },
+                                "height": {
+                                  "type": "number",
+                                  "exclusiveMinimum": true,
+                                  "maximum": 1,
+                                  "minimum": 0
+                                }
+                              },
+                              "required": ["page", "x", "y", "width", "height"],
+                              "additionalProperties": false
+                            }
+                          },
+                          "vin": {
+                            "type": "string",
+                            "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
+                            "nullable": true
+                          },
+                          "vinReview": {
+                            "type": "object",
+                            "properties": {
+                              "method": {
+                                "type": "string",
+                                "enum": ["manual"]
+                              },
+                              "originalVin": {
+                                "type": "string",
+                                "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
+                                "nullable": true
+                              }
+                            },
+                            "required": ["method", "originalVin"],
+                            "additionalProperties": false
+                          },
+                          "fields": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "maxLength": 2000
+                                },
+                                {
+                                  "type": "number"
+                                }
+                              ],
+                              "nullable": true
+                            }
+                          },
+                          "rawFields": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "string",
+                              "maxLength": 2000,
+                              "nullable": true
+                            }
+                          },
+                          "issues": {
+                            "maxItems": 500,
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "field": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 120
+                                },
+                                "code": {
+                                  "type": "string",
+                                  "enum": [
+                                    "unreadable",
+                                    "invalidValue",
+                                    "conflictingValues",
+                                    "typeMismatch",
+                                    "noData"
+                                  ]
+                                }
+                              },
+                              "required": ["field", "code"],
+                              "additionalProperties": false
+                            }
+                          },
+                          "inspections": {
+                            "maxItems": 50,
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "inspectionDate": {
+                                  "type": "string",
+                                  "format": "date",
+                                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+                                  "nullable": true
+                                },
+                                "validUntil": {
+                                  "type": "string",
+                                  "format": "date",
+                                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+                                  "nullable": true
+                                },
+                                "result": {
+                                  "type": "string",
+                                  "enum": ["passed", "failed", "unknown", null],
+                                  "nullable": true
+                                },
+                                "certificateNumber": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 120,
+                                  "nullable": true
+                                },
+                                "odometerKm": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 2147483647,
+                                  "nullable": true
+                                },
+                                "rawFields": {
+                                  "type": "object",
+                                  "additionalProperties": {
+                                    "type": "string",
+                                    "maxLength": 2000,
+                                    "nullable": true
+                                  }
+                                }
+                              },
+                              "required": [
+                                "inspectionDate",
+                                "validUntil",
+                                "result",
+                                "certificateNumber",
+                                "odometerKm",
+                                "rawFields"
+                              ],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "documentType",
+                          "pages",
+                          "vin",
+                          "fields",
+                          "rawFields"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "currentInsuranceDocumentId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 120,
+                      "nullable": true
+                    },
                     "vinReview": {
                       "type": "object",
                       "properties": {
@@ -11851,7 +13380,12 @@
                     "import_document",
                     "civ",
                     "registration_certificate",
-                    "insurance"
+                    "insurance",
+                    "foreign_registration",
+                    "export_certificate",
+                    "itp_card",
+                    "itp_certificate",
+                    "ownership_proof"
                   ]
                 },
                 "fileName": {
@@ -12270,12 +13804,17 @@
           "manufactureYear": {
             "type": "integer",
             "minimum": 1800,
-            "maximum": 2027,
+            "maximum": 2026,
             "nullable": true
           },
           "powertrainType": {
             "type": "string",
             "enum": ["electric", "combustion", "hybrid", "unpowered"]
+          },
+          "fuelSystem": {
+            "type": "string",
+            "enum": ["injection", "carburetor", null],
+            "nullable": true
           },
           "engineCode": {
             "type": "string",
@@ -12355,6 +13894,43 @@
       "Scooter_Output": {
         "type": "object",
         "properties": {
+          "coverUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "problemDifficultyCounts": {
+            "description": "Counts of open or in-progress problems and any remaining usage blockers, grouped by difficulty.",
+            "type": "object",
+            "properties": {
+              "easy": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "medium": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "hard": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "unknown": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": ["easy", "medium", "hard", "unknown"],
+            "additionalProperties": false
+          },
+          "maintenanceHoldCount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
           "documents": {
             "$ref": "#/components/schemas/ScooterDocumentList_Output"
           },
@@ -12439,6 +14015,10 @@
             "type": "string",
             "enum": ["expired", "upcoming", "review", null],
             "nullable": true
+          },
+          "rentalInsuranceStatus": {
+            "type": "string",
+            "enum": ["missing", "active", "expired", "upcoming", "review"]
           },
           "civVersion": {
             "type": "string",
@@ -12855,6 +14435,11 @@
             "type": "string",
             "enum": ["electric", "combustion", "hybrid", "unpowered"]
           },
+          "fuelSystem": {
+            "type": "string",
+            "enum": ["injection", "carburetor", null],
+            "nullable": true
+          },
           "engineCode": {
             "type": "string",
             "nullable": true
@@ -12874,12 +14459,32 @@
             "type": "string",
             "enum": ["unregistered", "national", "local", "temporary"]
           },
+          "civAvailability": {
+            "type": "string",
+            "enum": ["unknown", "not_issued", "issued"]
+          },
           "registrationNumber": {
             "type": "string",
             "nullable": true
           },
           "registrationDate": {
             "type": "string",
+            "nullable": true
+          },
+          "itpStatus": {
+            "type": "string",
+            "enum": [
+              "missing",
+              "review",
+              "active",
+              "expiring",
+              "expired",
+              "failed"
+            ]
+          },
+          "itpValidUntil": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
             "nullable": true
           },
           "temporaryRegistrationExpiresAt": {
@@ -12996,6 +14601,16 @@
       "UpdateScooterInput": {
         "type": "object",
         "properties": {
+          "fleetNumber": {
+            "type": "integer",
+            "exclusiveMinimum": true,
+            "maximum": 2147483647,
+            "minimum": 0
+          },
+          "civAvailability": {
+            "type": "string",
+            "enum": ["unknown", "not_issued", "issued"]
+          },
           "sessionId": {
             "type": "string",
             "minLength": 1,
@@ -13076,6 +14691,39 @@
             "items": {
               "type": "object",
               "properties": {
+                "clientCopy": {
+                  "type": "object",
+                  "properties": {
+                    "fileName": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 255,
+                      "pattern": "^[^\\x00-\\x1f\\x7f/\\\\]+$"
+                    },
+                    "uploadToken": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 8192
+                    },
+                    "uploadType": {
+                      "type": "string",
+                      "enum": [
+                        "import_document",
+                        "civ",
+                        "registration_certificate",
+                        "insurance",
+                        "foreign_registration",
+                        "export_certificate",
+                        "itp_card",
+                        "itp_certificate",
+                        "ownership_proof",
+                        "unclassified"
+                      ]
+                    }
+                  },
+                  "required": ["fileName", "uploadToken", "uploadType"],
+                  "additionalProperties": false
+                },
                 "insurancePolicyId": {
                   "type": "string",
                   "minLength": 1,
@@ -13084,6 +14732,10 @@
                 "extractedData": {
                   "type": "object",
                   "properties": {
+                    "clientCopy": {
+                      "type": "boolean",
+                      "enum": [true]
+                    },
                     "vin": {
                       "type": "string",
                       "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
@@ -13112,6 +14764,222 @@
                         "nullable": true
                       }
                     },
+                    "documents": {
+                      "maxItems": 20,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 120
+                          },
+                          "documentType": {
+                            "type": "string",
+                            "enum": [
+                              "import_document",
+                              "civ",
+                              "registration_certificate",
+                              "insurance",
+                              "foreign_registration",
+                              "export_certificate",
+                              "itp_card",
+                              "itp_certificate",
+                              "ownership_proof"
+                            ]
+                          },
+                          "pages": {
+                            "minItems": 1,
+                            "maxItems": 10,
+                            "type": "array",
+                            "items": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 10
+                            }
+                          },
+                          "regions": {
+                            "maxItems": 40,
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "page": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 10
+                                },
+                                "x": {
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 1
+                                },
+                                "y": {
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 1
+                                },
+                                "width": {
+                                  "type": "number",
+                                  "exclusiveMinimum": true,
+                                  "maximum": 1,
+                                  "minimum": 0
+                                },
+                                "height": {
+                                  "type": "number",
+                                  "exclusiveMinimum": true,
+                                  "maximum": 1,
+                                  "minimum": 0
+                                }
+                              },
+                              "required": ["page", "x", "y", "width", "height"],
+                              "additionalProperties": false
+                            }
+                          },
+                          "vin": {
+                            "type": "string",
+                            "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
+                            "nullable": true
+                          },
+                          "vinReview": {
+                            "type": "object",
+                            "properties": {
+                              "method": {
+                                "type": "string",
+                                "enum": ["manual"]
+                              },
+                              "originalVin": {
+                                "type": "string",
+                                "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
+                                "nullable": true
+                              }
+                            },
+                            "required": ["method", "originalVin"],
+                            "additionalProperties": false
+                          },
+                          "fields": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "maxLength": 2000
+                                },
+                                {
+                                  "type": "number"
+                                }
+                              ],
+                              "nullable": true
+                            }
+                          },
+                          "rawFields": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "string",
+                              "maxLength": 2000,
+                              "nullable": true
+                            }
+                          },
+                          "issues": {
+                            "maxItems": 500,
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "field": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 120
+                                },
+                                "code": {
+                                  "type": "string",
+                                  "enum": [
+                                    "unreadable",
+                                    "invalidValue",
+                                    "conflictingValues",
+                                    "typeMismatch",
+                                    "noData"
+                                  ]
+                                }
+                              },
+                              "required": ["field", "code"],
+                              "additionalProperties": false
+                            }
+                          },
+                          "inspections": {
+                            "maxItems": 50,
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "inspectionDate": {
+                                  "type": "string",
+                                  "format": "date",
+                                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+                                  "nullable": true
+                                },
+                                "validUntil": {
+                                  "type": "string",
+                                  "format": "date",
+                                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+                                  "nullable": true
+                                },
+                                "result": {
+                                  "type": "string",
+                                  "enum": ["passed", "failed", "unknown", null],
+                                  "nullable": true
+                                },
+                                "certificateNumber": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 120,
+                                  "nullable": true
+                                },
+                                "odometerKm": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 2147483647,
+                                  "nullable": true
+                                },
+                                "rawFields": {
+                                  "type": "object",
+                                  "additionalProperties": {
+                                    "type": "string",
+                                    "maxLength": 2000,
+                                    "nullable": true
+                                  }
+                                }
+                              },
+                              "required": [
+                                "inspectionDate",
+                                "validUntil",
+                                "result",
+                                "certificateNumber",
+                                "odometerKm",
+                                "rawFields"
+                              ],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "documentType",
+                          "pages",
+                          "vin",
+                          "fields",
+                          "rawFields"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "currentInsuranceDocumentId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 120,
+                      "nullable": true
+                    },
                     "vinReview": {
                       "type": "object",
                       "properties": {
@@ -13139,7 +15007,12 @@
                     "import_document",
                     "civ",
                     "registration_certificate",
-                    "insurance"
+                    "insurance",
+                    "foreign_registration",
+                    "export_certificate",
+                    "itp_card",
+                    "itp_certificate",
+                    "ownership_proof"
                   ]
                 },
                 "fileName": {
@@ -13176,6 +15049,10 @@
                 "extractedData": {
                   "type": "object",
                   "properties": {
+                    "clientCopy": {
+                      "type": "boolean",
+                      "enum": [true]
+                    },
                     "vin": {
                       "type": "string",
                       "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
@@ -13203,6 +15080,222 @@
                         "maxLength": 2000,
                         "nullable": true
                       }
+                    },
+                    "documents": {
+                      "maxItems": 20,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 120
+                          },
+                          "documentType": {
+                            "type": "string",
+                            "enum": [
+                              "import_document",
+                              "civ",
+                              "registration_certificate",
+                              "insurance",
+                              "foreign_registration",
+                              "export_certificate",
+                              "itp_card",
+                              "itp_certificate",
+                              "ownership_proof"
+                            ]
+                          },
+                          "pages": {
+                            "minItems": 1,
+                            "maxItems": 10,
+                            "type": "array",
+                            "items": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 10
+                            }
+                          },
+                          "regions": {
+                            "maxItems": 40,
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "page": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 10
+                                },
+                                "x": {
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 1
+                                },
+                                "y": {
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 1
+                                },
+                                "width": {
+                                  "type": "number",
+                                  "exclusiveMinimum": true,
+                                  "maximum": 1,
+                                  "minimum": 0
+                                },
+                                "height": {
+                                  "type": "number",
+                                  "exclusiveMinimum": true,
+                                  "maximum": 1,
+                                  "minimum": 0
+                                }
+                              },
+                              "required": ["page", "x", "y", "width", "height"],
+                              "additionalProperties": false
+                            }
+                          },
+                          "vin": {
+                            "type": "string",
+                            "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
+                            "nullable": true
+                          },
+                          "vinReview": {
+                            "type": "object",
+                            "properties": {
+                              "method": {
+                                "type": "string",
+                                "enum": ["manual"]
+                              },
+                              "originalVin": {
+                                "type": "string",
+                                "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
+                                "nullable": true
+                              }
+                            },
+                            "required": ["method", "originalVin"],
+                            "additionalProperties": false
+                          },
+                          "fields": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "maxLength": 2000
+                                },
+                                {
+                                  "type": "number"
+                                }
+                              ],
+                              "nullable": true
+                            }
+                          },
+                          "rawFields": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "string",
+                              "maxLength": 2000,
+                              "nullable": true
+                            }
+                          },
+                          "issues": {
+                            "maxItems": 500,
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "field": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 120
+                                },
+                                "code": {
+                                  "type": "string",
+                                  "enum": [
+                                    "unreadable",
+                                    "invalidValue",
+                                    "conflictingValues",
+                                    "typeMismatch",
+                                    "noData"
+                                  ]
+                                }
+                              },
+                              "required": ["field", "code"],
+                              "additionalProperties": false
+                            }
+                          },
+                          "inspections": {
+                            "maxItems": 50,
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "inspectionDate": {
+                                  "type": "string",
+                                  "format": "date",
+                                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+                                  "nullable": true
+                                },
+                                "validUntil": {
+                                  "type": "string",
+                                  "format": "date",
+                                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+                                  "nullable": true
+                                },
+                                "result": {
+                                  "type": "string",
+                                  "enum": ["passed", "failed", "unknown", null],
+                                  "nullable": true
+                                },
+                                "certificateNumber": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 120,
+                                  "nullable": true
+                                },
+                                "odometerKm": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 2147483647,
+                                  "nullable": true
+                                },
+                                "rawFields": {
+                                  "type": "object",
+                                  "additionalProperties": {
+                                    "type": "string",
+                                    "maxLength": 2000,
+                                    "nullable": true
+                                  }
+                                }
+                              },
+                              "required": [
+                                "inspectionDate",
+                                "validUntil",
+                                "result",
+                                "certificateNumber",
+                                "odometerKm",
+                                "rawFields"
+                              ],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "documentType",
+                          "pages",
+                          "vin",
+                          "fields",
+                          "rawFields"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "currentInsuranceDocumentId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 120,
+                      "nullable": true
                     },
                     "vinReview": {
                       "type": "object",
@@ -13634,12 +15727,17 @@
           "manufactureYear": {
             "type": "integer",
             "minimum": 1800,
-            "maximum": 2027,
+            "maximum": 2026,
             "nullable": true
           },
           "powertrainType": {
             "type": "string",
             "enum": ["electric", "combustion", "hybrid", "unpowered"]
+          },
+          "fuelSystem": {
+            "type": "string",
+            "enum": ["injection", "carburetor", null],
+            "nullable": true
           },
           "engineCode": {
             "type": "string",
@@ -13767,6 +15865,11 @@
                       "civ",
                       "registration_certificate",
                       "insurance",
+                      "foreign_registration",
+                      "export_certificate",
+                      "itp_card",
+                      "itp_certificate",
+                      "ownership_proof",
                       "unclassified"
                     ]
                   },
@@ -13834,12 +15937,21 @@
               "import_document",
               "civ",
               "registration_certificate",
-              "insurance"
+              "insurance",
+              "foreign_registration",
+              "export_certificate",
+              "itp_card",
+              "itp_certificate",
+              "ownership_proof"
             ]
           },
           "extractedData": {
             "type": "object",
             "properties": {
+              "clientCopy": {
+                "type": "boolean",
+                "enum": [true]
+              },
               "vin": {
                 "type": "string",
                 "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
@@ -13868,6 +15980,222 @@
                   "nullable": true
                 }
               },
+              "documents": {
+                "maxItems": 20,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 120
+                    },
+                    "documentType": {
+                      "type": "string",
+                      "enum": [
+                        "import_document",
+                        "civ",
+                        "registration_certificate",
+                        "insurance",
+                        "foreign_registration",
+                        "export_certificate",
+                        "itp_card",
+                        "itp_certificate",
+                        "ownership_proof"
+                      ]
+                    },
+                    "pages": {
+                      "minItems": 1,
+                      "maxItems": 10,
+                      "type": "array",
+                      "items": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 10
+                      }
+                    },
+                    "regions": {
+                      "maxItems": 40,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "page": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 10
+                          },
+                          "x": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                          },
+                          "y": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                          },
+                          "width": {
+                            "type": "number",
+                            "exclusiveMinimum": true,
+                            "maximum": 1,
+                            "minimum": 0
+                          },
+                          "height": {
+                            "type": "number",
+                            "exclusiveMinimum": true,
+                            "maximum": 1,
+                            "minimum": 0
+                          }
+                        },
+                        "required": ["page", "x", "y", "width", "height"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "vin": {
+                      "type": "string",
+                      "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
+                      "nullable": true
+                    },
+                    "vinReview": {
+                      "type": "object",
+                      "properties": {
+                        "method": {
+                          "type": "string",
+                          "enum": ["manual"]
+                        },
+                        "originalVin": {
+                          "type": "string",
+                          "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
+                          "nullable": true
+                        }
+                      },
+                      "required": ["method", "originalVin"],
+                      "additionalProperties": false
+                    },
+                    "fields": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "maxLength": 2000
+                          },
+                          {
+                            "type": "number"
+                          }
+                        ],
+                        "nullable": true
+                      }
+                    },
+                    "rawFields": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string",
+                        "maxLength": 2000,
+                        "nullable": true
+                      }
+                    },
+                    "issues": {
+                      "maxItems": 500,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "field": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 120
+                          },
+                          "code": {
+                            "type": "string",
+                            "enum": [
+                              "unreadable",
+                              "invalidValue",
+                              "conflictingValues",
+                              "typeMismatch",
+                              "noData"
+                            ]
+                          }
+                        },
+                        "required": ["field", "code"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "inspections": {
+                      "maxItems": 50,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "inspectionDate": {
+                            "type": "string",
+                            "format": "date",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+                            "nullable": true
+                          },
+                          "validUntil": {
+                            "type": "string",
+                            "format": "date",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+                            "nullable": true
+                          },
+                          "result": {
+                            "type": "string",
+                            "enum": ["passed", "failed", "unknown", null],
+                            "nullable": true
+                          },
+                          "certificateNumber": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 120,
+                            "nullable": true
+                          },
+                          "odometerKm": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 2147483647,
+                            "nullable": true
+                          },
+                          "rawFields": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "string",
+                              "maxLength": 2000,
+                              "nullable": true
+                            }
+                          }
+                        },
+                        "required": [
+                          "inspectionDate",
+                          "validUntil",
+                          "result",
+                          "certificateNumber",
+                          "odometerKm",
+                          "rawFields"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "documentType",
+                    "pages",
+                    "vin",
+                    "fields",
+                    "rawFields"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "currentInsuranceDocumentId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120,
+                "nullable": true
+              },
               "vinReview": {
                 "type": "object",
                 "properties": {
@@ -13889,7 +16217,7 @@
             "additionalProperties": false
           },
           "issues": {
-            "maxItems": 200,
+            "maxItems": 1000,
             "type": "array",
             "items": {
               "type": "object",
@@ -13948,6 +16276,11 @@
               "civ",
               "registration_certificate",
               "insurance",
+              "foreign_registration",
+              "export_certificate",
+              "itp_card",
+              "itp_certificate",
+              "ownership_proof",
               "unclassified"
             ]
           },
@@ -14246,6 +16579,10 @@
               "required": ["id", "revision"],
               "additionalProperties": false
             }
+          },
+          "avatarAssetId": {
+            "type": "string",
+            "nullable": true
           }
         },
         "required": [
@@ -14420,6 +16757,553 @@
           }
         },
         "required": ["challengeId", "code"],
+        "additionalProperties": false
+      },
+      "CreateScooterImportDraft": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "ScooterImportDraft_Output": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "state": {
+            "$ref": "#/components/schemas/ScooterImportDraftState_Output"
+          }
+        },
+        "required": ["id", "expiresAt", "updatedAt", "revision", "state"],
+        "additionalProperties": false
+      },
+      "ScooterImportDraftState_Output": {
+        "type": "object",
+        "additionalProperties": {}
+      },
+      "ScooterImportDraftList_Output": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 20,
+            "items": {
+              "$ref": "#/components/schemas/ScooterImportDraft_Output"
+            }
+          }
+        },
+        "required": ["items"],
+        "additionalProperties": false
+      },
+      "UpdateScooterImportDraft": {
+        "type": "object",
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "state": {
+            "$ref": "#/components/schemas/UpdateScooterImportDraftScooterImportDraftState"
+          }
+        },
+        "required": ["revision", "state"],
+        "additionalProperties": false
+      },
+      "UpdateScooterImportDraftScooterImportDraftState": {
+        "type": "object",
+        "additionalProperties": {}
+      },
+      "ImportDraftDocumentContent": {
+        "type": "object",
+        "properties": {
+          "sourceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "source": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": ["draft"]
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "import_document",
+                      "civ",
+                      "registration_certificate",
+                      "insurance",
+                      "foreign_registration",
+                      "export_certificate",
+                      "itp_card",
+                      "itp_certificate",
+                      "ownership_proof",
+                      "unclassified"
+                    ]
+                  },
+                  "uploadType": {
+                    "type": "string",
+                    "enum": ["unclassified"]
+                  },
+                  "uploadToken": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 8192
+                  }
+                },
+                "required": ["kind", "type", "uploadToken"],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": ["saved"]
+                  },
+                  "scooterId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "documentId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  }
+                },
+                "required": ["kind", "scooterId", "documentId"],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "required": ["sourceId", "source"],
+        "additionalProperties": false
+      },
+      "ImportDraftPhotoContent": {
+        "type": "object",
+        "properties": {
+          "uploadToken": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 8192
+          }
+        },
+        "required": ["uploadToken"],
+        "additionalProperties": false
+      },
+      "ScooterItpList_Output": {
+        "type": "object",
+        "properties": {
+          "inspections": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120
+                },
+                "inspectionDate": {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                },
+                "validUntil": {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "nullable": true
+                },
+                "result": {
+                  "type": "string",
+                  "enum": ["passed", "failed", "unknown"]
+                },
+                "certificateNumber": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "odometerKm": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991,
+                  "nullable": true
+                },
+                "cardDocumentId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120
+                },
+                "certificateDocumentId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                }
+              },
+              "required": [
+                "id",
+                "inspectionDate",
+                "validUntil",
+                "result",
+                "certificateNumber",
+                "odometerKm",
+                "cardDocumentId",
+                "certificateDocumentId",
+                "createdAt",
+                "updatedAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "missing",
+              "review",
+              "active",
+              "expiring",
+              "expired",
+              "failed"
+            ]
+          },
+          "validUntil": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "nullable": true
+          },
+          "renewalRequired": {
+            "type": "boolean"
+          }
+        },
+        "required": ["inspections", "status", "validUntil", "renewalRequired"],
+        "additionalProperties": false
+      },
+      "ScooterItpInput": {
+        "type": "object",
+        "properties": {
+          "inspectionDate": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "validUntil": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "nullable": true
+          },
+          "result": {
+            "type": "string",
+            "enum": ["passed", "failed", "unknown"]
+          },
+          "certificateNumber": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "nullable": true
+          },
+          "odometerKm": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "cardDocumentId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "certificateDocumentId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "evidenceReviewed": {
+            "type": "boolean",
+            "enum": [true]
+          }
+        },
+        "required": [
+          "inspectionDate",
+          "validUntil",
+          "result",
+          "certificateNumber",
+          "odometerKm",
+          "cardDocumentId",
+          "certificateDocumentId",
+          "evidenceReviewed"
+        ],
+        "additionalProperties": false
+      },
+      "ScooterItpInspection_Output": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "inspectionDate": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "validUntil": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "nullable": true
+          },
+          "result": {
+            "type": "string",
+            "enum": ["passed", "failed", "unknown"]
+          },
+          "certificateNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "odometerKm": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "nullable": true
+          },
+          "cardDocumentId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "certificateDocumentId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          }
+        },
+        "required": [
+          "id",
+          "inspectionDate",
+          "validUntil",
+          "result",
+          "certificateNumber",
+          "odometerKm",
+          "cardDocumentId",
+          "certificateDocumentId",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "NextScooterFleetNumber_Output": {
+        "type": "object",
+        "properties": {
+          "fleetNumber": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 2147483647,
+            "nullable": true
+          }
+        },
+        "required": ["fleetNumber"],
+        "additionalProperties": false
+      },
+      "Photo_Output": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "caption": {
+            "type": "string",
+            "nullable": true
+          },
+          "isPublic": {
+            "type": "boolean"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["GALLERY", "GALLERY_COVER"]
+          },
+          "position": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "contentUrl": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "fileName",
+          "caption",
+          "isPublic",
+          "type",
+          "position",
+          "contentUrl",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      },
+      "AttachPhoto": {
+        "type": "object",
+        "properties": {
+          "uploadToken": {
+            "type": "string",
+            "minLength": 1
+          },
+          "fileName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          }
+        },
+        "required": ["uploadToken", "fileName"]
+      },
+      "CreateUpload": {
+        "type": "object",
+        "properties": {
+          "contentType": {
+            "type": "string",
+            "enum": ["image/jpeg", "image/png", "image/webp"]
+          },
+          "byteSize": {
+            "type": "integer",
+            "exclusiveMinimum": true,
+            "maximum": 15728640,
+            "minimum": 0
+          },
+          "checksumSha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": ["contentType", "byteSize", "checksumSha256"]
+      },
+      "Upload_Output": {
+        "type": "object",
+        "properties": {
+          "uploadUrl": {
+            "type": "string",
+            "format": "uri"
+          },
+          "uploadToken": {
+            "type": "string"
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "maxBytes": {
+            "type": "number"
+          }
+        },
+        "required": ["uploadUrl", "uploadToken", "headers", "maxBytes"],
+        "additionalProperties": false
+      },
+      "ReorderPhotos": {
+        "type": "object",
+        "properties": {
+          "photoIds": {
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "required": ["photoIds"]
+      },
+      "UpdatePhoto": {
+        "type": "object",
+        "properties": {
+          "caption": {
+            "type": "string",
+            "maxLength": 500,
+            "nullable": true
+          },
+          "isPublic": {
+            "type": "boolean"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["GALLERY_COVER"]
+          }
+        }
+      },
+      "MergeScooterImportDraftScooterImportDraftState": {
+        "type": "object",
+        "additionalProperties": {}
+      },
+      "MergeScooterImportDraft": {
+        "type": "object",
+        "properties": {
+          "sourceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "sourceRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "state": {
+            "$ref": "#/components/schemas/MergeScooterImportDraftScooterImportDraftState"
+          }
+        },
+        "required": ["sourceId", "sourceRevision", "revision", "state"],
         "additionalProperties": false
       }
     }

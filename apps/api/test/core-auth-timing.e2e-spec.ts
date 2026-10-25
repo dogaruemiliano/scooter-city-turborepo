@@ -27,6 +27,7 @@
 import { JwtModule } from "@nestjs/jwt";
 import type { INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
+import { LoggerModule } from "nestjs-pino";
 
 import { ConfigModule } from "../src/config/config.module";
 import { PrismaModule } from "../src/prisma/prisma.module";
@@ -67,6 +68,7 @@ describe("CoreAuthService timing channels (e2e)", () => {
     const moduleRef = await Test.createTestingModule({
       imports: [
         ConfigModule,
+        LoggerModule.forRoot({ pinoHttp: { level: "silent" } }),
         PrismaModule,
         UsersModule,
         KeysModule,
@@ -96,7 +98,7 @@ describe("CoreAuthService timing channels (e2e)", () => {
     if (createdUserIds.length > 0) {
       await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
     }
-    await app.close();
+    await app?.close();
   });
 
   it("performDummyHashCompare actually does the bcrypt work (≥ 20ms)", async () => {

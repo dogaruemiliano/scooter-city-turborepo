@@ -1,9 +1,11 @@
-# Scooter document extraction
+# Historical synchronous scooter document extraction
 
-The synchronous transport described below is the historical implementation. The
-current job API, direct S3 inputs, deployment settings and abandoned-resource
-cleanup are documented in [Background scooter document extraction](background-document-extraction.md).
-The validation and review rules below still apply.
+This page records the **retired synchronous implementation**, including its former
+crop inputs, import suppression, concurrency limits and component-local review.
+Those behaviors are not the current product contract. The persistent 20-scooter
+workspace, mixed PDFs, all document types, durable queue, current validation,
+review and deployment instructions are documented in
+[Background scooter document extraction](background-document-extraction.md).
 
 The scooter editor reads uploaded import documents, CIVs, registration certificates,
 and insurance policies before the scooter is saved. **Extrage și continuă** starts
@@ -103,22 +105,23 @@ unreadable. The unreadable/unsupported message instead covers source format and
 PDF validation failures.
 
 Source IDs and document types in API responses are assigned by the server. The model
-extracts each VIN independently, without being given an expected VIN from another
+extracts eligible VINs independently (excluding Romanian registration and yellow ITP cards), without being given an expected VIN from another
 document. The editor compares readings before applying suggestions. Conflicting
-VINs block application; unreadable VINs require explicit operator confirmation.
+VINs are retained as conflicts for review. The form selects CIV, insurance, export, foreign registration, then other eligible VINs. Manual VIN entry is requested only when none can be parsed.
 VIN field values must also agree with their raw reading; a Z/2 substitution during
 normalization remains unresolved instead of becoming verified evidence.
 
-When extracted VINs conflict, the editor offers per-document corrections beside
-the original AI readings. An operator must check the document previews, enter the
-correction and explicitly confirm that it matches the originals. Different VINs
-still block the import; there is no automatic majority vote or Z/2 replacement.
+When eligible VIN readings conflict, the form fills the priority reading and flags
+the discrepancy. The operator reviews the original and explicitly confirms whether
+the document belongs to the scooter VIN. Per-document VIN and page-number inputs
+are not shown. Conflicts block creation until resolved; no majority vote or Z/2
+replacement is performed.
 Corrections retain `rawFields` and persist `vinReview: { method: "manual",
 originalVin }` with the per-file evidence. The corrected VIN is reused in the
 session without another AI request; replacing a file invalidates that review.
 
-When a CIV is attached, import documents are kept as attachments but excluded from
-AI requests and VIN review. Removing every CIV makes the import documents eligible
+When a CIV is attached, import documents are still analysed and retain independent
+identity evidence. CIV fields keep technical authority. Removing every CIV makes the import documents eligible
 for extraction again. CIV technical readings take precedence over import readings. Registration details
 come from registration documents, and insurance supplies the insured person,
 validity dates, premium and currency. A printed dash is confirmed empty; unknown
@@ -142,8 +145,8 @@ failure does not discard successful readings or implicitly confirm unresolved VI
 
 ## Limits and diagnostics
 
-The browser runs at most two requests concurrently. Each API process admits at most
-four simultaneous analyses and two per user. The endpoint also uses the existing
+The browser starts up to 20 requests concurrently per draft. The durable dispatcher
+reserves up to 20 active jobs globally across API instances, and one admin can use all slots. The endpoint also uses the existing
 20 requests/minute IP throttle. These are process-local limits, not a distributed
 quota or durable idempotency guarantee. Multiple tabs/instances can cause repeated
 paid calls. Cancellation is propagated, but cannot guarantee an already submitted

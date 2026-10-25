@@ -13,7 +13,7 @@ import {
   UploadIcon,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type RefObject } from "react";
 import { useFormContext } from "react-hook-form";
 import {
   MAX_IMPORT_CHARACTERS,
@@ -44,17 +44,25 @@ export function ScooterDocumentImport({
   sources = [],
   onApplyImport,
   secondary = false,
+  open: controlledOpen,
+  onOpenChange,
+  hideTrigger = false,
+  finalFocus,
 }: {
   brands: v1.scooterBrands.ScooterBrand[];
   editing: boolean;
   sources?: DocumentSource[];
   onApplyImport?: (result: Extract<DocumentImportResult, { ok: true }>) => void;
-  onImport: (result: Extract<DocumentImportResult, { ok: true }>) => void;
+  onImport?: (result: Extract<DocumentImportResult, { ok: true }>) => void;
   disabled: boolean;
   insuranceFiles?: { fileName: string; insurancePolicyId?: string | null }[];
   rawFields: Record<string, string>;
   onRawFields: (fields: Record<string, string>) => void;
   secondary?: boolean;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  hideTrigger?: boolean;
+  finalFocus?: RefObject<HTMLButtonElement | null>;
 }) {
   const t = useTranslations("scooters");
   const canWrite = canAccess(
@@ -66,7 +74,8 @@ export function ScooterDocumentImport({
   const [vinReviewed, setVinReviewed] = useState(false);
   const [needsVinReview, setNeedsVinReview] = useState(false);
   const [importedVin, setImportedVin] = useState<string>();
-  const [open, setOpen] = useState(false);
+  const [localOpen, setLocalOpen] = useState(false);
+  const open = controlledOpen ?? localOpen;
   const [showEditor, setShowEditor] = useState(false);
   const [readingFile, setReadingFile] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
@@ -91,7 +100,8 @@ export function ScooterDocumentImport({
   function changeOpen(nextOpen: boolean) {
     fileRequest.current += 1;
     setReadingFile(false);
-    setOpen(nextOpen);
+    setLocalOpen(nextOpen);
+    onOpenChange?.(nextOpen);
   }
 
   function parseJson(text: string) {
@@ -186,7 +196,7 @@ export function ScooterDocumentImport({
         vinReviewConfirmed:
           policy.vinReviewConfirmed || (vinReviewed && !policy.documentVin),
       }));
-    onImport(result);
+    onImport?.(result);
     if (onApplyImport) onApplyImport(result);
     else {
       if (result.insurancePolicies)
@@ -232,21 +242,24 @@ export function ScooterDocumentImport({
         description={t("documentImport.help")}
         closeLabel={t("actions.close")}
         initialFocus={uploadRef}
+        finalFocus={finalFocus}
         trigger={
-          <Button
-            type="button"
-            size={secondary ? "default" : "lg"}
-            variant={secondary ? "text" : "default"}
-            disabled={disabled}
-            className={
-              secondary
-                ? undefined
-                : "w-full justify-self-center sm:w-auto sm:px-8"
-            }
-          >
-            <ImportIcon aria-hidden="true" className="size-5" />
-            {t("documentImport.open")}
-          </Button>
+          hideTrigger ? undefined : (
+            <Button
+              type="button"
+              size={secondary ? "default" : "lg"}
+              variant={secondary ? "text" : "default"}
+              disabled={disabled}
+              className={
+                secondary
+                  ? undefined
+                  : "w-full justify-self-center sm:w-auto sm:px-8"
+              }
+            >
+              <ImportIcon aria-hidden="true" className="size-5" />
+              {t("documentImport.open")}
+            </Button>
+          )
         }
         footer={
           json.trim() ? (

@@ -1,8 +1,11 @@
 "use client";
+import { useFormAction } from "@/lib/form/use-form-action";
+import { SaveButton } from "@repo/ui/components/save-button";
 
 import { v1 } from "@repo/api-shared";
+import { spacing } from "@repo/theme";
 import { localeHeaderName } from "@repo/i18n";
-import { Button, Input, Label } from "@repo/ui/components";
+import { Input, Label } from "@repo/ui/components";
 import { useLocale, useTranslations } from "next-intl";
 import { useId, useRef, useState, type FormEvent } from "react";
 
@@ -17,6 +20,8 @@ export interface EmailOtpSignInFormProps {
 }
 
 export function EmailOtpSignInForm({ onChallenge }: EmailOtpSignInFormProps) {
+  const formAction = useFormAction();
+
   const t = useTranslations("auth.signIn.emailOtp");
   const locale = useLocale();
   const emailInputId = useId();
@@ -29,6 +34,7 @@ export function EmailOtpSignInForm({ onChallenge }: EmailOtpSignInFormProps) {
 
   async function requestCode(event: FormEvent) {
     event.preventDefault();
+    if (busy) return;
     setError(null);
 
     const input = v1.auth.requestEmailOtpInputSchema.safeParse({ email });
@@ -103,9 +109,18 @@ export function EmailOtpSignInForm({ onChallenge }: EmailOtpSignInFormProps) {
           </p>
         ) : null}
       </div>
-      <Button type="submit" disabled={busy} className="mt-9">
-        {busy ? t("sendingCode") : t("sendCode")}
-      </Button>
+      <div
+        data-slot="email-submit-action"
+        className="shrink-0"
+        style={{ paddingTop: spacing[9] }}
+      >
+        <SaveButton
+          type="submit"
+          disabled={busy}
+          className="w-full"
+          {...formAction("sendCode", { pending: busy, error: error })}
+        />
+      </div>
       {error ? (
         <p role="alert" className="text-sm text-destructive">
           {formatAuthError(error.cause, locale)}

@@ -223,7 +223,7 @@ describe("scooter editor conversion", () => {
     expect(defaults.powertrainType).toBe("combustion");
     expect(defaults.vehicleCategory).toBe("L1e");
     expect(defaults.registrationType).toBe("");
-    expect(defaults.requiredLicenseCategory).toBe("");
+    expect(defaults.requiredLicenseCategory).toBe("none");
     expect(defaults.hasGps).toBe("");
     expect(defaults.odometerWorking).toBe("");
     expect(defaults.speedometerWorking).toBe("");
@@ -410,4 +410,26 @@ describe("required fields for create actions", () => {
       }),
     ).toBe(true);
   });
+});
+
+it("creates unregistered scooters before CIV issue and supports issued CIV without a scan", () => {
+  expect(
+    scooterCreateFormSchema.parse({
+      ...validValues(),
+      civAvailability: "not_issued",
+    }).civAvailability,
+  ).toBe("not_issued");
+  expect(
+    scooterCreateFormSchema.parse({
+      ...validValues(),
+      civAvailability: "issued",
+    }).civAvailability,
+  ).toBe("issued");
+  expect(
+    scooterCreateFormSchema.safeParse({
+      ...validValues(),
+      civAvailability: "not_issued",
+      civNumber: "CIV-123",
+    }).success,
+  ).toBe(false);
 });

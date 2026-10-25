@@ -8,6 +8,7 @@ import {
 import { v1 } from "@repo/api-shared";
 import { messages, type SupportedLocale } from "@repo/i18n";
 import { TooltipProvider } from "@repo/ui/components/tooltip";
+import { PageLayout } from "@repo/ui/components/page-layout";
 import { NextIntlClientProvider } from "next-intl";
 import { useState, type AnchorHTMLAttributes, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -104,32 +105,66 @@ beforeEach(() => {
 });
 
 describe("AppShell", () => {
-  it("keeps the mobile header outside the isolated page scroll area", () => {
-    Object.defineProperty(window, "innerWidth", {
-      configurable: true,
-      value: 390,
-    });
-    const { container } = renderAppShell(undefined, <div>Page body</div>);
-    const shell = container.querySelector("[data-app-shell]");
-    expect(shell).toHaveClass(
-      "fixed",
-      "h-dvh",
-      "overflow-hidden",
-      "md:relative",
-      "md:overflow-visible",
-    );
-    const content = container.querySelector('[data-slot="app-page-scroll"]');
-    expect(content).toHaveClass(
-      "min-h-0",
-      "overflow-y-auto",
-      "overscroll-y-contain",
-      "md:overflow-visible",
-    );
-    const header = screen.getByRole("banner");
-    expect(content).not.toContainElement(header);
-    expect(header.parentElement).toBe(content?.parentElement);
-    expect(header).toHaveClass("shrink-0", "bg-card", "md:sticky");
-  });
+  it.each(["/en/persons/new", "/en/rentals/new"])(
+    "keeps app navigation and exactly one main landmark on wizard route %s",
+    (pathname) => {
+      mocks.pathname = pathname;
+      const { container } = renderAppShell(
+        {
+          id: "admin-1",
+          email: "admin@example.com",
+          roles: [],
+          isSuperAdmin: false,
+          effectiveScopes: staffScopes,
+        },
+        <PageLayout paddingX="none" paddingTop="compact">
+          Wizard
+        </PageLayout>,
+      );
+      expect(screen.getByRole("banner")).toBeInTheDocument();
+      expect(screen.getAllByRole("main")).toHaveLength(1);
+      expect(
+        screen.getByRole("link", { name: "Overview" }),
+      ).toBeInTheDocument();
+      expect(
+        container.querySelector('[data-slot="sidebar-inset"]')?.tagName,
+      ).toBe("DIV");
+    },
+  );
+
+  it.each([390, 1280])(
+    "keeps the header outside the padded page scroll area at %ipx",
+    (width) => {
+      Object.defineProperty(window, "innerWidth", {
+        configurable: true,
+        value: width,
+      });
+      const { container } = renderAppShell(undefined, <div>Page body</div>);
+      const shell = container.querySelector("[data-app-shell]");
+      expect(shell).toHaveClass(
+        "[--sticky-content-top:0]",
+        "md:[--sticky-content-top:var(--spacing-16)]",
+        "fixed",
+        "h-dvh",
+        "overflow-hidden",
+        "md:relative",
+        "md:overflow-visible",
+      );
+      const content = container.querySelector('[data-slot="app-page-scroll"]');
+      expect(content).toHaveClass(
+        "min-h-0",
+        "overflow-y-auto",
+        "overscroll-y-contain",
+        "md:overflow-visible",
+        "pb-[calc(var(--spacing-screen-bottom)+env(safe-area-inset-bottom))]",
+      );
+      expect(content).not.toHaveClass("md:pb-0");
+      const header = screen.getByRole("banner");
+      expect(content).not.toContainElement(header);
+      expect(header.parentElement).toBe(content?.parentElement);
+      expect(header).toHaveClass("shrink-0", "bg-card", "md:sticky");
+    },
+  );
 
   it("renders the application navigation and current user menu", async () => {
     renderAppShell();
@@ -664,6 +699,58 @@ describe("AppShell", () => {
     );
   });
 
+  it.each(["/problems", "/en/problems"])(
+    "shows only service navigation for a mechanic (%s)",
+    (pathname) => {
+      mocks.pathname = pathname;
+      renderAppShell({
+        id: "mechanic-1",
+        email: "mechanic@example.com",
+        roles: [],
+        effectiveScopes: {
+          "problems.read": ["ASSIGNED", "AVAILABLE"],
+          "scooters.read": ["ASSIGNED"],
+        },
+      });
+
+      const content = document.querySelector('[data-slot="sidebar-content"]');
+      expect(content).not.toBeNull();
+      const links = within(content as HTMLElement).getAllByRole("link");
+      expect(links).toHaveLength(1);
+      expect(links[0]).toHaveAttribute("href", pathname);
+      expect(links[0]).toHaveAttribute("data-active");
+      expect(
+        screen.queryByRole("link", { name: "Dashboard" }),
+      ).not.toBeInTheDocument();
+    },
+  );
+
+  it("orders primary pages before the four administrative groups", () => {
+    mocks.pathname = "/en";
+    renderAppShell({
+      id: "admin-1",
+      email: "admin@example.com",
+      roles: [],
+      isSuperAdmin: true,
+      effectiveScopes: staffScopes,
+    });
+    const content = document.querySelector(
+      '[data-slot="sidebar-content"]',
+    ) as HTMLElement;
+    const links = within(content).getAllByRole("link");
+    expect(links.slice(0, 4).map((link) => link.textContent)).toEqual([
+      "Dashboard",
+      "Rentals",
+      "Persons",
+      "Service",
+    ]);
+    expect(
+      Array.from(
+        content.querySelectorAll('[data-slot="sidebar-group-label"]'),
+      ).map((label) => label.textContent?.trim()),
+    ).toEqual(["Scooters", "Finance", "Company", "Users & roles"]);
+  });
+
   it("renders company navigation for super admins", () => {
     mocks.pathname = "/persons";
 
@@ -686,14 +773,16 @@ describe("AppShell", () => {
       "href",
       "/scooters",
     );
-    expect(
-      screen.queryByRole("link", { name: "Service" }),
-    ).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Service" })).toHaveAttribute(
+      "href",
+      "/problems",
+    );
     expect(
       screen.getByRole("link", { name: "Prezentare generală" }),
     ).toHaveAttribute("href", "/finance");
     expect(screen.queryByText("General")).not.toBeInTheDocument();
-    expect(screen.getByText("Entități")).toBeInTheDocument();
+    expect(screen.queryByText("Entități")).not.toBeInTheDocument();
+    expect(screen.getByText("Utilizatori și roluri")).toBeInTheDocument();
     expect(screen.getAllByText("Scutere").length).toBeGreaterThan(0);
     expect(screen.getByText("Finanțe")).toBeInTheDocument();
     expect(screen.getByText("Firmă")).toBeInTheDocument();

@@ -8,7 +8,7 @@ const correct = "LXYTCZP05P0000001";
 const misread = "LXYTC2P05P0000001";
 const input: v1.scooters.ScooterDocumentAnalysis = {
   sourceId: "registration",
-  documentType: "registration_certificate",
+  documentType: "foreign_registration",
   extractedData: {
     vin: misread,
     fields: { vin: misread },
@@ -60,12 +60,12 @@ describe("explicit document VIN corrections", () => {
     expect(reviewScooterDocumentVin(input, misread)).toBe(input);
   });
 
-  it("keeps conflicts blocked until explicit review and persists its provenance through import", () => {
+  it("selects the CIV VIN while preserving conflicting readings and explicit correction provenance", () => {
     const sources = [
       { sourceId: "civ", type: "civ" as const, fileName: "civ.pdf" },
       {
         sourceId: "registration",
-        type: "registration_certificate" as const,
+        type: "foreign_registration" as const,
         fileName: "registration.pdf",
       },
       {
@@ -89,11 +89,11 @@ describe("explicit document VIN corrections", () => {
         scooterEditorDefaults(),
         false,
       );
-    const rejected = parse(input);
-    expect(rejected).toMatchObject({
-      ok: false,
-      reason: "vinMismatch",
-      fields: [`civ.pdf: ${correct}`, `registration.pdf: ${misread}`],
+    const suggested = parse(input);
+    expect(suggested).toMatchObject({
+      ok: true,
+      values: { vin: correct },
+      extractedDocuments: { registration: { vin: misread } },
     });
     const accepted = parse(reviewScooterDocumentVin(input, correct)!);
     expect(accepted.ok).toBe(true);
@@ -104,10 +104,10 @@ describe("explicit document VIN corrections", () => {
       rawFields: { E: misread },
       vinReview: { method: "manual", originalVin: misread },
     });
-    expect(accepted.needsVinReview).not.toBe(true);
+    expect(accepted.needsVinReview).toBeUndefined();
     expect(
       parse(reviewScooterDocumentVin(input, "LXYTCBP05P0000001")!),
-    ).toMatchObject({ ok: false, reason: "vinMismatch" });
+    ).toMatchObject({ ok: true, values: { vin: correct } });
   });
 
   it("updates insurance VIN assertions without replacing raw insurance text", () => {

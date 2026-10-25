@@ -30,6 +30,8 @@ export interface SheetSelectOption {
   label: string;
   keywords?: readonly string[];
   disabled?: boolean;
+  /** Unavailable choices can be revealed only when searching. */
+  searchOnly?: boolean;
 }
 
 const SEARCH_KEYS: readonly FuzzySearchKey<SheetSelectOption>[] = [
@@ -75,7 +77,12 @@ interface SheetSelectBaseProps {
   triggerVariant?: "field" | "card";
   optionClassName?: string;
   /** Rich option content; label remains the search and accessible name. */
-  renderOption?: (option: SheetSelectOption) => React.ReactNode;
+  renderOption?: (
+    option: SheetSelectOption,
+    selected: boolean,
+  ) => React.ReactNode;
+  /** Rich options can place the selection indicator in their own action slot. */
+  hideOptionIndicator?: boolean;
   /** Custom trigger content, for collection add/change actions. */
   triggerContent?: React.ReactNode;
   /** Use the shared add surface as the picker trigger. */
@@ -121,6 +128,7 @@ function SheetSelect({
   className,
   optionClassName,
   renderOption,
+  hideOptionIndicator = false,
   triggerContent,
   triggerVariant = "field",
   addAction,
@@ -143,7 +151,10 @@ function SheetSelect({
     )
     .join(", ");
   const filteredOptions = React.useMemo(
-    () => searchFuzzyIndex(searchIndex, query, options),
+    () =>
+      searchFuzzyIndex(searchIndex, query, options).filter(
+        (option) => query.trim() || !option.searchOnly,
+      ),
     [options, query, searchIndex],
   );
 
@@ -296,7 +307,7 @@ function SheetSelect({
                     onClick={clear}
                     aria-current={hasSelection ? undefined : "true"}
                     className={cn(
-                      "flex h-10 w-full items-center justify-between gap-2 rounded px-3 py-2 text-left text-sm outline-none transition-colors duration-fast ease-standard focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:text-disabled-foreground",
+                      "flex w-full items-center justify-between gap-2 rounded-2xl border border-border p-4 text-left text-sm outline-none transition-colors duration-fast ease-standard focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:text-disabled-foreground",
                       hasSelection
                         ? "bg-selectable-row text-muted-foreground hover:bg-accent/50"
                         : "bg-accent font-medium text-accent-foreground",
@@ -329,7 +340,7 @@ function SheetSelect({
                         : undefined
                     }
                     className={cn(
-                      "flex h-10 w-full items-center justify-between gap-2 rounded px-3 py-2 text-left text-sm outline-none transition-colors duration-fast ease-standard focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:text-disabled-foreground",
+                      "flex w-full items-center justify-between gap-2 rounded-2xl border border-border p-4 text-left text-sm outline-none transition-colors duration-fast ease-standard focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:text-disabled-foreground",
                       selectedSet.has(option.value)
                         ? "bg-accent font-medium text-accent-foreground"
                         : "bg-selectable-row text-foreground hover:bg-accent/50",
@@ -337,11 +348,11 @@ function SheetSelect({
                     )}
                   >
                     {renderOption ? (
-                      renderOption(option)
+                      renderOption(option, selectedSet.has(option.value))
                     ) : (
                       <span className="truncate">{option.label}</span>
                     )}
-                    {selectedSet.has(option.value) ? (
+                    {selectedSet.has(option.value) && !hideOptionIndicator ? (
                       <CheckIcon
                         aria-hidden="true"
                         className="size-4 shrink-0"

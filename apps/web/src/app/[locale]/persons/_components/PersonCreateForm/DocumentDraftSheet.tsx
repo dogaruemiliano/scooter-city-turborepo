@@ -1,4 +1,6 @@
 "use client";
+import { useFormAction } from "@/lib/form/use-form-action";
+import { SaveButton } from "@repo/ui/components/save-button";
 
 import { v1 } from "@repo/api-shared";
 import {
@@ -40,6 +42,8 @@ export function DocumentDraftSheet({
   onSave: () => void;
   onSetDocumentValue: SetPersonDocumentValue;
 }) {
+  const formAction = useFormAction();
+
   const t = useTranslations("persons");
   const [localExpiresOnError, setLocalExpiresOnError] = useState<string | null>(
     null,
@@ -83,16 +87,17 @@ export function DocumentDraftSheet({
         />
       </BottomSheetBody>
       <BottomSheetFooter className="sm:flex-row-reverse sm:justify-start">
-        <Button
+        <SaveButton
           type="button"
           className="w-full sm:w-auto"
           disabled={disabled || photoUploadPending || photoUploadFailed}
           onClick={saveDocument}
-        >
-          {photoUploadPending
-            ? t("actions.uploadingDocumentPhoto")
-            : t("actions.save")}
-        </Button>
+          {...formAction(
+            "save",
+            { pending: photoUploadPending },
+            t("actions.save"),
+          )}
+        />
         <BottomSheetClose
           render={
             <Button

@@ -740,7 +740,8 @@ describe("Scooters HTTP surface (e2e)", () => {
       userId: admin.userId,
       editorSessionId: session.id,
       purpose: "scooter-document:civ",
-      expiresAt: new Date(Date.now() + 3_600_000),
+      // Queued work leases the upload through the editor session's expiry.
+      expiresAt: new Date(session.expiresAt),
       claimedAt: null,
       cleanupStartedAt: null,
       checksumSha256: stored.checksumSha256,
@@ -844,6 +845,9 @@ describe("Scooters HTTP surface (e2e)", () => {
       ).toBe("cancelled");
       for (const invalid of [
         { expiresAt: new Date(Date.now() - 60_000) },
+        {
+          expiresAt: new Date(new Date(session.expiresAt).getTime() - 1_000),
+        },
         { claimedAt: new Date() },
         { cleanupStartedAt: new Date() },
         { userId: member.userId },
