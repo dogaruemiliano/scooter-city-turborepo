@@ -26,6 +26,8 @@ const EXCLUDED_FIELDS = new Set([
   "notes",
   "currentMileageKm",
   "hasGps",
+  "hasPhoneStand",
+  "hasChargingOutlet",
   "odometerWorking",
   "speedometerWorking",
   "actualMaxSpeedKmh",

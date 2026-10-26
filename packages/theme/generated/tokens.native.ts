@@ -419,6 +419,7 @@ export const tokens = {
   },
   opacity: {
     dragGhost: 0.3,
+    imagePlaceholder: 0.5,
   },
   magnification: {
     loupe: 2,

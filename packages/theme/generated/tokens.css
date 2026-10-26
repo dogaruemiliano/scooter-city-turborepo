@@ -546,6 +546,7 @@
   --ease-linear: linear;
 
   --opacity-drag-ghost: 0.3;
+  --opacity-image-placeholder: 0.5;
 
   --z-base: 0;
   --z-raised: 10;

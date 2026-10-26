@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="18" stroke-linecap="round" stroke-linejoin="round" role="img" aria-labelledby="icon-title" viewBox="-12.75 -12.75 536.5 539.5">
+  <title id="icon-title">Satellite GPS</title>
+  <!-- Upper-left solar panel -->
+  <path d="M52 14Q62 4 72 14L192 134Q202 144 192 154L155 191Q145 201 135 191L14 73Q4 63 14 53Z"/>
+  <!-- Solar panel mounting bracket -->
+  <path d="M173 181L196 204"/>
+  <!-- Main satellite body -->
+  <path d="M235 161Q250 146 265 161L352 248Q367 263 352 278L277 353Q262 368 247 353L161 267Q146 252 161 237Z"/>
+  <!-- Three simple, rounded internal communication marks -->
+  <path d="M231 231L235 235M250 250L263 263M277 277L280 280"/>
+  <!-- Lower-right panel mounting bracket -->
+  <path d="M317 316L340 339"/>
+  <!-- Lower-right solar panel -->
+  <path d="M358 318Q368 308 378 318L497 439Q507 450 497 461L458 500Q448 510 438 500L318 380Q308 370 318 360Z"/>
+  <!-- Antenna and equally spaced transmission arcs -->
+  <path d="M201 315L182 333"/>
+  <circle cx="168" cy="344" r="17"/>
+  <path d="M119 344A50 50 0 0 0 169 395"/>
+  <path d="M86 344A83 83 0 0 0 169 427"/>
+  <path d="M53 344A116 116 0 0 0 169 460"/>
+</svg>

@@ -391,6 +391,8 @@ export const scootersCatalog = {
     operational: {
       rows: {
         hasGps: "GPS installed",
+        hasPhoneStand: "Phone stand",
+        hasChargingOutlet: "Phone charging outlet",
         speedometerWorking: "Speedometer",
         odometerWorking: "Odometer",
       },
@@ -710,6 +712,24 @@ export const scootersCatalog = {
     },
     detail: {
       hero: {
+        noImageUploaded: "No image uploaded",
+        coverImageHint: "Add a cover photo in the edit form.",
+        phoneStandPresent: "Handlebar phone stand installed",
+        phoneStandAbsent: "No handlebar phone stand",
+        phoneStandUnknown: "Phone stand status not specified",
+        chargingOutletPresent:
+          "Phone charging outlet installed (USB or car socket)",
+        chargingOutletAbsent: "No phone charging outlet",
+        chargingOutletUnknown: "Charging outlet status not specified",
+        gpsPresent: "GPS installed",
+        gpsAbsent: "No GPS installed",
+        gpsUnknown: "GPS status not specified",
+        speedometerWorking: "Speedometer working",
+        speedometerBroken: "Speedometer absent or not working",
+        speedometerUnknown: "Speedometer status not specified",
+        maxSpeed: "Actual maximum speed: {speed} km/h",
+        odometerBroken:
+          "Odometer not working. Displayed mileage may be unreliable.",
         totalKilometers: "Total kilometers",
         displacement: "Displacement",
         requiredLicense: "Required license",
@@ -719,6 +739,7 @@ export const scootersCatalog = {
         unregistered: "Unregistered",
         withoutRar: "No RAR",
       },
+      moreDetails: "More details",
       description: "Scooter record",
       emptyValue: "Not provided",
       purchaseNotRecorded: "Not recorded",
@@ -965,6 +986,8 @@ export const scootersCatalog = {
       exportRecipientName: "Export recipient",
       fleetNumber: "Internal number",
       hasGps: "GPS installed",
+      hasPhoneStand: "Phone stand",
+      hasChargingOutlet: "Phone charging outlet",
       odometerWorking: "Odometer working",
       speedometerWorking: "Speedometer working",
       actualMaxSpeedKmh: "Actual maximum speed (km/h)",
@@ -1687,6 +1710,8 @@ export const scootersCatalog = {
     operational: {
       rows: {
         hasGps: "GPS instalat",
+        hasPhoneStand: "Suport pentru telefon",
+        hasChargingOutlet: "Priză de încărcare telefon",
         speedometerWorking: "Vitezometru",
         odometerWorking: "Odometru",
       },
@@ -2024,6 +2049,24 @@ export const scootersCatalog = {
     },
     detail: {
       hero: {
+        noImageUploaded: "Nicio fotografie încărcată",
+        coverImageHint: "Adaugă poza de copertă din formularul de editare.",
+        phoneStandPresent: "Suport de telefon pe ghidon instalat",
+        phoneStandAbsent: "Fără suport de telefon pe ghidon",
+        phoneStandUnknown: "Suport de telefon nespecificat",
+        chargingOutletPresent:
+          "Priză de încărcare telefon instalată (USB sau auto)",
+        chargingOutletAbsent: "Fără priză de încărcare telefon",
+        chargingOutletUnknown: "Priză de încărcare nespecificată",
+        gpsPresent: "GPS instalat",
+        gpsAbsent: "Fără GPS",
+        gpsUnknown: "Starea GPS nu este specificată",
+        speedometerWorking: "Vitezometru funcțional",
+        speedometerBroken: "Vitezometru absent sau nefuncțional",
+        speedometerUnknown: "Starea vitezometrului nu este specificată",
+        maxSpeed: "Viteză maximă reală: {speed} km/h",
+        odometerBroken:
+          "Kilometrajul nu funcționează. Valoarea afișată poate fi inexactă.",
         totalKilometers: "Kilometri totali",
         displacement: "Cilindree",
         requiredLicense: "Permis necesar",
@@ -2033,6 +2076,7 @@ export const scootersCatalog = {
         unregistered: "Neînmatriculat",
         withoutRar: "Fără RAR",
       },
+      moreDetails: "Mai multe detalii",
       description: "Înregistrare scuter",
       emptyValue: "Necompletat",
       purchaseNotRecorded: "Neînregistrat",
@@ -2283,6 +2327,8 @@ export const scootersCatalog = {
       exportRecipientName: "Destinatar export",
       fleetNumber: "Număr intern",
       hasGps: "Are GPS",
+      hasPhoneStand: "Suport pentru telefon",
+      hasChargingOutlet: "Priză de încărcare telefon",
       odometerWorking: "Funcționează odometrul",
       speedometerWorking: "Funcționează vitezometrul",
       actualMaxSpeedKmh: "Viteză maximă reală (km/h)",

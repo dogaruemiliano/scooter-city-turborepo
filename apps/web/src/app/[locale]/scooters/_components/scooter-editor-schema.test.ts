@@ -21,6 +21,21 @@ const validValues = () => ({
 });
 
 describe("scooter editor conversion", () => {
+  it("saves only changed phone equipment and preserves false versus unknown", () => {
+    const input = scooterEditFormSchema.parse({
+      ...validValues(),
+      fleetNumber: "7",
+      hasPhoneStand: "false",
+      hasChargingOutlet: "",
+    });
+    expect(
+      scooterChangedFields(input, {
+        hasPhoneStand: true,
+        hasChargingOutlet: true,
+      }),
+    ).toEqual({ hasPhoneStand: false, hasChargingOutlet: null });
+  });
+
   it("converts fuel systems and clears them when switching to electric", () => {
     expect(
       scooterCreateFormSchema.parse({
@@ -198,6 +213,8 @@ describe("scooter editor conversion", () => {
     const input = scooterCreateFormSchema.parse({
       ...validValues(),
       hasGps: "false",
+      hasPhoneStand: "true",
+      hasChargingOutlet: "false",
       odometerWorking: "true",
       speedometerWorking: "",
       currentMileageKm: "0",
@@ -206,6 +223,8 @@ describe("scooter editor conversion", () => {
     });
     expect(input).toMatchObject({
       hasGps: false,
+      hasPhoneStand: true,
+      hasChargingOutlet: false,
       odometerWorking: true,
       speedometerWorking: null,
       currentMileageKm: 0,
@@ -225,6 +244,8 @@ describe("scooter editor conversion", () => {
     expect(defaults.registrationType).toBe("");
     expect(defaults.requiredLicenseCategory).toBe("none");
     expect(defaults.hasGps).toBe("");
+    expect(defaults.hasPhoneStand).toBe("");
+    expect(defaults.hasChargingOutlet).toBe("");
     expect(defaults.odometerWorking).toBe("");
     expect(defaults.speedometerWorking).toBe("");
     expect(

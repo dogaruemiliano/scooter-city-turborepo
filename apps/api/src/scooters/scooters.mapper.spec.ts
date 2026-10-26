@@ -1,6 +1,23 @@
 import { toScooter } from "./scooters.mapper";
 
 describe("scooter picker summaries", () => {
+  it.each([true, false, null])(
+    "returns phone equipment without coercing %s",
+    (value) => {
+      const record = {
+        id: "scooter",
+        brand: { name: "Honda", code: "HON" },
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        hasPhoneStand: value,
+        hasChargingOutlet: value,
+      };
+      expect(
+        toScooter(record as unknown as Parameters<typeof toScooter>[0]),
+      ).toMatchObject({ hasPhoneStand: value, hasChargingOutlet: value });
+    },
+  );
+
   const base = {
     id: "scooter",
     brand: { name: "KYMCO", code: "KYM" },

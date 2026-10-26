@@ -9,6 +9,10 @@ import { ScooterItpPanel } from "./ScooterItpPanel";
 
 import { v1 } from "@repo/api-shared";
 import {
+  Accordion,
+  AccordionItem,
+  AccordionTrigger,
+  AccordionContent,
   Alert,
   AlertTitle,
   BottomSheet,
@@ -254,121 +258,28 @@ export function ScooterDetailPage({
           label={t("fields.color")}
           value={scooter.color ?? t("detail.emptyValue")}
         />
-        <DetailField
-          label={t("detail.fields.scooterId")}
-          value={scooter.id}
-          className="sm:col-span-2"
-        />
-      </DetailSection>
-
-      <DetailSection title={t("sections.technical")}>
-        <DetailField
-          label={t("fields.manufactureYear")}
-          value={
-            scooter.manufactureYear == null
-              ? t("detail.emptyValue")
-              : String(scooter.manufactureYear)
-          }
-        />
-        <DetailField
-          label={t("fields.powertrainType")}
-          value={t(`powertrainTypes.${scooter.powertrainType}`)}
-        />
-        {scooter.powertrainType === "combustion" ||
-        scooter.powertrainType === "hybrid" ? (
-          <DetailField
-            label={t("fields.fuelSystem")}
-            value={t(`fuelSystems.${scooter.fuelSystem ?? "unknown"}`)}
-          />
-        ) : null}
-        <DetailField
-          label={t("fields.engineCode")}
-          value={scooter.engineCode ?? t("detail.emptyValue")}
-        />
-        <DetailField
-          label={t("fields.engineDisplacementCc")}
-          value={
-            scooter.engineDisplacementCc
-              ? t("list.ccValue", { cc: scooter.engineDisplacementCc })
-              : t("detail.emptyValue")
-          }
-        />
-        <DetailField
-          label={t("fields.powerKw")}
-          value={
-            scooter.powerKw
-              ? t("list.kwValue", { kw: scooter.powerKw })
-              : t("detail.emptyValue")
-          }
-        />
-      </DetailSection>
-
-      <DetailSection title={t("sections.registration")}>
-        <DetailField
-          label={t("fields.registrationType")}
-          value={t(`registrationTypes.${scooter.registrationType}`)}
-        />
-        <DetailField
-          label={t("fields.registrationNumber")}
-          value={scooter.registrationNumber ?? t("detail.emptyValue")}
-        />
-        <DetailField
-          label={t("fields.registrationDate")}
-          value={
-            scooter.registrationDate
-              ? formatDate(scooter.registrationDate, locale)
-              : t("detail.emptyValue")
-          }
-        />
-        {scooter.registrationType === "temporary" ? (
-          <DetailField
-            label={t("fields.temporaryRegistrationExpiresAt")}
-            value={
-              scooter.temporaryRegistrationExpiresAt
-                ? formatDate(scooter.temporaryRegistrationExpiresAt, locale)
-                : t("detail.emptyValue")
-            }
-          />
-        ) : null}
-        <DetailField
-          label={t("fields.requiredLicenseCategory")}
-          value={t(
-            `requiredDriverLicenseTypes.${scooter.requiredLicenseCategory}`,
-          )}
-        />
-      </DetailSection>
-
-      <DetailSection title={t("sections.record")}>
-        <DetailField
-          label={t("detail.fields.createdAt")}
-          value={formatDateTime(scooter.createdAt, locale)}
-        />
-        <DetailField
-          label={t("detail.fields.updatedAt")}
-          value={formatDateTime(scooter.updatedAt, locale)}
-        />
-        {scooter.deletedAt ? (
-          <DetailField
-            label={t("detail.fields.deletedAt")}
-            value={formatDateTime(scooter.deletedAt, locale)}
-          />
-        ) : null}
       </DetailSection>
 
       <DetailSection title={t("sections.operational")}>
-        {(["hasGps", "odometerWorking", "speedometerWorking"] as const).map(
-          (field) => (
-            <DetailField
-              key={field}
-              label={t(`fields.${field}`)}
-              value={
-                scooter[field] == null
-                  ? t("operational.unknown")
-                  : t(scooter[field] ? "operational.yes" : "operational.no")
-              }
-            />
-          ),
-        )}
+        {(
+          [
+            "hasGps",
+            "hasPhoneStand",
+            "hasChargingOutlet",
+            "odometerWorking",
+            "speedometerWorking",
+          ] as const
+        ).map((field) => (
+          <DetailField
+            key={field}
+            label={t(`fields.${field}`)}
+            value={
+              scooter[field] == null
+                ? t("operational.unknown")
+                : t(scooter[field] ? "operational.yes" : "operational.no")
+            }
+          />
+        ))}
         {(["currentMileageKm", "actualMaxSpeedKmh"] as const).map((field) => (
           <DetailField
             key={field}
@@ -393,6 +304,113 @@ export function ScooterDetailPage({
       ) : null}
       <ScooterInsuranceList scooter={scooter} />
       <ScooterItpPanel scooter={scooter} />
+      <Accordion>
+        <AccordionItem value="details">
+          <AccordionTrigger>{t("detail.moreDetails")}</AccordionTrigger>
+          <AccordionContent className="grid gap-6">
+            <DetailSection title={t("sections.technical")}>
+              <DetailField
+                label={t("fields.manufactureYear")}
+                value={
+                  scooter.manufactureYear == null
+                    ? t("detail.emptyValue")
+                    : String(scooter.manufactureYear)
+                }
+              />
+              <DetailField
+                label={t("fields.powertrainType")}
+                value={t(`powertrainTypes.${scooter.powertrainType}`)}
+              />
+              {scooter.powertrainType === "combustion" ||
+              scooter.powertrainType === "hybrid" ? (
+                <DetailField
+                  label={t("fields.fuelSystem")}
+                  value={t(`fuelSystems.${scooter.fuelSystem ?? "unknown"}`)}
+                />
+              ) : null}
+              <DetailField
+                label={t("fields.engineCode")}
+                value={scooter.engineCode ?? t("detail.emptyValue")}
+              />
+              <DetailField
+                label={t("fields.engineDisplacementCc")}
+                value={
+                  scooter.engineDisplacementCc
+                    ? t("list.ccValue", { cc: scooter.engineDisplacementCc })
+                    : t("detail.emptyValue")
+                }
+              />
+              <DetailField
+                label={t("fields.powerKw")}
+                value={
+                  scooter.powerKw
+                    ? t("list.kwValue", { kw: scooter.powerKw })
+                    : t("detail.emptyValue")
+                }
+              />
+            </DetailSection>
+
+            <DetailSection title={t("sections.registration")}>
+              <DetailField
+                label={t("fields.registrationType")}
+                value={t(`registrationTypes.${scooter.registrationType}`)}
+              />
+              <DetailField
+                label={t("fields.registrationNumber")}
+                value={scooter.registrationNumber ?? t("detail.emptyValue")}
+              />
+              <DetailField
+                label={t("fields.registrationDate")}
+                value={
+                  scooter.registrationDate
+                    ? formatDate(scooter.registrationDate, locale)
+                    : t("detail.emptyValue")
+                }
+              />
+              {scooter.registrationType === "temporary" ? (
+                <DetailField
+                  label={t("fields.temporaryRegistrationExpiresAt")}
+                  value={
+                    scooter.temporaryRegistrationExpiresAt
+                      ? formatDate(
+                          scooter.temporaryRegistrationExpiresAt,
+                          locale,
+                        )
+                      : t("detail.emptyValue")
+                  }
+                />
+              ) : null}
+              <DetailField
+                label={t("fields.requiredLicenseCategory")}
+                value={t(
+                  `requiredDriverLicenseTypes.${scooter.requiredLicenseCategory}`,
+                )}
+              />
+            </DetailSection>
+
+            <DetailSection title={t("sections.record")}>
+              <DetailField
+                label={t("detail.fields.scooterId")}
+                value={scooter.id}
+              />
+              <DetailField
+                label={t("detail.fields.createdAt")}
+                value={formatDateTime(scooter.createdAt, locale)}
+              />
+              <DetailField
+                label={t("detail.fields.updatedAt")}
+                value={formatDateTime(scooter.updatedAt, locale)}
+              />
+              {scooter.deletedAt ? (
+                <DetailField
+                  label={t("detail.fields.deletedAt")}
+                  value={formatDateTime(scooter.deletedAt, locale)}
+                />
+              ) : null}
+            </DetailSection>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
       <ScooterRegistrationDialog
         key={`edit-scooter-registration-${registrationDialogKey}`}
         scooter={scooter}

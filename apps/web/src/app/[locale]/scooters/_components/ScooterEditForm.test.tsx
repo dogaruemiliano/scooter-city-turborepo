@@ -129,6 +129,21 @@ const brands: v1.scooterBrands.ScooterBrand[] = [
 ];
 
 beforeEach(() => {
+  // Responsive hooks read the CSS media-query result, including mobile tests.
+  vi.spyOn(window, "matchMedia").mockImplementation((query: string) => ({
+    get matches() {
+      const width = query.match(/width\s*<\s*(\d+)/);
+      return width ? window.innerWidth < Number(width[1]) : false;
+    },
+    media: query,
+    onchange: null,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  }));
+
   access.user = { isSuperAdmin: true, effectiveScopes: {} };
   mocks.apiFetch.mockReset();
   mocks.refresh.mockReset();

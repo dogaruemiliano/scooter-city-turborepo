@@ -168,6 +168,8 @@ export function toScooter(row: ScooterRowWithBrand): v1.scooters.Scooter {
     requiredLicenseCategory: row.requiredLicenseCategory,
     currentMileageKm: row.currentMileageKm,
     hasGps: row.hasGps,
+    hasPhoneStand: row.hasPhoneStand,
+    hasChargingOutlet: row.hasChargingOutlet,
     odometerWorking: row.odometerWorking,
     speedometerWorking: row.speedometerWorking,
     actualMaxSpeedKmh: row.actualMaxSpeedKmh,

@@ -545,6 +545,10 @@ model Scooter {
   /// Enforced as non-negative by a database CHECK constraint.
   currentMileageKm   Int?
   hasGps             Boolean?
+  /// Handlebar-mounted phone holder.
+  hasPhoneStand      Boolean?
+  /// USB or automotive socket suitable for charging a phone.
+  hasChargingOutlet  Boolean?
   odometerWorking    Boolean?
   speedometerWorking Boolean?
   /// Real-world measurement, separate from the document's maximum speed.

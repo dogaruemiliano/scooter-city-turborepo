@@ -88,6 +88,189 @@ beforeEach(() => {
 });
 
 describe("ScooterDetailPage", () => {
+  it.each([
+    {
+      hasCivDocument: false,
+      registrationType: "unregistered" as const,
+      registrationNumber: null,
+      temporaryRegistrationExpiresAt: null,
+    },
+    {
+      hasCivDocument: true,
+      registrationType: "unregistered" as const,
+      registrationNumber: null,
+      temporaryRegistrationExpiresAt: null,
+    },
+    {
+      hasCivDocument: true,
+      registrationType: "national" as const,
+      registrationNumber: null,
+      temporaryRegistrationExpiresAt: null,
+    },
+    {
+      hasCivDocument: true,
+      registrationType: "temporary" as const,
+      registrationNumber: "B123456",
+      temporaryRegistrationExpiresAt: "2020-01-01",
+    },
+    {
+      hasCivDocument: true,
+      registrationType: "national" as const,
+      registrationNumber: "B123ABC",
+      temporaryRegistrationExpiresAt: null,
+    },
+  ])(
+    "uses shared readiness rules for hero registration badges: %j",
+    (overrides) => {
+      const record = { ...scooter, ...overrides };
+      renderDetail("en", record);
+      const hero = within(screen.getByRole("region", { name: "001 YAM" }));
+      const issues = v1.scooters.scooterReadinessIssues(record);
+      expect(hero.queryByText("No RAR") !== null).toBe(
+        issues.includes("needsCiv"),
+      );
+      const registrationLabel =
+        record.registrationType === "unregistered"
+          ? messages.en.scooters.detail.hero.unregistered
+          : messages.en.scooters.readiness.needsRegistration;
+      expect(
+        hero.queryByText(registrationLabel, {
+          selector: '[data-slot="badge"]',
+        }) !== null,
+      ).toBe(issues.includes("needsRegistration"));
+    },
+  );
+
+  it.each(["en", "ro"] as const)(
+    "uses the bundled faded placeholder without a scooter image (%s)",
+    (locale) => {
+      renderDetail(locale);
+      const fallback = screen.getByRole("img", {
+        name: messages[locale].scooters.card.noPhoto,
+      });
+      expect(fallback.querySelector("img")).toHaveAttribute(
+        "src",
+        expect.stringContaining("%2Fscooter-placeholder.png"),
+      );
+      expect(fallback.querySelector("img")).toHaveStyle({ opacity: 0.5 });
+      expect(
+        within(fallback).getByText(
+          messages[locale].scooters.detail.hero.noImageUploaded,
+        ),
+      ).toBeVisible();
+    },
+  );
+
+  it.each([
+    {
+      value: true,
+      gps: "GPS installed",
+      speed: "Speedometer working",
+      gpsColor: "text-success",
+      speedColor: "text-foreground",
+    },
+    {
+      value: false,
+      gps: "No GPS installed",
+      speed: "Speedometer absent or not working",
+      gpsColor: "text-destructive",
+      speedColor: "text-destructive",
+    },
+    {
+      value: null,
+      gps: "GPS status not specified",
+      speed: "Speedometer status not specified",
+      gpsColor: "text-warning",
+      speedColor: "text-warning",
+    },
+  ])(
+    "shows operational hero status for $value",
+    ({ value, gps, speed, gpsColor, speedColor }) => {
+      renderDetail("en", {
+        ...scooter,
+        hasGps: value,
+        hasPhoneStand: value,
+        hasChargingOutlet: value,
+        speedometerWorking: value,
+        actualMaxSpeedKmh: 45,
+        odometerWorking: value,
+      });
+      const hero = within(screen.getByRole("region", { name: "001 YAM" }));
+      expect(hero.getByRole("button", { name: gps })).toHaveClass(
+        `${gpsColor.replace("text-", "bg-")}-subtle`,
+        gpsColor,
+        "size-9",
+        "min-h-9",
+        "min-w-9",
+        "md:size-11",
+        "md:min-h-11",
+        "md:min-w-11",
+      );
+      for (const label of [/phone stand/i, /charging outlet/i]) {
+        expect(hero.getByRole("button", { name: label })).toHaveClass(
+          `${gpsColor.replace("text-", "bg-")}-subtle`,
+          gpsColor,
+          `${gpsColor.replace("text-", "border-")}/20`,
+        );
+      }
+      expect(hero.getByRole("button", { name: gps })).toHaveClass(
+        `${gpsColor.replace("text-", "border-")}/20`,
+      );
+      expect(
+        hero.getByRole("button", { name: gps }).querySelector("span"),
+      ).toHaveStyle({ maskImage: "url(/icons/satellite.svg)" });
+      expect(
+        hero
+          .getByRole("button", { name: /phone stand/i })
+          .querySelector("span"),
+      ).toHaveStyle({ maskImage: "url(/icons/phone-stand.svg)" });
+      expect(
+        hero
+          .getByRole("button", { name: /charging outlet/i })
+          .querySelector("span"),
+      ).toHaveStyle({ maskImage: "url(/icons/power.svg)" });
+      const gauge = hero.getByRole("button", {
+        name: `${speed}. Actual maximum speed: 45 km/h`,
+      });
+      expect(gauge).toHaveClass(speedColor);
+      expect(within(gauge).getByText("45")).toBeVisible();
+      expect(
+        hero.queryByRole("button", { name: /Odometer not working/ }) !== null,
+      ).toBe(value === false);
+    },
+  );
+
+  it("shows unknown speed without inventing zero and explains the odometer warning on tap", async () => {
+    renderDetail("en", {
+      ...scooter,
+      actualMaxSpeedKmh: null,
+      odometerWorking: false,
+    });
+    const gauge = screen.getByRole("button", {
+      name: /Actual maximum speed: — km\/h/,
+    });
+    expect(within(gauge).getByText("—")).toBeVisible();
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: /Odometer not working/ }));
+    expect(
+      await screen.findByRole("dialog", { name: /Odometer not working/ }),
+    ).toHaveTextContent("Displayed mileage may be unreliable");
+  });
+
+  it("collapses technical, registration and record details until requested", async () => {
+    const browser = userEvent.setup();
+    renderDetail();
+    const toggle = screen.getByRole("button", { name: "More details" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText(scooter.id)).not.toBeInTheDocument();
+    await browser.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText(scooter.id)).toBeVisible();
+    await browser.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+  });
+
   it.each(["en", "ro"] as const)(
     "returns directly to the localized scooter list from the header (%s)",
     (locale) => {
@@ -148,8 +331,8 @@ describe("ScooterDetailPage", () => {
     const hero = within(screen.getByRole("region", { name: "001 YAM" }));
     expect(hero.getByText("Nefuncțional")).toBeInTheDocument();
     expect(
-      hero.getByText("Neînmatriculat", { selector: '[data-slot="badge"]' }),
-    ).toBeInTheDocument();
+      hero.queryByText("Neînmatriculat", { selector: '[data-slot="badge"]' }),
+    ).not.toBeInTheDocument();
     expect(hero.getByText("Fără RAR")).toBeInTheDocument();
     expect(
       hero.getByRole("img", { name: /Kilometraj:.*km/ }),
@@ -161,13 +344,13 @@ describe("ScooterDetailPage", () => {
     expect(hero.queryByText("Închiriat")).not.toBeInTheDocument();
   });
 
-  it("keeps missing mileage distinct from zero and does not infer missing CIV data", () => {
+  it("keeps missing mileage distinct from zero and uses alert readiness rules for missing CIV data", () => {
     renderDetail("en", { ...scooter, currentMileageKm: null });
     const hero = within(screen.getByRole("region", { name: "001 YAM" }));
     expect(
       hero.getByRole("img", { name: "Total kilometers: Not provided" }),
     ).toHaveTextContent("—");
-    expect(hero.queryByText("No RAR")).not.toBeInTheDocument();
+    expect(hero.getByText("No RAR")).toBeInTheDocument();
     expect(hero.getByText("No license")).toBeInTheDocument();
     expect(hero.queryByText("Total kilometers")).not.toBeInTheDocument();
   });
@@ -215,8 +398,11 @@ describe("ScooterDetailPage", () => {
     expect(screen.queryByText("Needs CIV")).not.toBeInTheDocument();
   });
 
-  it("renders scooter details and actions", () => {
+  it("renders scooter details and actions", async () => {
     renderDetail();
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "More details" }));
 
     expect(
       screen.getByRole("heading", { name: "001 YAM" }),
