@@ -1,18 +1,14 @@
 "use client";
 
 import type { v1 } from "@repo/api-shared";
-import {
-  CarFrontIcon,
-  CheckIcon,
-  FileTextIcon,
-  IdCardIcon,
-} from "lucide-react";
+import { CheckIcon, FileTextIcon, IdCardIcon } from "lucide-react";
+import { cn } from "@repo/ui/lib/utils";
 import { useTranslations } from "next-intl";
 
 const icons = {
   nationalId: IdCardIcon,
   passport: IdCardIcon,
-  driverLicense: CarFrontIcon,
+  driverLicense: IdCardIcon,
   residencePermit: IdCardIcon,
   visa: FileTextIcon,
   proofOfAddress: FileTextIcon,
@@ -75,7 +71,10 @@ export function DocumentSummary({
     <span className="flex min-w-0 items-center gap-3">
       <Icon
         aria-hidden="true"
-        className="size-5 shrink-0 text-muted-foreground"
+        className={cn(
+          "shrink-0 text-muted-foreground",
+          type === "driverLicense" ? "size-6" : "size-5",
+        )}
       />
       <span className="grid min-w-0 gap-1">
         <span className="font-medium text-foreground">

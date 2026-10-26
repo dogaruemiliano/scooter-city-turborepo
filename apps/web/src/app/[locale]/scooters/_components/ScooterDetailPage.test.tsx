@@ -1,6 +1,12 @@
 import { ApiError, v1 } from "@repo/api-shared";
 import { messages, type SupportedLocale } from "@repo/i18n";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -12,6 +18,7 @@ vi.mock("./ScooterPhotos", () => ({ ScooterPhotos: () => null }));
 vi.mock("./ScooterItpPanel", () => ({ ScooterItpPanel: () => null }));
 
 const mocks = vi.hoisted(() => ({
+  canReportProblem: true,
   apiFetch: vi.fn(),
   refresh: vi.fn(),
   replace: vi.fn(),
@@ -21,6 +28,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/api", () => ({
   webApi: {
     fetch: mocks.apiFetch,
+    url: (path: string) => `http://localhost:3000${path}`,
   },
 }));
 
@@ -63,6 +71,8 @@ const scooter: v1.scooters.Scooter = {
 };
 
 beforeEach(() => {
+  mocks.canReportProblem = true;
+  mocks.push.mockReset();
   mocks.apiFetch.mockReset();
   mocks.refresh.mockReset();
   mocks.replace.mockReset();
@@ -74,6 +84,95 @@ beforeEach(() => {
 });
 
 describe("ScooterDetailPage", () => {
+  it.each([
+    ["en", "Report problem", "/en/problems/new"],
+    ["ro", "Raportează o problemă", "/problems/new"],
+  ] as const)(
+    "opens the localized problem form with this scooter selected (%s)",
+    async (locale, label, path) => {
+      const browser = userEvent.setup();
+      renderDetail(locale, { ...scooter, id: "scooter/one" });
+      await browser.click(
+        screen.getByRole("button", {
+          name: messages[locale].scooters.actions.moreActions,
+        }),
+      );
+      await browser.click(await screen.findByRole("menuitem", { name: label }));
+      expect(mocks.push).toHaveBeenCalledWith(
+        `${path}?scooterId=scooter%2Fone`,
+      );
+    },
+  );
+
+  it("hides report problem without creation permission", async () => {
+    mocks.canReportProblem = false;
+    const browser = userEvent.setup();
+    renderDetail();
+    await browser.click(screen.getByRole("button", { name: "More actions" }));
+    expect(
+      screen.queryByRole("menuitem", { name: "Report problem" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("groups the hero identity, mileage, license and concurrent recorded states without VIN", () => {
+    renderDetail("ro", {
+      ...scooter,
+      maintenanceHoldCount: 2,
+      hasCivDocument: false,
+      requiredLicenseCategory: "A1",
+    });
+    const hero = within(screen.getByRole("region", { name: "001 YAM" }));
+    expect(hero.getByText("Nefuncțional")).toBeInTheDocument();
+    expect(
+      hero.getByText("Neînmatriculat", { selector: '[data-slot="badge"]' }),
+    ).toBeInTheDocument();
+    expect(hero.getByText("Fără RAR")).toBeInTheDocument();
+    expect(
+      hero.getByRole("img", { name: /Kilometraj:.*km/ }),
+    ).toHaveAccessibleName("Kilometraj: 1.200 km");
+    expect(hero.queryByText("125 cc")).not.toBeInTheDocument();
+    expect(hero.getByText("Cat. A1")).toBeInTheDocument();
+    expect(hero.getByText("Yamaha NMAX")).toBeInTheDocument();
+    expect(hero.queryByText(scooter.vin)).not.toBeInTheDocument();
+    expect(hero.queryByText("Închiriat")).not.toBeInTheDocument();
+  });
+
+  it("keeps missing mileage distinct from zero and does not infer missing CIV data", () => {
+    renderDetail("en", { ...scooter, currentMileageKm: null });
+    const hero = within(screen.getByRole("region", { name: "001 YAM" }));
+    expect(
+      hero.getByRole("img", { name: "Total kilometers: Not provided" }),
+    ).toHaveTextContent("—");
+    expect(hero.queryByText("No RAR")).not.toBeInTheDocument();
+    expect(hero.getByText("No license")).toBeInTheDocument();
+    expect(hero.queryByText("Total kilometers")).not.toBeInTheDocument();
+  });
+
+  it("shows a scooter fallback when a cover fails and retries a changed cover", () => {
+    const view = renderDetail("en", { ...scooter, coverUrl: "/first.png" });
+    const hero = within(screen.getByRole("region", { name: "001 YAM" }));
+    const image = hero.getByRole("img", {
+      name: messages.en.scooters.card.photoAlt.replace("{code}", "001 YAM"),
+    });
+    fireEvent.error(image);
+    expect(
+      hero.getByRole("img", { name: messages.en.scooters.card.noPhoto }),
+    ).toBeInTheDocument();
+    view.rerender(
+      <NextIntlClientProvider locale="en" messages={messages.en}>
+        <ScooterDetailPage
+          scooter={{ ...scooter, coverUrl: "/second.png" }}
+          scootersHref="/en/scooters"
+        />
+      </NextIntlClientProvider>,
+    );
+    expect(
+      within(screen.getByRole("region", { name: "001 YAM" })).getByRole("img", {
+        name: messages.en.scooters.card.photoAlt.replace("{code}", "001 YAM"),
+      }),
+    ).toHaveAttribute("src", "http://localhost:3000/second.png");
+  });
+
   it("shows invalid insurance and ITP as fixed danger areas", () => {
     renderDetail("en", {
       ...scooter,
@@ -115,8 +214,8 @@ describe("ScooterDetailPage", () => {
     expect(moreActionsButton.querySelector("svg")).toHaveClass(
       "lucide-ellipsis-vertical",
     );
-    expect(moreActionsButton.parentElement).toContainElement(
-      screen.getByRole("heading", { name: "001 YAM" }),
+    expect(moreActionsButton.parentElement).not.toContainElement(
+      screen.getByRole("region", { name: "001 YAM" }),
     );
     expect(
       screen.queryByRole("heading", { name: "Maintenance and repairs" }),
@@ -256,7 +355,12 @@ describe("ScooterDetailPage", () => {
       await browser.click(screen.getByRole("button", { name: "More actions" }));
       expect(screen.queryByText("Edit registration")).not.toBeInTheDocument();
       expect(screen.queryByText("Add registration")).not.toBeInTheDocument();
-      expect(screen.getByText("CJ 12 ABC")).toBeInTheDocument();
+      expect(
+        within(screen.getByRole("region", { name: "001 YAM" })).getByRole(
+          "img",
+          { name: /CJ 12 ABC/ },
+        ),
+      ).toBeInTheDocument();
       await browser.click(await screen.findByText("Edit scooter"));
       expect(mocks.push).toHaveBeenCalledWith(
         `/en/scooters/${scooter.id}/edit`,
@@ -326,6 +430,7 @@ vi.mock("@/components/auth/SessionProvider", () => ({
   useOptionalSession: () => ({
     user: {
       effectiveScopes: {
+        "problems.create": mocks.canReportProblem ? ["ALL"] : [],
         "persons.read": ["ALL"],
         "persons.create": ["ALL"],
         "persons.update": ["ALL"],

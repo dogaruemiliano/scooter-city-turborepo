@@ -9,7 +9,19 @@ function withAlpha(color: string, opacity: number): string {
     : color.replace(/\)$/, ` / ${opacity * 100}%)`);
 }
 
+// Physical plate colors stay consistent in light and dark schemes.
+const registrationPlate = {
+  plate: p.mist[0],
+  plateForeground: p.charcoal[950],
+  plateLocal: p.amber[300],
+  plateTemporary: p.red[700],
+  plateCountry: p.blue[800],
+  plateCountryForeground: p.mist[0],
+  plateStars: p.amber[300],
+} as const;
+
 const light = {
+  ...registrationPlate,
   difficultyEasy: p.repairSeverity.low,
   difficultyMedium: p.repairSeverity.medium,
   difficultyHard: p.repairSeverity.high,
@@ -53,6 +65,10 @@ const light = {
   chart3: p.cyan[800],
   chart4: p.charcoal[500],
   chart5: p.charcoal[800],
+  odometer: p.charcoal[950],
+  odometerDigit: p.charcoal[800],
+  odometerForeground: p.charcoal[50],
+  odometerBorder: p.charcoal[700],
   sidebar: p.charcoal[950],
   sidebarForeground: p.charcoal[50],
   sidebarMutedForeground: p.charcoal[300],
@@ -106,6 +122,7 @@ const light = {
 } as const;
 
 const dark: Record<keyof typeof light, string> = {
+  ...registrationPlate,
   difficultyEasy: p.repairSeverity.low,
   difficultyMedium: p.repairSeverity.medium,
   difficultyHard: p.repairSeverity.high,
@@ -148,6 +165,10 @@ const dark: Record<keyof typeof light, string> = {
   chart3: p.cyan[200],
   chart4: p.charcoal[500],
   chart5: p.cyan[600],
+  odometer: p.charcoal[950],
+  odometerDigit: p.charcoal[800],
+  odometerForeground: p.charcoal[50],
+  odometerBorder: p.charcoal[700],
   sidebar: p.neutral[950],
   sidebarForeground: p.charcoal[50],
   sidebarMutedForeground: p.neutral[400],

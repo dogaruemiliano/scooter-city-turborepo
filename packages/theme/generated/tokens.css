@@ -4,6 +4,13 @@
   color-scheme: light;
   --radius: 0.75rem;
   --dashed-surface-border-width: 0.125rem;
+  --plate: oklch(1 0 0);
+  --plate-foreground: oklch(0.198264 0.011840 254.1076);
+  --plate-local: oklch(0.879 0.169 91.605);
+  --plate-temporary: oklch(0.505 0.213 27.518);
+  --plate-country: oklch(0.424 0.199 265.638);
+  --plate-country-foreground: oklch(1 0 0);
+  --plate-stars: oklch(0.879 0.169 91.605);
   --difficulty-easy: #3B82F6;
   --difficulty-medium: #EAB308;
   --difficulty-hard: #F97316;
@@ -45,6 +52,10 @@
   --chart-3: oklch(0.431477 0.070178 212.8220);
   --chart-4: oklch(0.618330 0.029405 234.2944);
   --chart-5: oklch(0.325239 0.023149 253.6111);
+  --odometer: oklch(0.198264 0.011840 254.1076);
+  --odometer-digit: oklch(0.325239 0.023149 253.6111);
+  --odometer-foreground: oklch(0.974148 0.003471 219.5331);
+  --odometer-border: oklch(0.432340 0.023770 246.0446);
   --sidebar: oklch(0.198264 0.011840 254.1076);
   --sidebar-foreground: oklch(0.974148 0.003471 219.5331);
   --sidebar-muted-foreground: oklch(0.766085 0.020387 240.8202);
@@ -100,6 +111,13 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
     color-scheme: dark;
+    --plate: oklch(1 0 0);
+    --plate-foreground: oklch(0.198264 0.011840 254.1076);
+    --plate-local: oklch(0.879 0.169 91.605);
+    --plate-temporary: oklch(0.505 0.213 27.518);
+    --plate-country: oklch(0.424 0.199 265.638);
+    --plate-country-foreground: oklch(1 0 0);
+    --plate-stars: oklch(0.879 0.169 91.605);
     --difficulty-easy: #3B82F6;
     --difficulty-medium: #EAB308;
     --difficulty-hard: #F97316;
@@ -141,6 +159,10 @@
     --chart-3: oklch(0.898236 0.051870 205.3585);
     --chart-4: oklch(0.618330 0.029405 234.2944);
     --chart-5: oklch(0.620782 0.096514 209.5220);
+    --odometer: oklch(0.198264 0.011840 254.1076);
+    --odometer-digit: oklch(0.325239 0.023149 253.6111);
+    --odometer-foreground: oklch(0.974148 0.003471 219.5331);
+    --odometer-border: oklch(0.432340 0.023770 246.0446);
     --sidebar: #0a0a0a;
     --sidebar-foreground: oklch(0.974148 0.003471 219.5331);
     --sidebar-muted-foreground: #a1a1aa;
@@ -196,6 +218,13 @@
 
 :root[data-theme='dark'], .dark {
   color-scheme: dark;
+  --plate: oklch(1 0 0);
+  --plate-foreground: oklch(0.198264 0.011840 254.1076);
+  --plate-local: oklch(0.879 0.169 91.605);
+  --plate-temporary: oklch(0.505 0.213 27.518);
+  --plate-country: oklch(0.424 0.199 265.638);
+  --plate-country-foreground: oklch(1 0 0);
+  --plate-stars: oklch(0.879 0.169 91.605);
   --difficulty-easy: #3B82F6;
   --difficulty-medium: #EAB308;
   --difficulty-hard: #F97316;
@@ -237,6 +266,10 @@
   --chart-3: oklch(0.898236 0.051870 205.3585);
   --chart-4: oklch(0.618330 0.029405 234.2944);
   --chart-5: oklch(0.620782 0.096514 209.5220);
+  --odometer: oklch(0.198264 0.011840 254.1076);
+  --odometer-digit: oklch(0.325239 0.023149 253.6111);
+  --odometer-foreground: oklch(0.974148 0.003471 219.5331);
+  --odometer-border: oklch(0.432340 0.023770 246.0446);
   --sidebar: #0a0a0a;
   --sidebar-foreground: oklch(0.974148 0.003471 219.5331);
   --sidebar-muted-foreground: #a1a1aa;
@@ -533,6 +566,13 @@
 }
 
 @theme inline {
+  --color-plate: var(--plate);
+  --color-plate-foreground: var(--plate-foreground);
+  --color-plate-local: var(--plate-local);
+  --color-plate-temporary: var(--plate-temporary);
+  --color-plate-country: var(--plate-country);
+  --color-plate-country-foreground: var(--plate-country-foreground);
+  --color-plate-stars: var(--plate-stars);
   --color-difficulty-easy: var(--difficulty-easy);
   --color-difficulty-medium: var(--difficulty-medium);
   --color-difficulty-hard: var(--difficulty-hard);
@@ -574,6 +614,10 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
+  --color-odometer: var(--odometer);
+  --color-odometer-digit: var(--odometer-digit);
+  --color-odometer-foreground: var(--odometer-foreground);
+  --color-odometer-border: var(--odometer-border);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-muted-foreground: var(--sidebar-muted-foreground);
