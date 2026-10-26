@@ -1,6 +1,6 @@
 "use client";
 
-import { aspectRatio } from "@repo/theme";
+import { aspectRatio, softFade } from "@repo/theme";
 import { CheckIcon, ImagePlusIcon, LoaderCircleIcon } from "lucide-react";
 import {
   useCallback,
@@ -187,12 +187,18 @@ export function DocumentPreview({
         >
           {preview}
           {headerOverlay ? (
-            <div className="pointer-events-none absolute inset-x-0 top-0 flex min-w-0 items-start justify-between gap-2 bg-linear-to-b from-media-scrim to-transparent p-2 pb-8 text-scrim-foreground *:pointer-events-auto">
+            <div
+              style={{ backgroundImage: softFade.toTop }}
+              className="pointer-events-none absolute inset-x-0 top-0 flex min-w-0 items-start justify-between gap-2 p-1.5 pb-6 text-scrim-foreground *:pointer-events-auto"
+            >
               {headerOverlay}
             </div>
           ) : null}
           {bottomOverlay ? (
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 flex min-w-0 items-center justify-between gap-2 bg-linear-to-t from-media-scrim to-transparent p-3 pt-8 text-scrim-foreground *:pointer-events-auto">
+            <div
+              style={{ backgroundImage: softFade.toBottom }}
+              className="pointer-events-none absolute inset-x-0 bottom-0 flex min-w-0 items-center justify-between gap-2 p-1.5 pt-6 text-scrim-foreground *:pointer-events-auto"
+            >
               {bottomOverlay}
             </div>
           ) : null}

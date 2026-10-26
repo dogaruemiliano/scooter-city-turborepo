@@ -102,6 +102,7 @@ const light = {
   scrim: "oklch(0 0 0 / 40%)",
   scrimForeground: p.mist[50],
   mediaScrim: "oklch(0 0 0 / 65%)",
+  documentPreviewScrim: "oklch(0 0 0 / 75%)",
 } as const;
 
 const dark: Record<keyof typeof light, string> = {
@@ -196,6 +197,7 @@ const dark: Record<keyof typeof light, string> = {
   scrim: "oklch(0 0 0 / 65%)",
   scrimForeground: p.mist[50],
   mediaScrim: "oklch(0 0 0 / 65%)",
+  documentPreviewScrim: "oklch(0 0 0 / 75%)",
 };
 
 export const semanticColors = { light, dark } as const;

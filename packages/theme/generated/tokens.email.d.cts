@@ -90,7 +90,8 @@ export declare const tokens: {
     "borderStrong": "#9CA8AB",
     "scrim": "#00000066",
     "scrimForeground": "#F9FBFB",
-    "mediaScrim": "#000000A6"
+    "mediaScrim": "#000000A6",
+    "documentPreviewScrim": "#000000BF"
   },
   "spacing": {
     "0": 0,

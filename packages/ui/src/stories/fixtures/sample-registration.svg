@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 595 842" role="img" aria-labelledby="title desc">
+<title id="title">Sample vehicle registration document</title>
+<desc id="desc">Fictional document for preview testing. Not valid for registration.</desc>
+<rect width="595" height="842" fill="#fafafa"/>
+<g font-family="sans-serif" fill="#141414">
+<text x="40" y="55" font-size="14" fill="#71717a">SCOOTERCITY · STORYBOOK FIXTURE</text>
+<text x="40" y="94" font-size="27" font-weight="bold">Vehicle registration</text>
+<text x="40" y="123" font-size="14" fill="#71717a">SAMPLE DOCUMENT — NOT VALID</text>
+<path d="M40 145H555" stroke="#d4d4d8"/>
+<text x="40" y="178" font-size="12" fill="#71717a">REGISTRATION NUMBER</text><text x="40" y="203" font-size="18">DEMO 001</text><path d="M40 218H555" stroke="#d4d4d8"/>
+<text x="40" y="242" font-size="12" fill="#71717a">VEHICLE IDENTIFICATION NUMBER</text><text x="40" y="267" font-size="18">DEMO0000000000001</text><path d="M40 282H555" stroke="#d4d4d8"/>
+<text x="40" y="306" font-size="12" fill="#71717a">MAKE / MODEL</text><text x="40" y="331" font-size="18">ScooterCity / Example scooter</text><path d="M40 346H555" stroke="#d4d4d8"/>
+<text x="40" y="370" font-size="12" fill="#71717a">VEHICLE CATEGORY</text><text x="40" y="395" font-size="18">Demonstration vehicle</text><path d="M40 410H555" stroke="#d4d4d8"/>
+<text x="40" y="434" font-size="12" fill="#71717a">FIRST REGISTRATION</text><text x="40" y="459" font-size="18">01 January 2026</text><path d="M40 474H555" stroke="#d4d4d8"/>
+<text x="40" y="498" font-size="12" fill="#71717a">DOCUMENT ISSUED</text><text x="40" y="523" font-size="18">01 October 2026</text><path d="M40 538H555" stroke="#d4d4d8"/>
+<text x="40" y="562" font-size="12" fill="#71717a">REGISTERED KEEPER</text><text x="40" y="587" font-size="18">Example Company</text><path d="M40 602H555" stroke="#d4d4d8"/>
+<text x="40" y="626" font-size="12" fill="#71717a">ADDRESS</text><text x="40" y="651" font-size="18">Sample Street 1, Example City</text><path d="M40 666H555" stroke="#d4d4d8"/>
+<rect x="40" y="707" width="515" height="65" rx="4" fill="none" stroke="#d4d4d8"/>
+<text x="56" y="733" font-size="13" font-weight="bold">FOR COMPONENT PREVIEW ONLY</text>
+<text x="56" y="755" font-size="12" fill="#71717a">All vehicle details and identifiers are fictional.</text>
+<text x="40" y="810" font-size="11" fill="#71717a">DEMO-REGISTRATION · Page 1 of 1</text>
+</g></svg>

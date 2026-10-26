@@ -49,6 +49,10 @@ export const emailSizing = { content: 560 } as const;
 /** Web sizing for document editors and available-width form layouts. */
 export const viewportSizing = {
   primaryFormActions: "minmax(0, 2fr) minmax(0, 3fr)",
+  /** One full document, the spacing-3 gap, and one tenth of the next document. */
+  scooterDocumentCard: "calc((100% - var(--spacing-3)) / 1.1)",
+  scooterDocumentGrid: "repeat(auto-fill, minmax(min(100%, 160px), 1fr))",
+  scooterDocumentCardMax: "220px",
   scooterPhotoPreview: "55dvh",
   scooterPhotoPreviewMobile: "35dvh",
   documentEditor: "80vw",

@@ -164,7 +164,7 @@ function SegmentedRadioGroup<Value extends string>({
               "relative flex min-h-10 min-w-0 cursor-pointer md:min-h-9",
               appearance === "segmented" &&
                 cn(
-                  "p-0.5",
+                  "px-0.5 py-1",
                   "before:pointer-events-none before:absolute before:inset-y-2 before:left-0 before:rounded-full before:border-l before:border-(--radio-border) after:pointer-events-none after:absolute after:inset-x-3 after:top-0 after:rounded-full after:border-t after:border-(--radio-border)",
                   hasDivider(index, columns ?? 2, "column")
                     ? "before:block"

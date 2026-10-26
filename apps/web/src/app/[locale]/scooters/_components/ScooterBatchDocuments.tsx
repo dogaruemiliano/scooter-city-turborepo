@@ -3,7 +3,11 @@
 import { useOptionalSession } from "@/components/auth/SessionProvider";
 import { canAccess } from "@/lib/access";
 import { v1 } from "@repo/api-shared";
-import { motion, spacing } from "@repo/theme";
+import { breakpoints, motion, spacing, viewportSizing } from "@repo/theme";
+import {
+  DocumentStatus,
+  type DocumentStatusState,
+} from "@repo/ui/components/document-status";
 import { DocumentPreview } from "@repo/ui/components/document-preview";
 import {
   Button,
@@ -13,12 +17,10 @@ import {
   CardContent,
   Badge,
   FileDropZone,
-  Spinner,
+  HorizontalScrollArea,
 } from "@repo/ui/components";
-import { FileDropOverlay } from "@repo/ui/components/file-drop-overlay";
-import { useFileDrop } from "@repo/ui/hooks/use-file-drop";
 import { useObjectUrl } from "@repo/ui/hooks/use-object-url";
-import { CheckIcon, SparklesIcon, XIcon } from "lucide-react";
+import { SparklesIcon, XIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import {
   useCallback,
@@ -28,6 +30,7 @@ import {
   useRef,
   useState,
   type ReactNode,
+  type CSSProperties,
 } from "react";
 import {
   ScooterDocumentTypeEditor,
@@ -50,7 +53,6 @@ export function ScooterBatchDocuments({
   onCancelAnalysis,
   children,
   headerActions,
-  importResult,
   onLogicalDocument,
   scooterVin,
 }: {
@@ -77,30 +79,32 @@ export function ScooterBatchDocuments({
     () => new Set(documents.drafts.map((draft) => draft.id)),
   );
   const [errors, setErrors] = useState<string[]>([]);
-  const [expandedImport, setExpandedImport] = useState<typeof importResult>();
-  const [expandedSaved, setExpandedSaved] = useState(false);
   const analysisEntries = useContext(ScooterDocumentAnalysisContext);
-  const compact =
-    documents.existing.length + documents.drafts.length > 0 &&
-    (importResult
-      ? expandedImport !== importResult
-      : documents.existing.length > 0 && !expandedSaved) &&
-    !analyzing &&
-    !errors.length &&
-    !documents.drafts.some(
-      (draft) =>
-        (draft.version === "client_copy" && !draft.originalId) ||
-        draft.status === "failed" ||
-        draft.status === "uploading" ||
-        analysisEntries[draft.id]?.status === "failed",
+  const hasDocuments = documents.existing.length + documents.drafts.length > 0;
+
+  const documentList = useRef<HTMLUListElement>(null);
+  const previousDraftIds = useRef(
+    new Set(documents.drafts.map((draft) => draft.id)),
+  );
+  useEffect(() => {
+    const added = documents.drafts.some(
+      (draft) => !previousDraftIds.current.has(draft.id),
     );
-  const { dragging, handlers: fileDropHandlers } = useFileDrop({
-    disabled,
-    onFiles: (files) => {
-      setExpandedImport(importResult);
-      add(files);
-    },
-  });
+    previousDraftIds.current = new Set(
+      documents.drafts.map((draft) => draft.id),
+    );
+    if (!added || window.innerWidth >= breakpoints.md) return;
+    const viewport = documentList.current?.closest<HTMLElement>(
+      '[data-slot="horizontal-scroll-viewport"]',
+    );
+    if (!viewport) return;
+    viewport.scrollTo?.({
+      left: Math.max(0, viewport.scrollWidth - viewport.clientWidth),
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        ? "instant"
+        : "smooth",
+    });
+  }, [documents.drafts]);
 
   if (!canRead) return null;
 
@@ -164,20 +168,126 @@ export function ScooterBatchDocuments({
           </div>
         </div>
       </CardHeader>
-      <CardContent
-        hidden={compact}
-        className={compact ? "hidden" : "grid gap-4"}
-      >
+      <CardContent className="grid min-w-0 gap-4">
         <FileDropZone
           label={t("batch.drop")}
           mobileLabel={t("batch.select")}
           browseLabel={t("batch.browse")}
+          addLabel={t("batch.addDocument")}
           hint={t("batch.hint")}
           requirements={t("batch.requirements")}
           accept={v1.scooters.SCOOTER_DOCUMENT_CONTENT_TYPES.join(",")}
           disabled={disabled}
           onFiles={add}
-        />
+        >
+          {hasDocuments
+            ? (addCard) => (
+                <div className="grid min-w-0 gap-4">
+                  <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+                    <p
+                      className="text-sm text-muted-foreground"
+                      aria-live="polite"
+                    >
+                      {t("documentCount", {
+                        count: documents.existing.reduce(
+                          (count, document) =>
+                            count + (document.clientCopy ? 2 : 1),
+                          documents.drafts.length,
+                        ),
+                      })}
+                    </p>
+                    {analyzing && onCancelAnalysis ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={disabled}
+                        onClick={onCancelAnalysis}
+                      >
+                        {extraction("cancel")}
+                      </Button>
+                    ) : null}
+                  </div>
+                  <HorizontalScrollArea
+                    label={t("batch.attached")}
+                    fadeEdges="always"
+                    className="-mx-(--card-spacing) w-auto [--gallery-fade-width:var(--card-spacing)] md:mx-0 md:w-full md:[--gallery-fade-width:0]"
+                    fadeWidth="var(--gallery-fade-width)"
+                    contentWidth="viewport"
+                    snap
+                    scrollbarVisibility="desktop"
+                  >
+                    <ul
+                      ref={documentList}
+                      aria-label={t("batch.attached")}
+                      style={
+                        {
+                          "--document-card-width":
+                            viewportSizing.scooterDocumentCard,
+                          "--document-card-max-width":
+                            viewportSizing.scooterDocumentCardMax,
+                          "--document-grid-columns":
+                            viewportSizing.scooterDocumentGrid,
+                        } as CSSProperties
+                      }
+                      className="grid w-full min-w-0 grid-flow-col auto-cols-(--document-card-width) gap-3 px-(--card-spacing) md:px-0 [&>li]:snap-start [&>li:last-child]:relative [&>li:last-child]:after:absolute [&>li:last-child]:after:left-full [&>li:last-child]:after:top-0 [&>li:last-child]:after:h-px [&>li:last-child]:after:w-(--card-spacing) [&>li:last-child]:after:content-[''] md:[&>li:last-child]:after:content-none has-[>li:only-child]:auto-cols-[100%] md:grid-flow-row md:auto-cols-auto md:grid-cols-(--document-grid-columns) md:[&>li]:max-w-(--document-card-max-width)"
+                    >
+                      {documents.existing.flatMap((document) => [
+                        <SavedDocumentCard
+                          key={document.id}
+                          document={document}
+                          disabled={disabled}
+                          onRemove={() => documents.removeExisting(document.id)}
+                          onLogicalDocument={
+                            analysisEntries[document.id]?.status === "success"
+                              ? onLogicalDocument
+                              : undefined
+                          }
+                          scooterVin={scooterVin}
+                        />,
+                        ...(document.clientCopy
+                          ? [
+                              <SavedDocumentCard
+                                key={`${document.id}-copy`}
+                                document={document}
+                                clientCopy
+                                disabled={disabled}
+                                onRemove={() =>
+                                  documents.removeExisting(document.id)
+                                }
+                              />,
+                            ]
+                          : []),
+                      ])}
+                      {documents.drafts.map((draft) => (
+                        <BatchDocumentRow
+                          key={draft.id}
+                          draft={draft}
+                          animateEntrance={!initialDraftIds.has(draft.id)}
+                          documents={documents}
+                          disabled={disabled}
+                          canExtract={canExtract}
+                          onLogicalDocument={onLogicalDocument}
+                          scooterVin={scooterVin}
+                          onPreview={() => documents.preview(draft)}
+                          onType={(type) =>
+                            documents.classify(draft.id, type, true)
+                          }
+                          onRemove={() => documents.removeDraft(draft.id)}
+                          onRetry={() =>
+                            draft.status === "failed"
+                              ? documents.retry(draft)
+                              : onRetryAnalysis?.(draft.id)
+                          }
+                        />
+                      ))}
+                      {addCard ? <li className="min-w-0">{addCard}</li> : null}
+                    </ul>
+                  </HorizontalScrollArea>
+                </div>
+              )
+            : undefined}
+        </FileDropZone>
         {!canExtract ? (
           <p className="text-sm text-muted-foreground">
             {t("batch.manualTypes")}
@@ -189,84 +299,6 @@ export function ScooterBatchDocuments({
               <li key={index}>{error}</li>
             ))}
           </ul>
-        ) : null}
-      </CardContent>
-      <CardContent className="grid min-w-0 gap-4">
-        {documents.existing.length || documents.drafts.length ? (
-          <>
-            <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
-              <p className="text-sm text-muted-foreground" aria-live="polite">
-                {t("documentCount", {
-                  count: documents.existing.reduce(
-                    (count, document) => count + (document.clientCopy ? 2 : 1),
-                    documents.drafts.length,
-                  ),
-                })}
-              </p>
-              {analyzing && onCancelAnalysis ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={disabled}
-                  onClick={onCancelAnalysis}
-                >
-                  {extraction("cancel")}
-                </Button>
-              ) : null}
-            </div>
-            <ul
-              aria-label={t("batch.attached")}
-              className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3"
-            >
-              {documents.existing.flatMap((document) => [
-                <SavedDocumentCard
-                  key={document.id}
-                  document={document}
-                  disabled={disabled}
-                  onRemove={() => documents.removeExisting(document.id)}
-                  onLogicalDocument={
-                    analysisEntries[document.id]?.status === "success"
-                      ? onLogicalDocument
-                      : undefined
-                  }
-                  scooterVin={scooterVin}
-                />,
-                ...(document.clientCopy
-                  ? [
-                      <SavedDocumentCard
-                        key={`${document.id}-copy`}
-                        document={document}
-                        clientCopy
-                        disabled={disabled}
-                        onRemove={() => documents.removeExisting(document.id)}
-                      />,
-                    ]
-                  : []),
-              ])}
-              {documents.drafts.map((draft) => (
-                <BatchDocumentRow
-                  key={draft.id}
-                  draft={draft}
-                  animateEntrance={!initialDraftIds.has(draft.id)}
-                  documents={documents}
-                  disabled={disabled}
-                  canExtract={canExtract}
-                  onLogicalDocument={onLogicalDocument}
-                  scooterVin={scooterVin}
-                  onPreview={() => documents.preview(draft)}
-                  onType={(type) => documents.classify(draft.id, type, true)}
-                  onRemove={() => documents.removeDraft(draft.id)}
-                  onRetry={() =>
-                    draft.status === "failed"
-                      ? documents.retry(draft)
-                      : onRetryAnalysis?.(draft.id)
-                  }
-                />
-              ))}
-            </ul>
-            <p className="text-sm text-muted-foreground">{t("batch.review")}</p>
-          </>
         ) : null}
       </CardContent>
       {(documents.removed ?? []).length ? (
@@ -289,32 +321,6 @@ export function ScooterBatchDocuments({
               </Button>
             </div>
           ))}
-        </CardContent>
-      ) : null}
-      {compact ? (
-        <CardContent>
-          {" "}
-          <Button
-            type="button"
-            variant="outline"
-            className="relative w-full justify-center rounded-dashed-surface border-(length:--dashed-surface-border-width) border-dashed bg-transparent text-center duration-normal enabled:hover:border-primary enabled:active:border-primary enabled:active:border-solid"
-            disabled={disabled}
-            aria-label={creation("importMore")}
-            onClick={() => {
-              setExpandedImport(importResult);
-              setExpandedSaved(true);
-            }}
-            {...fileDropHandlers}
-          >
-            {creation("importMore")}
-            {dragging ? (
-              <FileDropOverlay
-                compact
-                label={creation("importMore")}
-                className="rounded-lg"
-              />
-            ) : null}
-          </Button>
         </CardContent>
       ) : null}
       {children ? <CardContent>{children}</CardContent> : null}
@@ -440,7 +446,7 @@ function BatchDocumentRow({
         : state?.status === "failed"
           ? extractionT(`errors.${state.error}`)
           : state?.status === "processing"
-            ? extractionT("analyzing")
+            ? extractionT(state.phase === "queued" ? "queued" : "analyzing")
             : draft.version === "client_copy"
               ? t("batch.uploaded")
               : state?.status === "success"
@@ -448,6 +454,21 @@ function BatchDocumentRow({
                 : canExtract
                   ? extractionT("queued")
                   : t("batch.manualTypes");
+  const documentState: DocumentStatusState = failed
+    ? "failed"
+    : draft.status === "uploading"
+      ? "uploading"
+      : state?.status === "processing"
+        ? state.phase === "queued"
+          ? "queued"
+          : "analyzing"
+        : draft.version === "client_copy"
+          ? "uploaded"
+          : state?.status === "success"
+            ? "analyzed"
+            : canExtract
+              ? "queued"
+              : "uploaded";
   const labels = {
     error: t("pdfPreviewError"),
     previousPage: t("previousPage"),
@@ -546,20 +567,7 @@ function BatchDocumentRow({
                 scooterVin={scooterVin}
               />
             )}
-            <p
-              role={failed ? "alert" : "status"}
-              className={`flex min-w-0 items-center justify-end gap-1 text-right text-xs wrap-anywhere ${failed ? "rounded-md bg-destructive-subtle px-2 py-1 text-destructive" : "text-scrim-foreground"}`}
-            >
-              {busy ? (
-                <Spinner className="shrink-0" />
-              ) : state?.status === "success" ? (
-                <CheckIcon
-                  className="size-4 shrink-0 text-success"
-                  aria-hidden="true"
-                />
-              ) : null}
-              {status}
-            </p>
+            <DocumentStatus state={documentState} label={status} />
           </>
         }
       />

@@ -1,5 +1,6 @@
 import { PageHeaderActionsContext } from "@/components/PageHeaderActions";
 import { ApiError, v1 } from "@repo/api-shared";
+import { scrollFade } from "@repo/theme";
 import { messages } from "@repo/i18n";
 import {
   fireEvent,
@@ -746,9 +747,7 @@ it("updates the draft state without a detection toast", async () => {
       .firstElementChild,
   ).toHaveClass("bg-warning-subtle", "text-warning");
   const rail = screen.getByRole("region", { name: "Scooter drafts" });
-  expect(rail).toHaveClass(
-    "[mask-image:linear-gradient(to_right,var(--scroll-fade-start),currentColor_var(--spacing-6),currentColor_calc(100%_-_var(--spacing-6)),var(--scroll-fade-end))]",
-  );
+  expect(rail.style.maskImage).toBe(scrollFade.softMask);
   expect(
     screen.getByRole("navigation", { name: "Scooter drafts" }),
   ).toHaveClass("w-max");

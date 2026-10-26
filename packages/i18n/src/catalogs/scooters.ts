@@ -536,6 +536,7 @@ export const scootersCatalog = {
     documents: {
       clientCopy: "For client",
       batch: {
+        addDocument: "Add document",
         attached: "Attached documents",
         uploaded: "Uploaded",
         uploadedAndAnalyzed: "Uploaded and analyzed",
@@ -1826,6 +1827,7 @@ export const scootersCatalog = {
     documents: {
       clientCopy: "Pentru client",
       batch: {
+        addDocument: "Adaugă document",
         attached: "Documente atașate",
         uploaded: "Încărcat",
         uploadedAndAnalyzed: "Încărcat și analizat",

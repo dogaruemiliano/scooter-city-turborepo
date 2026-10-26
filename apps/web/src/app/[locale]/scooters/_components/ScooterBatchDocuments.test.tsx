@@ -1,4 +1,5 @@
 import { v1 } from "@repo/api-shared";
+import { scrollFade } from "@repo/theme";
 import { messages } from "@repo/i18n";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -75,6 +76,139 @@ beforeEach(() => {
 });
 
 describe("Scooter batch document states", () => {
+  it("keeps the mobile upload area below the documents without an expand button or ghost card", () => {
+    const originalWidth = window.innerWidth;
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: 390,
+    });
+    try {
+      render(view());
+      const list = screen.getByRole("list", { name: "Attached documents" });
+      const picker = screen.getByRole("button", {
+        name: "Select scooter documents",
+      });
+      expect(
+        list.compareDocumentPosition(picker) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(
+        screen.queryByRole("button", { name: "Add document" }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Import more documents" }),
+      ).not.toBeInTheDocument();
+      expect(within(list).getAllByRole("listitem")).toHaveLength(1);
+    } finally {
+      Object.defineProperty(window, "innerWidth", {
+        configurable: true,
+        value: originalWidth,
+      });
+    }
+  });
+
+  it("scrolls the mobile rail to newly appended documents, but not on analysis updates or removal", () => {
+    const originalWidth = window.innerWidth;
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: 390,
+    });
+    try {
+      const fixture = render(view());
+      const viewport = screen.getByRole("region", {
+        name: "Attached documents",
+      });
+      const scrollTo = vi.fn();
+      Object.defineProperties(viewport, {
+        scrollTo: { configurable: true, value: scrollTo },
+        scrollWidth: { configurable: true, value: 900 },
+        clientWidth: { configurable: true, value: 300 },
+      });
+      expect(scrollTo).not.toHaveBeenCalled();
+      const file = {
+        id: "new",
+        type: "civ" as const,
+        status: "uploading" as const,
+        file: new File(["image"], "new.jpg", { type: "image/jpeg" }),
+      };
+      fixture.rerender(view({ drafts: [file] }));
+      expect(scrollTo).toHaveBeenCalledExactlyOnceWith({
+        left: 600,
+        behavior: "smooth",
+      });
+      const list = screen.getByRole("list", { name: "Attached documents" });
+      expect(
+        within(within(list).getAllByRole("listitem").at(-1)!).getByText(
+          "new.jpg",
+        ),
+      ).toBeInTheDocument();
+      fixture.rerender(view({ drafts: [{ ...file, status: "ready" }] }));
+      fixture.rerender(view());
+      expect(scrollTo).toHaveBeenCalledTimes(1);
+    } finally {
+      Object.defineProperty(window, "innerWidth", {
+        configurable: true,
+        value: originalWidth,
+      });
+    }
+  });
+
+  it("accepts a file dropped directly on the desktop gallery surrounding the document cards", () => {
+    render(view());
+    const gallery = screen.getByRole("region", {
+      name: "Drop your scooter documents",
+    });
+    expect(
+      within(gallery).getByRole("list", { name: "Attached documents" }),
+    ).toBeInTheDocument();
+    const file = new File(["pdf"], "new.pdf", { type: "application/pdf" });
+    drop(gallery, [file]);
+    expect(add).toHaveBeenCalledExactlyOnceWith(null, [file]);
+  });
+
+  it("uses a viewport-sized snapping rail for both saved and uploaded document cards", () => {
+    const file = {
+      id: "one",
+      type: "civ" as const,
+      status: "ready" as const,
+      file: new File(["image"], "CIV.jpg", { type: "image/jpeg" }),
+    };
+    const fixture = render(view({ drafts: [file] }));
+    const list = screen.getByRole("list", {
+      name: messages.en.scooters.documents.batch.attached,
+    });
+    const viewport = screen.getByRole("region", {
+      name: messages.en.scooters.documents.batch.attached,
+    });
+    expect(viewport).toHaveClass(
+      "snap-x",
+      "snap-proximity",
+      "[--scroll-fade-start:transparent]",
+      "[--scroll-fade-end:transparent]",
+      "scroll-px-(--scroll-fade-width)",
+    );
+    expect(viewport.style.maskImage).toBe(scrollFade.softMask);
+    expect(viewport.className).not.toContain("data-[overflow-x-start]");
+    expect(viewport.className).not.toContain("data-[overflow-x-end]");
+    expect(viewport.parentElement).toHaveClass(
+      "-mx-(--card-spacing)",
+      "w-auto",
+    );
+    expect(list).toHaveClass("px-(--card-spacing)");
+    expect(viewport.style.getPropertyValue("--scroll-fade-width")).toBe(
+      "var(--gallery-fade-width)",
+    );
+    expect(list.parentElement).toHaveStyle({ minWidth: 0, width: "100%" });
+    expect(within(list).getAllByRole("listitem")).toHaveLength(3);
+    viewport.scrollLeft = 120;
+    fixture.rerender(view({ drafts: [{ ...file, status: "uploading" }] }));
+    expect(
+      screen.getByRole("region", {
+        name: messages.en.scooters.documents.batch.attached,
+      }),
+    ).toBe(viewport);
+    expect(viewport.scrollLeft).toBe(120);
+  });
+
   it("places import more after all document previews", () => {
     const file = {
       id: "one",
@@ -87,7 +221,7 @@ describe("Scooter batch document states", () => {
       '[data-slot="document-preview-card"]',
     )!;
     const addMore = screen.getByRole("button", {
-      name: "Import more documents",
+      name: "Add document",
     });
     expect(
       preview.compareDocumentPosition(addMore) &
@@ -169,7 +303,7 @@ describe("Scooter batch document states", () => {
         </ScooterDocumentAnalysisContext>,
       );
       const expand = screen.queryByRole("button", {
-        name: "Import more documents",
+        name: "Add document",
       });
       if (expand) fireEvent.click(expand);
       const name = screen.getByRole("button", { name: "CIV.pdf" });
@@ -307,7 +441,7 @@ describe("Scooter batch document states", () => {
       screen.getByRole("button", { name: /Drop your scooter documents/ }),
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "Import more documents" }),
+      screen.queryByRole("button", { name: "Add document" }),
     ).not.toBeInTheDocument();
     expect(
       screen.queryByText(messages.en.scooters.creation.importComplete),
@@ -317,7 +451,7 @@ describe("Scooter batch document states", () => {
   it("restores the drop area when the final attached document is removed", () => {
     const fixture = render(view());
     expect(
-      screen.getByRole("button", { name: "Import more documents" }),
+      screen.getByRole("button", { name: "Add document" }),
     ).toBeInTheDocument();
     fixture.rerender(view({ attached: [] }));
     expect(
@@ -328,30 +462,39 @@ describe("Scooter batch document states", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("keeps click-to-expand on the compact drop target", async () => {
+  it("opens the file picker directly from the add card without revealing another upload control", async () => {
     const user = userEvent.setup();
-    render(view());
-    await user.click(
-      screen.getByRole("button", { name: "Import more documents" }),
-    );
+    const fixture = render(view());
+    const picker =
+      fixture.container.querySelector<HTMLInputElement>('input[type="file"]')!;
+    const click = vi.spyOn(picker, "click");
+    await user.click(screen.getByRole("button", { name: "Add document" }));
+    expect(click).toHaveBeenCalledOnce();
     expect(
-      screen.getByRole("button", { name: /Drop your scooter documents/ }),
-    ).toBeInTheDocument();
-    expect(add).not.toHaveBeenCalled();
+      screen.queryByRole("button", { name: /Drop your scooter documents/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Import more documents" }),
+    ).not.toBeInTheDocument();
   });
 
   it("highlights file drags and passes dropped files through the existing upload path", () => {
     render(view());
     const target = screen.getByRole("button", {
-      name: "Import more documents",
+      name: "Add document",
     });
     fireEvent.dragOver(target, { dataTransfer: { types: ["Files"] } });
-    expect(target.querySelector('[data-slot="file-drop-overlay"]')).toHaveClass(
-      "bg-file-drop-overlay",
-      "backdrop-blur-file-drop",
-    );
+    expect(
+      target
+        .closest('[data-slot="file-drop-gallery"]')!
+        .querySelector('[data-slot="file-drop-overlay"]'),
+    ).toHaveClass("bg-file-drop-overlay", "backdrop-blur-file-drop");
     fireEvent.dragLeave(target, { relatedTarget: null });
-    expect(target.querySelector('[data-slot="file-drop-overlay"]')).toBeNull();
+    expect(
+      target
+        .closest('[data-slot="file-drop-gallery"]')!
+        .querySelector('[data-slot="file-drop-overlay"]'),
+    ).toBeNull();
     const pdf = new File(["pdf"], "registration.pdf", {
       type: "application/pdf",
     });
@@ -359,19 +502,19 @@ describe("Scooter batch document states", () => {
     drop(target, [pdf, image]);
     expect(add).toHaveBeenCalledExactlyOnceWith(null, [pdf, image]);
     expect(
-      screen.getByRole("button", { name: /Drop your scooter documents/ }),
+      screen.getByRole("button", { name: "Add document" }),
     ).toBeInTheDocument();
   });
 
   it("shows validation errors when an invalid file is dropped on the compact target", () => {
     render(view());
-    drop(screen.getByRole("button", { name: "Import more documents" }), [
+    drop(screen.getByRole("button", { name: "Add document" }), [
       new File(["text"], "notes.txt", { type: "text/plain" }),
     ]);
     expect(add).not.toHaveBeenCalled();
     expect(screen.getByRole("alert")).toHaveTextContent("notes.txt");
     expect(
-      screen.getByRole("button", { name: /Drop your scooter documents/ }),
+      screen.getByRole("button", { name: "Add document" }),
     ).toBeInTheDocument();
   });
 
@@ -391,7 +534,7 @@ describe("Scooter batch document states", () => {
         ),
       }),
     );
-    drop(screen.getByRole("button", { name: "Import more documents" }), [
+    drop(screen.getByRole("button", { name: "Add document" }), [
       new File([], "empty.pdf", { type: "application/pdf" }),
       large,
       duplicate,
@@ -409,11 +552,15 @@ describe("Scooter batch document states", () => {
   it("does not accept or highlight drops while disabled", () => {
     render(view({ disabled: true }));
     const target = screen.getByRole("button", {
-      name: "Import more documents",
+      name: "Add document",
     });
     expect(target).toBeDisabled();
     fireEvent.dragOver(target, { dataTransfer: { types: ["Files"] } });
-    expect(target.querySelector('[data-slot="file-drop-overlay"]')).toBeNull();
+    expect(
+      target
+        .closest('[data-slot="file-drop-gallery"]')!
+        .querySelector('[data-slot="file-drop-overlay"]'),
+    ).toBeNull();
     drop(target, [
       new File(["pdf"], "registration.pdf", { type: "application/pdf" }),
     ]);
@@ -426,10 +573,14 @@ describe("Scooter batch document states", () => {
   it("ignores text drags and empty drops", () => {
     render(view());
     const target = screen.getByRole("button", {
-      name: "Import more documents",
+      name: "Add document",
     });
     fireEvent.dragOver(target, { dataTransfer: { types: ["text/plain"] } });
-    expect(target.querySelector('[data-slot="file-drop-overlay"]')).toBeNull();
+    expect(
+      target
+        .closest('[data-slot="file-drop-gallery"]')!
+        .querySelector('[data-slot="file-drop-overlay"]'),
+    ).toBeNull();
     drop(target, []);
     expect(add).not.toHaveBeenCalled();
     expect(target).toBeInTheDocument();

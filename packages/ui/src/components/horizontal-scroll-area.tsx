@@ -1,9 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useRef, type ComponentProps } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  type CSSProperties,
+  type ComponentProps,
+} from "react";
 import { ScrollArea as ScrollAreaPrimitive } from "@base-ui/react/scroll-area";
 import { ChevronRight } from "lucide-react";
-import { motion, spacing } from "@repo/theme";
+import { motion, spacing, scrollFade } from "@repo/theme";
 import { Button } from "@repo/ui/components/button";
 import { cn } from "@repo/ui/lib/utils";
 
@@ -13,8 +19,14 @@ type HorizontalScrollAreaProps = Omit<
 > & {
   className?: string;
   label: string;
-  /** Fade only the edges with horizontally clipped content, using the shared tab fade width. */
-  fadeEdges?: boolean;
+  /** Fade clipped edges, or keep both edge fades fixed with "always". */
+  fadeEdges?: boolean | "always";
+  /** A theme token or inherited surface spacing variable for the edge fade width. */
+  fadeWidth?: string;
+  /** Snap gently to children with snap-start without trapping touch scrolling. */
+  snap?: boolean;
+  /** Base percentage-sized cards on the viewport instead of intrinsic content width. */
+  contentWidth?: "intrinsic" | "viewport";
   /** Keep touch scrolling, showing the scrollbar only at the lg breakpoint and above. */
   scrollbarVisibility?: "always" | "desktop";
   /** Enables a right-edge arrow and mouse-hover scrolling across the full viewport height. */
@@ -27,6 +39,9 @@ export function HorizontalScrollArea({
   className,
   label,
   fadeEdges = false,
+  fadeWidth = "var(--spacing-6)",
+  snap = false,
+  contentWidth = "intrinsic",
   scrollbarVisibility = "always",
   scrollRightLabel,
   onPointerMove,
@@ -120,14 +135,31 @@ export function HorizontalScrollArea({
         data-slot="horizontal-scroll-viewport"
         aria-label={label}
         role="region"
+        style={
+          {
+            "--scroll-fade-width": fadeWidth,
+            maskImage: fadeEdges ? scrollFade.softMask : undefined,
+          } as CSSProperties
+        }
         tabIndex={0}
         className={cn(
           "w-full min-w-0 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
-          fadeEdges &&
-            "[--scroll-fade-start:currentColor] [--scroll-fade-end:currentColor] data-[overflow-x-start]:[--scroll-fade-start:transparent] data-[overflow-x-end]:[--scroll-fade-end:transparent] [mask-image:linear-gradient(to_right,var(--scroll-fade-start),currentColor_var(--spacing-6),currentColor_calc(100%_-_var(--spacing-6)),var(--scroll-fade-end))]",
+          snap && "snap-x snap-proximity",
+          fadeEdges === "always"
+            ? "[--scroll-fade-start:transparent] [--scroll-fade-end:transparent] scroll-px-(--scroll-fade-width)"
+            : fadeEdges &&
+                "[--scroll-fade-start:currentColor] [--scroll-fade-end:currentColor] data-[overflow-x-start]:[--scroll-fade-start:transparent] data-[overflow-x-end]:[--scroll-fade-end:transparent]",
         )}
       >
-        <ScrollAreaPrimitive.Content>{children}</ScrollAreaPrimitive.Content>
+        <ScrollAreaPrimitive.Content
+          style={
+            contentWidth === "viewport"
+              ? { minWidth: 0, width: "100%" }
+              : undefined
+          }
+        >
+          {children}
+        </ScrollAreaPrimitive.Content>
       </ScrollAreaPrimitive.Viewport>
       {scrollRightLabel ? (
         <div

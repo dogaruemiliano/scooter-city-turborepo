@@ -209,7 +209,7 @@ describe("ScooterEditForm", () => {
     );
     expect(screen.getByText("Fill automatically")).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Import more documents" }),
+      screen.getByRole("button", { name: "Add document" }),
     ).toBeInTheDocument();
     await browser.click(
       screen.getByRole("button", { name: "Preview client.jpg" }),

@@ -235,7 +235,7 @@ describe("Scooter documents", () => {
       "true",
     );
   });
-  it("keeps preview cards and analysis feedback visible when import controls expand", async () => {
+  it("keeps preview cards and analysis feedback visible inside the desktop drop gallery", async () => {
     function Fixture() {
       const documents = useScooterDocuments();
       return (
@@ -293,10 +293,14 @@ describe("Scooter documents", () => {
     const summary = within(
       screen.getByRole("list", { name: "Attached documents" }),
     );
-    const rows = summary.getAllByRole("listitem");
+    const rows = summary
+      .getAllByRole("listitem")
+      .filter((row) =>
+        row.querySelector('[data-slot="document-preview-card"]'),
+      );
     expect(rows).toHaveLength(2);
     const importMore = screen.getByRole("button", {
-      name: "Import more documents",
+      name: "Add document",
     });
     expect(importMore).toHaveClass(
       "w-full",
@@ -326,9 +330,7 @@ describe("Scooter documents", () => {
     expect(
       screen.queryByRole("button", { name: /Drop your scooter documents/ }),
     ).not.toBeInTheDocument();
-    await browser.click(
-      screen.getByRole("button", { name: "Import more documents" }),
-    );
+    await browser.click(screen.getByRole("button", { name: "Add document" }));
     expect(
       screen.getByRole("list", { name: "Attached documents" }),
     ).toBeInTheDocument();
@@ -336,8 +338,8 @@ describe("Scooter documents", () => {
       2,
     );
     expect(
-      screen.getByRole("button", { name: /Drop your scooter documents/ }),
-    ).toBeInTheDocument();
+      screen.queryByRole("button", { name: /Drop your scooter documents/ }),
+    ).not.toBeInTheDocument();
   });
   it("requires an explicit review action after manually changing a valid VIN", async () => {
     mockBatchExtraction(["civ"]);
@@ -703,9 +705,6 @@ describe("Scooter documents", () => {
     );
     expect(screen.getByLabelText("Plate number")).toHaveValue("14949");
     expect(screen.getByLabelText("Insured name")).toHaveValue("Example Person");
-    await browser.click(
-      screen.getByRole("button", { name: "Import more documents" }),
-    );
     for (const [index, type] of types.entries()) {
       await browser.click(
         screen.getByRole("button", {
@@ -852,10 +851,6 @@ describe("Scooter documents", () => {
     );
     await waitFor(() => expect(mocks.put).toHaveBeenCalledTimes(3));
     for (const document of documents) {
-      const expand = screen.queryByRole("button", {
-        name: "Import more documents",
-      });
-      if (expand) await browser.click(expand);
       await browser.click(
         screen.getByRole("button", {
           name: `Edit document type for ${document.fileName}`,
@@ -872,12 +867,6 @@ describe("Scooter documents", () => {
     }
     const vin = "L5YAUCZB9H1148984";
     const copy = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue();
-    {
-      const expand = screen.queryByRole("button", {
-        name: "Import more documents",
-      });
-      if (expand) await browser.click(expand);
-    }
     expect(
       screen.queryByRole("button", { name: "Import JSON" }),
     ).not.toBeInTheDocument();
@@ -1171,22 +1160,10 @@ describe("Scooter documents", () => {
       expect(screen.getAllByText("Details extracted")).toHaveLength(2),
     );
     expect(screen.getAllByLabelText("Insured name")).toHaveLength(1);
-    {
-      const expand = screen.queryByRole("button", {
-        name: "Import more documents",
-      });
-      if (expand) await browser.click(expand);
-    }
     await browser.click(
       screen.getByRole("button", { name: "Remove front.pdf" }),
     );
     expect(screen.getByLabelText("Insured name")).toHaveValue("Example Person");
-    {
-      const expand = screen.queryByRole("button", {
-        name: "Import more documents",
-      });
-      if (expand) await browser.click(expand);
-    }
     await browser.click(
       screen.getByRole("button", { name: "Remove back.pdf" }),
     );

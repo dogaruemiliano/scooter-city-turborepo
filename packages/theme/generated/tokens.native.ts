@@ -93,6 +93,7 @@ export const tokens = {
       scrim: "#00000066",
       scrimForeground: "#F9FBFB",
       mediaScrim: "#000000A6",
+      documentPreviewScrim: "#000000BF",
     },
     dark: {
       difficultyEasy: "#3B82F6",
@@ -185,6 +186,7 @@ export const tokens = {
       scrim: "#000000A6",
       scrimForeground: "#F9FBFB",
       mediaScrim: "#000000A6",
+      documentPreviewScrim: "#000000BF",
     },
   },
   spacing: {

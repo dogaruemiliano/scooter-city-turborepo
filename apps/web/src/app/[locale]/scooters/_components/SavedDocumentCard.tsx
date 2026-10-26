@@ -1,9 +1,10 @@
 "use client";
 
 import { v1 } from "@repo/api-shared";
-import { Badge, Button, Spinner } from "@repo/ui/components";
+import { Badge, Button } from "@repo/ui/components";
+import { DocumentStatus } from "@repo/ui/components/document-status";
 import { DocumentPreview } from "@repo/ui/components/document-preview";
-import { CheckIcon, ShieldIcon, XIcon } from "lucide-react";
+import { ShieldIcon, XIcon } from "lucide-react";
 import { useContext, useState } from "react";
 import { useTranslations } from "next-intl";
 import { webApi } from "@/lib/api";
@@ -129,24 +130,28 @@ export function SavedDocumentCard({
                 scooterVin={scooterVin}
               />
             )}
-            <p
-              role={failed ? "alert" : "status"}
-              className={`flex min-w-0 items-center justify-end gap-1 text-right text-xs wrap-anywhere ${failed ? "rounded-md bg-destructive-subtle px-2 py-1 text-destructive" : "text-scrim-foreground"}`}
-            >
-              {processing ? (
-                <Spinner className="shrink-0" />
-              ) : extracted ? (
-                <CheckIcon
-                  className="size-4 shrink-0 text-success"
-                  aria-hidden="true"
-                />
-              ) : null}
-              {processing
-                ? extraction("analyzing")
-                : failed
-                  ? extraction(`errors.${entry.error}`)
-                  : t(extracted ? "batch.read" : "batch.uploaded")}
-            </p>
+            <DocumentStatus
+              state={
+                failed
+                  ? "failed"
+                  : processing
+                    ? entry.phase === "queued"
+                      ? "queued"
+                      : "analyzing"
+                    : extracted
+                      ? "analyzed"
+                      : "uploaded"
+              }
+              label={
+                processing
+                  ? extraction(
+                      entry.phase === "queued" ? "queued" : "analyzing",
+                    )
+                  : failed
+                    ? extraction(`errors.${entry.error}`)
+                    : t(extracted ? "batch.read" : "batch.uploaded")
+              }
+            />
           </>
         }
       />

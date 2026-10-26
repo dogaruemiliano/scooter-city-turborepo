@@ -36,13 +36,16 @@ const document: v1.scooters.LogicalDocumentExtraction = {
 };
 
 describe("document card type editor", () => {
-  it("keeps the type selector behind a small edit action", async () => {
+  it("opens the type selector by pressing the type label", async () => {
     const user = userEvent.setup();
     const { onType } = mount();
     expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
-    await user.click(
-      screen.getByRole("button", { name: "Edit document type for scan.pdf" }),
-    );
+    const trigger = screen.getByRole("button", {
+      name: "Edit document type for scan.pdf",
+    });
+    expect(trigger).toHaveTextContent("CIV");
+    expect(trigger.lastElementChild?.tagName.toLowerCase()).toBe("svg");
+    await user.click(screen.getByText("CIV"));
     await user.click(
       screen.getByRole("combobox", { name: "Document type for scan.pdf" }),
     );
@@ -106,5 +109,8 @@ describe("document card type editor", () => {
     expect(
       screen.getByRole("button", { name: "Edit document type for scan.pdf" }),
     ).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "Edit document type for scan.pdf" }),
+    ).toHaveClass("disabled:bg-transparent");
   });
 });
