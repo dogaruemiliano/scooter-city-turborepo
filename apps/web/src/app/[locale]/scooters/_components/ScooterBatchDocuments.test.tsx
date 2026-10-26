@@ -9,6 +9,8 @@ import type { DocumentAnalysisState } from "./useScooterDocumentAnalysis";
 import { ScooterBatchDocuments } from "./ScooterBatchDocuments";
 import type { ScooterDocumentsEditor } from "./useScooterDocuments";
 
+vi.mock("@/lib/api", () => ({ webApi: { url: (path: string) => path } }));
+
 vi.mock("@/components/auth/SessionProvider", () => ({
   useOptionalSession: () => ({ user: { isSuperAdmin: true } }),
 }));

@@ -32,7 +32,11 @@ test("VIN authority is CIV, insurance, export, foreign registration, then other 
   );
 });
 test("handwritten registration and yellow ITP cards never supply a VIN", () => {
-  for (const documentType of ["registration_certificate", "itp_card"]) {
+  for (const documentType of [
+    "registration_certificate",
+    "itp_card",
+    "other",
+  ]) {
     assert.equal(v1.scooters.scooterDocumentReadsVin(documentType), false);
     assert.equal(
       v1.scooters.preferredScooterDocumentVin([{ documentType, vin }]),
@@ -41,7 +45,7 @@ test("handwritten registration and yellow ITP cards never supply a VIN", () => {
   }
 });
 test("purchase proof and a paired client copy are valid without CIV or registration", () => {
-  for (const type of ["ownership_proof", "export_certificate"]) {
+  for (const type of ["ownership_proof", "export_certificate", "other"]) {
     assert.equal(
       v1.scooters.createScooterInputSchema.safeParse({
         vin,

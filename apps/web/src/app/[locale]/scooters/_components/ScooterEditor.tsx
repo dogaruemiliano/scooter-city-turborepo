@@ -655,22 +655,10 @@ export function ScooterEditor({
     }
   }
 
-  async function extractAndContinue() {
-    if (!canExtract || analysis.running || documents.blocked) return;
-    setAnalysisError(null);
-    if (importedCurrentDocuments && !hasFailedAnalysis) {
-      return;
-    }
-    const results = await analysis.run();
-    if (!results || results.some((entry) => entry?.status === "failed")) return;
-    applyAnalysis(results);
-  }
-
   // Uploading is the user's intent to analyze. Never retry a failed paid request automatically.
   const runAnalysis = analysis.run;
   useEffect(() => {
     if (
-      scooter ||
       saveCompleted ||
       !canExtract ||
       (importedCurrentDocuments &&
@@ -722,9 +710,11 @@ export function ScooterEditor({
   // Retain visual copy evidence before the analysis hook drops copies from its
   // active sources. Copies never become independent form-field authorities.
   useEffect(() => {
-    if (scooter) return;
     const copies = Object.values(analysis.entries).flatMap((entry) =>
-      entry.status === "success" && entry.analysis.extractedData.clientCopy
+      entry.status === "success" &&
+      (scooter
+        ? documents.drafts.some((draft) => draft.id === entry.analysis.sourceId)
+        : entry.analysis.extractedData.clientCopy)
         ? [[entry.analysis.sourceId, entry.analysis.extractedData] as const]
         : [],
     );
@@ -735,13 +725,14 @@ export function ScooterEditor({
       }));
   }, [
     analysis.entries,
+    documents.drafts,
     savedDocumentExtractions,
     setDocumentExtractions,
     scooter,
   ]);
   const classify = documents.classify;
   useEffect(() => {
-    if (scooter || saveCompleted) return;
+    if (saveCompleted) return;
     for (const draft of documents.drafts) {
       const entry = analysis.entries[draft.id];
       if (
@@ -786,7 +777,7 @@ export function ScooterEditor({
 
   const automaticImport = useRef(initialSnapshot?.automaticImport ?? "");
   useEffect(() => {
-    if (scooter || saveCompleted) return;
+    if (saveCompleted) return;
     const successes = Object.values(analysis.entries).filter(
       (entry) =>
         entry.status === "success" &&
@@ -945,7 +936,7 @@ export function ScooterEditor({
                 >
                   <ScooterEditorFields
                     step="documents"
-                    combinedReview={!scooter}
+                    combinedReview
                     onLogicalDocument={(sourceId, documentId, patch) => {
                       if (patch.documentType)
                         extraction.resetAutomaticSource(sourceId);
@@ -1063,19 +1054,13 @@ export function ScooterEditor({
                     {analysisError}
                   </p>
                 ) : null}
-                {(vinReviewRequested ||
-                  Boolean(
-                    scooter && (vinReviewRequired || extraction.vinMismatch),
-                  )) &&
-                vinReviewDocuments.length ? (
+                {vinReviewRequested && vinReviewDocuments.length ? (
                   <ScooterVinReview
                     key={JSON.stringify([sourceSignature, vinReviewDocuments])}
                     documents={vinReviewDocuments}
-                    initialVin={!scooter ? form.getValues("vin") : ""}
-                    showSummary={Boolean(scooter)}
-                    onClose={
-                      !scooter ? () => setVinReviewRequested(false) : undefined
-                    }
+                    initialVin={form.getValues("vin")}
+                    showSummary={false}
+                    onClose={() => setVinReviewRequested(false)}
                     disabled={
                       isSubmitting || analysis.running || documents.blocked
                     }
@@ -1240,29 +1225,6 @@ export function ScooterEditor({
                   {t("actions.cancel")}
                 </Link>
               )}
-              {canExtract && scooter && extraction.sources.length ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={
-                    isSubmitting ||
-                    documents.blocked ||
-                    analysis.running ||
-                    (importedCurrentDocuments && !hasFailedAnalysis)
-                  }
-                  onClick={() => {
-                    void extractAndContinue();
-                  }}
-                >
-                  {t(
-                    analysis.running
-                      ? "extraction.processing"
-                      : hasFailedAnalysis
-                        ? "extraction.retry"
-                        : "extraction.extract",
-                  )}
-                </Button>
-              ) : null}
               <SaveButton
                 type="submit"
                 disabled={

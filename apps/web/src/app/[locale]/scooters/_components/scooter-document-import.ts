@@ -427,6 +427,7 @@ export function documentExtractionPrompt(
       ["vin", "brandName", "requiredLicenseCategory"].includes(field),
   );
   const fieldsByType = {
+    other: [],
     ownership_proof: technical.filter((field) => !civMetadata.has(field)),
     import_document: technical.filter((field) => !civMetadata.has(field)),
     foreign_registration: [

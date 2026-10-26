@@ -1498,14 +1498,14 @@ describe("Scooter documents", () => {
       screen.queryByRole("link", { name: "old.pdf" }),
     ).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
-    await removeFromViewer(user, "old.pdf");
+    await user.click(screen.getByRole("button", { name: "Remove old.pdf" }));
     await waitFor(() =>
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
     );
     expect(mocks.api).not.toHaveBeenCalled();
     await user.click(screen.getByRole("button", { name: "Undo removal" }));
     expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
-    await removeFromViewer(user, "old.pdf");
+    await user.click(screen.getByRole("button", { name: "Remove old.pdf" }));
     await waitFor(() =>
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
     );
@@ -1521,7 +1521,8 @@ describe("Scooter documents", () => {
       ),
     );
   });
-  it("includes uploaded drafts when saving and preserves them after a failed save", async () => {
+  it("analyzes new insurance uploads in edit mode and saves their linked policy", async () => {
+    mockBatchExtraction(["insurance"]);
     const user = userEvent.setup();
     renderWithMessages(
       <ScooterEditForm
@@ -1531,15 +1532,69 @@ describe("Scooter documents", () => {
       />,
     );
     await user.upload(
-      screen.getByLabelText("Add Vehicle identity card (CIV)", {
+      screen.getByLabelText("Browse files", { selector: "input" }),
+      pdf("insurance.pdf"),
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Save changes" }),
+      ).toBeEnabled(),
+    );
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() =>
+      expect(mocks.api).toHaveBeenCalledWith(
+        v1.scooters.ROUTES.update("s"),
+        v1.scooters.scooterSchema,
+        expect.objectContaining({
+          method: "PATCH",
+          json: expect.objectContaining({
+            insurancePolicies: expect.arrayContaining([
+              expect.objectContaining({
+                id: expect.any(String),
+                insuredName: "Example Person",
+                validFrom: "2026-09-01",
+                validUntil: "2027-08-31",
+              }),
+            ]),
+            documentDrafts: expect.arrayContaining([
+              expect.objectContaining({
+                type: "insurance",
+                fileName: "insurance.pdf",
+                insurancePolicyId: expect.any(String),
+              }),
+            ]),
+          }),
+        }),
+      ),
+    );
+  });
+
+  it("includes uploaded drafts when saving and preserves them after a failed save", async () => {
+    const fallback = mocks.api.getMockImplementation()!;
+    mocks.api.mockImplementation((path, schema, options) =>
+      path === v1.scooters.ROUTES.documents.startExtractionJob
+        ? Promise.resolve({
+            sourceId: options.json.sourceId,
+            documentType: "civ",
+            extractedData: { vin: scooter.vin, fields: {}, rawFields: {} },
+            issues: [],
+            reviewRequired: true,
+          })
+        : fallback(path, schema, options),
+    );
+    const user = userEvent.setup();
+    renderWithMessages(
+      <ScooterEditForm
+        scooter={{ ...scooter, documents: [] }}
+        brands={brands}
+        scooterHref="/scooters/s"
+      />,
+    );
+    await user.upload(
+      screen.getByLabelText("Browse files", {
         selector: "input",
       }),
       pdf(),
-    );
-    await user.click(
-      within(screen.getByRole("dialog")).getByRole("button", {
-        name: "Save",
-      }),
     );
     expect(screen.queryByText("I checked CIV.pdf")).not.toBeInTheDocument();
     await waitFor(() =>
@@ -1567,7 +1622,13 @@ describe("Scooter documents", () => {
           sessionId: "editor-session",
           civAvailability: "issued",
           documentDrafts: [
-            { type: "civ", fileName: "CIV.pdf", uploadToken: "token" },
+            {
+              type: "civ",
+              fileName: "CIV.pdf",
+              uploadToken: "token",
+              uploadType: "unclassified",
+              extractedData: { vin: scooter.vin, fields: {}, rawFields: {} },
+            },
           ],
         },
       },

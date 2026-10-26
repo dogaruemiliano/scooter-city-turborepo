@@ -254,16 +254,34 @@ export function ScooterEditorFields({
                     : "grid gap-4 sm:col-span-2"
                 }
               >
-                {(
-                  [
-                    "import_document",
-                    "civ",
-                    "registration_certificate",
-                  ] as const
+                {v1.scooters.SCOOTER_DOCUMENT_TYPES.filter(
+                  (type) => type !== "insurance",
                 ).map((type) => (
                   <ScooterDocumentUpload
                     key={type}
                     type={type}
+                    documents={documents}
+                    disabled={disabled}
+                    compact={step === "documents"}
+                  />
+                ))}
+                {[
+                  ...new Set(
+                    [...documents.existing, ...documents.drafts]
+                      .filter(
+                        (doc) =>
+                          doc.type === "insurance" &&
+                          !insurance.fields.some(
+                            (policy) => policy.id === doc.insurancePolicyId,
+                          ),
+                      )
+                      .map((doc) => doc.insurancePolicyId ?? undefined),
+                  ),
+                ].map((policyId) => (
+                  <ScooterDocumentUpload
+                    key={policyId ?? "unassigned-insurance"}
+                    type="insurance"
+                    insurancePolicyId={policyId}
                     documents={documents}
                     disabled={disabled}
                     compact={step === "documents"}

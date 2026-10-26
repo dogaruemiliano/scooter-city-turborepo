@@ -140,7 +140,106 @@ beforeEach(() => {
   });
 });
 
+async function openJsonImport(browser: ReturnType<typeof userEvent.setup>) {
+  await browser.click(screen.getByRole("button", { name: "Document actions" }));
+  await browser.click(
+    await screen.findByRole("menuitem", { name: "Import JSON" }),
+  );
+}
+
 describe("ScooterEditForm", () => {
+  it("shows every attached document type, including other documents", () => {
+    const documents: NonNullable<v1.scooters.Scooter["documents"]> =
+      v1.scooters.SCOOTER_DOCUMENT_TYPES.map((type) => ({
+        id: `document-${type}`,
+        type,
+        fileName: `${type}.pdf`,
+        contentType: "application/pdf",
+        byteSize: 100,
+        contentUrl: `/documents/${type}`,
+        createdAt: scooter.createdAt,
+        updatedAt: scooter.updatedAt,
+      }));
+    render(
+      <NextIntlClientProvider locale="en" messages={messages.en}>
+        <ScooterEditForm
+          scooter={{ ...scooter, documents }}
+          brands={brands}
+          scooterHref="/en/scooters"
+        />
+      </NextIntlClientProvider>,
+    );
+    expect(
+      document.querySelectorAll('[data-slot="document-preview-card"]'),
+    ).toHaveLength(documents.length);
+    for (const document of documents)
+      expect(
+        screen.getByRole("button", { name: `Preview ${document.fileName}` }),
+      ).toBeInTheDocument();
+    expect(
+      screen.getByText("Other document", { exact: true }),
+    ).toBeInTheDocument();
+  });
+
+  it("previews saved client copies and can undo removing their original before saving", async () => {
+    const browser = userEvent.setup();
+    const document: v1.scooters.ScooterDocument = {
+      id: "saved-civ",
+      type: "civ",
+      fileName: "original.jpg",
+      contentType: "image/jpeg",
+      byteSize: 100,
+      createdAt: scooter.createdAt,
+      contentUrl: "/original.jpg",
+      clientCopy: {
+        fileName: "client.jpg",
+        contentType: "image/jpeg",
+        byteSize: 100,
+        contentUrl: "/client.jpg",
+      },
+    };
+    render(
+      <NextIntlClientProvider locale="en" messages={messages.en}>
+        <ScooterEditForm
+          scooter={{ ...scooter, documents: [document] }}
+          brands={brands}
+          scooterHref="/en/scooters"
+        />
+      </NextIntlClientProvider>,
+    );
+    expect(screen.getByText("Fill automatically")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Import more documents" }),
+    ).toBeInTheDocument();
+    await browser.click(
+      screen.getByRole("button", { name: "Preview client.jpg" }),
+    );
+    const viewer = await screen.findByRole("dialog", { name: "client.jpg" });
+    expect(
+      within(viewer).getByRole("img", { name: "client.jpg" }),
+    ).toBeInTheDocument();
+    await browser.click(
+      within(viewer).getByRole("button", { name: "Close preview" }),
+    );
+    await browser.click(
+      screen.getByRole("button", { name: "Remove original.jpg" }),
+    );
+    expect(
+      screen.queryByRole("button", { name: "Preview client.jpg" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Preview original.jpg" }),
+    ).not.toBeInTheDocument();
+    await browser.click(screen.getByRole("button", { name: "Undo removal" }));
+    expect(
+      screen.getByRole("button", { name: "Preview original.jpg" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Preview client.jpg" }),
+    ).toBeInTheDocument();
+    expect(mocks.apiFetch).not.toHaveBeenCalled();
+  });
+
   it("preserves existing engine, homologation, and license instead of applying create defaults", () => {
     expect(
       scooterEditorDefaults({
@@ -211,7 +310,7 @@ describe("ScooterEditForm", () => {
     expect(headings[galleryIndex + 1]).toMatch(/03/);
 
     expect(screen.getByLabelText("Insured name")).toHaveValue("");
-    await browser.click(screen.getByRole("button", { name: "Import JSON" }));
+    await openJsonImport(browser);
     await browser.click(screen.getByRole("button", { name: "Edit JSON" }));
     fireEvent.change(screen.getByLabelText("Extracted data (JSON)"), {
       target: {
@@ -275,7 +374,7 @@ describe("ScooterEditForm", () => {
         />
       </NextIntlClientProvider>,
     );
-    await browser.click(screen.getByRole("button", { name: "Import JSON" }));
+    await openJsonImport(browser);
     await browser.click(screen.getByRole("button", { name: "Edit JSON" }));
     const input = screen.getByLabelText("Extracted data (JSON)");
     fireEvent.change(input, {
@@ -329,7 +428,7 @@ describe("ScooterEditForm", () => {
         />
       </NextIntlClientProvider>,
     );
-    await browser.click(screen.getByRole("button", { name: "Import JSON" }));
+    await openJsonImport(browser);
     await browser.click(screen.getByRole("button", { name: "Edit JSON" }));
     fireEvent.change(screen.getByLabelText("Extracted data (JSON)"), {
       target: {
@@ -376,7 +475,7 @@ describe("ScooterEditForm", () => {
         />
       </NextIntlClientProvider>,
     );
-    await browser.click(screen.getByRole("button", { name: "Import JSON" }));
+    await openJsonImport(browser);
     await browser.click(screen.getByRole("button", { name: "Edit JSON" }));
     fireEvent.change(screen.getByLabelText("Extracted data (JSON)"), {
       target: {
@@ -449,7 +548,7 @@ describe("ScooterEditForm", () => {
       screen.queryByText(/field.*could not be interpreted/),
     ).not.toBeInTheDocument();
     // A fresh import flags the freshly unresolved fields again.
-    await browser.click(screen.getByRole("button", { name: "Import JSON" }));
+    await openJsonImport(browser);
     await browser.click(screen.getByRole("button", { name: "Fill fields" }));
     expect(importStatus()).toHaveTextContent(
       "2 fields could not be interpreted.",
@@ -481,7 +580,7 @@ describe("ScooterEditForm", () => {
         />
       </NextIntlClientProvider>,
     );
-    await browser.click(screen.getByRole("button", { name: "Import JSON" }));
+    await openJsonImport(browser);
     await browser.click(
       screen.getByRole("button", { name: "Copy extraction prompt" }),
     );
@@ -513,7 +612,7 @@ describe("ScooterEditForm", () => {
         />
       </NextIntlClientProvider>,
     );
-    await browser.click(screen.getByRole("button", { name: "Import JSON" }));
+    await openJsonImport(browser);
     await browser.click(screen.getByRole("button", { name: "Edit JSON" }));
     fireEvent.change(screen.getByLabelText("Extracted data (JSON)"), {
       target: { value: '{"color":"Red","powerKw":"bad"}' },
@@ -543,7 +642,7 @@ describe("ScooterEditForm", () => {
     expect(
       screen.queryByLabelText("Extracted data (JSON)"),
     ).not.toBeInTheDocument();
-    await browser.click(screen.getByRole("button", { name: "Import JSON" }));
+    await openJsonImport(browser);
     expect(
       screen.getByRole("dialog", { name: "Import from documents" }),
     ).toHaveAttribute("data-slot", "dialog-content");
@@ -578,7 +677,7 @@ describe("ScooterEditForm", () => {
         />
       </NextIntlClientProvider>,
     );
-    await browser.click(screen.getByRole("button", { name: "Import JSON" }));
+    await openJsonImport(browser);
     await browser.click(screen.getByRole("button", { name: "Edit JSON" }));
     fireEvent.change(screen.getByLabelText("Extracted data (JSON)"), {
       target: { value: '{"color":"Red"}' },
@@ -586,7 +685,7 @@ describe("ScooterEditForm", () => {
     await browser.click(screen.getByRole("button", { name: "Close" }));
     expect(screen.getByLabelText("Color")).toHaveValue("White");
     expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
-    await browser.click(screen.getByRole("button", { name: "Import JSON" }));
+    await openJsonImport(browser);
     expect(screen.getByLabelText("Extracted data (JSON)")).toHaveValue(
       '{"color":"Red"}',
     );
@@ -609,7 +708,7 @@ describe("ScooterEditForm", () => {
           />
         </NextIntlClientProvider>,
       );
-      await browser.click(screen.getByRole("button", { name: "Import JSON" }));
+      await openJsonImport(browser);
       const sheet = screen.getByRole("dialog", {
         name: "Import from documents",
       });

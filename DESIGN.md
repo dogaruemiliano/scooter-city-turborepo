@@ -34,9 +34,10 @@ typography:
     lineHeight: "var(--leading-normal)"
   label:
     fontFamily: "var(--font-sans)"
-    fontSize: "var(--text-xs)"
-    fontWeight: 600
-    lineHeight: "var(--leading-normal)"
+    fontSize: "var(--text-sm)"
+    fontWeight: 500
+    lineHeight: "var(--leading-snug)"
+    color: "var(--muted-foreground)"
 rounded:
   md: "calc(var(--radius) - var(--spacing-0-5))"
   lg: "var(--radius)"
@@ -156,7 +157,8 @@ The same sans family carries headings, body, and controls. Hierarchy comes from 
 - **Headline:** `2xl`, semibold, tight; compact page headings.
 - **Title:** `base`, semibold, snug; cards and review panels.
 - **Body:** `sm`, regular, normal; supporting copy and desktop controls.
-- **Label:** `xs`/semibold for compact fields; section headings use `sm`/semibold with uppercase and the shared wide tracking.
+- **Label:** shared Label uses `text-sm`, `font-medium`, `leading-snug`, and `text-muted-foreground`. Preserve its `data-slot="label"` hook and shared defaults across forms.
+- **Form section heading:** shared FormSection uses `text-base`, `font-semibold`, normal case, and normal letter spacing. Purposeful uppercase metadata, such as problem difficulty, remains distinct from section headings.
 - Mobile inputs use `base`; desktop inputs use `sm`. Preserve localized text wrapping.
 
 ## Layout

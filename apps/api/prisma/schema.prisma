@@ -1422,6 +1422,7 @@ enum ScooterDocumentType {
   itp_card
   itp_certificate
   ownership_proof
+  other
 }
 
 enum ScooterCivAvailability {

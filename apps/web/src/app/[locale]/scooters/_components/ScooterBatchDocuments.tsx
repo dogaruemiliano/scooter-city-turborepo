@@ -18,7 +18,7 @@ import {
 import { FileDropOverlay } from "@repo/ui/components/file-drop-overlay";
 import { useFileDrop } from "@repo/ui/hooks/use-file-drop";
 import { useObjectUrl } from "@repo/ui/hooks/use-object-url";
-import { CheckIcon, ShieldIcon, SparklesIcon, XIcon } from "lucide-react";
+import { CheckIcon, SparklesIcon, XIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import {
   useCallback,
@@ -34,6 +34,7 @@ import {
   type LogicalDocumentUpdate,
 } from "./ScooterDocumentTypeEditor";
 import type { DocumentImportResult } from "./scooter-document-import";
+import { SavedDocumentCard } from "./SavedDocumentCard";
 import { ScooterClientCopyBadge } from "./ScooterClientCopyBadge";
 import { ScooterDocumentAnalysisContext } from "./ScooterDocumentAnalysisStatus";
 import type {
@@ -43,7 +44,7 @@ import type {
 
 export function ScooterBatchDocuments({
   documents,
-  disabled,
+  disabled: formDisabled,
   analyzing,
   onRetryAnalysis,
   onCancelAnalysis,
@@ -67,20 +68,23 @@ export function ScooterBatchDocuments({
   const t = useTranslations("scooters.documents");
   const user = useOptionalSession()?.user;
   const canWrite = canAccess(user, "scooter_documents.write");
+  const canRead = canAccess(user, "scooter_documents.read");
+  const disabled = formDisabled || !canWrite;
   const canExtract = canAccess(user, "scooter_documents.extract");
   const creation = useTranslations("scooters.creation");
   const extraction = useTranslations("scooters.extraction");
-  const workspace = useTranslations("scooters.workspace");
   const [initialDraftIds] = useState(
     () => new Set(documents.drafts.map((draft) => draft.id)),
   );
   const [errors, setErrors] = useState<string[]>([]);
   const [expandedImport, setExpandedImport] = useState<typeof importResult>();
+  const [expandedSaved, setExpandedSaved] = useState(false);
   const analysisEntries = useContext(ScooterDocumentAnalysisContext);
   const compact =
     documents.existing.length + documents.drafts.length > 0 &&
-    Boolean(importResult) &&
-    expandedImport !== importResult &&
+    (importResult
+      ? expandedImport !== importResult
+      : documents.existing.length > 0 && !expandedSaved) &&
     !analyzing &&
     !errors.length &&
     !documents.drafts.some(
@@ -90,27 +94,6 @@ export function ScooterBatchDocuments({
         draft.status === "uploading" ||
         analysisEntries[draft.id]?.status === "failed",
     );
-  const logicalDocumentsFor = (sourceId: string) => {
-    const entry = analysisEntries[sourceId];
-    return entry?.status === "success"
-      ? entry.analysis.extractedData.documents
-      : documents.existing.find((item) => item.id === sourceId)?.extractedData
-          ?.documents;
-  };
-  const attachedDocuments = [
-    ...documents.existing.map((document) => ({
-      id: document.id,
-      name: document.fileName,
-      type: document.type,
-      clientCopy: false,
-      originalName: undefined as string | undefined,
-      analyzed: Boolean(
-        document.extractedData ||
-        documents.extractions[document.id] ||
-        analysisEntries[document.id]?.status === "success",
-      ),
-    })),
-  ];
   const { dragging, handlers: fileDropHandlers } = useFileDrop({
     disabled,
     onFiles: (files) => {
@@ -119,7 +102,7 @@ export function ScooterBatchDocuments({
     },
   });
 
-  if (!canWrite) return null;
+  if (!canRead) return null;
 
   function add(files: File[]) {
     if (disabled) return;
@@ -181,80 +164,6 @@ export function ScooterBatchDocuments({
           </div>
         </div>
       </CardHeader>
-      {compact && attachedDocuments.length > 0 ? (
-        <CardContent>
-          <ul aria-label={t("batch.attached")} className="grid min-w-0 gap-2">
-            {attachedDocuments.map((document) => (
-              <li
-                key={document.id}
-                className="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-lg bg-control px-3 py-2"
-              >
-                <div className="min-w-0 flex-1">
-                  <p
-                    className="truncate text-sm font-medium"
-                    title={document.name}
-                  >
-                    {document.name}
-                  </p>
-                  {document.clientCopy ? (
-                    <p className="text-xs text-muted-foreground">
-                      {document.originalName
-                        ? workspace("matchedOriginal", {
-                            name: document.originalName,
-                          })
-                        : workspace("copyNeedsOriginal")}
-                    </p>
-                  ) : (
-                    <ScooterDocumentTypeEditor
-                      sourceId={document.id}
-                      fileName={document.name}
-                      type={document.type}
-                      documents={logicalDocumentsFor(document.id)}
-                      disabled={disabled || analyzing}
-                      scooterVin={scooterVin}
-                      onType={
-                        documents.drafts.some(
-                          (draft) =>
-                            draft.id === document.id &&
-                            draft.version !== "client_copy",
-                        )
-                          ? (type) =>
-                              documents.classify(document.id, type, true)
-                          : undefined
-                      }
-                      onDocument={
-                        analysisEntries[document.id]?.status === "success"
-                          ? onLogicalDocument
-                          : undefined
-                      }
-                    />
-                  )}
-                </div>
-                <Badge
-                  variant={
-                    document.clientCopy
-                      ? "default"
-                      : document.analyzed
-                        ? "success"
-                        : "secondary"
-                  }
-                >
-                  {document.clientCopy ? (
-                    <ShieldIcon aria-hidden="true" />
-                  ) : null}
-                  {document.clientCopy
-                    ? t("clientCopy")
-                    : t(
-                        document.analyzed
-                          ? "batch.uploadedAndAnalyzed"
-                          : "batch.uploaded",
-                      )}
-                </Badge>
-              </li>
-            ))}
-          </ul>
-        </CardContent>
-      ) : null}
       <CardContent
         hidden={compact}
         className={compact ? "hidden" : "grid gap-4"}
@@ -283,11 +192,16 @@ export function ScooterBatchDocuments({
         ) : null}
       </CardContent>
       <CardContent className="grid min-w-0 gap-4">
-        {documents.drafts.length ? (
+        {documents.existing.length || documents.drafts.length ? (
           <>
             <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
               <p className="text-sm text-muted-foreground" aria-live="polite">
-                {t("documentCount", { count: documents.drafts.length })}
+                {t("documentCount", {
+                  count: documents.existing.reduce(
+                    (count, document) => count + (document.clientCopy ? 2 : 1),
+                    documents.drafts.length,
+                  ),
+                })}
               </p>
               {analyzing && onCancelAnalysis ? (
                 <Button
@@ -305,6 +219,31 @@ export function ScooterBatchDocuments({
               aria-label={t("batch.attached")}
               className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3"
             >
+              {documents.existing.flatMap((document) => [
+                <SavedDocumentCard
+                  key={document.id}
+                  document={document}
+                  disabled={disabled}
+                  onRemove={() => documents.removeExisting(document.id)}
+                  onLogicalDocument={
+                    analysisEntries[document.id]?.status === "success"
+                      ? onLogicalDocument
+                      : undefined
+                  }
+                  scooterVin={scooterVin}
+                />,
+                ...(document.clientCopy
+                  ? [
+                      <SavedDocumentCard
+                        key={`${document.id}-copy`}
+                        document={document}
+                        clientCopy
+                        disabled={disabled}
+                        onRemove={() => documents.removeExisting(document.id)}
+                      />,
+                    ]
+                  : []),
+              ])}
               {documents.drafts.map((draft) => (
                 <BatchDocumentRow
                   key={draft.id}
@@ -330,6 +269,28 @@ export function ScooterBatchDocuments({
           </>
         ) : null}
       </CardContent>
+      {(documents.removed ?? []).length ? (
+        <CardContent className="grid gap-2">
+          {documents.removed.map((document) => (
+            <div
+              key={document.id}
+              className="flex min-w-0 items-center justify-between gap-3"
+            >
+              <span className="truncate text-sm text-muted-foreground">
+                {document.fileName}
+              </span>
+              <Button
+                type="button"
+                variant="text"
+                disabled={disabled}
+                onClick={() => documents.undoRemove(document.id)}
+              >
+                {t("undo")}
+              </Button>
+            </div>
+          ))}
+        </CardContent>
+      ) : null}
       {compact ? (
         <CardContent>
           {" "}
@@ -339,7 +300,10 @@ export function ScooterBatchDocuments({
             className="relative w-full justify-center rounded-dashed-surface border-(length:--dashed-surface-border-width) border-dashed bg-transparent text-center duration-normal enabled:hover:border-primary enabled:active:border-primary enabled:active:border-solid"
             disabled={disabled}
             aria-label={creation("importMore")}
-            onClick={() => setExpandedImport(importResult)}
+            onClick={() => {
+              setExpandedImport(importResult);
+              setExpandedSaved(true);
+            }}
             {...fileDropHandlers}
           >
             {creation("importMore")}
