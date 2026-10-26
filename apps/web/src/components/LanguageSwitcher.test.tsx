@@ -1,11 +1,16 @@
 import { messages, type SupportedLocale } from "@repo/i18n";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@repo/ui/components";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { NextIntlClientProvider } from "next-intl";
+import { NextIntlClientProvider, useLocale } from "next-intl";
 import type { AnchorHTMLAttributes } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { LanguageSwitcher } from "./LanguageSwitcher";
+import { LanguageMenuSub, LanguageSwitcher } from "./LanguageSwitcher";
 
 const mocks = vi.hoisted(() => ({
   pathname: "/account/settings",
@@ -25,7 +30,8 @@ type MockLinkProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href"> & {
 
 vi.mock("../i18n/navigation", () => ({
   Link({ href, locale, ...props }: MockLinkProps) {
-    return <a href={locale ? prefixHref(href, locale) : href} {...props} />;
+    const currentLocale = useLocale();
+    return <a href={prefixHref(href, locale ?? currentLocale)} {...props} />;
   },
   useRouter: () => ({
     replace: mocks.replace,
@@ -72,6 +78,63 @@ describe("LanguageSwitcher", () => {
       locale: "ro",
     });
   });
+
+  it("does not navigate when selecting the current language", async () => {
+    const browser = userEvent.setup();
+    mocks.pathname = "/en";
+    mocks.search = "";
+
+    renderLanguageSwitcher("en");
+
+    await browser.click(screen.getByRole("combobox", { name: "Language" }));
+    await browser.click(await screen.findByRole("option", { name: "English" }));
+
+    expect(mocks.replace).not.toHaveBeenCalled();
+  });
+});
+
+describe("LanguageMenuSub", () => {
+  it.each([
+    ["/en", "", "/en", "/ro"],
+    [
+      "/en/account/settings",
+      "tab=profile",
+      "/en/account/settings?tab=profile",
+      "/ro/account/settings?tab=profile",
+    ],
+  ])(
+    "does not duplicate the locale in links from %s",
+    async (pathname, search, currentHref, otherHref) => {
+      const browser = userEvent.setup();
+      mocks.pathname = pathname;
+      mocks.search = search;
+
+      render(
+        <NextIntlClientProvider locale="en" messages={messages.en}>
+          <DropdownMenu>
+            <DropdownMenuTrigger>Account</DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <LanguageMenuSub />
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </NextIntlClientProvider>,
+      );
+
+      await browser.click(screen.getByRole("button", { name: "Account" }));
+      await browser.click(
+        await screen.findByRole("menuitem", { name: /Language/ }),
+      );
+
+      expect(
+        await screen.findByRole("menuitemradio", {
+          name: messages.en.language.current,
+        }),
+      ).toHaveAttribute("href", currentHref);
+      expect(
+        screen.getByRole("menuitemradio", { name: /Romanian/ }),
+      ).toHaveAttribute("href", otherHref);
+    },
+  );
 });
 
 function renderLanguageSwitcher(locale: SupportedLocale) {

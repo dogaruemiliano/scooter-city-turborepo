@@ -138,7 +138,6 @@ function useLanguageOptions() {
   const currentLocale = resolveRouteLocale(useLocale());
   const query = searchParams.toString();
   const queryString = query ? `?${query}` : "";
-  const visiblePath = `${pathname}${queryString}`;
   const unprefixedPath = `${getUnprefixedPathname(pathname)}${queryString}`;
 
   return supportedLocales.map((locale: SupportedLocale) => {
@@ -147,8 +146,8 @@ function useLanguageOptions() {
     return {
       locale,
       label,
-      href: locale === currentLocale ? visiblePath : unprefixedPath,
-      linkLocale: locale === currentLocale ? undefined : locale,
+      href: unprefixedPath,
+      linkLocale: locale,
       current: locale === currentLocale,
       ariaLabel:
         locale === currentLocale
