@@ -91,6 +91,49 @@ beforeEach(() => {
 });
 
 describe("ScootersPage", () => {
+  it.each([
+    { unmounted: false, returnToList: false },
+    { unmounted: true, returnToList: false },
+    { unmounted: true, returnToList: true },
+  ])(
+    "ignores a delayed search after leaving the list ($unmounted, $returnToList)",
+    async ({ unmounted, returnToList }) => {
+      let resolveRequest!: (list: v1.scooters.ScooterList) => void;
+      mocks.apiFetch.mockReturnValue(
+        new Promise((resolve) => {
+          resolveRequest = resolve;
+        }),
+      );
+      const browser = userEvent.setup();
+      const view = renderScooters();
+      await browser.type(screen.getByLabelText("Search scooters"), "honda");
+      await waitFor(() => expect(mocks.apiFetch).toHaveBeenCalledOnce());
+
+      window.history.pushState(
+        { route: "details" },
+        "",
+        "/en/scooters/scooter-1",
+      );
+      if (unmounted) view.unmount();
+      if (returnToList) {
+        window.history.pushState({ route: "list" }, "", "/en/scooters");
+      }
+      const replaceState = vi.spyOn(window.history, "replaceState").mockClear();
+      await act(async () => resolveRequest(scooterList([], { total: 0 })));
+
+      expect(replaceState).not.toHaveBeenCalled();
+      expect(window.location.pathname).toBe(
+        returnToList ? "/en/scooters" : "/en/scooters/scooter-1",
+      );
+      expect(window.location.search).toBe("");
+      expect(window.history.state).toEqual({
+        route: returnToList ? "list" : "details",
+      });
+      replaceState.mockRestore();
+      if (!unmounted) expect(screen.getByText("Yamaha NMAX")).toBeVisible();
+    },
+  );
+
   it("does not repeatedly fetch a whitespace-normalized search", async () => {
     mocks.apiFetch.mockResolvedValue(scooterList([], { total: 0 }));
     const browser = userEvent.setup();

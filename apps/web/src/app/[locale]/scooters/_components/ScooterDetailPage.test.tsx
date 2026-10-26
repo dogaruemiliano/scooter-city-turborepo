@@ -12,6 +12,10 @@ import { NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ScooterDetailPage } from "./ScooterDetailPage";
+import {
+  PageHeaderNavigationContext,
+  type PageHeaderNavigationOptions,
+} from "@/components/PageHeaderNavigation";
 // Gallery API interactions are covered independently in ScooterPhotos.test.tsx.
 vi.mock("./ScooterPhotos", () => ({ ScooterPhotos: () => null }));
 // Inspection requests and confirmation are covered in ScooterItpPanel.test.tsx.
@@ -84,6 +88,26 @@ beforeEach(() => {
 });
 
 describe("ScooterDetailPage", () => {
+  it.each(["en", "ro"] as const)(
+    "returns directly to the localized scooter list from the header (%s)",
+    (locale) => {
+      const register = vi.fn<
+        (options: PageHeaderNavigationOptions) => () => void
+      >(() => vi.fn());
+      const href = locale === "en" ? "/en/scooters" : "/scooters";
+      render(
+        <NextIntlClientProvider locale={locale} messages={messages[locale]}>
+          <PageHeaderNavigationContext.Provider value={register}>
+            <ScooterDetailPage scooter={scooter} scootersHref={href} />
+          </PageHeaderNavigationContext.Provider>
+        </NextIntlClientProvider>,
+      );
+      expect(register).toHaveBeenCalled();
+      register.mock.calls.at(-1)?.[0].onBack?.();
+      expect(mocks.push).toHaveBeenCalledWith(href);
+    },
+  );
+
   it.each([
     ["en", "Report problem", "/en/problems/new"],
     ["ro", "Raportează o problemă", "/problems/new"],

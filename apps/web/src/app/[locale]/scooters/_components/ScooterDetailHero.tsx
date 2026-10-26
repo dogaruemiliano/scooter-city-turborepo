@@ -102,7 +102,17 @@ export function ScooterDetailHero({
         </div>
 
         <div className="absolute inset-x-0 bottom-0 z-raised grid grid-cols-2 items-end gap-3">
-          <div className="min-w-0">
+          <div className="min-w-0 justify-self-start">
+            <Odometer
+              value={scooter.currentMileageKm}
+              readingLabel={
+                mileage === null
+                  ? `${t("detail.hero.totalKilometers")}: ${t("detail.emptyValue")}`
+                  : t("list.mileageValue", { km: mileage })
+              }
+            />
+          </div>
+          <div className="flex min-w-0 justify-end text-right">
             {plateNumber && scooter.registrationType !== "unregistered" ? (
               <RegistrationPlate
                 number={plateNumber}
@@ -115,14 +125,6 @@ export function ScooterDetailHero({
               </span>
             ) : null}
           </div>
-          <Odometer
-            value={scooter.currentMileageKm}
-            readingLabel={
-              mileage === null
-                ? `${t("detail.hero.totalKilometers")}: ${t("detail.emptyValue")}`
-                : t("list.mileageValue", { km: mileage })
-            }
-          />
         </div>
       </div>
 

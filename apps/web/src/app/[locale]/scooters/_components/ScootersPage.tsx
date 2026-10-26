@@ -88,6 +88,7 @@ function ScootersPageContent({
   const searchDebounceReadyRef = useRef(false);
   const pendingSearchRef = useRef<string | null>(null);
   const searchDebounceTimeoutRef = useRef<number | null>(null);
+  const listPathnameRef = useRef<string | null>(null);
 
   const clearSearchDebounce = useCallback(() => {
     if (searchDebounceTimeoutRef.current === null) {
@@ -98,6 +99,22 @@ function ScootersPageContent({
     searchDebounceTimeoutRef.current = null;
   }, []);
 
+  useEffect(() => {
+    listPathnameRef.current = window.location.pathname;
+    return () => {
+      // A completed list request must never rewrite another route's history.
+      requestIdRef.current += 1;
+      clearSearchDebounce();
+    };
+  }, [clearSearchDebounce]);
+
+  const isCurrentRequest = useCallback(
+    (requestId: number) =>
+      requestId === requestIdRef.current &&
+      window.location.pathname === listPathnameRef.current,
+    [],
+  );
+
   const loadScooters = useCallback(
     async (
       nextQuery: v1.scooters.ListScootersQuery,
@@ -107,6 +124,7 @@ function ScootersPageContent({
         preserveDraft?: boolean;
       } = {},
     ) => {
+      if (window.location.pathname !== listPathnameRef.current) return false;
       const parsedQuery = v1.scooters.listScootersQuerySchema.parse({
         ...nextQuery,
         page: 1,
@@ -131,7 +149,7 @@ function ScootersPageContent({
           { cache: "no-store" },
         );
 
-        if (requestId !== requestIdRef.current) {
+        if (!isCurrentRequest(requestId)) {
           return false;
         }
 
@@ -145,7 +163,7 @@ function ScootersPageContent({
         }
         return true;
       } catch (error) {
-        if (requestId !== requestIdRef.current) {
+        if (!isCurrentRequest(requestId)) {
           return false;
         }
 
@@ -156,17 +174,18 @@ function ScootersPageContent({
         );
         return false;
       } finally {
-        if (requestId === requestIdRef.current) {
+        if (isCurrentRequest(requestId)) {
           pendingSearchRef.current = null;
           setListLoading(false);
         }
       }
     },
-    [t],
+    [isCurrentRequest, t],
   );
 
   const loadNextScootersPage = useCallback(async () => {
     if (
+      window.location.pathname !== listPathnameRef.current ||
       appendLoadingRef.current ||
       listLoading ||
       list.items.length >= list.total
@@ -192,7 +211,7 @@ function ScootersPageContent({
         { cache: "no-store" },
       );
 
-      if (requestId !== requestIdRef.current) {
+      if (!isCurrentRequest(requestId)) {
         return;
       }
 
@@ -202,7 +221,7 @@ function ScootersPageContent({
       }));
       setQuery(nextQuery);
     } catch (error) {
-      if (requestId !== requestIdRef.current) {
+      if (!isCurrentRequest(requestId)) {
         return;
       }
 
@@ -210,12 +229,20 @@ function ScootersPageContent({
         error instanceof ApiError ? error.message : t("feedback.genericError"),
       );
     } finally {
-      if (requestId === requestIdRef.current) {
+      if (isCurrentRequest(requestId)) {
         appendLoadingRef.current = false;
         setAppendLoading(false);
       }
     }
-  }, [list.items.length, list.page, list.total, listLoading, query, t]);
+  }, [
+    isCurrentRequest,
+    list.items.length,
+    list.page,
+    list.total,
+    listLoading,
+    query,
+    t,
+  ]);
 
   useEffect(() => {
     if (!searchDebounceReadyRef.current) {
@@ -295,8 +322,11 @@ function ScootersPageContent({
   useEffect(() => {
     const pathname = window.location.pathname;
     function restoreLocation() {
-      if (window.location.pathname !== pathname) return;
       clearSearchDebounce();
+      if (window.location.pathname !== pathname) {
+        requestIdRef.current += 1;
+        return;
+      }
       const params = new URLSearchParams(window.location.search);
       const restoredQuery = v1.scooters.listScootersQuerySchema.safeParse({
         ...Object.fromEntries(

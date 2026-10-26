@@ -52,6 +52,7 @@ import { useOptionalSession } from "@/components/auth/SessionProvider";
 import { canAccess } from "@/lib/access";
 import { MoreActionsMenu } from "@/components/MoreActionsMenu";
 import { PageTitleOverride } from "@/components/PageTitleOverride";
+import { PageHeaderNavigation } from "@/components/PageHeaderNavigation";
 import { webApi } from "@/lib/api";
 import { localizePath, resolveRouteLocale } from "@/i18n/paths";
 import {
@@ -155,6 +156,7 @@ export function ScooterDetailPage({
   return (
     <PageLayout>
       <PageTitleOverride title={title} />
+      <PageHeaderNavigation onBack={() => router.push(scootersHref)} />
       <div className="hidden justify-end md:flex">
         <MoreActionsMenu
           ariaLabel={t("actions.moreActions")}
