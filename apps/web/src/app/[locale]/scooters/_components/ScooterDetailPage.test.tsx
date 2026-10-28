@@ -258,14 +258,20 @@ describe("ScooterDetailPage", () => {
     ).toHaveTextContent("Displayed mileage may be unreliable");
   });
 
-  it("collapses technical, registration and record details until requested", async () => {
+  it("collapses operational, technical, registration and record details until requested", async () => {
     const browser = userEvent.setup();
     renderDetail();
     const toggle = screen.getByRole("button", { name: "More details" });
     expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(
+      screen.queryByRole("heading", { name: "Operational information" }),
+    ).not.toBeInTheDocument();
     expect(screen.queryByText(scooter.id)).not.toBeInTheDocument();
     await browser.click(toggle);
     expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(
+      screen.getByRole("heading", { name: "Operational information" }),
+    ).toBeVisible();
     expect(screen.getByText(scooter.id)).toBeVisible();
     await browser.click(toggle);
     expect(toggle).toHaveAttribute("aria-expanded", "false");

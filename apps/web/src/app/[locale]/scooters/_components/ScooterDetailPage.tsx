@@ -260,44 +260,6 @@ export function ScooterDetailPage({
         />
       </DetailSection>
 
-      <DetailSection title={t("sections.operational")}>
-        {(
-          [
-            "hasGps",
-            "hasPhoneStand",
-            "hasChargingOutlet",
-            "odometerWorking",
-            "speedometerWorking",
-          ] as const
-        ).map((field) => (
-          <DetailField
-            key={field}
-            label={t(`fields.${field}`)}
-            value={
-              scooter[field] == null
-                ? t("operational.unknown")
-                : t(scooter[field] ? "operational.yes" : "operational.no")
-            }
-          />
-        ))}
-        {(["currentMileageKm", "actualMaxSpeedKmh"] as const).map((field) => (
-          <DetailField
-            key={field}
-            label={t(`fields.${field}`)}
-            value={
-              scooter[field] == null
-                ? t("detail.emptyValue")
-                : new Intl.NumberFormat(locale).format(scooter[field])
-            }
-          />
-        ))}
-        <DetailField
-          label={t("fields.notes")}
-          value={scooter.notes ?? t("detail.emptyValue")}
-          className="sm:col-span-2"
-        />
-      </DetailSection>
-
       <CivDetails scooter={scooter} />
       {canAccess(session?.user, "scooter_documents.read") ? (
         <ScooterDocumentList documents={scooter.documents ?? []} />
@@ -308,6 +270,46 @@ export function ScooterDetailPage({
         <AccordionItem value="details">
           <AccordionTrigger>{t("detail.moreDetails")}</AccordionTrigger>
           <AccordionContent className="grid gap-6">
+            <DetailSection title={t("sections.operational")}>
+              {(
+                [
+                  "hasGps",
+                  "hasPhoneStand",
+                  "hasChargingOutlet",
+                  "odometerWorking",
+                  "speedometerWorking",
+                ] as const
+              ).map((field) => (
+                <DetailField
+                  key={field}
+                  label={t(`fields.${field}`)}
+                  value={
+                    scooter[field] == null
+                      ? t("operational.unknown")
+                      : t(scooter[field] ? "operational.yes" : "operational.no")
+                  }
+                />
+              ))}
+              {(["currentMileageKm", "actualMaxSpeedKmh"] as const).map(
+                (field) => (
+                  <DetailField
+                    key={field}
+                    label={t(`fields.${field}`)}
+                    value={
+                      scooter[field] == null
+                        ? t("detail.emptyValue")
+                        : new Intl.NumberFormat(locale).format(scooter[field])
+                    }
+                  />
+                ),
+              )}
+              <DetailField
+                label={t("fields.notes")}
+                value={scooter.notes ?? t("detail.emptyValue")}
+                className="sm:col-span-2"
+              />
+            </DetailSection>
+
             <DetailSection title={t("sections.technical")}>
               <DetailField
                 label={t("fields.manufactureYear")}

@@ -1225,6 +1225,7 @@ export const scootersCatalog = {
     },
     card: {
       photoAlt: "Scooter {code}",
+      noImageAvailable: "No image available",
       noPhoto: "No photo",
       photoUnavailable: "Photo unavailable",
       quickActions: "Quick actions for {code}",
@@ -2091,7 +2092,7 @@ export const scootersCatalog = {
         editScooterTitle: "Editează scuterul",
         deleteScooterTitle: "Ștergi scuterul?",
         deleteScooterDescription:
-          "Această acțiune șterge logic scuterul și ascunde pagina de detalii.",
+          "Această acțiune NU șterge permanent scuterul, ci ascunde pagina de detalii, iar acesta continuă să existe în baza de date pentru audit.",
       },
     },
     sales: {
@@ -2569,6 +2570,7 @@ export const scootersCatalog = {
     },
     card: {
       photoAlt: "Scuter {code}",
+      noImageAvailable: "Imagine indisponibilă",
       noPhoto: "Fără fotografie",
       photoUnavailable: "Fotografie indisponibilă",
       quickActions: "Acțiuni rapide pentru {code}",
