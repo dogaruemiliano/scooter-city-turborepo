@@ -12,6 +12,8 @@ export function scooterRentalBlockers(
     | "insuranceExpired"
     | "insuranceUpcoming"
     | "insuranceReview"
+    | "clientDocumentsMissing"
+    | "itpInvalid"
     | "serviceHold"
     | "eligibilityUnknown"
   )[] = [];
@@ -46,6 +48,10 @@ export function scooterRentalBlockers(
       if (!reasons.includes("eligibilityUnknown"))
         reasons.push("eligibilityUnknown");
   }
+  if (scooter.missingClientDocuments?.length)
+    reasons.push("clientDocumentsMissing");
+  if (scooter.itpStatus && !["active", "expiring"].includes(scooter.itpStatus))
+    reasons.push("itpInvalid");
   if (scooter.maintenanceHoldCount === undefined) {
     if (!reasons.includes("eligibilityUnknown"))
       reasons.push("eligibilityUnknown");

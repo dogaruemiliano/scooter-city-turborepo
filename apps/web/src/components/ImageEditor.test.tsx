@@ -422,7 +422,8 @@ describe("shared ImageEditor", () => {
     loadImage();
     adjustAxis("Vertical perspective", "PageUp");
     const dialog = screen.getByRole("dialog");
-    expect(dialog).toHaveClass("bg-background", "text-foreground");
+    expect(dialog).toHaveClass("bg-popover", "text-popover-foreground");
+    expect(dialog).not.toHaveClass("bg-background");
     expect(dialog.querySelector("header")).not.toHaveClass("bg-background");
     expect(dialog.querySelector("footer")).not.toHaveClass("bg-background");
     expect(screen.getByRole("slider")).not.toHaveClass("bg-background");
@@ -433,7 +434,7 @@ describe("shared ImageEditor", () => {
       "Vertical perspective",
       "Horizontal perspective",
     ]) {
-      expect(screen.getByRole("button", { name })).toHaveClass("bg-background");
+      expect(screen.getByRole("button", { name })).toHaveClass("bg-popover");
     }
     expect(
       document.querySelector('[data-slot="receipt-crop-frame"]'),

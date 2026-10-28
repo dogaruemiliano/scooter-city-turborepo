@@ -309,8 +309,10 @@ export function ScooterInsuranceFields({
 
 export function ScooterInsuranceList({
   scooter,
+  showDocuments = true,
 }: {
   scooter: v1.scooters.Scooter;
+  showDocuments?: boolean;
 }) {
   const t = useTranslations("scooters.insurance");
   const locale = useLocale();
@@ -363,17 +365,19 @@ export function ScooterInsuranceList({
               ),
             )}
           </dl>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {scooter.documents
-              ?.filter((doc) => doc.insurancePolicyId === policy.id)
-              .map((doc) => (
-                <ScooterFilePreview
-                  key={doc.id}
-                  document={doc}
-                  disabled={false}
-                />
-              ))}
-          </div>
+          {showDocuments ? (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {scooter.documents
+                ?.filter((doc) => doc.insurancePolicyId === policy.id)
+                .map((doc) => (
+                  <ScooterFilePreview
+                    key={doc.id}
+                    document={doc}
+                    disabled={false}
+                  />
+                ))}
+            </div>
+          ) : null}
         </article>
       ))}
     </section>

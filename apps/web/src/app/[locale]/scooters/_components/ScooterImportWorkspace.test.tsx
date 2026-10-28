@@ -37,11 +37,15 @@ vi.mock("./ScooterEditor", () => ({
     onSnapshot,
     onCreated,
     initialSnapshot,
+    draftActions,
   }: ScooterEditorProps) => {
     const [text, setText] = useState(initialSnapshot?.values.notes ?? "");
     useEffect(() => () => mocks.unmount(importDraft?.id), [importDraft?.id]);
     return (
       <div>
+        {draftActions && !draftActions.hasOtherDrafts ? (
+          <button onClick={draftActions.onDiscard}>Cancel</button>
+        ) : null}
         <button
           onClick={() => onSnapshot?.(identifiedSnapshot(importDraft!.id))}
         >
@@ -777,4 +781,94 @@ it.each([
   expect(
     screen.getByRole("heading", { name: /Draft 1/ }).firstElementChild,
   ).toHaveClass(color);
+});
+
+it("confirms the sole draft's bottom Cancel before deleting progress and leaving", async () => {
+  const item = draft("one");
+  mocks.fetch.mockImplementation(async (_path, _schema, options) =>
+    options?.method === "PATCH"
+      ? {
+          ...item,
+          revision: options.json.revision + 1,
+          state: options.json.state,
+        }
+      : options?.method === "POST"
+        ? { ok: true }
+        : { items: [item] },
+  );
+  mount();
+  fireEvent.change(await screen.findByRole("textbox", { name: "Draft note" }), {
+    target: { value: "Keep until I confirm" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Finish analysis" }));
+  fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+  const dialog = await screen.findByRole("dialog", {
+    name: "Discard this scooter draft?",
+  });
+  expect(
+    mocks.fetch.mock.calls.some(
+      ([path]) => path === v1.scooters.ROUTES.importDrafts.discard("one"),
+    ),
+  ).toBe(false);
+  expect(mocks.push).not.toHaveBeenCalled();
+  fireEvent.click(within(dialog).getByRole("button", { name: "Keep draft" }));
+  expect(screen.getByRole("textbox", { name: "Draft note" })).toHaveValue(
+    "Keep until I confirm",
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+  fireEvent.click(
+    within(
+      await screen.findByRole("dialog", {
+        name: "Discard this scooter draft?",
+      }),
+    ).getByRole("button", { name: "Discard draft" }),
+  );
+  await waitFor(() =>
+    expect(mocks.push).toHaveBeenCalledExactlyOnceWith("/en/scooters"),
+  );
+  expect(
+    mocks.fetch.mock.calls.filter(
+      ([path]) => path === v1.scooters.ROUTES.importDrafts.discard("one"),
+    ),
+  ).toHaveLength(1);
+  expect(
+    screen.queryByRole("textbox", { name: "Draft note" }),
+  ).not.toBeInTheDocument();
+});
+it("preserves autosaved progress across navigation away and a return visit without discarding", async () => {
+  let saved = draft("one");
+  mocks.fetch.mockImplementation(async (_path, _schema, options) => {
+    if (options?.method === "PATCH") {
+      saved = {
+        ...saved,
+        revision: saved.revision + 1,
+        state: options.json.state,
+      };
+      return saved;
+    }
+    return { items: [saved] };
+  });
+  const view = mount();
+  fireEvent.change(await screen.findByRole("textbox", { name: "Draft note" }), {
+    target: { value: "Resume from Back" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Finish analysis" }));
+  await waitFor(() =>
+    expect(saved.state).toMatchObject({
+      values: { notes: "Resume from Back" },
+    }),
+  );
+  // Both header Back and browser Back unmount the route without invoking Cancel.
+  fireEvent(window, new PageTransitionEvent("pagehide", { persisted: false }));
+  view.unmount();
+  mount();
+  expect(
+    await screen.findByRole("textbox", { name: "Draft note" }),
+  ).toHaveValue("Resume from Back");
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(
+    mocks.fetch.mock.calls.some(
+      ([path]) => path === v1.scooters.ROUTES.importDrafts.discard("one"),
+    ),
+  ).toBe(false);
 });

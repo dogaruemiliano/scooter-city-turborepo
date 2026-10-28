@@ -80,6 +80,7 @@ interface EditorFieldProps {
 export function ScooterEditorFields({
   brands,
   combinedReview = false,
+  itpValidUntil,
   onRetryAnalysis,
   onLogicalDocument,
   scooterVin,
@@ -100,6 +101,7 @@ export function ScooterEditorFields({
   photos,
 }: {
   combinedReview?: boolean;
+  itpValidUntil?: string | null;
   onRetryAnalysis?: (sourceId: string) => void;
   onLogicalDocument?: LogicalDocumentUpdate;
   scooterVin?: string;
@@ -129,6 +131,7 @@ export function ScooterEditorFields({
     name: "insurancePolicies",
     keyName: "formKey",
   });
+  const civIssuedAt = useWatch({ control, name: "civIssuedAt" });
   const powertrain = useWatch({ control, name: "powertrainType" });
   const { documentWarnings, clearDocumentWarnings } = useScooterImportReview();
   const fieldProps = { brands, onBrandCreated, disabled, powertrain };
@@ -208,6 +211,13 @@ export function ScooterEditorFields({
         <>
           {!editing || combinedReview ? (
             <ScooterBatchDocuments
+              editing={editing}
+              itpValidUntil={
+                itpValidUntil ??
+                (civIssuedAt
+                  ? v1.scooters.initialScooterItpExpiry(civIssuedAt)
+                  : null)
+              }
               headerActions={
                 canImport ? (
                   <DropdownMenu>

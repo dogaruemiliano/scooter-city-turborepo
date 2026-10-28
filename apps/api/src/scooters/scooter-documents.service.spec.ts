@@ -36,6 +36,7 @@ describe("ScooterDocumentsService", () => {
       count: jest.fn(),
       create: jest.fn<unknown, [Prisma.ScooterDocumentCreateArgs]>(),
       updateMany: jest.fn(),
+      update: jest.fn<unknown, [Prisma.ScooterDocumentUpdateArgs]>(),
       findFirst: jest.fn(),
       findMany: jest.fn(),
     },
@@ -61,6 +62,40 @@ describe("ScooterDocumentsService", () => {
     prisma.draftUpload.updateMany.mockResolvedValue({ count: 1 });
     prisma.scooterDocument.count.mockResolvedValue(0);
     prisma.scooterInsurancePolicy.findFirst.mockResolvedValue({ id: "policy" });
+  });
+  it("attaches a client copy to an existing original without creating a second original", async () => {
+    const prepared = await service.prepare(
+      [{ ...draft, originalDocumentId: "saved-civ", fileName: "client.pdf" }],
+      "user",
+    );
+    prisma.scooterDocument.findFirst.mockResolvedValue({
+      id: "saved-civ",
+      type: "civ",
+      clientCopyAsset: null,
+    });
+    await service.apply(tx, "scooter", prepared, [], "user");
+    expect(prisma.scooterDocument.create).not.toHaveBeenCalled();
+    expect(prisma.scooterDocument.update.mock.calls[0]?.[0]).toMatchObject({
+      where: { id: "saved-civ" },
+      data: { clientCopyFileName: "client.pdf" },
+    });
+    expect(prisma.draftUpload.updateMany).toHaveBeenCalledTimes(1);
+  });
+  it("rejects client copies targeting another scooter or an original already carrying a client copy", async () => {
+    const prepared = await service.prepare(
+      [{ ...draft, originalDocumentId: "saved-civ" }],
+      "user",
+    );
+    for (const original of [
+      null,
+      { id: "saved-civ", type: "civ", clientCopyAsset: { deletedAt: null } },
+    ]) {
+      prisma.scooterDocument.findFirst.mockResolvedValue(original);
+      await expect(
+        service.apply(tx, "scooter", prepared, [], "user"),
+      ).rejects.toThrow(BadRequestException);
+    }
+    expect(prisma.scooterDocument.update).not.toHaveBeenCalled();
   });
   it("stores both versions as one document and claims both uploads", async () => {
     const copy = { ...stored, storageKey: "scooter-documents/client.pdf" };

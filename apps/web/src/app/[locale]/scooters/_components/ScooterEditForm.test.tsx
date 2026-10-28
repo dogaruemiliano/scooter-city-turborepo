@@ -1222,3 +1222,38 @@ function importStatus() {
       /field.*could not be interpreted/.test(element.textContent ?? ""),
     )!;
 }
+
+it("reuses stored extraction without a paid request or enabling Save on opening Edit", async () => {
+  const document: v1.scooters.ScooterDocument = {
+    id: "saved-civ",
+    type: "civ",
+    fileName: "CIV.png",
+    contentType: "image/png",
+    byteSize: 100,
+    createdAt: scooter.createdAt,
+    contentUrl: "/civ.png",
+    extractedData: {
+      vin: scooter.vin,
+      fields: { model: scooter.model ?? null },
+      rawFields: {},
+    },
+  };
+  render(
+    <NextIntlClientProvider locale="en" messages={messages.en}>
+      <ScooterEditForm
+        scooter={{ ...scooter, documents: [document] }}
+        brands={brands}
+        scooterHref="/en/scooters"
+      />
+    </NextIntlClientProvider>,
+  );
+  await waitFor(() =>
+    expect(screen.getByText("Details extracted")).toBeInTheDocument(),
+  );
+  expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
+  expect(
+    mocks.apiFetch.mock.calls.some(
+      ([path]) => path === v1.scooters.ROUTES.documents.startExtractionJob,
+    ),
+  ).toBe(false);
+});

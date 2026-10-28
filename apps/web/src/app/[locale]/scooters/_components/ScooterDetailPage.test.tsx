@@ -12,12 +12,13 @@ import { NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ScooterDetailPage } from "./ScooterDetailPage";
+import { ScooterPhotos } from "./ScooterPhotos";
 import {
   PageHeaderNavigationContext,
   type PageHeaderNavigationOptions,
 } from "@/components/PageHeaderNavigation";
 // Gallery API interactions are covered independently in ScooterPhotos.test.tsx.
-vi.mock("./ScooterPhotos", () => ({ ScooterPhotos: () => null }));
+vi.mock("./ScooterPhotos", () => ({ ScooterPhotos: vi.fn(() => null) }));
 // Inspection requests and confirmation are covered in ScooterItpPanel.test.tsx.
 vi.mock("./ScooterItpPanel", () => ({ ScooterItpPanel: () => null }));
 
@@ -88,6 +89,33 @@ beforeEach(() => {
 });
 
 describe("ScooterDetailPage", () => {
+  it("refreshes the scooter data after saved photo changes so the hero gets the current cover", () => {
+    const view = renderDetail("en");
+    expect(mocks.refresh).not.toHaveBeenCalled();
+
+    const props = vi.mocked(ScooterPhotos).mock.calls.at(-1)![0];
+    props.onSaved?.();
+    expect(mocks.refresh).toHaveBeenCalledOnce();
+
+    view.rerender(
+      <NextIntlClientProvider locale="en" messages={messages.en}>
+        <ScooterDetailPage
+          scooter={{ ...scooter, coverUrl: "/new-cover.png" }}
+          scootersHref="/en/scooters"
+        />
+      </NextIntlClientProvider>,
+    );
+    const hero = within(screen.getByRole("region", { name: "001 YAM" }));
+    expect(
+      hero.getByRole("img", {
+        name: messages.en.scooters.card.photoAlt.replace("{code}", "001 YAM"),
+      }),
+    ).toHaveAttribute("src", "http://localhost:3000/new-cover.png");
+    expect(
+      hero.queryByRole("img", { name: messages.en.scooters.card.noPhoto }),
+    ).not.toBeInTheDocument();
+  });
+
   it.each([
     {
       hasCivDocument: false,

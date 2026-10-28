@@ -3,6 +3,7 @@ import { scooterItpMessages } from "./scooter-itp";
 export const scootersCatalog = {
   en: {
     readiness: {
+      needsClientDocuments: "Required client documents are missing",
       needsCiv: "Needs CIV",
       needsRegistration: "Unregistered",
       needsInsurance: "Needs insurance",
@@ -537,6 +538,12 @@ export const scootersCatalog = {
     },
     documents: {
       clientCopy: "For client",
+      generateClientCopies: "Create client copies",
+      generatingClientCopies: "Creating client copies…",
+      clientCopiesGenerated: "Client copies created",
+      generateClientCopiesError: "Some client copies could not be created. Your originals and completed copies were kept. PDFs must have at most 10 pages and generated files must fit the 15 MB upload limit. You can create the remaining copies again or upload them.",
+      missingDocument: "Missing document · drop files anywhere in this area",
+      lifecycle: { expired: "Expired", next: "Next", newest: "Newest" },
       batch: {
         addDocument: "Add document",
         attached: "Attached documents",
@@ -592,7 +599,7 @@ export const scootersCatalog = {
       previousDocument: "Previous document",
       nextDocument: "Next document",
       documentCount: "{count, plural, one {# document} other {# documents}}",
-      documentPosition: "Document {index} of {total}",
+      documentPosition: "Doc. {index} of {total}",
 
       civ: "Vehicle identity card (CIV)",
       foreign_registration: "Foreign registration (both sides)",
@@ -1314,6 +1321,7 @@ export const scootersCatalog = {
   },
   ro: {
     readiness: {
+      needsClientDocuments: "Lipsesc documentele necesare pentru client",
       needsCiv: "Necesită CIV",
       needsRegistration: "Neînmatriculat",
       needsInsurance: "Necesită asigurare",
@@ -1863,6 +1871,17 @@ export const scootersCatalog = {
     },
     documents: {
       clientCopy: "Pentru client",
+      generateClientCopies: "Creează copii pentru client",
+      generatingClientCopies: "Se creează copiile…",
+      clientCopiesGenerated: "Copii pentru client create",
+      generateClientCopiesError: "Unele copii nu au putut fi create. Originalele și copiile finalizate au fost păstrate. PDF-urile trebuie să aibă cel mult 10 pagini, iar fișierele generate trebuie să respecte limita de 15 MB. Poți crea din nou copiile rămase sau le poți încărca.",
+      missingDocument:
+        "Document lipsă · adaugă fișiere oriunde în această zonă",
+      lifecycle: {
+        expired: "Expirat",
+        next: "Următoarea",
+        newest: "Cel mai nou",
+      },
       batch: {
         addDocument: "Adaugă document",
         attached: "Documente atașate",
@@ -1921,7 +1940,7 @@ export const scootersCatalog = {
       nextDocument: "Documentul următor",
       documentCount:
         "{count, plural, one {# document} few {# documente} other {# de documente}}",
-      documentPosition: "Documentul {index} din {total}",
+      documentPosition: "Doc. {index} din {total}",
 
       civ: "Cartea de identitate a vehiculului (CIV)",
       foreign_registration: "Înmatriculare străină (ambele fețe)",
@@ -2433,7 +2452,7 @@ export const scootersCatalog = {
       co2EmissionsGKm: "Ex.: 120,5",
 
       selectOption: "Selectează o opțiune",
-      search: "Caută VIN, număr, marcă, model sau culoare",
+      search: "VIN, numar, brand, model",
       vin: "VIN de 17 caractere",
       brand: "Caută sau selectează o marcă",
       model: "ex. NMAX",

@@ -65,6 +65,7 @@ import {
   scooterFieldConflict,
 } from "./scooter-feedback";
 import { CivDetails } from "./CivDetails";
+import { ScooterDocumentMediaList } from "./ScooterDocumentMediaList";
 import { ScooterDocumentList } from "./ScooterDocumentUpload";
 import { ScooterPhotos } from "./ScooterPhotos";
 import { ScooterDetailHero } from "./ScooterDetailHero";
@@ -245,6 +246,7 @@ export function ScooterDetailPage({
         panel
         disabled={Boolean(scooter.deletedAt) || busyAction !== null}
         onBusyChange={setPhotosBusy}
+        onSaved={() => router.refresh()}
       />
 
       <DetailSection title={t("sections.identity")}>
@@ -261,11 +263,13 @@ export function ScooterDetailPage({
       </DetailSection>
 
       <CivDetails scooter={scooter} />
-      {canAccess(session?.user, "scooter_documents.read") ? (
-        <ScooterDocumentList documents={scooter.documents ?? []} />
-      ) : null}
-      <ScooterInsuranceList scooter={scooter} />
-      <ScooterItpPanel scooter={scooter} />
+      <ScooterDocumentMediaList documents={scooter.documents ?? []}>
+        {canAccess(session?.user, "scooter_documents.read") ? (
+          <ScooterDocumentList documents={scooter.documents ?? []} />
+        ) : null}
+        <ScooterInsuranceList scooter={scooter} showDocuments={false} />
+        <ScooterItpPanel scooter={scooter} />
+      </ScooterDocumentMediaList>
       <Accordion>
         <AccordionItem value="details">
           <AccordionTrigger>{t("detail.moreDetails")}</AccordionTrigger>

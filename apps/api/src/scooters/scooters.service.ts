@@ -32,13 +32,19 @@ const maintenanceCount = {
   select: { problems: { where: activeMaintenanceHoldWhere } },
 } as const;
 
-const scooterInclude = {
+export const scooterInclude = {
   _count: maintenanceCount,
   photos: galleryCoverPhotos,
   brand: true,
   documents: {
     where: { deletedAt: null, asset: { deletedAt: null } },
-    select: { type: true, extractedData: true },
+    select: {
+      id: true,
+      type: true,
+      extractedData: true,
+      clientCopyAsset: { select: { deletedAt: true } },
+      insurancePolicy: { select: { validFrom: true, validUntil: true } },
+    },
   },
   civDocument: true,
   inspections: {
@@ -49,6 +55,7 @@ const scooterInclude = {
 } satisfies Prisma.ScooterInclude;
 
 const scooterListInclude = {
+  civDocument: true,
   problems: {
     where: {
       status: { in: ["open", "in_progress"] },
@@ -60,7 +67,13 @@ const scooterListInclude = {
   brand: true,
   documents: {
     where: { deletedAt: null, asset: { deletedAt: null } },
-    select: { type: true, extractedData: true },
+    select: {
+      id: true,
+      type: true,
+      extractedData: true,
+      clientCopyAsset: { select: { deletedAt: true } },
+      insurancePolicy: { select: { validFrom: true, validUntil: true } },
+    },
   },
   insurancePolicies: { select: { validFrom: true, validUntil: true } },
   inspections: {

@@ -373,9 +373,19 @@ function ItpPanelContent({
             ))}
           </div>
         ) : data ? (
-          <p className="text-sm text-muted-foreground">{t("empty")}</p>
+          <p className="text-sm text-muted-foreground">
+            {data.validUntil && scooter.civIssuedAt
+              ? t("initialCoverage", {
+                  issuedAt: scooter.civIssuedAt,
+                  validUntil: data.validUntil,
+                })
+              : t("empty")}
+          </p>
         ) : null}
-        {canWrite && !canConfirm ? (
+        {canWrite &&
+        !canConfirm &&
+        (!data?.validUntil ||
+          v1.scooters.scooterItpDocumentsDue(data.validUntil)) ? (
           <p className="text-sm text-muted-foreground">
             {t("missingEvidence")}
           </p>

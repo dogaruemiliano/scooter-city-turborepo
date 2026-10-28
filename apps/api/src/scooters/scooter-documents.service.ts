@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
+import { toDateOnlyString } from "../common/dates/date-only";
 import { v1 } from "@repo/api-shared";
 import { Prisma } from "../generated/prisma/client";
 import { ImageStorageService } from "../image-storage/image-storage.service";
@@ -295,7 +296,11 @@ export class ScooterDocumentsService {
     const count = await tx.scooterDocument.count({
       where: { scooterId, deletedAt: null },
     });
-    if (count + prepared.length > v1.scooters.SCOOTER_DOCUMENT_MAX_FILES)
+    if (
+      count +
+        prepared.filter((document) => !document.originalDocumentId).length >
+      v1.scooters.SCOOTER_DOCUMENT_MAX_FILES
+    )
       throw new BadRequestException("Too many scooter documents");
     for (const {
       stored,
@@ -306,13 +311,18 @@ export class ScooterDocumentsService {
       uploadType,
       clientCopy,
       clientCopyStored,
+      originalDocumentId,
     } of prepared) {
       const hasInsurance = extractedData?.documents?.length
         ? extractedData.documents.some(
             (document) => document.documentType === "insurance",
           )
         : type === "insurance";
-      if (hasInsurance && extractedData?.currentInsuranceDocumentId !== null) {
+      if (
+        !originalDocumentId &&
+        hasInsurance &&
+        extractedData?.currentInsuranceDocumentId !== null
+      ) {
         if (
           !insurancePolicyId ||
           !(await tx.scooterInsurancePolicy.findFirst({
@@ -323,7 +333,7 @@ export class ScooterDocumentsService {
           throw new BadRequestException(
             "Insurance document must belong to a policy on this scooter",
           );
-      } else if (insurancePolicyId)
+      } else if (!originalDocumentId && insurancePolicyId)
         throw new BadRequestException(
           "Only documents containing insurance evidence can belong to a policy",
         );
@@ -356,6 +366,53 @@ export class ScooterDocumentsService {
           throw new BadRequestException(
             "Document upload expired or was already used. Upload it again.",
           );
+      }
+      if (originalDocumentId) {
+        const original = await tx.scooterDocument.findFirst({
+          where: {
+            id: originalDocumentId,
+            scooterId,
+            deletedAt: null,
+            asset: { deletedAt: null },
+          },
+          include: { clientCopyAsset: true },
+        });
+        if (
+          !original ||
+          original.type !== type ||
+          (original.clientCopyAsset && !original.clientCopyAsset.deletedAt) ||
+          clientCopyStored
+        )
+          throw new BadRequestException(
+            "Choose an original on this scooter without an existing client copy",
+          );
+        await tx.scooterDocument.update({
+          where: { id: originalDocumentId },
+          data: {
+            clientCopyFileName: fileName,
+            clientCopyAsset: {
+              create: {
+                provider: stored.provider,
+                bucket: stored.bucket,
+                storageKey: stored.storageKey,
+                contentType: stored.contentType,
+                byteSize: stored.byteSize,
+                checksumSha256: stored.checksumSha256,
+                uploadedByUserId: userId,
+              },
+            },
+          },
+        });
+        if (sessionId)
+          await tx.scooterDocumentResource.updateMany({
+            where: {
+              sessionId,
+              storageKey: stored.storageKey,
+              kind: "original",
+            },
+            data: { status: "retained" },
+          });
+        continue;
       }
       const document = await tx.scooterDocument.create({
         data: {
@@ -427,8 +484,12 @@ export class ScooterDocumentsService {
       throw new NotFoundException("Scooter not found");
     const documents = await this.prisma.scooterDocument.findMany({
       where: { scooterId, deletedAt: null, asset: { deletedAt: null } },
-      include: { asset: true, clientCopyAsset: true },
+      include: { asset: true, clientCopyAsset: true, insurancePolicy: true },
       orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    });
+    const inspections = await this.prisma.scooterItpInspection.findMany({
+      where: { scooterId },
+      orderBy: [{ inspectionDate: "desc" }, { createdAt: "desc" }],
     });
     return documents.map((doc) =>
       v1.scooters.scooterDocumentSchema.parse({
@@ -440,6 +501,24 @@ export class ScooterDocumentsService {
         contentType: doc.asset.contentType,
         byteSize: doc.asset.byteSize,
         createdAt: doc.createdAt.toISOString(),
+        validFrom: toDateOnlyString(
+          doc.insurancePolicy?.validFrom ??
+            inspections.find(
+              (inspection) =>
+                inspection.cardDocumentId === doc.id ||
+                inspection.certificateDocumentId === doc.id,
+            )?.inspectionDate ??
+            null,
+        ),
+        validUntil: toDateOnlyString(
+          doc.insurancePolicy?.validUntil ??
+            inspections.find(
+              (inspection) =>
+                inspection.cardDocumentId === doc.id ||
+                inspection.certificateDocumentId === doc.id,
+            )?.validUntil ??
+            null,
+        ),
         contentUrl: v1.scooters.ROUTES.documents.content(scooterId, doc.id),
         clientCopy:
           doc.clientCopyAsset && !doc.clientCopyAsset.deletedAt

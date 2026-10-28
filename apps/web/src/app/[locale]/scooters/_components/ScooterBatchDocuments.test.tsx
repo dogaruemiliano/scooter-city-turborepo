@@ -41,8 +41,12 @@ function view({
   disabled = false,
   result = importResult,
   drafts = [],
+  editing = false,
+  itpValidUntil,
 }: {
   attached?: v1.scooters.ScooterDocument[];
+  editing?: boolean;
+  itpValidUntil?: string | null;
   disabled?: boolean;
   result?: typeof importResult;
   drafts?: ScooterDocumentsEditor["drafts"];
@@ -58,6 +62,8 @@ function view({
     <NextIntlClientProvider locale="en" messages={messages.en}>
       <ScooterBatchDocuments
         documents={documents}
+        editing={editing}
+        itpValidUntil={itpValidUntil}
         disabled={disabled}
         analyzing={false}
         importResult={result}
@@ -78,6 +84,11 @@ beforeEach(() => {
 describe("Scooter batch document states", () => {
   it("keeps the mobile upload area below the documents without an expand button or ghost card", () => {
     const originalWidth = window.innerWidth;
+    const originalMatchMedia = window.matchMedia;
+    window.matchMedia = vi.fn((query) => ({
+      ...originalMatchMedia(query),
+      matches: query === "(width < 768px)",
+    }));
     Object.defineProperty(window, "innerWidth", {
       configurable: true,
       value: 390,
@@ -99,6 +110,7 @@ describe("Scooter batch document states", () => {
       ).not.toBeInTheDocument();
       expect(within(list).getAllByRole("listitem")).toHaveLength(1);
     } finally {
+      window.matchMedia = originalMatchMedia;
       Object.defineProperty(window, "innerWidth", {
         configurable: true,
         value: originalWidth,
@@ -108,6 +120,11 @@ describe("Scooter batch document states", () => {
 
   it("scrolls the mobile rail to newly appended documents, but not on analysis updates or removal", () => {
     const originalWidth = window.innerWidth;
+    const originalMatchMedia = window.matchMedia;
+    window.matchMedia = vi.fn((query) => ({
+      ...originalMatchMedia(query),
+      matches: query === "(width < 768px)",
+    }));
     Object.defineProperty(window, "innerWidth", {
       configurable: true,
       value: 390,
@@ -145,6 +162,7 @@ describe("Scooter batch document states", () => {
       fixture.rerender(view());
       expect(scrollTo).toHaveBeenCalledTimes(1);
     } finally {
+      window.matchMedia = originalMatchMedia;
       Object.defineProperty(window, "innerWidth", {
         configurable: true,
         value: originalWidth,
@@ -395,7 +413,9 @@ describe("Scooter batch document states", () => {
         name: messages.en.scooters.documents.closePreview,
       }),
     ).toBeInTheDocument();
-    expect(within(viewer).getByRole("status")).toBeInTheDocument();
+    expect(
+      viewer.querySelector('[data-slot="document-status"]'),
+    ).toBeInTheDocument();
     fireEvent.click(within(viewer).getByRole("button", { name: "For client" }));
     const sheet = await screen.findByRole("dialog", {
       name: "A protected copy for clients",
@@ -585,4 +605,48 @@ describe("Scooter batch document states", () => {
     expect(add).not.toHaveBeenCalled();
     expect(target).toBeInTheDocument();
   });
+});
+
+it("shows the six missing edit slots and accepts a file dropped onto a ghost", () => {
+  const fixture = render(
+    view({ attached: [], editing: true, itpValidUntil: "2099-01-01" }),
+  );
+  const ghosts = fixture.container.querySelectorAll(
+    '[data-slot="scooter-document-ghost"]',
+  );
+  expect(ghosts).toHaveLength(6);
+  const file = new File(["pdf"], "ownership.pdf", { type: "application/pdf" });
+  drop(ghosts[0] as HTMLElement, [file]);
+  expect(add).toHaveBeenCalledExactlyOnceWith(null, [file]);
+  fixture.rerender(
+    view({
+      attached: [],
+      editing: true,
+      itpValidUntil: new Date().toISOString().slice(0, 10),
+    }),
+  );
+  expect(
+    fixture.container.querySelectorAll('[data-slot="scooter-document-ghost"]'),
+  ).toHaveLength(10);
+});
+it("retains an expired insurance with its badge and a missing valid insurance slot", () => {
+  const fixture = render(
+    view({
+      attached: [
+        {
+          ...existing,
+          id: "expired-policy",
+          type: "insurance",
+          validFrom: "2020-01-01",
+          validUntil: "2021-01-01",
+        },
+      ],
+      editing: true,
+      itpValidUntil: "2099-01-01",
+    }),
+  );
+  expect(screen.getByText("Expired")).toBeInTheDocument();
+  expect(
+    fixture.container.querySelectorAll('[data-slot="scooter-document-ghost"]'),
+  ).toHaveLength(6);
 });

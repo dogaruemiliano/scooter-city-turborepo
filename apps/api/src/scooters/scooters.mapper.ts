@@ -13,7 +13,16 @@ type ScooterRowWithBrand = ScooterRow & {
   insuranceAttention?: v1.scooters.InsuranceAttention | null;
   rentalInsuranceStatus?: v1.scooters.Scooter["rentalInsuranceStatus"];
   photos?: { id: string }[];
-  documents?: { type: string; extractedData: unknown }[];
+  documents?: {
+    id?: string;
+    type: string;
+    extractedData: unknown;
+    clientCopyAsset?: { deletedAt: Date | null } | null;
+    insurancePolicy?: {
+      validFrom: Date | null;
+      validUntil: Date | null;
+    } | null;
+  }[];
   problems?: { difficulty: v1.problems.Problem["difficulty"] }[];
   _count?: { problems: number };
   brand: { name: string; code: string };
@@ -30,9 +39,46 @@ export function toScooter(row: ScooterRowWithBrand): v1.scooters.Scooter {
           validUntil: toDateOnlyString(entry.validUntil),
           result: v1.scooters.scooterItpResultSchema.parse(entry.result),
         })),
+        undefined,
+        toDateOnlyString(row.civDocument?.issuedAt ?? null),
       )
     : undefined;
   return {
+    ...(row.documents
+      ? {
+          missingClientDocuments: v1.scooters.missingScooterClientDocuments(
+            row.documents.map((document) => ({
+              ...document,
+              id: document.id ?? "",
+              clientCopy:
+                document.clientCopyAsset && !document.clientCopyAsset.deletedAt,
+              validFrom: toDateOnlyString(
+                document.insurancePolicy?.validFrom ??
+                  row.inspections?.find(
+                    (inspection) =>
+                      inspection.cardDocumentId === document.id ||
+                      inspection.certificateDocumentId === document.id,
+                  )?.inspectionDate ??
+                  null,
+              ),
+              validUntil: toDateOnlyString(
+                document.insurancePolicy?.validUntil ??
+                  row.inspections?.find(
+                    (inspection) =>
+                      inspection.cardDocumentId === document.id ||
+                      inspection.certificateDocumentId === document.id,
+                  )?.validUntil ??
+                  null,
+              ),
+            })),
+            Boolean(row.inspections?.length) ||
+              !itp?.validUntil ||
+              itp.status === "expired" ||
+              itp.status === "failed" ||
+              itp.status === "review",
+          ),
+        }
+      : {}),
     ...(itp ? { itpStatus: itp.status, itpValidUntil: itp.validUntil } : {}),
     ...(row.problems
       ? {

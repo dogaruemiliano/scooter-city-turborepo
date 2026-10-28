@@ -39,6 +39,7 @@ export const scooterDocumentDraftSchema = z
       })
       .strict()
       .optional(),
+    originalDocumentId: z.string().min(1).max(120).optional(),
     insurancePolicyId: z.string().min(1).max(120).optional(),
     extractedData: scooterDocumentExtractedDataSchema.nullable().optional(),
     type: scooterDocumentTypeSchema,
@@ -84,6 +85,8 @@ export const scooterDocumentSchema = z
     contentType: z.enum(SCOOTER_DOCUMENT_CONTENT_TYPES),
     byteSize: z.number(),
     createdAt: z.string(),
+    validFrom: z.string().nullable().optional(),
+    validUntil: z.string().nullable().optional(),
     contentUrl: z.string(),
     clientCopy: z
       .object({

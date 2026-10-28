@@ -52,6 +52,69 @@ describe("Rental operational invariants", () => {
     db.person.findFirst.mockResolvedValue({ id: "person" });
   });
 
+  it("requires client copies before creating a rental and accepts the initial CIV inspection", async () => {
+    const documents = ["civ", "registration_certificate", "insurance"].map(
+      (type) => ({
+        id: type,
+        type,
+        extractedData: null,
+        clientCopyAsset: { deletedAt: null },
+        insurancePolicy:
+          type === "insurance"
+            ? {
+                validFrom: new Date("2020-01-01"),
+                validUntil: new Date("2099-01-01"),
+              }
+            : null,
+      }),
+    );
+    const scooter = {
+      id: "scooter",
+      registrationType: "national",
+      registrationNumber: "B123ABC",
+      civDocument: { issuedAt: new Date() },
+      inspections: [],
+      documents,
+      insurancePolicies: [
+        {
+          validFrom: new Date("2020-01-01"),
+          validUntil: new Date("2099-01-01"),
+        },
+      ],
+    };
+    const input = {
+      scooterId: "scooter",
+      personId: "person",
+      startsAt: now.toISOString(),
+      endsAt: new Date(now.getTime() + 60_000).toISOString(),
+    };
+    db.scooter.findFirst.mockResolvedValue(scooter);
+    const reachedCreate = new Error("Reached rental creation");
+    db.rental.create.mockRejectedValue(reachedCreate);
+    await expect(service.create("agent", input)).rejects.toBe(reachedCreate);
+    expect(db.rental.create).toHaveBeenCalledTimes(1);
+    db.rental.create.mockClear();
+    db.scooter.findFirst.mockResolvedValue({
+      ...scooter,
+      documents: documents.map((document) => ({
+        ...document,
+        clientCopyAsset: null,
+      })),
+    });
+    await expect(service.create("agent", input)).rejects.toMatchObject({
+      response: {
+        code: "SCOOTER_DOCUMENTS_REQUIRED",
+        details: {
+          missingClientDocuments: [
+            "civ",
+            "registration_certificate",
+            "insurance",
+          ],
+        },
+      },
+    });
+    expect(db.rental.create).not.toHaveBeenCalled();
+  });
   it("checks overlapping reservations after acquiring the scooter lock", async () => {
     db.rental.findFirst.mockResolvedValue({ id: "existing" });
     await expect(

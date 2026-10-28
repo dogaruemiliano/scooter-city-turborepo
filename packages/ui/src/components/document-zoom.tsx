@@ -29,6 +29,11 @@ export type MediaNavigationProps = {
   leftActions?: ReactNode;
   rightActions?: ReactNode;
   entryDirection?: -1 | 1;
+  wheelGesture?: React.RefObject<{
+    last: number;
+    distance: number;
+    committed: boolean;
+  }>;
 };
 
 type DocumentPointer = {
@@ -49,6 +54,7 @@ export function DocumentZoom({
   navigation,
   resetKey,
   caption,
+  captionStatus,
   headerOverlay,
   bottomOverlay,
   onClosePress,
@@ -59,6 +65,7 @@ export function DocumentZoom({
   leftActions,
   rightActions,
   entryDirection,
+  wheelGesture: sharedWheelGesture,
   onSwipeDown,
   swipeDownTarget,
 }: {
@@ -74,6 +81,12 @@ export function DocumentZoom({
 } & DocumentPreviewHeaderProps &
   MediaNavigationProps) {
   const viewport = useRef<HTMLDivElement>(null);
+  const localWheelGesture = useRef({
+    last: -Infinity,
+    distance: 0,
+    committed: false,
+  });
+  const wheelGesture = sharedWheelGesture ?? localWheelGesture;
   const stage = useRef<HTMLDivElement>(null);
   const slideAnimation = useRef<Animation | null>(null);
   const navigating = useRef(false);
@@ -248,6 +261,7 @@ export function DocumentZoom({
       <DocumentPreviewHeader
         headerOverlay={headerOverlay}
         caption={caption}
+        captionStatus={captionStatus}
         onClosePress={onClosePress}
         closeLabel={closeLabel}
         headerActions={headerActions}
@@ -266,6 +280,36 @@ export function DocumentZoom({
         tabIndex={0}
         data-zoom={view.scale}
         className="relative min-h-0 flex-1 touch-none overflow-hidden overscroll-none select-none [-webkit-touch-callout:none]"
+        onWheel={(event) => {
+          if (event.ctrlKey || event.metaKey) return;
+          const current = currentView.current;
+          if (current.scale > 1) {
+            update(
+              current.scale,
+              current.x - event.deltaX,
+              current.y - event.deltaY,
+            );
+            return;
+          }
+          const gesture = wheelGesture.current;
+          if (event.timeStamp - gesture.last > motion.duration.mediaWheelIdle) {
+            gesture.distance = 0;
+            gesture.committed = false;
+          }
+          gesture.last = event.timeStamp;
+          if (Math.abs(event.deltaX) <= Math.abs(event.deltaY)) return;
+          if (gesture.committed) return;
+          gesture.distance +=
+            event.deltaX *
+            (event.deltaMode === 1
+              ? spacing[4]
+              : event.deltaMode === 2
+                ? (viewport.current?.clientWidth ?? spacing[12])
+                : 1);
+          if (Math.abs(gesture.distance) < spacing[12]) return;
+          gesture.committed = true;
+          (gesture.distance > 0 ? onNext : onPrevious)?.();
+        }}
         onMouseDown={(event) => {
           if (event.detail > 1) event.preventDefault();
         }}

@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeftIcon, ChevronRightIcon, PlusIcon } from "lucide-react";
+import { PlusIcon } from "lucide-react";
 import { useRef, useState } from "react";
 import { useObjectUrl } from "../hooks/use-object-url";
 import { Button } from "./button";
@@ -45,10 +45,6 @@ export function DocumentCollectionInput({
   const replacementId = useRef<string | null>(null);
   const sequence = useRef(0);
   const [open, setOpen] = useState(false);
-  const [documentDirection, setDocumentDirection] = useState<-1 | 1>();
-  const [initialPdfPage, setInitialPdfPage] = useState<"first" | "last">(
-    "first",
-  );
   const [activeId, setActiveId] = useState<string | null>(null);
   const [pending, setPending] = useState<DocumentInputItem[]>([]);
   const [replacements, setReplacements] = useState<Record<string, File>>({});
@@ -67,25 +63,12 @@ export function DocumentCollectionInput({
   const active = items[activeIndex];
   const cover = values[0];
   const coverUrl = useObjectUrl(cover?.file ?? null);
-  const activeUrl = useObjectUrl(open ? (active?.file ?? null) : null);
   const coverSrc = cover?.src ?? coverUrl;
-  const activeSrc = active?.src ?? activeUrl;
   const atLimit = maxFiles !== undefined && items.length >= maxFiles;
   const failed = values.find((item) => item.uploadError);
   const status = values.find((item) => item.status)?.status;
 
-  function moveDocument(direction: -1 | 1) {
-    const item = items[activeIndex + direction];
-    if (!item) return;
-    setDocumentDirection(direction);
-    setInitialPdfPage(direction < 0 ? "last" : "first");
-    setActiveId(item.id);
-    setError(null);
-  }
-
   function close() {
-    setDocumentDirection(undefined);
-    setInitialPdfPage("first");
     setOpen(false);
     setPending([]);
     setReplacements({});
@@ -239,6 +222,7 @@ export function DocumentCollectionInput({
         ) : null}
         <DocumentPreview
           id={id}
+          mediaId={cover?.id}
           src={coverSrc}
           fileName={cover?.fileName}
           contentType={cover?.contentType}
@@ -303,13 +287,52 @@ export function DocumentCollectionInput({
         onOpenChange={(next) => {
           if (!next) close();
         }}
-        entryDirection={documentDirection}
-        initialPdfPage={initialPdfPage}
-        onPrevious={activeIndex > 0 ? () => moveDocument(-1) : undefined}
-        onNext={
-          activeIndex < items.length - 1 ? () => moveDocument(1) : undefined
+        items={items}
+        activeId={active?.id}
+        onActiveIdChange={(id) => {
+          setActiveId(id);
+          setError(null);
+        }}
+        collectionLabels={{
+          previous: labels.previousDocument,
+          next: labels.nextDocument,
+          position: labels.documentPosition,
+        }}
+        file={active?.file}
+        cropLabel={labels.crop ?? labels.change}
+        editorLabels={labels.editorLabels}
+        onCrop={
+          disabled || !labels.crop
+            ? undefined
+            : (file) => {
+                const problem = validate(file);
+                if (problem) throw new Error(problem);
+                if (!active) return;
+                if (pending.some((item) => item.id === active.id)) {
+                  setPending((current) =>
+                    current.map((item) =>
+                      item.id === active.id
+                        ? {
+                            ...item,
+                            file,
+                            fileName: file.name,
+                            contentType: file.type,
+                          }
+                        : item,
+                    ),
+                  );
+                } else
+                  setReplacements((current) => ({
+                    ...current,
+                    [active.id]: file,
+                  }));
+              }
         }
-        src={activeSrc}
+        imageLabels={{
+          loadingLabel: labels.title,
+          errorLabel: labels.error,
+          retryLabel: labels.retry,
+        }}
         contentType={active?.contentType}
         fileName={active?.fileName}
         title={active?.fileName ?? labels.title}
@@ -331,40 +354,7 @@ export function DocumentCollectionInput({
         disabled={disabled}
         error={error ?? active?.uploadError}
         navigation={
-          <div
-            data-slot="document-navigation"
-            className="flex items-center justify-between gap-2"
-          >
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              aria-label={labels.previousDocument}
-              disabled={activeIndex === 0}
-              onClick={() => {
-                moveDocument(-1);
-              }}
-            >
-              <ChevronLeftIcon aria-hidden="true" className="size-5" />
-            </Button>
-            <p
-              aria-live="polite"
-              className="min-w-0 flex-1 text-center text-sm"
-            >
-              {labels.documentPosition(activeIndex + 1, items.length)}
-            </p>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              aria-label={labels.nextDocument}
-              disabled={activeIndex >= items.length - 1}
-              onClick={() => {
-                moveDocument(1);
-              }}
-            >
-              <ChevronRightIcon aria-hidden="true" className="size-5" />
-            </Button>
+          <div data-slot="document-navigation" className="flex justify-end">
             {addButton()}
           </div>
         }

@@ -12,10 +12,12 @@ import { PdfPreview, type PdfPreviewLabels } from "./pdf-preview";
 import { Badge } from "./badge";
 import { Button } from "./button";
 import { DocumentViewer } from "./document-viewer";
+import { useMediaCollection } from "./media-collection";
 import type { DocumentZoomLabels } from "./document-zoom";
 
 /** Shared person/vehicle document card, with an accessible full-screen viewer. */
 export function DocumentPreview({
+  mediaId,
   id,
   src,
   contentType,
@@ -50,6 +52,7 @@ export function DocumentPreview({
   /** Fullscreen header may replace the card remove action with viewer dismissal. */
   viewerHeaderOverlay?: ReactNode;
   bottomOverlay?: ReactNode;
+  mediaId?: string;
   id?: string;
   src?: string | null;
   contentType?: string;
@@ -75,6 +78,7 @@ export function DocumentPreview({
   countLabel?: string;
   onDrop?: DragEventHandler<HTMLElement>;
 }) {
+  const collection = useMediaCollection();
   const isPdf = contentType === "application/pdf";
   const [measured, setMeasured] = useState<{
     src: typeof src;
@@ -111,7 +115,11 @@ export function DocumentPreview({
           : undefined
       }
       className={`group ${layout === "paper" ? "absolute inset-0 h-full w-full rounded-none md:h-full" : "relative h-auto w-full rounded-lg md:h-auto"} overflow-hidden p-0 whitespace-normal ${dragging ? "border-primary bg-accent" : ""}`}
-      onClick={() => (fileName ? onOpenChange(true) : onEmptyClick?.())}
+      onClick={() => {
+        if (fileName) {
+          if (!collection?.open(mediaId ?? src)) onOpenChange(true);
+        } else onEmptyClick?.();
+      }}
     >
       {isPdf && src ? (
         <PdfPreview

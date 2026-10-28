@@ -1,11 +1,6 @@
 "use client";
 
-import {
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  FileTextIcon,
-  LoaderCircleIcon,
-} from "lucide-react";
+import { FileTextIcon, LoaderCircleIcon } from "lucide-react";
 import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
@@ -18,13 +13,15 @@ import {
   type DocumentZoomLabels,
   type MediaNavigationProps,
 } from "./document-zoom";
-import { Button } from "./button";
+import { MediaNavigation } from "./media-navigation";
 import type { DocumentPreviewHeaderProps } from "./document-preview-header";
 
 export type PdfPreviewLabels = {
   error: string;
   previousPage: string;
   nextPage: string;
+  retry?: string;
+  pagePosition?: (page: number, total: number) => string;
 };
 
 /** Client-rendered PDFs also work in browsers without a built-in PDF viewer. */
@@ -44,8 +41,12 @@ export function PdfPreview({
   onNext,
   leftActions,
   rightActions,
+  collectionPosition,
+  previousDocumentLabel,
+  nextDocumentLabel,
   initialPage = "first",
   entryDirection,
+  wheelGesture,
 }: {
   bottomOverlay?: ReactNode;
   src: string;
@@ -56,6 +57,9 @@ export function PdfPreview({
   onAspectRatio?: (ratio: number) => void;
   zoomLabels?: DocumentZoomLabels;
   initialPage?: "first" | "last";
+  collectionPosition?: string;
+  previousDocumentLabel?: string;
+  nextDocumentLabel?: string;
 } & Omit<DocumentPreviewHeaderProps, "caption"> &
   MediaNavigationProps) {
   const [pageDirection, setPageDirection] = useState<-1 | 1>();
@@ -105,35 +109,30 @@ export function PdfPreview({
       onAspectRatio={onAspectRatio}
     />
   );
-  const navigation = pdf ? (
-    <>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className="size-11 min-h-11 hover:bg-document-overlay disabled:border-transparent disabled:bg-transparent"
-        aria-label={labels.previousPage}
-        disabled={pageNumber === 1}
-        onClick={previous}
-      >
-        <ChevronLeftIcon aria-hidden="true" />
-      </Button>
-      <span role="status" className="px-1 text-xs tabular-nums">
-        {pageNumber} / {pdf.numPages}
-      </span>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className="size-11 min-h-11 hover:bg-document-overlay disabled:border-transparent disabled:bg-transparent"
-        aria-label={labels.nextPage}
-        disabled={pageNumber === pdf.numPages}
-        onClick={next}
-      >
-        <ChevronRightIcon aria-hidden="true" />
-      </Button>
-    </>
-  ) : null;
+  const canPrevious = pageNumber > 1 || Boolean(onPrevious);
+  const canNext = Boolean(pdf && pageNumber < pdf.numPages) || Boolean(onNext);
+  const navigation = (
+    <MediaNavigation
+      previous={canPrevious ? previous : undefined}
+      next={canNext ? next : undefined}
+      previousLabel={
+        pageNumber === 1 && onPrevious
+          ? (previousDocumentLabel ?? labels.previousPage)
+          : labels.previousPage
+      }
+      nextLabel={
+        (!pdf || pageNumber === pdf.numPages) && onNext
+          ? (nextDocumentLabel ?? labels.nextPage)
+          : labels.nextPage
+      }
+      position={
+        pdf
+          ? (labels.pagePosition?.(pageNumber, pdf.numPages) ??
+            `${pageNumber} / ${pdf.numPages}`)
+          : undefined
+      }
+    />
+  );
   const content = (scale = 1) =>
     failed ? (
       <span
@@ -168,18 +167,16 @@ export function PdfPreview({
       {!thumbnail && zoomLabels ? (
         <DocumentZoom
           entryDirection={pageDirection ?? entryDirection}
-          onPrevious={
-            pdf && (pageNumber > 1 || onPrevious) ? previous : undefined
-          }
-          onNext={
-            pdf && (pageNumber < pdf.numPages || onNext) ? next : undefined
-          }
+          onPrevious={canPrevious ? previous : undefined}
+          onNext={canNext ? next : undefined}
           leftActions={leftActions}
           rightActions={rightActions}
           resetKey={pageNumber}
+          wheelGesture={wheelGesture}
           labels={zoomLabels}
           navigation={navigation}
           caption={label}
+          captionStatus={collectionPosition}
           onClosePress={onClosePress}
           closeLabel={closeLabel}
           headerActions={headerActions}

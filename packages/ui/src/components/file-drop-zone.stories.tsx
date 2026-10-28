@@ -47,7 +47,7 @@ export const MobileSelection: Story = {
   args: { requirements: "PDF, JPG, PNG or WebP, up to 15 MB each." },
 };
 
-/** Desktop is one drop gallery. Mobile keeps its picker below the swipeable cards. */
+/** Desktop is one drop gallery. Mobile keeps its picker below the swipeable cards; both accept files anywhere in the gallery. */
 export const PopulatedGallery: Story = {
   args: {
     addLabel: "Add document",

@@ -492,6 +492,7 @@ export function ScooterImportWorkspace({
           : selected,
       );
       setDiscardTarget(undefined);
+      if (drafts.length === 1) router.push(scootersHref);
     } catch {
       closed.current.delete(id);
       setDiscardError(t("discardFailed"));

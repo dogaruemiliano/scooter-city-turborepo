@@ -471,6 +471,9 @@
   --container-scooter-photo-preview: 55dvh;
   --container-scooter-photo-preview-mobile: 35dvh;
   --container-document-editor: 80vw;
+  --container-media-viewer-width: 90vw;
+  --container-media-viewer-height: 88dvh;
+  --container-media-viewer-max: 1536px;
   --container-document-review: 60dvh;
   --container-form-columns: 640px;
   --container-form-controls: 384px;
@@ -530,6 +533,8 @@
   --transition-duration-slower: 600ms;
   --duration-double-tap: 300ms;
   --transition-duration-double-tap: 300ms;
+  --duration-media-wheel-idle: 180ms;
+  --transition-duration-media-wheel-idle: 180ms;
   --duration-countdown-tick: 1000ms;
   --transition-duration-countdown-tick: 1000ms;
   --duration-document-review-pause: 3000ms;
@@ -547,6 +552,7 @@
 
   --opacity-drag-ghost: 0.3;
   --opacity-image-placeholder: 0.5;
+  --opacity-client-document-overlay: 0.1;
 
   --z-base: 0;
   --z-raised: 10;

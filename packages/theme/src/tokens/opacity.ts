@@ -1,7 +1,8 @@
-/** Opacity for temporary interaction feedback. */
+/** Opacity for interaction feedback and document protection. */
 export const opacity = {
   dragGhost: 0.3,
   imagePlaceholder: 0.5,
+  clientDocumentOverlay: 0.1,
 } as const;
 
 export type Opacity = typeof opacity;

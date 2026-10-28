@@ -75,7 +75,6 @@ export function FileDropZone({
         dragging ? "border-primary" : "border-border",
       )}
       onClick={() => input.current?.click()}
-      {...handlers}
     >
       <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
         <UploadIcon aria-hidden="true" className="size-6" />
@@ -144,10 +143,14 @@ export function FileDropZone({
     );
   }
   return (
-    <>
+    <div
+      data-slot="file-drop-surface"
+      {...handlers}
+      className="relative grid min-w-0 gap-4"
+    >
       {children?.(null)}
       {picker}
       {control}
-    </>
+    </div>
   );
 }

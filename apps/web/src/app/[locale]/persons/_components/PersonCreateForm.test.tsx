@@ -12,7 +12,7 @@ import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import type { ComponentProps } from "react";
 import { TooltipProvider } from "@repo/ui/components/tooltip";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PersonCreateForm } from "./PersonCreateForm";
 import { AppShell } from "@/components/AppShell";
@@ -92,7 +92,18 @@ const createdPerson: v1.persons.Person = {
   deletedAt: null,
 };
 
+const originalMatchMedia = window.matchMedia;
+afterEach(() => {
+  window.matchMedia = originalMatchMedia;
+});
 beforeEach(() => {
+  window.matchMedia = vi.fn((query: string) => ({
+    ...originalMatchMedia(query),
+    matches:
+      query === "(width < 768px)"
+        ? window.innerWidth < 768
+        : originalMatchMedia(query).matches,
+  }));
   Object.defineProperty(window, "innerWidth", {
     configurable: true,
     value: 1024,

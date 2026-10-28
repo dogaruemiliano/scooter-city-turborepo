@@ -1,103 +1,420 @@
 "use client";
-import type { ReactNode, Ref } from "react";
-import { Dialog, DialogContent, DialogTitle } from "./dialog";
-import { Button } from "./button";
-import { cn } from "../lib/utils";
 
-/** Shared fullscreen surface for image and document evidence. */
-export function MediaViewer({
+import {
+  PencilIcon,
+  EllipsisVerticalIcon,
+  ExternalLinkIcon,
+  Trash2Icon,
+  Grid3X3Icon,
+  CropIcon,
+} from "lucide-react";
+import { useRef, useState, type ReactNode, type ComponentProps } from "react";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "./dropdown-menu";
+import { Button } from "./button";
+import { MediaViewerSurface } from "./media-viewer-surface";
+import { ImagePreview, type ImagePreviewProps } from "./image-preview";
+import { ImageEditor, type ImageEditorLabels } from "./image-editor";
+import { MediaNavigation } from "./media-navigation";
+import { useObjectUrl } from "../hooks/use-object-url";
+import { DocumentZoom, type DocumentZoomLabels } from "./document-zoom";
+import { PdfPreview, type PdfPreviewLabels } from "./pdf-preview";
+import type { MediaNavigationProps } from "./document-zoom";
+
+export type MediaItem = {
+  id: string;
+  src?: string | null;
+  file?: File;
+  contentType: string;
+  fileName: string;
+  alt?: string;
+};
+
+/** One viewer for a caller-owned list. DocumentViewer/ImageViewer are adapters only. */
+function MediaViewerSession({
+  embedded = false,
+  file,
+  items,
+  activeId,
+  onActiveIdChange,
+  collectionLabels,
+  imageLabels,
+  gridLabel,
+  swipeDismiss = false,
+  onCrop,
+  cropLabel,
+  editorLabels,
+  slot = "media-viewer",
+  saving,
+  pendingLabel,
   open,
   onOpenChange,
+  src,
+  contentType,
+  fileName,
   title,
-  children,
-  hasSource,
-  slot = "media-viewer",
-  review,
-  reviewTitle,
-  navigation,
-  error,
+  imageAlt,
+  closeLabel,
+  openFileLabel,
+  pdfLabels,
+  zoomLabels,
+  onChange,
+  changeLabel,
+  actionsLabel,
+  onRemove,
+  removeLabel,
   onSave,
   saveLabel,
   disabled,
+  error,
   footer,
-  contentRef,
+  headerOverlay,
+  bottomOverlay,
+  navigation,
+  review,
+  reviewTitle,
+  onPrevious,
+  onNext,
+  initialPdfPage,
+  leftActions,
+  rightActions,
+  entryDirection: requestedEntryDirection,
 }: {
+  embedded?: boolean;
+  file?: File;
+  items?: readonly MediaItem[];
+  activeId?: string | null;
+  onActiveIdChange?: (id: string) => void;
+  collectionLabels?: {
+    previous: string;
+    next: string;
+    position: (index: number, total: number) => string;
+  };
+  imageLabels?: Pick<
+    ImagePreviewProps,
+    "loadingLabel" | "errorLabel" | "retryLabel"
+  >;
+  gridLabel?: string;
+  swipeDismiss?: boolean;
+  onCrop?: (file: File) => void | Promise<void>;
+  cropLabel?: string;
+  editorLabels?: Partial<ImageEditorLabels>;
+  slot?: string;
+  saving?: boolean;
+  pendingLabel?: string;
+  headerOverlay?: ReactNode;
+  bottomOverlay?: ReactNode;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  src?: string | null;
+  contentType?: string;
+  fileName?: string;
   title: string;
-  children: ReactNode;
-  hasSource?: boolean;
-  slot?: string;
-  review?: ReactNode;
-  reviewTitle?: string;
-  navigation?: ReactNode;
-  error?: string | null;
+  imageAlt: string;
+  closeLabel: string;
+  openFileLabel: string;
+  pdfLabels: PdfPreviewLabels;
+  zoomLabels: DocumentZoomLabels;
+  onChange?: () => void;
+  changeLabel?: string;
+  actionsLabel: string;
+  onRemove?: () => void;
+  removeLabel?: string;
   onSave?: () => void;
   saveLabel?: string;
   disabled?: boolean;
+  error?: string | null;
   footer?: ReactNode;
-  contentRef?: Ref<HTMLDivElement>;
-}) {
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange} disablePointerDismissal>
-      <DialogContent
-        ref={contentRef}
-        showCloseButton={false}
-        data-slot={slot}
-        className="inset-0 flex h-dvh max-h-dvh w-full max-w-none translate-x-0 translate-y-0 flex-col gap-0 rounded-none border-0 bg-popover p-0 text-popover-foreground transition-none sm:max-w-none data-open:slide-in-from-bottom data-closed:slide-out-to-bottom"
-      >
-        <DialogTitle className="sr-only">{title}</DialogTitle>
-        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
-          <div
-            className={cn(
-              "relative flex min-h-0 flex-1 flex-col overflow-hidden bg-control",
-              review &&
-                hasSource &&
-                "h-(--container-document-review) shrink-0 flex-none lg:h-auto lg:flex-1",
-            )}
-            data-slot="document-viewer-body"
-          >
-            {children}
-          </div>
-          {review ? (
-            <aside
-              aria-label={reviewTitle}
-              data-slot="document-review"
-              className="flex shrink-0 flex-col gap-6 rounded-t-3xl border-t border-border bg-popover p-6 text-popover-foreground lg:w-96 lg:overflow-y-auto lg:rounded-none lg:border-t-0 lg:border-l"
-            >
-              <div
-                aria-hidden="true"
-                className="mx-auto h-1 w-12 shrink-0 rounded-full bg-muted-foreground/40 lg:hidden"
-              />
-              {reviewTitle ? (
-                <h2 className="text-base font-semibold">{reviewTitle}</h2>
-              ) : null}
-              {review}
-            </aside>
-          ) : null}
-        </div>
-        {navigation || error || onSave || footer ? (
-          <div className="flex shrink-0 flex-col gap-1 bg-popover px-2 pt-1 pb-[max(var(--spacing-2),env(safe-area-inset-bottom))] text-popover-foreground">
-            {navigation}
-            {error ? (
-              <p role="alert" className="text-center text-sm text-destructive">
-                {error}
-              </p>
-            ) : null}
-            {onSave ? (
+  navigation?: ReactNode;
+  /** Optional editor/comparison panel; domain state remains with the caller. */
+  review?: ReactNode;
+  reviewTitle?: string;
+  initialPdfPage?: "first" | "last";
+} & MediaNavigationProps) {
+  const viewer = useRef<HTMLDivElement>(null);
+  const wheelGesture = useRef({
+    last: -Infinity,
+    distance: 0,
+    committed: false,
+  });
+  const [entryDirection, setEntryDirection] = useState<-1 | 1>();
+  const [initialPage, setInitialPage] = useState<"first" | "last">("first");
+  const [grid, setGrid] = useState(false);
+  const [cropLoading, setCropLoading] = useState(false);
+  const [cropError, setCropError] = useState<string | null>(null);
+  const [editing, setEditing] = useState<File | null>(null);
+  const index = items?.findIndex((item) => item.id === activeId) ?? -1;
+  const item = items?.[index];
+  const localSrc = useObjectUrl(open ? (item?.file ?? null) : null);
+  src = item ? (item.src ?? localSrc) : src;
+  contentType = item?.contentType ?? contentType;
+  fileName = item?.fileName ?? fileName;
+  imageAlt = item?.alt ?? item?.fileName ?? imageAlt;
+  file = item?.file ?? file;
+  const canCrop = ["image/jpeg", "image/png", "image/webp"].includes(
+    contentType ?? "",
+  );
+  const isImage = !contentType || contentType.startsWith("image/");
+  function move(direction: -1 | 1) {
+    if (cropLoading || saving) return;
+    setEntryDirection(direction);
+    setInitialPage(direction < 0 ? "last" : "first");
+    const target = items?.[index + direction];
+    if (target) onActiveIdChange?.(target.id);
+    else (direction < 0 ? onPrevious : onNext)?.();
+  }
+  const previous = (items ? index > 0 : onPrevious)
+    ? () => move(-1)
+    : undefined;
+  const next = (items ? index >= 0 && index < items.length - 1 : onNext)
+    ? () => move(1)
+    : undefined;
+  const position =
+    items && collectionLabels
+      ? collectionLabels.position(index + 1, items.length)
+      : undefined;
+  const collectionNavigation =
+    items && collectionLabels ? (
+      <MediaNavigation
+        previous={previous}
+        next={next}
+        previousLabel={collectionLabels.previous}
+        nextLabel={collectionLabels.next}
+      />
+    ) : undefined;
+  const headerActions = (
+    <>
+      {gridLabel && isImage ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label={gridLabel}
+          aria-pressed={grid}
+          onClick={() => setGrid(!grid)}
+        >
+          <Grid3X3Icon aria-hidden="true" />
+        </Button>
+      ) : null}
+      {actionsLabel &&
+      (onChange || onRemove || onCrop || (src && openFileLabel)) ? (
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
               <Button
                 type="button"
-                onClick={onSave}
-                disabled={disabled || !hasSource}
-                className="w-full"
+                variant="ghost"
+                size="icon"
+                aria-label={actionsLabel}
+                disabled={disabled || cropLoading}
+                className="size-11 min-h-11 hover:bg-document-overlay"
+              />
+            }
+          >
+            <EllipsisVerticalIcon aria-hidden="true" className="size-5" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            align="end"
+            className="w-auto max-w-[calc(100vw-var(--spacing-4))]"
+          >
+            {canCrop && onCrop ? (
+              <DropdownMenuItem
+                disabled={disabled || cropLoading}
+                onClick={async () => {
+                  setCropError(null);
+                  if (file) {
+                    setEditing(file);
+                    return;
+                  }
+                  if (!src || cropLoading) return;
+                  setCropLoading(true);
+                  try {
+                    const response = await fetch(src, {
+                      credentials: "include",
+                    });
+                    if (!response.ok) throw new Error(pdfLabels.error);
+                    const blob = await response.blob();
+                    setEditing(
+                      new File([blob], fileName ?? title, {
+                        type: contentType,
+                      }),
+                    );
+                  } catch {
+                    setCropError(pdfLabels.error);
+                  } finally {
+                    setCropLoading(false);
+                  }
+                }}
               >
-                {saveLabel}
-              </Button>
+                <CropIcon aria-hidden="true" />
+                {cropLabel}
+              </DropdownMenuItem>
             ) : null}
-            {footer}
-          </div>
-        ) : null}
-      </DialogContent>
-    </Dialog>
+            {onChange ? (
+              <DropdownMenuItem disabled={disabled} onClick={onChange}>
+                <PencilIcon aria-hidden="true" />
+                {changeLabel}
+              </DropdownMenuItem>
+            ) : null}
+            {onRemove ? (
+              <DropdownMenuItem
+                disabled={disabled}
+                variant="destructive"
+                onClick={onRemove}
+              >
+                <Trash2Icon aria-hidden="true" />
+                {removeLabel}
+              </DropdownMenuItem>
+            ) : null}
+            {src ? (
+              <DropdownMenuItem
+                render={
+                  <a href={src} target="_blank" rel="noopener noreferrer" />
+                }
+              >
+                <ExternalLinkIcon aria-hidden="true" />
+                {openFileLabel}
+              </DropdownMenuItem>
+            ) : null}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ) : null}
+    </>
   );
+  const previewHeader = {
+    captionStatus: position,
+    onClosePress: embedded
+      ? undefined
+      : () => {
+          if (!cropLoading && !saving) onOpenChange(false);
+        },
+    closeLabel,
+    headerActions,
+    leftActions,
+    rightActions,
+    headerOverlay,
+    bottomOverlay,
+    onPrevious: previous,
+    onNext: next,
+    entryDirection: requestedEntryDirection ?? entryDirection,
+    onSwipeDown: swipeDismiss ? () => onOpenChange(false) : undefined,
+    swipeDownTarget: viewer,
+    wheelGesture,
+  };
+  // A positioned Dialog supplies a full-screen sheet without swipe dismissal.
+  if (editing && onCrop)
+    return (
+      <ImageEditor
+        file={editing}
+        labels={editorLabels}
+        onCancel={() => setEditing(null)}
+        onSave={async (file) => {
+          await onCrop(file);
+          setEditing(null);
+        }}
+      />
+    );
+  const content = open ? (
+    <>
+      {src ? (
+        contentType === "application/pdf" ? (
+          <PdfPreview
+            key={src}
+            src={src}
+            initialPage={initialPdfPage ?? initialPage}
+            collectionPosition={position}
+            previousDocumentLabel={collectionLabels?.previous}
+            nextDocumentLabel={collectionLabels?.next}
+            label={fileName ?? imageAlt}
+            labels={pdfLabels}
+            zoomLabels={zoomLabels}
+            {...previewHeader}
+          />
+        ) : isImage ? (
+          <DocumentZoom
+            key={src}
+            labels={zoomLabels}
+            caption={fileName ?? title}
+            navigation={collectionNavigation}
+            {...previewHeader}
+          >
+            {() => (
+              <ImagePreview
+                src={src}
+                alt={imageAlt}
+                grid={grid}
+                loadingLabel={imageLabels?.loadingLabel ?? fileName ?? title}
+                errorLabel={imageLabels?.errorLabel ?? pdfLabels.error}
+                retryLabel={
+                  imageLabels?.retryLabel ?? pdfLabels.retry ?? openFileLabel
+                }
+              />
+            )}
+          </DocumentZoom>
+        ) : (
+          <DocumentZoom
+            key={src}
+            labels={zoomLabels}
+            caption={fileName ?? title}
+            navigation={collectionNavigation}
+            {...previewHeader}
+          >
+            {() => (
+              <div
+                role="status"
+                className="flex flex-1 items-center justify-center p-4"
+              >
+                {pdfLabels.error}
+              </div>
+            )}
+          </DocumentZoom>
+        )
+      ) : (
+        <DocumentZoom
+          labels={zoomLabels}
+          caption={fileName ?? title}
+          navigation={collectionNavigation}
+          {...previewHeader}
+        >
+          {() => null}
+        </DocumentZoom>
+      )}
+    </>
+  ) : null;
+  if (embedded) return content;
+  return (
+    <MediaViewerSurface
+      open={open && (!items || Boolean(item))}
+      onOpenChange={(value) => {
+        if (!cropLoading && !saving) onOpenChange(value);
+      }}
+      title={title}
+      slot={slot}
+      contentRef={viewer}
+      saving={saving}
+      pendingLabel={pendingLabel}
+      hasSource={Boolean(src)}
+      review={review}
+      reviewTitle={reviewTitle}
+      navigation={navigation}
+      error={cropError ?? error}
+      onSave={onSave}
+      saveLabel={saveLabel}
+      disabled={disabled || cropLoading}
+      footer={footer}
+    >
+      {content}
+    </MediaViewerSurface>
+  );
+}
+
+export type MediaViewerProps = ComponentProps<typeof MediaViewerSession>;
+
+/** Closing a session releases sources, crop state and PDF navigation together. */
+export function MediaViewer(props: MediaViewerProps) {
+  return props.open ? <MediaViewerSession {...props} /> : null;
 }

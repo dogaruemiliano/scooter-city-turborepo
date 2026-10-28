@@ -101,16 +101,50 @@ export function useScooterDocuments(
     Record<string, v1.scooters.ScooterDocumentExtractedData | null>
   >(() => options.snapshot?.extractions ?? {});
   const detectClientCopies = options.detectClientCopies ?? true;
-  const drafts = useMemo(
-    () =>
-      detectClientCopies
-        ? resolveDocumentVersions(uploadedDrafts, extractions)
-        : uploadedDrafts,
-    [uploadedDrafts, extractions, detectClientCopies],
-  );
   const [removedIds, setRemovedIds] = useState<string[]>(
     () => options.snapshot?.removedIds ?? [],
   );
+  const existingKey = JSON.stringify(existing);
+  const existingDocuments = useMemo(
+    () => JSON.parse(existingKey) as v1.scooters.ScooterDocument[],
+    [existingKey],
+  );
+  const drafts = useMemo(
+    () =>
+      detectClientCopies
+        ? resolveDocumentVersions(
+            [
+              ...existingDocuments
+                .filter(
+                  (doc) => !removedIds.includes(doc.id) && !doc.clientCopy,
+                )
+                .map(
+                  (doc): DocumentDraft => ({
+                    id: doc.id,
+                    type: doc.type,
+                    file: new File([], doc.fileName),
+                    status: "ready",
+                  }),
+                ),
+              ...uploadedDrafts,
+            ],
+            {
+              ...Object.fromEntries(
+                existingDocuments.map((doc) => [doc.id, doc.extractedData]),
+              ),
+              ...extractions,
+            },
+          ).filter((doc) => uploadedDrafts.some((draft) => draft.id === doc.id))
+        : uploadedDrafts,
+    [
+      uploadedDrafts,
+      extractions,
+      detectClientCopies,
+      existingDocuments,
+      removedIds,
+    ],
+  );
+
   const uploading = useRef(new Set<string>());
 
   async function upload(draft: DocumentDraft) {
@@ -245,8 +279,109 @@ export function useScooterDocuments(
     [],
   );
 
+  async function preview(draft: DocumentDraft): Promise<File> {
+    if (!draft.fileUnavailable) return draft.file;
+    if (!options.session || !draft.uploadToken)
+      throw new Error("Upload unavailable");
+    const response = await fetch(
+      webApi.url(
+        `/v1/scooters/import-drafts/${encodeURIComponent(options.session.id)}/document-content`,
+      ),
+      {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Requested-With": "fetch",
+        },
+        body: JSON.stringify({
+          sourceId: draft.id,
+          source: {
+            kind: "draft",
+            type: draft.requestedType ?? draft.uploadType ?? draft.type,
+            ...(draft.uploadType ? { uploadType: draft.uploadType } : {}),
+            uploadToken: draft.uploadToken,
+          },
+        }),
+      },
+    );
+    if (!response.ok) throw new Error("Preview unavailable");
+    const file = new File([await response.blob()], draft.file.name, {
+      type: draft.file.type,
+      lastModified: draft.file.lastModified,
+    });
+    setDrafts((current) =>
+      current.map((item) =>
+        item.id === draft.id ? { ...item, file, fileUnavailable: false } : item,
+      ),
+    );
+    return file;
+  }
+
+  const [generatingClientCopies, setGeneratingClientCopies] = useState(false);
+  const [clientCopyError, setClientCopyError] = useState(false);
+  const generationLock = useRef(false);
+  const copyCandidates = [
+    ...existing.filter(
+      (doc) => !removedIds.includes(doc.id) && !doc.clientCopy,
+    ),
+    ...drafts.filter(
+      (doc) => doc.status === "ready" && doc.version !== "client_copy",
+    ),
+  ].filter(
+    (doc) =>
+      v1.scooters
+        .scooterDocumentTypes({
+          ...doc,
+          extractedData:
+            extractions[doc.id] ??
+            ("extractedData" in doc ? doc.extractedData : undefined),
+        })
+        .some((type) =>
+          (
+            v1.scooters.SCOOTER_CLIENT_DOCUMENT_TYPES as readonly string[]
+          ).includes(type),
+        ) &&
+      !drafts.some(
+        (copy) => copy.originalId === doc.id && copy.version === "client_copy",
+      ),
+  );
+  async function generateClientCopies() {
+    if (generationLock.current) return;
+    generationLock.current = true;
+    setGeneratingClientCopies(true);
+    setClientCopyError(false);
+    try {
+      const { generateScooterClientCopy } =
+        await import("./scooter-client-copy");
+      for (const original of copyCandidates) {
+        let file: File;
+        if ("file" in original) file = await preview(original);
+        else {
+          const response = await fetch(webApi.url(original.contentUrl), {
+            credentials: "include",
+          });
+          if (!response.ok) throw new Error("Original document unavailable");
+          file = new File([await response.blob()], original.fileName, {
+            type: original.contentType,
+          });
+        }
+        const copy = await generateScooterClientCopy(file);
+        add(original.type, [copy], undefined, "client_copy", original.id);
+      }
+    } catch {
+      setClientCopyError(true);
+    } finally {
+      generationLock.current = false;
+      setGeneratingClientCopies(false);
+    }
+  }
   return {
     ...editorSession,
+    generatingClientCopies,
+    clientCopyError,
+    canGenerateClientCopies: copyCandidates.length > 0,
+    generateClientCopies,
     classify,
     setVersion: useCallback(
       (
@@ -289,46 +424,7 @@ export function useScooterDocuments(
       extractions,
       removedIds,
     } satisfies ScooterDocumentsSnapshot,
-    async preview(draft: DocumentDraft): Promise<File> {
-      if (!draft.fileUnavailable) return draft.file;
-      if (!options.session || !draft.uploadToken)
-        throw new Error("Upload unavailable");
-      const response = await fetch(
-        webApi.url(
-          `/v1/scooters/import-drafts/${encodeURIComponent(options.session.id)}/document-content`,
-        ),
-        {
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Requested-With": "fetch",
-          },
-          body: JSON.stringify({
-            sourceId: draft.id,
-            source: {
-              kind: "draft",
-              type: draft.requestedType ?? draft.uploadType ?? draft.type,
-              ...(draft.uploadType ? { uploadType: draft.uploadType } : {}),
-              uploadToken: draft.uploadToken,
-            },
-          }),
-        },
-      );
-      if (!response.ok) throw new Error("Preview unavailable");
-      const file = new File([await response.blob()], draft.file.name, {
-        type: draft.file.type,
-        lastModified: draft.file.lastModified,
-      });
-      setDrafts((current) =>
-        current.map((item) =>
-          item.id === draft.id
-            ? { ...item, file, fileUnavailable: false }
-            : item,
-        ),
-      );
-      return file;
-    },
+    preview,
     drafts,
     extractions,
     setExtractions,
@@ -351,22 +447,30 @@ export function useScooterDocuments(
       setRemovedIds((current) => [...current, id]),
     undoRemove: (id: string) =>
       setRemovedIds((current) => current.filter((item) => item !== id)),
-    blocked: drafts.some(
-      (item) =>
-        item.status !== "ready" ||
-        (item.version === "client_copy"
-          ? !drafts.some(
-              (original) =>
-                original.id === item.originalId &&
-                original.version !== "client_copy",
-            ) ||
-            drafts.filter(
-              (copy) =>
-                copy.originalId === item.originalId &&
-                copy.version === "client_copy",
-            ).length !== 1
-          : item.type === null),
-    ),
+    blocked:
+      generatingClientCopies ||
+      drafts.some(
+        (item) =>
+          item.status !== "ready" ||
+          (item.version === "client_copy"
+            ? ![
+                ...drafts,
+                ...existing.filter(
+                  (doc) => !removedIds.includes(doc.id) && !doc.clientCopy,
+                ),
+              ].some(
+                (original) =>
+                  original.id === item.originalId &&
+                  (!("version" in original) ||
+                    original.version !== "client_copy"),
+              ) ||
+              drafts.filter(
+                (copy) =>
+                  copy.originalId === item.originalId &&
+                  copy.version === "client_copy",
+              ).length !== 1
+            : item.type === null),
+      ),
     changed:
       drafts.length > 0 ||
       removedIds.length > 0 ||
@@ -386,17 +490,24 @@ export function useScooterDocuments(
                 } =>
                   item.status === "ready" &&
                   item.type !== null &&
-                  item.version !== "client_copy",
+                  (item.version !== "client_copy" ||
+                    existing.some((doc) => doc.id === item.originalId)),
               )
               .map((item) => ({
+                ...(item.version === "client_copy"
+                  ? { originalDocumentId: item.originalId }
+                  : {}),
                 type:
-                  item.uploadType === "unclassified" &&
-                  extractions[item.id]?.documents?.length
-                    ? (extractions[item.id]!.documents!.find(
-                        (document) => document.documentType === "civ",
-                      )?.documentType ??
-                      extractions[item.id]!.documents![0]!.documentType)
-                    : item.type,
+                  item.version === "client_copy" &&
+                  existing.some((doc) => doc.id === item.originalId)
+                    ? existing.find((doc) => doc.id === item.originalId)!.type
+                    : item.uploadType === "unclassified" &&
+                        extractions[item.id]?.documents?.length
+                      ? (extractions[item.id]!.documents!.find(
+                          (document) => document.documentType === "civ",
+                        )?.documentType ??
+                        extractions[item.id]!.documents![0]!.documentType)
+                      : item.type,
                 ...(item.uploadType ? { uploadType: item.uploadType } : {}),
                 ...(item.insurancePolicyId &&
                 extractions[item.id]?.currentInsuranceDocumentId !== null

@@ -74,14 +74,8 @@ export class ScooterDocumentExtractionService {
         "Document extraction returned unusable data.",
         true,
       );
-    const detected = predominantType(parsed.data);
-    if (!detected)
-      throw new DocumentExtractionError(
-        "DOCUMENT_EXTRACTION_TYPE_UNKNOWN",
-        "Choose the document type or replace this file.",
-        false,
-      );
-    return detected;
+    // Supporting attachments remain storable even when no operational type is recognized.
+    return predominantType(parsed.data) ?? "other";
   }
 
   /** Apply the same review rules to asynchronously retrieved provider output. */

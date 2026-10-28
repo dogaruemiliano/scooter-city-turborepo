@@ -1,3 +1,4 @@
+import type { v1 } from "@repo/api-shared";
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -142,4 +143,37 @@ describe("document versions", () => {
     expect(hook.result.current.blocked).toBe(true);
     expect(hook.result.current.payload.documentDrafts).toEqual([]);
   });
+});
+
+it("pairs a new client copy with a saved original and submits only the new file", () => {
+  const state = snapshot();
+  state.drafts = [
+    {
+      ...state.drafts[1]!,
+      type: "civ",
+      originalId: "saved-original",
+      versionSource: "manual",
+    },
+  ];
+  const existing = [
+    {
+      id: "saved-original",
+      type: "civ",
+      fileName: "original.pdf",
+      extractedData: null,
+    },
+  ] as v1.scooters.ScooterDocument[];
+  const hook = renderHook(() =>
+    useScooterDocuments(existing, { snapshot: state }),
+  );
+  expect(hook.result.current.blocked).toBe(false);
+  expect(hook.result.current.payload.documentDrafts).toEqual([
+    {
+      originalDocumentId: "saved-original",
+      type: "civ",
+      fileName: "client.pdf",
+      uploadToken: "client-token",
+      uploadType: "unclassified",
+    },
+  ]);
 });

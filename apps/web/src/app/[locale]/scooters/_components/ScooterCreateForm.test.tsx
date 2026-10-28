@@ -1904,3 +1904,24 @@ it("retains a visually detected client copy for assignment without importing its
     screen.getByText(messages.en.scooters.workspace.copyNeedsOriginal),
   ).toBeInTheDocument();
 });
+
+it("uses the sole draft's bottom Cancel button to request discard confirmation", async () => {
+  const user = userEvent.setup();
+  const onDiscard = vi.fn();
+  render(
+    <NextIntlClientProvider locale="en" messages={messages.en}>
+      <ScooterEditor
+        returnHref="/en/scooters"
+        brands={brands}
+        draftActions={{ hasOtherDrafts: false, pending: false, onDiscard }}
+      />
+    </NextIntlClientProvider>,
+  );
+  const cancel = screen.getByRole("button", { name: "Cancel" });
+  expect(
+    screen.queryByRole("link", { name: "Cancel" }),
+  ).not.toBeInTheDocument();
+  await user.click(cancel);
+  expect(onDiscard).toHaveBeenCalledOnce();
+  expect(mocks.push).not.toHaveBeenCalled();
+});

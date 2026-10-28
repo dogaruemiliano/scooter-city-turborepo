@@ -70,12 +70,27 @@ export function scooterItpSummary(
     "inspectionDate" | "validUntil" | "result"
   >[],
   today = dateOnlyToday(),
+  civIssuedAt?: string | null,
 ): {
   status: ScooterItpStatus;
   validUntil: string | null;
   renewalRequired: boolean;
 } {
-  const latest = [...inspections].sort((a, b) =>
+  // RAR's inspection on CIV issuance is the initial two-year inspection.
+  const initialExpiry = civIssuedAt
+    ? initialScooterItpExpiry(civIssuedAt)
+    : null;
+  const records =
+    inspections.length || !initialExpiry
+      ? inspections
+      : [
+          {
+            inspectionDate: civIssuedAt!,
+            validUntil: initialExpiry,
+            result: "passed" as const,
+          },
+        ];
+  const latest = [...records].sort((a, b) =>
     b.inspectionDate.localeCompare(a.inspectionDate),
   )[0];
   if (!latest)
@@ -117,3 +132,16 @@ export const scooterItpListSchema = z
   .strict()
   .meta({ id: "ScooterItpList" });
 export type ScooterItpList = z.infer<typeof scooterItpListSchema>;
+
+/** Add calendar years and clamp leap-day issuance to February's last day. */
+export function initialScooterItpExpiry(issuedAt: string): string | null {
+  if (!dateOnlySchema.safeParse(issuedAt).success) return null;
+  const issued = new Date(`${issuedAt}T00:00:00Z`);
+  const year = issued.getUTCFullYear() + 2;
+  const month = issued.getUTCMonth();
+  const day = Math.min(
+    issued.getUTCDate(),
+    new Date(Date.UTC(year, month + 1, 0)).getUTCDate(),
+  );
+  return new Date(Date.UTC(year, month, day)).toISOString().slice(0, 10);
+}

@@ -1123,7 +1123,13 @@ describe("Scooter documents", () => {
     await browser.click(
       screen.getByRole("button", { name: "Preview import-front.pdf" }),
     );
-    expect(screen.getByText("Document 1 of 2")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        messages.en.scooters.documents.documentPosition
+          .replace("{index}", "1")
+          .replace("{total}", "2"),
+      ),
+    ).toBeInTheDocument();
     await browser.click(screen.getByRole("button", { name: "Next document" }));
     expect(
       screen.getByRole("dialog", { name: "import-back.pdf" }),

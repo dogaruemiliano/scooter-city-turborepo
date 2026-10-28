@@ -15,8 +15,8 @@ import {
   Input,
   Label,
 } from "@repo/ui/components";
-import { PdfPreview } from "@repo/ui/components/pdf-preview";
-import { DocumentZoom } from "@repo/ui/components/document-zoom";
+import { MediaViewer } from "@repo/ui/components/media-viewer";
+import { useMediaViewerLabels } from "@/components/useMediaViewerLabels";
 import { useObjectUrl } from "@repo/ui/hooks/use-object-url";
 import {
   ArrowRightIcon,
@@ -410,14 +410,7 @@ function VinDocumentPreview({ document }: { document: VinReviewDocument }) {
   const localSrc = useObjectUrl(document.file ?? null);
   const src = localSrc ?? document.src;
   const contentType = document.file?.type ?? document.contentType;
-  const labels = {
-    error: t("pdfPreviewError"),
-    previousPage: t("previousPage"),
-    nextPage: t("nextPage"),
-    zoomIn: t("zoomIn"),
-    zoomOut: t("zoomOut"),
-    resetZoom: t("resetZoom"),
-  };
+  const labels = useMediaViewerLabels();
   return (
     <div
       ref={preview}
@@ -428,34 +421,25 @@ function VinDocumentPreview({ document }: { document: VinReviewDocument }) {
       className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border bg-control"
     >
       {src ? (
-        contentType === "application/pdf" ? (
-          <PdfPreview
-            key={src}
-            src={src}
-            label={document.fileName}
-            labels={labels}
-            zoomLabels={labels}
-          />
-        ) : (
-          <DocumentZoom key={src} labels={labels} caption={document.fileName}>
-            {() => (
-              // Local and authenticated document previews cannot use the image optimizer.
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={src}
-                alt={document.fileName}
-                draggable={false}
-                className="absolute inset-0 h-full w-full object-contain"
-              />
-            )}
-          </DocumentZoom>
-        )
+        <MediaViewer
+          {...labels}
+          embedded
+          gridLabel={undefined}
+          actionsLabel=""
+          open
+          onOpenChange={() => {}}
+          src={src}
+          contentType={contentType}
+          fileName={document.fileName}
+          title={document.fileName}
+          imageAlt={document.fileName}
+        />
       ) : (
         <p
           role="status"
           className="m-auto p-4 text-center text-sm text-muted-foreground"
         >
-          {labels.error}
+          {labels.pdfLabels.error}
         </p>
       )}
     </div>

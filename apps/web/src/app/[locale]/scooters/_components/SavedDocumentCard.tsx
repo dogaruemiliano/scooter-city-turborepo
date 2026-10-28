@@ -3,9 +3,10 @@
 import { v1 } from "@repo/api-shared";
 import { Badge, Button } from "@repo/ui/components";
 import { DocumentStatus } from "@repo/ui/components/document-status";
+import { useMediaCollection } from "@repo/ui/components/media-collection";
 import { DocumentPreview } from "@repo/ui/components/document-preview";
 import { ShieldIcon, XIcon } from "lucide-react";
-import { useContext, useState } from "react";
+import { useContext, useState, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import { webApi } from "@/lib/api";
 import { ScooterDocumentAnalysisContext } from "./ScooterDocumentAnalysisStatus";
@@ -21,6 +22,7 @@ export function SavedDocumentCard({
   onLogicalDocument,
   scooterVin,
   clientCopy = false,
+  lifecycleBadge,
 }: {
   document: v1.scooters.ScooterDocument;
   disabled: boolean;
@@ -28,10 +30,16 @@ export function SavedDocumentCard({
   onLogicalDocument?: LogicalDocumentUpdate;
   scooterVin?: string;
   clientCopy?: boolean;
+  lifecycleBadge?: ReactNode;
 }) {
   const t = useTranslations("scooters.documents");
   const extraction = useTranslations("scooters.extraction");
   const [open, setOpen] = useState(false);
+  const collection = useMediaCollection();
+  const mediaId = clientCopy ? `${document.id}-copy` : document.id;
+  function show() {
+    if (!collection?.open(mediaId)) setOpen(true);
+  }
   const entry = useContext(ScooterDocumentAnalysisContext)[document.id];
   const file = clientCopy ? document.clientCopy! : document;
   const processing = !clientCopy && entry?.status === "processing";
@@ -51,6 +59,7 @@ export function SavedDocumentCard({
     <li className="grid min-w-0 content-start gap-3">
       <DocumentPreview
         layout="paper"
+        mediaId={mediaId}
         open={open}
         onOpenChange={setOpen}
         src={webApi.url(file.contentUrl)}
@@ -71,7 +80,7 @@ export function SavedDocumentCard({
               type="button"
               className="min-w-0 flex-1 truncate py-2 text-left text-sm font-medium underline-offset-4 hover:underline focus-visible:outline-ring"
               title={file.fileName}
-              onClick={() => setOpen(true)}
+              onClick={show}
             >
               {file.fileName}
             </button>
@@ -109,6 +118,7 @@ export function SavedDocumentCard({
         }
         bottomOverlay={
           <>
+            {lifecycleBadge}
             {clientCopy ? (
               <Badge>
                 <ShieldIcon aria-hidden="true" />

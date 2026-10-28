@@ -42,7 +42,16 @@ export function ScooterClientCopyBadge({
   const documentT = useTranslations("scooters.documents");
   const [open, setOpen] = useState(false);
   const id = useId();
-  const originals = documents.drafts.filter(
+  const originals = [
+    ...documents.drafts,
+    ...documents.existing
+      .filter((doc) => !doc.clientCopy)
+      .map((doc) => ({
+        id: doc.id,
+        file: { name: doc.fileName },
+        version: "original" as const,
+      })),
+  ].filter(
     (original) =>
       original.version !== "client_copy" &&
       !documents.drafts.some(
