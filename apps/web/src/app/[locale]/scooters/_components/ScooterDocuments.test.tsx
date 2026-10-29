@@ -50,8 +50,9 @@ vi.mock("@/lib/api", () => ({
         ? {
             id: `job-${result.sourceId}`,
             sourceId: result.sourceId,
-            documentType: (args[1] as { json: { source: { type: string } } })
-              .json.source.type,
+            documentType:
+              (args[1] as { json: { source: { type: string } } }).json.source
+                .type ?? result.documentType,
             status: "completed",
             result,
             expiresAt: new Date(Date.now() + 300_000).toISOString(),
@@ -1687,6 +1688,88 @@ vi.mock("@/components/auth/SessionProvider", () => ({
 }));
 
 describe("document capabilities", () => {
+  it("reextracts saved originals from the menu, preserves manual data, and saves accepted additions explicitly", async () => {
+    const { ScooterEditor } = await import("./ScooterEditor");
+    const timestamp = "2026-10-29T12:00:00.000Z";
+    const edited = { ...scooter, model: "Manual model", updatedAt: timestamp };
+    mocks.api.mockImplementation(async (path: string) => {
+      if (path === v1.scooters.ROUTES.documents.startExtractionJob)
+        return {
+          sourceId: "doc",
+          documentType: "civ",
+          extractedData: {
+            vin: scooter.vin,
+            fields: { model: "AI model", civIssuedAt: "2025-01-15" },
+            rawFields: {},
+          },
+          issues: [],
+          reviewRequired: true,
+        };
+      if (path === v1.scooters.ROUTES.update(scooter.id)) return edited;
+      throw new Error(`Unexpected request: ${path}`);
+    });
+    const user = userEvent.setup();
+    renderWithMessages(
+      <ScooterEditor
+        scooter={edited}
+        brands={brands}
+        returnHref="/en/scooters"
+      />,
+    );
+    expect(mocks.api).not.toHaveBeenCalled();
+    await user.click(
+      screen.getByRole("button", {
+        name: messages.en.scooters.documents.actions,
+      }),
+    );
+    await user.click(
+      await screen.findByRole("menuitem", {
+        name: messages.en.scooters.reextraction.action,
+      }),
+    );
+    const dialog = await screen.findByRole("dialog", {
+      name: messages.en.scooters.reextraction.title,
+    });
+    await waitFor(() =>
+      expect(
+        within(dialog).getByRole("checkbox", {
+          name: messages.en.scooters.fields.model,
+        }),
+      ).toBeEnabled(),
+    );
+    expect(
+      within(dialog).getByRole("checkbox", {
+        name: messages.en.scooters.fields.model,
+      }),
+    ).not.toBeChecked();
+    expect(
+      mocks.api.mock.calls.some(
+        ([path]) => path === v1.scooters.ROUTES.update(scooter.id),
+      ),
+    ).toBe(false);
+    await user.click(
+      within(dialog).getByRole("button", { name: /Apply .* to form/ }),
+    );
+    expect(
+      screen.getByRole("textbox", { name: messages.en.scooters.fields.model }),
+    ).toHaveValue("Manual model");
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(mocks.push).toHaveBeenCalled());
+    const patch = mocks.api.mock.calls.find(
+      ([path]) => path === v1.scooters.ROUTES.update(scooter.id),
+    )!;
+    expect(patch[2].json).toMatchObject({
+      expectedUpdatedAt: timestamp,
+      civIssuedAt: "2025-01-15",
+      documentExtractions: [
+        {
+          documentId: "doc",
+          extractedData: { reextractionHistory: [{ evidence: null }] },
+        },
+      ],
+    });
+    expect(patch[2].json).not.toHaveProperty("model");
+  });
   it("keeps previews available to readers while hiding upload, replacement, and removal", async () => {
     access.user = {
       isSuperAdmin: false,

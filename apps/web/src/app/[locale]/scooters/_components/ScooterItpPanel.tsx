@@ -325,6 +325,14 @@ function ItpPanelContent({
             {t(loadError ? "loadError" : "loading")}
           </p>
         )}
+        {data &&
+        !data.inspections.length &&
+        data.validUntil &&
+        scooter.civIssuedAt ? (
+          <p className="text-sm text-muted-foreground">
+            {t("calculatedFromCiv")}
+          </p>
+        ) : null}
         {data && loadError ? (
           <p role="alert" className="text-sm text-warning">
             {t("loadError")}

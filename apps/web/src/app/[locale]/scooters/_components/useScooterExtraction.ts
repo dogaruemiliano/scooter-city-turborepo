@@ -33,6 +33,7 @@ interface Origin {
   sourceIds: string[];
 }
 export interface ScooterExtractionSnapshot {
+  manualRawFields?: Record<string, string>;
   reviewResult?: Success;
   confirmedSources: string[];
   origins: [string, Origin][];
@@ -144,6 +145,7 @@ export function useScooterExtraction(options: Options) {
     new Map<string, string>(options.snapshot?.automaticBaselines),
   );
   const publishedRaw = useRef(options.initialRawFields ?? {});
+  const manualRawFields = useRef(options.snapshot?.manualRawFields ?? {});
   const previousSources = useRef<DocumentSource[] | null>(null);
   const rawBySource = useRef(
     new Map<string, Record<string, string>>(options.snapshot?.rawBySource),
@@ -155,6 +157,7 @@ export function useScooterExtraction(options: Options) {
   });
 
   const publishRawFields = useCallback((raw: Record<string, string>) => {
+    raw = { ...raw, ...manualRawFields.current };
     const previous = publishedRaw.current;
     if (
       Object.keys(previous).length === Object.keys(raw).length &&
@@ -192,6 +195,7 @@ export function useScooterExtraction(options: Options) {
         const path = pathFor({ field, policyId }, values);
         const manuallyChanged =
           manual.current.has(key) ||
+          (latest.current.editing && !previous && Boolean(current)) ||
           (previous
             ? current !== previous.lastAuto
             : Boolean(
@@ -360,6 +364,52 @@ export function useScooterExtraction(options: Options) {
     [applyValues],
   );
 
+  /** Explicit field choices are human corrections, never future auto-fill baselines. */
+  const applyReextraction = useCallback(
+    (result: Success) => {
+      const { form, documents } = latest.current;
+      for (const [field, value] of Object.entries(result.values)) {
+        manual.current.add(originKey(field));
+        origins.current.delete(originKey(field));
+        form.setValue(field as ScooterEditorField, value, {
+          shouldDirty: true,
+          shouldTouch: true,
+        });
+      }
+      if (result.insurancePolicies) {
+        const previous = form.getValues("insurancePolicies") ?? [];
+        for (const policy of result.insurancePolicies) {
+          const old = previous.find((item) => item.id === policy.id);
+          for (const field of v1.scooters.INSURANCE_FIELDS)
+            if (old?.[field] !== policy[field]) {
+              manual.current.add(originKey(field, policy.id));
+              origins.current.delete(originKey(field, policy.id));
+            }
+        }
+        form.setValue("insurancePolicies", result.insurancePolicies, {
+          shouldDirty: true,
+          shouldTouch: true,
+        });
+      }
+      if (result.extractedDocuments) {
+        store.current = { ...store.current, ...result.extractedDocuments };
+        setEvidence({ ...store.current });
+        documents.setExtractions((previous) => ({
+          ...previous,
+          ...result.extractedDocuments,
+        }));
+      }
+      if (result.rawFields) {
+        for (const [field, value] of Object.entries(result.rawFields))
+          if (value !== publishedRaw.current[field])
+            manualRawFields.current[field] = value;
+        publishRawFields(result.rawFields);
+      }
+      setReviewResult(result);
+    },
+    [publishRawFields],
+  );
+
   const synchronizeSources = useCallback(() => {
     const { documents, sources, form, brands, editing, initialRawFields } =
       latest.current;
@@ -478,8 +528,10 @@ export function useScooterExtraction(options: Options) {
     if (
       previous.some((entry) => entry.type === "civ") &&
       !sources.some((entry) => entry.type === "civ")
-    )
+    ) {
+      manualRawFields.current = {};
       publishRawFields({});
+    }
     const result =
       sources.length && sources.some((entry) => store.current[entry.sourceId])
         ? parseDocumentImport(
@@ -592,6 +644,7 @@ export function useScooterExtraction(options: Options) {
     getSnapshot: () =>
       ({
         reviewResult,
+        manualRawFields: manualRawFields.current,
         confirmedSources: [...confirmedSources],
         origins: [...origins.current],
         manual: [...manual.current],
@@ -599,6 +652,7 @@ export function useScooterExtraction(options: Options) {
         rawBySource: [...rawBySource.current],
       }) satisfies ScooterExtractionSnapshot,
     sources,
+    applyReextraction,
     applyImport,
     reviewResult,
     vinMismatch,

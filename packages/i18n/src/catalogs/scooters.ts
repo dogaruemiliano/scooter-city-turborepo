@@ -1,7 +1,9 @@
 import { scooterItpMessages } from "./scooter-itp";
+import { scooterReextractionMessages } from "./scooter-reextraction";
 
 export const scootersCatalog = {
   en: {
+    reextraction: scooterReextractionMessages.en,
     readiness: {
       needsClientDocuments: "Required client documents are missing",
       needsCiv: "Needs CIV",
@@ -541,7 +543,8 @@ export const scootersCatalog = {
       generateClientCopies: "Create client copies",
       generatingClientCopies: "Creating client copies…",
       clientCopiesGenerated: "Client copies created",
-      generateClientCopiesError: "Some client copies could not be created. Your originals and completed copies were kept. PDFs must have at most 10 pages and generated files must fit the 15 MB upload limit. You can create the remaining copies again or upload them.",
+      generateClientCopiesError:
+        "Some client copies could not be created. Your originals and completed copies were kept. PDFs must have at most 10 pages and generated files must fit the 15 MB upload limit. You can create the remaining copies again or upload them.",
       missingDocument: "Missing document · drop files anywhere in this area",
       lifecycle: { expired: "Expired", next: "Next", newest: "Newest" },
       batch: {
@@ -1320,6 +1323,7 @@ export const scootersCatalog = {
     },
   },
   ro: {
+    reextraction: scooterReextractionMessages.ro,
     readiness: {
       needsClientDocuments: "Lipsesc documentele necesare pentru client",
       needsCiv: "Necesită CIV",
@@ -1874,7 +1878,8 @@ export const scootersCatalog = {
       generateClientCopies: "Creează copii pentru client",
       generatingClientCopies: "Se creează copiile…",
       clientCopiesGenerated: "Copii pentru client create",
-      generateClientCopiesError: "Unele copii nu au putut fi create. Originalele și copiile finalizate au fost păstrate. PDF-urile trebuie să aibă cel mult 10 pagini, iar fișierele generate trebuie să respecte limita de 15 MB. Poți crea din nou copiile rămase sau le poți încărca.",
+      generateClientCopiesError:
+        "Unele copii nu au putut fi create. Originalele și copiile finalizate au fost păstrate. PDF-urile trebuie să aibă cel mult 10 pagini, iar fișierele generate trebuie să respecte limita de 15 MB. Poți crea din nou copiile rămase sau le poți încărca.",
       missingDocument:
         "Document lipsă · adaugă fișiere oriunde în această zonă",
       lifecycle: {

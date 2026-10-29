@@ -1,5 +1,7 @@
 export const scooterItpMessages = {
   en: {
+    calculatedFromCiv:
+      "Calculated from the CIV issue date (initial two-year inspection).",
     title: "Technical inspections (ITP)",
     status: {
       missing: "ITP not recorded",
@@ -50,6 +52,8 @@ export const scooterItpMessages = {
       "The selected yellow card and certificate have different inspection readings. Compare both originals and correct the dates/result before confirming.",
   },
   ro: {
+    calculatedFromCiv:
+      "Calculată din data emiterii CIV (inspecția inițială de doi ani).",
     title: "Inspecții tehnice (ITP)",
     status: {
       missing: "ITP neînregistrat",

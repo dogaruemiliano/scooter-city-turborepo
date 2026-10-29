@@ -469,6 +469,7 @@ export type CreateScooterInput = z.infer<typeof createScooterInputSchema>;
 
 export const updateScooterInputSchema = z
   .object({
+    expectedUpdatedAt: z.iso.datetime().optional(),
     fleetNumber: scooterFleetNumberSchema.optional(),
     civAvailability: scooterCivAvailabilitySchema.optional(),
     sessionId: z.string().min(1).max(120).optional(),

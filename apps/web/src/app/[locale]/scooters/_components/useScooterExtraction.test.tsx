@@ -224,6 +224,59 @@ describe("document extraction lifecycle", () => {
     expect(hook.result.current.extraction.unverifiedSources).toEqual([]);
     expect(hook.result.current.form.formState.isDirty).toBe(false);
   });
+  it("keeps persisted values on auto-import and protects explicitly accepted reextraction corrections from later imports", () => {
+    const hook = setup(
+      { attached: [civ], existing: true, editing: true },
+      {
+        ...scooterEditorDefaults(),
+        vin,
+        model: "Previously reviewed",
+      },
+    );
+    hook.apply({
+      [civ.sourceId]: extracted({
+        model: "AI reading",
+        civIssuedAt: "2025-01-15",
+      }),
+    });
+    expect(hook.result.current.form.getValues("model")).toBe(
+      "Previously reviewed",
+    );
+    act(() =>
+      hook.result.current.extraction.applyReextraction({
+        ok: true,
+        values: { model: "Accepted correction" },
+        confirmedEmpty: [],
+        unresolved: [],
+        unresolvedRawFields: [],
+        emptyConflicts: [],
+      }),
+    );
+    expect(hook.result.current.form.getValues("model")).toBe(
+      "Accepted correction",
+    );
+    act(() =>
+      hook.result.current.extraction.applyReextraction({
+        ok: true,
+        values: {},
+        rawFields: { "Original label": "Accepted original" },
+        confirmedEmpty: [],
+        unresolved: [],
+        unresolvedRawFields: [],
+        emptyConflicts: [],
+      }),
+    );
+    hook.apply({
+      [civ.sourceId]: extracted({}, { "Original label": "Later reading" }),
+    });
+    expect(hook.onRawFields).toHaveBeenLastCalledWith({
+      "Original label": "Accepted original",
+    });
+    hook.apply({ [civ.sourceId]: extracted({ model: "Later reading" }) });
+    expect(hook.result.current.form.getValues("model")).toBe(
+      "Accepted correction",
+    );
+  });
 
   it("clears replaced automatic values but preserves manual changes and flags conflicts", () => {
     const hook = setup({ attached: [importer] });

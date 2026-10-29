@@ -388,6 +388,23 @@ export class ScootersService {
         userId,
       );
       return await this.prisma.$transaction(async (tx) => {
+        if (input.expectedUpdatedAt) {
+          // Compare after locking the parent, shared with document mutations.
+          const rows = await tx.$queryRaw<{ updatedAt: Date }[]>`
+            SELECT "updatedAt" FROM "Scooter"
+            WHERE id = ${id} AND "deletedAt" IS NULL FOR UPDATE
+          `;
+          if (!rows.length) throw new NotFoundException("Scooter not found");
+          if (
+            rows[0].updatedAt.getTime() !==
+            new Date(input.expectedUpdatedAt).getTime()
+          )
+            throw new ConflictException({
+              code: "SCOOTER_UPDATE_CONFLICT",
+              message:
+                "The scooter changed since this editor was opened. Reload before saving.",
+            });
+        }
         if (
           input.fleetNumber !== undefined &&
           input.fleetNumber !== existing.fleetNumber

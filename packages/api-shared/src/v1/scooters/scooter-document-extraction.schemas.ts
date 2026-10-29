@@ -135,7 +135,7 @@ export type LogicalDocumentExtraction = z.infer<
 >;
 
 /** Per-file source evidence, independent of the current normalized scooter data. */
-export const scooterDocumentExtractedDataSchema = z
+const scooterDocumentEvidenceSchema = z
   .object({
     /** Visually detected protective branding; never an ordinary issuer logo. */
     clientCopy: z.literal(true).optional(),
@@ -159,7 +159,35 @@ export const scooterDocumentExtractedDataSchema = z
       .strict()
       .optional(),
   })
-  .strict()
+  .strict();
+
+export const scooterDocumentExtractedDataSchema = scooterDocumentEvidenceSchema
+  .extend({
+    /** Previous readings are retained when a human accepts a new extraction. */
+    reextractionHistory: z
+      .array(
+        z
+          .object({
+            analyzedAt: z.iso.datetime(),
+            evidence: scooterDocumentEvidenceSchema.nullable(),
+            changes: z
+              .array(
+                z
+                  .object({
+                    field: z.string().min(1).max(250),
+                    previous: z.string().max(2000),
+                    next: z.string().max(2000),
+                  })
+                  .strict(),
+              )
+              .max(300)
+              .optional(),
+          })
+          .strict(),
+      )
+      .max(20)
+      .optional(),
+  })
   .superRefine((evidence, context) => {
     if (
       evidence.currentInsuranceDocumentId &&

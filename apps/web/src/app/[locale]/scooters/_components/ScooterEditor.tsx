@@ -145,6 +145,7 @@ export function ScooterEditor({
   const submitting = useRef(false);
   const pendingFocus = useRef<FieldErrors<ScooterEditorValues> | null>(null);
   const [requestError, setRequestError] = useState<string | null>(null);
+  const [saveConflict, setSaveConflict] = useState(false);
   const [saveCompleted, setSaveCompleted] = useState(false);
   const form = useZodForm<ScooterEditorValues, v1.scooters.UpdateScooterInput>(
     scooter ? scooterEditFormSchema : scooterCreateFormSchema,
@@ -441,6 +442,7 @@ export function ScooterEditor({
 
   async function submit(input: v1.scooters.UpdateScooterInput) {
     if (
+      saveConflict ||
       persistenceBlocked ||
       submitting.current ||
       saveCompleted ||
@@ -476,6 +478,7 @@ export function ScooterEditor({
       const json = scooter ? scooterChangedFields(input, dirtyFields) : input;
       const payload: v1.scooters.UpdateScooterInput = {
         ...json,
+        ...(scooter?.updatedAt ? { expectedUpdatedAt: scooter.updatedAt } : {}),
         ...(!scooter && photoDrafts.length ? { photoDrafts } : {}),
         sessionId,
         ...documents.payload,
@@ -518,6 +521,14 @@ export function ScooterEditor({
       router.refresh();
     } catch (error) {
       documents.saveFailed();
+      if (
+        error instanceof ApiError &&
+        error.code === "SCOOTER_UPDATE_CONFLICT"
+      ) {
+        setSaveConflict(true);
+        setRequestError(t("reextraction.saveConflict"));
+        return;
+      }
       if (documents.handleSessionError(error)) {
         setRequestError(t("feedback.sessionExpired"));
         return;
@@ -588,7 +599,15 @@ export function ScooterEditor({
   ) {
     const successes = entries.flatMap((entry) =>
       entry?.status === "success" && isOriginalAnalysis(entry.analysis)
-        ? [entry.analysis]
+        ? [
+            {
+              ...entry.analysis,
+              extractedData: documents.extractions[entry.analysis.sourceId]
+                ?.reextractionHistory
+                ? documents.extractions[entry.analysis.sourceId]!
+                : entry.analysis.extractedData,
+            },
+          ]
         : [],
     );
     if (successes.length) {
@@ -966,6 +985,8 @@ export function ScooterEditor({
                     sources={extraction.sources}
                   >
                     <ScooterEditorFields
+                      scooterId={scooter?.id}
+                      onApplyReextraction={extraction.applyReextraction}
                       step="documents"
                       itpValidUntil={scooter?.itpValidUntil}
                       combinedReview
@@ -1275,6 +1296,7 @@ export function ScooterEditor({
               <SaveButton
                 type="submit"
                 disabled={
+                  saveConflict ||
                   persistenceBlocked ||
                   saveCompleted ||
                   photosBusy ||

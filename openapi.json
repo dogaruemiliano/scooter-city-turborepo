@@ -12854,6 +12854,330 @@
                 },
                 "required": ["method", "originalVin"],
                 "additionalProperties": false
+              },
+              "reextractionHistory": {
+                "maxItems": 20,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "analyzedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                    },
+                    "evidence": {
+                      "type": "object",
+                      "properties": {
+                        "clientCopy": {
+                          "type": "boolean",
+                          "enum": [true]
+                        },
+                        "vin": {
+                          "type": "string",
+                          "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
+                          "nullable": true
+                        },
+                        "fields": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "maxLength": 2000
+                              },
+                              {
+                                "type": "number"
+                              }
+                            ],
+                            "nullable": true
+                          }
+                        },
+                        "rawFields": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string",
+                            "maxLength": 2000,
+                            "nullable": true
+                          }
+                        },
+                        "documents": {
+                          "maxItems": 20,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 120
+                              },
+                              "documentType": {
+                                "type": "string",
+                                "enum": [
+                                  "import_document",
+                                  "civ",
+                                  "registration_certificate",
+                                  "insurance",
+                                  "foreign_registration",
+                                  "export_certificate",
+                                  "itp_card",
+                                  "itp_certificate",
+                                  "ownership_proof",
+                                  "other"
+                                ]
+                              },
+                              "pages": {
+                                "minItems": 1,
+                                "maxItems": 10,
+                                "type": "array",
+                                "items": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 10
+                                }
+                              },
+                              "regions": {
+                                "maxItems": 40,
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "page": {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "maximum": 10
+                                    },
+                                    "x": {
+                                      "type": "number",
+                                      "minimum": 0,
+                                      "maximum": 1
+                                    },
+                                    "y": {
+                                      "type": "number",
+                                      "minimum": 0,
+                                      "maximum": 1
+                                    },
+                                    "width": {
+                                      "type": "number",
+                                      "exclusiveMinimum": true,
+                                      "maximum": 1,
+                                      "minimum": 0
+                                    },
+                                    "height": {
+                                      "type": "number",
+                                      "exclusiveMinimum": true,
+                                      "maximum": 1,
+                                      "minimum": 0
+                                    }
+                                  },
+                                  "required": [
+                                    "page",
+                                    "x",
+                                    "y",
+                                    "width",
+                                    "height"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "vin": {
+                                "type": "string",
+                                "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
+                                "nullable": true
+                              },
+                              "vinReview": {
+                                "type": "object",
+                                "properties": {
+                                  "method": {
+                                    "type": "string",
+                                    "enum": ["manual"]
+                                  },
+                                  "originalVin": {
+                                    "type": "string",
+                                    "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
+                                    "nullable": true
+                                  }
+                                },
+                                "required": ["method", "originalVin"],
+                                "additionalProperties": false
+                              },
+                              "fields": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "maxLength": 2000
+                                    },
+                                    {
+                                      "type": "number"
+                                    }
+                                  ],
+                                  "nullable": true
+                                }
+                              },
+                              "rawFields": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "type": "string",
+                                  "maxLength": 2000,
+                                  "nullable": true
+                                }
+                              },
+                              "issues": {
+                                "maxItems": 500,
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "field": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 120
+                                    },
+                                    "code": {
+                                      "type": "string",
+                                      "enum": [
+                                        "unreadable",
+                                        "invalidValue",
+                                        "conflictingValues",
+                                        "typeMismatch",
+                                        "noData"
+                                      ]
+                                    }
+                                  },
+                                  "required": ["field", "code"],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "inspections": {
+                                "maxItems": 50,
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "inspectionDate": {
+                                      "type": "string",
+                                      "format": "date",
+                                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+                                      "nullable": true
+                                    },
+                                    "validUntil": {
+                                      "type": "string",
+                                      "format": "date",
+                                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+                                      "nullable": true
+                                    },
+                                    "result": {
+                                      "type": "string",
+                                      "enum": [
+                                        "passed",
+                                        "failed",
+                                        "unknown",
+                                        null
+                                      ],
+                                      "nullable": true
+                                    },
+                                    "certificateNumber": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 120,
+                                      "nullable": true
+                                    },
+                                    "odometerKm": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 2147483647,
+                                      "nullable": true
+                                    },
+                                    "rawFields": {
+                                      "type": "object",
+                                      "additionalProperties": {
+                                        "type": "string",
+                                        "maxLength": 2000,
+                                        "nullable": true
+                                      }
+                                    }
+                                  },
+                                  "required": [
+                                    "inspectionDate",
+                                    "validUntil",
+                                    "result",
+                                    "certificateNumber",
+                                    "odometerKm",
+                                    "rawFields"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "documentType",
+                              "pages",
+                              "vin",
+                              "fields",
+                              "rawFields"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "currentInsuranceDocumentId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 120,
+                          "nullable": true
+                        },
+                        "vinReview": {
+                          "type": "object",
+                          "properties": {
+                            "method": {
+                              "type": "string",
+                              "enum": ["manual"]
+                            },
+                            "originalVin": {
+                              "type": "string",
+                              "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
+                              "nullable": true
+                            }
+                          },
+                          "required": ["method", "originalVin"],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": ["vin", "fields", "rawFields"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "changes": {
+                      "maxItems": 300,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "field": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 250
+                          },
+                          "previous": {
+                            "type": "string",
+                            "maxLength": 2000
+                          },
+                          "next": {
+                            "type": "string",
+                            "maxLength": 2000
+                          }
+                        },
+                        "required": ["field", "previous", "next"],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["analyzedAt", "evidence"],
+                  "additionalProperties": false
+                }
               }
             },
             "required": ["vin", "fields", "rawFields"],
@@ -13368,6 +13692,330 @@
                       },
                       "required": ["method", "originalVin"],
                       "additionalProperties": false
+                    },
+                    "reextractionHistory": {
+                      "maxItems": 20,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "analyzedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                          },
+                          "evidence": {
+                            "type": "object",
+                            "properties": {
+                              "clientCopy": {
+                                "type": "boolean",
+                                "enum": [true]
+                              },
+                              "vin": {
+                                "type": "string",
+                                "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
+                                "nullable": true
+                              },
+                              "fields": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "maxLength": 2000
+                                    },
+                                    {
+                                      "type": "number"
+                                    }
+                                  ],
+                                  "nullable": true
+                                }
+                              },
+                              "rawFields": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "type": "string",
+                                  "maxLength": 2000,
+                                  "nullable": true
+                                }
+                              },
+                              "documents": {
+                                "maxItems": 20,
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 120
+                                    },
+                                    "documentType": {
+                                      "type": "string",
+                                      "enum": [
+                                        "import_document",
+                                        "civ",
+                                        "registration_certificate",
+                                        "insurance",
+                                        "foreign_registration",
+                                        "export_certificate",
+                                        "itp_card",
+                                        "itp_certificate",
+                                        "ownership_proof",
+                                        "other"
+                                      ]
+                                    },
+                                    "pages": {
+                                      "minItems": 1,
+                                      "maxItems": 10,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 10
+                                      }
+                                    },
+                                    "regions": {
+                                      "maxItems": 40,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "page": {
+                                            "type": "integer",
+                                            "minimum": 1,
+                                            "maximum": 10
+                                          },
+                                          "x": {
+                                            "type": "number",
+                                            "minimum": 0,
+                                            "maximum": 1
+                                          },
+                                          "y": {
+                                            "type": "number",
+                                            "minimum": 0,
+                                            "maximum": 1
+                                          },
+                                          "width": {
+                                            "type": "number",
+                                            "exclusiveMinimum": true,
+                                            "maximum": 1,
+                                            "minimum": 0
+                                          },
+                                          "height": {
+                                            "type": "number",
+                                            "exclusiveMinimum": true,
+                                            "maximum": 1,
+                                            "minimum": 0
+                                          }
+                                        },
+                                        "required": [
+                                          "page",
+                                          "x",
+                                          "y",
+                                          "width",
+                                          "height"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "vin": {
+                                      "type": "string",
+                                      "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
+                                      "nullable": true
+                                    },
+                                    "vinReview": {
+                                      "type": "object",
+                                      "properties": {
+                                        "method": {
+                                          "type": "string",
+                                          "enum": ["manual"]
+                                        },
+                                        "originalVin": {
+                                          "type": "string",
+                                          "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
+                                          "nullable": true
+                                        }
+                                      },
+                                      "required": ["method", "originalVin"],
+                                      "additionalProperties": false
+                                    },
+                                    "fields": {
+                                      "type": "object",
+                                      "additionalProperties": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 2000
+                                          },
+                                          {
+                                            "type": "number"
+                                          }
+                                        ],
+                                        "nullable": true
+                                      }
+                                    },
+                                    "rawFields": {
+                                      "type": "object",
+                                      "additionalProperties": {
+                                        "type": "string",
+                                        "maxLength": 2000,
+                                        "nullable": true
+                                      }
+                                    },
+                                    "issues": {
+                                      "maxItems": 500,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "field": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 120
+                                          },
+                                          "code": {
+                                            "type": "string",
+                                            "enum": [
+                                              "unreadable",
+                                              "invalidValue",
+                                              "conflictingValues",
+                                              "typeMismatch",
+                                              "noData"
+                                            ]
+                                          }
+                                        },
+                                        "required": ["field", "code"],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "inspections": {
+                                      "maxItems": 50,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "inspectionDate": {
+                                            "type": "string",
+                                            "format": "date",
+                                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+                                            "nullable": true
+                                          },
+                                          "validUntil": {
+                                            "type": "string",
+                                            "format": "date",
+                                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+                                            "nullable": true
+                                          },
+                                          "result": {
+                                            "type": "string",
+                                            "enum": [
+                                              "passed",
+                                              "failed",
+                                              "unknown",
+                                              null
+                                            ],
+                                            "nullable": true
+                                          },
+                                          "certificateNumber": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 120,
+                                            "nullable": true
+                                          },
+                                          "odometerKm": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 2147483647,
+                                            "nullable": true
+                                          },
+                                          "rawFields": {
+                                            "type": "object",
+                                            "additionalProperties": {
+                                              "type": "string",
+                                              "maxLength": 2000,
+                                              "nullable": true
+                                            }
+                                          }
+                                        },
+                                        "required": [
+                                          "inspectionDate",
+                                          "validUntil",
+                                          "result",
+                                          "certificateNumber",
+                                          "odometerKm",
+                                          "rawFields"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "documentType",
+                                    "pages",
+                                    "vin",
+                                    "fields",
+                                    "rawFields"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "currentInsuranceDocumentId": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 120,
+                                "nullable": true
+                              },
+                              "vinReview": {
+                                "type": "object",
+                                "properties": {
+                                  "method": {
+                                    "type": "string",
+                                    "enum": ["manual"]
+                                  },
+                                  "originalVin": {
+                                    "type": "string",
+                                    "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
+                                    "nullable": true
+                                  }
+                                },
+                                "required": ["method", "originalVin"],
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": ["vin", "fields", "rawFields"],
+                            "additionalProperties": false,
+                            "nullable": true
+                          },
+                          "changes": {
+                            "maxItems": 300,
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "field": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 250
+                                },
+                                "previous": {
+                                  "type": "string",
+                                  "maxLength": 2000
+                                },
+                                "next": {
+                                  "type": "string",
+                                  "maxLength": 2000
+                                }
+                              },
+                              "required": ["field", "previous", "next"],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": ["analyzedAt", "evidence"],
+                        "additionalProperties": false
+                      }
                     }
                   },
                   "required": ["vin", "fields", "rawFields"],
@@ -14995,6 +15643,330 @@
                       },
                       "required": ["method", "originalVin"],
                       "additionalProperties": false
+                    },
+                    "reextractionHistory": {
+                      "maxItems": 20,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "analyzedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                          },
+                          "evidence": {
+                            "type": "object",
+                            "properties": {
+                              "clientCopy": {
+                                "type": "boolean",
+                                "enum": [true]
+                              },
+                              "vin": {
+                                "type": "string",
+                                "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
+                                "nullable": true
+                              },
+                              "fields": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "maxLength": 2000
+                                    },
+                                    {
+                                      "type": "number"
+                                    }
+                                  ],
+                                  "nullable": true
+                                }
+                              },
+                              "rawFields": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "type": "string",
+                                  "maxLength": 2000,
+                                  "nullable": true
+                                }
+                              },
+                              "documents": {
+                                "maxItems": 20,
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 120
+                                    },
+                                    "documentType": {
+                                      "type": "string",
+                                      "enum": [
+                                        "import_document",
+                                        "civ",
+                                        "registration_certificate",
+                                        "insurance",
+                                        "foreign_registration",
+                                        "export_certificate",
+                                        "itp_card",
+                                        "itp_certificate",
+                                        "ownership_proof",
+                                        "other"
+                                      ]
+                                    },
+                                    "pages": {
+                                      "minItems": 1,
+                                      "maxItems": 10,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 10
+                                      }
+                                    },
+                                    "regions": {
+                                      "maxItems": 40,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "page": {
+                                            "type": "integer",
+                                            "minimum": 1,
+                                            "maximum": 10
+                                          },
+                                          "x": {
+                                            "type": "number",
+                                            "minimum": 0,
+                                            "maximum": 1
+                                          },
+                                          "y": {
+                                            "type": "number",
+                                            "minimum": 0,
+                                            "maximum": 1
+                                          },
+                                          "width": {
+                                            "type": "number",
+                                            "exclusiveMinimum": true,
+                                            "maximum": 1,
+                                            "minimum": 0
+                                          },
+                                          "height": {
+                                            "type": "number",
+                                            "exclusiveMinimum": true,
+                                            "maximum": 1,
+                                            "minimum": 0
+                                          }
+                                        },
+                                        "required": [
+                                          "page",
+                                          "x",
+                                          "y",
+                                          "width",
+                                          "height"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "vin": {
+                                      "type": "string",
+                                      "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
+                                      "nullable": true
+                                    },
+                                    "vinReview": {
+                                      "type": "object",
+                                      "properties": {
+                                        "method": {
+                                          "type": "string",
+                                          "enum": ["manual"]
+                                        },
+                                        "originalVin": {
+                                          "type": "string",
+                                          "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
+                                          "nullable": true
+                                        }
+                                      },
+                                      "required": ["method", "originalVin"],
+                                      "additionalProperties": false
+                                    },
+                                    "fields": {
+                                      "type": "object",
+                                      "additionalProperties": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 2000
+                                          },
+                                          {
+                                            "type": "number"
+                                          }
+                                        ],
+                                        "nullable": true
+                                      }
+                                    },
+                                    "rawFields": {
+                                      "type": "object",
+                                      "additionalProperties": {
+                                        "type": "string",
+                                        "maxLength": 2000,
+                                        "nullable": true
+                                      }
+                                    },
+                                    "issues": {
+                                      "maxItems": 500,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "field": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 120
+                                          },
+                                          "code": {
+                                            "type": "string",
+                                            "enum": [
+                                              "unreadable",
+                                              "invalidValue",
+                                              "conflictingValues",
+                                              "typeMismatch",
+                                              "noData"
+                                            ]
+                                          }
+                                        },
+                                        "required": ["field", "code"],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "inspections": {
+                                      "maxItems": 50,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "inspectionDate": {
+                                            "type": "string",
+                                            "format": "date",
+                                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+                                            "nullable": true
+                                          },
+                                          "validUntil": {
+                                            "type": "string",
+                                            "format": "date",
+                                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+                                            "nullable": true
+                                          },
+                                          "result": {
+                                            "type": "string",
+                                            "enum": [
+                                              "passed",
+                                              "failed",
+                                              "unknown",
+                                              null
+                                            ],
+                                            "nullable": true
+                                          },
+                                          "certificateNumber": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 120,
+                                            "nullable": true
+                                          },
+                                          "odometerKm": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 2147483647,
+                                            "nullable": true
+                                          },
+                                          "rawFields": {
+                                            "type": "object",
+                                            "additionalProperties": {
+                                              "type": "string",
+                                              "maxLength": 2000,
+                                              "nullable": true
+                                            }
+                                          }
+                                        },
+                                        "required": [
+                                          "inspectionDate",
+                                          "validUntil",
+                                          "result",
+                                          "certificateNumber",
+                                          "odometerKm",
+                                          "rawFields"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "documentType",
+                                    "pages",
+                                    "vin",
+                                    "fields",
+                                    "rawFields"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "currentInsuranceDocumentId": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 120,
+                                "nullable": true
+                              },
+                              "vinReview": {
+                                "type": "object",
+                                "properties": {
+                                  "method": {
+                                    "type": "string",
+                                    "enum": ["manual"]
+                                  },
+                                  "originalVin": {
+                                    "type": "string",
+                                    "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
+                                    "nullable": true
+                                  }
+                                },
+                                "required": ["method", "originalVin"],
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": ["vin", "fields", "rawFields"],
+                            "additionalProperties": false,
+                            "nullable": true
+                          },
+                          "changes": {
+                            "maxItems": 300,
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "field": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 250
+                                },
+                                "previous": {
+                                  "type": "string",
+                                  "maxLength": 2000
+                                },
+                                "next": {
+                                  "type": "string",
+                                  "maxLength": 2000
+                                }
+                              },
+                              "required": ["field", "previous", "next"],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": ["analyzedAt", "evidence"],
+                        "additionalProperties": false
+                      }
                     }
                   },
                   "required": ["vin", "fields", "rawFields"],
@@ -15312,6 +16284,330 @@
                       },
                       "required": ["method", "originalVin"],
                       "additionalProperties": false
+                    },
+                    "reextractionHistory": {
+                      "maxItems": 20,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "analyzedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                          },
+                          "evidence": {
+                            "type": "object",
+                            "properties": {
+                              "clientCopy": {
+                                "type": "boolean",
+                                "enum": [true]
+                              },
+                              "vin": {
+                                "type": "string",
+                                "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
+                                "nullable": true
+                              },
+                              "fields": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "maxLength": 2000
+                                    },
+                                    {
+                                      "type": "number"
+                                    }
+                                  ],
+                                  "nullable": true
+                                }
+                              },
+                              "rawFields": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "type": "string",
+                                  "maxLength": 2000,
+                                  "nullable": true
+                                }
+                              },
+                              "documents": {
+                                "maxItems": 20,
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 120
+                                    },
+                                    "documentType": {
+                                      "type": "string",
+                                      "enum": [
+                                        "import_document",
+                                        "civ",
+                                        "registration_certificate",
+                                        "insurance",
+                                        "foreign_registration",
+                                        "export_certificate",
+                                        "itp_card",
+                                        "itp_certificate",
+                                        "ownership_proof",
+                                        "other"
+                                      ]
+                                    },
+                                    "pages": {
+                                      "minItems": 1,
+                                      "maxItems": 10,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 10
+                                      }
+                                    },
+                                    "regions": {
+                                      "maxItems": 40,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "page": {
+                                            "type": "integer",
+                                            "minimum": 1,
+                                            "maximum": 10
+                                          },
+                                          "x": {
+                                            "type": "number",
+                                            "minimum": 0,
+                                            "maximum": 1
+                                          },
+                                          "y": {
+                                            "type": "number",
+                                            "minimum": 0,
+                                            "maximum": 1
+                                          },
+                                          "width": {
+                                            "type": "number",
+                                            "exclusiveMinimum": true,
+                                            "maximum": 1,
+                                            "minimum": 0
+                                          },
+                                          "height": {
+                                            "type": "number",
+                                            "exclusiveMinimum": true,
+                                            "maximum": 1,
+                                            "minimum": 0
+                                          }
+                                        },
+                                        "required": [
+                                          "page",
+                                          "x",
+                                          "y",
+                                          "width",
+                                          "height"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "vin": {
+                                      "type": "string",
+                                      "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
+                                      "nullable": true
+                                    },
+                                    "vinReview": {
+                                      "type": "object",
+                                      "properties": {
+                                        "method": {
+                                          "type": "string",
+                                          "enum": ["manual"]
+                                        },
+                                        "originalVin": {
+                                          "type": "string",
+                                          "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
+                                          "nullable": true
+                                        }
+                                      },
+                                      "required": ["method", "originalVin"],
+                                      "additionalProperties": false
+                                    },
+                                    "fields": {
+                                      "type": "object",
+                                      "additionalProperties": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 2000
+                                          },
+                                          {
+                                            "type": "number"
+                                          }
+                                        ],
+                                        "nullable": true
+                                      }
+                                    },
+                                    "rawFields": {
+                                      "type": "object",
+                                      "additionalProperties": {
+                                        "type": "string",
+                                        "maxLength": 2000,
+                                        "nullable": true
+                                      }
+                                    },
+                                    "issues": {
+                                      "maxItems": 500,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "field": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 120
+                                          },
+                                          "code": {
+                                            "type": "string",
+                                            "enum": [
+                                              "unreadable",
+                                              "invalidValue",
+                                              "conflictingValues",
+                                              "typeMismatch",
+                                              "noData"
+                                            ]
+                                          }
+                                        },
+                                        "required": ["field", "code"],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "inspections": {
+                                      "maxItems": 50,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "inspectionDate": {
+                                            "type": "string",
+                                            "format": "date",
+                                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+                                            "nullable": true
+                                          },
+                                          "validUntil": {
+                                            "type": "string",
+                                            "format": "date",
+                                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+                                            "nullable": true
+                                          },
+                                          "result": {
+                                            "type": "string",
+                                            "enum": [
+                                              "passed",
+                                              "failed",
+                                              "unknown",
+                                              null
+                                            ],
+                                            "nullable": true
+                                          },
+                                          "certificateNumber": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 120,
+                                            "nullable": true
+                                          },
+                                          "odometerKm": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 2147483647,
+                                            "nullable": true
+                                          },
+                                          "rawFields": {
+                                            "type": "object",
+                                            "additionalProperties": {
+                                              "type": "string",
+                                              "maxLength": 2000,
+                                              "nullable": true
+                                            }
+                                          }
+                                        },
+                                        "required": [
+                                          "inspectionDate",
+                                          "validUntil",
+                                          "result",
+                                          "certificateNumber",
+                                          "odometerKm",
+                                          "rawFields"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "documentType",
+                                    "pages",
+                                    "vin",
+                                    "fields",
+                                    "rawFields"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "currentInsuranceDocumentId": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 120,
+                                "nullable": true
+                              },
+                              "vinReview": {
+                                "type": "object",
+                                "properties": {
+                                  "method": {
+                                    "type": "string",
+                                    "enum": ["manual"]
+                                  },
+                                  "originalVin": {
+                                    "type": "string",
+                                    "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
+                                    "nullable": true
+                                  }
+                                },
+                                "required": ["method", "originalVin"],
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": ["vin", "fields", "rawFields"],
+                            "additionalProperties": false,
+                            "nullable": true
+                          },
+                          "changes": {
+                            "maxItems": 300,
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "field": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 250
+                                },
+                                "previous": {
+                                  "type": "string",
+                                  "maxLength": 2000
+                                },
+                                "next": {
+                                  "type": "string",
+                                  "maxLength": 2000
+                                }
+                              },
+                              "required": ["field", "previous", "next"],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": ["analyzedAt", "evidence"],
+                        "additionalProperties": false
+                      }
                     }
                   },
                   "required": ["vin", "fields", "rawFields"],
@@ -15809,6 +17105,11 @@
             "minLength": 1,
             "maxLength": 2000,
             "nullable": true
+          },
+          "expectedUpdatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
           }
         },
         "additionalProperties": false
@@ -16211,6 +17512,330 @@
                 },
                 "required": ["method", "originalVin"],
                 "additionalProperties": false
+              },
+              "reextractionHistory": {
+                "maxItems": 20,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "analyzedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                    },
+                    "evidence": {
+                      "type": "object",
+                      "properties": {
+                        "clientCopy": {
+                          "type": "boolean",
+                          "enum": [true]
+                        },
+                        "vin": {
+                          "type": "string",
+                          "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
+                          "nullable": true
+                        },
+                        "fields": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "maxLength": 2000
+                              },
+                              {
+                                "type": "number"
+                              }
+                            ],
+                            "nullable": true
+                          }
+                        },
+                        "rawFields": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string",
+                            "maxLength": 2000,
+                            "nullable": true
+                          }
+                        },
+                        "documents": {
+                          "maxItems": 20,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 120
+                              },
+                              "documentType": {
+                                "type": "string",
+                                "enum": [
+                                  "import_document",
+                                  "civ",
+                                  "registration_certificate",
+                                  "insurance",
+                                  "foreign_registration",
+                                  "export_certificate",
+                                  "itp_card",
+                                  "itp_certificate",
+                                  "ownership_proof",
+                                  "other"
+                                ]
+                              },
+                              "pages": {
+                                "minItems": 1,
+                                "maxItems": 10,
+                                "type": "array",
+                                "items": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 10
+                                }
+                              },
+                              "regions": {
+                                "maxItems": 40,
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "page": {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "maximum": 10
+                                    },
+                                    "x": {
+                                      "type": "number",
+                                      "minimum": 0,
+                                      "maximum": 1
+                                    },
+                                    "y": {
+                                      "type": "number",
+                                      "minimum": 0,
+                                      "maximum": 1
+                                    },
+                                    "width": {
+                                      "type": "number",
+                                      "exclusiveMinimum": true,
+                                      "maximum": 1,
+                                      "minimum": 0
+                                    },
+                                    "height": {
+                                      "type": "number",
+                                      "exclusiveMinimum": true,
+                                      "maximum": 1,
+                                      "minimum": 0
+                                    }
+                                  },
+                                  "required": [
+                                    "page",
+                                    "x",
+                                    "y",
+                                    "width",
+                                    "height"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "vin": {
+                                "type": "string",
+                                "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
+                                "nullable": true
+                              },
+                              "vinReview": {
+                                "type": "object",
+                                "properties": {
+                                  "method": {
+                                    "type": "string",
+                                    "enum": ["manual"]
+                                  },
+                                  "originalVin": {
+                                    "type": "string",
+                                    "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
+                                    "nullable": true
+                                  }
+                                },
+                                "required": ["method", "originalVin"],
+                                "additionalProperties": false
+                              },
+                              "fields": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "maxLength": 2000
+                                    },
+                                    {
+                                      "type": "number"
+                                    }
+                                  ],
+                                  "nullable": true
+                                }
+                              },
+                              "rawFields": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "type": "string",
+                                  "maxLength": 2000,
+                                  "nullable": true
+                                }
+                              },
+                              "issues": {
+                                "maxItems": 500,
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "field": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 120
+                                    },
+                                    "code": {
+                                      "type": "string",
+                                      "enum": [
+                                        "unreadable",
+                                        "invalidValue",
+                                        "conflictingValues",
+                                        "typeMismatch",
+                                        "noData"
+                                      ]
+                                    }
+                                  },
+                                  "required": ["field", "code"],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "inspections": {
+                                "maxItems": 50,
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "inspectionDate": {
+                                      "type": "string",
+                                      "format": "date",
+                                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+                                      "nullable": true
+                                    },
+                                    "validUntil": {
+                                      "type": "string",
+                                      "format": "date",
+                                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+                                      "nullable": true
+                                    },
+                                    "result": {
+                                      "type": "string",
+                                      "enum": [
+                                        "passed",
+                                        "failed",
+                                        "unknown",
+                                        null
+                                      ],
+                                      "nullable": true
+                                    },
+                                    "certificateNumber": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 120,
+                                      "nullable": true
+                                    },
+                                    "odometerKm": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 2147483647,
+                                      "nullable": true
+                                    },
+                                    "rawFields": {
+                                      "type": "object",
+                                      "additionalProperties": {
+                                        "type": "string",
+                                        "maxLength": 2000,
+                                        "nullable": true
+                                      }
+                                    }
+                                  },
+                                  "required": [
+                                    "inspectionDate",
+                                    "validUntil",
+                                    "result",
+                                    "certificateNumber",
+                                    "odometerKm",
+                                    "rawFields"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "documentType",
+                              "pages",
+                              "vin",
+                              "fields",
+                              "rawFields"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "currentInsuranceDocumentId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 120,
+                          "nullable": true
+                        },
+                        "vinReview": {
+                          "type": "object",
+                          "properties": {
+                            "method": {
+                              "type": "string",
+                              "enum": ["manual"]
+                            },
+                            "originalVin": {
+                              "type": "string",
+                              "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
+                              "nullable": true
+                            }
+                          },
+                          "required": ["method", "originalVin"],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": ["vin", "fields", "rawFields"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "changes": {
+                      "maxItems": 300,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "field": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 250
+                          },
+                          "previous": {
+                            "type": "string",
+                            "maxLength": 2000
+                          },
+                          "next": {
+                            "type": "string",
+                            "maxLength": 2000
+                          }
+                        },
+                        "required": ["field", "previous", "next"],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["analyzedAt", "evidence"],
+                  "additionalProperties": false
+                }
               }
             },
             "required": ["vin", "fields", "rawFields"],
