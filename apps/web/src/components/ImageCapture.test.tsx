@@ -1,3 +1,4 @@
+import { tokens } from "@repo/theme";
 import { useState } from "react";
 import {
   ImageCapture,
@@ -13,6 +14,22 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+// Match responsive hooks to the viewport selected by each test.
+beforeEach(() => {
+  vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
+    matches:
+      query === `(width < ${tokens.breakpoints.md}px)` &&
+      window.innerWidth < tokens.breakpoints.md,
+    media: query,
+    onchange: null,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  }));
+});
 
 const originalMediaDevices = Object.getOwnPropertyDescriptor(
   navigator,

@@ -51,9 +51,11 @@ describe("proxy auth refresh handling", () => {
     expect(res.status).toBe(503);
     expect(res.headers.get("location")).toBeNull();
     expect(res.headers.get("cache-control")).toBe("no-store");
-    await expect(res.text()).resolves.toContain(
-      "browser session was not cleared",
+    expect(res.headers.get("x-middleware-rewrite")).toBe(
+      "https://web.test/session-unavailable?locale=en",
     );
+    expect(res.headers.getSetCookie()).toEqual([]);
+    expect(res.headers.get("retry-after")).toBe("5");
   });
 
   it("does not redirect to sign-in when the refresh endpoint has a server failure", async () => {
@@ -65,6 +67,24 @@ describe("proxy auth refresh handling", () => {
 
     expect(res.status).toBe(503);
     expect(res.headers.get("location")).toBeNull();
+  });
+
+  it("serves the recovery route without calling the unavailable API", async () => {
+    const res = await proxy(
+      request("/session-unavailable", "refresh_token=refresh"),
+    );
+    expect(res.status).toBe(200);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("localizes recovery without copying the destination query into the rewrite", async () => {
+    fetchMock.mockRejectedValue(new TypeError("API unavailable"));
+    const res = await proxy(
+      request("/ro/scooters?filter=active", "refresh_token=refresh"),
+    );
+    expect(res.headers.get("x-middleware-rewrite")).toBe(
+      "https://web.test/session-unavailable?locale=ro",
+    );
   });
 
   it("redirects to sign-in when the refresh token is rejected", async () => {

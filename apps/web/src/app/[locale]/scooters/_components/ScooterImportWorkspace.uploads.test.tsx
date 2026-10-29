@@ -135,7 +135,7 @@ describe("document uploads stay in their scooter draft", () => {
     mount();
     const selected = await screen.findByRole("group", { name: "Draft 1" });
     expect(
-      within(selected).queryByRole("link", { name: "Cancel" }),
+      within(selected).queryByRole("button", { name: "Cancel" }),
     ).not.toBeInTheDocument();
     expect(
       within(selected).queryByRole("button", { name: "Create scooter" }),
@@ -167,7 +167,9 @@ describe("document uploads stay in their scooter draft", () => {
       ).getByRole("button", { name: "Discard draft" }),
     );
     await waitFor(() =>
-      expect(screen.getByRole("link", { name: "Cancel" })).toBeInTheDocument(),
+      expect(
+        screen.getByRole("button", { name: "Cancel" }),
+      ).toBeInTheDocument(),
     );
     expect(
       screen.getByRole("button", { name: "Create scooter" }),
@@ -187,7 +189,7 @@ describe("document uploads stay in their scooter draft", () => {
     mount();
     const selected = await screen.findByRole("group", { name: "Draft 1" });
     expect(
-      within(selected).getByRole("link", { name: "Cancel" }),
+      within(selected).getByRole("button", { name: "Cancel" }),
     ).toBeInTheDocument();
     expect(
       within(selected).getByRole("button", { name: "Create scooter" }),

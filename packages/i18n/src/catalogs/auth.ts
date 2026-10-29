@@ -1,5 +1,15 @@
 export const authCatalog = {
   en: {
+    sessionUnavailable: {
+      title: "We can’t check your session right now",
+      description:
+        "The authentication service is temporarily unavailable. Please try again in a moment.",
+      preserved: "Your browser session has been kept",
+      reassurance:
+        "You don’t need to sign out. Retry once the service is available to continue where you left off.",
+      retry: "Retry connection",
+      retrying: "Reconnecting…",
+    },
     avatar: {
       title: "Profile picture",
       choose: "Choose a picture",
@@ -68,6 +78,16 @@ export const authCatalog = {
     },
   },
   ro: {
+    sessionUnavailable: {
+      title: "Nu putem verifica sesiunea momentan",
+      description:
+        "Serviciul de autentificare este temporar indisponibil. Încearcă din nou în câteva momente.",
+      preserved: "Sesiunea din browser a fost păstrată",
+      reassurance:
+        "Nu trebuie să te deconectezi. Reîncearcă atunci când serviciul este disponibil pentru a continua de unde ai rămas.",
+      retry: "Reîncearcă conectarea",
+      retrying: "Se reconectează…",
+    },
     avatar: {
       title: "Fotografie de profil",
       choose: "Alege o fotografie",
