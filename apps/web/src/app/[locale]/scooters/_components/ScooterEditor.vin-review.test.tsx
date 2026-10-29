@@ -275,74 +275,102 @@ it.each(["en", "ro"] as const)(
   },
 );
 
-it("fills the CIV VIN once and ignores a legacy Romanian registration VIN without asking again", async () => {
-  const correct = "LXYTCZP05P0000001";
-  const misread = "LXYTC2P05P0000001";
-  apiFetch.mockImplementation((_route, _schema, options) => {
-    if (!options?.json) throw new Error(`Unexpected API request: ${_route}`);
-    const { json } = options;
-    const vin = json.sourceId === "civ" ? correct : misread;
-    const result = {
-      sourceId: json.sourceId,
-      documentType: json.source.type,
-      extractedData: {
-        vin,
-        fields: { vin },
-        rawFields: { E: vin },
-        ...(json.sourceId === "civ"
-          ? {
-              documents: [
-                {
-                  id: "civ-child",
-                  documentType: "civ",
-                  pages: [1],
-                  vin,
-                  fields: { vin },
-                  rawFields: {},
-                },
-              ],
-            }
-          : {}),
-      },
-      issues: [],
-      reviewRequired: true,
-    };
-    return Promise.resolve({
-      id: `job-${json.sourceId}`,
-      sourceId: json.sourceId,
-      documentType: json.source.type,
-      status: "completed",
-      result,
-      expiresAt: new Date(Date.now() + 300_000).toISOString(),
+it.each(["civ", "registration"] as const)(
+  "fills the CIV VIN and ignores a legacy Romanian registration VIN when %s completes first",
+  async (firstSource) => {
+    const correct = "LXYTCZP05P0000001";
+    const misread = "LXYTC2P05P0000001";
+    const completions = new Map<string, () => void>();
+    apiFetch.mockImplementation((_route, _schema, options) => {
+      if (!options?.json) throw new Error(`Unexpected API request: ${_route}`);
+      const { json } = options;
+      const vin = json.sourceId === "civ" ? correct : misread;
+      const result: v1.scooters.ScooterDocumentAnalysis = {
+        sourceId: json.sourceId,
+        documentType: json.source.type,
+        extractedData: {
+          vin,
+          fields: { vin },
+          rawFields: { E: vin },
+          ...(json.sourceId === "civ"
+            ? {
+                documents: [
+                  {
+                    id: "civ-child",
+                    documentType: "civ",
+                    pages: [1],
+                    vin,
+                    fields: { vin },
+                    rawFields: {},
+                  },
+                ],
+              }
+            : {}),
+        },
+        issues: [],
+        reviewRequired: true,
+      };
+      return new Promise<v1.scooters.ScooterDocumentExtractionJob>(
+        (resolve) => {
+          completions.set(json.sourceId, () =>
+            resolve({
+              id: `job-${json.sourceId}`,
+              sourceId: json.sourceId,
+              documentType: json.source.type,
+              status: "completed",
+              result,
+              expiresAt: new Date(Date.now() + 300_000).toISOString(),
+            }),
+          );
+        },
+      );
     });
-  });
-  render(
-    <NextIntlClientProvider locale="en" messages={messages.en}>
-      <ScooterEditor brands={[]} returnHref="/en/scooters" />
-    </NextIntlClientProvider>,
-  );
-  expect(
-    screen.queryByRole("dialog", { name: "Verify the scooter VIN" }),
-  ).not.toBeInTheDocument();
-  await waitFor(() =>
-    expect(screen.getByLabelText("VIN")).toHaveValue(correct),
-  );
-  expect(
-    screen.queryByRole("button", {
-      name: messages.en.scooters.creation.validateDocuments,
-    }),
-  ).not.toBeInTheDocument();
-  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-  await waitFor(() => expect(persisted.registration?.vin).toBeNull());
-  expect(apiFetch).toHaveBeenCalledTimes(2);
-  expect(
-    screen.queryByRole("region", { name: "Review identified documents" }),
-  ).not.toBeInTheDocument();
-  expect(
-    screen.queryByText("I reviewed this document and its pages."),
-  ).not.toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Create scooter" })).toBeEnabled();
-});
+    // Await React's effect chain instead of giving the full editor a one-second
+    // waitFor deadline. CI can render this form much more slowly than a laptop.
+    await act(async () => {
+      render(
+        <NextIntlClientProvider locale="en" messages={messages.en}>
+          <ScooterEditor brands={[]} returnHref="/en/scooters" />
+        </NextIntlClientProvider>,
+      );
+    });
+    expect([...completions.keys()].sort()).toEqual(["civ", "registration"]);
+    expect(screen.getByLabelText("VIN")).toHaveValue("");
+    expect(
+      screen.queryByRole("dialog", { name: "Verify the scooter VIN" }),
+    ).not.toBeInTheDocument();
+    // Keep the requests pending until explicitly completed, and exercise both
+    // response orders so a late registration response cannot overwrite the CIV.
+    const secondSource = firstSource === "civ" ? "registration" : "civ";
+    await act(async () => {
+      completions.get(firstSource)!();
+    });
+    expect(screen.getByLabelText("VIN")).toHaveValue(
+      firstSource === "civ" ? correct : "",
+    );
+    await act(async () => {
+      completions.get(secondSource)!();
+    });
+    expect(screen.getByLabelText("VIN")).toHaveValue(correct);
+    expect(
+      screen.queryByRole("button", {
+        name: messages.en.scooters.creation.validateDocuments,
+      }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(persisted.registration?.vin).toBeNull();
+    expect(apiFetch).toHaveBeenCalledTimes(2);
+    expect(
+      screen.queryByRole("region", { name: "Review identified documents" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("I reviewed this document and its pages."),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Create scooter" }),
+    ).toBeEnabled();
+  },
+);
 
 vi.mock("@/components/auth/SessionProvider", () => ({
   useOptionalSession: () => ({ user: { isSuperAdmin: true } }),
