@@ -470,6 +470,7 @@ describe("ScooterEditForm", () => {
         expect.objectContaining({
           json: {
             sessionId: "editor-session",
+            expectedUpdatedAt: scooter.updatedAt,
             powerKw: 9.25,
             civVersion: "2024",
             civRawFields: { E: scooter.vin, "P.2": "9,25" },
@@ -899,6 +900,7 @@ describe("ScooterEditForm", () => {
           method: "PATCH",
           json: {
             sessionId: "editor-session",
+            expectedUpdatedAt: scooter.updatedAt,
             registrationNumber: "VL-BUJORENI-176",
           },
         },
@@ -944,7 +946,11 @@ describe("ScooterEditForm", () => {
         v1.scooters.scooterSchema,
         {
           method: "PATCH",
-          json: { sessionId: "editor-session", color: "Blue" },
+          json: {
+            sessionId: "editor-session",
+            expectedUpdatedAt: scooter.updatedAt,
+            color: "Blue",
+          },
         },
       ),
     );
@@ -1081,6 +1087,7 @@ describe("ScooterEditForm", () => {
     await waitFor(() => expect(mocks.apiFetch).toHaveBeenCalledOnce());
     expect(mocks.apiFetch.mock.calls[0]![2].json).toEqual({
       sessionId: "editor-session",
+      expectedUpdatedAt: scooter.updatedAt,
       lengthMm: 1900,
       fuelTankCapacityLiters: 5.25,
     });
@@ -1096,6 +1103,7 @@ describe("ScooterEditForm", () => {
     await waitFor(() => expect(mocks.apiFetch).toHaveBeenCalledOnce());
     expect(mocks.apiFetch.mock.calls[0]![2].json).toEqual({
       sessionId: "editor-session",
+      expectedUpdatedAt: scooter.updatedAt,
       powertrainType: "electric",
       fuelSystem: null,
       engineDisplacementCc: null,
@@ -1201,7 +1209,11 @@ it("saves scooter fields without document writes or inline brand creation for a 
     expect.anything(),
     {
       method: "PATCH",
-      json: { sessionId: "editor-session", variant: "Sport" },
+      json: {
+        sessionId: "editor-session",
+        expectedUpdatedAt: scooter.updatedAt,
+        variant: "Sport",
+      },
     },
   );
 });

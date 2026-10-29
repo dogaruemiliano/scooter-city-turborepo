@@ -12,6 +12,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { OpenAiScooterDocumentJobProvider } from "../scooter-document-extraction/openai-scooter-document-job.provider";
 import {
   ACTIVE_JOB_STATES,
+  documentJobFailureDetails,
   AUDIT_RETENTION_MS,
   SESSION_LIFETIME_MS,
   WORKER_LEASE_MS,
@@ -37,8 +38,9 @@ export class ScooterDocumentCleanupService {
   async tick() {
     try {
       await this.runOnce();
-    } catch {
+    } catch (error) {
       this.logger.warn(
+        documentJobFailureDetails(error),
         "Document cleanup failed; resource records retained for retry.",
       );
     }

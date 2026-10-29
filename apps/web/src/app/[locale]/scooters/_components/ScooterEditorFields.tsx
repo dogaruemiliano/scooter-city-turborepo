@@ -39,6 +39,10 @@ import type { LogicalDocumentUpdate } from "./ScooterDocumentTypeEditor";
 import { ScooterBatchDocuments } from "./ScooterBatchDocuments";
 import { ScooterDocumentImport } from "./ScooterDocumentImport";
 import {
+  ScooterReextractionMenuItem,
+  useScooterReextractionReview,
+} from "./ScooterDocumentReextraction";
+import {
   ScooterDocumentUpload,
   ScooterFilePreview,
 } from "./ScooterDocumentUpload";
@@ -99,7 +103,13 @@ export function ScooterEditorFields({
   onApplyImport,
   importResult,
   photos,
+  scooterId,
+  onApplyReextraction,
 }: {
+  scooterId?: string;
+  onApplyReextraction?: (
+    result: Extract<DocumentImportResult, { ok: true }>,
+  ) => void;
   combinedReview?: boolean;
   itpValidUntil?: string | null;
   onRetryAnalysis?: (sourceId: string) => void;
@@ -182,6 +192,20 @@ export function ScooterEditorFields({
   const importMenuRef = useRef<HTMLButtonElement>(null);
   const menuImport = !editing || combinedReview;
   const canImport = canAccess(user, "scooter_documents.write");
+  const reextraction = useScooterReextractionReview({
+    documents,
+    scooterId,
+    brands,
+    rawFields,
+    onApply: onApplyReextraction,
+    disabled:
+      disabled ||
+      analyzing ||
+      documents.blocked ||
+      documents.generatingClientCopies ||
+      !canImport ||
+      !canAccess(user, "scooter_documents.extract"),
+  });
   const jsonImport = (
     <ScooterDocumentImport
       secondary
@@ -236,6 +260,15 @@ export function ScooterEditorFields({
                       <EllipsisVerticalIcon aria-hidden="true" />
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
+                      {reextraction.canStart &&
+                      canAccess(user, "scooter_documents.extract") ? (
+                        <ScooterReextractionMenuItem
+                          onStart={reextraction.start}
+                          disabled={
+                            disabled || analyzing || reextraction.running
+                          }
+                        />
+                      ) : null}
                       <DropdownMenuItem onClick={() => setJsonOpen(true)}>
                         <FileJsonIcon aria-hidden="true" />
                         {t("documentImport.open")}
@@ -254,6 +287,7 @@ export function ScooterEditorFields({
               importResult={importResult}
             >
               {jsonImport}
+              {reextraction.content}
             </ScooterBatchDocuments>
           ) : (
             <FormSection title={t("documents.title")}>

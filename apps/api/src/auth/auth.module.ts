@@ -24,7 +24,6 @@
 import { DynamicModule, Module, type Provider } from "@nestjs/common";
 import { APP_GUARD } from "@nestjs/core";
 import { PassportModule } from "@nestjs/passport";
-import { ScheduleModule } from "@nestjs/schedule";
 import { v1 } from "@repo/api-shared";
 
 import { AccessModule } from "../access/access.module";
@@ -80,9 +79,8 @@ export class AuthModule {
     ];
 
     // ─── Cleanup cron ──────────────────────────────────────────────
-    // Independent of the method modules; just needs Schedule + Prisma.
+    // AppModule owns the single scheduler; this flag controls only auth cleanup.
     if (config.cleanup.enabled) {
-      imports.push(ScheduleModule.forRoot());
       providers.push(AuthCleanupService);
     }
 
