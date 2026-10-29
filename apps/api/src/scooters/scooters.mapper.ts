@@ -225,3 +225,12 @@ export function toScooter(row: ScooterRowWithBrand): v1.scooters.Scooter {
     deletedAt: row.deletedAt?.toISOString() ?? null,
   };
 }
+
+/** Inventory summaries retain CIV metadata without returning the original document fields. */
+export function toScooterListItem(
+  row: ScooterRowWithBrand,
+): v1.scooters.ScooterListItem {
+  const item = toScooter(row);
+  delete item.civRawFields;
+  return item;
+}

@@ -33,7 +33,7 @@ import { ListScootersQuery } from "./dto/list-scooters.query";
 import { Scooter } from "./dto/scooter";
 import { ScooterList } from "./dto/scooter-list";
 import { UpdateScooterInput } from "./dto/update-scooter.input";
-import { toScooter } from "./scooters.mapper";
+import { toScooter, toScooterListItem } from "./scooters.mapper";
 import { ScootersService } from "./scooters.service";
 
 @ApiTags("scooters")
@@ -74,7 +74,7 @@ export class ScootersController {
     const result = await this.scooters.list(query);
     return {
       ...result,
-      items: result.items.map(toScooter),
+      items: result.items.map(toScooterListItem),
     };
   }
 
