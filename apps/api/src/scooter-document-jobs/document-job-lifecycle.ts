@@ -88,3 +88,33 @@ export function safeErrorCode(error: unknown): string {
     ? code
     : "DOCUMENT_EXTRACTION_UNAVAILABLE";
 }
+
+/** Prisma driver errors can wrap an AggregateError with an empty message.
+ * Keep diagnostic codes without logging query values, credentials or documents.
+ */
+export function documentJobFailureDetails(error: unknown): {
+  errorName: string;
+  errorCodes: string[];
+} {
+  const codes = new Set<string>();
+  const seen = new Set<object>();
+  const pending: unknown[] = [error];
+  while (pending.length && seen.size < 16) {
+    const next = pending.shift();
+    if (!next || typeof next !== "object" || seen.has(next)) continue;
+    seen.add(next);
+    const node = next as Record<string, unknown>;
+    for (const value of [node.code, node.originalCode])
+      if (typeof value === "string" && /^[A-Za-z0-9_]{1,80}$/.test(value))
+        codes.add(value);
+    pending.push(node.cause);
+    if (Array.isArray(node.errors))
+      pending.push(...(node.errors as unknown[]).slice(0, 16));
+    if (node.meta && typeof node.meta === "object")
+      pending.push((node.meta as Record<string, unknown>).driverAdapterError);
+  }
+  return {
+    errorName: error instanceof Error ? error.name : "UnknownError",
+    errorCodes: [...codes],
+  };
+}

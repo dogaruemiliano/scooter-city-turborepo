@@ -18,6 +18,7 @@ import { ScooterDocumentExtractionService } from "../scooter-document-extraction
 import { SCOOTER_DOCUMENT_EXTRACTION_PROMPT_VERSION } from "../scooter-document-extraction/scooter-document-extraction.prompt";
 import {
   ACTIVE_JOB_STATES,
+  documentJobFailureDetails,
   JOB_LIFETIME_MS,
   MAX_GLOBAL_PENDING_JOBS,
   MAX_GLOBAL_PROCESSING_JOBS,
@@ -115,8 +116,9 @@ export class ScooterDocumentDispatcherService {
   async tick() {
     try {
       await this.runOnce(false);
-    } catch {
+    } catch (error) {
       this.logger.warn(
+        documentJobFailureDetails(error),
         "Document dispatcher failed; durable work remains queued.",
       );
     }
@@ -197,8 +199,9 @@ export class ScooterDocumentDispatcherService {
     // Database reservations and leases still enforce the shared capacity across instances.
     if (!this.eventsInFlight) {
       this.eventsInFlight = this.processEvents()
-        .catch(() => {
+        .catch((error: unknown) => {
           this.logger.warn(
+            documentJobFailureDetails(error),
             "Document event processing failed; durable events remain queued.",
           );
         })
@@ -211,8 +214,9 @@ export class ScooterDocumentDispatcherService {
       let task = this.inFlight.get(job.id);
       if (!task) {
         task = this.process(job)
-          .catch(() => {
+          .catch((error: unknown) => {
             this.logger.warn(
+              { ...documentJobFailureDetails(error), jobId: job.id },
               "Document worker failed; durable work remains queued.",
             );
           })

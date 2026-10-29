@@ -1,4 +1,5 @@
 import type { Env } from "../config/env";
+import { Logger } from "@nestjs/common";
 import type { Prisma, ScooterDocumentJob } from "../generated/prisma/client";
 import type { PrismaService } from "../prisma/prisma.service";
 import type { ImageStorageService } from "../image-storage/image-storage.service";
@@ -120,6 +121,28 @@ function dispatcherSetup(count: number) {
   );
   return { dispatcher, candidate, validate, tx, updateMany };
 }
+
+it("keeps queued work intact and includes database cause codes when a dispatcher tick fails", async () => {
+  const { dispatcher } = dispatcherSetup(0);
+  const refused = Object.assign(new Error("private connection information"), {
+    code: "ECONNREFUSED",
+  });
+  jest
+    .spyOn(dispatcher, "runOnce")
+    .mockRejectedValue(new AggregateError([refused], ""));
+  const warn = jest
+    .spyOn(Logger.prototype, "warn")
+    .mockImplementation(() => {});
+  try {
+    await expect(dispatcher.tick()).resolves.toBeUndefined();
+    expect(warn).toHaveBeenCalledWith(
+      { errorName: "AggregateError", errorCodes: ["ECONNREFUSED"] },
+      "Document dispatcher failed; durable work remains queued.",
+    );
+  } finally {
+    warn.mockRestore();
+  }
+});
 
 it("leaves a normal waiting job queued when the owner's active slots are full", async () => {
   const { dispatcher, candidate, validate, tx } = dispatcherSetup(20);

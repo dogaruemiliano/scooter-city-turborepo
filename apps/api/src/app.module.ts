@@ -9,6 +9,7 @@ import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, APP_PIPE } from "@nestjs/core";
 import { ZodSerializerInterceptor, ZodValidationPipe } from "nestjs-zod";
 import { MiddlewareConsumer, Module, NestModule } from "@nestjs/common";
 import { LoggerModule } from "nestjs-pino";
+import { ScheduleModule } from "@nestjs/schedule";
 
 import { AccessModule } from "./access/access.module";
 import { ProblemsModule } from "./problems/problems.module";
@@ -42,6 +43,8 @@ const env = loadEnv();
   imports: [
     // Global infrastructure (every feature module sees these).
     ConfigModule,
+    // Initialize once: each forRoot() discovers and registers every cron again.
+    ScheduleModule.forRoot(),
     LoggerModule.forRoot(pinoConfig(process.env.NODE_ENV ?? "development")),
     PrismaModule,
     DocumentExtractionModule,

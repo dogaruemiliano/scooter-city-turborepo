@@ -1,6 +1,5 @@
 import { UsersModule } from "../users/users.module";
 import { Module } from "@nestjs/common";
-import { ScheduleModule } from "@nestjs/schedule";
 
 import { ImageStorageModule } from "../image-storage/image-storage.module";
 import { DraftUploadCleanupService } from "./draft-upload-cleanup.service";
@@ -10,12 +9,7 @@ import { PersonDocumentAnalysisService } from "./person-document-analysis.servic
 import { PersonDocumentExtractionModule } from "../person-document-extraction/person-document-extraction.module";
 
 @Module({
-  imports: [
-    ImageStorageModule,
-    UsersModule,
-    PersonDocumentExtractionModule,
-    ScheduleModule.forRoot(),
-  ],
+  imports: [ImageStorageModule, UsersModule, PersonDocumentExtractionModule],
   controllers: [PersonsController],
   providers: [
     PersonsService,
