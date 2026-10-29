@@ -93,13 +93,33 @@ export function useScooterDocumentAnalysis(
   );
   const [running, setRunning] = useState(false);
   const cache = useRef(
-    new Map<string, DocumentAnalysisState>(
-      options.snapshot?.cache.flatMap(([key, id]) =>
-        options.snapshot?.entries[id]
-          ? [[key, options.snapshot.entries[id]]]
+    new Map<string, DocumentAnalysisState>([
+      ...documents.existing.flatMap((doc): [string, DocumentAnalysisState][] =>
+        doc.extractedData
+          ? [
+              [
+                JSON.stringify([doc.id, doc.type, doc.fileName, doc.byteSize]),
+                {
+                  status: "success",
+                  analysis: {
+                    sourceId: doc.id,
+                    documentType: doc.type,
+                    extractedData: doc.extractedData,
+                    issues: [],
+                    reviewRequired: true,
+                  },
+                },
+              ],
+            ]
           : [],
       ),
-    ),
+      ...(options.snapshot?.cache.flatMap(
+        ([key, id]): [string, DocumentAnalysisState][] =>
+          options.snapshot?.entries[id]
+            ? [[key, options.snapshot.entries[id]]]
+            : [],
+      ) ?? []),
+    ]),
   );
   const controllers = useRef(new Map<string, AbortController>());
   const [initialAttempts] = useState(
@@ -129,7 +149,7 @@ export function useScooterDocumentAnalysis(
         scooterId: scooterId!,
         documentId: doc.id,
       },
-      ready: Boolean(scooterId),
+      ready: false, // Saved files are retained as evidence, never queued for extraction.
     })),
     ...documents.drafts
       .filter((doc) => doc.version !== "client_copy")

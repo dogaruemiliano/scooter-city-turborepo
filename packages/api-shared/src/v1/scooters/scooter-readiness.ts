@@ -2,6 +2,7 @@ import { dateOnlyToday } from "../common/common.schemas";
 import type { Scooter } from "./scooters.schemas";
 
 export type ScooterReadinessIssue =
+  | "needsClientDocuments"
   | "needsCiv"
   | "needsRegistration"
   | "needsInsurance"
@@ -23,6 +24,7 @@ export function scooterReadinessIssues(
     | "temporaryRegistrationExpiresAt"
     | "rentalInsuranceStatus"
     | "itpStatus"
+    | "missingClientDocuments"
   >,
   today = dateOnlyToday(),
 ): ScooterReadinessIssue[] {
@@ -67,5 +69,7 @@ export function scooterReadinessIssues(
     default:
       issues.push("needsItp");
   }
+  if (scooter.missingClientDocuments?.length)
+    issues.push("needsClientDocuments");
   return issues;
 }

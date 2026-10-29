@@ -86,7 +86,7 @@ it.each(v1.scooters.SCOOTER_DOCUMENT_TYPES)(
   },
 );
 
-it("returns an actionable classification failure without publishing invented evidence", async () => {
+it("classifies unrecognized supporting attachments as other without inventing vehicle evidence", async () => {
   const { tx, dispatcher } = setup();
   await dispatcher.acceptProviderResult(job, {
     id: "resp_test",
@@ -99,8 +99,7 @@ it("returns an actionable classification failure without publishing invented evi
     },
   });
   expect(tx.scooterDocumentJob.updateMany.mock.calls[0][0].data).toMatchObject({
-    status: "failed",
-    result: Prisma.DbNull,
-    errorCode: "DOCUMENT_EXTRACTION_TYPE_UNKNOWN",
+    status: "completed",
+    result: { documentType: "other", extractedData: { vin: null, fields: {} } },
   });
 });

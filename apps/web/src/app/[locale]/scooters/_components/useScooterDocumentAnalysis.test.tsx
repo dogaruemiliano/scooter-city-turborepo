@@ -287,13 +287,13 @@ describe("direct document analysis", () => {
       await act(async () => {
         await hook.result.current.run();
       });
-      expect(apiFetch).toHaveBeenCalledTimes(5);
+      expect(apiFetch).toHaveBeenCalledTimes(saved ? 4 : 5);
       expect(
         apiFetch.mock.calls
           .map(([, , options]) => options.json.sourceId)
           .sort(),
       ).toEqual([
-        "civ",
+        ...(saved ? [] : ["civ"]),
         "import-one",
         "import-two",
         "insurance",

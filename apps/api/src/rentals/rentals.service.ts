@@ -4,6 +4,8 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
+import { scooterInclude } from "../scooters/scooters.service";
+import { toDateOnlyString } from "../common/dates/date-only";
 import { v1 } from "@repo/api-shared";
 import { AccessService } from "../access/access.service";
 import { accessibleWhere } from "../access/access.ability";
@@ -120,6 +122,83 @@ export class RentalsService {
     return toRental(row);
   }
 
+  private async assertDocuments(
+    tx: Prisma.TransactionClient,
+    scooterId: string,
+    today = v1.common.dateOnlyToday(),
+  ) {
+    const row = await tx.scooter.findFirst({
+      where: { id: scooterId, deletedAt: null },
+      include: scooterInclude,
+    });
+    if (!row) throw new NotFoundException("Scooter not found");
+    const inspections = (row.inspections ?? []).map((inspection) => ({
+      inspectionDate: toDateOnlyString(inspection.inspectionDate)!,
+      validUntil: toDateOnlyString(inspection.validUntil),
+      result: v1.scooters.scooterItpResultSchema.parse(inspection.result),
+    }));
+    const itp = v1.scooters.scooterItpSummary(
+      inspections,
+      today,
+      toDateOnlyString(row.civDocument?.issuedAt ?? null),
+    );
+    const documents = (row.documents ?? []).map((document) => {
+      const inspection = row.inspections?.find(
+        (entry) =>
+          entry.cardDocumentId === document.id ||
+          entry.certificateDocumentId === document.id,
+      );
+      return {
+        ...document,
+        clientCopy:
+          document.clientCopyAsset && !document.clientCopyAsset.deletedAt,
+        validFrom: toDateOnlyString(
+          document.insurancePolicy?.validFrom ??
+            inspection?.inspectionDate ??
+            null,
+        ),
+        validUntil: toDateOnlyString(
+          document.insurancePolicy?.validUntil ??
+            inspection?.validUntil ??
+            null,
+        ),
+      };
+    });
+    const scooter = {
+      ...row,
+      hasCivDocument: documents.some(v1.scooters.hasScooterCivDocumentEvidence),
+      rentalInsuranceStatus: v1.scooters.rentalInsuranceStatus(
+        (row.insurancePolicies ?? []).map((policy) => ({
+          validFrom: toDateOnlyString(policy.validFrom),
+          validUntil: toDateOnlyString(policy.validUntil),
+        })),
+        today,
+      ),
+      itpStatus: itp.status,
+      temporaryRegistrationExpiresAt: toDateOnlyString(
+        row.temporaryRegistrationExpiresAt ?? null,
+      ),
+      missingClientDocuments: v1.scooters.missingScooterClientDocuments(
+        documents,
+        Boolean(inspections.length) ||
+          !itp.validUntil ||
+          !["active", "expiring"].includes(itp.status),
+        today,
+      ),
+    };
+    const issues = v1.scooters.scooterReadinessIssues(scooter, today);
+    if (issues.length)
+      throw new ConflictException({
+        code: "SCOOTER_DOCUMENTS_REQUIRED",
+        message:
+          "Valid scooter documents and their client copies are required before rental.",
+        details: {
+          issues,
+          missingClientDocuments: scooter.missingClientDocuments,
+        },
+      });
+  }
+
   async create(userId: string, input: v1.rentals.CreateRentalInput) {
     return this.prisma.$transaction(async (tx) => {
       await this.requireAll(userId, "rentals.create", tx);
@@ -158,6 +237,7 @@ export class RentalsService {
         throw new ConflictException(
           "Scooter is already rented or reserved during those dates",
         );
+      await this.assertDocuments(tx, input.scooterId);
       const row = await tx.rental.create({
         data: { ...input, startsAt, endsAt, createdByUserId: userId },
         include: rentalInclude,
@@ -244,6 +324,7 @@ export class RentalsService {
         )
           throw new ConflictException("Scooter already has an active rental");
       }
+      if (action === "handover") await this.assertDocuments(tx, row.scooterId);
       const status =
         action === "handover"
           ? "active"

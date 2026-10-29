@@ -12,6 +12,7 @@ import {
   type DocumentCollectionInputProps,
 } from "./document-collection-input";
 import type { DocumentZoomLabels } from "./document-zoom";
+import type { ImageEditorLabels } from "./image-editor";
 import type { PdfPreviewLabels } from "./pdf-preview";
 
 export type DocumentInputValue = {
@@ -22,6 +23,8 @@ export type DocumentInputValue = {
 };
 export type DocumentInputLabels = DocumentZoomLabels &
   PdfPreviewLabels & {
+    crop?: string;
+    editorLabels?: Partial<ImageEditorLabels>;
     label: string;
     add: string;
     addAction?: string;
@@ -203,6 +206,23 @@ function SingleDocumentInput({
         open={open}
         onOpenChange={(next) => {
           if (!next) close();
+        }}
+        file={pending ?? value?.file}
+        cropLabel={labels.crop ?? labels.change}
+        editorLabels={labels.editorLabels}
+        onCrop={
+          disabled || !labels.crop
+            ? undefined
+            : (file) => {
+                const problem = validate(file);
+                if (problem) throw new Error(problem);
+                setPending(file);
+              }
+        }
+        imageLabels={{
+          loadingLabel: labels.title,
+          errorLabel: labels.error,
+          retryLabel: labels.retry,
         }}
         src={pending ? pendingUrl : src}
         contentType={pending?.type ?? value?.contentType}

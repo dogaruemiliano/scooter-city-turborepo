@@ -1,5 +1,5 @@
 import type { ComponentProps } from "react";
-import { CarFrontIcon, IdCardIcon } from "lucide-react";
+import { IdCardIcon } from "lucide-react";
 import { cn } from "@repo/ui/lib/utils";
 import { Card, CardContent } from "./card";
 import { PersonRow } from "./person-row";
@@ -30,7 +30,6 @@ export function PersonDocuments({
   return (
     <span className="flex flex-wrap items-center gap-2">
       {documents.map(({ type, label, state }) => {
-        const Icon = type === "identity" ? IdCardIcon : CarFrontIcon;
         return (
           <span
             key={type}
@@ -42,7 +41,10 @@ export function PersonDocuments({
               documentClasses[state],
             )}
           >
-            <Icon aria-hidden="true" className="size-4" />
+            <IdCardIcon
+              aria-hidden="true"
+              className={type === "driverLicense" ? "size-5" : "size-4"}
+            />
           </span>
         );
       })}

@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { ArrowUpRightIcon, CheckIcon } from "lucide-react";
+import { ArrowUpRightIcon, IdCardIcon, CheckIcon } from "lucide-react";
+import { EngineIcon } from "./engine-icon";
 
 import { Badge } from "@repo/ui/components/badge";
 
@@ -8,6 +9,7 @@ const meta = {
   component: Badge,
   tags: ["autodocs"],
   argTypes: {
+    iconSize: { control: "inline-radio", options: ["sm", "md"] },
     variant: {
       control: "inline-radio",
       options: [
@@ -65,4 +67,37 @@ export const AsLink: Story = {
       Billing profile
     </Badge>
   ),
+};
+
+export const VehicleDetails: Story = {
+  render: () => (
+    <div className="flex flex-wrap items-center gap-2">
+      <Badge variant="secondary">
+        <EngineIcon data-icon="inline-start" />
+        125 cc
+      </Badge>
+      <Badge variant="secondary" iconSize="md">
+        <IdCardIcon aria-hidden="true" data-icon="inline-start" />
+        Cat. A1
+      </Badge>
+      <Badge variant="secondary" iconSize="md">
+        <IdCardIcon aria-hidden="true" data-icon="inline-start" />
+        Fără permis
+      </Badge>
+    </div>
+  ),
+};
+
+/** Larger document icons retain the shared badge surface and text sizing. */
+export const LargerIcon: Story = {
+  args: {
+    iconSize: "md",
+    variant: "secondary",
+    children: (
+      <>
+        <IdCardIcon aria-hidden="true" data-icon="inline-start" />
+        Cat. A1
+      </>
+    ),
+  },
 };

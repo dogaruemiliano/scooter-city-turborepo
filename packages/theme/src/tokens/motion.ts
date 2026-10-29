@@ -23,6 +23,7 @@ export const motion = {
     slow: 400,
     slower: 600,
     doubleTap: 300,
+    mediaWheelIdle: 180,
     countdownTick: 1000,
     documentReviewPause: 3000,
     documentNameScroll: 8000,

@@ -151,6 +151,21 @@ const createdScooter: v1.scooters.Scooter = {
 };
 
 beforeEach(() => {
+  // Responsive hooks read the CSS media-query result, including mobile tests.
+  vi.spyOn(window, "matchMedia").mockImplementation((query: string) => ({
+    get matches() {
+      const width = query.match(/width\s*<\s*(\d+)/);
+      return width ? window.innerWidth < Number(width[1]) : false;
+    },
+    media: query,
+    onchange: null,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  }));
+
   mocks.apiFetch.mockReset();
   mocks.push.mockReset();
   mocks.refresh.mockReset();
@@ -383,6 +398,17 @@ describe("ScooterCreateForm combined review", () => {
       screen.getByRole("textbox", { name: "Actual maximum speed (km/h)" }),
       "0",
     );
+    await browser.click(
+      within(screen.getByRole("radiogroup", { name: "Phone stand" })).getByRole(
+        "radio",
+        { name: /Yes$/ },
+      ),
+    );
+    await browser.click(
+      within(
+        screen.getByRole("radiogroup", { name: "Phone charging outlet" }),
+      ).getByRole("radio", { name: /No$/ }),
+    );
     await browser.type(
       screen.getByRole("textbox", { name: "Notes" }),
       "Needs inspection",
@@ -425,6 +451,8 @@ describe("ScooterCreateForm combined review", () => {
       speedometerWorking: true,
       currentMileageKm: 0,
       actualMaxSpeedKmh: 0,
+      hasPhoneStand: true,
+      hasChargingOutlet: false,
       notes: "Needs inspection",
     });
   }, 15_000);
@@ -1875,4 +1903,25 @@ it("retains a visually detected client copy for assignment without importing its
   expect(
     screen.getByText(messages.en.scooters.workspace.copyNeedsOriginal),
   ).toBeInTheDocument();
+});
+
+it("uses the sole draft's bottom Cancel button to request discard confirmation", async () => {
+  const user = userEvent.setup();
+  const onDiscard = vi.fn();
+  render(
+    <NextIntlClientProvider locale="en" messages={messages.en}>
+      <ScooterEditor
+        returnHref="/en/scooters"
+        brands={brands}
+        draftActions={{ hasOtherDrafts: false, pending: false, onDiscard }}
+      />
+    </NextIntlClientProvider>,
+  );
+  const cancel = screen.getByRole("button", { name: "Cancel" });
+  expect(
+    screen.queryByRole("link", { name: "Cancel" }),
+  ).not.toBeInTheDocument();
+  await user.click(cancel);
+  expect(onDiscard).toHaveBeenCalledOnce();
+  expect(mocks.push).not.toHaveBeenCalled();
 });

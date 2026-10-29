@@ -85,7 +85,7 @@ describe("ScooterCard", () => {
         odometerWorking: true,
       }),
     );
-    expect(screen.getByText("No photo")).toBeInTheDocument();
+    expect(screen.getByText("No image available")).toBeInTheDocument();
     expect(
       field("Rental status").getByText("Not recorded"),
     ).toBeInTheDocument();
@@ -143,7 +143,7 @@ describe("ScooterCard", () => {
   it("replaces a broken photo and retries a changed photo source", () => {
     const view = render(card({ photoUrl: "/scooter-photo.jpg" }));
     fireEvent.error(screen.getByRole("img", { name: "Scooter 001 YAM" }));
-    expect(screen.getByText("Photo unavailable")).toBeInTheDocument();
+    expect(screen.getByText("No image available")).toBeInTheDocument();
     expect(screen.queryByRole("img")).not.toBeInTheDocument();
     view.rerender(card({ photoUrl: "/scooter-replacement.jpg" }));
     expect(
@@ -157,7 +157,7 @@ describe("ScooterCard", () => {
       screen.getByRole("img", { name: "Scooter 001 YAM" }),
     ).toHaveAttribute("src", "https://photos.example.com/scooter.jpg");
     fireEvent.error(screen.getByRole("img"));
-    expect(screen.getByText("Photo unavailable")).toBeInTheDocument();
+    expect(screen.getByText("No image available")).toBeInTheDocument();
   });
 
   it("opens accessible quick actions without navigating and restores focus on Escape", async () => {

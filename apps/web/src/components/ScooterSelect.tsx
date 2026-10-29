@@ -28,6 +28,8 @@ export type ScooterSelectItem = Pick<
       | "temporaryRegistrationExpiresAt"
       | "maintenanceHoldCount"
       | "rentalInsuranceStatus"
+      | "missingClientDocuments"
+      | "itpStatus"
     >
   >;
 

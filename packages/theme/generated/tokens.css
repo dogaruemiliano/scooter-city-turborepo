@@ -4,6 +4,13 @@
   color-scheme: light;
   --radius: 0.75rem;
   --dashed-surface-border-width: 0.125rem;
+  --plate: oklch(1 0 0);
+  --plate-foreground: oklch(0.198264 0.011840 254.1076);
+  --plate-local: oklch(0.879 0.169 91.605);
+  --plate-temporary: oklch(0.505 0.213 27.518);
+  --plate-country: oklch(0.424 0.199 265.638);
+  --plate-country-foreground: oklch(1 0 0);
+  --plate-stars: oklch(0.879 0.169 91.605);
   --difficulty-easy: #3B82F6;
   --difficulty-medium: #EAB308;
   --difficulty-hard: #F97316;
@@ -45,6 +52,10 @@
   --chart-3: oklch(0.431477 0.070178 212.8220);
   --chart-4: oklch(0.618330 0.029405 234.2944);
   --chart-5: oklch(0.325239 0.023149 253.6111);
+  --odometer: oklch(0.198264 0.011840 254.1076);
+  --odometer-digit: oklch(0.325239 0.023149 253.6111);
+  --odometer-foreground: oklch(0.974148 0.003471 219.5331);
+  --odometer-border: oklch(0.432340 0.023770 246.0446);
   --sidebar: oklch(0.198264 0.011840 254.1076);
   --sidebar-foreground: oklch(0.974148 0.003471 219.5331);
   --sidebar-muted-foreground: oklch(0.766085 0.020387 240.8202);
@@ -94,11 +105,19 @@
   --scrim: oklch(0 0 0 / 40%);
   --scrim-foreground: oklch(0.987 0.002 197.1);
   --media-scrim: oklch(0 0 0 / 65%);
+  --document-preview-scrim: oklch(0 0 0 / 75%);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
     color-scheme: dark;
+    --plate: oklch(1 0 0);
+    --plate-foreground: oklch(0.198264 0.011840 254.1076);
+    --plate-local: oklch(0.879 0.169 91.605);
+    --plate-temporary: oklch(0.505 0.213 27.518);
+    --plate-country: oklch(0.424 0.199 265.638);
+    --plate-country-foreground: oklch(1 0 0);
+    --plate-stars: oklch(0.879 0.169 91.605);
     --difficulty-easy: #3B82F6;
     --difficulty-medium: #EAB308;
     --difficulty-hard: #F97316;
@@ -140,6 +159,10 @@
     --chart-3: oklch(0.898236 0.051870 205.3585);
     --chart-4: oklch(0.618330 0.029405 234.2944);
     --chart-5: oklch(0.620782 0.096514 209.5220);
+    --odometer: oklch(0.198264 0.011840 254.1076);
+    --odometer-digit: oklch(0.325239 0.023149 253.6111);
+    --odometer-foreground: oklch(0.974148 0.003471 219.5331);
+    --odometer-border: oklch(0.432340 0.023770 246.0446);
     --sidebar: #0a0a0a;
     --sidebar-foreground: oklch(0.974148 0.003471 219.5331);
     --sidebar-muted-foreground: #a1a1aa;
@@ -189,11 +212,19 @@
     --scrim: oklch(0 0 0 / 65%);
     --scrim-foreground: oklch(0.987 0.002 197.1);
     --media-scrim: oklch(0 0 0 / 65%);
+    --document-preview-scrim: oklch(0 0 0 / 75%);
   }
 }
 
 :root[data-theme='dark'], .dark {
   color-scheme: dark;
+  --plate: oklch(1 0 0);
+  --plate-foreground: oklch(0.198264 0.011840 254.1076);
+  --plate-local: oklch(0.879 0.169 91.605);
+  --plate-temporary: oklch(0.505 0.213 27.518);
+  --plate-country: oklch(0.424 0.199 265.638);
+  --plate-country-foreground: oklch(1 0 0);
+  --plate-stars: oklch(0.879 0.169 91.605);
   --difficulty-easy: #3B82F6;
   --difficulty-medium: #EAB308;
   --difficulty-hard: #F97316;
@@ -235,6 +266,10 @@
   --chart-3: oklch(0.898236 0.051870 205.3585);
   --chart-4: oklch(0.618330 0.029405 234.2944);
   --chart-5: oklch(0.620782 0.096514 209.5220);
+  --odometer: oklch(0.198264 0.011840 254.1076);
+  --odometer-digit: oklch(0.325239 0.023149 253.6111);
+  --odometer-foreground: oklch(0.974148 0.003471 219.5331);
+  --odometer-border: oklch(0.432340 0.023770 246.0446);
   --sidebar: #0a0a0a;
   --sidebar-foreground: oklch(0.974148 0.003471 219.5331);
   --sidebar-muted-foreground: #a1a1aa;
@@ -284,6 +319,7 @@
   --scrim: oklch(0 0 0 / 65%);
   --scrim-foreground: oklch(0.987 0.002 197.1);
   --media-scrim: oklch(0 0 0 / 65%);
+  --document-preview-scrim: oklch(0 0 0 / 75%);
 }
 
 .access-workspace {
@@ -429,9 +465,15 @@
   --spacing-2-5: 0.625rem;
   --spacing-screen-bottom: 0.5rem;
   --container-primary-form-actions: minmax(0, 2fr) minmax(0, 3fr);
+  --container-scooter-document-card: calc((100% - var(--spacing-3)) / 1.1);
+  --container-scooter-document-grid: repeat(auto-fill, minmax(min(100%, 160px), 1fr));
+  --container-scooter-document-card-max: 220px;
   --container-scooter-photo-preview: 55dvh;
   --container-scooter-photo-preview-mobile: 35dvh;
   --container-document-editor: 80vw;
+  --container-media-viewer-width: 90vw;
+  --container-media-viewer-height: 88dvh;
+  --container-media-viewer-max: 1536px;
   --container-document-review: 60dvh;
   --container-form-columns: 640px;
   --container-form-controls: 384px;
@@ -491,6 +533,8 @@
   --transition-duration-slower: 600ms;
   --duration-double-tap: 300ms;
   --transition-duration-double-tap: 300ms;
+  --duration-media-wheel-idle: 180ms;
+  --transition-duration-media-wheel-idle: 180ms;
   --duration-countdown-tick: 1000ms;
   --transition-duration-countdown-tick: 1000ms;
   --duration-document-review-pause: 3000ms;
@@ -507,6 +551,8 @@
   --ease-linear: linear;
 
   --opacity-drag-ghost: 0.3;
+  --opacity-image-placeholder: 0.5;
+  --opacity-client-document-overlay: 0.1;
 
   --z-base: 0;
   --z-raised: 10;
@@ -527,6 +573,13 @@
 }
 
 @theme inline {
+  --color-plate: var(--plate);
+  --color-plate-foreground: var(--plate-foreground);
+  --color-plate-local: var(--plate-local);
+  --color-plate-temporary: var(--plate-temporary);
+  --color-plate-country: var(--plate-country);
+  --color-plate-country-foreground: var(--plate-country-foreground);
+  --color-plate-stars: var(--plate-stars);
   --color-difficulty-easy: var(--difficulty-easy);
   --color-difficulty-medium: var(--difficulty-medium);
   --color-difficulty-hard: var(--difficulty-hard);
@@ -568,6 +621,10 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
+  --color-odometer: var(--odometer);
+  --color-odometer-digit: var(--odometer-digit);
+  --color-odometer-foreground: var(--odometer-foreground);
+  --color-odometer-border: var(--odometer-border);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-muted-foreground: var(--sidebar-muted-foreground);
@@ -617,6 +674,7 @@
   --color-scrim: var(--scrim);
   --color-scrim-foreground: var(--scrim-foreground);
   --color-media-scrim: var(--media-scrim);
+  --color-document-preview-scrim: var(--document-preview-scrim);
 
   --radius-none: 0;
   --radius-sm: max(0px, calc(var(--radius) - 4px));

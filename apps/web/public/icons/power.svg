@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="18" stroke-linecap="round" stroke-linejoin="round" role="img" aria-labelledby="icon-title" viewBox="155 16.25 202 493.5">
+  <title id="icon-title">Power connector</title>
+  <!-- USB head -->
+  <path d="M193 116V38H319V116"/>
+  <path d="M220 75H236M275 75H292"/>
+  <!-- Main housing -->
+  <rect x="173" y="116" width="166" height="218" rx="19"/>
+  <!-- Lightning symbol, original angles and relative size -->
+  <path d="M264 162L238 215L272 213L251 265"/>
+  <!-- Strain relief and leads -->
+  <path d="M222 334V403H290V334"/>
+  <path d="M238 403V488M273 403V488"/>
+</svg>

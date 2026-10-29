@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { RotateCwSquareIcon, XIcon } from "lucide-react";
+import { mediaViewerSurfaceClassName } from "./media-viewer-surface";
 import { SaveButton } from "./save-button";
 import { Button } from "@repo/ui/components/button";
 import {
@@ -219,7 +220,7 @@ export function ImageEditor({
         aria-busy={busy}
         onDragOver={(event) => event.preventDefault()}
         onDrop={(event) => event.preventDefault()}
-        className="top-0 left-0 flex h-dvh max-h-dvh w-full max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-none border-0 bg-background p-0 text-foreground sm:max-w-none"
+        className={mediaViewerSurfaceClassName}
       >
         <DialogTitle className="sr-only">{labels.title}</DialogTitle>
         <DialogDescription className="sr-only">
@@ -233,7 +234,7 @@ export function ImageEditor({
             type="button"
             variant="ghost"
             size="icon"
-            className="justify-self-start bg-background"
+            className="justify-self-start bg-popover"
             aria-label={labels.cancel}
             disabled={busy}
             onClick={cancel}
@@ -245,7 +246,7 @@ export function ImageEditor({
             variant="text"
             disabled={busy}
             onClick={reset}
-            className="bg-background text-link hover:text-link-hover active:text-link-active"
+            className="bg-popover text-link hover:text-link-hover active:text-link-active"
           >
             {labels.reset}
           </Button>
@@ -253,7 +254,7 @@ export function ImageEditor({
             type="button"
             variant="ghost"
             size="icon"
-            className="justify-self-end bg-background"
+            className="justify-self-end bg-popover"
             aria-label={labels.rotatePhoto}
             title={labels.rotatePhoto}
             disabled={busy}
@@ -318,7 +319,7 @@ export function ImageEditor({
                   setAxis(item);
                 }}
                 className={cn(
-                  "rounded-full border bg-background hover:bg-muted",
+                  "rounded-full border bg-popover hover:bg-muted",
                   toolOpen && axis === item
                     ? "border-link text-link hover:text-link"
                     : "border-transparent text-foreground",
@@ -356,7 +357,7 @@ export function ImageEditor({
           {error ? (
             <p
               role="alert"
-              className="mx-auto w-fit rounded-md bg-background px-4 py-2 text-center text-sm text-destructive"
+              className="mx-auto w-fit rounded-md bg-popover px-4 py-2 text-center text-sm text-destructive"
             >
               {error}
             </p>

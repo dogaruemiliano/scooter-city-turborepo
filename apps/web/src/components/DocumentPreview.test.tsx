@@ -1,4 +1,4 @@
-import { aspectRatio } from "@repo/theme";
+import { aspectRatio, softFade } from "@repo/theme";
 import { DocumentPreview } from "@repo/ui/components/document-preview";
 import { loadPdf } from "@repo/ui/lib/pdf";
 import {
@@ -84,6 +84,24 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("shared PDF previews", () => {
+  it("uses the shared soft curve for both paper-card overlays", () => {
+    render(
+      <DocumentPreview
+        {...props}
+        contentType="image/jpeg"
+        layout="paper"
+        headerOverlay={<span>Document title</span>}
+        bottomOverlay={<span>Document status</span>}
+      />,
+    );
+    expect(screen.getByText("Document title").parentElement).toHaveStyle({
+      backgroundImage: softFade.toTop,
+    });
+    expect(screen.getByText("Document status").parentElement).toHaveStyle({
+      backgroundImage: softFade.toBottom,
+    });
+  });
+
   it.each([
     [1200, 600, 2],
     [300, 1200, aspectRatio.documentA4Portrait],

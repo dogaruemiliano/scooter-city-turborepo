@@ -23,6 +23,8 @@ export const CIV_METADATA_FIELDS = [
 
 export const OPERATIONAL_FIELDS = [
   "hasGps",
+  "hasPhoneStand",
+  "hasChargingOutlet",
   "speedometerWorking",
   "odometerWorking",
   "currentMileageKm",

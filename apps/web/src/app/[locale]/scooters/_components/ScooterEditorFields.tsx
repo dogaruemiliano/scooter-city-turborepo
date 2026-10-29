@@ -80,6 +80,7 @@ interface EditorFieldProps {
 export function ScooterEditorFields({
   brands,
   combinedReview = false,
+  itpValidUntil,
   onRetryAnalysis,
   onLogicalDocument,
   scooterVin,
@@ -100,6 +101,7 @@ export function ScooterEditorFields({
   photos,
 }: {
   combinedReview?: boolean;
+  itpValidUntil?: string | null;
   onRetryAnalysis?: (sourceId: string) => void;
   onLogicalDocument?: LogicalDocumentUpdate;
   scooterVin?: string;
@@ -129,6 +131,7 @@ export function ScooterEditorFields({
     name: "insurancePolicies",
     keyName: "formKey",
   });
+  const civIssuedAt = useWatch({ control, name: "civIssuedAt" });
   const powertrain = useWatch({ control, name: "powertrainType" });
   const { documentWarnings, clearDocumentWarnings } = useScooterImportReview();
   const fieldProps = { brands, onBrandCreated, disabled, powertrain };
@@ -208,6 +211,13 @@ export function ScooterEditorFields({
         <>
           {!editing || combinedReview ? (
             <ScooterBatchDocuments
+              editing={editing}
+              itpValidUntil={
+                itpValidUntil ??
+                (civIssuedAt
+                  ? v1.scooters.initialScooterItpExpiry(civIssuedAt)
+                  : null)
+              }
               headerActions={
                 canImport ? (
                   <DropdownMenu>
@@ -254,16 +264,34 @@ export function ScooterEditorFields({
                     : "grid gap-4 sm:col-span-2"
                 }
               >
-                {(
-                  [
-                    "import_document",
-                    "civ",
-                    "registration_certificate",
-                  ] as const
+                {v1.scooters.SCOOTER_DOCUMENT_TYPES.filter(
+                  (type) => type !== "insurance",
                 ).map((type) => (
                   <ScooterDocumentUpload
                     key={type}
                     type={type}
+                    documents={documents}
+                    disabled={disabled}
+                    compact={step === "documents"}
+                  />
+                ))}
+                {[
+                  ...new Set(
+                    [...documents.existing, ...documents.drafts]
+                      .filter(
+                        (doc) =>
+                          doc.type === "insurance" &&
+                          !insurance.fields.some(
+                            (policy) => policy.id === doc.insurancePolicyId,
+                          ),
+                      )
+                      .map((doc) => doc.insurancePolicyId ?? undefined),
+                  ),
+                ].map((policyId) => (
+                  <ScooterDocumentUpload
+                    key={policyId ?? "unassigned-insurance"}
+                    type="insurance"
+                    insurancePolicyId={policyId}
                     documents={documents}
                     disabled={disabled}
                     compact={step === "documents"}

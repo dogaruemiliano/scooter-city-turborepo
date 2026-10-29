@@ -5,16 +5,20 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@repo/ui/lib/utils";
 
 const badgeVariants = cva(
-  "group/badge inline-flex min-h-5 w-fit min-w-0 max-w-full shrink-0 items-center justify-center gap-1 rounded-md border border-transparent px-2 py-0.5 text-xs font-medium whitespace-normal wrap-anywhere transition-all duration-fast ease-standard focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive [&>svg]:pointer-events-none [&>svg]:shrink-0 [&>svg]:size-3!",
+  "group/badge inline-flex min-h-5 w-fit min-w-0 max-w-full shrink-0 items-center justify-center gap-1 rounded-md border border-transparent px-2 py-0.5 text-xs font-medium whitespace-normal wrap-anywhere transition-all duration-fast ease-standard focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive [&>svg]:pointer-events-none [&>svg]:shrink-0",
   {
     variants: {
+      iconSize: {
+        sm: "[&>svg]:size-3!",
+        md: "[&>svg]:size-4!",
+      },
       variant: {
         default:
           "bg-primary text-primary-foreground [a]:hover:bg-primary-hover",
         secondary:
           "bg-secondary text-secondary-foreground [a]:hover:bg-secondary-hover",
         destructive:
-          "bg-destructive-subtle text-destructive focus-visible:ring-destructive [a]:hover:bg-destructive [a]:hover:text-destructive-foreground",
+          "border-destructive/20 bg-destructive-subtle text-destructive focus-visible:ring-destructive [a]:hover:bg-destructive [a]:hover:text-destructive-foreground",
         warning: "border-warning/20 bg-warning-subtle text-warning",
         success: "border-success/20 bg-success-subtle text-success",
         outline: "border-border text-foreground [a]:hover:bg-muted",
@@ -23,6 +27,7 @@ const badgeVariants = cva(
       },
     },
     defaultVariants: {
+      iconSize: "sm",
       variant: "default",
     },
   },
@@ -31,6 +36,7 @@ const badgeVariants = cva(
 function Badge({
   className,
   variant = "default",
+  iconSize = "sm",
   render,
   ...props
 }: useRender.ComponentProps<"span"> & VariantProps<typeof badgeVariants>) {
@@ -38,7 +44,7 @@ function Badge({
     defaultTagName: "span",
     props: mergeProps<"span">(
       {
-        className: cn(badgeVariants({ variant }), className),
+        className: cn(badgeVariants({ variant, iconSize }), className),
       },
       props,
     ),
@@ -46,6 +52,7 @@ function Badge({
     state: {
       slot: "badge",
       variant,
+      iconSize,
     },
   });
 }

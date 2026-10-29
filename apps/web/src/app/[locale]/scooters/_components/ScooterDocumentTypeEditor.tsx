@@ -61,26 +61,22 @@ export function ScooterDocumentTypeEditor({
     : type
       ? [type]
       : [];
+  const typeLabel = types.length
+    ? types.map((value) => t(`compact.${value}`)).join(" · ")
+    : t("batch.unknown");
   return (
     <div className="flex min-w-0 items-center gap-2">
-      <span
-        className={`text-xs ${surface === "media" ? "text-scrim-foreground" : "text-muted-foreground"}`}
-      >
-        {types.length
-          ? types.map((value) => t(`compact.${value}`)).join(" · ")
-          : t("batch.unknown")}
-      </span>
       {editable ? (
         <Popover>
           <PopoverTrigger
             render={
               <Button
                 type="button"
-                variant="ghost"
-                size="icon-xs"
+                variant="text"
+                size="xs"
                 className={
                   surface === "media"
-                    ? "text-scrim-foreground hover:bg-media-scrim hover:text-scrim-foreground"
+                    ? "text-scrim-foreground hover:text-scrim-foreground"
                     : undefined
                 }
                 disabled={disabled}
@@ -88,7 +84,8 @@ export function ScooterDocumentTypeEditor({
               />
             }
           >
-            <PencilIcon className="size-4" aria-hidden="true" />
+            <span className="min-w-0 text-left">{typeLabel}</span>
+            <PencilIcon className="size-3" aria-hidden="true" />
           </PopoverTrigger>
           <PopoverContent align="end" className="gap-4 p-4">
             <PopoverTitle>{workspace("documentType")}</PopoverTitle>
@@ -166,7 +163,13 @@ export function ScooterDocumentTypeEditor({
             )}
           </PopoverContent>
         </Popover>
-      ) : null}
+      ) : (
+        <span
+          className={`text-xs ${surface === "media" ? "text-scrim-foreground" : "text-muted-foreground"}`}
+        >
+          {typeLabel}
+        </span>
+      )}
     </div>
   );
 }

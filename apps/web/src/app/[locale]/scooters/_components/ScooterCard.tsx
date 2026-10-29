@@ -21,7 +21,6 @@ import {
   EllipsisIcon,
   EyeIcon,
   GaugeIcon,
-  ImageIcon,
   KeyRoundIcon,
   OctagonAlertIcon,
   PencilIcon,
@@ -96,10 +95,20 @@ function ScooterPhoto({ src, code }: { src?: string | null; code: string }) {
           />
         </div>
       ) : (
-        <span className="flex flex-col items-center gap-2 px-2 text-center text-xs text-muted-foreground">
-          <ImageIcon aria-hidden="true" className="size-6" />
-          {src ? t("photoUnavailable") : t("noPhoto")}
-        </span>
+        <>
+          <Image
+            src="/scooter-placeholder.png"
+            alt=""
+            aria-hidden="true"
+            fill
+            sizes={`(min-width: ${tokens.breakpoints.sm}px) ${tokens.spacing[48]}px, ${tokens.spacing[32]}px`}
+            className="object-contain"
+            style={{ opacity: tokens.opacity.imagePlaceholder }}
+          />
+          <span className="relative z-raised px-2 text-center text-sm font-semibold leading-snug text-foreground dark:text-image-grid-outline">
+            {t("noImageAvailable")}
+          </span>
+        </>
       )}
     </div>
   );

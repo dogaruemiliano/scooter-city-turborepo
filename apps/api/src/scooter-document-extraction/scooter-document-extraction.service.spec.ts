@@ -94,7 +94,7 @@ describe("scooter document extraction normalization", () => {
     ).toThrow();
   });
 
-  it("leaves unrecognizable documents unresolved instead of inventing a category", async () => {
+  it("stores unrecognized supporting documents as other while rejecting malformed extraction output", async () => {
     const { service } = setup();
     await expect(
       Promise.resolve().then(() =>
@@ -105,7 +105,7 @@ describe("scooter document extraction normalization", () => {
           rawFields: [],
         }),
       ),
-    ).rejects.toMatchObject({ code: "DOCUMENT_EXTRACTION_TYPE_UNKNOWN" });
+    ).resolves.toBe("other");
     await expect(
       Promise.resolve().then(() =>
         service.detectType({ detectedDocumentType: "civ" }),

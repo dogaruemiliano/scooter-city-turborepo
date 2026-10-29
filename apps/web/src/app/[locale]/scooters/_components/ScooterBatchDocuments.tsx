@@ -3,22 +3,32 @@
 import { useOptionalSession } from "@/components/auth/SessionProvider";
 import { canAccess } from "@/lib/access";
 import { v1 } from "@repo/api-shared";
-import { motion, spacing } from "@repo/theme";
+import {
+  breakpoints,
+  motion,
+  spacing,
+  viewportSizing,
+  aspectRatio,
+} from "@repo/theme";
+import {
+  DocumentStatus,
+  type DocumentStatusState,
+} from "@repo/ui/components/document-status";
+import { useMediaCollection } from "@repo/ui/components/media-collection";
 import { DocumentPreview } from "@repo/ui/components/document-preview";
 import {
   Button,
+  SaveButton,
   Card,
   CardHeader,
   CardTitle,
   CardContent,
   Badge,
   FileDropZone,
-  Spinner,
+  HorizontalScrollArea,
 } from "@repo/ui/components";
-import { FileDropOverlay } from "@repo/ui/components/file-drop-overlay";
-import { useFileDrop } from "@repo/ui/hooks/use-file-drop";
 import { useObjectUrl } from "@repo/ui/hooks/use-object-url";
-import { CheckIcon, ShieldIcon, SparklesIcon, XIcon } from "lucide-react";
+import { SparklesIcon, XIcon, FileTextIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import {
   useCallback,
@@ -28,12 +38,14 @@ import {
   useRef,
   useState,
   type ReactNode,
+  type CSSProperties,
 } from "react";
 import {
   ScooterDocumentTypeEditor,
   type LogicalDocumentUpdate,
 } from "./ScooterDocumentTypeEditor";
 import type { DocumentImportResult } from "./scooter-document-import";
+import { SavedDocumentCard } from "./SavedDocumentCard";
 import { ScooterClientCopyBadge } from "./ScooterClientCopyBadge";
 import { ScooterDocumentAnalysisContext } from "./ScooterDocumentAnalysisStatus";
 import type {
@@ -43,15 +55,16 @@ import type {
 
 export function ScooterBatchDocuments({
   documents,
-  disabled,
+  disabled: formDisabled,
   analyzing,
   onRetryAnalysis,
   onCancelAnalysis,
   children,
   headerActions,
-  importResult,
   onLogicalDocument,
   scooterVin,
+  editing = false,
+  itpValidUntil,
 }: {
   documents: ScooterDocumentsEditor;
   disabled: boolean;
@@ -63,63 +76,130 @@ export function ScooterBatchDocuments({
   importResult?: Extract<DocumentImportResult, { ok: true }>;
   onLogicalDocument?: LogicalDocumentUpdate;
   scooterVin?: string;
+  editing?: boolean;
+  itpValidUntil?: string | null;
 }) {
   const t = useTranslations("scooters.documents");
   const user = useOptionalSession()?.user;
   const canWrite = canAccess(user, "scooter_documents.write");
+  const canRead = canAccess(user, "scooter_documents.read");
+  const disabled =
+    formDisabled || !canWrite || documents.generatingClientCopies;
   const canExtract = canAccess(user, "scooter_documents.extract");
   const creation = useTranslations("scooters.creation");
   const extraction = useTranslations("scooters.extraction");
-  const workspace = useTranslations("scooters.workspace");
   const [initialDraftIds] = useState(
     () => new Set(documents.drafts.map((draft) => draft.id)),
   );
   const [errors, setErrors] = useState<string[]>([]);
-  const [expandedImport, setExpandedImport] = useState<typeof importResult>();
-  const analysisEntries = useContext(ScooterDocumentAnalysisContext);
-  const compact =
-    documents.existing.length + documents.drafts.length > 0 &&
-    Boolean(importResult) &&
-    expandedImport !== importResult &&
-    !analyzing &&
-    !errors.length &&
-    !documents.drafts.some(
-      (draft) =>
-        (draft.version === "client_copy" && !draft.originalId) ||
-        draft.status === "failed" ||
-        draft.status === "uploading" ||
-        analysisEntries[draft.id]?.status === "failed",
-    );
-  const logicalDocumentsFor = (sourceId: string) => {
-    const entry = analysisEntries[sourceId];
-    return entry?.status === "success"
-      ? entry.analysis.extractedData.documents
-      : documents.existing.find((item) => item.id === sourceId)?.extractedData
-          ?.documents;
-  };
-  const attachedDocuments = [
+  const candidates = [
     ...documents.existing.map((document) => ({
-      id: document.id,
-      name: document.fileName,
-      type: document.type,
-      clientCopy: false,
-      originalName: undefined as string | undefined,
-      analyzed: Boolean(
-        document.extractedData ||
-        documents.extractions[document.id] ||
-        analysisEntries[document.id]?.status === "success",
-      ),
+      ...document,
+      kind: "saved" as const,
+      extractedData:
+        documents.extractions[document.id] ?? document.extractedData,
     })),
+    ...documents.drafts.map((draft) => {
+      const original =
+        draft.version === "client_copy"
+          ? documents.existing.find(
+              (document) => document.id === draft.originalId,
+            )
+          : undefined;
+      return {
+        ...draft,
+        kind: "draft" as const,
+        extractedData:
+          documents.extractions[draft.id] ??
+          (draft.originalId
+            ? documents.extractions[draft.originalId]
+            : undefined) ??
+          original?.extractedData,
+        validFrom: original?.validFrom,
+        validUntil: original?.validUntil,
+        createdAt: new Date(draft.file.lastModified).toISOString(),
+      };
+    }),
   ];
-  const { dragging, handlers: fileDropHandlers } = useFileDrop({
-    disabled,
-    onFiles: (files) => {
-      setExpandedImport(importResult);
-      add(files);
-    },
-  });
+  const displayed = v1.scooters.scooterDocumentDisplayEntries(candidates);
+  const required = v1.scooters.SCOOTER_CLIENT_DOCUMENT_TYPES.filter(
+    (type) =>
+      !type.startsWith("itp_") ||
+      v1.scooters.scooterItpDocumentsDue(itpValidUntil),
+  );
+  const ghosts = editing
+    ? required.flatMap((type) =>
+        [false, true]
+          .filter(
+            (clientCopy) =>
+              !displayed.some(
+                (entry) =>
+                  entry.type === type &&
+                  entry.clientCopy === clientCopy &&
+                  v1.scooters.scooterDocumentState(
+                    entry.document,
+                    undefined,
+                    type,
+                  ) === "current" &&
+                  (!type.startsWith("itp_") ||
+                    !v1.scooters.scooterItpDocumentsDue(
+                      v1.scooters.scooterDocumentValidity(entry.document, type)
+                        .validUntil,
+                    )),
+              ),
+          )
+          .map((clientCopy) => ({ type, clientCopy })),
+      )
+    : [];
+  const rank = (type: string | null, clientCopy: boolean) => {
+    const index = v1.scooters.SCOOTER_DOCUMENT_DISPLAY_ORDER.indexOf(
+      type as v1.scooters.ScooterDocumentType,
+    );
+    return (
+      (index < 0 ? v1.scooters.SCOOTER_DOCUMENT_DISPLAY_ORDER.length : index) *
+        2 +
+      Number(clientCopy)
+    );
+  };
+  const rows = [
+    ...displayed.map((entry) => ({ ...entry, ghost: false as const })),
+    ...ghosts.map((entry) => ({
+      ...entry,
+      ghost: true as const,
+      archived: false,
+    })),
+  ].sort(
+    (a, b) =>
+      Number(a.archived) - Number(b.archived) ||
+      rank(a.type, a.clientCopy) - rank(b.type, b.clientCopy),
+  );
+  const hasDocuments = documents.existing.length + documents.drafts.length > 0;
 
-  if (!canWrite) return null;
+  const documentList = useRef<HTMLUListElement>(null);
+  const previousDraftIds = useRef(
+    new Set(documents.drafts.map((draft) => draft.id)),
+  );
+  useEffect(() => {
+    const added = documents.drafts.some(
+      (draft) => !previousDraftIds.current.has(draft.id),
+    );
+    previousDraftIds.current = new Set(
+      documents.drafts.map((draft) => draft.id),
+    );
+    if (!added || window.innerWidth >= breakpoints.md) return;
+    const viewport = documentList.current?.closest<HTMLElement>(
+      '[data-slot="horizontal-scroll-viewport"]',
+    );
+    if (!viewport) return;
+    viewport.scrollTo?.({
+      left: Math.max(0, viewport.scrollWidth - viewport.clientWidth),
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        ? "instant"
+        : "smooth",
+    });
+  }, [documents.drafts]);
+
+  if (!canRead) return null;
 
   function add(files: File[]) {
     if (disabled) return;
@@ -181,97 +261,174 @@ export function ScooterBatchDocuments({
           </div>
         </div>
       </CardHeader>
-      {compact && attachedDocuments.length > 0 ? (
-        <CardContent>
-          <ul aria-label={t("batch.attached")} className="grid min-w-0 gap-2">
-            {attachedDocuments.map((document) => (
-              <li
-                key={document.id}
-                className="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-lg bg-control px-3 py-2"
-              >
-                <div className="min-w-0 flex-1">
-                  <p
-                    className="truncate text-sm font-medium"
-                    title={document.name}
-                  >
-                    {document.name}
-                  </p>
-                  {document.clientCopy ? (
-                    <p className="text-xs text-muted-foreground">
-                      {document.originalName
-                        ? workspace("matchedOriginal", {
-                            name: document.originalName,
-                          })
-                        : workspace("copyNeedsOriginal")}
-                    </p>
-                  ) : (
-                    <ScooterDocumentTypeEditor
-                      sourceId={document.id}
-                      fileName={document.name}
-                      type={document.type}
-                      documents={logicalDocumentsFor(document.id)}
-                      disabled={disabled || analyzing}
-                      scooterVin={scooterVin}
-                      onType={
-                        documents.drafts.some(
-                          (draft) =>
-                            draft.id === document.id &&
-                            draft.version !== "client_copy",
-                        )
-                          ? (type) =>
-                              documents.classify(document.id, type, true)
-                          : undefined
-                      }
-                      onDocument={
-                        analysisEntries[document.id]?.status === "success"
-                          ? onLogicalDocument
-                          : undefined
-                      }
-                    />
-                  )}
-                </div>
-                <Badge
-                  variant={
-                    document.clientCopy
-                      ? "default"
-                      : document.analyzed
-                        ? "success"
-                        : "secondary"
-                  }
-                >
-                  {document.clientCopy ? (
-                    <ShieldIcon aria-hidden="true" />
-                  ) : null}
-                  {document.clientCopy
-                    ? t("clientCopy")
-                    : t(
-                        document.analyzed
-                          ? "batch.uploadedAndAnalyzed"
-                          : "batch.uploaded",
-                      )}
-                </Badge>
-              </li>
-            ))}
-          </ul>
-        </CardContent>
-      ) : null}
-      <CardContent
-        hidden={compact}
-        className={compact ? "hidden" : "grid gap-4"}
-      >
+      <CardContent className="grid min-w-0 gap-4">
+        {documents.canGenerateClientCopies && canWrite ? (
+          <SaveButton
+            className="justify-self-start"
+            type="button"
+            variant="outline"
+            size="sm"
+            state={documents.generatingClientCopies ? "pending" : "idle"}
+            disabled={disabled || analyzing}
+            idleLabel={t("generateClientCopies")}
+            pendingLabel={t("generatingClientCopies")}
+            successLabel={t("clientCopiesGenerated")}
+            onClick={() => {
+              void documents.generateClientCopies();
+            }}
+          />
+        ) : null}
         <FileDropZone
           label={t("batch.drop")}
           mobileLabel={t("batch.select")}
           browseLabel={t("batch.browse")}
+          addLabel={t("batch.addDocument")}
           hint={t("batch.hint")}
           requirements={t("batch.requirements")}
           accept={v1.scooters.SCOOTER_DOCUMENT_CONTENT_TYPES.join(",")}
           disabled={disabled}
           onFiles={add}
-        />
+        >
+          {hasDocuments || editing
+            ? (addCard) => (
+                <div className="grid min-w-0 gap-4">
+                  <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+                    <p
+                      className="text-sm text-muted-foreground"
+                      aria-live="polite"
+                    >
+                      {t("documentCount", {
+                        count: documents.existing.reduce(
+                          (count, document) =>
+                            count + (document.clientCopy ? 2 : 1),
+                          documents.drafts.length,
+                        ),
+                      })}
+                    </p>
+                    {analyzing && onCancelAnalysis ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={disabled}
+                        onClick={onCancelAnalysis}
+                      >
+                        {extraction("cancel")}
+                      </Button>
+                    ) : null}
+                  </div>
+                  <HorizontalScrollArea
+                    label={t("batch.attached")}
+                    fadeEdges="always"
+                    className="-mx-(--card-spacing) w-auto [--gallery-fade-width:var(--card-spacing)] md:mx-0 md:w-full md:[--gallery-fade-width:0]"
+                    fadeWidth="var(--gallery-fade-width)"
+                    contentWidth="viewport"
+                    snap
+                    scrollbarVisibility="desktop"
+                  >
+                    <ul
+                      ref={documentList}
+                      aria-label={t("batch.attached")}
+                      style={
+                        {
+                          "--document-card-width":
+                            viewportSizing.scooterDocumentCard,
+                          "--document-card-max-width":
+                            viewportSizing.scooterDocumentCardMax,
+                          "--document-grid-columns":
+                            viewportSizing.scooterDocumentGrid,
+                        } as CSSProperties
+                      }
+                      className="grid w-full min-w-0 grid-flow-col auto-cols-(--document-card-width) gap-3 px-(--card-spacing) md:px-0 [&>li]:snap-start [&>li:last-child]:relative [&>li:last-child]:after:absolute [&>li:last-child]:after:left-full [&>li:last-child]:after:top-0 [&>li:last-child]:after:h-px [&>li:last-child]:after:w-(--card-spacing) [&>li:last-child]:after:content-[''] md:[&>li:last-child]:after:content-none has-[>li:only-child]:auto-cols-[100%] md:grid-flow-row md:auto-cols-auto md:grid-cols-(--document-grid-columns) md:[&>li]:max-w-(--document-card-max-width)"
+                    >
+                      {rows.map((entry) => {
+                        if (entry.ghost)
+                          return (
+                            <li
+                              key={`ghost-${entry.type}-${entry.clientCopy}`}
+                              data-slot="scooter-document-ghost"
+                              className="flex min-w-0 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border p-4 text-center text-muted-foreground"
+                              style={{
+                                aspectRatio: aspectRatio.documentA4Portrait,
+                              }}
+                            >
+                              <FileTextIcon
+                                className="size-6"
+                                aria-hidden="true"
+                              />
+                              <span className="text-sm font-medium">
+                                {t(
+                                  entry.type! as v1.scooters.ScooterDocumentType,
+                                )}
+                                {entry.clientCopy
+                                  ? ` · ${t("clientCopy")}`
+                                  : ""}
+                              </span>
+                              <span className="text-xs">
+                                {t("missingDocument")}
+                              </span>
+                            </li>
+                          );
+                        const document = entry.document;
+                        const badge = entry.badge ? (
+                          <Badge variant="outline">
+                            {t(`lifecycle.${entry.badge}`)}
+                          </Badge>
+                        ) : undefined;
+                        if (document.kind === "saved")
+                          return (
+                            <SavedDocumentCard
+                              key={`${document.id}-${entry.type}-${entry.clientCopy}`}
+                              document={document}
+                              clientCopy={entry.clientCopy}
+                              lifecycleBadge={badge}
+                              disabled={disabled}
+                              onRemove={() =>
+                                documents.removeExisting(document.id)
+                              }
+                              onLogicalDocument={onLogicalDocument}
+                              scooterVin={scooterVin}
+                            />
+                          );
+                        return (
+                          <BatchDocumentRow
+                            key={`${document.id}-${Math.max(0, v1.scooters.scooterDocumentTypes(document).indexOf(entry.type!))}`}
+                            draft={document}
+                            lifecycleBadge={badge}
+                            animateEntrance={!initialDraftIds.has(document.id)}
+                            documents={documents}
+                            disabled={disabled}
+                            canExtract={canExtract}
+                            onLogicalDocument={onLogicalDocument}
+                            scooterVin={scooterVin}
+                            onPreview={() => documents.preview(document)}
+                            onType={(type) =>
+                              documents.classify(document.id, type, true)
+                            }
+                            onRemove={() => documents.removeDraft(document.id)}
+                            onRetry={() =>
+                              document.status === "failed"
+                                ? documents.retry(document)
+                                : onRetryAnalysis?.(document.id)
+                            }
+                          />
+                        );
+                      })}
+                      {addCard ? <li className="min-w-0">{addCard}</li> : null}
+                    </ul>
+                  </HorizontalScrollArea>
+                </div>
+              )
+            : undefined}
+        </FileDropZone>
         {!canExtract ? (
           <p className="text-sm text-muted-foreground">
             {t("batch.manualTypes")}
+          </p>
+        ) : null}
+        {documents.clientCopyError ? (
+          <p role="alert" className="text-sm text-destructive">
+            {t("generateClientCopiesError")}
           </p>
         ) : null}
         {errors.length ? (
@@ -282,75 +439,26 @@ export function ScooterBatchDocuments({
           </ul>
         ) : null}
       </CardContent>
-      <CardContent className="grid min-w-0 gap-4">
-        {documents.drafts.length ? (
-          <>
-            <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
-              <p className="text-sm text-muted-foreground" aria-live="polite">
-                {t("documentCount", { count: documents.drafts.length })}
-              </p>
-              {analyzing && onCancelAnalysis ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={disabled}
-                  onClick={onCancelAnalysis}
-                >
-                  {extraction("cancel")}
-                </Button>
-              ) : null}
-            </div>
-            <ul
-              aria-label={t("batch.attached")}
-              className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3"
+      {(documents.removed ?? []).length ? (
+        <CardContent className="grid gap-2">
+          {documents.removed.map((document) => (
+            <div
+              key={document.id}
+              className="flex min-w-0 items-center justify-between gap-3"
             >
-              {documents.drafts.map((draft) => (
-                <BatchDocumentRow
-                  key={draft.id}
-                  draft={draft}
-                  animateEntrance={!initialDraftIds.has(draft.id)}
-                  documents={documents}
-                  disabled={disabled}
-                  canExtract={canExtract}
-                  onLogicalDocument={onLogicalDocument}
-                  scooterVin={scooterVin}
-                  onPreview={() => documents.preview(draft)}
-                  onType={(type) => documents.classify(draft.id, type, true)}
-                  onRemove={() => documents.removeDraft(draft.id)}
-                  onRetry={() =>
-                    draft.status === "failed"
-                      ? documents.retry(draft)
-                      : onRetryAnalysis?.(draft.id)
-                  }
-                />
-              ))}
-            </ul>
-            <p className="text-sm text-muted-foreground">{t("batch.review")}</p>
-          </>
-        ) : null}
-      </CardContent>
-      {compact ? (
-        <CardContent>
-          {" "}
-          <Button
-            type="button"
-            variant="outline"
-            className="relative w-full justify-center rounded-dashed-surface border-(length:--dashed-surface-border-width) border-dashed bg-transparent text-center duration-normal enabled:hover:border-primary enabled:active:border-primary enabled:active:border-solid"
-            disabled={disabled}
-            aria-label={creation("importMore")}
-            onClick={() => setExpandedImport(importResult)}
-            {...fileDropHandlers}
-          >
-            {creation("importMore")}
-            {dragging ? (
-              <FileDropOverlay
-                compact
-                label={creation("importMore")}
-                className="rounded-lg"
-              />
-            ) : null}
-          </Button>
+              <span className="truncate text-sm text-muted-foreground">
+                {document.fileName}
+              </span>
+              <Button
+                type="button"
+                variant="text"
+                disabled={disabled}
+                onClick={() => documents.undoRemove(document.id)}
+              >
+                {t("undo")}
+              </Button>
+            </div>
+          ))}
         </CardContent>
       ) : null}
       {children ? <CardContent>{children}</CardContent> : null}
@@ -361,6 +469,7 @@ export function ScooterBatchDocuments({
 function BatchDocumentRow({
   draft,
   animateEntrance,
+  lifecycleBadge,
   documents,
   disabled,
   canExtract,
@@ -373,6 +482,7 @@ function BatchDocumentRow({
 }: {
   draft: DocumentDraft;
   animateEntrance: boolean;
+  lifecycleBadge?: ReactNode;
   documents: ScooterDocumentsEditor;
   disabled: boolean;
   canExtract: boolean;
@@ -451,7 +561,9 @@ function BatchDocumentRow({
     return () => observer.disconnect();
   }, [draft.fileUnavailable, draft.uploadToken, draft.status, loadPreview]);
 
+  const collection = useMediaCollection();
   async function openPreview() {
+    if (collection?.open(draft.id)) return;
     if (!draft.fileUnavailable) {
       setOpen(true);
       return;
@@ -476,7 +588,7 @@ function BatchDocumentRow({
         : state?.status === "failed"
           ? extractionT(`errors.${state.error}`)
           : state?.status === "processing"
-            ? extractionT("analyzing")
+            ? extractionT(state.phase === "queued" ? "queued" : "analyzing")
             : draft.version === "client_copy"
               ? t("batch.uploaded")
               : state?.status === "success"
@@ -484,6 +596,21 @@ function BatchDocumentRow({
                 : canExtract
                   ? extractionT("queued")
                   : t("batch.manualTypes");
+  const documentState: DocumentStatusState = failed
+    ? "failed"
+    : draft.status === "uploading"
+      ? "uploading"
+      : state?.status === "processing"
+        ? state.phase === "queued"
+          ? "queued"
+          : "analyzing"
+        : draft.version === "client_copy"
+          ? "uploaded"
+          : state?.status === "success"
+            ? "analyzed"
+            : canExtract
+              ? "queued"
+              : "uploaded";
   const labels = {
     error: t("pdfPreviewError"),
     previousPage: t("previousPage"),
@@ -496,6 +623,7 @@ function BatchDocumentRow({
     <li ref={cardRef} className="grid min-w-0 content-start gap-3">
       <DocumentPreview
         layout="paper"
+        mediaId={draft.id}
         open={open}
         onOpenChange={(next) => {
           if (next) void openPreview();
@@ -559,6 +687,7 @@ function BatchDocumentRow({
         }
         bottomOverlay={
           <>
+            {lifecycleBadge}
             {draft.version === "client_copy" ? (
               <ScooterClientCopyBadge
                 draft={draft}
@@ -582,20 +711,7 @@ function BatchDocumentRow({
                 scooterVin={scooterVin}
               />
             )}
-            <p
-              role={failed ? "alert" : "status"}
-              className={`flex min-w-0 items-center justify-end gap-1 text-right text-xs wrap-anywhere ${failed ? "rounded-md bg-destructive-subtle px-2 py-1 text-destructive" : "text-scrim-foreground"}`}
-            >
-              {busy ? (
-                <Spinner className="shrink-0" />
-              ) : state?.status === "success" ? (
-                <CheckIcon
-                  className="size-4 shrink-0 text-success"
-                  aria-hidden="true"
-                />
-              ) : null}
-              {status}
-            </p>
+            <DocumentStatus state={documentState} label={status} />
           </>
         }
       />

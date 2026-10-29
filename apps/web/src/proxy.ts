@@ -37,6 +37,9 @@ import { webApi } from "./lib/api";
 const handleI18nRouting = createMiddleware(routing);
 
 export async function proxy(req: NextRequest): Promise<NextResponse> {
+  if (req.nextUrl.pathname === "/session-unavailable")
+    return NextResponse.next();
+
   const access = req.cookies.get(v1.auth.ACCESS_TOKEN_COOKIE)?.value;
   const refresh = req.cookies.get(v1.auth.REFRESH_TOKEN_COOKIE)?.value;
   const isPublic = isPublicPathname(req.nextUrl.pathname);
@@ -60,7 +63,7 @@ export async function proxy(req: NextRequest): Promise<NextResponse> {
       body: "{}",
     });
   } catch {
-    return sessionTemporarilyUnavailable();
+    return sessionTemporarilyUnavailable(req);
   }
 
   if (!apiRes.ok) {
@@ -68,7 +71,7 @@ export async function proxy(req: NextRequest): Promise<NextResponse> {
       return isPublic ? handleI18nRouting(req) : redirectToSignIn(req);
     }
 
-    return sessionTemporarilyUnavailable();
+    return sessionTemporarilyUnavailable(req);
   }
 
   const setCookies = apiRes.headers.getSetCookie();
@@ -112,18 +115,18 @@ function isRefreshAuthFailure(status: number): boolean {
   return status === 401 || status === 403;
 }
 
-function sessionTemporarilyUnavailable(): NextResponse {
-  return new NextResponse(
-    "Your session could not be checked because the authentication service is temporarily unavailable. Your browser session was not cleared. Retry when the API is back online.",
-    {
-      status: 503,
-      headers: {
-        "cache-control": "no-store",
-        "content-type": "text/plain; charset=utf-8",
-        "retry-after": "5",
-      },
+function sessionTemporarilyUnavailable(req: NextRequest): NextResponse {
+  // A separate root layout keeps recovery independent of API-backed session loading.
+  const url = new URL("/session-unavailable", req.url);
+  url.searchParams.set("locale", getLocaleFromPathname(req.nextUrl.pathname));
+  return NextResponse.rewrite(url, {
+    status: 503,
+    headers: {
+      "cache-control": "no-store",
+      "retry-after": "5",
+      "x-robots-tag": "noindex",
     },
-  );
+  });
 }
 
 function mergeRequestOverrides(

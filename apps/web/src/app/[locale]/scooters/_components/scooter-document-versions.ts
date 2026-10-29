@@ -131,7 +131,7 @@ export function resolveDocumentVersions<T extends DocumentVersionCandidate>(
         draft.version === "client_copy" &&
         draft.originalId)
     )
-      return draft;
+      return { ...draft, type: draft.type ?? drafts.find((original) => original.id === draft.originalId)?.type ?? null };
     const source = evidence[draft.id]?.clientCopy
       ? ("branded_overlay" as const)
       : hasClientCopyFileName(draft.file.name)
@@ -177,6 +177,6 @@ export function resolveDocumentVersions<T extends DocumentVersionCandidate>(
       ).length !== 1
     )
       return draft;
-    return { ...draft, originalId: original.id };
+    return { ...draft, type: original.type, originalId: original.id };
   });
 }

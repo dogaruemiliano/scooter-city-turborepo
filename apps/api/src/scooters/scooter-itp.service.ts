@@ -31,7 +31,7 @@ export class ScooterItpService {
   async list(scooterId: string): Promise<v1.scooters.ScooterItpList> {
     const scooter = await this.prisma.scooter.findFirst({
       where: { id: scooterId, deletedAt: null },
-      select: { id: true },
+      select: { id: true, civDocument: { select: { issuedAt: true } } },
     });
     if (!scooter) throw new NotFoundException("Scooter not found");
     const rows = await this.prisma.scooterItpInspection.findMany({
@@ -43,7 +43,14 @@ export class ScooterItpService {
       ],
     });
     const inspections = rows.map(response);
-    return { inspections, ...v1.scooters.scooterItpSummary(inspections) };
+    return {
+      inspections,
+      ...v1.scooters.scooterItpSummary(
+        inspections,
+        undefined,
+        toDateOnlyString(scooter.civDocument?.issuedAt ?? null),
+      ),
+    };
   }
 
   async create(scooterId: string, input: v1.scooters.ScooterItpInput) {

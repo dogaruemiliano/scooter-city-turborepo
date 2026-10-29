@@ -1,12 +1,54 @@
-import { toScooter } from "./scooters.mapper";
+import { toScooter, toScooterListItem } from "./scooters.mapper";
 
 describe("scooter picker summaries", () => {
+  it.each([true, false, null])(
+    "returns phone equipment without coercing %s",
+    (value) => {
+      const record = {
+        id: "scooter",
+        brand: { name: "Honda", code: "HON" },
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        hasPhoneStand: value,
+        hasChargingOutlet: value,
+      };
+      expect(
+        toScooter(record as unknown as Parameters<typeof toScooter>[0]),
+      ).toMatchObject({ hasPhoneStand: value, hasChargingOutlet: value });
+    },
+  );
+
   const base = {
     id: "scooter",
     brand: { name: "KYMCO", code: "KYM" },
     createdAt: new Date("2026-10-14"),
     updatedAt: new Date("2026-10-14"),
   };
+  it("keeps CIV metadata on inventory summaries and raw fields on details", () => {
+    const rawFields = { "13": "ENG-123", unmapped: "Original text" };
+    const row = {
+      ...base,
+      civDocument: {
+        version: "v2024",
+        issuedAt: new Date("2026-10-14"),
+        issuingAuthority: "RAR",
+        rawFields,
+      },
+      inspections: [],
+    } as unknown as Parameters<typeof toScooter>[0];
+    const detail = toScooter(row);
+    const summary = toScooterListItem(row);
+    expect(detail.civRawFields).toEqual(rawFields);
+    expect(summary).not.toHaveProperty("civRawFields");
+    expect(summary).toMatchObject({
+      brandCode: "KYM",
+      civVersion: "2024",
+      civIssuedAt: "2026-10-14",
+      civIssuingAuthority: "RAR",
+    });
+    expect(row.civDocument?.rawFields).toEqual(rawFields);
+  });
+
   it("keeps difficulty totals, cover and maintenance hold independent", () => {
     const result = toScooter({
       ...base,

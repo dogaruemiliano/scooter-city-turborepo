@@ -1,17 +1,29 @@
 import { ApiError, v1 } from "@repo/api-shared";
 import { messages, type SupportedLocale } from "@repo/i18n";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ScooterDetailPage } from "./ScooterDetailPage";
+import { ScooterPhotos } from "./ScooterPhotos";
+import {
+  PageHeaderNavigationContext,
+  type PageHeaderNavigationOptions,
+} from "@/components/PageHeaderNavigation";
 // Gallery API interactions are covered independently in ScooterPhotos.test.tsx.
-vi.mock("./ScooterPhotos", () => ({ ScooterPhotos: () => null }));
+vi.mock("./ScooterPhotos", () => ({ ScooterPhotos: vi.fn(() => null) }));
 // Inspection requests and confirmation are covered in ScooterItpPanel.test.tsx.
 vi.mock("./ScooterItpPanel", () => ({ ScooterItpPanel: () => null }));
 
 const mocks = vi.hoisted(() => ({
+  canReportProblem: true,
   apiFetch: vi.fn(),
   refresh: vi.fn(),
   replace: vi.fn(),
@@ -21,6 +33,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/api", () => ({
   webApi: {
     fetch: mocks.apiFetch,
+    url: (path: string) => `http://localhost:3000${path}`,
   },
 }));
 
@@ -63,6 +76,8 @@ const scooter: v1.scooters.Scooter = {
 };
 
 beforeEach(() => {
+  mocks.canReportProblem = true;
+  mocks.push.mockReset();
   mocks.apiFetch.mockReset();
   mocks.refresh.mockReset();
   mocks.replace.mockReset();
@@ -74,6 +89,331 @@ beforeEach(() => {
 });
 
 describe("ScooterDetailPage", () => {
+  it("refreshes the scooter data after saved photo changes so the hero gets the current cover", () => {
+    const view = renderDetail("en");
+    expect(mocks.refresh).not.toHaveBeenCalled();
+
+    const props = vi.mocked(ScooterPhotos).mock.calls.at(-1)![0];
+    props.onSaved?.();
+    expect(mocks.refresh).toHaveBeenCalledOnce();
+
+    view.rerender(
+      <NextIntlClientProvider locale="en" messages={messages.en}>
+        <ScooterDetailPage
+          scooter={{ ...scooter, coverUrl: "/new-cover.png" }}
+          scootersHref="/en/scooters"
+        />
+      </NextIntlClientProvider>,
+    );
+    const hero = within(screen.getByRole("region", { name: "001 YAM" }));
+    expect(
+      hero.getByRole("img", {
+        name: messages.en.scooters.card.photoAlt.replace("{code}", "001 YAM"),
+      }),
+    ).toHaveAttribute("src", "http://localhost:3000/new-cover.png");
+    expect(
+      hero.queryByRole("img", { name: messages.en.scooters.card.noPhoto }),
+    ).not.toBeInTheDocument();
+  });
+
+  it.each([
+    {
+      hasCivDocument: false,
+      registrationType: "unregistered" as const,
+      registrationNumber: null,
+      temporaryRegistrationExpiresAt: null,
+    },
+    {
+      hasCivDocument: true,
+      registrationType: "unregistered" as const,
+      registrationNumber: null,
+      temporaryRegistrationExpiresAt: null,
+    },
+    {
+      hasCivDocument: true,
+      registrationType: "national" as const,
+      registrationNumber: null,
+      temporaryRegistrationExpiresAt: null,
+    },
+    {
+      hasCivDocument: true,
+      registrationType: "temporary" as const,
+      registrationNumber: "B123456",
+      temporaryRegistrationExpiresAt: "2020-01-01",
+    },
+    {
+      hasCivDocument: true,
+      registrationType: "national" as const,
+      registrationNumber: "B123ABC",
+      temporaryRegistrationExpiresAt: null,
+    },
+  ])(
+    "uses shared readiness rules for hero registration badges: %j",
+    (overrides) => {
+      const record = { ...scooter, ...overrides };
+      renderDetail("en", record);
+      const hero = within(screen.getByRole("region", { name: "001 YAM" }));
+      const issues = v1.scooters.scooterReadinessIssues(record);
+      expect(hero.queryByText("No RAR") !== null).toBe(
+        issues.includes("needsCiv"),
+      );
+      const registrationLabel =
+        record.registrationType === "unregistered"
+          ? messages.en.scooters.detail.hero.unregistered
+          : messages.en.scooters.readiness.needsRegistration;
+      expect(
+        hero.queryByText(registrationLabel, {
+          selector: '[data-slot="badge"]',
+        }) !== null,
+      ).toBe(issues.includes("needsRegistration"));
+    },
+  );
+
+  it.each(["en", "ro"] as const)(
+    "uses the bundled faded placeholder without a scooter image (%s)",
+    (locale) => {
+      renderDetail(locale);
+      const fallback = screen.getByRole("img", {
+        name: messages[locale].scooters.card.noPhoto,
+      });
+      expect(fallback.querySelector("img")).toHaveAttribute(
+        "src",
+        expect.stringContaining("%2Fscooter-placeholder.png"),
+      );
+      expect(fallback.querySelector("img")).toHaveStyle({ opacity: 0.5 });
+      expect(
+        within(fallback).getByText(
+          messages[locale].scooters.detail.hero.noImageUploaded,
+        ),
+      ).toBeVisible();
+    },
+  );
+
+  it.each([
+    {
+      value: true,
+      gps: "GPS installed",
+      speed: "Speedometer working",
+      gpsColor: "text-success",
+      speedColor: "text-foreground",
+    },
+    {
+      value: false,
+      gps: "No GPS installed",
+      speed: "Speedometer absent or not working",
+      gpsColor: "text-destructive",
+      speedColor: "text-destructive",
+    },
+    {
+      value: null,
+      gps: "GPS status not specified",
+      speed: "Speedometer status not specified",
+      gpsColor: "text-warning",
+      speedColor: "text-warning",
+    },
+  ])(
+    "shows operational hero status for $value",
+    ({ value, gps, speed, gpsColor, speedColor }) => {
+      renderDetail("en", {
+        ...scooter,
+        hasGps: value,
+        hasPhoneStand: value,
+        hasChargingOutlet: value,
+        speedometerWorking: value,
+        actualMaxSpeedKmh: 45,
+        odometerWorking: value,
+      });
+      const hero = within(screen.getByRole("region", { name: "001 YAM" }));
+      expect(hero.getByRole("button", { name: gps })).toHaveClass(
+        `${gpsColor.replace("text-", "bg-")}-subtle`,
+        gpsColor,
+        "size-9",
+        "min-h-9",
+        "min-w-9",
+        "md:size-11",
+        "md:min-h-11",
+        "md:min-w-11",
+      );
+      for (const label of [/phone stand/i, /charging outlet/i]) {
+        expect(hero.getByRole("button", { name: label })).toHaveClass(
+          `${gpsColor.replace("text-", "bg-")}-subtle`,
+          gpsColor,
+          `${gpsColor.replace("text-", "border-")}/20`,
+        );
+      }
+      expect(hero.getByRole("button", { name: gps })).toHaveClass(
+        `${gpsColor.replace("text-", "border-")}/20`,
+      );
+      expect(
+        hero.getByRole("button", { name: gps }).querySelector("span"),
+      ).toHaveStyle({ maskImage: "url(/icons/satellite.svg)" });
+      expect(
+        hero
+          .getByRole("button", { name: /phone stand/i })
+          .querySelector("span"),
+      ).toHaveStyle({ maskImage: "url(/icons/phone-stand.svg)" });
+      expect(
+        hero
+          .getByRole("button", { name: /charging outlet/i })
+          .querySelector("span"),
+      ).toHaveStyle({ maskImage: "url(/icons/power.svg)" });
+      const gauge = hero.getByRole("button", {
+        name: `${speed}. Actual maximum speed: 45 km/h`,
+      });
+      expect(gauge).toHaveClass(speedColor);
+      expect(within(gauge).getByText("45")).toBeVisible();
+      expect(
+        hero.queryByRole("button", { name: /Odometer not working/ }) !== null,
+      ).toBe(value === false);
+    },
+  );
+
+  it("shows unknown speed without inventing zero and explains the odometer warning on tap", async () => {
+    renderDetail("en", {
+      ...scooter,
+      actualMaxSpeedKmh: null,
+      odometerWorking: false,
+    });
+    const gauge = screen.getByRole("button", {
+      name: /Actual maximum speed: — km\/h/,
+    });
+    expect(within(gauge).getByText("—")).toBeVisible();
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: /Odometer not working/ }));
+    expect(
+      await screen.findByRole("dialog", { name: /Odometer not working/ }),
+    ).toHaveTextContent("Displayed mileage may be unreliable");
+  });
+
+  it("collapses operational, technical, registration and record details until requested", async () => {
+    const browser = userEvent.setup();
+    renderDetail();
+    const toggle = screen.getByRole("button", { name: "More details" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(
+      screen.queryByRole("heading", { name: "Operational information" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(scooter.id)).not.toBeInTheDocument();
+    await browser.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(
+      screen.getByRole("heading", { name: "Operational information" }),
+    ).toBeVisible();
+    expect(screen.getByText(scooter.id)).toBeVisible();
+    await browser.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it.each(["en", "ro"] as const)(
+    "returns directly to the localized scooter list from the header (%s)",
+    (locale) => {
+      const register = vi.fn<
+        (options: PageHeaderNavigationOptions) => () => void
+      >(() => vi.fn());
+      const href = locale === "en" ? "/en/scooters" : "/scooters";
+      render(
+        <NextIntlClientProvider locale={locale} messages={messages[locale]}>
+          <PageHeaderNavigationContext.Provider value={register}>
+            <ScooterDetailPage scooter={scooter} scootersHref={href} />
+          </PageHeaderNavigationContext.Provider>
+        </NextIntlClientProvider>,
+      );
+      expect(register).toHaveBeenCalled();
+      register.mock.calls.at(-1)?.[0].onBack?.();
+      expect(mocks.push).toHaveBeenCalledWith(href);
+    },
+  );
+
+  it.each([
+    ["en", "Report problem", "/en/problems/new"],
+    ["ro", "Raportează o problemă", "/problems/new"],
+  ] as const)(
+    "opens the localized problem form with this scooter selected (%s)",
+    async (locale, label, path) => {
+      const browser = userEvent.setup();
+      renderDetail(locale, { ...scooter, id: "scooter/one" });
+      await browser.click(
+        screen.getByRole("button", {
+          name: messages[locale].scooters.actions.moreActions,
+        }),
+      );
+      await browser.click(await screen.findByRole("menuitem", { name: label }));
+      expect(mocks.push).toHaveBeenCalledWith(
+        `${path}?scooterId=scooter%2Fone`,
+      );
+    },
+  );
+
+  it("hides report problem without creation permission", async () => {
+    mocks.canReportProblem = false;
+    const browser = userEvent.setup();
+    renderDetail();
+    await browser.click(screen.getByRole("button", { name: "More actions" }));
+    expect(
+      screen.queryByRole("menuitem", { name: "Report problem" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("groups the hero identity, mileage, license and concurrent recorded states without VIN", () => {
+    renderDetail("ro", {
+      ...scooter,
+      maintenanceHoldCount: 2,
+      hasCivDocument: false,
+      requiredLicenseCategory: "A1",
+    });
+    const hero = within(screen.getByRole("region", { name: "001 YAM" }));
+    expect(hero.getByText("Nefuncțional")).toBeInTheDocument();
+    expect(
+      hero.queryByText("Neînmatriculat", { selector: '[data-slot="badge"]' }),
+    ).not.toBeInTheDocument();
+    expect(hero.getByText("Fără RAR")).toBeInTheDocument();
+    expect(
+      hero.getByRole("img", { name: /Kilometraj:.*km/ }),
+    ).toHaveAccessibleName("Kilometraj: 1.200 km");
+    expect(hero.queryByText("125 cc")).not.toBeInTheDocument();
+    expect(hero.getByText("Cat. A1")).toBeInTheDocument();
+    expect(hero.getByText("Yamaha NMAX")).toBeInTheDocument();
+    expect(hero.queryByText(scooter.vin)).not.toBeInTheDocument();
+    expect(hero.queryByText("Închiriat")).not.toBeInTheDocument();
+  });
+
+  it("keeps missing mileage distinct from zero and uses alert readiness rules for missing CIV data", () => {
+    renderDetail("en", { ...scooter, currentMileageKm: null });
+    const hero = within(screen.getByRole("region", { name: "001 YAM" }));
+    expect(
+      hero.getByRole("img", { name: "Total kilometers: Not provided" }),
+    ).toHaveTextContent("—");
+    expect(hero.getByText("No RAR")).toBeInTheDocument();
+    expect(hero.getByText("No license")).toBeInTheDocument();
+    expect(hero.queryByText("Total kilometers")).not.toBeInTheDocument();
+  });
+
+  it("shows a scooter fallback when a cover fails and retries a changed cover", () => {
+    const view = renderDetail("en", { ...scooter, coverUrl: "/first.png" });
+    const hero = within(screen.getByRole("region", { name: "001 YAM" }));
+    const image = hero.getByRole("img", {
+      name: messages.en.scooters.card.photoAlt.replace("{code}", "001 YAM"),
+    });
+    fireEvent.error(image);
+    expect(
+      hero.getByRole("img", { name: messages.en.scooters.card.noPhoto }),
+    ).toBeInTheDocument();
+    view.rerender(
+      <NextIntlClientProvider locale="en" messages={messages.en}>
+        <ScooterDetailPage
+          scooter={{ ...scooter, coverUrl: "/second.png" }}
+          scootersHref="/en/scooters"
+        />
+      </NextIntlClientProvider>,
+    );
+    expect(
+      within(screen.getByRole("region", { name: "001 YAM" })).getByRole("img", {
+        name: messages.en.scooters.card.photoAlt.replace("{code}", "001 YAM"),
+      }),
+    ).toHaveAttribute("src", "http://localhost:3000/second.png");
+  });
+
   it("shows invalid insurance and ITP as fixed danger areas", () => {
     renderDetail("en", {
       ...scooter,
@@ -92,8 +432,11 @@ describe("ScooterDetailPage", () => {
     expect(screen.queryByText("Needs CIV")).not.toBeInTheDocument();
   });
 
-  it("renders scooter details and actions", () => {
+  it("renders scooter details and actions", async () => {
     renderDetail();
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "More details" }));
 
     expect(
       screen.getByRole("heading", { name: "001 YAM" }),
@@ -115,8 +458,8 @@ describe("ScooterDetailPage", () => {
     expect(moreActionsButton.querySelector("svg")).toHaveClass(
       "lucide-ellipsis-vertical",
     );
-    expect(moreActionsButton.parentElement).toContainElement(
-      screen.getByRole("heading", { name: "001 YAM" }),
+    expect(moreActionsButton.parentElement).not.toContainElement(
+      screen.getByRole("region", { name: "001 YAM" }),
     );
     expect(
       screen.queryByRole("heading", { name: "Maintenance and repairs" }),
@@ -256,7 +599,12 @@ describe("ScooterDetailPage", () => {
       await browser.click(screen.getByRole("button", { name: "More actions" }));
       expect(screen.queryByText("Edit registration")).not.toBeInTheDocument();
       expect(screen.queryByText("Add registration")).not.toBeInTheDocument();
-      expect(screen.getByText("CJ 12 ABC")).toBeInTheDocument();
+      expect(
+        within(screen.getByRole("region", { name: "001 YAM" })).getByRole(
+          "img",
+          { name: /CJ 12 ABC/ },
+        ),
+      ).toBeInTheDocument();
       await browser.click(await screen.findByText("Edit scooter"));
       expect(mocks.push).toHaveBeenCalledWith(
         `/en/scooters/${scooter.id}/edit`,
@@ -326,6 +674,7 @@ vi.mock("@/components/auth/SessionProvider", () => ({
   useOptionalSession: () => ({
     user: {
       effectiveScopes: {
+        "problems.create": mocks.canReportProblem ? ["ALL"] : [],
         "persons.read": ["ALL"],
         "persons.create": ["ALL"],
         "persons.update": ["ALL"],

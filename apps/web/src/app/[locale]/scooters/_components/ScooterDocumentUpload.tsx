@@ -3,8 +3,9 @@
 import { useOptionalSession } from "@/components/auth/SessionProvider";
 import { canAccess } from "@/lib/access";
 
+import { SavedDocumentCard } from "./SavedDocumentCard";
 import { v1 } from "@repo/api-shared";
-import { Button, FormSection } from "@repo/ui/components";
+import { Button, Badge } from "@repo/ui/components";
 import {
   DocumentInput,
   type DocumentInputLabels,
@@ -15,6 +16,8 @@ import { useObjectUrl } from "@repo/ui/hooks/use-object-url";
 import { FileTextIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useContext, useState } from "react";
+import { useMediaCollection } from "@repo/ui/components/media-collection";
+import { useMediaViewerLabels } from "@/components/useMediaViewerLabels";
 import { webApi } from "@/lib/api";
 import {
   ScooterDocumentAnalysisContext,
@@ -40,7 +43,10 @@ function useDocumentLabels(
   compact = false,
 ): DocumentInputLabels {
   const t = useTranslations("scooters.documents");
+  const media = useMediaViewerLabels();
   return {
+    crop: media.cropLabel,
+    editorLabels: media.editorLabels,
     label: type
       ? compact
         ? t(`compact.${type}`)
@@ -326,6 +332,7 @@ export function ScooterFilePreview({
         />
       ) : (
         <DocumentPreview
+          mediaId={document?.id ?? draft?.id}
           src={url}
           fileName={fileName}
           contentType={contentType}
@@ -354,9 +361,14 @@ export function DocumentLink({
   document: v1.scooters.ScooterDocument;
 }) {
   const versionT = useTranslations("scooters.workspace");
+  const collection = useMediaCollection();
   return (
     <span className="grid min-w-0 gap-2">
       <a
+        onClick={(event) => {
+          if (collection?.open(webApi.url(document.contentUrl)))
+            event.preventDefault();
+        }}
         href={webApi.url(document.contentUrl)}
         target="_blank"
         rel="noopener noreferrer"
@@ -367,6 +379,10 @@ export function DocumentLink({
       </a>
       {document.clientCopy ? (
         <a
+          onClick={(event) => {
+            if (collection?.open(webApi.url(document.clientCopy!.contentUrl)))
+              event.preventDefault();
+          }}
           href={webApi.url(document.clientCopy.contentUrl)}
           target="_blank"
           rel="noopener noreferrer"
@@ -386,34 +402,24 @@ export function ScooterDocumentList({
 }) {
   const t = useTranslations("scooters.documents");
   return (
-    <div className="grid gap-6">
-      {v1.scooters.SCOOTER_DOCUMENT_TYPES.filter(
-        (type) => type !== "insurance",
-      ).map((type) => (
-        <FormSection key={type} title={t(type)}>
-          <ul className="grid gap-4 sm:col-span-2 sm:grid-cols-2 lg:grid-cols-3">
-            {documents
-              .filter((item) => item.type === type)
-              .map((document) => (
-                <li key={document.id}>
-                  <ScooterFilePreview document={document} disabled={false} />
-                  {document.clientCopy ? (
-                    <DocumentLink
-                      document={{
-                        ...document,
-                        ...document.clientCopy,
-                        clientCopy: null,
-                      }}
-                    />
-                  ) : null}
-                </li>
-              ))}
-          </ul>
-          {!documents.some((item) => item.type === type) ? (
-            <p className="text-sm text-muted-foreground">{t("empty")}</p>
-          ) : null}
-        </FormSection>
+    <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {v1.scooters.scooterDocumentDisplayEntries(documents).map((entry) => (
+        <SavedDocumentCard
+          key={`${entry.document.id}-${entry.type}-${entry.clientCopy}`}
+          document={entry.document}
+          clientCopy={entry.clientCopy}
+          disabled
+          onRemove={() => {}}
+          lifecycleBadge={
+            entry.badge ? (
+              <Badge variant="outline">{t(`lifecycle.${entry.badge}`)}</Badge>
+            ) : undefined
+          }
+        />
       ))}
-    </div>
+      {!documents.length ? (
+        <li className="text-sm text-muted-foreground">{t("empty")}</li>
+      ) : null}
+    </ul>
   );
 }

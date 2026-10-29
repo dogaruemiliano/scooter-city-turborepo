@@ -288,3 +288,34 @@ describe("inspection review", () => {
     ).toBeDisabled();
   });
 });
+
+it("shows the initial RAR inspection without requiring separate ITP evidence before renewal", async () => {
+  mocks.fetch.mockResolvedValue({
+    inspections: [],
+    status: "active",
+    validUntil: "2099-01-01",
+    renewalRequired: false,
+  });
+  render(
+    <NextIntlClientProvider locale="en" messages={messages.en}>
+      <ScooterItpPanel
+        scooter={
+          {
+            id: "scooter",
+            vin,
+            civIssuedAt: "2097-01-01",
+            documents: [],
+          } as unknown as v1.scooters.Scooter
+        }
+      />
+    </NextIntlClientProvider>,
+  );
+  expect(
+    await screen.findByText(
+      "Initial RAR inspection: CIV issued 2097-01-01, valid until 2099-01-01.",
+    ),
+  ).toBeInTheDocument();
+  expect(
+    screen.queryByText(messages.en.scooters.itp.missingEvidence),
+  ).not.toBeInTheDocument();
+});

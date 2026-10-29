@@ -1,10 +1,27 @@
+import { tokens } from "@repo/theme";
 import { FileDropZone } from "@repo/ui/components/file-drop-zone";
 import {
   DocumentInput,
   type DocumentCollectionLabels,
 } from "@repo/ui/components/document-input";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+// Match responsive hooks to the viewport selected by each test.
+beforeEach(() => {
+  vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
+    matches:
+      query === `(width < ${tokens.breakpoints.md}px)` &&
+      window.innerWidth < tokens.breakpoints.md,
+    media: query,
+    onchange: null,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  }));
+});
 
 const labels: DocumentCollectionLabels = {
   label: "Document",
@@ -187,3 +204,5 @@ describe("shared file drop overlay", () => {
     },
   );
 });
+
+afterEach(() => vi.restoreAllMocks());

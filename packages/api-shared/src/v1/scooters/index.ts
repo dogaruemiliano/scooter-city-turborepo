@@ -13,3 +13,5 @@ export * from "./scooter-itp.schemas";
 export * from "./scooter-document-types";
 
 export * from "./scooter-readiness";
+
+export * from "./scooter-document-lifecycle";

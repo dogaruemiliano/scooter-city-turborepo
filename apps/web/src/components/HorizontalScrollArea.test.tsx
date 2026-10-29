@@ -16,7 +16,10 @@ describe("horizontal overflow fades", () => {
     expect(viewport.className).toContain(
       "data-[overflow-x-end]:[--scroll-fade-end:transparent]",
     );
-    expect(viewport.className).toContain("var(--spacing-6)");
+    expect(viewport.style.getPropertyValue("--scroll-fade-width")).toBe(
+      "var(--spacing-6)",
+    );
+    expect(viewport.style.maskImage).toContain("var(--scroll-fade-width)");
     expect(screen.getByRole("button", { name: "Draft one" })).toBeEnabled();
   });
   it("reserves scrollbar spacing only on desktop without disabling the viewport", () => {

@@ -42,8 +42,10 @@ export const scooterItpMessages = {
     extracted: "Use extracted inspection: {date}",
     history: "Inspection history",
     empty: "No confirmed inspection has been recorded.",
+    initialCoverage:
+      "Initial RAR inspection: CIV issued {issuedAt}, valid until {validUntil}.",
     unverified:
-      "Extracted dates need your review. CIV issuance does not determine ITP validity.",
+      "Review the dates of subsequent inspections. The initial RAR inspection is valid for two years from CIV issuance.",
     evidenceConflict:
       "The selected yellow card and certificate have different inspection readings. Compare both originals and correct the dates/result before confirming.",
   },
@@ -91,8 +93,10 @@ export const scooterItpMessages = {
     extracted: "Folosește inspecția extrasă: {date}",
     history: "Istoricul inspecțiilor",
     empty: "Nu există nicio inspecție confirmată.",
+    initialCoverage:
+      "Inspecție RAR inițială: CIV emis la {issuedAt}, valabilă până la {validUntil}.",
     unverified:
-      "Datele extrase trebuie verificate. Data eliberării CIV nu stabilește valabilitatea ITP.",
+      "Verifică datele inspecțiilor ulterioare. Inspecția RAR inițială este valabilă doi ani de la eliberarea CIV.",
     evidenceConflict:
       "Anexa galbenă și certificatul selectat au date diferite pentru inspecție. Compară ambele originale și corectează datele sau rezultatul înainte de confirmare.",
   },

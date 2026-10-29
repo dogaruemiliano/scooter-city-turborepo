@@ -92,3 +92,20 @@ export const TwoByTwo: Story = {
   },
   render: Default.render,
 };
+
+/** Selected lower-row options retain vertical breathing room beside the divider. */
+export const WrappedPropulsion: Story = {
+  args: {
+    label: "Propulsion system",
+    name: "propulsion-system",
+    columns: 2,
+    value: "hybrid",
+    options: [
+      { value: "electric", label: "Electric" },
+      { value: "combustion", label: "Combustion" },
+      { value: "hybrid", label: "Hybrid" },
+      { value: "unpowered", label: "Unpowered vehicle" },
+    ],
+  },
+  render: Default.render,
+};

@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "@repo/theme";
+import { motion, softFade } from "@repo/theme";
 import { XIcon } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "./button";
@@ -8,6 +8,7 @@ import { Button } from "./button";
 export type DocumentPreviewHeaderProps = {
   headerOverlay?: ReactNode;
   caption?: string;
+  captionStatus?: string;
   onClosePress?: () => void;
   closeLabel?: string;
   headerActions?: ReactNode;
@@ -16,6 +17,7 @@ export type DocumentPreviewHeaderProps = {
 /** Shared overlay for inline and fullscreen image/PDF previews. */
 export function DocumentPreviewHeader({
   caption,
+  captionStatus,
   headerOverlay,
   onClosePress,
   closeLabel,
@@ -25,7 +27,8 @@ export function DocumentPreviewHeader({
     return (
       <div
         data-slot="document-preview-header"
-        className="pointer-events-none absolute inset-x-0 top-0 z-raised flex min-w-0 items-start justify-between gap-2 bg-linear-to-b from-media-scrim to-transparent px-3 pt-[max(var(--spacing-3),env(safe-area-inset-top))] pb-8 text-scrim-foreground *:pointer-events-auto"
+        style={{ backgroundImage: softFade.toTop }}
+        className="pointer-events-none absolute inset-x-0 top-0 z-raised flex min-w-0 items-start justify-between gap-2 px-1.5 pt-[max(var(--spacing-1-5),env(safe-area-inset-top))] pb-6 text-scrim-foreground *:pointer-events-auto"
       >
         {headerOverlay}
       </div>
@@ -34,7 +37,7 @@ export function DocumentPreviewHeader({
   return (
     <div
       data-slot="document-preview-header"
-      className="absolute top-[max(var(--spacing-3),env(safe-area-inset-top))] right-3 left-3 z-raised grid grid-cols-[var(--spacing-11)_minmax(0,1fr)_var(--spacing-11)] items-center gap-2 text-foreground"
+      className="absolute top-[max(var(--spacing-3),env(safe-area-inset-top))] right-3 left-3 z-raised grid grid-cols-[var(--spacing-11)_minmax(0,1fr)_auto] items-center gap-2 text-foreground"
     >
       <div className="flex items-center justify-center">
         {onClosePress ? (
@@ -50,10 +53,20 @@ export function DocumentPreviewHeader({
           </Button>
         ) : null}
       </div>
-      {caption ? <ScrollingDocumentName name={caption} /> : <span />}
-      <div className="flex items-center justify-center">
+      <div className="flex min-w-0 items-center justify-center gap-2">
+        {caption ? <ScrollingDocumentName name={caption} /> : null}
+        {captionStatus ? (
+          <span
+            role="status"
+            className="shrink-0 whitespace-nowrap rounded-xl border border-document-overlay-border bg-document-overlay px-2 py-1 text-xs tabular-nums shadow-sm"
+          >
+            {captionStatus}
+          </span>
+        ) : null}
+      </div>
+      <div className="flex min-w-11 items-center justify-center">
         {headerActions ? (
-          <div className="flex size-11 items-center justify-center rounded-xl border border-document-overlay-border bg-document-overlay shadow-sm">
+          <div className="flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-document-overlay-border bg-document-overlay shadow-sm">
             {headerActions}
           </div>
         ) : null}

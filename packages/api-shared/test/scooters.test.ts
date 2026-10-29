@@ -563,3 +563,22 @@ test("fuel systems validate their values and propulsion compatibility", () => {
       false,
     );
 });
+
+test("phone equipment accepts true, false and unknown independently", () => {
+  for (const value of [true, false, null]) {
+    const input = { hasPhoneStand: value, hasChargingOutlet: value };
+    assert.deepEqual(v1.scooters.updateScooterInputSchema.parse(input), input);
+    assert.equal(
+      v1.scooters.createScooterInputSchema.parse({
+        ...baseScooterInput(),
+        ...input,
+      }).hasPhoneStand,
+      value,
+    );
+  }
+  assert.equal(
+    v1.scooters.updateScooterInputSchema.safeParse({ hasPhoneStand: "yes" })
+      .success,
+    false,
+  );
+});

@@ -790,7 +790,7 @@ describe("PersonDetailPage", () => {
         within(preview).getByRole("button", { name: "Zoom in" }),
       ).toBeInTheDocument();
       await browser.keyboard("{Escape}");
-      expect(preview).toHaveAttribute("data-closed");
+      await waitFor(() => expect(preview).not.toBeInTheDocument());
     },
   );
 

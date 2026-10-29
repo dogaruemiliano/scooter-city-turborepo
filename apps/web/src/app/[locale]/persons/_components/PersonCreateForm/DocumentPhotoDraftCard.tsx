@@ -1,4 +1,5 @@
 "use client";
+import { useMediaViewerLabels } from "@/components/useMediaViewerLabels";
 import { v1 } from "@repo/api-shared";
 import { DocumentInput } from "@repo/ui/components/document-input";
 import { useTranslations } from "next-intl";
@@ -34,6 +35,7 @@ export function DocumentPhotoDraftCard({
   onRetryExtraction?: () => void;
 }) {
   const t = useTranslations("persons");
+  const media = useMediaViewerLabels();
   const accept = acceptsPdf
     ? `${DOCUMENT_PHOTO_ACCEPT},application/pdf`
     : DOCUMENT_PHOTO_ACCEPT;
@@ -82,6 +84,8 @@ export function DocumentPhotoDraftCard({
         }
         onConfirm={(file) => onSetDocumentPhoto(documentKey, slot, file)}
         labels={{
+          crop: media.cropLabel,
+          editorLabels: media.editorLabels,
           label: slotLabel,
           add: t("documentForm.addPhoto", { slot: slotLabel }),
           preview: t("documentForm.changePhoto", { slot: slotLabel }),

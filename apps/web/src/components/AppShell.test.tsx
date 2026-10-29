@@ -7,6 +7,7 @@ import {
 } from "@testing-library/react";
 import { v1 } from "@repo/api-shared";
 import { messages, type SupportedLocale } from "@repo/i18n";
+import { tokens } from "@repo/theme";
 import { TooltipProvider } from "@repo/ui/components/tooltip";
 import { PageLayout } from "@repo/ui/components/page-layout";
 import { NextIntlClientProvider } from "next-intl";
@@ -88,7 +89,9 @@ beforeEach(() => {
   Object.defineProperty(window, "matchMedia", {
     configurable: true,
     value: vi.fn().mockReturnValue({
-      matches: false,
+      get matches() {
+        return window.innerWidth < tokens.breakpoints.md;
+      },
       media: "",
       onchange: null,
       addEventListener: vi.fn(),

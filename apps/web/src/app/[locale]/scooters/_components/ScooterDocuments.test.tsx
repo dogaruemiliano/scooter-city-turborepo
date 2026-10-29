@@ -235,7 +235,7 @@ describe("Scooter documents", () => {
       "true",
     );
   });
-  it("keeps preview cards and analysis feedback visible when import controls expand", async () => {
+  it("keeps preview cards and analysis feedback visible inside the desktop drop gallery", async () => {
     function Fixture() {
       const documents = useScooterDocuments();
       return (
@@ -293,10 +293,14 @@ describe("Scooter documents", () => {
     const summary = within(
       screen.getByRole("list", { name: "Attached documents" }),
     );
-    const rows = summary.getAllByRole("listitem");
+    const rows = summary
+      .getAllByRole("listitem")
+      .filter((row) =>
+        row.querySelector('[data-slot="document-preview-card"]'),
+      );
     expect(rows).toHaveLength(2);
     const importMore = screen.getByRole("button", {
-      name: "Import more documents",
+      name: "Add document",
     });
     expect(importMore).toHaveClass(
       "w-full",
@@ -326,9 +330,7 @@ describe("Scooter documents", () => {
     expect(
       screen.queryByRole("button", { name: /Drop your scooter documents/ }),
     ).not.toBeInTheDocument();
-    await browser.click(
-      screen.getByRole("button", { name: "Import more documents" }),
-    );
+    await browser.click(screen.getByRole("button", { name: "Add document" }));
     expect(
       screen.getByRole("list", { name: "Attached documents" }),
     ).toBeInTheDocument();
@@ -336,8 +338,8 @@ describe("Scooter documents", () => {
       2,
     );
     expect(
-      screen.getByRole("button", { name: /Drop your scooter documents/ }),
-    ).toBeInTheDocument();
+      screen.queryByRole("button", { name: /Drop your scooter documents/ }),
+    ).not.toBeInTheDocument();
   });
   it("requires an explicit review action after manually changing a valid VIN", async () => {
     mockBatchExtraction(["civ"]);
@@ -703,9 +705,6 @@ describe("Scooter documents", () => {
     );
     expect(screen.getByLabelText("Plate number")).toHaveValue("14949");
     expect(screen.getByLabelText("Insured name")).toHaveValue("Example Person");
-    await browser.click(
-      screen.getByRole("button", { name: "Import more documents" }),
-    );
     for (const [index, type] of types.entries()) {
       await browser.click(
         screen.getByRole("button", {
@@ -852,10 +851,6 @@ describe("Scooter documents", () => {
     );
     await waitFor(() => expect(mocks.put).toHaveBeenCalledTimes(3));
     for (const document of documents) {
-      const expand = screen.queryByRole("button", {
-        name: "Import more documents",
-      });
-      if (expand) await browser.click(expand);
       await browser.click(
         screen.getByRole("button", {
           name: `Edit document type for ${document.fileName}`,
@@ -872,12 +867,6 @@ describe("Scooter documents", () => {
     }
     const vin = "L5YAUCZB9H1148984";
     const copy = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue();
-    {
-      const expand = screen.queryByRole("button", {
-        name: "Import more documents",
-      });
-      if (expand) await browser.click(expand);
-    }
     expect(
       screen.queryByRole("button", { name: "Import JSON" }),
     ).not.toBeInTheDocument();
@@ -1134,7 +1123,13 @@ describe("Scooter documents", () => {
     await browser.click(
       screen.getByRole("button", { name: "Preview import-front.pdf" }),
     );
-    expect(screen.getByText("Document 1 of 2")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        messages.en.scooters.documents.documentPosition
+          .replace("{index}", "1")
+          .replace("{total}", "2"),
+      ),
+    ).toBeInTheDocument();
     await browser.click(screen.getByRole("button", { name: "Next document" }));
     expect(
       screen.getByRole("dialog", { name: "import-back.pdf" }),
@@ -1171,22 +1166,10 @@ describe("Scooter documents", () => {
       expect(screen.getAllByText("Details extracted")).toHaveLength(2),
     );
     expect(screen.getAllByLabelText("Insured name")).toHaveLength(1);
-    {
-      const expand = screen.queryByRole("button", {
-        name: "Import more documents",
-      });
-      if (expand) await browser.click(expand);
-    }
     await browser.click(
       screen.getByRole("button", { name: "Remove front.pdf" }),
     );
     expect(screen.getByLabelText("Insured name")).toHaveValue("Example Person");
-    {
-      const expand = screen.queryByRole("button", {
-        name: "Import more documents",
-      });
-      if (expand) await browser.click(expand);
-    }
     await browser.click(
       screen.getByRole("button", { name: "Remove back.pdf" }),
     );
@@ -1498,14 +1481,14 @@ describe("Scooter documents", () => {
       screen.queryByRole("link", { name: "old.pdf" }),
     ).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
-    await removeFromViewer(user, "old.pdf");
+    await user.click(screen.getByRole("button", { name: "Remove old.pdf" }));
     await waitFor(() =>
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
     );
     expect(mocks.api).not.toHaveBeenCalled();
     await user.click(screen.getByRole("button", { name: "Undo removal" }));
     expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
-    await removeFromViewer(user, "old.pdf");
+    await user.click(screen.getByRole("button", { name: "Remove old.pdf" }));
     await waitFor(() =>
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
     );
@@ -1521,7 +1504,8 @@ describe("Scooter documents", () => {
       ),
     );
   });
-  it("includes uploaded drafts when saving and preserves them after a failed save", async () => {
+  it("analyzes new insurance uploads in edit mode and saves their linked policy", async () => {
+    mockBatchExtraction(["insurance"]);
     const user = userEvent.setup();
     renderWithMessages(
       <ScooterEditForm
@@ -1531,15 +1515,69 @@ describe("Scooter documents", () => {
       />,
     );
     await user.upload(
-      screen.getByLabelText("Add Vehicle identity card (CIV)", {
+      screen.getByLabelText("Browse files", { selector: "input" }),
+      pdf("insurance.pdf"),
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Save changes" }),
+      ).toBeEnabled(),
+    );
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() =>
+      expect(mocks.api).toHaveBeenCalledWith(
+        v1.scooters.ROUTES.update("s"),
+        v1.scooters.scooterSchema,
+        expect.objectContaining({
+          method: "PATCH",
+          json: expect.objectContaining({
+            insurancePolicies: expect.arrayContaining([
+              expect.objectContaining({
+                id: expect.any(String),
+                insuredName: "Example Person",
+                validFrom: "2026-09-01",
+                validUntil: "2027-08-31",
+              }),
+            ]),
+            documentDrafts: expect.arrayContaining([
+              expect.objectContaining({
+                type: "insurance",
+                fileName: "insurance.pdf",
+                insurancePolicyId: expect.any(String),
+              }),
+            ]),
+          }),
+        }),
+      ),
+    );
+  });
+
+  it("includes uploaded drafts when saving and preserves them after a failed save", async () => {
+    const fallback = mocks.api.getMockImplementation()!;
+    mocks.api.mockImplementation((path, schema, options) =>
+      path === v1.scooters.ROUTES.documents.startExtractionJob
+        ? Promise.resolve({
+            sourceId: options.json.sourceId,
+            documentType: "civ",
+            extractedData: { vin: scooter.vin, fields: {}, rawFields: {} },
+            issues: [],
+            reviewRequired: true,
+          })
+        : fallback(path, schema, options),
+    );
+    const user = userEvent.setup();
+    renderWithMessages(
+      <ScooterEditForm
+        scooter={{ ...scooter, documents: [] }}
+        brands={brands}
+        scooterHref="/scooters/s"
+      />,
+    );
+    await user.upload(
+      screen.getByLabelText("Browse files", {
         selector: "input",
       }),
       pdf(),
-    );
-    await user.click(
-      within(screen.getByRole("dialog")).getByRole("button", {
-        name: "Save",
-      }),
     );
     expect(screen.queryByText("I checked CIV.pdf")).not.toBeInTheDocument();
     await waitFor(() =>
@@ -1567,7 +1605,13 @@ describe("Scooter documents", () => {
           sessionId: "editor-session",
           civAvailability: "issued",
           documentDrafts: [
-            { type: "civ", fileName: "CIV.pdf", uploadToken: "token" },
+            {
+              type: "civ",
+              fileName: "CIV.pdf",
+              uploadToken: "token",
+              uploadType: "unclassified",
+              extractedData: { vin: scooter.vin, fields: {}, rawFields: {} },
+            },
           ],
         },
       },

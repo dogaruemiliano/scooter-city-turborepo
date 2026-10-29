@@ -9,11 +9,16 @@ export const SCOOTER_DOCUMENT_TYPES = [
   "itp_card",
   "itp_certificate",
   "ownership_proof",
+  "other",
 ] as const;
 
 /** Handwritten registration cards and yellow ITP cards are not reliable VIN sources. */
 export function scooterDocumentReadsVin(type: string): boolean {
-  return type !== "registration_certificate" && type !== "itp_card";
+  return (
+    type !== "registration_certificate" &&
+    type !== "itp_card" &&
+    type !== "other"
+  );
 }
 
 export function scooterDocumentVinPriority(type: string): number {

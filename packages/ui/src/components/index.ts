@@ -59,6 +59,7 @@ export * from "./document-input";
 export * from "./image-preview";
 export * from "./image-viewer";
 export * from "./media-viewer";
+export * from "./media-collection";
 
 export * from "./file-drop-overlay";
 export * from "./person-row";

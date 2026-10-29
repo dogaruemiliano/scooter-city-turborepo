@@ -183,6 +183,8 @@ export function ScooterCreateFields({
             "speedometerWorking",
             "actualMaxSpeedKmh",
             "hasGps",
+            "hasPhoneStand",
+            "hasChargingOutlet",
           ] as const
         ).map((name) =>
           name === "currentMileageKm" || name === "actualMaxSpeedKmh" ? (
@@ -195,12 +197,16 @@ export function ScooterCreateFields({
               falseLabel={t(
                 name === "hasGps"
                   ? "operational.withoutGps"
-                  : "operational.defective",
+                  : name === "hasPhoneStand" || name === "hasChargingOutlet"
+                    ? "operational.no"
+                    : "operational.defective",
               )}
               trueLabel={t(
                 name === "hasGps"
                   ? "operational.withGps"
-                  : "operational.functional",
+                  : name === "hasPhoneStand" || name === "hasChargingOutlet"
+                    ? "operational.yes"
+                    : "operational.functional",
               )}
               disabled={disabled}
               stacked

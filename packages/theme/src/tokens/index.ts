@@ -18,7 +18,7 @@ export type { Shadow, ShadowToken, NativeShadow } from "./shadow";
 
 export { motion } from "./motion";
 export type { Motion } from "./motion";
-export { opacity } from "./opacity";
+export { opacity, scrollFade, softFade } from "./opacity";
 export type { Opacity } from "./opacity";
 
 export { magnification } from "./magnification";

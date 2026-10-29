@@ -444,6 +444,8 @@ export const workspaceCatalog = {
         insuranceExpired: "Insurance expired",
         insuranceUpcoming: "Insurance is not active yet",
         insuranceReview: "Insurance dates need review",
+        clientDocumentsMissing: "Required client documents are missing",
+        itpInvalid: "A valid technical inspection is required",
         serviceHold: "Held for service",
         eligibilityUnknown: "Rental eligibility could not be verified",
         details: "Rental details",
@@ -988,6 +990,8 @@ export const workspaceCatalog = {
         insuranceExpired: "Asigurare expirată",
         insuranceUpcoming: "Asigurarea nu este încă activă",
         insuranceReview: "Datele asigurării necesită verificare",
+        clientDocumentsMissing: "Lipsesc documentele necesare pentru client",
+        itpInvalid: "Este necesară o inspecție tehnică valabilă",
         serviceHold: "Blocat pentru service",
         eligibilityUnknown:
           "Eligibilitatea pentru închiriere nu a putut fi verificată",

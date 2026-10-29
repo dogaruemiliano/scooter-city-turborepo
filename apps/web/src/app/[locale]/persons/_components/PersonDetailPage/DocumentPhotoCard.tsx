@@ -5,6 +5,7 @@ import { canAccess } from "@/lib/access";
 
 import { v1 } from "@repo/api-shared";
 import { Button } from "@repo/ui/components";
+import { useMediaCollection } from "@repo/ui/components/media-collection";
 import { DocumentViewer } from "@repo/ui/components/document-viewer";
 import { FileTextIcon, Trash2Icon } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -40,6 +41,7 @@ export function DocumentPhotoCard({
   onDeletePhoto: (slot: v1.persons.PersonDocumentPhotoSlot) => Promise<boolean>;
 }) {
   const session = useOptionalSession();
+  const collection = useMediaCollection();
   const t = useTranslations("persons");
   const [previewOpen, setPreviewOpen] = useState(false);
   const [failedUpload, setFailedUpload] = useState<File | null>(null);
@@ -76,7 +78,13 @@ export function DocumentPhotoCard({
         uploadLabel={uploadLabel}
         slotLabel={slotLabel}
         imageUrl={imageUrl}
-        onPreview={photo && imageUrl ? () => setPreviewOpen(true) : undefined}
+        onPreview={
+          photo && imageUrl
+            ? () => {
+                if (!collection?.open(photo.id)) setPreviewOpen(true);
+              }
+            : undefined
+        }
         previewLabel={`${t("actions.view")} ${photoAlt}`}
         preview={
           photo?.contentType === "application/pdf" ? (

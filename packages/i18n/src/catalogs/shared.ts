@@ -1,5 +1,26 @@
 export const sharedCatalog = {
   en: {
+    media: {
+      loading: "Loading preview…",
+      error: "Preview unavailable. Open the file to view it.",
+      retry: "Retry preview",
+      previous: "Previous page or document",
+      next: "Next page or document",
+      position: "Doc. {index} of {total}",
+      pagePosition: "Page {page} of {total}",
+      crop: "Crop image",
+      close: "Close preview",
+      openFile: "Open file in new tab",
+      actions: "Media actions",
+      remove: "Remove file",
+      confirm: "Confirm changes",
+      saving: "Applying changes…",
+      grid: "Toggle image grid",
+      zoomIn: "Zoom in",
+      zoomOut: "Zoom out",
+      resetZoom: "Reset zoom",
+    },
+
     notifications: {
       label: "Notifications",
       dismiss: "Dismiss notification",
@@ -119,6 +140,28 @@ export const sharedCatalog = {
     },
   },
   ro: {
+    media: {
+      loading: "Se încarcă previzualizarea…",
+      error:
+        "Previzualizare indisponibilă. Deschide fișierul pentru a-l vizualiza.",
+      retry: "Reîncearcă previzualizarea",
+      previous: "Pagina sau documentul anterior",
+      next: "Pagina sau documentul următor",
+      position: "Doc. {index} din {total}",
+      pagePosition: "Pagina {page} din {total}",
+      crop: "Decupează imaginea",
+      close: "Închide previzualizarea",
+      openFile: "Deschide fișierul într-o filă nouă",
+      actions: "Acțiuni media",
+      remove: "Elimină fișierul",
+      confirm: "Confirmă modificările",
+      saving: "Se aplică modificările…",
+      grid: "Comută grila imaginii",
+      zoomIn: "Mărește",
+      zoomOut: "Micșorează",
+      resetZoom: "Resetează mărirea",
+    },
+
     notifications: {
       label: "Notificări",
       dismiss: "Închide notificarea",

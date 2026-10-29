@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="15" stroke-linecap="round" stroke-linejoin="round" role="img" aria-labelledby="icon-title" viewBox="138.87 52.5 234.27 427">
+  <title id="icon-title">Smartphone holder</title>
+  <!-- Rounded phone housing, speaker and simple screen separators -->
+  <rect x="188.5" y="67.5" width="135" height="254" rx="19"/>
+  <path d="M189 116H323M189 277H323"/>
+  <path d="M240 92H272"/>
+  <circle cx="256" cy="299" r="8.5" fill="currentColor" stroke="none"/>
+  <!-- Symmetric phone grips -->
+  <path d="M188 152H174C164 152 157 159 157 169V230C157 240 164 247 174 247H188"/>
+  <path d="M324 152H338C348 152 355 159 355 169V230C355 240 348 247 338 247H324"/>
+  <!-- Lower mounting cradle and stem -->
+  <path d="M211 322V342C211 353 219 360 230 360H282C293 360 301 353 301 342V322"/>
+  <path d="M239 360V434M273 360V434"/>
+  <!-- Rounded foot -->
+  <rect x="187.5" y="434.5" width="137" height="30" rx="16"/>
+</svg>

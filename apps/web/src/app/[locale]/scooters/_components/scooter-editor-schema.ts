@@ -93,6 +93,8 @@ export const SCOOTER_EDITOR_SECTIONS = [
     title: "operational",
     fields: [
       "hasGps",
+      "hasPhoneStand",
+      "hasChargingOutlet",
       "currentMileageKm",
       "odometerWorking",
       "speedometerWorking",
@@ -192,6 +194,8 @@ export const DECIMAL_FIELDS = new Set<string>([
 ]);
 export const BOOLEAN_FIELDS = new Set<string>([
   "hasGps",
+  "hasPhoneStand",
+  "hasChargingOutlet",
   "odometerWorking",
   "speedometerWorking",
 ]);

@@ -9,7 +9,10 @@ import { ScooterItpPanel } from "./ScooterItpPanel";
 
 import { v1 } from "@repo/api-shared";
 import {
-  Badge,
+  Accordion,
+  AccordionItem,
+  AccordionTrigger,
+  AccordionContent,
   Alert,
   AlertTitle,
   BottomSheet,
@@ -34,11 +37,10 @@ import {
 } from "@repo/ui/components";
 import { cn } from "@repo/ui/lib/utils";
 import {
-  BatteryChargingIcon,
   CarFrontIcon,
-  GaugeIcon,
   PencilIcon,
   Trash2Icon,
+  TriangleAlertIcon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
@@ -54,15 +56,19 @@ import { useOptionalSession } from "@/components/auth/SessionProvider";
 import { canAccess } from "@/lib/access";
 import { MoreActionsMenu } from "@/components/MoreActionsMenu";
 import { PageTitleOverride } from "@/components/PageTitleOverride";
+import { PageHeaderNavigation } from "@/components/PageHeaderNavigation";
 import { webApi } from "@/lib/api";
+import { localizePath, resolveRouteLocale } from "@/i18n/paths";
 import {
   FeedbackAlert,
   formErrorsFromIssues,
   scooterFieldConflict,
 } from "./scooter-feedback";
 import { CivDetails } from "./CivDetails";
+import { ScooterDocumentMediaList } from "./ScooterDocumentMediaList";
 import { ScooterDocumentList } from "./ScooterDocumentUpload";
 import { ScooterPhotos } from "./ScooterPhotos";
+import { ScooterDetailHero } from "./ScooterDetailHero";
 import { ScooterRegistrationFormFields } from "./ScooterRegistrationFormFields";
 import {
   buildScooterRegistrationInputCandidate,
@@ -90,7 +96,6 @@ export function ScooterDetailPage({
   scootersHref,
 }: ScooterDetailPageProps) {
   const t = useTranslations("scooters");
-  const problemsT = useTranslations("workspace.problems");
   const session = useOptionalSession();
   const locale = useLocale();
   const router = useRouter();
@@ -156,70 +161,65 @@ export function ScooterDetailPage({
   return (
     <PageLayout>
       <PageTitleOverride title={title} />
-      <div className="flex flex-col gap-4">
-        <div className="flex min-w-0 items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="break-words text-2xl font-semibold">{title}</h1>
-            <p className="break-words text-sm text-muted-foreground">
-              {[scooter.brand, scooter.model].filter(Boolean).join(" ")}
-            </p>
-            <p className="break-words text-sm text-muted-foreground">
-              {scooter.vin}
-            </p>
-          </div>
-          <MoreActionsMenu
-            ariaLabel={t("actions.moreActions")}
-            groups={[
-              [
-                ...(scooter.registrationType === "unregistered"
-                  ? [
-                      {
-                        key: "registration",
-                        permission: "scooters.update",
-                        label: t("actions.addRegistration"),
-                        icon: <PencilIcon data-icon="inline-start" />,
-                        disabled: busyAction !== null || photosBusy,
-                        onClick: () => {
-                          setRegistrationDialogKey((current) => current + 1);
-                          setRegistrationOpen(true);
-                        },
+      <PageHeaderNavigation onBack={() => router.push(scootersHref)} />
+      <div className="hidden justify-end md:flex">
+        <MoreActionsMenu
+          ariaLabel={t("actions.moreActions")}
+          groups={[
+            [
+              {
+                key: "report-problem",
+                permission: "problems.create",
+                label: t("actions.reportProblem"),
+                icon: <TriangleAlertIcon data-icon="inline-start" />,
+                disabled:
+                  Boolean(scooter.deletedAt) ||
+                  busyAction !== null ||
+                  photosBusy,
+                onClick: () =>
+                  router.push(
+                    `${localizePath("/problems/new", resolveRouteLocale(locale))}?scooterId=${encodeURIComponent(scooter.id)}`,
+                  ),
+              },
+              ...(scooter.registrationType === "unregistered"
+                ? [
+                    {
+                      key: "registration",
+                      permission: "scooters.update",
+                      label: t("actions.addRegistration"),
+                      icon: <PencilIcon data-icon="inline-start" />,
+                      disabled: busyAction !== null || photosBusy,
+                      onClick: () => {
+                        setRegistrationDialogKey((current) => current + 1);
+                        setRegistrationOpen(true);
                       },
-                    ]
-                  : []),
-                {
-                  key: "edit",
-                  permission: "scooters.update",
-                  label: t("actions.editScooter"),
-                  icon: <PencilIcon data-icon="inline-start" />,
-                  disabled: busyAction !== null || photosBusy,
-                  onClick: () => router.push(scooterEditHref),
-                },
-              ],
-              [
-                {
-                  key: "delete",
-                  permission: "scooters.archive",
-                  label: t("actions.deleteScooter"),
-                  icon: <Trash2Icon data-icon="inline-start" />,
-                  variant: "destructive",
-                  disabled: busyAction !== null || photosBusy,
-                  onClick: () => setDeleteOpen(true),
-                },
-              ],
-            ]}
-          />
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          {scooter.deletedAt ? (
-            <Badge variant="outline">{t("recordStatus.deleted")}</Badge>
-          ) : null}
-          {(scooter.maintenanceHoldCount ?? 0) > 0 ? (
-            <Badge variant="destructive">{problemsT("maintenanceHold")}</Badge>
-          ) : null}
-          <PowertrainBadge scooter={scooter} />
-        </div>
+                    },
+                  ]
+                : []),
+              {
+                key: "edit",
+                permission: "scooters.update",
+                label: t("actions.editScooter"),
+                icon: <PencilIcon data-icon="inline-start" />,
+                disabled: busyAction !== null || photosBusy,
+                onClick: () => router.push(scooterEditHref),
+              },
+            ],
+            [
+              {
+                key: "delete",
+                permission: "scooters.archive",
+                label: t("actions.deleteScooter"),
+                icon: <Trash2Icon data-icon="inline-start" />,
+                variant: "destructive",
+                disabled: busyAction !== null || photosBusy,
+                onClick: () => setDeleteOpen(true),
+              },
+            ],
+          ]}
+        />
       </div>
+      <ScooterDetailHero scooter={scooter} />
 
       {readiness.length ? (
         <div className="grid gap-3">
@@ -246,6 +246,7 @@ export function ScooterDetailPage({
         panel
         disabled={Boolean(scooter.deletedAt) || busyAction !== null}
         onBusyChange={setPhotosBusy}
+        onSaved={() => router.refresh()}
       />
 
       <DetailSection title={t("sections.identity")}>
@@ -259,145 +260,163 @@ export function ScooterDetailPage({
           label={t("fields.color")}
           value={scooter.color ?? t("detail.emptyValue")}
         />
-        <DetailField
-          label={t("detail.fields.scooterId")}
-          value={scooter.id}
-          className="sm:col-span-2"
-        />
-      </DetailSection>
-
-      <DetailSection title={t("sections.technical")}>
-        <DetailField
-          label={t("fields.manufactureYear")}
-          value={
-            scooter.manufactureYear == null
-              ? t("detail.emptyValue")
-              : String(scooter.manufactureYear)
-          }
-        />
-        <DetailField
-          label={t("fields.powertrainType")}
-          value={t(`powertrainTypes.${scooter.powertrainType}`)}
-        />
-        {scooter.powertrainType === "combustion" ||
-        scooter.powertrainType === "hybrid" ? (
-          <DetailField
-            label={t("fields.fuelSystem")}
-            value={t(`fuelSystems.${scooter.fuelSystem ?? "unknown"}`)}
-          />
-        ) : null}
-        <DetailField
-          label={t("fields.engineCode")}
-          value={scooter.engineCode ?? t("detail.emptyValue")}
-        />
-        <DetailField
-          label={t("fields.engineDisplacementCc")}
-          value={
-            scooter.engineDisplacementCc
-              ? t("list.ccValue", { cc: scooter.engineDisplacementCc })
-              : t("detail.emptyValue")
-          }
-        />
-        <DetailField
-          label={t("fields.powerKw")}
-          value={
-            scooter.powerKw
-              ? t("list.kwValue", { kw: scooter.powerKw })
-              : t("detail.emptyValue")
-          }
-        />
-      </DetailSection>
-
-      <DetailSection title={t("sections.registration")}>
-        <DetailField
-          label={t("fields.registrationType")}
-          value={t(`registrationTypes.${scooter.registrationType}`)}
-        />
-        <DetailField
-          label={t("fields.registrationNumber")}
-          value={scooter.registrationNumber ?? t("detail.emptyValue")}
-        />
-        <DetailField
-          label={t("fields.registrationDate")}
-          value={
-            scooter.registrationDate
-              ? formatDate(scooter.registrationDate, locale)
-              : t("detail.emptyValue")
-          }
-        />
-        {scooter.registrationType === "temporary" ? (
-          <DetailField
-            label={t("fields.temporaryRegistrationExpiresAt")}
-            value={
-              scooter.temporaryRegistrationExpiresAt
-                ? formatDate(scooter.temporaryRegistrationExpiresAt, locale)
-                : t("detail.emptyValue")
-            }
-          />
-        ) : null}
-        <DetailField
-          label={t("fields.requiredLicenseCategory")}
-          value={t(
-            `requiredDriverLicenseTypes.${scooter.requiredLicenseCategory}`,
-          )}
-        />
-      </DetailSection>
-
-      <DetailSection title={t("sections.record")}>
-        <DetailField
-          label={t("detail.fields.createdAt")}
-          value={formatDateTime(scooter.createdAt, locale)}
-        />
-        <DetailField
-          label={t("detail.fields.updatedAt")}
-          value={formatDateTime(scooter.updatedAt, locale)}
-        />
-        {scooter.deletedAt ? (
-          <DetailField
-            label={t("detail.fields.deletedAt")}
-            value={formatDateTime(scooter.deletedAt, locale)}
-          />
-        ) : null}
-      </DetailSection>
-
-      <DetailSection title={t("sections.operational")}>
-        {(["hasGps", "odometerWorking", "speedometerWorking"] as const).map(
-          (field) => (
-            <DetailField
-              key={field}
-              label={t(`fields.${field}`)}
-              value={
-                scooter[field] == null
-                  ? t("operational.unknown")
-                  : t(scooter[field] ? "operational.yes" : "operational.no")
-              }
-            />
-          ),
-        )}
-        {(["currentMileageKm", "actualMaxSpeedKmh"] as const).map((field) => (
-          <DetailField
-            key={field}
-            label={t(`fields.${field}`)}
-            value={
-              scooter[field] == null
-                ? t("detail.emptyValue")
-                : new Intl.NumberFormat(locale).format(scooter[field])
-            }
-          />
-        ))}
-        <DetailField
-          label={t("fields.notes")}
-          value={scooter.notes ?? t("detail.emptyValue")}
-          className="sm:col-span-2"
-        />
       </DetailSection>
 
       <CivDetails scooter={scooter} />
-      {canAccess(session?.user, "scooter_documents.read") ? (
-        <ScooterDocumentList documents={scooter.documents ?? []} />
-      ) : null}
-      <ScooterInsuranceList scooter={scooter} />
-      <ScooterItpPanel scooter={scooter} />
+      <ScooterDocumentMediaList documents={scooter.documents ?? []}>
+        {canAccess(session?.user, "scooter_documents.read") ? (
+          <ScooterDocumentList documents={scooter.documents ?? []} />
+        ) : null}
+        <ScooterInsuranceList scooter={scooter} showDocuments={false} />
+        <ScooterItpPanel scooter={scooter} />
+      </ScooterDocumentMediaList>
+      <Accordion>
+        <AccordionItem value="details">
+          <AccordionTrigger>{t("detail.moreDetails")}</AccordionTrigger>
+          <AccordionContent className="grid gap-6">
+            <DetailSection title={t("sections.operational")}>
+              {(
+                [
+                  "hasGps",
+                  "hasPhoneStand",
+                  "hasChargingOutlet",
+                  "odometerWorking",
+                  "speedometerWorking",
+                ] as const
+              ).map((field) => (
+                <DetailField
+                  key={field}
+                  label={t(`fields.${field}`)}
+                  value={
+                    scooter[field] == null
+                      ? t("operational.unknown")
+                      : t(scooter[field] ? "operational.yes" : "operational.no")
+                  }
+                />
+              ))}
+              {(["currentMileageKm", "actualMaxSpeedKmh"] as const).map(
+                (field) => (
+                  <DetailField
+                    key={field}
+                    label={t(`fields.${field}`)}
+                    value={
+                      scooter[field] == null
+                        ? t("detail.emptyValue")
+                        : new Intl.NumberFormat(locale).format(scooter[field])
+                    }
+                  />
+                ),
+              )}
+              <DetailField
+                label={t("fields.notes")}
+                value={scooter.notes ?? t("detail.emptyValue")}
+                className="sm:col-span-2"
+              />
+            </DetailSection>
+
+            <DetailSection title={t("sections.technical")}>
+              <DetailField
+                label={t("fields.manufactureYear")}
+                value={
+                  scooter.manufactureYear == null
+                    ? t("detail.emptyValue")
+                    : String(scooter.manufactureYear)
+                }
+              />
+              <DetailField
+                label={t("fields.powertrainType")}
+                value={t(`powertrainTypes.${scooter.powertrainType}`)}
+              />
+              {scooter.powertrainType === "combustion" ||
+              scooter.powertrainType === "hybrid" ? (
+                <DetailField
+                  label={t("fields.fuelSystem")}
+                  value={t(`fuelSystems.${scooter.fuelSystem ?? "unknown"}`)}
+                />
+              ) : null}
+              <DetailField
+                label={t("fields.engineCode")}
+                value={scooter.engineCode ?? t("detail.emptyValue")}
+              />
+              <DetailField
+                label={t("fields.engineDisplacementCc")}
+                value={
+                  scooter.engineDisplacementCc
+                    ? t("list.ccValue", { cc: scooter.engineDisplacementCc })
+                    : t("detail.emptyValue")
+                }
+              />
+              <DetailField
+                label={t("fields.powerKw")}
+                value={
+                  scooter.powerKw
+                    ? t("list.kwValue", { kw: scooter.powerKw })
+                    : t("detail.emptyValue")
+                }
+              />
+            </DetailSection>
+
+            <DetailSection title={t("sections.registration")}>
+              <DetailField
+                label={t("fields.registrationType")}
+                value={t(`registrationTypes.${scooter.registrationType}`)}
+              />
+              <DetailField
+                label={t("fields.registrationNumber")}
+                value={scooter.registrationNumber ?? t("detail.emptyValue")}
+              />
+              <DetailField
+                label={t("fields.registrationDate")}
+                value={
+                  scooter.registrationDate
+                    ? formatDate(scooter.registrationDate, locale)
+                    : t("detail.emptyValue")
+                }
+              />
+              {scooter.registrationType === "temporary" ? (
+                <DetailField
+                  label={t("fields.temporaryRegistrationExpiresAt")}
+                  value={
+                    scooter.temporaryRegistrationExpiresAt
+                      ? formatDate(
+                          scooter.temporaryRegistrationExpiresAt,
+                          locale,
+                        )
+                      : t("detail.emptyValue")
+                  }
+                />
+              ) : null}
+              <DetailField
+                label={t("fields.requiredLicenseCategory")}
+                value={t(
+                  `requiredDriverLicenseTypes.${scooter.requiredLicenseCategory}`,
+                )}
+              />
+            </DetailSection>
+
+            <DetailSection title={t("sections.record")}>
+              <DetailField
+                label={t("detail.fields.scooterId")}
+                value={scooter.id}
+              />
+              <DetailField
+                label={t("detail.fields.createdAt")}
+                value={formatDateTime(scooter.createdAt, locale)}
+              />
+              <DetailField
+                label={t("detail.fields.updatedAt")}
+                value={formatDateTime(scooter.updatedAt, locale)}
+              />
+              {scooter.deletedAt ? (
+                <DetailField
+                  label={t("detail.fields.deletedAt")}
+                  value={formatDateTime(scooter.deletedAt, locale)}
+                />
+              ) : null}
+            </DetailSection>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
       <ScooterRegistrationDialog
         key={`edit-scooter-registration-${registrationDialogKey}`}
         scooter={scooter}
@@ -686,21 +705,6 @@ function DetailField({
       <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
       <dd className="min-w-0 break-words text-sm font-medium">{value}</dd>
     </div>
-  );
-}
-
-function PowertrainBadge({ scooter }: { scooter: v1.scooters.Scooter }) {
-  const t = useTranslations("scooters");
-  const Icon =
-    scooter.powertrainType === "electric" ? BatteryChargingIcon : GaugeIcon;
-
-  return (
-    <Badge variant="outline">
-      <Icon aria-hidden="true" data-icon="inline-start" />
-      {scooter.powertrainType !== "electric" && scooter.engineDisplacementCc
-        ? t("list.ccValue", { cc: scooter.engineDisplacementCc })
-        : t(`powertrainTypes.${scooter.powertrainType}`)}
-    </Badge>
   );
 }
 
