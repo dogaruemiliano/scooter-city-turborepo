@@ -9,9 +9,47 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL || 'https://api.ci.placeholder.invalid' }}
+
 jobs:
-  ci:
-    name: Lint · typecheck · test
+  checks:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      # Finish every check so one failure doesn't hide failures in other jobs.
+      fail-fast: false
+      matrix:
+        include:
+          - id: lint
+            name: Lint
+            command: pnpm lint
+          - id: types
+            name: Typecheck
+            command: pnpm check-types
+          - id: unit
+            name: API and shared unit tests
+            command: pnpm exec turbo run test --filter='!web'
+          - id: web-unit-1
+            name: Web unit tests (1/2)
+            command: pnpm exec turbo run test --filter=web -- --shard=1/2
+          - id: web-unit-2
+            name: Web unit tests (2/2)
+            command: pnpm exec turbo run test --filter=web -- --shard=2/2
+          - id: web-build
+            name: Web production build
+            command: pnpm exec turbo run build --filter=web
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/verify
+        with:
+          command: ${{ matrix.command }}
+          cache-key: ${{ matrix.id }}
+
+  e2e:
+    name: Database E2E tests
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -34,25 +72,28 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
+      - uses: ./.github/actions/verify
         with:
-          node-version: 24.17.0
-
-      - uses: pnpm/action-setup@v6
-        with:
-          cache: true
-
-      - name: Install
-        run: pnpm install --frozen-lockfile
-
-      - name: Verify (same command as local pre-push checks)
+          command: pnpm test:e2e
+          cache-key: e2e
         env:
-          NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL || 'https://api.ci.placeholder.invalid' }}
           E2E_DATABASE_URL: postgresql://app:app@localhost:5434/scooter_city_test
           E2E_FINANCE_DATABASE_URL: postgresql://app:app@localhost:5434/finance_books_test
           JWT_ACCESS_SECRET: ${{ secrets.JWT_ACCESS_SECRET || 'ci-test-access-secret-padded-to-32-chars' }}
           JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET || 'ci-test-refresh-secret-padded-to-32-chars' }}
           REFRESH_TOKEN_HMAC_SECRET: ${{ secrets.REFRESH_TOKEN_HMAC_SECRET || 'ci-test-refresh-hmac-padded-to-32-chars-x' }}
           OTP_HMAC_SECRET: ${{ secrets.OTP_HMAC_SECRET || 'ci-test-otp-hmac-padded-to-32-chars-pad-x' }}
-        run: pnpm verify
+
+  # Preserve the existing required check name for branch protection.
+  ci:
+    name: Lint · typecheck · test
+    if: ${{ always() }}
+    needs: [checks, e2e]
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - name: Require every verification job to pass
+        env:
+          CHECKS_RESULT: ${{ needs.checks.result }}
+          E2E_RESULT: ${{ needs.e2e.result }}
+        run: test "$CHECKS_RESULT" = success && test "$E2E_RESULT" = success

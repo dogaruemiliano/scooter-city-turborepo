@@ -142,12 +142,32 @@ docker compose --profile test up -d postgres-test
 pnpm verify
 ```
 
-`pnpm verify` is also the GitHub CI command. It runs lint, typechecking, all unit
-tests, the production web build, and database E2E tests in that order. It forces
-fresh lint/type/unit execution, prints the source commit and runtime, and stops
-at the first failing stage. E2E tests require the dedicated test databases from
+`pnpm verify` runs lint, typechecking, all unit tests, the production web build,
+and database E2E tests in that order. It forces fresh lint/type/unit execution,
+prints the source commit and runtime, and stops at the first failing stage.
+E2E tests require the dedicated test databases from
 [the API test environment guide](apps/api/README.md#e2e-environment). A passing
 `pnpm test` alone does not verify the production build or database E2E tests.
+
+GitHub CI runs the same checks as independent jobs, with web unit tests split
+into two shards on separate runners. Only the E2E job starts PostgreSQL. CI
+reuses successful Turbo tasks and the Next.js compiler cache across runs,
+including successful tasks from a failed job; database E2E tests always run.
+The combined `Lint · typecheck · test` check passes only when every job passes.
+Use GitHub's **Re-run failed jobs** to retry failures on the same commit. A new
+commit runs every job, reusing cached tasks whose inputs have not changed.
+
+To reproduce an individual CI check locally:
+
+```bash
+pnpm lint
+pnpm check-types
+pnpm exec turbo run test --filter='!web'
+pnpm exec turbo run test --filter=web -- --shard=1/2
+pnpm exec turbo run test --filter=web -- --shard=2/2
+pnpm exec turbo run build --filter=web
+pnpm test:e2e
+```
 
 Pull requests run on GitHub's temporary merge commit, which can differ from the
 branch tip. Compare that commit in the CI log when investigating discrepancies.
@@ -163,7 +183,7 @@ not update that release.
 | `pnpm build`                    | Build the workspace.                                                                                            |
 | `pnpm lint`                     | Run ESLint.                                                                                                     |
 | `pnpm check-types`              | Run TypeScript checks.                                                                                          |
-| `pnpm verify`                   | Run the same complete verification pipeline as GitHub CI before pushing.                                        |
+| `pnpm verify`                   | Run all CI checks locally, sequentially with fresh lint, types, and unit tests.                                 |
 | `pnpm test`                     | Run unit tests.                                                                                                 |
 | `pnpm test:e2e`                 | Prepare test databases and run API E2E tests; see [test environment setup](apps/api/README.md#e2e-environment). |
 | `pnpm init:local`               | Configure the local project name, env files, Docker Postgres, DB, seed, and shared builds after clone.          |
