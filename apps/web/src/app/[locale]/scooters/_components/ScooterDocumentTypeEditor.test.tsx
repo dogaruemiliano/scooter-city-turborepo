@@ -36,6 +36,26 @@ const document: v1.scooters.LogicalDocumentExtraction = {
 };
 
 describe("document card type editor", () => {
+  it.each([false, true])(
+    "keeps the compact media type readable when disabled=%s",
+    (disabled) => {
+      mount({ type: null, surface: "media", disabled });
+      const trigger = screen.getByRole("button", {
+        name: "Edit document type for scan.pdf",
+      });
+      expect(trigger).toHaveTextContent("Doc. type");
+      expect(trigger).not.toHaveTextContent("Choose document type");
+      expect(trigger).toHaveClass(
+        "text-scrim-foreground",
+        "disabled:text-scrim-foreground",
+        "disabled:bg-transparent",
+      );
+      expect(trigger).not.toHaveClass("disabled:text-disabled-foreground");
+      expect(trigger.firstElementChild).toHaveClass("truncate");
+      if (disabled) expect(trigger).toBeDisabled();
+      else expect(trigger).toBeEnabled();
+    },
+  );
   it("opens the type selector by pressing the type label", async () => {
     const user = userEvent.setup();
     const { onType } = mount();

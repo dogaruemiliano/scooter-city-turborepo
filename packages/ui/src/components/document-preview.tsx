@@ -2,18 +2,14 @@
 
 import { aspectRatio, softFade } from "@repo/theme";
 import { CheckIcon, ImagePlusIcon, LoaderCircleIcon } from "lucide-react";
-import {
-  useCallback,
-  useState,
-  type DragEventHandler,
-  type ReactNode,
-} from "react";
+import { type DragEventHandler, type ReactNode } from "react";
 import { PdfPreview, type PdfPreviewLabels } from "./pdf-preview";
 import { Badge } from "./badge";
 import { Button } from "./button";
 import { DocumentViewer } from "./document-viewer";
 import { useMediaCollection } from "./media-collection";
 import type { DocumentZoomLabels } from "./document-zoom";
+import { DocumentPreviewBackdrop } from "./document-preview-backdrop";
 
 /** Shared person/vehicle document card, with an accessible full-screen viewer. */
 export function DocumentPreview({
@@ -46,7 +42,7 @@ export function DocumentPreview({
   viewerHeaderOverlay,
   bottomOverlay,
 }: {
-  /** Portrait paper cards keep interactive overlays outside the preview button. */
+  /** Fixed A4 portrait cards contain the document over a blurred copy. */
   layout?: "landscape" | "paper";
   headerOverlay?: ReactNode;
   /** Fullscreen header may replace the card remove action with viewer dismissal. */
@@ -80,27 +76,6 @@ export function DocumentPreview({
 }) {
   const collection = useMediaCollection();
   const isPdf = contentType === "application/pdf";
-  const [measured, setMeasured] = useState<{
-    src: typeof src;
-    ratio: number;
-  }>();
-  const measureRatio = useCallback(
-    (ratio: number) => {
-      if (!Number.isFinite(ratio) || ratio <= 0) return;
-      setMeasured((previous) =>
-        previous && previous.src === src && previous.ratio === ratio
-          ? previous
-          : { src, ratio },
-      );
-    },
-    [src],
-  );
-  const paperRatio = Math.max(
-    aspectRatio.documentA4Portrait,
-    measured && measured.src === src
-      ? measured.ratio
-      : aspectRatio.documentA4Portrait,
-  );
   const preview = (
     <Button
       id={id}
@@ -128,24 +103,18 @@ export function DocumentPreview({
           label={fileName ?? imageAlt}
           labels={pdfLabels}
           thumbnail
-          onAspectRatio={layout === "paper" ? measureRatio : undefined}
+          thumbnailBackdrop={layout === "paper"}
         />
       ) : src ? (
-        // Local or authenticated document previews cannot use an image optimizer.
-        <img
-          src={src}
-          alt={imageAlt}
-          onLoad={
-            layout === "paper"
-              ? (event) =>
-                  measureRatio(
-                    event.currentTarget.naturalWidth /
-                      event.currentTarget.naturalHeight,
-                  )
-              : undefined
-          }
-          className="absolute inset-0 h-full w-full object-contain"
-        />
+        <>
+          {layout === "paper" ? <DocumentPreviewBackdrop src={src} /> : null}
+          {/* Local or authenticated previews cannot use an image optimizer. */}
+          <img
+            src={src}
+            alt={imageAlt}
+            className="absolute inset-0 h-full w-full object-contain object-center"
+          />
+        </>
       ) : (
         <span className="flex flex-col items-center gap-2 px-3 text-center">
           <ImagePlusIcon
@@ -190,7 +159,7 @@ export function DocumentPreview({
       {layout === "paper" ? (
         <div
           data-slot="document-preview-card"
-          style={{ aspectRatio: paperRatio }}
+          style={{ aspectRatio: aspectRatio.documentA4Portrait }}
           className="relative isolate min-w-0 overflow-hidden rounded-xl border border-border bg-control"
         >
           {preview}

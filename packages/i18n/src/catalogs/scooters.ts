@@ -146,6 +146,7 @@ export const scootersCatalog = {
       dropOverlay: "Drop it like it's hot",
       addPhotos: "Add photos",
       sortPhoto: "Reorder photo: {name}",
+      dragHint: "Drag to reorder. Touch and hold on mobile.",
       sortInstructions:
         "Drag to reorder. With the keyboard, press Space to pick up, use arrow keys to move, and press Space to drop or Escape to cancel. From the last row, press Arrow Down to move to the delete area and Space to delete.",
       addOtherPhotos: "Add other photos",
@@ -204,6 +205,7 @@ export const scootersCatalog = {
       retry: "Retry",
       remove: "Remove",
       delete: "Delete photo",
+      deleteNamed: "Delete photo: {name}",
       deleteDrop: "Drag a photo here to delete it",
       deleteDropActive: "Release to delete this photo",
       deleteConfirm:
@@ -557,7 +559,7 @@ export const scootersCatalog = {
         browse: "Browse files",
         hint: "All files added here belong to this scooter draft.",
         requirements: "PDF, JPG, PNG or WebP, up to 15 MB each.",
-        unknown: "Choose document type",
+        unknown: "Doc. type",
         editType: "Edit document type for {name}",
         typeLabel: "Document type for {name}",
         duplicate: "This file is already attached.",
@@ -1468,6 +1470,7 @@ export const scootersCatalog = {
       dropOverlay: "Drop it like it's hot",
       addPhotos: "Adaugă fotografii",
       sortPhoto: "Reordonează fotografia: {name}",
+      dragHint: "Trage pentru reordonare. Pe mobil, ține apăsat.",
       sortInstructions:
         "Trage pentru reordonare. Cu tastatura, apasă Spațiu pentru selectare, săgețile pentru mutare și Spațiu pentru plasare sau Escape pentru anulare. Din ultimul rând, apasă Săgeată jos pentru zona de ștergere și Spațiu pentru a șterge.",
       addOtherPhotos: "Adaugă alte fotografii",
@@ -1528,6 +1531,7 @@ export const scootersCatalog = {
       retry: "Reîncearcă",
       remove: "Elimină",
       delete: "Șterge fotografia",
+      deleteNamed: "Șterge fotografia: {name}",
       deleteDrop: "Trage o fotografie aici pentru a o șterge",
       deleteDropActive: "Eliberează pentru a șterge fotografia",
       deleteConfirm:
@@ -1897,7 +1901,7 @@ export const scootersCatalog = {
         browse: "Alege fișiere",
         hint: "Toate fișierele adăugate aici aparțin acestei ciorne de scuter.",
         requirements: "PDF, JPG, PNG sau WebP, maximum 15 MB fiecare.",
-        unknown: "Alege tipul documentului",
+        unknown: "Tip doc.",
         editType: "Modifică tipul documentului {name}",
         typeLabel: "Tipul documentului {name}",
         duplicate: "Acest fișier este deja atașat.",

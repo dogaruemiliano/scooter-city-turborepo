@@ -226,6 +226,11 @@ export function ScooterPhotoGallery({
                   gallery.uploads.length > 0
                 }
                 instructions={t("sortInstructions")}
+                hint={
+                  editable && gallery.photos.length > 1
+                    ? t("dragHint")
+                    : undefined
+                }
                 getItemLabel={(photo) =>
                   t("open", { name: photo.caption || photo.fileName })
                 }
@@ -234,6 +239,10 @@ export function ScooterPhotoGallery({
                     ? {
                         label: t("deleteDrop"),
                         activeLabel: t("deleteDropActive"),
+                        getButtonLabel: (photo) =>
+                          t("deleteNamed", {
+                            name: photo.caption || photo.fileName,
+                          }),
                         onRemove: (photo) => gallery.remove(photo.id),
                       }
                     : undefined

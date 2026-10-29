@@ -72,19 +72,15 @@ export function ScooterDocumentTypeEditor({
             render={
               <Button
                 type="button"
-                variant="text"
+                variant={surface === "media" ? "media-text" : "text"}
                 size="xs"
-                className={
-                  surface === "media"
-                    ? "text-scrim-foreground hover:text-scrim-foreground"
-                    : undefined
-                }
+                className="shrink"
                 disabled={disabled}
                 aria-label={t("batch.editType", { name: fileName })}
               />
             }
           >
-            <span className="min-w-0 text-left">{typeLabel}</span>
+            <span className="min-w-0 truncate text-left">{typeLabel}</span>
             <PencilIcon className="size-3" aria-hidden="true" />
           </PopoverTrigger>
           <PopoverContent align="end" className="gap-4 p-4">
