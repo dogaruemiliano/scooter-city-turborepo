@@ -195,7 +195,6 @@ export function useScooterExtraction(options: Options) {
         const path = pathFor({ field, policyId }, values);
         const manuallyChanged =
           manual.current.has(key) ||
-          (latest.current.editing && !previous && Boolean(current)) ||
           (previous
             ? current !== previous.lastAuto
             : Boolean(
@@ -368,6 +367,23 @@ export function useScooterExtraction(options: Options) {
   const applyReextraction = useCallback(
     (result: Success) => {
       const { form, documents } = latest.current;
+      // Values retained during reextraction are reviewed choices too. Protect
+      // them here, without changing the existing explicit JSON import flow.
+      for (const [field, value] of Object.entries(form.getValues()))
+        if (typeof value === "string" && value.trim()) {
+          manual.current.add(originKey(field));
+          origins.current.delete(originKey(field));
+        }
+      for (const policy of form.getValues("insurancePolicies") ?? [])
+        for (const field of v1.scooters.INSURANCE_FIELDS)
+          if (policy[field]) {
+            manual.current.add(originKey(field, policy.id));
+            origins.current.delete(originKey(field, policy.id));
+          }
+      manualRawFields.current = {
+        ...publishedRaw.current,
+        ...manualRawFields.current,
+      };
       for (const [field, value] of Object.entries(result.values)) {
         manual.current.add(originKey(field));
         origins.current.delete(originKey(field));

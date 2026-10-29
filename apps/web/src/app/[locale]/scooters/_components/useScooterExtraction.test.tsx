@@ -224,7 +224,7 @@ describe("document extraction lifecycle", () => {
     expect(hook.result.current.extraction.unverifiedSources).toEqual([]);
     expect(hook.result.current.form.formState.isDirty).toBe(false);
   });
-  it("keeps persisted values on auto-import and protects explicitly accepted reextraction corrections from later imports", () => {
+  it("protects retained values and accepted reextraction corrections from later imports", () => {
     const hook = setup(
       { attached: [civ], existing: true, editing: true },
       {
@@ -233,12 +233,17 @@ describe("document extraction lifecycle", () => {
         model: "Previously reviewed",
       },
     );
-    hook.apply({
-      [civ.sourceId]: extracted({
-        model: "AI reading",
-        civIssuedAt: "2025-01-15",
+    act(() =>
+      hook.result.current.extraction.applyReextraction({
+        ok: true,
+        values: { civIssuedAt: "2025-01-15" },
+        confirmedEmpty: [],
+        unresolved: [],
+        unresolvedRawFields: [],
+        emptyConflicts: [],
       }),
-    });
+    );
+    hook.apply({ [civ.sourceId]: extracted({ model: "AI reading" }) });
     expect(hook.result.current.form.getValues("model")).toBe(
       "Previously reviewed",
     );
