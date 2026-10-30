@@ -192,7 +192,7 @@ describe("AppShell", () => {
       const header = screen.getByRole("banner");
       expect(content).not.toContainElement(header);
       expect(header.parentElement).toBe(content?.parentElement);
-      expect(header).toHaveClass("shrink-0", "bg-card", "md:sticky");
+      expect(header).toHaveClass("shrink-0", "bg-card", "sticky", "top-0");
     },
   );
 

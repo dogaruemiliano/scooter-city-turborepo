@@ -327,7 +327,7 @@ function AppShellContent({
           as="div"
           className="min-h-0 min-w-0 overflow-hidden md:overflow-visible"
         >
-          <header className="relative z-sticky flex h-[calc(var(--spacing-16)+env(safe-area-inset-top))] shrink-0 items-center gap-3 border-b border-border bg-card px-4 pt-[env(safe-area-inset-top)] md:sticky md:top-0 md:h-16 md:px-8 md:pt-0">
+          <header className="sticky top-0 z-sticky flex h-[calc(var(--spacing-16)+env(safe-area-inset-top))] shrink-0 items-center gap-3 border-b border-border bg-card px-4 pt-[env(safe-area-inset-top)] md:h-16 md:px-8 md:pt-0">
             <HeaderNavigationButton
               pathname={pathname}
               navigation={navigation}

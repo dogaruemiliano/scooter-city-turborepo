@@ -48,5 +48,7 @@
 @variant max-md {
   html:has([data-app-shell]) {
     overscroll-behavior-y: none;
+    /* Safari paints the area outside the viewport from the root surface. */
+    background-color: var(--card);
   }
 }
