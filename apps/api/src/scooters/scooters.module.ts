@@ -8,6 +8,8 @@ import { ScooterDocumentJobsController } from "../scooter-document-jobs/scooter-
 
 import { ScootersController } from "./scooters.controller";
 import { ScootersService } from "./scooters.service";
+import { ScooterInsuranceService } from "./scooter-insurance.service";
+import { ScooterInsuranceController } from "./scooter-insurance.controller";
 import { ScooterItpController } from "./scooter-itp.controller";
 import { ScooterItpService } from "./scooter-itp.service";
 import {
@@ -23,6 +25,7 @@ import { ScooterPhotosService } from "./scooter-photos.service";
     ScooterDocumentJobsController,
     CivVocabularyController,
     ScooterItpController,
+    ScooterInsuranceController,
     ScooterDocumentsController,
     ScootersController,
     ScooterPhotosController,
@@ -33,6 +36,7 @@ import { ScooterPhotosService } from "./scooter-photos.service";
     CivVocabularyService,
     ScooterPhotosService,
     ScooterItpService,
+    ScooterInsuranceService,
   ],
   exports: [ScootersService],
 })

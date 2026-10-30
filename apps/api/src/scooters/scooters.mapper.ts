@@ -35,7 +35,9 @@ export function toScooter(row: ScooterRowWithBrand): v1.scooters.Scooter {
   const itp = row.inspections
     ? v1.scooters.scooterItpSummary(
         row.inspections.map((entry) => ({
-          inspectionDate: toDateOnlyString(entry.inspectionDate)!,
+          inspectionDate: toDateOnlyString(entry.inspectionDate),
+          effectiveDate: toDateOnlyString(entry.effectiveDate) ?? undefined,
+          createdAt: entry.createdAt.toISOString(),
           validUntil: toDateOnlyString(entry.validUntil),
           result: v1.scooters.scooterItpResultSchema.parse(entry.result),
         })),

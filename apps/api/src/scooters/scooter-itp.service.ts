@@ -13,6 +13,9 @@ function response(row: ScooterItpInspection): v1.scooters.ScooterItpInspection {
   return v1.scooters.scooterItpInspectionSchema.parse({
     id: row.id,
     result: row.result,
+    source: row.source,
+    effectiveDate:
+      toDateOnlyString(row.effectiveDate ?? row.inspectionDate) ?? undefined,
     certificateNumber: row.certificateNumber,
     odometerKm: row.odometerKm,
     cardDocumentId: row.cardDocumentId,
@@ -37,7 +40,7 @@ export class ScooterItpService {
     const rows = await this.prisma.scooterItpInspection.findMany({
       where: { scooterId },
       orderBy: [
-        { inspectionDate: "desc" },
+        { effectiveDate: "desc" },
         { createdAt: "desc" },
         { id: "desc" },
       ],
@@ -64,23 +67,48 @@ export class ScooterItpService {
         where: { id: scooterId },
         select: { vin: true },
       });
-      const documents = await tx.scooterDocument.findMany({
-        where: {
-          id: {
-            in: [
-              ...new Set([input.cardDocumentId, input.certificateDocumentId]),
-            ],
-          },
-          scooterId,
-          deletedAt: null,
-          asset: { deletedAt: null },
-        },
-        select: { id: true, type: true, extractedData: true },
-      });
-      for (const [id, requiredType] of [
-        [input.cardDocumentId, "itp_card"],
-        [input.certificateDocumentId, "itp_certificate"],
-      ] as const) {
+      const source = input.source ?? "document";
+      if (source === "manual" && input.expectedLatestId !== undefined) {
+        const latest = await tx.scooterItpInspection.findFirst({
+          where: { scooterId },
+          orderBy: [
+            { effectiveDate: "desc" },
+            { createdAt: "desc" },
+            { id: "desc" },
+          ],
+        });
+        if ((latest?.id ?? null) !== input.expectedLatestId)
+          throw new ConflictException({
+            code: "ITP_RECORD_CONFLICT",
+            message:
+              "The inspection history changed. Reload before recording this update.",
+          });
+      }
+      const documents =
+        source === "manual"
+          ? []
+          : await tx.scooterDocument.findMany({
+              where: {
+                id: {
+                  in: [
+                    ...new Set([
+                      input.cardDocumentId!,
+                      input.certificateDocumentId!,
+                    ]),
+                  ],
+                },
+                scooterId,
+                deletedAt: null,
+                asset: { deletedAt: null },
+              },
+              select: { id: true, type: true, extractedData: true },
+            });
+      for (const [id, requiredType] of source === "manual"
+        ? []
+        : ([
+            [input.cardDocumentId, "itp_card"],
+            [input.certificateDocumentId, "itp_certificate"],
+          ] as const)) {
         const document = documents.find((entry) => entry.id === id);
         if (!document)
           throw new BadRequestException({
@@ -127,19 +155,34 @@ export class ScooterItpService {
             message: "The inspection document VIN does not match this scooter.",
           });
       }
-      const inspectionDate = toDateOnlyDate(input.inspectionDate)!;
+      const inspectionDate = toDateOnlyDate(input.inspectionDate);
       const existing =
-        (await tx.scooterItpInspection.findUnique({
-          where: {
-            scooterId_cardDocumentId_certificateDocumentId_inspectionDate: {
-              scooterId,
-              cardDocumentId: input.cardDocumentId,
-              certificateDocumentId: input.certificateDocumentId,
-              inspectionDate,
-            },
-          },
-        })) ??
-        (input.certificateNumber
+        (source === "document"
+          ? await tx.scooterItpInspection.findUnique({
+              where: {
+                scooterId_cardDocumentId_certificateDocumentId_inspectionDate: {
+                  scooterId,
+                  cardDocumentId: input.cardDocumentId!,
+                  certificateDocumentId: input.certificateDocumentId!,
+                  inspectionDate: inspectionDate!,
+                },
+              },
+            })
+          : input.expectedLatestId
+            ? await tx.scooterItpInspection.findFirst({
+                where: {
+                  scooterId,
+                  source: "manual",
+                  id: input.expectedLatestId,
+                  inspectionDate,
+                  validUntil: toDateOnlyDate(input.validUntil),
+                  result: input.result,
+                  certificateNumber: input.certificateNumber,
+                  odometerKm: input.odometerKm,
+                },
+              })
+            : null) ??
+        (source === "document" && input.certificateNumber
           ? await tx.scooterItpInspection.findFirst({
               where: {
                 scooterId,
@@ -169,6 +212,9 @@ export class ScooterItpService {
       return response(
         await tx.scooterItpInspection.create({
           data: {
+            source,
+            effectiveDate:
+              inspectionDate ?? toDateOnlyDate(v1.common.dateOnlyToday())!,
             result: input.result,
             certificateNumber: input.certificateNumber,
             odometerKm: input.odometerKm,

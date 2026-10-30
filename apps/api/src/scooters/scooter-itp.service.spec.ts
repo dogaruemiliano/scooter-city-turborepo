@@ -65,6 +65,39 @@ describe("inspection evidence confirmation", () => {
     expect(record.odometerKm).toBe(0);
     expect(tx.scooterItpInspection.create).toHaveBeenCalledTimes(1);
   });
+  it("records reviewed manual validity without inventing an inspection date or requiring scans", async () => {
+    const record = await service.create("scooter", {
+      ...input,
+      source: "manual",
+      expectedLatestId: null,
+      inspectionDate: null,
+      cardDocumentId: null,
+      certificateDocumentId: null,
+      certificateNumber: null,
+      result: "unknown",
+    });
+    expect(record).toMatchObject({
+      source: "manual",
+      inspectionDate: null,
+      result: "unknown",
+      validUntil: "2027-01-01",
+    });
+    expect(tx.scooterDocument.findMany).not.toHaveBeenCalled();
+  });
+  it("rejects a manual update when inspection history changed in another session", async () => {
+    tx.scooterItpInspection.findFirst.mockResolvedValue({ id: "new-record" });
+    await expect(
+      service.create("scooter", {
+        ...input,
+        source: "manual",
+        expectedLatestId: null,
+        inspectionDate: null,
+        cardDocumentId: null,
+        certificateDocumentId: null,
+      }),
+    ).rejects.toThrow("history changed");
+    expect(tx.scooterItpInspection.create).not.toHaveBeenCalled();
+  });
   it("rejects missing or foreign-scooter evidence", async () => {
     tx.scooterDocument.findMany.mockResolvedValue([
       evidence("card", "itp_card"),

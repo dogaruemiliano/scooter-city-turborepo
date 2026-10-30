@@ -31,12 +31,14 @@ export function ScooterCreateFields({
   onBrandCreated,
   disabled,
   photos,
+  compliance,
 }: {
   editing?: boolean;
   brands: v1.scooterBrands.ScooterBrand[];
   onBrandCreated: (brand: v1.scooterBrands.ScooterBrand) => void;
   disabled: boolean;
   photos?: ReactNode;
+  compliance?: (startNumber: number) => ReactNode;
 }) {
   const t = useTranslations("scooters");
   const {
@@ -45,6 +47,9 @@ export function ScooterCreateFields({
   } = useFormContext<ScooterEditorValues>();
   const powertrain = useWatch({ control, name: "powertrainType" });
   const registration = useWatch({ control, name: "registrationType" });
+  const insurancePolicies =
+    useWatch({ control, name: "insurancePolicies" }) ?? [];
+  const complianceStart = photos ? 5 : 4;
   const props = { brands, onBrandCreated, disabled, powertrain };
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const advancedId = useId();
@@ -158,13 +163,21 @@ export function ScooterCreateFields({
         }
         disabled={disabled}
       />
-      <ScooterCreateInsuranceFields
-        disabled={disabled}
-        number={photos ? 5 : 4}
-      />
+      {compliance ? (
+        compliance(complianceStart)
+      ) : (
+        <ScooterCreateInsuranceFields
+          disabled={disabled}
+          number={photos ? 5 : 4}
+        />
+      )}
       <FormSection
         panel
-        number={photos ? 6 : 5}
+        number={
+          compliance
+            ? complianceStart + 1 + insurancePolicies.length
+            : complianceStart + 1
+        }
         title={t("creation.conditionEquipment")}
         status={
           <div className="flex flex-wrap items-center gap-2">

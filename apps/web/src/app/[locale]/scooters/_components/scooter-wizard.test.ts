@@ -114,7 +114,10 @@ describe("scooter creation review steps", () => {
     expect(stepFields("import_document")).not.toContain("civVersion");
     expect(stepFields("import_document")).not.toContain("civNumber");
     expect(stepFields("civ")).toContain("civVersion");
-    expect(stepFields("insurance")).toEqual(["insurancePolicies"]);
+    expect(stepFields("insurance")).toEqual([
+      "itpValidUntil",
+      "insurancePolicies",
+    ]);
     expect(stepFields("registration_certificate")).toContain(
       "requiredLicenseCategory",
     );

@@ -274,6 +274,20 @@ export function parseDocumentImport(
         values.temporaryRegistrationExpiresAt = "";
     }
   }
+  // CIV commercial name and the visible Model control describe the same value.
+  const model = values.commercialName ?? values.model;
+  if (model !== undefined) {
+    values.model = model;
+    values.commercialName = model;
+    if (sourceData) {
+      const sources =
+        sourceData.fieldSources.commercialName ?? sourceData.fieldSources.model;
+      if (sources) {
+        sourceData.fieldSources.model = sources;
+        sourceData.fieldSources.commercialName = sources;
+      }
+    }
+  }
   const merged = { ...current, ...values };
   const autoFilledLicenseCategory =
     !editing &&

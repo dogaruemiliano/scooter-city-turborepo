@@ -1,3 +1,4 @@
+import { scooterComplianceMessages } from "./scooter-compliance";
 import { scooterItpMessages } from "./scooter-itp";
 import { scooterReextractionMessages } from "./scooter-reextraction";
 
@@ -410,7 +411,9 @@ export const scootersCatalog = {
       no: "No",
     },
     itp: scooterItpMessages.en,
+    compliance: scooterComplianceMessages.en,
     insurance: {
+      delete: "Delete insurance",
       title: "Insurance",
       policy: "Insurance policy {number}",
       add: "Add insurance",
@@ -981,6 +984,7 @@ export const scootersCatalog = {
       notes: "Notes",
     },
     fields: {
+      itpValidUntil: "ITP valid until",
       civAvailability: "CIV availability",
       registrationCounty: "Registration county",
       registrationLocality: "Registration locality",
@@ -1741,7 +1745,9 @@ export const scootersCatalog = {
       no: "Nu",
     },
     itp: scooterItpMessages.ro,
+    compliance: scooterComplianceMessages.ro,
     insurance: {
+      delete: "Șterge asigurarea",
       title: "Asigurări",
       policy: "Polița de asigurare {number}",
       add: "Adaugă asigurare",
@@ -2339,6 +2345,7 @@ export const scootersCatalog = {
       notes: "Notițe",
     },
     fields: {
+      itpValidUntil: "ITP valabil până la",
       civAvailability: "Situație CIV",
       registrationCounty: "Județul înregistrării",
       registrationLocality: "Localitatea înregistrării",

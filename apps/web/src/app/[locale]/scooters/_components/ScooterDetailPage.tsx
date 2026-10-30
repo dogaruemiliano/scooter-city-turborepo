@@ -4,8 +4,7 @@ import { PageLayout } from "@repo/ui/components/page-layout";
 import { useFormAction } from "@/lib/form/use-form-action";
 import { SaveButton } from "@repo/ui/components/save-button";
 import { ScooterProblems } from "./ScooterProblems";
-import { ScooterInsuranceList } from "./ScooterInsuranceFields";
-import { ScooterItpPanel } from "./ScooterItpPanel";
+import { ScooterComplianceSection } from "./ScooterComplianceSection";
 
 import { v1 } from "@repo/api-shared";
 import {
@@ -267,8 +266,7 @@ export function ScooterDetailPage({
         {canAccess(session?.user, "scooter_documents.read") ? (
           <ScooterDocumentList documents={scooter.documents ?? []} />
         ) : null}
-        <ScooterInsuranceList scooter={scooter} showDocuments={false} />
-        <ScooterItpPanel scooter={scooter} />
+        <ScooterComplianceSection scooter={scooter} />
       </ScooterDocumentMediaList>
       <Accordion>
         <AccordionItem value="details">

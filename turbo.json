@@ -26,6 +26,10 @@
       ],
       "outputs": ["coverage/**"]
     },
+    "db:generate": {
+      "inputs": ["prisma/**/*.prisma", "prisma.config.ts", "package.json"],
+      "outputs": ["src/generated/prisma/**"]
+    },
     "test:e2e": {
       "dependsOn": ["^build"],
       "cache": false,

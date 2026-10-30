@@ -1,5 +1,10 @@
 import { activeMaintenanceHoldWhere } from "../problems/maintenance-hold";
-import { writeInsurancePolicies } from "./scooter-insurance";
+import { writeScooterItpValidity } from "./scooter-itp-validity";
+import {
+  resolveInsuranceDateSources,
+  removeInsurancePolicies,
+  writeInsurancePolicies,
+} from "./scooter-insurance";
 import { CivVocabularyService } from "./civ-vocabulary.service";
 import { civMetadataWrite } from "./civ-metadata";
 import {
@@ -48,10 +53,13 @@ export const scooterInclude = {
   },
   civDocument: true,
   inspections: {
-    orderBy: [{ inspectionDate: "desc" }, { createdAt: "desc" }],
+    orderBy: [{ effectiveDate: "desc" }, { createdAt: "desc" }, { id: "desc" }],
     take: 1,
   },
-  insurancePolicies: { orderBy: [{ validUntil: "desc" }, { id: "asc" }] },
+  insurancePolicies: {
+    where: { deletedAt: null },
+    orderBy: [{ validUntil: "desc" }, { id: "asc" }],
+  },
 } satisfies Prisma.ScooterInclude;
 
 const scooterListInclude = {
@@ -75,9 +83,12 @@ const scooterListInclude = {
       insurancePolicy: { select: { validFrom: true, validUntil: true } },
     },
   },
-  insurancePolicies: { select: { validFrom: true, validUntil: true } },
+  insurancePolicies: {
+    where: { deletedAt: null },
+    select: { validFrom: true, validUntil: true },
+  },
   inspections: {
-    orderBy: [{ inspectionDate: "desc" }, { createdAt: "desc" }],
+    orderBy: [{ effectiveDate: "desc" }, { createdAt: "desc" }, { id: "desc" }],
     take: 1,
   },
 } satisfies Prisma.ScooterInclude;
@@ -216,13 +227,14 @@ export class ScootersService {
           data: { ...data, fleetNumber },
           include: scooterInclude,
         });
-        if (input.insurancePolicies?.length)
-          await writeInsurancePolicies(
-            tx,
-            scooter.id,
-            scooter.vin,
-            input.insurancePolicies,
-          );
+        const insuranceRevisions = input.insurancePolicies?.length
+          ? await writeInsurancePolicies(
+              tx,
+              scooter.id,
+              scooter.vin,
+              input.insurancePolicies,
+            )
+          : [];
         await this.documents.apply(
           tx,
           scooter.id,
@@ -234,9 +246,24 @@ export class ScootersService {
           editorSaveFingerprint(input),
           scooter.vin,
         );
+        await resolveInsuranceDateSources(
+          tx,
+          scooter.id,
+          scooter.vin,
+          insuranceRevisions,
+        );
+        await writeScooterItpValidity(
+          tx,
+          scooter.id,
+          input.itpValidUntil,
+          Boolean(input.documentDrafts?.length),
+        );
         await this.civVocabulary.remember(tx, input);
         await this.photos.applyDrafts(tx, scooter.id, preparedPhotos, userId);
-        return input.insurancePolicies?.length || preparedPhotos.length
+        return input.insurancePolicies?.length ||
+          preparedPhotos.length ||
+          input.itpValidUntil !== undefined ||
+          input.documentDrafts?.length
           ? tx.scooter.findUniqueOrThrow({
               where: { id: scooter.id },
               include: scooterInclude,
@@ -446,13 +473,16 @@ export class ScootersService {
               details: { field: "civAvailability" },
             });
         }
-        if (input.insurancePolicies?.length || input.vin !== undefined)
-          await writeInsurancePolicies(
-            tx,
-            id,
-            scooter.vin,
-            input.insurancePolicies,
-          );
+        const insuranceRevisions =
+          input.insurancePolicies?.length || input.vin !== undefined
+            ? await writeInsurancePolicies(
+                tx,
+                id,
+                scooter.vin,
+                input.insurancePolicies,
+              )
+            : [];
+        await removeInsurancePolicies(tx, id, input.removedInsurancePolicyIds);
         await this.documents.apply(
           tx,
           id,
@@ -464,8 +494,26 @@ export class ScootersService {
           editorSaveFingerprint(input),
           scooter.vin,
         );
+        await resolveInsuranceDateSources(
+          tx,
+          scooter.id,
+          scooter.vin,
+          insuranceRevisions,
+        );
+        await writeScooterItpValidity(
+          tx,
+          scooter.id,
+          input.itpValidUntil,
+          Boolean(
+            input.documentDrafts?.length || input.documentExtractions?.length,
+          ),
+        );
         await this.civVocabulary.remember(tx, input);
-        return input.insurancePolicies?.length
+        return input.insurancePolicies?.length ||
+          input.removedInsurancePolicyIds?.length ||
+          input.itpValidUntil !== undefined ||
+          input.documentDrafts?.length ||
+          input.documentExtractions?.length
           ? tx.scooter.findUniqueOrThrow({
               where: { id: scooter.id },
               include: scooterInclude,

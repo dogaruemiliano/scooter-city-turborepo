@@ -20,8 +20,19 @@ describe("insurance persistence", () => {
   };
   const tx = {
     scooterInsurancePolicy: model,
+    scooterInsuranceRevision: { findFirst: jest.fn(), create: jest.fn() },
   } as unknown as Prisma.TransactionClient;
-  beforeEach(() => jest.resetAllMocks());
+  beforeEach(() => {
+    jest.resetAllMocks();
+    for (const method of [model.create, model.update])
+      method.mockImplementation(({ data }) =>
+        Promise.resolve({
+          ...data,
+          createdAt: new Date("2026-01-01"),
+          updatedAt: new Date("2026-01-02"),
+        }),
+      );
+  });
   it("creates a renewal without deleting historical policies", async () => {
     await writeInsurancePolicies(tx, "scooter", policy.documentVin, [policy]);
     expect(model.create).toHaveBeenCalledWith({
@@ -51,9 +62,55 @@ describe("insurance persistence", () => {
     expect(model.findFirst).toHaveBeenCalledWith({
       where: {
         scooterId: "scooter",
+        deletedAt: null,
         documentVin: { not: "LXYTCKP05P0000002" },
       },
       select: { id: true },
     });
   });
+});
+
+it("keeps the previous policy snapshot when correcting dates", async () => {
+  const existing = {
+    ...policy,
+    scooterId: "scooter",
+    rawFields: {},
+    validFrom: new Date(policy.validFrom),
+    validUntil: new Date(policy.validUntil),
+    createdAt: new Date("2026-01-01"),
+    updatedAt: new Date("2026-01-02"),
+  };
+  const revisions = {
+    findFirst: jest.fn().mockResolvedValue(null),
+    create: jest.fn(),
+  };
+  const tx = {
+    scooterInsurancePolicy: {
+      findUnique: jest.fn().mockResolvedValue(existing),
+      update: jest
+        .fn()
+        .mockImplementation(({ data }) =>
+          Promise.resolve({ ...existing, ...data }),
+        ),
+      findFirst: jest.fn(),
+    },
+    scooterInsuranceRevision: revisions,
+  } as unknown as Prisma.TransactionClient;
+  await writeInsurancePolicies(
+    tx,
+    "scooter",
+    policy.documentVin,
+    [{ ...policy, validUntil: "2027-01-01" }],
+    "manual",
+  );
+  expect(revisions.create.mock.calls.map(([arg]) => arg.data)).toEqual([
+    expect.objectContaining({
+      source: "unknown",
+      snapshot: expect.objectContaining({ validUntil: "2026-12-31" }),
+    }),
+    expect.objectContaining({
+      source: "manual",
+      snapshot: expect.objectContaining({ validUntil: "2027-01-01" }),
+    }),
+  ]);
 });

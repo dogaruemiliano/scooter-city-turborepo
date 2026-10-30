@@ -77,6 +77,8 @@ export class AccessGuard implements CanActivate {
         "documentExtractions",
         "removedDocumentIds",
         "insurancePolicies",
+        "removedInsurancePolicyIds",
+        "itpValidUntil",
         "civVersion",
         "civIssuedAt",
         "civIssuingAuthority",

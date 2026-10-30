@@ -416,6 +416,7 @@ export const createScooterInputSchema = z
     photoDrafts: scooterPhotoDraftsSchema.optional(),
     sessionId: z.string().min(1).max(120).optional(),
     insurancePolicies: insurancePoliciesInputSchema.optional(),
+    itpValidUntil: dateOnlySchema.nullable().optional(),
     documentDrafts: scooterDocumentDraftsSchema.optional(),
     ...civMetadataSchema.shape,
     ...scooterTechnicalDetailsSchema.shape,
@@ -474,6 +475,15 @@ export const updateScooterInputSchema = z
     civAvailability: scooterCivAvailabilitySchema.optional(),
     sessionId: z.string().min(1).max(120).optional(),
     insurancePolicies: insurancePoliciesInputSchema.optional(),
+    removedInsurancePolicyIds: z
+      .array(z.string().min(1).max(120))
+      .max(100)
+      .refine(
+        (ids) => new Set(ids).size === ids.length,
+        "Duplicate insurance policy IDs",
+      )
+      .optional(),
+    itpValidUntil: dateOnlySchema.nullable().optional(),
     documentDrafts: scooterDocumentDraftsSchema.optional(),
     documentExtractions: z
       .array(scooterDocumentExtractionUpdateSchema)

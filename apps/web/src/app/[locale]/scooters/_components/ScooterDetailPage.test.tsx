@@ -19,8 +19,10 @@ import {
 } from "@/components/PageHeaderNavigation";
 // Gallery API interactions are covered independently in ScooterPhotos.test.tsx.
 vi.mock("./ScooterPhotos", () => ({ ScooterPhotos: vi.fn(() => null) }));
-// Inspection requests and confirmation are covered in ScooterItpPanel.test.tsx.
-vi.mock("./ScooterItpPanel", () => ({ ScooterItpPanel: () => null }));
+// Independent compliance forms are covered by their focused suites.
+vi.mock("./ScooterComplianceSection", () => ({
+  ScooterComplianceSection: () => null,
+}));
 
 const mocks = vi.hoisted(() => ({
   canReportProblem: true,

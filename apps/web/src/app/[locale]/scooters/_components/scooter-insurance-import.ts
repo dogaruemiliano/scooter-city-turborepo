@@ -179,6 +179,17 @@ export function parseInsuranceImport(
     }
   for (const [id, group] of groups) {
     const { normalized, rawFields } = mergePolicyReadings(group.readings);
+    if (
+      ![
+        normalized.insuredName,
+        normalized.validFrom,
+        normalized.validUntil,
+        normalized.premiumAmount,
+      ].some((value) => value !== null && value !== undefined && value !== "")
+    ) {
+      needsVinReview ||= !normalized.documentVin;
+      continue;
+    }
     const parsed = v1.scooters.insurancePolicyInputSchema.safeParse({
       ...normalized,
       id,

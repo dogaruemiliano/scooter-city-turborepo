@@ -4,6 +4,8 @@ import {
   type ScooterImportSnapshot,
   type ScooterImportStatus,
 } from "./scooter-import-workspace";
+import { ScooterItpValidityFields } from "./ScooterItpValidityFields";
+import { ScooterInsuranceSection } from "./ScooterInsuranceSection";
 import { ScooterInsuranceSelection } from "./ScooterInsuranceSelection";
 import { PageLayout } from "@repo/ui/components/page-layout";
 import { useFormAction } from "@/lib/form/use-form-action";
@@ -56,6 +58,7 @@ import {
 } from "./scooter-editor-messages";
 import {
   insuranceEditorDefaults,
+  insuranceEditorHasContent,
   scooterChangedFields,
   scooterCreateFormSchema,
   scooterEditFormSchema,
@@ -99,6 +102,7 @@ export function ScooterEditor({
   draftActions,
 }: ScooterEditorProps) {
   const formAction = useFormAction();
+  const expectedUpdatedAt = scooter?.updatedAt;
 
   const t = useTranslations("scooters");
   const router = useRouter();
@@ -152,9 +156,11 @@ export function ScooterEditor({
     {
       defaultValues: initialSnapshot?.values ?? scooterEditorDefaults(scooter),
       labelFor: (path) =>
-        path.startsWith("insurancePolicies.")
-          ? t(`insurance.fields.${path.split(".").at(-1)}`)
-          : t(`fields.${path === "brandId" ? "brand" : path}`),
+        path === "itpValidUntil"
+          ? t("itp.validUntil")
+          : path.startsWith("insurancePolicies.")
+            ? t(`insurance.fields.${path.split(".").at(-1)}`)
+            : t(`fields.${path === "brandId" ? "brand" : path}`),
       messageOverride: (issue, path) => scooterEditorMessage(issue, path, t),
       shouldFocusError: false,
     },
@@ -457,6 +463,25 @@ export function ScooterEditor({
       insuranceSelectionRequired
     )
       return;
+    const emptySavedPolicy = (form.getValues("insurancePolicies") ?? []).find(
+      (policy) =>
+        canWriteDocuments &&
+        scooter?.insurancePolicies?.some(
+          (saved) =>
+            saved.id === policy.id &&
+            insuranceEditorHasContent(insuranceEditorDefaults(saved)),
+        ) &&
+        !insuranceEditorHasContent(policy),
+    );
+    if (emptySavedPolicy) {
+      const index = (form.getValues("insurancePolicies") ?? []).indexOf(
+        emptySavedPolicy,
+      );
+      form.setError(`insurancePolicies.${index}.insuredName`, {
+        message: t("compliance.emptyInsurance"),
+      });
+      return;
+    }
     submitting.current = true;
     setRequestError(null);
     try {
@@ -478,7 +503,7 @@ export function ScooterEditor({
       const json = scooter ? scooterChangedFields(input, dirtyFields) : input;
       const payload: v1.scooters.UpdateScooterInput = {
         ...json,
-        ...(scooter?.updatedAt ? { expectedUpdatedAt: scooter.updatedAt } : {}),
+        ...(expectedUpdatedAt ? { expectedUpdatedAt } : {}),
         ...(!scooter && photoDrafts.length ? { photoDrafts } : {}),
         sessionId,
         ...documents.payload,
@@ -487,11 +512,36 @@ export function ScooterEditor({
           : {}),
         ...(importedRawFields ? { civRawFields: importedRawFields } : {}),
       };
+      if (scooter) {
+        const currentIds = new Set(
+          (form.getValues("insurancePolicies") ?? []).map(
+            (policy) => policy.id,
+          ),
+        );
+        const removed = (scooter.insurancePolicies ?? [])
+          .filter((policy) => !currentIds.has(policy.id))
+          .map((policy) => policy.id);
+        if (removed.length) payload.removedInsurancePolicyIds = removed;
+      }
+      const policyIds = new Set([
+        ...(input.insurancePolicies ?? []).map((policy) => policy.id),
+        ...(scooter?.insurancePolicies ?? []).map((policy) => policy.id),
+      ]);
+      payload.documentDrafts = payload.documentDrafts?.map(
+        ({ insurancePolicyId, ...draft }) => ({
+          ...draft,
+          ...(insurancePolicyId && policyIds.has(insurancePolicyId)
+            ? { insurancePolicyId }
+            : {}),
+        }),
+      );
       if (!canWriteDocuments) {
         delete payload.documentDrafts;
         delete payload.documentExtractions;
         delete payload.removedDocumentIds;
         delete payload.insurancePolicies;
+        delete payload.removedInsurancePolicyIds;
+        delete payload.itpValidUntil;
         delete payload.civVersion;
         delete payload.civIssuedAt;
         delete payload.civIssuingAuthority;
@@ -1074,6 +1124,52 @@ export function ScooterEditor({
                         {t("creation.scooterDetails")}
                       </h2>
                       <ScooterCreateFields
+                        compliance={(startNumber) => (
+                          <div className="grid gap-6">
+                            <ScooterItpValidityFields
+                              number={startNumber}
+                              scooter={scooter}
+                              evidence={[
+                                ...documents.existing.map((doc) => {
+                                  const entry = analysis.entries[doc.id];
+                                  return {
+                                    ...doc,
+                                    extractedData:
+                                      entry?.status === "success"
+                                        ? entry.analysis.extractedData
+                                        : doc.extractedData,
+                                  };
+                                }),
+                                ...documents.drafts.flatMap((draft) => {
+                                  const entry = analysis.entries[draft.id];
+                                  return entry?.status === "success"
+                                    ? [
+                                        {
+                                          id: draft.id,
+                                          fileName: draft.file.name,
+                                          extractedData:
+                                            entry.analysis.extractedData,
+                                        },
+                                      ]
+                                    : [];
+                                }),
+                              ]}
+                              disabled={isSubmitting || !canWriteDocuments}
+                            />
+                            <ScooterInsuranceSection
+                              number={startNumber + 1}
+                              scooter={scooter}
+                              disabled={isSubmitting}
+                              onRemoveDraftPolicy={(id) =>
+                                documents.drafts
+                                  .filter((doc) => doc.insurancePolicyId === id)
+                                  .forEach((doc) =>
+                                    documents.removeDraft(doc.id),
+                                  )
+                              }
+                            />
+                          </div>
+                        )}
                         editing={Boolean(scooter)}
                         photos={
                           <ScooterPhotos

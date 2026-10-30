@@ -1,8 +1,10 @@
+import { parseDocumentImport } from "./scooter-document-import";
 import { messages } from "@repo/i18n";
 import { v1 } from "@repo/api-shared";
 import { describe, expect, it } from "vitest";
 import {
   CREATE_FIELDS,
+  SCOOTER_EDITOR_SECTIONS,
   insuranceEditorDefaults,
   scooterChangedFields,
   scooterCreateFormSchema,
@@ -21,6 +23,77 @@ const validValues = () => ({
 });
 
 describe("scooter editor conversion", () => {
+  it("keeps commercial name out of the visible field sections", () => {
+    const fields = SCOOTER_EDITOR_SECTIONS.flatMap((section) => [
+      ...section.fields,
+    ]);
+    expect(fields).toContain("model");
+    expect(fields).not.toContain("commercialName");
+  });
+
+  it("loads the commercial name into Model and falls back to legacy models", () => {
+    for (const [commercialName, model, expected] of [
+      ["NMAX 125", "Old model", "NMAX 125"],
+      [null, "Legacy model", "Legacy model"],
+      ["", "Legacy model", "Legacy model"],
+    ]) {
+      const values = scooterEditorDefaults({
+        commercialName,
+        model,
+      } as v1.scooters.Scooter);
+      expect(values.model).toBe(expected);
+      expect(values.commercialName).toBe(expected);
+    }
+  });
+
+  it.each([
+    { commercialName: "NMAX 125" },
+    { model: "NMAX 125" },
+    { commercialName: "NMAX 125", model: "Old model" },
+  ])("imports a single model value from documentary names: %j", (source) => {
+    const result = parseDocumentImport(
+      JSON.stringify(source),
+      [],
+      validValues(),
+      false,
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok)
+      expect(result.values).toMatchObject({
+        model: "NMAX 125",
+        commercialName: "NMAX 125",
+      });
+  });
+
+  it("uses one Model input for the commercial name on create and edit", () => {
+    const values = {
+      ...validValues(),
+      model: " NMAX 125 ",
+      commercialName: "Old name",
+    };
+    expect(scooterCreateFormSchema.parse(values)).toMatchObject({
+      model: "NMAX 125",
+      commercialName: "NMAX 125",
+    });
+    const input = scooterEditFormSchema.parse({ ...values, fleetNumber: "7" });
+    expect(scooterChangedFields(input, { model: true })).toEqual({
+      model: "NMAX 125",
+      commercialName: "NMAX 125",
+    });
+    expect(scooterChangedFields(input, { color: true })).not.toHaveProperty(
+      "commercialName",
+    );
+    const cleared = scooterEditFormSchema.parse({
+      ...values,
+      fleetNumber: "7",
+      model: "",
+    });
+    expect(scooterChangedFields(cleared, { model: true })).toEqual({
+      model: null,
+      commercialName: null,
+    });
+  });
+
   it("saves only changed phone equipment and preserves false versus unknown", () => {
     const input = scooterEditFormSchema.parse({
       ...validValues(),
@@ -127,24 +200,21 @@ describe("scooter editor conversion", () => {
     expect(input.insurancePolicies).toEqual([]);
   });
 
-  it("still validates incomplete insurance details and attached empty policy evidence", () => {
-    for (const policy of [
-      { ...insuranceEditorDefaults(), insuredName: "ScooterCity" },
-      { ...insuranceEditorDefaults(), sourceFileNames: ["insurance.pdf"] },
-    ]) {
-      const result = scooterCreateFormSchema.safeParse({
-        ...validValues(),
-        insurancePolicies: [policy],
-      });
-      expect(result.success).toBe(false);
-      if (!result.success)
-        expect(
-          result.error.issues.some(
-            (issue) =>
-              issue.path.join(".") === "insurancePolicies.0.vinReviewConfirmed",
-          ),
-        ).toBe(true);
-    }
+  it("accepts manual insurance without a VIN checkbox and skips empty evidence placeholders", () => {
+    const manual = scooterCreateFormSchema.parse({
+      ...validValues(),
+      insurancePolicies: [
+        { ...insuranceEditorDefaults(), insuredName: "ScooterCity" },
+      ],
+    });
+    expect(manual.insurancePolicies).toHaveLength(1);
+    const empty = scooterCreateFormSchema.parse({
+      ...validValues(),
+      insurancePolicies: [
+        { ...insuranceEditorDefaults(), sourceFileNames: ["insurance.pdf"] },
+      ],
+    });
+    expect(empty.insurancePolicies).toEqual([]);
   });
   it("has localized labels for every form field in English and Romanian", () => {
     for (const locale of ["en", "ro"] as const)
