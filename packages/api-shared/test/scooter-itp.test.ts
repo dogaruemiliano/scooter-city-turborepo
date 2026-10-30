@@ -73,7 +73,7 @@ test("manual ITP validity is distinct from an appointment and does not imply a p
     expectedLatestId: null,
     inspectionDate: null,
     validUntil: "2027-01-01",
-    result: "unknown",
+    result: "unknown" as const,
     certificateNumber: null,
     odometerKm: null,
     cardDocumentId: null,

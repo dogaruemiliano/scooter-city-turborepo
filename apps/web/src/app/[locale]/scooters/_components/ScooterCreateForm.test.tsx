@@ -84,7 +84,7 @@ describe("ScooterCreateForm combined review", () => {
       screen.getByRole("textbox", { name: "Current mileage (km)" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: /06.*Condition & equipment/ }),
+      screen.getByRole("heading", { name: /07.*Condition & equipment/ }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Create scooter" }),

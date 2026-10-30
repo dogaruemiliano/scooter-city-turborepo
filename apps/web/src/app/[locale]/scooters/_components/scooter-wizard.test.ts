@@ -125,7 +125,7 @@ describe("scooter creation review steps", () => {
     expect(stepFields("operational")).not.toContain("maxSpeedKmh");
   });
 
-  it("routes each scalar field to exactly one review stage when all review types exist", () => {
+  it("routes each editable scalar field to exactly one review stage when all review types exist", () => {
     const fields = [
       "civ",
       "registration_certificate",
@@ -135,6 +135,9 @@ describe("scooter creation review steps", () => {
     expect(new Set(fields).size).toBe(fields.length);
     expect(
       fields.filter((field) => field !== "insurancePolicies").sort(),
-    ).toEqual([...CREATE_FIELDS].sort());
+    ).toEqual(
+      CREATE_FIELDS.filter((field) => field !== "commercialName").sort(),
+    );
+    expect(fields).not.toContain("commercialName");
   });
 });

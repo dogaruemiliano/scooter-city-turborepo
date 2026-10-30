@@ -82,14 +82,14 @@ it("keeps the previous policy snapshot when correcting dates", async () => {
   };
   const revisions = {
     findFirst: jest.fn().mockResolvedValue(null),
-    create: jest.fn(),
+    create: jest.fn<unknown, [{ data: unknown }]>(),
   };
   const tx = {
     scooterInsurancePolicy: {
       findUnique: jest.fn().mockResolvedValue(existing),
       update: jest
         .fn()
-        .mockImplementation(({ data }) =>
+        .mockImplementation(({ data }: { data: Record<string, unknown> }) =>
           Promise.resolve({ ...existing, ...data }),
         ),
       findFirst: jest.fn(),
@@ -103,14 +103,14 @@ it("keeps the previous policy snapshot when correcting dates", async () => {
     [{ ...policy, validUntil: "2027-01-01" }],
     "manual",
   );
-  expect(revisions.create.mock.calls.map(([arg]) => arg.data)).toEqual([
-    expect.objectContaining({
+  expect(revisions.create.mock.calls.map(([arg]) => arg.data)).toMatchObject([
+    {
       source: "unknown",
-      snapshot: expect.objectContaining({ validUntil: "2026-12-31" }),
-    }),
-    expect.objectContaining({
+      snapshot: { validUntil: "2026-12-31" },
+    },
+    {
       source: "manual",
-      snapshot: expect.objectContaining({ validUntil: "2027-01-01" }),
-    }),
+      snapshot: { validUntil: "2027-01-01" },
+    },
   ]);
 });

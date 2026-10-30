@@ -195,8 +195,11 @@ describe("Scooters HTTP surface (e2e)", () => {
       .post(v1.scooters.ROUTES.itp.create(scooter.id))
       .set("Cookie", cookie)
       .send(input)
-      .expect(201);
-    expect(first.body).toMatchObject({
+      .expect(201)
+      .then((response) =>
+        v1.scooters.scooterItpInspectionSchema.parse(response.body),
+      );
+    expect(first).toMatchObject({
       source: "manual",
       inspectionDate: null,
       result: "unknown",
@@ -218,20 +221,27 @@ describe("Scooters HTTP surface (e2e)", () => {
     const confirmed = await req()
       .post(v1.scooters.ROUTES.itp.create(scooter.id))
       .set("Cookie", cookie)
-      .send({ ...input, expectedLatestId: first.body.id, result: "passed" })
-      .expect(201);
+      .send({ ...input, expectedLatestId: first.id, result: "passed" })
+      .expect(201)
+      .then((response) =>
+        v1.scooters.scooterItpInspectionSchema.parse(response.body),
+      );
     const summary = await req()
       .get(v1.scooters.ROUTES.get(scooter.id))
       .set("Cookie", cookie)
-      .expect(200);
-    expect(summary.body.itpStatus).toBe("active");
+      .expect(200)
+      .then((response) => v1.scooters.scooterSchema.parse(response.body));
+    expect(summary.itpStatus).toBe("active");
     const history = await req()
       .get(v1.scooters.ROUTES.itp.list(scooter.id))
       .set("Cookie", cookie)
-      .expect(200);
-    expect(history.body.inspections).toHaveLength(2);
-    expect(history.body.inspections[0].id).toBe(confirmed.body.id);
-    expect(summary.body.missingClientDocuments).toContain("itp_card");
+      .expect(200)
+      .then((response) =>
+        v1.scooters.scooterItpListSchema.parse(response.body),
+      );
+    expect(history.inspections).toHaveLength(2);
+    expect(history.inspections[0].id).toBe(confirmed.id);
+    expect(summary.missingClientDocuments).toContain("itp_card");
   });
 
   it("saves just an ITP expiry without insurance fields and rejects empty insurance", async () => {
@@ -250,17 +260,18 @@ describe("Scooters HTTP surface (e2e)", () => {
         itpValidUntil: "2027-12-31",
         expectedUpdatedAt: scooter.updatedAt,
       })
-      .expect(200);
-    expect(saved.body).toMatchObject({
+      .expect(200)
+      .then((response) => v1.scooters.scooterSchema.parse(response.body));
+    expect(saved).toMatchObject({
       itpValidUntil: "2027-12-31",
       insurancePolicies: [],
     });
-    expect(saved.body.updatedAt).not.toBe(scooter.updatedAt);
+    expect(saved.updatedAt).not.toBe(scooter.updatedAt);
     await req()
       .patch(v1.scooters.ROUTES.insurance.update(scooter.id))
       .set("Cookie", cookie)
       .send({
-        expectedUpdatedAt: saved.body.updatedAt,
+        expectedUpdatedAt: saved.updatedAt,
         source: "manual",
         policies: [
           {
@@ -301,20 +312,22 @@ describe("Scooters HTTP surface (e2e)", () => {
       .post(v1.scooters.ROUTES.create)
       .set("Cookie", cookie)
       .send({ ...scooterInput(), insurancePolicies: [first, second] })
-      .expect(201);
-    const id = created.body.id as string;
+      .expect(201)
+      .then((response) => v1.scooters.scooterSchema.parse(response.body));
+    const id = created.id;
     const saved = await req()
       .patch(v1.scooters.ROUTES.update(id))
       .set("Cookie", cookie)
       .send({
-        expectedUpdatedAt: created.body.updatedAt,
+        expectedUpdatedAt: created.updatedAt,
         itpValidUntil: "2028-01-01",
         color: "Red",
         insurancePolicies: [{ ...second, insuredName: "Updated Fleet" }],
         removedInsurancePolicyIds: [first.id],
       })
-      .expect(200);
-    expect(saved.body).toMatchObject({
+      .expect(200)
+      .then((response) => v1.scooters.scooterSchema.parse(response.body));
+    expect(saved).toMatchObject({
       color: "Red",
       itpValidUntil: "2028-01-01",
       insurancePolicies: [{ id: second.id, insuredName: "Updated Fleet" }],
@@ -330,7 +343,7 @@ describe("Scooters HTTP surface (e2e)", () => {
       .patch(v1.scooters.ROUTES.update(id))
       .set("Cookie", cookie)
       .send({
-        expectedUpdatedAt: saved.body.updatedAt,
+        expectedUpdatedAt: saved.updatedAt,
         removedInsurancePolicyIds: [second.id],
       })
       .expect(409);
@@ -371,9 +384,12 @@ describe("Scooters HTTP surface (e2e)", () => {
       .patch(v1.scooters.ROUTES.insurance.update(scooter.id))
       .set("Cookie", cookie)
       .send(payload)
-      .expect(200);
-    expect(first.body.policies[0].premiumAmount).toBe(0);
-    expect(first.body.history[0]).toMatchObject({
+      .expect(200)
+      .then((response) =>
+        v1.scooters.scooterInsuranceListSchema.parse(response.body),
+      );
+    expect(first.policies[0].premiumAmount).toBe(0);
+    expect(first.history[0]).toMatchObject({
       source: "manual",
       snapshot: { validUntil: "2027-01-01" },
     });
@@ -387,25 +403,26 @@ describe("Scooters HTTP surface (e2e)", () => {
       .set("Cookie", cookie)
       .send({
         ...payload,
-        expectedUpdatedAt: first.body.updatedAt,
+        expectedUpdatedAt: first.updatedAt,
         policies: [{ ...policy, validUntil: "2028-01-01" }],
       })
-      .expect(200);
-    expect(
-      corrected.body.history.map(
-        (entry: { snapshot: { validUntil: string } }) =>
-          entry.snapshot.validUntil,
-      ),
-    ).toEqual(["2028-01-01", "2027-01-01"]);
+      .expect(200)
+      .then((response) =>
+        v1.scooters.scooterInsuranceListSchema.parse(response.body),
+      );
+    expect(corrected.history.map((entry) => entry.snapshot.validUntil)).toEqual(
+      ["2028-01-01", "2027-01-01"],
+    );
     const summary = await req()
       .get(v1.scooters.ROUTES.get(scooter.id))
       .set("Cookie", cookie)
-      .expect(200);
-    expect(summary.body.itpStatus).toBe("missing");
+      .expect(200)
+      .then((response) => v1.scooters.scooterSchema.parse(response.body));
+    expect(summary.itpStatus).toBe("missing");
     await req()
       .delete(v1.scooters.ROUTES.insurance.delete(scooter.id, policy.id))
       .set("Cookie", cookie)
-      .send({ expectedUpdatedAt: corrected.body.updatedAt })
+      .send({ expectedUpdatedAt: corrected.updatedAt })
       .expect(409);
     const replacement = {
       ...policy,
@@ -418,19 +435,25 @@ describe("Scooters HTTP surface (e2e)", () => {
       .set("Cookie", cookie)
       .send({
         source: "manual",
-        expectedUpdatedAt: corrected.body.updatedAt,
+        expectedUpdatedAt: corrected.updatedAt,
         policies: [replacement],
       })
-      .expect(200);
+      .expect(200)
+      .then((response) =>
+        v1.scooters.scooterInsuranceListSchema.parse(response.body),
+      );
     const deletion = await req()
       .delete(v1.scooters.ROUTES.insurance.delete(scooter.id, policy.id))
       .set("Cookie", cookie)
-      .send({ expectedUpdatedAt: added.body.updatedAt })
-      .expect(200);
-    expect(deletion.body.policies).toEqual([
+      .send({ expectedUpdatedAt: added.updatedAt })
+      .expect(200)
+      .then((response) =>
+        v1.scooters.scooterInsuranceListSchema.parse(response.body),
+      );
+    expect(deletion.policies).toEqual([
       expect.objectContaining({ id: replacement.id }),
     ]);
-    expect(deletion.body.history[0]).toMatchObject({
+    expect(deletion.history[0]).toMatchObject({
       action: "deleted",
       snapshot: { id: policy.id, validUntil: "2028-01-01" },
     });
@@ -587,42 +610,46 @@ describe("Scooters HTTP surface (e2e)", () => {
       const detail = await req()
         .get(v1.scooters.ROUTES.get(scooterId))
         .set("Cookie", cookie)
-        .expect(200);
-      expect(v1.scooters.scooterSchema.parse(detail.body).documents).toEqual([
+        .expect(200)
+        .then((response) => v1.scooters.scooterSchema.parse(response.body));
+      expect(detail.documents).toEqual([
         expect.objectContaining({ type: "insurance", insurancePolicyId: id }),
       ]);
-      await req()
-        .get(
-          v1.scooters.scooterSchema.parse(detail.body).documents![0].contentUrl,
-        )
-        .expect(401);
+      await req().get(detail.documents![0].contentUrl).expect(401);
       const replacement = {
         ...policy,
         id: crypto.randomUUID(),
         insuredName: "Replacement policy",
       };
       const added = await req()
-        .patch(v1.scooters.ROUTES.insurance.update(scooterId!))
+        .patch(v1.scooters.ROUTES.insurance.update(scooterId))
         .set("Cookie", cookie)
         .send({
           source: "manual",
-          expectedUpdatedAt: detail.body.updatedAt,
+          expectedUpdatedAt: detail.updatedAt,
           policies: [replacement],
         })
-        .expect(200);
+        .expect(200)
+        .then((response) =>
+          v1.scooters.scooterInsuranceListSchema.parse(response.body),
+        );
       const deleted = await req()
-        .delete(v1.scooters.ROUTES.insurance.delete(scooterId!, id))
+        .delete(v1.scooters.ROUTES.insurance.delete(scooterId, id))
         .set("Cookie", cookie)
-        .send({ expectedUpdatedAt: added.body.updatedAt })
-        .expect(200);
-      expect(deleted.body.policies).toEqual([
+        .send({ expectedUpdatedAt: added.updatedAt })
+        .expect(200)
+        .then((response) =>
+          v1.scooters.scooterInsuranceListSchema.parse(response.body),
+        );
+      expect(deleted.policies).toEqual([
         expect.objectContaining({ id: replacement.id }),
       ]);
       const retained = await req()
-        .get(v1.scooters.ROUTES.get(scooterId!))
+        .get(v1.scooters.ROUTES.get(scooterId))
         .set("Cookie", cookie)
-        .expect(200);
-      expect(retained.body.documents).toEqual([
+        .expect(200)
+        .then((response) => v1.scooters.scooterSchema.parse(response.body));
+      expect(retained.documents).toEqual([
         expect.objectContaining({ insurancePolicyId: id }),
       ]);
       expect(

@@ -57,13 +57,13 @@ describe("Scooter creation follow-up and optional steps", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("keeps section 5 inline when recovering an invalid mileage", async () => {
+  it("keeps the condition section inline when recovering an invalid mileage", async () => {
     const browser = userEvent.setup();
     renderWizard();
     await fillWizardIdentity(browser);
     await chooseSelectOption(browser, "Registration type", "Unregistered");
     expect(
-      screen.getByRole("heading", { name: /06.*Condition & equipment/ }),
+      screen.getByRole("heading", { name: /07.*Condition & equipment/ }),
     ).toBeInTheDocument();
     await browser.type(
       screen.getByRole("textbox", { name: "Current mileage (km)" }),
