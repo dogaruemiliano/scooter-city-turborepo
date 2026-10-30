@@ -69,6 +69,90 @@ afterEach(() => {
 });
 
 describe("Scooter photo gallery", () => {
+  it.each(["en", "ro"] as const)(
+    "shows visible delete buttons and drag help in %s",
+    async (locale) => {
+      const user = userEvent.setup();
+      const t = messages[locale].scooters.photos;
+      mocks.fetch.mockImplementation(async (_path, _schema, options) =>
+        options?.method === "DELETE"
+          ? [photo("one")]
+          : [photo("one"), photo("two")],
+      );
+      renderGallery(true, locale);
+      const remove = await screen.findByRole("button", {
+        name: t.deleteNamed.replace("{name}", "two.jpg"),
+      });
+      expect(remove).toBeVisible();
+      expect(remove).toHaveAttribute(
+        "title",
+        t.deleteNamed.replace("{name}", "two.jpg"),
+      );
+      expect(
+        remove.parentElement?.closest('button, [role="button"]'),
+      ).toBeNull();
+      expect(screen.getByText(t.dragHint)).toBeVisible();
+      await user.click(remove);
+      await waitFor(() => expect(screen.queryByAltText("two.jpg")).toBeNull());
+      expect(mocks.fetch).toHaveBeenCalledWith(
+        routes.photo("scooter-1", "two"),
+        expect.anything(),
+        expect.objectContaining({ method: "DELETE" }),
+      );
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    },
+  );
+
+  it("blocks duplicate deletion while pending and allows keyboard retry after failure", async () => {
+    const user = userEvent.setup();
+    let rejectRemoval!: (reason: Error) => void;
+    mocks.fetch.mockImplementation(async (_path, _schema, options) => {
+      if (options?.method === "DELETE")
+        return new Promise((_resolve, reject) => {
+          rejectRemoval = reject;
+        });
+      return [photo("one"), photo("two")];
+    });
+    renderGallery();
+    const remove = await screen.findByRole("button", {
+      name: "Delete photo: two.jpg",
+    });
+    remove.focus();
+    await user.keyboard("{Enter}");
+    expect(remove).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "Delete photo: one.jpg" }),
+    ).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Add photos" })).toBeDisabled();
+    await user.click(remove);
+    expect(
+      mocks.fetch.mock.calls.filter((call) => call[2]?.method === "DELETE"),
+    ).toHaveLength(1);
+    await act(async () => rejectRemoval(new Error("Offline")));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "The change couldn’t be saved",
+    );
+    expect(screen.getByAltText("two.jpg")).toBeInTheDocument();
+    await waitFor(() => expect(remove).toBeEnabled());
+    expect(remove).toHaveAccessibleName("Delete photo: two.jpg");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    mocks.fetch.mockResolvedValue([photo("one")]);
+    remove.focus();
+    await user.keyboard(" ");
+    await waitFor(() => expect(screen.queryByAltText("two.jpg")).toBeNull());
+  });
+
+  it("disables visible delete actions when the gallery is disabled", async () => {
+    render(
+      <NextIntlClientProvider locale="en" messages={messages.en}>
+        <ScooterPhotoGallery scooterId="scooter-1" editable disabled />
+      </NextIntlClientProvider>,
+    );
+    expect(
+      await screen.findByRole("button", { name: "Delete photo: one.jpg" }),
+    ).toBeDisabled();
+  });
+
   it("shows one Cover badge independently of public visibility", async () => {
     mocks.fetch.mockResolvedValue([
       photo("one", { isPublic: true }),
@@ -149,6 +233,9 @@ describe("Scooter photo gallery", () => {
       card.focus();
       fireEvent.keyDown(card, { key: " ", code: "Space" });
       await waitFor(() => expect(card).toHaveAttribute("aria-pressed", "true"));
+      expect(
+        screen.getByRole("button", { name: "Delete photo: two.jpg" }),
+      ).toBeDisabled();
       fireEvent.keyDown(card, { key: "ArrowDown", code: "ArrowDown" });
       await screen.findByText("Release to delete this photo");
       fireEvent.keyDown(card, { key: " ", code: "Space" });
@@ -546,6 +633,12 @@ describe("Scooter photo gallery", () => {
     await screen.findByAltText("one.jpg");
     expect(
       screen.queryByRole("button", { name: "Add photos" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Delete photo/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(messages.en.scooters.photos.dragHint),
     ).not.toBeInTheDocument();
   });
 

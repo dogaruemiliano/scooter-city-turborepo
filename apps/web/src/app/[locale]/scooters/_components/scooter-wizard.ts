@@ -75,7 +75,7 @@ export function stepFields(
     case "registration_certificate":
       return ["registrationCertificateNumber", ...REGISTRATION_FIELDS];
     case "insurance":
-      return ["insurancePolicies"];
+      return ["itpValidUntil", "insurancePolicies"];
     case "operational":
       return [...OPERATIONAL_FIELDS];
   }

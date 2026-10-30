@@ -65,6 +65,12 @@ export const ROUTES = {
     discard: (id: string) =>
       `/v1/scooters/import-drafts/${encodeURIComponent(id)}/discard`,
   },
+  insurance: {
+    delete: (id: string, policyId: string) =>
+      `/v1/scooters/${encodeURIComponent(id)}/insurance/${encodeURIComponent(policyId)}`,
+    list: (id: string) => `/v1/scooters/${encodeURIComponent(id)}/insurance`,
+    update: (id: string) => `/v1/scooters/${encodeURIComponent(id)}/insurance`,
+  },
   itp: {
     list: (id: string) => `/v1/scooters/${encodeURIComponent(id)}/itp`,
     create: (id: string) => `/v1/scooters/${encodeURIComponent(id)}/itp`,

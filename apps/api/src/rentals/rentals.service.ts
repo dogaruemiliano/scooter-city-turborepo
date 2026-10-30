@@ -133,7 +133,9 @@ export class RentalsService {
     });
     if (!row) throw new NotFoundException("Scooter not found");
     const inspections = (row.inspections ?? []).map((inspection) => ({
-      inspectionDate: toDateOnlyString(inspection.inspectionDate)!,
+      inspectionDate: toDateOnlyString(inspection.inspectionDate),
+      effectiveDate: toDateOnlyString(inspection.effectiveDate) ?? undefined,
+      createdAt: inspection.createdAt.toISOString(),
       validUntil: toDateOnlyString(inspection.validUntil),
       result: v1.scooters.scooterItpResultSchema.parse(inspection.result),
     }));

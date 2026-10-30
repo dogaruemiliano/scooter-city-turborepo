@@ -45,7 +45,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 export const Landscape: Story = {};
-/** Paper cards follow image/PDF proportions up to A4 portrait height, with interactive overlays. */
+/** Paper cards use a fixed A4 frame with an uncropped preview over a dark, blurred fill. */
 /** Header and footer share the scroll rail’s quintic smootherstep fade, with a darker text backing. */
 export const PaperWithOverlays: Story = {
   render: function Render(args) {
@@ -147,6 +147,83 @@ export const AllDocumentStates: Story = {
               bottomOverlay={<DocumentStatus state={state} label={label} />}
             />
             <p className="mt-2 text-sm text-muted-foreground">{label}</p>
+          </div>
+        ))}
+      </div>
+    );
+  },
+};
+
+/** Mixed document proportions retain matching card heights, including empty cards. */
+export const MixedFormats: Story = {
+  render: function Render(args) {
+    const [active, setActive] = useState<string | null>(null);
+    const documents = [
+      {
+        label: "Landscape CIV",
+        src: new URL(
+          "../stories/fixtures/sample-landscape-document.svg",
+          import.meta.url,
+        ).href,
+        contentType: "image/svg+xml",
+        fileName: "CIV.svg",
+      },
+      {
+        label: "A4 registration",
+        src: sampleDocumentUrl,
+        contentType: "image/svg+xml",
+        fileName: "registration.svg",
+      },
+      {
+        label: "PDF document",
+        src: new URL(
+          "../stories/fixtures/sample-two-pages.pdf",
+          import.meta.url,
+        ).href,
+        contentType: "application/pdf",
+        fileName: "document.pdf",
+      },
+      {
+        label: "Add document",
+        src: undefined,
+        contentType: undefined,
+        fileName: undefined,
+      },
+    ];
+    return (
+      <div
+        className="grid w-full gap-3"
+        style={{ gridTemplateColumns: viewportSizing.scooterDocumentGrid }}
+      >
+        {documents.map((document) => (
+          <div
+            key={document.label}
+            className="w-full min-w-0"
+            style={{ maxWidth: viewportSizing.scooterDocumentCardMax }}
+          >
+            <DocumentPreview
+              {...args}
+              {...document}
+              layout="paper"
+              triggerLabel={document.label}
+              imageAlt={document.label}
+              title={document.label}
+              emptyLabel={document.fileName ? undefined : document.label}
+              open={active === document.label}
+              onOpenChange={(open) => setActive(open ? document.label : null)}
+              headerOverlay={
+                document.fileName ? (
+                  <span className="truncate py-2 text-sm font-medium">
+                    {document.fileName}
+                  </span>
+                ) : undefined
+              }
+              bottomOverlay={
+                document.fileName ? (
+                  <span className="text-xs">{document.label}</span>
+                ) : undefined
+              }
+            />
           </div>
         ))}
       </div>

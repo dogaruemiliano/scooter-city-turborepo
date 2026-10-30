@@ -1440,18 +1440,21 @@ model ScooterItpInspection {
   id                    String    @id @default(cuid())
   scooterId             String
   scooter               Scooter   @relation(fields: [scooterId], references: [id], onDelete: Cascade)
-  inspectionDate        DateTime  @db.Date
+  inspectionDate        DateTime? @db.Date
+  effectiveDate         DateTime  @default(now()) @db.Date
+  source                String    @default("document")
   validUntil            DateTime? @db.Date
   result                String
   certificateNumber     String?
   odometerKm            Int?
-  cardDocumentId        String
-  certificateDocumentId String
+  cardDocumentId        String?
+  certificateDocumentId String?
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
   @@unique([scooterId, cardDocumentId, certificateDocumentId, inspectionDate])
   @@index([scooterId, inspectionDate])
+  @@index([scooterId, effectiveDate, createdAt])
 }
 
 enum ScooterPhotoType {
@@ -1537,20 +1540,22 @@ model CivVocabularyEntry {
 
 /// A historical policy. Coverage status is derived from dates, never stored.
 model ScooterInsurancePolicy {
-  id                 String            @id @default(cuid())
+  id                 String                     @id @default(cuid())
   scooterId          String
-  scooter            Scooter           @relation(fields: [scooterId], references: [id], onDelete: Cascade)
+  scooter            Scooter                    @relation(fields: [scooterId], references: [id], onDelete: Cascade)
   insuredName        String?
-  validFrom          DateTime?         @db.Date
-  validUntil         DateTime?         @db.Date
-  premiumAmount      Decimal?          @db.Decimal(12, 2)
-  currency           String?           @db.VarChar(3)
-  documentVin        String?           @db.VarChar(17)
-  vinReviewConfirmed Boolean           @default(false)
+  validFrom          DateTime?                  @db.Date
+  validUntil         DateTime?                  @db.Date
+  premiumAmount      Decimal?                   @db.Decimal(12, 2)
+  currency           String?                    @db.VarChar(3)
+  documentVin        String?                    @db.VarChar(17)
+  vinReviewConfirmed Boolean                    @default(false)
   rawFields          Json?
   documents          ScooterDocument[]
-  createdAt          DateTime          @default(now())
-  updatedAt          DateTime          @updatedAt
+  revisions          ScooterInsuranceRevision[]
+  deletedAt          DateTime?
+  createdAt          DateTime                   @default(now())
+  updatedAt          DateTime                   @updatedAt
 
   @@unique([id, scooterId])
   @@index([scooterId, validUntil])
@@ -1725,4 +1730,17 @@ model Rental {
   @@unique([scooterId], map: "Rental_one_active_scooter", where: { status: "active" })
   @@index([personId, createdAt])
   @@index([scooterId, status, startsAt, endsAt])
+}
+
+/// Immutable snapshots retain insurance values before and after each change.
+model ScooterInsuranceRevision {
+  id        String                 @id @default(cuid())
+  policyId  String
+  policy    ScooterInsurancePolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  snapshot  Json
+  action    String                 @default("change")
+  source    String                 @default("unknown")
+  createdAt DateTime               @default(now())
+
+  @@index([policyId, createdAt])
 }

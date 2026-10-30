@@ -129,17 +129,30 @@ export async function runE2e(
 ): Promise<number> {
   const { run } = dependencies;
   const generalEnv = { ...config.env, DATABASE_URL: config.general.href };
-  // Prisma 7: migrate deploy applies committed migrations without generating
-  // artifacts or seeding. Run generate and db seed explicitly.
-  // Verified 2026-10-15: https://www.prisma.io/docs/cli/v7/migrate/deploy
+  // Prisma 7: migrate deploy does not generate artifacts or seed. Keep both
+  // explicit, and let Turbo restore the client only when its schema/config and
+  // installed dependency inputs match. Direct package runs use the same prep.
+  // Verified 2026-10-30: https://www.prisma.io/docs/cli/v7/migrate/deploy
   const prepare = async (args: string[], env = generalEnv) => {
     if (await run(args, env))
       throw new Error(`E2E preparation failed: pnpm ${args.join(" ")}`);
   };
-  for (const name of ["@repo/theme", "@repo/i18n", "@repo/api-shared"]) {
-    await prepare(["--filter", name, "build"]);
-  }
-  await prepare(["exec", "prisma", "generate"]);
+  await prepare([
+    "--workspace-root",
+    "exec",
+    "turbo",
+    "run",
+    "build",
+    "--filter=api^...",
+  ]);
+  await prepare([
+    "--workspace-root",
+    "exec",
+    "turbo",
+    "run",
+    "db:generate",
+    "--filter=api",
+  ]);
   const jest = (filenames: string[], env: Env) =>
     run(
       [

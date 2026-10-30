@@ -32,6 +32,7 @@ try {
 }
 
 const checks = [
+  ["CI job selection", ["exec", "node", "--test", "scripts/ci-plan.test.mjs"]],
   ["Lint", ["lint", "--force"]],
   ["Typecheck", ["check-types", "--force"]],
   ["Unit tests", ["test", "--force"]],

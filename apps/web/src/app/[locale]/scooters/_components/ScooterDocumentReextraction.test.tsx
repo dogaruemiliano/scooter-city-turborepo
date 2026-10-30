@@ -119,6 +119,11 @@ describe("document reextraction sheet", () => {
     });
     await waitFor(() => expect(model).toBeEnabled());
     expect(model).not.toBeChecked();
+    expect(
+      within(dialog).queryByRole("checkbox", {
+        name: messages.ro.scooters.fields.commercialName,
+      }),
+    ).not.toBeInTheDocument();
     const date = within(dialog).getByRole("checkbox", {
       name: messages.ro.scooters.fields.civIssuedAt,
     });

@@ -66,3 +66,58 @@ test("ITP confirmation requires reviewed paired evidence and explicit validity f
       false,
     );
 });
+
+test("manual ITP validity is distinct from an appointment and does not imply a passed result", () => {
+  const input = {
+    source: "manual",
+    expectedLatestId: null,
+    inspectionDate: null,
+    validUntil: "2027-01-01",
+    result: "unknown" as const,
+    certificateNumber: null,
+    odometerKm: null,
+    cardDocumentId: null,
+    certificateDocumentId: null,
+    evidenceReviewed: true,
+  };
+  assert.ok(scooterItpInputSchema.safeParse(input).success);
+  assert.equal(
+    scooterItpSummary([{ ...input, effectiveDate: "2026-10-30" }], "2026-10-30")
+      .status,
+    "review",
+  );
+  assert.equal(
+    scooterItpSummary(
+      [{ ...input, result: "passed", effectiveDate: "2026-10-30" }],
+      "2026-10-30",
+    ).status,
+    "active",
+  );
+  assert.equal(
+    scooterItpInputSchema.safeParse({ ...input, inspectionDate: "2099-01-01" })
+      .success,
+    false,
+  );
+});
+test("manual validity supersedes CIV fallback and retains later known failures", () => {
+  const manual = {
+    inspectionDate: null,
+    effectiveDate: "2026-10-01",
+    validUntil: "2027-01-01",
+    result: "passed" as const,
+  };
+  assert.equal(
+    scooterItpSummary([manual], "2026-10-30", "2020-01-01").status,
+    "active",
+  );
+  assert.equal(
+    scooterItpSummary(
+      [
+        manual,
+        { inspectionDate: "2026-10-20", validUntil: null, result: "failed" },
+      ],
+      "2026-10-30",
+    ).status,
+    "failed",
+  );
+});

@@ -223,10 +223,11 @@ const dark: Record<keyof typeof light, string> = {
 
 export const semanticColors = { light, dark } as const;
 
-/** Backdrop blur radii in px, shared by floating surfaces in every theme. */
+/** Blur radii in px, shared by surfaces and media in every theme. */
 export const semanticBlur = {
   floatingSurface: spacing[3],
   fileDrop: spacing[1],
+  documentPreview: spacing[3],
 } as const;
 
 export type ThemeColors = typeof light;

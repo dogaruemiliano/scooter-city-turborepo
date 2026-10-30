@@ -36,7 +36,7 @@ test("list attention considers all policies and never treats unknown coverage as
     null,
   );
 });
-test("insurance validates coverage dates, money, VIN and explicit review", () => {
+test("insurance validates coverage dates and money without requiring VIN confirmation", () => {
   assert.ok(v1.scooters.insurancePolicyInputSchema.safeParse(policy).success);
   for (const change of [
     { validUntil: "2025-01-01" },
@@ -44,7 +44,6 @@ test("insurance validates coverage dates, money, VIN and explicit review", () =>
     { premiumAmount: 1.234 },
     { currency: "lei" },
     { documentVin: "bad" },
-    { documentVin: null },
   ])
     assert.equal(
       v1.scooters.insurancePolicyInputSchema.safeParse({ ...policy, ...change })
@@ -110,4 +109,27 @@ test("insurance schemas remain representable in OpenAPI JSON schema", () => {
     z.toJSONSchema(v1.scooters.createScooterInputSchema),
   );
   assert.doesNotThrow(() => z.toJSONSchema(v1.scooters.scooterSchema));
+});
+
+test("empty insurance is rejected while a manual policy needs no VIN confirmation", () => {
+  assert.equal(
+    v1.scooters.insurancePolicyInputSchema.safeParse({
+      ...policy,
+      documentVin: null,
+      vinReviewConfirmed: false,
+    }).success,
+    true,
+  );
+  assert.equal(
+    v1.scooters.insurancePolicyInputSchema.safeParse({
+      ...policy,
+      insuredName: null,
+      validFrom: null,
+      validUntil: null,
+      premiumAmount: null,
+      documentVin: null,
+      vinReviewConfirmed: false,
+    }).success,
+    false,
+  );
 });

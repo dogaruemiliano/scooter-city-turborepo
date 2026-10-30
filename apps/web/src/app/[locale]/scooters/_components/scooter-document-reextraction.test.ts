@@ -66,6 +66,42 @@ function review(
 }
 
 describe("saved document reextraction review", () => {
+  it.each<Record<string, string>>([
+    { model: "AI model" },
+    { commercialName: "AI model" },
+    { model: "AI model", commercialName: "AI model" },
+  ])(
+    "reviews and applies the model and commercial name as one choice: %j",
+    (fields) => {
+      const current = values({
+        model: "Manual model",
+        commercialName: "Manual model",
+      });
+      const result = review([analysis(fields)], current);
+      const proposals = result.proposals.filter(
+        (item) => item.kind === "field",
+      );
+      expect(proposals).toHaveLength(1);
+      const proposal = proposals[0]!;
+      expect(proposal).toMatchObject({ field: "model", preselected: false });
+      expect(
+        selectedReextraction(proposals, {}, {}, {}, [file()], current).values,
+      ).toEqual({});
+      const applied = selectedReextraction(
+        proposals,
+        { [proposal.id]: proposal },
+        {},
+        {},
+        [file()],
+        current,
+      );
+      expect(applied.values).toEqual({
+        model: "AI model",
+        commercialName: "AI model",
+      });
+    },
+  );
+
   it("preselects missing CIV metadata and leaves existing values unchecked", () => {
     const current = values({ model: "Manual model" });
     const result = review(

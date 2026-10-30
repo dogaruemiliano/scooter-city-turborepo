@@ -15,6 +15,7 @@ import {
 } from "./document-zoom";
 import { MediaNavigation } from "./media-navigation";
 import type { DocumentPreviewHeaderProps } from "./document-preview-header";
+import { DocumentPreviewBackdrop } from "./document-preview-backdrop";
 
 export type PdfPreviewLabels = {
   error: string;
@@ -30,6 +31,7 @@ export function PdfPreview({
   label,
   labels,
   thumbnail = false,
+  thumbnailBackdrop = false,
   onAspectRatio,
   zoomLabels,
   onClosePress,
@@ -53,6 +55,8 @@ export function PdfPreview({
   label: string;
   labels: PdfPreviewLabels;
   thumbnail?: boolean;
+  /** Fill thumbnail letterboxing with a blurred, darkened copy of the page. */
+  thumbnailBackdrop?: boolean;
   /** Reports the displayed PDF page proportions for adaptive thumbnail cards. */
   onAspectRatio?: (ratio: number) => void;
   zoomLabels?: DocumentZoomLabels;
@@ -104,6 +108,7 @@ export function PdfPreview({
       pageNumber={pageNumber}
       label={`${label} (${pageNumber}/${pdf!.numPages})`}
       thumbnail={thumbnail}
+      thumbnailBackdrop={thumbnailBackdrop}
       errorLabel={labels.error}
       renderScale={scale}
       onAspectRatio={onAspectRatio}
@@ -204,6 +209,7 @@ function PdfPage({
   pageNumber,
   label,
   thumbnail,
+  thumbnailBackdrop,
   errorLabel,
   renderScale,
   onAspectRatio,
@@ -212,6 +218,7 @@ function PdfPage({
   pageNumber: number;
   label: string;
   thumbnail: boolean;
+  thumbnailBackdrop: boolean;
   errorLabel: string;
   renderScale: number;
   onAspectRatio?: (ratio: number) => void;
@@ -220,6 +227,7 @@ function PdfPage({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [width, setWidth] = useState(0);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
+  const [backdrop, setBackdrop] = useState<string>();
   const preview =
     !thumbnail && pageNumber === 1 ? getPdfThumbnail(pdf) : undefined;
 
@@ -258,7 +266,10 @@ function PdfPage({
         task = page.render({ canvas, viewport });
         await task.promise;
         if (!disposed) {
-          if (thumbnail && pageNumber === 1) rememberPdfThumbnail(pdf, canvas);
+          if (thumbnail && pageNumber === 1) {
+            rememberPdfThumbnail(pdf, canvas);
+            if (thumbnailBackdrop) setBackdrop(getPdfThumbnail(pdf));
+          }
           setState("ready");
         }
       })
@@ -269,7 +280,15 @@ function PdfPage({
       disposed = true;
       task?.cancel();
     };
-  }, [pdf, pageNumber, width, renderScale, thumbnail, onAspectRatio]);
+  }, [
+    pdf,
+    pageNumber,
+    width,
+    renderScale,
+    thumbnail,
+    thumbnailBackdrop,
+    onAspectRatio,
+  ]);
 
   return (
     <span
@@ -282,6 +301,9 @@ function PdfPage({
       }
       data-slot="pdf-page"
     >
+      {thumbnail && thumbnailBackdrop && state === "ready" && backdrop ? (
+        <DocumentPreviewBackdrop src={backdrop} />
+      ) : null}
       {state === "loading" && preview ? (
         <img
           src={preview}
@@ -296,7 +318,7 @@ function PdfPage({
         role="img"
         aria-label={label}
         data-rendered={state === "ready"}
-        className={`absolute inset-0 h-full w-full object-contain ${state === "ready" ? "visible" : "invisible"}`}
+        className={`absolute inset-0 h-full w-full object-contain object-center ${state === "ready" ? "visible" : "invisible"}`}
       />
       {state !== "ready" && !(state === "loading" && preview) ? (
         <span className="absolute inset-0 flex items-center justify-center gap-2 p-4 text-center text-sm text-muted-foreground">

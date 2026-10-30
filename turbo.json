@@ -17,6 +17,19 @@
       "dependsOn": ["^build"],
       "outputs": ["coverage/**"]
     },
+    "@repo/theme#test": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/packages/ui/src/components/sheet-select.tsx",
+        "$TURBO_ROOT$/packages/ui/src/components/bottom-sheet.tsx"
+      ],
+      "outputs": ["coverage/**"]
+    },
+    "db:generate": {
+      "inputs": ["prisma/**/*.prisma", "prisma.config.ts", "package.json"],
+      "outputs": ["src/generated/prisma/**"]
+    },
     "test:e2e": {
       "dependsOn": ["^build"],
       "cache": false,

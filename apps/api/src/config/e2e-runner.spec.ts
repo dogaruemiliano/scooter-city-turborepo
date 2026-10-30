@@ -228,6 +228,52 @@ describe("E2E runner lifecycle", () => {
     expect(deps.ensureGeneral).toHaveBeenCalledTimes(1);
   });
 
+  it("prepares cached shared builds and the current Prisma client before opening either database", async () => {
+    const deps = dependencies();
+    const artifactCommands = [
+      ["--workspace-root", "exec", "turbo", "run", "build", "--filter=api^..."],
+      [
+        "--workspace-root",
+        "exec",
+        "turbo",
+        "run",
+        "db:generate",
+        "--filter=api",
+      ],
+    ];
+    deps.ensureGeneral.mockImplementation(() => {
+      expect(deps.run.mock.calls.slice(0, 2).map(([args]) => args)).toEqual(
+        artifactCommands,
+      );
+      expect(deps.createFinance).not.toHaveBeenCalled();
+      return Promise.resolve();
+    });
+
+    await expect(runE2e(config(), suites, deps)).resolves.toBe(0);
+  });
+
+  it.each(["build", "db:generate"])(
+    "does not touch either database when cached artifact preparation fails at %s",
+    async (failedTask) => {
+      const deps = dependencies();
+      deps.run.mockImplementation((args) =>
+        Promise.resolve(args.includes(failedTask) ? 1 : 0),
+      );
+
+      await expect(runE2e(config(), suites, deps)).rejects.toThrow(
+        "E2E preparation failed",
+      );
+      expect(deps.ensureGeneral).not.toHaveBeenCalled();
+      expect(deps.createFinance).not.toHaveBeenCalled();
+      expect(deps.dropFinance).not.toHaveBeenCalled();
+      expect(
+        deps.run.mock.calls.some(([args]) =>
+          args.some((arg) => ["db:deploy", "db:seed", "jest"].includes(arg)),
+        ),
+      ).toBe(false);
+    },
+  );
+
   it("does not provision a general database for finance-only runs", async () => {
     const deps = dependencies();
     await expect(

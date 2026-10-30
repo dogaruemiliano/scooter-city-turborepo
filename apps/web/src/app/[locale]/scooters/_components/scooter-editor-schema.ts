@@ -11,7 +11,6 @@ export const SCOOTER_EDITOR_SECTIONS = [
       "vehicleType",
       "variant",
       "version",
-      "commercialName",
       "model",
       "manufactureYear",
       "color",
@@ -117,6 +116,8 @@ export const EDITOR_FIELDS = [
   "civVersion",
   "civIssuedAt",
   "civIssuingAuthority",
+  // Retained for document imports and API compatibility; Model is the sole input.
+  "commercialName",
   ...SCOOTER_EDITOR_SECTIONS.flatMap((section) => [...section.fields]),
   "registrationCertificateNumber",
   "vehicleCategoryOther",
@@ -125,6 +126,7 @@ export const EDITOR_FIELDS = [
   "fuelTypeOther",
 ] as const;
 export const CREATE_FIELDS = [
+  "itpValidUntil",
   ...EDITOR_FIELDS,
   ...REGISTRATION_FIELDS,
 ] as const;
@@ -173,13 +175,9 @@ const insuranceEditorSchema = z.object({
 
 /** The visible, untouched create-form placeholder is not an insurance policy. */
 export function insuranceEditorHasContent(policy: InsuranceEditorValues) {
-  return (
-    v1.scooters.INSURANCE_FIELDS.some(
-      (field) => field !== "currency" && Boolean(policy[field].trim()),
-    ) ||
-    policy.vinReviewConfirmed ||
-    Boolean(policy.sourceFileNames?.length) ||
-    policy.rawFields !== undefined
+  return ["insuredName", "validFrom", "validUntil", "premiumAmount"].some(
+    (field) =>
+      Boolean(policy[field as keyof InsuranceEditorValues]?.toString().trim()),
   );
 }
 
@@ -239,6 +237,8 @@ export function scooterEditorDefaults(
       scooter?.[field] == null ? "" : String(scooter[field]),
     ]),
   ) as Record<ScooterEditorField, string>;
+  values.model = scooter?.commercialName?.trim() || scooter?.model || "";
+  values.commercialName = values.model;
   values.fleetNumber = scooter ? String(scooter.fleetNumber) : null;
   const existingCivEvidence =
     v1.scooters.hasScooterCivEvidence(scooter ?? {}) ||
@@ -315,6 +315,7 @@ function convertValues(values: Partial<ScooterEditorValues>) {
 function convertForm(values: Partial<ScooterEditorValues>) {
   return {
     ...convertValues(values),
+    commercialName: values.model?.trim() || null,
     ...(values.insurancePolicies
       ? {
           insurancePolicies: values.insurancePolicies.map((policy) => ({
@@ -411,6 +412,10 @@ export function scooterChangedFields(
         dirty[field] && !(inactive as readonly string[]).includes(field),
     ).map((field) => [field, input[field]]),
   );
+  if (dirty.model || dirty.commercialName) {
+    changes.model = input.model;
+    changes.commercialName = input.model;
+  }
   if (dirty.fleetNumber) changes.fleetNumber = input.fleetNumber;
   if (dirty.powertrainType) {
     for (const field of inactive) changes[field] = null;

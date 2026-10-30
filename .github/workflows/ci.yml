@@ -1,6 +1,7 @@
 name: CI
 
 on:
+  workflow_dispatch:
   pull_request:
   push:
     branches: [main]
@@ -9,9 +10,50 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL || 'https://api.ci.placeholder.invalid' }}
+
 jobs:
-  ci:
-    name: Lint · typecheck · test
+  plan:
+    name: Determine affected checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      checks: ${{ steps.plan.outputs.checks }}
+      e2e: ${{ steps.plan.outputs.e2e }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Verify check selection
+        run: node --test scripts/ci-plan.test.mjs
+      - name: Select checks
+        id: plan
+        run: node scripts/ci-plan.mjs
+
+  checks:
+    name: ${{ matrix.name }}
+    needs: plan
+    if: ${{ needs.plan.outputs.checks == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      # Finish every check so one failure doesn't hide failures in other jobs.
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/verify
+        with:
+          command: ${{ matrix.command }}
+          cache-key: ${{ matrix.id }}
+
+  e2e:
+    name: Database E2E tests
+    needs: plan
+    if: ${{ needs.plan.outputs.e2e == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -34,25 +76,42 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
+      - uses: ./.github/actions/verify
         with:
-          node-version: 24.17.0
-
-      - uses: pnpm/action-setup@v6
-        with:
-          cache: true
-
-      - name: Install
-        run: pnpm install --frozen-lockfile
-
-      - name: Verify (same command as local pre-push checks)
+          command: pnpm test:e2e
+          cache-key: e2e
         env:
-          NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL || 'https://api.ci.placeholder.invalid' }}
           E2E_DATABASE_URL: postgresql://app:app@localhost:5434/scooter_city_test
           E2E_FINANCE_DATABASE_URL: postgresql://app:app@localhost:5434/finance_books_test
           JWT_ACCESS_SECRET: ${{ secrets.JWT_ACCESS_SECRET || 'ci-test-access-secret-padded-to-32-chars' }}
           JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET || 'ci-test-refresh-secret-padded-to-32-chars' }}
           REFRESH_TOKEN_HMAC_SECRET: ${{ secrets.REFRESH_TOKEN_HMAC_SECRET || 'ci-test-refresh-hmac-padded-to-32-chars-x' }}
           OTP_HMAC_SECRET: ${{ secrets.OTP_HMAC_SECRET || 'ci-test-otp-hmac-padded-to-32-chars-pad-x' }}
-        run: pnpm verify
+
+  # Preserve the existing required check name for branch protection.
+  ci:
+    name: Lint · typecheck · test
+    if: ${{ always() }}
+    needs: [plan, checks, e2e]
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - name: Require every verification job to pass
+        env:
+          PLAN_RESULT: ${{ needs.plan.result }}
+          CHECKS_REQUIRED: ${{ needs.plan.outputs.checks }}
+          E2E_REQUIRED: ${{ needs.plan.outputs.e2e }}
+          CHECKS_RESULT: ${{ needs.checks.result }}
+          E2E_RESULT: ${{ needs.e2e.result }}
+        run: |
+          test "$PLAN_RESULT" = success
+          if [ "$CHECKS_REQUIRED" = true ]; then
+            test "$CHECKS_RESULT" = success
+          else
+            test "$CHECKS_REQUIRED" = false && test "$CHECKS_RESULT" = skipped
+          fi
+          if [ "$E2E_REQUIRED" = true ]; then
+            test "$E2E_RESULT" = success
+          else
+            test "$E2E_REQUIRED" = false && test "$E2E_RESULT" = skipped
+          fi

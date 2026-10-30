@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 595 375" role="img" aria-labelledby="title desc">
+<title id="title">Sample landscape vehicle document</title>
+<desc id="desc">Fictional landscape document for preview testing. Not valid for identification.</desc>
+<rect width="595" height="375" fill="#fafafa"/>
+<g font-family="sans-serif" fill="#141414">
+<text x="40" y="55" font-size="14" fill="#71717a">SCOOTERCITY · STORYBOOK FIXTURE</text>
+<text x="40" y="94" font-size="27" font-weight="bold">Vehicle identity</text>
+<text x="40" y="123" font-size="14" fill="#71717a">SAMPLE DOCUMENT — NOT VALID</text>
+<path d="M40 145H555" stroke="#d4d4d8"/>
+<text x="40" y="178" font-size="12" fill="#71717a">VEHICLE IDENTIFICATION NUMBER</text>
+<text x="40" y="203" font-size="18">DEMO0000000000001</text>
+<path d="M40 218H555" stroke="#d4d4d8"/>
+<text x="40" y="242" font-size="12" fill="#71717a">MAKE / MODEL</text>
+<text x="40" y="267" font-size="18">ScooterCity / Example scooter</text>
+<path d="M40 282H555" stroke="#d4d4d8"/>
+<text x="40" y="331" font-size="12" fill="#71717a">FOR COMPONENT PREVIEW ONLY · All details are fictional.</text>
+</g></svg>

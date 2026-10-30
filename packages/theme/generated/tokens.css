@@ -329,6 +329,7 @@
 @theme {
   --blur-floating-surface: 0.75rem;
   --blur-file-drop: 0.25rem;
+  --blur-document-preview: 0.75rem;
   --color-violet-50: #f5f3ff;
   --color-violet-400: #a78bfa;
   --color-violet-600: #7c3aed;

@@ -434,7 +434,7 @@ export function ScooterEditorFields({
       {showRegistration && !editing ? (
         <ScooterInitialRegistrationFields disabled={disabled} />
       ) : null}
-      {!step || step === "insurance" ? (
+      {(!step || step === "insurance") && !editing ? (
         <ScooterInsuranceFields
           number={photos ? (canReadDocuments ? 10 : 9) : undefined}
           disabled={disabled}

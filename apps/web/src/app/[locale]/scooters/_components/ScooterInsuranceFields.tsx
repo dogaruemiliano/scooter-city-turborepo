@@ -7,16 +7,14 @@ import { v1 } from "@repo/api-shared";
 import {
   Button,
   Badge,
-  Checkbox,
   FormSection,
   InputGroup,
   InputGroupAddon,
 } from "@repo/ui/components";
 import { ScooterSectionComplete } from "./ScooterSectionComplete";
-import { PlusIcon } from "lucide-react";
+import { PlusIcon, Trash2Icon } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import {
-  Controller,
   type UseFieldArrayReturn,
   useFormContext,
   useWatch,
@@ -33,11 +31,9 @@ import {
 } from "./ScooterDocumentUpload";
 import {
   insuranceEditorDefaults,
-  insuranceEditorHasContent,
   type ScooterEditorValues,
 } from "./scooter-editor-schema";
 import type { ScooterDocumentsEditor } from "./useScooterDocuments";
-import { ScooterVinReference } from "./ScooterVinReference";
 import { cn } from "@repo/ui/lib/utils";
 
 export function ScooterInsuranceDocuments({
@@ -132,6 +128,7 @@ export function ScooterInsuranceFields({
   disabled,
   fieldKeys,
   onRemovePolicy,
+  canRemovePolicy,
   singleColumn = false,
   panel = false,
   title,
@@ -141,6 +138,7 @@ export function ScooterInsuranceFields({
   disabled: boolean;
   fieldKeys: string[];
   onRemovePolicy?: (index: number) => void;
+  canRemovePolicy?: (index: number) => boolean;
   singleColumn?: boolean;
   panel?: boolean;
   title?: string;
@@ -154,7 +152,6 @@ export function ScooterInsuranceFields({
   const user = useOptionalSession()?.user;
   const canWrite = canAccess(user, "scooter_documents.write");
   const readOnly = disabled || !canWrite;
-  const vin = useWatch({ control, name: "vin" });
   if (!canAccess(user, "scooter_documents.read")) return null;
   return (
     <>
@@ -168,7 +165,7 @@ export function ScooterInsuranceFields({
           key={fieldKeys[index] ?? policy.id}
           panel={panel}
           title={title ?? t("policy", { number: index + 1 })}
-          number={number}
+          number={number == null ? undefined : number + index}
           columns={singleColumn ? 1 : 2}
           status={
             <div className="flex flex-wrap items-center gap-2">
@@ -183,6 +180,22 @@ export function ScooterInsuranceFields({
                   {t(`status.${v1.scooters.insuranceStatus(policy)}`)}
                 </Badge>
               ) : null}
+              {canWrite && onRemovePolicy ? (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="icon"
+                  disabled={
+                    readOnly ||
+                    policies.length <= 1 ||
+                    canRemovePolicy?.(index) === false
+                  }
+                  aria-label={t("delete")}
+                  onClick={() => onRemovePolicy(index)}
+                >
+                  <Trash2Icon aria-hidden="true" />
+                </Button>
+              ) : null}
               <ScooterSectionComplete
                 fields={[
                   ...[
@@ -191,12 +204,6 @@ export function ScooterInsuranceFields({
                     "validUntil",
                     "premiumAmount",
                   ].map((field) => `insurancePolicies.${index}.${field}`),
-                  ...(policy.documentVin
-                    ? [`insurancePolicies.${index}.documentVin`]
-                    : []),
-                  ...(!policy.documentVin && !policy.vinReviewConfirmed
-                    ? [`insurancePolicies.${index}.documentVin`]
-                    : []),
                 ]}
               />
             </div>
@@ -248,59 +255,6 @@ export function ScooterInsuranceFields({
               </div>
             );
           })}
-          {policy.documentVin &&
-          vin &&
-          policy.documentVin.toUpperCase() !== vin.toUpperCase() ? (
-            <p
-              role="alert"
-              className={cn(
-                "text-sm text-destructive",
-                !singleColumn && "sm:col-span-2",
-              )}
-            >
-              {t("vinMismatch")}
-            </p>
-          ) : null}
-          {!policy.documentVin &&
-          (showPolicyStatus || insuranceEditorHasContent(policy)) ? (
-            <FormField
-              name={`insurancePolicies.${index}.vinReviewConfirmed`}
-              controlId={`insurance-${policy.id}-vin-review`}
-              label={t("fields.vinReviewConfirmed")}
-              disabled={readOnly}
-            >
-              <Controller
-                control={control}
-                name={`insurancePolicies.${index}.vinReviewConfirmed`}
-                render={({ field }) => (
-                  <Checkbox
-                    id={`insurance-${policy.id}-vin-review`}
-                    checked={field.value}
-                    onCheckedChange={field.onChange}
-                    onBlur={field.onBlur}
-                    ref={field.ref}
-                    disabled={readOnly}
-                    aria-label={t("fields.vinReviewConfirmed")}
-                  />
-                )}
-              />
-              <p className="text-sm text-muted-foreground">
-                {t("vinReviewHint")}
-              </p>
-              <ScooterVinReference />
-            </FormField>
-          ) : null}
-          {canWrite && onRemovePolicy ? (
-            <Button
-              type="button"
-              variant="text"
-              className="justify-self-start"
-              disabled={readOnly}
-              onClick={() => onRemovePolicy(index)}
-            >
-              {t("removeDraft")}
-            </Button>
-          ) : null}
         </FormSection>
       ))}
     </>

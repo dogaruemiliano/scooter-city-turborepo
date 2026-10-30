@@ -5,18 +5,60 @@ const identifier = z.string().min(1).max(120);
 export const scooterItpResultSchema = z.enum(["passed", "failed", "unknown"]);
 export const scooterItpInputSchema = z
   .object({
-    inspectionDate: dateOnlySchema,
+    inspectionDate: dateOnlySchema.nullable(),
     validUntil: dateOnlySchema.nullable(),
     result: scooterItpResultSchema,
     certificateNumber: z.string().trim().min(1).max(120).nullable(),
     odometerKm: z.number().int().nonnegative().max(2_147_483_647).nullable(),
-    cardDocumentId: identifier,
-    certificateDocumentId: identifier,
+    cardDocumentId: identifier.nullable(),
+    certificateDocumentId: identifier.nullable(),
+    source: z.enum(["manual", "document"]).optional(),
     evidenceReviewed: z.literal(true),
+    expectedLatestId: identifier.nullable().optional(),
   })
   .strict()
   .superRefine((record, context) => {
-    if (record.validUntil && record.validUntil < record.inspectionDate)
+    if (record.source === "manual" && record.expectedLatestId === undefined)
+      context.addIssue({
+        code: "custom",
+        path: ["expectedLatestId"],
+        message: "itpHistoryRequired",
+      });
+    if (
+      (record.source ?? "document") === "document" &&
+      (!record.inspectionDate ||
+        !record.cardDocumentId ||
+        !record.certificateDocumentId)
+    )
+      context.addIssue({
+        code: "custom",
+        path: ["inspectionDate"],
+        message: "itpEvidenceRequired",
+      });
+    if (
+      record.source === "manual" &&
+      (record.cardDocumentId || record.certificateDocumentId)
+    )
+      context.addIssue({
+        code: "custom",
+        path: ["cardDocumentId"],
+        message: "itpManualEvidence",
+      });
+    if (
+      record.source === "manual" &&
+      !record.validUntil &&
+      record.result !== "failed"
+    )
+      context.addIssue({
+        code: "custom",
+        path: ["validUntil"],
+        message: "itpValidityRequired",
+      });
+    if (
+      record.validUntil &&
+      record.inspectionDate &&
+      record.validUntil < record.inspectionDate
+    )
       context.addIssue({
         code: "custom",
         path: ["validUntil"],
@@ -28,7 +70,7 @@ export const scooterItpInputSchema = z
         path: ["validUntil"],
         message: "itpValidityRequired",
       });
-    if (record.inspectionDate > dateOnlyToday())
+    if (record.inspectionDate && record.inspectionDate > dateOnlyToday())
       context.addIssue({
         code: "custom",
         path: ["inspectionDate"],
@@ -41,13 +83,15 @@ export type ScooterItpInput = z.infer<typeof scooterItpInputSchema>;
 export const scooterItpInspectionSchema = z
   .object({
     id: identifier,
-    inspectionDate: dateOnlySchema,
+    inspectionDate: dateOnlySchema.nullable(),
     validUntil: dateOnlySchema.nullable(),
     result: scooterItpResultSchema,
     certificateNumber: z.string().nullable(),
     odometerKm: z.number().int().nonnegative().nullable(),
-    cardDocumentId: identifier,
-    certificateDocumentId: identifier,
+    cardDocumentId: identifier.nullable(),
+    certificateDocumentId: identifier.nullable(),
+    source: z.enum(["manual", "document"]).optional(),
+    effectiveDate: dateOnlySchema.optional(),
     createdAt: z.iso.datetime(),
     updatedAt: z.iso.datetime(),
   })
@@ -65,10 +109,10 @@ export type ScooterItpStatus = z.infer<typeof scooterItpStatusSchema>;
 
 /** The newest recorded inspection controls status, never the furthest expiry. */
 export function scooterItpSummary(
-  inspections: Pick<
+  inspections: (Pick<
     ScooterItpInspection,
     "inspectionDate" | "validUntil" | "result"
-  >[],
+  > & { effectiveDate?: string; createdAt?: string })[],
   today = dateOnlyToday(),
   civIssuedAt?: string | null,
 ): {
@@ -90,8 +134,16 @@ export function scooterItpSummary(
             result: "passed" as const,
           },
         ];
-  const latest = [...records].sort((a, b) =>
-    b.inspectionDate.localeCompare(a.inspectionDate),
+  const latest = [...records].sort(
+    (a, b) =>
+      (
+        b.effectiveDate ??
+        b.inspectionDate ??
+        b.createdAt?.slice(0, 10) ??
+        ""
+      ).localeCompare(
+        a.effectiveDate ?? a.inspectionDate ?? a.createdAt?.slice(0, 10) ?? "",
+      ) || (b.createdAt ?? "").localeCompare(a.createdAt ?? ""),
   )[0];
   if (!latest)
     return { status: "missing", validUntil: null, renewalRequired: true };
@@ -100,7 +152,7 @@ export function scooterItpSummary(
   if (
     latest.result !== "passed" ||
     !latest.validUntil ||
-    latest.inspectionDate > today
+    (latest.inspectionDate != null && latest.inspectionDate > today)
   )
     return {
       status: "review",

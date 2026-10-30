@@ -24,6 +24,7 @@ import { insertSortableItem, sameSortableOrder } from "../lib/sortable-order";
 export function SortableGrid<Item extends { id: string }>({
   items,
   renderItem,
+  renderItemActions,
   getItemLabel,
   instructions,
   disabled = false,
@@ -39,6 +40,8 @@ export function SortableGrid<Item extends { id: string }>({
 }: {
   items: readonly Item[];
   renderItem: (item: Item) => ReactNode;
+  /** Sibling controls outside the drag handle; disabled during requests and dragging. */
+  renderItemActions?: (item: Item, disabled: boolean) => ReactNode;
   getItemLabel: (item: Item) => string;
   instructions: string;
   disabled?: boolean;
@@ -354,9 +357,13 @@ export function SortableGrid<Item extends { id: string }>({
         onKeyDownCapture={(event) => {
           if (event.key !== "Enter" || interactionBusy || !onItemPress) return;
           const target = event.target as HTMLElement;
-          const card = target.closest<HTMLElement>("[data-sortable-id]");
+          const card = target.closest<HTMLElement>(
+            "[data-sortable-handle], [data-sortable-id]",
+          );
           if (!card || target !== card) return;
-          const item = byId.get(card.dataset.sortableId!);
+          const item = byId.get(
+            (card.dataset.sortableHandle ?? card.dataset.sortableId)!,
+          );
           if (!item) return;
           event.preventDefault();
           event.stopPropagation();
@@ -385,6 +392,7 @@ export function SortableGrid<Item extends { id: string }>({
             }
             variant={itemVariant}
             reducedMotion={reducedMotion}
+            actions={renderItemActions?.(item, disabled || interactionBusy)}
           >
             {renderItem(item)}
           </SortableGridItem>
@@ -443,10 +451,12 @@ function SortableGridItem({
   reducedMotion,
   children,
   onPress,
+  actions,
 }: {
   id: string;
   variant: "card" | "row";
   onPress?: () => void;
+  actions?: ReactNode;
   index: number;
   group: string;
   disabled: boolean;
@@ -455,7 +465,7 @@ function SortableGridItem({
   reducedMotion: boolean;
   children: ReactNode;
 }) {
-  const { ref, isDragSource } = useSortable({
+  const { ref, handleRef, isDragSource } = useSortable({
     id,
     index,
     group,
@@ -470,33 +480,36 @@ function SortableGridItem({
           idle: true,
         },
   });
+  const interactionProps = {
+    role: "button" as const,
+    tabIndex: disabled && !onPress ? -1 : 0,
+    onClick: (event: React.MouseEvent<HTMLDivElement>) => {
+      if (
+        !(event.target as HTMLElement).closest(
+          "button, a, input, select, textarea",
+        )
+      )
+        onPress?.();
+    },
+    onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => {
+      if (
+        event.key === "Enter" &&
+        event.target === event.currentTarget &&
+        onPress
+      ) {
+        event.preventDefault();
+        onPress();
+      }
+    },
+    "aria-label": label,
+    "aria-describedby": instructions,
+    "aria-disabled": disabled && !onPress,
+  };
   return (
     <div
       ref={ref}
       data-sortable-id={id}
-      role="button"
-      tabIndex={disabled && !onPress ? -1 : 0}
-      onClick={(event) => {
-        if (
-          !(event.target as HTMLElement).closest(
-            "button, a, input, select, textarea",
-          )
-        )
-          onPress?.();
-      }}
-      onKeyDown={(event) => {
-        if (
-          event.key === "Enter" &&
-          event.target === event.currentTarget &&
-          onPress
-        ) {
-          event.preventDefault();
-          onPress();
-        }
-      }}
-      aria-label={label}
-      aria-describedby={instructions}
-      aria-disabled={disabled && !onPress}
+      {...(actions ? {} : interactionProps)}
       className={cn(
         "relative min-w-0 overflow-hidden outline-none focus-visible:ring-2",
         variant === "row"
@@ -511,7 +524,21 @@ function SortableGridItem({
         className={isDragSource ? "pointer-events-none" : undefined}
         style={{ opacity: isDragSource ? opacity.dragGhost : undefined }}
       >
-        {children}
+        {actions ? (
+          <>
+            <div
+              ref={handleRef}
+              data-sortable-handle={id}
+              {...interactionProps}
+              className="outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+            >
+              {children}
+            </div>
+            {actions}
+          </>
+        ) : (
+          children
+        )}
       </div>
     </div>
   );

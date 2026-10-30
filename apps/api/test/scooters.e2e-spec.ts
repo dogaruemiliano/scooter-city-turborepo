@@ -165,6 +165,307 @@ describe("Scooters HTTP surface (e2e)", () => {
     };
   }
 
+  it("saves manual ITP independently, keeps history, and requires an explicit passed result", async () => {
+    const admin = await freshSession(["ADMIN"]);
+    const cookie = [`access_token=${admin.accessToken}`];
+    const created = await req()
+      .post(v1.scooters.ROUTES.create)
+      .set("Cookie", cookie)
+      .send(scooterInput())
+      .expect(201);
+    const scooter = v1.scooters.scooterSchema.parse(created.body);
+    const input = {
+      source: "manual",
+      expectedLatestId: null,
+      inspectionDate: null,
+      validUntil: "2099-01-01",
+      result: "unknown",
+      cardDocumentId: null,
+      certificateDocumentId: null,
+      odometerKm: null,
+      certificateNumber: null,
+      evidenceReviewed: true,
+    };
+    await req()
+      .post(v1.scooters.ROUTES.itp.create(scooter.id))
+      .set("Cookie", cookie)
+      .send({ ...input, evidenceReviewed: false })
+      .expect(400);
+    const first = await req()
+      .post(v1.scooters.ROUTES.itp.create(scooter.id))
+      .set("Cookie", cookie)
+      .send(input)
+      .expect(201)
+      .then((response) =>
+        v1.scooters.scooterItpInspectionSchema.parse(response.body),
+      );
+    expect(first).toMatchObject({
+      source: "manual",
+      inspectionDate: null,
+      result: "unknown",
+    });
+    const needsReview = await req()
+      .get(v1.scooters.ROUTES.get(scooter.id))
+      .set("Cookie", cookie)
+      .expect(200);
+    expect(needsReview.body).toMatchObject({
+      itpStatus: "review",
+      itpValidUntil: "2099-01-01",
+      insurancePolicies: [],
+    });
+    await req()
+      .post(v1.scooters.ROUTES.itp.create(scooter.id))
+      .set("Cookie", cookie)
+      .send(input)
+      .expect(409);
+    const confirmed = await req()
+      .post(v1.scooters.ROUTES.itp.create(scooter.id))
+      .set("Cookie", cookie)
+      .send({ ...input, expectedLatestId: first.id, result: "passed" })
+      .expect(201)
+      .then((response) =>
+        v1.scooters.scooterItpInspectionSchema.parse(response.body),
+      );
+    const summary = await req()
+      .get(v1.scooters.ROUTES.get(scooter.id))
+      .set("Cookie", cookie)
+      .expect(200)
+      .then((response) => v1.scooters.scooterSchema.parse(response.body));
+    expect(summary.itpStatus).toBe("active");
+    const history = await req()
+      .get(v1.scooters.ROUTES.itp.list(scooter.id))
+      .set("Cookie", cookie)
+      .expect(200)
+      .then((response) =>
+        v1.scooters.scooterItpListSchema.parse(response.body),
+      );
+    expect(history.inspections).toHaveLength(2);
+    expect(history.inspections[0].id).toBe(confirmed.id);
+    expect(summary.missingClientDocuments).toContain("itp_card");
+  });
+
+  it("saves just an ITP expiry without insurance fields and rejects empty insurance", async () => {
+    const admin = await freshSession(["ADMIN"]);
+    const cookie = [`access_token=${admin.accessToken}`];
+    const created = await req()
+      .post(v1.scooters.ROUTES.create)
+      .set("Cookie", cookie)
+      .send(scooterInput())
+      .expect(201);
+    const scooter = v1.scooters.scooterSchema.parse(created.body);
+    const saved = await req()
+      .patch(v1.scooters.ROUTES.update(scooter.id))
+      .set("Cookie", cookie)
+      .send({
+        itpValidUntil: "2027-12-31",
+        expectedUpdatedAt: scooter.updatedAt,
+      })
+      .expect(200)
+      .then((response) => v1.scooters.scooterSchema.parse(response.body));
+    expect(saved).toMatchObject({
+      itpValidUntil: "2027-12-31",
+      insurancePolicies: [],
+    });
+    expect(saved.updatedAt).not.toBe(scooter.updatedAt);
+    await req()
+      .patch(v1.scooters.ROUTES.insurance.update(scooter.id))
+      .set("Cookie", cookie)
+      .send({
+        expectedUpdatedAt: saved.updatedAt,
+        source: "manual",
+        policies: [
+          {
+            id: crypto.randomUUID(),
+            insuredName: null,
+            validFrom: null,
+            validUntil: null,
+            premiumAmount: null,
+            currency: "RON",
+            documentVin: null,
+            vinReviewConfirmed: false,
+          },
+        ],
+      })
+      .expect(400);
+    expect(
+      await prisma.scooterInsurancePolicy.count({
+        where: { scooterId: scooter.id },
+      }),
+    ).toBe(0);
+  });
+
+  it("commits ITP, insurance edits and staged removal in one scooter save", async () => {
+    const admin = await freshSession(["ADMIN"]);
+    const cookie = [`access_token=${admin.accessToken}`];
+    const policy = {
+      insuredName: "Fleet",
+      validFrom: "2026-01-01",
+      validUntil: "2027-01-01",
+      premiumAmount: 0,
+      currency: "RON",
+      documentVin: null,
+      vinReviewConfirmed: false,
+    };
+    const first = { ...policy, id: crypto.randomUUID() };
+    const second = { ...policy, id: crypto.randomUUID() };
+    const created = await req()
+      .post(v1.scooters.ROUTES.create)
+      .set("Cookie", cookie)
+      .send({ ...scooterInput(), insurancePolicies: [first, second] })
+      .expect(201)
+      .then((response) => v1.scooters.scooterSchema.parse(response.body));
+    const id = created.id;
+    const saved = await req()
+      .patch(v1.scooters.ROUTES.update(id))
+      .set("Cookie", cookie)
+      .send({
+        expectedUpdatedAt: created.updatedAt,
+        itpValidUntil: "2028-01-01",
+        color: "Red",
+        insurancePolicies: [{ ...second, insuredName: "Updated Fleet" }],
+        removedInsurancePolicyIds: [first.id],
+      })
+      .expect(200)
+      .then((response) => v1.scooters.scooterSchema.parse(response.body));
+    expect(saved).toMatchObject({
+      color: "Red",
+      itpValidUntil: "2028-01-01",
+      insurancePolicies: [{ id: second.id, insuredName: "Updated Fleet" }],
+    });
+    expect(
+      (
+        await prisma.scooterInsurancePolicy.findUniqueOrThrow({
+          where: { id: first.id },
+        })
+      ).deletedAt,
+    ).not.toBeNull();
+    await req()
+      .patch(v1.scooters.ROUTES.update(id))
+      .set("Cookie", cookie)
+      .send({
+        expectedUpdatedAt: saved.updatedAt,
+        removedInsurancePolicyIds: [second.id],
+      })
+      .expect(409);
+    expect(
+      (
+        await prisma.scooterInsurancePolicy.findUniqueOrThrow({
+          where: { id: second.id },
+        })
+      ).deletedAt,
+    ).toBeNull();
+  });
+
+  it("saves insurance independently with immutable revisions and rejects stale saves", async () => {
+    const admin = await freshSession(["ADMIN"]);
+    const cookie = [`access_token=${admin.accessToken}`];
+    const created = await req()
+      .post(v1.scooters.ROUTES.create)
+      .set("Cookie", cookie)
+      .send(scooterInput())
+      .expect(201);
+    const scooter = v1.scooters.scooterSchema.parse(created.body);
+    const policy = {
+      id: crypto.randomUUID(),
+      insuredName: "Manual policy",
+      validFrom: "2026-01-01",
+      validUntil: "2027-01-01",
+      premiumAmount: 0,
+      currency: "RON",
+      documentVin: null,
+      vinReviewConfirmed: true,
+    };
+    const payload = {
+      policies: [policy],
+      expectedUpdatedAt: scooter.updatedAt,
+      source: "manual",
+    };
+    const first = await req()
+      .patch(v1.scooters.ROUTES.insurance.update(scooter.id))
+      .set("Cookie", cookie)
+      .send(payload)
+      .expect(200)
+      .then((response) =>
+        v1.scooters.scooterInsuranceListSchema.parse(response.body),
+      );
+    expect(first.policies[0].premiumAmount).toBe(0);
+    expect(first.history[0]).toMatchObject({
+      source: "manual",
+      snapshot: { validUntil: "2027-01-01" },
+    });
+    await req()
+      .patch(v1.scooters.ROUTES.insurance.update(scooter.id))
+      .set("Cookie", cookie)
+      .send({ ...payload, policies: [{ ...policy, validUntil: "2028-01-01" }] })
+      .expect(409);
+    const corrected = await req()
+      .patch(v1.scooters.ROUTES.insurance.update(scooter.id))
+      .set("Cookie", cookie)
+      .send({
+        ...payload,
+        expectedUpdatedAt: first.updatedAt,
+        policies: [{ ...policy, validUntil: "2028-01-01" }],
+      })
+      .expect(200)
+      .then((response) =>
+        v1.scooters.scooterInsuranceListSchema.parse(response.body),
+      );
+    expect(corrected.history.map((entry) => entry.snapshot.validUntil)).toEqual(
+      ["2028-01-01", "2027-01-01"],
+    );
+    const summary = await req()
+      .get(v1.scooters.ROUTES.get(scooter.id))
+      .set("Cookie", cookie)
+      .expect(200)
+      .then((response) => v1.scooters.scooterSchema.parse(response.body));
+    expect(summary.itpStatus).toBe("missing");
+    await req()
+      .delete(v1.scooters.ROUTES.insurance.delete(scooter.id, policy.id))
+      .set("Cookie", cookie)
+      .send({ expectedUpdatedAt: corrected.updatedAt })
+      .expect(409);
+    const replacement = {
+      ...policy,
+      id: crypto.randomUUID(),
+      validFrom: "2028-01-01",
+      validUntil: "2029-01-01",
+    };
+    const added = await req()
+      .patch(v1.scooters.ROUTES.insurance.update(scooter.id))
+      .set("Cookie", cookie)
+      .send({
+        source: "manual",
+        expectedUpdatedAt: corrected.updatedAt,
+        policies: [replacement],
+      })
+      .expect(200)
+      .then((response) =>
+        v1.scooters.scooterInsuranceListSchema.parse(response.body),
+      );
+    const deletion = await req()
+      .delete(v1.scooters.ROUTES.insurance.delete(scooter.id, policy.id))
+      .set("Cookie", cookie)
+      .send({ expectedUpdatedAt: added.updatedAt })
+      .expect(200)
+      .then((response) =>
+        v1.scooters.scooterInsuranceListSchema.parse(response.body),
+      );
+    expect(deletion.policies).toEqual([
+      expect.objectContaining({ id: replacement.id }),
+    ]);
+    expect(deletion.history[0]).toMatchObject({
+      action: "deleted",
+      snapshot: { id: policy.id, validUntil: "2028-01-01" },
+    });
+    expect(
+      (
+        await prisma.scooterInsurancePolicy.findUniqueOrThrow({
+          where: { id: policy.id },
+        })
+      ).deletedAt,
+    ).not.toBeNull();
+  });
+
   it("preserves insurance history and prices, checks VIN changes and rejects foreign policies", async () => {
     const admin = await freshSession(["ADMIN"]);
     const cookie = [`access_token=${admin.accessToken}`];
@@ -309,15 +610,52 @@ describe("Scooters HTTP surface (e2e)", () => {
       const detail = await req()
         .get(v1.scooters.ROUTES.get(scooterId))
         .set("Cookie", cookie)
-        .expect(200);
-      expect(v1.scooters.scooterSchema.parse(detail.body).documents).toEqual([
+        .expect(200)
+        .then((response) => v1.scooters.scooterSchema.parse(response.body));
+      expect(detail.documents).toEqual([
         expect.objectContaining({ type: "insurance", insurancePolicyId: id }),
       ]);
-      await req()
-        .get(
-          v1.scooters.scooterSchema.parse(detail.body).documents![0].contentUrl,
-        )
-        .expect(401);
+      await req().get(detail.documents![0].contentUrl).expect(401);
+      const replacement = {
+        ...policy,
+        id: crypto.randomUUID(),
+        insuredName: "Replacement policy",
+      };
+      const added = await req()
+        .patch(v1.scooters.ROUTES.insurance.update(scooterId))
+        .set("Cookie", cookie)
+        .send({
+          source: "manual",
+          expectedUpdatedAt: detail.updatedAt,
+          policies: [replacement],
+        })
+        .expect(200)
+        .then((response) =>
+          v1.scooters.scooterInsuranceListSchema.parse(response.body),
+        );
+      const deleted = await req()
+        .delete(v1.scooters.ROUTES.insurance.delete(scooterId, id))
+        .set("Cookie", cookie)
+        .send({ expectedUpdatedAt: added.updatedAt })
+        .expect(200)
+        .then((response) =>
+          v1.scooters.scooterInsuranceListSchema.parse(response.body),
+        );
+      expect(deleted.policies).toEqual([
+        expect.objectContaining({ id: replacement.id }),
+      ]);
+      const retained = await req()
+        .get(v1.scooters.ROUTES.get(scooterId))
+        .set("Cookie", cookie)
+        .expect(200)
+        .then((response) => v1.scooters.scooterSchema.parse(response.body));
+      expect(retained.documents).toEqual([
+        expect.objectContaining({ insurancePolicyId: id }),
+      ]);
+      expect(
+        (await prisma.mediaAsset.findUniqueOrThrow({ where: { storageKey } }))
+          .deletedAt,
+      ).toBeNull();
       expect(complete).toHaveBeenCalledWith(
         "token",
         `scooter-document:insurance:${admin.userId}`,

@@ -321,12 +321,12 @@ export class ScooterDocumentsService {
       if (
         !originalDocumentId &&
         hasInsurance &&
+        insurancePolicyId &&
         extractedData?.currentInsuranceDocumentId !== null
       ) {
         if (
-          !insurancePolicyId ||
           !(await tx.scooterInsurancePolicy.findFirst({
-            where: { id: insurancePolicyId, scooterId },
+            where: { id: insurancePolicyId, scooterId, deletedAt: null },
             select: { id: true },
           }))
         )

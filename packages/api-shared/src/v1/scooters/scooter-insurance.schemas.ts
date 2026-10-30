@@ -51,11 +51,16 @@ export const insurancePolicyInputSchema = z
         path: ["validUntil"],
         message: "insuranceDateOrder",
       });
-    if (!policy.documentVin && !policy.vinReviewConfirmed)
+    if (
+      !policy.insuredName &&
+      !policy.validFrom &&
+      !policy.validUntil &&
+      policy.premiumAmount === null
+    )
       ctx.addIssue({
         code: "custom",
-        path: ["vinReviewConfirmed"],
-        message: "insuranceVinReview",
+        path: ["insuredName"],
+        message: "insuranceEmpty",
       });
   });
 export type InsurancePolicyInput = z.infer<typeof insurancePolicyInputSchema>;
@@ -70,7 +75,8 @@ export const insurancePoliciesInputSchema = z
         message: "Duplicate insurance policy IDs",
       });
   });
-export const insurancePolicySchema = insurancePolicyInputSchema.safeExtend({
+export const insurancePolicySchema = z.object({
+  ...insurancePolicyInputSchema.shape,
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -134,3 +140,30 @@ export function rentalInsuranceStatus(
   if (statuses.includes("active")) return "active";
   return insuranceAttention(policies, today) ?? "missing";
 }
+
+export const insuranceRevisionSchema = z.object({
+  id: z.string(),
+  policyId: z.string(),
+  snapshot: insurancePolicySchema,
+  source: z.enum(["manual", "document", "unknown"]),
+  action: z.enum(["change", "deleted"]).optional(),
+  createdAt: z.iso.datetime(),
+});
+export const scooterInsuranceListSchema = z.object({
+  policies: z.array(insurancePolicySchema),
+  history: z.array(insuranceRevisionSchema),
+  updatedAt: z.iso.datetime(),
+});
+export type ScooterInsuranceList = z.infer<typeof scooterInsuranceListSchema>;
+export const scooterInsuranceSaveSchema = z
+  .object({
+    policies: insurancePoliciesInputSchema,
+    expectedUpdatedAt: z.iso.datetime(),
+    source: z.enum(["manual", "document"]).default("manual"),
+  })
+  .strict();
+export type ScooterInsuranceSave = z.infer<typeof scooterInsuranceSaveSchema>;
+
+export const scooterInsuranceDeleteSchema = z
+  .object({ expectedUpdatedAt: z.iso.datetime() })
+  .strict();

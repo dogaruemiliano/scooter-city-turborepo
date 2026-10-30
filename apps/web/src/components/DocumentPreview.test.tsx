@@ -1,4 +1,4 @@
-import { aspectRatio, softFade } from "@repo/theme";
+import { aspectRatio, semanticBlur, softFade } from "@repo/theme";
 import { DocumentPreview } from "@repo/ui/components/document-preview";
 import { loadPdf } from "@repo/ui/lib/pdf";
 import {
@@ -103,11 +103,12 @@ describe("shared PDF previews", () => {
   });
 
   it.each([
-    [1200, 600, 2],
-    [300, 1200, aspectRatio.documentA4Portrait],
+    [1200, 600],
+    [600, 800],
+    [300, 1200],
   ])(
-    "sizes paper image cards from %s × %s without exceeding A4 height",
-    (width, height, expected) => {
+    "keeps %s × %s images centered in a fixed A4 frame over a decorative fill",
+    (width, height) => {
       const view = render(
         <DocumentPreview {...props} layout="paper" contentType="image/jpeg" />,
       );
@@ -119,7 +120,23 @@ describe("shared PDF previews", () => {
       fireEvent.load(image);
       expect(
         view.container.querySelector('[data-slot="document-preview-card"]'),
-      ).toHaveStyle({ aspectRatio: String(expected) });
+      ).toHaveStyle({ aspectRatio: String(aspectRatio.documentA4Portrait) });
+      expect(image).toHaveClass(
+        "object-contain",
+        "object-center",
+        "h-full",
+        "w-full",
+      );
+      const backdrop = view.container.querySelector(
+        '[data-slot="document-preview-backdrop"]',
+      )!;
+      expect(backdrop).toHaveAttribute("aria-hidden", "true");
+      expect(backdrop.querySelector("img")).toHaveAttribute("src", props.src);
+      expect(backdrop.querySelector("img")).toHaveClass("object-cover");
+      expect(backdrop.firstElementChild).toHaveStyle({
+        filter: `blur(${semanticBlur.documentPreview}px)`,
+      });
+      expect(backdrop.lastElementChild).toHaveClass("bg-media-scrim");
       view.rerender(
         <DocumentPreview
           {...props}
@@ -131,15 +148,45 @@ describe("shared PDF previews", () => {
       expect(
         view.container.querySelector('[data-slot="document-preview-card"]'),
       ).toHaveStyle({ aspectRatio: String(aspectRatio.documentA4Portrait) });
+      expect(
+        view.container.querySelector(
+          '[data-slot="document-preview-backdrop"] img',
+        ),
+      ).toHaveAttribute("src", "blob:replacement");
     },
   );
-  it("sizes a paper PDF thumbnail using the page proportions", async () => {
+  it("keeps PDF cards A4 and reuses the rendered page for the decorative fill", async () => {
     const view = render(<DocumentPreview {...props} layout="paper" />);
     await waitFor(() =>
       expect(
         view.container.querySelector('[data-slot="document-preview-card"]'),
-      ).toHaveStyle({ aspectRatio: String(600 / 800) }),
+      ).toHaveStyle({ aspectRatio: String(aspectRatio.documentA4Portrait) }),
     );
+    await waitFor(() =>
+      expect(
+        view.container.querySelector(
+          '[data-slot="document-preview-backdrop"] img',
+        ),
+      ).toHaveAttribute("src", "data:image/jpeg;base64,preview"),
+    );
+    expect(screen.getByRole("img", { name: "CIV.pdf (1/3)" })).toHaveClass(
+      "object-contain",
+      "object-center",
+    );
+    expect(renderPage).toHaveBeenCalledTimes(1);
+    expect(getDocument).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the landscape preview free of the paper-card backdrop", () => {
+    const view = render(
+      <DocumentPreview {...props} contentType="image/jpeg" />,
+    );
+    expect(screen.getByRole("button", { name: "Preview CIV" })).toHaveStyle({
+      aspectRatio: String(aspectRatio.documentLandscape),
+    });
+    expect(
+      view.container.querySelector('[data-slot="document-preview-backdrop"]'),
+    ).toBeNull();
   });
 
   it.each(["image/png", "application/pdf"])(

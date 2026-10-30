@@ -187,6 +187,8 @@ export function reextractionReview(
       rejected: rejected.map((analysis) => analysis.sourceId),
     };
   for (const [field, next] of Object.entries(result.values)) {
+    // Model owns this alias: it must never be offered or accepted independently.
+    if (field === "commercialName") continue;
     const key = field as ScooterEditorField;
     const previous = current[key] ?? "";
     if (!meaningful(next) || next === previous) continue;
@@ -333,8 +335,11 @@ export function selectedReextraction(
       choice.next !== proposal.next
     )
       continue;
-    if (proposal.kind === "field")
+    if (proposal.kind === "field") {
       result.values[proposal.field as ScooterEditorField] = proposal.next;
+      if (proposal.field === "model")
+        result.values.commercialName = proposal.next;
+    }
     if (proposal.kind === "policy") {
       result.insurancePolicies ??= structuredClone(
         current.insurancePolicies ?? [],

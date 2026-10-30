@@ -4,6 +4,7 @@ import {
   DownloadIcon,
   MoreHorizontalIcon,
   PlusIcon,
+  PencilIcon,
   Trash2Icon,
 } from "lucide-react";
 
@@ -22,6 +23,7 @@ const meta = {
         "secondary",
         "ghost",
         "text",
+        "media-text",
         "success",
         "destructive",
         "link",
@@ -122,6 +124,20 @@ export const Disabled: Story = {
     children: "Saving",
     disabled: true,
   },
+};
+
+/** Media captions remain readable while edits are temporarily disabled. */
+export const MediaText: Story = {
+  render: () => (
+    <div className="flex items-center gap-2 rounded-xl bg-media-scrim p-4">
+      <Button variant="media-text" size="xs">
+        Doc. type <PencilIcon aria-hidden="true" />
+      </Button>
+      <Button variant="media-text" size="xs" disabled>
+        CIV <PencilIcon aria-hidden="true" />
+      </Button>
+    </div>
+  ),
 };
 
 export const AsLink: Story = {
