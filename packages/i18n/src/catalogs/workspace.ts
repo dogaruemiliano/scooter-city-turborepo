@@ -365,6 +365,9 @@ export const workspaceCatalog = {
       noActivity: "No comments or activity yet.",
       blockingFilter: "Maintenance hold",
       scooterSection: "Problems",
+      viewAllScooterProblems: "View all problems",
+      allScooterProblems: "All problems",
+      noActiveScooterProblems: "No active problems for this scooter.",
       remainingBlockers:
         "{count, plural, one {# problem still blocks scooter use.} other {# problems still block scooter use.}}",
       noScooterProblems: "No problems reported for this scooter.",
@@ -910,6 +913,9 @@ export const workspaceCatalog = {
       noActivity: "Nu există încă comentarii sau activitate.",
       blockingFilter: "Blocaj pentru mentenanță",
       scooterSection: "Probleme",
+      viewAllScooterProblems: "Vezi toate problemele",
+      allScooterProblems: "Toate problemele",
+      noActiveScooterProblems: "Nu există probleme active pentru acest scuter.",
       remainingBlockers:
         "{count, plural, one {# problemă încă blochează utilizarea scuterului.} few {# probleme încă blochează utilizarea scuterului.} other {# de probleme încă blochează utilizarea scuterului.}}",
       noScooterProblems: "Nu există probleme raportate pentru acest scuter.",

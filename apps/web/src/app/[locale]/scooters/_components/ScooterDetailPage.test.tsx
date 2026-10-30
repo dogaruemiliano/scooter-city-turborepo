@@ -12,13 +12,12 @@ import { NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ScooterDetailPage } from "./ScooterDetailPage";
-import { ScooterPhotos } from "./ScooterPhotos";
 import {
   PageHeaderNavigationContext,
   type PageHeaderNavigationOptions,
 } from "@/components/PageHeaderNavigation";
-// Gallery API interactions are covered independently in ScooterPhotos.test.tsx.
-vi.mock("./ScooterPhotos", () => ({ ScooterPhotos: vi.fn(() => null) }));
+// Read-only gallery behavior is covered independently.
+vi.mock("./ScooterDetailPhotos", () => ({ ScooterDetailPhotos: () => null }));
 // Independent compliance forms are covered by their focused suites.
 vi.mock("./ScooterComplianceSection", () => ({
   ScooterComplianceSection: () => null,
@@ -91,13 +90,9 @@ beforeEach(() => {
 });
 
 describe("ScooterDetailPage", () => {
-  it("refreshes the scooter data after saved photo changes so the hero gets the current cover", () => {
+  it("shows the current cover when scooter data changes", () => {
     const view = renderDetail("en");
     expect(mocks.refresh).not.toHaveBeenCalled();
-
-    const props = vi.mocked(ScooterPhotos).mock.calls.at(-1)![0];
-    props.onSaved?.();
-    expect(mocks.refresh).toHaveBeenCalledOnce();
 
     view.rerender(
       <NextIntlClientProvider locale="en" messages={messages.en}>
@@ -443,8 +438,8 @@ describe("ScooterDetailPage", () => {
     expect(
       screen.getByRole("heading", { name: "001 YAM" }),
     ).toBeInTheDocument();
-    expect(screen.getAllByText("JYARN23E0RA123456")[0]).toBeInTheDocument();
-    expect(screen.getByText("White")).toBeInTheDocument();
+    expect(screen.queryByText("JYARN23E0RA123456")).not.toBeInTheDocument();
+    expect(screen.queryByText("White")).not.toBeInTheDocument();
     expect(screen.getAllByText("125 cc")[0]).toBeInTheDocument();
     expect(screen.getAllByText("Unregistered")[0]).toBeInTheDocument();
     expect(screen.queryByText("Active")).not.toBeInTheDocument();

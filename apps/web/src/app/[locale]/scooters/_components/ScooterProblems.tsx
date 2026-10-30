@@ -4,6 +4,14 @@ import { useCallback, useState } from "react";
 import { v1 } from "@repo/api-shared";
 import {
   Badge,
+  BottomSheet,
+  BottomSheetBody,
+  BottomSheetClose,
+  BottomSheetContent,
+  BottomSheetFooter,
+  BottomSheetHeader,
+  BottomSheetTitle,
+  BottomSheetTrigger,
   Button,
   Card,
   CardContent,
@@ -23,19 +31,9 @@ import { ProblemListItem } from "../../problems/_components/ProblemListItem";
 
 export function ScooterProblems({ scooterId }: { scooterId: string }) {
   const t = useTranslations("workspace");
+  const shared = useTranslations("shared");
   const locale = resolveRouteLocale(useLocale());
   const { user } = useSession();
-  const [selected, setSelected] = useState<v1.problems.Problem | null>(null);
-  const [page, setPage] = useState(1);
-  const load = useCallback(
-    () =>
-      webApi.fetch(
-        `/v1/problems?scooterId=${encodeURIComponent(scooterId)}&page=${page}`,
-        v1.problems.problemListSchema,
-        { cache: "no-store" },
-      ),
-    [scooterId, page],
-  );
   const loadHold = useCallback(
     () =>
       webApi.fetch(
@@ -45,7 +43,6 @@ export function ScooterProblems({ scooterId }: { scooterId: string }) {
       ),
     [scooterId],
   );
-  const remote = useRemote(load);
   const hold = useRemote(loadHold);
   return (
     <Card>
@@ -96,71 +93,136 @@ export function ScooterProblems({ scooterId }: { scooterId: string }) {
             </ul>
           </div>
         ) : null}
-        <Feedback error={remote.error} />
-        {remote.error ? (
-          <Button
-            className="self-start"
-            variant="outline"
-            onClick={remote.reload}
-          >
-            {t("retry")}
-          </Button>
-        ) : null}
-        {remote.loading ? (
-          <p className="text-sm text-muted-foreground" role="status">
-            {t("loading")}
-          </p>
-        ) : null}
-        {remote.data ? (
-          <>
-            <div className="flex flex-col gap-3">
-              {remote.data.items.length ? (
-                remote.data.items.map((problem) => (
-                  <ProblemListItem
-                    key={problem.id}
-                    problem={problem}
-                    expanded={selected?.id === problem.id}
-                    onToggle={() => setSelected(problem)}
-                  />
-                ))
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  {t("problems.noScooterProblems")}
-                </p>
-              )}
-            </div>
+        <ScooterProblemList scooterId={scooterId} activeOnly />
+        <BottomSheet>
+          <BottomSheetTrigger render={<Button variant="outline" />}>
+            {t("problems.viewAllScooterProblems")}
+          </BottomSheetTrigger>
+          <BottomSheetContent className="lg:w-(--container-form-columns)">
+            <BottomSheetHeader>
+              <BottomSheetTitle>
+                {t("problems.allScooterProblems")}
+              </BottomSheetTitle>
+            </BottomSheetHeader>
+            <BottomSheetBody>
+              <ScooterProblemList scooterId={scooterId} />
+            </BottomSheetBody>
+            <BottomSheetFooter>
+              <BottomSheetClose render={<Button variant="outline" />}>
+                {shared("actions.close")}
+              </BottomSheetClose>
+            </BottomSheetFooter>
+          </BottomSheetContent>
+        </BottomSheet>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ScooterProblemList({
+  scooterId,
+  activeOnly = false,
+}: {
+  scooterId: string;
+  activeOnly?: boolean;
+}) {
+  const t = useTranslations("workspace");
+  const [selected, setSelected] = useState<v1.problems.Problem | null>(null);
+  const [page, setPage] = useState(1);
+  const load = useCallback(async () => {
+    const fetchPage = (page: number, status?: "open" | "in_progress") =>
+      webApi.fetch(
+        `/v1/problems?scooterId=${encodeURIComponent(scooterId)}&page=${page}${status ? `&status=${status}&pageSize=100` : ""}`,
+        v1.problems.problemListSchema,
+        { cache: "no-store" },
+      );
+    if (!activeOnly) return fetchPage(page);
+
+    // Filter on the server so historical reports cannot crowd active work out
+    // of the first page. The API accepts one status per request.
+    const groups = await Promise.all(
+      (["open", "in_progress"] as const).map(async (status) => {
+        const first = await fetchPage(1, status);
+        const items = [...first.items];
+        for (let next = 2; (next - 1) * first.pageSize < first.total; next++) {
+          items.push(...(await fetchPage(next, status)).items);
+        }
+        return items;
+      }),
+    );
+    const items = groups
+      .flat()
+      .sort(
+        (a, b) =>
+          b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id),
+      );
+    return { items, total: items.length, page: 1, pageSize: items.length };
+  }, [scooterId, activeOnly, page]);
+  const remote = useRemote(load);
+
+  return (
+    <>
+      <Feedback error={remote.error} />
+      {remote.error ? (
+        <Button
+          className="self-start"
+          variant="outline"
+          onClick={remote.reload}
+        >
+          {t("retry")}
+        </Button>
+      ) : null}
+      {remote.loading ? (
+        <p className="text-sm text-muted-foreground" role="status">
+          {t("loading")}
+        </p>
+      ) : remote.data && !remote.error ? (
+        <>
+          <div className="flex flex-col gap-3">
+            {remote.data.items.length ? (
+              remote.data.items.map((problem) => (
+                <ProblemListItem
+                  key={problem.id}
+                  problem={problem}
+                  expanded={selected?.id === problem.id}
+                  onToggle={() => setSelected(problem)}
+                />
+              ))
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                {t(
+                  activeOnly
+                    ? "problems.noActiveScooterProblems"
+                    : "problems.noScooterProblems",
+                )}
+              </p>
+            )}
+          </div>
+          {!activeOnly &&
+          (page > 1 || remote.data.total > remote.data.pageSize) ? (
             <div className="flex gap-3">
               <Button
                 variant="outline"
-                disabled={page === 1 || remote.loading}
-                onClick={() => {
-                  setPage((v) => v - 1);
-                  setSelected(null);
-                }}
+                disabled={page === 1}
+                onClick={() => setPage((v) => v - 1)}
               >
                 {t("previous")}
               </Button>
               <Button
                 variant="outline"
-                disabled={
-                  remote.loading ||
-                  page * remote.data.pageSize >= remote.data.total
-                }
-                onClick={() => {
-                  setPage((v) => v + 1);
-                  setSelected(null);
-                }}
+                disabled={page * remote.data.pageSize >= remote.data.total}
+                onClick={() => setPage((v) => v + 1)}
               >
                 {t("next")}
               </Button>
             </div>
-          </>
-        ) : null}
-      </CardContent>
+          ) : null}
+        </>
+      ) : null}
       <ProblemDetailSheet
         problem={selected}
         onClose={() => setSelected(null)}
       />
-    </Card>
+    </>
   );
 }
