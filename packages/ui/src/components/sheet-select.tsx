@@ -68,6 +68,8 @@ interface SheetSelectBaseProps {
    */
   onClear?: () => void;
   clearOptionLabel?: string;
+  /** Hide search for small option sets; defaults to enabled. */
+  searchable?: boolean;
   searchPlaceholder?: string;
   clearSearchLabel?: string;
   emptyMessage?: string;
@@ -121,6 +123,7 @@ function SheetSelect({
   placeholder,
   onClear,
   clearOptionLabel,
+  searchable = true,
   searchPlaceholder = "Search options",
   clearSearchLabel = "Clear search",
   emptyMessage = "No options found",
@@ -150,15 +153,18 @@ function SheetSelect({
         options.find((option) => option.value === selected)?.label ?? selected,
     )
     .join(", ");
+  const activeQuery = searchable ? query : "";
   const filteredOptions = React.useMemo(
     () =>
-      searchFuzzyIndex(searchIndex, query, options).filter(
-        (option) => query.trim() || !option.searchOnly,
+      searchFuzzyIndex(searchIndex, activeQuery, options).filter(
+        (option) => activeQuery.trim() || !option.searchOnly,
       ),
-    [options, query, searchIndex],
+    [options, activeQuery, searchIndex],
   );
 
-  const showClearOption = Boolean(onClear && clearOptionLabel && !query.trim());
+  const showClearOption = Boolean(
+    onClear && clearOptionLabel && !activeQuery.trim(),
+  );
 
   function select(value: string) {
     if (multiple) {
@@ -252,7 +258,7 @@ function SheetSelect({
       />
 
       <BottomSheetContent
-        initialFocus={searchInputRef}
+        initialFocus={searchable ? searchInputRef : undefined}
         className="lg:h-(--select-sheet-height)"
         style={
           {
@@ -268,31 +274,33 @@ function SheetSelect({
         </BottomSheetHeader>
 
         <BottomSheetBody className="overflow-hidden pb-0">
-          <div className="flex h-10 shrink-0 items-center rounded-lg border border-input bg-control px-3 transition-colors duration-fast ease-standard focus-within:border-ring focus-within:ring-2 focus-within:ring-ring">
-            <SearchIcon
-              aria-hidden="true"
-              className="pointer-events-none size-4 shrink-0 text-muted-foreground"
-            />
-            <input
-              ref={searchInputRef}
-              type="text"
-              aria-label={searchPlaceholder}
-              placeholder={searchPlaceholder}
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              className="min-w-0 flex-1 bg-transparent px-2 text-sm outline-none placeholder:text-muted-foreground"
-            />
-            {query ? (
-              <button
-                type="button"
-                aria-label={clearSearchLabel}
-                onClick={() => setQuery("")}
-                className="flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground outline-none transition-colors duration-fast ease-standard hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <XIcon aria-hidden="true" className="size-4" />
-              </button>
-            ) : null}
-          </div>
+          {searchable ? (
+            <div className="flex h-10 shrink-0 items-center rounded-lg border border-input bg-control px-3 transition-colors duration-fast ease-standard focus-within:border-ring focus-within:ring-2 focus-within:ring-ring">
+              <SearchIcon
+                aria-hidden="true"
+                className="pointer-events-none size-4 shrink-0 text-muted-foreground"
+              />
+              <input
+                ref={searchInputRef}
+                type="text"
+                aria-label={searchPlaceholder}
+                placeholder={searchPlaceholder}
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                className="min-w-0 flex-1 bg-transparent px-2 text-sm outline-none placeholder:text-muted-foreground"
+              />
+              {query ? (
+                <button
+                  type="button"
+                  aria-label={clearSearchLabel}
+                  onClick={() => setQuery("")}
+                  className="flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground outline-none transition-colors duration-fast ease-standard hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <XIcon aria-hidden="true" className="size-4" />
+                </button>
+              ) : null}
+            </div>
+          ) : null}
 
           {filteredOptions.length === 0 && !showClearOption ? (
             <div className="flex min-h-24 items-center justify-center text-center text-sm text-muted-foreground">

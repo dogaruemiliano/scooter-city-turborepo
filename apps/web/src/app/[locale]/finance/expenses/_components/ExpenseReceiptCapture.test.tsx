@@ -1,6 +1,5 @@
 import { v1 } from "@repo/api-shared";
 import { messages } from "@repo/i18n";
-import type { ImageCaptureProps } from "@repo/ui/components/image-capture";
 import {
   fireEvent,
   render,
@@ -10,7 +9,7 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
-import { type ComponentProps, useState } from "react";
+import { type ComponentProps } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ExpenseReceiptCapture } from "./ExpenseReceiptCapture";
@@ -19,7 +18,6 @@ const mocks = vi.hoisted(() => ({
   analyze: vi.fn(),
   create: vi.fn(),
   createSupplier: vi.fn(),
-  captureProps: vi.fn(),
   back: vi.fn(),
   push: vi.fn(),
   refresh: vi.fn(),
@@ -33,38 +31,6 @@ vi.mock("../_lib/expense-api", () => ({
   analyzeExpenseReceipt: mocks.analyze,
   createExpense: mocks.create,
   createSupplier: mocks.createSupplier,
-}));
-
-// Camera and crop behavior are tested with the shared component. These tests
-// exercise the hand-off of its confirmed file into expense analysis and review.
-vi.mock("@repo/ui/components/image-capture", () => ({
-  ImageCapture: function CaptureBoundary(props: ImageCaptureProps) {
-    const [error, setError] = useState("");
-    mocks.captureProps(props);
-    if (!props.open) return null;
-    return (
-      <div role="dialog" aria-label={props.labels?.title}>
-        <button type="button" onClick={() => props.onOpenChange(false)}>
-          {props.labels?.close}
-        </button>
-        <input
-          type="file"
-          aria-label="Confirmed photo"
-          onChange={(event) => {
-            const file = event.target.files?.[0];
-            if (!file) return;
-            event.target.value = "";
-            setError("");
-            void Promise.resolve(props.onCapture(file, { originalFile: file }))
-              .then(() => props.onOpenChange(false))
-              .catch((caught: Error) => setError(caught.message));
-          }}
-        />
-        {props.cameraActions}
-        {error ? <p role="alert">{error}</p> : null}
-      </div>
-    );
-  },
 }));
 
 vi.mock("@/i18n/navigation", () => ({
@@ -172,7 +138,6 @@ describe("ExpenseReceiptCapture", () => {
       createdAt: "2026-08-22T10:00:00.000Z",
       updatedAt: "2026-08-22T10:00:00.000Z",
     });
-    mocks.captureProps.mockReset();
     mocks.back.mockReset();
     mocks.push.mockReset();
     mocks.refresh.mockReset();
@@ -184,13 +149,12 @@ describe("ExpenseReceiptCapture", () => {
     const browser = userEvent.setup();
     renderCapture();
 
-    expect(mocks.captureProps).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        open: true,
-        allowGallery: true,
-        allowCrop: true,
-      }),
-    );
+    expect(
+      screen.getByLabelText("Take photo", { selector: "input" }),
+    ).toHaveAttribute("capture", "environment");
+    expect(
+      screen.getByLabelText("Choose from files", { selector: "input" }),
+    ).toHaveAttribute("multiple");
     await browser.click(screen.getByRole("button", { name: "Add manually" }));
     expect(mocks.push).toHaveBeenCalledWith("/finance/expenses/new/manual");
   });
@@ -199,7 +163,7 @@ describe("ExpenseReceiptCapture", () => {
     const browser = userEvent.setup();
     renderCapture();
 
-    await browser.click(screen.getByRole("button", { name: "Go back" }));
+    await browser.click(screen.getByRole("button", { name: "Close" }));
     expect(mocks.back).toHaveBeenCalledOnce();
   });
 
@@ -208,7 +172,7 @@ describe("ExpenseReceiptCapture", () => {
     renderCapture();
     const cropped = await confirmPhoto(browser);
 
-    expect(mocks.analyze).toHaveBeenCalledWith(cropped);
+    expect(mocks.analyze).toHaveBeenCalledWith([cropped]);
     const reviewSheet = await screen.findByRole("dialog", {
       name: "Review expense",
     });
@@ -252,6 +216,32 @@ describe("ExpenseReceiptCapture", () => {
     );
     expect(mocks.push).toHaveBeenCalledWith("/finance/operations/operation-42");
     expect(mocks.refresh).toHaveBeenCalledOnce();
+  });
+
+  it("analyzes two selected photos as one expense and previews both", async () => {
+    let index = 0;
+    vi.spyOn(URL, "createObjectURL").mockImplementation(
+      () => `blob:receipt-${++index}`,
+    );
+    const browser = userEvent.setup();
+    renderCapture();
+    const photos = [
+      new File(["page1"], "page-1.jpg", { type: "image/jpeg" }),
+      new File(["page2"], "page-2.jpg", { type: "image/jpeg" }),
+    ];
+    await browser.upload(
+      screen.getByLabelText("Choose from gallery", { selector: "input" }),
+      photos,
+    );
+    expect(mocks.analyze).not.toHaveBeenCalled();
+    await browser.click(screen.getByRole("button", { name: "Use 2 files" }));
+    const review = await screen.findByRole("dialog", {
+      name: "Review expense",
+    });
+    expect(mocks.analyze).toHaveBeenCalledExactlyOnceWith(photos);
+    expect(
+      review.querySelectorAll('[data-slot="receipt-preview-frame"]'),
+    ).toHaveLength(2);
   });
 
   it("waits for analysis before leaving shared capture", async () => {
@@ -371,7 +361,7 @@ describe("ExpenseReceiptCapture", () => {
 
     await browser.click(screen.getByRole("button", { name: "Retake photo" }));
     expect(screen.getByRole("dialog", { name: "Add expense" })).toBeVisible();
-    await browser.click(screen.getByRole("button", { name: "Go back" }));
+    await browser.click(screen.getByRole("button", { name: "Close" }));
 
     expect(mocks.back).not.toHaveBeenCalled();
     await browser.click(screen.getByRole("button", { name: "Review expense" }));
@@ -396,7 +386,12 @@ async function confirmPhoto(browser: ReturnType<typeof userEvent.setup>) {
   const cropped = new File(["cropped"], "receipt-cropped.jpg", {
     type: "image/jpeg",
   });
-  await browser.upload(screen.getByLabelText("Confirmed photo"), cropped);
+  if (!screen.queryByText("receipt-cropped.jpg"))
+    await browser.upload(
+      screen.getByLabelText("Take photo", { selector: "input" }),
+      cropped,
+    );
+  await browser.click(screen.getByRole("button", { name: "Use file" }));
   return cropped;
 }
 

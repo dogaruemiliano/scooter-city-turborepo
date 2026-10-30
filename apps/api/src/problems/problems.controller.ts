@@ -59,6 +59,9 @@ class RevisionInput extends createZodDto(v1.problems.revisionInputSchema) {}
 class ListQuery extends createZodDto(v1.problems.listProblemsQuerySchema) {}
 class Problem extends createZodDto(v1.problems.problemSchema) {}
 class ProblemList extends createZodDto(v1.problems.problemListSchema) {}
+class AssigneeQuery extends createZodDto(
+  v1.problems.eligibleAssigneeQuerySchema,
+) {}
 class AssigneeList extends createZodDto(
   v1.problems.eligibleAssigneeListSchema,
 ) {}
@@ -93,14 +96,8 @@ export class ProblemsController {
   @Get("eligible-assignees")
   @RequirePermissions("problems.assign")
   @ZodResponse({ type: AssigneeList })
-  assignees(
-    @CurrentUser() user: AuthPrincipal,
-    @Query("search") search?: string,
-  ) {
-    return this.problems.assignees(
-      user.id,
-      typeof search === "string" ? search.trim().slice(0, 100) : "",
-    );
+  assignees(@CurrentUser() user: AuthPrincipal, @Query() query: AssigneeQuery) {
+    return this.problems.assignees(user.id, query.search ?? "", query.kind);
   }
 
   @Get("scooters/:id")

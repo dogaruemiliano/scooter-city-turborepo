@@ -114,13 +114,15 @@ export function ProblemDetailScreen({ id }: { id: string }) {
             </Badge>
           ) : null}
           <section className="relative flex flex-col gap-4 overflow-hidden rounded-2xl border border-border bg-card p-5 text-card-foreground">
-            {problem.difficulty ? (
+            {problem.scooterId !== null && problem.difficulty ? (
               <CardAccent className={difficultyColors[problem.difficulty]} />
             ) : null}
-            <span className="sr-only">
-              {t("problems.difficulty")}:{" "}
-              {t(`problems.${problem.difficulty ?? "unassessed"}`)}
-            </span>
+            {problem.scooterId !== null ? (
+              <span className="sr-only">
+                {t("problems.difficulty")}:{" "}
+                {t(`problems.${problem.difficulty ?? "unassessed"}`)}
+              </span>
+            ) : null}
             <h1 className="text-xl font-semibold wrap-anywhere">
               {problem.title}
             </h1>
@@ -128,23 +130,25 @@ export function ProblemDetailScreen({ id }: { id: string }) {
               {problem.description || t("problems.noDescription")}
             </p>
           </section>
-          <Link
-            className="flex min-h-20 items-center gap-4 rounded-2xl border border-border bg-card p-4 text-card-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            href={localizePath(
-              `/scooters/${encodeURIComponent(problem.scooterId)}`,
-              locale,
-            )}
-          >
-            <ScooterCover scooter={problem.scooter} />
-            <span className="flex min-w-0 flex-1 flex-col gap-1">
-              <span className="text-base font-semibold">
-                {v1.scooters.scooterDisplayCode(problem.scooter)}
+          {problem.scooter && problem.scooterId ? (
+            <Link
+              className="flex min-h-20 items-center gap-4 rounded-2xl border border-border bg-card p-4 text-card-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              href={localizePath(
+                `/scooters/${encodeURIComponent(problem.scooterId)}`,
+                locale,
+              )}
+            >
+              <ScooterCover scooter={problem.scooter} />
+              <span className="flex min-w-0 flex-1 flex-col gap-1">
+                <span className="text-base font-semibold">
+                  {v1.scooters.scooterDisplayCode(problem.scooter)}
+                </span>
+                <span className="text-sm text-muted-foreground">
+                  {problem.scooter.brandName} {problem.scooter.model}
+                </span>
               </span>
-              <span className="text-sm text-muted-foreground">
-                {problem.scooter.brandName} {problem.scooter.model}
-              </span>
-            </span>
-          </Link>
+            </Link>
+          ) : null}
           <ProblemWork
             actionsTarget={actionsTarget}
             compact

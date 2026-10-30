@@ -1,6 +1,9 @@
 import { DocumentExtractionError } from "../../../document-extraction/document-extraction.errors";
 import type { ExpenseAnalysisResult } from "../../../document-extraction/document-extraction.types";
-import { AnalyzeExpenseReceiptUseCase } from "./analyze-expense-receipt.use-case";
+import {
+  AnalyzeExpenseReceiptUseCase,
+  mergeExpenseAnalyses,
+} from "./analyze-expense-receipt.use-case";
 
 const stored = {
   provider: "s3" as const,
@@ -19,6 +22,101 @@ const analysis: ExpenseAnalysisResult = {
 };
 
 describe("AnalyzeExpenseReceiptUseCase", () => {
+  it("analyzes two verified uploads into one draft with both sources retained", async () => {
+    const imageStorage = {
+      completePresignedUpload: jest
+        .fn()
+        .mockResolvedValueOnce(stored)
+        .mockResolvedValueOnce({
+          ...stored,
+          storageKey: "expense-invoice/page2.jpg",
+        }),
+    };
+    const extraction = {
+      providerName: "fake",
+      analyzeExpense: jest.fn().mockResolvedValue(analysis),
+    };
+    const repository = {
+      findAvailableSourceUploadByFile: jest
+        .fn()
+        .mockResolvedValueOnce({ id: "upload-1" })
+        .mockResolvedValueOnce({ id: "upload-2" }),
+    };
+    const drafts = {
+      begin: jest
+        .fn()
+        .mockResolvedValue({ draftId: "draft-1", shouldAnalyze: true }),
+      complete: jest.fn().mockResolvedValue({ id: "draft-1", status: "READY" }),
+      fail: jest.fn(),
+    };
+    const useCase = new AnalyzeExpenseReceiptUseCase(
+      imageStorage as never,
+      extraction as never,
+      repository as never,
+      drafts as never,
+    );
+    await useCase.execute({ uploadTokens: ["one", "two"] }, "user-1");
+    expect(drafts.begin).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sourceUploadId: "upload-1",
+        additionalSourceUploadIds: ["upload-2"],
+      }),
+    );
+    expect(extraction.analyzeExpense).toHaveBeenCalledTimes(2);
+    expect(drafts.complete).toHaveBeenCalledWith(
+      expect.objectContaining({
+        analysis: expect.objectContaining({ pages: 2 }) as unknown,
+      }),
+    );
+  });
+
+  it("normalizes page references across the two receipt photos", () => {
+    const page = {
+      ...analysis,
+      documents: [
+        {
+          summaryFields: [
+            { value: { text: "25.00" }, pageNumber: 1, groups: [] },
+          ],
+          lineItemGroups: [],
+          textLines: [{ text: "Receipt", pageNumber: 1 }],
+        },
+      ],
+    };
+    const merged = mergeExpenseAnalyses([page, page]);
+    expect(merged.pages).toBe(2);
+    expect(
+      merged.documents.map((document) => document.summaryFields[0]?.pageNumber),
+    ).toEqual([1, 2]);
+    expect(
+      merged.documents.map((document) => document.textLines[0]?.pageNumber),
+    ).toEqual([1, 2]);
+  });
+
+  it("rejects two tokens referring to the same source upload", async () => {
+    const imageStorage = {
+      completePresignedUpload: jest.fn().mockResolvedValue(stored),
+    };
+    const extraction = { providerName: "fake", analyzeExpense: jest.fn() };
+    const repository = {
+      findAvailableSourceUploadByFile: jest
+        .fn()
+        .mockResolvedValue({ id: "same" }),
+    };
+    const drafts = { begin: jest.fn() };
+    const useCase = new AnalyzeExpenseReceiptUseCase(
+      imageStorage as never,
+      extraction as never,
+      repository as never,
+      drafts as never,
+    );
+    await expect(
+      useCase.execute({ uploadTokens: ["one", "two"] }, "user-1"),
+    ).rejects.toThrow("distinct receipt photos");
+    expect(drafts.begin).not.toHaveBeenCalled();
+    expect(extraction.analyzeExpense).not.toHaveBeenCalled();
+  });
+
   it("verifies the upload and analyzes its private S3 object", async () => {
     const imageStorage = {
       completePresignedUpload: jest.fn().mockResolvedValue(stored),

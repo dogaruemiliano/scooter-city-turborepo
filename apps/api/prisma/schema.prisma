@@ -1307,6 +1307,7 @@ model FinancialOperation {
 /// output is normalized and validated before it is stored in `result`; raw AWS
 /// response shapes never become an API or UI contract.
 model ExpenseExtractionDraft {
+  additionalSourceUploadIds String[] @default([])
   id                   String                       @id @default(cuid())
   ownerUserId          String
   sourceUploadId       String                       @unique
@@ -1912,8 +1913,9 @@ model UserInvitation {
 
 model ScooterProblem {
   id              String                @id @default(cuid())
-  scooterId       String
-  scooter         Scooter               @relation(fields: [scooterId], references: [id], onDelete: Restrict)
+  /// Null identifies a general todo, accessible only to admins.
+  scooterId       String?
+  scooter         Scooter?              @relation(fields: [scooterId], references: [id], onDelete: Restrict)
   title           String
   description     String                @default("")
   checklist       Json                  @default("[]")

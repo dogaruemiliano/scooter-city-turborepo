@@ -14,6 +14,10 @@ import {
 import { v1 } from "@repo/api-shared";
 import {
   Button,
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
   ActivityTimeline,
   ActivityTimelineItem,
   CommentThread,
@@ -26,7 +30,6 @@ import {
   BottomSheetHeader,
   BottomSheetTitle,
   BottomSheetBody,
-  BottomSheetFooter,
   BottomSheetClose,
   Field,
   FieldLabel,
@@ -53,6 +56,7 @@ import {
 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
+import { localizePath, resolveRouteLocale } from "@/i18n/paths";
 import { useWorkspaceNotifications } from "@/components/WorkspaceNotifications";
 import { PageHeaderActions } from "@/components/PageHeaderActions";
 import { ProblemAssignment } from "./ProblemAssignment";
@@ -62,27 +66,22 @@ export { memberName } from "../_lib/member-name";
 import { useSession } from "@/components/auth/SessionProvider";
 import { canAccess } from "@/lib/access";
 import { webApi } from "@/lib/api";
-import {
-  Choice,
-  Feedback,
-  useRemote,
-  useTask,
-} from "@/components/WorkspaceForm";
+import { Feedback, useRemote, useTask } from "@/components/WorkspaceForm";
 import { ProblemScooterPicker } from "./ProblemScooterPicker";
 import { ProblemSections, type ProblemSectionData } from "./ProblemSections";
 import { ProblemPhotos } from "./ProblemPhotos";
 
-export function useProblemAssignees(enabled: boolean) {
+export function useProblemAssignees(enabled: boolean, todo = false) {
   const load = useCallback(
     () =>
       enabled
         ? webApi.fetch(
-            "/v1/problems/eligible-assignees",
+            `/v1/problems/eligible-assignees${todo ? "?kind=todo" : ""}`,
             v1.problems.eligibleAssigneeListSchema,
             { cache: "no-store" },
           )
         : Promise.resolve({ items: [] }),
-    [enabled],
+    [enabled, todo],
   );
   return useRemote(load);
 }
@@ -92,7 +91,13 @@ export function CreateProblem({
   onSaved,
   onCancel,
   stickyActions = false,
+  todo = false,
+  initialProblem,
+  onReloadLatest,
 }: {
+  onReloadLatest?: () => void;
+  initialProblem?: v1.problems.Problem;
+  todo?: boolean;
   scooterId?: string;
   onSaved: (problem: v1.problems.Problem) => void;
   onCancel?: () => void;
@@ -107,31 +112,49 @@ export function CreateProblem({
   const { user } = useSession();
   const id = useId();
   const task = useTask();
-  const [scooterId, setScooter] = useState(preselected ?? "");
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [difficulty, setDifficulty] = useState("");
-  const [blocksUsage, setBlocks] = useState("");
-  const [assigneeIds, setAssignees] = useState<string[]>([]);
+  const [scooterId, setScooter] = useState(
+    initialProblem?.scooterId ?? preselected ?? "",
+  );
+  const [title, setTitle] = useState(initialProblem?.title ?? "");
+  const [description, setDescription] = useState(
+    initialProblem?.description ?? "",
+  );
+  const [difficulty, setDifficulty] = useState(
+    initialProblem?.difficulty ?? "",
+  );
+  const [blocksUsage, setBlocks] = useState(
+    initialProblem
+      ? initialProblem.blocksUsage && !initialProblem.holdClearedAt
+        ? "defective"
+        : "functional"
+      : "",
+  );
+  const [assigneeIds, setAssignees] = useState<string[]>(
+    initialProblem
+      ? v1.problems.problemAssignees(initialProblem).map(({ id }) => id)
+      : [],
+  );
   const [files, setFiles] = useState<File[]>([]);
   const [galleryBusy, setGalleryBusy] = useState(false);
   const [sectionsBusy, setSectionsBusy] = useState(false);
   const [sectionData, setSectionData] = useState<ProblemSectionData>({
-    sections: [],
-    checklist: [],
-    buyList: [],
-    location: null,
+    sections: initialProblem?.sections ?? [],
+    checklist: initialProblem?.checklist ?? [],
+    buyList: initialProblem?.buyList ?? [],
+    location: initialProblem?.location ?? null,
   });
   const [fileError, setFileError] = useState<string | null>(null);
   const uploads = useRef(new Map<File, v1.problems.ProblemPhotoDraft>());
   const mayAssign = canAccess(user, "problems.assign", "ALL");
-  const assignees = useProblemAssignees(mayAssign);
+  const assignees = useProblemAssignees(mayAssign, todo);
 
+  const needsReload = Boolean(initialProblem && task.error === t("conflict"));
   const readyToSubmit = Boolean(
-    scooterId &&
+    !needsReload &&
+    (todo || scooterId) &&
     title.trim() &&
-    difficulty &&
-    blocksUsage &&
+    (todo || initialProblem || difficulty) &&
+    (todo || blocksUsage) &&
     !fileError &&
     !galleryBusy &&
     !sectionsBusy,
@@ -181,38 +204,82 @@ export function CreateProblem({
       className={
         stickyActions ? "flex flex-1 flex-col gap-4" : "flex flex-col gap-4"
       }
-      aria-label={t("problems.add")}
+      aria-label={t(
+        initialProblem
+          ? todo
+            ? "todos.edit"
+            : "problems.edit"
+          : todo
+            ? "todos.add"
+            : "problems.add",
+      )}
       onSubmit={(event) => {
         event.preventDefault();
-        if (!blocksUsage) return;
+        if (task.busy || !readyToSubmit) return;
         void task.run(async () => {
-          const input = v1.problems.createProblemInputSchema.parse({
-            ...sectionData,
-            scooterId,
-            title,
-            difficulty,
-            description,
-            blocksUsage: blocksUsage === "defective",
-            ...(mayAssign ? { assigneeIds } : {}),
-          });
           const photos = await uploadPhotos();
+          const previousIds = initialProblem
+            ? v1.problems.problemAssignees(initialProblem).map(({ id }) => id)
+            : [];
+          const assignmentChanged =
+            assigneeIds.length !== previousIds.length ||
+            assigneeIds.some((id) => !previousIds.includes(id));
+          const blocking = blocksUsage === "defective";
+          const input = initialProblem
+            ? v1.problems.updateProblemInputSchema.parse({
+                ...sectionData,
+                revision: initialProblem.revision,
+                title,
+                description,
+                ...(!todo && difficulty ? { difficulty } : {}),
+                ...(!todo &&
+                blocking !==
+                  (initialProblem.blocksUsage && !initialProblem.holdClearedAt)
+                  ? { blocksUsage: blocking }
+                  : {}),
+                ...(mayAssign && assignmentChanged ? { assigneeIds } : {}),
+                photos,
+              })
+            : v1.problems.createProblemInputSchema.parse({
+                ...sectionData,
+                scooterId: todo ? null : scooterId,
+                title,
+                ...(!todo ? { difficulty } : {}),
+                description,
+                blocksUsage: blocking,
+                ...(mayAssign ? { assigneeIds } : {}),
+                photos,
+              });
           const created = await webApi.fetch(
-            "/v1/problems",
+            initialProblem
+              ? `/v1/problems/${encodeURIComponent(initialProblem.id)}`
+              : "/v1/problems",
             v1.problems.problemSchema,
-            {
-              method: "POST",
-              json: { ...input, photos },
-            },
+            { method: initialProblem ? "PATCH" : "POST", json: input },
           );
           notifications?.add({
-            title: t("problems.reported"),
+            title: t(
+              initialProblem
+                ? todo
+                  ? "todos.updated"
+                  : "problems.notifications.changesSaved"
+                : todo
+                  ? "todos.created"
+                  : "problems.reported",
+            ),
             variant: "success",
           });
           onSaved(created);
         });
       }}
     >
-      {!preselected ? (
+      {initialProblem?.scooter ? (
+        <p className="text-sm text-muted-foreground">
+          {v1.scooters.scooterDisplayCode(initialProblem.scooter)} ·{" "}
+          {initialProblem.scooter.model}
+        </p>
+      ) : null}
+      {!todo && !preselected && !initialProblem ? (
         <ProblemScooterPicker
           disabled={task.busy}
           value={scooterId}
@@ -225,7 +292,9 @@ export function CreateProblem({
         </FieldLabel>
         <Input
           id={`${id}-title`}
-          placeholder={t("problems.titlePlaceholder")}
+          placeholder={t(
+            todo ? "todos.titlePlaceholder" : "problems.titlePlaceholder",
+          )}
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           required
@@ -233,56 +302,62 @@ export function CreateProblem({
           disabled={task.busy}
         />
       </Field>
-      <Field>
-        <FieldLabel>{t("problems.difficulty")}</FieldLabel>
-        <SegmentedRadioGroup
-          label={t("problems.difficulty")}
-          name={`${id}-difficulty`}
-          columns={3}
-          value={difficulty}
-          onValueChange={setDifficulty}
-          disabled={task.busy}
-          showCheckmark
-          aria-describedby={`${id}-difficulty-help`}
-          options={v1.problems.problemDifficultySchema.options.map((value) => ({
-            value,
-            label: t(`problems.${value}`),
-            difficulty: value,
-          }))}
-        />
-        <p
-          id={`${id}-difficulty-help`}
-          className="text-sm text-muted-foreground"
-        >
-          {t("problems.difficultyHelp")}
-        </p>
-      </Field>
-      <Field>
-        <FieldLabel>{t("problems.scooterCondition")}</FieldLabel>
-        <SegmentedRadioGroup
-          label={t("problems.scooterCondition")}
-          name={`${id}-blocking`}
-          value={blocksUsage}
-          onValueChange={setBlocks}
-          disabled={task.busy}
-          required
-          showCheckmark
-          options={[
-            {
-              value: "functional",
-              label: t("problems.functional"),
-              tone: "success",
-              colorUnselected: true,
-            },
-            {
-              value: "defective",
-              label: t("problems.defective"),
-              tone: "destructive",
-              colorUnselected: true,
-            },
-          ]}
-        />
-      </Field>
+      {!todo ? (
+        <Field>
+          <FieldLabel>{t("problems.difficulty")}</FieldLabel>
+          <SegmentedRadioGroup
+            label={t("problems.difficulty")}
+            name={`${id}-difficulty`}
+            columns={3}
+            value={difficulty}
+            onValueChange={setDifficulty}
+            disabled={task.busy}
+            showCheckmark
+            aria-describedby={`${id}-difficulty-help`}
+            options={v1.problems.problemDifficultySchema.options.map(
+              (value) => ({
+                value,
+                label: t(`problems.${value}`),
+                difficulty: value,
+              }),
+            )}
+          />
+          <p
+            id={`${id}-difficulty-help`}
+            className="text-sm text-muted-foreground"
+          >
+            {t("problems.difficultyHelp")}
+          </p>
+        </Field>
+      ) : null}
+      {!todo ? (
+        <Field>
+          <FieldLabel>{t("problems.scooterCondition")}</FieldLabel>
+          <SegmentedRadioGroup
+            label={t("problems.scooterCondition")}
+            name={`${id}-blocking`}
+            value={blocksUsage}
+            onValueChange={setBlocks}
+            disabled={task.busy}
+            required
+            showCheckmark
+            options={[
+              {
+                value: "functional",
+                label: t("problems.functional"),
+                tone: "success",
+                colorUnselected: true,
+              },
+              {
+                value: "defective",
+                label: t("problems.defective"),
+                tone: "destructive",
+                colorUnselected: true,
+              },
+            ]}
+          />
+        </Field>
+      ) : null}
       <Field>
         <FieldLabel htmlFor={`${id}-description`}>
           {t("problems.optionalDescription")}
@@ -303,13 +378,34 @@ export function CreateProblem({
             multiple
             value={assigneeIds}
             onValueChange={setAssignees}
-            members={assignees.data?.items ?? []}
+            members={[
+              ...(assignees.data?.items ?? []),
+              ...(initialProblem
+                ? v1.problems
+                    .problemAssignees(initialProblem)
+                    .filter(
+                      (member) =>
+                        !assignees.data?.items.some(
+                          ({ id }) => id === member.id,
+                        ),
+                    )
+                : []),
+            ]}
             disabled={task.busy}
             loading={assignees.loading}
             error={assignees.error}
             onRetry={assignees.reload}
           />
         </Field>
+      ) : null}
+      {initialProblem?.photos.length ? (
+        <ProblemPhotos
+          problem={initialProblem}
+          editable={false}
+          disabled={task.busy}
+          onBusyChange={setGalleryBusy}
+          onSave={async () => {}}
+        />
       ) : null}
       <Field>
         <FieldLabel>{t("problems.photos")}</FieldLabel>
@@ -318,12 +414,16 @@ export function CreateProblem({
           disabled={task.busy}
           onBusyChange={setGalleryBusy}
           title={t("problems.photos")}
-          accept={v1.scooters.SCOOTER_PHOTO_CONTENT_TYPES.join(",")}
-          maxFiles={v1.problems.PROBLEM_PHOTO_MAX_FILES}
+          accept="image/*"
+          maxFiles={
+            v1.problems.PROBLEM_PHOTO_MAX_FILES -
+            (initialProblem?.photos.length ?? 0)
+          }
           maxFileSize={v1.scooters.SCOOTER_PHOTO_MAX_BYTES}
           onChange={(next) => {
             if (
-              next.length > v1.problems.PROBLEM_PHOTO_MAX_FILES ||
+              next.length + (initialProblem?.photos.length ?? 0) >
+                v1.problems.PROBLEM_PHOTO_MAX_FILES ||
               next.some(
                 (file) =>
                   !v1.problems.createProblemPhotoUploadSchema.safeParse({
@@ -401,6 +501,11 @@ export function CreateProblem({
         }}
       />
       <Feedback error={fileError ?? task.error} />
+      {needsReload && onReloadLatest ? (
+        <Button type="button" variant="outline" onClick={onReloadLatest}>
+          {t("problems.reloadLatest")}
+        </Button>
+      ) : null}
       <FormActions
         data-slot="problem-create-actions"
         arrangement="split"
@@ -412,7 +517,17 @@ export function CreateProblem({
           className={stickyActions ? "w-full" : undefined}
           type="submit"
           disabled={task.busy || !readyToSubmit}
-          {...formAction("report", { pending: task.busy, error: task.error })}
+          {...formAction(initialProblem ? "save" : "report", {
+            pending: task.busy,
+            error: task.error,
+          })}
+          {...(todo && !initialProblem
+            ? {
+                idleLabel: t("todos.add"),
+                pendingLabel: t("todos.creating"),
+                successLabel: t("todos.created"),
+              }
+            : {})}
         />
         {onCancel ? (
           <Button
@@ -460,10 +575,8 @@ export function ProblemWork({
   const [reopenMessage, setReopenMessage] = useState("");
   const [resolution, setResolution] = useState("");
   const [confirm, setConfirm] = useState<"reopen" | "cancel" | null>(null);
-  const [editing, setEditing] = useState(false);
-  const [title, setTitle] = useState(problem.title);
-  const [description, setDescription] = useState(problem.description);
-  const [difficulty, setDifficulty] = useState(problem.difficulty ?? "");
+  const locale = resolveRouteLocale(useLocale());
+  const todo = problem.scooterId === null;
   const editable =
     problem.status === "open" || problem.status === "in_progress";
   const assignedMembers = v1.problems.problemAssignees(problem);
@@ -472,7 +585,10 @@ export function ProblemWork({
   const can = (action: string) =>
     canAccess(user, action, own ? "ASSIGNED" : "ALL");
   const mayAssign = canAccess(user, "problems.assign", "ALL");
-  const assignees = useProblemAssignees(mayAssign && editable);
+  const assignees = useProblemAssignees(
+    mayAssign && editable,
+    problem.scooterId === null,
+  );
   const busy = task.busy || commentTask.busy || photosBusy || sectionsBusy;
   useEffect(() => {
     onBusyChange?.(busy);
@@ -508,7 +624,10 @@ export function ProblemWork({
               ? "commentAdded"
               : "changesSaved";
     notifications?.add({
-      title: t(`problems.notifications.${message}`),
+      title:
+        message === "changesSaved" && problem.scooterId === null
+          ? t("todos.updated")
+          : t(`problems.notifications.${message}`),
       variant: "success",
     });
     reload(updated);
@@ -535,8 +654,8 @@ export function ProblemWork({
   ) : null;
   return (
     <div className="flex flex-col gap-8">
-      <Feedback error={task.error} />
-      {retryAction}
+      <Feedback error={confirm ? null : task.error} />
+      {confirm ? null : retryAction}
       <ProblemAssignment
         problem={problem}
         userId={user?.id}
@@ -598,11 +717,7 @@ export function ProblemWork({
       ) : null}
       {!compact ||
       (problem.status === "in_progress" && can("problems.resolve")) ? (
-        <ProblemWorkPanel
-          compact={compact}
-          title={t("problems.completeTask")}
-          primary={problem.status === "in_progress" && can("problems.resolve")}
-        >
+        <ProblemWorkPanel compact={compact} title={t("problems.completeTask")}>
           {compact ? (
             <>
               <Feedback error={task.error} />
@@ -647,228 +762,206 @@ export function ProblemWork({
           ) : null}
         </ProblemWorkPanel>
       ) : null}
-      <ProblemWorkPanel
-        compact={compact}
-        actionsTarget={actionsTarget}
-        title={t("problems.moreActions")}
+      {editable && can("problems.update") ? (
+        <PageHeaderActions desktopTarget={actionsTarget}>
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  variant="outline"
+                  size="icon"
+                  disabled={busy}
+                  aria-label={t("problems.moreActions")}
+                />
+              }
+            >
+              <MoreVertical aria-hidden="true" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="end"
+              aria-label={t("problems.moreActions")}
+            >
+              <DropdownMenuItem
+                onClick={() =>
+                  router.push(
+                    localizePath(
+                      `${todo ? "/todos" : "/problems"}/${encodeURIComponent(problem.id)}/edit`,
+                      locale,
+                    ),
+                  )
+                }
+              >
+                <Pencil aria-hidden="true" />
+                {t("problems.editAction")}
+              </DropdownMenuItem>
+              {problem.status === "in_progress" ? (
+                <DropdownMenuItem
+                  disabled={busy}
+                  onClick={() =>
+                    void task.run(() =>
+                      mutate("", "PATCH", { pauseWork: true }),
+                    )
+                  }
+                >
+                  <Pause aria-hidden="true" />
+                  {t("problems.pause")}
+                </DropdownMenuItem>
+              ) : null}
+              {canAccess(user, "problems.update", "ALL") ? (
+                <DropdownMenuItem
+                  variant="destructive"
+                  onClick={() => setConfirm("cancel")}
+                >
+                  <CircleSlash aria-hidden="true" />
+                  {t("problems.dismissAction")}
+                </DropdownMenuItem>
+              ) : null}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </PageHeaderActions>
+      ) : null}
+      {problem.resolutionNotes ? (
+        <div>
+          <p className="text-sm font-medium">
+            {t("problems.previousResolution")}
+          </p>
+          <p className="whitespace-pre-wrap text-sm">
+            {problem.resolutionNotes}
+          </p>
+        </div>
+      ) : null}
+      {problem.workNotes ? (
+        <div>
+          <p className="text-sm font-medium">{t("problems.workNotes")}</p>
+          <p className="whitespace-pre-wrap text-sm">{problem.workNotes}</p>
+        </div>
+      ) : null}
+      {problem.scooterId && editable && can("problems.update") ? (
+        <Button
+          className="self-start"
+          variant="outline"
+          disabled={busy}
+          onClick={() =>
+            void task.run(() =>
+              mutate("/hold", "PUT", { blocksUsage: !problem.blocksUsage }),
+            )
+          }
+        >
+          {problem.blocksUsage
+            ? t("problems.clearHold")
+            : t("problems.setHold")}
+        </Button>
+      ) : null}
+      <div className="flex flex-wrap gap-3">
+        {(problem.status === "resolved" || problem.status === "cancelled") &&
+        canAccess(user, "problems.reopen") ? (
+          <Button
+            variant="outline"
+            disabled={busy}
+            onClick={() => setConfirm("reopen")}
+          >
+            {t(todo ? "todos.reopen" : "problems.reopen")}
+          </Button>
+        ) : null}
+      </div>
+      <BottomSheet
+        open={Boolean(confirm)}
+        onOpenChange={(open) => {
+          if (!open && !busy) setConfirm(null);
+        }}
       >
-        {compact ? (
-          <>
+        <BottomSheetContent>
+          <BottomSheetHeader>
+            <BottomSheetTitle>
+              {t(
+                confirm === "reopen"
+                  ? todo
+                    ? "todos.reopen"
+                    : "problems.reopen"
+                  : todo
+                    ? "todos.dismiss"
+                    : "problems.dismiss",
+              )}
+            </BottomSheetTitle>
+          </BottomSheetHeader>
+          <BottomSheetBody>
             <Feedback error={task.error} />
             {retryAction}
-          </>
-        ) : null}
-        {problem.status === "in_progress" && can("problems.update") ? (
-          <Button
-            variant="outline"
-            disabled={busy}
-            onClick={() =>
-              void task.run(() => mutate("", "PATCH", { pauseWork: true }))
-            }
-          >
-            {t("problems.pause")}
-          </Button>
-        ) : null}
-        {problem.resolutionNotes ? (
-          <div>
-            <p className="text-sm font-medium">
-              {t("problems.previousResolution")}
-            </p>
-            <p className="whitespace-pre-wrap text-sm">
-              {problem.resolutionNotes}
-            </p>
-          </div>
-        ) : null}
-        {editable && can("problems.update") ? (
-          <>
-            <div className="flex flex-wrap gap-3">
-              <Button
-                variant="outline"
-                disabled={busy}
-                onClick={() => setEditing(!editing)}
-              >
-                {t("problems.editReport")}
-              </Button>
-            </div>
-            {editing ? (
-              <form
-                className="flex flex-col gap-3"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void task.run(() =>
-                    mutate(
-                      "",
-                      "PATCH",
-                      v1.problems.updateProblemInputSchema.parse({
-                        revision: problem.revision,
-                        title,
-                        description,
-                        ...(difficulty ? { difficulty } : {}),
-                      }),
-                    ),
-                  );
-                }}
-              >
-                <Field>
-                  <FieldLabel htmlFor={`title-${problem.id}`}>
-                    {t("problems.reportTitle")}
-                  </FieldLabel>
-                  <Input
-                    id={`title-${problem.id}`}
-                    placeholder={t("problems.titlePlaceholder")}
-                    required
-                    value={title}
-                    maxLength={160}
-                    onChange={(e) => setTitle(e.target.value)}
+            {confirm ? (
+              <div className="flex flex-col gap-3">
+                <p className="text-sm">
+                  {t(
+                    confirm === "cancel"
+                      ? todo
+                        ? "todos.dismissHelp"
+                        : "problems.dismissHelp"
+                      : todo
+                        ? "todos.reopenHelp"
+                        : "problems.reopenHelp",
+                  )}
+                </p>
+                {confirm === "reopen" ? (
+                  <Field>
+                    <FieldLabel htmlFor={`reopen-${problem.id}`}>
+                      {t("problems.reopenMessage")}
+                    </FieldLabel>
+                    <Textarea
+                      id={`reopen-${problem.id}`}
+                      required
+                      maxLength={4000}
+                      value={reopenMessage}
+                      disabled={busy}
+                      onChange={(event) => setReopenMessage(event.target.value)}
+                      placeholder={t("problems.reopenMessagePlaceholder")}
+                    />
+                  </Field>
+                ) : null}
+                <FormActions pending={busy}>
+                  <SaveButton
+                    variant={confirm === "reopen" ? "warning" : "destructive"}
+                    disabled={
+                      busy || (confirm === "reopen" && !reopenMessage.trim())
+                    }
+                    onClick={() =>
+                      void task.run(async () => {
+                        await mutate(
+                          `/${confirm}`,
+                          "POST",
+                          confirm === "reopen"
+                            ? { message: reopenMessage.trim() }
+                            : {},
+                        );
+                        setConfirm(null);
+                        setReopenMessage("");
+                      })
+                    }
+                    {...formAction(
+                      "confirm",
+                      { pending: busy, error: task.error },
+                      t(
+                        confirm === "reopen"
+                          ? todo
+                            ? "todos.reopen"
+                            : "problems.reopen"
+                          : "access.confirm",
+                      ),
+                    )}
                   />
-                </Field>
-                <Choice
-                  label={t("problems.difficulty")}
-                  value={difficulty}
-                  onChange={setDifficulty}
-                  options={[
-                    { value: "", label: t("problems.unassessed") },
-                    ...v1.problems.problemDifficultySchema.options.map(
-                      (value) => ({
-                        value,
-                        label: t(`problems.${value}`),
-                      }),
-                    ),
-                  ]}
-                />
-                <Field>
-                  <FieldLabel htmlFor={`description-${problem.id}`}>
-                    {t("problems.optionalDescription")}
-                  </FieldLabel>
-                  <Textarea
-                    id={`description-${problem.id}`}
-                    placeholder={t("problems.descriptionPlaceholder")}
-                    value={description}
-                    maxLength={4000}
-                    onChange={(e) => setDescription(e.target.value)}
-                  />
-                </Field>
-                <SaveButton
-                  type="submit"
-                  disabled={busy}
-                  {...formAction("save", { pending: busy, error: task.error })}
-                />
-              </form>
+                  <Button
+                    variant="outline"
+                    disabled={busy}
+                    onClick={() => setConfirm(null)}
+                  >
+                    {t("cancel")}
+                  </Button>
+                </FormActions>
+              </div>
             ) : null}
-          </>
-        ) : null}
-        {problem.workNotes ? (
-          <div>
-            <p className="text-sm font-medium">{t("problems.workNotes")}</p>
-            <p className="whitespace-pre-wrap text-sm">{problem.workNotes}</p>
-          </div>
-        ) : null}
-        {editable && can("problems.update") ? (
-          <Button
-            className="self-start"
-            variant="outline"
-            disabled={busy}
-            onClick={() =>
-              void task.run(() =>
-                mutate("/hold", "PUT", { blocksUsage: !problem.blocksUsage }),
-              )
-            }
-          >
-            {problem.blocksUsage
-              ? t("problems.clearHold")
-              : t("problems.setHold")}
-          </Button>
-        ) : null}
-        {problem.reporter ? (
-          <p className="text-sm text-muted-foreground">
-            {t("problems.reportedBy", { name: memberName(problem.reporter) })}
-          </p>
-        ) : null}
-        <div className="flex flex-wrap gap-3">
-          {(problem.status === "resolved" || problem.status === "cancelled") &&
-          canAccess(user, "problems.reopen") ? (
-            <Button
-              variant="outline"
-              disabled={busy}
-              onClick={() => setConfirm("reopen")}
-            >
-              {t("problems.reopen")}
-            </Button>
-          ) : null}
-          {editable && canAccess(user, "problems.update", "ALL") ? (
-            <Button
-              variant="outline"
-              disabled={busy}
-              onClick={() => setConfirm("cancel")}
-            >
-              {t("problems.cancel")}
-            </Button>
-          ) : null}
-        </div>
-        {confirm ? (
-          <div className="flex flex-col gap-3">
-            <p className="text-sm">
-              {t(
-                confirm === "cancel"
-                  ? "problems.dismissHelp"
-                  : "problems.reopenHelp",
-              )}
-            </p>
-            {confirm === "reopen" ? (
-              <Field>
-                <FieldLabel htmlFor={`reopen-${problem.id}`}>
-                  {t("problems.reopenMessage")}
-                </FieldLabel>
-                <Textarea
-                  id={`reopen-${problem.id}`}
-                  required
-                  maxLength={4000}
-                  value={reopenMessage}
-                  disabled={busy}
-                  onChange={(event) => setReopenMessage(event.target.value)}
-                  placeholder={t("problems.reopenMessagePlaceholder")}
-                />
-              </Field>
-            ) : null}
-            <div className="flex gap-3">
-              <SaveButton
-                variant={confirm === "reopen" ? "warning" : "destructive"}
-                disabled={
-                  busy || (confirm === "reopen" && !reopenMessage.trim())
-                }
-                onClick={() =>
-                  void task.run(async () => {
-                    await mutate(
-                      `/${confirm}`,
-                      "POST",
-                      confirm === "reopen"
-                        ? { message: reopenMessage.trim() }
-                        : {},
-                    );
-                    setConfirm(null);
-                    setReopenMessage("");
-                  })
-                }
-                {...formAction(
-                  "confirm",
-                  { pending: busy, error: task.error },
-                  t(
-                    confirm === "reopen" ? "problems.reopen" : "access.confirm",
-                  ),
-                )}
-              />
-              <Button
-                variant="outline"
-                disabled={busy}
-                onClick={() => setConfirm(null)}
-              >
-                {t("cancel")}
-              </Button>
-            </div>
-          </div>
-        ) : null}
-      </ProblemWorkPanel>
+          </BottomSheetBody>
+        </BottomSheetContent>
+      </BottomSheet>
       <ProblemActivity
+        showDifficulty={problem.scooterId !== null}
         problemId={problem.id}
         revision={problem.revision}
         postedComment={postedComment}
@@ -926,70 +1019,42 @@ export function ProblemWork({
 }
 
 function ProblemWorkPanel({
-  actionsTarget,
   compact,
   title,
-  primary = false,
   children,
 }: {
-  actionsTarget?: HTMLElement | null;
   compact: boolean;
   title: string;
-  primary?: boolean;
   children: ReactNode;
 }) {
-  const t = useTranslations("workspace");
   const shared = useTranslations("shared.actions");
   if (!compact) return <>{children}</>;
   return (
     <BottomSheet>
-      {primary ? (
-        <BottomSheetTrigger
-          render={
-            <Button className="sticky bottom-4 z-sticky order-last w-full shadow-primary" />
-          }
-        >
-          {title}
-        </BottomSheetTrigger>
-      ) : (
-        <PageHeaderActions desktopTarget={actionsTarget}>
-          <BottomSheetTrigger
-            render={<Button variant="outline" size="icon" aria-label={title} />}
-          >
-            <MoreVertical aria-hidden="true" />
-          </BottomSheetTrigger>
-        </PageHeaderActions>
-      )}
+      <BottomSheetTrigger
+        render={
+          <Button className="sticky bottom-4 z-sticky order-last w-full shadow-primary" />
+        }
+      >
+        {title}
+      </BottomSheetTrigger>
       <BottomSheetContent>
-        <BottomSheetHeader
-          className={
-            primary ? "flex-row items-center justify-between gap-3" : undefined
-          }
-        >
+        <BottomSheetHeader className="flex-row items-center justify-between gap-3">
           <BottomSheetTitle>{title}</BottomSheetTitle>
-          {primary ? (
-            <BottomSheetClose
-              render={
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="hidden shrink-0 lg:inline-flex"
-                />
-              }
-              aria-label={shared("close")}
-            >
-              <X aria-hidden="true" />
-            </BottomSheetClose>
-          ) : null}
+          <BottomSheetClose
+            render={
+              <Button
+                variant="ghost"
+                size="icon"
+                className="hidden shrink-0 lg:inline-flex"
+              />
+            }
+            aria-label={shared("close")}
+          >
+            <X aria-hidden="true" />
+          </BottomSheetClose>
         </BottomSheetHeader>
         <BottomSheetBody className="gap-6">{children}</BottomSheetBody>
-        {!primary ? (
-          <BottomSheetFooter>
-            <BottomSheetClose render={<Button variant="outline" />}>
-              {t("cancel")}
-            </BottomSheetClose>
-          </BottomSheetFooter>
-        ) : null}
       </BottomSheetContent>
     </BottomSheet>
   );
@@ -1036,6 +1101,7 @@ function activityAppearance(entry: v1.problems.ProblemActivity) {
 }
 
 function ProblemActivity({
+  showDifficulty = true,
   kind = "comments",
   postedComment,
   onCommentAnimated,
@@ -1044,6 +1110,7 @@ function ProblemActivity({
   composer,
 }: {
   problemId: string;
+  showDifficulty?: boolean;
   kind?: "comments" | "activity";
   revision?: number;
   postedComment?: { body: string; actorId?: string } | null;
@@ -1195,7 +1262,9 @@ function ProblemActivity({
                       ? t(
                           `problems.notifications.${entry.after?.status === "in_progress" ? "workStarted" : "workPaused"}`,
                         )
-                      : t(`problems.events.${entry.type}`)
+                      : t(
+                          `${showDifficulty ? "problems" : "todos"}.events.${entry.type}`,
+                        )
                   }
                   actor={entry.actor ? memberName(entry.actor) : undefined}
                   timestamp={new Date(entry.createdAt).toLocaleString(locale)}
@@ -1244,7 +1313,8 @@ function ProblemActivity({
                       )}
                     </p>
                   ) : null}
-                  {entry.before?.difficulty !== entry.after?.difficulty &&
+                  {showDifficulty &&
+                  entry.before?.difficulty !== entry.after?.difficulty &&
                   entry.after?.difficulty ? (
                     <p className="text-sm">
                       {t("problems.difficulty")}:{" "}
@@ -1316,7 +1386,7 @@ function ProblemActivity({
       count={remote.data?.total}
       summary={
         latest
-          ? `${t(`problems.events.${latest.type}`)} · ${new Date(latest.createdAt).toLocaleString(locale)}`
+          ? `${t(`${showDifficulty ? "problems" : "todos"}.events.${latest.type}`)} · ${new Date(latest.createdAt).toLocaleString(locale)}`
           : undefined
       }
     >
@@ -1330,6 +1400,7 @@ function ProblemActivity({
       {user?.isAdmin || user?.isSuperAdmin ? (
         <ProblemActivity
           kind="activity"
+          showDifficulty={showDifficulty}
           problemId={problemId}
           revision={revision}
         />

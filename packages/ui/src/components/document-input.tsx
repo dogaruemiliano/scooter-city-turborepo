@@ -5,6 +5,10 @@ import { useObjectUrl } from "../hooks/use-object-url";
 import { Button } from "./button";
 import { FileDropOverlay } from "./file-drop-overlay";
 import { useFileDrop } from "../hooks/use-file-drop";
+import {
+  AttachmentPicker,
+  type AttachmentPickerProps,
+} from "./attachment-picker";
 import { DocumentPreview } from "./document-preview";
 import { DocumentViewer } from "./document-viewer";
 import {
@@ -58,6 +62,10 @@ export type DocumentCollectionLabels = DocumentInputLabels & {
 };
 
 type SingleDocumentInputProps = {
+  pickerProps?: Omit<
+    AttachmentPickerProps,
+    "open" | "onOpenChange" | "onConfirm" | "maxFiles" | "accept" | "validate"
+  >;
   multiple?: false;
   id?: string;
   value?: DocumentInputValue;
@@ -99,8 +107,16 @@ function SingleDocumentInput({
   uploaded,
   status,
   labels,
+  pickerProps,
 }: SingleDocumentInputProps) {
   const input = useRef<HTMLInputElement>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const chooseFile = () => {
+    if (pickerProps) {
+      setOpen(false);
+      setPickerOpen(true);
+    } else input.current?.click();
+  };
   const [pending, setPending] = useState<File | null>(null);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -141,6 +157,20 @@ function SingleDocumentInput({
   return (
     <div data-slot="document-input" className="min-w-0" {...handlers}>
       {picker}
+      {pickerProps ? (
+        <AttachmentPicker
+          {...pickerProps}
+          open={pickerOpen}
+          onOpenChange={setPickerOpen}
+          maxFiles={1}
+          accept={accept}
+          validate={validate}
+          onConfirm={(files) => {
+            onConfirm(files[0]!);
+            close();
+          }}
+        />
+      ) : null}
       <div className="relative">
         {dragging ? (
           <FileDropOverlay label={labels.add} className="rounded-lg" />
@@ -161,7 +191,7 @@ function SingleDocumentInput({
           zoomLabels={labels}
           open={false}
           onOpenChange={setOpen}
-          onEmptyClick={() => input.current?.click()}
+          onEmptyClick={chooseFile}
           emptyLabel={
             labels.addAction ? (
               <>
@@ -238,7 +268,7 @@ function SingleDocumentInput({
         actionsLabel={labels.actions}
         pdfLabels={labels}
         zoomLabels={labels}
-        onChange={() => input.current?.click()}
+        onChange={chooseFile}
         changeLabel={labels.change}
         removeLabel={labels.remove}
         onRemove={

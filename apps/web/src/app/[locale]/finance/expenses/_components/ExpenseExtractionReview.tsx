@@ -43,6 +43,7 @@ interface ExpenseExtractionReviewProps {
   draft: v1.finance.ExpenseExtractionDraft;
   values: ExpenseFormValues;
   previewUrl: string;
+  previewUrls?: readonly string[];
   books: readonly v1.finance.FinanceBook[];
   accounts: readonly v1.finance.LedgerAccount[];
   categories: readonly v1.finance.ExpenseCategory[];
@@ -66,6 +67,7 @@ export function ExpenseExtractionReview({
   draft,
   values,
   previewUrl,
+  previewUrls,
   books,
   accounts,
   categories,
@@ -87,9 +89,6 @@ export function ExpenseExtractionReview({
   const [amountEditing, setAmountEditing] = useState(false);
   const [documentSeriesEditing, setDocumentSeriesEditing] = useState(false);
   const [documentNumberEditing, setDocumentNumberEditing] = useState(false);
-  const [receiptPreviewAspectRatio, setReceiptPreviewAspectRatio] = useState(
-    aspectRatio.receiptPortrait,
-  );
   const book = books.find((candidate) => candidate.id === values.bookId);
   const category = categories.find(
     (candidate) => candidate.id === values.categoryId,
@@ -670,30 +669,13 @@ export function ExpenseExtractionReview({
               />
               {t("receiptAttached")}
             </figcaption>
-            <div
-              data-slot="receipt-preview-frame"
-              className="relative w-full overflow-hidden rounded-lg bg-muted sm:mx-auto sm:max-w-72"
-              style={{ aspectRatio: receiptPreviewAspectRatio }}
-            >
-              <Image
-                src={previewUrl}
+            {(previewUrls ?? [previewUrl]).map((url) => (
+              <ReceiptPhotoPreview
+                key={url}
+                url={url}
                 alt={t("receiptPreview")}
-                fill
-                unoptimized
-                className="object-contain object-center"
-                onLoad={(event) => {
-                  const { naturalWidth, naturalHeight } = event.currentTarget;
-                  if (naturalWidth <= 0 || naturalHeight <= 0) return;
-
-                  setReceiptPreviewAspectRatio(
-                    Math.max(
-                      aspectRatio.receiptPortrait,
-                      naturalWidth / naturalHeight,
-                    ),
-                  );
-                }}
               />
-            </div>
+            ))}
           </figure>
 
           {!canSave ? (
@@ -1111,4 +1093,33 @@ function formatDate(dateOnly: string, locale: string): string | null {
     day: "2-digit",
     timeZone: "UTC",
   }).format(parsed);
+}
+
+function ReceiptPhotoPreview({ url, alt }: { url: string; alt: string }) {
+  const [ratio, setRatio] = useState<number>(aspectRatio.receiptPortrait);
+  return (
+    <div
+      data-slot="receipt-preview-frame"
+      className="relative w-full overflow-hidden rounded-lg bg-muted sm:mx-auto sm:max-w-72"
+      style={{ aspectRatio: ratio }}
+    >
+      <Image
+        src={url}
+        alt={alt}
+        fill
+        unoptimized
+        className="object-contain object-center"
+        onLoad={(event) => {
+          const { naturalWidth, naturalHeight } = event.currentTarget;
+          if (naturalWidth > 0 && naturalHeight > 0)
+            setRatio(
+              Math.max(
+                aspectRatio.receiptPortrait,
+                naturalWidth / naturalHeight,
+              ),
+            );
+        }}
+      />
+    </div>
+  );
 }

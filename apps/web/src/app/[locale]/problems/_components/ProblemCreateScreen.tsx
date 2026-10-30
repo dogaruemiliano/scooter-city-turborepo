@@ -8,19 +8,30 @@ import { localizePath, resolveRouteLocale } from "@/i18n/paths";
 import { PageTitleOverride } from "@/components/PageTitleOverride";
 import { CreateProblem } from "./ProblemForms";
 
-export function ProblemCreateScreen({ scooterId }: { scooterId?: string }) {
+export function ProblemCreateScreen({
+  scooterId,
+  todo = false,
+}: {
+  scooterId?: string;
+  todo?: boolean;
+}) {
   const t = useTranslations("workspace");
   const locale = resolveRouteLocale(useLocale());
   const router = useRouter();
   const returnPath = localizePath(
-    scooterId ? `/scooters/${encodeURIComponent(scooterId)}` : "/problems",
+    todo
+      ? "/todos"
+      : scooterId
+        ? `/scooters/${encodeURIComponent(scooterId)}`
+        : "/problems",
     locale,
   );
   return (
     <PageLayout>
-      <PageTitleOverride title={t("problems.add")} />
+      <PageTitleOverride title={t(todo ? "todos.add" : "problems.add")} />
       <div className="mx-auto flex w-full max-w-(--breakpoint-md) flex-1 flex-col">
         <CreateProblem
+          todo={todo}
           stickyActions
           scooterId={scooterId}
           onCancel={() => router.push(returnPath)}

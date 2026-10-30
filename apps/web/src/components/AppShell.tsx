@@ -16,6 +16,7 @@ import {
   BikeIcon,
   Building2Icon,
   ChartPieIcon,
+  ListTodoIcon,
   HandCoinsIcon,
   LandmarkIcon,
   LayoutDashboardIcon,
@@ -103,6 +104,7 @@ const PRIMARY_NAVIGATION_ITEMS = [
   { href: "/my-rentals", labelKey: "myRentals", icon: BikeIcon },
   { href: "/persons", labelKey: "persons", icon: UsersRoundIcon },
   { href: "/problems", labelKey: "problems", icon: WrenchIcon },
+  { href: "/todos", labelKey: "todos", icon: ListTodoIcon },
 ] as const;
 
 const NAVIGATION_GROUPS = [

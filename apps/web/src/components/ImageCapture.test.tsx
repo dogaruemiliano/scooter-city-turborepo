@@ -101,6 +101,16 @@ afterEach(() => {
 });
 
 describe("shared ImageCapture", () => {
+  it("covers the preview while keeping controls on black surfaces", async () => {
+    render(<CaptureHarness onCapture={vi.fn()} previewFit="cover" />);
+    const video = await cameraReady();
+    expect(video).toHaveClass("object-cover");
+    expect(video).not.toHaveClass("object-contain");
+    const dialog = screen.getByRole("dialog");
+    expect(dialog.querySelector("header")).toHaveClass("bg-mist-950");
+    expect(dialog.querySelector("footer")).toHaveClass("bg-mist-950");
+  });
+
   it("keeps the camera open for successive confirmed collection photos", async () => {
     const onCapture = vi.fn();
     render(

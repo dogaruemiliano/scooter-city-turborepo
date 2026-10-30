@@ -18,12 +18,16 @@ import { ProblemWork } from "./ProblemForms";
 
 const mocks = vi.hoisted(() => ({
   fetch: vi.fn(),
+  refresh: vi.fn(),
   user: {
     id: "mechanic",
     isSuperAdmin: false,
     isAdmin: false,
     effectiveScopes: {} as Record<string, string[]>,
   },
+}));
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: mocks.refresh }),
 }));
 vi.mock("@/lib/api", () => ({
   webApi: { fetch: mocks.fetch, url: (path: string) => path },
@@ -71,6 +75,7 @@ function renderDetail() {
   return onChanged;
 }
 beforeEach(() => {
+  mocks.refresh.mockReset();
   mocks.user.id = "mechanic";
   mocks.user.isSuperAdmin = false;
   mocks.user.isAdmin = false;
@@ -134,6 +139,7 @@ describe("task detail workflow permissions", () => {
     ).toHaveAttribute("aria-disabled", "true");
     expect(screen.queryByRole("button", { name: "Save checklist" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Take photos" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "More actions" })).toBeNull();
   });
 
   it.each([false, true])(
@@ -354,7 +360,7 @@ describe("problem details page", () => {
     await waitFor(() => expect(item).not.toHaveClass("motion-safe:animate-in"));
     expect(screen.getByRole("textbox", { name: "Comment" })).toHaveValue("");
     await user.click(screen.getByRole("button", { name: "More actions" }));
-    const menu = await screen.findByRole("dialog", { name: "More actions" });
+    const menu = await screen.findByRole("menu", { name: "More actions" });
     expect(within(menu).queryByRole("textbox", { name: "Comment" })).toBeNull();
     expect(within(menu).queryByText("Inspection complete")).toBeNull();
   });
@@ -379,9 +385,14 @@ describe("problem details page", () => {
     await waitFor(() => expect(modal).not.toBeInTheDocument());
   });
 
-  it.each(["open", "in_progress"] as const)(
-    "uses the primary action for %s work and keeps pause in more actions",
-    async (status) => {
+  it.each([
+    ["scooter problem", "open", false],
+    ["scooter problem", "in_progress", false],
+    ["to-do", "open", true],
+    ["to-do", "in_progress", true],
+  ] as const)(
+    "%s uses the primary action for %s work and keeps pause in more actions",
+    async (_kind, status, todo) => {
       mocks.user.effectiveScopes = {
         "problems.read": ["ALL"],
         "problems.update": ["ALL"],
@@ -390,7 +401,13 @@ describe("problem details page", () => {
       mocks.fetch.mockImplementation(async (url: string) =>
         url.includes("/activity")
           ? { items: [], total: 0, page: 1, pageSize: 25 }
-          : { ...problem, status },
+          : {
+              ...problem,
+              status,
+              ...(todo
+                ? { scooterId: null, scooter: null, difficulty: null }
+                : {}),
+            },
       );
       render(
         <NextIntlClientProvider locale="en" messages={messages.en}>
@@ -398,10 +415,16 @@ describe("problem details page", () => {
         </NextIntlClientProvider>,
       );
       await screen.findByRole("heading", { name: problem.title });
+      const user = userEvent.setup();
+      expect(screen.queryByRole("button", { name: "Pause work" })).toBeNull();
+      await user.click(screen.getByRole("button", { name: "More actions" }));
+      const menu = await screen.findByRole("menu", { name: "More actions" });
       if (status === "open") {
-        await userEvent
-          .setup()
-          .click(screen.getByRole("button", { name: "Start work" }));
+        expect(
+          within(menu).queryByRole("menuitem", { name: "Pause work" }),
+        ).toBeNull();
+        await user.keyboard("{Escape}");
+        await user.click(screen.getByRole("button", { name: "Start work" }));
         await waitFor(() =>
           expect(mocks.fetch).toHaveBeenCalledWith(
             "/v1/problems/problem",
@@ -417,13 +440,9 @@ describe("problem details page", () => {
           screen.getByRole("button", { name: /Complete/ }),
         ).toBeInTheDocument();
         expect(screen.queryByRole("button", { name: "Start work" })).toBeNull();
-        expect(screen.queryByRole("button", { name: "Pause work" })).toBeNull();
-        await userEvent
-          .setup()
-          .click(screen.getByRole("button", { name: "More actions" }));
-        await userEvent
-          .setup()
-          .click(await screen.findByRole("button", { name: "Pause work" }));
+        await user.click(
+          within(menu).getByRole("menuitem", { name: "Pause work" }),
+        );
         await waitFor(() =>
           expect(mocks.fetch).toHaveBeenCalledWith(
             "/v1/problems/problem",
@@ -471,7 +490,7 @@ describe("problem details page", () => {
         expect(actions.nextElementSibling).toHaveTextContent("Priority");
       } else expect(actions).toBeEmptyDOMElement();
       await userEvent.setup().click(trigger);
-      const sheet = await screen.findByRole("dialog", {
+      const sheet = await screen.findByRole("menu", {
         name: "More actions",
       });
       expect(sheet).toHaveClass("bg-popover");

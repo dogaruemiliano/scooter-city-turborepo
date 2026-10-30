@@ -132,10 +132,14 @@ describe("ExpenseForm receipt evidence", () => {
       type: "image/webp",
     });
 
+    await browser.click(
+      screen.getByText(messages.en.finance.expense.documents.imageAdd),
+    );
     await browser.upload(
-      screen.getByLabelText(/Choose receipt or bill image/),
+      screen.getByLabelText("Choose from files", { selector: "input" }),
       file,
     );
+    await browser.click(screen.getByRole("button", { name: "Use file" }));
 
     expect(
       screen.getByRole("img", { name: "Selected receipt or bill" }),
@@ -153,6 +157,35 @@ describe("ExpenseForm receipt evidence", () => {
     );
   });
 
+  it("attaches two receipt photos from the manual form", async () => {
+    mocks.upload
+      .mockResolvedValueOnce("token-one")
+      .mockResolvedValueOnce("token-two");
+    const browser = userEvent.setup();
+    renderExpenseForm();
+    const files = [
+      new File(["1"], "one.jpg", { type: "image/jpeg" }),
+      new File(["2"], "two.jpg", { type: "image/jpeg" }),
+    ];
+    await browser.click(
+      screen.getByText(messages.en.finance.expense.documents.imageAdd),
+    );
+    await browser.upload(
+      screen.getByLabelText("Choose from files", { selector: "input" }),
+      files,
+    );
+    await browser.click(screen.getByRole("button", { name: "Use 2 files" }));
+    await browser.click(screen.getByRole("button", { name: "Record expense" }));
+    await waitFor(() =>
+      expect(mocks.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          receiptUploadTokens: ["token-one", "token-two"],
+        }),
+        expect.any(String),
+      ),
+    );
+  });
+
   it("keeps a failed image ready so submitting again retries the upload", async () => {
     mocks.upload
       .mockRejectedValueOnce(new Error("S3 unavailable"))
@@ -163,10 +196,14 @@ describe("ExpenseForm receipt evidence", () => {
       type: "image/jpeg",
     });
 
+    await browser.click(
+      screen.getByText(messages.en.finance.expense.documents.imageAdd),
+    );
     await browser.upload(
-      screen.getByLabelText(/Choose receipt or bill image/),
+      screen.getByLabelText("Choose from files", { selector: "input" }),
       file,
     );
+    await browser.click(screen.getByRole("button", { name: "Use file" }));
     await browser.click(screen.getByRole("button", { name: "Record expense" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
@@ -193,10 +230,14 @@ describe("ExpenseForm receipt evidence", () => {
       type: "image/jpeg",
     });
 
+    await browser.click(
+      screen.getByText(messages.en.finance.expense.documents.imageAdd),
+    );
     await browser.upload(
-      screen.getByLabelText(/Choose receipt or bill image/),
+      screen.getByLabelText("Choose from files", { selector: "input" }),
       file,
     );
+    await browser.click(screen.getByRole("button", { name: "Use file" }));
     await browser.click(screen.getByRole("button", { name: "Record expense" }));
     await waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(1));
 

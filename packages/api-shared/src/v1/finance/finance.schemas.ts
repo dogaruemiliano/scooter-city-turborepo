@@ -19,6 +19,7 @@ import {
   requiredTrimmedStringSchema,
 } from "../common/common.schemas";
 import {
+  EXPENSE_RECEIPT_MAX_FILES,
   COST_OBJECT_OWNERSHIP_TYPES,
   COST_OBJECT_TYPES,
   ASSOCIATE_FUNDING_TYPES,
@@ -771,6 +772,15 @@ export const createExpenseInputSchema = z
      * accepted from the client.
      */
     receiptUploadToken: idSchema.optional(),
+    receiptUploadTokens: z
+      .array(idSchema)
+      .min(1)
+      .max(EXPENSE_RECEIPT_MAX_FILES)
+      .refine(
+        (values) => new Set(values).size === values.length,
+        "Duplicate uploads",
+      )
+      .optional(),
     occurredAt: isoTimestampSchema,
     description: nullableTrimmedStringSchema(MAX_DESCRIPTION_LENGTH).optional(),
     amountMinor: amountMinorSchema,
@@ -789,7 +799,13 @@ export const createExpenseInputSchema = z
   })
   .strict()
   .superRefine((input, ctx) => {
-    if (input.extractionDraftId && input.receiptUploadToken) {
+    if (
+      [
+        input.extractionDraftId,
+        input.receiptUploadToken,
+        input.receiptUploadTokens,
+      ].filter((value) => value !== undefined).length > 1
+    ) {
       ctx.addIssue({
         code: "custom",
         path: ["receiptUploadToken"],
@@ -897,8 +913,24 @@ export type ExpenseReceiptDraftUpload = z.infer<
 >;
 
 export const analyzeExpenseReceiptInputSchema = z
-  .object({ uploadToken: z.string().min(1) })
+  .object({
+    uploadToken: z.string().min(1).optional(),
+    uploadTokens: z
+      .array(z.string().min(1))
+      .min(1)
+      .max(EXPENSE_RECEIPT_MAX_FILES)
+      .refine(
+        (values) => new Set(values).size === values.length,
+        "Duplicate uploads",
+      )
+      .optional(),
+  })
   .strict()
+  .refine(
+    (input) =>
+      (input.uploadToken !== undefined) !== (input.uploadTokens !== undefined),
+    "Provide uploadToken or uploadTokens",
+  )
   .meta({ id: "AnalyzeExpenseReceiptInput" });
 
 export type AnalyzeExpenseReceiptInput = z.infer<

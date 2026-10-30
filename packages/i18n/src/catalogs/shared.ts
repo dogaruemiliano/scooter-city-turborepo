@@ -1,5 +1,28 @@
 export const sharedCatalog = {
   en: {
+    attachments: {
+      title: "Add photos or files",
+      close: "Close",
+      takePhoto: "Take photo",
+      gallery: "Choose from gallery",
+      files: "Choose from files",
+      addMore: "Add more",
+      review: "Review selected files",
+      replace: "Replace",
+      remove: "Remove",
+      preview: "Preview",
+      moveEarlier: "Move earlier",
+      moveLater: "Move later",
+      empty: "Take a photo or choose a file to get started.",
+      confirming: "Preparing files…",
+      confirmed: "Files ready",
+      invalidFile: "This file type is not supported.",
+      fileTooLarge: "This file is too large.",
+      tooManyFiles: "You can add up to {max} files.",
+      selectedCount: "{count} of {max} files selected",
+      confirm:
+        "{count, plural, =0 {Continue} one {Use file} other {Use # files}}",
+    },
     media: {
       loading: "Loading preview…",
       error: "Preview unavailable. Open the file to view it.",
@@ -140,6 +163,29 @@ export const sharedCatalog = {
     },
   },
   ro: {
+    attachments: {
+      title: "Adaugă fotografii sau fișiere",
+      close: "Închide",
+      takePhoto: "Fotografiază",
+      gallery: "Alege din galerie",
+      files: "Alege din fișiere",
+      addMore: "Adaugă altele",
+      review: "Vezi fișierele selectate",
+      replace: "Înlocuiește",
+      remove: "Elimină",
+      preview: "Previzualizează",
+      moveEarlier: "Mută înainte",
+      moveLater: "Mută după",
+      empty: "Fotografiază sau alege un fișier pentru a începe.",
+      confirming: "Se pregătesc fișierele…",
+      confirmed: "Fișiere pregătite",
+      invalidFile: "Acest tip de fișier nu este acceptat.",
+      fileTooLarge: "Acest fișier este prea mare.",
+      tooManyFiles: "Poți adăuga cel mult {max} fișiere.",
+      selectedCount: "{count} din {max} fișiere selectate",
+      confirm:
+        "{count, plural, =0 {Continuă} one {Folosește fișierul} few {Folosește # fișiere} other {Folosește # de fișiere}}",
+    },
     media: {
       loading: "Se încarcă previzualizarea…",
       error:

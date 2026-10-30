@@ -1,4 +1,6 @@
 "use client";
+import { AttachmentPicker } from "@repo/ui/components/attachment-picker";
+import { useAttachmentPicker } from "@/components/useAttachmentPicker";
 import { FormActions } from "@repo/ui/components/form-actions";
 import { useFormAction } from "@/lib/form/use-form-action";
 import { SaveButton } from "@repo/ui/components/save-button";
@@ -20,18 +22,11 @@ import { canAccess } from "@/lib/access";
 
 import { ApiError, v1 } from "@repo/api-shared";
 import type { SupportedLocale } from "@repo/i18n";
-import {
-  Button,
-  Card,
-  CardContent,
-  FormSection,
-  Input,
-  Label,
-} from "@repo/ui/components";
+import { Button, Card, CardContent, FormSection } from "@repo/ui/components";
 import { ImageIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { FormProvider, useFieldArray, useWatch } from "react-hook-form";
 
 import { FormField } from "@/components/form/FormField";
@@ -114,12 +109,15 @@ export function ExpenseForm({
   const [previewError, setPreviewError] = useState<string>();
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [receiptFile, setReceiptFile] = useState<File>();
-  const [receiptPreview, setReceiptPreview] = useState<string>();
-  const [receiptUploadToken, setReceiptUploadToken] = useState<string>();
+  const [receiptFiles, setReceiptFiles] = useState<File[]>([]);
+  const [receiptPreviews, setReceiptPreviews] = useState<string[]>([]);
+  const receiptFile = receiptFiles[0];
+  const receiptPreview = receiptPreviews[0];
+  const [receiptUploadTokens, setReceiptUploadTokens] = useState<string[]>();
+  const [receiptPickerOpen, setReceiptPickerOpen] = useState(false);
+  const picker = useAttachmentPicker();
   const [receiptUploading, setReceiptUploading] = useState(false);
   const [receiptError, setReceiptError] = useState<string>();
-  const receiptInputRef = useRef<HTMLInputElement>(null);
 
   // One key for the life of this form. A retry after a timeout returns the
   // original operation instead of recording the expense a second time.
@@ -268,9 +266,9 @@ export function ExpenseForm({
 
   useEffect(
     () => () => {
-      if (receiptPreview) URL.revokeObjectURL(receiptPreview);
+      receiptPreviews.forEach((url) => URL.revokeObjectURL(url));
     },
-    [receiptPreview],
+    [receiptPreviews],
   );
 
   const paymentsTotalMinor = sumLines(values.payments ?? []);
@@ -311,15 +309,17 @@ export function ExpenseForm({
         form.reset(valuesToSave);
       }
 
-      let uploadToken = receiptUploadToken;
+      let uploadTokens = receiptUploadTokens;
 
-      if (!extractionDraftId && receiptFile && !uploadToken) {
+      if (!extractionDraftId && receiptFile && !uploadTokens) {
         setReceiptError(undefined);
         setReceiptUploading(true);
 
         try {
-          uploadToken = await uploadExpenseReceipt(receiptFile);
-          setReceiptUploadToken(uploadToken);
+          uploadTokens = await Promise.all(
+            receiptFiles.map((file) => uploadExpenseReceipt(file)),
+          );
+          setReceiptUploadTokens(uploadTokens);
         } catch {
           setReceiptError(t("documents.imageUploadFailed"));
           return;
@@ -332,8 +332,10 @@ export function ExpenseForm({
         {
           ...toCreateExpenseInput(valuesToSave),
           ...(extractionDraftId ? { extractionDraftId } : {}),
-          ...(!extractionDraftId && uploadToken
-            ? { receiptUploadToken: uploadToken }
+          ...(!extractionDraftId && uploadTokens?.length
+            ? uploadTokens.length === 1
+              ? { receiptUploadToken: uploadTokens[0] }
+              : { receiptUploadTokens: uploadTokens }
             : {}),
         },
         idempotencyKey,
@@ -348,7 +350,7 @@ export function ExpenseForm({
       // local File, but obtain a fresh upload/token on the next submit so a
       // validation or network failure cannot strand the receipt.
       if (!extractionDraftId && receiptFile) {
-        setReceiptUploadToken(undefined);
+        setReceiptUploadTokens(undefined);
       }
       setSubmitError(messageForError(error, tErrors));
     } finally {
@@ -356,24 +358,18 @@ export function ExpenseForm({
     }
   }
 
-  function selectReceipt(file: File | null) {
-    if (!file) return;
-
-    if (!(RECEIPT_IMAGE_TYPES as readonly string[]).includes(file.type)) {
-      setReceiptError(t("documents.imageUnsupportedType"));
-      return;
-    }
-
-    setReceiptFile(file);
-    setReceiptPreview(URL.createObjectURL(file));
-    setReceiptUploadToken(undefined);
+  function selectReceipts(files: File[]) {
+    if (!files.length) return;
+    setReceiptFiles(files);
+    setReceiptPreviews(files.map((file) => URL.createObjectURL(file)));
+    setReceiptUploadTokens(undefined);
     setReceiptError(undefined);
   }
 
   function removeReceipt() {
-    setReceiptFile(undefined);
-    setReceiptPreview(undefined);
-    setReceiptUploadToken(undefined);
+    setReceiptFiles([]);
+    setReceiptPreviews([]);
+    setReceiptUploadTokens(undefined);
     setReceiptError(undefined);
   }
 
@@ -799,30 +795,34 @@ export function ExpenseForm({
                   </p>
                 </div>
 
-                <Input
-                  ref={receiptInputRef}
-                  id="expense-receipt-image"
-                  type="file"
+                <AttachmentPicker
+                  {...picker}
+                  open={receiptPickerOpen}
+                  onOpenChange={setReceiptPickerOpen}
+                  onConfirm={selectReceipts}
+                  maxFiles={v1.finance.EXPENSE_RECEIPT_MAX_FILES}
+                  maxFileSize={v1.finance.EXPENSE_RECEIPT_MAX_BYTES}
                   accept={RECEIPT_IMAGE_TYPES.join(",")}
-                  className="sr-only"
-                  disabled={submitting || receiptUploading}
-                  onChange={(event) => {
-                    selectReceipt(event.target.files?.[0] ?? null);
-                    event.currentTarget.value = "";
+                  labels={{
+                    ...picker.labels,
+                    title: t("documents.imageTitle"),
                   }}
                 />
 
                 {receiptPreview && receiptFile ? (
                   <div className="flex min-h-20 flex-col gap-3 border-y border-border py-3 sm:flex-row sm:items-center">
-                    {/* eslint-disable-next-line @next/next/no-img-element -- local object URL preview. */}
-                    <img
-                      src={receiptPreview}
-                      alt={t("documents.imagePreviewAlt")}
-                      className="size-16 shrink-0 rounded-lg object-cover"
-                    />
+                    {receiptPreviews.map((url) => (
+                      // eslint-disable-next-line @next/next/no-img-element -- local object URL preview.
+                      <img
+                        key={url}
+                        src={url}
+                        alt={t("documents.imagePreviewAlt")}
+                        className="size-16 shrink-0 rounded-lg object-cover"
+                      />
+                    ))}
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium">
-                        {receiptFile.name}
+                        {receiptFiles.map((file) => file.name).join(", ")}
                       </p>
                       <p className="mt-1 text-xs text-muted-foreground">
                         {receiptUploading
@@ -838,7 +838,7 @@ export function ExpenseForm({
                         variant="outline"
                         size="sm"
                         disabled={submitting || receiptUploading}
-                        onClick={() => receiptInputRef.current?.click()}
+                        onClick={() => setReceiptPickerOpen(true)}
                       >
                         {t("documents.imageReplace")}
                       </Button>
@@ -855,8 +855,11 @@ export function ExpenseForm({
                     </div>
                   </div>
                 ) : (
-                  <Label
-                    htmlFor="expense-receipt-image"
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setReceiptPickerOpen(true)}
+                    disabled={submitting || receiptUploading}
                     className="flex min-h-20 cursor-pointer items-center gap-4 border-y border-border py-3 transition-colors duration-fast ease-standard hover:bg-muted/50"
                   >
                     <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
@@ -870,7 +873,7 @@ export function ExpenseForm({
                         {t("documents.imageFormats")}
                       </span>
                     </span>
-                  </Label>
+                  </Button>
                 )}
 
                 {receiptError ? (

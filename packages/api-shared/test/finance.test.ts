@@ -373,3 +373,46 @@ test("route helpers build the versioned finance paths", () => {
     "/v1/finance/suppliers/supplier%2F1",
   );
 });
+
+test("expense receipt batches accept two unique sources and reject mixed origins", () => {
+  assert.equal(
+    v1.finance.analyzeExpenseReceiptInputSchema.safeParse({
+      uploadTokens: ["one", "two"],
+    }).success,
+    true,
+  );
+  for (const input of [
+    { uploadTokens: [] },
+    { uploadTokens: ["same", "same"] },
+    { uploadTokens: ["one", "two", "three"] },
+    { uploadToken: "one", uploadTokens: ["two"] },
+  ]) {
+    assert.equal(
+      v1.finance.analyzeExpenseReceiptInputSchema.safeParse(input).success,
+      false,
+    );
+  }
+  assert.equal(
+    v1.finance.createExpenseInputSchema.safeParse({
+      ...validExpense,
+      receiptUploadTokens: ["one", "two"],
+    }).success,
+    true,
+  );
+  assert.equal(
+    v1.finance.createExpenseInputSchema.safeParse({
+      ...validExpense,
+      receiptUploadToken: "one",
+      receiptUploadTokens: ["two"],
+    }).success,
+    false,
+  );
+  assert.equal(
+    v1.finance.createExpenseInputSchema.safeParse({
+      ...validExpense,
+      extractionDraftId: "draft",
+      receiptUploadTokens: ["two"],
+    }).success,
+    false,
+  );
+});

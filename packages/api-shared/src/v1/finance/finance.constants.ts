@@ -9,6 +9,9 @@
  * surprise.
  */
 
+export const EXPENSE_RECEIPT_MAX_FILES = 2;
+export const EXPENSE_RECEIPT_MAX_BYTES = 10 * 1024 * 1024;
+
 export const FINANCE_BOOK_TYPES = ["COMPANY", "ASSOCIATE_POOL"] as const;
 
 export type FinanceBookType = (typeof FINANCE_BOOK_TYPES)[number];

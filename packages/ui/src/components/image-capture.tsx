@@ -134,6 +134,8 @@ export interface ImageCaptureProps {
   ) => void | Promise<void>;
   /** Portrait guide for card-shaped IDs, not paper documents. */
   captureMode?: "photo" | "identity-card";
+  /** Cover fills the area between black control bars; saved photos keep the full frame. */
+  previewFit?: "contain" | "cover";
   /** Reopen an existing image for review/crop. Ignored for live-only capture. */
   initialFile?: File;
   /** Disables ALL imports, including file inputs and drag/drop, for live capture. */
@@ -156,6 +158,7 @@ function ImageCaptureSession({
   onOpenChange,
   onCapture,
   captureMode = "photo",
+  previewFit = "contain",
   initialFile,
   allowGallery = true,
   keepOpenAfterCapture = false,
@@ -187,7 +190,11 @@ function ImageCaptureSession({
   const galleryRef = useRef<HTMLInputElement>(null);
   const filesRef = useRef<HTMLInputElement>(null);
   const camera = useCaptureCamera(!source);
-  const cameraPreview = useCameraPreviewLayout(!source, camera.frameSize);
+  const cameraPreview = useCameraPreviewLayout(
+    !source,
+    camera.frameSize,
+    previewFit,
+  );
   const isMobile = useIsMobile();
   const portraitFrame = Boolean(
     camera.frameSize && camera.frameSize.height > camera.frameSize.width,
@@ -380,7 +387,10 @@ function ImageCaptureSession({
                 autoPlay
                 muted
                 playsInline
-                className="size-full object-contain"
+                className={cn(
+                  "size-full",
+                  previewFit === "cover" ? "object-cover" : "object-contain",
+                )}
                 onLoadedData={camera.markReady}
                 onCanPlay={camera.markReady}
                 onResize={camera.updateFrameSize}
@@ -413,6 +423,7 @@ function ImageCaptureSession({
           className={cn(
             "z-raised flex shrink-0 items-center justify-between gap-3 pr-[calc(env(safe-area-inset-right)+var(--spacing-4))] pl-[calc(env(safe-area-inset-left)+var(--spacing-4))] pt-[calc(env(safe-area-inset-top)+var(--spacing-3))] pb-3",
             source ? "relative" : "absolute inset-x-0 top-0",
+            !source && previewFit === "cover" && "bg-mist-950",
           )}
         >
           <Button
@@ -546,7 +557,10 @@ function ImageCaptureSession({
             </div>
             <footer
               ref={cameraPreview.controlsRef}
-              className="absolute inset-x-0 bottom-0 shrink-0 pr-[calc(env(safe-area-inset-right)+var(--spacing-6))] pl-[calc(env(safe-area-inset-left)+var(--spacing-6))] pt-2 pb-[calc(env(safe-area-inset-bottom)+var(--spacing-6))]"
+              className={cn(
+                "absolute inset-x-0 bottom-0 shrink-0 pr-[calc(env(safe-area-inset-right)+var(--spacing-6))] pl-[calc(env(safe-area-inset-left)+var(--spacing-6))] pt-2 pb-[calc(env(safe-area-inset-bottom)+var(--spacing-6))]",
+                previewFit === "cover" && "bg-mist-950",
+              )}
             >
               {error ? (
                 <p

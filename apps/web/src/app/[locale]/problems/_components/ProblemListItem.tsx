@@ -42,17 +42,20 @@ export function ProblemListItem({
   /** Omits scooter identity and moves badges into the header. */
   variant?: "default" | "simple";
 }) {
+  const difficulty = problem.scooterId === null ? null : problem.difficulty;
   const t = useTranslations("workspace.problems");
   const format = useFormatter();
   const assignee = v1.problems
     .problemAssignees(problem)
     .map(memberName)
     .join(", ");
-  const internalId = v1.scooters.scooterDisplayCode(problem.scooter);
-  const brandAndModel = [problem.scooter.brandName, problem.scooter.model]
+  const internalId = problem.scooter
+    ? v1.scooters.scooterDisplayCode(problem.scooter)
+    : "";
+  const brandAndModel = [problem.scooter?.brandName, problem.scooter?.model]
     .filter(Boolean)
     .join(" ");
-  const scooter = `${problem.scooter.brandName} ${problem.scooter.model ?? ""} · ${internalId}`;
+  const scooter = problem.scooter ? `${brandAndModel} · ${internalId}` : "";
   const statusVariant =
     problem.status === "resolved"
       ? "success"
@@ -80,42 +83,44 @@ export function ProblemListItem({
       size="comfortable"
       className="relative isolate transition-colors duration-fast hover:border-border-strong"
     >
-      {problem.difficulty ? (
-        <CardAccent className={difficultyAccent[problem.difficulty]} />
+      {difficulty ? (
+        <CardAccent className={difficultyAccent[difficulty]} />
       ) : null}
       {href ? (
         <Link
           href={href}
           className="absolute inset-0 z-raised rounded-xl focus-visible:outline-ring"
-          aria-label={`${problem.title} · ${scooter}`}
+          aria-label={`${problem.title}${scooter ? ` · ${scooter}` : ""}`}
         />
       ) : (
         <Button
           variant="ghost"
           className="absolute inset-0 z-raised h-full w-full rounded-xl p-0 hover:bg-transparent aria-expanded:bg-transparent focus-visible:ring-inset"
-          aria-label={`${problem.title} · ${scooter}`}
+          aria-label={`${problem.title}${scooter ? ` · ${scooter}` : ""}`}
           aria-haspopup="dialog"
           aria-expanded={expanded}
           onClick={onToggle}
         />
       )}
       <CardHeader className="gap-3">
-        <div className="flex flex-wrap items-center gap-2 text-xs">
-          <span
-            className={`font-semibold uppercase ${problem.difficulty ? difficultyText[problem.difficulty] : "text-muted-foreground"}`}
-            title={
-              problem.difficulty
-                ? t(`difficultyDescriptions.${problem.difficulty}`)
-                : undefined
-            }
-          >
-            {problem.difficulty ? t(problem.difficulty) : t("unassessed")}
-          </span>
-        </div>
+        {problem.scooterId !== null ? (
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <span
+              className={`font-semibold uppercase ${difficulty ? difficultyText[difficulty] : "text-muted-foreground"}`}
+              title={
+                difficulty
+                  ? t(`difficultyDescriptions.${difficulty}`)
+                  : undefined
+              }
+            >
+              {difficulty ? t(difficulty) : t("unassessed")}
+            </span>
+          </div>
+        ) : null}
         <CardTitle role="heading" aria-level={3}>
           {problem.title}
         </CardTitle>
-        {variant === "simple" ? (
+        {variant === "simple" || !problem.scooter ? (
           <CardAction className="flex max-w-32 flex-col items-end gap-2">
             {badges}
           </CardAction>
@@ -143,7 +148,7 @@ export function ProblemListItem({
           </p>
         </CardContent>
       ) : null}
-      {variant === "default" ? (
+      {variant === "default" && problem.scooter ? (
         <CardContent className="flex flex-wrap gap-2">{badges}</CardContent>
       ) : null}
       <CardFooter className="mx-(--card-spacing) flex-wrap justify-between gap-3 rounded-none px-0 text-xs text-muted-foreground">

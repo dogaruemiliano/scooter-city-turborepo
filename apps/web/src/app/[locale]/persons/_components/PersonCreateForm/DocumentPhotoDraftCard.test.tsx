@@ -54,23 +54,25 @@ beforeEach(() => {
 });
 
 describe("person shared native document input", () => {
-  it("opens the native input directly without a custom camera or chooser", async () => {
+  it("opens the shared source chooser and commits only on confirmation", async () => {
     setup();
-    const input = screen.getByLabelText("Add Front photo", {
-      selector: "input",
-    });
-    const click = vi.spyOn(input, "click");
-    await userEvent.click(
-      screen.getByRole("button", { name: "Add Front photo" }),
-    );
-    expect(click).toHaveBeenCalledOnce();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Add Front photo" }));
+    const picker = await screen.findByRole("dialog");
+    const camera = screen.getByLabelText("Take photo", { selector: "input" });
+    expect(camera).toHaveAttribute("capture", "environment");
+    expect(
+      screen.getByLabelText("Choose from files", { selector: "input" }),
+    ).not.toHaveAttribute("multiple");
+    await user.upload(camera, file);
+    expect(onSet).not.toHaveBeenCalled();
+    await user.click(within(picker).getByRole("button", { name: "Use file" }));
     await waitFor(() =>
-      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
-    );
-    expect(input).toHaveAttribute("type", "file");
-    expect(input).toHaveAttribute(
-      "accept",
-      "image/jpeg,image/png,image/webp,application/pdf",
+      expect(onSet).toHaveBeenCalledWith(
+        "romanian-classic-national-id",
+        "front",
+        file,
+      ),
     );
   });
   it.each(["image/png", "application/pdf"])(

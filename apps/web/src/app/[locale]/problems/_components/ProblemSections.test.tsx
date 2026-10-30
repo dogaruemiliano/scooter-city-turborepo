@@ -288,6 +288,17 @@ describe("optional task sections", () => {
     const sheet = await screen.findByRole("dialog", { name: "Add to task" });
     expect(sheet).toHaveClass("bg-popover", "text-popover-foreground");
     expect(sheet.querySelector(".bg-background")).toBeNull();
+    for (const [title, description] of [
+      ["Checklist", "Break the task into steps and track what’s done."],
+      ["Buy list", "List the parts or supplies that need to be bought."],
+      ["Location", "Add an address or saved place for this task."],
+    ]) {
+      const option = within(sheet).getByRole("button", { name: title });
+      expect(option).toHaveAccessibleDescription(description);
+      expect(within(option).getByText(description)).toBeVisible();
+      expect(option.querySelector("svg")).toHaveClass("size-8");
+    }
+
     for (const slot of ["bottom-sheet-header", "bottom-sheet-body"]) {
       expect(sheet.querySelector(`[data-slot="${slot}"]`)).not.toHaveClass(
         "bg-background",

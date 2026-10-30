@@ -11,7 +11,8 @@ import {
   BottomSheetTitle,
   Button,
 } from "@repo/ui/components";
-import { ImageCapture } from "@repo/ui/components/image-capture";
+import { AttachmentPicker } from "@repo/ui/components/attachment-picker";
+import { useAttachmentPicker } from "@/components/useAttachmentPicker";
 import { ClipboardPenLineIcon, XIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
@@ -57,9 +58,11 @@ export function ExpenseReceiptCapture({
   const t = useTranslations("finance.expense.captureSheet");
   const router = useRouter();
   const readyReviewRef = useRef(false);
+  const picker = useAttachmentPicker();
   const [captureOpen, setCaptureOpen] = useState(true);
   const [reviewOpen, setReviewOpen] = useState(false);
-  const [receiptPreviewUrl, setReceiptPreviewUrl] = useState<string>();
+  const [receiptPreviewUrls, setReceiptPreviewUrls] = useState<string[]>([]);
+  const receiptPreviewUrl = receiptPreviewUrls[0];
   const [draft, setDraft] = useState<v1.finance.ExpenseExtractionDraft>();
   const [reviewValues, setReviewValues] = useState<ExpenseFormValues>();
   const [error, setError] = useState<string>();
@@ -71,9 +74,9 @@ export function ExpenseReceiptCapture({
 
   useEffect(
     () => () => {
-      if (receiptPreviewUrl) URL.revokeObjectURL(receiptPreviewUrl);
+      receiptPreviewUrls.forEach((url) => URL.revokeObjectURL(url));
     },
-    [receiptPreviewUrl],
+    [receiptPreviewUrls],
   );
 
   function changeCaptureOpen(open: boolean) {
@@ -88,10 +91,10 @@ export function ExpenseReceiptCapture({
     }
   }
 
-  async function processPhoto(file: File) {
+  async function processPhotos(files: File[]) {
     setError(undefined);
     try {
-      const extraction = await analyzeExpenseReceipt(file);
+      const extraction = await analyzeExpenseReceipt(files);
       if (extraction.status !== "READY" || !extraction.result) {
         throw new Error(extraction.failureMessage ?? t("analyzeFailed"));
       }
@@ -110,7 +113,7 @@ export function ExpenseReceiptCapture({
         }),
       );
       setDraft(extraction);
-      setReceiptPreviewUrl(URL.createObjectURL(file));
+      setReceiptPreviewUrls(files.map((file) => URL.createObjectURL(file)));
       readyReviewRef.current = true;
     } catch (caught) {
       throw new Error(messageForCaptureError(caught, t("analyzeFailed")));
@@ -227,61 +230,24 @@ export function ExpenseReceiptCapture({
         ) : null}
       </section>
 
-      <ImageCapture
+      <AttachmentPicker
+        {...picker}
         open={captureOpen}
         onOpenChange={changeCaptureOpen}
-        onCapture={processPhoto}
-        allowGallery
-        allowCrop
+        onConfirm={processPhotos}
+        maxFiles={v1.finance.EXPENSE_RECEIPT_MAX_FILES}
+        maxFileSize={v1.finance.EXPENSE_RECEIPT_MAX_BYTES}
+        accept={v1.finance.fundingProofContentTypeSchema.options.join(",")}
         labels={{
+          ...picker.labels,
           title: t("title"),
-          close: t("back"),
-          capture: t("takePhoto"),
-          choosePhoto: t("choosePhoto"),
-          gallery: t("gallery"),
-          files: t("files"),
-          switchCamera: t("switchCamera"),
-          startingCamera: t("startingCamera"),
-          cameraUnavailable: t("cameraUnavailable"),
-          retryCamera: t("retryCamera"),
-          cropTitle: t("cropTitle"),
-          cropHint: t("cropHint"),
-          previewTitle: t("previewTitle"),
-          previewAlt: t("cropPreview"),
-          retake: t("retake"),
-          usePhoto: t("usePhoto"),
-          processing: t("analyzing"),
-          unsupportedType: t("unsupportedType"),
-          fileTooLarge: t("fileTooLarge"),
-          captureFailed: t("captureFailed"),
-          saveFailed: t("analyzeFailed"),
-          resetCrop: t("resetCrop"),
-          rotatePhoto: t("rotatePhoto"),
-          straightenPhoto: t("straightenPhoto"),
-          resetTilt: t("resetTilt"),
-          editPhoto: t("editPhoto"),
-          cancelEdit: t("cancelEdit"),
-          rotationX: t("rotationX"),
-          rotationY: t("rotationY"),
-          adjustRotationX: t("adjustRotationX"),
-          adjustRotationY: t("adjustRotationY"),
-          resetEdits: t("resetEdits"),
-          showEntirePhoto: t("showEntirePhoto"),
-          cropCorner: (corner) => t(`cropCorners.${corner}`),
-          cropEdge: (edge) => t(`cropEdges.${edge}`),
+          confirming: t("analyzing"),
         }}
-        cameraActions={
-          <Button
-            type="button"
-            variant="text"
-            size="icon"
-            aria-label={t("manual")}
-            onClick={() => router.push(FINANCE_PATHS.newExpenseManual)}
-            className="text-mist-100 hover:text-mist-50"
-          >
-            <ClipboardPenLineIcon className="size-6" aria-hidden="true" />
-          </Button>
-        }
+        secondaryAction={{
+          label: t("manual"),
+          icon: <ClipboardPenLineIcon aria-hidden="true" />,
+          onClick: () => router.push(FINANCE_PATHS.newExpenseManual),
+        }}
       />
 
       <BottomSheet open={reviewOpen} onOpenChange={setReviewOpen}>
@@ -297,6 +263,7 @@ export function ExpenseReceiptCapture({
               draft={draft}
               values={reviewValues}
               previewUrl={receiptPreviewUrl}
+              previewUrls={receiptPreviewUrls}
               books={books}
               accounts={accounts}
               categories={categories}
