@@ -33,11 +33,14 @@ export function ProblemListItem({
   expanded,
   onToggle,
   href,
+  variant = "default",
 }: {
   problem: v1.problems.Problem;
   expanded?: boolean;
   onToggle?: () => void;
   href?: string;
+  /** Omits scooter identity and moves badges into the header. */
+  variant?: "default" | "simple";
 }) {
   const t = useTranslations("workspace.problems");
   const format = useFormatter();
@@ -57,6 +60,18 @@ export function ProblemListItem({
         ? "default"
         : "secondary";
   const date = problem.createdAt ? new Date(problem.createdAt) : null;
+  const badges = (
+    <>
+      <Badge variant={statusVariant}>{t(problem.status)}</Badge>
+      {problem.blocksUsage &&
+      (problem.status === "open" || problem.status === "in_progress") ? (
+        <Badge variant="destructive">{t("maintenanceHold")}</Badge>
+      ) : null}
+      {problem.assigneeNeedsReassignment ? (
+        <Badge variant="destructive">{t("reassignRequired")}</Badge>
+      ) : null}
+    </>
+  );
 
   return (
     <Card
@@ -100,14 +115,20 @@ export function ProblemListItem({
         <CardTitle role="heading" aria-level={3}>
           {problem.title}
         </CardTitle>
-        <CardAction className="flex max-w-32 flex-col items-end gap-1 text-right">
-          <span className="text-xl font-semibold leading-tight tabular-nums">
-            {internalId}
-          </span>
-          <span className="text-xs font-normal leading-snug text-muted-foreground">
-            {brandAndModel}
-          </span>
-        </CardAction>
+        {variant === "simple" ? (
+          <CardAction className="flex max-w-32 flex-col items-end gap-2">
+            {badges}
+          </CardAction>
+        ) : (
+          <CardAction className="flex max-w-32 flex-col items-end gap-1 text-right">
+            <span className="text-xl font-semibold leading-tight tabular-nums">
+              {internalId}
+            </span>
+            <span className="text-xs font-normal leading-snug text-muted-foreground">
+              {brandAndModel}
+            </span>
+          </CardAction>
+        )}
       </CardHeader>
       {problem.description ? (
         <CardContent>
@@ -122,16 +143,9 @@ export function ProblemListItem({
           </p>
         </CardContent>
       ) : null}
-      <CardContent className="flex flex-wrap gap-2">
-        <Badge variant={statusVariant}>{t(problem.status)}</Badge>
-        {problem.blocksUsage &&
-        (problem.status === "open" || problem.status === "in_progress") ? (
-          <Badge variant="destructive">{t("maintenanceHold")}</Badge>
-        ) : null}
-        {problem.assigneeNeedsReassignment ? (
-          <Badge variant="destructive">{t("reassignRequired")}</Badge>
-        ) : null}
-      </CardContent>
+      {variant === "default" ? (
+        <CardContent className="flex flex-wrap gap-2">{badges}</CardContent>
+      ) : null}
       <CardFooter className="mx-(--card-spacing) flex-wrap justify-between gap-3 rounded-none px-0 text-xs text-muted-foreground">
         <div className="flex min-w-0 items-center gap-2">
           <UserAvatar

@@ -42,34 +42,37 @@ it("rejects corrupt or unsupported stored values", () => {
 
 it("uses seven calendar days across month/year boundaries and rejects impossible dates", () => {
   const period = weeklyPeriod({ day: "28", month: "12", year: "2026" })!;
-  const start = new Date(period.startsAt);
-  const end = new Date(period.endsAt);
-  expect([
-    start.getFullYear(),
-    start.getMonth(),
-    start.getDate(),
-    start.getHours(),
-  ]).toEqual([2026, 11, 28, 0]);
-  expect([
-    end.getFullYear(),
-    end.getMonth(),
-    end.getDate(),
-    end.getHours(),
-  ]).toEqual([2027, 0, 4, 0]);
+  expect(period.startsAt).toBe("2026-12-27T22:00:00.000Z");
+  expect(period.endsAt).toBe("2027-01-03T22:00:00.000Z");
+  expect(period.timeZone).toBe("Europe/Bucharest");
   expect(weeklyPeriod({ day: "31", month: "02", year: "2026" })).toBeNull();
 });
 
-it("keeps the weekly boundary at local midnight over the autumn DST change", () => {
-  // The suite runs in Europe/Bucharest for this check (see validation command).
-  const period = weeklyPeriod({ day: "24", month: "10", year: "2026" })!;
-  const start = new Date(period.startsAt);
-  const end = new Date(period.endsAt);
-  expect(end.getDate()).toBe(31);
-  expect(end.getHours()).toBe(start.getHours());
-  if (start.getTimezoneOffset() !== end.getTimezoneOffset())
+it("keeps Bucharest midnight across the autumn DST change regardless of device timezone", () => {
+  const previousTimezone = process.env.TZ;
+  try {
+    process.env.TZ = "America/Los_Angeles";
+    const period = weeklyPeriod({ day: "24", month: "10", year: "2026" })!;
+    expect(period.startsAt).toBe("2026-10-23T21:00:00.000Z");
+    expect(period.endsAt).toBe("2026-10-30T22:00:00.000Z");
     expect(Date.parse(period.endsAt) - Date.parse(period.startsAt)).toBe(
       169 * 60 * 60 * 1000,
     );
+  } finally {
+    if (previousTimezone === undefined) delete process.env.TZ;
+    else process.env.TZ = previousTimezone;
+  }
+});
+
+it("persists first-step input after an actual edit without requiring the review step", () => {
+  const draft = {
+    ...emptyRentalDraft(),
+    inputTouched: true,
+    personId: "person",
+  };
+  expect(canPersistRentalDraft(draft)).toBe(true);
+  writeRentalDraft("staff", draft);
+  expect(readRentalDraft("staff")).toEqual(draft);
 });
 
 it("only attaches a created person to its original draft and never deletes a person", () => {
@@ -179,10 +182,10 @@ it("recognizes legacy review drafts but not legacy first-step drafts as eligible
   }
 });
 
-it("defaults new rentals to the local date and calculates the first week without persisting", () => {
+it("defaults new rentals to the Bucharest date and calculates the first week without persisting", () => {
   vi.useFakeTimers();
   try {
-    vi.setSystemTime(new Date(2026, 9, 24, 0, 30));
+    vi.setSystemTime(new Date("2026-10-23T22:30:00.000Z"));
     const draft = emptyRentalDraft();
     expect(draft.startDate).toEqual({ day: "24", month: "10", year: "2026" });
     expect(draft.period).toEqual(weeklyPeriod(draft.startDate));

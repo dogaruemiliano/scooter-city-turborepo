@@ -158,6 +158,11 @@ const NAVIGATION_GROUPS = [
         icon: Building2Icon,
       },
       {
+        href: "/company/contract-templates",
+        labelKey: "contractTemplates",
+        icon: Settings2Icon,
+      },
+      {
         href: "/company/associates",
         labelKey: "companyAssociates",
         icon: UsersRoundIcon,
@@ -200,6 +205,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/finance/settings": "financeSettings",
   "/finance/settlement": "financeSettlement",
   "/company/settings": "companySettings",
+  "/company/contract-templates": "contractTemplates",
   "/company/associates": "companyAssociates",
   "/persons": "persons",
   "/persons/new": "newPerson",
@@ -230,7 +236,9 @@ export function AppShell({
     pageTitleOverride ?? (pageTitleKey ? tPages(pageTitleKey) : "Scooter City");
 
   const standalone =
-    isSignInPathname(pathname) || IMMERSIVE_ROUTES.has(routePathname);
+    isSignInPathname(pathname) ||
+    routePathname === "/signing" ||
+    IMMERSIVE_ROUTES.has(routePathname);
   const [pageScrollRef, onPageScroll] = useMobilePageScroll(
     pathname,
     !standalone,

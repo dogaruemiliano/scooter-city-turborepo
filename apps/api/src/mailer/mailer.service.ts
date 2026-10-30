@@ -15,6 +15,10 @@ export interface MailerMessage {
   text: string;
   /** HTML body. Optional; clients without HTML support fall back to `text`. */
   html?: string;
+  /** Authorized private bytes only; callers cannot ask the provider to fetch arbitrary URLs. */
+  attachments?: { filename: string; content: Buffer; contentType: string }[];
+  /** Stable domain delivery ID. SMTP acknowledgement still does not prove recipient delivery. */
+  messageId?: string;
 }
 
 export abstract class MailerService {

@@ -17,6 +17,54 @@ import { ScooterEditForm } from "./ScooterEditForm";
 import { scooterEditorDefaults } from "./scooter-editor-schema";
 
 describe("ScooterEditForm", () => {
+  it("uses the licence selector as the only editable speed policy and preserves CIV speed", async () => {
+    const browser = userEvent.setup();
+    mocks.apiFetch.mockResolvedValue(scooter);
+    renderEditForm();
+    for (const label of [
+      "Commercial rental category",
+      "Limiter configuration",
+      "Limiter threshold (km/h)",
+      "Documented constructive speed source",
+      "Configuration evidence",
+      "Reason for speed configuration correction",
+    ])
+      expect(screen.queryByLabelText(label)).not.toBeInTheDocument();
+    expect(screen.getByText("Application speed cap: 25 km/h.")).toBeVisible();
+    await browser.click(
+      screen.getByRole("combobox", { name: "Required driver license" }),
+    );
+    await browser.click(await screen.findByRole("option", { name: "AM" }));
+    expect(screen.getByText("Application speed cap: 45 km/h.")).toBeVisible();
+    await browser.click(
+      screen.getByRole("combobox", { name: "Required driver license" }),
+    );
+    await browser.click(await screen.findByRole("option", { name: "A1" }));
+    expect(
+      screen.getByText("No driving licence based application speed cap."),
+    ).toBeVisible();
+    await openTechnical(browser);
+    const civSpeed = screen.getByLabelText("Maximum speed (km/h)");
+    await browser.type(civSpeed, "60");
+    await closeTechnical(browser);
+    await browser.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() =>
+      expect(mocks.apiFetch).toHaveBeenCalledWith(
+        v1.scooters.ROUTES.update(scooter.id),
+        v1.scooters.scooterSchema,
+        {
+          method: "PATCH",
+          json: {
+            sessionId: "editor-session",
+            expectedUpdatedAt: scooter.updatedAt,
+            requiredLicenseCategory: "A1",
+            maxSpeedKmh: 60,
+          },
+        },
+      ),
+    );
+  });
+
   it("preserves existing engine, homologation, and license instead of applying create defaults", () => {
     expect(
       scooterEditorDefaults({

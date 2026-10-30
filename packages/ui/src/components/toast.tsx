@@ -105,6 +105,7 @@ export function ToastProvider({
     <Primitive.Provider timeout={timeout} {...props}>
       {children}
       <ToastViewport
+        timeout={timeout}
         position={position}
         surface={surface}
         closeLabel={closeLabel}
@@ -118,6 +119,7 @@ export function ToastProvider({
 }
 
 function ToastViewport({
+  timeout,
   position,
   surface,
   closeLabel,
@@ -128,7 +130,7 @@ function ToastViewport({
 }: Required<
   Pick<
     ToastProviderProps,
-    "position" | "surface" | "closeLabel" | "viewportLabel"
+    "position" | "surface" | "closeLabel" | "viewportLabel" | "timeout"
   >
 > &
   Pick<
@@ -153,6 +155,7 @@ function ToastViewport({
             <ToastItem
               key={toast.id}
               toast={toast}
+              timeout={timeout}
               position={position}
               surface={surface}
               closeLabel={closeLabel}
@@ -171,6 +174,7 @@ function ToastViewport({
           >
             <ToastItem
               toast={toast}
+              timeout={timeout}
               position={position}
               surface={surface}
               closeLabel={closeLabel}
@@ -253,6 +257,7 @@ function AnchoredToastViewport({
 
 function ToastItem({
   toast,
+  timeout,
   position,
   surface,
   closeLabel,
@@ -260,6 +265,7 @@ function ToastItem({
   renderIcon,
 }: {
   toast: ComponentProps<typeof Primitive.Root>["toast"];
+  timeout: number;
 } & Pick<ToastProviderProps, "toastClassName" | "renderIcon"> &
   Required<Pick<ToastProviderProps, "position" | "surface" | "closeLabel">>) {
   const variant: ToastVariant =
@@ -307,7 +313,7 @@ function ToastItem({
       data-slot="toast"
       data-variant={variant}
       className={cn(
-        "pointer-events-auto rounded-xl bg-card p-4 text-card-foreground shadow-lg transition-[opacity,transform] duration-normal ease-decelerate outline-none focus-visible:ring-2 focus-visible:ring-ring data-starting-style:-translate-y-2 data-starting-style:opacity-0 data-ending-style:opacity-0 data-limited:hidden motion-reduce:transition-none",
+        "pointer-events-auto relative overflow-hidden rounded-xl bg-card p-4 text-card-foreground shadow-lg transition-[opacity,transform] duration-normal ease-decelerate outline-none focus-visible:ring-2 focus-visible:ring-ring data-starting-style:-translate-y-2 data-starting-style:opacity-0 data-ending-style:opacity-0 data-limited:hidden motion-reduce:transition-none",
         surface === "floating" &&
           "supports-[backdrop-filter:blur(0)]:bg-floating-action-surface supports-[backdrop-filter:blur(0)]:backdrop-blur-floating-surface",
         toastClassName,
@@ -378,28 +384,116 @@ function ToastItem({
           </Primitive.Close>
         ) : null}
       </Primitive.Content>
+      {variant !== "loading" && (toast.timeout ?? timeout) > 0 ? (
+        <ToastCountdown
+          duration={toast.timeout ?? timeout}
+          revision={toast.data?.countdownRevision}
+          ending={toast.transitionStatus === "ending"}
+          tone={tones[variant]}
+        />
+      ) : null}
     </Primitive.Root>
   );
 }
 
-function options({
-  variant,
-  dismissible,
-  anchorRef,
-  actionPlacement,
-  actionPending,
-  ...rest
-}: ToastOptions): ToastManagerAddOptions<Record<string, unknown>> {
+/** Mirrors the primitive's public expanded state and window-focus timer pauses. */
+function ToastCountdown({
+  duration,
+  revision,
+  ending,
+  tone,
+}: {
+  duration: number;
+  revision: unknown;
+  ending: boolean;
+  tone: string;
+}) {
+  const bar = useRef<HTMLDivElement>(null);
+  const windowBlurred = useRef(false);
+  useLayoutEffect(() => {
+    const element = bar.current;
+    if (!element?.animate || ending) return;
+    const animation = element.animate(
+      [{ transform: "scaleX(1)" }, { transform: "scaleX(0)" }],
+      { duration, easing: motion.easing.linear, fill: "forwards" },
+    );
+    const viewport = element.closest(
+      '[data-slot="toast-viewport"], [data-slot="anchored-toast-viewport"]',
+    );
+    // The primitive starts timers immediately, including in an unfocused document;
+    // only a subsequent window blur pauses them.
+    const sync = () => {
+      if (windowBlurred.current || viewport?.hasAttribute("data-expanded"))
+        animation.pause();
+      else animation.play();
+    };
+    const blur = () => {
+      windowBlurred.current = true;
+      sync();
+    };
+    const focus = () => {
+      windowBlurred.current = false;
+      sync();
+    };
+    const observer = new MutationObserver(sync);
+    if (viewport)
+      observer.observe(viewport, {
+        attributes: true,
+        attributeFilter: ["data-expanded"],
+      });
+    window.addEventListener("blur", blur);
+    window.addEventListener("focus", focus);
+    sync();
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("blur", blur);
+      window.removeEventListener("focus", focus);
+      animation.cancel();
+    };
+  }, [duration, revision, ending]);
+  return (
+    <div
+      aria-hidden="true"
+      data-slot="toast-countdown"
+      className={cn(
+        "pointer-events-none absolute inset-x-0 bottom-0 h-0.5",
+        tone,
+        ending && "invisible",
+      )}
+    >
+      <div ref={bar} className="h-full w-full origin-left bg-current" />
+    </div>
+  );
+}
+
+let countdownRevision = 0;
+
+function options(
+  {
+    variant,
+    dismissible,
+    anchorRef,
+    actionPlacement,
+    actionPending,
+    ...rest
+  }: ToastOptions,
+  resetTimer = false,
+): ToastManagerAddOptions<Record<string, unknown>> {
+  const refreshCountdown = resetTimer || Object.hasOwn(rest, "timeout");
   return {
     ...rest,
     ...(variant ? { type: variant } : {}),
     ...(dismissible !== undefined ||
     anchorRef !== undefined ||
     actionPlacement !== undefined ||
-    actionPending !== undefined
+    actionPending !== undefined ||
+    refreshCountdown
       ? {
           data: {
             ...rest.data,
+            ...(refreshCountdown
+              ? { countdownRevision: ++countdownRevision }
+              : {}),
             ...(dismissible !== undefined ? { dismissible } : {}),
             ...(anchorRef ? { anchorRef } : {}),
             ...(actionPlacement ? { actionPlacement } : {}),
@@ -417,9 +511,24 @@ function options({
 export function useToast() {
   const manager = Primitive.useToastManager();
   return {
-    add: (value: ToastOptions) => manager.add(options(value)),
-    update: (id: string, value: ToastOptions) =>
-      manager.update(id, options(value)),
+    add: (value: ToastOptions) => manager.add(options(value, true)),
+    update: (id: string, value: ToastOptions) => {
+      const next = options(value);
+      const previous = manager.toasts.find((toast) => toast.id === id);
+      manager.update(id, {
+        ...next,
+        ...(next.data
+          ? {
+              data: {
+                ...next.data,
+                countdownRevision:
+                  next.data.countdownRevision ??
+                  previous?.data?.countdownRevision,
+              },
+            }
+          : {}),
+      });
+    },
     dismiss: manager.close,
     promise: <T,>(
       promise: Promise<T>,

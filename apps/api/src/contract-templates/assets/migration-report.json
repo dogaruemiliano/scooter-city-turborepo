@@ -1,0 +1,1984 @@
+{
+  "sourceSha256": "006720d4193dc84f2b1f4ab13a85ff12fcb29b4d392362ff84c2957537764882",
+  "originalUnchanged": true,
+  "structuralContentPreserved": true,
+  "order": ["RENTAL_AGREEMENT", "GDPR_NOTICE", "TECHNICAL_HANDOVER"],
+  "visualReview": "PDFs generated; human visual/legal review still required",
+  "results": [
+    {
+      "type": "RENTAL_AGREEMENT",
+      "file": "rental-agreement.docx",
+      "bodyTextSha256": "0cf53584759156ac55343b0b543907f18ea4e83dd01cdf9f6ff74e7d2a8a5fab",
+      "validation": {
+        "status": "PASSED",
+        "sourceSha256": "4a77afb0304ec33f3b62d901f8a48c4666fd26eb4ebdb0ea91c3295009fc4125",
+        "registryVersion": "scootercity-fields-v3.0.0",
+        "rendererVersion": "scootercity-ooxml-v1.0.0",
+        "manifestHash": "2088ac1ad0365f4b0010fb79d5ff5c4ec8a3c7dad3758ef3ba2488aca96c9c02",
+        "placeholders": [
+          "authorizedUsers",
+          "billingAnchorAt",
+          "billingCycleDays",
+          "billingStartsAt",
+          "brandName",
+          "companyAddress",
+          "companyLogo",
+          "companyName",
+          "companyRepresentativeName",
+          "companyRepresentativeRole",
+          "companySignContract",
+          "companyTaxId",
+          "companyTradeRegisterNumber",
+          "contractDate",
+          "contractNumber",
+          "depositAmount",
+          "durationMonths",
+          "latePenaltyPercent",
+          "maintenanceNoticeHours",
+          "noticeDays",
+          "paymentGraceDays",
+          "paymentGraceDaysWords",
+          "rentPaymentMethod",
+          "rentalEndsOn",
+          "rentalStartsOn",
+          "renterAddress",
+          "renterCitizenship",
+          "renterEmail",
+          "renterFirstName",
+          "renterFullName",
+          "renterIdExpiresOn",
+          "renterIdNumber",
+          "renterIdSeries",
+          "renterIdType",
+          "renterLastName",
+          "renterNationalId",
+          "renterPhone",
+          "renterSignContract",
+          "returnAfterNoticeHours",
+          "scooterLimiterStatus",
+          "scooterLimiterValue",
+          "scooterMaxSpeedKmh",
+          "scooterMaxSpeedSource",
+          "templateVersion",
+          "weeklyRent"
+        ],
+        "occurrences": [
+          {
+            "key": "contractNumber",
+            "part": "word/document.xml",
+            "paragraph": 1,
+            "offset": 4,
+            "type": "text",
+            "source": "Agreement"
+          },
+          {
+            "key": "contractDate",
+            "part": "word/document.xml",
+            "paragraph": 1,
+            "offset": 29,
+            "type": "text",
+            "source": "Agreement"
+          },
+          {
+            "key": "companyName",
+            "part": "word/document.xml",
+            "paragraph": 4,
+            "offset": 0,
+            "type": "text",
+            "source": "CompanyProfile"
+          },
+          {
+            "key": "companyAddress",
+            "part": "word/document.xml",
+            "paragraph": 4,
+            "offset": 29,
+            "type": "text",
+            "source": "CompanyProfile"
+          },
+          {
+            "key": "companyTaxId",
+            "part": "word/document.xml",
+            "paragraph": 4,
+            "offset": 52,
+            "type": "text",
+            "source": "CompanyProfile"
+          },
+          {
+            "key": "companyTradeRegisterNumber",
+            "part": "word/document.xml",
+            "paragraph": 4,
+            "offset": 94,
+            "type": "text",
+            "source": "CompanyProfile"
+          },
+          {
+            "key": "companyRepresentativeRole",
+            "part": "word/document.xml",
+            "paragraph": 4,
+            "offset": 143,
+            "type": "text",
+            "source": "CompanyProfile"
+          },
+          {
+            "key": "companyRepresentativeName",
+            "part": "word/document.xml",
+            "paragraph": 4,
+            "offset": 172,
+            "type": "text",
+            "source": "CompanyProfile + authorized signer"
+          },
+          {
+            "key": "renterLastName",
+            "part": "word/document.xml",
+            "paragraph": 7,
+            "offset": 14,
+            "type": "text",
+            "source": "Person snapshot"
+          },
+          {
+            "key": "renterFirstName",
+            "part": "word/document.xml",
+            "paragraph": 7,
+            "offset": 41,
+            "type": "text",
+            "source": "Person snapshot"
+          },
+          {
+            "key": "renterCitizenship",
+            "part": "word/document.xml",
+            "paragraph": 7,
+            "offset": 71,
+            "type": "text",
+            "source": "Person snapshot"
+          },
+          {
+            "key": "renterNationalId",
+            "part": "word/document.xml",
+            "paragraph": 7,
+            "offset": 120,
+            "type": "text",
+            "source": "Person snapshot"
+          },
+          {
+            "key": "renterIdType",
+            "part": "word/document.xml",
+            "paragraph": 7,
+            "offset": 159,
+            "type": "text",
+            "source": "PersonDocument snapshot"
+          },
+          {
+            "key": "renterIdSeries",
+            "part": "word/document.xml",
+            "paragraph": 7,
+            "offset": 182,
+            "type": "text",
+            "source": "PersonDocument snapshot"
+          },
+          {
+            "key": "renterIdNumber",
+            "part": "word/document.xml",
+            "paragraph": 7,
+            "offset": 205,
+            "type": "text",
+            "source": "PersonDocument snapshot"
+          },
+          {
+            "key": "renterIdExpiresOn",
+            "part": "word/document.xml",
+            "paragraph": 7,
+            "offset": 240,
+            "type": "text",
+            "source": "PersonDocument snapshot"
+          },
+          {
+            "key": "renterAddress",
+            "part": "word/document.xml",
+            "paragraph": 7,
+            "offset": 272,
+            "type": "text",
+            "source": "Person snapshot"
+          },
+          {
+            "key": "renterPhone",
+            "part": "word/document.xml",
+            "paragraph": 7,
+            "offset": 298,
+            "type": "text",
+            "source": "Person snapshot"
+          },
+          {
+            "key": "renterEmail",
+            "part": "word/document.xml",
+            "paragraph": 7,
+            "offset": 321,
+            "type": "text",
+            "source": "Person snapshot"
+          },
+          {
+            "key": "durationMonths",
+            "part": "word/document.xml",
+            "paragraph": 36,
+            "offset": 51,
+            "type": "text",
+            "source": "RentalTerms snapshot"
+          },
+          {
+            "key": "rentalStartsOn",
+            "part": "word/document.xml",
+            "paragraph": 36,
+            "offset": 95,
+            "type": "text",
+            "source": "RentalTerms snapshot"
+          },
+          {
+            "key": "rentalEndsOn",
+            "part": "word/document.xml",
+            "paragraph": 36,
+            "offset": 132,
+            "type": "text",
+            "source": "RentalTerms snapshot"
+          },
+          {
+            "key": "weeklyRent",
+            "part": "word/document.xml",
+            "paragraph": 44,
+            "offset": 42,
+            "type": "text",
+            "source": "Pricing snapshot"
+          },
+          {
+            "key": "billingStartsAt",
+            "part": "word/document.xml",
+            "paragraph": 44,
+            "offset": 177,
+            "type": "text",
+            "source": "RentalTerms snapshot"
+          },
+          {
+            "key": "rentPaymentMethod",
+            "part": "word/document.xml",
+            "paragraph": 45,
+            "offset": 60,
+            "type": "text",
+            "source": "RentalTerms"
+          },
+          {
+            "key": "billingCycleDays",
+            "part": "word/document.xml",
+            "paragraph": 46,
+            "offset": 77,
+            "type": "text",
+            "source": "Approved template policy"
+          },
+          {
+            "key": "billingAnchorAt",
+            "part": "word/document.xml",
+            "paragraph": 46,
+            "offset": 118,
+            "type": "text",
+            "source": "RentalTerms snapshot"
+          },
+          {
+            "key": "paymentGraceDays",
+            "part": "word/document.xml",
+            "paragraph": 47,
+            "offset": 78,
+            "type": "text",
+            "source": "Approved template policy"
+          },
+          {
+            "key": "paymentGraceDaysWords",
+            "part": "word/document.xml",
+            "paragraph": 47,
+            "offset": 99,
+            "type": "text",
+            "source": "ContractDataBuilder"
+          },
+          {
+            "key": "depositAmount",
+            "part": "word/document.xml",
+            "paragraph": 49,
+            "offset": 87,
+            "type": "text",
+            "source": "Pricing snapshot"
+          },
+          {
+            "key": "authorizedUsers",
+            "part": "word/document.xml",
+            "paragraph": 77,
+            "offset": 29,
+            "type": "text",
+            "source": "RentalParticipant snapshot"
+          },
+          {
+            "key": "scooterMaxSpeedSource",
+            "part": "word/document.xml",
+            "paragraph": 87,
+            "offset": 53,
+            "type": "text",
+            "source": "ScooterDocument snapshot"
+          },
+          {
+            "key": "scooterMaxSpeedKmh",
+            "part": "word/document.xml",
+            "paragraph": 87,
+            "offset": 87,
+            "type": "text",
+            "source": "Scooter speed snapshot"
+          },
+          {
+            "key": "scooterLimiterStatus",
+            "part": "word/document.xml",
+            "paragraph": 87,
+            "offset": 151,
+            "type": "text",
+            "source": "SpeedConfiguration"
+          },
+          {
+            "key": "scooterLimiterValue",
+            "part": "word/document.xml",
+            "paragraph": 87,
+            "offset": 204,
+            "type": "text",
+            "source": "SpeedConfiguration"
+          },
+          {
+            "key": "maintenanceNoticeHours",
+            "part": "word/document.xml",
+            "paragraph": 98,
+            "offset": 88,
+            "type": "text",
+            "source": "Approved template policy"
+          },
+          {
+            "key": "returnAfterNoticeHours",
+            "part": "word/document.xml",
+            "paragraph": 110,
+            "offset": 191,
+            "type": "text",
+            "source": "Approved template policy"
+          },
+          {
+            "key": "latePenaltyPercent",
+            "part": "word/document.xml",
+            "paragraph": 148,
+            "offset": 72,
+            "type": "text",
+            "source": "Approved template policy"
+          },
+          {
+            "key": "noticeDays",
+            "part": "word/document.xml",
+            "paragraph": 157,
+            "offset": 79,
+            "type": "text",
+            "source": "RentalTerms snapshot"
+          },
+          {
+            "key": "paymentGraceDays",
+            "part": "word/document.xml",
+            "paragraph": 162,
+            "offset": 270,
+            "type": "text",
+            "source": "Approved template policy"
+          },
+          {
+            "key": "contractDate",
+            "part": "word/document.xml",
+            "paragraph": 198,
+            "offset": 41,
+            "type": "text",
+            "source": "Agreement"
+          },
+          {
+            "key": "companyName",
+            "part": "word/document.xml",
+            "paragraph": 200,
+            "offset": 4,
+            "type": "text",
+            "source": "CompanyProfile"
+          },
+          {
+            "key": "companyName",
+            "part": "word/document.xml",
+            "paragraph": 203,
+            "offset": 10,
+            "type": "text",
+            "source": "CompanyProfile"
+          },
+          {
+            "key": "companyRepresentativeName",
+            "part": "word/document.xml",
+            "paragraph": 203,
+            "offset": 14,
+            "type": "text",
+            "source": "CompanyProfile + authorized signer"
+          },
+          {
+            "key": "companySignContract",
+            "part": "word/document.xml",
+            "paragraph": 203,
+            "offset": 11,
+            "type": "signature",
+            "source": "Signature evidence / paper-signing slot"
+          },
+          {
+            "key": "renterFullName",
+            "part": "word/document.xml",
+            "paragraph": 204,
+            "offset": 10,
+            "type": "text",
+            "source": "ContractDataBuilder"
+          },
+          {
+            "key": "renterSignContract",
+            "part": "word/document.xml",
+            "paragraph": 204,
+            "offset": 11,
+            "type": "signature",
+            "source": "Signature evidence / paper-signing slot"
+          },
+          {
+            "key": "brandName",
+            "part": "word/footer1.xml",
+            "paragraph": 0,
+            "offset": 0,
+            "type": "text",
+            "source": "CompanyProfile"
+          },
+          {
+            "key": "contractNumber",
+            "part": "word/footer1.xml",
+            "paragraph": 0,
+            "offset": 28,
+            "type": "text",
+            "source": "Agreement"
+          },
+          {
+            "key": "contractDate",
+            "part": "word/footer1.xml",
+            "paragraph": 0,
+            "offset": 48,
+            "type": "text",
+            "source": "Agreement"
+          },
+          {
+            "key": "templateVersion",
+            "part": "word/footer1.xml",
+            "paragraph": 1,
+            "offset": 16,
+            "type": "text",
+            "source": "ContractTemplateVersion"
+          },
+          {
+            "key": "brandName",
+            "part": "word/footer2.xml",
+            "paragraph": 0,
+            "offset": 0,
+            "type": "text",
+            "source": "CompanyProfile"
+          },
+          {
+            "key": "contractNumber",
+            "part": "word/footer2.xml",
+            "paragraph": 0,
+            "offset": 28,
+            "type": "text",
+            "source": "Agreement"
+          },
+          {
+            "key": "contractDate",
+            "part": "word/footer2.xml",
+            "paragraph": 0,
+            "offset": 48,
+            "type": "text",
+            "source": "Agreement"
+          },
+          {
+            "key": "templateVersion",
+            "part": "word/footer2.xml",
+            "paragraph": 1,
+            "offset": 16,
+            "type": "text",
+            "source": "ContractTemplateVersion"
+          },
+          {
+            "key": "brandName",
+            "part": "word/footer3.xml",
+            "paragraph": 0,
+            "offset": 0,
+            "type": "text",
+            "source": "CompanyProfile"
+          },
+          {
+            "key": "contractNumber",
+            "part": "word/footer3.xml",
+            "paragraph": 0,
+            "offset": 28,
+            "type": "text",
+            "source": "Agreement"
+          },
+          {
+            "key": "contractDate",
+            "part": "word/footer3.xml",
+            "paragraph": 0,
+            "offset": 48,
+            "type": "text",
+            "source": "Agreement"
+          },
+          {
+            "key": "templateVersion",
+            "part": "word/footer3.xml",
+            "paragraph": 1,
+            "offset": 16,
+            "type": "text",
+            "source": "ContractTemplateVersion"
+          },
+          {
+            "key": "companyLogo",
+            "part": "word/header1.xml",
+            "paragraph": 0,
+            "offset": 0,
+            "type": "image",
+            "source": "CompanyProfile asset"
+          },
+          {
+            "key": "companyName",
+            "part": "word/header1.xml",
+            "paragraph": 0,
+            "offset": 19,
+            "type": "text",
+            "source": "CompanyProfile"
+          },
+          {
+            "key": "companyLogo",
+            "part": "word/header2.xml",
+            "paragraph": 0,
+            "offset": 0,
+            "type": "image",
+            "source": "CompanyProfile asset"
+          },
+          {
+            "key": "companyName",
+            "part": "word/header2.xml",
+            "paragraph": 0,
+            "offset": 19,
+            "type": "text",
+            "source": "CompanyProfile"
+          },
+          {
+            "key": "companyLogo",
+            "part": "word/header3.xml",
+            "paragraph": 0,
+            "offset": 0,
+            "type": "image",
+            "source": "CompanyProfile asset"
+          },
+          {
+            "key": "companyName",
+            "part": "word/header3.xml",
+            "paragraph": 0,
+            "offset": 19,
+            "type": "text",
+            "source": "CompanyProfile"
+          }
+        ],
+        "errors": []
+      },
+      "previews": [
+        {
+          "scenario": "25",
+          "renderedDocxSha256": "be19ed97a60c22cc6991279376f5685a135e504026a3975fd034970205f75f8c"
+        },
+        {
+          "scenario": "45",
+          "renderedDocxSha256": "a9cc3f0a6f4b3fe05041b6cd3cc3f6905f77a477b396c536b0dafc9613fd8849"
+        },
+        {
+          "scenario": "NO_LIMITER",
+          "renderedDocxSha256": "64a77a32c26e47bedca0e5737daf89277307ef9b8b99cc85f7cf508cdd99c8f5"
+        },
+        {
+          "scenario": "LONG_NAMES",
+          "renderedDocxSha256": "9fb6977a17ccd94a657b9032f494a9360a36110c9d0dc3f289d8d1c7b21367c7"
+        },
+        {
+          "scenario": "ABSENT_EQUIPMENT",
+          "renderedDocxSha256": "be19ed97a60c22cc6991279376f5685a135e504026a3975fd034970205f75f8c"
+        },
+        {
+          "scenario": "DEFECTS",
+          "renderedDocxSha256": "be19ed97a60c22cc6991279376f5685a135e504026a3975fd034970205f75f8c"
+        }
+      ]
+    },
+    {
+      "type": "GDPR_NOTICE",
+      "file": "gdpr-notice.docx",
+      "bodyTextSha256": "bea45ecd7f0c9d4a17fe9cd9961f08ec7f3df72664a4c40f5c66a0d03763f848",
+      "validation": {
+        "status": "PASSED",
+        "sourceSha256": "fdc23f5ce41c8036ee4bf5c8291c6808bd238ec14b654f8d5ed5541e2d6e5163",
+        "registryVersion": "scootercity-fields-v3.0.0",
+        "rendererVersion": "scootercity-ooxml-v1.0.0",
+        "manifestHash": "cbecf60461fdc3d53638c635b6ae191129fb7f774f2462644ac8451c5942155e",
+        "placeholders": [
+          "brandName",
+          "companyAddress",
+          "companyLogo",
+          "companyName",
+          "companyPrivacyEmail",
+          "companyRepresentativeName",
+          "companySignGdpr",
+          "companyTaxId",
+          "companyTradeRegisterNumber",
+          "contractDate",
+          "contractNumber",
+          "gdprCommunicatedAt",
+          "gpsHistoryStatement",
+          "renterFullName",
+          "renterSignGdpr",
+          "templateVersion"
+        ],
+        "occurrences": [
+          {
+            "key": "contractNumber",
+            "part": "word/document.xml",
+            "paragraph": 2,
+            "offset": 41,
+            "type": "text",
+            "source": "Agreement"
+          },
+          {
+            "key": "contractDate",
+            "part": "word/document.xml",
+            "paragraph": 2,
+            "offset": 61,
+            "type": "text",
+            "source": "Agreement"
+          },
+          {
+            "key": "companyName",
+            "part": "word/document.xml",
+            "paragraph": 4,
+            "offset": 20,
+            "type": "text",
+            "source": "CompanyProfile"
+          },
+          {
+            "key": "companyTaxId",
+            "part": "word/document.xml",
+            "paragraph": 4,
+            "offset": 40,
+            "type": "text",
+            "source": "CompanyProfile"
+          },
+          {
+            "key": "companyTradeRegisterNumber",
+            "part": "word/document.xml",
+            "paragraph": 4,
+            "offset": 82,
+            "type": "text",
+            "source": "CompanyProfile"
+          },
+          {
+            "key": "companyAddress",
+            "part": "word/document.xml",
+            "paragraph": 4,
+            "offset": 123,
+            "type": "text",
+            "source": "CompanyProfile"
+          },
+          {
+            "key": "companyPrivacyEmail",
+            "part": "word/document.xml",
+            "paragraph": 4,
+            "offset": 194,
+            "type": "text",
+            "source": "CompanyProfile"
+          },
+          {
+            "key": "companyName",
+            "part": "word/document.xml",
+            "paragraph": 12,
+            "offset": 146,
+            "type": "text",
+            "source": "CompanyProfile"
+          },
+          {
+            "key": "gpsHistoryStatement",
+            "part": "word/document.xml",
+            "paragraph": 12,
+            "offset": 172,
+            "type": "text",
+            "source": "CompanyPrivacyPolicy"
+          },
+          {
+            "key": "companyPrivacyEmail",
+            "part": "word/document.xml",
+            "paragraph": 20,
+            "offset": 345,
+            "type": "text",
+            "source": "CompanyProfile"
+          },
+          {
+            "key": "companyName",
+            "part": "word/document.xml",
+            "paragraph": 23,
+            "offset": 10,
+            "type": "text",
+            "source": "CompanyProfile"
+          },
+          {
+            "key": "companyRepresentativeName",
+            "part": "word/document.xml",
+            "paragraph": 23,
+            "offset": 14,
+            "type": "text",
+            "source": "CompanyProfile + authorized signer"
+          },
+          {
+            "key": "companySignGdpr",
+            "part": "word/document.xml",
+            "paragraph": 23,
+            "offset": 11,
+            "type": "signature",
+            "source": "Signature evidence / paper-signing slot"
+          },
+          {
+            "key": "renterFullName",
+            "part": "word/document.xml",
+            "paragraph": 24,
+            "offset": 10,
+            "type": "text",
+            "source": "ContractDataBuilder"
+          },
+          {
+            "key": "renterSignGdpr",
+            "part": "word/document.xml",
+            "paragraph": 24,
+            "offset": 11,
+            "type": "signature",
+            "source": "Signature evidence / paper-signing slot"
+          },
+          {
+            "key": "gdprCommunicatedAt",
+            "part": "word/document.xml",
+            "paragraph": 25,
+            "offset": 29,
+            "type": "text",
+            "source": "Privacy communication evidence"
+          },
+          {
+            "key": "brandName",
+            "part": "word/footer1.xml",
+            "paragraph": 0,
+            "offset": 0,
+            "type": "text",
+            "source": "CompanyProfile"
+          },
+          {
+            "key": "contractNumber",
+            "part": "word/footer1.xml",
+            "paragraph": 0,
+            "offset": 28,
+            "type": "text",
+            "source": "Agreement"
+          },
+          {
+            "key": "contractDate",
+            "part": "word/footer1.xml",
+            "paragraph": 0,
+            "offset": 48,
+            "type": "text",
+            "source": "Agreement"
+          },
+          {
+            "key": "templateVersion",
+            "part": "word/footer1.xml",
+            "paragraph": 1,
+            "offset": 16,
+            "type": "text",
+            "source": "ContractTemplateVersion"
+          },
+          {
+            "key": "brandName",
+            "part": "word/footer2.xml",
+            "paragraph": 0,
+            "offset": 0,
+            "type": "text",
+            "source": "CompanyProfile"
+          },
+          {
+            "key": "contractNumber",
+            "part": "word/footer2.xml",
+            "paragraph": 0,
+            "offset": 28,
+            "type": "text",
+            "source": "Agreement"
+          },
+          {
+            "key": "contractDate",
+            "part": "word/footer2.xml",
+            "paragraph": 0,
+            "offset": 48,
+            "type": "text",
+            "source": "Agreement"
+          },
+          {
+            "key": "templateVersion",
+            "part": "word/footer2.xml",
+            "paragraph": 1,
+            "offset": 16,
+            "type": "text",
+            "source": "ContractTemplateVersion"
+          },
+          {
+            "key": "brandName",
+            "part": "word/footer3.xml",
+            "paragraph": 0,
+            "offset": 0,
+            "type": "text",
+            "source": "CompanyProfile"
+          },
+          {
+            "key": "contractNumber",
+            "part": "word/footer3.xml",
+            "paragraph": 0,
+            "offset": 28,
+            "type": "text",
+            "source": "Agreement"
+          },
+          {
+            "key": "contractDate",
+            "part": "word/footer3.xml",
+            "paragraph": 0,
+            "offset": 48,
+            "type": "text",
+            "source": "Agreement"
+          },
+          {
+            "key": "templateVersion",
+            "part": "word/footer3.xml",
+            "paragraph": 1,
+            "offset": 16,
+            "type": "text",
+            "source": "ContractTemplateVersion"
+          },
+          {
+            "key": "companyLogo",
+            "part": "word/header1.xml",
+            "paragraph": 0,
+            "offset": 0,
+            "type": "image",
+            "source": "CompanyProfile asset"
+          },
+          {
+            "key": "companyName",
+            "part": "word/header1.xml",
+            "paragraph": 0,
+            "offset": 19,
+            "type": "text",
+            "source": "CompanyProfile"
+          },
+          {
+            "key": "companyLogo",
+            "part": "word/header2.xml",
+            "paragraph": 0,
+            "offset": 0,
+            "type": "image",
+            "source": "CompanyProfile asset"
+          },
+          {
+            "key": "companyName",
+            "part": "word/header2.xml",
+            "paragraph": 0,
+            "offset": 19,
+            "type": "text",
+            "source": "CompanyProfile"
+          },
+          {
+            "key": "companyLogo",
+            "part": "word/header3.xml",
+            "paragraph": 0,
+            "offset": 0,
+            "type": "image",
+            "source": "CompanyProfile asset"
+          },
+          {
+            "key": "companyName",
+            "part": "word/header3.xml",
+            "paragraph": 0,
+            "offset": 19,
+            "type": "text",
+            "source": "CompanyProfile"
+          }
+        ],
+        "errors": []
+      },
+      "previews": [
+        {
+          "scenario": "25",
+          "renderedDocxSha256": "4482736cd64c2562c6904fbcf8b2b96a023e93d52bd833257d014f86ca414567"
+        },
+        {
+          "scenario": "45",
+          "renderedDocxSha256": "4482736cd64c2562c6904fbcf8b2b96a023e93d52bd833257d014f86ca414567"
+        },
+        {
+          "scenario": "NO_LIMITER",
+          "renderedDocxSha256": "4482736cd64c2562c6904fbcf8b2b96a023e93d52bd833257d014f86ca414567"
+        },
+        {
+          "scenario": "LONG_NAMES",
+          "renderedDocxSha256": "3eb65ca5a819baeb9654391b19bc943eaeea4bb8aa73a73d43457a516dfb59c4"
+        },
+        {
+          "scenario": "ABSENT_EQUIPMENT",
+          "renderedDocxSha256": "4482736cd64c2562c6904fbcf8b2b96a023e93d52bd833257d014f86ca414567"
+        },
+        {
+          "scenario": "DEFECTS",
+          "renderedDocxSha256": "4482736cd64c2562c6904fbcf8b2b96a023e93d52bd833257d014f86ca414567"
+        }
+      ]
+    },
+    {
+      "type": "TECHNICAL_HANDOVER",
+      "file": "technical-handover.docx",
+      "bodyTextSha256": "2ff325788e4bcaa19a2921b0f143ed77dec8c008dc7eff11a7bd795c3aaf5e1a",
+      "validation": {
+        "status": "PASSED",
+        "sourceSha256": "bf745d38aea46ee41da565652f9726b54897031c048e0b095adc2773871ba808",
+        "registryVersion": "scootercity-fields-v3.0.0",
+        "rendererVersion": "scootercity-ooxml-v1.0.0",
+        "manifestHash": "6f330259aef21a81dead24d38e76daf8edffc0db4c3e0a1019f7873538b66d8b",
+        "placeholders": [
+          "aestheticCondition",
+          "antitheftHandover",
+          "batteryChargeCondition",
+          "batteryChargeNotes",
+          "billingStartsAt",
+          "brakeLightCondition",
+          "brakeLightNotes",
+          "brandName",
+          "civDocDelivery",
+          "civDocNotes",
+          "companyLogo",
+          "companyName",
+          "companyRepresentativeName",
+          "companyRepresentativeRole",
+          "companySignHandover",
+          "contractDate",
+          "contractNumber",
+          "depositAmount",
+          "depositPaymentMethod",
+          "electricStartCondition",
+          "electricStartNotes",
+          "engineCondition",
+          "engineNotes",
+          "frontTyreCondition",
+          "frontTyreNotes",
+          "fuelLevel",
+          "handoverDate",
+          "handoverMedia",
+          "handoverTime",
+          "headlightCondition",
+          "headlightNotes",
+          "helmetCondition",
+          "helmetHandover",
+          "helmetNotes",
+          "helmetQuantity",
+          "hornCondition",
+          "hornNotes",
+          "indicatorsCondition",
+          "indicatorsNotes",
+          "insuranceDocDelivery",
+          "insuranceDocNotes",
+          "keyCondition",
+          "keysQuantity",
+          "kickstartCondition",
+          "kickstartNotes",
+          "luggageRackHandover",
+          "mileageAtHandover",
+          "mirrorsCondition",
+          "mirrorsNotes",
+          "odometerCondition",
+          "odometerNotes",
+          "otherDocsDelivery",
+          "otherDocsNotes",
+          "otherEquipment",
+          "phoneHolderCondition",
+          "phoneHolderNotes",
+          "phoneHolderPresence",
+          "rearTyreCondition",
+          "rearTyreNotes",
+          "registrationDocDelivery",
+          "registrationDocNotes",
+          "renterFullName",
+          "renterSignHandover",
+          "renterSignSpeed",
+          "scooterBrand",
+          "scooterColor",
+          "scooterInternalCode",
+          "scooterLimiterBasis",
+          "scooterLimiterStatus",
+          "scooterLimiterValue",
+          "scooterMaxSpeedKmh",
+          "scooterMaxSpeedSource",
+          "scooterModel",
+          "scooterRegistrationNumber",
+          "scooterVin",
+          "scooterYear",
+          "speedCheckMethod",
+          "speedCheckResult",
+          "speedCheckedAt",
+          "speedDeclaration",
+          "speedometerCondition",
+          "speedometerNotes",
+          "technicalNotes",
+          "templateVersion",
+          "topCaseHandover",
+          "usbCondition",
+          "usbNotes",
+          "usbPresence",
+          "weeklyRent"
+        ],
+        "occurrences": [
+          {
+            "key": "contractNumber",
+            "part": "word/document.xml",
+            "paragraph": 2,
+            "offset": 31,
+            "type": "text",
+            "source": "Agreement"
+          },
+          {
+            "key": "contractDate",
+            "part": "word/document.xml",
+            "paragraph": 2,
+            "offset": 51,
+            "type": "text",
+            "source": "Agreement"
+          },
+          {
+            "key": "handoverDate",
+            "part": "word/document.xml",
+            "paragraph": 3,
+            "offset": 28,
+            "type": "text",
+            "source": "Handover"
+          },
+          {
+            "key": "companyName",
+            "part": "word/document.xml",
+            "paragraph": 5,
+            "offset": 9,
+            "type": "text",
+            "source": "CompanyProfile"
+          },
+          {
+            "key": "companyRepresentativeRole",
+            "part": "word/document.xml",
+            "paragraph": 5,
+            "offset": 30,
+            "type": "text",
+            "source": "CompanyProfile"
+          },
+          {
+            "key": "companyRepresentativeName",
+            "part": "word/document.xml",
+            "paragraph": 5,
+            "offset": 59,
+            "type": "text",
+            "source": "CompanyProfile + authorized signer"
+          },
+          {
+            "key": "renterFullName",
+            "part": "word/document.xml",
+            "paragraph": 6,
+            "offset": 9,
+            "type": "text",
+            "source": "ContractDataBuilder"
+          },
+          {
+            "key": "scooterInternalCode",
+            "part": "word/document.xml",
+            "paragraph": 10,
+            "offset": 0,
+            "type": "text",
+            "source": "Scooter snapshot"
+          },
+          {
+            "key": "scooterBrand",
+            "part": "word/document.xml",
+            "paragraph": 12,
+            "offset": 0,
+            "type": "text",
+            "source": "Scooter snapshot"
+          },
+          {
+            "key": "scooterModel",
+            "part": "word/document.xml",
+            "paragraph": 14,
+            "offset": 0,
+            "type": "text",
+            "source": "Scooter snapshot"
+          },
+          {
+            "key": "scooterVin",
+            "part": "word/document.xml",
+            "paragraph": 16,
+            "offset": 0,
+            "type": "text",
+            "source": "Scooter snapshot"
+          },
+          {
+            "key": "scooterRegistrationNumber",
+            "part": "word/document.xml",
+            "paragraph": 18,
+            "offset": 0,
+            "type": "text",
+            "source": "Scooter snapshot"
+          },
+          {
+            "key": "scooterYear",
+            "part": "word/document.xml",
+            "paragraph": 20,
+            "offset": 0,
+            "type": "text",
+            "source": "Scooter snapshot"
+          },
+          {
+            "key": "scooterColor",
+            "part": "word/document.xml",
+            "paragraph": 22,
+            "offset": 0,
+            "type": "text",
+            "source": "Scooter snapshot"
+          },
+          {
+            "key": "mileageAtHandover",
+            "part": "word/document.xml",
+            "paragraph": 24,
+            "offset": 0,
+            "type": "text",
+            "source": "Inspection"
+          },
+          {
+            "key": "fuelLevel",
+            "part": "word/document.xml",
+            "paragraph": 26,
+            "offset": 0,
+            "type": "text",
+            "source": "Inspection"
+          },
+          {
+            "key": "scooterMaxSpeedKmh",
+            "part": "word/document.xml",
+            "paragraph": 28,
+            "offset": 0,
+            "type": "text",
+            "source": "Scooter speed snapshot"
+          },
+          {
+            "key": "scooterMaxSpeedSource",
+            "part": "word/document.xml",
+            "paragraph": 30,
+            "offset": 0,
+            "type": "text",
+            "source": "ScooterDocument snapshot"
+          },
+          {
+            "key": "scooterLimiterStatus",
+            "part": "word/document.xml",
+            "paragraph": 32,
+            "offset": 0,
+            "type": "text",
+            "source": "SpeedConfiguration"
+          },
+          {
+            "key": "scooterLimiterValue",
+            "part": "word/document.xml",
+            "paragraph": 34,
+            "offset": 0,
+            "type": "text",
+            "source": "SpeedConfiguration"
+          },
+          {
+            "key": "scooterLimiterBasis",
+            "part": "word/document.xml",
+            "paragraph": 36,
+            "offset": 0,
+            "type": "text",
+            "source": "SpeedConfiguration + review"
+          },
+          {
+            "key": "registrationDocDelivery",
+            "part": "word/document.xml",
+            "paragraph": 42,
+            "offset": 0,
+            "type": "text",
+            "source": "DocumentDelivery"
+          },
+          {
+            "key": "registrationDocNotes",
+            "part": "word/document.xml",
+            "paragraph": 43,
+            "offset": 0,
+            "type": "text",
+            "source": "DocumentDelivery"
+          },
+          {
+            "key": "insuranceDocDelivery",
+            "part": "word/document.xml",
+            "paragraph": 45,
+            "offset": 0,
+            "type": "text",
+            "source": "DocumentDelivery"
+          },
+          {
+            "key": "insuranceDocNotes",
+            "part": "word/document.xml",
+            "paragraph": 46,
+            "offset": 0,
+            "type": "text",
+            "source": "DocumentDelivery"
+          },
+          {
+            "key": "civDocDelivery",
+            "part": "word/document.xml",
+            "paragraph": 48,
+            "offset": 0,
+            "type": "text",
+            "source": "DocumentDelivery"
+          },
+          {
+            "key": "civDocNotes",
+            "part": "word/document.xml",
+            "paragraph": 49,
+            "offset": 0,
+            "type": "text",
+            "source": "DocumentDelivery"
+          },
+          {
+            "key": "otherDocsDelivery",
+            "part": "word/document.xml",
+            "paragraph": 51,
+            "offset": 0,
+            "type": "text",
+            "source": "DocumentDelivery"
+          },
+          {
+            "key": "otherDocsNotes",
+            "part": "word/document.xml",
+            "paragraph": 52,
+            "offset": 0,
+            "type": "text",
+            "source": "DocumentDelivery"
+          },
+          {
+            "key": "keysQuantity",
+            "part": "word/document.xml",
+            "paragraph": 55,
+            "offset": 20,
+            "type": "text",
+            "source": "EquipmentHandover"
+          },
+          {
+            "key": "keyCondition",
+            "part": "word/document.xml",
+            "paragraph": 56,
+            "offset": 13,
+            "type": "text",
+            "source": "EquipmentHandover"
+          },
+          {
+            "key": "helmetHandover",
+            "part": "word/document.xml",
+            "paragraph": 58,
+            "offset": 15,
+            "type": "text",
+            "source": "EquipmentHandover"
+          },
+          {
+            "key": "helmetQuantity",
+            "part": "word/document.xml",
+            "paragraph": 58,
+            "offset": 45,
+            "type": "text",
+            "source": "EquipmentHandover"
+          },
+          {
+            "key": "helmetCondition",
+            "part": "word/document.xml",
+            "paragraph": 61,
+            "offset": 13,
+            "type": "text",
+            "source": "EquipmentHandover"
+          },
+          {
+            "key": "helmetNotes",
+            "part": "word/document.xml",
+            "paragraph": 62,
+            "offset": 17,
+            "type": "text",
+            "source": "EquipmentHandover"
+          },
+          {
+            "key": "phoneHolderPresence",
+            "part": "word/document.xml",
+            "paragraph": 64,
+            "offset": 26,
+            "type": "text",
+            "source": "ScooterEquipment snapshot"
+          },
+          {
+            "key": "phoneHolderCondition",
+            "part": "word/document.xml",
+            "paragraph": 66,
+            "offset": 14,
+            "type": "text",
+            "source": "Inspection equipment"
+          },
+          {
+            "key": "phoneHolderNotes",
+            "part": "word/document.xml",
+            "paragraph": 67,
+            "offset": 17,
+            "type": "text",
+            "source": "Inspection equipment"
+          },
+          {
+            "key": "usbPresence",
+            "part": "word/document.xml",
+            "paragraph": 69,
+            "offset": 21,
+            "type": "text",
+            "source": "ScooterEquipment snapshot"
+          },
+          {
+            "key": "usbCondition",
+            "part": "word/document.xml",
+            "paragraph": 72,
+            "offset": 13,
+            "type": "text",
+            "source": "Inspection equipment"
+          },
+          {
+            "key": "usbNotes",
+            "part": "word/document.xml",
+            "paragraph": 73,
+            "offset": 12,
+            "type": "text",
+            "source": "Inspection equipment"
+          },
+          {
+            "key": "antitheftHandover",
+            "part": "word/document.xml",
+            "paragraph": 75,
+            "offset": 10,
+            "type": "text",
+            "source": "EquipmentHandover"
+          },
+          {
+            "key": "topCaseHandover",
+            "part": "word/document.xml",
+            "paragraph": 76,
+            "offset": 18,
+            "type": "text",
+            "source": "EquipmentHandover"
+          },
+          {
+            "key": "luggageRackHandover",
+            "part": "word/document.xml",
+            "paragraph": 77,
+            "offset": 15,
+            "type": "text",
+            "source": "EquipmentHandover"
+          },
+          {
+            "key": "otherEquipment",
+            "part": "word/document.xml",
+            "paragraph": 78,
+            "offset": 16,
+            "type": "text",
+            "source": "EquipmentHandover"
+          },
+          {
+            "key": "engineCondition",
+            "part": "word/document.xml",
+            "paragraph": 84,
+            "offset": 0,
+            "type": "text",
+            "source": "Inspection snapshot"
+          },
+          {
+            "key": "engineNotes",
+            "part": "word/document.xml",
+            "paragraph": 85,
+            "offset": 0,
+            "type": "text",
+            "source": "Inspection snapshot"
+          },
+          {
+            "key": "electricStartCondition",
+            "part": "word/document.xml",
+            "paragraph": 87,
+            "offset": 0,
+            "type": "text",
+            "source": "Inspection snapshot"
+          },
+          {
+            "key": "electricStartNotes",
+            "part": "word/document.xml",
+            "paragraph": 88,
+            "offset": 0,
+            "type": "text",
+            "source": "Inspection snapshot"
+          },
+          {
+            "key": "kickstartCondition",
+            "part": "word/document.xml",
+            "paragraph": 90,
+            "offset": 0,
+            "type": "text",
+            "source": "Inspection snapshot"
+          },
+          {
+            "key": "kickstartNotes",
+            "part": "word/document.xml",
+            "paragraph": 91,
+            "offset": 0,
+            "type": "text",
+            "source": "Inspection snapshot"
+          },
+          {
+            "key": "frontTyreCondition",
+            "part": "word/document.xml",
+            "paragraph": 93,
+            "offset": 0,
+            "type": "text",
+            "source": "Inspection snapshot"
+          },
+          {
+            "key": "frontTyreNotes",
+            "part": "word/document.xml",
+            "paragraph": 94,
+            "offset": 0,
+            "type": "text",
+            "source": "Inspection snapshot"
+          },
+          {
+            "key": "rearTyreCondition",
+            "part": "word/document.xml",
+            "paragraph": 96,
+            "offset": 0,
+            "type": "text",
+            "source": "Inspection snapshot"
+          },
+          {
+            "key": "rearTyreNotes",
+            "part": "word/document.xml",
+            "paragraph": 97,
+            "offset": 0,
+            "type": "text",
+            "source": "Inspection snapshot"
+          },
+          {
+            "key": "headlightCondition",
+            "part": "word/document.xml",
+            "paragraph": 99,
+            "offset": 0,
+            "type": "text",
+            "source": "Inspection snapshot"
+          },
+          {
+            "key": "headlightNotes",
+            "part": "word/document.xml",
+            "paragraph": 100,
+            "offset": 0,
+            "type": "text",
+            "source": "Inspection snapshot"
+          },
+          {
+            "key": "brakeLightCondition",
+            "part": "word/document.xml",
+            "paragraph": 102,
+            "offset": 0,
+            "type": "text",
+            "source": "Inspection snapshot"
+          },
+          {
+            "key": "brakeLightNotes",
+            "part": "word/document.xml",
+            "paragraph": 103,
+            "offset": 0,
+            "type": "text",
+            "source": "Inspection snapshot"
+          },
+          {
+            "key": "indicatorsCondition",
+            "part": "word/document.xml",
+            "paragraph": 105,
+            "offset": 0,
+            "type": "text",
+            "source": "Inspection snapshot"
+          },
+          {
+            "key": "indicatorsNotes",
+            "part": "word/document.xml",
+            "paragraph": 106,
+            "offset": 0,
+            "type": "text",
+            "source": "Inspection snapshot"
+          },
+          {
+            "key": "hornCondition",
+            "part": "word/document.xml",
+            "paragraph": 108,
+            "offset": 0,
+            "type": "text",
+            "source": "Inspection snapshot"
+          },
+          {
+            "key": "hornNotes",
+            "part": "word/document.xml",
+            "paragraph": 109,
+            "offset": 0,
+            "type": "text",
+            "source": "Inspection snapshot"
+          },
+          {
+            "key": "speedometerCondition",
+            "part": "word/document.xml",
+            "paragraph": 111,
+            "offset": 0,
+            "type": "text",
+            "source": "Inspection snapshot"
+          },
+          {
+            "key": "speedometerNotes",
+            "part": "word/document.xml",
+            "paragraph": 112,
+            "offset": 0,
+            "type": "text",
+            "source": "Inspection snapshot"
+          },
+          {
+            "key": "odometerCondition",
+            "part": "word/document.xml",
+            "paragraph": 114,
+            "offset": 0,
+            "type": "text",
+            "source": "Inspection snapshot"
+          },
+          {
+            "key": "odometerNotes",
+            "part": "word/document.xml",
+            "paragraph": 115,
+            "offset": 0,
+            "type": "text",
+            "source": "Inspection snapshot"
+          },
+          {
+            "key": "mirrorsCondition",
+            "part": "word/document.xml",
+            "paragraph": 117,
+            "offset": 0,
+            "type": "text",
+            "source": "Inspection snapshot"
+          },
+          {
+            "key": "mirrorsNotes",
+            "part": "word/document.xml",
+            "paragraph": 118,
+            "offset": 0,
+            "type": "text",
+            "source": "Inspection snapshot"
+          },
+          {
+            "key": "batteryChargeCondition",
+            "part": "word/document.xml",
+            "paragraph": 120,
+            "offset": 0,
+            "type": "text",
+            "source": "Inspection snapshot"
+          },
+          {
+            "key": "batteryChargeNotes",
+            "part": "word/document.xml",
+            "paragraph": 121,
+            "offset": 0,
+            "type": "text",
+            "source": "Inspection snapshot"
+          },
+          {
+            "key": "technicalNotes",
+            "part": "word/document.xml",
+            "paragraph": 123,
+            "offset": 20,
+            "type": "text",
+            "source": "Inspection"
+          },
+          {
+            "key": "aestheticCondition",
+            "part": "word/document.xml",
+            "paragraph": 124,
+            "offset": 42,
+            "type": "text",
+            "source": "Inspection"
+          },
+          {
+            "key": "handoverMedia",
+            "part": "word/document.xml",
+            "paragraph": 128,
+            "offset": 33,
+            "type": "text",
+            "source": "HandoverMedia"
+          },
+          {
+            "key": "depositAmount",
+            "part": "word/document.xml",
+            "paragraph": 130,
+            "offset": 23,
+            "type": "text",
+            "source": "Pricing snapshot"
+          },
+          {
+            "key": "depositPaymentMethod",
+            "part": "word/document.xml",
+            "paragraph": 131,
+            "offset": 21,
+            "type": "text",
+            "source": "RentalTerms / Payment"
+          },
+          {
+            "key": "weeklyRent",
+            "part": "word/document.xml",
+            "paragraph": 133,
+            "offset": 36,
+            "type": "text",
+            "source": "Pricing snapshot"
+          },
+          {
+            "key": "billingStartsAt",
+            "part": "word/document.xml",
+            "paragraph": 134,
+            "offset": 43,
+            "type": "text",
+            "source": "RentalTerms snapshot"
+          },
+          {
+            "key": "handoverDate",
+            "part": "word/document.xml",
+            "paragraph": 142,
+            "offset": 26,
+            "type": "text",
+            "source": "Handover"
+          },
+          {
+            "key": "handoverTime",
+            "part": "word/document.xml",
+            "paragraph": 142,
+            "offset": 47,
+            "type": "text",
+            "source": "Handover"
+          },
+          {
+            "key": "mileageAtHandover",
+            "part": "word/document.xml",
+            "paragraph": 143,
+            "offset": 31,
+            "type": "text",
+            "source": "Inspection"
+          },
+          {
+            "key": "scooterMaxSpeedKmh",
+            "part": "word/document.xml",
+            "paragraph": 145,
+            "offset": 28,
+            "type": "text",
+            "source": "Scooter speed snapshot"
+          },
+          {
+            "key": "scooterLimiterStatus",
+            "part": "word/document.xml",
+            "paragraph": 145,
+            "offset": 74,
+            "type": "text",
+            "source": "SpeedConfiguration"
+          },
+          {
+            "key": "scooterLimiterValue",
+            "part": "word/document.xml",
+            "paragraph": 145,
+            "offset": 117,
+            "type": "text",
+            "source": "SpeedConfiguration"
+          },
+          {
+            "key": "speedCheckMethod",
+            "part": "word/document.xml",
+            "paragraph": 146,
+            "offset": 25,
+            "type": "text",
+            "source": "Inspection speed check"
+          },
+          {
+            "key": "speedCheckResult",
+            "part": "word/document.xml",
+            "paragraph": 146,
+            "offset": 70,
+            "type": "text",
+            "source": "Inspection speed check"
+          },
+          {
+            "key": "speedDeclaration",
+            "part": "word/document.xml",
+            "paragraph": 147,
+            "offset": 37,
+            "type": "text",
+            "source": "Approved speed-declarations + snapshot"
+          },
+          {
+            "key": "renterFullName",
+            "part": "word/document.xml",
+            "paragraph": 148,
+            "offset": 25,
+            "type": "text",
+            "source": "ContractDataBuilder"
+          },
+          {
+            "key": "renterSignSpeed",
+            "part": "word/document.xml",
+            "paragraph": 149,
+            "offset": 75,
+            "type": "signature",
+            "source": "Signature evidence / paper-signing slot"
+          },
+          {
+            "key": "speedCheckedAt",
+            "part": "word/document.xml",
+            "paragraph": 150,
+            "offset": 25,
+            "type": "text",
+            "source": "Inspection speed check"
+          },
+          {
+            "key": "companyName",
+            "part": "word/document.xml",
+            "paragraph": 151,
+            "offset": 10,
+            "type": "text",
+            "source": "CompanyProfile"
+          },
+          {
+            "key": "companyRepresentativeName",
+            "part": "word/document.xml",
+            "paragraph": 151,
+            "offset": 14,
+            "type": "text",
+            "source": "CompanyProfile + authorized signer"
+          },
+          {
+            "key": "companySignHandover",
+            "part": "word/document.xml",
+            "paragraph": 151,
+            "offset": 11,
+            "type": "signature",
+            "source": "Signature evidence / paper-signing slot"
+          },
+          {
+            "key": "renterFullName",
+            "part": "word/document.xml",
+            "paragraph": 152,
+            "offset": 10,
+            "type": "text",
+            "source": "ContractDataBuilder"
+          },
+          {
+            "key": "renterSignHandover",
+            "part": "word/document.xml",
+            "paragraph": 152,
+            "offset": 11,
+            "type": "signature",
+            "source": "Signature evidence / paper-signing slot"
+          },
+          {
+            "key": "brandName",
+            "part": "word/footer1.xml",
+            "paragraph": 0,
+            "offset": 0,
+            "type": "text",
+            "source": "CompanyProfile"
+          },
+          {
+            "key": "contractNumber",
+            "part": "word/footer1.xml",
+            "paragraph": 0,
+            "offset": 28,
+            "type": "text",
+            "source": "Agreement"
+          },
+          {
+            "key": "contractDate",
+            "part": "word/footer1.xml",
+            "paragraph": 0,
+            "offset": 48,
+            "type": "text",
+            "source": "Agreement"
+          },
+          {
+            "key": "templateVersion",
+            "part": "word/footer1.xml",
+            "paragraph": 1,
+            "offset": 16,
+            "type": "text",
+            "source": "ContractTemplateVersion"
+          },
+          {
+            "key": "brandName",
+            "part": "word/footer2.xml",
+            "paragraph": 0,
+            "offset": 0,
+            "type": "text",
+            "source": "CompanyProfile"
+          },
+          {
+            "key": "contractNumber",
+            "part": "word/footer2.xml",
+            "paragraph": 0,
+            "offset": 28,
+            "type": "text",
+            "source": "Agreement"
+          },
+          {
+            "key": "contractDate",
+            "part": "word/footer2.xml",
+            "paragraph": 0,
+            "offset": 48,
+            "type": "text",
+            "source": "Agreement"
+          },
+          {
+            "key": "templateVersion",
+            "part": "word/footer2.xml",
+            "paragraph": 1,
+            "offset": 16,
+            "type": "text",
+            "source": "ContractTemplateVersion"
+          },
+          {
+            "key": "brandName",
+            "part": "word/footer3.xml",
+            "paragraph": 0,
+            "offset": 0,
+            "type": "text",
+            "source": "CompanyProfile"
+          },
+          {
+            "key": "contractNumber",
+            "part": "word/footer3.xml",
+            "paragraph": 0,
+            "offset": 28,
+            "type": "text",
+            "source": "Agreement"
+          },
+          {
+            "key": "contractDate",
+            "part": "word/footer3.xml",
+            "paragraph": 0,
+            "offset": 48,
+            "type": "text",
+            "source": "Agreement"
+          },
+          {
+            "key": "templateVersion",
+            "part": "word/footer3.xml",
+            "paragraph": 1,
+            "offset": 16,
+            "type": "text",
+            "source": "ContractTemplateVersion"
+          },
+          {
+            "key": "companyLogo",
+            "part": "word/header1.xml",
+            "paragraph": 0,
+            "offset": 0,
+            "type": "image",
+            "source": "CompanyProfile asset"
+          },
+          {
+            "key": "companyName",
+            "part": "word/header1.xml",
+            "paragraph": 0,
+            "offset": 19,
+            "type": "text",
+            "source": "CompanyProfile"
+          },
+          {
+            "key": "companyLogo",
+            "part": "word/header2.xml",
+            "paragraph": 0,
+            "offset": 0,
+            "type": "image",
+            "source": "CompanyProfile asset"
+          },
+          {
+            "key": "companyName",
+            "part": "word/header2.xml",
+            "paragraph": 0,
+            "offset": 19,
+            "type": "text",
+            "source": "CompanyProfile"
+          },
+          {
+            "key": "companyLogo",
+            "part": "word/header3.xml",
+            "paragraph": 0,
+            "offset": 0,
+            "type": "image",
+            "source": "CompanyProfile asset"
+          },
+          {
+            "key": "companyName",
+            "part": "word/header3.xml",
+            "paragraph": 0,
+            "offset": 19,
+            "type": "text",
+            "source": "CompanyProfile"
+          }
+        ],
+        "errors": []
+      },
+      "previews": [
+        {
+          "scenario": "25",
+          "renderedDocxSha256": "69961ede8a9ff555fbe6597c2d319c9481673e831f13636cd94b45332de46410"
+        },
+        {
+          "scenario": "45",
+          "renderedDocxSha256": "cf34ec3c09f9a367015f543f064612cf7696b0491f43c9962406c87c83426400"
+        },
+        {
+          "scenario": "NO_LIMITER",
+          "renderedDocxSha256": "66465140374bb92017340eb514d525bdaef8f48a19ceb05fa90aaa6b5d3e9417"
+        },
+        {
+          "scenario": "LONG_NAMES",
+          "renderedDocxSha256": "9521fe661eb896b924448d42b432888373d7b242e4b6ad353d31bbc212d94df9"
+        },
+        {
+          "scenario": "ABSENT_EQUIPMENT",
+          "renderedDocxSha256": "1c03c9bc80d5980a817ef4dcf3c69c1403f2b896e27b756f9bf83ee0c62deabc"
+        },
+        {
+          "scenario": "DEFECTS",
+          "renderedDocxSha256": "2482048543d03ecb616d7e1b93f7b501018604b9748782e21d63fee26f261313"
+        }
+      ]
+    }
+  ]
+}

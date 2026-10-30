@@ -183,6 +183,7 @@ function ScooterProblemList({
               remote.data.items.map((problem) => (
                 <ProblemListItem
                   key={problem.id}
+                  variant="simple"
                   problem={problem}
                   expanded={selected?.id === problem.id}
                   onToggle={() => setSelected(problem)}

@@ -1,5 +1,15 @@
 import { z } from "zod";
 import { maintenanceScooterSchema } from "../problems";
+import {
+  rentalTermsSchema,
+  rentalPromotionSchema,
+  rentalPaymentMethodSchema,
+  rentalInspectionSchema,
+  rentalPaymentSchema,
+  rentalInspectionDataSchema,
+  rentalConclusionContextSchema,
+} from "./checkout";
+export * from "./checkout";
 
 export const rentalStatusSchema = z.enum([
   "reserved",
@@ -27,11 +37,35 @@ export const rentalSchema = z.object({
   handedOverAt: z.string().nullable(),
   returnedAt: z.string().nullable(),
   createdAt: z.string(),
+  workflowVersion: z.number().int().optional(),
+  conclusionContext: rentalConclusionContextSchema.nullable().optional(),
+  terms: rentalTermsSchema.nullable().optional(),
+  agreementStartsAt: z.string().nullable().optional(),
+  agreementEndsAt: z.string().nullable().optional(),
+  billingAnchorAt: z.string().nullable().optional(),
+  nextPaymentDueAt: z.string().nullable().optional(),
+  contractTimezone: z.string().optional(),
 });
 export const customerRentalSchema = rentalSchema.omit({
   personId: true,
   person: true,
   internalNotes: true,
+});
+export const rentalCheckoutSchema = z.object({
+  rental: rentalSchema,
+  inspection: rentalInspectionSchema.nullable(),
+  prefill: rentalInspectionDataSchema,
+  expectedScooterUpdatedAt: z.iso.datetime(),
+  payments: z.array(rentalPaymentSchema),
+  issues: z.array(z.string()),
+  handoverRecipients: z.array(
+    z.object({
+      personId: z.string(),
+      firstName: z.string(),
+      lastName: z.string(),
+    }),
+  ),
+  lastKnownMileageKm: z.number().int().nonnegative().nullable(),
 });
 export const rentalListSchema = z.object({
   items: z.array(rentalSchema),
@@ -57,6 +91,12 @@ export const createRentalInputSchema = z
     endsAt: z.iso.datetime(),
     customerNotes: z.string().trim().max(4000).optional(),
     internalNotes: z.string().trim().max(4000).optional(),
+    promotion: rentalPromotionSchema.optional(),
+    conclusionContext: rentalConclusionContextSchema.optional(),
+    rentalPaymentMethod: rentalPaymentMethodSchema.optional(),
+    depositPaymentMethod: rentalPaymentMethodSchema.optional(),
+    agreementStartsAt: z.iso.datetime().optional(),
+    driverPersonIds: z.array(z.string().min(1)).min(1).max(10).optional(),
   })
   .strict()
   .refine((value) => Date.parse(value.endsAt) > Date.parse(value.startsAt), {
@@ -66,6 +106,10 @@ export const createRentalInputSchema = z
 export const rentalTransitionInputSchema = z
   .object({ revision: z.number().int().positive() })
   .strict();
+export const rentalHandoverInputSchema = rentalTransitionInputSchema.extend({
+  recipientPersonId: z.string().min(1),
+  originalIdentityChecked: z.literal(true),
+});
 export const customerProfileSchema = z.object({
   id: z.string(),
   firstName: z.string(),
@@ -89,3 +133,4 @@ export type Rental = z.infer<typeof rentalSchema>;
 export type CustomerRental = z.infer<typeof customerRentalSchema>;
 export type CreateRentalInput = z.infer<typeof createRentalInputSchema>;
 export type ListRentalsQuery = z.infer<typeof listRentalsQuerySchema>;
+export * from "./media";

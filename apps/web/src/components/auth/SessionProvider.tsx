@@ -1,7 +1,7 @@
 "use client";
 
 import { ApiError, configureAuthAdapter, v1 } from "@repo/api-shared";
-import { isSignInPathname } from "@/i18n/paths";
+import { getUnprefixedPathname, isSignInPathname } from "@/i18n/paths";
 import { usePathname } from "next/navigation";
 import { webApi } from "@/lib/api";
 import {
@@ -37,7 +37,11 @@ export function SessionProvider({
   const pathname = usePathname();
 
   useEffect(() => {
-    if (isSignInPathname(pathname)) return;
+    if (
+      isSignInPathname(pathname) ||
+      getUnprefixedPathname(pathname) === "/signing"
+    )
+      return;
     let cancelled = false;
     async function refreshCapabilities() {
       try {

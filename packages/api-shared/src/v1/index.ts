@@ -23,3 +23,4 @@ export * as vehicleCiv from "./vehicle-civ";
 export * as access from "./access";
 export * as problems from "./problems";
 export * as rentals from "./rentals";
+export * as contracts from "./contracts";

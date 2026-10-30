@@ -26,6 +26,7 @@ export const appShellCatalog = {
       financeSettlement: "Settlement",
       financeSettings: "Configuration",
       companySettings: "Settings",
+      contractTemplates: "Contract templates",
       companyAssociates: "Associates",
     },
     pages: {
@@ -42,6 +43,7 @@ export const appShellCatalog = {
       financeSettings: "Finance settings",
       financeSettlement: "Settlement",
       companySettings: "Company settings",
+      contractTemplates: "Contract templates",
       companyAssociates: "Associates",
       accountSettings: "Account settings",
       persons: "Persons",
@@ -90,6 +92,7 @@ export const appShellCatalog = {
       financeSettlement: "Decontare",
       financeSettings: "Configurare",
       companySettings: "Setări",
+      contractTemplates: "Șabloane contractuale",
       companyAssociates: "Asociați",
     },
     pages: {
@@ -106,6 +109,7 @@ export const appShellCatalog = {
       financeSettings: "Setări financiare",
       financeSettlement: "Decontare",
       companySettings: "Setări firmă",
+      contractTemplates: "Șabloane contractuale",
       companyAssociates: "Asociați",
       accountSettings: "Setări cont",
       persons: "Persoane",

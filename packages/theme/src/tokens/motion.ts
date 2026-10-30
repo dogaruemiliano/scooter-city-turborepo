@@ -22,6 +22,7 @@ export const motion = {
     normal: 250,
     slow: 400,
     slower: 600,
+    formAutosave: 600,
     doubleTap: 300,
     mediaWheelIdle: 180,
     countdownTick: 1000,

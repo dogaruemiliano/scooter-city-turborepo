@@ -207,6 +207,32 @@ export const accessCatalog = {
           read: "View published scooter documents for the customer’s eligible rentals.",
         },
       },
+      templates: {
+        read: "View contract template versions and compatible sets.",
+        manage:
+          "Upload sources, validate previews and manage contract settings.",
+        publish:
+          "Approve and publish immutable versions; activate compatible sets.",
+        archive:
+          "Archive published versions without deleting historical documents.",
+      },
+      documents: {
+        read: "View private rental document packages.",
+        manage: "Generate and publish packages and send signing invitations.",
+        company_sign:
+          "Sign individual documents as the authorized company representative.",
+      },
+      identity: {
+        review:
+          "Manually inspect identity evidence and approve or reject the exact submitted files.",
+      },
+      evidence: {
+        export: "Export the restricted rental evidence file.",
+        retention: {
+          manage: "Manage approved retention policies and legal holds.",
+          purge: "Approve and execute a reviewed retention purge.",
+        },
+      },
       rentals: {
         read: "View rentals and the associated scooter and renter.",
         create: "Create a scooter rental for a customer.",
@@ -303,6 +329,32 @@ export const accessCatalog = {
         },
         scooter_documents: {
           read: "Renter documents · View",
+        },
+      },
+      templates: {
+        read: "View contract template versions and compatible sets.",
+        manage:
+          "Upload sources, validate previews and manage contract settings.",
+        publish:
+          "Approve and publish immutable versions; activate compatible sets.",
+        archive:
+          "Archive published versions without deleting historical documents.",
+      },
+      documents: {
+        read: "View private rental document packages.",
+        manage: "Generate and publish packages and send signing invitations.",
+        company_sign:
+          "Sign individual documents as the authorized company representative.",
+      },
+      identity: {
+        review:
+          "Manually inspect identity evidence and approve or reject the exact submitted files.",
+      },
+      evidence: {
+        export: "Export the restricted rental evidence file.",
+        retention: {
+          manage: "Manage approved retention policies and legal holds.",
+          purge: "Approve and execute a reviewed retention purge.",
         },
       },
       rentals: {
@@ -534,6 +586,33 @@ export const accessCatalog = {
           read: "Consultă documentele publicate ale scuterelor pentru închirierile eligibile ale clientului.",
         },
       },
+      templates: {
+        read: "Consultă versiunile șabloanelor și seturile compatibile.",
+        manage:
+          "Încarcă surse, validează previzualizări și gestionează setările contractuale.",
+        publish:
+          "Aprobă și publică versiuni imuabile; activează seturi compatibile.",
+        archive:
+          "Arhivează versiuni publicate fără ștergerea documentelor istorice.",
+      },
+      documents: {
+        read: "Consultă pachetele private de documente ale închirierilor.",
+        manage: "Generează și publică pachete; trimite invitații de semnare.",
+        company_sign:
+          "Semnează documentele individuale ca reprezentant autorizat al firmei.",
+      },
+      identity: {
+        review:
+          "Verifică manual dovezile de identitate și aprobă sau respinge fișierele exacte.",
+      },
+      evidence: {
+        export: "Exportă dosarul restricționat de dovezi al închirierii.",
+        retention: {
+          manage:
+            "Administrează politicile de retenție aprobate și blocările juridice.",
+          purge: "Aprobă și execută ștergerea verificată conform retenției.",
+        },
+      },
       rentals: {
         read: "Consultă închirierile, scuterul și chiriașul asociat.",
         create: "Creează o închiriere de scuter pentru un client.",
@@ -633,6 +712,33 @@ export const accessCatalog = {
         },
         scooter_documents: {
           read: "Documente pentru chiriași · Vizualizare",
+        },
+      },
+      templates: {
+        read: "Consultă versiunile șabloanelor și seturile compatibile.",
+        manage:
+          "Încarcă surse, validează previzualizări și gestionează setările contractuale.",
+        publish:
+          "Aprobă și publică versiuni imuabile; activează seturi compatibile.",
+        archive:
+          "Arhivează versiuni publicate fără ștergerea documentelor istorice.",
+      },
+      documents: {
+        read: "Consultă pachetele private de documente ale închirierilor.",
+        manage: "Generează și publică pachete; trimite invitații de semnare.",
+        company_sign:
+          "Semnează documentele individuale ca reprezentant autorizat al firmei.",
+      },
+      identity: {
+        review:
+          "Verifică manual dovezile de identitate și aprobă sau respinge fișierele exacte.",
+      },
+      evidence: {
+        export: "Exportă dosarul restricționat de dovezi al închirierii.",
+        retention: {
+          manage:
+            "Administrează politicile de retenție aprobate și blocările juridice.",
+          purge: "Aprobă și execută ștergerea verificată conform retenției.",
         },
       },
       rentals: {

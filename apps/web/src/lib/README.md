@@ -81,6 +81,19 @@ The provider's `initialUser` is hydrated from the root layout's `meOnServer()` c
 - **JWKS, not BFF.** The browser hits `api.example.com` directly with `credentials: "include"`. Next.js does not proxy data — it just renders pages and gates routes.
 - **Private key stays on the API.** Next.js only ever holds the public key, fetched once and cached by `createRemoteJWKSet`.
 
+### Restricted rental signing sessions
+
+The guest `/signing` flow uses a separate HttpOnly `scooter_signing` cookie and
+the allowlisted `/api/signing/[...path]` BFF. It forwards only that cookie to
+NestJS, checks Origin and `X-Requested-With: fetch` for mutations, and applies
+`no-store` and `no-referrer`. Account access/refresh cookies are never forwarded
+through this boundary. The normal authenticated workspace continues to use the
+direct API client and existing refresh adapter.
+
+`meFromApi()` returns `null` when neither account cookie exists. Locale, theme,
+and restricted signing cookies alone must not trigger an account lookup or make
+a public signing page depend on account authentication availability.
+
 ## Required environment
 
 See [`apps/web/.env.example`](../../.env.example):

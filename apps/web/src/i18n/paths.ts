@@ -5,7 +5,7 @@ import {
 } from "@repo/i18n";
 
 const LOCAL_ORIGIN = "http://local.invalid";
-const PUBLIC_PATHS = ["/sign-in"] as const;
+const PUBLIC_PATHS = ["/sign-in", "/signing"] as const;
 
 export interface LocalePathInfo {
   readonly locale: SupportedLocale;
@@ -75,10 +75,7 @@ export function getUnprefixedPathname(pathname: string): string {
   return getLocalePathInfo(pathname).unprefixedPathname;
 }
 
-export function localizePath(
-  path: string,
-  locale: SupportedLocale,
-): string {
+export function localizePath(path: string, locale: SupportedLocale): string {
   const safePath = safeLocalPath(path);
   const url = new URL(safePath, LOCAL_ORIGIN);
   const unprefixedPathname = getUnprefixedPathname(url.pathname);

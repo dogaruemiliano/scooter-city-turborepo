@@ -273,7 +273,7 @@ function buildRegistrationInput(
         registrationNumber: null,
         registrationDate: null,
         temporaryRegistrationExpiresAt: null,
-        requiredLicenseCategory: "none",
+        requiredLicenseCategory: form.requiredLicenseCategory,
       },
     };
   }

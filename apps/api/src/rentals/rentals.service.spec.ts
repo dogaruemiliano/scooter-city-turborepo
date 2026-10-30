@@ -4,6 +4,7 @@ import type { AccessSnapshot } from "../access/access.resolver";
 import type { AuditService } from "../audit/audit.service";
 import type { PrismaService } from "../prisma/prisma.service";
 import { RentalsService } from "./rentals.service";
+import { v1 } from "@repo/api-shared";
 
 const snapshot: AccessSnapshot = {
   userId: "agent",
@@ -31,7 +32,7 @@ describe("Rental operational invariants", () => {
     },
     scooter: { findFirst: jest.fn() },
     scooterProblem: { findFirst: jest.fn() },
-    person: { findFirst: jest.fn() },
+    person: { findFirst: jest.fn(), count: jest.fn() },
     scooterDocument: { findFirst: jest.fn(), update: jest.fn() },
   };
   const access = { getSnapshot: jest.fn() },
@@ -50,6 +51,87 @@ describe("Rental operational invariants", () => {
     access.getSnapshot.mockResolvedValue(snapshot);
     db.scooter.findFirst.mockResolvedValue({ id: "scooter" });
     db.person.findFirst.mockResolvedValue({ id: "person" });
+    db.person.count.mockResolvedValue(1);
+  });
+
+  it.each(["none", "AM", "A1", "A2", "A"] as const)(
+    "quotes %s from licence policy despite a contradictory legacy category",
+    async (requiredLicenseCategory) => {
+      db.scooter.findFirst.mockResolvedValue({
+        id: "scooter",
+        requiredLicenseCategory,
+        commercialCategory:
+          requiredLicenseCategory === "none"
+            ? "with_license"
+            : "without_license",
+      });
+      const terms = await service.quote("agent", { scooterId: "scooter" });
+      expect(terms.commercialCategory).toBe(
+        requiredLicenseCategory === "none" ? "without_license" : "with_license",
+      );
+      expect(terms.weeklyRateMinor).toBe(
+        requiredLicenseCategory === "none" ? 30000 : 25000,
+      );
+    },
+  );
+
+  it.each(["reserved", "active", "returned", "cancelled"])(
+    "rejects 3+1 quotes and creation for a customer with a %s rental",
+    async (status) => {
+      db.rental.findFirst.mockResolvedValue({ id: "previous", status });
+      const input = {
+        scooterId: "scooter",
+        personId: "person",
+        promotion: "three_plus_one" as const,
+        startsAt: now.toISOString(),
+        endsAt: new Date(now.getTime() + 60_000).toISOString(),
+      };
+      const failure = {
+        response: { code: v1.rentals.NEW_CUSTOMER_PROMOTION_ERROR_CODE },
+      };
+      await expect(service.quote("agent", input)).rejects.toMatchObject(
+        failure,
+      );
+      await expect(service.create("agent", input)).rejects.toMatchObject(
+        failure,
+      );
+      expect(db.rental.findFirst).toHaveBeenLastCalledWith({
+        where: { personId: "person" },
+        select: { id: true },
+      });
+      expect(db.$queryRaw).toHaveBeenCalledWith(
+        expect.arrayContaining([expect.stringContaining('"Person"')]),
+        "person",
+      );
+      expect(db.rental.create).not.toHaveBeenCalled();
+    },
+  );
+
+  it("quotes 3+1 for a new customer and standard terms for a returning customer", async () => {
+    const input = { scooterId: "scooter", personId: "person" };
+    db.scooter.findFirst.mockResolvedValue({ requiredLicenseCategory: "none" });
+    db.rental.findFirst.mockResolvedValue(null);
+    await expect(
+      service.quote("agent", { ...input, promotion: "three_plus_one" }),
+    ).resolves.toMatchObject({
+      promotion: "three_plus_one",
+      initialCoverageDays: 28,
+    });
+    db.rental.findFirst.mockResolvedValue({ id: "previous" });
+    await expect(
+      service.quote("agent", { ...input, promotion: "standard" }),
+    ).resolves.toMatchObject({ promotion: "standard", initialCoverageDays: 7 });
+  });
+
+  it("requires a selected customer for a 3+1 quote", async () => {
+    await expect(
+      service.quote("agent", {
+        scooterId: "scooter",
+        promotion: "three_plus_one",
+      }),
+    ).rejects.toMatchObject({
+      response: { code: v1.rentals.NEW_CUSTOMER_PROMOTION_ERROR_CODE },
+    });
   });
 
   it("requires client copies before creating a rental and accepts the initial CIV inspection", async () => {
@@ -59,6 +141,7 @@ describe("Rental operational invariants", () => {
         type,
         extractedData: null,
         clientCopyAsset: { deletedAt: null },
+        customerVisible: true,
         insurancePolicy:
           type === "insurance"
             ? {
@@ -81,6 +164,7 @@ describe("Rental operational invariants", () => {
           validUntil: new Date("2099-01-01"),
         },
       ],
+      requiredLicenseCategory: "none",
     };
     const input = {
       scooterId: "scooter",

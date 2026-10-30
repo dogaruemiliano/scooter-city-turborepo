@@ -52,6 +52,7 @@ import {
   X,
 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
+import { useRouter } from "next/navigation";
 import { useWorkspaceNotifications } from "@/components/WorkspaceNotifications";
 import { PageHeaderActions } from "@/components/PageHeaderActions";
 import { ProblemAssignment } from "./ProblemAssignment";
@@ -441,6 +442,7 @@ export function ProblemWork({
   reload: (problem?: v1.problems.Problem) => void;
   onBusyChange?: (busy: boolean) => void;
 }) {
+  const router = useRouter();
   const formAction = useFormAction();
   const notifications = useWorkspaceNotifications();
 
@@ -486,6 +488,14 @@ export function ProblemWork({
       v1.problems.problemSchema,
       { method, json: { revision: problem.revision, ...input } },
     );
+    if (
+      updated.status !== problem.status ||
+      updated.blocksUsage !== problem.blocksUsage ||
+      updated.holdClearedAt !== problem.holdClearedAt
+    ) {
+      // Invalidate cached scooter status, including browser back/forward entries.
+      router.refresh();
+    }
     const message = input.startWork
       ? "workStarted"
       : input.pauseWork

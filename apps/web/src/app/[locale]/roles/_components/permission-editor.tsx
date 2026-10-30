@@ -55,7 +55,17 @@ const permissionGroups = [
     ],
   },
   { key: "service", icon: Wrench, prefixes: ["problems."] },
-  { key: "rentals", icon: CalendarDays, prefixes: ["rentals."] },
+  {
+    key: "rentals",
+    icon: CalendarDays,
+    prefixes: [
+      "rentals.",
+      "templates.",
+      "documents.",
+      "identity.",
+      "evidence.",
+    ],
+  },
   { key: "people", icon: Users, prefixes: ["persons.", "person_documents."] },
   { key: "finance", icon: Banknote, prefixes: ["finance."] },
   { key: "client", icon: Monitor, prefixes: ["portal."] },

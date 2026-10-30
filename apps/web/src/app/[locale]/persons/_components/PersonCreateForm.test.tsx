@@ -883,6 +883,7 @@ describe("PersonCreateForm wizard", () => {
             phone: "+40749096855",
             firstName: "Grace",
             lastName: "Hopper",
+            citizenship: "română",
             dateOfBirth: "1990-02-28",
             addressLine1: "1 Rental Street",
             addressLine2: "Apt 4",

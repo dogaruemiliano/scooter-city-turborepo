@@ -24,6 +24,8 @@ export function canVisit(
   user: AccessIdentity | null | undefined,
   path: string,
 ): boolean {
+  if (path === "/company/contract-templates")
+    return canAccess(user, "templates.read");
   if (path.startsWith("/company") || path === "/finance/settings")
     return user?.isSuperAdmin === true;
   if (path === "/users" || path.startsWith("/users/"))

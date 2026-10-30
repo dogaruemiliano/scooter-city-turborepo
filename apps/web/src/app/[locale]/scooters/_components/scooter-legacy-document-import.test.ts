@@ -226,10 +226,8 @@ describe("legacy document extraction with explicit filename evidence", () => {
         standingCapacity: "0",
         powerToWeightRatioKwKg: "0",
         maxSpeedKmh: "25",
-        requiredLicenseCategory: "none",
         registrationNumber: "14949",
       },
-      autoFilledLicenseCategory: true,
       confirmedEmpty: expect.arrayContaining([
         "actualWeightKg",
         "vehicleClass",
@@ -241,7 +239,6 @@ describe("legacy document extraction with explicit filename evidence", () => {
       fieldSources: {
         brandId: ["civ-1"],
         powerKw: ["civ-1"],
-        requiredLicenseCategory: ["civ-1"],
         registrationNumber: ["registration-1"],
         "insurancePolicies.0.premiumAmount": ["insurance-1"],
       },
@@ -311,7 +308,6 @@ describe("legacy document extraction with explicit filename evidence", () => {
           powerKw: "1.8",
           registrationCertificateNumber: "BUJORENI-VL-176/18",
           registrationNumber: "14949",
-          requiredLicenseCategory: "none",
         },
         unresolvedRawFields: [],
         fieldSources: {

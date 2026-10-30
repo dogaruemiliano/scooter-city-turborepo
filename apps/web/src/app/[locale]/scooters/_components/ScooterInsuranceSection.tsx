@@ -25,7 +25,6 @@ export function ScooterInsuranceSection({
   number?: number;
   onRemoveDraftPolicy?: (id: string) => void;
 }) {
-  const t = useTranslations("scooters.compliance");
   const ti = useTranslations("scooters.insurance");
   const user = useOptionalSession()?.user;
   const form = useFormContext<ScooterEditorValues>();
@@ -82,12 +81,11 @@ export function ScooterInsuranceSection({
         canRemovePolicy={canRemove}
         onRemovePolicy={canWrite ? remove : undefined}
       />
-      {scooter && canWrite ? (
+      {scooter && canWrite && canAdd ? (
         <Button
           type="button"
           variant="outline"
           className="justify-self-start"
-          disabled={!canAdd}
           onClick={() =>
             form.setValue(
               "insurancePolicies",
@@ -101,9 +99,6 @@ export function ScooterInsuranceSection({
         >
           {ti("add")}
         </Button>
-      ) : null}
-      {scooter && canWrite && !canAdd ? (
-        <p className="text-sm text-muted-foreground">{t("addHint")}</p>
       ) : null}
     </div>
   );

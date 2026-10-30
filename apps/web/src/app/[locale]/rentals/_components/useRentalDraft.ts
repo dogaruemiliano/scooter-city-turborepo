@@ -13,8 +13,8 @@ import {
 
 type Snapshot = { draft: RentalDraft; storageError: boolean };
 const serverSnapshot = () => null;
-// Preserve uncompleted details only during the Add person round trip. Nothing
-// is written to browser storage before the first step has been completed.
+// Preserve the pristine form during an Add person round trip without writing
+// an empty draft. Explicit user input is autosaved at every step.
 const personHandoffs = new Map<string, RentalDraft>();
 
 function createStore(userId: string, draftId?: string, personId?: string) {
@@ -35,7 +35,7 @@ function createStore(userId: string, draftId?: string, personId?: string) {
       storageError = true;
     }
     if (draftId === draft.id && personId && !draft.createdRentalId)
-      draft = { ...draft, personId, step: "details" };
+      draft = { ...draft, personId, inputTouched: true, step: "details" };
     snapshot = { draft, storageError };
     return snapshot;
   }
@@ -43,7 +43,29 @@ function createStore(userId: string, draftId?: string, personId?: string) {
     listeners.forEach((listener) => listener());
   }
   function update(patch: Partial<RentalDraft>): boolean {
-    const draft = { ...getSnapshot().draft, ...patch };
+    const previous = getSnapshot().draft;
+    const inputTouched =
+      previous.inputTouched ||
+      Object.keys(patch).some((key) =>
+        [
+          "personId",
+          "scooterId",
+          "startDate",
+          "promotion",
+          "conclusionContext",
+          "rentalPaymentMethod",
+          "depositPaymentMethod",
+          "driverPersonIds",
+          "renterDrives",
+          "customerNotes",
+          "internalNotes",
+        ].includes(key),
+      );
+    const draft = {
+      ...previous,
+      ...patch,
+      ...(inputTouched ? { inputTouched: true } : {}),
+    };
     let storageError = false;
     try {
       const stored = readRentalDraft(userId);

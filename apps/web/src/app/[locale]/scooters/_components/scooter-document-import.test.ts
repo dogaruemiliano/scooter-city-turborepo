@@ -330,38 +330,37 @@ describe("document JSON import", () => {
     expect(parse({ bodyType: "other" }).ok).toBe(false);
     expect(parse({ bodyType: "other", bodyTypeOther: "AC" }).ok).toBe(true);
   });
-  it("selects no license from a documented 25 km/h speed after switching registration type", () => {
-    const result = parse({
-      maxSpeedKmh: 25,
-      registrationType: "local",
-      registrationNumber: "14947",
-      requiredLicenseCategory: null,
-    });
-    expect(result).toMatchObject({
-      ok: true,
-      autoFilledLicenseCategory: true,
-      values: { maxSpeedKmh: "25", requiredLicenseCategory: "none" },
-      unresolved: [],
-    });
+  it("keeps the selected licence policy independent from constructive speed and registration imports", () => {
+    for (const maxSpeedKmh of [25, 45, 60]) {
+      const result = parseDocumentImport(
+        JSON.stringify({ maxSpeedKmh, registrationType: "unregistered" }),
+        brands,
+        {
+          ...current,
+          registrationType: "local",
+          requiredLicenseCategory: "A1",
+        },
+        false,
+      );
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.values).toMatchObject({
+          maxSpeedKmh: String(maxSpeedKmh),
+        });
+        expect(result.values).not.toHaveProperty("requiredLicenseCategory");
+        expect(result).not.toHaveProperty("autoFilledLicenseCategory");
+      }
+    }
     expect(
       parse({
         maxSpeedKmh: 25,
         registrationType: "local",
         requiredLicenseCategory: "AM",
       }),
-    ).toMatchObject({ ok: true, values: { requiredLicenseCategory: "AM" } });
-    for (const maxSpeedKmh of [null, 0, 24, 26, 45]) {
-      const noSuggestion = parse({ maxSpeedKmh, registrationType: "local" });
-      expect(noSuggestion.ok).toBe(true);
-      if (noSuggestion.ok)
-        expect(
-          { ...current, ...noSuggestion.values }.requiredLicenseCategory,
-        ).toBe("none");
-    }
-    const edit = parse({ maxSpeedKmh: 25 }, true);
-    expect(edit.ok && edit.values).not.toHaveProperty(
-      "requiredLicenseCategory",
-    );
+    ).toMatchObject({
+      ok: true,
+      values: { requiredLicenseCategory: "AM" },
+    });
   });
   it("protects registration lifecycle fields in edit mode and validates visible registration fields on create", () => {
     expect(parse({ registrationNumber: "B 123 ABC" }, true).ok).toBe(false);

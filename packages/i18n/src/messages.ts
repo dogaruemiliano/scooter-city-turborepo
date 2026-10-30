@@ -1,4 +1,5 @@
 import { accessCatalog } from "./catalogs/access";
+import { contractsCatalog } from "./catalogs/contracts";
 import { workspaceCatalog } from "./catalogs/workspace";
 import type { SupportedLocale } from "./locales";
 import { apiCatalog } from "./catalogs/api";
@@ -21,6 +22,7 @@ export type MessageCatalogs = Readonly<Record<SupportedLocale, MessageTree>>;
 
 export const messages = {
   en: {
+    contracts: contractsCatalog.en,
     access: accessCatalog.en,
     workspace: workspaceCatalog.en,
     shared: sharedCatalog.en,
@@ -36,6 +38,7 @@ export const messages = {
     mobilePlatform: mobilePlatformCatalog.en,
   },
   ro: {
+    contracts: contractsCatalog.ro,
     access: accessCatalog.ro,
     workspace: workspaceCatalog.ro,
     shared: sharedCatalog.ro,

@@ -1,0 +1,2533 @@
+{
+  "renderer": "LibreOffice 26.8.2.2 9dea406ab7695df6325b11b0e19fdca8db4b7276",
+  "platform": "macOS 26.7.1 arm64",
+  "pymupdf": "1.28.2",
+  "files": [
+    {
+      "file": "final-gdpr-notice-45.pdf",
+      "sha256": "a2ff559a3c90d54a8dbc6c4f85f35e28ae817575b52b8f870b5fa962c4d0e20d",
+      "bytes": 98190,
+      "pages": 2,
+      "placeholderLiterals": false,
+      "replacementCharacters": false,
+      "missingTextValues": [],
+      "boundsWarnings": [],
+      "fonts": [
+        {
+          "font": "BAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "CAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "DAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "EAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "FAAAAA+Carlito-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "GAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "HAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "IAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        }
+      ],
+      "pageInfo": [
+        {
+          "page": 1,
+          "characters": 3389,
+          "imageCount": 1,
+          "textBlocks": 19,
+          "pagePng": "pages/final-gdpr-notice-45-p01.png",
+          "rasterSha256": "3cb475114b354656558c045205229cb8fa6778cc1c2734e962bdf487df272198"
+        },
+        {
+          "page": 2,
+          "characters": 2889,
+          "imageCount": 3,
+          "textBlocks": 20,
+          "pagePng": "pages/final-gdpr-notice-45-p02.png",
+          "rasterSha256": "e518da5ace1fa7c52185a81b68fa01e069b5d053578381ca8d09a5626a542c51"
+        }
+      ],
+      "contactSheet": "contact-sheets/final-gdpr-notice-45.png"
+    },
+    {
+      "file": "final-rental-agreement-25.pdf",
+      "sha256": "fb48fcd4259508f6231504f7832c6116057aab09fa85c43a666682ff02d19e26",
+      "bytes": 192718,
+      "pages": 8,
+      "placeholderLiterals": false,
+      "replacementCharacters": false,
+      "missingTextValues": [],
+      "boundsWarnings": [],
+      "fonts": [
+        {
+          "font": "BAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "CAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "DAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "EAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "FAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "GAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "HAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "IAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "JAAAAA+OpenSymbol",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "KAAAAA+Carlito-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "LAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "MAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        }
+      ],
+      "pageInfo": [
+        {
+          "page": 1,
+          "characters": 2268,
+          "imageCount": 1,
+          "textBlocks": 20,
+          "pagePng": "pages/final-rental-agreement-25-p01.png",
+          "rasterSha256": "aae754c671e877e464d00c358feaf4831bc10e3c61a9c8d92b5739e32265e3f4"
+        },
+        {
+          "page": 2,
+          "characters": 2664,
+          "imageCount": 1,
+          "textBlocks": 25,
+          "pagePng": "pages/final-rental-agreement-25-p02.png",
+          "rasterSha256": "0b46618840af03b7a98c1554877731c1272b2b753a506ea9b007d547fcccb2ee"
+        },
+        {
+          "page": 3,
+          "characters": 2620,
+          "imageCount": 1,
+          "textBlocks": 30,
+          "pagePng": "pages/final-rental-agreement-25-p03.png",
+          "rasterSha256": "ff550167bf83c3fd1f0bcd0e06d033c6cdb3a4c1f17e65b15d511a1c2f9b7593"
+        },
+        {
+          "page": 4,
+          "characters": 3655,
+          "imageCount": 1,
+          "textBlocks": 20,
+          "pagePng": "pages/final-rental-agreement-25-p04.png",
+          "rasterSha256": "57912513ac51e9b451357d1c3df116c2bc3722603f99b8308064f52d8b9f909c"
+        },
+        {
+          "page": 5,
+          "characters": 2596,
+          "imageCount": 1,
+          "textBlocks": 32,
+          "pagePng": "pages/final-rental-agreement-25-p05.png",
+          "rasterSha256": "624232a9a8b4408ac80671f5c67b85d6ab72321b2d586c2027c29fd4c6cebbf9"
+        },
+        {
+          "page": 6,
+          "characters": 2249,
+          "imageCount": 1,
+          "textBlocks": 30,
+          "pagePng": "pages/final-rental-agreement-25-p06.png",
+          "rasterSha256": "e569e1b5d7f1661fc95701849b768c12b3c23024dabaec155f3d3bbda87598cf"
+        },
+        {
+          "page": 7,
+          "characters": 2492,
+          "imageCount": 1,
+          "textBlocks": 31,
+          "pagePng": "pages/final-rental-agreement-25-p07.png",
+          "rasterSha256": "81f00905877af47800222a42f58ed274a8f1737a49db1026e77c886331e2421c"
+        },
+        {
+          "page": 8,
+          "characters": 2014,
+          "imageCount": 3,
+          "textBlocks": 23,
+          "pagePng": "pages/final-rental-agreement-25-p08.png",
+          "rasterSha256": "a7e907ec2f28cc62493a999891843f1a60c702444b7f1dc382ba20c373e8b263"
+        }
+      ],
+      "contactSheet": "contact-sheets/final-rental-agreement-25.png"
+    },
+    {
+      "file": "final-technical-handover-25.pdf",
+      "sha256": "c5eff64db0b2fb95b76e93032b0cff3ae465b6ce1497fffae25fbbee6d936c55",
+      "bytes": 179308,
+      "pages": 4,
+      "placeholderLiterals": false,
+      "replacementCharacters": false,
+      "missingTextValues": [],
+      "boundsWarnings": [],
+      "fonts": [
+        {
+          "font": "BAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "CAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "DAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "EAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "FAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "GAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "HAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "IAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "JAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "KAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "LAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "MAAAAA+Carlito-Bold",
+          "encoding": "",
+          "embedded": true
+        }
+      ],
+      "pageInfo": [
+        {
+          "page": 1,
+          "characters": 1503,
+          "imageCount": 1,
+          "textBlocks": 34,
+          "pagePng": "pages/final-technical-handover-25-p01.png",
+          "rasterSha256": "537592810fddd49973285a158771b038466c798732e774b69c83a10355d15b0f"
+        },
+        {
+          "page": 2,
+          "characters": 1163,
+          "imageCount": 1,
+          "textBlocks": 39,
+          "pagePng": "pages/final-technical-handover-25-p02.png",
+          "rasterSha256": "a4aab2481d309a35572ef7a807bdbebbd1adaf6ae2d3190e600480f441d49200"
+        },
+        {
+          "page": 3,
+          "characters": 1654,
+          "imageCount": 1,
+          "textBlocks": 30,
+          "pagePng": "pages/final-technical-handover-25-p03.png",
+          "rasterSha256": "84b05f5680ba6206f0f675134ed0ad1ad1ddf7d8cf23241aac7bffed1e8f613b"
+        },
+        {
+          "page": 4,
+          "characters": 1073,
+          "imageCount": 4,
+          "textBlocks": 13,
+          "pagePng": "pages/final-technical-handover-25-p04.png",
+          "rasterSha256": "0a76cdf0f29d0b3bfc365d391804f0d64db56bf142950f733047a38812b0d039"
+        }
+      ],
+      "contactSheet": "contact-sheets/final-technical-handover-25.png"
+    },
+    {
+      "file": "final-technical-handover-no_limiter.pdf",
+      "sha256": "6ef03f58f64e5409b45d14ef494ab2d663b28922f9a61093d129803abf7465e0",
+      "bytes": 175491,
+      "pages": 4,
+      "placeholderLiterals": false,
+      "replacementCharacters": false,
+      "missingTextValues": [],
+      "boundsWarnings": [],
+      "fonts": [
+        {
+          "font": "BAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "CAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "DAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "EAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "FAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "GAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "HAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "IAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "JAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "KAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "LAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "MAAAAA+Carlito-Bold",
+          "encoding": "",
+          "embedded": true
+        }
+      ],
+      "pageInfo": [
+        {
+          "page": 1,
+          "characters": 1523,
+          "imageCount": 1,
+          "textBlocks": 34,
+          "pagePng": "pages/final-technical-handover-no_limiter-p01.png",
+          "rasterSha256": "d36f54f6428d630bee8703da179a7fc2f46d0a89875337ccef97a0c0f5a15985"
+        },
+        {
+          "page": 2,
+          "characters": 1163,
+          "imageCount": 1,
+          "textBlocks": 39,
+          "pagePng": "pages/final-technical-handover-no_limiter-p02.png",
+          "rasterSha256": "a4aab2481d309a35572ef7a807bdbebbd1adaf6ae2d3190e600480f441d49200"
+        },
+        {
+          "page": 3,
+          "characters": 2315,
+          "imageCount": 1,
+          "textBlocks": 33,
+          "pagePng": "pages/final-technical-handover-no_limiter-p03.png",
+          "rasterSha256": "f27fd84dfde3934e78d67ece73b6ae3a1a67fe0adfba437291ac1f5ff99643ab"
+        },
+        {
+          "page": 4,
+          "characters": 406,
+          "imageCount": 3,
+          "textBlocks": 10,
+          "pagePng": "pages/final-technical-handover-no_limiter-p04.png",
+          "rasterSha256": "1e2b76e9a3bb5de9891c6b40373c02c5b4aebf3b7baaa8473815724537d8997a"
+        }
+      ],
+      "contactSheet": "contact-sheets/final-technical-handover-no_limiter.png"
+    },
+    {
+      "file": "gdpr-notice-25.pdf",
+      "sha256": "7d9e1db8d352fc5a472d3e786f66d3f7bf5c24872b3477a1445756a2d2c1c7b7",
+      "bytes": 86423,
+      "pages": 2,
+      "placeholderLiterals": false,
+      "replacementCharacters": false,
+      "missingTextValues": [],
+      "boundsWarnings": [],
+      "fonts": [
+        {
+          "font": "BAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "CAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "DAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "EAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "FAAAAA+Carlito-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "GAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "HAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "IAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        }
+      ],
+      "pageInfo": [
+        {
+          "page": 1,
+          "characters": 3709,
+          "imageCount": 1,
+          "textBlocks": 19,
+          "pagePng": "pages/gdpr-notice-25-p01.png",
+          "rasterSha256": "ad7c7a3c98f880293b635253393726166e1f7cef74ed15557c07fbc7012bdcfd"
+        },
+        {
+          "page": 2,
+          "characters": 2599,
+          "imageCount": 1,
+          "textBlocks": 19,
+          "pagePng": "pages/gdpr-notice-25-p02.png",
+          "rasterSha256": "bac278eb89bec326fc0d2855f139d4a502c4a9465b929d1d5fcb46459b77c551"
+        }
+      ],
+      "contactSheet": "contact-sheets/gdpr-notice-25.png"
+    },
+    {
+      "file": "gdpr-notice-45.pdf",
+      "sha256": "82d51da59b9b3f3454e972432d88e3f222b62b38b15db5c477d7597ceef3f43c",
+      "bytes": 86423,
+      "pages": 2,
+      "placeholderLiterals": false,
+      "replacementCharacters": false,
+      "missingTextValues": [],
+      "boundsWarnings": [],
+      "fonts": [
+        {
+          "font": "BAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "CAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "DAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "EAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "FAAAAA+Carlito-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "GAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "HAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "IAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        }
+      ],
+      "pageInfo": [
+        {
+          "page": 1,
+          "characters": 3709,
+          "imageCount": 1,
+          "textBlocks": 19,
+          "pagePng": "pages/gdpr-notice-45-p01.png",
+          "rasterSha256": "ad7c7a3c98f880293b635253393726166e1f7cef74ed15557c07fbc7012bdcfd"
+        },
+        {
+          "page": 2,
+          "characters": 2599,
+          "imageCount": 1,
+          "textBlocks": 19,
+          "pagePng": "pages/gdpr-notice-45-p02.png",
+          "rasterSha256": "bac278eb89bec326fc0d2855f139d4a502c4a9465b929d1d5fcb46459b77c551"
+        }
+      ],
+      "contactSheet": "contact-sheets/gdpr-notice-45.png"
+    },
+    {
+      "file": "gdpr-notice-absent_equipment.pdf",
+      "sha256": "b3cad5089d3041d56adda976410780d4ea9716bae41d9874452fc90c41c963aa",
+      "bytes": 86423,
+      "pages": 2,
+      "placeholderLiterals": false,
+      "replacementCharacters": false,
+      "missingTextValues": [],
+      "boundsWarnings": [],
+      "fonts": [
+        {
+          "font": "BAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "CAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "DAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "EAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "FAAAAA+Carlito-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "GAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "HAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "IAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        }
+      ],
+      "pageInfo": [
+        {
+          "page": 1,
+          "characters": 3709,
+          "imageCount": 1,
+          "textBlocks": 19,
+          "pagePng": "pages/gdpr-notice-absent_equipment-p01.png",
+          "rasterSha256": "ad7c7a3c98f880293b635253393726166e1f7cef74ed15557c07fbc7012bdcfd"
+        },
+        {
+          "page": 2,
+          "characters": 2599,
+          "imageCount": 1,
+          "textBlocks": 19,
+          "pagePng": "pages/gdpr-notice-absent_equipment-p02.png",
+          "rasterSha256": "bac278eb89bec326fc0d2855f139d4a502c4a9465b929d1d5fcb46459b77c551"
+        }
+      ],
+      "contactSheet": "contact-sheets/gdpr-notice-absent_equipment.png"
+    },
+    {
+      "file": "gdpr-notice-defects.pdf",
+      "sha256": "d79c58f08104f685956e4a8c0a606c3a16c77ff9a25c82d3642bfdbda9eaab3a",
+      "bytes": 86423,
+      "pages": 2,
+      "placeholderLiterals": false,
+      "replacementCharacters": false,
+      "missingTextValues": [],
+      "boundsWarnings": [],
+      "fonts": [
+        {
+          "font": "BAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "CAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "DAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "EAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "FAAAAA+Carlito-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "GAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "HAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "IAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        }
+      ],
+      "pageInfo": [
+        {
+          "page": 1,
+          "characters": 3709,
+          "imageCount": 1,
+          "textBlocks": 19,
+          "pagePng": "pages/gdpr-notice-defects-p01.png",
+          "rasterSha256": "ad7c7a3c98f880293b635253393726166e1f7cef74ed15557c07fbc7012bdcfd"
+        },
+        {
+          "page": 2,
+          "characters": 2599,
+          "imageCount": 1,
+          "textBlocks": 19,
+          "pagePng": "pages/gdpr-notice-defects-p02.png",
+          "rasterSha256": "bac278eb89bec326fc0d2855f139d4a502c4a9465b929d1d5fcb46459b77c551"
+        }
+      ],
+      "contactSheet": "contact-sheets/gdpr-notice-defects.png"
+    },
+    {
+      "file": "gdpr-notice-long_names.pdf",
+      "sha256": "1c15356cb83d8af7dd627af2400c7ba01c274b01197372af5fc8a9a7e3c5eb68",
+      "bytes": 87899,
+      "pages": 2,
+      "placeholderLiterals": false,
+      "replacementCharacters": false,
+      "missingTextValues": [],
+      "boundsWarnings": [],
+      "fonts": [
+        {
+          "font": "BAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "CAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "DAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "EAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "FAAAAA+Carlito-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "GAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "HAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "IAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        }
+      ],
+      "pageInfo": [
+        {
+          "page": 1,
+          "characters": 3709,
+          "imageCount": 1,
+          "textBlocks": 19,
+          "pagePng": "pages/gdpr-notice-long_names-p01.png",
+          "rasterSha256": "ad7c7a3c98f880293b635253393726166e1f7cef74ed15557c07fbc7012bdcfd"
+        },
+        {
+          "page": 2,
+          "characters": 2665,
+          "imageCount": 1,
+          "textBlocks": 19,
+          "pagePng": "pages/gdpr-notice-long_names-p02.png",
+          "rasterSha256": "61d5ea072c0c94838055f1dfb1a11ed680987427a7a10affa28c5f416316e25d"
+        }
+      ],
+      "contactSheet": "contact-sheets/gdpr-notice-long_names.png"
+    },
+    {
+      "file": "gdpr-notice-no_limiter.pdf",
+      "sha256": "18df8f052d3a2300815e101379590ca15b7103b895885891f8a8415e54bbf36a",
+      "bytes": 86423,
+      "pages": 2,
+      "placeholderLiterals": false,
+      "replacementCharacters": false,
+      "missingTextValues": [],
+      "boundsWarnings": [],
+      "fonts": [
+        {
+          "font": "BAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "CAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "DAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "EAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "FAAAAA+Carlito-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "GAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "HAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "IAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        }
+      ],
+      "pageInfo": [
+        {
+          "page": 1,
+          "characters": 3709,
+          "imageCount": 1,
+          "textBlocks": 19,
+          "pagePng": "pages/gdpr-notice-no_limiter-p01.png",
+          "rasterSha256": "ad7c7a3c98f880293b635253393726166e1f7cef74ed15557c07fbc7012bdcfd"
+        },
+        {
+          "page": 2,
+          "characters": 2599,
+          "imageCount": 1,
+          "textBlocks": 19,
+          "pagePng": "pages/gdpr-notice-no_limiter-p02.png",
+          "rasterSha256": "bac278eb89bec326fc0d2855f139d4a502c4a9465b929d1d5fcb46459b77c551"
+        }
+      ],
+      "contactSheet": "contact-sheets/gdpr-notice-no_limiter.png"
+    },
+    {
+      "file": "rental-agreement-25.pdf",
+      "sha256": "6d07ff0799dc6b3a169c9d2820e7e1d4d9db1fc2891f9b5bfded9f7c89690339",
+      "bytes": 180192,
+      "pages": 8,
+      "placeholderLiterals": false,
+      "replacementCharacters": false,
+      "missingTextValues": [],
+      "boundsWarnings": [],
+      "fonts": [
+        {
+          "font": "BAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "CAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "DAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "EAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "FAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "GAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "HAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "IAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "JAAAAA+OpenSymbol",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "KAAAAA+Carlito-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "LAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "MAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        }
+      ],
+      "pageInfo": [
+        {
+          "page": 1,
+          "characters": 2498,
+          "imageCount": 1,
+          "textBlocks": 21,
+          "pagePng": "pages/rental-agreement-25-p01.png",
+          "rasterSha256": "76f40ad5ecbee650b3053447edd8e72930be7e63a38dfa8ef512723bde03830b"
+        },
+        {
+          "page": 2,
+          "characters": 2816,
+          "imageCount": 1,
+          "textBlocks": 23,
+          "pagePng": "pages/rental-agreement-25-p02.png",
+          "rasterSha256": "f9d4bae9faa10514c2b88895bc4000c05fb956a24131ea6ee61235819974a546"
+        },
+        {
+          "page": 3,
+          "characters": 3262,
+          "imageCount": 1,
+          "textBlocks": 30,
+          "pagePng": "pages/rental-agreement-25-p03.png",
+          "rasterSha256": "5f6edd58f86535a7686e81e913df307b9d9e8c93fefb56c4c90cc8dfe68b187d"
+        },
+        {
+          "page": 4,
+          "characters": 3606,
+          "imageCount": 1,
+          "textBlocks": 25,
+          "pagePng": "pages/rental-agreement-25-p04.png",
+          "rasterSha256": "41a384f1b32466fb5da3489dee0743f3522aaf4cda2132b10dcb62bcece6bf3d"
+        },
+        {
+          "page": 5,
+          "characters": 2558,
+          "imageCount": 1,
+          "textBlocks": 33,
+          "pagePng": "pages/rental-agreement-25-p05.png",
+          "rasterSha256": "06efede48489df6581e1179ffab4dd767c8b0638ff6169467e07bd798d8300a8"
+        },
+        {
+          "page": 6,
+          "characters": 2421,
+          "imageCount": 1,
+          "textBlocks": 33,
+          "pagePng": "pages/rental-agreement-25-p06.png",
+          "rasterSha256": "f3f5785e02bd15841f00ee8a4388bfdf700236475b0a662e7f078af720deb063"
+        },
+        {
+          "page": 7,
+          "characters": 2506,
+          "imageCount": 1,
+          "textBlocks": 26,
+          "pagePng": "pages/rental-agreement-25-p07.png",
+          "rasterSha256": "09b6ad9f3f6f3aceb3ca7ad6aa887abe9c80f5d4bdbefb187c7e196b2e602f04"
+        },
+        {
+          "page": 8,
+          "characters": 915,
+          "imageCount": 1,
+          "textBlocks": 11,
+          "pagePng": "pages/rental-agreement-25-p08.png",
+          "rasterSha256": "b9c3c8d4466a59a51d9781c609bfef5222d9251bf5e8f630560af8afad55ae9c"
+        }
+      ],
+      "contactSheet": "contact-sheets/rental-agreement-25.png"
+    },
+    {
+      "file": "rental-agreement-45.pdf",
+      "sha256": "6c1723df3ef1bccc179ef3c7a33695a4874e2991bbd7ce3daff847dea4dccb31",
+      "bytes": 180191,
+      "pages": 8,
+      "placeholderLiterals": false,
+      "replacementCharacters": false,
+      "missingTextValues": [],
+      "boundsWarnings": [],
+      "fonts": [
+        {
+          "font": "BAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "CAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "DAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "EAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "FAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "GAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "HAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "IAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "JAAAAA+OpenSymbol",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "KAAAAA+Carlito-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "LAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "MAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        }
+      ],
+      "pageInfo": [
+        {
+          "page": 1,
+          "characters": 2498,
+          "imageCount": 1,
+          "textBlocks": 21,
+          "pagePng": "pages/rental-agreement-45-p01.png",
+          "rasterSha256": "76f40ad5ecbee650b3053447edd8e72930be7e63a38dfa8ef512723bde03830b"
+        },
+        {
+          "page": 2,
+          "characters": 2816,
+          "imageCount": 1,
+          "textBlocks": 23,
+          "pagePng": "pages/rental-agreement-45-p02.png",
+          "rasterSha256": "f9d4bae9faa10514c2b88895bc4000c05fb956a24131ea6ee61235819974a546"
+        },
+        {
+          "page": 3,
+          "characters": 3262,
+          "imageCount": 1,
+          "textBlocks": 30,
+          "pagePng": "pages/rental-agreement-45-p03.png",
+          "rasterSha256": "41ce858b49840d08557b9867a43ae9ba9f4fa1a9793e350d3b2225a9ca44e91f"
+        },
+        {
+          "page": 4,
+          "characters": 3606,
+          "imageCount": 1,
+          "textBlocks": 25,
+          "pagePng": "pages/rental-agreement-45-p04.png",
+          "rasterSha256": "41a384f1b32466fb5da3489dee0743f3522aaf4cda2132b10dcb62bcece6bf3d"
+        },
+        {
+          "page": 5,
+          "characters": 2558,
+          "imageCount": 1,
+          "textBlocks": 33,
+          "pagePng": "pages/rental-agreement-45-p05.png",
+          "rasterSha256": "06efede48489df6581e1179ffab4dd767c8b0638ff6169467e07bd798d8300a8"
+        },
+        {
+          "page": 6,
+          "characters": 2421,
+          "imageCount": 1,
+          "textBlocks": 33,
+          "pagePng": "pages/rental-agreement-45-p06.png",
+          "rasterSha256": "f3f5785e02bd15841f00ee8a4388bfdf700236475b0a662e7f078af720deb063"
+        },
+        {
+          "page": 7,
+          "characters": 2506,
+          "imageCount": 1,
+          "textBlocks": 26,
+          "pagePng": "pages/rental-agreement-45-p07.png",
+          "rasterSha256": "09b6ad9f3f6f3aceb3ca7ad6aa887abe9c80f5d4bdbefb187c7e196b2e602f04"
+        },
+        {
+          "page": 8,
+          "characters": 915,
+          "imageCount": 1,
+          "textBlocks": 11,
+          "pagePng": "pages/rental-agreement-45-p08.png",
+          "rasterSha256": "b9c3c8d4466a59a51d9781c609bfef5222d9251bf5e8f630560af8afad55ae9c"
+        }
+      ],
+      "contactSheet": "contact-sheets/rental-agreement-45.png"
+    },
+    {
+      "file": "rental-agreement-absent_equipment.pdf",
+      "sha256": "f2744d7ac982fb2fe5a8002f597b2d74c14724ded692680a4b9b89f369d4b090",
+      "bytes": 180192,
+      "pages": 8,
+      "placeholderLiterals": false,
+      "replacementCharacters": false,
+      "missingTextValues": [],
+      "boundsWarnings": [],
+      "fonts": [
+        {
+          "font": "BAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "CAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "DAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "EAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "FAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "GAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "HAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "IAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "JAAAAA+OpenSymbol",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "KAAAAA+Carlito-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "LAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "MAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        }
+      ],
+      "pageInfo": [
+        {
+          "page": 1,
+          "characters": 2498,
+          "imageCount": 1,
+          "textBlocks": 21,
+          "pagePng": "pages/rental-agreement-absent_equipment-p01.png",
+          "rasterSha256": "76f40ad5ecbee650b3053447edd8e72930be7e63a38dfa8ef512723bde03830b"
+        },
+        {
+          "page": 2,
+          "characters": 2816,
+          "imageCount": 1,
+          "textBlocks": 23,
+          "pagePng": "pages/rental-agreement-absent_equipment-p02.png",
+          "rasterSha256": "f9d4bae9faa10514c2b88895bc4000c05fb956a24131ea6ee61235819974a546"
+        },
+        {
+          "page": 3,
+          "characters": 3262,
+          "imageCount": 1,
+          "textBlocks": 30,
+          "pagePng": "pages/rental-agreement-absent_equipment-p03.png",
+          "rasterSha256": "5f6edd58f86535a7686e81e913df307b9d9e8c93fefb56c4c90cc8dfe68b187d"
+        },
+        {
+          "page": 4,
+          "characters": 3606,
+          "imageCount": 1,
+          "textBlocks": 25,
+          "pagePng": "pages/rental-agreement-absent_equipment-p04.png",
+          "rasterSha256": "41a384f1b32466fb5da3489dee0743f3522aaf4cda2132b10dcb62bcece6bf3d"
+        },
+        {
+          "page": 5,
+          "characters": 2558,
+          "imageCount": 1,
+          "textBlocks": 33,
+          "pagePng": "pages/rental-agreement-absent_equipment-p05.png",
+          "rasterSha256": "06efede48489df6581e1179ffab4dd767c8b0638ff6169467e07bd798d8300a8"
+        },
+        {
+          "page": 6,
+          "characters": 2421,
+          "imageCount": 1,
+          "textBlocks": 33,
+          "pagePng": "pages/rental-agreement-absent_equipment-p06.png",
+          "rasterSha256": "f3f5785e02bd15841f00ee8a4388bfdf700236475b0a662e7f078af720deb063"
+        },
+        {
+          "page": 7,
+          "characters": 2506,
+          "imageCount": 1,
+          "textBlocks": 26,
+          "pagePng": "pages/rental-agreement-absent_equipment-p07.png",
+          "rasterSha256": "09b6ad9f3f6f3aceb3ca7ad6aa887abe9c80f5d4bdbefb187c7e196b2e602f04"
+        },
+        {
+          "page": 8,
+          "characters": 915,
+          "imageCount": 1,
+          "textBlocks": 11,
+          "pagePng": "pages/rental-agreement-absent_equipment-p08.png",
+          "rasterSha256": "b9c3c8d4466a59a51d9781c609bfef5222d9251bf5e8f630560af8afad55ae9c"
+        }
+      ],
+      "contactSheet": "contact-sheets/rental-agreement-absent_equipment.png"
+    },
+    {
+      "file": "rental-agreement-defects.pdf",
+      "sha256": "40a4841d8ca40d22336f40c3a8d7cfd542017b715b1ee2da7df2256f41f552bb",
+      "bytes": 180192,
+      "pages": 8,
+      "placeholderLiterals": false,
+      "replacementCharacters": false,
+      "missingTextValues": [],
+      "boundsWarnings": [],
+      "fonts": [
+        {
+          "font": "BAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "CAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "DAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "EAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "FAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "GAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "HAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "IAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "JAAAAA+OpenSymbol",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "KAAAAA+Carlito-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "LAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "MAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        }
+      ],
+      "pageInfo": [
+        {
+          "page": 1,
+          "characters": 2498,
+          "imageCount": 1,
+          "textBlocks": 21,
+          "pagePng": "pages/rental-agreement-defects-p01.png",
+          "rasterSha256": "76f40ad5ecbee650b3053447edd8e72930be7e63a38dfa8ef512723bde03830b"
+        },
+        {
+          "page": 2,
+          "characters": 2816,
+          "imageCount": 1,
+          "textBlocks": 23,
+          "pagePng": "pages/rental-agreement-defects-p02.png",
+          "rasterSha256": "f9d4bae9faa10514c2b88895bc4000c05fb956a24131ea6ee61235819974a546"
+        },
+        {
+          "page": 3,
+          "characters": 3262,
+          "imageCount": 1,
+          "textBlocks": 30,
+          "pagePng": "pages/rental-agreement-defects-p03.png",
+          "rasterSha256": "5f6edd58f86535a7686e81e913df307b9d9e8c93fefb56c4c90cc8dfe68b187d"
+        },
+        {
+          "page": 4,
+          "characters": 3606,
+          "imageCount": 1,
+          "textBlocks": 25,
+          "pagePng": "pages/rental-agreement-defects-p04.png",
+          "rasterSha256": "41a384f1b32466fb5da3489dee0743f3522aaf4cda2132b10dcb62bcece6bf3d"
+        },
+        {
+          "page": 5,
+          "characters": 2558,
+          "imageCount": 1,
+          "textBlocks": 33,
+          "pagePng": "pages/rental-agreement-defects-p05.png",
+          "rasterSha256": "06efede48489df6581e1179ffab4dd767c8b0638ff6169467e07bd798d8300a8"
+        },
+        {
+          "page": 6,
+          "characters": 2421,
+          "imageCount": 1,
+          "textBlocks": 33,
+          "pagePng": "pages/rental-agreement-defects-p06.png",
+          "rasterSha256": "f3f5785e02bd15841f00ee8a4388bfdf700236475b0a662e7f078af720deb063"
+        },
+        {
+          "page": 7,
+          "characters": 2506,
+          "imageCount": 1,
+          "textBlocks": 26,
+          "pagePng": "pages/rental-agreement-defects-p07.png",
+          "rasterSha256": "09b6ad9f3f6f3aceb3ca7ad6aa887abe9c80f5d4bdbefb187c7e196b2e602f04"
+        },
+        {
+          "page": 8,
+          "characters": 915,
+          "imageCount": 1,
+          "textBlocks": 11,
+          "pagePng": "pages/rental-agreement-defects-p08.png",
+          "rasterSha256": "b9c3c8d4466a59a51d9781c609bfef5222d9251bf5e8f630560af8afad55ae9c"
+        }
+      ],
+      "contactSheet": "contact-sheets/rental-agreement-defects.png"
+    },
+    {
+      "file": "rental-agreement-long_names.pdf",
+      "sha256": "300ef43060934bb7de23c8ff94f24af2de0fc8179073bbb64d9a3079e168b5ec",
+      "bytes": 182023,
+      "pages": 8,
+      "placeholderLiterals": false,
+      "replacementCharacters": false,
+      "missingTextValues": [],
+      "boundsWarnings": [],
+      "fonts": [
+        {
+          "font": "BAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "CAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "DAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "EAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "FAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "GAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "HAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "IAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "JAAAAA+OpenSymbol",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "KAAAAA+Carlito-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "LAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "MAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        }
+      ],
+      "pageInfo": [
+        {
+          "page": 1,
+          "characters": 2370,
+          "imageCount": 1,
+          "textBlocks": 19,
+          "pagePng": "pages/rental-agreement-long_names-p01.png",
+          "rasterSha256": "8b5faf223a170a34b327cad0c6cc1ba238260c803fadfe9e286f6eef1c2c5092"
+        },
+        {
+          "page": 2,
+          "characters": 2852,
+          "imageCount": 1,
+          "textBlocks": 24,
+          "pagePng": "pages/rental-agreement-long_names-p02.png",
+          "rasterSha256": "2367ae484a2210273b42677051db24b73fe00d5326017228295e7c7a75174fa7"
+        },
+        {
+          "page": 3,
+          "characters": 3336,
+          "imageCount": 1,
+          "textBlocks": 31,
+          "pagePng": "pages/rental-agreement-long_names-p03.png",
+          "rasterSha256": "891adae24f2cb23c3e93350120334301d5b27d7c18719c42c1e13d42b4bee875"
+        },
+        {
+          "page": 4,
+          "characters": 3617,
+          "imageCount": 1,
+          "textBlocks": 25,
+          "pagePng": "pages/rental-agreement-long_names-p04.png",
+          "rasterSha256": "aaa289b8d21a478cc72c58e33d0ba2b8a76af7014546f39a9ea4ee2ca8ea9fdf"
+        },
+        {
+          "page": 5,
+          "characters": 2523,
+          "imageCount": 1,
+          "textBlocks": 33,
+          "pagePng": "pages/rental-agreement-long_names-p05.png",
+          "rasterSha256": "0c9b132619e53487f1119d1a1db703adabe35975fba7f5ba80e036cc396fa62b"
+        },
+        {
+          "page": 6,
+          "characters": 2430,
+          "imageCount": 1,
+          "textBlocks": 31,
+          "pagePng": "pages/rental-agreement-long_names-p06.png",
+          "rasterSha256": "85a4dcec8afffbcf2c49b67522b3b2dcc4f0c458b8ed87758202f41826a1283b"
+        },
+        {
+          "page": 7,
+          "characters": 2329,
+          "imageCount": 1,
+          "textBlocks": 27,
+          "pagePng": "pages/rental-agreement-long_names-p07.png",
+          "rasterSha256": "43fff94b53cac235345bce54dee4e5fa2fc150eee546d8d466cd87775ae4c439"
+        },
+        {
+          "page": 8,
+          "characters": 1294,
+          "imageCount": 1,
+          "textBlocks": 13,
+          "pagePng": "pages/rental-agreement-long_names-p08.png",
+          "rasterSha256": "e1734af3202e37d6ab86b5abdec09abc5b734b85332eee86372739357ec720df"
+        }
+      ],
+      "contactSheet": "contact-sheets/rental-agreement-long_names.png"
+    },
+    {
+      "file": "rental-agreement-no_limiter.pdf",
+      "sha256": "3c95b9a1dbeac726c66923f3c891b15e2b603ff717a6b254fc4975c215dfeac8",
+      "bytes": 180210,
+      "pages": 8,
+      "placeholderLiterals": false,
+      "replacementCharacters": false,
+      "missingTextValues": [],
+      "boundsWarnings": [],
+      "fonts": [
+        {
+          "font": "BAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "CAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "DAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "EAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "FAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "GAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "HAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "IAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "JAAAAA+OpenSymbol",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "KAAAAA+Carlito-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "LAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "MAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        }
+      ],
+      "pageInfo": [
+        {
+          "page": 1,
+          "characters": 2498,
+          "imageCount": 1,
+          "textBlocks": 21,
+          "pagePng": "pages/rental-agreement-no_limiter-p01.png",
+          "rasterSha256": "76f40ad5ecbee650b3053447edd8e72930be7e63a38dfa8ef512723bde03830b"
+        },
+        {
+          "page": 2,
+          "characters": 2816,
+          "imageCount": 1,
+          "textBlocks": 23,
+          "pagePng": "pages/rental-agreement-no_limiter-p02.png",
+          "rasterSha256": "f9d4bae9faa10514c2b88895bc4000c05fb956a24131ea6ee61235819974a546"
+        },
+        {
+          "page": 3,
+          "characters": 3282,
+          "imageCount": 1,
+          "textBlocks": 30,
+          "pagePng": "pages/rental-agreement-no_limiter-p03.png",
+          "rasterSha256": "9bbee3705b7a97e64a9e39e450a01d317d0c0a8b7fb4d4f7af9cd63ae93e252a"
+        },
+        {
+          "page": 4,
+          "characters": 3606,
+          "imageCount": 1,
+          "textBlocks": 25,
+          "pagePng": "pages/rental-agreement-no_limiter-p04.png",
+          "rasterSha256": "41a384f1b32466fb5da3489dee0743f3522aaf4cda2132b10dcb62bcece6bf3d"
+        },
+        {
+          "page": 5,
+          "characters": 2558,
+          "imageCount": 1,
+          "textBlocks": 33,
+          "pagePng": "pages/rental-agreement-no_limiter-p05.png",
+          "rasterSha256": "06efede48489df6581e1179ffab4dd767c8b0638ff6169467e07bd798d8300a8"
+        },
+        {
+          "page": 6,
+          "characters": 2421,
+          "imageCount": 1,
+          "textBlocks": 33,
+          "pagePng": "pages/rental-agreement-no_limiter-p06.png",
+          "rasterSha256": "f3f5785e02bd15841f00ee8a4388bfdf700236475b0a662e7f078af720deb063"
+        },
+        {
+          "page": 7,
+          "characters": 2506,
+          "imageCount": 1,
+          "textBlocks": 26,
+          "pagePng": "pages/rental-agreement-no_limiter-p07.png",
+          "rasterSha256": "09b6ad9f3f6f3aceb3ca7ad6aa887abe9c80f5d4bdbefb187c7e196b2e602f04"
+        },
+        {
+          "page": 8,
+          "characters": 915,
+          "imageCount": 1,
+          "textBlocks": 11,
+          "pagePng": "pages/rental-agreement-no_limiter-p08.png",
+          "rasterSha256": "b9c3c8d4466a59a51d9781c609bfef5222d9251bf5e8f630560af8afad55ae9c"
+        }
+      ],
+      "contactSheet": "contact-sheets/rental-agreement-no_limiter.png"
+    },
+    {
+      "file": "technical-handover-25.pdf",
+      "sha256": "96899a3d52489ac1b46e233003934abb695dee2f3fb21982918aa347157b6ec8",
+      "bytes": 161947,
+      "pages": 3,
+      "placeholderLiterals": false,
+      "replacementCharacters": false,
+      "missingTextValues": [],
+      "boundsWarnings": [],
+      "fonts": [
+        {
+          "font": "BAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "CAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "DAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "EAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "FAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "GAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "HAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "IAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "JAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "KAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "LAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "MAAAAA+Carlito-Bold",
+          "encoding": "",
+          "embedded": true
+        }
+      ],
+      "pageInfo": [
+        {
+          "page": 1,
+          "characters": 1577,
+          "imageCount": 1,
+          "textBlocks": 37,
+          "pagePng": "pages/technical-handover-25-p01.png",
+          "rasterSha256": "85d4cef896da403220cbad424b0cbfab0ee6ff0a7d44e8c6d4e5b5aab21fd35d"
+        },
+        {
+          "page": 2,
+          "characters": 1439,
+          "imageCount": 1,
+          "textBlocks": 40,
+          "pagePng": "pages/technical-handover-25-p02.png",
+          "rasterSha256": "dc6020b82de9c9f1c3fcbfac980f0c605dd0a4d5575599701d24c6ad7f6d662c"
+        },
+        {
+          "page": 3,
+          "characters": 2190,
+          "imageCount": 1,
+          "textBlocks": 30,
+          "pagePng": "pages/technical-handover-25-p03.png",
+          "rasterSha256": "fc60678df83461c52f78e218dbfc50b47c67ee96530a8a289de78c7d448a3a3f"
+        }
+      ],
+      "contactSheet": "contact-sheets/technical-handover-25.png"
+    },
+    {
+      "file": "technical-handover-45.pdf",
+      "sha256": "23ef64312eb4b3e67129add245de3c57b8993c27fec0732bbb1d06dba9a421fc",
+      "bytes": 162056,
+      "pages": 3,
+      "placeholderLiterals": false,
+      "replacementCharacters": false,
+      "missingTextValues": [],
+      "boundsWarnings": [],
+      "fonts": [
+        {
+          "font": "BAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "CAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "DAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "EAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "FAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "GAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "HAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "IAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "JAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "KAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "LAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "MAAAAA+Carlito-Bold",
+          "encoding": "",
+          "embedded": true
+        }
+      ],
+      "pageInfo": [
+        {
+          "page": 1,
+          "characters": 1577,
+          "imageCount": 1,
+          "textBlocks": 37,
+          "pagePng": "pages/technical-handover-45-p01.png",
+          "rasterSha256": "cf021a7482991ab09ac8cb474c6671864c82f00a95487bfd27532504b3bce3da"
+        },
+        {
+          "page": 2,
+          "characters": 1439,
+          "imageCount": 1,
+          "textBlocks": 40,
+          "pagePng": "pages/technical-handover-45-p02.png",
+          "rasterSha256": "dc6020b82de9c9f1c3fcbfac980f0c605dd0a4d5575599701d24c6ad7f6d662c"
+        },
+        {
+          "page": 3,
+          "characters": 2190,
+          "imageCount": 1,
+          "textBlocks": 30,
+          "pagePng": "pages/technical-handover-45-p03.png",
+          "rasterSha256": "13fa068ce27658b7477c01936be5883cb98808c89be436220971eec5225fbcfe"
+        }
+      ],
+      "contactSheet": "contact-sheets/technical-handover-45.png"
+    },
+    {
+      "file": "technical-handover-absent_equipment.pdf",
+      "sha256": "634415b73b44180d30fe2facbfc49aa8dfe8e4bedc2e840f8e88dfc7fd5b94bf",
+      "bytes": 161942,
+      "pages": 3,
+      "placeholderLiterals": false,
+      "replacementCharacters": false,
+      "missingTextValues": [],
+      "boundsWarnings": [],
+      "fonts": [
+        {
+          "font": "BAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "CAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "DAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "EAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "FAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "GAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "HAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "IAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "JAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "KAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "LAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "MAAAAA+Carlito-Bold",
+          "encoding": "",
+          "embedded": true
+        }
+      ],
+      "pageInfo": [
+        {
+          "page": 1,
+          "characters": 1577,
+          "imageCount": 1,
+          "textBlocks": 37,
+          "pagePng": "pages/technical-handover-absent_equipment-p01.png",
+          "rasterSha256": "85d4cef896da403220cbad424b0cbfab0ee6ff0a7d44e8c6d4e5b5aab21fd35d"
+        },
+        {
+          "page": 2,
+          "characters": 1447,
+          "imageCount": 1,
+          "textBlocks": 40,
+          "pagePng": "pages/technical-handover-absent_equipment-p02.png",
+          "rasterSha256": "0cdd7c23d7be08e9a09ea0a582729f0f995f302e3752adcc52446f7d58793879"
+        },
+        {
+          "page": 3,
+          "characters": 2190,
+          "imageCount": 1,
+          "textBlocks": 30,
+          "pagePng": "pages/technical-handover-absent_equipment-p03.png",
+          "rasterSha256": "fc60678df83461c52f78e218dbfc50b47c67ee96530a8a289de78c7d448a3a3f"
+        }
+      ],
+      "contactSheet": "contact-sheets/technical-handover-absent_equipment.png"
+    },
+    {
+      "file": "technical-handover-defects.pdf",
+      "sha256": "69adaa287bf889a88cc1a58a461144fe91f07389d43657468c8f00b1253f4ece",
+      "bytes": 162663,
+      "pages": 3,
+      "placeholderLiterals": false,
+      "replacementCharacters": false,
+      "missingTextValues": [],
+      "boundsWarnings": [],
+      "fonts": [
+        {
+          "font": "BAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "CAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "DAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "EAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "FAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "GAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "HAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "IAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "JAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "KAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "LAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "MAAAAA+Carlito-Bold",
+          "encoding": "",
+          "embedded": true
+        }
+      ],
+      "pageInfo": [
+        {
+          "page": 1,
+          "characters": 1587,
+          "imageCount": 1,
+          "textBlocks": 37,
+          "pagePng": "pages/technical-handover-defects-p01.png",
+          "rasterSha256": "c25ac1ad2f45a1f8383884f84f18a0be7a0919a6978e817bebda97ab5119e50c"
+        },
+        {
+          "page": 2,
+          "characters": 1492,
+          "imageCount": 1,
+          "textBlocks": 40,
+          "pagePng": "pages/technical-handover-defects-p02.png",
+          "rasterSha256": "4785f6c6c5889cf0165473043fd386135cc22aa67e206010dd1b1c838f1cad47"
+        },
+        {
+          "page": 3,
+          "characters": 2200,
+          "imageCount": 1,
+          "textBlocks": 30,
+          "pagePng": "pages/technical-handover-defects-p03.png",
+          "rasterSha256": "522858a5e20b122cf78aaab850cda67e966593ee250815683ef914cc1757ce0f"
+        }
+      ],
+      "contactSheet": "contact-sheets/technical-handover-defects.png"
+    },
+    {
+      "file": "technical-handover-long_names.pdf",
+      "sha256": "2867cf2c7f528556eee60f2b12717461442b12fcc5e5d4636b82d395e2a60009",
+      "bytes": 162358,
+      "pages": 3,
+      "placeholderLiterals": false,
+      "replacementCharacters": false,
+      "missingTextValues": [],
+      "boundsWarnings": [],
+      "fonts": [
+        {
+          "font": "BAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "CAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "DAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "EAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "FAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "GAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "HAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "IAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "JAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "KAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "LAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "MAAAAA+Carlito-Bold",
+          "encoding": "",
+          "embedded": true
+        }
+      ],
+      "pageInfo": [
+        {
+          "page": 1,
+          "characters": 1641,
+          "imageCount": 1,
+          "textBlocks": 37,
+          "pagePng": "pages/technical-handover-long_names-p01.png",
+          "rasterSha256": "ddce44caf8ef10771ac1c4a8fb8759c3d4b52be8fa1648e480add4cc725ae962"
+        },
+        {
+          "page": 2,
+          "characters": 1439,
+          "imageCount": 1,
+          "textBlocks": 40,
+          "pagePng": "pages/technical-handover-long_names-p02.png",
+          "rasterSha256": "dc6020b82de9c9f1c3fcbfac980f0c605dd0a4d5575599701d24c6ad7f6d662c"
+        },
+        {
+          "page": 3,
+          "characters": 2321,
+          "imageCount": 1,
+          "textBlocks": 30,
+          "pagePng": "pages/technical-handover-long_names-p03.png",
+          "rasterSha256": "00c4de2d5643d7eeaff52fcebeac28bc0897db23eb4228451cc5b49c2b5e32bf"
+        }
+      ],
+      "contactSheet": "contact-sheets/technical-handover-long_names.png"
+    },
+    {
+      "file": "technical-handover-no_limiter.pdf",
+      "sha256": "23d93d13b7612bed3594119ec339f5854039f24c2ccad9e4a18faa6bd9c1dbf0",
+      "bytes": 162266,
+      "pages": 3,
+      "placeholderLiterals": false,
+      "replacementCharacters": false,
+      "missingTextValues": [],
+      "boundsWarnings": [],
+      "fonts": [
+        {
+          "font": "BAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "CAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "DAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "EAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "FAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "GAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "HAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "IAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "JAAAAA+LiberationSans",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "KAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "LAAAAA+LiberationSans-Bold",
+          "encoding": "",
+          "embedded": true
+        },
+        {
+          "font": "MAAAAA+Carlito-Bold",
+          "encoding": "",
+          "embedded": true
+        }
+      ],
+      "pageInfo": [
+        {
+          "page": 1,
+          "characters": 1597,
+          "imageCount": 1,
+          "textBlocks": 37,
+          "pagePng": "pages/technical-handover-no_limiter-p01.png",
+          "rasterSha256": "b9357a49ceae0647085857255dd2b4edc8a12f3b45bbcfc3ca46c38dfc57ae81"
+        },
+        {
+          "page": 2,
+          "characters": 1439,
+          "imageCount": 1,
+          "textBlocks": 40,
+          "pagePng": "pages/technical-handover-no_limiter-p02.png",
+          "rasterSha256": "dc6020b82de9c9f1c3fcbfac980f0c605dd0a4d5575599701d24c6ad7f6d662c"
+        },
+        {
+          "page": 3,
+          "characters": 2168,
+          "imageCount": 1,
+          "textBlocks": 30,
+          "pagePng": "pages/technical-handover-no_limiter-p03.png",
+          "rasterSha256": "7bbffe70a9720197b6859bda8f6a1b35dd1401c6e918aa043a00ab1dff3ec756"
+        }
+      ],
+      "contactSheet": "contact-sheets/technical-handover-no_limiter.png"
+    }
+  ],
+  "totalPdfFiles": 22,
+  "totalPages": 96,
+  "textValueFailures": 0,
+  "boundsWarningCount": 0,
+  "distinctPageRasters": 51,
+  "duplicatePageRasters": [
+    [
+      "final-technical-handover-25.pdf#page=2",
+      "final-technical-handover-no_limiter.pdf#page=2"
+    ],
+    [
+      "gdpr-notice-25.pdf#page=1",
+      "gdpr-notice-45.pdf#page=1",
+      "gdpr-notice-absent_equipment.pdf#page=1",
+      "gdpr-notice-defects.pdf#page=1",
+      "gdpr-notice-long_names.pdf#page=1",
+      "gdpr-notice-no_limiter.pdf#page=1"
+    ],
+    [
+      "gdpr-notice-25.pdf#page=2",
+      "gdpr-notice-45.pdf#page=2",
+      "gdpr-notice-absent_equipment.pdf#page=2",
+      "gdpr-notice-defects.pdf#page=2",
+      "gdpr-notice-no_limiter.pdf#page=2"
+    ],
+    [
+      "rental-agreement-25.pdf#page=1",
+      "rental-agreement-45.pdf#page=1",
+      "rental-agreement-absent_equipment.pdf#page=1",
+      "rental-agreement-defects.pdf#page=1",
+      "rental-agreement-no_limiter.pdf#page=1"
+    ],
+    [
+      "rental-agreement-25.pdf#page=2",
+      "rental-agreement-45.pdf#page=2",
+      "rental-agreement-absent_equipment.pdf#page=2",
+      "rental-agreement-defects.pdf#page=2",
+      "rental-agreement-no_limiter.pdf#page=2"
+    ],
+    [
+      "rental-agreement-25.pdf#page=3",
+      "rental-agreement-absent_equipment.pdf#page=3",
+      "rental-agreement-defects.pdf#page=3"
+    ],
+    [
+      "rental-agreement-25.pdf#page=4",
+      "rental-agreement-45.pdf#page=4",
+      "rental-agreement-absent_equipment.pdf#page=4",
+      "rental-agreement-defects.pdf#page=4",
+      "rental-agreement-no_limiter.pdf#page=4"
+    ],
+    [
+      "rental-agreement-25.pdf#page=5",
+      "rental-agreement-45.pdf#page=5",
+      "rental-agreement-absent_equipment.pdf#page=5",
+      "rental-agreement-defects.pdf#page=5",
+      "rental-agreement-no_limiter.pdf#page=5"
+    ],
+    [
+      "rental-agreement-25.pdf#page=6",
+      "rental-agreement-45.pdf#page=6",
+      "rental-agreement-absent_equipment.pdf#page=6",
+      "rental-agreement-defects.pdf#page=6",
+      "rental-agreement-no_limiter.pdf#page=6"
+    ],
+    [
+      "rental-agreement-25.pdf#page=7",
+      "rental-agreement-45.pdf#page=7",
+      "rental-agreement-absent_equipment.pdf#page=7",
+      "rental-agreement-defects.pdf#page=7",
+      "rental-agreement-no_limiter.pdf#page=7"
+    ],
+    [
+      "rental-agreement-25.pdf#page=8",
+      "rental-agreement-45.pdf#page=8",
+      "rental-agreement-absent_equipment.pdf#page=8",
+      "rental-agreement-defects.pdf#page=8",
+      "rental-agreement-no_limiter.pdf#page=8"
+    ],
+    [
+      "technical-handover-25.pdf#page=1",
+      "technical-handover-absent_equipment.pdf#page=1"
+    ],
+    [
+      "technical-handover-25.pdf#page=2",
+      "technical-handover-45.pdf#page=2",
+      "technical-handover-long_names.pdf#page=2",
+      "technical-handover-no_limiter.pdf#page=2"
+    ],
+    [
+      "technical-handover-25.pdf#page=3",
+      "technical-handover-absent_equipment.pdf#page=3"
+    ]
+  ],
+  "visuallyInspectedContactSheets": [
+    "final-gdpr-notice-45",
+    "final-rental-agreement-25",
+    "final-technical-handover-25",
+    "final-technical-handover-no_limiter",
+    "gdpr-notice-25",
+    "gdpr-notice-long_names",
+    "rental-agreement-25",
+    "rental-agreement-45",
+    "rental-agreement-long_names",
+    "rental-agreement-no_limiter",
+    "technical-handover-25",
+    "technical-handover-45",
+    "technical-handover-absent_equipment",
+    "technical-handover-defects",
+    "technical-handover-long_names",
+    "technical-handover-no_limiter"
+  ],
+  "uncoveredDistinctPageRasters": [],
+  "provenance": {
+    "date": "2026-10-30",
+    "officialDownloadUrl": "https://download.documentfoundation.org/libreoffice/stable/26.8.2/mac/aarch64/LibreOffice_26.8.2_MacOS_aarch64.dmg",
+    "downloadBytes": 299236406,
+    "downloadSha256": "9f24fe83ab1ed5c95eb3df580119f32932f713e577feeac02bf619fb00749b55",
+    "checksumMatchedOfficialDigestAndMetalink": true,
+    "readOnlyMount": true,
+    "codeSignatureVerification": "codesign --verify --deep --strict passed",
+    "rendererVersion": "LibreOffice 26.8.2.2 9dea406ab7695df6325b11b0e19fdca8db4b7276",
+    "os": "macOS 26.7.1 arm64",
+    "persistentApplicationInstall": false,
+    "productionDataAccess": false
+  },
+  "sourceSha256": "006720d4193dc84f2b1f4ab13a85ff12fcb29b4d392362ff84c2957537764882",
+  "sourceFiles": [
+    {
+      "file": "rental-agreement.docx",
+      "sha256": "4a77afb0304ec33f3b62d901f8a48c4666fd26eb4ebdb0ea91c3295009fc4125",
+      "identicalToRepository": true
+    },
+    {
+      "file": "gdpr-notice.docx",
+      "sha256": "fdc23f5ce41c8036ee4bf5c8291c6808bd238ec14b654f8d5ed5541e2d6e5163",
+      "identicalToRepository": true
+    },
+    {
+      "file": "technical-handover.docx",
+      "sha256": "bf745d38aea46ee41da565652f9726b54897031c048e0b095adc2773871ba808",
+      "identicalToRepository": true
+    }
+  ],
+  "fullSizeVisualInspections": [
+    "pages/final-technical-handover-25-p04.png",
+    "pages/final-gdpr-notice-45-p02.png",
+    "pages/technical-handover-long_names-p03.png",
+    "pages/technical-handover-absent_equipment-p02.png"
+  ],
+  "signatureFixtures": [
+    {
+      "file": "final-rental-agreement-25.pdf",
+      "stage": "FINAL_SIGNED",
+      "type": "RENTAL_AGREEMENT",
+      "scenario": "25",
+      "slots": [
+        {
+          "key": "companySignContract",
+          "sha256": "1cf09cc90f5eac18856d37e0eb4dd2c991e3df8e6fff91ce0a9d95d27c2a4b00"
+        },
+        {
+          "key": "renterSignContract",
+          "sha256": "ec740af080d91c337e70a749562810ebfa458480081a03266605630825ffbc95"
+        }
+      ]
+    },
+    {
+      "file": "final-gdpr-notice-45.pdf",
+      "stage": "FINAL_SIGNED",
+      "type": "GDPR_NOTICE",
+      "scenario": "45",
+      "slots": [
+        {
+          "key": "companySignGdpr",
+          "sha256": "a021eb62acaa3d87c5ed778c038d178064dcc863873bf01ba8ccacbd87b1e3b4"
+        },
+        {
+          "key": "renterSignGdpr",
+          "sha256": "df3f6738371af2df924515b281a945ffa6a128ec01c0b5d181a4485242338d6c"
+        }
+      ]
+    },
+    {
+      "file": "final-technical-handover-25.pdf",
+      "stage": "FINAL_SIGNED",
+      "type": "TECHNICAL_HANDOVER",
+      "scenario": "25",
+      "slots": [
+        {
+          "key": "companySignHandover",
+          "sha256": "25d1b332d4b3e3f051db03c04b0a862606dd42252342b08eea37ec70b0b11031"
+        },
+        {
+          "key": "renterSignHandover",
+          "sha256": "34a8a2d6f241048a128d5050feb455d5aefc76cf025e38f46fad10ca3ba00d93"
+        },
+        {
+          "key": "renterSignSpeed",
+          "sha256": "89ca6f98edc0679062f2a4202e2be81d39947d7b14419623e0aab3ea9339404a"
+        }
+      ]
+    },
+    {
+      "file": "final-technical-handover-no_limiter.pdf",
+      "stage": "FINAL_SIGNED",
+      "type": "TECHNICAL_HANDOVER",
+      "scenario": "NO_LIMITER",
+      "slots": [
+        {
+          "key": "companySignHandover",
+          "sha256": "ea73d3b7c77d02977eee6c36f47529fd4f49e82ba978f520ca2a88e2e4ee16da"
+        },
+        {
+          "key": "renterSignHandover",
+          "sha256": "01059ec57e284d1d35f760e4ecf7bad849b3abc701755dc5c084afc3adee38ef"
+        }
+      ]
+    }
+  ],
+  "signatureFixturesUniqueBitmaps": 9,
+  "summary": {
+    "pdfFiles": 22,
+    "pages": 96,
+    "readyPdfFiles": 18,
+    "readyPages": 78,
+    "finalSyntheticPdfFiles": 4,
+    "finalSyntheticPages": 18,
+    "missingExpectedStringValues": 0,
+    "outOfPageWordBoxes": 0,
+    "placeholderOrReplacementFiles": 0,
+    "unembeddedFonts": 0,
+    "distinctPageRasters": 51,
+    "uncoveredDistinctPageRasters": 0
+  },
+  "finding": {
+    "id": "ABSENT_EQUIPMENT_HELMET_FIXTURE",
+    "originalFixtureContradiction": "Helmet quantity zero with supplied/good handover text",
+    "resolution": "Preview fixture now no handover / zero / not applicable; matching absent phone/USB notes",
+    "sourceLegalTextChanged": false,
+    "allReadyPreviewsRegenerated": true,
+    "correctedPageVisuallyInspected": true,
+    "preCorrectionArtifacts": [
+      "findings/absent-equipment-before-fixture-fix.pdf",
+      "findings/absent-equipment-before-fixture-fix.png"
+    ]
+  },
+  "scope": "Synthetic document rendering and layout QA; no legal approval, real signing act, provider delivery or production template activation."
+}

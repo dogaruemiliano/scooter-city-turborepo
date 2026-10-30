@@ -32,6 +32,7 @@ export function toPerson(row: PersonWithDocuments): v1.persons.Person {
     city: row.city,
     region: row.region,
     countryCode: row.countryCode,
+    citizenship: row.citizenship,
     documents: row.documents.map(toPersonDocument),
     notes: row.notes,
     createdAt: row.createdAt.toISOString(),

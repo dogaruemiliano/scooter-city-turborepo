@@ -3,14 +3,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 /** Owns one camera stream; late permission grants are disposed after closing. */
-export function useCaptureCamera(enabled: boolean) {
+export function useCaptureCamera(
+  enabled: boolean,
+  initialFacingMode: "environment" | "user" = "environment",
+) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [status, setStatus] = useState<"starting" | "ready" | "unavailable">(
     "starting",
   );
   const [facingMode, setFacingMode] = useState<"environment" | "user">(
-    "environment",
+    initialFacingMode,
   );
   const [attempt, setAttempt] = useState(0);
   const [frameSize, setFrameSize] = useState<{

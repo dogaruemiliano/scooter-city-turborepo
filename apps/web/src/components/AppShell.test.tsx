@@ -803,13 +803,17 @@ describe("AppShell", () => {
     );
   });
 
-  it("hides company navigation from admins without the super-admin role", () => {
+  it("hides company settings from admins without template permissions or the super-admin role", () => {
     renderAppShell({
       id: "admin-1",
       email: "admin@example.com",
       roles: [],
       isSuperAdmin: false,
-      effectiveScopes: staffScopes,
+      effectiveScopes: Object.fromEntries(
+        Object.entries(staffScopes).filter(
+          ([key]) => !key.startsWith("templates."),
+        ),
+      ),
     });
 
     expect(screen.queryByText("Firmă")).not.toBeInTheDocument();

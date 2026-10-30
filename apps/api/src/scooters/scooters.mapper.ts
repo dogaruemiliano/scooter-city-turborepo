@@ -181,6 +181,16 @@ export function toScooter(row: ScooterRowWithBrand): v1.scooters.Scooter {
     electricMotorPowerKw: row.electricMotorPowerKw?.toNumber() ?? null,
     powerToWeightRatioKwKg: row.powerToWeightRatioKwKg?.toNumber() ?? null,
     maxSpeedKmh: row.maxSpeedKmh,
+    commercialCategory: v1.scooters.scooterCommercialCategoryForLicense(
+      row.requiredLicenseCategory,
+    ),
+    applicationSpeedLimitKmh: v1.scooters.licenceSpeedLimitKmh(
+      row.requiredLicenseCategory,
+    ),
+    limiterKind: row.limiterKind as v1.scooters.Scooter["limiterKind"],
+    limiterKmh: row.limiterKmh,
+    maxSpeedSource: row.maxSpeedSource,
+    configurationEvidence: row.configurationEvidence,
     emissionsStandard: row.emissionsStandard,
     curbWeightKg: row.curbWeightKg,
     actualWeightKg: row.actualWeightKg,

@@ -983,6 +983,10 @@ export const scootersCatalog = {
       record: "Record",
       notes: "Notes",
     },
+    licencePolicy: {
+      capped: "Application speed cap: {speed} km/h.",
+      uncapped: "No driving licence based application speed cap.",
+    },
     fields: {
       itpValidUntil: "ITP valid until",
       civAvailability: "CIV availability",
@@ -2343,6 +2347,10 @@ export const scootersCatalog = {
       registration: "Înmatriculare",
       record: "Înregistrare",
       notes: "Notițe",
+    },
+    licencePolicy: {
+      capped: "Plafon de viteză în aplicație: {speed} km/h.",
+      uncapped: "Fără plafon de viteză în aplicație bazat pe permis.",
     },
     fields: {
       itpValidUntil: "ITP valabil până la",

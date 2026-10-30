@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist_Mono, Manrope } from "next/font/google";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { isSupportedLocale, supportedLocales } from "@repo/i18n";
 import { TooltipProvider } from "@repo/ui/components/tooltip";
@@ -66,9 +66,10 @@ export default async function RootLayout({
 
   setRequestLocale(locale);
 
+  const signingRoute = (await headers()).get("x-scooter-route") === "/signing";
   const [cookieStore, initialUser] = await Promise.all([
     cookies(),
-    meFromApi(),
+    signingRoute ? Promise.resolve(null) : meFromApi(),
   ]);
   const themeCookie = cookieStore.get(THEME_COOKIE_NAME)?.value;
   const dataTheme = resolveDataTheme(themeCookie);

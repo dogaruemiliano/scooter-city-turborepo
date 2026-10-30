@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import { useState } from "react";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
@@ -105,6 +105,110 @@ beforeEach(() => {
 });
 
 describe("problem release forms", () => {
+  it.each(["dismiss", "resolve", "reopen", "clear hold"] as const)(
+    "invalidates cached scooter status after %s succeeds",
+    async (action) => {
+      const user = userEvent.setup();
+      const reload = vi.fn();
+      let finish!: (value: v1.problems.Problem) => void;
+      const response = new Promise<v1.problems.Problem>((resolve) => {
+        finish = resolve;
+      });
+      const original = mocks.fetch.getMockImplementation()!;
+      mocks.fetch.mockImplementation((url, ...args) =>
+        ["/cancel", "/resolve", "/reopen", "/hold"].some((path) =>
+          url.endsWith(path),
+        )
+          ? response
+          : original(url, ...args),
+      );
+      renderForm(
+        <ProblemWork
+          problem={
+            action === "reopen" ? { ...problem, status: "cancelled" } : problem
+          }
+          reload={reload}
+        />,
+      );
+      if (action === "dismiss") {
+        await user.click(
+          screen.getByRole("button", { name: "Dismiss report" }),
+        );
+        await user.click(
+          screen.getByRole("button", { name: "Confirm changes" }),
+        );
+      } else if (action === "resolve") {
+        await user.type(
+          screen.getByRole("textbox", { name: "Resolution notes" }),
+          "Fixed belt",
+        );
+        await user.click(screen.getByRole("button", { name: "Complete task" }));
+      } else if (action === "reopen") {
+        await user.click(
+          screen.getByRole("button", {
+            name: messages.en.workspace.problems.reopen,
+          }),
+        );
+        await user.type(
+          screen.getByRole("textbox", { name: "Reason for reopening" }),
+          "Noise returned",
+        );
+        await user.click(
+          screen
+            .getAllByRole("button", {
+              name: messages.en.workspace.problems.reopen,
+            })
+            .at(-1)!,
+        );
+      } else {
+        await user.click(
+          screen.getByRole("button", { name: "Clear this problem’s hold" }),
+        );
+      }
+      expect(mocks.refresh).not.toHaveBeenCalled();
+      expect(reload).not.toHaveBeenCalled();
+      const updated: v1.problems.Problem = {
+        ...problem,
+        revision: 4,
+        status:
+          action === "dismiss"
+            ? "cancelled"
+            : action === "resolve"
+              ? "resolved"
+              : "open",
+        ...(action === "clear hold"
+          ? {
+              status: problem.status,
+              blocksUsage: false,
+              holdClearedAt: "2026-10-30T08:00:00Z",
+            }
+          : {}),
+      };
+      await act(async () => finish(updated));
+      await waitFor(() => expect(reload).toHaveBeenCalledWith(updated));
+      expect(mocks.refresh).toHaveBeenCalledOnce();
+    },
+  );
+
+  it("preserves the cached scooter state when dismissal fails", async () => {
+    const user = userEvent.setup();
+    const reload = vi.fn();
+    const original = mocks.fetch.getMockImplementation()!;
+    mocks.fetch.mockImplementation((url, ...args) =>
+      url.endsWith("/cancel")
+        ? Promise.reject(new ApiError(409, "Problem changed"))
+        : original(url, ...args),
+    );
+    renderForm(<ProblemWork problem={problem} reload={reload} />);
+    await user.click(screen.getByRole("button", { name: "Dismiss report" }));
+    await user.click(screen.getByRole("button", { name: "Confirm changes" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "This record changed while you were editing",
+    );
+    expect(reload).not.toHaveBeenCalled();
+    expect(mocks.refresh).not.toHaveBeenCalled();
+  });
+
   it("collapses a removed assignee and keeps keyboard focus in the list", async () => {
     function Picker() {
       const [value, setValue] = useState(["a", "b"]);
@@ -894,6 +998,7 @@ describe("problem release forms", () => {
       expect.anything(),
       { method: "POST", json: { revision: 3, body: "Inspected drivetrain" } },
     );
+    expect(mocks.refresh).not.toHaveBeenCalled();
   });
 
   it("keeps the previous resolution without hold controls on closed work", () => {

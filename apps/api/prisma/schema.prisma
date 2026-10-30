@@ -50,6 +50,7 @@ model Person {
   city                  String?
   region                String?
   countryCode           String?
+  citizenship           String?
   notes                 String?
   createdAt             DateTime         @default(now())
   updatedAt             DateTime         @updatedAt
@@ -57,6 +58,7 @@ model Person {
   documents             PersonDocument[]
   customerAccessEnabled Boolean          @default(false)
   rentals               Rental[]
+  rentalParticipations  RentalParticipant[]
 
   @@index([deletedAt])
   @@index([lastName, firstName])
@@ -173,6 +175,16 @@ model User {
 /// the server-only storage key and public-safe metadata that API responses can
 /// expose through domain-specific resources such as PersonDocumentPhoto.
 model MediaAsset {
+  contractCompanyId String?
+  contractPurpose String?
+  retentionPurgeItemId String?
+  retentionPurgedAt DateTime?
+  contractSources     ContractTemplateVersion[] @relation("ContractSource")
+  contractPreviews    ContractPreview[]
+  contractPresented   RentalDocument[] @relation("ContractPresented")
+  contractFinal       RentalDocument[] @relation("ContractFinal")
+  contractSignatures  DocumentSignature[]
+  contractSelfies     DocumentPackage[] @relation("ContractSelfie")
   avatarUser          User?                 @relation("UserAvatar")
   id                  String                @id @default(cuid())
   provider            String
@@ -541,6 +553,15 @@ model Scooter {
   // Other technical data
   fuelTankCapacityLiters Decimal?
 
+  /// Explicit pricing category; independent of driving entitlement or speed.
+  commercialCategory String?
+  /// maxSpeedKmh remains the constructive maximum documented in vehicle papers.
+  limiterKind String @default("UNKNOWN")
+  limiterKmh Int?
+  maxSpeedSource String?
+  configurationEvidence String?
+  rentalInspections RentalInspection[]
+
   // Current operational data
   /// Enforced as non-negative by a database CHECK constraint.
   currentMileageKm   Int?
@@ -718,6 +739,8 @@ model AuthAccount {
 /// OAUTH_UNLINKED, SESSION_REVOKED, SESSION_BURNED, LOGOUT_ALL,
 /// ACCOUNT_DELETED, NEW_DEVICE_NOTIFIED.
 model AuditEvent {
+  retentionPurgedAt DateTime?
+  retentionOriginalHash String?
   id         String   @id @default(cuid())
   userId     String?
   user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
@@ -914,6 +937,13 @@ model FinanceBook {
 /// book. Normalized fields are persisted so receipt matching is deterministic
 /// and does not depend on locale-specific database collation.
 model FinanceLegalIdentity {
+  retentionPolicies ContractRetentionPolicy[]
+  legalHolds ContractLegalHold[]
+  retentionBatches ContractRetentionBatch[]
+  contractSettings ContractSettings?
+  contractTemplates ContractTemplate[]
+  contractSets TemplateSetVersion[]
+  contractPackages DocumentPackage[]
   id                      String      @id @default(cuid())
   bookId                  String      @unique
   legalName               String
@@ -925,6 +955,241 @@ model FinanceLegalIdentity {
   book                    FinanceBook @relation(fields: [bookId], references: [id], onDelete: Restrict)
   createdAt               DateTime    @default(now())
   updatedAt               DateTime    @updatedAt
+}
+
+/// Additional approved contractual settings; legal name/tax ID remain in FinanceLegalIdentity.
+model ContractSettings {
+  companyId String @id
+  company FinanceLegalIdentity @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  data Json
+  activeSetId String?
+  activeSet TemplateSetVersion? @relation("ActiveContractSet", fields: [activeSetId], references: [id], onDelete: Restrict)
+  revision Int @default(1)
+  updatedAt DateTime @updatedAt
+}
+
+model ContractTemplate {
+  id String @id @default(cuid())
+  companyId String
+  company FinanceLegalIdentity @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  type String
+  name String
+  locale String
+  createdBy String
+  createdAt DateTime @default(now())
+  versions ContractTemplateVersion[]
+  @@index([companyId, locale, type])
+}
+
+model ContractTemplateVersion {
+  id String @id @default(cuid())
+  templateId String
+  template ContractTemplate @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  version Int
+  status String @default("DRAFT")
+  sourceAssetId String
+  sourceAsset MediaAsset @relation("ContractSource", fields: [sourceAssetId], references: [id], onDelete: Restrict)
+  sourceSha256 String
+  rendererVersion String
+  schemaVersion String
+  validationStatus String @default("PENDING")
+  validation Json?
+  manifestHash String?
+  approvedBy String?
+  approvedAt DateTime?
+  reviewStatement String?
+  createdBy String
+  publishedAt DateTime?
+  createdAt DateTime @default(now())
+  previews ContractPreview[]
+  documents RentalDocument[]
+  agreementSets TemplateSetVersion[] @relation("SetAgreement")
+  gdprSets TemplateSetVersion[] @relation("SetGdpr")
+  technicalSets TemplateSetVersion[] @relation("SetTechnical")
+  promotionSets TemplateSetVersion[] @relation("SetPromotion")
+  @@unique([templateId, version])
+}
+
+model ContractPreview {
+  id String @id @default(cuid())
+  versionId String
+  version ContractTemplateVersion @relation(fields: [versionId], references: [id], onDelete: Restrict)
+  manifestHash String
+  scenario String
+  assetId String
+  asset MediaAsset @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  @@unique([versionId, manifestHash, scenario])
+}
+
+model TemplateSetVersion {
+  id String @id @default(cuid())
+  companyId String
+  company FinanceLegalIdentity @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  name String
+  locale String
+  version Int
+  agreementVersionId String
+  agreementVersion ContractTemplateVersion @relation("SetAgreement", fields: [agreementVersionId], references: [id], onDelete: Restrict)
+  gdprVersionId String
+  gdprVersion ContractTemplateVersion @relation("SetGdpr", fields: [gdprVersionId], references: [id], onDelete: Restrict)
+  technicalVersionId String
+  technicalVersion ContractTemplateVersion @relation("SetTechnical", fields: [technicalVersionId], references: [id], onDelete: Restrict)
+  promotionVersionId String?
+  promotionVersion ContractTemplateVersion? @relation("SetPromotion", fields: [promotionVersionId], references: [id], onDelete: Restrict)
+  promotionApproved Boolean @default(false)
+  manifestHash String
+  createdBy String
+  createdAt DateTime @default(now())
+  activeSettings ContractSettings[] @relation("ActiveContractSet")
+  packages DocumentPackage[]
+  @@unique([companyId, locale, version])
+}
+
+model DocumentPackage {
+  retentionState String @default("retained")
+  retentionPurgedCategories String[] @default([])
+  retentionRedactedAt DateTime?
+  id String @id @default(cuid())
+  companyId String
+  company FinanceLegalIdentity @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  rentalId String
+  rental Rental @relation(fields: [rentalId], references: [id], onDelete: Restrict)
+  revision Int
+  rentalRevision Int
+  inspectionId String?
+  templateSetVersionId String
+  templateSetVersion TemplateSetVersion @relation(fields: [templateSetVersionId], references: [id], onDelete: Restrict)
+  status String @default("draft")
+  snapshot Json
+  sourceFingerprint String
+  subjectHash String
+  manifestHash String?
+  manifest Json?
+  error String?
+  renderLeaseUntil DateTime?
+  identityStatus String @default("pending")
+  selfieAssetId String?
+  selfieAsset MediaAsset? @relation("ContractSelfie", fields: [selfieAssetId], references: [id], onDelete: Restrict)
+  identityDocumentId String?
+  identityReviewedBy String?
+  identityReviewReason String?
+  identityApprovedAt DateTime?
+  phoneVerifiedAt DateTime?
+  customerCompletedAt DateTime?
+  companyAcceptedAt DateTime?
+  contractConcludedAt DateTime?
+  createdBy String
+  createdAt DateTime @default(now())
+  documents RentalDocument[]
+  invitations SigningInvitation[]
+  sessions RentalSigningSession[]
+  deliveries ContractDelivery[]
+  @@unique([rentalId, revision])
+  @@index([rentalId, status])
+}
+
+model RentalDocument {
+  id String @id @default(cuid())
+  packageId String
+  package DocumentPackage @relation(fields: [packageId], references: [id], onDelete: Restrict)
+  type String
+  templateVersionId String
+  templateVersion ContractTemplateVersion @relation(fields: [templateVersionId], references: [id], onDelete: Restrict)
+  contentHash String
+  presentedAssetId String
+  presentedAsset MediaAsset @relation("ContractPresented", fields: [presentedAssetId], references: [id], onDelete: Restrict)
+  signedAssetId String?
+  signedAsset MediaAsset? @relation("ContractFinal", fields: [signedAssetId], references: [id], onDelete: Restrict)
+  signedHash String?
+  status String @default("published")
+  signedAt DateTime?
+  requiresLimiterSignature Boolean @default(false)
+  signatures DocumentSignature[]
+  @@unique([packageId, type])
+}
+
+model SigningInvitation {
+  tokenVersion Int @default(1)
+  channel String @default("email")
+  deliveryStatus String @default("legacy")
+  deliveryAttempts Int @default(0)
+  deliveryLeaseUntil DateTime?
+  deliveryNextRunAt DateTime @default(now())
+  sentAt DateTime?
+  id String @id @default(cuid())
+  packageId String
+  package DocumentPackage @relation(fields: [packageId], references: [id], onDelete: Restrict)
+  tokenHash String @unique
+  expiresAt DateTime
+  consumedAt DateTime?
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+  @@index([deliveryStatus, deliveryNextRunAt])
+}
+
+model RentalSigningSession {
+  id String @id @default(cuid())
+  packageId String
+  package DocumentPackage @relation(fields: [packageId], references: [id], onDelete: Restrict)
+  tokenHash String @unique
+  phone String
+  expiresAt DateTime
+  lastActiveAt DateTime @default(now())
+  revokedAt DateTime?
+  phoneVerifiedAt DateTime?
+  finalVerifiedAt DateTime?
+  otpHash String?
+  otpPurpose String?
+  otpExpiresAt DateTime?
+  otpSentAt DateTime?
+  otpAttempts Int @default(0)
+  otpSends Int @default(0)
+  createdAt DateTime @default(now())
+  signatures DocumentSignature[]
+  @@index([expiresAt, revokedAt])
+}
+
+model DocumentSignature {
+  id String @id @default(cuid())
+  documentId String
+  document RentalDocument @relation(fields: [documentId], references: [id], onDelete: Restrict)
+  sessionId String?
+  session RentalSigningSession? @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  signerId String
+  role String
+  contentHash String
+  acceptanceText String
+  assetId String
+  asset MediaAsset @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  createdAt DateTime @default(now())
+  @@unique([documentId, role])
+}
+
+/// Metadata only: delivery errors never roll back an actual physical handover.
+model ContractDelivery {
+  id String @id @default(cuid())
+  packageId String
+  package DocumentPackage @relation(fields: [packageId], references: [id], onDelete: Restrict)
+  channel String
+  status String @default("queued")
+  attempts Int @default(0)
+  nextRunAt DateTime @default(now())
+  leaseUntil DateTime?
+  sentAt DateTime?
+  deliveredAt DateTime?
+  acknowledgedAt DateTime?
+  error String?
+  createdAt DateTime @default(now())
+  @@index([status, nextRunAt, leaseUntil])
+}
+
+model ContractCommand {
+  key String @id
+  action String
+  targetId String
+  fingerprint String
+  resultId String
+  createdAt DateTime @default(now())
 }
 
 /// A supplier that can be selected while confirming an expense receipt.
@@ -1706,6 +1971,23 @@ model ScooterProblemPhoto {
 }
 
 model Rental {
+  conclusionContext String?
+  documentPackages DocumentPackage[]
+  handoverRecipientPersonId String?
+  handoverConfirmedByUserId String?
+  handoverOriginalIdentityCheckedAt DateTime?
+  /// 0 preserves existing rental provenance; new checkouts use version 1.
+  workflowVersion Int @default(0)
+  termsSnapshot Json?
+  agreementStartsAt DateTime?
+  agreementEndsAt DateTime?
+  billingAnchorAt DateTime?
+  nextPaymentDueAt DateTime?
+  contractTimezone String @default("Europe/Bucharest")
+  checkoutDraft Json?
+  inspections RentalInspection[]
+  payments RentalPayment[]
+  participants RentalParticipant[]
   id              String    @id @default(cuid())
   personId        String
   person          Person    @relation(fields: [personId], references: [id], onDelete: Restrict)
@@ -1743,4 +2025,132 @@ model ScooterInsuranceRevision {
   createdAt DateTime               @default(now())
 
   @@index([policyId, createdAt])
+}
+
+/// Inspection revisions are append-only, including unsafe confirmed findings.
+model RentalInspection {
+  id String @id @default(cuid())
+  rentalId String
+  rental Rental @relation(fields: [rentalId], references: [id], onDelete: Restrict)
+  scooterId String
+  scooter Scooter @relation(fields: [scooterId], references: [id], onDelete: Restrict)
+  eventType String
+  version Int
+  status String @default("draft")
+  dataSnapshot Json
+  scooterUpdatedAt DateTime
+  inspectedByUserId String
+  confirmedAt DateTime?
+  createdAt DateTime @default(now())
+  @@unique([rentalId, version])
+  @@index([rentalId, eventType, status, version])
+}
+
+/// Confirmed receipts are distinct from selected methods and preserve allocation.
+model RentalPayment {
+  id String @id @default(cuid())
+  rentalId String
+  rental Rental @relation(fields: [rentalId], references: [id], onDelete: Restrict)
+  idempotencyKey String @unique
+  purpose String
+  method String
+  amountMinor Int
+  status String @default("confirmed")
+  receivedAt DateTime
+  confirmedByUserId String
+  evidenceReference String
+  coverageStartsAt DateTime?
+  coverageEndsAt DateTime?
+  createdAt DateTime @default(now())
+  @@index([rentalId, purpose, status])
+}
+
+model RentalParticipant {
+  id String @id @default(cuid())
+  rentalId String
+  rental Rental @relation(fields: [rentalId], references: [id], onDelete: Restrict)
+  personId String
+  person Person @relation(fields: [personId], references: [id], onDelete: Restrict)
+  role String
+  createdAt DateTime @default(now())
+  @@unique([rentalId, personId, role])
+}
+
+/// Approved category policies are immutable versions; no retention duration is inferred.
+model ContractRetentionPolicy {
+  company FinanceLegalIdentity @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  id String @id @default(cuid())
+  companyId String
+  category String
+  version Int
+  daysAfterRentalClosed Int
+  status String @default("draft")
+  legalBasis String
+  createdBy String
+  approvedBy String?
+  approvalStatement String?
+  approvedAt DateTime?
+  createdAt DateTime @default(now())
+  @@unique([companyId, category, version])
+  @@index([companyId, category, status, version])
+}
+
+/// A hold is independently recorded; release never shortens a policy or approves a purge.
+model ContractLegalHold {
+  company FinanceLegalIdentity @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  id String @id @default(cuid())
+  companyId String
+  packageId String?
+  assetId String?
+  category String?
+  reason String
+  legalBasis String
+  createdBy String
+  createdAt DateTime @default(now())
+  releasedBy String?
+  releasedAt DateTime?
+  releaseReason String?
+  @@index([companyId, releasedAt])
+}
+
+model ContractRetentionBatch {
+  company FinanceLegalIdentity @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  id String @id @default(cuid())
+  companyId String
+  packageIds String[]
+  categories String[]
+  manifest Json
+  manifestHash String
+  status String @default("preview")
+  requestedBy String
+  approvedBy String?
+  approvalStatement String?
+  approvedAt DateTime?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  completedAt DateTime?
+  items ContractRetentionItem[]
+  @@index([companyId, createdAt])
+}
+
+model ContractRetentionItem {
+  id String @id @default(cuid())
+  batchId String
+  batch ContractRetentionBatch @relation(fields: [batchId], references: [id], onDelete: Restrict)
+  category String
+  subjectType String
+  targetId String
+  packageIds String[]
+  policyId String
+  expectedHash String
+  eligibleAt DateTime
+  status String @default("pending")
+  attempts Int @default(0)
+  leaseUntil DateTime?
+  leaseToken String?
+  providerDeletedAt DateTime?
+  error String?
+  purgedAt DateTime?
+  @@unique([batchId, category, subjectType, targetId])
+  @@index([status, leaseUntil])
 }

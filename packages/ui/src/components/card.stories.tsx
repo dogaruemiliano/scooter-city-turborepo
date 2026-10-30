@@ -83,6 +83,29 @@ export const Small: Story = {
   ),
 };
 
+/** Problem cards inside a scooter's details omit the repeated scooter identity. */
+export const HeaderBadges: Story = {
+  render: () => (
+    <Card as="article" size="comfortable">
+      <CardHeader className="gap-3">
+        <span className="text-xs font-semibold uppercase text-muted-foreground">
+          Unassessed
+        </span>
+        <CardTitle>Inspect rear brake</CardTitle>
+        <CardAction className="flex max-w-32 flex-col items-end gap-2">
+          <Badge variant="secondary">Open</Badge>
+          <Badge variant="destructive">Hold</Badge>
+        </CardAction>
+      </CardHeader>
+      <CardContent>
+        <p className="text-sm text-muted-foreground">
+          Rear brake needs inspection before the next rental.
+        </p>
+      </CardContent>
+    </Card>
+  ),
+};
+
 export const StraightAccent: Story = {
   render: () => (
     <Card size="comfortable">

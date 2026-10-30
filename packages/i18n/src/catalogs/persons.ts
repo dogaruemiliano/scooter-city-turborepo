@@ -380,6 +380,7 @@ export const personsCatalog = {
     },
     fields: {
       firstName: "First name",
+      citizenship: "Citizenship / nationality",
       lastName: "Last name",
       email: "Email",
       phone: "Phone",
@@ -896,6 +897,7 @@ export const personsCatalog = {
     },
     fields: {
       firstName: "Prenume",
+      citizenship: "Cetățenie",
       lastName: "Nume",
       email: "Email",
       phone: "Telefon",

@@ -1,3 +1,4 @@
+import { v1 } from "@repo/api-shared";
 import { buildDateOnly, type DateParts } from "@repo/ui/lib/date-parts";
 
 export type WeeklyPeriod = {
@@ -10,6 +11,13 @@ export type RentalDraft = {
   id: string;
   step: "details" | "review";
   detailsCompleted: boolean;
+  inputTouched?: boolean;
+  conclusionContext?: "on_site" | "distance" | "off_premises";
+  promotion?: "standard" | "three_plus_one";
+  rentalPaymentMethod?: "cash" | "transfer" | "card";
+  depositPaymentMethod?: "cash" | "transfer" | "card";
+  driverPersonIds?: string[];
+  renterDrives?: boolean;
   personId: string;
   scooterId: string;
   startDate: DateParts;
@@ -23,12 +31,8 @@ export type RentalDraft = {
 export const rentalDraftKey = (userId: string) => `rental-create:v1:${userId}`;
 
 export function emptyRentalDraft(): RentalDraft {
-  const today = new Date();
-  const startDate: DateParts = {
-    day: String(today.getDate()).padStart(2, "0"),
-    month: String(today.getMonth() + 1).padStart(2, "0"),
-    year: String(today.getFullYear()),
-  };
+  const [year, month, day] = v1.rentals.rentalDateOnly(new Date()).split("-");
+  const startDate: DateParts = { day: day!, month: month!, year: year! };
   return {
     version: 1,
     id: crypto.randomUUID(),
@@ -58,26 +62,29 @@ export function hasRentalDraftInput(draft: RentalDraft): boolean {
   ].some((value) => value.trim().length > 0);
 }
 
-/** Once details are completed, edits can keep saving even on the first step. */
+/** Explicit input is autosaved on every step; navigation alone creates no draft. */
 export function canPersistRentalDraft(draft: RentalDraft): boolean {
   return Boolean(
-    (draft.detailsCompleted && hasRentalDraftInput(draft)) ||
+    ((draft.detailsCompleted || draft.inputTouched) &&
+      hasRentalDraftInput(draft)) ||
     draft.submissionUncertain ||
     draft.createdRentalId,
   );
 }
 
 /** Seven local calendar days, including weeks that cross a DST boundary. */
-export function weeklyPeriod(parts: DateParts): WeeklyPeriod | null {
+export function weeklyPeriod(
+  parts: DateParts,
+  days: 7 | 28 = 7,
+): WeeklyPeriod | null {
   const date = buildDateOnly(parts).value;
   if (!date) return null;
-  const start = new Date(`${date}T00:00:00`);
-  const end = new Date(start);
-  end.setDate(end.getDate() + 7);
+  const start = v1.rentals.rentalDateStart(date);
+  const end = v1.rentals.addRentalCalendar(start, days);
   return {
     startsAt: start.toISOString(),
     endsAt: end.toISOString(),
-    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    timeZone: v1.rentals.RENTAL_POLICY.timezone,
   };
 }
 
@@ -100,8 +107,25 @@ export function readRentalDraft(userId: string): RentalDraft | null {
       ![d.startDate.day, d.startDate.month, d.startDate.year].every(
         (v) => typeof v === "string",
       ) ||
+      (d.inputTouched !== undefined && typeof d.inputTouched !== "boolean") ||
       (d.detailsCompleted !== undefined &&
         typeof d.detailsCompleted !== "boolean") ||
+      (d.conclusionContext !== undefined &&
+        !["on_site", "distance", "off_premises"].includes(
+          d.conclusionContext,
+        )) ||
+      (d.promotion !== undefined &&
+        !["standard", "three_plus_one"].includes(d.promotion)) ||
+      (d.rentalPaymentMethod !== undefined &&
+        !["cash", "transfer", "card"].includes(d.rentalPaymentMethod)) ||
+      (d.depositPaymentMethod !== undefined &&
+        !["cash", "transfer", "card"].includes(d.depositPaymentMethod)) ||
+      (d.renterDrives !== undefined && typeof d.renterDrives !== "boolean") ||
+      (d.driverPersonIds !== undefined &&
+        (!Array.isArray(d.driverPersonIds) ||
+          !d.driverPersonIds.every(
+            (value: unknown) => typeof value === "string",
+          ))) ||
       typeof d.submissionUncertain !== "boolean" ||
       !(d.createdRentalId === null || typeof d.createdRentalId === "string")
     )

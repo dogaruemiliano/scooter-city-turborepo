@@ -523,6 +523,42 @@ describe("ScooterDetailPage", () => {
     expect(mocks.refresh).toHaveBeenCalledOnce();
   });
 
+  it("preserves the application licence policy when registration is cleared", async () => {
+    mocks.apiFetch.mockResolvedValueOnce(scooter);
+    const browser = userEvent.setup();
+    renderDetail();
+    await browser.click(screen.getByRole("button", { name: "More actions" }));
+    await browser.click(await screen.findByText("Add registration"));
+    const dialog = await screen.findByRole("dialog", {
+      name: "Add registration",
+    });
+    await chooseSelectOption(browser, "Required driver license", "A1");
+    await chooseSelectOption(browser, "Registration type", "Local");
+    await chooseSelectOption(browser, "Registration type", "Unregistered");
+    expect(
+      within(dialog).getByRole("combobox", { name: /Required driver license/ }),
+    ).toHaveTextContent("A1");
+    await browser.click(
+      within(dialog).getByRole("button", { name: "Save changes" }),
+    );
+    await waitFor(() =>
+      expect(mocks.apiFetch).toHaveBeenCalledWith(
+        v1.scooters.ROUTES.update(scooter.id),
+        v1.scooters.scooterSchema,
+        {
+          method: "PATCH",
+          json: {
+            registrationType: "unregistered",
+            registrationNumber: null,
+            registrationDate: null,
+            temporaryRegistrationExpiresAt: null,
+            requiredLicenseCategory: "A1",
+          },
+        },
+      ),
+    );
+  });
+
   it("keeps a duplicate plate error inside the registration sheet and marks the input invalid", async () => {
     const browser = userEvent.setup();
     mocks.apiFetch.mockImplementation((url: string) => {

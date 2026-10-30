@@ -16,7 +16,7 @@ import {
   ListStatus,
   SheetSelect,
 } from "@repo/ui/components";
-import { useLocale, useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import { z } from "zod";
 import { Link } from "@/i18n/navigation";
 import { useSession } from "@/components/auth/SessionProvider";
@@ -32,6 +32,7 @@ import {
 import { RentalCreateAction } from "./RentalCreateAction";
 import { RentalPersonCard, RentalPersonsProvider } from "./RentalPersonCard";
 import { RentalListItem } from "./RentalListItem";
+import { RentalCheckout } from "./RentalCheckout";
 
 type Rental = v1.rentals.Rental | v1.rentals.CustomerRental;
 type RentalList = {
@@ -233,7 +234,7 @@ function RentalDetail({
   const formAction = useFormAction();
 
   const t = useTranslations("workspace");
-  const locale = useLocale();
+  const format = useFormatter();
   const { user } = useSession();
   const task = useTask({
     [v1.problems.MAINTENANCE_HOLD_ERROR_CODE]: t("rentals.maintenanceHold"),
@@ -271,13 +272,25 @@ function RentalDetail({
           <dt className="text-sm text-muted-foreground">
             {t("rentals.startsAt")}
           </dt>
-          <dd>{new Date(rental.startsAt).toLocaleString(locale)}</dd>
+          <dd>
+            {format.dateTime(new Date(rental.startsAt), {
+              dateStyle: "medium",
+              timeStyle: "short",
+              timeZone: v1.rentals.RENTAL_POLICY.timezone,
+            })}
+          </dd>
         </div>
         <div>
           <dt className="text-sm text-muted-foreground">
             {t("rentals.endsAt")}
           </dt>
-          <dd>{new Date(rental.endsAt).toLocaleString(locale)}</dd>
+          <dd>
+            {format.dateTime(new Date(rental.endsAt), {
+              dateStyle: "medium",
+              timeStyle: "short",
+              timeZone: v1.rentals.RENTAL_POLICY.timezone,
+            })}
+          </dd>
         </div>
       </dl>
       {rental.customerNotes ? (
@@ -296,10 +309,14 @@ function RentalDetail({
           </p>
         </section>
       ) : null}
+      {!portal && "person" in rental ? (
+        <RentalCheckout rental={rental} onChanged={reload} />
+      ) : null}
       {!portal ? (
         <>
           <div className="flex flex-wrap gap-3">
             {rental.status === "reserved" &&
+            rental.workflowVersion !== 1 &&
             canAccess(user, "rentals.handover") ? (
               <Button onClick={() => setConfirm("handover")}>
                 {t("rentals.handover")}

@@ -47,6 +47,7 @@ export const scooterInclude = {
       id: true,
       type: true,
       extractedData: true,
+      customerVisible: true,
       clientCopyAsset: { select: { deletedAt: true } },
       insurancePolicy: { select: { validFrom: true, validUntil: true } },
     },
@@ -763,7 +764,8 @@ export class ScootersService {
         registrationNumber: null,
         registrationDate: null,
         temporaryRegistrationExpiresAt: null,
-        requiredLicenseCategory: "none",
+        requiredLicenseCategory:
+          input.requiredLicenseCategory ?? existing.requiredLicenseCategory,
       };
     }
 
@@ -804,7 +806,7 @@ export class ScootersService {
         registrationNumberNormalized: null,
         registrationDate: null,
         temporaryRegistrationExpiresAt: null,
-        requiredLicenseCategory: "none",
+        requiredLicenseCategory: state.requiredLicenseCategory,
       };
     }
 
