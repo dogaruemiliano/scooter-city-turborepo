@@ -2209,7 +2209,7 @@ describe("Scooters HTTP surface (e2e)", () => {
     );
   });
 
-  it("lets admins add and clear scooter registration", async () => {
+  it("lets admins add and clear scooter registration while preserving the selected licence policy", async () => {
     const admin = await freshSession(["ADMIN"]);
     const createRes = await req()
       .post(v1.scooters.ROUTES.create)
@@ -2250,7 +2250,7 @@ describe("Scooters HTTP surface (e2e)", () => {
         registrationNumber: null,
         registrationDate: null,
         temporaryRegistrationExpiresAt: null,
-        requiredLicenseCategory: "none",
+        requiredLicenseCategory: "A1",
       }),
     );
   });
