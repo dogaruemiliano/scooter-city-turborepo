@@ -73,7 +73,21 @@ export function toScooter(row: ScooterRowWithBrand): v1.scooters.Scooter {
                   null,
               ),
             })),
-            Boolean(row.inspections?.length) ||
+            Boolean(
+              row.inspections?.some(
+                (inspection) =>
+                  inspection.source !== "manual" ||
+                  inspection.inspectionDate ||
+                  inspection.cardDocumentId ||
+                  inspection.certificateDocumentId ||
+                  toDateOnlyString(inspection.validUntil) !==
+                    (row.civDocument?.issuedAt
+                      ? v1.scooters.initialScooterItpExpiry(
+                          toDateOnlyString(row.civDocument.issuedAt)!,
+                        )
+                      : null),
+              ),
+            ) ||
               !itp?.validUntil ||
               itp.status === "expired" ||
               itp.status === "failed" ||

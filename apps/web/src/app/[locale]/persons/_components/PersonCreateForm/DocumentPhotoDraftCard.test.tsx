@@ -1,4 +1,5 @@
 import { messages } from "@repo/i18n";
+import { cropImage } from "@repo/ui/lib/crop-image";
 import {
   fireEvent,
   render,
@@ -11,6 +12,11 @@ import { NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DocumentPhotoDraftCard } from "./DocumentPhotoDraftCard";
 import type { PersonDocumentPhotoDraftUpload } from "./types";
+
+vi.mock("@repo/ui/lib/crop-image", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@repo/ui/lib/crop-image")>()),
+  cropImage: vi.fn(async (file: File) => file),
+}));
 
 const onSet = vi.fn();
 const file = new File(["photo"], "id.png", { type: "image/png" });
@@ -54,32 +60,37 @@ beforeEach(() => {
 });
 
 describe("person shared native document input", () => {
-  it("opens the shared source chooser and commits only on confirmation", async () => {
+  it("opens the native picker directly without a source-selection sheet", async () => {
     setup();
     const user = userEvent.setup();
+    const input = screen.getByLabelText("Add Front photo", {
+      selector: "input",
+    });
+    const click = vi.spyOn(input, "click");
     await user.click(screen.getByRole("button", { name: "Add Front photo" }));
-    const picker = await screen.findByRole("dialog");
-    const camera = screen.getByLabelText("Take photo", { selector: "input" });
-    expect(camera).toHaveAttribute("capture", "environment");
-    expect(
-      screen.getByLabelText("Choose from files", { selector: "input" }),
-    ).not.toHaveAttribute("multiple");
-    await user.upload(camera, file);
-    expect(onSet).not.toHaveBeenCalled();
-    await user.click(within(picker).getByRole("button", { name: "Use file" }));
-    await waitFor(() =>
-      expect(onSet).toHaveBeenCalledWith(
-        "romanian-classic-national-id",
-        "front",
-        file,
-      ),
+    expect(click).toHaveBeenCalledOnce();
+    expect(input).toHaveAttribute(
+      "accept",
+      "image/jpeg,image/png,image/webp,application/pdf",
     );
+    expect(input).not.toHaveAttribute("capture");
+    expect(input).not.toHaveAttribute("multiple");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(onSet).not.toHaveBeenCalled();
+    fireEvent.change(input, { target: { files: [] } });
+    expect(onSet).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
   it.each(["image/png", "application/pdf"])(
     "requires Save before adding a %s",
     async (type) => {
       setup();
       const selected = new File(["document"], "document", { type });
+      const confirmed = type.startsWith("image/")
+        ? new File(["edited"], "edited.jpg", { type: "image/jpeg" })
+        : selected;
+      if (confirmed !== selected)
+        vi.mocked(cropImage).mockResolvedValueOnce(confirmed);
       await userEvent.upload(
         screen.getByLabelText("Add Front photo", { selector: "input" }),
         selected,
@@ -91,23 +102,57 @@ describe("person shared native document input", () => {
         "text-popover-foreground",
         "p-0",
       );
-      expect(
-        dialog.querySelector('[data-slot="document-viewer-body"]'),
-      ).not.toHaveClass("bg-background");
+      if (type.startsWith("image/")) {
+        expect(
+          within(dialog).getByRole("button", { name: "Rotate photo 90°" }),
+        ).toBeInTheDocument();
+        expect(
+          within(dialog).getByRole("button", { name: "Straighten photo" }),
+        ).toBeInTheDocument();
+        expect(
+          within(dialog).getByRole("button", { name: "Vertical perspective" }),
+        ).toBeInTheDocument();
+        expect(
+          within(dialog).getByRole("button", {
+            name: "Horizontal perspective",
+          }),
+        ).toBeInTheDocument();
+      } else {
+        expect(
+          dialog.querySelector('[data-slot="document-viewer-body"]'),
+        ).not.toHaveClass("bg-background");
+      }
       expect(onSet).not.toHaveBeenCalled();
       await userEvent.click(
         within(dialog).getByRole("button", { name: "Save" }),
       );
+      await waitFor(() => expect(onSet).toHaveBeenCalledOnce());
       expect(onSet).toHaveBeenCalledWith(
         "romanian-classic-national-id",
         "front",
-        selected,
+        confirmed,
       );
       await waitFor(() =>
         expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
       );
     },
   );
+  it("keeps the editor open when the edited image fails validation", async () => {
+    setup();
+    vi.mocked(cropImage).mockResolvedValueOnce(
+      new File([], "empty.jpg", { type: "image/jpeg" }),
+    );
+    await userEvent.upload(
+      screen.getByLabelText("Add Front photo", { selector: "input" }),
+      file,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(
+      screen.getByRole("dialog", { name: "Crop image" }),
+    ).toBeInTheDocument();
+    expect(onSet).not.toHaveBeenCalled();
+  });
   it("discards a provisional selection when closed", async () => {
     setup();
     await userEvent.upload(

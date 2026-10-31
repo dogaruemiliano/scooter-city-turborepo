@@ -1148,7 +1148,7 @@ describe("PersonCreateForm wizard", () => {
       }),
       new File(["photo"], "front.png", { type: "image/png" }),
     );
-    const chooser = await screen.findByRole("dialog", { name: "Front photo" });
+    const chooser = await screen.findByRole("dialog", { name: "Crop image" });
     await browser.click(
       within(chooser).getByRole("button", { name: "Cancel" }),
     );
@@ -1217,7 +1217,7 @@ describe("PersonCreateForm wizard", () => {
       new File(["photo"], "id.png", { type: "image/png" }),
     );
     const chooser = await screen.findByRole("dialog", {
-      name: "Poză document: Față",
+      name: "Decupează imaginea",
     });
     await browser.click(
       within(chooser).getByRole("button", { name: "Salvează" }),
@@ -1772,9 +1772,9 @@ async function uploadPhoto(
     }),
     new File(["photo"], `${slot}.png`, { type: "image/png" }),
   );
-  const editor = await screen.findByRole("dialog", { name: `${slot} photo` });
+  const editor = await screen.findByRole("dialog", { name: "Crop image" });
   expect(
-    within(editor).getByRole("img", { name: `${slot} document photo` }),
+    within(editor).getByRole("img", { name: "Crop image" }),
   ).toBeInTheDocument();
   await browser.click(within(editor).getByRole("button", { name: "Save" }));
   await waitFor(() => expect(editor).not.toBeInTheDocument());

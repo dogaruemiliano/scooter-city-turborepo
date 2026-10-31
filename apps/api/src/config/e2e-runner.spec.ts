@@ -4,6 +4,7 @@ import path from "node:path";
 import {
   configureTestEnvironment,
   financeRunUrl,
+  formatE2eError,
   readEnvFile,
   runE2e,
   selectSuites,
@@ -157,6 +158,32 @@ describe("E2E runner configuration", () => {
   });
 });
 
+describe("E2E runner diagnostics", () => {
+  it("reports empty-message aggregate connection errors", () => {
+    const error = new AggregateError([
+      Object.assign(new Error("connect ECONNREFUSED ::1:55434"), {
+        code: "ECONNREFUSED",
+      }),
+      Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:55434"), {
+        code: "ECONNREFUSED",
+      }),
+    ]);
+    expect(formatE2eError(error)).toContain("ECONNREFUSED");
+    expect(formatE2eError(error)).toContain("127.0.0.1:55434");
+  });
+
+  it("provides a nonempty fallback and redacts PostgreSQL URLs", () => {
+    expect(formatE2eError(new AggregateError([]))).toBe("E2E runner failed.");
+    const message = formatE2eError(
+      new Error(
+        "Cannot connect to postgresql://user:secret@host/test?password=secret",
+      ),
+    );
+    expect(message).toContain("[redacted database URL]");
+    expect(message).not.toContain("secret");
+  });
+});
+
 describe("E2E runner lifecycle", () => {
   const config = () => configureTestEnvironment(urls, {}, {});
   const dependencies = () => ({
@@ -294,6 +321,34 @@ describe("E2E runner lifecycle", () => {
       ),
     ).toBe(false);
     expect(deps.createFinance).not.toHaveBeenCalled();
+  });
+
+  it("explains how to start an unavailable local test server without exposing credentials", async () => {
+    const local = configureTestEnvironment(
+      {
+        E2E_DATABASE_URL:
+          "postgresql://app:secret@localhost:55434/scooter_city_test",
+        E2E_FINANCE_DATABASE_URL:
+          "postgresql://app:secret@localhost:55434/finance_books_test",
+      },
+      {},
+      {},
+    );
+    const deps = dependencies();
+    deps.ensureGeneral.mockRejectedValue(
+      new AggregateError([
+        Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:55434"), {
+          code: "ECONNREFUSED",
+        }),
+      ]),
+    );
+    const run = runE2e(local, suites, deps);
+    await expect(run).rejects.toThrow("localhost:55434/scooter_city_test");
+    await expect(run).rejects.toThrow("ECONNREFUSED");
+    await expect(run).rejects.toThrow(
+      "docker compose --profile test up -d --wait postgres-test",
+    );
+    await expect(run).rejects.not.toThrow("secret");
   });
 
   it("still runs finance and returns failure if general Jest fails", async () => {

@@ -16,7 +16,7 @@ import {
   type DocumentCollectionInputProps,
 } from "./document-collection-input";
 import type { DocumentZoomLabels } from "./document-zoom";
-import type { ImageEditorLabels } from "./image-editor";
+import { ImageEditor, type ImageEditorLabels } from "./image-editor";
 import type { PdfPreviewLabels } from "./pdf-preview";
 
 export type DocumentInputValue = {
@@ -62,6 +62,8 @@ export type DocumentCollectionLabels = DocumentInputLabels & {
 };
 
 type SingleDocumentInputProps = {
+  /** Open the shared crop/rotation editor immediately for newly selected images. */
+  editOnSelect?: boolean;
   pickerProps?: Omit<
     AttachmentPickerProps,
     "open" | "onOpenChange" | "onConfirm" | "maxFiles" | "accept" | "validate"
@@ -108,6 +110,7 @@ function SingleDocumentInput({
   status,
   labels,
   pickerProps,
+  editOnSelect = false,
 }: SingleDocumentInputProps) {
   const input = useRef<HTMLInputElement>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -118,6 +121,7 @@ function SingleDocumentInput({
     } else input.current?.click();
   };
   const [pending, setPending] = useState<File | null>(null);
+  const [editing, setEditing] = useState<File | null>(null);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const currentUrl = useObjectUrl(value?.file ?? null);
@@ -128,11 +132,18 @@ function SingleDocumentInput({
     const problem = validate(file);
     setError(problem);
     if (problem) return;
+    if (editOnSelect && file.type.startsWith("image/")) {
+      setOpen(false);
+      setPending(null);
+      setEditing(file);
+      return;
+    }
     setPending(file);
     setOpen(true);
   }
   function close() {
     setOpen(false);
+    setEditing(null);
     setPending(null);
     setError(null);
   }
@@ -157,6 +168,23 @@ function SingleDocumentInput({
   return (
     <div data-slot="document-input" className="min-w-0" {...handlers}>
       {picker}
+      {editing ? (
+        <ImageEditor
+          file={editing}
+          labels={{
+            ...labels.editorLabels,
+            save: labels.save,
+            cancel: labels.close,
+          }}
+          onCancel={close}
+          onSave={(file) => {
+            const problem = validate(file);
+            if (problem) throw new Error(problem);
+            onConfirm(file);
+            close();
+          }}
+        />
+      ) : null}
       {pickerProps ? (
         <AttachmentPicker
           {...pickerProps}

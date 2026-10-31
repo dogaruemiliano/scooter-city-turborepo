@@ -10,9 +10,6 @@ import {
   FormSection,
 } from "@repo/ui/components";
 import { useTranslations } from "next-intl";
-import { useRef } from "react";
-
-import { EmailDomainSuggestions } from "@/components/form/EmailDomainSuggestions";
 
 import { fieldErrorId, invalidAria } from "./errors";
 import { FormField } from "./FormField";
@@ -42,7 +39,6 @@ export function ContactSection({
 }) {
   const t = useTranslations("persons");
   const tAccess = useTranslations("workspace.access");
-  const emailInputRef = useRef<HTMLInputElement>(null);
   const emailError = fieldErrors.email;
 
   return (
@@ -54,7 +50,6 @@ export function ContactSection({
         error={emailError}
       >
         <Input
-          ref={emailInputRef}
           id={`${formId}-email`}
           aria-describedby={fieldErrorId(`${formId}-email`, emailError)}
           aria-invalid={invalidAria(emailError)}
@@ -64,11 +59,6 @@ export function ContactSection({
           required
           value={form.email}
           onChange={(event) => onSetFormValue("email", event.target.value)}
-        />
-        <EmailDomainSuggestions
-          email={form.email}
-          onChange={(email) => onSetFormValue("email", email)}
-          inputRef={emailInputRef}
         />
       </FormField>
       <Field orientation="horizontal">

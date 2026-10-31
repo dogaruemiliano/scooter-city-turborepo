@@ -8,8 +8,10 @@ export async function writeScooterItpValidity(
   scooterId: string,
   requested: string | null | undefined,
   documentsChanged = false,
+  civMetadataChanged = false,
 ) {
-  if (requested === undefined && !documentsChanged) return;
+  if (requested === undefined && !documentsChanged && !civMetadataChanged)
+    return;
   const latest = await tx.scooterItpInspection.findFirst({
     where: { scooterId },
     orderBy: [{ effectiveDate: "desc" }, { createdAt: "desc" }, { id: "desc" }],
@@ -55,6 +57,34 @@ export async function writeScooterItpValidity(
     (row) =>
       row.validUntil !== newest?.validUntil || row.result !== newest?.result,
   );
+  // Re-extraction may recover the CIV date for a scooter created before ITP
+  // metadata existed. Reconcile only a lone date-only manual entry that agrees
+  // with that initial validity, preserving every actual inspection/history.
+  if (
+    requested === undefined &&
+    (documentsChanged || civMetadataChanged) &&
+    latest?.source === "manual" &&
+    latest.result === "unknown" &&
+    latest.validUntil &&
+    !latest.inspectionDate &&
+    !latest.cardDocumentId &&
+    !latest.certificateDocumentId &&
+    !conflicts &&
+    !newest
+  ) {
+    const scooter = await tx.scooter.findUniqueOrThrow({
+      where: { id: scooterId },
+      select: { civDocument: { select: { issuedAt: true } } },
+    });
+    const issuedAt = toDateOnlyString(scooter.civDocument?.issuedAt ?? null);
+    if (
+      issuedAt &&
+      v1.scooters.initialScooterItpExpiry(issuedAt) ===
+        toDateOnlyString(latest.validUntil) &&
+      (await tx.scooterItpInspection.count({ where: { scooterId } })) === 1
+    )
+      requested = toDateOnlyString(latest.validUntil);
+  }
   if (requested === null && !latest && documentsChanged) requested = undefined;
   // Automatic extraction fills missing information; reviewed/manual values need an explicit edit.
   if (requested === undefined && (latest || conflicts || !newest)) return;
@@ -74,9 +104,17 @@ export async function writeScooterItpValidity(
       return;
   }
   const source = evidence ? "document" : "manual";
+  // The editor asks for confirmed validity, not an appointment or an OCR result.
+  // Unreadable document results remain unknown until reviewed.
+  const result =
+    evidence?.result ??
+    (validUntil && latest?.result !== "failed" && newest?.result !== "failed"
+      ? "passed"
+      : "unknown");
   if (
     latest &&
     toDateOnlyString(latest.validUntil) === validUntil &&
+    latest.result === result &&
     (latest.source === source || !documentsChanged)
   )
     return;
@@ -85,7 +123,7 @@ export async function writeScooterItpValidity(
       scooterId,
       source,
       validUntil: toDateOnlyDate(validUntil),
-      result: evidence?.result ?? "unknown",
+      result,
       inspectionDate: toDateOnlyDate(evidence?.inspectionDate ?? null),
       effectiveDate: toDateOnlyDate(v1.common.dateOnlyToday())!,
       cardDocumentId:

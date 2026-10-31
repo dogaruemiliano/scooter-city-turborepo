@@ -3,6 +3,46 @@ import test from "node:test";
 import { v1 } from "../src";
 const { vehicleCiv: civ, scooters } = v1;
 
+test("reextraction saves accumulated original CIV fields without dropping earlier labels", () => {
+  const previous = Object.fromEntries(
+    Array.from({ length: 53 }, (_, i) => [`old-label-${i}`, `old value ${i}`]),
+  );
+  const incoming = Object.fromEntries(
+    Array.from({ length: 60 }, (_, i) => [`new-label-${i}`, `new value ${i}`]),
+  );
+  const civRawFields = { ...previous, ...incoming };
+  assert.equal(Object.keys(civRawFields).length, 113);
+  const payload = { civIssuedAt: "2026-08-21", civRawFields };
+  const result = scooters.updateScooterInputSchema.parse(payload);
+  assert.deepEqual(result.civRawFields, civRawFields);
+  assert.equal(result.civIssuedAt, "2026-08-21");
+  assert.ok(
+    scooters.scooterSchema.shape.civRawFields.safeParse(civRawFields).success,
+  );
+});
+
+test("accumulated CIV metadata still bounds count, keys and text lengths", () => {
+  const raw = Object.fromEntries(
+    Array.from({ length: civ.CIV_RAW_FIELDS_MAX }, (_, i) => [
+      `label-${i}`,
+      "value",
+    ]),
+  );
+  assert.ok(civ.civRawFieldsSchema.safeParse(raw).success);
+  assert.equal(
+    civ.civRawFieldsSchema.safeParse({ ...raw, extra: "value" }).success,
+    false,
+  );
+  assert.equal(
+    civ.civRawFieldsSchema.safeParse({ ["a".repeat(121)]: "value" }).success,
+    false,
+  );
+  assert.equal(
+    civ.civRawFieldsSchema.safeParse({ label: "a".repeat(2001) }).success,
+    false,
+  );
+});
+
 test("CIV 2024 and 2016 codes follow their own layouts", () => {
   const examples = [
     ["manufactureYear", "1", "2"],

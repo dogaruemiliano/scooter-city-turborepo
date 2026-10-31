@@ -1,5 +1,4 @@
 "use client";
-import { useAttachmentPicker } from "@/components/useAttachmentPicker";
 import { useMediaViewerLabels } from "@/components/useMediaViewerLabels";
 import { v1 } from "@repo/api-shared";
 import { DocumentInput } from "@repo/ui/components/document-input";
@@ -37,21 +36,13 @@ export function DocumentPhotoDraftCard({
 }) {
   const t = useTranslations("persons");
   const media = useMediaViewerLabels();
-  const picker = useAttachmentPicker();
   const accept = acceptsPdf
     ? `${DOCUMENT_PHOTO_ACCEPT},application/pdf`
     : DOCUMENT_PHOTO_ACCEPT;
   return (
     <div data-slot="document-preview" className="relative min-w-0">
       <DocumentInput
-        pickerProps={{
-          ...picker,
-          maxFileSize: MAX_FILE_BYTES,
-          labels: {
-            ...picker.labels,
-            title: t("documentForm.photoSheetTitle", { slot: slotLabel }),
-          },
-        }}
+        editOnSelect
         id={inputId}
         value={
           upload

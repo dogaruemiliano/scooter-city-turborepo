@@ -122,6 +122,47 @@ export type RunnerDependencies = {
   dropFinance: (url: URL) => Promise<void>;
 };
 
+/** Aggregate connection errors may have an empty message (for example IPv4/IPv6 refusal). */
+export function formatE2eError(error: unknown): string {
+  const details =
+    error instanceof AggregateError
+      ? [...new Set(error.errors.map(formatE2eError))].join("; ")
+      : error instanceof Error
+        ? error.message.trim()
+        : "";
+  const code =
+    error &&
+    typeof error === "object" &&
+    "code" in error &&
+    typeof error.code === "string"
+      ? error.code
+      : "";
+  const message =
+    [code, details].filter(Boolean).join(": ") || "E2E runner failed.";
+  // Diagnostic output must not expose connection credentials or URL query secrets.
+  return message.replace(
+    /postgres(?:ql)?:\/\/[^\s]+/gi,
+    "[redacted database URL]",
+  );
+}
+
+async function prepareDatabase(url: URL, prepare: (url: URL) => Promise<void>) {
+  try {
+    await prepare(url);
+  } catch (error) {
+    const localTestServer =
+      ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname) &&
+      url.port === "55434";
+    throw new Error(
+      `E2E database preparation failed for ${databaseIdentity(url.href)}: ${formatE2eError(error)}. ` +
+        (localTestServer
+          ? "Start the test server from the repository root: docker compose --profile test up -d --wait postgres-test"
+          : "Check that the configured test PostgreSQL server is running and accessible."),
+      { cause: error },
+    );
+  }
+}
+
 export async function runE2e(
   config: ReturnType<typeof configureTestEnvironment>,
   suites: ReturnType<typeof selectSuites>,
@@ -173,7 +214,7 @@ export async function runE2e(
     );
   let status = 0;
   if (suites.general.length) {
-    await dependencies.ensureGeneral(config.general);
+    await prepareDatabase(config.general, dependencies.ensureGeneral);
     await prepare(["run", "db:deploy"]);
     await prepare(["run", "db:seed"]);
     status = await jest(suites.general, generalEnv);
@@ -184,7 +225,7 @@ export async function runE2e(
       randomUUID().replaceAll("-", "").slice(0, 16),
     );
     const financeEnv = { ...config.env, DATABASE_URL: finance.href };
-    await dependencies.createFinance(finance);
+    await prepareDatabase(finance, dependencies.createFinance);
     try {
       await prepare(["run", "db:deploy"], financeEnv);
       const financeStatus = await jest(suites.finance, financeEnv);
@@ -317,9 +358,7 @@ if (require.main === module) {
       process.exitCode = status;
     })
     .catch((error: unknown) => {
-      console.error(
-        error instanceof Error ? error.message : "E2E runner failed.",
-      );
+      console.error(formatE2eError(error));
       process.exitCode = 1;
     });
 }
