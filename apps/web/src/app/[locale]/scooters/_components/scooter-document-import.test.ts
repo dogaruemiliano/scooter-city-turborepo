@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { v1 } from "@repo/api-shared";
 import {
   documentExtractionPrompt,
   documentImportFields,
@@ -281,7 +282,10 @@ describe("document JSON import", () => {
       { ["x".repeat(121)]: null },
       { "15": " ".repeat(2001) },
       Object.fromEntries(
-        Array.from({ length: 101 }, (_, i) => [`field${i}`, null]),
+        Array.from({ length: v1.vehicleCiv.CIV_RAW_FIELDS_MAX + 1 }, (_, i) => [
+          `field${i}`,
+          null,
+        ]),
       ),
     ]) {
       expect(parse({ color: "Red", civRawFields })).toMatchObject({
@@ -291,9 +295,28 @@ describe("document JSON import", () => {
       });
     }
   });
-  it("validates the merged raw fields across successive imports", () => {
+  it("preserves more than 100 accumulated raw fields across successive imports", () => {
     const original = Object.fromEntries(
       Array.from({ length: 100 }, (_, index) => [`field${index}`, "original"]),
+    );
+    const result = parseDocumentImport(
+      '{"civRawFields":{"extra":"new"}}',
+      brands,
+      current,
+      true,
+      original,
+    );
+    expect(result).toMatchObject({
+      ok: true,
+      rawFields: { ...original, extra: "new" },
+    });
+  });
+  it("validates the merged raw fields across successive imports", () => {
+    const original = Object.fromEntries(
+      Array.from({ length: v1.vehicleCiv.CIV_RAW_FIELDS_MAX }, (_, index) => [
+        `field${index}`,
+        "original",
+      ]),
     );
     expect(
       parseDocumentImport(
@@ -305,7 +328,7 @@ describe("document JSON import", () => {
       ),
     ).toMatchObject({
       ok: true,
-      rawFields: { field0: "updated", field99: "original" },
+      rawFields: { ...original, field0: "updated" },
     });
     expect(
       parseDocumentImport(
