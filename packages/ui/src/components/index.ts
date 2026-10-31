@@ -77,3 +77,5 @@ export * from "./wizard-form";
 export * from "./page-layout";
 
 export * from "./person-card";
+
+export * from "./attachment-picker";

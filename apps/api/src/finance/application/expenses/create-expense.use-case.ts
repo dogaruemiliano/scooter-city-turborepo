@@ -66,16 +66,39 @@ export class CreateExpenseUseCase {
     if (replay) return replay;
 
     await this.assertReferencesExist(input);
+    const tokens =
+      input.receiptUploadTokens ??
+      (input.receiptUploadToken ? [input.receiptUploadToken] : []);
+    const direct = input.extractionDraftId
+      ? []
+      : await Promise.all(
+          tokens.map((token) =>
+            this.prepareDirectAttachment(token, createdById),
+          ),
+        );
+    if (
+      new Set(direct.map((value) => value.draftUploadId)).size !== direct.length
+    )
+      throw new FinanceValidationError("Choose distinct receipt photos.");
     const receiptAttachment = input.extractionDraftId
       ? await this.prepareExtractionAttachment(
           input.extractionDraftId,
           createdById,
         )
-      : input.receiptUploadToken
-        ? await this.prepareDirectAttachment(
-            input.receiptUploadToken,
-            createdById,
-          )
+      : direct[0]
+        ? {
+            ...direct[0],
+            ...(direct.length > 1
+              ? {
+                  additionalUploads: direct
+                    .slice(1)
+                    .map(({ draftUploadId, storageKey }) => ({
+                      draftUploadId,
+                      storageKey,
+                    })),
+                }
+              : {}),
+          }
         : null;
 
     const command = toExpenseCommand(input);
@@ -122,12 +145,14 @@ export class CreateExpenseUseCase {
     extractionDraftId: string;
     draftUploadId: string;
     storageKey: string;
+    additionalUploads?: { draftUploadId: string; storageKey: string }[];
   }> {
     const draft = await this.prisma.expenseExtractionDraft.findFirst({
       where: { id: draftId, ownerUserId },
       select: {
         id: true,
         sourceUploadId: true,
+        additionalSourceUploadIds: true,
         status: true,
         confirmedOperationId: true,
         sourceUpload: {
@@ -161,11 +186,37 @@ export class CreateExpenseUseCase {
       );
     }
 
+    const additionalIds = draft.additionalSourceUploadIds ?? [];
+    const additional = additionalIds.length
+      ? await this.prisma.draftUpload.findMany({
+          where: {
+            id: { in: additionalIds },
+            userId: ownerUserId,
+            purpose: EXPENSE_RECEIPT_DRAFT_PURPOSE,
+            claimedAt: null,
+            cleanupStartedAt: null,
+          },
+          select: { id: true, storageKey: true },
+        })
+      : [];
+    if (additional.length !== additionalIds.length)
+      throw new FinanceStateError("A receipt photo is no longer available.");
     return {
       source: "EXTRACTION_DRAFT",
       extractionDraftId: draft.id,
       draftUploadId: draft.sourceUploadId,
       storageKey: draft.sourceUpload.storageKey,
+      ...(additional.length
+        ? {
+            additionalUploads: additionalIds.map((id) => {
+              const upload = additional.find((value) => value.id === id)!;
+              return {
+                draftUploadId: upload.id,
+                storageKey: upload.storageKey,
+              };
+            }),
+          }
+        : {}),
     };
   }
 

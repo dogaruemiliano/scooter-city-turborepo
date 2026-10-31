@@ -123,7 +123,6 @@ describe("source-aware extraction", () => {
         brandId: "brand-1",
         powerKw: "2.68",
         maxSpeedKmh: "25",
-        requiredLicenseCategory: "none",
         registrationNumber: "14947",
       },
       unresolved: ["engineCode"],
@@ -143,6 +142,7 @@ describe("source-aware extraction", () => {
       },
     });
     if (!result.ok) throw new Error("Expected valid import");
+    expect(result.values).not.toHaveProperty("requiredLicenseCategory");
     expect(result.values).not.toHaveProperty("color");
     expect(result.values).not.toHaveProperty("engineCode");
   });

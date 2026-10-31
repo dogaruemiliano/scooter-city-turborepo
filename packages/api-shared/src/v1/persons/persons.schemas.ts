@@ -312,6 +312,7 @@ export const personSchema = z
     city: z.string().nullable(),
     region: z.string().nullable(),
     countryCode: z.string().nullable(),
+    citizenship: z.string().nullable().optional(),
     documents: z.array(personDocumentSchema),
     notes: z.string().nullable(),
     createdAt: z.string().describe("ISO timestamp of person creation."),
@@ -390,6 +391,7 @@ export const createPersonInputSchema = z
     city: z.string().trim().min(1).max(MAX_TEXT_LENGTH),
     region: z.string().trim().min(1).max(MAX_TEXT_LENGTH),
     countryCode: countryCodeSchema.nullable().optional(),
+    citizenship: z.string().trim().min(1).max(120).nullable().optional(),
     documents: z
       .array(createPersonNestedDocumentInputSchema)
       .refine(hasUniqueDocumentTypes, {
@@ -421,6 +423,7 @@ export const updatePersonInputSchema = z
     city: z.string().trim().min(1).max(MAX_TEXT_LENGTH).optional(),
     region: z.string().trim().min(1).max(MAX_TEXT_LENGTH).optional(),
     countryCode: countryCodeSchema.nullable().optional(),
+    citizenship: z.string().trim().min(1).max(120).nullable().optional(),
     notes: notesSchema.optional(),
   })
   .strict()

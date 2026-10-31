@@ -1,8 +1,8 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { messages } from "@repo/i18n";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ProblemsWorkspace } from "./ProblemsWorkspace";
 const mocks = vi.hoisted(() => ({
   fetch: vi.fn(),
@@ -288,7 +288,7 @@ describe("service list filters", () => {
     await screen.findByRole("link", {
       name: "Inspect rear brake · Honda Vision · 007 HON",
     });
-    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(screen.getByRole("button", { name: "Load more" }));
     await waitFor(() =>
       expect(mocks.fetch).toHaveBeenLastCalledWith(
         "/v1/problems?page=2",
@@ -316,7 +316,12 @@ describe("service list filters", () => {
         { cache: "no-store" },
       ),
     );
-    expect(screen.getByRole("button", { name: "Previous" })).toBeDisabled();
+    expect(
+      screen.queryByRole("button", { name: "Previous" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Next" }),
+    ).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Filters" }));
     expect(
       within(screen.getByRole("radiogroup", { name: "Status" })).getByRole(
@@ -476,7 +481,7 @@ describe("service list filters", () => {
   });
 });
 
-it("keeps existing results visibly marked when the next page fails", async () => {
+it("keeps existing results and offers a retry when loading more fails", async () => {
   const user = userEvent.setup();
   mocks.fetch.mockResolvedValueOnce({
     items: [problem],
@@ -496,13 +501,14 @@ it("keeps existing results visibly marked when the next page fails", async () =>
   await screen.findByRole("link", {
     name: "Inspect rear brake · Honda Vision · 007 HON",
   });
-  await user.click(screen.getByRole("button", { name: "Next" }));
+  await user.click(screen.getByRole("button", { name: "Load more" }));
   expect(
     await screen.findByText("Could not update service work"),
   ).toBeInTheDocument();
   expect(
-    screen.getByText(messages.en.shared.list.staleResults),
-  ).toBeInTheDocument();
+    screen.queryByText(messages.en.shared.list.staleResults),
+  ).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
   expect(
     screen.getByRole("link", {
       name: "Inspect rear brake · Honda Vision · 007 HON",
@@ -553,7 +559,7 @@ it("places the quick radios under the creation action and applies quick filters 
     ),
   );
   await user.click(within(group).getByRole("radio", { name: /^All( \d+)?$/ }));
-  await user.click(screen.getByRole("button", { name: "Next" }));
+  await user.click(screen.getByRole("button", { name: "Load more" }));
   await user.click(within(group).getByRole("radio", { name: /^Open( \d+)?$/ }));
   await waitFor(() =>
     expect(mocks.fetch).toHaveBeenLastCalledWith(
@@ -692,4 +698,220 @@ it("loads real totals from the list API when aggregate counts are absent", async
       await within(group).findByRole("radio", { name }),
     ).toBeInTheDocument();
   }
+});
+
+it("lists todos without a scooter and links to todo creation and detail", async () => {
+  mocks.user.effectiveScopes = {
+    "problems.read": ["ALL"],
+    "problems.create": ["ALL"],
+  };
+  mocks.fetch.mockResolvedValue({
+    items: [
+      { ...problem, scooterId: null, scooter: null, title: "Order supplies" },
+    ],
+    total: 1,
+    page: 1,
+    pageSize: 25,
+    quickFilterCounts: {
+      all: 1,
+      open: 1,
+      in_progress: 0,
+      mine: 0,
+      resolved: 0,
+    },
+  });
+  render(
+    <NextIntlClientProvider locale="en" messages={messages.en}>
+      <ProblemsWorkspace todo />
+    </NextIntlClientProvider>,
+  );
+  expect(
+    await screen.findByRole("link", { name: "Order supplies" }),
+  ).toHaveAttribute("href", "/en/todos/problem");
+  expect(screen.getByRole("link", { name: "Add todo" })).toHaveAttribute(
+    "href",
+    "/en/todos/new",
+  );
+  expect(
+    mocks.fetch.mock.calls.some(
+      ([url]) =>
+        new URL(url, "https://example.test").searchParams.get("kind") ===
+        "todo",
+    ),
+  ).toBe(true);
+  expect(
+    screen.queryByText(messages.en.workspace.problems.hard),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByText(messages.en.workspace.problems.unassessed),
+  ).not.toBeInTheDocument();
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: "Filters" }));
+  const filters = await screen.findByRole("dialog", { name: "Filters" });
+  expect(
+    within(filters).queryByRole("radiogroup", {
+      name: messages.en.workspace.problems.difficulty,
+    }),
+  ).not.toBeInTheDocument();
+  expect(
+    within(filters).queryByText(messages.en.workspace.problems.scooter),
+  ).not.toBeInTheDocument();
+  expect(
+    within(filters).queryByText(
+      messages.en.workspace.problems.scooterCondition,
+    ),
+  ).not.toBeInTheDocument();
+});
+
+describe("infinite problem lists", () => {
+  const observers: { enter: () => void; active: boolean }[] = [];
+  beforeEach(() => {
+    observers.length = 0;
+    mocks.user.effectiveScopes = { "problems.read": ["ALL"] };
+    vi.stubGlobal(
+      "IntersectionObserver",
+      class {
+        record: { enter: () => void; active: boolean };
+        constructor(callback: IntersectionObserverCallback) {
+          this.record = {
+            active: true,
+            enter: () =>
+              callback(
+                [{ isIntersecting: true } as IntersectionObserverEntry],
+                this as unknown as IntersectionObserver,
+              ),
+          };
+          observers.push(this.record);
+        }
+        observe() {}
+        disconnect() {
+          this.record.active = false;
+        }
+      },
+    );
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  function page(items: (typeof problem)[], currentPage = 1, total = 2) {
+    return {
+      items,
+      page: currentPage,
+      pageSize: 1,
+      total,
+      quickFilterCounts: {
+        all: total,
+        open: total,
+        in_progress: 0,
+        mine: 0,
+        resolved: 0,
+      },
+    };
+  }
+  function renderList(todo: boolean) {
+    render(
+      <NextIntlClientProvider locale="en" messages={messages.en}>
+        <ProblemsWorkspace todo={todo} />
+      </NextIntlClientProvider>,
+    );
+  }
+  function enter() {
+    const observer = observers.findLast((item) => item.active);
+    expect(observer).toBeDefined();
+    observer!.enter();
+  }
+
+  it.each([false, true])(
+    "automatically appends the next page once and stops at the end (todo=%s)",
+    async (todo) => {
+      let finish!: (value: ReturnType<typeof page>) => void;
+      const pending = new Promise<ReturnType<typeof page>>((resolve) => {
+        finish = resolve;
+      });
+      const next = { ...problem, id: "second", title: "Order supplies" };
+      mocks.fetch
+        .mockResolvedValueOnce(page([problem]))
+        .mockReturnValueOnce(pending);
+      renderList(todo);
+      await screen.findByText(problem.title);
+      expect(
+        screen.queryByRole("button", { name: "Next" }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Previous" }),
+      ).not.toBeInTheDocument();
+      act(() => {
+        enter();
+        enter();
+      });
+      expect(mocks.fetch).toHaveBeenCalledTimes(2);
+      const query = new URL(
+        mocks.fetch.mock.calls[1]![0],
+        "https://example.test",
+      ).searchParams;
+      expect(query.get("page")).toBe("2");
+      expect(query.get("kind")).toBe(todo ? "todo" : null);
+      expect(screen.getByText(problem.title)).toBeInTheDocument();
+      await act(async () => {
+        finish(page([next], 2));
+      });
+      expect(screen.getByText(problem.title)).toBeInTheDocument();
+      expect(screen.getByText(next.title)).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Load more" }),
+      ).not.toBeInTheDocument();
+      expect(observers.every((observer) => !observer.active)).toBe(true);
+    },
+  );
+
+  it.each([false, true])(
+    "discards a pending page when filters change and starts at page one (todo=%s)",
+    async (todo) => {
+      let finish!: (value: ReturnType<typeof page>) => void;
+      const pending = new Promise<ReturnType<typeof page>>((resolve) => {
+        finish = resolve;
+      });
+      const stale = { ...problem, id: "stale", title: "Old filter result" };
+      const filtered = {
+        ...problem,
+        id: "filtered",
+        title: "Completed work",
+        status: "resolved",
+      };
+      mocks.fetch
+        .mockResolvedValueOnce(page([problem]))
+        .mockReturnValueOnce(pending)
+        .mockResolvedValueOnce(page([filtered], 1, 1));
+      renderList(todo);
+      await screen.findByText(problem.title);
+      act(enter);
+      const user = userEvent.setup();
+      await user.click(screen.getByRole("radio", { name: /^Resolved/ }));
+      await screen.findByText(filtered.title);
+      const query = new URL(
+        mocks.fetch.mock.calls[2]![0],
+        "https://example.test",
+      ).searchParams;
+      expect(query.get("page")).toBe("1");
+      expect(query.get("status")).toBe("resolved");
+      expect(query.get("kind")).toBe(todo ? "todo" : null);
+      await act(async () => {
+        finish(page([stale], 2));
+      });
+      expect(screen.queryByText(stale.title)).not.toBeInTheDocument();
+      expect(screen.queryByText(problem.title)).not.toBeInTheDocument();
+      expect(screen.getByText(filtered.title)).toBeInTheDocument();
+    },
+  );
+
+  it("deduplicates tasks when records move between pages", async () => {
+    const next = { ...problem, id: "second", title: "Order supplies" };
+    mocks.fetch
+      .mockResolvedValueOnce(page([problem]))
+      .mockResolvedValueOnce(page([problem, next], 2));
+    renderList(false);
+    await screen.findByText(problem.title);
+    act(enter);
+    await screen.findByText(next.title);
+    expect(screen.getAllByText(problem.title)).toHaveLength(1);
+  });
 });

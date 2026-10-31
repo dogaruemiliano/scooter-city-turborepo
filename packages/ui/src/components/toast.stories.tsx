@@ -181,7 +181,8 @@ function Playground(props: PlaygroundProps) {
           </div>
         </section>
         <p className="text-sm text-muted-foreground">
-          Keyboard: F6 to reach notifications. Hover or focus pauses dismissal.
+          Keyboard: F6 to reach notifications. The bottom bar shows time
+          remaining. Hover or focus pauses both the countdown and dismissal.
           Swipe to dismiss. Use Storybook’s viewport controls to inspect mobile
           sizing.
         </p>
@@ -248,6 +249,7 @@ export const LongContent: Story = {
     withAction: true,
   },
 };
+/** The bottom bar drains until dismissal; hover or keyboard focus pauses it. */
 export const AutoDismiss: Story = {
   args: { timeout: motion.duration.toastDismiss },
 };

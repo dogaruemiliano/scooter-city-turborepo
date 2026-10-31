@@ -122,8 +122,8 @@ export const problemLocationSchema = businessLocationInputSchema.extend({
 });
 export const problemSchema = z.object({
   id: z.string(),
-  scooterId: z.string(),
-  scooter: maintenanceScooterSchema,
+  scooterId: z.string().nullable(),
+  scooter: maintenanceScooterSchema.nullable(),
   title: z.string(),
   description: z.string(),
   checklist: problemChecklistSchema.default([]),
@@ -166,6 +166,7 @@ export const problemListSchema = z.object({
 });
 export const listProblemsQuerySchema = z
   .object({
+    kind: z.enum(["scooter", "todo"]).optional(),
     page: z.coerce.number().int().min(1).default(1),
     pageSize: z.coerce.number().int().min(1).max(100).default(25),
     view: z.enum(["assigned", "available", "all"]).optional(),
@@ -191,9 +192,9 @@ export const listProblemsQuerySchema = z
   .strict();
 export const createProblemInputSchema = z
   .object({
-    scooterId: z.string().min(1),
+    scooterId: z.string().min(1).nullable(),
     title: z.string().trim().min(1).max(160),
-    difficulty: problemDifficultySchema,
+    difficulty: problemDifficultySchema.optional(),
     description: z.string().trim().max(4000).default(""),
     blocksUsage: z.boolean().default(false),
     assigneeId: z.string().min(1).nullable().optional(),
@@ -214,9 +215,18 @@ export const createProblemInputSchema = z
     {
       message: "Use assigneeIds or assigneeId, not both",
     },
+  )
+  .refine(
+    (input) => input.scooterId === null || input.difficulty !== undefined,
+    {
+      path: ["difficulty"],
+      message: "Scooter issues require difficulty",
+    },
   );
 export const updateProblemInputSchema = revisionInputSchema
   .extend({
+    assigneeIds: problemAssigneeIdsSchema.optional(),
+    blocksUsage: z.boolean().optional(),
     checklist: problemChecklistSchema.optional(),
     sections: problemSectionsSchema.optional(),
     buyList: problemChecklistSchema.optional(),
@@ -254,6 +264,10 @@ export const assignProblemInputSchema = revisionInputSchema
   );
 export const prioritizeProblemInputSchema = revisionInputSchema.extend({
   priority: problemPrioritySchema,
+});
+export const eligibleAssigneeQuerySchema = z.object({
+  kind: z.enum(["scooter", "todo"]).optional(),
+  search: z.string().trim().max(100).optional(),
 });
 export const eligibleAssigneeSchema = problemMemberSchema.extend({
   roles: z.array(z.string()).default([]),

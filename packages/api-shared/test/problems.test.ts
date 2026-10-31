@@ -230,7 +230,7 @@ test("assignments accept multiple unique users, clearing, and legacy requests", 
       revision: 1,
       assigneeIds: ["a"],
     }).success,
-    false,
+    true,
   );
 });
 
@@ -289,6 +289,58 @@ test("work transitions accept start or pause and reject contradictory actions", 
       revision: 1,
       startWork: true,
       pauseWork: true,
+    }).success,
+    false,
+  );
+});
+
+test("todos explicitly omit the scooter while keeping required task fields", () => {
+  const todo = { scooterId: null, title: "Order supplies" };
+  assert.equal(
+    v1.problems.createProblemInputSchema.safeParse({
+      ...todo,
+      scooterId: "scooter",
+    }).success,
+    false,
+  );
+  assert.equal(
+    v1.problems.createProblemInputSchema.parse(todo).scooterId,
+    null,
+  );
+  assert.equal(
+    v1.problems.createProblemInputSchema.safeParse({
+      title: "Missing scooter identity",
+      difficulty: "easy",
+    }).success,
+    false,
+  );
+  assert.equal(
+    v1.problems.createProblemInputSchema.safeParse({ ...todo, title: " " })
+      .success,
+    false,
+  );
+  assert.equal(
+    v1.problems.listProblemsQuerySchema.parse({ kind: "todo" }).kind,
+    "todo",
+  );
+  assert.equal(
+    v1.problems.listProblemsQuerySchema.safeParse({ kind: "other" }).success,
+    false,
+  );
+});
+
+test("full edits accept assignment and condition changes without creation fields", () => {
+  const input = {
+    revision: 2,
+    title: "Edited issue",
+    assigneeIds: ["admin"],
+    blocksUsage: false,
+  };
+  assert.deepEqual(v1.problems.updateProblemInputSchema.parse(input), input);
+  assert.equal(
+    v1.problems.updateProblemInputSchema.safeParse({
+      ...input,
+      assigneeIds: ["admin", "admin"],
     }).success,
     false,
   );

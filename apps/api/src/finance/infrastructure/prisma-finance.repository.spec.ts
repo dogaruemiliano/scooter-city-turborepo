@@ -21,6 +21,38 @@ interface DraftUploadClaimInput {
 }
 
 describe("PrismaFinanceRepository expense receipt claims", () => {
+  it("attaches and claims both receipt photos in the posting transaction", async () => {
+    const { repository, tx } = setupRepository(1);
+    const input = directExpense();
+    input.receiptAttachment!.additionalUploads = [
+      { draftUploadId: "upload-two", storageKey: "receipts/two.jpg" },
+    ];
+    await repository.createPostedExpense(input);
+    expect(tx.draftUpload.updateMany).toHaveBeenCalledTimes(2);
+    expect(tx.financialDocument.createMany).toHaveBeenCalledWith({
+      data: expect.arrayContaining([
+        expect.objectContaining({ storageKey: "receipts/manual.jpg" }),
+        expect.objectContaining({ storageKey: "receipts/two.jpg" }),
+      ]) as unknown,
+    });
+  });
+
+  it("does not post if the second receipt photo was claimed elsewhere", async () => {
+    const { repository, tx } = setupRepository(1);
+    tx.draftUpload.updateMany
+      .mockResolvedValueOnce({ count: 1 })
+      .mockResolvedValueOnce({ count: 0 });
+    const input = directExpense();
+    input.receiptAttachment!.additionalUploads = [
+      { draftUploadId: "upload-two", storageKey: "receipts/two.jpg" },
+    ];
+    await expect(repository.createPostedExpense(input)).rejects.toBeInstanceOf(
+      FinanceStateError,
+    );
+    expect(tx.journalEntry.create).not.toHaveBeenCalled();
+    expect(tx.financialOperation.update).not.toHaveBeenCalled();
+  });
+
   it("attaches a direct upload to the first invoice and claims it atomically", async () => {
     const { repository, tx } = setupRepository(1);
 

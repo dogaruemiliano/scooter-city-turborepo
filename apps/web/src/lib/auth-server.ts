@@ -55,8 +55,14 @@ export async function meOnServer(): Promise<SessionIdentity | null> {
  * that just performed a mutation against the user record).
  */
 export async function meFromApi(): Promise<SessionUser | null> {
-  const cookieHeader = (await cookies()).toString();
-  if (!cookieHeader) return null;
+  const store = await cookies();
+  // Locale and restricted guest cookies do not establish an account session.
+  if (
+    !store.get(v1.auth.ACCESS_TOKEN_COOKIE)?.value &&
+    !store.get(v1.auth.REFRESH_TOKEN_COOKIE)?.value
+  )
+    return null;
+  const cookieHeader = store.toString();
 
   try {
     return await webApi.fetch(v1.auth.ROUTES.me, v1.auth.sessionUserSchema, {

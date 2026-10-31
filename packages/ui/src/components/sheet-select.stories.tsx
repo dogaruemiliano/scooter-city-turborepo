@@ -35,3 +35,17 @@ export const SearchOnlyUnavailableOptions: Story = {
   args: { label: "Scooter", options: [], value: "", onValueChange: () => {} },
   render: () => <SearchOnlyExample />,
 };
+
+/** Small pickers can omit search without changing selection behavior. */
+export const WithoutSearch: Story = {
+  args: {
+    label: "Assignees",
+    options: [
+      { value: "ada", label: "Ada Lovelace" },
+      { value: "grace", label: "Grace Hopper" },
+    ],
+    value: "",
+    onValueChange: () => {},
+    searchable: false,
+  },
+};

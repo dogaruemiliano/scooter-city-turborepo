@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { v1 } from "@repo/api-shared";
+import { assertDocumentPhotosMutable } from "./person-document-contract-evidence";
 import { Logger } from "nestjs-pino";
 
 import { AuditService } from "../audit/audit.service";
@@ -871,16 +872,21 @@ export class PersonsService {
     }
 
     const deletedAt = new Date();
-    await this.prisma.$transaction([
-      this.prisma.personDocumentPhoto.update({
+    await this.prisma.$transaction(async (tx) => {
+      await assertDocumentPhotosMutable(tx, documentId);
+      await tx.personDocumentPhoto.update({
         where: { id: photo.id },
         data: { deletedAt },
-      }),
-      this.prisma.mediaAsset.update({
+      });
+      await tx.mediaAsset.update({
         where: { id: photo.assetId },
         data: { deletedAt },
-      }),
-    ]);
+      });
+      await tx.personDocument.update({
+        where: { id: documentId },
+        data: { updatedAt: new Date() },
+      });
+    });
 
     await this.deleteImageBestEffort(photo.asset.storageKey);
   }
@@ -1000,6 +1006,7 @@ export class PersonsService {
       city: input.city,
       region: input.region,
       countryCode: input.countryCode,
+      citizenship: input.citizenship,
       documents:
         input.documents && input.documents.length > 0
           ? {
@@ -1097,6 +1104,7 @@ export class PersonsService {
       city: input.city,
       region: input.region,
       countryCode: input.countryCode,
+      citizenship: input.citizenship,
       notes: input.notes,
     };
   }
@@ -1785,6 +1793,7 @@ export class PersonsService {
   }> {
     return this.prisma.$transaction(async (tx) => {
       const deletedAt = new Date();
+      await assertDocumentPhotosMutable(tx, documentId);
       const replaced = await tx.personDocumentPhoto.findMany({
         where: {
           personDocumentId: documentId,
@@ -1828,6 +1837,11 @@ export class PersonsService {
           slot,
         },
         include: { asset: true },
+      });
+
+      await tx.personDocument.update({
+        where: { id: documentId },
+        data: { updatedAt: new Date() },
       });
 
       return { photo, replacedStorageKeys };

@@ -6,9 +6,10 @@ export interface CameraPreviewLayoutInput {
   topControlsHeight: number;
   bottomControlsHeight: number;
   gap: number;
+  fit?: "contain" | "cover";
 }
 
-/** Fit the entire camera frame first, then use letterboxing for controls. */
+/** Contain preserves the frame; cover fills the area between separate controls. */
 export function fitCameraPreview(input: CameraPreviewLayoutInput) {
   const {
     containerWidth,
@@ -18,6 +19,7 @@ export function fitCameraPreview(input: CameraPreviewLayoutInput) {
     topControlsHeight,
     bottomControlsHeight,
     gap,
+    fit = "contain",
   } = input;
   if (
     containerWidth <= 0 ||
@@ -26,6 +28,20 @@ export function fitCameraPreview(input: CameraPreviewLayoutInput) {
     sourceHeight <= 0
   )
     return null;
+  if (fit === "cover") {
+    const top = Math.min(containerHeight, Math.max(0, topControlsHeight));
+    return {
+      left: 0,
+      top,
+      width: containerWidth,
+      height: Math.max(
+        0,
+        containerHeight - top - Math.max(0, bottomControlsHeight),
+      ),
+      guideTopInset: 0,
+      guideBottomInset: 0,
+    };
+  }
   const scale = Math.min(
     containerWidth / sourceWidth,
     containerHeight / sourceHeight,

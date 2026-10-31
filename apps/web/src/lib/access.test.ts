@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { canAccess, canVisit } from "./access";
 describe("current user capabilities", () => {
+  it("only shows todos to admins, including nested todo routes", () => {
+    for (const path of ["/todos", "/todos/new", "/todos/task"]) {
+      expect(canVisit({ isAdmin: true }, path)).toBe(true);
+      expect(canVisit({ isSuperAdmin: true }, path)).toBe(true);
+      expect(
+        canVisit({ effectiveScopes: { "problems.read": ["ALL"] } }, path),
+      ).toBe(false);
+      expect(canVisit(null, path)).toBe(false);
+    }
+  });
   it("exposes delegated administration pages from their independent read grants", () => {
     const manager = {
       effectiveScopes: { "users.read": ["ALL"], "roles.read": ["ALL"] },

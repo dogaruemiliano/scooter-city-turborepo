@@ -9,7 +9,7 @@ import {
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { messages } from "@repo/i18n";
-import { ApiError } from "@repo/api-shared";
+import { ApiError, v1 } from "@repo/api-shared";
 import { beforeEach, afterEach, expect, it, vi } from "vitest";
 import {
   useCallback,
@@ -96,6 +96,15 @@ beforeEach(() => {
   mocks.post.mockResolvedValue({ id: "rental-1" });
   mocks.fetch.mockImplementation((url: string, _schema, options) => {
     if (options?.method === "POST") return mocks.post(url, options);
+    if (url.startsWith("/v1/rentals/quote?")) {
+      const query = new URL(url, "https://fixture.test").searchParams;
+      return Promise.resolve(
+        v1.rentals.calculateRentalTerms(
+          "without_license",
+          v1.rentals.rentalPromotionSchema.parse(query.get("promotion")),
+        ),
+      );
+    }
     return Promise.resolve({
       items: url.startsWith("/v1/persons") ? [person] : [scooter],
       page: 1,
@@ -104,7 +113,80 @@ beforeEach(() => {
     });
   });
 });
+
+it("uses the authoritative quote and preserves the 28-day Bucharest promotion without recording a receipt", async () => {
+  writeRentalDraft("staff", completeDraft());
+  const browser = userEvent.setup();
+  renderWizard();
+  await loaded();
+  expect(await screen.findByText(/Initial total:.*600/)).toBeVisible();
+  await browser.click(
+    screen.getByRole("combobox", { name: "Initial rental plan" }),
+  );
+  await browser.click(
+    await screen.findByRole("option", { name: "3+1 · 28 days" }),
+  );
+  expect(await screen.findByText(/Initial total:.*1,200/)).toBeVisible();
+  const draft = readRentalDraft("staff")!;
+  expect(draft.promotion).toBe("three_plus_one");
+  expect(draft.period?.timeZone).toBe("Europe/Bucharest");
+  expect(draft.period?.endsAt).toBe(
+    v1.rentals
+      .addRentalCalendar(new Date(draft.period!.startsAt), 28)
+      .toISOString(),
+  );
+  expect(mocks.post).not.toHaveBeenCalled();
+});
 afterEach(() => vi.restoreAllMocks());
+
+it("blocks a returning customer's promotional plan and allows recovery to standard", async () => {
+  writeRentalDraft("staff", {
+    ...completeDraft(),
+    promotion: "three_plus_one",
+  });
+  const fetch = mocks.fetch.getMockImplementation()!;
+  mocks.fetch.mockImplementation((url: string, ...args) => {
+    if (url.startsWith("/v1/rentals/quote?")) {
+      const query = new URL(url, "https://fixture.test").searchParams;
+      expect(query.get("personId")).toBe(person.id);
+      if (query.get("promotion") === "three_plus_one")
+        return Promise.reject(
+          new ApiError(
+            409,
+            "New customers only",
+            v1.rentals.NEW_CUSTOMER_PROMOTION_ERROR_CODE,
+          ),
+        );
+    }
+    return fetch(url, ...args);
+  });
+  const browser = userEvent.setup();
+  renderWizard();
+  expect(
+    (
+      await screen.findAllByText(
+        /The 3\+1 offer is available only to new customers/,
+      )
+    ).length,
+  ).toBeGreaterThan(0);
+  await browser.click(
+    screen.getByRole("button", { name: "Continue to review" }),
+  );
+  expect(readRentalDraft("staff")?.step).toBe("details");
+  await browser.click(
+    screen.getByRole("combobox", { name: "Initial rental plan" }),
+  );
+  await browser.click(
+    await screen.findByRole("option", { name: "Standard · 7 days" }),
+  );
+  expect(await screen.findByText(/Initial total:.*600/)).toBeVisible();
+  await browser.click(
+    screen.getByRole("button", { name: "Continue to review" }),
+  );
+  expect(readRentalDraft("staff")?.step).toBe("review");
+  expect(readRentalDraft("staff")?.personId).toBe(person.id);
+  expect(mocks.post).not.toHaveBeenCalled();
+});
 
 function HeaderHarness({ children }: { children: ReactNode }) {
   const [navigation, setNavigation] = useState<PageHeaderNavigationOptions>({});
@@ -254,7 +336,11 @@ it("uses real person/scooter selectors, calculates a week, and creates only on f
       target: { value },
     });
   expect(screen.getByText(/First week:/)).toHaveTextContent("31");
-  expect(readRentalDraft("staff")).toBeNull();
+  expect(readRentalDraft("staff")).toMatchObject({
+    personId: person.id,
+    scooterId: scooter.id,
+    step: "details",
+  });
   await user.click(screen.getByRole("button", { name: "Continue to review" }));
   expect(mocks.post).not.toHaveBeenCalled();
   expect(screen.getByRole("heading", { name: "Review rental" })).toHaveFocus();
@@ -279,7 +365,7 @@ it("uses real person/scooter selectors, calculates a week, and creates only on f
   expect(readRentalDraft("staff")).toBeNull();
 });
 
-it("does not restore or offer to resume input before completing the first step", async () => {
+it("autosaves and resumes input before completing the first step", async () => {
   const view = renderWizard();
   await loaded();
   fireEvent.change(screen.getByPlaceholderText("DD"), {
@@ -292,17 +378,12 @@ it("does not restore or offer to resume input before completing the first step",
     </NextIntlClientProvider>,
   );
   expect(
-    await screen.findByRole("link", { name: "Create rental" }),
+    await screen.findByRole("link", { name: "Resume rental" }),
   ).toHaveAttribute("href", "/rentals/new");
   action.unmount();
   renderWizard();
   await loaded();
-  expect(screen.getByPlaceholderText("DD")).toHaveValue(
-    String(new Date().getDate()).padStart(2, "0"),
-  );
-  expect(screen.getByPlaceholderText("MM")).toHaveValue(
-    String(new Date().getMonth() + 1).padStart(2, "0"),
-  );
+  expect(screen.getByPlaceholderText("DD")).toHaveValue("2");
 });
 
 it("flushes before adding a person, then restores the draft with the new person selected", async () => {
@@ -566,19 +647,20 @@ it("leaves an untouched or validation-only form without saving or prompting", as
   expect(localStorage.length).toBe(0);
 });
 
-it("keeps first-step edits out of storage and leaves without offering to save", async () => {
+it("autosaves first-step edits and offers a safe exit without losing them", async () => {
   const user = userEvent.setup();
   renderWizard();
   await loaded();
   const day = screen.getByPlaceholderText("DD");
   fireEvent.change(day, { target: { value: "2" } });
-  expect(readRentalDraft("staff")).toBeNull();
+  expect(readRentalDraft("staff")?.startDate.day).toBe("2");
   fireEvent.change(day, { target: { value: "24" } });
-  expect(readRentalDraft("staff")).toBeNull();
-  expect(screen.getByPlaceholderText("DD")).toHaveValue("24");
+  expect(readRentalDraft("staff")?.startDate.day).toBe("24");
   await user.click(screen.getByRole("button", { name: "Header back" }));
-  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  const dialog = await screen.findByRole("dialog");
+  await user.click(within(dialog).getByRole("button", { name: "Save draft" }));
   expect(mocks.replace).toHaveBeenCalledWith("/rentals");
+  expect(readRentalDraft("staff")?.startDate.day).toBe("24");
   expect(mocks.post).not.toHaveBeenCalled();
 });
 
@@ -687,7 +769,10 @@ it("returns from adding a person to an empty form without saving an empty draft"
   renderWizard({ returnedDraftId: draftId, returnedPersonId: person.id });
   await loaded();
   expect(screen.getByText("Ada Lovelace")).toBeVisible();
-  expect(readRentalDraft("staff")).toBeNull();
+  expect(readRentalDraft("staff")).toMatchObject({
+    personId: person.id,
+    inputTouched: true,
+  });
 });
 
 it("keeps autosaving edits after passing details and going back, including after remount", async () => {
@@ -714,7 +799,7 @@ it("keeps autosaving edits after passing details and going back, including after
   expect(readRentalDraft("staff")?.startDate.day).toBe("3");
 });
 
-it("preserves first-step input only in memory during the add-person round trip", async () => {
+it("persists first-step input during the add-person round trip", async () => {
   const user = userEvent.setup();
   const view = renderWizard();
   await loaded();
@@ -733,14 +818,17 @@ it("preserves first-step input only in memory during the add-person round trip",
     mocks.push.mock.calls[0]![0],
     "https://example.test",
   ).searchParams.get("returnToRental")!;
-  expect(localStorage.length).toBe(0);
+  expect(readRentalDraft("staff")?.startDate.day).toBe("2");
   expect(sessionStorage.length).toBe(0);
   view.unmount();
   renderWizard({ returnedDraftId: draftId, returnedPersonId: person.id });
   await loaded();
   expect(screen.getByPlaceholderText("DD")).toHaveValue("2");
   expect(screen.getByText("Ada Lovelace")).toBeVisible();
-  expect(readRentalDraft("staff")).toBeNull();
+  expect(readRentalDraft("staff")).toMatchObject({
+    personId: person.id,
+    startDate: { day: "2" },
+  });
 });
 
 function rentalSwipe(
@@ -809,7 +897,7 @@ it("uses swipes to edit and return to review without ever submitting a rental", 
   expect(screen.getByRole("heading", { name: "Review rental" })).toBeVisible();
 });
 
-it("does not let a swipe bypass first-step validation or save an incomplete draft", async () => {
+it("does not let a swipe bypass validation while preserving incomplete draft input", async () => {
   const view = renderWizard();
   await loaded();
   fireEvent.change(screen.getByPlaceholderText("DD"), {
@@ -821,7 +909,11 @@ it("does not let a swipe bypass first-step validation or save an incomplete draf
     100,
   );
   expect(screen.getByRole("heading", { name: "Rental details" })).toBeVisible();
-  expect(readRentalDraft("staff")).toBeNull();
+  expect(readRentalDraft("staff")).toMatchObject({
+    step: "details",
+    detailsCompleted: false,
+    startDate: { day: "2" },
+  });
   expect(mocks.post).not.toHaveBeenCalled();
 });
 

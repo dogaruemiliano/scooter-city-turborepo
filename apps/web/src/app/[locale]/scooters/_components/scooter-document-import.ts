@@ -8,7 +8,6 @@ import {
   type SourceImportIssue,
 } from "./scooter-document-sources";
 import { parseInsuranceImport } from "./scooter-insurance-import";
-import { documentedLicenseSuggestion } from "./scooter-license-suggestion";
 import { v1 } from "@repo/api-shared";
 import {
   CREATE_FIELDS,
@@ -59,7 +58,6 @@ export type DocumentImportResult =
       values: Partial<Record<ScooterEditorField, string>>;
       insurancePolicies?: ScooterEditorValues["insurancePolicies"];
       needsVinReview?: boolean;
-      autoFilledLicenseCategory?: boolean;
       rawFields?: Record<string, string>;
       unmatchedBrand?: string;
       confirmedEmpty: string[];
@@ -156,6 +154,9 @@ export function parseDocumentImport(
   let rawFields: Record<string, string> | undefined;
   let unmatchedBrand: string | undefined;
   for (const [key, raw] of Object.entries(source as Record<string, unknown>)) {
+    // Missing document data must not replace the operator's application policy.
+    if (key === "requiredLicenseCategory" && (raw == null || raw === ""))
+      continue;
     if (
       key === "insurancePolicies" ||
       key === "documentVins" ||
@@ -260,12 +261,6 @@ export function parseDocumentImport(
         if (values[field]) errors.add(field);
         else values[field] = "";
       }
-      if (
-        values.requiredLicenseCategory &&
-        values.requiredLicenseCategory !== "none"
-      )
-        errors.add("requiredLicenseCategory");
-      values.requiredLicenseCategory = "none";
     } else {
       if (
         values.registrationType !== "temporary" &&
@@ -289,23 +284,6 @@ export function parseDocumentImport(
     }
   }
   const merged = { ...current, ...values };
-  const autoFilledLicenseCategory =
-    !editing &&
-    merged.registrationType !== "unregistered" &&
-    (!merged.requiredLicenseCategory ||
-      merged.requiredLicenseCategory === "none") &&
-    documentedLicenseSuggestion(merged.maxSpeedKmh) === "none";
-  if (autoFilledLicenseCategory) {
-    values.requiredLicenseCategory = "none";
-    merged.requiredLicenseCategory = "none";
-    if (sourceData?.fieldSources.maxSpeedKmh)
-      sourceData.fieldSources.requiredLicenseCategory =
-        sourceData.fieldSources.maxSpeedKmh;
-    for (const fields of [unresolved, emptyConflicts]) {
-      const index = fields.indexOf("requiredLicenseCategory");
-      if (index !== -1) fields.splice(index, 1);
-    }
-  }
   const inactive: readonly string[] = v1.scooters.inactivePowertrainFields(
     merged.powertrainType,
   );
@@ -394,7 +372,6 @@ export function parseDocumentImport(
       : {}),
     ...(insurance.policies ? { insurancePolicies: insurance.policies } : {}),
     ...(insurance.needsVinReview ? { needsVinReview: true } : {}),
-    ...(autoFilledLicenseCategory ? { autoFilledLicenseCategory: true } : {}),
     values,
     rawFields,
     unmatchedBrand,

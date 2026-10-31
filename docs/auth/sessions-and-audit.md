@@ -101,3 +101,10 @@ When `AUTH_CLEANUP_ENABLED=true`, a daily 03:00 job deletes:
 - Sessions revoked more than 30 days ago
 
 Audit events are not deleted by this job.
+
+Rental inspection photographs add two append-only application event types:
+
+- `RENTAL_MEDIA_UPLOADED` records the authenticated uploader, rental, photo/asset IDs, handover/return event and normalized file SHA-256 after the metadata transaction succeeds.
+- `RENTAL_MEDIA_ACCESSED` records authorized access to a rental photograph after its stored bytes pass integrity verification.
+
+These events contain references and actors, not image bytes, customer identity-document contents or signing secrets. Media retention is documented in `docs/rentals/private-media.md`.

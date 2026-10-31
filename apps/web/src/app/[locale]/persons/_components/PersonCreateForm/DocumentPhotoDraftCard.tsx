@@ -42,6 +42,7 @@ export function DocumentPhotoDraftCard({
   return (
     <div data-slot="document-preview" className="relative min-w-0">
       <DocumentInput
+        editOnSelect
         id={inputId}
         value={
           upload

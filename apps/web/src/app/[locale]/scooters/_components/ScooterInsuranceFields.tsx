@@ -180,16 +180,15 @@ export function ScooterInsuranceFields({
                   {t(`status.${v1.scooters.insuranceStatus(policy)}`)}
                 </Badge>
               ) : null}
-              {canWrite && onRemovePolicy ? (
+              {canWrite &&
+              onRemovePolicy &&
+              policies.length > 1 &&
+              canRemovePolicy?.(index) !== false ? (
                 <Button
                   type="button"
                   variant="destructive"
                   size="icon"
-                  disabled={
-                    readOnly ||
-                    policies.length <= 1 ||
-                    canRemovePolicy?.(index) === false
-                  }
+                  disabled={readOnly}
                   aria-label={t("delete")}
                   onClick={() => onRemovePolicy(index)}
                 >

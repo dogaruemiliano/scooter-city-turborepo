@@ -14,6 +14,7 @@ import { ScheduleModule } from "@nestjs/schedule";
 import { AccessModule } from "./access/access.module";
 import { ProblemsModule } from "./problems/problems.module";
 import { RentalsModule } from "./rentals/rentals.module";
+import { ContractsModule } from "./contract-templates/contracts.module";
 import { PortalModule } from "./portal/portal.module";
 import { AuditModule } from "./audit/audit.module";
 import { buildAuthConfig } from "./auth/auth.config";
@@ -54,6 +55,7 @@ const env = loadEnv();
     AccessModule,
     ProblemsModule,
     RentalsModule,
+    ContractsModule,
     PortalModule,
 
     // Internal (non-global) feature modules.

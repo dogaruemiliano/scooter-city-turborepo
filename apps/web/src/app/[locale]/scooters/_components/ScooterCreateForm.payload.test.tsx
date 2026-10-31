@@ -61,6 +61,15 @@ describe("Scooter create controls with the create resolver", () => {
         },
       ),
     );
+    for (const field of [
+      "commercialCategory",
+      "limiterKind",
+      "limiterKmh",
+      "maxSpeedSource",
+      "configurationEvidence",
+      "speedConfigurationChangeReason",
+    ])
+      expect(mocks.apiFetch.mock.calls[0]![2].json).not.toHaveProperty(field);
   });
 
   it("submits an optional nonnegative whole-number mileage", async () => {

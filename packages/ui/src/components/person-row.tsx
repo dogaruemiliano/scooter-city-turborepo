@@ -56,7 +56,7 @@ export function PersonRow({
       {action || details || metadata ? (
         <span
           data-slot="person-trailing"
-          className="flex shrink-0 flex-col items-end justify-between gap-2 self-stretch"
+          className={`flex shrink-0 flex-col items-end gap-2 ${details || metadata ? "self-stretch justify-between" : "justify-center"}`}
         >
           {metadata || action ? (
             <span className="flex flex-col items-end gap-2">

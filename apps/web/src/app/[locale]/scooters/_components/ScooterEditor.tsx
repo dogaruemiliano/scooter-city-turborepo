@@ -463,6 +463,7 @@ export function ScooterEditor({
       insuranceSelectionRequired
     )
       return;
+    const json = scooter ? scooterChangedFields(input, dirtyFields) : input;
     const emptySavedPolicy = (form.getValues("insurancePolicies") ?? []).find(
       (policy) =>
         canWriteDocuments &&
@@ -500,7 +501,6 @@ export function ScooterEditor({
       }
       const sessionId = await documents.ensureSession();
       documents.beginSave();
-      const json = scooter ? scooterChangedFields(input, dirtyFields) : input;
       const payload: v1.scooters.UpdateScooterInput = {
         ...json,
         ...(expectedUpdatedAt ? { expectedUpdatedAt } : {}),

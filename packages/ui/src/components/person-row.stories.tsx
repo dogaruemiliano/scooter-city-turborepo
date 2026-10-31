@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { CheckIcon, PencilIcon } from "lucide-react";
+import { CheckIcon, PencilIcon, XIcon } from "lucide-react";
 import { Button } from "./button";
 import { PersonRow } from "./person-row";
 import { PersonDocuments } from "./person-card";
@@ -43,6 +43,26 @@ export const SelectedPerson: Story = {
       />
     </div>
   ),
+};
+
+/** Standalone actions stay centered beside a multi-line identity. */
+export const CenteredRemoveAction: Story = {
+  args: {
+    name: "Ada Lovelace",
+    email: "ada@example.com",
+    description: "Admin",
+    action: (
+      <Button
+        type="button"
+        variant="secondary-destructive"
+        size="icon"
+        aria-label="Remove Ada Lovelace"
+      >
+        <XIcon />
+      </Button>
+    ),
+  },
+  render: SelectOption.render,
 };
 
 export const LongIdentity: Story = {

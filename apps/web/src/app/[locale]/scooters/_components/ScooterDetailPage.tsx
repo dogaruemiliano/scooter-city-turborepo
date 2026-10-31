@@ -38,6 +38,7 @@ import { cn } from "@repo/ui/lib/utils";
 import {
   CarFrontIcon,
   PencilIcon,
+  Share2Icon,
   Trash2Icon,
   TriangleAlertIcon,
 } from "lucide-react";
@@ -64,9 +65,9 @@ import {
   scooterFieldConflict,
 } from "./scooter-feedback";
 import { CivDetails } from "./CivDetails";
-import { ScooterDocumentMediaList } from "./ScooterDocumentMediaList";
-import { ScooterDocumentList } from "./ScooterDocumentUpload";
-import { ScooterPhotos } from "./ScooterPhotos";
+import { useShareClientDocuments } from "./useShareClientDocuments";
+import { ScooterDetailDocuments } from "./ScooterDetailDocuments";
+import { ScooterDetailPhotos } from "./ScooterDetailPhotos";
 import { ScooterDetailHero } from "./ScooterDetailHero";
 import { ScooterRegistrationFormFields } from "./ScooterRegistrationFormFields";
 import {
@@ -100,7 +101,10 @@ export function ScooterDetailPage({
   const router = useRouter();
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
-  const [photosBusy, setPhotosBusy] = useState(false);
+  const clientDocumentShare = useShareClientDocuments(
+    scooter,
+    canAccess(session?.user, "scooter_documents.read"),
+  );
   const readiness = v1.scooters.scooterReadinessIssues(scooter);
   const [registrationOpen, setRegistrationOpen] = useState(false);
   const [registrationDialogKey, setRegistrationDialogKey] = useState(0);
@@ -164,17 +168,24 @@ export function ScooterDetailPage({
       <div className="hidden justify-end md:flex">
         <MoreActionsMenu
           ariaLabel={t("actions.moreActions")}
+          onOpenChange={clientDocumentShare.onMenuOpenChange}
           groups={[
             [
+              {
+                key: "share-client-documents",
+                permission: "scooter_documents.read",
+                label: t("sharing.action"),
+                description: clientDocumentShare.description,
+                icon: <Share2Icon data-icon="inline-start" />,
+                disabled: clientDocumentShare.disabled || busyAction !== null,
+                onClick: clientDocumentShare.share,
+              },
               {
                 key: "report-problem",
                 permission: "problems.create",
                 label: t("actions.reportProblem"),
                 icon: <TriangleAlertIcon data-icon="inline-start" />,
-                disabled:
-                  Boolean(scooter.deletedAt) ||
-                  busyAction !== null ||
-                  photosBusy,
+                disabled: Boolean(scooter.deletedAt) || busyAction !== null,
                 onClick: () =>
                   router.push(
                     `${localizePath("/problems/new", resolveRouteLocale(locale))}?scooterId=${encodeURIComponent(scooter.id)}`,
@@ -187,7 +198,7 @@ export function ScooterDetailPage({
                       permission: "scooters.update",
                       label: t("actions.addRegistration"),
                       icon: <PencilIcon data-icon="inline-start" />,
-                      disabled: busyAction !== null || photosBusy,
+                      disabled: busyAction !== null,
                       onClick: () => {
                         setRegistrationDialogKey((current) => current + 1);
                         setRegistrationOpen(true);
@@ -200,7 +211,7 @@ export function ScooterDetailPage({
                 permission: "scooters.update",
                 label: t("actions.editScooter"),
                 icon: <PencilIcon data-icon="inline-start" />,
-                disabled: busyAction !== null || photosBusy,
+                disabled: busyAction !== null,
                 onClick: () => router.push(scooterEditHref),
               },
             ],
@@ -211,7 +222,7 @@ export function ScooterDetailPage({
                 label: t("actions.deleteScooter"),
                 icon: <Trash2Icon data-icon="inline-start" />,
                 variant: "destructive",
-                disabled: busyAction !== null || photosBusy,
+                disabled: busyAction !== null,
                 onClick: () => setDeleteOpen(true),
               },
             ],
@@ -237,41 +248,24 @@ export function ScooterDetailPage({
         </div>
       ) : null}
       {feedback ? <FeedbackAlert feedback={feedback} /> : null}
+      {clientDocumentShare.shareError ? (
+        <Alert variant="destructive">
+          <AlertTitle>{clientDocumentShare.shareError}</AlertTitle>
+        </Alert>
+      ) : null}
       {canAccess(session?.user, "problems.read") ? (
         <ScooterProblems scooterId={scooter.id} />
       ) : null}
-      <ScooterPhotos
-        scooterId={scooter.id}
-        panel
-        disabled={Boolean(scooter.deletedAt) || busyAction !== null}
-        onBusyChange={setPhotosBusy}
-        onSaved={() => router.refresh()}
-      />
+      <ScooterDetailPhotos scooterId={scooter.id} />
 
-      <DetailSection title={t("sections.identity")}>
-        <DetailField label={t("fields.vin")} value={scooter.vin} />
-        <DetailField label={t("fields.brand")} value={scooter.brand} />
-        <DetailField
-          label={t("fields.model")}
-          value={scooter.model ?? t("detail.emptyValue")}
-        />
-        <DetailField
-          label={t("fields.color")}
-          value={scooter.color ?? t("detail.emptyValue")}
-        />
-      </DetailSection>
-
-      <CivDetails scooter={scooter} />
-      <ScooterDocumentMediaList documents={scooter.documents ?? []}>
-        {canAccess(session?.user, "scooter_documents.read") ? (
-          <ScooterDocumentList documents={scooter.documents ?? []} />
-        ) : null}
+      <ScooterDetailDocuments documents={scooter.documents ?? []}>
         <ScooterComplianceSection scooter={scooter} />
-      </ScooterDocumentMediaList>
+      </ScooterDetailDocuments>
       <Accordion>
         <AccordionItem value="details">
           <AccordionTrigger>{t("detail.moreDetails")}</AccordionTrigger>
           <AccordionContent className="grid gap-6">
+            <CivDetails scooter={scooter} />
             <DetailSection title={t("sections.operational")}>
               {(
                 [

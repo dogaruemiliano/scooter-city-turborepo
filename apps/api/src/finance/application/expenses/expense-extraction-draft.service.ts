@@ -28,6 +28,7 @@ export class ExpenseExtractionDraftService {
   async begin(input: {
     ownerUserId: string;
     sourceUploadId: string;
+    additionalSourceUploadIds?: string[];
     provider: string;
   }): Promise<BeginExpenseExtractionResult> {
     const availableAt = new Date();

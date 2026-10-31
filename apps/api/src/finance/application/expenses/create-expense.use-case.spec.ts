@@ -80,6 +80,52 @@ describe("CreateExpenseUseCase receipt confirmation", () => {
     );
   });
 
+  it("resolves both extraction sources when creating the expense", async () => {
+    const { useCase, repository, prisma } = setup({
+      status: "READY",
+      additionalSourceUploadIds: ["upload-two"],
+    });
+    await useCase.execute({
+      input,
+      idempotencyKey: "two-pages",
+      createdById: "user-1",
+    });
+    expect(prisma.draftUpload.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          userId: "user-1",
+          claimedAt: null,
+          cleanupStartedAt: null,
+        }) as unknown,
+      }),
+    );
+    expect(repository.createPostedExpense).toHaveBeenCalledWith(
+      expect.objectContaining({
+        receiptAttachment: expect.objectContaining({
+          additionalUploads: [
+            { draftUploadId: "upload-two", storageKey: "receipts/two.jpg" },
+          ],
+        }) as unknown,
+      }),
+    );
+  });
+
+  it("refuses an extraction whose second photo is no longer available", async () => {
+    const { useCase, repository, prisma } = setup({
+      status: "READY",
+      additionalSourceUploadIds: ["upload-two"],
+    });
+    prisma.draftUpload.findMany.mockResolvedValue([]);
+    await expect(
+      useCase.execute({
+        input,
+        idempotencyKey: "missing-page",
+        createdById: "user-1",
+      }),
+    ).rejects.toBeInstanceOf(FinanceStateError);
+    expect(repository.createPostedExpense).not.toHaveBeenCalled();
+  });
+
   it("refuses an extraction draft that was already confirmed", async () => {
     const { useCase, repository } = setup({
       status: "CONFIRMED",
@@ -250,6 +296,7 @@ function setup(inputDraft: {
   status: "READY" | "CONFIRMED";
   confirmedOperationId?: string;
   cleanupStartedAt?: Date;
+  additionalSourceUploadIds?: string[];
 }) {
   const repository = {
     findOperationByIdempotencyKey: jest.fn().mockResolvedValue(null),
@@ -278,6 +325,7 @@ function setup(inputDraft: {
       findFirst: jest.fn().mockResolvedValue({
         id: "draft-1",
         sourceUploadId: "upload-1",
+        additionalSourceUploadIds: inputDraft.additionalSourceUploadIds ?? [],
         status: inputDraft.status,
         confirmedOperationId: inputDraft.confirmedOperationId ?? null,
         sourceUpload: {
@@ -289,6 +337,11 @@ function setup(inputDraft: {
       }),
     },
     draftUpload: {
+      findMany: jest
+        .fn()
+        .mockResolvedValue([
+          { id: "upload-two", storageKey: "receipts/two.jpg" },
+        ]),
       findUnique: jest.fn().mockResolvedValue(validDraftUpload),
     },
   };

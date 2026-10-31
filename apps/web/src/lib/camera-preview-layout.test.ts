@@ -12,6 +12,42 @@ const portraitPhone = {
 };
 
 describe("fitCameraPreview", () => {
+  it.each([
+    { width: 390, height: 844 },
+    { width: 844, height: 390 },
+  ])(
+    "fills the preview between control bars in cover mode ($width × $height)",
+    ({ width, height }) => {
+      const frame = fitCameraPreview({
+        ...portraitPhone,
+        containerWidth: width,
+        containerHeight: height,
+        fit: "cover",
+      })!;
+      expect(frame).toMatchObject({
+        left: 0,
+        top: portraitPhone.topControlsHeight,
+        width,
+        height:
+          height -
+          portraitPhone.topControlsHeight -
+          portraitPhone.bottomControlsHeight,
+        guideTopInset: 0,
+        guideBottomInset: 0,
+      });
+    },
+  );
+
+  it("keeps the cover area nonnegative when controls fill a short viewport", () => {
+    const frame = fitCameraPreview({
+      ...portraitPhone,
+      containerHeight: 120,
+      fit: "cover",
+    })!;
+    expect(frame.height).toBe(0);
+    expect(frame.top).toBe(80);
+  });
+
   it("uses the complete portrait camera frame and places it between controls when it fits", () => {
     const frame = fitCameraPreview(portraitPhone)!;
 

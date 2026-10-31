@@ -14,6 +14,8 @@ import { RefreshCwIcon } from "lucide-react";
 import { ApiError, v1 } from "@repo/api-shared";
 import {
   Button,
+  Checkbox,
+  SheetSelect,
   Field,
   FieldDescription,
   FieldError,
@@ -33,7 +35,12 @@ import {
   ScooterSelectRow,
   loadScooterSelectItems,
 } from "@/components/ScooterSelect";
-import { Feedback, useRemote, useTask } from "@/components/WorkspaceForm";
+import {
+  Choice,
+  Feedback,
+  useRemote,
+  useTask,
+} from "@/components/WorkspaceForm";
 import { useWorkspaceNotifications } from "@/components/WorkspaceNotifications";
 import { useSession } from "@/components/auth/SessionProvider";
 import { Link, useRouter } from "@/i18n/navigation";
@@ -57,21 +64,66 @@ export function RentalCreateWizard({
 }) {
   const t = useTranslations("workspace.rentals.wizard");
   const rentalT = useTranslations("workspace.rentals");
+  const contractsT = useTranslations("contracts");
   const locale = useLocale();
   const router = useRouter();
   const { user } = useSession();
   const formAction = useFormAction();
   const task = useTask({
     [v1.problems.MAINTENANCE_HOLD_ERROR_CODE]: rentalT("maintenanceHold"),
+    [v1.rentals.NEW_CUSTOMER_PROMOTION_ERROR_CODE]: contractsT(
+      "threePlusOneNewCustomersOnly",
+    ),
   });
   const store = useRentalDraft(userId, {
     draftId: returnedDraftId,
     personId: returnedPersonId,
   });
   const { draft } = store;
+  const quoteScooterId = draft?.scooterId ?? "";
+  const quotePersonId = draft?.personId ?? "";
+  const promotionEligibilityMessage = contractsT(
+    "threePlusOneNewCustomersOnly",
+  );
+  const promotion = draft?.promotion ?? "standard";
+  const rentalPaymentMethod = draft?.rentalPaymentMethod ?? "cash";
+  const depositPaymentMethod = draft?.depositPaymentMethod ?? "cash";
+  const loadQuote = useCallback(async () => {
+    if (!quoteScooterId || !quotePersonId) return null;
+    const query = new URLSearchParams({
+      scooterId: quoteScooterId,
+      personId: quotePersonId,
+      promotion,
+      rentalPaymentMethod,
+      depositPaymentMethod,
+    });
+    try {
+      return await webApi.fetch(
+        `/v1/rentals/quote?${query}`,
+        v1.rentals.rentalTermsSchema,
+        { cache: "no-store" },
+      );
+    } catch (error) {
+      if (
+        error instanceof ApiError &&
+        error.code === v1.rentals.NEW_CUSTOMER_PROMOTION_ERROR_CODE
+      )
+        throw new Error(promotionEligibilityMessage);
+      throw error;
+    }
+  }, [
+    quoteScooterId,
+    quotePersonId,
+    promotion,
+    rentalPaymentMethod,
+    depositPaymentMethod,
+    promotionEligibilityMessage,
+  ]);
+  const quote = useRemote(loadQuote);
+  const reloadQuote = quote.reload;
   const [attempted, setAttempted] = useState(false);
   const leaveGuard = useWizardLeaveGuard(
-    Boolean(draft?.detailsCompleted && !draft.createdRentalId),
+    Boolean(draft && canPersistRentalDraft(draft) && !draft.createdRentalId),
   );
   const submitting = useRef(false);
   const mounted = useRef(true);
@@ -123,10 +175,18 @@ export function RentalCreateWizard({
           if (retryingOptions.current) return;
           retryingOptions.current = true;
           reloadOptions();
+          reloadQuote();
         },
       },
     });
-  }, [options.error, options.loading, reloadOptions, loadErrorToastId, t]);
+  }, [
+    options.error,
+    options.loading,
+    reloadOptions,
+    reloadQuote,
+    loadErrorToastId,
+    t,
+  ]);
   useEffect(
     () => () => {
       toastRef.current?.dismiss(loadErrorToastId);
@@ -138,9 +198,12 @@ export function RentalCreateWizard({
   const getUnavailableReasons = (
     item: import("@/components/ScooterSelect").ScooterSelectItem,
   ) =>
-    scooterRentalBlockers(item, v1.common.dateOnlyToday()).map((reason) =>
-      t(reason),
-    );
+    scooterRentalBlockers(
+      item,
+      draft?.period
+        ? v1.rentals.rentalDateOnly(new Date(draft.period.startsAt))
+        : v1.common.dateOnlyToday(),
+    ).map((reason) => t(reason));
   const scooterBlockers = scooter ? getUnavailableReasons(scooter) : [];
   const authorized = user?.id === userId && canAccess(user, "rentals.create");
 
@@ -195,6 +258,10 @@ export function RentalCreateWizard({
   const ready = Boolean(
     person &&
     scooter &&
+    ((draft.renterDrives ?? true) || Boolean(draft.driverPersonIds?.length)) &&
+    !quote.loading &&
+    !quote.error &&
+    quote.data &&
     !scooterBlockers.length &&
     draft.period &&
     !options.loading &&
@@ -238,6 +305,18 @@ export function RentalCreateWizard({
     submitting.current = true;
     await task.run(async () => {
       const parsed = v1.rentals.createRentalInputSchema.safeParse({
+        promotion,
+        ...(draft.conclusionContext
+          ? { conclusionContext: draft.conclusionContext }
+          : {}),
+        rentalPaymentMethod,
+        depositPaymentMethod,
+        driverPersonIds: [
+          ...new Set([
+            ...((draft.renterDrives ?? true) ? [draft.personId] : []),
+            ...(draft.driverPersonIds ?? []),
+          ]),
+        ],
         personId: draft.personId,
         scooterId: draft.scooterId,
         startsAt: draft.period!.startsAt,
@@ -292,7 +371,7 @@ export function RentalCreateWizard({
       <PageHeaderNavigation
         onBack={() => {
           if (task.busy || submitting.current) return;
-          if (draft.detailsCompleted)
+          if (canPersistRentalDraft(draft))
             leaveGuard.requestLeave(() => router.replace("/rentals"));
           else if (store.discard()) router.replace("/rentals");
         }}
@@ -381,6 +460,34 @@ export function RentalCreateWizard({
                     </FieldError>
                   </Field>
                   <Field>
+                    <FieldLabel htmlFor="rental-start-day">
+                      {t("startDate")}
+                    </FieldLabel>
+                    <DatePartsInput
+                      baseId="rental-start"
+                      label={t("startDate")}
+                      value={draft.startDate}
+                      onChange={(startDate) =>
+                        store.update({
+                          startDate,
+                          period: weeklyPeriod(
+                            startDate,
+                            promotion === "three_plus_one" ? 28 : 7,
+                          ),
+                        })
+                      }
+                      disabled={task.busy}
+                      invalid={attempted && !draft.period}
+                      aria-describedby="rental-start-error rental-period"
+                    />
+                    <FieldError id="rental-start-error">
+                      {attempted && !draft.period ? t("dateRequired") : null}
+                    </FieldError>
+                    <FieldDescription id="rental-period">
+                      {periodLabel ?? t("dateHint")}
+                    </FieldDescription>
+                  </Field>
+                  <Field>
                     <FieldLabel id="rental-scooter-label">
                       {rentalT("scooter")}
                     </FieldLabel>
@@ -410,31 +517,162 @@ export function RentalCreateWizard({
                             : null}
                     </FieldError>
                   </Field>
-                  <Field>
-                    <FieldLabel htmlFor="rental-start-day">
-                      {t("startDate")}
-                    </FieldLabel>
-                    <DatePartsInput
-                      baseId="rental-start"
-                      label={t("startDate")}
-                      value={draft.startDate}
-                      onChange={(startDate) =>
-                        store.update({
-                          startDate,
-                          period: weeklyPeriod(startDate),
-                        })
-                      }
+                  <label className="flex items-start gap-3 text-sm">
+                    <Checkbox
+                      checked={draft.renterDrives ?? true}
                       disabled={task.busy}
-                      invalid={attempted && !draft.period}
-                      aria-describedby="rental-start-error rental-period"
+                      onCheckedChange={(value) =>
+                        store.update({ renterDrives: value === true })
+                      }
                     />
-                    <FieldError id="rental-start-error">
-                      {attempted && !draft.period ? t("dateRequired") : null}
-                    </FieldError>
-                    <FieldDescription id="rental-period">
-                      {periodLabel ?? t("dateHint")}
-                    </FieldDescription>
+                    {contractsT("sameDriver")}
+                  </label>
+                  <Field>
+                    <FieldLabel>{contractsT("drivers")}</FieldLabel>
+                    <SheetSelect
+                      multiple
+                      label={contractsT("drivers")}
+                      value={draft.driverPersonIds ?? []}
+                      onValueChange={(driverPersonIds) =>
+                        store.update({ driverPersonIds })
+                      }
+                      options={(options.data?.persons ?? [])
+                        .filter(
+                          (person) =>
+                            !(draft.renterDrives ?? true) ||
+                            person.id !== draft.personId,
+                        )
+                        .map((person) => ({
+                          value: person.id,
+                          label: `${person.firstName} ${person.lastName} · ${person.phone}`,
+                        }))}
+                      searchPlaceholder={contractsT("drivers")}
+                      clearSearchLabel={contractsT("cancel")}
+                      closeLabel={contractsT("cancel")}
+                      emptyMessage={contractsT("loading")}
+                      disabled={task.busy}
+                    />
                   </Field>
+                  <Choice
+                    label={contractsT("promotion")}
+                    value={promotion}
+                    onChange={(value) => {
+                      const next =
+                        v1.rentals.rentalPromotionSchema.parse(value);
+                      store.update({
+                        promotion: next,
+                        period: weeklyPeriod(
+                          draft.startDate,
+                          next === "three_plus_one" ? 28 : 7,
+                        ),
+                      });
+                    }}
+                    options={[
+                      { value: "standard", label: contractsT("standard") },
+                      {
+                        value: "three_plus_one",
+                        label: contractsT("threePlusOne"),
+                      },
+                    ]}
+                    disabled={task.busy}
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    {promotionEligibilityMessage}
+                  </p>
+                  <Choice
+                    label={contractsT("conclusionContext")}
+                    value={draft.conclusionContext ?? ""}
+                    onChange={(value) =>
+                      store.update({
+                        conclusionContext:
+                          v1.rentals.rentalConclusionContextSchema.parse(value),
+                      })
+                    }
+                    options={v1.rentals.rentalConclusionContextSchema.options.map(
+                      (value) => ({ value, label: contractsT(value) }),
+                    )}
+                    disabled={task.busy}
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    {contractsT("contextHint")}
+                  </p>
+                  <Choice
+                    label={`${contractsT("rent")} · ${contractsT("method")}`}
+                    value={rentalPaymentMethod}
+                    onChange={(value) =>
+                      store.update({
+                        rentalPaymentMethod:
+                          v1.rentals.rentalPaymentMethodSchema.parse(value),
+                      })
+                    }
+                    options={v1.rentals.rentalPaymentMethodSchema.options.map(
+                      (value) => ({ value, label: contractsT(value) }),
+                    )}
+                    disabled={task.busy}
+                  />
+                  <Choice
+                    label={`${contractsT("deposit")} · ${contractsT("method")}`}
+                    value={depositPaymentMethod}
+                    onChange={(value) =>
+                      store.update({
+                        depositPaymentMethod:
+                          v1.rentals.rentalPaymentMethodSchema.parse(value),
+                      })
+                    }
+                    options={v1.rentals.rentalPaymentMethodSchema.options.map(
+                      (value) => ({ value, label: contractsT(value) }),
+                    )}
+                    disabled={task.busy}
+                  />
+                  {quote.loading && quoteScooterId ? (
+                    <p role="status">{contractsT("loading")}</p>
+                  ) : null}
+                  <Feedback
+                    error={
+                      !options.error && !options.loading && options.data
+                        ? quote.error
+                        : null
+                    }
+                  />
+                  {quote.error &&
+                  !options.error &&
+                  !options.loading &&
+                  options.data ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={quote.reload}
+                    >
+                      {contractsT("retry")}
+                    </Button>
+                  ) : null}
+                  {quote.data ? (
+                    <div className="flex flex-col gap-2 text-sm">
+                      <p>
+                        {contractsT("weeklyRent")}:{" "}
+                        {new Intl.NumberFormat(locale, {
+                          style: "currency",
+                          currency: "RON",
+                        }).format(quote.data.weeklyRateMinor / 100)}
+                      </p>
+                      <p>
+                        {contractsT("deposit")}:{" "}
+                        {new Intl.NumberFormat(locale, {
+                          style: "currency",
+                          currency: "RON",
+                        }).format(quote.data.depositMinor / 100)}
+                      </p>
+                      <p className="font-semibold">
+                        {contractsT("initialTotal")}:{" "}
+                        {new Intl.NumberFormat(locale, {
+                          style: "currency",
+                          currency: "RON",
+                        }).format(quote.data.initialTotalMinor / 100)}
+                      </p>
+                      <p>{contractsT("agreementTerm")}</p>
+                      <p>{contractsT("timezone")}</p>
+                    </div>
+                  ) : null}
                 </FieldGroup>
               </>
             ),

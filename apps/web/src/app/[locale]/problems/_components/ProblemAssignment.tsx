@@ -52,6 +52,7 @@ export function ProblemAssignment({
   const t = useTranslations("workspace");
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<string[]>([]);
+  const [initialSelection, setInitialSelection] = useState<string[]>([]);
   const [query, setQuery] = useState("");
   const assigned = v1.problems.problemAssignees(problem);
   const editable =
@@ -66,16 +67,21 @@ export function ProblemAssignment({
     .filter((member) =>
       `${memberName(member)} ${member.email ?? ""}`
         .toLocaleLowerCase()
-        .includes(query.trim().toLocaleLowerCase()),
+        .includes(options.length > 5 ? query.trim().toLocaleLowerCase() : ""),
     )
     .sort(
-      (a, b) => Number(draft.includes(b.id)) - Number(draft.includes(a.id)),
+      (a, b) =>
+        Number(initialSelection.includes(b.id)) -
+        Number(initialSelection.includes(a.id)),
     );
   const action = t(
     assigned.length ? "problems.manageAssignment" : "problems.assignSomeone",
   );
   function openAssignment() {
-    setDraft(assigned.map((member) => member.id));
+    const selectedIds = assigned.map((member) => member.id);
+    setDraft(selectedIds);
+    // Keep the opening order stable while the draft selection changes.
+    setInitialSelection(selectedIds);
     setQuery("");
     setOpen(true);
   }
@@ -158,12 +164,14 @@ export function ProblemAssignment({
             <BottomSheetTitle>{action}</BottomSheetTitle>
           </BottomSheetHeader>
           <BottomSheetBody className="flex flex-col gap-3">
-            <Input
-              aria-label={t("problems.searchAssignees")}
-              placeholder={t("problems.searchAssignees")}
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-            />
+            {options.length > 5 ? (
+              <Input
+                aria-label={t("problems.searchAssignees")}
+                placeholder={t("problems.searchAssignees")}
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+              />
+            ) : null}
             {loading ? <p role="status">{t("loading")}</p> : null}
             {error ? (
               <div>

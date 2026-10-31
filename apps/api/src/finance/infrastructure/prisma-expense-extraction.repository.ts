@@ -78,6 +78,7 @@ export class PrismaExpenseExtractionRepository {
   async beginDraft(input: {
     ownerUserId: string;
     sourceUploadId: string;
+    additionalSourceUploadIds?: string[];
     provider: string;
     parserVersion: string;
     sourceUploadPurpose: string;
@@ -92,9 +93,17 @@ export class PrismaExpenseExtractionRepository {
         return null;
       }
 
+      const additionalSourceUploadIds = input.additionalSourceUploadIds ?? [];
+      if (
+        existing &&
+        JSON.stringify(existing.additionalSourceUploadIds ?? []) !==
+          JSON.stringify(additionalSourceUploadIds)
+      )
+        return null;
+      const uploadIds = [input.sourceUploadId, ...additionalSourceUploadIds];
       const retainedUpload = await tx.draftUpload.updateMany({
         where: {
-          id: input.sourceUploadId,
+          id: { in: uploadIds },
           userId: input.ownerUserId,
           purpose: input.sourceUploadPurpose,
           claimedAt: null,
@@ -104,7 +113,7 @@ export class PrismaExpenseExtractionRepository {
         data: { expiresAt: input.retainUntil },
       });
 
-      if (retainedUpload.count !== 1) {
+      if (retainedUpload.count !== uploadIds.length) {
         return null;
       }
 
@@ -117,6 +126,7 @@ export class PrismaExpenseExtractionRepository {
         create: {
           ownerUserId: input.ownerUserId,
           sourceUploadId: input.sourceUploadId,
+          additionalSourceUploadIds,
           provider: input.provider,
           parserVersion: input.parserVersion,
           status: "ANALYZING",

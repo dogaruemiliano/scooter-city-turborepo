@@ -21,11 +21,14 @@ export const civVocabularySchema = z
   .array(z.object({ field: z.enum(CIV_VOCABULARY_FIELDS), value: z.string() }))
   .meta({ id: "CivVocabulary" });
 export const CIV_ROUTES = { vocabulary: "/v1/vehicle-civ/vocabulary" } as const;
+// This is accumulated scooter metadata, including preserved labels from prior
+// extractions. A single reading's 100-field limit cannot bound the merged map.
+export const CIV_RAW_FIELDS_MAX = 2_000;
 export const civRawFieldsSchema = z
   .record(z.string().min(1).max(120), z.string().max(2000))
   .refine(
-    (value) => Object.keys(value).length <= 100,
-    "At most 100 original CIV fields are allowed.",
+    (value) => Object.keys(value).length <= CIV_RAW_FIELDS_MAX,
+    `At most ${CIV_RAW_FIELDS_MAX} original CIV fields are allowed.`,
   );
 const integer = z
   .number()

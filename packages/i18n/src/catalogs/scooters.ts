@@ -4,6 +4,15 @@ import { scooterReextractionMessages } from "./scooter-reextraction";
 
 export const scootersCatalog = {
   en: {
+    sharing: {
+      action: "Share client documents",
+      missing: "Missing documents",
+      preparing: "Preparing documents…",
+      unsupported: "File sharing is not supported on this device",
+      loadError:
+        "Could not prepare documents. Close and reopen the menu to retry.",
+      shareError: "Could not share client documents. Please try again.",
+    },
     reextraction: scooterReextractionMessages.en,
     readiness: {
       needsClientDocuments: "Required client documents are missing",
@@ -983,6 +992,10 @@ export const scootersCatalog = {
       record: "Record",
       notes: "Notes",
     },
+    licencePolicy: {
+      capped: "Application speed cap: {speed} km/h.",
+      uncapped: "No driving licence based application speed cap.",
+    },
     fields: {
       itpValidUntil: "ITP valid until",
       civAvailability: "CIV availability",
@@ -1329,6 +1342,17 @@ export const scootersCatalog = {
     },
   },
   ro: {
+    sharing: {
+      action: "Distribuie documentele pentru client",
+      missing: "Lipsesc documente",
+      preparing: "Se pregătesc documentele…",
+      unsupported:
+        "Distribuirea fișierelor nu este disponibilă pe acest dispozitiv",
+      loadError:
+        "Documentele nu au putut fi pregătite. Închide și redeschide meniul pentru a reîncerca.",
+      shareError:
+        "Documentele pentru client nu au putut fi distribuite. Încearcă din nou.",
+    },
     reextraction: scooterReextractionMessages.ro,
     readiness: {
       needsClientDocuments: "Lipsesc documentele necesare pentru client",
@@ -2343,6 +2367,10 @@ export const scootersCatalog = {
       registration: "Înmatriculare",
       record: "Înregistrare",
       notes: "Notițe",
+    },
+    licencePolicy: {
+      capped: "Plafon de viteză în aplicație: {speed} km/h.",
+      uncapped: "Fără plafon de viteză în aplicație bazat pe permis.",
     },
     fields: {
       itpValidUntil: "ITP valabil până la",

@@ -353,6 +353,19 @@ export const scooterSchema = z
       .optional(),
     ...civMetadataSchema.shape,
     ...scooterTechnicalDetailsSchema.shape,
+    // Historical physical configuration stays readable; new writes use licence policy only.
+    commercialCategory: z
+      .enum(["without_license", "with_license"])
+      .nullable()
+      .optional(),
+    applicationSpeedLimitKmh: z
+      .union([z.literal(25), z.literal(45)])
+      .nullable()
+      .optional(),
+    limiterKind: z.enum(["LIMITED", "NO_LIMITER", "UNKNOWN"]).optional(),
+    limiterKmh: z.number().int().positive().max(300).nullable().optional(),
+    maxSpeedSource: nullableTrimmedStringSchema(MAX_TEXT_LENGTH).optional(),
+    configurationEvidence: nullableTrimmedStringSchema(4000).optional(),
     id: z.string(),
     fleetNumber: z
       .number()

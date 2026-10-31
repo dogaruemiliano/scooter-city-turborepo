@@ -47,6 +47,7 @@ export const scooterInclude = {
       id: true,
       type: true,
       extractedData: true,
+      customerVisible: true,
       clientCopyAsset: { select: { deletedAt: true } },
       insurancePolicy: { select: { validFrom: true, validUntil: true } },
     },
@@ -257,12 +258,14 @@ export class ScootersService {
           scooter.id,
           input.itpValidUntil,
           Boolean(input.documentDrafts?.length),
+          input.civIssuedAt !== undefined,
         );
         await this.civVocabulary.remember(tx, input);
         await this.photos.applyDrafts(tx, scooter.id, preparedPhotos, userId);
         return input.insurancePolicies?.length ||
           preparedPhotos.length ||
           input.itpValidUntil !== undefined ||
+          input.civIssuedAt !== undefined ||
           input.documentDrafts?.length
           ? tx.scooter.findUniqueOrThrow({
               where: { id: scooter.id },
@@ -507,11 +510,13 @@ export class ScootersService {
           Boolean(
             input.documentDrafts?.length || input.documentExtractions?.length,
           ),
+          input.civIssuedAt !== undefined,
         );
         await this.civVocabulary.remember(tx, input);
         return input.insurancePolicies?.length ||
           input.removedInsurancePolicyIds?.length ||
           input.itpValidUntil !== undefined ||
+          input.civIssuedAt !== undefined ||
           input.documentDrafts?.length ||
           input.documentExtractions?.length
           ? tx.scooter.findUniqueOrThrow({
@@ -763,7 +768,8 @@ export class ScootersService {
         registrationNumber: null,
         registrationDate: null,
         temporaryRegistrationExpiresAt: null,
-        requiredLicenseCategory: "none",
+        requiredLicenseCategory:
+          input.requiredLicenseCategory ?? existing.requiredLicenseCategory,
       };
     }
 
@@ -804,7 +810,7 @@ export class ScootersService {
         registrationNumberNormalized: null,
         registrationDate: null,
         temporaryRegistrationExpiresAt: null,
-        requiredLicenseCategory: "none",
+        requiredLicenseCategory: state.requiredLicenseCategory,
       };
     }
 

@@ -1,3 +1,4 @@
+import { assertVehicleDocumentsMutable } from "./scooter-contract-evidence";
 import {
   BadRequestException,
   Injectable,
@@ -187,7 +188,7 @@ export class ScooterDocumentsService {
     if (
       asset.provider !== "s3" ||
       !v1.scooters.SCOOTER_DOCUMENT_CONTENT_TYPES.includes(
-        asset.contentType as StoredDocument["contentType"],
+        asset.contentType as (typeof v1.scooters.SCOOTER_DOCUMENT_CONTENT_TYPES)[number],
       )
     )
       throw new BadRequestException("Unsupported document storage metadata");
@@ -252,6 +253,7 @@ export class ScooterDocumentsService {
     await saveEditorSession(tx, sessionId, userId, scooterId, saveFingerprint);
     const ids = [...new Set(removedIds)];
     if (ids.length) {
+      await assertVehicleDocumentsMutable(tx, scooterId, ids);
       const inspection = await tx.scooterItpInspection.findFirst({
         where: {
           scooterId,

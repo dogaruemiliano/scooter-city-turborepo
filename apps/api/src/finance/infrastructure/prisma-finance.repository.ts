@@ -123,11 +123,13 @@ export type ExpenseReceiptAttachment =
       extractionDraftId: string;
       draftUploadId: string;
       storageKey: string;
+      additionalUploads?: { draftUploadId: string; storageKey: string }[];
     }
   | {
       source: "DIRECT_UPLOAD";
       draftUploadId: string;
       storageKey: string;
+      additionalUploads?: { draftUploadId: string; storageKey: string }[];
     };
 
 export interface CreatePostedExpenseInput {
@@ -766,6 +768,9 @@ export class PrismaFinanceRepository {
           });
         }
       }
+      for (const upload of input.receiptAttachment?.additionalUploads ?? []) {
+        documents.push({ type: "RECEIPT", storageKey: upload.storageKey });
+      }
 
       if (documents.length > 0) {
         await tx.financialDocument.createMany({
@@ -814,6 +819,27 @@ export class PrismaFinanceRepository {
           },
           data: { claimedAt: postedAt },
         });
+        for (const additional of input.receiptAttachment.additionalUploads ??
+          []) {
+          const claimed = await tx.draftUpload.updateMany({
+            where: {
+              id: additional.draftUploadId,
+              userId: input.createdById,
+              purpose: "finance-expense-document",
+              storageKey: additional.storageKey,
+              claimedAt: null,
+              cleanupStartedAt: null,
+              ...(input.receiptAttachment.source === "DIRECT_UPLOAD"
+                ? { expiresAt: { gt: postedAt } }
+                : {}),
+            },
+            data: { claimedAt: postedAt },
+          });
+          if (claimed.count !== 1)
+            throw new FinanceStateError(
+              "A receipt photo changed during the request. Reload and try again.",
+            );
+        }
 
         if (
           (extractionDraft && extractionDraft.count !== 1) ||

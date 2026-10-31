@@ -53,12 +53,14 @@ export function ProblemDetailSheet({
                   <X aria-hidden="true" />
                 </Button>
               </div>
-              <BottomSheetDescription>
-                <span className="font-semibold text-popover-foreground">
-                  {v1.scooters.scooterDisplayCode(problem.scooter)}
-                </span>
-                {` · ${problem.scooter.brandName} ${problem.scooter.model ?? ""}`}
-              </BottomSheetDescription>
+              {problem.scooter ? (
+                <BottomSheetDescription>
+                  <span className="font-semibold text-popover-foreground">
+                    {v1.scooters.scooterDisplayCode(problem.scooter)}
+                  </span>
+                  {` · ${problem.scooter.brandName} ${problem.scooter.model ?? ""}`}
+                </BottomSheetDescription>
+              ) : null}
             </BottomSheetHeader>
             <BottomSheetBody safeAreaBottom className="gap-6 pt-4">
               <dl className="grid grid-cols-2 gap-4">
@@ -76,14 +78,16 @@ export function ProblemDetailSheet({
                     </Badge>
                   </dd>
                 </div>
-                <div className="flex flex-col items-end gap-2">
-                  <dt className="text-sm font-medium text-muted-foreground">
-                    {t("problems.difficulty")}
-                  </dt>
-                  <dd className="font-semibold">
-                    {t(`problems.${problem.difficulty ?? "unassessed"}`)}
-                  </dd>
-                </div>
+                {problem.scooterId !== null ? (
+                  <div className="flex flex-col items-end gap-2">
+                    <dt className="text-sm font-medium text-muted-foreground">
+                      {t("problems.difficulty")}
+                    </dt>
+                    <dd className="font-semibold">
+                      {t(`problems.${problem.difficulty ?? "unassessed"}`)}
+                    </dd>
+                  </div>
+                ) : null}
               </dl>
               {problem.blocksUsage &&
               !problem.holdClearedAt &&
@@ -114,11 +118,11 @@ export function ProblemDetailSheet({
               <Link
                 className={buttonVariants()}
                 href={localizePath(
-                  `/problems/${encodeURIComponent(problem.id)}`,
+                  `${problem.scooterId ? "/problems" : "/todos"}/${encodeURIComponent(problem.id)}`,
                   locale,
                 )}
               >
-                {t("problems.openProblem")}
+                {t(problem.scooterId ? "problems.openProblem" : "todos.open")}
               </Link>
             </BottomSheetBody>
           </>

@@ -77,6 +77,22 @@ export function PersonalSection({
           onChange={(event) => onSetFormValue("lastName", event.target.value)}
         />
       </FormField>
+      {form.citizenship === "foreign" ? (
+        <FormField
+          id={`${formId}-citizenship`}
+          label={t("fields.citizenship")}
+          error={fieldErrors.citizenshipNationality}
+        >
+          <Input
+            id={`${formId}-citizenship`}
+            value={form.citizenshipNationality ?? ""}
+            maxLength={200}
+            onChange={(event) =>
+              onSetFormValue("citizenshipNationality", event.target.value)
+            }
+          />
+        </FormField>
+      ) : null}
       <FormField
         id={`${formId}-cnp`}
         extractionKey="person.cnp"

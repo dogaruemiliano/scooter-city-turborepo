@@ -7,6 +7,7 @@ import { fitCameraPreview } from "@repo/ui/lib/camera-preview-layout";
 export function useCameraPreviewLayout(
   enabled: boolean,
   frameSize: { width: number; height: number } | undefined,
+  fit: "contain" | "cover" = "contain",
 ) {
   const stageRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLElement>(null);
@@ -63,6 +64,7 @@ export function useCameraPreviewLayout(
         topControlsHeight: space.top,
         bottomControlsHeight: space.bottom,
         gap: spacing[2],
+        fit,
       })
     : null;
   return { stageRef, headerRef, controlsRef, layout };

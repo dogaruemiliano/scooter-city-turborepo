@@ -106,6 +106,20 @@ export const permissionCatalog = [
   definition("rentals.create", all, ["rentals.read"]),
   definition("rentals.handover", all, ["rentals.read"]),
   definition("rentals.return", all, ["rentals.read"]),
+  definition("templates.read"),
+  definition("templates.manage", all, ["templates.read"]),
+  definition("templates.publish", all, ["templates.manage"]),
+  definition("templates.archive", all, ["templates.read"]),
+  definition("documents.read", all, ["rentals.read"]),
+  definition("documents.manage", all, ["documents.read"]),
+  definition("identity.review", all, [
+    "documents.read",
+    "person_documents.read",
+  ]),
+  definition("documents.company_sign", all, ["documents.read"]),
+  definition("evidence.export", all, ["documents.read"]),
+  definition("evidence.retention.manage", all, ["evidence.export"]),
+  definition("evidence.retention.purge", all, ["evidence.retention.manage"]),
 ] as const;
 export type PermissionKey = (typeof permissionCatalog)[number]["key"];
 export const permissionKeys = permissionCatalog.map((p) => p.key);

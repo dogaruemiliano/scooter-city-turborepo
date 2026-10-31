@@ -28,7 +28,10 @@ export function ImageGalleryEditor({
   maxFileSize,
   labels,
   onBusyChange,
+  onAdd,
 }: {
+  /** Optional shared picker supplied by the feature. */
+  onAdd?: () => void;
   files: readonly File[];
   onChange: (files: File[]) => void;
   disabled?: boolean;
@@ -162,7 +165,7 @@ export function ImageGalleryEditor({
             icon={<PlusIcon />}
             disabled={busy}
             style={{ aspectRatio: aspectRatio.scooterPhoto }}
-            onClick={() => input.current?.click()}
+            onClick={() => (onAdd ? onAdd() : input.current?.click())}
           />
         ) : null}
       </ImageGallery>

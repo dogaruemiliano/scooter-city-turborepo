@@ -75,3 +75,9 @@ export const IdentityCard: Story = {
   args: { captureMode: "identity-card", allowCrop: true },
   render: (args) => <CaptureExample {...args} />,
 };
+
+/** Fills the preview between black control bars without changing saved image framing. */
+export const CoverBetweenControls: Story = {
+  args: { previewFit: "cover", allowGallery: false, allowCrop: false },
+  render: (args) => <CaptureExample {...args} />,
+};

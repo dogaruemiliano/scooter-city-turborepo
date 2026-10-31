@@ -24,6 +24,8 @@ const draft = {
 
 describe("ScooterDocumentsService", () => {
   const prisma = {
+    $queryRaw: jest.fn().mockResolvedValue([]),
+    documentPackage: { findFirst: jest.fn().mockResolvedValue(null) },
     draftUpload: {
       create: jest.fn(),
       updateMany: jest.fn<
@@ -57,6 +59,8 @@ describe("ScooterDocumentsService", () => {
   const tx = prisma as unknown as Prisma.TransactionClient;
   beforeEach(() => {
     jest.resetAllMocks();
+    prisma.$queryRaw.mockResolvedValue([]);
+    prisma.documentPackage.findFirst.mockResolvedValue(null);
     storage.completePresignedDocumentUpload.mockResolvedValue(stored);
     storage.verifyDocumentUploadToken.mockReturnValue(stored);
     prisma.draftUpload.updateMany.mockResolvedValue({ count: 1 });
@@ -306,6 +310,27 @@ describe("ScooterDocumentsService", () => {
     await expect(service.prepare([draft, draft], "admin")).rejects.toThrow(
       "Duplicate document",
     );
+  });
+  it("preserves client-copy documents referenced by retained contract packages", async () => {
+    prisma.documentPackage.findFirst.mockResolvedValueOnce({ id: "package" });
+    await expect(
+      service.apply(tx, "scooter", [], ["registration"], "admin"),
+    ).rejects.toThrow("retained contract package");
+    expect(prisma.scooterDocument.updateMany).not.toHaveBeenCalled();
+    expect(prisma.documentPackage.findFirst).toHaveBeenCalledWith({
+      where: {
+        rental: { scooterId: "scooter" },
+        OR: [
+          {
+            snapshot: {
+              path: ["vehicleDocuments"],
+              array_contains: [{ documentId: "registration" }],
+            },
+          },
+        ],
+      },
+      select: { id: true },
+    });
   });
   it("retains the original paired evidence of confirmed inspections", async () => {
     prisma.scooterItpInspection.findFirst.mockResolvedValueOnce({

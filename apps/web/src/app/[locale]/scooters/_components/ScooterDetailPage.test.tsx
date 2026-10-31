@@ -12,13 +12,12 @@ import { NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ScooterDetailPage } from "./ScooterDetailPage";
-import { ScooterPhotos } from "./ScooterPhotos";
 import {
   PageHeaderNavigationContext,
   type PageHeaderNavigationOptions,
 } from "@/components/PageHeaderNavigation";
-// Gallery API interactions are covered independently in ScooterPhotos.test.tsx.
-vi.mock("./ScooterPhotos", () => ({ ScooterPhotos: vi.fn(() => null) }));
+// Read-only gallery behavior is covered independently.
+vi.mock("./ScooterDetailPhotos", () => ({ ScooterDetailPhotos: () => null }));
 // Independent compliance forms are covered by their focused suites.
 vi.mock("./ScooterComplianceSection", () => ({
   ScooterComplianceSection: () => null,
@@ -91,13 +90,77 @@ beforeEach(() => {
 });
 
 describe("ScooterDetailPage", () => {
-  it("refreshes the scooter data after saved photo changes so the hero gets the current cover", () => {
+  it("disables sharing with a small missing-documents description", async () => {
+    const browser = userEvent.setup();
+    renderDetail();
+    await browser.click(screen.getByRole("button", { name: "More actions" }));
+    const item = await screen.findByRole("menuitem", {
+      name: /Share client documents/,
+    });
+    expect(item).toHaveAttribute("aria-disabled", "true");
+    expect(item).toHaveAccessibleDescription("Missing documents");
+    expect(within(item).getByText("Missing documents")).toHaveClass("text-xs");
+  });
+
+  it("shares every client copy from the header menu", async () => {
+    const share = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "share", {
+      configurable: true,
+      value: share,
+    });
+    Object.defineProperty(navigator, "canShare", {
+      configurable: true,
+      value: () => true,
+    });
+    const download = vi
+      .fn()
+      .mockImplementation(() => Promise.resolve(new Response("client pdf")));
+    vi.stubGlobal("fetch", download);
+    try {
+      const documents: v1.scooters.ScooterDocument[] = (
+        ["civ", "registration_certificate", "insurance"] as const
+      ).map((type) => ({
+        id: type,
+        type,
+        fileName: `${type}.pdf`,
+        contentType: "application/pdf",
+        byteSize: 8,
+        createdAt: "2026-01-01T00:00:00Z",
+        contentUrl: `/original/${type}`,
+        validFrom: "2000-01-01",
+        validUntil: "2099-01-01",
+        clientCopy: {
+          fileName: `${type}-client.pdf`,
+          contentType: "application/pdf",
+          byteSize: 8,
+          contentUrl: `/client/${type}`,
+        },
+      }));
+      const browser = userEvent.setup();
+      renderDetail("en", { ...scooter, documents, missingClientDocuments: [] });
+      await browser.click(screen.getByRole("button", { name: "More actions" }));
+      await waitFor(() =>
+        expect(
+          screen.getByRole("menuitem", { name: "Share client documents" }),
+        ).not.toHaveAttribute("aria-disabled", "true"),
+      );
+      await browser.click(
+        screen.getByRole("menuitem", { name: "Share client documents" }),
+      );
+      expect(share).toHaveBeenCalledWith({
+        title: "001 YAM",
+        files: [expect.any(File), expect.any(File), expect.any(File)],
+      });
+    } finally {
+      vi.unstubAllGlobals();
+      delete (navigator as Partial<Navigator>).share;
+      delete (navigator as Partial<Navigator>).canShare;
+    }
+  });
+
+  it("shows the current cover when scooter data changes", () => {
     const view = renderDetail("en");
     expect(mocks.refresh).not.toHaveBeenCalled();
-
-    const props = vi.mocked(ScooterPhotos).mock.calls.at(-1)![0];
-    props.onSaved?.();
-    expect(mocks.refresh).toHaveBeenCalledOnce();
 
     view.rerender(
       <NextIntlClientProvider locale="en" messages={messages.en}>
@@ -443,8 +506,8 @@ describe("ScooterDetailPage", () => {
     expect(
       screen.getByRole("heading", { name: "001 YAM" }),
     ).toBeInTheDocument();
-    expect(screen.getAllByText("JYARN23E0RA123456")[0]).toBeInTheDocument();
-    expect(screen.getByText("White")).toBeInTheDocument();
+    expect(screen.queryByText("JYARN23E0RA123456")).not.toBeInTheDocument();
+    expect(screen.queryByText("White")).not.toBeInTheDocument();
     expect(screen.getAllByText("125 cc")[0]).toBeInTheDocument();
     expect(screen.getAllByText("Unregistered")[0]).toBeInTheDocument();
     expect(screen.queryByText("Active")).not.toBeInTheDocument();
@@ -526,6 +589,42 @@ describe("ScooterDetailPage", () => {
       ),
     );
     expect(mocks.refresh).toHaveBeenCalledOnce();
+  });
+
+  it("preserves the application licence policy when registration is cleared", async () => {
+    mocks.apiFetch.mockResolvedValueOnce(scooter);
+    const browser = userEvent.setup();
+    renderDetail();
+    await browser.click(screen.getByRole("button", { name: "More actions" }));
+    await browser.click(await screen.findByText("Add registration"));
+    const dialog = await screen.findByRole("dialog", {
+      name: "Add registration",
+    });
+    await chooseSelectOption(browser, "Required driver license", "A1");
+    await chooseSelectOption(browser, "Registration type", "Local");
+    await chooseSelectOption(browser, "Registration type", "Unregistered");
+    expect(
+      within(dialog).getByRole("combobox", { name: /Required driver license/ }),
+    ).toHaveTextContent("A1");
+    await browser.click(
+      within(dialog).getByRole("button", { name: "Save changes" }),
+    );
+    await waitFor(() =>
+      expect(mocks.apiFetch).toHaveBeenCalledWith(
+        v1.scooters.ROUTES.update(scooter.id),
+        v1.scooters.scooterSchema,
+        {
+          method: "PATCH",
+          json: {
+            registrationType: "unregistered",
+            registrationNumber: null,
+            registrationDate: null,
+            temporaryRegistrationExpiresAt: null,
+            requiredLicenseCategory: "A1",
+          },
+        },
+      ),
+    );
   });
 
   it("keeps a duplicate plate error inside the registration sheet and marks the input invalid", async () => {

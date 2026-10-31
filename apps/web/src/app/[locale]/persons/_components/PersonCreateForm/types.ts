@@ -21,6 +21,7 @@ export type DocumentWorkflow =
   | "foreign";
 
 export type PersonFormFieldKey =
+  | "citizenshipNationality"
   | "email"
   | "phone"
   | "firstName"
@@ -83,6 +84,7 @@ export type PersonDocumentPhotoDraftUploads = Partial<
 export interface CreatePersonFormState {
   linkExistingAccount?: boolean;
   citizenship: PersonCitizenship;
+  citizenshipNationality?: string;
   nationalIdFormat: NationalIdFormat;
   documentDrafts: Partial<
     Record<DocumentWorkflow, CreatePersonDocumentFormState[]>

@@ -27,6 +27,7 @@ import createMiddleware from "next-intl/middleware";
 
 import {
   getLocalizedSignInPath,
+  getUnprefixedPathname,
   getLocaleFromPathname,
   isPublicPathname,
   safeNextPath,
@@ -40,14 +41,35 @@ export async function proxy(req: NextRequest): Promise<NextResponse> {
   if (req.nextUrl.pathname === "/session-unavailable")
     return NextResponse.next();
 
+  const signingRoute =
+    getUnprefixedPathname(req.nextUrl.pathname) === "/signing";
+  const respond = (
+    response: NextResponse,
+    requestHeaders = new Headers(req.headers),
+  ) => {
+    requestHeaders.set(
+      "x-scooter-route",
+      getUnprefixedPathname(req.nextUrl.pathname),
+    );
+    mergeRequestOverrides(response, requestHeaders);
+    if (signingRoute) {
+      response.headers.set("Cache-Control", "private, no-store");
+      response.headers.set("Referrer-Policy", "no-referrer");
+      response.headers.set("X-Robots-Tag", "noindex, nofollow");
+    }
+    return response;
+  };
+  // Guest signing has its own restricted session; account refresh is unrelated.
+  if (signingRoute) return respond(handleI18nRouting(req));
+
   const access = req.cookies.get(v1.auth.ACCESS_TOKEN_COOKIE)?.value;
   const refresh = req.cookies.get(v1.auth.REFRESH_TOKEN_COOKIE)?.value;
   const isPublic = isPublicPathname(req.nextUrl.pathname);
 
-  if (access) return handleI18nRouting(req);
+  if (access) return respond(handleI18nRouting(req));
 
   if (!refresh) {
-    return isPublic ? handleI18nRouting(req) : redirectToSignIn(req);
+    return respond(isPublic ? handleI18nRouting(req) : redirectToSignIn(req));
   }
 
   // Stale-tab refresh path.
@@ -63,15 +85,15 @@ export async function proxy(req: NextRequest): Promise<NextResponse> {
       body: "{}",
     });
   } catch {
-    return sessionTemporarilyUnavailable(req);
+    return respond(sessionTemporarilyUnavailable(req));
   }
 
   if (!apiRes.ok) {
     if (isRefreshAuthFailure(apiRes.status)) {
-      return isPublic ? handleI18nRouting(req) : redirectToSignIn(req);
+      return respond(isPublic ? handleI18nRouting(req) : redirectToSignIn(req));
     }
 
-    return sessionTemporarilyUnavailable(req);
+    return respond(sessionTemporarilyUnavailable(req));
   }
 
   const setCookies = apiRes.headers.getSetCookie();
@@ -101,7 +123,7 @@ export async function proxy(req: NextRequest): Promise<NextResponse> {
   for (const cookie of setCookies) {
     res.headers.append("set-cookie", cookie);
   }
-  return res;
+  return respond(res, requestHeaders);
 }
 
 function redirectToSignIn(req: NextRequest): NextResponse {

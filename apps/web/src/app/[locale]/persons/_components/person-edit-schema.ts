@@ -10,6 +10,7 @@ const FIELD_LABEL_KEYS: Record<keyof PersonFormState, string> = {
   addressLine2: "addressLine2",
   city: "city",
   cnp: "documentCnp",
+  citizenship: "citizenship",
   countryCode: "country",
   dateOfBirth: "dateOfBirth",
   email: "email",
@@ -29,6 +30,7 @@ const personEditValuesSchema = z.object({
   addressLine2: z.string(),
   city: z.string(),
   cnp: z.string(),
+  citizenship: z.string().optional(),
   countryCode: z.string(),
   dateOfBirth: z.string(),
   email: z.string(),
@@ -51,6 +53,7 @@ export const personEditFormSchema = personEditValuesSchema
   .transform(
     (form): z.input<typeof v1.persons.updatePersonInputSchema> => ({
       cnp: blankToNull(form.cnp),
+      citizenship: blankToNull(form.citizenship ?? ""),
       email: form.email,
       phone: form.phone,
       firstName: form.firstName,

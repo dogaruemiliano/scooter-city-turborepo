@@ -802,6 +802,16 @@ export function ScooterInitialRegistrationFields({
     useFormContext<ScooterEditorValues>();
   const registrationType = useWatch({ control, name: "registrationType" });
   const registrationDate = useWatch({ control, name: "registrationDate" });
+  const requiredLicenseCategory = useWatch({
+    control,
+    name: "requiredLicenseCategory",
+  });
+  const license = v1.scooters.SCOOTER_REQUIRED_DRIVER_LICENSE_TYPES.find(
+    (category) => category === requiredLicenseCategory,
+  );
+  const applicationSpeedLimit = license
+    ? v1.scooters.licenceSpeedLimitKmh(license)
+    : undefined;
   const registered =
     Boolean(registrationType) && registrationType !== "unregistered";
   return (
@@ -834,10 +844,6 @@ export function ScooterInitialRegistrationFields({
                 setValue(field, "", { shouldDirty: true });
                 clearErrors(field);
               }
-              setValue("requiredLicenseCategory", "none", {
-                shouldDirty: true,
-              });
-              clearErrors("requiredLicenseCategory");
             } else {
               if (value !== "temporary") {
                 setValue("temporaryRegistrationExpiresAt", "", {
@@ -881,21 +887,6 @@ export function ScooterInitialRegistrationFields({
             />
           </FormField>
 
-          <FormField
-            name="requiredLicenseCategory"
-            label={t("fields.requiredLicenseCategory")}
-            disabled={disabled}
-          >
-            <FormSelect
-              placeholder={t("placeholders.requiredLicenseCategory")}
-              options={v1.scooters.SCOOTER_REQUIRED_DRIVER_LICENSE_TYPES.map(
-                (value) => ({
-                  value,
-                  label: t(`requiredDriverLicenseTypes.${value}`),
-                }),
-              )}
-            />
-          </FormField>
           {registrationType === "temporary" ? (
             <FormField
               name="temporaryRegistrationExpiresAt"
@@ -908,6 +899,30 @@ export function ScooterInitialRegistrationFields({
           ) : null}
         </>
       ) : null}
+      <div className="grid gap-2">
+        <FormField
+          name="requiredLicenseCategory"
+          label={t("fields.requiredLicenseCategory")}
+          disabled={disabled}
+        >
+          <FormSelect
+            placeholder={t("placeholders.requiredLicenseCategory")}
+            options={v1.scooters.SCOOTER_REQUIRED_DRIVER_LICENSE_TYPES.map(
+              (value) => ({
+                value,
+                label: t(`requiredDriverLicenseTypes.${value}`),
+              }),
+            )}
+          />
+        </FormField>
+        {applicationSpeedLimit !== undefined ? (
+          <p className="text-sm text-muted-foreground" aria-live="polite">
+            {applicationSpeedLimit === null
+              ? t("licencePolicy.uncapped")
+              : t("licencePolicy.capped", { speed: applicationSpeedLimit })}
+          </p>
+        ) : null}
+      </div>
       {children}
     </FormSection>
   );

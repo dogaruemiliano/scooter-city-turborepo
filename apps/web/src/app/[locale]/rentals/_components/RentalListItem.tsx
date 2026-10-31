@@ -1,6 +1,6 @@
 import { v1 } from "@repo/api-shared";
 import { Badge } from "@repo/ui/components/badge";
-import { useLocale, useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import { RentalPersonCard } from "./RentalPersonCard";
 import { Link } from "@/i18n/navigation";
 
@@ -12,7 +12,7 @@ export function RentalListItem({
   portal: boolean;
 }) {
   const t = useTranslations("workspace.rentals");
-  const locale = useLocale();
+  const format = useFormatter();
   return (
     <article className="flex flex-col gap-4 rounded-lg border p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -38,7 +38,11 @@ export function RentalListItem({
           <dt className="text-sm text-muted-foreground">{t("startsAt")}</dt>
           <dd className="text-sm">
             <time dateTime={rental.startsAt}>
-              {new Date(rental.startsAt).toLocaleString(locale)}
+              {format.dateTime(new Date(rental.startsAt), {
+                dateStyle: "medium",
+                timeStyle: "short",
+                timeZone: v1.rentals.RENTAL_POLICY.timezone,
+              })}
             </time>
           </dd>
         </div>
@@ -46,7 +50,11 @@ export function RentalListItem({
           <dt className="text-sm text-muted-foreground">{t("endsAt")}</dt>
           <dd className="text-sm">
             <time dateTime={rental.endsAt}>
-              {new Date(rental.endsAt).toLocaleString(locale)}
+              {format.dateTime(new Date(rental.endsAt), {
+                dateStyle: "medium",
+                timeStyle: "short",
+                timeZone: v1.rentals.RENTAL_POLICY.timezone,
+              })}
             </time>
           </dd>
         </div>

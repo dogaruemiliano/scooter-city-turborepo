@@ -48,7 +48,6 @@ export function ScooterRegistrationFormFields({
     if (registrationType === "unregistered") {
       onSetValue("registrationNumber", "");
       onSetValue("registrationDate", { day: "", month: "", year: "" });
-      onSetValue("requiredLicenseCategory", "none");
     }
     if (registrationType !== "temporary") {
       onSetValue("temporaryRegistrationExpiresAt", {
@@ -130,43 +129,43 @@ export function ScooterRegistrationFormFields({
               />
             </Field>
           ) : null}
-          <Field
-            id={`${formId}-required-driver-license-type`}
-            label={t("fields.requiredLicenseCategory")}
-            required
-            error={errors.requiredLicenseCategory}
-          >
-            <Select
-              value={form.requiredLicenseCategory}
-              onValueChange={(value) =>
-                onSetValue(
-                  "requiredLicenseCategory",
-                  value as v1.scooters.ScooterRequiredDriverLicenseType,
-                )
-              }
-              disabled={disabled}
-            >
-              <SelectTrigger
-                id={`${formId}-required-driver-license-type`}
-                className="w-full"
-              >
-                <SelectValue
-                  placeholder={t("placeholders.requiredLicenseCategory")}
-                />
-              </SelectTrigger>
-              <SelectContent>
-                {v1.scooters.SCOOTER_REQUIRED_DRIVER_LICENSE_TYPES.map(
-                  (licenseType) => (
-                    <SelectItem key={licenseType} value={licenseType}>
-                      {t(`requiredDriverLicenseTypes.${licenseType}`)}
-                    </SelectItem>
-                  ),
-                )}
-              </SelectContent>
-            </Select>
-          </Field>
         </>
       ) : null}
+      <Field
+        id={`${formId}-required-driver-license-type`}
+        label={t("fields.requiredLicenseCategory")}
+        required
+        error={errors.requiredLicenseCategory}
+      >
+        <Select
+          value={form.requiredLicenseCategory}
+          onValueChange={(value) =>
+            onSetValue(
+              "requiredLicenseCategory",
+              value as v1.scooters.ScooterRequiredDriverLicenseType,
+            )
+          }
+          disabled={disabled}
+        >
+          <SelectTrigger
+            id={`${formId}-required-driver-license-type`}
+            className="w-full"
+          >
+            <SelectValue
+              placeholder={t("placeholders.requiredLicenseCategory")}
+            />
+          </SelectTrigger>
+          <SelectContent>
+            {v1.scooters.SCOOTER_REQUIRED_DRIVER_LICENSE_TYPES.map(
+              (licenseType) => (
+                <SelectItem key={licenseType} value={licenseType}>
+                  {t(`requiredDriverLicenseTypes.${licenseType}`)}
+                </SelectItem>
+              ),
+            )}
+          </SelectContent>
+        </Select>
+      </Field>
     </FormSection>
   );
 }

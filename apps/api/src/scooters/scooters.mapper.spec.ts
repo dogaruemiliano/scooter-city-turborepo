@@ -24,6 +24,47 @@ describe("scooter picker summaries", () => {
     createdAt: new Date("2026-10-14"),
     updatedAt: new Date("2026-10-14"),
   };
+  const clientDocuments = ["civ", "registration_certificate", "insurance"].map(
+    (type) => ({
+      id: type,
+      type,
+      extractedData: null,
+      clientCopyAsset: { deletedAt: null },
+      ...(type === "insurance"
+        ? {
+            insurancePolicy: {
+              validFrom: new Date("2020-01-01"),
+              validUntil: new Date("2099-01-01"),
+            },
+          }
+        : {}),
+    }),
+  );
+  it("does not require renewal documents for manually confirmed initial CIV validity", () => {
+    const row = {
+      ...base,
+      civDocument: { version: "v2024", issuedAt: new Date("2026-08-21") },
+      documents: clientDocuments,
+      inspections: [
+        {
+          source: "manual",
+          result: "passed",
+          inspectionDate: null,
+          validUntil: new Date("2028-08-21"),
+          effectiveDate: new Date("2026-10-30"),
+          createdAt: new Date("2026-10-30"),
+          cardDocumentId: null,
+          certificateDocumentId: null,
+        },
+      ],
+    } as unknown as Parameters<typeof toScooter>[0];
+    expect(toScooter(row)).toMatchObject({ missingClientDocuments: [] });
+    row.inspections![0].inspectionDate = new Date("2026-08-21");
+    expect(toScooter(row).missingClientDocuments).toEqual([
+      "itp_certificate",
+      "itp_card",
+    ]);
+  });
   it("keeps CIV metadata on inventory summaries and raw fields on details", () => {
     const rawFields = { "13": "ENG-123", unmapped: "Original text" };
     const row = {

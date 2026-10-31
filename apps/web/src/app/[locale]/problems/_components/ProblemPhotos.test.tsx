@@ -1,10 +1,4 @@
-import {
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { messages } from "@repo/i18n";
@@ -82,31 +76,30 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("task attachment collection", () => {
-  it("opens the camera from the gallery add tile and keeps file selection available", async () => {
+  it("opens the native picker directly from the add tile without a sheet", async () => {
     renderPhotos(vi.fn());
-    expect(screen.queryByRole("button", { name: "Take photos" })).toBeNull();
-    await userEvent
-      .setup()
-      .click(screen.getByRole("button", { name: "Choose photos" }));
-    const capture = await screen.findByRole("dialog", { name: "Take photos" });
     const input = screen.getByLabelText("Choose photos", { selector: "input" });
-    const choose = vi.spyOn(input, "click");
-    await userEvent
-      .setup()
-      .click(within(capture).getByRole("button", { name: "Choose photos" }));
-    expect(choose).toHaveBeenCalledOnce();
+    const click = vi.spyOn(input, "click");
+    await userEvent.click(
+      screen.getByRole("button", { name: "Choose photos" }),
+    );
+    expect(click).toHaveBeenCalledOnce();
+    expect(input).toHaveAttribute("accept", "image/*");
+    expect(input).toHaveAttribute("multiple");
+    expect(input).not.toHaveAttribute("capture");
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
   it("appends multiple selections and saves the whole batch", async () => {
     const user = userEvent.setup();
     const save = vi.fn().mockResolvedValue(undefined);
     renderPhotos(save);
+    await user.click(screen.getByRole("button", { name: "Choose photos" }));
     const input = screen.getByLabelText("Choose photos", { selector: "input" });
-    expect(input).toHaveAttribute("multiple");
-    fireEvent.change(input, {
-      target: { files: [photo("one.jpg"), photo("two.jpg")] },
-    });
-    fireEvent.change(input, { target: { files: [photo("three.jpg")] } });
+    await user.upload(input, [photo("one.jpg"), photo("two.jpg")]);
+    await user.click(screen.getByRole("button", { name: "Choose photos" }));
+    await user.upload(input, photo("three.jpg"));
+    expect(screen.queryByRole("dialog")).toBeNull();
     expect(screen.getByText("3 / 10 photos")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Save photos" }));
     await waitFor(() =>
@@ -134,10 +127,7 @@ describe("task attachment collection", () => {
       .mockRejectedValueOnce(new Error("Task changed; retry"))
       .mockResolvedValueOnce(undefined);
     renderPhotos(save);
-    fireEvent.change(
-      screen.getByLabelText("Choose photos", { selector: "input" }),
-      { target: { files: [photo("pads.jpg")] } },
-    );
+    await addPhotos(user, [photo("pads.jpg")]);
     await user.click(screen.getByRole("button", { name: "Save photos" }));
     await screen.findByText("Task changed; retry");
     expect(screen.getByText("1 / 10 photos")).toBeInTheDocument();
@@ -146,22 +136,35 @@ describe("task attachment collection", () => {
     expect(mocks.fetch).toHaveBeenCalledTimes(1);
   });
 
-  it("rejects an oversized batch without replacing the selected photos", () => {
+  it("rejects an oversized batch without replacing the selected photos", async () => {
+    const user = userEvent.setup();
     renderPhotos(vi.fn());
-    expect(screen.queryByText(/Up to 10/)).toBeNull();
-    expect(screen.queryByRole("alert")).toBeNull();
-    const input = screen.getByLabelText("Choose photos", { selector: "input" });
-    fireEvent.change(input, { target: { files: [photo("keep.jpg")] } });
-    fireEvent.change(input, {
-      target: {
-        files: Array.from({ length: 10 }, (_, i) => photo(`extra-${i}.jpg`)),
+    await addPhotos(user, [photo("keep.jpg")]);
+    await user.click(screen.getByRole("button", { name: "Choose photos" }));
+    fireEvent.change(
+      screen.getByLabelText("Choose photos", { selector: "input" }),
+      {
+        target: {
+          files: Array.from({ length: 10 }, (_, i) => photo(`extra-${i}.jpg`)),
+        },
       },
-    });
-    expect(screen.getByText("1 / 10 photos")).toBeInTheDocument();
+    );
     expect(screen.getByRole("alert")).toHaveTextContent("Up to 10");
     expect(mocks.fetch).not.toHaveBeenCalled();
-    fireEvent.change(input, { target: { files: [photo("valid.jpg")] } });
-    expect(screen.queryByRole("alert")).toBeNull();
-    expect(screen.queryByText(/Up to 10/)).toBeNull();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByText("1 / 10 photos")).toBeInTheDocument();
+    await addPhotos(user, [photo("valid.jpg")]);
+    expect(screen.getByText("2 / 10 photos")).toBeInTheDocument();
   });
 });
+
+async function addPhotos(
+  user: ReturnType<typeof userEvent.setup>,
+  files: File[],
+) {
+  await user.click(screen.getByRole("button", { name: "Choose photos" }));
+  await user.upload(
+    screen.getByLabelText("Choose photos", { selector: "input" }),
+    files,
+  );
+}

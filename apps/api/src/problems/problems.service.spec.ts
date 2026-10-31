@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   NotFoundException,
@@ -114,6 +115,323 @@ describe("ProblemsService authorization and write conflicts", () => {
     });
   });
 
+  it("rejects todo creation and listing for non-admins with full problem grants", async () => {
+    access.getSnapshot.mockResolvedValue({
+      ...snapshot,
+      effectiveScopes: {
+        "problems.create": ["ALL"],
+        "problems.read": ["ALL"],
+      },
+    });
+    await expect(
+      service.create(
+        "mechanic",
+        v1.problems.createProblemInputSchema.parse({
+          scooterId: null,
+          title: "Order supplies",
+          difficulty: "easy",
+        }),
+      ),
+    ).rejects.toThrow(ForbiddenException);
+    await expect(
+      service.list("mechanic", { kind: "todo", page: 1, pageSize: 25 }),
+    ).rejects.toThrow(ForbiddenException);
+    expect(db.scooterProblem.create).not.toHaveBeenCalled();
+  });
+
+  it("isolates the admin todo list and all quick-filter counts from scooter issues", async () => {
+    access.getSnapshot.mockResolvedValue({ ...snapshot, isSuperAdmin: true });
+    db.$transaction.mockImplementation((queries: Promise<unknown>[]) =>
+      Promise.all(queries),
+    );
+    db.scooterProblem.findMany.mockResolvedValue([]);
+    db.scooterProblem.count.mockResolvedValue(0);
+    await service.list("admin", { kind: "todo", page: 1, pageSize: 25 });
+    const listCalls = db.scooterProblem.findMany.mock.calls as [
+      { where: { AND: unknown[] } },
+    ][];
+    expect(listCalls[0][0].where.AND).toContainEqual({ scooterId: null });
+    const counts = db.scooterProblem.count.mock.calls as [
+      { where: { AND: { AND: unknown[] }[] } },
+    ][];
+    // Total count uses the list predicate; each quick-filter count uses its shared base.
+    expect(counts[0][0].where.AND).toContainEqual({ scooterId: null });
+    expect(counts[1][0].where.AND).toContainEqual({ scooterId: null });
+    for (const [query] of counts.slice(2))
+      expect(query.where.AND[0].AND).toContainEqual({ scooterId: null });
+  });
+
+  it("creates an admin todo without looking up or locking a scooter", async () => {
+    access.getSnapshot.mockResolvedValue({
+      ...snapshot,
+      isAdmin: true,
+      effectiveScopes: {
+        "problems.create": ["ALL"],
+        "problems.read": ["ALL"],
+      },
+    });
+    const todo = { ...row, scooterId: null, scooter: null, difficulty: null };
+    db.scooterProblem.create.mockResolvedValue(todo);
+    db.scooterProblem.findUniqueOrThrow.mockResolvedValue(todo);
+    const result = await service.create(
+      "admin",
+      v1.problems.createProblemInputSchema.parse({
+        scooterId: null,
+        title: "Order supplies",
+      }),
+    );
+    expect(result.scooter).toBeNull();
+    expect(result.scooterId).toBeNull();
+    expect(result.difficulty).toBeNull();
+    expect(db.scooter.findFirst).not.toHaveBeenCalled();
+    expect(db.$queryRaw).not.toHaveBeenCalled();
+    expect(
+      (db.scooterProblem.create.mock.calls as unknown[][])[0]?.[0],
+    ).toMatchObject({ data: { scooterId: null, blocksUsage: false } });
+  });
+
+  describe("todo assignee eligibility", () => {
+    const admin = {
+      ...snapshot,
+      isAdmin: true,
+      effectiveScopes: {
+        "problems.create": ["ALL"],
+        "problems.read": ["ALL"],
+        "problems.assign": ["ALL"],
+        "problems.update": ["ALL"],
+        "problems.resolve": ["ALL"],
+        "problems.claim": ["ALL"],
+      },
+    };
+    const todo = { ...row, scooterId: null, scooter: null, difficulty: null };
+
+    beforeEach(() => {
+      access.getSnapshot.mockImplementation((id: string) =>
+        Promise.resolve(id === "mechanic" ? snapshot : admin),
+      );
+      db.scooterProblem.findFirst.mockResolvedValue(todo);
+      db.scooterProblem.findUnique.mockResolvedValue({ scooterId: null });
+      db.scooterProblem.findUniqueOrThrow.mockResolvedValue(todo);
+      db.scooterProblem.create.mockResolvedValue(todo);
+    });
+
+    it.each(["create", "assign"] as const)(
+      "rejects mechanics on todo %s",
+      async (action) => {
+        const request =
+          action === "create"
+            ? service.create(
+                "admin",
+                v1.problems.createProblemInputSchema.parse({
+                  scooterId: null,
+                  title: "Order supplies",
+                  assigneeIds: ["mechanic"],
+                }),
+              )
+            : service.assign("admin", row.id, {
+                revision: 1,
+                assigneeIds: ["mechanic"],
+              });
+        await expect(request).rejects.toThrow(ConflictException);
+        expect(db.scooterProblem.create).not.toHaveBeenCalled();
+        expect(db.scooterProblem.updateMany).not.toHaveBeenCalled();
+      },
+    );
+
+    it.each([
+      { isAdmin: true, isSuperAdmin: false },
+      { isAdmin: false, isSuperAdmin: true },
+    ])("accepts admin assignees %j", async (designation) => {
+      access.getSnapshot.mockImplementation((id: string) =>
+        Promise.resolve(id === "target" ? { ...admin, ...designation } : admin),
+      );
+      await expect(
+        service.create(
+          "admin",
+          v1.problems.createProblemInputSchema.parse({
+            scooterId: null,
+            title: "Order supplies",
+            assigneeIds: ["target"],
+          }),
+        ),
+      ).resolves.toBeDefined();
+      await expect(
+        service.assign("admin", row.id, {
+          revision: 1,
+          assigneeIds: ["target"],
+        }),
+      ).resolves.toBeDefined();
+    });
+
+    it("only lists eligible admins for todo assignment", async () => {
+      db.user.findMany.mockResolvedValue([{ id: "mechanic" }, { id: "admin" }]);
+      db.user.findFirst.mockImplementation(
+        ({ where }: { where: { id: string } }) =>
+          Promise.resolve({
+            id: where.id,
+            firstName: where.id,
+            lastName: null,
+            roleMemberships: [],
+          }),
+      );
+      const result = await service.assignees("admin", "", "todo");
+      expect(result.items.map(({ id }) => id)).toEqual(["admin"]);
+      const scooterResult = await service.assignees("admin", "", "scooter");
+      expect(scooterResult.items.map(({ id }) => id)).toEqual([
+        "mechanic",
+        "admin",
+      ]);
+    });
+
+    it("rejects a mechanic claiming an unassigned todo", async () => {
+      db.scooterProblem.findFirst.mockResolvedValue({
+        ...todo,
+        assigneeId: null,
+        assignee: null,
+        assignees: [],
+      });
+      await expect(service.claim("mechanic", row.id, 1)).rejects.toThrow(
+        ForbiddenException,
+      );
+      expect(db.scooterProblem.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("flags a mechanic already assigned to a todo for reassignment", async () => {
+      const result = await service.get("admin", row.id);
+      expect(result?.assigneeNeedsReassignment).toBe(true);
+    });
+  });
+
+  describe("full edit updates", () => {
+    const admin = {
+      ...snapshot,
+      isAdmin: true,
+      effectiveScopes: {
+        "problems.read": ["ALL"],
+        "problems.update": ["ALL"],
+        "problems.resolve": ["ALL"],
+        "problems.assign": ["ALL"],
+      },
+    };
+    it("saves fields, assignees, and scooter condition in the same transaction", async () => {
+      access.getSnapshot.mockResolvedValue(admin);
+      await service.update("admin", row.id, {
+        revision: 1,
+        title: "Changed title",
+        description: "Changed description",
+        assigneeIds: ["target"],
+        blocksUsage: true,
+      });
+      expect(db.$transaction).toHaveBeenCalledTimes(1);
+      expect(db.scooterProblem.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            title: "Changed title",
+            description: "Changed description",
+            assigneeId: "target",
+            blocksUsage: true,
+            holdClearedAt: null,
+            holdClearedById: null,
+          }) as unknown,
+        }),
+      );
+      expect(db.scooterProblem.update).toHaveBeenCalledWith({
+        where: { id: row.id },
+        data: { assignees: { set: [{ id: "target" }] } },
+      });
+    });
+    it("requires assignment permission when changing assignees through edit", async () => {
+      access.getSnapshot.mockResolvedValue({
+        ...admin,
+        effectiveScopes: { "problems.update": ["ALL"] },
+      });
+      await expect(
+        service.update("admin", row.id, {
+          revision: 1,
+          title: "Changed",
+          assigneeIds: [],
+        }),
+      ).rejects.toThrow(ForbiddenException);
+      expect(db.scooterProblem.updateMany).not.toHaveBeenCalled();
+    });
+    it("rejects mechanic assignment to a todo before saving any edits", async () => {
+      access.getSnapshot.mockImplementation((id: string) =>
+        Promise.resolve(id === "mechanic" ? snapshot : admin),
+      );
+      db.scooterProblem.findFirst.mockResolvedValue({
+        ...row,
+        scooterId: null,
+        scooter: null,
+      });
+      db.scooterProblem.findUnique.mockResolvedValue({ scooterId: null });
+      await expect(
+        service.update("admin", row.id, {
+          revision: 1,
+          title: "Changed",
+          assigneeIds: ["mechanic"],
+        }),
+      ).rejects.toThrow(ConflictException);
+      expect(db.scooterProblem.updateMany).not.toHaveBeenCalled();
+    });
+    it("rejects maintenance holds on todos before saving any edits", async () => {
+      access.getSnapshot.mockResolvedValue(admin);
+      db.scooterProblem.findFirst.mockResolvedValue({
+        ...row,
+        scooterId: null,
+        scooter: null,
+      });
+      db.scooterProblem.findUnique.mockResolvedValue({ scooterId: null });
+      await expect(
+        service.update("admin", row.id, {
+          revision: 1,
+          title: "Changed",
+          blocksUsage: true,
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(db.scooterProblem.updateMany).not.toHaveBeenCalled();
+    });
+  });
+
+  it("excludes todos from every non-admin record authorization query", async () => {
+    await service.get("mechanic", "problem");
+    expect(db.scooterProblem.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          AND: [
+            { id: "problem" },
+            {
+              AND: [
+                expect.anything(),
+                {
+                  OR: [{ scooter: { deletedAt: null } }],
+                },
+              ],
+            },
+          ],
+        },
+      }),
+    );
+  });
+
+  it("allows admins to complete todos without a scooter lock", async () => {
+    access.getSnapshot.mockResolvedValue({ ...snapshot, isSuperAdmin: true });
+    const todo = { ...row, scooterId: null, scooter: null, difficulty: null };
+    db.scooterProblem.findUnique.mockResolvedValue({ scooterId: null });
+    db.scooterProblem.findFirst.mockResolvedValue(todo);
+    db.scooterProblem.findUniqueOrThrow.mockResolvedValue({
+      ...todo,
+      status: "resolved",
+    });
+    await service.resolve("admin", "problem", {
+      revision: 1,
+      resolutionNotes: "Done",
+    });
+    expect(db.$queryRaw).toHaveBeenCalledTimes(1);
+    expect(
+      (db.scooterProblem.updateMany.mock.calls as unknown[][])[0]?.[0],
+    ).toMatchObject({ data: { status: "resolved" } });
+  });
+
   it("persists optional sections during creation and resolves saved locations", async () => {
     access.getSnapshot.mockResolvedValue({ ...snapshot, isSuperAdmin: true });
     db.scooter.findFirst.mockResolvedValue({ id: "scooter" });
@@ -177,10 +495,10 @@ describe("ProblemsService authorization and write conflicts", () => {
       scooter: { ...row.scooter, photos: [{ id: "cover" }] },
     });
     const result = await service.get("mechanic", "problem");
-    expect(result.scooter.coverUrl).toBe(
+    expect(result.scooter?.coverUrl).toBe(
       v1.scooters.ROUTES.photos.content("scooter", "cover"),
     );
-    expect(result.scooter.brandCode).toBe("BRD");
+    expect(result.scooter?.brandCode).toBe("BRD");
     const calls = db.scooterProblem.findFirst.mock.calls as unknown[][];
     expect(calls[0]?.[0]).toMatchObject({
       include: {
@@ -206,7 +524,7 @@ describe("ProblemsService authorization and write conflicts", () => {
       scooter: { ...row.scooter, photos: [] },
     });
     expect(
-      (await service.get("mechanic", "problem")).scooter.coverUrl,
+      (await service.get("mechanic", "problem")).scooter?.coverUrl,
     ).toBeNull();
   });
 
@@ -229,6 +547,7 @@ describe("ProblemsService authorization and write conflicts", () => {
           where: {
             AND: [
               expect.anything(),
+              { scooterId: { not: null } },
               {},
               expect.objectContaining({
                 OR: [
@@ -277,8 +596,9 @@ describe("ProblemsService authorization and write conflicts", () => {
       { where: { AND: unknown[] } },
     ][];
     const base = countCalls[1][0].where;
-    expect(base.AND[1]).toEqual({ difficulty: "hard" });
-    expect(base.AND[0]).toEqual(findCalls[0][0].where.AND[0]);
+    expect(base.AND[2]).toEqual({ difficulty: "hard" });
+    expect(base.AND[0]).toEqual({ scooterId: { not: null } });
+    expect(base.AND[1]).toEqual(findCalls[0][0].where.AND[0]);
     expect(countCalls[4][0].where).toEqual({
       AND: [
         base,

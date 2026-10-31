@@ -214,6 +214,7 @@ export function AssigneeSelect(props: AssigneeSelectProps) {
         addAction={{ text: action, icon: <UserPlusIcon /> }}
         onClear={props.onClear}
         clearOptionLabel={props.clearOptionLabel}
+        searchable={options.length > 5}
         searchPlaceholder={t("problems.searchAssignees")}
         clearSearchLabel={t("problems.clearAssigneeSearch")}
         closeLabel={t("done")}

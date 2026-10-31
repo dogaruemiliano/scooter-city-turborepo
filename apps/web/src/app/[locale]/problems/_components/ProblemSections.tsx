@@ -58,6 +58,7 @@ export function ProblemSections({
   const t = useTranslations("workspace.problems");
   const shared = useTranslations("workspace");
   const task = useTask();
+  const optionId = useId();
   const [open, setOpen] = useState(false);
   const [editingLocation, setEditingLocation] = useState(false);
   const [creatingChecklist, setCreatingChecklist] = useState<
@@ -178,7 +179,9 @@ export function ProblemSections({
               <Button
                 key={key}
                 variant="outline"
-                className="justify-start"
+                className="h-auto justify-start gap-4 p-4 text-left md:p-4"
+                aria-labelledby={`${optionId}-${key}-title`}
+                aria-describedby={`${optionId}-${key}-description`}
                 disabled={busy || has(key)}
                 onClick={() => {
                   if (key === "location") {
@@ -190,8 +193,21 @@ export function ProblemSections({
                   }
                 }}
               >
-                <Icon aria-hidden="true" />
-                {t(key)}
+                <Icon aria-hidden="true" className="size-8 shrink-0" />
+                <span className="flex min-w-0 flex-1 flex-col gap-1">
+                  <span
+                    id={`${optionId}-${key}-title`}
+                    className="text-base font-semibold"
+                  >
+                    {t(key)}
+                  </span>
+                  <span
+                    id={`${optionId}-${key}-description`}
+                    className="text-sm font-normal text-muted-foreground group-disabled/button:text-disabled-foreground"
+                  >
+                    {t(`sectionDescriptions.${key}`)}
+                  </span>
+                </span>
               </Button>
             ))}
             <Feedback error={task.error} />

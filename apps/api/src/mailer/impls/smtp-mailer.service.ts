@@ -56,6 +56,8 @@ export class SmtpMailerService
       subject: message.subject,
       text: message.text,
       html: message.html,
+      attachments: message.attachments,
+      messageId: message.messageId,
     });
   }
 

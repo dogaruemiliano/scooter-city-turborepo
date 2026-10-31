@@ -12,6 +12,12 @@ describe("scooter editor concurrency", () => {
       id: "scooter",
       powertrainType: "combustion",
       registrationType: "unregistered",
+      requiredLicenseCategory: "none",
+      // Legacy evidence must not impose removed manual configuration requirements.
+      limiterKind: "LIMITED",
+      limiterKmh: 45,
+      maxSpeedSource: null,
+      configurationEvidence: null,
       updatedAt: new Date(timestamp),
     };
     const tx = {
@@ -77,5 +83,14 @@ describe("scooter editor concurrency", () => {
       service.update("scooter", { expectedUpdatedAt: timestamp }),
     ).rejects.toBeInstanceOf(NotFoundException);
     expect(tx.scooter.update).not.toHaveBeenCalled();
+  });
+  it("preserves selected licence policy for unregistered scooters without rewriting physical evidence", async () => {
+    const { service, tx } = setup();
+    await service.update("scooter", { requiredLicenseCategory: "AM" });
+    const call: unknown = tx.scooter.update.mock.calls[0];
+    expect(call).toMatchObject([{ data: { requiredLicenseCategory: "AM" } }]);
+    expect(call).not.toMatchObject([
+      { data: { limiterKind: "LIMITED", limiterKmh: 25 } },
+    ]);
   });
 });

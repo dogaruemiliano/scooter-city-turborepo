@@ -41,27 +41,30 @@ it("starts with one policy, blocks a second blank policy, and allows removing th
   const browser = userEvent.setup();
   expect(await screen.findAllByLabelText("Insured name")).toHaveLength(1);
   expect(
-    screen.getByRole("button", { name: messages.en.scooters.insurance.add }),
-  ).toBeDisabled();
+    screen.queryByRole("button", { name: messages.en.scooters.insurance.add }),
+  ).not.toBeInTheDocument();
   expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
   expect(
-    screen.getByRole("button", { name: "Delete insurance" }),
-  ).toBeDisabled();
+    screen.queryByText("Complete the current insurance before adding another"),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: "Delete insurance" }),
+  ).not.toBeInTheDocument();
   await browser.type(screen.getByLabelText("Insured name"), "Fleet SRL");
   await browser.click(
     screen.getByRole("button", { name: messages.en.scooters.insurance.add }),
   );
   expect(screen.getAllByLabelText("Insured name")).toHaveLength(2);
   expect(
-    screen.getByRole("button", { name: messages.en.scooters.insurance.add }),
-  ).toBeDisabled();
+    screen.queryByRole("button", { name: messages.en.scooters.insurance.add }),
+  ).not.toBeInTheDocument();
   await browser.click(
     screen.getAllByRole("button", { name: "Delete insurance" })[1]!,
   );
   expect(screen.getAllByLabelText("Insured name")).toHaveLength(1);
   expect(
-    screen.getByRole("button", { name: "Delete insurance" }),
-  ).toBeDisabled();
+    screen.queryByRole("button", { name: "Delete insurance" }),
+  ).not.toBeInTheDocument();
 });
 it("uses the scooter save instead of its own save action", async () => {
   render(<Harness />);
@@ -101,7 +104,7 @@ it("stages deleting a saved policy without an HTTP request and keeps the last ro
   );
   expect(screen.getAllByLabelText("Insured name")).toHaveLength(1);
   expect(
-    screen.getByRole("button", { name: "Delete insurance" }),
-  ).toBeDisabled();
+    screen.queryByRole("button", { name: "Delete insurance" }),
+  ).not.toBeInTheDocument();
   expect(mocks.fetch).not.toHaveBeenCalled();
 });

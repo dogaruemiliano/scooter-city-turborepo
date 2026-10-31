@@ -2,6 +2,82 @@ import { Prisma } from "../../generated/prisma/client";
 import { PrismaExpenseExtractionRepository } from "./prisma-expense-extraction.repository";
 
 describe("PrismaExpenseExtractionRepository", () => {
+  it("retains both receipt photos before starting analysis", async () => {
+    const tx = {
+      draftUpload: { updateMany: jest.fn().mockResolvedValue({ count: 2 }) },
+      expenseExtractionDraft: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        upsert: jest.fn().mockResolvedValue({ id: "draft" }),
+      },
+    };
+    const prisma = {
+      $transaction: jest.fn(
+        (callback: (client: typeof tx) => Promise<unknown>) => callback(tx),
+      ),
+    };
+    const repository = new PrismaExpenseExtractionRepository(prisma as never);
+    const availableAt = new Date(),
+      retainUntil = new Date(availableAt.getTime() + 7 * 86_400_000);
+    await repository.beginDraft({
+      ownerUserId: "owner",
+      sourceUploadId: "first",
+      additionalSourceUploadIds: ["second"],
+      provider: "fake",
+      parserVersion: "v1",
+      sourceUploadPurpose: "finance-expense-document",
+      availableAt,
+      retainUntil,
+    });
+    expect(tx.draftUpload.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          id: { in: ["first", "second"] },
+        }) as unknown,
+        data: { expiresAt: retainUntil },
+      }),
+    );
+    expect(tx.expenseExtractionDraft.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          additionalSourceUploadIds: ["second"],
+        }) as unknown,
+      }),
+    );
+  });
+
+  it("does not reuse an analysis with a different second source photo", async () => {
+    const tx = {
+      draftUpload: { updateMany: jest.fn() },
+      expenseExtractionDraft: {
+        findUnique: jest.fn().mockResolvedValue({
+          ownerUserId: "owner",
+          status: "READY",
+          additionalSourceUploadIds: ["old-second"],
+        }),
+        upsert: jest.fn(),
+      },
+    };
+    const prisma = {
+      $transaction: jest.fn(
+        (callback: (client: typeof tx) => Promise<unknown>) => callback(tx),
+      ),
+    };
+    const repository = new PrismaExpenseExtractionRepository(prisma as never);
+    await expect(
+      repository.beginDraft({
+        ownerUserId: "owner",
+        sourceUploadId: "first",
+        additionalSourceUploadIds: ["new-second"],
+        provider: "fake",
+        parserVersion: "v1",
+        sourceUploadPurpose: "finance-expense-document",
+        availableAt: new Date(),
+        retainUntil: new Date(),
+      }),
+    ).resolves.toBeNull();
+    expect(tx.expenseExtractionDraft.upsert).not.toHaveBeenCalled();
+  });
+
   afterEach(() => {
     jest.useRealTimers();
   });
@@ -76,7 +152,7 @@ describe("PrismaExpenseExtractionRepository", () => {
 
     expect(tx.draftUpload.updateMany).toHaveBeenCalledWith({
       where: {
-        id: "upload-1",
+        id: { in: ["upload-1"] },
         userId: "user-1",
         purpose: "finance-expense-document",
         claimedAt: null,
@@ -90,6 +166,7 @@ describe("PrismaExpenseExtractionRepository", () => {
       create: {
         ownerUserId: "user-1",
         sourceUploadId: "upload-1",
+        additionalSourceUploadIds: [],
         provider: "aws-textract",
         parserVersion: "expense-v5",
         status: "ANALYZING",

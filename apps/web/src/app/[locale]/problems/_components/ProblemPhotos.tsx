@@ -7,7 +7,6 @@ import { v1 } from "@repo/api-shared";
 import { aspectRatio } from "@repo/theme";
 import { AddAction, Button } from "@repo/ui/components";
 import { ImageGallery } from "@repo/ui/components/image-gallery";
-import { ImageCapture } from "@repo/ui/components/image-capture";
 import { Plus } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { webApi } from "@/lib/api";
@@ -36,7 +35,6 @@ export function ProblemPhotos({
   const galleryT = useTranslations("scooters.photos");
   const task = useTask();
   const input = useRef<HTMLInputElement>(null);
-  const [camera, setCamera] = useState(false);
   const [pending, setPending] = useState<PendingPhoto[]>([]);
   const pendingRef = useRef(pending);
   const previews = useRef(new Set<string>());
@@ -108,19 +106,20 @@ export function ProblemPhotos({
       </div>
       <input
         ref={input}
-        hidden
         type="file"
+        hidden
         multiple
-        accept={v1.scooters.SCOOTER_PHOTO_CONTENT_TYPES.join(",")}
+        accept="image/*"
         aria-label={t("choosePhotos")}
         disabled={busy}
         onChange={(event) => {
           const files = Array.from(event.target.files ?? []);
           event.target.value = "";
+          if (!files.length) return;
           try {
             add(files);
           } catch {
-            /* The validation message is displayed below. */
+            /* The validation message is displayed beside the photos. */
           }
         }}
       />
@@ -164,7 +163,7 @@ export function ProblemPhotos({
             icon={<Plus />}
             style={{ aspectRatio: aspectRatio.scooterPhoto }}
             disabled={busy}
-            onClick={() => setCamera(true)}
+            onClick={() => input.current?.click()}
           />
         ) : null}
       </ImageGallery>
@@ -273,42 +272,6 @@ export function ProblemPhotos({
           {galleryT("retry")}
         </Button>
       ) : null}
-      <ImageCapture
-        open={camera}
-        onOpenChange={setCamera}
-        allowCrop={false}
-        allowGallery={false}
-        keepOpenAfterCapture
-        onCapture={(file) => add([file])}
-        labels={{
-          title: t("takePhotos"),
-          close: t("donePhotos"),
-          capture: t("takePhotos"),
-          usePhoto: t("addPhoto"),
-          retake: t("retakePhoto"),
-          previewTitle: t("previewPhoto"),
-          previewAlt: t("previewPhoto"),
-          switchCamera: t("switchCamera"),
-          startingCamera: t("startingCamera"),
-          cameraUnavailable: t("cameraUnavailable"),
-          retryCamera: t("retryCamera"),
-          fileTooLarge: t("photoLimits"),
-          captureFailed: t("photoFailed"),
-          saveFailed: t("photoFailed"),
-        }}
-        cameraActions={
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              disabled={count >= v1.problems.PROBLEM_PHOTO_MAX_FILES}
-              onClick={() => input.current?.click()}
-            >
-              {t("choosePhotos")}
-            </Button>
-            <Button onClick={() => setCamera(false)}>{t("donePhotos")}</Button>
-          </div>
-        }
-      />
     </section>
   );
 }

@@ -1,4 +1,11 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { useState } from "react";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
@@ -6,6 +13,7 @@ import { messages } from "@repo/i18n";
 import { ApiError, v1 } from "@repo/api-shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CreateProblem, ProblemWork, memberName } from "./ProblemForms";
+import { ProblemEditScreen } from "./ProblemEditScreen";
 import { ProblemCreateScreen } from "./ProblemCreateScreen";
 import { AssigneeSelect } from "./AssigneeSelect";
 import { ProblemAssignment } from "./ProblemAssignment";
@@ -105,6 +113,391 @@ beforeEach(() => {
 });
 
 describe("problem release forms", () => {
+  it("creates a todo using the issue form without scooter selection or condition", async () => {
+    const user = userEvent.setup();
+    const saved = vi.fn();
+    renderForm(<CreateProblem todo onSaved={saved} />);
+    await waitFor(() =>
+      expect(mocks.fetch).toHaveBeenCalledWith(
+        "/v1/problems/eligible-assignees?kind=todo",
+        expect.anything(),
+        expect.anything(),
+      ),
+    );
+    expect(screen.queryByText("Select scooter")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(messages.en.workspace.problems.scooterCondition),
+    ).not.toBeInTheDocument();
+    await user.type(
+      screen.getByRole("textbox", {
+        name: messages.en.workspace.problems.reportTitle,
+      }),
+      "Order supplies",
+    );
+    expect(
+      screen.queryByRole("radiogroup", {
+        name: messages.en.workspace.problems.difficulty,
+      }),
+    ).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Add todo" }));
+    await waitFor(() => expect(saved).toHaveBeenCalled());
+    const request = mocks.fetch.mock.calls.find(
+      ([url]) => url === "/v1/problems",
+    );
+    expect(request?.[2].json).not.toHaveProperty("difficulty");
+    expect(mocks.fetch).toHaveBeenCalledWith(
+      "/v1/problems",
+      expect.anything(),
+      expect.objectContaining({
+        method: "POST",
+        json: expect.objectContaining({
+          scooterId: null,
+          title: "Order supplies",
+          blocksUsage: false,
+        }),
+      }),
+    );
+  });
+
+  it("edits todos without a difficulty control or difficulty in the request", async () => {
+    const user = userEvent.setup();
+    const reload = vi.fn();
+    renderForm(
+      <CreateProblem
+        todo
+        initialProblem={{ ...problem, scooterId: null, scooter: null }}
+        onSaved={reload}
+      />,
+    );
+    await waitFor(() =>
+      expect(mocks.fetch).toHaveBeenCalledWith(
+        "/v1/problems/eligible-assignees?kind=todo",
+        expect.anything(),
+        expect.anything(),
+      ),
+    );
+    expect(
+      screen.queryByRole("combobox", {
+        name: messages.en.workspace.problems.difficulty,
+      }),
+    ).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(reload).toHaveBeenCalled());
+    const request = mocks.fetch.mock.calls.find(
+      ([url, , options]) =>
+        url === "/v1/problems/report" && options?.method === "PATCH",
+    );
+    expect(request?.[2].json).not.toHaveProperty("difficulty");
+  });
+
+  it.each(["todo", "issue"])(
+    "opens %s editing from the more actions popup",
+    async (kind) => {
+      const todo = kind === "todo";
+      renderForm(
+        <ProblemWork
+          compact
+          problem={{
+            ...problem,
+            ...(todo ? { scooterId: null, scooter: null } : {}),
+          }}
+          reload={vi.fn()}
+        />,
+      );
+      const user = userEvent.setup();
+      await user.click(screen.getByRole("button", { name: "More actions" }));
+      const menu = await screen.findByRole("menu", { name: "More actions" });
+      expect(
+        within(menu)
+          .getAllByRole("menuitem")
+          .map((item) => item.textContent),
+      ).toEqual(["Edit", "Pause work", "Dismiss"]);
+      expect(within(menu).queryByRole("textbox")).toBeNull();
+      await user.click(within(menu).getByRole("menuitem", { name: "Edit" }));
+      expect(mocks.push).toHaveBeenCalledWith(
+        `/en/${todo ? "todos" : "problems"}/report/edit`,
+      );
+    },
+  );
+
+  it.each(["todo", "issue"])(
+    "prefills the shared form and saves %s edits in one request",
+    async (kind) => {
+      const todo = kind === "todo";
+      const original = mocks.fetch.getMockImplementation()!;
+      const existing = {
+        ...problem,
+        description: "Existing description",
+        ...(todo ? { scooterId: null, scooter: null } : {}),
+      };
+      mocks.fetch.mockImplementation((url, schema, options) =>
+        url === "/v1/problems/report"
+          ? Promise.resolve({ ...existing, ...options?.json })
+          : original(url, schema, options),
+      );
+      renderForm(<ProblemEditScreen id="report" />);
+      const title = await screen.findByRole("textbox", { name: "Title" });
+      expect(title).toHaveValue("Broken belt");
+      expect(
+        screen.getByRole("textbox", { name: "Description (optional)" }),
+      ).toHaveValue("Existing description");
+      expect(screen.getByText("Alex")).toBeInTheDocument();
+      expect(screen.queryByRole("form", { name: "Report problem" })).toBeNull();
+      if (!todo) {
+        expect(screen.getByRole("radio", { name: "Hard" })).toBeChecked();
+        expect(screen.getByRole("radio", { name: "Unusable" })).toBeChecked();
+        expect(screen.getByText(/007 HON/)).toBeInTheDocument();
+      } else expect(screen.queryByRole("radiogroup")).toBeNull();
+      const user = userEvent.setup();
+      await user.clear(title);
+      await user.type(title, "Updated title");
+      await user.click(screen.getByRole("button", { name: "Save changes" }));
+      await waitFor(() =>
+        expect(mocks.push).toHaveBeenCalledWith(
+          `/en/${todo ? "todos" : "problems"}/report`,
+        ),
+      );
+      const writes = mocks.fetch.mock.calls.filter(
+        ([, , options]) => options?.method === "PATCH",
+      );
+      expect(writes).toHaveLength(1);
+      expect(writes[0]?.[2].json).toMatchObject({
+        title: "Updated title",
+        description: "Existing description",
+        revision: 3,
+      });
+      expect(writes[0]?.[2].json).not.toHaveProperty("scooterId");
+      expect(writes[0]?.[2].json).not.toHaveProperty("assigneeIds");
+      if (todo) expect(writes[0]?.[2].json).not.toHaveProperty("difficulty");
+    },
+  );
+
+  it("preserves entered todo edits after a failed save", async () => {
+    const saved = vi.fn();
+    const original = mocks.fetch.getMockImplementation()!;
+    mocks.fetch.mockImplementation((url, schema, options) =>
+      options?.method === "PATCH"
+        ? Promise.reject(new Error("Save failed"))
+        : original(url, schema, options),
+    );
+    renderForm(
+      <CreateProblem
+        todo
+        initialProblem={{ ...problem, scooterId: null, scooter: null }}
+        onSaved={saved}
+      />,
+    );
+    const user = userEvent.setup();
+    const title = screen.getByRole("textbox", { name: "Title" });
+    await user.clear(title);
+    await user.type(title, "Keep these edits");
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Save failed");
+    expect(title).toHaveValue("Keep these edits");
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeEnabled();
+    expect(saved).not.toHaveBeenCalled();
+  });
+
+  it("requires reloading a stale todo before saving again", async () => {
+    const original = mocks.fetch.getMockImplementation()!;
+    let revision = 3;
+    mocks.fetch.mockImplementation((url, schema, options) => {
+      if (url === "/v1/problems/report") {
+        if (options?.method === "PATCH") {
+          revision = 4;
+          return Promise.reject(new ApiError(409, "Changed elsewhere"));
+        }
+        return Promise.resolve({
+          ...problem,
+          scooterId: null,
+          scooter: null,
+          revision,
+        });
+      }
+      return original(url, schema, options);
+    });
+    renderForm(<ProblemEditScreen id="report" />);
+    const title = await screen.findByRole("textbox", { name: "Title" });
+    const user = userEvent.setup();
+    await user.clear(title);
+    await user.type(title, "Unsaved change");
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "This record changed while you were editing",
+    );
+    expect(title).toHaveValue("Unsaved change");
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
+    await user.click(
+      screen.getByRole("button", { name: "Reload latest version" }),
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Save changes" }),
+      ).toBeEnabled(),
+    );
+    expect(screen.getByRole("textbox", { name: "Title" })).toHaveValue(
+      "Broken belt",
+    );
+  });
+
+  it("cancels todo editing without writing and returns to its details", async () => {
+    const original = mocks.fetch.getMockImplementation()!;
+    mocks.fetch.mockImplementation((url, schema, options) =>
+      url === "/v1/problems/report"
+        ? Promise.resolve({ ...problem, scooterId: null, scooter: null })
+        : original(url, schema, options),
+    );
+    renderForm(<ProblemEditScreen id="report" />);
+    const user = userEvent.setup();
+    const title = await screen.findByRole("textbox", { name: "Title" });
+    await user.type(title, " edited");
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(mocks.push).toHaveBeenCalledWith("/en/todos/report");
+    expect(
+      mocks.fetch.mock.calls.some(
+        ([, , options]) => options?.method === "PATCH",
+      ),
+    ).toBe(false);
+  });
+
+  it("uses todo copy in dismissal confirmation without duplicate creator attribution", async () => {
+    renderForm(
+      <ProblemWork
+        compact
+        problem={{
+          ...problem,
+          scooterId: null,
+          scooter: null,
+          reporter: { id: "creator", firstName: "Chris", lastName: null },
+        }}
+        reload={vi.fn()}
+      />,
+    );
+    expect(screen.queryByText("Created by Chris")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Reported by/)).toBeNull();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "More actions" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Dismiss" }));
+    const sheet = await screen.findByRole("dialog", { name: "Dismiss todo" });
+    expect(sheet).toHaveTextContent(
+      "Dismiss this todo? Its history will be kept.",
+    );
+    expect(sheet).not.toHaveTextContent(/report/i);
+  });
+
+  it("returns to the todo list after cancelling todo creation", async () => {
+    const user = userEvent.setup();
+    renderForm(<ProblemCreateScreen todo />);
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(mocks.push).toHaveBeenCalledWith("/en/todos");
+  });
+
+  it.each(["dismiss", "resolve", "reopen", "clear hold"] as const)(
+    "invalidates cached scooter status after %s succeeds",
+    async (action) => {
+      const user = userEvent.setup();
+      const reload = vi.fn();
+      let finish!: (value: v1.problems.Problem) => void;
+      const response = new Promise<v1.problems.Problem>((resolve) => {
+        finish = resolve;
+      });
+      const original = mocks.fetch.getMockImplementation()!;
+      mocks.fetch.mockImplementation((url, ...args) =>
+        ["/cancel", "/resolve", "/reopen", "/hold"].some((path) =>
+          url.endsWith(path),
+        )
+          ? response
+          : original(url, ...args),
+      );
+      renderForm(
+        <ProblemWork
+          problem={
+            action === "reopen" ? { ...problem, status: "cancelled" } : problem
+          }
+          reload={reload}
+        />,
+      );
+      if (action === "dismiss") {
+        await user.click(screen.getByRole("button", { name: "More actions" }));
+        await user.click(
+          await screen.findByRole("menuitem", { name: "Dismiss" }),
+        );
+        await user.click(
+          screen.getByRole("button", { name: "Confirm changes" }),
+        );
+      } else if (action === "resolve") {
+        await user.type(
+          screen.getByRole("textbox", { name: "Resolution notes" }),
+          "Fixed belt",
+        );
+        await user.click(screen.getByRole("button", { name: "Complete task" }));
+      } else if (action === "reopen") {
+        await user.click(
+          screen.getByRole("button", {
+            name: messages.en.workspace.problems.reopen,
+          }),
+        );
+        await user.type(
+          screen.getByRole("textbox", { name: "Reason for reopening" }),
+          "Noise returned",
+        );
+        await user.click(
+          screen
+            .getAllByRole("button", {
+              name: messages.en.workspace.problems.reopen,
+            })
+            .at(-1)!,
+        );
+      } else {
+        await user.click(
+          screen.getByRole("button", { name: "Clear this problem’s hold" }),
+        );
+      }
+      expect(mocks.refresh).not.toHaveBeenCalled();
+      expect(reload).not.toHaveBeenCalled();
+      const updated: v1.problems.Problem = {
+        ...problem,
+        revision: 4,
+        status:
+          action === "dismiss"
+            ? "cancelled"
+            : action === "resolve"
+              ? "resolved"
+              : "open",
+        ...(action === "clear hold"
+          ? {
+              status: problem.status,
+              blocksUsage: false,
+              holdClearedAt: "2026-10-30T08:00:00Z",
+            }
+          : {}),
+      };
+      await act(async () => finish(updated));
+      await waitFor(() => expect(reload).toHaveBeenCalledWith(updated));
+      expect(mocks.refresh).toHaveBeenCalledOnce();
+    },
+  );
+
+  it("preserves the cached scooter state when dismissal fails", async () => {
+    const user = userEvent.setup();
+    const reload = vi.fn();
+    const original = mocks.fetch.getMockImplementation()!;
+    mocks.fetch.mockImplementation((url, ...args) =>
+      url.endsWith("/cancel")
+        ? Promise.reject(new ApiError(409, "Problem changed"))
+        : original(url, ...args),
+    );
+    renderForm(<ProblemWork problem={problem} reload={reload} />);
+    await user.click(screen.getByRole("button", { name: "More actions" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Dismiss" }));
+    await user.click(screen.getByRole("button", { name: "Confirm changes" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "This record changed while you were editing",
+    );
+    expect(reload).not.toHaveBeenCalled();
+    expect(mocks.refresh).not.toHaveBeenCalled();
+  });
+
   it("collapses a removed assignee and keeps keyboard focus in the list", async () => {
     function Picker() {
       const [value, setValue] = useState(["a", "b"]);
@@ -431,6 +824,155 @@ describe("problem release forms", () => {
     expect(screen.getByText("Alex")).toBeInTheDocument();
   });
 
+  it.each(["todo", "issue"])(
+    "keeps %s assignee order stable until the sheet is reopened",
+    async (kind) => {
+      const user = userEvent.setup();
+      const members = [
+        { id: "a", firstName: "Alex", lastName: null },
+        { id: "b", firstName: "Blake", lastName: null },
+        { id: "c", firstName: "Casey", lastName: null },
+      ];
+      function Assignment() {
+        const [ids, setIds] = useState(["b"]);
+        return (
+          <ProblemAssignment
+            problem={{
+              ...problem,
+              scooterId: kind === "todo" ? null : problem.scooterId,
+              scooter: kind === "todo" ? null : problem.scooter,
+              assigneeId: ids[0] ?? null,
+              assignee: members.find(({ id }) => id === ids[0]) ?? null,
+              assignees: members.filter(({ id }) => ids.includes(id)),
+            }}
+            mayAssign
+            mayClaim={false}
+            busy={false}
+            members={members}
+            loading={false}
+            error={null}
+            saveError={null}
+            onRetry={vi.fn()}
+            onClaim={vi.fn()}
+            onAssign={(nextIds) => {
+              setIds(nextIds);
+              return Promise.resolve(true);
+            }}
+          />
+        );
+      }
+      renderForm(<Assignment />);
+      await user.click(
+        screen.getByRole("button", { name: "Manage assignment" }),
+      );
+      const sheet = await screen.findByRole("dialog", {
+        name: "Manage assignment",
+      });
+      const order = () =>
+        Array.from(sheet.querySelectorAll("button[aria-pressed]")).map(
+          (button) => button.getAttribute("aria-label"),
+        );
+      expect(order()).toEqual(["Blake", "Alex", "Casey"]);
+      await user.click(within(sheet).getByRole("button", { name: "Blake" }));
+      expect(
+        within(sheet).getByRole("button", { name: "Blake" }),
+      ).toHaveAttribute("aria-pressed", "false");
+      expect(order()).toEqual(["Blake", "Alex", "Casey"]);
+      await user.click(within(sheet).getByRole("button", { name: "Casey" }));
+      expect(order()).toEqual(["Blake", "Alex", "Casey"]);
+      expect(
+        within(sheet).queryByRole("textbox", { name: "Search assignees" }),
+      ).not.toBeInTheDocument();
+      await user.click(
+        within(sheet).getByRole("button", { name: "Save assignees" }),
+      );
+      await waitFor(() =>
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+      );
+      await user.click(
+        screen.getByRole("button", { name: "Manage assignment" }),
+      );
+      const reopened = await screen.findByRole("dialog", {
+        name: "Manage assignment",
+      });
+      expect(
+        Array.from(reopened.querySelectorAll("button[aria-pressed]")).map(
+          (button) => button.getAttribute("aria-label"),
+        ),
+      ).toEqual(["Casey", "Alex", "Blake"]);
+    },
+  );
+
+  it.each([
+    ["picker", 2],
+    ["picker", 5],
+    ["picker", 6],
+    ["manage", 2],
+    ["manage", 5],
+    ["manage", 6],
+  ] as const)(
+    "shows assignee search in %s only above five choices (%i)",
+    async (surface, count) => {
+      const members = Array.from({ length: count }, (_, i) => ({
+        id: `person-${i}`,
+        firstName: ["Alex", "Blake", "Casey", "Drew", "Evan", "Zoe"][i]!,
+        lastName: null,
+      }));
+      renderForm(
+        surface === "picker" ? (
+          <AssigneeSelect
+            multiple
+            value={[]}
+            onValueChange={vi.fn()}
+            members={members}
+          />
+        ) : (
+          <ProblemAssignment
+            problem={{
+              ...problem,
+              assigneeId: members[0]!.id,
+              assignee: members[0]!,
+              assignees: [members[0]!],
+            }}
+            mayAssign
+            mayClaim={false}
+            busy={false}
+            members={members}
+            loading={false}
+            error={null}
+            saveError={null}
+            onRetry={vi.fn()}
+            onClaim={vi.fn()}
+            onAssign={vi.fn()}
+          />
+        ),
+      );
+      const user = userEvent.setup();
+      const label = surface === "picker" ? "Add assignee" : "Manage assignment";
+      await user.click(screen.getByRole("button", { name: label }));
+      const sheet = await screen.findByRole("dialog", { name: label });
+      const search = within(sheet).queryByRole("textbox", {
+        name: "Search assignees",
+      });
+      if (count <= 5) {
+        expect(search).not.toBeInTheDocument();
+        expect(
+          within(sheet).getByRole("button", { name: "Alex" }),
+        ).toBeInTheDocument();
+      } else {
+        expect(search).toBeInTheDocument();
+        await user.type(search!, "Zoe");
+        expect(search).toBeInTheDocument();
+        expect(
+          within(sheet).getByRole("button", { name: "Zoe" }),
+        ).toBeInTheDocument();
+        expect(
+          within(sheet).queryByRole("button", { name: "Alex" }),
+        ).not.toBeInTheDocument();
+      }
+    },
+  );
+
   it("assigns an existing problem from the assignee bottom sheet", async () => {
     const user = userEvent.setup();
     const reload = vi.fn();
@@ -514,6 +1056,34 @@ describe("problem release forms", () => {
 
   it("reuses the person row in a searchable popover sheet and allows removal", async () => {
     const user = userEvent.setup();
+    const original = mocks.fetch.getMockImplementation()!;
+    mocks.fetch.mockImplementation((url, ...args) =>
+      url.includes("eligible-assignees")
+        ? Promise.resolve({
+            items: [
+              {
+                id: "other",
+                firstName: "Taylor",
+                lastName: null,
+                roles: ["Mechanic"],
+              },
+              {
+                id: "second",
+                firstName: "Jordan",
+                lastName: null,
+                roles: ["Mechanic"],
+              },
+              ...Array.from({ length: 4 }, (_, i) => ({
+                id: `extra-${i}`,
+                firstName: `Person ${i}`,
+                lastName: null,
+                roles: ["Mechanic"],
+              })),
+            ],
+          })
+        : original(url, ...args),
+    );
+
     renderForm(<CreateProblem scooterId="scooter" onSaved={vi.fn()} />);
     const add = screen.getByRole("button", { name: "Add assignee" });
     expect(add).toHaveClass("border-dashed");
@@ -561,6 +1131,40 @@ describe("problem release forms", () => {
       screen.getByRole("button", { name: "Add assignee" }),
     ).toBeInTheDocument();
   });
+
+  it.each([false, true])(
+    "opens the native picker directly in the creation form (todo=%s)",
+    async (todo) => {
+      const saved = vi.fn();
+      renderForm(
+        <CreateProblem
+          todo={todo}
+          scooterId={todo ? undefined : "scooter"}
+          onSaved={saved}
+        />,
+      );
+      const user = userEvent.setup();
+      const input = screen.getByLabelText("Choose photos", {
+        selector: "input",
+      });
+      const click = vi.spyOn(input, "click");
+      await user.click(screen.getByRole("button", { name: "Choose photos" }));
+      expect(click).toHaveBeenCalledOnce();
+      expect(input).toHaveAttribute("accept", "image/*");
+      expect(input).toHaveAttribute("multiple");
+      expect(input).not.toHaveAttribute("capture");
+      expect(screen.queryByRole("dialog")).toBeNull();
+      const file = new File(["photo"], "task.jpg", { type: "image/jpeg" });
+      await user.upload(input, file);
+      expect(
+        await screen.findByRole("img", { name: "task.jpg" }),
+      ).toBeInTheDocument();
+      expect(saved).not.toHaveBeenCalled();
+      expect(screen.queryByRole("dialog")).toBeNull();
+      fireEvent.change(input, { target: { files: [] } });
+      expect(screen.getByRole("img", { name: "task.jpg" })).toBeInTheDocument();
+    },
+  );
 
   it("appends photo previews, removes photos, and releases preview URLs", async () => {
     const user = userEvent.setup();
@@ -782,22 +1386,17 @@ describe("problem release forms", () => {
         screen.queryByRole("button", { name: "Complete task" }),
       ).toBeNull();
       await user.click(screen.getByRole("button", { name: "More actions" }));
+      const menu = await screen.findByRole("menu", { name: "More actions" });
+      expect(within(menu).getAllByRole("menuitem")).toHaveLength(3);
+      expect(within(menu).queryByRole("textbox")).toBeNull();
+      await user.click(within(menu).getByRole("menuitem", { name: "Dismiss" }));
       const sheet = await screen.findByRole("dialog", {
-        name: "More actions",
+        name: "Dismiss problem",
       });
       expect(sheet).toHaveClass("bg-popover", "text-popover-foreground");
-      // Controls inherit the temporary surface; no full-sheet page override.
       expect(
         sheet.querySelector('[data-slot="bottom-sheet-body"].bg-background'),
       ).toBeNull();
-      expect(
-        within(sheet).queryByRole("combobox", {
-          name: "When closing this report",
-        }),
-      ).toBeNull();
-      await user.click(
-        within(sheet).getByRole("button", { name: "Dismiss report" }),
-      );
       await user.click(
         within(sheet).getByRole("button", { name: "Confirm changes" }),
       );
@@ -894,6 +1493,7 @@ describe("problem release forms", () => {
       expect.anything(),
       { method: "POST", json: { revision: 3, body: "Inspected drivetrain" } },
     );
+    expect(mocks.refresh).not.toHaveBeenCalled();
   });
 
   it("keeps the previous resolution without hold controls on closed work", () => {

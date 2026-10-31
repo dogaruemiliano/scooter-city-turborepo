@@ -26,6 +26,11 @@ export function createPersonInput(
   const input: Record<string, unknown> = {
     ...(form.linkExistingAccount ? { linkExistingAccount: true } : {}),
     documentWorkflow: documentWorkflow(form),
+    ...(form.citizenship === "romanian"
+      ? { citizenship: "română" }
+      : form.citizenshipNationality?.trim()
+        ? { citizenship: form.citizenshipNationality.trim() }
+        : {}),
     email: form.email,
     phone: normalizePhoneForSubmit(form),
     firstName: form.firstName,

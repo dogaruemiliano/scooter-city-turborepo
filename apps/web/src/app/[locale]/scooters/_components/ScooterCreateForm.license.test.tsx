@@ -12,6 +12,43 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
 describe("Scooter create controls with the create resolver", () => {
+  it("shows only the licence policy and preserves its selection when registration changes", async () => {
+    const browser = userEvent.setup();
+    renderControls();
+    for (const label of [
+      "Commercial rental category",
+      "Limiter configuration",
+      "Limiter threshold (km/h)",
+      "Documented constructive speed source",
+      "Configuration evidence",
+      "Reason for speed configuration correction",
+    ])
+      expect(screen.queryByLabelText(label)).not.toBeInTheDocument();
+    expect(screen.getByText("Application speed cap: 25 km/h.")).toBeVisible();
+    await chooseSelectOption(browser, "Required driver license", "AM");
+    expect(screen.getByText("Application speed cap: 45 km/h.")).toBeVisible();
+    for (const category of ["A1", "A2", "A"]) {
+      await chooseSelectOption(browser, "Required driver license", category);
+      expect(
+        screen.getByText("No driving licence based application speed cap."),
+      ).toBeVisible();
+    }
+    await chooseSelectOption(browser, "Registration type", "Local");
+    await chooseSelectOption(browser, "Registration type", "Unregistered");
+    expect(
+      screen.getByRole("combobox", { name: "Required driver license" }),
+    ).toHaveTextContent("A");
+    expect(
+      screen.getByText("No driving licence based application speed cap."),
+    ).toBeVisible();
+    await chooseSelectOption(
+      browser,
+      "Required driver license",
+      messages.en.scooters.requiredDriverLicenseTypes.none,
+    );
+    expect(screen.getByText("Application speed cap: 25 km/h.")).toBeVisible();
+  });
+
   it("defaults local registration to no license before speed is supplied and preserves a manual choice", async () => {
     const browser = userEvent.setup();
     renderControls();

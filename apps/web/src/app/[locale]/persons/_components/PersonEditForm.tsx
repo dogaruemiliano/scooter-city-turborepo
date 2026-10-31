@@ -186,6 +186,9 @@ export function PersonEditForm({ person, personHref }: PersonEditFormProps) {
               <FormField name="lastName" label={t("fields.lastName")} required>
                 <FormInput />
               </FormField>
+              <FormField name="citizenship" label={t("fields.citizenship")}>
+                <FormInput maxLength={200} />
+              </FormField>
               <FormField name="cnp" label={t("fields.documentCnp")}>
                 <FormInput inputMode="numeric" maxLength={13} />
               </FormField>

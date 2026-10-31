@@ -532,6 +532,8 @@
   --transition-duration-slow: 400ms;
   --duration-slower: 600ms;
   --transition-duration-slower: 600ms;
+  --duration-form-autosave: 600ms;
+  --transition-duration-form-autosave: 600ms;
   --duration-double-tap: 300ms;
   --transition-duration-double-tap: 300ms;
   --duration-media-wheel-idle: 180ms;

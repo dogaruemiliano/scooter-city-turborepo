@@ -33,23 +33,29 @@ export function ProblemListItem({
   expanded,
   onToggle,
   href,
+  variant = "default",
 }: {
   problem: v1.problems.Problem;
   expanded?: boolean;
   onToggle?: () => void;
   href?: string;
+  /** Omits scooter identity and moves badges into the header. */
+  variant?: "default" | "simple";
 }) {
+  const difficulty = problem.scooterId === null ? null : problem.difficulty;
   const t = useTranslations("workspace.problems");
   const format = useFormatter();
   const assignee = v1.problems
     .problemAssignees(problem)
     .map(memberName)
     .join(", ");
-  const internalId = v1.scooters.scooterDisplayCode(problem.scooter);
-  const brandAndModel = [problem.scooter.brandName, problem.scooter.model]
+  const internalId = problem.scooter
+    ? v1.scooters.scooterDisplayCode(problem.scooter)
+    : "";
+  const brandAndModel = [problem.scooter?.brandName, problem.scooter?.model]
     .filter(Boolean)
     .join(" ");
-  const scooter = `${problem.scooter.brandName} ${problem.scooter.model ?? ""} · ${internalId}`;
+  const scooter = problem.scooter ? `${brandAndModel} · ${internalId}` : "";
   const statusVariant =
     problem.status === "resolved"
       ? "success"
@@ -57,6 +63,18 @@ export function ProblemListItem({
         ? "default"
         : "secondary";
   const date = problem.createdAt ? new Date(problem.createdAt) : null;
+  const badges = (
+    <>
+      <Badge variant={statusVariant}>{t(problem.status)}</Badge>
+      {problem.blocksUsage &&
+      (problem.status === "open" || problem.status === "in_progress") ? (
+        <Badge variant="destructive">{t("maintenanceHold")}</Badge>
+      ) : null}
+      {problem.assigneeNeedsReassignment ? (
+        <Badge variant="destructive">{t("reassignRequired")}</Badge>
+      ) : null}
+    </>
+  );
 
   return (
     <Card
@@ -65,49 +83,57 @@ export function ProblemListItem({
       size="comfortable"
       className="relative isolate transition-colors duration-fast hover:border-border-strong"
     >
-      {problem.difficulty ? (
-        <CardAccent className={difficultyAccent[problem.difficulty]} />
+      {difficulty ? (
+        <CardAccent className={difficultyAccent[difficulty]} />
       ) : null}
       {href ? (
         <Link
           href={href}
           className="absolute inset-0 z-raised rounded-xl focus-visible:outline-ring"
-          aria-label={`${problem.title} · ${scooter}`}
+          aria-label={`${problem.title}${scooter ? ` · ${scooter}` : ""}`}
         />
       ) : (
         <Button
           variant="ghost"
           className="absolute inset-0 z-raised h-full w-full rounded-xl p-0 hover:bg-transparent aria-expanded:bg-transparent focus-visible:ring-inset"
-          aria-label={`${problem.title} · ${scooter}`}
+          aria-label={`${problem.title}${scooter ? ` · ${scooter}` : ""}`}
           aria-haspopup="dialog"
           aria-expanded={expanded}
           onClick={onToggle}
         />
       )}
       <CardHeader className="gap-3">
-        <div className="flex flex-wrap items-center gap-2 text-xs">
-          <span
-            className={`font-semibold uppercase ${problem.difficulty ? difficultyText[problem.difficulty] : "text-muted-foreground"}`}
-            title={
-              problem.difficulty
-                ? t(`difficultyDescriptions.${problem.difficulty}`)
-                : undefined
-            }
-          >
-            {problem.difficulty ? t(problem.difficulty) : t("unassessed")}
-          </span>
-        </div>
+        {problem.scooterId !== null ? (
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <span
+              className={`font-semibold uppercase ${difficulty ? difficultyText[difficulty] : "text-muted-foreground"}`}
+              title={
+                difficulty
+                  ? t(`difficultyDescriptions.${difficulty}`)
+                  : undefined
+              }
+            >
+              {difficulty ? t(difficulty) : t("unassessed")}
+            </span>
+          </div>
+        ) : null}
         <CardTitle role="heading" aria-level={3}>
           {problem.title}
         </CardTitle>
-        <CardAction className="flex max-w-32 flex-col items-end gap-1 text-right">
-          <span className="text-xl font-semibold leading-tight tabular-nums">
-            {internalId}
-          </span>
-          <span className="text-xs font-normal leading-snug text-muted-foreground">
-            {brandAndModel}
-          </span>
-        </CardAction>
+        {variant === "simple" || !problem.scooter ? (
+          <CardAction className="flex max-w-32 flex-col items-end gap-2">
+            {badges}
+          </CardAction>
+        ) : (
+          <CardAction className="flex max-w-32 flex-col items-end gap-1 text-right">
+            <span className="text-xl font-semibold leading-tight tabular-nums">
+              {internalId}
+            </span>
+            <span className="text-xs font-normal leading-snug text-muted-foreground">
+              {brandAndModel}
+            </span>
+          </CardAction>
+        )}
       </CardHeader>
       {problem.description ? (
         <CardContent>
@@ -122,16 +148,9 @@ export function ProblemListItem({
           </p>
         </CardContent>
       ) : null}
-      <CardContent className="flex flex-wrap gap-2">
-        <Badge variant={statusVariant}>{t(problem.status)}</Badge>
-        {problem.blocksUsage &&
-        (problem.status === "open" || problem.status === "in_progress") ? (
-          <Badge variant="destructive">{t("maintenanceHold")}</Badge>
-        ) : null}
-        {problem.assigneeNeedsReassignment ? (
-          <Badge variant="destructive">{t("reassignRequired")}</Badge>
-        ) : null}
-      </CardContent>
+      {variant === "default" && problem.scooter ? (
+        <CardContent className="flex flex-wrap gap-2">{badges}</CardContent>
+      ) : null}
       <CardFooter className="mx-(--card-spacing) flex-wrap justify-between gap-3 rounded-none px-0 text-xs text-muted-foreground">
         <div className="flex min-w-0 items-center gap-2">
           <UserAvatar

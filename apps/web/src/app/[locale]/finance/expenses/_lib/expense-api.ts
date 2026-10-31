@@ -64,16 +64,27 @@ export function updateSupplier(
 }
 
 export async function analyzeExpenseReceipt(
-  file: File,
+  files: File | readonly File[],
 ): Promise<v1.finance.ExpenseExtractionDraft> {
-  const uploadToken = await uploadExpenseReceipt(file);
+  const selected = files instanceof File ? [files] : files;
+  if (
+    !selected.length ||
+    selected.length > v1.finance.EXPENSE_RECEIPT_MAX_FILES
+  )
+    throw new Error("Choose one or two receipt photos.");
+  const uploadTokens = await Promise.all(
+    selected.map((file) => uploadExpenseReceipt(file)),
+  );
 
   return webApi.fetch(
     v1.finance.ROUTES.expenses.analyze,
     v1.finance.expenseExtractionDraftSchema,
     {
       method: "POST",
-      json: { uploadToken },
+      json:
+        uploadTokens.length === 1
+          ? { uploadToken: uploadTokens[0] }
+          : { uploadTokens },
     },
   );
 }

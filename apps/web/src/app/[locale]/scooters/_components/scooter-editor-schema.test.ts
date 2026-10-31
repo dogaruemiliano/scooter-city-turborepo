@@ -23,6 +23,45 @@ const validValues = () => ({
 });
 
 describe("scooter editor conversion", () => {
+  it("omits retired manual policy inputs from create and edit without replacing CIV speed", () => {
+    const retired = {
+      commercialCategory: "with_license",
+      limiterKind: "LIMITED",
+      limiterKmh: "45",
+      maxSpeedSource: "Manual override",
+      configurationEvidence: "Manual override",
+      speedConfigurationChangeReason: "Manual override",
+    };
+    const values = { ...validValues(), ...retired, maxSpeedKmh: "60" };
+    const created = scooterCreateFormSchema.parse(values);
+    const edited = scooterEditFormSchema.parse({ ...values, fleetNumber: "7" });
+    for (const field of Object.keys(retired)) {
+      expect(CREATE_FIELDS).not.toContain(field);
+      expect(scooterEditorDefaults()).not.toHaveProperty(field);
+      expect(created).not.toHaveProperty(field);
+      expect(edited).not.toHaveProperty(field);
+    }
+    expect(created.maxSpeedKmh).toBe(60);
+    expect(edited.maxSpeedKmh).toBe(60);
+  });
+
+  it.each(v1.scooters.SCOOTER_REQUIRED_DRIVER_LICENSE_TYPES)(
+    "preserves the selected application policy %s for an unregistered scooter",
+    (requiredLicenseCategory) => {
+      const values = { ...validValues(), requiredLicenseCategory };
+      expect(
+        scooterCreateFormSchema.parse(values).requiredLicenseCategory,
+      ).toBe(requiredLicenseCategory);
+      const input = scooterEditFormSchema.parse({
+        ...values,
+        fleetNumber: "7",
+      });
+      expect(
+        scooterChangedFields(input, { requiredLicenseCategory: true }),
+      ).toEqual({ requiredLicenseCategory });
+    },
+  );
+
   it("keeps commercial name out of the visible field sections", () => {
     const fields = SCOOTER_EDITOR_SECTIONS.flatMap((section) => [
       ...section.fields,

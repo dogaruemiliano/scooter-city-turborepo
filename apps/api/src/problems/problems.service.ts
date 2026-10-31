@@ -119,7 +119,14 @@ export class ProblemsService {
     return {
       AND: [
         accessibleWhere(snapshot, key, "ScooterProblem"),
-        { scooter: { deletedAt: null } },
+        {
+          OR: [
+            { scooter: { deletedAt: null } },
+            ...(snapshot.isSuperAdmin || snapshot.isAdmin
+              ? [{ scooterId: null }]
+              : []),
+          ],
+        },
       ],
     };
   }
@@ -135,15 +142,17 @@ export class ProblemsService {
     return v1.problems.problemSchema.parse({
       id: row.id,
       scooterId: row.scooterId,
-      scooter: {
-        ...toMaintenanceScooter(row.scooter),
-        coverUrl: row.scooter.photos?.[0]
-          ? v1.scooters.ROUTES.photos.content(
-              row.scooterId,
-              row.scooter.photos[0].id,
-            )
-          : null,
-      },
+      scooter: row.scooter
+        ? {
+            ...toMaintenanceScooter(row.scooter),
+            coverUrl: row.scooter.photos?.[0]
+              ? v1.scooters.ROUTES.photos.content(
+                  row.scooter.id,
+                  row.scooter.photos[0].id,
+                )
+              : null,
+          }
+        : null,
       title: row.title,
       description: row.description,
       checklist: row.checklist,
@@ -183,18 +192,24 @@ export class ProblemsService {
       !snapshot.effectiveScopes["problems.assign"]?.includes("ALL")
     )
       return results;
-    const ids = [
-      ...new Set(
+    const assignments = [
+      ...new Map(
         rows
           .filter((row) => openStates.includes(row.status))
           .flatMap((row) =>
-            v1.problems.problemAssignees(row).map((member) => member.id),
+            v1.problems.problemAssignees(row).map((member) => {
+              const todo = row.scooterId === null;
+              return [`${todo}:${member.id}`, { id: member.id, todo }] as const;
+            }),
           ),
       ),
     ];
     const eligible = new Map(
       await Promise.all(
-        ids.map(async (id) => [id, !!(await this.eligible(id))] as const),
+        assignments.map(
+          async ([key, { id, todo }]) =>
+            [key, !!(await this.eligible(id, undefined, todo))] as const,
+        ),
       ),
     );
     return results.map((row) => ({
@@ -203,15 +218,24 @@ export class ProblemsService {
         openStates.includes(row.status) &&
         v1.problems
           .problemAssignees(row)
-          .some((member) => !eligible.get(member.id)),
+          .some(
+            (member) => !eligible.get(`${row.scooterId === null}:${member.id}`),
+          ),
     }));
   }
 
   async list(userId: string, query: v1.problems.ListProblemsQuery) {
     const snapshot = await this.access.getSnapshot(userId);
+    if (query.kind === "todo" && !snapshot.isAdmin && !snapshot.isSuperAdmin)
+      throw new ForbiddenException("Admin required");
+    const kindWhere =
+      query.kind === "todo"
+        ? { scooterId: null }
+        : { scooterId: { not: null } };
     const where: Prisma.ScooterProblemWhereInput = {
       AND: [
         this.where(snapshot, "problems.read"),
+        kindWhere,
         query.view === "assigned"
           ? assignedProblemWhere(userId)
           : query.view === "available"
@@ -250,6 +274,7 @@ export class ProblemsService {
     };
     const countWhere: Prisma.ScooterProblemWhereInput = {
       AND: [
+        kindWhere,
         this.where(snapshot, "problems.read"),
         {
           ...(query.scooterId ? { scooterId: query.scooterId } : {}),
@@ -345,28 +370,41 @@ export class ProblemsService {
   }
 
   async create(userId: string, input: v1.problems.CreateProblemInput) {
-    this.requireAll(await this.access.getSnapshot(userId), "problems.create");
+    const initial = await this.access.getSnapshot(userId);
+    this.requireAll(initial, "problems.create");
+    if (input.scooterId === null && !initial.isAdmin && !initial.isSuperAdmin)
+      throw new ForbiddenException("Admin required");
+    if (input.scooterId === null && input.blocksUsage)
+      throw new BadRequestException("Todos cannot block scooter usage");
     const prepared = await this.photos.prepare(userId, input.photos);
     return this.prisma.$transaction(async (tx) => {
       const snapshot = await this.access.getSnapshot(userId, tx);
       this.requireAll(snapshot, "problems.create");
-      await tx.$queryRaw`SELECT id FROM "Scooter" WHERE id = ${input.scooterId} FOR UPDATE`;
-      const scooter = await tx.scooter.findFirst({
-        where: {
-          AND: [
-            { id: input.scooterId, deletedAt: null },
-            accessibleWhere(snapshot, "scooters.read", "Scooter"),
-          ],
-        },
-        select: { id: true },
-      });
-      if (!scooter) throw new NotFoundException("Scooter not found");
+      if (
+        input.scooterId === null &&
+        !snapshot.isAdmin &&
+        !snapshot.isSuperAdmin
+      )
+        throw new ForbiddenException("Admin required");
+      if (input.scooterId !== null) {
+        await tx.$queryRaw`SELECT id FROM "Scooter" WHERE id = ${input.scooterId} FOR UPDATE`;
+        const scooter = await tx.scooter.findFirst({
+          where: {
+            AND: [
+              { id: input.scooterId, deletedAt: null },
+              accessibleWhere(snapshot, "scooters.read", "Scooter"),
+            ],
+          },
+          select: { id: true },
+        });
+        if (!scooter) throw new NotFoundException("Scooter not found");
+      }
       const assigneeIds =
         input.assigneeIds ?? (input.assigneeId ? [input.assigneeId] : []);
       if (assigneeIds.length) {
         this.requireAll(snapshot, "problems.assign");
         for (const assigneeId of assigneeIds) {
-          if (!(await this.eligible(assigneeId, tx)))
+          if (!(await this.eligible(assigneeId, tx, input.scooterId === null)))
             throw new ConflictException(
               "Assignee is not eligible for problem work",
             );
@@ -396,7 +434,7 @@ export class ProblemsService {
         scooterId: input.scooterId,
         title: input.title,
         description: input.description,
-        difficulty: input.difficulty,
+        difficulty: input.scooterId === null ? null : input.difficulty,
         blocksUsage: input.blocksUsage,
         assigneeId: assigneeIds[0] ?? null,
         assignees: { connect: assigneeIds.map((id) => ({ id })) },
@@ -444,13 +482,18 @@ export class ProblemsService {
       throw new ForbiddenException("Permission required");
   }
 
-  private async eligible(userId: string, tx?: Prisma.TransactionClient) {
+  private async eligible(
+    userId: string,
+    tx?: Prisma.TransactionClient,
+    todo = false,
+  ) {
     const user = await (tx ?? this.prisma).user.findFirst({
       where: { id: userId, deletedAt: null, loginStatus: "ACTIVE" },
       select: assigneeSelect,
     });
     if (!user) return null;
     const snapshot = await this.access.getSnapshot(userId, tx);
+    if (todo && !snapshot.isAdmin && !snapshot.isSuperAdmin) return null;
     const permits = (action: string) =>
       snapshot.isSuperAdmin ||
       snapshot.effectiveScopes[action]?.some(
@@ -463,12 +506,28 @@ export class ProblemsService {
       : null;
   }
 
-  async assignees(userId: string, search: string) {
+  async assignees(userId: string, search: string, kind?: "scooter" | "todo") {
     this.requireAll(await this.access.getSnapshot(userId), "problems.assign");
     const users = await this.prisma.user.findMany({
       where: {
         deletedAt: null,
         loginStatus: "ACTIVE",
+        ...(kind === "todo"
+          ? {
+              AND: [
+                {
+                  OR: [
+                    { isSuperAdmin: true },
+                    {
+                      roleMemberships: {
+                        some: { role: { slug: "admin", archivedAt: null } },
+                      },
+                    },
+                  ],
+                },
+              ],
+            }
+          : {}),
         ...(search
           ? {
               OR: [
@@ -488,7 +547,7 @@ export class ProblemsService {
       take: 100,
     });
     const eligible = await Promise.all(
-      users.map((user) => this.eligible(user.id)),
+      users.map((user) => this.eligible(user.id, undefined, kind === "todo")),
     );
     return v1.problems.eligibleAssigneeListSchema.parse({
       items: eligible.filter((user) => user !== null),
@@ -517,7 +576,8 @@ export class ProblemsService {
         select: { scooterId: true },
       });
       if (!reference) throw new NotFoundException("Problem not found");
-      await tx.$queryRaw`SELECT id FROM "Scooter" WHERE id = ${reference.scooterId} FOR UPDATE`;
+      if (reference.scooterId)
+        await tx.$queryRaw`SELECT id FROM "Scooter" WHERE id = ${reference.scooterId} FOR UPDATE`;
       await tx.$queryRaw`SELECT id FROM "ScooterProblem" WHERE id = ${id} FOR UPDATE`;
       const snapshot = await this.access.getSnapshot(userId, tx);
       const row = await tx.scooterProblem.findFirst({
@@ -609,7 +669,7 @@ export class ProblemsService {
           row.assigneeId !== null
         )
           throw new ConflictException("Problem is no longer available");
-        if (!(await this.eligible(userId, tx)))
+        if (!(await this.eligible(userId, tx, row.scooterId === null)))
           throw new ForbiddenException(
             "Assigned-work permissions are required to claim work",
           );
@@ -642,6 +702,17 @@ export class ProblemsService {
           throw new ForbiddenException(
             "Only admins and the assignee can edit task sections",
           );
+        if (input.assigneeIds !== undefined) {
+          this.requireAll(snapshot, "problems.assign");
+          for (const assigneeId of input.assigneeIds) {
+            if (!(await this.eligible(assigneeId, tx, row.scooterId === null)))
+              throw new ConflictException(
+                "Assignee is not eligible for this work",
+              );
+          }
+        }
+        if (input.blocksUsage !== undefined && row.scooterId === null)
+          throw new BadRequestException("Todos have no maintenance hold");
         let location = input.location;
         if (location?.savedLocationId) {
           const saved = await tx.businessLocation.findUnique({
@@ -672,6 +743,19 @@ export class ProblemsService {
             "Assign the problem before starting work",
           );
         return {
+          ...(input.assigneeIds !== undefined
+            ? {
+                assigneeId: input.assigneeIds[0] ?? null,
+                assignees: { set: input.assigneeIds.map((id) => ({ id })) },
+              }
+            : {}),
+          ...(input.blocksUsage !== undefined
+            ? {
+                blocksUsage: input.blocksUsage,
+                holdClearedAt: input.blocksUsage ? null : new Date(),
+                holdClearedById: input.blocksUsage ? null : userId,
+              }
+            : {}),
           ...(input.sections !== undefined ? { sections: input.sections } : {}),
           ...(input.buyList !== undefined ? { buyList: input.buyList } : {}),
           ...(location !== undefined
@@ -684,7 +768,7 @@ export class ProblemsService {
           ...(input.description !== undefined
             ? { description: input.description }
             : {}),
-          ...(input.difficulty !== undefined
+          ...(row.scooterId !== null && input.difficulty !== undefined
             ? { difficulty: input.difficulty }
             : {}),
           ...(input.workNotes !== undefined
@@ -766,9 +850,9 @@ export class ProblemsService {
         const assigneeIds =
           input.assigneeIds ?? (input.assigneeId ? [input.assigneeId] : []);
         for (const assigneeId of assigneeIds) {
-          if (!(await this.eligible(assigneeId, tx)))
+          if (!(await this.eligible(assigneeId, tx, row.scooterId === null)))
             throw new ConflictException(
-              "Assignee is not eligible for mechanic work",
+              "Assignee is not eligible for this work",
             );
         }
         return {
@@ -862,6 +946,8 @@ export class ProblemsService {
       "problems.update",
       AuditEventType.PROBLEM_HOLD_CHANGED,
       (row) => {
+        if (row.scooterId === null)
+          throw new BadRequestException("Todos have no maintenance hold");
         if (!openStates.includes(row.status))
           throw new ConflictException(
             "Only open work can change a maintenance hold",

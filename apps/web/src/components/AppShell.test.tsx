@@ -108,6 +108,33 @@ beforeEach(() => {
 });
 
 describe("AppShell", () => {
+  it.each([false, true])(
+    "shows the todo link below the main links only for admins (%s)",
+    (isAdmin) => {
+      mocks.pathname = "/en/todos";
+      renderAppShell({
+        id: "staff",
+        email: "staff@example.test",
+        roles: [],
+        isAdmin,
+        effectiveScopes: staffScopes,
+      });
+      const content = document.querySelector(
+        '[data-slot="sidebar-content"]',
+      ) as HTMLElement;
+      const todo = within(content).queryByRole("link", { name: "Todo" });
+      if (isAdmin) {
+        expect(todo).toHaveAttribute("href", "/en/todos");
+        expect(todo).toHaveAttribute("data-active");
+        const links = within(content).getAllByRole("link");
+        const service = within(content).getByRole("link", { name: "Service" });
+        expect(links.indexOf(todo!)).toBe(links.indexOf(service) + 1);
+      } else {
+        expect(todo).not.toBeInTheDocument();
+      }
+    },
+  );
+
   it.each(["/en/persons/new", "/en/rentals/new"])(
     "keeps app navigation and exactly one main landmark on wizard route %s",
     (pathname) => {
@@ -165,7 +192,7 @@ describe("AppShell", () => {
       const header = screen.getByRole("banner");
       expect(content).not.toContainElement(header);
       expect(header.parentElement).toBe(content?.parentElement);
-      expect(header).toHaveClass("shrink-0", "bg-card", "md:sticky");
+      expect(header).toHaveClass("shrink-0", "bg-card", "sticky", "top-0");
     },
   );
 
@@ -803,13 +830,17 @@ describe("AppShell", () => {
     );
   });
 
-  it("hides company navigation from admins without the super-admin role", () => {
+  it("hides company settings from admins without template permissions or the super-admin role", () => {
     renderAppShell({
       id: "admin-1",
       email: "admin@example.com",
       roles: [],
       isSuperAdmin: false,
-      effectiveScopes: staffScopes,
+      effectiveScopes: Object.fromEntries(
+        Object.entries(staffScopes).filter(
+          ([key]) => !key.startsWith("templates."),
+        ),
+      ),
     });
 
     expect(screen.queryByText("Firmă")).not.toBeInTheDocument();

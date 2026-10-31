@@ -98,6 +98,36 @@ function createService(
   };
 }
 
+describe("privileged retained-object deletion scope", () => {
+  it("refuses another bucket or provider before any storage call", async () => {
+    const { service, send } = createService();
+    await expect(
+      service.purgeRetainedDocument({
+        provider: "s3",
+        bucket: "an-archived-other-bucket",
+        storageKey: "document-photos-test/contracts/example.pdf",
+      }),
+    ).rejects.toBeInstanceOf(ServiceUnavailableException);
+    await expect(
+      service.purgeRetainedDocument({
+        provider: "another-provider",
+        bucket: "private-bucket",
+        storageKey: "document-photos-test/contracts/example.pdf",
+      }),
+    ).rejects.toBeInstanceOf(ServiceUnavailableException);
+    expect(send).not.toHaveBeenCalled();
+  });
+  it("uses the bounded version-aware cleanup only for the stored private bucket", async () => {
+    const { service, send } = createService();
+    await service.purgeRetainedDocument({
+      provider: "s3",
+      bucket: "private-bucket",
+      storageKey: "document-photos-test/contracts/example.pdf",
+    });
+    expect(send.mock.calls[0]?.[0]).toBeInstanceOf(ListObjectVersionsCommand);
+  });
+});
+
 describe("ImageStorageService", () => {
   it.each([11 * 1024 * 1024, 15 * 1024 * 1024])(
     "presigns a %i-byte scooter document with the 15 MB runtime setting",

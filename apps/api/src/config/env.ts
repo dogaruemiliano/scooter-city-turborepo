@@ -75,6 +75,75 @@ export const envSchema = z
       ),
 
     /* DB ------------------------------------------------------------------ */
+    CONTRACT_RENDERER_BINARY: z
+      .string()
+      .optional()
+      .describe(
+        "Absolute path to an isolated LibreOffice/soffice PDF converter. Missing configuration blocks contractual preview and publication.",
+      ),
+    CONTRACT_FINAL_OTP_ENABLED: boolFromString
+      .default(false)
+      .describe(
+        "Require a second, package-bound OTP at customer completion. Disabled by default.",
+      ),
+    CONTRACT_WORKFLOW_ENABLED: boolFromString
+      .default(false)
+      .describe(
+        "Enable new contract issuance after provider, retention and legal pilot review.",
+      ),
+    CONTRACT_INVITATION_TTL_SECONDS: z.coerce
+      .number()
+      .int()
+      .positive()
+      .max(604800)
+      .default(86400)
+      .describe("Lifetime of a single-use signing invitation."),
+    CONTRACT_SESSION_TTL_SECONDS: z.coerce
+      .number()
+      .int()
+      .positive()
+      .max(86400)
+      .default(7200)
+      .describe("Absolute lifetime of a restricted guest signing session."),
+    CONTRACT_SESSION_IDLE_SECONDS: z.coerce
+      .number()
+      .int()
+      .positive()
+      .max(86400)
+      .default(1800)
+      .describe("Maximum inactivity of a restricted guest signing session."),
+    CONTRACT_OTP_TTL_SECONDS: z.coerce
+      .number()
+      .int()
+      .positive()
+      .max(600)
+      .default(300)
+      .describe("Lifetime of a package-bound signing OTP."),
+    CONTRACT_OTP_MAX_ATTEMPTS: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(10)
+      .default(5)
+      .describe(
+        "Cumulative OTP failures allowed in one signing session; resends do not reset this counter.",
+      ),
+    CONTRACT_OTP_RESEND_SECONDS: z.coerce
+      .number()
+      .int()
+      .min(60)
+      .max(3600)
+      .default(60)
+      .describe("Minimum delay between signing SMS codes."),
+    CONTRACT_OTP_MAX_SENDS: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(20)
+      .default(10)
+      .describe(
+        "Maximum signing OTP sends in one session, alongside phone/IP delivery quotas.",
+      ),
     DATABASE_URL: z
       .url()
       .default("postgresql://app:app@localhost:5434/app")

@@ -66,6 +66,45 @@ function review(
 }
 
 describe("saved document reextraction review", () => {
+  it("preserves 113 accumulated CIV labels when accepting a re-extracted issue date", () => {
+    const previous = Object.fromEntries(
+      Array.from({ length: 53 }, (_, i) => [`old-${i}`, `original ${i}`]),
+    );
+    const incoming = Object.fromEntries(
+      Array.from({ length: 60 }, (_, i) => [`new-${i}`, `reading ${i}`]),
+    );
+    const current = values();
+    const files = [file({ vin, fields: {}, rawFields: previous })];
+    const result = review(
+      [analysis({ civIssuedAt: "2026-08-21" }, incoming)],
+      current,
+      files,
+      current,
+      previous,
+    );
+    const applied = selectedReextraction(
+      result.proposals,
+      Object.fromEntries(
+        result.proposals
+          .filter((proposal) => !proposal.blocked)
+          .map((proposal) => [proposal.id, proposal]),
+      ),
+      previous,
+      result.evidence ?? {},
+      files,
+      current,
+    );
+    expect(applied.rawFields).toEqual({ ...previous, ...incoming });
+    expect(
+      v1.scooters.updateScooterInputSchema.safeParse({
+        civIssuedAt: applied.values.civIssuedAt,
+        civRawFields: applied.rawFields,
+        documentExtractions: Object.entries(
+          applied.extractedDocuments ?? {},
+        ).map(([documentId, extractedData]) => ({ documentId, extractedData })),
+      }).success,
+    ).toBe(true);
+  });
   it.each<Record<string, string>>([
     { model: "AI model" },
     { commercialName: "AI model" },

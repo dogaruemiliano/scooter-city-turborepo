@@ -11,6 +11,7 @@ export const SUPPORTED_IMAGE_CONTENT_TYPES = [
 export const SUPPORTED_DOCUMENT_CONTENT_TYPES = [
   ...SUPPORTED_IMAGE_CONTENT_TYPES,
   "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 ] as const;
 
 export type SupportedImageContentType =
@@ -27,6 +28,8 @@ export const DOCUMENT_STORAGE_CATEGORIES = [
   "scooter-sale-document",
   "scooter-document",
   "scooter-photo",
+  "contract-document",
+  "contract-branding",
 ] as const;
 
 export type DocumentStorageCategory =

@@ -49,6 +49,8 @@ export function PdfPreview({
   initialPage = "first",
   entryDirection,
   wheelGesture,
+  onPageRendered,
+  showCaption = true,
 }: {
   bottomOverlay?: ReactNode;
   src: string;
@@ -64,6 +66,10 @@ export function PdfPreview({
   collectionPosition?: string;
   previousDocumentLabel?: string;
   nextDocumentLabel?: string;
+  /** Reports the exact rendered page and its accessible text for document review flows. */
+  onPageRendered?: (page: number, total: number, text: string) => void;
+  /** Embedded readers with their own heading can omit the overlay caption. */
+  showCaption?: boolean;
 } & Omit<DocumentPreviewHeaderProps, "caption"> &
   MediaNavigationProps) {
   const [pageDirection, setPageDirection] = useState<-1 | 1>();
@@ -112,6 +118,7 @@ export function PdfPreview({
       errorLabel={labels.error}
       renderScale={scale}
       onAspectRatio={onAspectRatio}
+      onRendered={onPageRendered}
     />
   );
   const canPrevious = pageNumber > 1 || Boolean(onPrevious);
@@ -180,7 +187,7 @@ export function PdfPreview({
           wheelGesture={wheelGesture}
           labels={zoomLabels}
           navigation={navigation}
-          caption={label}
+          caption={showCaption ? label : undefined}
           captionStatus={collectionPosition}
           onClosePress={onClosePress}
           closeLabel={closeLabel}
@@ -213,6 +220,7 @@ function PdfPage({
   errorLabel,
   renderScale,
   onAspectRatio,
+  onRendered,
 }: {
   pdf: PDFDocumentProxy;
   pageNumber: number;
@@ -222,6 +230,7 @@ function PdfPage({
   errorLabel: string;
   renderScale: number;
   onAspectRatio?: (ratio: number) => void;
+  onRendered?: (page: number, total: number, text: string) => void;
 }) {
   const containerRef = useRef<HTMLSpanElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -245,6 +254,7 @@ function PdfPage({
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !width) return;
+    setState("loading");
     let disposed = false;
     let task: RenderTask | undefined;
     void pdf
@@ -271,6 +281,17 @@ function PdfPage({
             if (thumbnailBackdrop) setBackdrop(getPdfThumbnail(pdf));
           }
           setState("ready");
+          if (onRendered) {
+            const content = await page.getTextContent();
+            if (!disposed)
+              onRendered(
+                pageNumber,
+                pdf.numPages,
+                content.items
+                  .map((item) => ("str" in item ? item.str : ""))
+                  .join(" "),
+              );
+          }
         }
       })
       .catch(() => {
@@ -288,6 +309,7 @@ function PdfPage({
     thumbnail,
     thumbnailBackdrop,
     onAspectRatio,
+    onRendered,
   ]);
 
   return (

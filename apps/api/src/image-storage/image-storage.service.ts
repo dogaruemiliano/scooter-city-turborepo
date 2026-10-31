@@ -56,6 +56,8 @@ const CONTENT_TYPE_EXTENSIONS = {
   "image/png": "png",
   "image/webp": "webp",
   "application/pdf": "pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+    "docx",
 } satisfies Record<SupportedDocumentContentType, string>;
 
 const UPLOAD_TOKEN_VERSION = 1;
@@ -623,6 +625,21 @@ export class ImageStorageService {
       throwS3StorageError(error);
     }
   }
+  /** Called only after an approved retention fence; never guess an archived object's bucket. */
+  async purgeRetainedDocument(source: {
+    provider: string;
+    bucket: string;
+    storageKey: string;
+  }): Promise<void> {
+    if (
+      source.provider !== IMAGE_STORAGE_PROVIDER_S3 ||
+      source.bucket !== this.bucket
+    )
+      throw new ServiceUnavailableException(
+        "Configure the retained object's exact storage provider and bucket before purging it",
+      );
+    await this.deleteDocumentForCleanup(source.storageKey);
+  }
 
   private requireSupportedImageContentType(
     contentType: string,
@@ -678,6 +695,10 @@ export class ImageStorageService {
     const fileName = `${randomUUID()}.${extension}`;
 
     switch (category) {
+      case "contract-document":
+        return `${this.prefix}/contracts/${year}/${fileName}`;
+      case "contract-branding":
+        return `${this.prefix}/contract-branding/${year}/${fileName}`;
       case "user-avatar":
         return `${this.prefix}/user-avatars/${year}/${fileName}`;
       case "personal-document":
