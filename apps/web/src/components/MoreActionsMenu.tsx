@@ -19,6 +19,7 @@ import { canAccess } from "@/lib/access";
 export type MoreActionsItem = {
   key: string;
   label: string;
+  description?: string;
   icon: ReactNode;
   onClick: () => void;
   disabled?: boolean;
@@ -29,9 +30,11 @@ export type MoreActionsItem = {
 export function MoreActionsMenu({
   ariaLabel,
   groups,
+  onOpenChange,
 }: {
   ariaLabel: string;
   groups: MoreActionsItem[][];
+  onOpenChange?: (open: boolean) => void;
 }) {
   const session = useOptionalSession();
   const visibleGroups = groups
@@ -44,7 +47,7 @@ export function MoreActionsMenu({
   if (visibleGroups.length === 0) return null;
   return (
     <PageHeaderActions>
-      <DropdownMenu>
+      <DropdownMenu onOpenChange={onOpenChange}>
         <DropdownMenuTrigger
           render={<Button aria-label={ariaLabel} variant="ghost" size="icon" />}
         >
@@ -58,6 +61,7 @@ export function MoreActionsMenu({
                 {group.map((item) => (
                   <DropdownMenuItem
                     key={item.key}
+                    description={item.description}
                     variant={item.variant}
                     disabled={item.disabled}
                     onClick={item.onClick}

@@ -81,13 +81,18 @@ function DropdownMenuItem({
   className,
   inset,
   variant = "default",
+  description,
+  children,
   ...props
 }: MenuPrimitive.Item.Props & {
   inset?: boolean;
   variant?: "default" | "destructive";
+  description?: React.ReactNode;
 }) {
+  const descriptionId = React.useId();
   return (
     <MenuPrimitive.Item
+      aria-describedby={description ? descriptionId : undefined}
       data-slot="dropdown-menu-item"
       data-inset={inset}
       data-variant={variant}
@@ -96,7 +101,18 @@ function DropdownMenuItem({
         className,
       )}
       {...props}
-    />
+    >
+      {description ? (
+        <span className="flex min-w-0 flex-col gap-1">
+          <span className="flex items-center gap-2">{children}</span>
+          <span id={descriptionId} className="text-xs text-muted-foreground">
+            {description}
+          </span>
+        </span>
+      ) : (
+        children
+      )}
+    </MenuPrimitive.Item>
   );
 }
 

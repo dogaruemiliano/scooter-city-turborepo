@@ -120,3 +120,20 @@ export const WithSubmenu: Story = {
     </DropdownMenu>
   ),
 };
+
+export const WithDescription: Story = {
+  render: () => (
+    <DropdownMenu>
+      <DropdownMenuTrigger render={<Button variant="outline" />}>
+        Document actions
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="min-w-56">
+        <DropdownMenuGroup>
+          <DropdownMenuItem disabled description="Missing documents">
+            Share client documents
+          </DropdownMenuItem>
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  ),
+};

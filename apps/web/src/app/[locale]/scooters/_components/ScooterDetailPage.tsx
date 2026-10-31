@@ -38,6 +38,7 @@ import { cn } from "@repo/ui/lib/utils";
 import {
   CarFrontIcon,
   PencilIcon,
+  Share2Icon,
   Trash2Icon,
   TriangleAlertIcon,
 } from "lucide-react";
@@ -64,6 +65,7 @@ import {
   scooterFieldConflict,
 } from "./scooter-feedback";
 import { CivDetails } from "./CivDetails";
+import { useShareClientDocuments } from "./useShareClientDocuments";
 import { ScooterDetailDocuments } from "./ScooterDetailDocuments";
 import { ScooterDetailPhotos } from "./ScooterDetailPhotos";
 import { ScooterDetailHero } from "./ScooterDetailHero";
@@ -99,6 +101,10 @@ export function ScooterDetailPage({
   const router = useRouter();
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
+  const clientDocumentShare = useShareClientDocuments(
+    scooter,
+    canAccess(session?.user, "scooter_documents.read"),
+  );
   const readiness = v1.scooters.scooterReadinessIssues(scooter);
   const [registrationOpen, setRegistrationOpen] = useState(false);
   const [registrationDialogKey, setRegistrationDialogKey] = useState(0);
@@ -162,8 +168,18 @@ export function ScooterDetailPage({
       <div className="hidden justify-end md:flex">
         <MoreActionsMenu
           ariaLabel={t("actions.moreActions")}
+          onOpenChange={clientDocumentShare.onMenuOpenChange}
           groups={[
             [
+              {
+                key: "share-client-documents",
+                permission: "scooter_documents.read",
+                label: t("sharing.action"),
+                description: clientDocumentShare.description,
+                icon: <Share2Icon data-icon="inline-start" />,
+                disabled: clientDocumentShare.disabled || busyAction !== null,
+                onClick: clientDocumentShare.share,
+              },
               {
                 key: "report-problem",
                 permission: "problems.create",
@@ -232,6 +248,11 @@ export function ScooterDetailPage({
         </div>
       ) : null}
       {feedback ? <FeedbackAlert feedback={feedback} /> : null}
+      {clientDocumentShare.shareError ? (
+        <Alert variant="destructive">
+          <AlertTitle>{clientDocumentShare.shareError}</AlertTitle>
+        </Alert>
+      ) : null}
       {canAccess(session?.user, "problems.read") ? (
         <ScooterProblems scooterId={scooter.id} />
       ) : null}

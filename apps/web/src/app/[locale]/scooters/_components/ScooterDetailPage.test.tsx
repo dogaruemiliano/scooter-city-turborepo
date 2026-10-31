@@ -90,6 +90,74 @@ beforeEach(() => {
 });
 
 describe("ScooterDetailPage", () => {
+  it("disables sharing with a small missing-documents description", async () => {
+    const browser = userEvent.setup();
+    renderDetail();
+    await browser.click(screen.getByRole("button", { name: "More actions" }));
+    const item = await screen.findByRole("menuitem", {
+      name: /Share client documents/,
+    });
+    expect(item).toHaveAttribute("aria-disabled", "true");
+    expect(item).toHaveAccessibleDescription("Missing documents");
+    expect(within(item).getByText("Missing documents")).toHaveClass("text-xs");
+  });
+
+  it("shares every client copy from the header menu", async () => {
+    const share = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "share", {
+      configurable: true,
+      value: share,
+    });
+    Object.defineProperty(navigator, "canShare", {
+      configurable: true,
+      value: () => true,
+    });
+    const download = vi
+      .fn()
+      .mockImplementation(() => Promise.resolve(new Response("client pdf")));
+    vi.stubGlobal("fetch", download);
+    try {
+      const documents: v1.scooters.ScooterDocument[] = (
+        ["civ", "registration_certificate", "insurance"] as const
+      ).map((type) => ({
+        id: type,
+        type,
+        fileName: `${type}.pdf`,
+        contentType: "application/pdf",
+        byteSize: 8,
+        createdAt: "2026-01-01T00:00:00Z",
+        contentUrl: `/original/${type}`,
+        validFrom: "2000-01-01",
+        validUntil: "2099-01-01",
+        clientCopy: {
+          fileName: `${type}-client.pdf`,
+          contentType: "application/pdf",
+          byteSize: 8,
+          contentUrl: `/client/${type}`,
+        },
+      }));
+      const browser = userEvent.setup();
+      renderDetail("en", { ...scooter, documents, missingClientDocuments: [] });
+      await browser.click(screen.getByRole("button", { name: "More actions" }));
+      await waitFor(() =>
+        expect(
+          screen.getByRole("menuitem", { name: "Share client documents" }),
+        ).not.toHaveAttribute("aria-disabled", "true"),
+      );
+      await browser.click(
+        screen.getByRole("menuitem", { name: "Share client documents" }),
+      );
+      expect(share).toHaveBeenCalledWith({
+        title: "001 YAM",
+        files: [expect.any(File), expect.any(File), expect.any(File)],
+      });
+    } finally {
+      vi.unstubAllGlobals();
+      delete (navigator as Partial<Navigator>).share;
+      delete (navigator as Partial<Navigator>).canShare;
+    }
+  });
+
   it("shows the current cover when scooter data changes", () => {
     const view = renderDetail("en");
     expect(mocks.refresh).not.toHaveBeenCalled();
