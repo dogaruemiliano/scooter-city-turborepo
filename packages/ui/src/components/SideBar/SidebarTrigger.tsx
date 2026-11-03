@@ -40,7 +40,9 @@ export function SidebarTrigger({
       }}
       {...props}
     >
-      {isMobile ? <MenuIcon /> : <PanelLeftIcon />}
+      {/* CSS chooses the icon before hydration can resolve the viewport. */}
+      <MenuIcon aria-hidden="true" className="md:hidden" />
+      <PanelLeftIcon aria-hidden="true" className="hidden md:block" />
       <span className="sr-only">{label}</span>
     </Button>
   );

@@ -201,7 +201,12 @@ export class ScooterDocumentExtractionService {
         }
       }
     }
-    fields.vin = vin;
+    if (
+      documents.some((document) =>
+        v1.scooters.scooterDocumentExtractsData(document.documentType),
+      )
+    )
+      fields.vin = vin;
     if (Object.hasOwn(fields, "documentVin") && !vin) fields.documentVin = null;
     // Parent raw fields are a bounded preview only. Logical records retain all
     // readings without collisions between identical rubric labels.
@@ -247,6 +252,7 @@ export class ScooterDocumentExtractionService {
       extractedData: { vin: null, fields: {}, rawFields: {} },
       issues: [],
     };
+    if (!v1.scooters.scooterDocumentExtractsData(documentType)) return result;
     const { fields, rawFields } = result.extractedData;
     const issue = (
       field: string,
@@ -711,11 +717,7 @@ function normalizeInspections(
   document: NonNullable<ModelOutput["documents"]>[number],
   issues: ScooterDocumentExtractionResult["issues"],
 ): v1.scooters.ScooterDocumentInspection[] {
-  if (
-    document.documentType !== "itp_card" &&
-    document.documentType !== "itp_certificate"
-  )
-    return [];
+  if (document.documentType !== "itp_certificate") return [];
   const issue = (field: string) => {
     if (
       !issues.some(

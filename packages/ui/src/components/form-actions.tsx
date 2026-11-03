@@ -62,6 +62,7 @@ function FormActions({
     </>
   );
   const floating = ready === undefined ? sticky : ready || pending;
+  // Keep the normal edge gap or the device safe area, without adding both.
   if (sticky || ready !== undefined)
     return (
       <Card
@@ -69,7 +70,7 @@ function FormActions({
         data-sticky={floating}
         aria-busy={pending || undefined}
         className={cn(
-          "@container/form-actions sticky bottom-[calc(var(--spacing-4)+env(safe-area-inset-bottom))] z-sticky gap-0 py-0 shadow-md",
+          "@container/form-actions sticky bottom-[max(var(--spacing-4),env(safe-area-inset-bottom))] z-sticky gap-0 py-0 shadow-md",
           ready !== undefined && "w-full",
           ready !== undefined &&
             (floating

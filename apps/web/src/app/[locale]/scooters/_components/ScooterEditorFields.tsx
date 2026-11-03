@@ -785,12 +785,14 @@ function ScooterPowertrainField({ disabled }: { disabled: boolean }) {
 const uppercaseIdentifier = (value: string) => value.toUpperCase();
 
 export function ScooterInitialRegistrationFields({
+  registrationCertificateAttached = false,
   children,
   disabled,
   panel = false,
   number,
   status,
 }: {
+  registrationCertificateAttached?: boolean;
   disabled: boolean;
   panel?: boolean;
   number?: number;
@@ -821,6 +823,11 @@ export function ScooterInitialRegistrationFields({
       status={status}
       title={t("sections.registration")}
     >
+      {registrationCertificateAttached ? (
+        <p className="text-sm text-muted-foreground sm:col-span-2">
+          {t("creation.manualRegistration")}
+        </p>
+      ) : null}
       <FormField
         name="registrationType"
         label={t("fields.registrationType")}

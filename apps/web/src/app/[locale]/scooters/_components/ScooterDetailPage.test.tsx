@@ -1,4 +1,4 @@
-import { ApiError, v1 } from "@repo/api-shared";
+import { v1 } from "@repo/api-shared";
 import { messages, type SupportedLocale } from "@repo/i18n";
 import {
   fireEvent,
@@ -12,6 +12,7 @@ import { NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ScooterDetailPage } from "./ScooterDetailPage";
+import { ScooterNavigationProvider } from "./ScooterNavigation";
 import {
   PageHeaderNavigationContext,
   type PageHeaderNavigationOptions,
@@ -29,6 +30,8 @@ const mocks = vi.hoisted(() => ({
   refresh: vi.fn(),
   replace: vi.fn(),
   push: vi.fn(),
+  back: vi.fn(),
+  pathname: "/en/scooters/scooter-1",
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -39,10 +42,12 @@ vi.mock("@/lib/api", () => ({
 }));
 
 vi.mock("next/navigation", () => ({
+  usePathname: () => mocks.pathname,
   useRouter: () => ({
     refresh: mocks.refresh,
     replace: mocks.replace,
     push: mocks.push,
+    back: mocks.back,
   }),
 }));
 
@@ -78,7 +83,9 @@ const scooter: v1.scooters.Scooter = {
 
 beforeEach(() => {
   mocks.canReportProblem = true;
+  mocks.pathname = "/en/scooters/scooter-1";
   mocks.push.mockReset();
+  mocks.back.mockReset();
   mocks.apiFetch.mockReset();
   mocks.refresh.mockReset();
   mocks.replace.mockReset();
@@ -90,6 +97,49 @@ beforeEach(() => {
 });
 
 describe("ScooterDetailPage", () => {
+  it.each(["en", "ro"] as const)(
+    "lists only the missing client document types in the warning (%s)",
+    (locale) => {
+      renderDetail(locale, {
+        ...scooter,
+        hasCivDocument: true,
+        registrationType: "national",
+        registrationNumber: "B123ABC",
+        rentalInsuranceStatus: "active",
+        itpStatus: "active",
+        missingClientDocuments: ["insurance", "itp_card"],
+      });
+      const catalog = messages[locale].scooters;
+      const alert = screen
+        .getByText(catalog.readiness.needsClientDocuments)
+        .closest<HTMLElement>('[role="alert"]')!;
+      expect(within(alert).getByRole("list")).toBeVisible();
+      expect(
+        within(alert)
+          .getAllByRole("listitem")
+          .map((item) => item.textContent),
+      ).toEqual([catalog.documents.insurance, catalog.documents.itp_card]);
+      expect(
+        within(alert).getByText(catalog.readiness.clientDocumentsHint),
+      ).toBeVisible();
+    },
+  );
+
+  it("omits the missing client documents warning when the server reports none", () => {
+    renderDetail("en", {
+      ...scooter,
+      hasCivDocument: true,
+      registrationType: "national",
+      registrationNumber: "B123ABC",
+      rentalInsuranceStatus: "active",
+      itpStatus: "active",
+      missingClientDocuments: [],
+    });
+    expect(
+      screen.queryByText(messages.en.scooters.readiness.needsClientDocuments),
+    ).not.toBeInTheDocument();
+  });
+
   it("disables sharing with a small missing-documents description", async () => {
     const browser = userEvent.setup();
     renderDetail();
@@ -370,23 +420,70 @@ describe("ScooterDetailPage", () => {
     expect(toggle).toHaveAttribute("aria-expanded", "false");
   });
 
-  it.each(["en", "ro"] as const)(
-    "returns directly to the localized scooter list from the header (%s)",
-    (locale) => {
+  it.each(
+    (["en", "ro"] as const).flatMap((locale) => [
+      {
+        locale,
+        routes: ["/scooters", "/scooters/scooter-1"],
+        historyBack: true,
+      },
+      {
+        locale,
+        routes: ["/scooters/new", "/scooters/scooter-1"],
+        historyBack: false,
+      },
+      {
+        locale,
+        routes: ["/scooters/scooter-1/edit", "/scooters/scooter-1"],
+        historyBack: false,
+      },
+      {
+        locale,
+        routes: [
+          "/scooters",
+          "/scooters/scooter-1",
+          "/scooters/scooter-1/edit",
+          "/scooters/scooter-1",
+        ],
+        historyBack: false,
+      },
+      { locale, routes: ["/scooters/scooter-1"], historyBack: false },
+    ]),
+  )(
+    "chooses header Back for $routes ($locale, history: $historyBack)",
+    ({ locale, routes, historyBack }) => {
       const register = vi.fn<
         (options: PageHeaderNavigationOptions) => () => void
       >(() => vi.fn());
       const href = locale === "en" ? "/en/scooters" : "/scooters";
-      render(
-        <NextIntlClientProvider locale={locale} messages={messages[locale]}>
-          <PageHeaderNavigationContext.Provider value={register}>
-            <ScooterDetailPage scooter={scooter} scootersHref={href} />
-          </PageHeaderNavigationContext.Provider>
-        </NextIntlClientProvider>,
-      );
+      function navigation() {
+        return (
+          <NextIntlClientProvider locale={locale} messages={messages[locale]}>
+            <PageHeaderNavigationContext.Provider value={register}>
+              <ScooterNavigationProvider>
+                {mocks.pathname.endsWith("/scooter-1") ? (
+                  <ScooterDetailPage scooter={scooter} scootersHref={href} />
+                ) : null}
+              </ScooterNavigationProvider>
+            </PageHeaderNavigationContext.Provider>
+          </NextIntlClientProvider>
+        );
+      }
+      mocks.pathname = `/${locale}${routes[0]}`;
+      const view = render(navigation());
+      for (const route of routes.slice(1)) {
+        mocks.pathname = `/${locale}${route}`;
+        view.rerender(navigation());
+      }
       expect(register).toHaveBeenCalled();
       register.mock.calls.at(-1)?.[0].onBack?.();
-      expect(mocks.push).toHaveBeenCalledWith(href);
+      if (historyBack) {
+        expect(mocks.back).toHaveBeenCalledOnce();
+        expect(mocks.push).not.toHaveBeenCalled();
+      } else {
+        expect(mocks.push).toHaveBeenCalledWith(href);
+        expect(mocks.back).not.toHaveBeenCalled();
+      }
     },
   );
 
@@ -542,149 +639,7 @@ describe("ScooterDetailPage", () => {
     ).toBe(true);
   });
 
-  it("adds scooter registration from the focused dialog", async () => {
-    mocks.apiFetch.mockResolvedValueOnce({
-      ...scooter,
-      registrationType: "national",
-      registrationNumber: "CJ 12 ABC",
-      registrationDate: "2026-01-16",
-      requiredLicenseCategory: "A1",
-    });
-    const browser = userEvent.setup();
-
-    renderDetail();
-    await browser.click(screen.getByRole("button", { name: "More actions" }));
-    await browser.click(await screen.findByText("Add registration"));
-    const dialog = await screen.findByRole("dialog", {
-      name: "Add registration",
-    });
-    await chooseSelectOption(browser, "Registration type", "National");
-    await browser.type(
-      within(dialog).getByLabelText("Plate number"),
-      "cj12abc",
-    );
-    expect(within(dialog).getByLabelText("Plate number")).toHaveValue(
-      "CJ12ABC",
-    );
-    expect(within(dialog).queryByLabelText("Registered on")).toBeNull();
-    await chooseSelectOption(browser, "Required driver license", "A1");
-    await browser.click(
-      within(dialog).getByRole("button", { name: "Save changes" }),
-    );
-
-    await waitFor(() =>
-      expect(mocks.apiFetch).toHaveBeenCalledWith(
-        v1.scooters.ROUTES.update(scooter.id),
-        v1.scooters.scooterSchema,
-        {
-          method: "PATCH",
-          json: {
-            registrationType: "national",
-            registrationNumber: "CJ 12 ABC",
-            registrationDate: null,
-            temporaryRegistrationExpiresAt: null,
-            requiredLicenseCategory: "A1",
-          },
-        },
-      ),
-    );
-    expect(mocks.refresh).toHaveBeenCalledOnce();
-  });
-
-  it("preserves the application licence policy when registration is cleared", async () => {
-    mocks.apiFetch.mockResolvedValueOnce(scooter);
-    const browser = userEvent.setup();
-    renderDetail();
-    await browser.click(screen.getByRole("button", { name: "More actions" }));
-    await browser.click(await screen.findByText("Add registration"));
-    const dialog = await screen.findByRole("dialog", {
-      name: "Add registration",
-    });
-    await chooseSelectOption(browser, "Required driver license", "A1");
-    await chooseSelectOption(browser, "Registration type", "Local");
-    await chooseSelectOption(browser, "Registration type", "Unregistered");
-    expect(
-      within(dialog).getByRole("combobox", { name: /Required driver license/ }),
-    ).toHaveTextContent("A1");
-    await browser.click(
-      within(dialog).getByRole("button", { name: "Save changes" }),
-    );
-    await waitFor(() =>
-      expect(mocks.apiFetch).toHaveBeenCalledWith(
-        v1.scooters.ROUTES.update(scooter.id),
-        v1.scooters.scooterSchema,
-        {
-          method: "PATCH",
-          json: {
-            registrationType: "unregistered",
-            registrationNumber: null,
-            registrationDate: null,
-            temporaryRegistrationExpiresAt: null,
-            requiredLicenseCategory: "A1",
-          },
-        },
-      ),
-    );
-  });
-
-  it("keeps a duplicate plate error inside the registration sheet and marks the input invalid", async () => {
-    const browser = userEvent.setup();
-    mocks.apiFetch.mockImplementation((url: string) => {
-      if (url === v1.scooters.ROUTES.update(scooter.id)) {
-        return Promise.reject(
-          new ApiError(
-            409,
-            "The request conflicts with the current resource state.",
-            "SCOOTER_PLATE_CONFLICT",
-            { field: "registrationNumber" },
-          ),
-        );
-      }
-      return Promise.resolve({ items: [], total: 0, page: 1, pageSize: 25 });
-    });
-    renderDetail();
-    await browser.click(screen.getByRole("button", { name: "More actions" }));
-    await browser.click(await screen.findByText("Add registration"));
-    const dialog = await screen.findByRole("dialog", {
-      name: "Add registration",
-    });
-    await chooseSelectOption(browser, "Registration type", "Local");
-    expect(within(dialog).queryByLabelText("Registered on")).toBeNull();
-    const plate = within(dialog).getByRole("textbox", {
-      name: "Plate number",
-    });
-    await browser.clear(plate);
-    await browser.type(plate, "vl 18 188");
-    expect(plate).toHaveValue("VL 18 188");
-    await browser.click(
-      within(dialog).getByRole("button", { name: "Save changes" }),
-    );
-    const message = messages.en.scooters.feedback.plateConflict;
-    await waitFor(() =>
-      expect(within(dialog).getByText("Changes not saved")).toBeVisible(),
-    );
-    expect(within(dialog).getAllByText(message)).toHaveLength(2);
-    expect(screen.getAllByText("Changes not saved")).toHaveLength(1);
-    expect(plate).toHaveAttribute("aria-invalid", "true");
-    expect(plate).toHaveAccessibleDescription(message);
-    expect(plate).toHaveFocus();
-    expect(mocks.refresh).not.toHaveBeenCalled();
-    await browser.clear(plate);
-    await browser.type(plate, "vl 222");
-    expect(plate).toHaveValue("VL 222");
-    expect(plate).not.toHaveAttribute("aria-invalid", "true");
-    mocks.apiFetch.mockResolvedValue({
-      ...scooter,
-      registrationType: "local",
-      registrationNumber: "VL 222",
-    });
-    await browser.click(
-      within(dialog).getByRole("button", { name: "Save changes" }),
-    );
-    await waitFor(() => expect(mocks.refresh).toHaveBeenCalledOnce());
-  });
-
-  it.each(["national", "local", "temporary"] as const)(
+  it.each(["unregistered", "national", "local", "temporary"] as const)(
     "edits %s registration through the scooter edit page",
     async (registrationType) => {
       const browser = userEvent.setup();
@@ -692,7 +647,8 @@ describe("ScooterDetailPage", () => {
       renderDetail("en", {
         ...scooter,
         registrationType,
-        registrationNumber: "CJ 12 ABC",
+        registrationNumber:
+          registrationType === "unregistered" ? null : "CJ 12 ABC",
         registrationDate: "2026-01-16",
         requiredLicenseCategory: "A1",
       });
@@ -701,11 +657,11 @@ describe("ScooterDetailPage", () => {
       expect(screen.queryByText("Edit registration")).not.toBeInTheDocument();
       expect(screen.queryByText("Add registration")).not.toBeInTheDocument();
       expect(
-        within(screen.getByRole("region", { name: "001 YAM" })).getByRole(
-          "img",
-          { name: /CJ 12 ABC/ },
-        ),
-      ).toBeInTheDocument();
+        screen.queryByRole("dialog", { name: /registration/i }),
+      ).not.toBeInTheDocument();
+      expect(
+        document.querySelector('[data-slot="bottom-sheet-content"]'),
+      ).not.toBeInTheDocument();
       await browser.click(await screen.findByText("Edit scooter"));
       expect(mocks.push).toHaveBeenCalledWith(
         `/en/scooters/${scooter.id}/edit`,
@@ -760,15 +716,6 @@ function renderDetail(
       />
     </NextIntlClientProvider>,
   );
-}
-
-async function chooseSelectOption(
-  browser: ReturnType<typeof userEvent.setup>,
-  label: string,
-  option: string,
-) {
-  await browser.click(screen.getByRole("combobox", { name: label }));
-  await browser.click(await screen.findByRole("option", { name: option }));
 }
 
 vi.mock("@/components/auth/SessionProvider", () => ({

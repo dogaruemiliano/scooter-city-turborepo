@@ -16,6 +16,7 @@ import {
   resolveDataTheme,
   resolveThemePreference,
   THEME_COOKIE_NAME,
+  themeColorMetadata,
 } from "../../lib/theme-cookie";
 import "../globals.css";
 
@@ -41,13 +42,19 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export const viewport: Viewport = {
-  width: "device-width",
-  viewportFit: "cover",
-  initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
-};
+export async function generateViewport(): Promise<Viewport> {
+  const cookieStore = await cookies();
+  return {
+    width: "device-width",
+    viewportFit: "cover",
+    initialScale: 1,
+    maximumScale: 1,
+    userScalable: false,
+    themeColor: themeColorMetadata(
+      resolveThemePreference(cookieStore.get(THEME_COOKIE_NAME)?.value),
+    ),
+  };
+}
 
 export function generateStaticParams() {
   return supportedLocales.map((locale) => ({ locale }));

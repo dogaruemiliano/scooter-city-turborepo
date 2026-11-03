@@ -24,9 +24,20 @@ theme cookies select that theme's metadata on the next server render. Installed
 icons and startup artwork can be cached by the OS; changing the theme does not
 guarantee that an already installed icon changes immediately.
 
+iOS startup images also require `apple-mobile-web-app-capable=yes`. Keep the
+explicit `other` metadata entry in `src/lib/pwa.ts`: Next.js emits only the
+unprefixed `mobile-web-app-capable` tag for `appleWebApp.capable`, which enables
+standalone mode but does not enable Apple's startup images.
+
 Android controls its splash using the installed manifest icon and background; a
-separate full-logo launch image is not supported by that platform. Sharing services
-use the light full-logo preview by default; they do not expose the recipient's theme.
+separate full-logo launch image is not supported by that platform. After launch,
+the layouts emit `theme-color` metadata from the shared theme's background tokens
+so Android's status bar matches the page theme. Both appearance media entries stay
+present: system mode uses each scheme's color, while a saved preference overrides
+both. `applyThemePreference` updates those entries in place for immediate changes.
+
+Sharing services use the light full-logo preview by default; they do not expose
+the recipient's theme.
 The dark preview is retained at `/pwa/share/dark.png`.
 
 Set `NEXT_PUBLIC_SITE_URL` to the public web origin for absolute sharing-image URLs.

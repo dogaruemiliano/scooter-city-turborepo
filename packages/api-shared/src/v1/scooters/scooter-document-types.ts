@@ -12,13 +12,13 @@ export const SCOOTER_DOCUMENT_TYPES = [
   "other",
 ] as const;
 
-/** Handwritten registration cards and yellow ITP cards are not reliable VIN sources. */
+/** All other types are classified and stored without reading their contents. */
+export function scooterDocumentExtractsData(type: string): boolean {
+  return ["civ", "insurance", "itp_certificate"].includes(type);
+}
+
 export function scooterDocumentReadsVin(type: string): boolean {
-  return (
-    type !== "registration_certificate" &&
-    type !== "itp_card" &&
-    type !== "other"
-  );
+  return scooterDocumentExtractsData(type);
 }
 
 export function scooterDocumentVinPriority(type: string): number {

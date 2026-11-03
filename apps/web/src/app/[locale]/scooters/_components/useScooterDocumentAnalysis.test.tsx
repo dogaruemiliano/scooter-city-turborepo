@@ -78,7 +78,7 @@ describe("direct document analysis", () => {
     const misread = "LXYTCKP05P0000002";
     original.extractedData.documents = ["a", "b"].map((id, index) => ({
       id,
-      documentType: "foreign_registration",
+      documentType: "itp_certificate",
       pages: [index + 1],
       vin: misread,
       fields: { vin: misread },

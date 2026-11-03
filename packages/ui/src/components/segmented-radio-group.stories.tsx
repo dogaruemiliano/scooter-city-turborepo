@@ -75,6 +75,24 @@ export const TwoOptions: Story = {
   render: Default.render,
 };
 
+/** Short difficulty labels stay on one line beside the checkmark on mobile. */
+export const Difficulty: Story = {
+  parameters: { layout: "padded" },
+  args: {
+    label: "Difficulty",
+    name: "difficulty",
+    columns: 3,
+    value: "medium",
+    showCheckmark: true,
+    options: [
+      { value: "easy", label: "Easy", difficulty: "easy" },
+      { value: "medium", label: "Medium", difficulty: "medium" },
+      { value: "hard", label: "Hard", difficulty: "hard" },
+    ],
+  },
+  render: Default.render,
+};
+
 export const TwoByTwo: Story = {
   args: {
     label: "Status",

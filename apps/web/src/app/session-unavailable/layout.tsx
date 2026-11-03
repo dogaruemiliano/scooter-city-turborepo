@@ -1,7 +1,12 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { cookies } from "next/headers";
 import { Manrope } from "next/font/google";
-import { resolveDataTheme, THEME_COOKIE_NAME } from "../../lib/theme-cookie";
+import {
+  resolveDataTheme,
+  resolveThemePreference,
+  THEME_COOKIE_NAME,
+  themeColorMetadata,
+} from "../../lib/theme-cookie";
 import "../globals.css";
 
 const manrope = Manrope({
@@ -14,6 +19,15 @@ export const metadata: Metadata = {
   title: "ScooterCity",
   robots: { index: false, follow: false },
 };
+
+export async function generateViewport(): Promise<Viewport> {
+  const cookieStore = await cookies();
+  return {
+    themeColor: themeColorMetadata(
+      resolveThemePreference(cookieStore.get(THEME_COOKIE_NAME)?.value),
+    ),
+  };
+}
 
 export default async function RecoveryLayout({
   children,

@@ -1,9 +1,20 @@
+import { tokens } from "@repo/theme";
+
 export const EXPLICIT_THEMES = ["light", "dark"] as const;
 export type ExplicitTheme = (typeof EXPLICIT_THEMES)[number];
 export type ThemePreference = ExplicitTheme | "system";
 
 export const THEME_COOKIE_NAME = "theme";
 export const THEME_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
+
+/** Keep both media entries stable so theme switches can update them in place. */
+export function themeColorMetadata(preference: ThemePreference) {
+  return EXPLICIT_THEMES.map((scheme) => ({
+    media: `(prefers-color-scheme: ${scheme})`,
+    color:
+      tokens.color[preference === "system" ? scheme : preference].background,
+  }));
+}
 
 /** What the toggle UI displays; defaults to "system" when no cookie is set. */
 export function resolveThemePreference(
@@ -35,5 +46,14 @@ export function applyThemePreference(pref: ThemePreference): void {
   } else {
     document.documentElement.dataset.theme = pref;
     document.cookie = `${THEME_COOKIE_NAME}=${pref}; path=/; max-age=${THEME_COOKIE_MAX_AGE}; samesite=lax`;
+  }
+
+  const metaTags = document.querySelectorAll<HTMLMetaElement>(
+    'meta[name="theme-color"]',
+  );
+  for (const { media, color } of themeColorMetadata(pref)) {
+    for (const meta of metaTags) {
+      if (meta.getAttribute("media") === media) meta.content = color;
+    }
   }
 }

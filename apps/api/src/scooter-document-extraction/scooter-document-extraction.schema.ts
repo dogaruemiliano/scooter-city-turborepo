@@ -36,11 +36,8 @@ const exportFields = [
 export function extractionFieldsForType(
   type: v1.scooters.ScooterDocumentType,
 ): string[] {
-  if (type === "other") return [];
+  if (!v1.scooters.scooterDocumentExtractsData(type)) return [];
   if (type === "insurance") return [...v1.scooters.INSURANCE_FIELDS];
-  if (type === "registration_certificate")
-    return ["brandName", "requiredLicenseCategory", ...registrationFields];
-  if (type === "itp_card") return ["brandName"];
   if (type === "itp_certificate") return ["vin", "brandName"];
   const technical = [
     ...new Set(v1.scooters.SCOOTER_DOCUMENT_EXTRACTABLE_FIELDS),

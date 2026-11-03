@@ -439,6 +439,19 @@ export const Controlled: Story = {
   render: () => <ControlledSidebarApplication />,
 };
 
+export const MobileNavigation: Story = {
+  globals: { viewport: { value: "mobile1", isRotated: false } },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "The header uses the burger icon below the medium breakpoint, including before hydration. Select it to open the navigation sheet.",
+      },
+    },
+  },
+  render: () => <SidebarApplication />,
+};
+
 export const MobileSheetOpen: Story = {
   render: () => <MobileSheetApplication />,
 };

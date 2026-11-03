@@ -213,7 +213,7 @@ function SegmentedRadioGroup<Value extends string>({
             />
             <span
               className={cn(
-                "flex min-h-0 w-full min-w-0 items-center justify-center gap-1 rounded-md px-2 py-1 text-center text-sm font-medium wrap-anywhere outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-inset peer-focus-visible:ring-ring peer-disabled:cursor-not-allowed",
+                "flex min-h-0 w-full min-w-0 items-center justify-center gap-1 rounded-md px-2 py-1 text-center text-sm font-medium wrap-normal outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-inset peer-focus-visible:ring-ring peer-disabled:cursor-not-allowed",
                 appearance === "pills" &&
                   "min-h-8 rounded-full border border-border px-4 py-1",
                 value !== option.value &&
@@ -250,9 +250,6 @@ function SegmentedRadioGroup<Value extends string>({
                 />
               ) : null}
               {option.label}
-              {showCheckmark ? (
-                <span aria-hidden="true" className="size-4 shrink-0" />
-              ) : null}
             </span>
           </label>
         ))}

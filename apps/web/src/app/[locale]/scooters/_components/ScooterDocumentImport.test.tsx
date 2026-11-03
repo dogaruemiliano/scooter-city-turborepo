@@ -512,7 +512,7 @@ describe("scooter JSON import feedback", () => {
     },
   );
 
-  it("fills CIV, registration and insurance data when the AI names downloaded copies with (1)", async () => {
+  it("fills CIV and insurance while keeping registration manual when the AI names downloaded copies with (1)", async () => {
     const sources: DocumentSource[] = [
       { sourceId: "civ-1", type: "civ", fileName: "CIV-004-AGM.pdf" },
       {
@@ -570,10 +570,10 @@ describe("scooter JSON import feedback", () => {
       bodyType: "two_wheel_moped",
       typeApprovalNumber: "e4*2002/24*2691*06",
       powerKw: "1.8",
-      registrationType: "local",
-      registrationNumber: "14949",
-      registrationCertificateNumber: "BUJORENI-VL-176/18",
-      registrationDate: "2026-09-01",
+      registrationType: "",
+      registrationNumber: "",
+      registrationCertificateNumber: "",
+      registrationDate: "",
       requiredLicenseCategory: "none",
       insurancePolicies: [
         {

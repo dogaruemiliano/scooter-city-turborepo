@@ -11,7 +11,7 @@ const correct = "LXYTCZP05P0000001";
 const misread = "LXYTC2P05P0000001";
 const input: v1.scooters.ScooterDocumentAnalysis = {
   sourceId: "registration",
-  documentType: "foreign_registration",
+  documentType: "itp_certificate",
   extractedData: {
     vin: misread,
     fields: { vin: misread },
@@ -44,7 +44,7 @@ describe("explicit document VIN corrections", () => {
           },
           {
             id: "foreign",
-            documentType: "foreign_registration",
+            documentType: "itp_certificate",
             pages: [2, 3],
             vin: misread,
             fields: { vin: misread },
@@ -124,7 +124,7 @@ describe("explicit document VIN corrections", () => {
       { sourceId: "civ", type: "civ" as const, fileName: "civ.pdf" },
       {
         sourceId: "registration",
-        type: "foreign_registration" as const,
+        type: "itp_certificate" as const,
         fileName: "registration.pdf",
       },
       {

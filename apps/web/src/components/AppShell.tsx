@@ -357,9 +357,16 @@ function AppShellContent({
             ref={pageScrollRef}
             data-slot="app-page-scroll"
             onScroll={onPageScroll}
-            className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overscroll-y-contain pb-[calc(var(--spacing-screen-bottom)+env(safe-area-inset-bottom))] md:overflow-visible md:overscroll-auto"
+            className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overscroll-y-contain md:overflow-visible md:overscroll-auto"
           >
-            {children}
+            {/* Padding on the scrollport adds to bottom-sticky offsets. Keep it
+                in the scrolling content so floating actions count safe areas once. */}
+            <div
+              data-slot="app-page-content"
+              className="flex min-w-0 flex-1 flex-col pb-[calc(var(--spacing-screen-bottom)+env(safe-area-inset-bottom))]"
+            >
+              {children}
+            </div>
           </div>
         </SidebarInset>
       </PageHeaderActionsContext.Provider>

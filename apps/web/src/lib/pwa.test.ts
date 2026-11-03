@@ -15,6 +15,15 @@ const pngSize = (url: string) => {
 
 describe("PWA assets", () => {
   it.each(["system", "light", "dark"] as const)(
+    "enables iOS startup images with the Apple-prefixed capable tag in %s mode",
+    (preference) => {
+      const metadata = pwaMetadata(preference);
+      expect(metadata.other?.["apple-mobile-web-app-capable"]).toBe("yes");
+      expect(metadata.appleWebApp).toMatchObject({ capable: true });
+    },
+  );
+
+  it.each(["system", "light", "dark"] as const)(
     "keeps browser icons transparent and appearance-aware with %s app theme",
     (preference) => {
       const icons = pwaMetadata(preference).icons;
@@ -116,6 +125,15 @@ describe("PWA assets", () => {
           ? path.resolve("src/app/manifest.json")
           : assetPath("/pwa/manifest-dark.webmanifest");
       const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+      // Chrome on Android generates its launch screen from these manifest
+      // fields, independently of Apple's startup-image links.
+      expect(manifest.name).toBe("ScooterCity");
+      expect(manifest.display).toBe("standalone");
+      expect(manifest.background_color).toMatch(/^#[\da-f]{6}$/i);
+      expect(manifest.theme_color).toBe(manifest.background_color);
+      expect(metadata.manifest).toBe(
+        theme === "light" ? "/manifest.json" : "/pwa/manifest-dark.webmanifest",
+      );
       expect(manifest.id).toBe("/");
       expect(manifest.scope).toBe("/");
       expect(manifest.start_url).toBe("/");

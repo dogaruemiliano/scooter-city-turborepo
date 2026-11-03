@@ -1,7 +1,7 @@
 import { v1 } from "@repo/api-shared";
 import { scrollFade } from "@repo/theme";
 import { messages } from "@repo/i18n";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -35,6 +35,10 @@ const importResult = {
 };
 const add = vi.fn();
 const setVersion = vi.fn();
+const notifications = vi.hoisted(() => ({ add: vi.fn() }));
+vi.mock("@/components/WorkspaceNotifications", () => ({
+  useWorkspaceNotifications: () => notifications,
+}));
 
 function view({
   attached = [existing],
@@ -43,6 +47,7 @@ function view({
   drafts = [],
   editing = false,
   itpValidUntil,
+  generateClientCopies,
 }: {
   attached?: v1.scooters.ScooterDocument[];
   editing?: boolean;
@@ -50,6 +55,7 @@ function view({
   disabled?: boolean;
   result?: typeof importResult;
   drafts?: ScooterDocumentsEditor["drafts"];
+  generateClientCopies?: ScooterDocumentsEditor["generateClientCopies"];
 } = {}) {
   const documents = {
     existing: attached,
@@ -57,6 +63,8 @@ function view({
     extractions: {},
     add,
     setVersion,
+    canGenerateClientCopies: Boolean(generateClientCopies),
+    generateClientCopies,
   } as unknown as ScooterDocumentsEditor;
   return (
     <NextIntlClientProvider locale="en" messages={messages.en}>
@@ -79,6 +87,7 @@ function drop(target: HTMLElement, files: File[]) {
 beforeEach(() => {
   add.mockReset();
   setVersion.mockReset();
+  notifications.add.mockReset();
 });
 
 describe("Scooter batch document states", () => {
@@ -159,6 +168,16 @@ describe("Scooter batch document states", () => {
         ),
       ).toBeInTheDocument();
       fixture.rerender(view({ drafts: [{ ...file, status: "ready" }] }));
+      viewport.scrollLeft = 120;
+      fixture.rerender(
+        view({
+          drafts: [
+            { ...file, status: "ready" },
+            { ...file, id: "copy", version: "client_copy", originalId: "new" },
+          ],
+        }),
+      );
+      expect(viewport.scrollLeft).toBe(120);
       fixture.rerender(view());
       expect(scrollTo).toHaveBeenCalledTimes(1);
     } finally {
@@ -169,6 +188,33 @@ describe("Scooter batch document states", () => {
       });
     }
   });
+
+  it.each([true, false])(
+    "shows a completion toast only after generation resolves (%s)",
+    async (success) => {
+      let complete!: (value: boolean) => void;
+      const generateClientCopies = vi.fn(
+        () =>
+          new Promise<boolean>((resolve) => {
+            complete = resolve;
+          }),
+      );
+      render(view({ generateClientCopies }));
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: messages.en.scooters.documents.generateClientCopies,
+        }),
+      );
+      expect(notifications.add).not.toHaveBeenCalled();
+      await act(async () => complete(success));
+      expect(notifications.add).toHaveBeenCalledExactlyOnceWith({
+        title: success
+          ? messages.en.scooters.documents.clientCopiesGenerated
+          : messages.en.scooters.documents.generateClientCopiesError,
+        variant: success ? "success" : "error",
+      });
+    },
+  );
 
   it("accepts a file dropped directly on the desktop gallery surrounding the document cards", () => {
     render(view());

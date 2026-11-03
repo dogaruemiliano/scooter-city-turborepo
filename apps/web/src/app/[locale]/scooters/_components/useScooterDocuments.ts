@@ -208,6 +208,7 @@ export function useScooterDocuments(
             : item,
         ),
       );
+      return true;
     } catch (error) {
       editorSession.handleSessionError(error);
       setDrafts((current) =>
@@ -222,12 +223,13 @@ export function useScooterDocuments(
             : item,
         ),
       );
+      return false;
     } finally {
       uploading.current.delete(draft.id);
     }
   }
 
-  function add(
+  function addAndUpload(
     type: v1.scooters.ScooterDocumentType | null,
     files: File[],
     insurancePolicyId?: string,
@@ -246,7 +248,11 @@ export function useScooterDocuments(
       status: "uploading",
     }));
     setDrafts((current) => [...current, ...items]);
-    for (const item of items) void upload(item);
+    return Promise.all(items.map((item) => upload(item)));
+  }
+
+  function add(...args: Parameters<typeof addAndUpload>) {
+    void addAndUpload(...args);
   }
 
   const classify = useCallback(
@@ -347,7 +353,7 @@ export function useScooterDocuments(
       ),
   );
   async function generateClientCopies() {
-    if (generationLock.current) return;
+    if (generationLock.current || copyCandidates.length === 0) return;
     generationLock.current = true;
     setGeneratingClientCopies(true);
     setClientCopyError(false);
@@ -367,10 +373,20 @@ export function useScooterDocuments(
           });
         }
         const copy = await generateScooterClientCopy(file);
-        add(original.type, [copy], undefined, "client_copy", original.id);
+        const uploaded = await addAndUpload(
+          original.type,
+          [copy],
+          undefined,
+          "client_copy",
+          original.id,
+        );
+        if (!uploaded.every(Boolean))
+          throw new Error("Client copy upload failed");
       }
+      return true;
     } catch {
       setClientCopyError(true);
+      return false;
     } finally {
       generationLock.current = false;
       setGeneratingClientCopies(false);

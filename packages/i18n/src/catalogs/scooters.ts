@@ -16,6 +16,8 @@ export const scootersCatalog = {
     reextraction: scooterReextractionMessages.en,
     readiness: {
       needsClientDocuments: "Required client documents are missing",
+      clientDocumentsHint:
+        "These documents need a client copy linked to a current original. For insurance and ITP, check the original's validity dates even if a client copy is already uploaded.",
       needsCiv: "Needs CIV",
       needsRegistration: "Unregistered",
       needsInsurance: "Needs insurance",
@@ -244,6 +246,8 @@ export const scootersCatalog = {
       scooterDetails: "Scooter details",
       importHelp:
         "Upload vehicle documents to fill the form automatically. You can also enter everything manually.",
+      manualRegistration:
+        "A registration certificate is attached. Select the registration type and enter its plate number manually; these details are not read automatically.",
       aiPowered: "AI powered",
       propulsion: "Propulsion",
       compliance: "Registration & insurance",
@@ -576,6 +580,7 @@ export const scootersCatalog = {
         typeLabel: "Document type for {name}",
         duplicate: "This file is already attached.",
         read: "Details extracted",
+        identified: "Document identified",
         manualTypes: "Choose each document's type and enter its details below.",
         review:
           "Review the filled details below, then create the scooter. You can add more documents at any time.",
@@ -1356,6 +1361,8 @@ export const scootersCatalog = {
     reextraction: scooterReextractionMessages.ro,
     readiness: {
       needsClientDocuments: "Lipsesc documentele necesare pentru client",
+      clientDocumentsHint:
+        "Aceste documente necesită o copie pentru client asociată unui original valabil. Pentru asigurare și ITP, verifică datele de valabilitate ale originalului chiar dacă o copie pentru client este deja încărcată.",
       needsCiv: "Necesită CIV",
       needsRegistration: "Neînmatriculat",
       needsInsurance: "Necesită asigurare",
@@ -1588,6 +1595,8 @@ export const scootersCatalog = {
       scooterDetails: "Datele scuterului",
       importHelp:
         "Încarcă documentele vehiculului pentru completarea automată. Poți introduce toate datele și manual.",
+      manualRegistration:
+        "Este atașat un certificat de înregistrare. Selectează tipul înregistrării și introdu manual numărul de pe plăcuță; aceste date nu sunt citite automat.",
       aiPowered: "Asistat de AI",
       propulsion: "Propulsie",
       compliance: "Înregistrare și asigurare",
@@ -1936,6 +1945,7 @@ export const scootersCatalog = {
         typeLabel: "Tipul documentului {name}",
         duplicate: "Acest fișier este deja atașat.",
         read: "Date extrase",
+        identified: "Document identificat",
         manualTypes:
           "Alege tipul fiecărui document și completează datele mai jos.",
         review:

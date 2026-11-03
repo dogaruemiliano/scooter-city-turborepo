@@ -5,6 +5,7 @@ import {
   renderWithMessages,
   pdf,
   mockBatchExtraction,
+  enterRegistration,
   access,
 } from "./ScooterDocuments.test-helpers";
 import { ApiError, v1 } from "@repo/api-shared";
@@ -49,6 +50,8 @@ describe("Scooter documents", () => {
         expect(screen.getByLabelText("Total premium")).toHaveValue("278.88"),
       { timeout: 5_000 },
     );
+    expect(screen.queryByLabelText("Plate number")).toBeNull();
+    await enterRegistration(browser);
     expect(screen.getByLabelText("Plate number")).toHaveValue("14949");
     expect(screen.getByLabelText("Insured name")).toHaveValue("Example Person");
     for (const [index, type] of types.entries()) {
@@ -274,6 +277,8 @@ describe("Scooter documents", () => {
     await browser.click(screen.getByRole("button", { name: "Fill fields" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(screen.getByRole("textbox", { name: "VIN" })).toHaveValue(vin);
+    expect(screen.queryByLabelText("Plate number")).toBeNull();
+    await enterRegistration(browser);
     expect(screen.getByLabelText("Plate number")).toHaveValue("14949");
     expect(screen.getByLabelText("Insured name")).toHaveValue(
       "DOGARU EMILIANO CONSTANTIN",
@@ -296,7 +301,11 @@ describe("Scooter documents", () => {
         expect.objectContaining({
           type: document.type,
           fileName: document.fileName,
-          extractedData: expect.objectContaining({ vin }),
+          extractedData: expect.objectContaining({
+            vin: v1.scooters.scooterDocumentExtractsData(document.type)
+              ? vin
+              : null,
+          }),
           ...(document.type === "insurance"
             ? { insurancePolicyId: payload.insurancePolicies[0].id }
             : {}),
@@ -395,9 +404,10 @@ describe("Scooter documents", () => {
       target: { value: "Blue" },
     });
     await browser.click(retry);
-    await waitFor(() =>
-      expect(screen.getByLabelText("Plate number")).toHaveValue("14949"),
-    );
+    await screen.findByText(messages.en.scooters.creation.manualRegistration);
+    expect(screen.queryByLabelText("Plate number")).toBeNull();
+    await enterRegistration(browser);
+    expect(screen.getByLabelText("Plate number")).toHaveValue("14949");
     expect(screen.getByLabelText("Color")).toHaveValue("Blue");
     expect(mocks.put).toHaveBeenCalledTimes(2);
     expect(

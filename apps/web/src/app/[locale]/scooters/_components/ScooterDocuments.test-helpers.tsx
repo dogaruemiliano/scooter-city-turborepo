@@ -254,6 +254,14 @@ export async function removeFromViewer(
   await user.click(await screen.findByRole("menuitem", { name: "Remove" }));
 }
 
+export async function enterRegistration(
+  user: ReturnType<typeof userEvent.setup>,
+) {
+  await user.click(screen.getByRole("combobox", { name: "Registration type" }));
+  await user.click(await screen.findByRole("option", { name: "Local" }));
+  await user.type(screen.getByLabelText("Plate number"), "14949");
+}
+
 const access = vi.hoisted(() => ({
   user: { isSuperAdmin: true, effectiveScopes: {} as Record<string, string[]> },
 }));
