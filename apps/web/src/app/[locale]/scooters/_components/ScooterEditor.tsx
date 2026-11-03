@@ -955,6 +955,20 @@ export function ScooterEditor({
           : "creation.incomplete",
   );
 
+  const uploadingDocuments = documents.drafts.some(
+    (document) => document.status === "uploading",
+  );
+  const documentPendingLabel = documents.generatingClientCopies
+    ? t("documents.clientCopyProgress", documents.clientCopyProgress)
+    : uploadingDocuments
+      ? t("documents.uploadProgress", {
+          done: documents.drafts.filter(
+            (document) => document.status !== "uploading",
+          ).length,
+          total: documents.drafts.length,
+        })
+      : t("reextraction.pendingAction", analysis.progress);
+
   const workspaceStatus: ScooterImportStatus = saveCompleted
     ? "created"
     : photosBusy ||
@@ -1456,7 +1470,10 @@ export function ScooterEditor({
                 {...formAction(
                   scooter ? "save" : "create",
                   {
-                    pending: isSubmitting,
+                    pending:
+                      isSubmitting ||
+                      documentsProcessing ||
+                      documents.generatingClientCopies,
                     error: requestError,
                     success: saveCompleted,
                   },
@@ -1468,6 +1485,12 @@ export function ScooterEditor({
                         : "actions.create",
                   ),
                 )}
+                pendingLabel={
+                  isSubmitting
+                    ? formAction(scooter ? "save" : "create", { pending: true })
+                        .pendingLabel
+                    : documentPendingLabel
+                }
               />
             </ScooterCreateActions>
           </form>

@@ -12,6 +12,8 @@ import {
   Label,
 } from "@repo/ui/components";
 import { SaveButton } from "@repo/ui/components/save-button";
+import { Spinner } from "@repo/ui/components/spinner";
+import { Progress } from "@repo/ui/components/progress";
 import {
   BottomSheet,
   BottomSheetBody,
@@ -31,6 +33,7 @@ import {
   reextractionReview,
   selectedReextraction,
   type ReextractionProposal,
+  canReextractScooterDocument,
 } from "./scooter-document-reextraction";
 
 type Evidence = v1.scooters.ScooterDocumentExtractedData;
@@ -118,7 +121,7 @@ export function useScooterReextractionReview({
     Record<string, { previous: string; next: string; checked: boolean }>
   >({});
   const files = documents.existing
-    .filter((file) => !file.extractedData?.clientCopy)
+    .filter(canReextractScooterDocument)
     .map((file) => ({
       ...file,
       extractedData: Object.hasOwn(documents.extractions, file.id)
@@ -154,6 +157,10 @@ export function useScooterReextractionReview({
   const finished = Object.values(analysis.entries).filter(
     (entry) => entry.status !== "processing",
   ).length;
+  const progressLabel = t("progress", {
+    done: finished,
+    total: Object.keys(analysis.entries).length,
+  });
   function fieldLabel(field: string) {
     if (field === "brandId" || field === "brandName")
       return scooterT("fields.brand");
@@ -263,13 +270,49 @@ export function useScooterReextractionReview({
               </BottomSheetDescription>
             </BottomSheetHeader>
             <BottomSheetBody className="grid gap-4">
+              <p className="text-sm text-muted-foreground">
+                {t("eligibleDocuments")}
+              </p>
               {analysis.running ? (
-                <p role="status" className="text-sm">
-                  {t("progress", {
-                    done: finished,
-                    total: Object.keys(analysis.entries).length,
-                  })}
-                </p>
+                <div className="grid gap-3" aria-busy="true">
+                  <p role="status" className="flex items-center gap-2 text-sm">
+                    <Spinner />
+                    {progressLabel}
+                  </p>
+                  <Progress
+                    value={finished}
+                    max={Math.max(1, Object.keys(analysis.entries).length)}
+                    aria-label={progressLabel}
+                  />
+                  <ul className="grid gap-2 text-sm text-muted-foreground">
+                    {Object.entries(analysis.entries).map(
+                      ([sourceId, entry]) => (
+                        <li key={sourceId} className="flex items-center gap-2">
+                          {entry.status === "processing" ? <Spinner /> : null}
+                          <span className="min-w-0 break-words">
+                            {
+                              files.find((file) => file.id === sourceId)
+                                ?.fileName
+                            }
+                            {" · "}
+                            {t(
+                              entry.status === "success"
+                                ? "completed"
+                                : entry.status === "failed"
+                                  ? "failed"
+                                  : entry.phase === "validating"
+                                    ? "preparing"
+                                    : entry.phase === "submitting" ||
+                                        entry.phase === "running"
+                                      ? "analyzing"
+                                      : "queued",
+                            )}
+                          </span>
+                        </li>
+                      ),
+                    )}
+                  </ul>
+                </div>
               ) : null}
               {failures.length ? (
                 <div role="alert" className="grid gap-2 text-sm">
@@ -327,7 +370,7 @@ export function useScooterReextractionReview({
                   {t("noChanges")}
                 </p>
               ) : null}
-              {review.proposals.length ? (
+              {!analysis.running && review.proposals.length ? (
                 <p role="status" className="text-sm text-muted-foreground">
                   {t("found", {
                     additions: review.proposals.filter(
@@ -339,7 +382,10 @@ export function useScooterReextractionReview({
                   })}
                 </p>
               ) : null}
-              <ul className="grid divide-y divide-border">
+              <ul
+                className="grid divide-y divide-border"
+                hidden={analysis.running}
+              >
                 {review.proposals.map((proposal, index) => (
                   <li key={proposal.id} className="grid min-w-0 gap-3 py-4">
                     <div className="flex items-start gap-3">
@@ -408,7 +454,8 @@ export function useScooterReextractionReview({
                   </li>
                 ))}
               </ul>
-              {review.proposals.some(
+              {!analysis.running &&
+              review.proposals.some(
                 (proposal) => proposal.kind === "document",
               ) ? (
                 <p className="text-sm text-muted-foreground">
@@ -430,6 +477,7 @@ export function useScooterReextractionReview({
                 </Button>
                 <SaveButton
                   type="button"
+                  state={analysis.running ? "pending" : "idle"}
                   disabled={
                     analysis.running ||
                     disabled ||
@@ -437,7 +485,14 @@ export function useScooterReextractionReview({
                     !review.result.ok
                   }
                   idleLabel={t("apply", { count: selected.length })}
-                  pendingLabel={t("applying")}
+                  pendingLabel={
+                    analysis.running
+                      ? t("pendingAction", {
+                          done: finished,
+                          total: Object.keys(analysis.entries).length,
+                        })
+                      : t("applying")
+                  }
                   successLabel={t("applied")}
                   onClick={() => {
                     if (

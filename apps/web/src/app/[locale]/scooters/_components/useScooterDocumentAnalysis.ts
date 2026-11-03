@@ -555,6 +555,13 @@ export function useScooterDocumentAnalysis(
           }),
       }) satisfies ScooterAnalysisSnapshot,
     running: canExtract && running,
+    progress: {
+      total: sources.length,
+      done: sources.filter((source) => {
+        const state = entries[source.id];
+        return state?.status === "success" || state?.status === "failed";
+      }).length,
+    },
     run,
     cancel,
     dismissFailures,

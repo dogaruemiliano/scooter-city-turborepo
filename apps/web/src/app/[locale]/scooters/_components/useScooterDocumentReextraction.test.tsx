@@ -37,6 +37,58 @@ beforeEach(() => {
 });
 
 describe("explicit saved-document analysis", () => {
+  it("re-extracts eligible data only, retaining mixed PDFs and skipping classification-only originals", async () => {
+    const editor = documents();
+    editor.existing = [
+      ...editor.existing,
+      ...[
+        "registration_certificate",
+        "itp_card",
+        "ownership_proof",
+        "export_certificate",
+      ].map((type) => ({
+        ...editor.existing[0]!,
+        id: type,
+        type: type as v1.scooters.ScooterDocumentType,
+      })),
+      {
+        ...editor.existing[0]!,
+        id: "mixed",
+        type: "registration_certificate",
+        extractedData: {
+          vin: null,
+          fields: {},
+          rawFields: {},
+          documents: [
+            {
+              id: "certificate",
+              documentType: "itp_certificate",
+              pages: [1],
+              vin: null,
+              fields: {},
+              rawFields: {},
+              issues: [],
+            },
+          ],
+        },
+      },
+    ];
+    runner.mockImplementation(async (attempt, _type, _signal, progress) => {
+      progress("validating");
+      return response(attempt.input.sourceId);
+    });
+    const { result } = renderHook(() =>
+      useScooterDocumentReextraction(editor, "scooter"),
+    );
+    await act(async () => {
+      await result.current.run();
+    });
+    expect(
+      runner.mock.calls.map(([attempt]) => attempt.input.sourceId),
+    ).toEqual(["a", "b", "mixed"]);
+    expect(Object.keys(result.current.entries)).toEqual(["a", "b", "mixed"]);
+  });
+
   it("never runs on mount, uses existing saved files, and does not mutate document evidence", async () => {
     const editor = documents();
     runner.mockImplementation(async (attempt) =>

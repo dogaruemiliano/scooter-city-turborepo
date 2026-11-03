@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextIntlClientProvider } from "next-intl";
@@ -98,6 +98,51 @@ beforeEach(() => {
 });
 
 describe("document reextraction sheet", () => {
+  it("shows real progress and a spinner in the disabled action until extraction finishes", async () => {
+    let finish!: (value: unknown) => void;
+    runner.mockImplementation((_attempt, _type, _signal, progress) => {
+      progress("running");
+      return new Promise((resolve) => {
+        finish = resolve;
+      });
+    });
+    render(<Harness />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Reextract" }));
+    const dialog = screen.getByRole("dialog");
+    const pending = within(dialog).getByRole("button", {
+      name: "Se analizează 0 din 1…",
+    });
+    expect(pending).toBeDisabled();
+    expect(pending).toHaveAttribute("aria-busy", "true");
+    expect(pending.querySelector('[data-slot="spinner"]')).not.toBeNull();
+    expect(within(dialog).getByRole("progressbar")).toHaveAttribute(
+      "aria-valuenow",
+      "0",
+    );
+    expect(
+      within(dialog).getByText("CIV.pdf · Se analizează…"),
+    ).toBeInTheDocument();
+    await act(async () =>
+      finish({
+        sourceId: "civ",
+        documentType: "civ",
+        extractedData: {
+          vin,
+          fields: { civIssuedAt: "2025-01-15" },
+          rawFields: {},
+        },
+        issues: [],
+        reviewRequired: true,
+      }),
+    );
+    const apply = within(dialog).getByRole("button", {
+      name: /Aplică .* propuneri în formular/,
+    });
+    expect(apply).toBeEnabled();
+    expect(apply).not.toHaveAttribute("aria-busy");
+    expect(within(dialog).queryByRole("progressbar")).not.toBeInTheDocument();
+  });
   it("shows a safe selection, applies proposals without submitting the scooter, and keeps the sheet surface", async () => {
     runner.mockResolvedValue({
       sourceId: "civ",

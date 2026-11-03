@@ -560,11 +560,20 @@ export const scootersCatalog = {
       clientCopy: "For client",
       generateClientCopies: "Create client copies",
       generatingClientCopies: "Creating client copies…",
+      clientCopyProgress:
+        "Creating client copies: {done} of {total} completed…",
       clientCopiesGenerated: "Client copies created",
       generateClientCopiesError:
         "Some client copies could not be created. Your originals and completed copies were kept. PDFs must have at most 10 pages and generated files must fit the 15 MB upload limit. You can create the remaining copies again or upload them.",
       missingDocument: "Missing document · drop files anywhere in this area",
-      lifecycle: { expired: "Expired", next: "Next", newest: "Newest" },
+      renewDocument: "Upload a renewed document · keep the existing scan",
+      uploadProgress: "Uploading documents: {done} of {total} completed…",
+      lifecycle: {
+        expired: "Expired",
+        next: "Next",
+        newest: "Newest",
+        review: "Check validity",
+      },
       batch: {
         addDocument: "Add document",
         attached: "Attached documents",
@@ -1920,12 +1929,17 @@ export const scootersCatalog = {
       clientCopy: "Pentru client",
       generateClientCopies: "Creează copii pentru client",
       generatingClientCopies: "Se creează copiile…",
+      clientCopyProgress: "Se creează copiile: {done} din {total} finalizate…",
       clientCopiesGenerated: "Copii pentru client create",
       generateClientCopiesError:
         "Unele copii nu au putut fi create. Originalele și copiile finalizate au fost păstrate. PDF-urile trebuie să aibă cel mult 10 pagini, iar fișierele generate trebuie să respecte limita de 15 MB. Poți crea din nou copiile rămase sau le poți încărca.",
       missingDocument:
         "Document lipsă · adaugă fișiere oriunde în această zonă",
+      renewDocument:
+        "Încarcă documentul reînnoit · păstrează scanarea existentă",
+      uploadProgress: "Se încarcă documentele: {done} din {total} finalizate…",
       lifecycle: {
+        review: "Verifică valabilitatea",
         expired: "Expirat",
         next: "Următoarea",
         newest: "Cel mai nou",

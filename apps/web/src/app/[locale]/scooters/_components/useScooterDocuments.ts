@@ -325,6 +325,10 @@ export function useScooterDocuments(
   }
 
   const [generatingClientCopies, setGeneratingClientCopies] = useState(false);
+  const [clientCopyProgress, setClientCopyProgress] = useState({
+    done: 0,
+    total: 0,
+  });
   const [clientCopyError, setClientCopyError] = useState(false);
   const generationLock = useRef(false);
   const copyCandidates = [
@@ -356,6 +360,7 @@ export function useScooterDocuments(
     if (generationLock.current || copyCandidates.length === 0) return;
     generationLock.current = true;
     setGeneratingClientCopies(true);
+    setClientCopyProgress({ done: 0, total: copyCandidates.length });
     setClientCopyError(false);
     try {
       const { generateScooterClientCopy } =
@@ -382,6 +387,10 @@ export function useScooterDocuments(
         );
         if (!uploaded.every(Boolean))
           throw new Error("Client copy upload failed");
+        setClientCopyProgress((progress) => ({
+          ...progress,
+          done: progress.done + 1,
+        }));
       }
       return true;
     } catch {
@@ -395,6 +404,7 @@ export function useScooterDocuments(
   return {
     ...editorSession,
     generatingClientCopies,
+    clientCopyProgress,
     clientCopyError,
     canGenerateClientCopies: copyCandidates.length > 0,
     generateClientCopies,

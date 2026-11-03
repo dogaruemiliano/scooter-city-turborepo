@@ -46,7 +46,11 @@ export function MediaViewerSurface({
   pendingLabel?: string;
 }) {
   return (
-    <Dialog open={open} onOpenChange={onOpenChange} disablePointerDismissal>
+    <Dialog
+      open={open}
+      onOpenChange={onOpenChange}
+      disablePointerDismissal={saving}
+    >
       <DialogContent
         ref={contentRef}
         showCloseButton={false}

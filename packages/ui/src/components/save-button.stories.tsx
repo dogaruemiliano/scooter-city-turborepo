@@ -31,6 +31,16 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 
+/** Background work explains why the form action is temporarily unavailable. */
+export const DocumentAnalysisProgress: Story = {
+  args: {
+    state: "pending",
+    idleLabel: "Save changes",
+    pendingLabel: "Analyzing documents: 2 of 4 completed…",
+    successLabel: "Changes saved",
+  },
+};
+
 export const States: Story = {
   render: (args) => (
     <div className="flex flex-wrap items-center gap-2">
