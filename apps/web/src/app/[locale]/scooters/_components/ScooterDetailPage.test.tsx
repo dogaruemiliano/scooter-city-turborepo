@@ -12,6 +12,7 @@ import { NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ScooterDetailPage } from "./ScooterDetailPage";
+import { PageRefreshSurface } from "@/components/PageRefresh";
 import { ScooterNavigationProvider } from "./ScooterNavigation";
 import {
   PageHeaderNavigationContext,
@@ -702,6 +703,35 @@ describe("ScooterDetailPage", () => {
     expect(mocks.replace).toHaveBeenCalledWith("/en/scooters");
     expect(mocks.refresh).toHaveBeenCalledOnce();
   });
+});
+
+it("refreshes mobile scooter details through the server route and unlocks after completion", async () => {
+  const previousMatchMedia = window.matchMedia;
+  window.matchMedia = vi.fn().mockReturnValue({
+    matches: true,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+  } as unknown as MediaQueryList);
+  try {
+    render(
+      <NextIntlClientProvider locale="en" messages={messages.en}>
+        <div>
+          <PageRefreshSurface>
+            <ScooterDetailPage scooter={scooter} scootersHref="/en/scooters" />
+          </PageRefreshSurface>
+        </div>
+      </NextIntlClientProvider>,
+    );
+    const refresh = await screen.findByRole("button", {
+      name: messages.en.shared.pullToRefresh.refresh,
+    });
+    fireEvent.click(refresh);
+    await waitFor(() => expect(refresh).toBeEnabled());
+    expect(mocks.refresh).toHaveBeenCalledOnce();
+    expect(screen.getAllByText("001 YAM").length).toBeGreaterThan(0);
+  } finally {
+    window.matchMedia = previousMatchMedia;
+  }
 });
 
 function renderDetail(

@@ -15,6 +15,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CreateProblem, ProblemWork, memberName } from "./ProblemForms";
 import { ProblemEditScreen } from "./ProblemEditScreen";
 import { ProblemCreateScreen } from "./ProblemCreateScreen";
+import { ProblemDetailScreen } from "./ProblemDetailScreen";
+import { PageRefreshSurface } from "@/components/PageRefresh";
 import { AssigneeSelect } from "./AssigneeSelect";
 import { ProblemAssignment } from "./ProblemAssignment";
 
@@ -113,6 +115,65 @@ beforeEach(() => {
 });
 
 describe("problem release forms", () => {
+  it.each([false, true])(
+    "refreshes mobile details and comments while retaining a comment draft (todo=%s)",
+    async (todo) => {
+      const previousMatchMedia = window.matchMedia;
+      window.matchMedia = vi.fn().mockReturnValue({
+        matches: true,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      } as unknown as MediaQueryList);
+      const baseFetch = mocks.fetch.getMockImplementation()!;
+      const record = {
+        ...problem,
+        scooterId: todo ? null : problem.scooterId,
+        scooter: todo ? null : problem.scooter,
+      };
+      mocks.fetch.mockImplementation((path: string) =>
+        path === "/v1/problems/report"
+          ? Promise.resolve(record)
+          : baseFetch(path),
+      );
+      try {
+        renderForm(
+          <div>
+            <PageRefreshSurface>
+              <ProblemDetailScreen id="report" />
+            </PageRefreshSurface>
+          </div>,
+        );
+        const refresh = await screen.findByRole("button", {
+          name: messages.en.shared.pullToRefresh.refresh,
+        });
+        await waitFor(() => expect(refresh).toBeEnabled());
+        const comment = screen.getByRole("textbox", {
+          name: messages.en.workspace.problems.comment,
+        });
+        fireEvent.change(comment, { target: { value: "Keep this draft" } });
+        mocks.fetch.mockClear();
+        fireEvent.click(refresh);
+        await waitFor(() => expect(refresh).toBeEnabled());
+        expect(mocks.fetch).toHaveBeenCalledWith(
+          "/v1/problems/report",
+          expect.anything(),
+          { cache: "no-store" },
+        );
+        expect(mocks.fetch).toHaveBeenCalledWith(
+          expect.stringContaining("/v1/problems/report/activity"),
+          expect.anything(),
+          { cache: "no-store" },
+        );
+        expect(comment).toHaveValue("Keep this draft");
+        expect(
+          screen.getByRole("heading", { name: "Broken belt" }),
+        ).toBeVisible();
+      } finally {
+        window.matchMedia = previousMatchMedia;
+      }
+    },
+  );
+
   it("creates a todo using the issue form without scooter selection or condition", async () => {
     const user = userEvent.setup();
     const saved = vi.fn();

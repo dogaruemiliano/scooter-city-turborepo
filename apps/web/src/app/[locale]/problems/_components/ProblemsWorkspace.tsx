@@ -31,6 +31,7 @@ import { useSession } from "@/components/auth/SessionProvider";
 import { canAccess } from "@/lib/access";
 import { webApi } from "@/lib/api";
 import { useRemote } from "@/components/WorkspaceForm";
+import { usePageRefresh } from "@/components/PageRefresh";
 import { AssigneeSelect } from "./AssigneeSelect";
 import { PageTitleOverride } from "@/components/PageTitleOverride";
 import { ProblemListItem } from "./ProblemListItem";
@@ -145,6 +146,10 @@ export function ProblemsWorkspace({ todo = false }: { todo?: boolean }) {
   }, [loadPage]);
   const remote = useRemote(load);
   const { data, loading, error, setData } = remote;
+  usePageRefresh(remote.reload, {
+    refreshing: loading,
+    disabled: appendLoading,
+  });
   const hasMore = Boolean(data && data.page * data.pageSize < data.total);
 
   useEffect(

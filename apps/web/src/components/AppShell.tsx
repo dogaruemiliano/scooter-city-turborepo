@@ -74,6 +74,7 @@ import {
   type PageHeaderActionsContextValue,
 } from "./PageHeaderActions";
 import { useMobilePageScroll } from "./useMobilePageScroll";
+import { PageRefreshSurface } from "./PageRefresh";
 import { PageTitleOverrideContext } from "./PageTitleOverride";
 import {
   PageHeaderNavigationContext,
@@ -364,12 +365,7 @@ function AppShellContent({
           >
             {/* Padding on the scrollport adds to bottom-sticky offsets. Keep it
                 in the scrolling content so floating actions count safe areas once. */}
-            <div
-              data-slot="app-page-content"
-              className="flex min-w-0 flex-1 flex-col pb-[calc(var(--spacing-screen-bottom)+env(safe-area-inset-bottom))]"
-            >
-              {children}
-            </div>
+            <PageRefreshSurface key={pathname}>{children}</PageRefreshSurface>
           </div>
         </SidebarInset>
       </PageHeaderActionsContext.Provider>

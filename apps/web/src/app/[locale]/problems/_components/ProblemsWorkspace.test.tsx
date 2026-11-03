@@ -1,9 +1,17 @@
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { messages } from "@repo/i18n";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ProblemsWorkspace } from "./ProblemsWorkspace";
+import { PageRefreshSurface } from "@/components/PageRefresh";
 const mocks = vi.hoisted(() => ({
   fetch: vi.fn(),
   user: {
@@ -259,6 +267,50 @@ describe("mechanic workspace", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 });
+
+it.each([false, true])(
+  "refreshes the mobile list with its selected status (todo=%s)",
+  async (todo) => {
+    const previousMatchMedia = window.matchMedia;
+    window.matchMedia = vi.fn().mockReturnValue({
+      matches: true,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    } as unknown as MediaQueryList);
+    try {
+      render(
+        <NextIntlClientProvider locale="en" messages={messages.en}>
+          <div>
+            <PageRefreshSurface>
+              <ProblemsWorkspace todo={todo} />
+            </PageRefreshSurface>
+          </div>
+        </NextIntlClientProvider>,
+      );
+      const refresh = await screen.findByRole("button", {
+        name: messages.en.shared.pullToRefresh.refresh,
+      });
+      await waitFor(() => expect(refresh).toBeEnabled());
+      fireEvent.click(
+        screen.getByRole("radio", { name: /^In progress( \d+)?$/ }),
+      );
+      await waitFor(() => expect(refresh).toBeEnabled());
+      mocks.fetch.mockClear();
+      fireEvent.click(refresh);
+      await waitFor(() => expect(refresh).toBeEnabled());
+      expect(mocks.fetch).toHaveBeenCalledWith(
+        `/v1/problems?page=1${todo ? "&kind=todo" : ""}&status=in_progress`,
+        expect.anything(),
+        { cache: "no-store" },
+      );
+      expect(
+        screen.getByRole("radio", { name: /^In progress( \d+)?$/ }),
+      ).toBeChecked();
+    } finally {
+      window.matchMedia = previousMatchMedia;
+    }
+  },
+);
 
 function renderWorkspace() {
   return render(

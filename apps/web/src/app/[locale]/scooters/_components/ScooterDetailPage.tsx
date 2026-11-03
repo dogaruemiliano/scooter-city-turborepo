@@ -45,6 +45,7 @@ import { canAccess } from "@/lib/access";
 import { MoreActionsMenu } from "@/components/MoreActionsMenu";
 import { PageTitleOverride } from "@/components/PageTitleOverride";
 import { PageHeaderNavigation } from "@/components/PageHeaderNavigation";
+import { useRoutePageRefresh } from "@/components/PageRefresh";
 import { webApi } from "@/lib/api";
 import { localizePath, resolveRouteLocale } from "@/i18n/paths";
 import { FeedbackAlert } from "./scooter-feedback";
@@ -83,6 +84,7 @@ export function ScooterDetailPage({
   );
   const readiness = v1.scooters.scooterReadinessIssues(scooter);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  useRoutePageRefresh(busyAction !== null || deleteOpen);
   const title = v1.scooters.scooterDisplayCode(scooter);
   const scooterEditHref = `${scootersHref}/${encodeURIComponent(scooter.id)}/edit`;
 

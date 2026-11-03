@@ -26,6 +26,7 @@ import { useSession } from "@/components/auth/SessionProvider";
 import { canAccess } from "@/lib/access";
 import { webApi } from "@/lib/api";
 import { Feedback, useRemote } from "@/components/WorkspaceForm";
+import { usePageRefresh } from "@/components/PageRefresh";
 import { ProblemDetailSheet } from "../../problems/_components/ProblemDetailSheet";
 import { ProblemListItem } from "../../problems/_components/ProblemListItem";
 
@@ -44,6 +45,7 @@ export function ScooterProblems({ scooterId }: { scooterId: string }) {
     [scooterId],
   );
   const hold = useRemote(loadHold);
+  usePageRefresh(hold.reload, { refreshing: hold.loading, contributor: true });
   return (
     <Card>
       <CardHeader>
@@ -159,6 +161,11 @@ function ScooterProblemList({
     return { items, total: items.length, page: 1, pageSize: items.length };
   }, [scooterId, activeOnly, page]);
   const remote = useRemote(load);
+  usePageRefresh(remote.reload, {
+    refreshing: remote.loading,
+    contributor: true,
+    enabled: activeOnly,
+  });
 
   return (
     <>
@@ -172,11 +179,11 @@ function ScooterProblemList({
           {t("retry")}
         </Button>
       ) : null}
-      {remote.loading ? (
+      {remote.loading && !remote.data ? (
         <p className="text-sm text-muted-foreground" role="status">
           {t("loading")}
         </p>
-      ) : remote.data && !remote.error ? (
+      ) : remote.data ? (
         <>
           <div className="flex flex-col gap-3">
             {remote.data.items.length ? (

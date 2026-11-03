@@ -10,6 +10,7 @@ import { Badge, Button, CardAccent } from "@repo/ui/components";
 import { localizePath, resolveRouteLocale } from "@/i18n/paths";
 import { PageTitleOverride } from "@/components/PageTitleOverride";
 import { Feedback, useRemote } from "@/components/WorkspaceForm";
+import { usePageRefresh } from "@/components/PageRefresh";
 import { webApi } from "@/lib/api";
 import { ScooterCover } from "@/components/ScooterCover";
 import { ProblemWork } from "./ProblemForms";
@@ -50,6 +51,11 @@ export function ProblemDetailScreen({ id }: { id: string }) {
     null,
   );
   const remote = useRemote(load);
+  const [workBusy, setWorkBusy] = useState(false);
+  usePageRefresh(remote.reload, {
+    refreshing: remote.loading,
+    disabled: workBusy,
+  });
   const problem = remote.data;
   return (
     <PageLayout>
@@ -150,6 +156,7 @@ export function ProblemDetailScreen({ id }: { id: string }) {
             </Link>
           ) : null}
           <ProblemWork
+            onBusyChange={setWorkBusy}
             actionsTarget={actionsTarget}
             compact
             key={problem.id}

@@ -68,6 +68,7 @@ import { useSession } from "@/components/auth/SessionProvider";
 import { canAccess } from "@/lib/access";
 import { webApi } from "@/lib/api";
 import { Feedback, useRemote, useTask } from "@/components/WorkspaceForm";
+import { usePageRefresh } from "@/components/PageRefresh";
 import { ProblemScooterPicker } from "./ProblemScooterPicker";
 import { ProblemSections, type ProblemSectionData } from "./ProblemSections";
 import { ProblemPhotos } from "./ProblemPhotos";
@@ -1155,6 +1156,10 @@ function ProblemActivity({
     [problemId, page, kind],
   );
   const remote = useRemote(load);
+  usePageRefresh(remote.reload, {
+    refreshing: remote.loading,
+    contributor: true,
+  });
   const [latestPage, setLatestPage] = useState<typeof remote.data>(null);
   if (
     kind === "activity" &&
@@ -1206,7 +1211,7 @@ function ProblemActivity({
           {t("retry")}
         </Button>
       ) : null}
-      {remote.loading ? (
+      {remote.loading && !remote.data ? (
         <p role="status" className="text-sm text-muted-foreground">
           {t("loading")}
         </p>

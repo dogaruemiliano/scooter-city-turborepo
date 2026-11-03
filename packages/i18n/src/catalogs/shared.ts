@@ -1,5 +1,11 @@
 export const sharedCatalog = {
   en: {
+    pullToRefresh: {
+      pull: "Pull to refresh",
+      release: "Release to refresh",
+      refreshing: "Refreshing…",
+      refresh: "Refresh page data",
+    },
     formExit: {
       title: "Discard unsaved changes?",
       description:
@@ -170,6 +176,12 @@ export const sharedCatalog = {
     },
   },
   ro: {
+    pullToRefresh: {
+      pull: "Trage în jos pentru a actualiza",
+      release: "Eliberează pentru a actualiza",
+      refreshing: "Se actualizează…",
+      refresh: "Actualizează datele paginii",
+    },
     formExit: {
       title: "Renunți la modificările nesalvate?",
       description:
