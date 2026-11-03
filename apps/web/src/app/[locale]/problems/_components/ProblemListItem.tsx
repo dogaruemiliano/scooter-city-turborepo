@@ -155,7 +155,6 @@ export function ProblemListItem({
           <AvatarGroup
             role="img"
             aria-label={assignees.map(memberName).join(", ")}
-            className="min-w-0 max-w-full flex-wrap gap-y-2"
           >
             {assignees.map((member) => (
               <UserAvatar
