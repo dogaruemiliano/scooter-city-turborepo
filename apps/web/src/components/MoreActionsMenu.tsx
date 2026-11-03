@@ -53,7 +53,7 @@ export function MoreActionsMenu({
         >
           <EllipsisVerticalIcon aria-hidden="true" />
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-auto min-w-48">
+        <DropdownMenuContent align="end" className="min-w-48">
           {visibleGroups.map((group, index) => (
             <Fragment key={group.map((item) => item.key).join("-")}>
               {index > 0 ? <DropdownMenuSeparator /> : null}

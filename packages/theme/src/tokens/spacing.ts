@@ -48,6 +48,9 @@ export const emailSizing = { content: 560 } as const;
 
 /** Web sizing for document editors and available-width form layouts. */
 export const viewportSizing = {
+  dropdownMenuXs: "90vw",
+  dropdownMenuSm: "80vw",
+  dropdownMenuMax: `${spacing[96]}px`,
   primaryFormActions: "minmax(0, 2fr) minmax(0, 3fr)",
   /** One full document, the spacing-3 gap, and one tenth of the next document. */
   scooterDocumentCard: "calc((100% - var(--spacing-3)) / 1.1)",

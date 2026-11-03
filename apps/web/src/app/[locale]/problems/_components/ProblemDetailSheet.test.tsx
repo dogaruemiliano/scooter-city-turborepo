@@ -247,7 +247,7 @@ describe("problem details page", () => {
           pageSize: 25,
         };
       if (url.includes("eligible-assignees")) return { items: [] };
-      return problem;
+      return { ...problem, resolutionNotes: "Brake pads replaced" };
     });
     render(
       <NextIntlClientProvider locale="en" messages={messages.en}>
@@ -255,6 +255,8 @@ describe("problem details page", () => {
       </NextIntlClientProvider>,
     );
     expect(await screen.findByText("Brake pads replaced")).toBeVisible();
+    expect(screen.getAllByText("Brake pads replaced")).toHaveLength(1);
+    expect(screen.queryByText("Previous resolution note")).toBeNull();
     expect(screen.getByText("Task completed")).toBeVisible();
     expect(screen.getByText("Task reopened")).toBeVisible();
     expect(screen.getByText("Noise returned after road test")).toBeVisible();
@@ -454,9 +456,23 @@ describe("problem details page", () => {
     },
   );
 
-  it.each([false, true])(
-    "places more actions above priority on desktop and in the mobile header (mobile=%s)",
-    async (isMobile) => {
+  it.each(
+    (["in_progress", "resolved", "cancelled"] as const).flatMap((status) =>
+      [false, true].map((isMobile) => ({ status, isMobile })),
+    ),
+  )(
+    "places $status actions above priority on desktop and in the mobile header (mobile=$isMobile)",
+    async ({ status, isMobile }) => {
+      mocks.user.effectiveScopes["problems.reopen"] = ["ALL"];
+      if (status !== "in_progress") {
+        mocks.user.effectiveScopes["problems.update"] = [];
+      }
+      const original = mocks.fetch.getMockImplementation()!;
+      mocks.fetch.mockImplementation((url, ...args) =>
+        url === "/v1/problems/problem"
+          ? Promise.resolve({ ...problem, status })
+          : original(url, ...args),
+      );
       function Page() {
         const [target, setTarget] = useState<HTMLElement | null>(null);
         return (
@@ -495,6 +511,26 @@ describe("problem details page", () => {
       });
       expect(sheet).toHaveClass("bg-popover");
       expect(sheet.querySelector(".bg-background")).toBeNull();
+      if (status !== "in_progress") {
+        expect(within(sheet).getAllByRole("menuitem")).toHaveLength(1);
+        const reopen = within(sheet).getByRole("menuitem", {
+          name: "Reopen problem",
+        });
+        expect(reopen.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+        expect(
+          screen.queryByRole("button", { name: "Reopen problem" }),
+        ).toBeNull();
+        await userEvent.setup().click(reopen);
+        const confirmation = await screen.findByRole("dialog", {
+          name: "Reopen problem",
+        });
+        expect(
+          within(confirmation).getByRole("textbox", {
+            name: "Reason for reopening",
+          }),
+        ).toBeVisible();
+        expect(confirmation.querySelector(".bg-background")).toBeNull();
+      }
     },
   );
 

@@ -432,8 +432,9 @@ describe("problem release forms", () => {
         );
         await user.click(screen.getByRole("button", { name: "Complete task" }));
       } else if (action === "reopen") {
+        await user.click(screen.getByRole("button", { name: "More actions" }));
         await user.click(
-          screen.getByRole("button", {
+          await screen.findByRole("menuitem", {
             name: messages.en.workspace.problems.reopen,
           }),
         );
@@ -1415,6 +1416,27 @@ describe("problem release forms", () => {
     }
   });
 
+  it.each(["resolved", "cancelled"] as const)(
+    "hides the %s issue menu without reopen permission",
+    (status) => {
+      const previous = mocks.user.effectiveScopes["problems.reopen"];
+      mocks.user.effectiveScopes["problems.reopen"] = [];
+      try {
+        renderForm(
+          <ProblemWork problem={{ ...problem, status }} reload={vi.fn()} />,
+        );
+        expect(
+          screen.queryByRole("button", { name: "More actions" }),
+        ).toBeNull();
+        expect(
+          screen.queryByRole("button", { name: "Reopen problem" }),
+        ).toBeNull();
+      } finally {
+        mocks.user.effectiveScopes["problems.reopen"] = previous;
+      }
+    },
+  );
+
   it("requires a reopening reason and includes it in the request", async () => {
     const user = userEvent.setup();
     const reload = vi.fn();
@@ -1424,11 +1446,17 @@ describe("problem release forms", () => {
         reload={reload}
       />,
     );
-    await user.click(
-      screen.getByRole("button", {
+    expect(
+      screen.queryByRole("button", {
         name: messages.en.workspace.problems.reopen,
       }),
-    );
+    ).toBeNull();
+    await user.click(screen.getByRole("button", { name: "More actions" }));
+    const reopen = await screen.findByRole("menuitem", {
+      name: messages.en.workspace.problems.reopen,
+    });
+    expect(reopen.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+    await user.click(reopen);
     const confirm = screen
       .getAllByRole("button", { name: messages.en.workspace.problems.reopen })
       .at(-1)!;
@@ -1496,7 +1524,7 @@ describe("problem release forms", () => {
     expect(mocks.refresh).not.toHaveBeenCalled();
   });
 
-  it("keeps the previous resolution without hold controls on closed work", () => {
+  it("does not duplicate resolution notes or show hold controls on closed work", () => {
     const reload = vi.fn();
     renderForm(
       <ProblemWork
@@ -1508,7 +1536,7 @@ describe("problem release forms", () => {
         reload={reload}
       />,
     );
-    expect(screen.getByText("Belt replaced")).toBeInTheDocument();
+    expect(screen.queryByText("Belt replaced")).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Complete task" }),
     ).not.toBeInTheDocument();

@@ -579,6 +579,9 @@ export function ProblemWork({
   const todo = problem.scooterId === null;
   const editable =
     problem.status === "open" || problem.status === "in_progress";
+  const mayReopen =
+    (problem.status === "resolved" || problem.status === "cancelled") &&
+    canAccess(user, "problems.reopen");
   const assignedMembers = v1.problems.problemAssignees(problem);
   const assignedIds = assignedMembers.map((member) => member.id);
   const own = assignedIds.includes(user?.id ?? "");
@@ -762,7 +765,7 @@ export function ProblemWork({
           ) : null}
         </ProblemWorkPanel>
       ) : null}
-      {editable && can("problems.update") ? (
+      {(editable && can("problems.update")) || mayReopen ? (
         <PageHeaderActions desktopTarget={actionsTarget}>
           <DropdownMenu>
             <DropdownMenuTrigger
@@ -781,19 +784,21 @@ export function ProblemWork({
               align="end"
               aria-label={t("problems.moreActions")}
             >
-              <DropdownMenuItem
-                onClick={() =>
-                  router.push(
-                    localizePath(
-                      `${todo ? "/todos" : "/problems"}/${encodeURIComponent(problem.id)}/edit`,
-                      locale,
-                    ),
-                  )
-                }
-              >
-                <Pencil aria-hidden="true" />
-                {t("problems.editAction")}
-              </DropdownMenuItem>
+              {editable ? (
+                <DropdownMenuItem
+                  onClick={() =>
+                    router.push(
+                      localizePath(
+                        `${todo ? "/todos" : "/problems"}/${encodeURIComponent(problem.id)}/edit`,
+                        locale,
+                      ),
+                    )
+                  }
+                >
+                  <Pencil aria-hidden="true" />
+                  {t("problems.editAction")}
+                </DropdownMenuItem>
+              ) : null}
               {problem.status === "in_progress" ? (
                 <DropdownMenuItem
                   disabled={busy}
@@ -807,7 +812,7 @@ export function ProblemWork({
                   {t("problems.pause")}
                 </DropdownMenuItem>
               ) : null}
-              {canAccess(user, "problems.update", "ALL") ? (
+              {editable && canAccess(user, "problems.update", "ALL") ? (
                 <DropdownMenuItem
                   variant="destructive"
                   onClick={() => setConfirm("cancel")}
@@ -816,19 +821,18 @@ export function ProblemWork({
                   {t("problems.dismissAction")}
                 </DropdownMenuItem>
               ) : null}
+              {mayReopen ? (
+                <DropdownMenuItem
+                  disabled={busy}
+                  onClick={() => setConfirm("reopen")}
+                >
+                  <RotateCcw aria-hidden="true" />
+                  {t(todo ? "todos.reopen" : "problems.reopen")}
+                </DropdownMenuItem>
+              ) : null}
             </DropdownMenuContent>
           </DropdownMenu>
         </PageHeaderActions>
-      ) : null}
-      {problem.resolutionNotes ? (
-        <div>
-          <p className="text-sm font-medium">
-            {t("problems.previousResolution")}
-          </p>
-          <p className="whitespace-pre-wrap text-sm">
-            {problem.resolutionNotes}
-          </p>
-        </div>
       ) : null}
       {problem.workNotes ? (
         <div>
@@ -852,18 +856,6 @@ export function ProblemWork({
             : t("problems.setHold")}
         </Button>
       ) : null}
-      <div className="flex flex-wrap gap-3">
-        {(problem.status === "resolved" || problem.status === "cancelled") &&
-        canAccess(user, "problems.reopen") ? (
-          <Button
-            variant="outline"
-            disabled={busy}
-            onClick={() => setConfirm("reopen")}
-          >
-            {t(todo ? "todos.reopen" : "problems.reopen")}
-          </Button>
-        ) : null}
-      </div>
       <BottomSheet
         open={Boolean(confirm)}
         onOpenChange={(open) => {
