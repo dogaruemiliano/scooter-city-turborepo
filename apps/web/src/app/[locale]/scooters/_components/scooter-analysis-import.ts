@@ -179,6 +179,23 @@ export function prepareScooterAnalysisImport(
       }
   }
   const softIssues = new Map<string, Set<string>>();
+  const resolvedItpFields = new Map<string, Set<string>>();
+  for (const row of v1.scooters.scooterItpEvidence(
+    originalAnalyses.map((analysis) => ({
+      id: analysis.sourceId,
+      extractedData: analysis.extractedData,
+    })),
+  )) {
+    if (row.conflicts) continue;
+    for (const source of row.sources) {
+      const id = `${source.documentId}:${source.logicalDocumentId}`;
+      const resolved = resolvedItpFields.get(id) ?? new Set<string>();
+      for (const field of ["inspectionDate", "validUntil", "result"] as const)
+        if (row[field] != null && row[field] !== "unknown")
+          resolved.add(`inspections.${source.inspectionIndex}.${field}`);
+      resolvedItpFields.set(id, resolved);
+    }
+  }
   for (const analysis of analyses) {
     const source = sources.find((item) => item.sourceId === analysis.sourceId);
     if (!source || source.type !== analysis.documentType)
@@ -191,7 +208,13 @@ export function prepareScooterAnalysisImport(
       analysis.sourceId,
       new Set(
         v1.scooters.scooterDocumentExtractsData(analysis.documentType)
-          ? analysis.issues.map((issue) => issue.field)
+          ? analysis.issues
+              .filter(
+                (issue) =>
+                  issue.code !== "unreadable" ||
+                  !resolvedItpFields.get(analysis.sourceId)?.has(issue.field),
+              )
+              .map((issue) => issue.field)
           : [],
       ),
     );

@@ -518,7 +518,7 @@ describe("ScooterDetailPage", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("groups the hero identity, mileage, license and concurrent recorded states without VIN", () => {
+  it("groups the hero identity, VIN, mileage, license and concurrent recorded states", () => {
     renderDetail("ro", {
       ...scooter,
       maintenanceHoldCount: 2,
@@ -537,7 +537,7 @@ describe("ScooterDetailPage", () => {
     expect(hero.queryByText("125 cc")).not.toBeInTheDocument();
     expect(hero.getByText("Cat. A1")).toBeInTheDocument();
     expect(hero.getByText("Yamaha NMAX")).toBeInTheDocument();
-    expect(hero.queryByText(scooter.vin)).not.toBeInTheDocument();
+    expect(hero.getByText(scooter.vin)).toBeInTheDocument();
     expect(hero.queryByText("Închiriat")).not.toBeInTheDocument();
   });
 
@@ -604,7 +604,7 @@ describe("ScooterDetailPage", () => {
     expect(
       screen.getByRole("heading", { name: "001 YAM" }),
     ).toBeInTheDocument();
-    expect(screen.queryByText("JYARN23E0RA123456")).not.toBeInTheDocument();
+    expect(screen.getByText(scooter.vin)).toBeInTheDocument();
     expect(screen.queryByText("White")).not.toBeInTheDocument();
     expect(screen.getAllByText("125 cc")[0]).toBeInTheDocument();
     expect(screen.getAllByText("Unregistered")[0]).toBeInTheDocument();

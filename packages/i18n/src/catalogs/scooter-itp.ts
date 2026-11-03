@@ -5,6 +5,8 @@ export const scooterItpMessages = {
     fromDocuments: "Review ITP documents",
     close: "Close",
     manualSource: "Source: manual entry",
+    manualRecovery:
+      "The ITP date could not be read or matched reliably. Open the original yellow card, enter its next-inspection date in Valid until, then save the form. Your correction is recorded separately from the AI reading. If the original is unreadable, upload a clearer scan or verify the date with the inspection station.",
     documentSource: "Source: reviewed documents",
     manualHint:
       "Enter the valid-until date, not a future inspection appointment. Leave the result unclear unless you can confirm it. Inspection date is optional for manual entry. Previous entries remain in history.",
@@ -66,6 +68,8 @@ export const scooterItpMessages = {
     fromDocuments: "Verifică documentele ITP",
     close: "Închide",
     manualSource: "Sursă: introducere manuală",
+    manualRecovery:
+      "Data ITP nu a putut fi citită sau corelată sigur. Deschide anexa galbenă originală, introdu data următoarei inspecții în Valabil până la, apoi salvează formularul. Corecția se păstrează separat de citirea AI. Dacă originalul este ilizibil, încarcă o scanare mai clară sau verifică data la stația ITP.",
     documentSource: "Sursă: documente verificate",
     manualHint:
       "Introdu data până la care este valabil ITP-ul, nu o programare viitoare. Păstrează rezultatul neclar dacă nu îl poți confirma. Data inspecției este opțională la introducerea manuală. Înregistrările anterioare rămân în istoric.",

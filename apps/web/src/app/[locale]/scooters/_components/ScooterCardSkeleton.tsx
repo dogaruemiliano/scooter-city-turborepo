@@ -14,6 +14,7 @@ export function ScooterCardSkeleton() {
               <Skeleton className="h-4 w-24 max-w-full" />
             </div>
             <Skeleton className="mt-3 h-4 w-36 max-w-full" />
+            <Skeleton className="mt-1 h-lh w-12 max-w-full text-xs" />
           </div>
           <div className="relative flex h-36 w-32 shrink-0 items-center justify-center overflow-visible sm:h-48 sm:w-48">
             <Skeleton

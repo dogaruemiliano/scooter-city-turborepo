@@ -1,6 +1,7 @@
 import { dateOnlySchema, dateOnlyToday } from "../common/common.schemas";
 import { scooterDocumentExtractedDataSchema } from "./scooter-document-extraction.schemas";
 import type { ScooterDocumentType } from "./scooter-documents.schemas";
+import { scooterItpEvidence } from "./scooter-itp-evidence";
 
 export const SCOOTER_DOCUMENT_DISPLAY_ORDER: readonly ScooterDocumentType[] = [
   "civ",
@@ -31,6 +32,7 @@ export interface ScooterDocumentEvidence {
   validUntil?: string | null;
   clientCopy?: unknown;
   version?: "original" | "client_copy";
+  originalId?: string;
 }
 function date(value: unknown): string | null {
   const parsed = dateOnlySchema.safeParse(value);
@@ -51,7 +53,21 @@ export function scooterDocumentTypes(
 export function scooterDocumentValidity(
   document: ScooterDocumentEvidence,
   type = document.type,
+  documents: readonly ScooterDocumentEvidence[] = [document],
+  today = dateOnlyToday(),
 ) {
+  const reconciled =
+    type === "itp_card" || type === "itp_certificate"
+      ? scooterItpEvidence(documents, today).find((row) =>
+          row.sources.some(
+            (source) =>
+              source.documentId === (document.originalId ?? document.id) &&
+              source.type === type,
+          ),
+        )
+      : undefined;
+  if (reconciled?.conflicts && !date(document.validUntil))
+    return { validFrom: null, validUntil: null };
   const parsed = scooterDocumentExtractedDataSchema.safeParse(
     document.extractedData,
   );
@@ -69,10 +85,12 @@ export function scooterDocumentValidity(
   return {
     validFrom:
       date(document.validFrom) ??
+      date(reconciled?.inspectionDate) ??
       date(inspection?.inspectionDate) ??
       date(reading?.fields.validFrom),
     validUntil:
       date(document.validUntil) ??
+      date(reconciled?.validUntil) ??
       date(inspection?.validUntil) ??
       date(reading?.fields.validUntil),
   };
@@ -81,10 +99,16 @@ export function scooterDocumentState(
   document: ScooterDocumentEvidence,
   today = dateOnlyToday(),
   type = document.type,
+  documents: readonly ScooterDocumentEvidence[] = [document],
 ): "current" | "expired" | "future" | "unknown" {
   if (!["insurance", "itp_card", "itp_certificate"].includes(type ?? ""))
     return "current";
-  const { validFrom, validUntil } = scooterDocumentValidity(document, type);
+  const { validFrom, validUntil } = scooterDocumentValidity(
+    document,
+    type,
+    documents,
+    today,
+  );
   if (!validUntil || (validFrom && validUntil < validFrom)) return "unknown";
   if (validUntil < today) return "expired";
   if (!validFrom) return "unknown";
@@ -114,12 +138,18 @@ export function scooterDocumentDisplayEntries<
       (other) =>
         other.type === entry.type && other.clientCopy === entry.clientCopy,
     );
-    const state = scooterDocumentState(entry.document, today, entry.type);
+    const state = scooterDocumentState(
+      entry.document,
+      today,
+      entry.type,
+      documents,
+    );
     entry.archived =
       state === "expired" &&
       siblings.some(
         (other) =>
-          scooterDocumentState(other.document, today, other.type) === "current",
+          scooterDocumentState(other.document, today, other.type, documents) ===
+          "current",
       );
     if (state === "expired") entry.badge = "expired";
     else if (state === "future") entry.badge = "next";
@@ -129,16 +159,19 @@ export function scooterDocumentDisplayEntries<
     ) {
       const current = siblings.filter(
         (other) =>
-          scooterDocumentState(other.document, today, other.type) === "current",
+          scooterDocumentState(other.document, today, other.type, documents) ===
+          "current",
       );
       const newest = current
         .slice()
         .sort(
           (a, b) =>
             (
-              scooterDocumentValidity(b.document, b.type).validFrom ?? ""
+              scooterDocumentValidity(b.document, b.type, documents)
+                .validFrom ?? ""
             ).localeCompare(
-              scooterDocumentValidity(a.document, a.type).validFrom ?? "",
+              scooterDocumentValidity(a.document, a.type, documents)
+                .validFrom ?? "",
             ) ||
             (b.document.createdAt ?? "").localeCompare(
               a.document.createdAt ?? "",
@@ -158,7 +191,7 @@ export function scooterDocumentDisplayEntries<
   };
   const stateRank = (entry: (typeof entries)[number]) =>
     ({ current: 0, unknown: 1, future: 2, expired: 3 })[
-      scooterDocumentState(entry.document, today, entry.type)
+      scooterDocumentState(entry.document, today, entry.type, documents)
     ];
   return entries.sort(
     (a, b) =>
@@ -188,7 +221,7 @@ export function missingScooterClientDocuments(
         (document) =>
           document.clientCopy &&
           scooterDocumentTypes(document).includes(type) &&
-          scooterDocumentState(document, today, type) === "current",
+          scooterDocumentState(document, today, type, documents) === "current",
       ),
   );
 }

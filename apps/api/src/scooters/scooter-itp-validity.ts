@@ -20,43 +20,10 @@ export async function writeScooterItpValidity(
     where: { scooterId, deletedAt: null, asset: { deletedAt: null } },
     select: { id: true, type: true, extractedData: true },
   });
-  const readings = documents
-    .flatMap((document) => {
-      const parsed = v1.scooters.scooterDocumentExtractedDataSchema.safeParse(
-        document.extractedData,
-      );
-      if (!parsed.success) return [];
-      return (parsed.data.documents ?? [])
-        .filter(
-          (entry) =>
-            entry.documentType === "itp_card" ||
-            entry.documentType === "itp_certificate",
-        )
-        .flatMap((entry) =>
-          (entry.inspections ?? [])
-            .filter(
-              (row) =>
-                !row.inspectionDate ||
-                row.inspectionDate <= v1.common.dateOnlyToday(),
-            )
-            .map((row) => ({
-              ...row,
-              documentId: document.id,
-              type: entry.documentType,
-            })),
-        );
-    })
-    .sort((a, b) =>
-      (b.inspectionDate ?? "").localeCompare(a.inspectionDate ?? ""),
-    );
-  const newest = readings[0];
-  const current = readings.filter(
-    (row) => row.inspectionDate === newest?.inspectionDate,
-  );
-  const conflicts = current.some(
-    (row) =>
-      row.validUntil !== newest?.validUntil || row.result !== newest?.result,
-  );
+  const readings = v1.scooters.scooterItpEvidence(documents);
+  const current = v1.scooters.latestScooterItpEvidence(readings);
+  const newest = current.find((row) => row.validUntil) ?? current[0];
+  const conflicts = v1.scooters.scooterItpEvidenceConflicts(current);
   // Re-extraction may recover the CIV date for a scooter created before ITP
   // metadata existed. Reconcile only a lone date-only manual entry that agrees
   // with that initial validity, preserving every actual inspection/history.
@@ -89,7 +56,14 @@ export async function writeScooterItpValidity(
   // Automatic extraction fills missing information; reviewed/manual values need an explicit edit.
   if (requested === undefined && (latest || conflicts || !newest)) return;
   const validUntil = requested === undefined ? newest.validUntil : requested;
-  const evidence = current.find((row) => row.validUntil === validUntil);
+  const evidence = conflicts
+    ? undefined
+    : current.find((row) => row.validUntil === validUntil);
+  // An explicit correction can supply an unreadable expiry without destroying
+  // the AI reading. Keep links to the unambiguous inspection and both originals.
+  const reviewed =
+    evidence ??
+    (requested !== undefined && current.length === 1 ? current[0] : undefined);
   if (!latest && !validUntil && evidence?.result !== "failed") return;
   if (!latest && !evidence && validUntil) {
     const row = await tx.scooter.findUniqueOrThrow({
@@ -106,16 +80,33 @@ export async function writeScooterItpValidity(
   const source = evidence ? "document" : "manual";
   // The editor asks for confirmed validity, not an appointment or an OCR result.
   // Unreadable document results remain unknown until reviewed.
-  const result =
-    evidence?.result ??
-    (validUntil && latest?.result !== "failed" && newest?.result !== "failed"
+  let result =
+    (evidence ? (evidence.result ?? "unknown") : undefined) ??
+    (validUntil &&
+    latest?.result !== "failed" &&
+    !current.some((row) => row.result === "failed")
       ? "passed"
       : "unknown");
+  if (
+    result === "passed" &&
+    latest?.result === "failed" &&
+    (!evidence?.inspectionDate ||
+      !latest.inspectionDate ||
+      evidence.inspectionDate <= toDateOnlyString(latest.inspectionDate)!)
+  )
+    result = "unknown";
   if (
     latest &&
     toDateOnlyString(latest.validUntil) === validUntil &&
     latest.result === result &&
-    (latest.source === source || !documentsChanged)
+    (latest.source === source || !documentsChanged) &&
+    (!documentsChanged ||
+      ((latest.cardDocumentId ?? null) ===
+        (reviewed?.sources.find((item) => item.type === "itp_card")
+          ?.documentId ?? null) &&
+        (latest.certificateDocumentId ?? null) ===
+          (reviewed?.sources.find((item) => item.type === "itp_certificate")
+            ?.documentId ?? null)))
   )
     return;
   await tx.scooterItpInspection.create({
@@ -124,12 +115,14 @@ export async function writeScooterItpValidity(
       source,
       validUntil: toDateOnlyDate(validUntil),
       result,
-      inspectionDate: toDateOnlyDate(evidence?.inspectionDate ?? null),
+      inspectionDate: toDateOnlyDate(reviewed?.inspectionDate ?? null),
       effectiveDate: toDateOnlyDate(v1.common.dateOnlyToday())!,
       cardDocumentId:
-        evidence?.type === "itp_card" ? evidence.documentId : null,
+        reviewed?.sources.find((source) => source.type === "itp_card")
+          ?.documentId ?? null,
       certificateDocumentId:
-        evidence?.type === "itp_certificate" ? evidence.documentId : null,
+        reviewed?.sources.find((source) => source.type === "itp_certificate")
+          ?.documentId ?? null,
     },
   });
   const scooter = await tx.scooter.findUniqueOrThrow({

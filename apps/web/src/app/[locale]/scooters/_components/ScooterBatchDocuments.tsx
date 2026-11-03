@@ -400,6 +400,7 @@ export function ScooterBatchDocuments({
                             document,
                             undefined,
                             entry.type,
+                            candidates,
                           ) === "unknown" ? (
                           <Badge variant="warning">
                             {t("lifecycle.review")}

@@ -6,6 +6,7 @@ import {
   type ScooterEditorValues,
 } from "./scooter-editor-schema";
 import {
+  canReextractScooterDocument,
   mergeReextractedEvidence,
   reextractionReview,
   selectedReextraction,
@@ -66,6 +67,22 @@ function review(
 }
 
 describe("saved document reextraction review", () => {
+  it("allows an old yellow card to be analyzed again while keeping protected copies excluded", () => {
+    expect(
+      canReextractScooterDocument({ type: "itp_card", extractedData: null }),
+    ).toBe(true);
+    expect(
+      canReextractScooterDocument({
+        type: "itp_card",
+        extractedData: {
+          clientCopy: true,
+          vin: null,
+          fields: {},
+          rawFields: {},
+        },
+      }),
+    ).toBe(false);
+  });
   it("never asks to accept classification-only readings or changed extraction metadata", () => {
     const previous: v1.scooters.ScooterDocumentExtractedData = {
       vin,
@@ -86,11 +103,11 @@ describe("saved document reextraction review", () => {
     const classified = {
       ...analysis({}),
       sourceId: "card",
-      documentType: "itp_card" as const,
+      documentType: "registration_certificate" as const,
       extractedData: {
         vin: null,
         fields: {},
-        rawFields: { title: "Yellow card" },
+        rawFields: { title: "Registration certificate" },
       },
     };
     const result = review(
@@ -108,7 +125,10 @@ describe("saved document reextraction review", () => {
         classified,
       ],
       values({ color: "Black" }),
-      [file(previous), { ...file(), id: "card", type: "itp_card" }],
+      [
+        file(previous),
+        { ...file(), id: "card", type: "registration_certificate" },
+      ],
     );
     expect(result.proposals).toEqual([]);
   });

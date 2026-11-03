@@ -42,6 +42,46 @@ test("handwritten registration and yellow ITP cards never supply a VIN", () => {
     );
   }
 });
+
+test("yellow-card inspection evidence survives consumption without supplying scooter fields or identity", () => {
+  const evidence: v1.scooters.ScooterDocumentExtractedData = {
+    vin,
+    fields: { registrationNumber: "AI PLATE" },
+    rawFields: {},
+    documents: [
+      {
+        id: "card",
+        documentType: "itp_card",
+        pages: [1],
+        vin,
+        fields: { registrationNumber: "AI PLATE" },
+        rawFields: {},
+        inspections: [
+          {
+            inspectionDate: null,
+            validUntil: "2028-09-14",
+            result: null,
+            certificateNumber: "B0123ABC45",
+            odometerKm: null,
+            rawFields: { date: "14/09/28" },
+          },
+        ],
+      },
+    ],
+  };
+  const result = v1.scooters.scooterDocumentExtractionForType(
+    "itp_card",
+    evidence,
+  );
+  assert.equal(result.vin, null);
+  assert.deepEqual(result.fields, {});
+  assert.equal(result.documents?.[0]?.vin, null);
+  assert.deepEqual(result.documents?.[0]?.fields, {});
+  assert.equal(
+    result.documents?.[0]?.inspections?.[0]?.validUntil,
+    "2028-09-14",
+  );
+});
 test("purchase proof and a paired client copy are valid without CIV or registration", () => {
   for (const type of ["ownership_proof", "export_certificate", "other"]) {
     assert.equal(

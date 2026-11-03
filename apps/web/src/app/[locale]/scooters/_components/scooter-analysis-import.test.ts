@@ -42,6 +42,67 @@ function analysis(
     reviewRequired: true,
   };
 }
+
+it("resolves the certificate's missing expiry from its yellow annex without retaining a stale review warning", () => {
+  const sources: DocumentSource[] = [
+    {
+      sourceId: "certificate",
+      type: "itp_certificate",
+      fileName: "certificate.pdf",
+    },
+    { sourceId: "card", type: "itp_card", fileName: "card.pdf" },
+  ];
+  const readings = sources.map((source) => {
+    const isCard = source.type === "itp_card";
+    const result = analysis(source, {}, isCard ? null : vin);
+    const issues: v1.scooters.ScooterDocumentAnalysis["issues"] = isCard
+      ? []
+      : [{ field: "inspections.0.validUntil", code: "unreadable" }];
+    result.issues = issues;
+    result.extractedData.documents = [
+      {
+        id: "logical",
+        documentType: source.type,
+        pages: [1],
+        vin: result.extractedData.vin,
+        fields: {},
+        rawFields: {},
+        issues,
+        inspections: [
+          {
+            inspectionDate: isCard ? null : "2026-09-14",
+            validUntil: isCard ? "2028-09-14" : null,
+            result: isCard ? null : "passed",
+            certificateNumber: "B0123ABC45",
+            odometerKm: null,
+            rawFields: {},
+          },
+        ],
+      },
+    ];
+    return result;
+  });
+  const result = prepareScooterAnalysisImport(
+    readings,
+    sources,
+    [],
+    scooterEditorDefaults(),
+    false,
+  );
+  expect(result.ok).toBe(true);
+  if (!result.ok) return;
+  expect(result.unresolvedDocumentFields?.certificate ?? []).not.toContain(
+    "inspections.0.validUntil",
+  );
+  expect(
+    result.extractedDocuments?.certificate?.documents?.[0]?.inspections?.[0]
+      ?.validUntil,
+  ).toBeNull();
+  expect(
+    result.extractedDocuments?.card?.documents?.[0]?.inspections?.[0]
+      ?.validUntil,
+  ).toBe("2028-09-14");
+});
 describe("analysis suggestions through the shared import pipeline", () => {
   it("retains usable values while flagging invalid numbers and current-state incompatibilities", () => {
     const result = prepareScooterAnalysisImport(

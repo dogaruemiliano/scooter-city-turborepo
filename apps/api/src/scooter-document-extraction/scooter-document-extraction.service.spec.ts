@@ -929,6 +929,62 @@ describe("mixed document PDFs", () => {
       code: "unreadable",
     });
   });
+  it("reads yellow-card expiry rows without inventing an inspection date, result or vehicle identity", () => {
+    const result = normalize([
+      {
+        ...document("itp_card", []),
+        inspections: [
+          {
+            inspectionDate: null,
+            validUntil: "14.09.2028",
+            result: null,
+            certificateNumber: "B0123 ABC45",
+            odometerKm: null,
+            rawFields: [
+              { key: "Data urmatoarei inspectii", value: "14 / 09 / 28" },
+            ],
+          },
+        ],
+      },
+    ]);
+    expect(result.extractedData.documents?.[0]).toMatchObject({
+      documentType: "itp_card",
+      vin: null,
+      fields: {},
+      inspections: [
+        {
+          inspectionDate: null,
+          validUntil: "2028-09-14",
+          result: null,
+          rawFields: { "Data urmatoarei inspectii": "14 / 09 / 28" },
+        },
+      ],
+    });
+    expect(result.issues).toEqual([]);
+  });
+  it("keeps an unreadable yellow-card date null and flags it for manual correction", () => {
+    const result = normalize([
+      {
+        ...document("itp_card", []),
+        inspections: [
+          {
+            inspectionDate: null,
+            validUntil: null,
+            result: null,
+            certificateNumber: null,
+            odometerKm: null,
+            rawFields: [{ key: "date", value: "14 / ?? / 28" }],
+          },
+        ],
+      },
+    ]);
+    expect(
+      result.extractedData.documents?.[0].inspections?.[0].validUntil,
+    ).toBeNull();
+    expect(result.issues).toEqual([
+      { field: "inspections.0.validUntil", code: "unreadable" },
+    ]);
+  });
 });
 
 it.each(["registration_certificate", "itp_card"] as const)(

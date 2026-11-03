@@ -85,8 +85,13 @@ describe("explicit saved-document analysis", () => {
     });
     expect(
       runner.mock.calls.map(([attempt]) => attempt.input.sourceId),
-    ).toEqual(["a", "b", "mixed"]);
-    expect(Object.keys(result.current.entries)).toEqual(["a", "b", "mixed"]);
+    ).toEqual(["a", "b", "itp_card", "mixed"]);
+    expect(Object.keys(result.current.entries)).toEqual([
+      "a",
+      "b",
+      "itp_card",
+      "mixed",
+    ]);
   });
 
   it("never runs on mount, uses existing saved files, and does not mutate document evidence", async () => {
