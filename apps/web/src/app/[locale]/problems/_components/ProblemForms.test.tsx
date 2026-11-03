@@ -1336,46 +1336,70 @@ describe("problem release forms", () => {
     );
   });
 
-  it("adds checklist items in its editor and saves them", async () => {
-    const user = userEvent.setup();
-    renderForm(<ProblemWork compact problem={problem} reload={vi.fn()} />);
-    expect(screen.queryByRole("region", { name: "Checklist" })).toBeNull();
-    await user.click(screen.getByRole("button", { name: "Add" }));
-    await user.click(screen.getByRole("button", { name: "Checklist" }));
-    const sheet = await screen.findByRole("dialog", {
-      name: "Create checklist",
-    });
-    expect(sheet).toHaveClass("bg-popover");
-    expect(sheet.querySelector(".bg-background")).toBeNull();
-    const input = within(sheet).getByRole("textbox", {
-      name: "New checklist item",
-    });
-    await waitFor(() => expect(input).toHaveFocus());
-    await user.type(input, "Install pads{Enter}");
-    expect(within(sheet).getByText("Install pads")).toBeInTheDocument();
-    await user.click(
-      within(sheet).getByRole("button", { name: "Save checklist" }),
-    );
-    await waitFor(() =>
-      expect(mocks.fetch).toHaveBeenCalledWith(
-        "/v1/problems/report",
-        expect.anything(),
-        {
-          method: "PATCH",
-          json: {
-            revision: 3,
-            checklist: [
-              {
-                id: expect.any(String),
-                text: "Install pads",
-                completed: false,
-              },
-            ],
+  it.each([
+    {
+      section: "Checklist",
+      title: "Create checklist",
+      input: "New checklist item",
+      save: "Save checklist",
+      key: "checklist",
+    },
+    {
+      section: "Buy list",
+      title: "Create buy list",
+      input: "Item to buy",
+      save: "Save buy list",
+      key: "buyList",
+    },
+  ])(
+    "adds and edits items in the $section create sheet before saving",
+    async (list) => {
+      const user = userEvent.setup();
+      renderForm(<ProblemWork compact problem={problem} reload={vi.fn()} />);
+      expect(screen.queryByRole("region", { name: "Checklist" })).toBeNull();
+      await user.click(screen.getByRole("button", { name: "Add" }));
+      await user.click(screen.getByRole("button", { name: list.section }));
+      const sheet = await screen.findByRole("dialog", {
+        name: list.title,
+      });
+      expect(sheet).toHaveClass("bg-popover");
+      expect(sheet.querySelector(".bg-background")).toBeNull();
+      const input = within(sheet).getByRole("textbox", {
+        name: list.input,
+      });
+      await waitFor(() => expect(input).toHaveFocus());
+      await user.type(input, "Install pads{Enter}");
+      const item = within(sheet).getByRole("textbox", {
+        name: "Edit item: Install pads",
+      });
+      await user.click(item);
+      await user.keyboard("{End} and test brakes");
+      expect(item).toHaveValue("Install pads and test brakes");
+      await user.click(within(sheet).getByRole("button", { name: list.save }));
+      await waitFor(() =>
+        expect(mocks.fetch).toHaveBeenCalledWith(
+          "/v1/problems/report",
+          expect.anything(),
+          {
+            method: "PATCH",
+            json: {
+              revision: 3,
+              ...(list.key === "buyList"
+                ? { sections: ["checklist", "buyList"] }
+                : {}),
+              [list.key]: [
+                {
+                  id: expect.any(String),
+                  text: "Install pads and test brakes",
+                  completed: false,
+                },
+              ],
+            },
           },
-        },
-      ),
-    );
-  });
+        ),
+      );
+    },
+  );
 
   it("lets update-only administrators cancel a held problem from More actions", async () => {
     const user = userEvent.setup();

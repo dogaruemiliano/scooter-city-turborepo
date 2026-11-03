@@ -290,6 +290,8 @@ export const workspaceCatalog = {
       checklistSortInstructions:
         "Long press an item to move it up or down. With a keyboard, press Space to pick up, use Up or Down to move, then Space to drop or Escape to cancel. Press Enter in the new-item input to add it.",
       reorderChecklistItem: "Move item: {text}",
+      editChecklistItem: "Edit item: {text}",
+      checklistItemRequired: "Enter an item or remove this row.",
       checklist: "Checklist",
       checklistProgress: "{completed}/{total} done",
       checklistItem: "New checklist item",
@@ -872,6 +874,8 @@ export const workspaceCatalog = {
       checklistSortInstructions:
         "Ține apăsat un element pentru a-l muta în sus sau în jos. Cu tastatura, apasă Spațiu pentru a-l selecta, săgețile Sus sau Jos pentru a-l muta, apoi Spațiu pentru a-l plasa sau Escape pentru a anula. Apasă Enter în câmpul pentru elementul nou ca să-l adaugi.",
       reorderChecklistItem: "Mută elementul: {text}",
+      editChecklistItem: "Editează elementul: {text}",
+      checklistItemRequired: "Introdu un element sau șterge acest rând.",
       checklist: "Listă de verificare",
       checklistProgress: "{completed}/{total} finalizate",
       checklistItem: "Element nou",
