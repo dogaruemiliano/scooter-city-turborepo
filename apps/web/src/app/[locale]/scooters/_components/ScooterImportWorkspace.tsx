@@ -542,12 +542,13 @@ export function ScooterImportWorkspace({
               key={multipleDrafts ? "drafts" : "add"}
               label={t("drafts")}
               fadeEdges
+              fadeWidth="var(--page-gutter)"
               scrollbarVisibility="desktop"
-              className={`-mx-(--page-gutter) w-auto md:mx-0 md:w-full animate-in fade-in-0 slide-in-from-top-2 duration-normal ease-decelerate motion-reduce:animate-none ${multipleDrafts ? "" : "hidden md:block"}`}
+              className={`-mx-(--page-gutter) w-auto animate-in fade-in-0 slide-in-from-top-2 duration-normal ease-decelerate motion-reduce:animate-none ${multipleDrafts ? "" : "hidden md:block"}`}
             >
               <nav
                 aria-label={t("drafts")}
-                className="flex w-max min-w-full items-center gap-2 px-(--page-gutter) py-2 md:px-0"
+                className="flex w-max min-w-full items-center gap-2 px-(--page-gutter) py-2"
               >
                 {drafts.map(({ draft, status }, index) =>
                   selectedId !== draft.id ? (

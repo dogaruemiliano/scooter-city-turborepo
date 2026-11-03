@@ -362,6 +362,7 @@ export const workspaceCatalog = {
       unassessed: "Difficulty needs review",
       boardEmpty: "No repairs on this page",
       boardLabel: "Repairs by status",
+      scrollLeft: "Scroll repairs left",
       scrollRight: "Scroll repairs right",
       difficultyHelp:
         "Difficulty describes repair effort. Choose Easy, Medium or Hard. Set whether the scooter is usable separately.",
@@ -948,6 +949,7 @@ export const workspaceCatalog = {
       unassessed: "Dificultatea necesită verificare",
       boardEmpty: "Nicio reparație pe această pagină",
       boardLabel: "Reparații după stare",
+      scrollLeft: "Derulează reparațiile spre stânga",
       scrollRight: "Derulează reparațiile spre dreapta",
       difficultyHelp:
         "Dificultatea descrie efortul reparației. Alege Ușoară, Medie sau Dificilă. Stabilește separat dacă scuterul este utilizabil.",

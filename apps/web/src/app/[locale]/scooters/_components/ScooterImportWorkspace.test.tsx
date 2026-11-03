@@ -754,10 +754,13 @@ it("updates the draft state without a detection toast", async () => {
   expect(rail.style.maskImage).toBe(scrollFade.softMask);
   expect(
     screen.getByRole("navigation", { name: "Scooter drafts" }),
-  ).toHaveClass("w-max");
+  ).toHaveClass("w-max", "px-(--page-gutter)");
+  expect(rail.style.getPropertyValue("--scroll-fade-width")).toBe(
+    "var(--page-gutter)",
+  );
   expect(rail.closest('[data-slot="horizontal-scroll-area"]')).toHaveClass(
     "-mx-(--page-gutter)",
-    "md:mx-0",
+    "w-auto",
   );
 });
 
