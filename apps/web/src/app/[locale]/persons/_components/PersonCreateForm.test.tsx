@@ -295,7 +295,7 @@ describe("PersonCreateForm wizard", () => {
     expect(next.parentElement).toHaveClass(
       "flex",
       "items-center",
-      "@form-columns/form-actions:w-auto",
+      "md:*:flex-initial",
     );
     expect(
       within(next.parentElement!).getByRole("button", {
@@ -376,7 +376,13 @@ describe("PersonCreateForm wizard", () => {
       }),
     ).toBeEnabled();
     await browser.click(header.getByRole("button", { name: "Back" }));
-    expect(mocks.back).toHaveBeenCalledOnce();
+    expect(
+      screen.getByRole("dialog", { name: "Discard unsaved changes?" }),
+    ).toBeVisible();
+    await browser.click(
+      screen.getByRole("button", { name: "Discard changes" }),
+    );
+    expect(mocks.replace).toHaveBeenCalledWith("/en/persons");
   });
 
   it("keeps mobile forward unavailable when the primary action fails validation", async () => {
@@ -415,7 +421,7 @@ describe("PersonCreateForm wizard", () => {
     expect(mocks.back).not.toHaveBeenCalled();
   });
 
-  it("does not guard navigation or validation attempts before uploading a photo", async () => {
+  it("guards entered details even before uploading a photo", async () => {
     const browser = userEvent.setup();
     renderCreateForm();
     await enterDocuments(browser, "foreign");
@@ -425,7 +431,7 @@ describe("PersonCreateForm wizard", () => {
     ).toBeVisible();
     expect(
       window.dispatchEvent(new Event("beforeunload", { cancelable: true })),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it("guards exit after a photo upload even back at citizenship, and keeps values when cancelled", async () => {

@@ -66,3 +66,48 @@ it("leaves contained footers in the normal flow when readiness is omitted", () =
     "animate-in",
   );
 });
+
+it("reserves secondary navigation for desktop in page bars, including invalid forms", () => {
+  const { rerender } = render(
+    <FormActions
+      ready={false}
+      secondaryAction={<Button>Cancel</Button>}
+      status="Review details"
+    >
+      <Button>Create</Button>
+    </FormActions>,
+  );
+  const secondary = screen
+    .getByText("Cancel")
+    .closest('[data-slot="form-actions-secondary"]');
+  expect(secondary).toHaveClass("hidden", "md:flex");
+  const primary = screen.getByText("Create");
+  expect(primary.parentElement).toHaveClass("flex", "items-center");
+  expect(primary.parentElement).not.toHaveClass("flex-col", "flex-wrap");
+  expect(screen.getByRole("status").nextElementSibling).toBe(
+    primary.parentElement,
+  );
+  rerender(
+    <FormActions
+      ready
+      pending
+      secondaryAction={<Button disabled>Cancel</Button>}
+    >
+      <Button disabled>Creating</Button>
+    </FormActions>,
+  );
+  expect(
+    screen.getByText("Cancel").closest('[data-slot="form-actions-secondary"]'),
+  ).toBe(secondary);
+});
+
+it("retains secondary actions and primary-first ordering in contained split footers", () => {
+  render(
+    <FormActions arrangement="split" secondaryAction={<Button>Cancel</Button>}>
+      <Button>Confirm</Button>
+    </FormActions>,
+  );
+  const primary = screen.getByText("Confirm");
+  expect(primary.parentElement?.firstElementChild).toBe(primary);
+  expect(screen.getByText("Cancel").parentElement).toHaveClass("contents");
+});

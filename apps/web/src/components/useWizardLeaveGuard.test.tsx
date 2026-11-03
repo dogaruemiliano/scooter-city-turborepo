@@ -113,3 +113,51 @@ it("ignores previews, downloads, modified clicks, and same-page anchors", () => 
   link.remove();
   expect(result.current.open).toBe(false);
 });
+
+it("blocks header, link and browser exits during a request, then permits confirmation", () => {
+  const navigate = vi.fn();
+  const { result, rerender } = renderHook(
+    ({ blocked }) => useWizardLeaveGuard(true, { blocked }),
+    { initialProps: { blocked: true } },
+  );
+  act(() => result.current.requestLeave(navigate));
+  act(leaveLink);
+  fireEvent.popState(window, { state: {} });
+  expect(navigate).not.toHaveBeenCalled();
+  expect(router.replace).not.toHaveBeenCalled();
+  expect(result.current.open).toBe(false);
+  rerender({ blocked: false });
+  act(() => result.current.requestLeave(navigate));
+  expect(result.current.open).toBe(true);
+  act(() => result.current.leave());
+  expect(navigate).toHaveBeenCalledOnce();
+});
+
+it("uses browser Back within a wizard before offering to leave the route", () => {
+  const stepBack = vi.fn().mockReturnValueOnce(true).mockReturnValue(false);
+  const { result } = renderHook(() =>
+    useWizardLeaveGuard(true, {
+      onBrowserBack: stepBack,
+    }),
+  );
+  fireEvent.popState(window, { state: {} });
+  expect(stepBack).toHaveBeenCalledOnce();
+  expect(result.current.open).toBe(false);
+  fireEvent.popState(window, { state: {} });
+  expect(result.current.open).toBe(true);
+});
+
+it("skips its history sentinel without prompting after changes are undone", () => {
+  const go = vi.spyOn(window.history, "go").mockImplementation(() => {});
+  const { result, rerender } = renderHook(
+    ({ enabled }) => useWizardLeaveGuard(enabled),
+    { initialProps: { enabled: true } },
+  );
+  rerender({ enabled: false });
+  expect(
+    window.dispatchEvent(new Event("beforeunload", { cancelable: true })),
+  ).toBe(true);
+  fireEvent.popState(window, { state: {} });
+  expect(go).toHaveBeenCalledExactlyOnceWith(-2);
+  expect(result.current.open).toBe(false);
+});

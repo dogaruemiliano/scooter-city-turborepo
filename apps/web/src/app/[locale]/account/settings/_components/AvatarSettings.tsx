@@ -10,6 +10,7 @@ import {
   type ProfilePictureChange,
 } from "@/components/ProfilePictureEditor";
 import { useSession } from "@/components/auth/SessionProvider";
+import { useFormExitProtection } from "@/components/useFormExitProtection";
 import { useFormAction } from "@/lib/form/use-form-action";
 import { webApi } from "@/lib/api";
 
@@ -27,6 +28,7 @@ export function AvatarSettings({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const busy = useRef(false);
+  const exit = useFormExitProtection({ dirty: picture !== undefined, pending });
 
   async function save(event: FormEvent) {
     event.preventDefault();
@@ -62,6 +64,7 @@ export function AvatarSettings({
       onSubmit={(event) => void save(event)}
       className="flex flex-col gap-6"
     >
+      {exit.protection}
       <ProfilePictureEditor
         name={name}
         assetId={user.avatarAssetId}

@@ -65,6 +65,7 @@ beforeEach(() => {
       static revokeObjectURL = vi.fn();
     },
   );
+  window.history.replaceState({}, "", "/en/persons/person-1/edit");
   mocks.apiFetch.mockReset();
   mocks.refresh.mockReset();
   mocks.push.mockReset();
@@ -95,11 +96,13 @@ describe("PersonEditForm", () => {
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
     );
     expect(screen.getByLabelText("First name")).toHaveValue("Ada changed");
+    const go = vi.spyOn(window.history, "go").mockImplementation(() => {});
     act(back);
     await browser.click(
       screen.getByRole("button", { name: "Discard changes" }),
     );
-    expect(mocks.back).toHaveBeenCalledOnce();
+    expect(go).toHaveBeenCalledExactlyOnceWith(-2);
+    go.mockRestore();
     expect(mocks.apiFetch).not.toHaveBeenCalled();
   });
 

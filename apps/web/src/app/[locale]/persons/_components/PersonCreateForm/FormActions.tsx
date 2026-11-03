@@ -37,18 +37,20 @@ export function FormActions({
       ready={ready}
       pending={creating}
       className="mt-auto w-full"
+      secondaryAction={
+        canGoBack ? (
+          <Button
+            type="button"
+            variant="outline"
+            className="mr-auto"
+            disabled={creating}
+            onClick={onBack}
+          >
+            {t("wizard.back")}
+          </Button>
+        ) : null
+      }
     >
-      {canGoBack ? (
-        <Button
-          type="button"
-          variant="outline"
-          className="mr-auto hidden md:inline-flex"
-          disabled={creating}
-          onClick={onBack}
-        >
-          {t("wizard.back")}
-        </Button>
-      ) : null}
       {["documents", "personal", "license", "contact", "address"].includes(
         step,
       ) ? (
@@ -67,7 +69,6 @@ export function FormActions({
       {step === "review" ? (
         <SaveButton
           type="submit"
-          className="w-full md:w-auto"
           disabled={
             creating || uploadingPhotos || extracting || confirmationRequired
           }

@@ -352,6 +352,16 @@ describe("problem release forms", () => {
     const title = await screen.findByRole("textbox", { name: "Title" });
     await user.type(title, " edited");
     await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(mocks.push).not.toHaveBeenCalled();
+    const confirmation = screen.getByRole("dialog", {
+      name: "Discard unsaved changes?",
+    });
+    await user.click(
+      within(confirmation).getByRole("button", { name: "Keep editing" }),
+    );
+    expect(title).toHaveValue("Broken belt edited");
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    await user.click(screen.getByRole("button", { name: "Discard changes" }));
     expect(mocks.push).toHaveBeenCalledWith("/en/todos/report");
     expect(
       mocks.fetch.mock.calls.some(
@@ -1701,7 +1711,10 @@ describe("dedicated creation screen", () => {
     const user = userEvent.setup();
     renderForm(<ProblemCreateScreen scooterId="scooter" />);
     const submit = screen.getByRole("button", { name: "Report problem" });
-    expect(submit.parentElement?.firstElementChild).toBe(submit);
+    expect(
+      screen.getByRole("button", { name: "Cancel" }).parentElement,
+    ).toHaveClass("hidden", "md:flex");
+    expect(submit.parentElement).not.toHaveClass("flex-col");
     expect(submit.closest('[data-slot="problem-create-actions"]')).toHaveClass(
       "static",
       "bottom-auto",

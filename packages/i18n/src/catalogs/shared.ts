@@ -1,5 +1,12 @@
 export const sharedCatalog = {
   en: {
+    formExit: {
+      title: "Discard unsaved changes?",
+      description:
+        "Your changes have not been saved. Leaving this form will discard them.",
+      keepEditing: "Keep editing",
+      discard: "Discard changes",
+    },
     attachments: {
       title: "Add photos or files",
       close: "Close",
@@ -163,6 +170,13 @@ export const sharedCatalog = {
     },
   },
   ro: {
+    formExit: {
+      title: "Renunți la modificările nesalvate?",
+      description:
+        "Modificările nu au fost salvate. Dacă părăsești formularul, acestea se vor pierde.",
+      keepEditing: "Continuă editarea",
+      discard: "Renunță la modificări",
+    },
     attachments: {
       title: "Adaugă fotografii sau fișiere",
       close: "Închide",

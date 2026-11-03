@@ -12,6 +12,7 @@ export function ScooterCreateActions({
   status,
   review,
   children,
+  secondaryAction,
 }: {
   enabled?: boolean;
   ready: boolean;
@@ -20,8 +21,14 @@ export function ScooterCreateActions({
   status: ReactNode;
   review?: { label: string; onClick: () => void; disabled?: boolean };
   children: ReactNode;
+  secondaryAction?: ReactNode;
 }) {
-  if (!enabled) return <FormActions status={status}>{children}</FormActions>;
+  if (!enabled)
+    return (
+      <FormActions status={status} secondaryAction={secondaryAction}>
+        {children}
+      </FormActions>
+    );
   const readyToAct = !pending && (ready || Boolean(review));
 
   return (
@@ -29,6 +36,7 @@ export function ScooterCreateActions({
       ready={readyToAct}
       pending={submitting}
       status={status}
+      secondaryAction={review && !pending ? undefined : secondaryAction}
       data-slot="create-actions"
     >
       {review && !pending ? (

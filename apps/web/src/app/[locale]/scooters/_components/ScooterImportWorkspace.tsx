@@ -1,5 +1,8 @@
 "use client";
 
+import { PageHeaderNavigation } from "@/components/PageHeaderNavigation";
+import { useWizardLeaveGuard } from "@/components/useWizardLeaveGuard";
+
 import { ApiError, v1 } from "@repo/api-shared";
 import {
   Badge,
@@ -93,6 +96,18 @@ export function ScooterImportWorkspace({
   const [selectedId, setSelectedId] = useState<string>();
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
+  const [submittingDrafts, setSubmittingDrafts] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const onSubmittingChange = useCallback((id: string, submitting: boolean) => {
+    setSubmittingDrafts((current) => {
+      if (current.has(id) === submitting) return current;
+      const next = new Set(current);
+      if (submitting) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }, []);
   const [discarding, setDiscarding] = useState<string>();
   const [discardTarget, setDiscardTarget] = useState<string>();
   const [discardError, setDiscardError] = useState<string>();
@@ -533,8 +548,23 @@ export function ScooterImportWorkspace({
   const canAddDraft =
     !loading && drafts.every((entry) => entry.documentCount > 0);
 
+  const leavingBlocked =
+    submittingDrafts.size > 0 ||
+    adding ||
+    Boolean(discarding) ||
+    savingRecovery;
+  const navigationGuard = useWizardLeaveGuard(false, {
+    blocked: leavingBlocked,
+  });
+
   return (
     <PageLayout>
+      <PageHeaderNavigation
+        backDisabled={leavingBlocked}
+        onBack={() =>
+          navigationGuard.requestLeave(() => router.replace(scootersHref))
+        }
+      />
       <ScooterFleetNumberRefreshContext value={fleetNumberRevision}>
         <div ref={workspaceRef} className="grid min-w-0 gap-6">
           {multipleDrafts || canAddDraft ? (
@@ -706,6 +736,7 @@ export function ScooterImportWorkspace({
                     importDraft={draft}
                     initialSnapshot={initialSnapshot}
                     onSnapshot={(state) => snapshot(draft, state)}
+                    onSubmittingChange={onSubmittingChange}
                     onCreated={(scooter) => complete(draft.id, scooter)}
                     brands={brands}
                     vocabulary={vocabulary}

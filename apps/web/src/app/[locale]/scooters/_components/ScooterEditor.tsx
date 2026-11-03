@@ -9,6 +9,7 @@ import { ScooterInsuranceSection } from "./ScooterInsuranceSection";
 import { ScooterInsuranceSelection } from "./ScooterInsuranceSelection";
 import { PageLayout } from "@repo/ui/components/page-layout";
 import { useFormAction } from "@/lib/form/use-form-action";
+import { useFormExitProtection } from "@/components/useFormExitProtection";
 import { SaveButton } from "@repo/ui/components/save-button";
 
 import { useOptionalSession } from "@/components/auth/SessionProvider";
@@ -76,6 +77,7 @@ export interface ScooterEditorProps {
   importDraft?: v1.scooters.ScooterImportDraft;
   initialSnapshot?: ScooterImportSnapshot;
   onSnapshot?: (snapshot: ScooterImportSnapshot) => void;
+  onSubmittingChange?: (draftId: string, pending: boolean) => void;
   onCreated?: (scooter: v1.scooters.Scooter, reviewNext: boolean) => void;
   embedded?: boolean;
   persistenceBlocked?: boolean;
@@ -96,6 +98,7 @@ export function ScooterEditor({
   initialSnapshot,
   onSnapshot,
   onCreated,
+  onSubmittingChange,
   embedded = false,
   persistenceBlocked = false,
   incomingFiles,
@@ -357,6 +360,23 @@ export function ScooterEditor({
     [],
   );
   const { isSubmitting, isDirty, dirtyFields, submitCount } = form.formState;
+  const importDraftId = importDraft?.id;
+  useEffect(() => {
+    if (!importDraftId) return;
+    onSubmittingChange?.(importDraftId, isSubmitting);
+    return () => onSubmittingChange?.(importDraftId, false);
+  }, [isSubmitting, onSubmittingChange, importDraftId]);
+  const exit = useFormExitProtection({
+    enabled: !embedded,
+    dirty:
+      isDirty ||
+      photosChanged ||
+      photoDrafts.length > 0 ||
+      documents.changed ||
+      Boolean(importedRawFields),
+    pending: isSubmitting || photosBusy,
+    onLeave: () => router.replace(returnHref),
+  });
   const powertrain = useWatch({
     control: form.control,
     name: "powertrainType",
@@ -530,6 +550,7 @@ export function ScooterEditor({
         !documents.changed &&
         !importedRawFields
       ) {
+        exit.complete();
         setSaveCompleted(true);
         router.push(returnHref);
         router.refresh();
@@ -1027,6 +1048,7 @@ export function ScooterEditor({
   };
   return (
     <Boundary>
+      {exit.protection}
       {scooter && (
         <>
           <PageTitleOverride title={v1.scooters.scooterDisplayCode(scooter)} />
@@ -1396,6 +1418,47 @@ export function ScooterEditor({
                     }
                   : undefined
               }
+              secondaryAction={
+                draftActions ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size={draftActions.hasOtherDrafts ? "icon" : "default"}
+                    aria-label={
+                      draftActions.hasOtherDrafts
+                        ? t("workspace.discard")
+                        : undefined
+                    }
+                    title={
+                      draftActions.hasOtherDrafts
+                        ? t("workspace.discard")
+                        : undefined
+                    }
+                    disabled={
+                      isSubmitting || photosBusy || draftActions.pending
+                    }
+                    onClick={draftActions.onDiscard}
+                  >
+                    {draftActions.hasOtherDrafts ? (
+                      <Trash2Icon aria-hidden="true" />
+                    ) : (
+                      t("actions.cancel")
+                    )}
+                  </Button>
+                ) : (
+                  <Link
+                    href={returnHref}
+                    className={buttonVariants({ variant: "outline" })}
+                    aria-disabled={isSubmitting || photosBusy}
+                    tabIndex={isSubmitting || photosBusy ? -1 : undefined}
+                    onClick={(event) => {
+                      if (isSubmitting || photosBusy) event.preventDefault();
+                    }}
+                  >
+                    {t("actions.cancel")}
+                  </Link>
+                )
+              }
             >
               {scooter && analysis.running ? (
                 <Button
@@ -1406,43 +1469,6 @@ export function ScooterEditor({
                   {t("extraction.cancel")}
                 </Button>
               ) : null}
-              {draftActions ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size={draftActions.hasOtherDrafts ? "icon" : "default"}
-                  aria-label={
-                    draftActions.hasOtherDrafts
-                      ? t("workspace.discard")
-                      : undefined
-                  }
-                  title={
-                    draftActions.hasOtherDrafts
-                      ? t("workspace.discard")
-                      : undefined
-                  }
-                  disabled={isSubmitting || photosBusy || draftActions.pending}
-                  onClick={draftActions.onDiscard}
-                >
-                  {draftActions.hasOtherDrafts ? (
-                    <Trash2Icon aria-hidden="true" />
-                  ) : (
-                    t("actions.cancel")
-                  )}
-                </Button>
-              ) : (
-                <Link
-                  href={returnHref}
-                  className={buttonVariants({ variant: "outline" })}
-                  aria-disabled={isSubmitting || photosBusy}
-                  tabIndex={isSubmitting || photosBusy ? -1 : undefined}
-                  onClick={(event) => {
-                    if (isSubmitting || photosBusy) event.preventDefault();
-                  }}
-                >
-                  {t("actions.cancel")}
-                </Link>
-              )}
               <SaveButton
                 type="submit"
                 disabled={
