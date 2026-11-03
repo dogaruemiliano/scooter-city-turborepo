@@ -14,11 +14,11 @@ export const SCOOTER_DOCUMENT_TYPES = [
 
 /** All other types are classified and stored without reading their contents. */
 export function scooterDocumentExtractsData(type: string): boolean {
-  return ["civ", "insurance", "itp_certificate"].includes(type);
+  return ["civ", "insurance", "itp_certificate", "itp_card"].includes(type);
 }
 
 export function scooterDocumentReadsVin(type: string): boolean {
-  return scooterDocumentExtractsData(type);
+  return ["civ", "insurance", "itp_certificate"].includes(type);
 }
 
 export function scooterDocumentVinPriority(type: string): number {

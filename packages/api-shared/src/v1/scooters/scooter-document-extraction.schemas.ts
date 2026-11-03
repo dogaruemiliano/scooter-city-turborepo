@@ -218,6 +218,10 @@ export function scooterDocumentExtractionForType(
 ): ScooterDocumentExtractedData {
   if (evidence.documents?.length) {
     const documents = evidence.documents.map((document) => {
+      if (document.documentType === "itp_card") {
+        const { vinReview: _review, ...card } = document;
+        return { ...card, vin: null, fields: {} };
+      }
       if (scooterDocumentExtractsData(document.documentType)) return document;
       const {
         vinReview: _review,
@@ -258,6 +262,10 @@ export function scooterDocumentExtractionForType(
       ),
       documents,
     };
+  }
+  if (type === "itp_card") {
+    const { vinReview: _review, ...card } = evidence;
+    return { ...card, vin: null, fields: {} };
   }
   if (scooterDocumentExtractsData(type)) return evidence;
   const { vinReview: _review, ...classification } = evidence;

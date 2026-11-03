@@ -539,6 +539,7 @@ export class ScooterDocumentExtractionService {
         invalidate(end);
     }
     if (
+      documentType !== "itp_card" &&
       !result.extractedData.vin &&
       !Object.values(fields).some((value) => value !== null && value !== "-")
     )
@@ -717,7 +718,8 @@ function normalizeInspections(
   document: NonNullable<ModelOutput["documents"]>[number],
   issues: ScooterDocumentExtractionResult["issues"],
 ): v1.scooters.ScooterDocumentInspection[] {
-  if (document.documentType !== "itp_certificate") return [];
+  if (!["itp_certificate", "itp_card"].includes(document.documentType))
+    return [];
   const issue = (field: string) => {
     if (
       !issues.some(
@@ -751,7 +753,7 @@ function normalizeInspections(
       issue(`inspections.${index}.validUntil`);
       validUntil = null;
     }
-    if (!inspectionDate)
+    if (!inspectionDate && document.documentType === "itp_certificate")
       issues.push({
         field: `inspections.${index}.inspectionDate`,
         code: "unreadable",
@@ -761,7 +763,10 @@ function normalizeInspections(
         field: `inspections.${index}.validUntil`,
         code: "unreadable",
       });
-    if (entry.result === null || entry.result === "unknown")
+    if (
+      document.documentType === "itp_certificate" &&
+      (entry.result === null || entry.result === "unknown")
+    )
       issues.push({ field: `inspections.${index}.result`, code: "unreadable" });
     const rawFields: Record<string, string | null> = {};
     for (const reading of entry.rawFields)

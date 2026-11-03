@@ -1222,6 +1222,7 @@ export function ScooterEditor({
                                     ? [
                                         {
                                           id: draft.id,
+                                          version: draft.version,
                                           fileName: draft.file.name,
                                           extractedData:
                                             entry.analysis.extractedData,

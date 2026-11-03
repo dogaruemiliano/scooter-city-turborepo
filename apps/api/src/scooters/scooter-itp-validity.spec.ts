@@ -58,6 +58,7 @@ function setup(rows: object[] = [reading]) {
   };
   return {
     tx,
+    document,
     run: (
       date: string | null | undefined = undefined,
       documentsChanged = true,
@@ -77,6 +78,103 @@ it("extracts only the validity date and preserves its document source", async ()
   await run();
   expect(tx.scooterItpInspection.create).toHaveBeenCalledWith({
     data: expectedData(),
+  });
+});
+
+function pairedSetup(cardDate: string | null = "2028-09-14") {
+  const state = setup([
+    {
+      ...reading,
+      inspectionDate: "2026-09-14",
+      validUntil: null,
+      certificateNumber: "B0123ABC45 / DD12345",
+    },
+  ]);
+  const card = structuredClone(state.document);
+  card.id = "card";
+  card.type = "itp_card";
+  card.extractedData.documents[0].documentType = "itp_card";
+  card.extractedData.documents[0].inspections = [
+    {
+      ...reading,
+      inspectionDate: null,
+      validUntil: cardDate,
+      result: null,
+      certificateNumber: "B0123 ABC45",
+    },
+  ];
+  state.tx.scooterDocument.findMany.mockResolvedValue([state.document, card]);
+  return { ...state, card };
+}
+
+it("saves the certificate result with the yellow card's expiry and links both originals", async () => {
+  const { tx, run } = pairedSetup();
+  await run();
+  expect(tx.scooterItpInspection.create).toHaveBeenCalledWith({
+    data: {
+      ...expectedData(),
+      validUntil: new Date("2028-09-14"),
+      inspectionDate: new Date("2026-09-14"),
+      cardDocumentId: "card",
+    },
+  });
+});
+
+it("records a manually corrected unreadable expiry separately and keeps both document links", async () => {
+  const { tx, run, document } = pairedSetup(null);
+  await run("2028-09-14");
+  expect(tx.scooterItpInspection.create).toHaveBeenCalledWith({
+    data: {
+      ...expectedData(),
+      source: "manual",
+      validUntil: new Date("2028-09-14"),
+      inspectionDate: new Date("2026-09-14"),
+      cardDocumentId: "card",
+    },
+  });
+  expect(
+    (
+      document.extractedData.documents[0].inspections[0] as {
+        validUntil: string | null;
+      }
+    ).validUntil,
+  ).toBeNull();
+});
+
+it("does not automatically choose a contradictory expiry printed on the certificate", async () => {
+  const { tx, run, document } = pairedSetup();
+  (
+    document.extractedData.documents[0].inspections[0] as {
+      validUntil: string | null;
+    }
+  ).validUntil = "2027-09-14";
+  await run();
+  expect(tx.scooterItpInspection.create).not.toHaveBeenCalled();
+});
+it("keeps both source links for manual recovery even when the card has no readable rows", async () => {
+  const { tx, run, card } = pairedSetup(null);
+  card.extractedData.documents[0].inspections = [];
+  await run("2028-09-14");
+  expect(tx.scooterItpInspection.create).toHaveBeenCalledWith({
+    data: expect.objectContaining({
+      source: "manual",
+      result: "passed",
+      cardDocumentId: "card",
+      certificateDocumentId: "certificate",
+    }) as unknown,
+  });
+});
+
+it("never marks a lone yellow-card expiry as a passed inspection", async () => {
+  const { tx, run, card } = pairedSetup();
+  tx.scooterDocument.findMany.mockResolvedValue([card]);
+  await run();
+  expect(tx.scooterItpInspection.create).toHaveBeenCalledWith({
+    data: expect.objectContaining({
+      result: "unknown",
+      cardDocumentId: "card",
+      certificateDocumentId: null,
+    }) as unknown,
   });
 });
 it("keeps an existing manual date until an explicit replacement is saved", async () => {
@@ -175,6 +273,19 @@ it("requires review when a date-only edit would override a known failure", async
     validUntil: null,
   });
   await run("2028-08-21");
+  expect(tx.scooterItpInspection.create).toHaveBeenCalledWith({
+    data: expect.objectContaining({ result: "unknown" }) as unknown,
+  });
+});
+it("does not let a manual expiry correction reuse an older pass after a known failed inspection", async () => {
+  const { tx, run } = pairedSetup(null);
+  tx.scooterItpInspection.findFirst.mockResolvedValue({
+    source: "document",
+    result: "failed",
+    validUntil: null,
+    inspectionDate: new Date("2026-10-01"),
+  });
+  await run("2028-09-14");
   expect(tx.scooterItpInspection.create).toHaveBeenCalledWith({
     data: expect.objectContaining({ result: "unknown" }) as unknown,
   });

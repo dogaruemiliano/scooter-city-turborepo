@@ -743,3 +743,46 @@ it("fills attached ITP slots even when validity is unknown, including logical do
   for (const ghost of itpGhosts) expect(ghost).toHaveTextContent("For client");
   expect(screen.getAllByText("Check validity")).toHaveLength(2);
 });
+
+it.each([false, true])(
+  "clears both ITP warning badges after matching or manually correcting the expiry (manual: %s)",
+  (manual) => {
+    const attached = (["itp_certificate", "itp_card"] as const).map((type) => ({
+      ...existing,
+      id: type,
+      type,
+      fileName: `${type}.pdf`,
+      ...(manual ? { validFrom: "2026-09-14", validUntil: "2028-09-14" } : {}),
+      extractedData: {
+        vin: null,
+        fields: {},
+        rawFields: {},
+        documents: [
+          {
+            id: "logical",
+            documentType: type,
+            pages: [1],
+            vin: null,
+            fields: {},
+            rawFields: {},
+            inspections: [
+              {
+                inspectionDate:
+                  type === "itp_certificate" ? "2026-09-14" : null,
+                validUntil:
+                  !manual && type === "itp_card" ? "2028-09-14" : null,
+                result: type === "itp_certificate" ? ("passed" as const) : null,
+                certificateNumber: "B0123ABC45",
+                odometerKm: null,
+                rawFields: {},
+              },
+            ],
+          },
+        ],
+      },
+    }));
+    render(view({ attached, editing: true, itpValidUntil: "2028-09-14" }));
+    expect(screen.queryByText("Check validity")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("listitem").length).toBeGreaterThanOrEqual(2);
+  },
+);
