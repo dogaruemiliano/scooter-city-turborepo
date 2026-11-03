@@ -1,152 +1,100 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useTranslations } from "next-intl";
 import { v1 } from "@repo/api-shared";
 import { PageLayout } from "@repo/ui/components/page-layout";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@repo/ui/components/tabs";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@repo/ui/components/select";
-import { Switch } from "@repo/ui/components/switch";
-import { Label } from "@repo/ui/components/label";
 import { Button } from "@repo/ui/components/button";
-import {
-  SaveButton,
-  type SaveButtonState,
-} from "@repo/ui/components/save-button";
-import { ListEmpty, ListItems } from "@repo/ui/components/list";
+import { ArrowUpIcon } from "lucide-react";
 import { webApi } from "@/lib/api";
-import { canAccess } from "@/lib/access";
 import { useSession } from "@/components/auth/SessionProvider";
 import { useRemote } from "@/components/WorkspaceForm";
+import { usePageRefresh } from "@/components/PageRefresh";
+import { InfiniteListFooter } from "@/components/InfiniteListFooter";
 import { useActivityNotifications } from "@/components/notifications/ActivityNotificationsProvider";
-import { NotificationItem } from "@/components/notifications/NotificationItem";
-import { NotificationSettings } from "./NotificationSettings";
+import {
+  NotificationTimeline,
+  NotificationsEmpty,
+  NotificationsLoading,
+} from "@/components/notifications/NotificationTimeline";
+import {
+  notificationsAfterVisit,
+  useNotificationsVisit,
+} from "./useNotificationsVisit";
+import { useNotificationHistory } from "./useNotificationHistory";
 
-type Tab = "inbox" | "activity" | "settings";
-
-export function NotificationsWorkspace({
-  initialTab = "inbox",
-  openId,
-}: {
-  initialTab?: Tab;
-  openId?: string;
-}) {
+export function NotificationsWorkspace({ openId }: { openId?: string }) {
   const t = useTranslations("notifications");
   const { user } = useSession();
-  const canReadActivity = canAccess(user, "notifications.activity.read");
-  const [tab, setTab] = useState<Tab>(
-    initialTab === "activity" && !canReadActivity ? "inbox" : initialTab,
-  );
-  const [category, setCategory] = useState<
-    v1.notifications.NotificationCategory | "all"
-  >("all");
-  const [unreadOnly, setUnreadOnly] = useState(false);
+  const { pageRef, restored, ready, rememberList, onClickCapture } =
+    useNotificationHistory(user?.id ?? "", user?.accessRevision ?? 0);
+  const visit = useNotificationsVisit();
   return (
-    <PageLayout>
-      <div className="flex flex-col gap-6">
-        <h1 className="text-2xl font-semibold">{t("title")}</h1>
-        <Tabs value={tab} onValueChange={(value) => setTab(value as Tab)}>
-          <TabsList variant="line">
-            <TabsTrigger value="inbox">{t("inbox")}</TabsTrigger>
-            {canReadActivity ? (
-              <TabsTrigger value="activity">{t("activity")}</TabsTrigger>
-            ) : null}
-            <TabsTrigger value="settings">{t("settings")}</TabsTrigger>
-          </TabsList>
-          <TabsContent value="settings" className="pt-4">
-            <NotificationSettings />
-          </TabsContent>
-          {(["inbox", ...(canReadActivity ? ["activity"] : [])] as const).map(
-            (mode) => (
-              <TabsContent value={mode} key={mode} className="pt-4">
-                <div className="flex flex-col gap-4">
-                  <div className="flex flex-wrap items-end justify-between gap-4">
-                    <div className="flex min-w-0 flex-col gap-2">
-                      <Label htmlFor={`notifications-category-${mode}`}>
-                        {t("category")}
-                      </Label>
-                      <Select
-                        value={category}
-                        onValueChange={(value) =>
-                          setCategory(value as typeof category)
-                        }
-                      >
-                        <SelectTrigger id={`notifications-category-${mode}`}>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">
-                            {t("allCategories")}
-                          </SelectItem>
-                          {v1.notifications.NOTIFICATION_CATEGORIES.map(
-                            (value) => (
-                              <SelectItem key={value} value={value}>
-                                {t(`categories.${value}`)}
-                              </SelectItem>
-                            ),
-                          )}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    {mode === "inbox" ? (
-                      <Label htmlFor="notifications-unread-only">
-                        <Switch
-                          id="notifications-unread-only"
-                          checked={unreadOnly}
-                          onCheckedChange={setUnreadOnly}
-                        />
-                        {t("unread")}
-                      </Label>
-                    ) : null}
-                  </div>
-                  <NotificationFeed
-                    key={`${mode}:${category}:${unreadOnly}`}
-                    activity={mode === "activity"}
-                    category={category}
-                    unreadOnly={unreadOnly}
-                    openId={mode === "inbox" ? openId : undefined}
-                  />
-                </div>
-              </TabsContent>
-            ),
-          )}
-        </Tabs>
-      </div>
+    <PageLayout width="form" ref={pageRef} onClickCapture={onClickCapture}>
+      {visit.error ? (
+        <div
+          role="alert"
+          className="flex flex-wrap items-center gap-3 text-sm text-destructive"
+        >
+          <p>{t("seenError")}</p>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={visit.pending}
+            onClick={() => void visit.retry()}
+          >
+            {t("retrySeen")}
+          </Button>
+        </div>
+      ) : null}
+      {ready ? (
+        <NotificationFeed
+          openId={openId}
+          initialList={restored?.list}
+          seenCutoff={visit.seenCutoff}
+          onSnapshot={rememberList}
+        />
+      ) : (
+        <NotificationsLoading />
+      )}
     </PageLayout>
   );
 }
 
 function NotificationFeed({
-  activity,
-  category,
-  unreadOnly,
   openId,
+  initialList,
+  seenCutoff,
+  onSnapshot,
 }: {
-  activity: boolean;
-  category: v1.notifications.NotificationCategory | "all";
-  unreadOnly: boolean;
   openId?: string;
+  initialList?: v1.notifications.NotificationList;
+  seenCutoff: string | null;
+  onSnapshot: (list: v1.notifications.NotificationList) => void;
 }) {
   const t = useTranslations("notifications");
+  const shared = useTranslations("shared");
   const context = useActivityNotifications();
   const [mutationError, setMutationError] = useState(false);
   const [morePending, setMorePending] = useState(false);
+  const [moreError, setMoreError] = useState<string | null>(null);
   const [readPending, setReadPending] = useState<string | null>(null);
-  const [allReadState, setAllReadState] = useState<SaveButtonState>("idle");
   const runningRead = useRef(new Set<string>());
-  const allReadRunning = useRef(false);
   const moreRunning = useRef(false);
+  const feedRef = useRef<HTMLDivElement>(null);
+  const syncing = useRef(false);
+  const requestVersion = useRef(0);
+  const restoredList = useRef(initialList);
+  const [incoming, setIncoming] =
+    useState<v1.notifications.NotificationList | null>(null);
+  const [enteringIds, setEnteringIds] = useState<string[]>([]);
   const alive = useRef(true);
   useEffect(() => {
     alive.current = true;
@@ -154,20 +102,16 @@ function NotificationFeed({
       alive.current = false;
     };
   }, []);
-  const endpoint = activity
-    ? v1.notifications.ROUTES.activity
-    : v1.notifications.ROUTES.list;
-  const query = new URLSearchParams({ limit: "30" });
-  if (category !== "all") query.set("category", category);
-  if (!activity && unreadOnly) query.set("unreadOnly", "true");
-  const basePath = `${endpoint}?${query}`;
+  const basePath = `${v1.notifications.ROUTES.list}?limit=30`;
   const load = useCallback(async () => {
+    requestVersion.current += 1;
+    if (restoredList.current) return restoredList.current;
     const list = await webApi.fetch(
       basePath,
       v1.notifications.notificationListSchema,
       { cache: "no-store" },
     );
-    if (!openId || activity) return list;
+    if (!openId) return list;
     try {
       const selected = await webApi.fetch(
         v1.notifications.ROUTES.detail(openId),
@@ -191,13 +135,122 @@ function NotificationFeed({
       // An old push may refer to a record the recipient can no longer access.
       return list;
     }
-  }, [basePath, openId, activity]);
+  }, [basePath, openId]);
   const remote = useRemote(load);
+  const displayList = useMemo(
+    () =>
+      remote.data ? notificationsAfterVisit(remote.data, seenCutoff) : null,
+    [remote.data, seenCutoff],
+  );
+  useLayoutEffect(() => {
+    if (displayList) onSnapshot(displayList);
+  }, [displayList, onSnapshot]);
   const reload = remote.reload;
+  const refreshFeed = () => {
+    restoredList.current = undefined;
+    requestVersion.current += 1;
+    moreRunning.current = false;
+    setMorePending(false);
+    setMoreError(null);
+    setIncoming(null);
+    reload();
+  };
+  const refreshDisabled = morePending || readPending !== null;
+  usePageRefresh(refreshFeed, {
+    refreshing: remote.loading,
+    disabled: refreshDisabled,
+  });
+  const setData = remote.setData;
+  const snapshotRef = useRef(remote.data);
   useEffect(() => {
-    window.addEventListener("notifications-updated", reload);
-    return () => window.removeEventListener("notifications-updated", reload);
-  }, [reload]);
+    snapshotRef.current = remote.data;
+  }, [remote.data]);
+  useEffect(() => {
+    const controller = new AbortController();
+    const sync = async () => {
+      if (syncing.current || !snapshotRef.current) return;
+      syncing.current = true;
+      const version = requestVersion.current;
+      try {
+        const next = await webApi.fetch(
+          basePath,
+          v1.notifications.notificationListSchema,
+          { cache: "no-store", signal: controller.signal },
+        );
+        if (controller.signal.aborted || version !== requestVersion.current)
+          return;
+        const current = snapshotRef.current;
+        if (!current) return;
+        const known = new Set(current.items.map((item) => item.id));
+        const additions = next.items.filter(
+          (item) => !known.has(item.id) && item.createdAt >= current.cutoff,
+        );
+        const readerAway =
+          (feedRef.current?.getBoundingClientRect().top ?? 0) < 0 ||
+          !!feedRef.current?.contains(document.activeElement);
+        if (additions.length && readerAway) {
+          setIncoming(next);
+          return;
+        }
+        if (additions.length) {
+          setEnteringIds(additions.map((item) => item.id));
+          setData(next);
+        } else {
+          // Replace the authoritative first page (including source-access removals),
+          // retaining already-loaded older pages when no new rows are inserted.
+          const nextIds = new Set(next.items.map((item) => item.id));
+          setData((previous) =>
+            previous
+              ? {
+                  ...previous,
+                  unreadCount: next.unreadCount,
+                  cutoff: next.cutoff,
+                  nextCursor:
+                    previous.items.length > 30
+                      ? previous.nextCursor
+                      : next.nextCursor,
+                  items: [
+                    ...next.items,
+                    ...previous.items
+                      .slice(30)
+                      .filter((item) => !nextIds.has(item.id)),
+                  ],
+                }
+              : next,
+          );
+        }
+        setIncoming(null);
+      } catch {
+        /* The next provider update or pull-to-refresh can recover without replacing the feed. */
+      } finally {
+        syncing.current = false;
+      }
+    };
+    window.addEventListener("notifications-updated", sync);
+    return () => {
+      controller.abort();
+      window.removeEventListener("notifications-updated", sync);
+    };
+  }, [basePath, setData]);
+
+  const incomingCount =
+    incoming?.items.filter(
+      (item) =>
+        !remote.data?.items.some((current) => current.id === item.id) &&
+        item.createdAt >= (remote.data?.cutoff ?? ""),
+    ).length ?? 0;
+  function showIncoming() {
+    if (!incoming) return;
+    const known = new Set(remote.data?.items.map((item) => item.id));
+    setEnteringIds(
+      incoming.items
+        .filter((item) => !known.has(item.id))
+        .map((item) => item.id),
+    );
+    remote.setData(incoming);
+    setIncoming(null);
+    feedRef.current?.scrollIntoView({ block: "start", behavior: "instant" });
+  }
 
   async function markRead(id: string) {
     if (runningRead.current.has(id)) return;
@@ -217,15 +270,25 @@ function NotificationFeed({
           ? {
               ...current,
               unreadCount: Math.max(0, current.unreadCount - 1),
-              items: unreadOnly
-                ? current.items.filter((item) => item.id !== id)
-                : current.items.map((item) =>
-                    item.id === id
-                      ? { ...item, readAt: new Date().toISOString() }
-                      : item,
-                  ),
+              items: current.items.map((item) =>
+                item.id === id
+                  ? { ...item, readAt: new Date().toISOString() }
+                  : item,
+              ),
             }
           : current,
+      );
+      setIncoming((current) =>
+        current
+          ? {
+              ...current,
+              items: current.items.map((item) =>
+                item.id === id
+                  ? { ...item, readAt: new Date().toISOString() }
+                  : item,
+              ),
+            }
+          : null,
       );
       setMutationError(false);
       if (!context)
@@ -239,47 +302,23 @@ function NotificationFeed({
     }
   }
 
-  async function markAllRead() {
-    if (allReadRunning.current || !remote.data) return;
-    allReadRunning.current = true;
-    setAllReadState("pending");
-    try {
-      if (context) await context.markAllRead(remote.data.cutoff);
-      else
-        await webApi.fetch(
-          v1.notifications.ROUTES.readAll,
-          v1.notifications.notificationMutationResultSchema,
-          { method: "POST", json: { cutoff: remote.data.cutoff } },
-        );
-      if (!alive.current) return;
-      setAllReadState("success");
-      setMutationError(false);
-      reload();
-      if (!context)
-        window.dispatchEvent(new CustomEvent("notifications-updated"));
-    } catch {
-      if (alive.current) {
-        setMutationError(true);
-        setAllReadState("error");
-      }
-    } finally {
-      allReadRunning.current = false;
-    }
-  }
-
-  async function loadMore() {
-    if (moreRunning.current || !remote.data?.nextCursor) return;
+  const nextCursor = remote.data?.nextCursor;
+  const loading = remote.loading;
+  const loadMore = useCallback(async () => {
+    if (moreRunning.current || loading || !nextCursor) return;
+    const version = requestVersion.current;
     moreRunning.current = true;
     setMorePending(true);
+    setMoreError(null);
     try {
       const next = await webApi.fetch(
-        `${basePath}&cursor=${encodeURIComponent(remote.data.nextCursor)}`,
+        `${basePath}&cursor=${encodeURIComponent(nextCursor)}`,
         v1.notifications.notificationListSchema,
         { cache: "no-store" },
       );
-      if (!alive.current) return;
-      remote.setData((current) =>
-        current
+      if (!alive.current || version !== requestVersion.current) return;
+      setData((current) =>
+        current && current.nextCursor === nextCursor
           ? {
               ...next,
               cutoff: current.cutoff,
@@ -291,83 +330,73 @@ function NotificationFeed({
                 ),
               ],
             }
-          : next,
+          : current,
       );
-      setMutationError(false);
     } catch {
-      if (alive.current) setMutationError(true);
+      if (alive.current && version === requestVersion.current)
+        setMoreError(t("loadMoreError"));
     } finally {
-      moreRunning.current = false;
-      if (alive.current) setMorePending(false);
+      if (alive.current && version === requestVersion.current) {
+        moreRunning.current = false;
+        setMorePending(false);
+      }
     }
-  }
+  }, [basePath, nextCursor, loading, setData, t]);
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={remote.loading}
-          onClick={() => {
-            setAllReadState("idle");
-            reload();
-          }}
+    <div ref={feedRef} className="flex min-w-0 flex-col gap-4">
+      {incomingCount ? (
+        <div
+          className="sticky top-4 z-sticky flex justify-center"
+          role="status"
         >
-          {t("refresh")}
-        </Button>
-        {!activity ? (
-          <SaveButton
+          <Button
             type="button"
             size="sm"
-            variant="outline"
-            state={allReadState}
-            disabled={!remote.data?.unreadCount || remote.loading}
-            onClick={() => void markAllRead()}
-            idleLabel={t("markAllRead")}
-            pendingLabel={t("markingRead")}
-            successLabel={t("markedRead")}
-          />
-        ) : null}
-      </div>
+            onClick={showIncoming}
+            aria-label={t("showNew")}
+          >
+            <ArrowUpIcon aria-hidden="true" />
+            {t("newNotifications", { count: incomingCount })}
+          </Button>
+        </div>
+      ) : null}
       {remote.error || mutationError ? (
-        <p role="alert" className="text-sm text-destructive">
-          {t(remote.error ? "error" : "mutationError")}
-        </p>
-      ) : null}
-      {remote.loading && !remote.data ? (
-        <p role="status" className="text-sm text-muted-foreground">
-          {t("loading")}
-        </p>
-      ) : null}
-      {remote.data ? (
-        <ListItems
-          items={remote.data.items}
-          getItemKey={(item) => item.id}
-          empty={
-            <ListEmpty>{t(activity ? "emptyActivity" : "empty")}</ListEmpty>
-          }
-          renderItem={(item) => (
-            <NotificationItem
-              item={item}
-              activity={activity}
-              pending={readPending === item.id}
-              onRead={markRead}
-            />
-          )}
-        />
-      ) : null}
-      {remote.data?.nextCursor ? (
-        <Button
-          type="button"
-          variant="outline"
-          disabled={morePending}
-          onClick={() => void loadMore()}
+        <div
+          role="alert"
+          className="flex flex-wrap items-center gap-3 text-sm text-destructive"
         >
-          {t(morePending ? "loadingMore" : "loadMore")}
-        </Button>
+          <p>{t(remote.error ? "error" : "mutationError")}</p>
+          {remote.error ? (
+            <Button
+              type="button"
+              variant="outline"
+              disabled={remote.loading || refreshDisabled}
+              onClick={refreshFeed}
+            >
+              {shared("actions.retry")}
+            </Button>
+          ) : null}
+        </div>
       ) : null}
+      {remote.loading && !remote.data ? <NotificationsLoading /> : null}
+      {displayList ? (
+        displayList.items.length ? (
+          <NotificationTimeline
+            items={displayList.items}
+            enteringIds={enteringIds}
+            onRead={markRead}
+          />
+        ) : (
+          <NotificationsEmpty />
+        )
+      ) : null}
+      <InfiniteListFooter
+        hasMore={Boolean(nextCursor)}
+        loading={morePending || remote.loading}
+        error={moreError}
+        onLoadMore={loadMore}
+      />
     </div>
   );
 }

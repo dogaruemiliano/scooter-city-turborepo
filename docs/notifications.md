@@ -27,7 +27,7 @@ Email and native mobile delivery remain future integrations.
    to be renewed. The API exposes only the public key to authenticated clients.
 
 4. Serve the web app over HTTPS, with `/notifications-sw.js` available at the
-   origin root. Enable push through **Notifications → Notification settings**.
+   origin root. Enable push through **Account settings → Notification settings**.
    On iPhone/iPad, use the installed Home Screen web app. Browser permission is
    requested only after the user chooses to enable push.
 
@@ -36,6 +36,34 @@ work, and settings accurately report that external push is unconfigured.
 There is no email fallback when push is unavailable or denied.
 
 ## Delivery behavior
+
+The Notifications screen is one complete feed, without inbox/activity tabs,
+read-state pills, or a category selector. Updates are grouped by local calendar
+day with small dividers: Today, Yesterday, localized weekday names for the last
+week, and `dd.mm` for older days (`dd.mm.yyyy` for previous years). Each date
+retains one divider as cursor pages are appended. Event icons, unread dots and
+tinted rows, and localized relative times remain. Hovering or focusing
+a timestamp reveals its exact date and time. Read cards retain a solid
+card surface and readable main text. Unread rows use an accent surface and dot;
+there are no per-card mark-as-read buttons. The mobile bell opens the complete
+Notifications screen directly. Desktop keeps its preview popover.
+
+Opening Notifications automatically marks all existing inbox entries as seen,
+including older history not loaded yet. The existing bulk-read API receives a
+server snapshot cutoff; the badge and card states change after confirmation.
+Later arrivals remain unread. Failed acknowledgement keeps unread state and
+offers an explicit recovery action. Notification preferences remain in Account
+Settings.
+
+The history loads older cursor pages automatically as the reader scrolls, with a
+load-more fallback and pagination retry. Returning from a notification restores
+the loaded rows and scroll position from the history entry.
+The saved entry is scoped to the signed-in account and its access revision.
+
+New rows animate briefly when the reader is at the top. While reading older
+history or interacting with the feed, new entries wait behind a localized count
+button, preserving the current position. Opening that button reveals the latest
+page. Arrival and count animations respect reduced motion.
 
 Business changes and their safe notification events are written in the same
 database transaction. A Postgres-backed worker creates each recipient's inbox
@@ -49,8 +77,8 @@ pending push for that notification across the user's devices. Without a receipt,
 push becomes eligible after fifteen seconds. Provider/OS delivery can add delay.
 
 Presentation, push-provider acceptance, and reading are separate. Opening a
-notification or explicitly marking it read updates the shared read state.
-Mark-all-read uses the returned cutoff so newer notifications remain unread.
+notification or visiting the complete inbox updates the shared read state.
+The inbox visit uses its server cutoff so newer notifications remain unread.
 An acknowledgement racing an already-dispatched push can produce both alerts;
 the persistent inbox remains authoritative.
 

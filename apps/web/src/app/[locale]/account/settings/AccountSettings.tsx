@@ -2,6 +2,8 @@
 
 import { PageLayout } from "@repo/ui/components/page-layout";
 import { AvatarSettings } from "./_components/AvatarSettings";
+import { NotificationSettings } from "./_components/NotificationSettings";
+import { canAccess } from "@/lib/access";
 import { useWorkspaceNotifications } from "@/components/WorkspaceNotifications";
 import { useFormAction } from "@/lib/form/use-form-action";
 import { SaveButton } from "@repo/ui/components/save-button";
@@ -70,6 +72,7 @@ export function AccountSettings({
   const formAction = useFormAction();
   const notifications = useWorkspaceNotifications();
   const notificationText = useTranslations("shared.notifications");
+  const notificationSettingsText = useTranslations("notifications");
 
   const router = useRouter();
   const pathname = usePathname();
@@ -309,6 +312,23 @@ export function AccountSettings({
           </CardFooter>
         </form>
       </Card>
+
+      {canAccess(user, "notifications.receive") ? (
+        <Card
+          as="section"
+          id="notifications"
+          aria-labelledby="notification-settings-title"
+        >
+          <CardHeader>
+            <CardTitle id="notification-settings-title">
+              {notificationSettingsText("settings")}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <NotificationSettings />
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Card>
         <CardHeader>

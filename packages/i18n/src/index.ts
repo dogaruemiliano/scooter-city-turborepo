@@ -42,5 +42,7 @@ export {
 
 export {
   formatNotificationMessage,
+  formatNotificationMessageParts,
+  type NotificationMessagePart,
   type NotificationMessageInput,
 } from "./notifications";
